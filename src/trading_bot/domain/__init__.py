@@ -10,6 +10,7 @@ from trading_bot.domain.enums import (
 from trading_bot.domain.market import Asset, Bar, Symbol
 from trading_bot.domain.orders import Order, OrderFill, OrderRequest
 from trading_bot.domain.positions import Position
+from trading_bot.domain.proposals import TradeProposal
 
 __all__ = [
     "Asset",
@@ -24,4 +25,5 @@ __all__ = [
     "Position",
     "Symbol",
     "TimeInForce",
+    "TradeProposal",
 ]

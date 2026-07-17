@@ -10,7 +10,9 @@ readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "Proprietary" }
 authors = [{ name = "AI Trading Bot contributors" }]
-dependencies = []
+dependencies = [
+    "tzdata>=2024.1,<2027.0",
+]
 
 [project.optional-dependencies]
 dev = [

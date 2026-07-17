@@ -28,10 +28,23 @@ python -m pip install -e ".[dev]"
 On macOS or Linux, activate the environment with
 `source .venv/bin/activate` instead.
 
+Project commands must run inside the project virtual environment. On Windows,
+either activate it as shown above or invoke its Python interpreter explicitly:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest
+```
+
 ## Run tests
 
 From the repository root:
 
 ```powershell
 python -m pytest
+```
+
+Without an activated environment on Windows, use:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest
 ```

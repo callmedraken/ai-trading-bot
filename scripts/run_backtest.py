@@ -14,6 +14,7 @@ _SOURCE_ROOT = Path(__file__).resolve().parents[1] / "src"
 if str(_SOURCE_ROOT) not in sys.path:
     sys.path.insert(0, str(_SOURCE_ROOT))
 
+from trading_bot.analytics import PerformanceAnalyzer, PerformanceReport  # noqa: E402
 from trading_bot.backtesting import (  # noqa: E402
     BacktestConfig,
     BacktestEngine,
@@ -33,7 +34,7 @@ from trading_bot.strategies import (  # noqa: E402
     MovingAverageCrossoverStrategy,
 )
 
-REPORT_SCHEMA_VERSION = 1
+REPORT_SCHEMA_VERSION = 2
 
 
 def _decimal_argument(value: str) -> Decimal:
@@ -102,7 +103,7 @@ def _derived_run_id(args: argparse.Namespace, symbol: Symbol) -> UUID:
     return uuid5(NAMESPACE_URL, f"offline-backtest:{identity}")
 
 
-def _summary(result: BacktestResult) -> dict[str, Any]:
+def _summary(result: BacktestResult, performance: PerformanceReport) -> dict[str, Any]:
     final_snapshot = result.account_snapshots[-1]
     symbol = result.config.data_request.symbol
     position = result.final_positions.get(symbol)
@@ -134,14 +135,39 @@ def _summary(result: BacktestResult) -> dict[str, Any]:
                 "average_cost": str(position.average_cost),
             }
         ),
+        "total_return": str(performance.total_return),
+        "absolute_profit_loss": str(performance.absolute_profit_loss),
+        "maximum_drawdown_amount": str(performance.maximum_drawdown_amount),
+        "maximum_drawdown_percentage": str(performance.maximum_drawdown_percentage),
+        "closed_trade_count": performance.closed_trade_count,
+        "winning_trade_count": performance.winning_trade_count,
+        "losing_trade_count": performance.losing_trade_count,
+        "breakeven_trade_count": performance.breakeven_trade_count,
+        "win_rate": str(performance.win_rate),
+        "gross_profit": str(performance.gross_profit),
+        "gross_loss": str(performance.gross_loss),
+        "average_winning_trade": str(performance.average_winning_trade),
+        "average_losing_trade": str(performance.average_losing_trade),
+        "profit_factor": (
+            None
+            if performance.profit_factor is None
+            else str(performance.profit_factor)
+        ),
+        "turnover": str(performance.turnover),
+        "average_gross_exposure": str(performance.average_gross_exposure),
+        "maximum_gross_exposure": str(performance.maximum_gross_exposure),
+        "time_in_market_percentage": str(performance.time_in_market_percentage),
     }
 
 
 def build_json_report(
-    result: BacktestResult, strategy_config: MovingAverageCrossoverConfig
+    result: BacktestResult,
+    strategy_config: MovingAverageCrossoverConfig,
+    performance: PerformanceReport | None = None,
 ) -> dict[str, Any]:
     """Build the deliberate versioned public report schema."""
-    summary = _summary(result)
+    performance = performance or PerformanceAnalyzer().analyze(result)
+    summary = _summary(result, performance)
     return {
         "schema_version": REPORT_SCHEMA_VERSION,
         "configuration": {
@@ -224,6 +250,67 @@ def build_json_report(
             }
             for snapshot in result.account_snapshots
         ],
+        "performance": _performance_json(performance),
+    }
+
+
+def _drawdown_json(record: Any) -> dict[str, str]:
+    return {
+        "peak_timestamp": record.peak_timestamp.isoformat(),
+        "trough_timestamp": record.trough_timestamp.isoformat(),
+        "peak_equity": str(record.peak_equity),
+        "trough_equity": str(record.trough_equity),
+        "amount": str(record.amount),
+        "percentage": str(record.percentage),
+    }
+
+
+def _performance_json(performance: PerformanceReport) -> dict[str, Any]:
+    return {
+        "total_return": str(performance.total_return),
+        "absolute_profit_loss": str(performance.absolute_profit_loss),
+        "drawdowns": {
+            "maximum_amount": _drawdown_json(performance.drawdowns.maximum_amount),
+            "maximum_percentage": _drawdown_json(
+                performance.drawdowns.maximum_percentage
+            ),
+        },
+        "trade_statistics": {
+            "closed_trade_count": performance.closed_trade_count,
+            "winning_trade_count": performance.winning_trade_count,
+            "losing_trade_count": performance.losing_trade_count,
+            "breakeven_trade_count": performance.breakeven_trade_count,
+            "win_rate": str(performance.win_rate),
+            "gross_profit": str(performance.gross_profit),
+            "gross_loss": str(performance.gross_loss),
+            "average_winning_trade": str(performance.average_winning_trade),
+            "average_losing_trade": str(performance.average_losing_trade),
+            "profit_factor": (
+                None
+                if performance.profit_factor is None
+                else str(performance.profit_factor)
+            ),
+        },
+        "turnover": str(performance.turnover),
+        "average_gross_exposure": str(performance.average_gross_exposure),
+        "maximum_gross_exposure": str(performance.maximum_gross_exposure),
+        "time_in_market_percentage": str(performance.time_in_market_percentage),
+        "trade_realizations": [
+            {
+                "symbol": str(item.symbol),
+                "quantity": str(item.quantity),
+                "average_entry_cost": str(item.average_entry_cost),
+                "entry_cost_basis": str(item.entry_cost_basis),
+                "exit_price": str(item.exit_price),
+                "gross_proceeds": str(item.gross_proceeds),
+                "exit_commission": str(item.exit_commission),
+                "net_profit_loss": str(item.net_profit_loss),
+                "entry_started_at": item.entry_started_at.isoformat(),
+                "closed_at": item.closed_at.isoformat(),
+                "exit_fill_id": str(item.exit_fill_id),
+            }
+            for item in performance.trade_realizations
+        ],
     }
 
 
@@ -234,6 +321,12 @@ def _print_summary(summary: dict[str, Any]) -> None:
                 "flat"
                 if value is None
                 else f"{value['quantity']} @ {value['average_cost']}"
+            )
+        elif key == "profit_factor" and value is None:
+            rendered = (
+                "undefined (no profit-or-loss activity)"
+                if summary["gross_profit"] == "0" and summary["gross_loss"] == "0"
+                else "undefined (no gross loss)"
             )
         else:
             rendered = value
@@ -283,10 +376,11 @@ def main(argv: list[str] | None = None) -> int:
     except (TypeError, ValueError) as error:
         parser.error(str(error))
 
-    summary = _summary(result)
+    performance = PerformanceAnalyzer().analyze(result)
+    summary = _summary(result, performance)
     _print_summary(summary)
     if args.json_report is not None:
-        report = build_json_report(result, strategy_config)
+        report = build_json_report(result, strategy_config, performance)
         args.json_report.write_text(
             json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
         )

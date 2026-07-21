@@ -58,12 +58,15 @@ equity, realized and unrealized profit and loss, proposal and fill counts,
 approved/resized/rejected risk-decision counts, end-of-data proposal count,
 and final position.
 
-Optional `--json-report PATH` writes report schema version 1. Its deliberate
+Optional `--json-report PATH` writes numeric report schema version 2. Its deliberate
 sections are configuration, summary, final positions, proposals, risk
 decisions, fills, and equity history. Decimal values are strings, timestamps
 are ISO-8601 strings, UUIDs are canonical strings, enums use their values, and
 symbols use normalized ticker strings. Internal engine objects are not
 recursively serialized.
+
+Performance analytics now extend this command and its deliberate numeric JSON
+schema as documented in `09-performance-analytics.md`.
 
 ## Deferred scope
 

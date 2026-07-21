@@ -127,3 +127,53 @@ class PaperFillCreationError(PaperFillGenerationError):
 
 class InconsistentPaperFillBatchResultError(PaperFillGenerationError, ValueError):
     """Raised when generated evaluations or result identity do not reconcile."""
+
+
+class PaperFillApplicationError(Exception):
+    """Base exception for atomic paper-fill application."""
+
+
+class InvalidPaperFillApplicationBatchRequestError(
+    PaperFillApplicationError, ValueError
+):
+    """Raised when a fill-application request is malformed."""
+
+
+class InconsistentPaperFillApplicationSourceError(
+    PaperFillApplicationError, ValueError
+):
+    """Raised when generated fill candidates are structurally inconsistent."""
+
+
+class PaperFillApplicationEngineStateError(PaperFillApplicationError):
+    """Raised when active order-engine state does not match generated fills."""
+
+
+class PaperFillApplicationLedgerStateError(PaperFillApplicationError):
+    """Raised when active ledger state is incompatible with generated fills."""
+
+
+class PaperFillApplicationEventCollisionError(PaperFillApplicationError):
+    """Raised when a deterministic fill-event ID is unavailable."""
+
+
+class PaperFillApplicationEngineCopyError(PaperFillApplicationError):
+    """Raised when the authoritative order engine cannot be copied."""
+
+
+class PaperFillApplicationLedgerCopyError(PaperFillApplicationError):
+    """Raised when the authoritative paper ledger cannot be copied."""
+
+
+class PaperFillEngineApplyError(PaperFillApplicationError):
+    """Raised when the shadow order engine rejects a fill."""
+
+
+class PaperFillLedgerApplyError(PaperFillApplicationError):
+    """Raised when the shadow paper ledger rejects a fill."""
+
+
+class InconsistentPaperFillApplicationResultError(
+    PaperFillApplicationError, ValueError
+):
+    """Raised when applied shadow state or audit output does not reconcile."""

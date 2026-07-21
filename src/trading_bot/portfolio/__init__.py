@@ -5,10 +5,14 @@ from trading_bot.portfolio.exceptions import (
     InvalidOptimizationResultError,
     InvalidPortfolioConstraintsError,
     InvalidPortfolioStateError,
+    InvalidReturnScenarioError,
+    InvalidReturnScenarioSetError,
     InvalidTargetPortfolioError,
     PortfolioConstraintViolationError,
     PortfolioDomainError,
     PortfolioUniverseMismatchError,
+    ScenarioCompatibilityError,
+    ScenarioUniverseMismatchError,
 )
 from trading_bot.portfolio.models import (
     AllocationSource,
@@ -27,6 +31,11 @@ from trading_bot.portfolio.models import (
     TargetPortfolio,
 )
 from trading_bot.portfolio.optimizer import PortfolioOptimizer
+from trading_bot.portfolio.scenarios import (
+    ReturnScenario,
+    ReturnScenarioSet,
+    ScenarioSource,
+)
 
 __all__ = [
     "AllocationSource",
@@ -37,6 +46,8 @@ __all__ = [
     "InvalidPortfolioConstraintsError",
     "InvalidPortfolioStateError",
     "InvalidTargetPortfolioError",
+    "InvalidReturnScenarioError",
+    "InvalidReturnScenarioSetError",
     "MetadataEntry",
     "OptimizationDiagnostic",
     "OptimizationDiagnosticLevel",
@@ -50,6 +61,11 @@ __all__ = [
     "PortfolioPositionState",
     "PortfolioState",
     "PortfolioUniverseMismatchError",
+    "ReturnScenario",
+    "ReturnScenarioSet",
+    "ScenarioCompatibilityError",
+    "ScenarioSource",
+    "ScenarioUniverseMismatchError",
     "TargetAllocation",
     "TargetPortfolio",
 ]

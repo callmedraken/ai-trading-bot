@@ -6,17 +6,31 @@ from trading_bot.execution.exceptions import (
     DuplicateFillError,
     DuplicateOrderError,
     FillMismatchError,
+    InconsistentPortfolioOrderBatchResultError,
+    InconsistentPortfolioOrderSourceError,
     InvalidEventTimeError,
     InvalidOrderTransitionError,
+    InvalidPortfolioOrderBatchRequestError,
     InvalidRiskDecisionError,
     OrderEngineError,
     OrderNotFoundError,
     OverfillError,
+    PortfolioOrderCreationError,
+    PortfolioOrderEngineCopyError,
+    PortfolioOrderOrchestrationError,
 )
 from trading_bot.execution.models import (
     ExecutionInstruction,
     OrderEvent,
     OrderEventType,
+)
+from trading_bot.execution.portfolio_orders import (
+    PortfolioOrderBatchRequest,
+    PortfolioOrderBatchResult,
+    PortfolioOrderBatchStatus,
+    PortfolioOrderDiagnostic,
+    PortfolioOrderDiagnosticCode,
+    PortfolioOrderOrchestrator,
 )
 
 __all__ = [
@@ -25,8 +39,11 @@ __all__ = [
     "DuplicateOrderError",
     "ExecutionInstruction",
     "FillMismatchError",
+    "InconsistentPortfolioOrderBatchResultError",
+    "InconsistentPortfolioOrderSourceError",
     "InvalidEventTimeError",
     "InvalidOrderTransitionError",
+    "InvalidPortfolioOrderBatchRequestError",
     "InvalidRiskDecisionError",
     "OrderEngine",
     "OrderEngineError",
@@ -34,4 +51,13 @@ __all__ = [
     "OrderEventType",
     "OrderNotFoundError",
     "OverfillError",
+    "PortfolioOrderBatchRequest",
+    "PortfolioOrderBatchResult",
+    "PortfolioOrderBatchStatus",
+    "PortfolioOrderCreationError",
+    "PortfolioOrderDiagnostic",
+    "PortfolioOrderDiagnosticCode",
+    "PortfolioOrderEngineCopyError",
+    "PortfolioOrderOrchestrationError",
+    "PortfolioOrderOrchestrator",
 ]

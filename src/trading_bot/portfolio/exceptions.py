@@ -31,3 +31,19 @@ class InvalidOptimizationResultError(PortfolioDomainError, ValueError):
 
 class PortfolioUniverseMismatchError(PortfolioDomainError, ValueError):
     """Raised when two ordered symbol universes do not match exactly."""
+
+
+class InvalidReturnScenarioError(PortfolioDomainError, ValueError):
+    """Raised when one return-scenario row is malformed."""
+
+
+class InvalidReturnScenarioSetError(PortfolioDomainError, ValueError):
+    """Raised when a return-scenario set is malformed or inconsistent."""
+
+
+class ScenarioUniverseMismatchError(PortfolioDomainError, ValueError):
+    """Raised when scenario symbol membership or ordering does not match."""
+
+
+class ScenarioCompatibilityError(PortfolioDomainError, ValueError):
+    """Raised when scenario time or forecast horizon does not match."""

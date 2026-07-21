@@ -103,3 +103,27 @@ class InconsistentPaperSubmissionBatchResultError(
     PaperSubmissionOrchestrationError, ValueError
 ):
     """Raised when submitted shadow state or result output does not reconcile."""
+
+
+class PaperFillGenerationError(Exception):
+    """Base exception for deterministic paper-fill generation."""
+
+
+class InvalidPaperFillBatchRequestError(PaperFillGenerationError, ValueError):
+    """Raised when paper-fill inputs are malformed."""
+
+
+class InconsistentPaperFillSourceError(PaperFillGenerationError, ValueError):
+    """Raised when a submission result is not eligible for fill generation."""
+
+
+class PaperFillIdentityError(PaperFillGenerationError):
+    """Raised when generated fill identities are not unique."""
+
+
+class PaperFillCreationError(PaperFillGenerationError):
+    """Raised when an immutable fill candidate cannot be constructed."""
+
+
+class InconsistentPaperFillBatchResultError(PaperFillGenerationError, ValueError):
+    """Raised when generated evaluations or result identity do not reconcile."""

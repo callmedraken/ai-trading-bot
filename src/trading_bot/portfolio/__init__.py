@@ -1,6 +1,8 @@
 """Public immutable portfolio-domain API."""
 
 from trading_bot.portfolio.exceptions import (
+    InvalidMeanCvarOptimizationRequestError,
+    InvalidMeanCvarOptimizationResultError,
     InvalidOptimizationRequestError,
     InvalidOptimizationResultError,
     InvalidPortfolioConstraintsError,
@@ -13,6 +15,11 @@ from trading_bot.portfolio.exceptions import (
     PortfolioUniverseMismatchError,
     ScenarioCompatibilityError,
     ScenarioUniverseMismatchError,
+)
+from trading_bot.portfolio.mean_cvar import (
+    MeanCvarOptimizationParameters,
+    MeanCvarOptimizationRequest,
+    MeanCvarOptimizationResult,
 )
 from trading_bot.portfolio.models import (
     AllocationSource,
@@ -43,12 +50,17 @@ __all__ = [
     "ForecastHorizon",
     "InvalidOptimizationRequestError",
     "InvalidOptimizationResultError",
+    "InvalidMeanCvarOptimizationRequestError",
+    "InvalidMeanCvarOptimizationResultError",
     "InvalidPortfolioConstraintsError",
     "InvalidPortfolioStateError",
     "InvalidTargetPortfolioError",
     "InvalidReturnScenarioError",
     "InvalidReturnScenarioSetError",
     "MetadataEntry",
+    "MeanCvarOptimizationParameters",
+    "MeanCvarOptimizationRequest",
+    "MeanCvarOptimizationResult",
     "OptimizationDiagnostic",
     "OptimizationDiagnosticLevel",
     "OptimizationStatus",

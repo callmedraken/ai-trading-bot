@@ -47,3 +47,11 @@ class ScenarioUniverseMismatchError(PortfolioDomainError, ValueError):
 
 class ScenarioCompatibilityError(PortfolioDomainError, ValueError):
     """Raised when scenario time or forecast horizon does not match."""
+
+
+class InvalidMeanCvarOptimizationRequestError(PortfolioDomainError, ValueError):
+    """Raised when a specialized Mean-CVaR request is invalid."""
+
+
+class InvalidMeanCvarOptimizationResultError(PortfolioDomainError, ValueError):
+    """Raised when a specialized Mean-CVaR result is inconsistent."""

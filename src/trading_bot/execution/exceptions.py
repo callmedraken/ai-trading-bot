@@ -39,3 +39,33 @@ class OverfillError(OrderEngineError):
 
 class InvalidEventTimeError(OrderEngineError):
     """Raised when lifecycle chronology is inconsistent."""
+
+
+class PortfolioOrderOrchestrationError(Exception):
+    """Base exception for atomic portfolio order construction."""
+
+
+class InvalidPortfolioOrderBatchRequestError(
+    PortfolioOrderOrchestrationError, ValueError
+):
+    """Raised when an order-orchestration request is malformed."""
+
+
+class InconsistentPortfolioOrderSourceError(
+    PortfolioOrderOrchestrationError, ValueError
+):
+    """Raised when a collective-risk source is inconsistent."""
+
+
+class PortfolioOrderEngineCopyError(PortfolioOrderOrchestrationError):
+    """Raised when the authoritative engine cannot be copied safely."""
+
+
+class PortfolioOrderCreationError(PortfolioOrderOrchestrationError):
+    """Raised when shadow-engine order construction fails."""
+
+
+class InconsistentPortfolioOrderBatchResultError(
+    PortfolioOrderOrchestrationError, ValueError
+):
+    """Raised when created orders, events, or result identity do not reconcile."""

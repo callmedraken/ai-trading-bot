@@ -1,0 +1,55 @@
+"""Public immutable portfolio-domain API."""
+
+from trading_bot.portfolio.exceptions import (
+    InvalidOptimizationRequestError,
+    InvalidOptimizationResultError,
+    InvalidPortfolioConstraintsError,
+    InvalidPortfolioStateError,
+    InvalidTargetPortfolioError,
+    PortfolioConstraintViolationError,
+    PortfolioDomainError,
+    PortfolioUniverseMismatchError,
+)
+from trading_bot.portfolio.models import (
+    AllocationSource,
+    ExpectedReturn,
+    ForecastHorizon,
+    MetadataEntry,
+    OptimizationDiagnostic,
+    OptimizationDiagnosticLevel,
+    OptimizationStatus,
+    PortfolioConstraints,
+    PortfolioOptimizationRequest,
+    PortfolioOptimizationResult,
+    PortfolioPositionState,
+    PortfolioState,
+    TargetAllocation,
+    TargetPortfolio,
+)
+from trading_bot.portfolio.optimizer import PortfolioOptimizer
+
+__all__ = [
+    "AllocationSource",
+    "ExpectedReturn",
+    "ForecastHorizon",
+    "InvalidOptimizationRequestError",
+    "InvalidOptimizationResultError",
+    "InvalidPortfolioConstraintsError",
+    "InvalidPortfolioStateError",
+    "InvalidTargetPortfolioError",
+    "MetadataEntry",
+    "OptimizationDiagnostic",
+    "OptimizationDiagnosticLevel",
+    "OptimizationStatus",
+    "PortfolioConstraintViolationError",
+    "PortfolioConstraints",
+    "PortfolioDomainError",
+    "PortfolioOptimizationRequest",
+    "PortfolioOptimizationResult",
+    "PortfolioOptimizer",
+    "PortfolioPositionState",
+    "PortfolioState",
+    "PortfolioUniverseMismatchError",
+    "TargetAllocation",
+    "TargetPortfolio",
+]

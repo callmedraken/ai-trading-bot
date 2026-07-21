@@ -17,12 +17,32 @@ class InvalidHistoricalDataResultError(HistoricalDataValidationError):
     """Raised when a historical-data result violates its request."""
 
 
+class InvalidMultiSymbolHistoricalDataRequestError(HistoricalDataValidationError):
+    """Raised when a multi-symbol request is invalid."""
+
+
+class InvalidMultiSymbolHistoricalDataResultError(HistoricalDataValidationError):
+    """Raised when aligned multi-symbol data violates its request."""
+
+
+class DuplicateRequestedSymbolError(HistoricalDataValidationError):
+    """Raised when a requested universe repeats a symbol."""
+
+
+class EmptyAlignedHistoricalDataError(HistoricalDataValidationError):
+    """Raised when alignment produces no timestamp frames."""
+
+
 class DuplicateBarTimestampError(HistoricalDataValidationError):
     """Raised when more than one bar has the same timestamp."""
 
 
 class HistoricalDataNotFoundError(HistoricalDataError):
     """Raised when a requested local data source does not exist."""
+
+
+class InconsistentProviderResultError(HistoricalDataError):
+    """Raised when a constituent provider returns an inconsistent result."""
 
 
 class UnsupportedTimeframeError(HistoricalDataError):

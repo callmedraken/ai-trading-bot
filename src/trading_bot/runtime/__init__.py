@@ -1,0 +1,51 @@
+"""Public API for deterministic paper portfolio runtime orchestration."""
+
+from trading_bot.runtime.exceptions import (
+    InconsistentPaperPortfolioCycleResultError,
+    InconsistentPaperPortfolioRuntimeStateError,
+    InvalidPaperPortfolioCycleRequestError,
+    PaperPortfolioCycleEngineCopyError,
+    PaperPortfolioCycleLedgerCopyError,
+    PaperPortfolioFillApplicationError,
+    PaperPortfolioFillGenerationError,
+    PaperPortfolioOrderError,
+    PaperPortfolioPlanningError,
+    PaperPortfolioProposalError,
+    PaperPortfolioRiskError,
+    PaperPortfolioRuntimeError,
+    PaperPortfolioSubmissionError,
+)
+from trading_bot.runtime.paper_portfolio import (
+    PaperPortfolioCycleDiagnostic,
+    PaperPortfolioCycleDiagnosticCode,
+    PaperPortfolioCycleInputs,
+    PaperPortfolioCyclePrice,
+    PaperPortfolioCycleRequest,
+    PaperPortfolioCycleResult,
+    PaperPortfolioCycleStatus,
+    PaperPortfolioRuntime,
+)
+
+__all__ = [
+    "InconsistentPaperPortfolioCycleResultError",
+    "InconsistentPaperPortfolioRuntimeStateError",
+    "InvalidPaperPortfolioCycleRequestError",
+    "PaperPortfolioCycleDiagnostic",
+    "PaperPortfolioCycleDiagnosticCode",
+    "PaperPortfolioCycleEngineCopyError",
+    "PaperPortfolioCycleInputs",
+    "PaperPortfolioCycleLedgerCopyError",
+    "PaperPortfolioCyclePrice",
+    "PaperPortfolioCycleRequest",
+    "PaperPortfolioCycleResult",
+    "PaperPortfolioCycleStatus",
+    "PaperPortfolioFillApplicationError",
+    "PaperPortfolioFillGenerationError",
+    "PaperPortfolioOrderError",
+    "PaperPortfolioPlanningError",
+    "PaperPortfolioProposalError",
+    "PaperPortfolioRiskError",
+    "PaperPortfolioRuntime",
+    "PaperPortfolioRuntimeError",
+    "PaperPortfolioSubmissionError",
+]

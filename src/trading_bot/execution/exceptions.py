@@ -69,3 +69,37 @@ class InconsistentPortfolioOrderBatchResultError(
     PortfolioOrderOrchestrationError, ValueError
 ):
     """Raised when created orders, events, or result identity do not reconcile."""
+
+
+class PaperSubmissionOrchestrationError(Exception):
+    """Base exception for deterministic paper-order submission."""
+
+
+class InvalidPaperSubmissionBatchRequestError(
+    PaperSubmissionOrchestrationError, ValueError
+):
+    """Raised when a paper-submission request is malformed."""
+
+
+class InconsistentPaperSubmissionSourceError(
+    PaperSubmissionOrchestrationError, ValueError
+):
+    """Raised when source orders do not match authoritative engine state."""
+
+
+class PaperSubmissionEventCollisionError(PaperSubmissionOrchestrationError):
+    """Raised when a deterministic submitted-event ID is unavailable."""
+
+
+class PaperSubmissionEngineCopyError(PaperSubmissionOrchestrationError):
+    """Raised when the authoritative engine cannot be copied safely."""
+
+
+class PaperOrderSubmissionError(PaperSubmissionOrchestrationError):
+    """Raised when shadow-engine submission fails."""
+
+
+class InconsistentPaperSubmissionBatchResultError(
+    PaperSubmissionOrchestrationError, ValueError
+):
+    """Raised when submitted shadow state or result output does not reconcile."""

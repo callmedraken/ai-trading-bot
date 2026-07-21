@@ -31,3 +31,23 @@ class RebalancePlanningError(RebalanceError):
 
 class InconsistentRebalancePlanError(RebalanceError, ValueError):
     """Raised when immutable plan fields do not reconcile locally."""
+
+
+class RebalanceProposalError(RebalanceError):
+    """Base exception for rebalance-plan proposal conversion."""
+
+
+class InvalidRebalanceProposalRequestError(RebalanceProposalError, ValueError):
+    """Raised when a proposal-conversion request is malformed."""
+
+
+class RebalancePlanNotEligibleError(RebalanceProposalError):
+    """Raised when plan status is not eligible for proposal conversion."""
+
+
+class RebalanceProposalCreationError(RebalanceProposalError):
+    """Raised when a planned trade cannot produce a valid proposal."""
+
+
+class InconsistentRebalanceProposalResultError(RebalanceProposalError, ValueError):
+    """Raised when conversion inputs or output do not reconcile locally."""

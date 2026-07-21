@@ -2,10 +2,15 @@
 
 from trading_bot.rebalancing.exceptions import (
     InconsistentRebalancePlanError,
+    InconsistentRebalanceProposalResultError,
     InvalidRebalanceAssumptionsError,
+    InvalidRebalanceProposalRequestError,
     InvalidRebalanceRequestError,
     RebalanceError,
     RebalancePlanningError,
+    RebalancePlanNotEligibleError,
+    RebalanceProposalCreationError,
+    RebalanceProposalError,
     RebalanceTargetConstraintError,
     RebalanceUniverseMismatchError,
     StaleRebalanceTargetError,
@@ -23,10 +28,21 @@ from trading_bot.rebalancing.models import (
     UnplannedAllocationReason,
 )
 from trading_bot.rebalancing.planner import RebalancePlanner
+from trading_bot.rebalancing.proposals import (
+    RebalanceProposalDiagnostic,
+    RebalanceProposalDiagnosticCode,
+    RebalanceProposalFactory,
+    RebalanceProposalPolicy,
+    RebalanceProposalRequest,
+    RebalanceProposalResult,
+    RebalanceProposalStatus,
+)
 
 __all__ = [
     "InconsistentRebalancePlanError",
+    "InconsistentRebalanceProposalResultError",
     "InvalidRebalanceAssumptionsError",
+    "InvalidRebalanceProposalRequestError",
     "InvalidRebalanceRequestError",
     "PlannedTrade",
     "PlannedTradeSide",
@@ -36,9 +52,19 @@ __all__ = [
     "RebalanceDiagnosticCode",
     "RebalanceError",
     "RebalancePlan",
+    "RebalancePlanNotEligibleError",
     "RebalancePlanner",
     "RebalancePlanningError",
     "RebalancePlanRequest",
+    "RebalanceProposalCreationError",
+    "RebalanceProposalDiagnostic",
+    "RebalanceProposalDiagnosticCode",
+    "RebalanceProposalError",
+    "RebalanceProposalFactory",
+    "RebalanceProposalPolicy",
+    "RebalanceProposalRequest",
+    "RebalanceProposalResult",
+    "RebalanceProposalStatus",
     "RebalanceStatus",
     "RebalanceTargetConstraintError",
     "RebalanceUniverseMismatchError",

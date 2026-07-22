@@ -1,0 +1,107 @@
+{
+  "schema_version": 1,
+  "simulation_request_id": "00000000-0000-0000-0000-000000000001",
+  "initial_ledger": {
+    "initialization_mode": "CASH_ONLY",
+    "as_of": "2026-07-21T19:00:00+00:00",
+    "available_cash": "10000.00",
+    "positions": []
+  },
+  "frames": [
+    {
+      "as_of": "2026-07-21T20:00:00+00:00",
+      "submitted_at": "2026-07-21T20:01:00+00:00",
+      "filled_at": "2026-07-21T20:02:00+00:00",
+      "prices": [
+        {
+          "symbol": "SPY",
+          "risk_price": "500.00",
+          "fill_reference_price": "500.00"
+        },
+        {
+          "symbol": "QQQ",
+          "risk_price": "450.00",
+          "fill_reference_price": "450.00"
+        }
+      ],
+      "expected_returns": [
+        {"symbol": "SPY", "value": "0.02"},
+        {"symbol": "QQQ", "value": "0.01"}
+      ],
+      "scenarios": {
+        "scenario_set_id": "00000000-0000-0000-0000-000000000101",
+        "forecast_horizon": {"periods": 1, "timeframe": "1D"},
+        "symbols": ["SPY", "QQQ"],
+        "rows": [
+          {
+            "scenario_id": "00000000-0000-0000-0000-000000000201",
+            "returns": ["0.05", "0.03"],
+            "probability": "0.50",
+            "metadata": []
+          },
+          {
+            "scenario_id": "00000000-0000-0000-0000-000000000202",
+            "returns": ["-0.02", "-0.01"],
+            "probability": "0.50",
+            "metadata": []
+          }
+        ],
+        "cash_return": "0",
+        "source": "MANUAL",
+        "source_name": null,
+        "metadata": []
+      },
+      "optimization": {
+        "confidence_level": "0.75",
+        "minimum_expected_return": null,
+        "solver_tolerance": "0.00000001",
+        "maximum_iterations": null,
+        "output_quantum": "0.00000001",
+        "risk_aversion": "0"
+      },
+      "portfolio_constraints": {
+        "minimum_cash_weight": "0",
+        "maximum_cash_weight": "1",
+        "maximum_position_weight": "0.60",
+        "maximum_one_way_rebalance_turnover": null,
+        "minimum_position_weight": null,
+        "long_only": true,
+        "allow_leverage": false
+      },
+      "rebalance_assumptions": {
+        "fixed_commission": "0",
+        "allow_fractional_quantities": true,
+        "quantity_increment": "0.001",
+        "minimum_trade_notional": "0",
+        "minimum_trade_quantity": "0",
+        "target_weight_tolerance": "0",
+        "additional_execution_cash_buffer": "0",
+        "use_planned_sell_proceeds": true
+      },
+      "proposal_policy": {"allow_partial_plans": true},
+      "proposal_confidence": null,
+      "risk_limits": {
+        "max_position_percent": "0.60",
+        "max_total_exposure_percent": "1",
+        "max_order_notional": null,
+        "max_new_position_percent": null,
+        "minimum_cash_reserve_percent": "0",
+        "allow_fractional_shares": true,
+        "fractional_increment": "0.001",
+        "allow_buying": true,
+        "allow_selling": true,
+        "estimated_commission": "0"
+      },
+      "risk_policy": {"allow_sell_proceeds_for_later_buys": false},
+      "fill_policy": {
+        "slippage_basis_points": "0",
+        "fixed_commission": "0"
+      },
+      "trading_enabled": true,
+      "metadata": []
+    }
+  ],
+  "metadata": [
+    {"key": "source", "value": "optimized-cli-example"}
+  ]
+}

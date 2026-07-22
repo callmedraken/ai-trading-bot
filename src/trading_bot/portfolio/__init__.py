@@ -1,15 +1,21 @@
 """Public immutable portfolio-domain API."""
 
 from trading_bot.portfolio.exceptions import (
+    InconsistentOptimizedTargetResultError,
+    IneligibleOptimizedTargetError,
     InvalidMeanCvarOptimizationRequestError,
     InvalidMeanCvarOptimizationResultError,
     InvalidOptimizationRequestError,
     InvalidOptimizationResultError,
+    InvalidOptimizedTargetOutputError,
+    InvalidOptimizedTargetRequestError,
     InvalidPortfolioConstraintsError,
     InvalidPortfolioStateError,
     InvalidReturnScenarioError,
     InvalidReturnScenarioSetError,
     InvalidTargetPortfolioError,
+    OptimizedTargetAdapterError,
+    OptimizedTargetStateMismatchError,
     PortfolioConstraintViolationError,
     PortfolioDomainError,
     PortfolioUniverseMismatchError,
@@ -37,6 +43,11 @@ from trading_bot.portfolio.models import (
     TargetAllocation,
     TargetPortfolio,
 )
+from trading_bot.portfolio.optimized_targets import (
+    OptimizedTargetPortfolioFactory,
+    OptimizedTargetRequest,
+    OptimizedTargetResult,
+)
 from trading_bot.portfolio.optimizer import PortfolioOptimizer
 from trading_bot.portfolio.scenarios import (
     ReturnScenario,
@@ -50,6 +61,10 @@ __all__ = [
     "ForecastHorizon",
     "InvalidOptimizationRequestError",
     "InvalidOptimizationResultError",
+    "InconsistentOptimizedTargetResultError",
+    "IneligibleOptimizedTargetError",
+    "InvalidOptimizedTargetOutputError",
+    "InvalidOptimizedTargetRequestError",
     "InvalidMeanCvarOptimizationRequestError",
     "InvalidMeanCvarOptimizationResultError",
     "InvalidPortfolioConstraintsError",
@@ -64,6 +79,11 @@ __all__ = [
     "OptimizationDiagnostic",
     "OptimizationDiagnosticLevel",
     "OptimizationStatus",
+    "OptimizedTargetAdapterError",
+    "OptimizedTargetPortfolioFactory",
+    "OptimizedTargetRequest",
+    "OptimizedTargetResult",
+    "OptimizedTargetStateMismatchError",
     "PortfolioConstraintViolationError",
     "PortfolioConstraints",
     "PortfolioDomainError",

@@ -55,3 +55,27 @@ class InvalidMeanCvarOptimizationRequestError(PortfolioDomainError, ValueError):
 
 class InvalidMeanCvarOptimizationResultError(PortfolioDomainError, ValueError):
     """Raised when a specialized Mean-CVaR result is inconsistent."""
+
+
+class OptimizedTargetAdapterError(PortfolioDomainError):
+    """Base exception for optimizer-target certification failures."""
+
+
+class InvalidOptimizedTargetRequestError(OptimizedTargetAdapterError, ValueError):
+    """Raised when an optimizer-target request is malformed."""
+
+
+class IneligibleOptimizedTargetError(OptimizedTargetAdapterError, ValueError):
+    """Raised when an optimizer result cannot supply a certified target."""
+
+
+class OptimizedTargetStateMismatchError(OptimizedTargetAdapterError, ValueError):
+    """Raised when the intended state differs from optimizer inputs."""
+
+
+class InvalidOptimizedTargetOutputError(OptimizedTargetAdapterError, ValueError):
+    """Raised when an optimizer target fails exact structural reconciliation."""
+
+
+class InconsistentOptimizedTargetResultError(OptimizedTargetAdapterError, ValueError):
+    """Raised when a certified target result is internally inconsistent."""

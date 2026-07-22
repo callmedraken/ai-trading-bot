@@ -1,13 +1,26 @@
 """Public API for deterministic paper portfolio simulations."""
 
 from trading_bot.simulation.exceptions import (
+    InconsistentOptimizedPaperSimulationResultError,
     InconsistentPaperPortfolioSimulationResultError,
+    InvalidOptimizedPaperSimulationFrameError,
+    InvalidOptimizedPaperSimulationRequestError,
     InvalidPaperPortfolioSimulationFrameError,
     InvalidPaperPortfolioSimulationRequestError,
+    OptimizedPaperSimulationCertificationError,
+    OptimizedPaperSimulationError,
+    OptimizedPaperSimulationOptimizationError,
     PaperPortfolioSimulationCycleError,
     PaperPortfolioSimulationError,
     PaperPortfolioSimulationStateDerivationError,
     PaperPortfolioSimulationStateMismatchError,
+)
+from trading_bot.simulation.optimized_paper_portfolio import (
+    OptimizedPaperPortfolioSimulator,
+    OptimizedPaperSimulationEvaluation,
+    OptimizedPaperSimulationFrame,
+    OptimizedPaperSimulationRequest,
+    OptimizedPaperSimulationResult,
 )
 from trading_bot.simulation.paper_portfolio import (
     PaperPortfolioSimulationDiagnostic,
@@ -21,9 +34,20 @@ from trading_bot.simulation.paper_portfolio import (
 )
 
 __all__ = [
+    "InconsistentOptimizedPaperSimulationResultError",
     "InconsistentPaperPortfolioSimulationResultError",
     "InvalidPaperPortfolioSimulationFrameError",
     "InvalidPaperPortfolioSimulationRequestError",
+    "InvalidOptimizedPaperSimulationFrameError",
+    "InvalidOptimizedPaperSimulationRequestError",
+    "OptimizedPaperPortfolioSimulator",
+    "OptimizedPaperSimulationCertificationError",
+    "OptimizedPaperSimulationError",
+    "OptimizedPaperSimulationEvaluation",
+    "OptimizedPaperSimulationFrame",
+    "OptimizedPaperSimulationOptimizationError",
+    "OptimizedPaperSimulationRequest",
+    "OptimizedPaperSimulationResult",
     "PaperPortfolioSimulationCycleError",
     "PaperPortfolioSimulationDiagnostic",
     "PaperPortfolioSimulationDiagnosticCode",

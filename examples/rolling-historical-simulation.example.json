@@ -1,0 +1,95 @@
+{
+  "schema_version": 1,
+  "request_id": "00000000-0000-0000-0000-000000000301",
+  "historical_data": {
+    "symbols": ["SPY", "QQQ"],
+    "sources": [
+      {"symbol": "SPY", "path": "data/rolling-historical/SPY.csv"},
+      {"symbol": "QQQ", "path": "data/rolling-historical/QQQ.csv"}
+    ],
+    "start": "2026-01-05T00:00:00+00:00",
+    "end": "2026-01-10T00:00:00+00:00",
+    "timeframe": "1D",
+    "adjustment": "RAW",
+    "missing_bar_policy": "INTERSECTION",
+    "source_label": "rolling-example-local-csv"
+  },
+  "rebalance_schedule": [
+    "2026-01-07T20:00:00+00:00",
+    "2026-01-09T20:00:00+00:00"
+  ],
+  "rolling_window": {"observation_count": 3},
+  "scenario": {
+    "price_field": "CLOSE",
+    "return_method": "SIMPLE",
+    "window_policy": "ALL_SUPPLIED",
+    "cash_return": "0",
+    "source_name": "rolling-example-local-csv"
+  },
+  "execution_prices": {
+    "risk_price_field": "CLOSE",
+    "fill_reference_price_field": "CLOSE"
+  },
+  "timing": {
+    "submission_offset_microseconds": 60000000,
+    "fill_offset_microseconds": 120000000
+  },
+  "initial_state": {
+    "initialization_mode": "CASH_ONLY",
+    "as_of": "2026-01-05T19:00:00+00:00",
+    "available_cash": "10000",
+    "positions": []
+  },
+  "optimization": {
+    "confidence_level": "0.75",
+    "minimum_expected_return": null,
+    "solver_tolerance": "0.00000001",
+    "maximum_iterations": null,
+    "output_quantum": "0.00000001",
+    "risk_aversion": "1"
+  },
+  "portfolio_constraints": {
+    "minimum_cash_weight": "0",
+    "maximum_cash_weight": "1",
+    "maximum_position_weight": "0.60",
+    "maximum_one_way_rebalance_turnover": null,
+    "minimum_position_weight": null,
+    "long_only": true,
+    "allow_leverage": false
+  },
+  "rebalance": {
+    "assumptions": {
+      "fixed_commission": "0",
+      "allow_fractional_quantities": true,
+      "quantity_increment": "0.001",
+      "minimum_trade_notional": "0",
+      "minimum_trade_quantity": "0",
+      "target_weight_tolerance": "0",
+      "additional_execution_cash_buffer": "0",
+      "use_planned_sell_proceeds": true
+    },
+    "proposal_policy": {"allow_partial_plans": true},
+    "proposal_confidence": null
+  },
+  "risk": {
+    "limits": {
+      "max_position_percent": "0.60",
+      "max_total_exposure_percent": "1",
+      "max_order_notional": null,
+      "max_new_position_percent": null,
+      "minimum_cash_reserve_percent": "0",
+      "allow_fractional_shares": true,
+      "fractional_increment": "0.001",
+      "allow_buying": true,
+      "allow_selling": true,
+      "estimated_commission": "0"
+    },
+    "policy": {"allow_sell_proceeds_for_later_buys": false}
+  },
+  "fills": {
+    "slippage_basis_points": "0",
+    "fixed_commission": "0"
+  },
+  "trading_enabled": true,
+  "metadata": [{"key": "example", "value": "rolling-historical"}]
+}

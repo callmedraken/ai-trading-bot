@@ -37,7 +37,7 @@ def build_rolling_audit(
     return {
         "schema_version": ROLLING_AUDIT_SCHEMA_VERSION,
         "configuration": _configuration(config),
-        "historical_data": _historical_data(
+        "historical_data": build_historical_data_section(
             config.historical_data.source_label, historical
         ),
         "initial_state": {
@@ -54,30 +54,12 @@ def build_rolling_audit(
                 for item in bootstrap_fills
             ],
         },
-        "rolling": {
-            "request": _rolling_request(result),
-            "result": {
-                "result_id": str(result.result_id),
-                "frame_generations": [
-                    _frame_generation(item) for item in result.frame_generations
-                ],
-                "optimized_simulation": build_optimized_simulation_section(
-                    config.initial_state,
-                    result.optimized_result,
-                    ledger,
-                    bootstrap_fills,
-                ),
-                "performance": build_optimized_performance_section(
-                    result.performance_result
-                ),
-                "state_ids": {
-                    "initial_engine": str(result.initial_engine_state_id),
-                    "initial_ledger": str(result.initial_ledger_state_id),
-                    "final_engine": str(result.final_engine_state_id),
-                    "final_ledger": str(result.final_ledger_state_id),
-                },
-            },
-        },
+        "rolling": build_rolling_result_section(
+            config.initial_state,
+            result,
+            ledger,
+            bootstrap_fills,
+        ),
     }
 
 
@@ -183,9 +165,10 @@ def _configuration(config: LoadedRollingHistoricalConfig) -> dict[str, Any]:
     }
 
 
-def _historical_data(
+def build_historical_data_section(
     source_label: str, historical: MultiSymbolHistoricalDataResult
 ) -> dict[str, Any]:
+    """Serialize shared loaded history without CLI configuration or paths."""
     request = historical.request
     return {
         "provider_name": historical.provider_name,
@@ -224,6 +207,39 @@ def _historical_data(
             }
             for frame in historical.frames
         ],
+    }
+
+
+def build_rolling_result_section(
+    initial_state,
+    result: RollingHistoricalSimulationResult,
+    ledger: PaperLedger,
+    bootstrap_fills: tuple[OrderFill, ...],
+) -> dict[str, Any]:
+    """Serialize one rolling domain request/result without its CLI root wrapper."""
+    return {
+        "request": _rolling_request(result),
+        "result": {
+            "result_id": str(result.result_id),
+            "frame_generations": [
+                _frame_generation(item) for item in result.frame_generations
+            ],
+            "optimized_simulation": build_optimized_simulation_section(
+                initial_state,
+                result.optimized_result,
+                ledger,
+                bootstrap_fills,
+            ),
+            "performance": build_optimized_performance_section(
+                result.performance_result
+            ),
+            "state_ids": {
+                "initial_engine": str(result.initial_engine_state_id),
+                "initial_ledger": str(result.initial_ledger_state_id),
+                "final_engine": str(result.final_engine_state_id),
+                "final_ledger": str(result.final_ledger_state_id),
+            },
+        },
     }
 
 

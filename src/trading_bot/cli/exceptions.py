@@ -80,3 +80,23 @@ class RollingExecutionCliError(RollingHistoricalCliError):
 
 class RollingAuditOutputError(RollingHistoricalCliError):
     """Raised when the complete rolling audit cannot be constructed."""
+
+
+class HistoricalExperimentCliError(Exception):
+    """Base exception for expected historical-experiment CLI failures."""
+
+
+class HistoricalExperimentDataError(HistoricalExperimentCliError):
+    """Raised when configured local historical data cannot be loaded."""
+
+
+class HistoricalExperimentInitializationCliError(HistoricalExperimentCliError):
+    """Raised when one fresh experiment simulator cannot be initialized."""
+
+
+class HistoricalExperimentExecutionCliError(HistoricalExperimentCliError):
+    """Raised when experiment execution, isolation, or reconciliation fails."""
+
+
+class HistoricalExperimentAuditError(HistoricalExperimentCliError):
+    """Raised when experiment audit construction or reconciliation fails."""

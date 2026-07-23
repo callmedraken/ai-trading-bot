@@ -41,36 +41,61 @@ def initialize_ledger(
     request_id: UUID, initial: InitialLedgerConfig
 ) -> tuple[PaperLedger, tuple[OrderFill, ...]]:
     """Create a ledger, applying deterministic zero-commission bootstrap fills."""
-    if initial.initialization_mode is InitializationMode.CASH_ONLY:
-        return PaperLedger(initial.available_cash), ()
+    return initialize_canonical_ledger(
+        mode=initial.initialization_mode.value,
+        as_of=initial.as_of,
+        available_cash=initial.available_cash,
+        positions=tuple(
+            (item.symbol, item.quantity, item.average_cost)
+            for item in initial.positions
+        ),
+        identity_namespace=_BOOTSTRAP_NAMESPACE,
+        identity_material=(
+            _BOOTSTRAP_VERSION,
+            str(request_id),
+            initial.initialization_mode.value,
+        ),
+    )
+
+
+def initialize_canonical_ledger(
+    *,
+    mode: str,
+    as_of: datetime,
+    available_cash: Decimal,
+    positions: tuple[tuple[Symbol, Decimal, Decimal], ...],
+    identity_namespace: UUID,
+    identity_material: tuple[str, ...],
+) -> tuple[PaperLedger, tuple[OrderFill, ...]]:
+    """Build a ledger from canonical values and caller-owned identity material."""
+    if mode == InitializationMode.CASH_ONLY.value:
+        return PaperLedger(available_cash), ()
     basis = sum(
-        (item.quantity * item.average_cost for item in initial.positions),
+        (quantity * unit_cost for _, quantity, unit_cost in positions),
         start=Decimal("0"),
     )
-    ledger = PaperLedger(initial.available_cash + basis)
+    ledger = PaperLedger(available_cash + basis)
     fills = []
-    for ordinal, position in enumerate(initial.positions):
+    for ordinal, (symbol, quantity, unit_cost) in enumerate(positions):
         material = "|".join(
             (
-                _BOOTSTRAP_VERSION,
-                str(request_id),
-                initial.initialization_mode.value,
+                *identity_material,
                 str(ordinal),
-                str(position.symbol),
-                canonical_decimal(position.quantity),
-                canonical_decimal(position.average_cost),
-                initial.as_of.isoformat(),
+                str(symbol),
+                canonical_decimal(quantity),
+                canonical_decimal(unit_cost),
+                as_of.isoformat(),
             )
         )
         fill = OrderFill(
-            uuid5(_BOOTSTRAP_NAMESPACE, f"{material}|fill"),
-            uuid5(_BOOTSTRAP_NAMESPACE, f"{material}|order"),
-            position.symbol,
+            uuid5(identity_namespace, f"{material}|fill"),
+            uuid5(identity_namespace, f"{material}|order"),
+            symbol,
             OrderSide.BUY,
-            position.quantity,
-            position.average_cost,
+            quantity,
+            unit_cost,
             Decimal("0"),
-            initial.as_of,
+            as_of,
         )
         ledger.apply_fill(fill)
         fills.append(fill)

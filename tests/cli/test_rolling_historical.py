@@ -1,5 +1,6 @@
 import json
 from copy import deepcopy
+from hashlib import sha256
 from pathlib import Path
 
 import pytest
@@ -230,6 +231,25 @@ def test_compact_and_pretty_reports_are_byte_deterministic() -> None:
     assert serialize_audit(audits[0], pretty=True) == serialize_audit(
         audits[1], pretty=True
     )
+
+
+def test_representative_audit_bytes_retain_compatibility_digests() -> None:
+    run = rolling_historical.run_cli(EXAMPLE)
+    audit = build_rolling_audit(
+        run.config,
+        run.historical_data,
+        run.result,
+        run.ledger,
+        run.bootstrap_fills,
+    )
+    expected = {
+        False: "d77a1b4c52df2d7bd927dd15ff69680ed7f83fecfd304c2df4a45247000e45d7",
+        True: "b6c95c75a2fe0d1ee434d9a2e43d5bef2d81662f5cb20f2bc02a256dd27449dd",
+    }
+    for pretty, digest in expected.items():
+        rendered = serialize_audit(audit, pretty=pretty)
+        assert rendered.endswith("\n")
+        assert sha256(rendered.encode("utf-8")).hexdigest() == digest
 
 
 def test_schedule_window_and_metadata_change_report_bytes() -> None:

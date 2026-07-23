@@ -1,0 +1,261 @@
+{
+  "report": {
+    "experiment_request_id": "00000000-0000-0000-0000-000000000401",
+    "experiment_result_id": "4f182fbf-dd86-5bd4-b301-5034e725948d",
+    "grid_result_id": "4dc71a10-7af5-5b59-ac2a-56d2ee8ca74b",
+    "grid_specification_id": "00000000-0000-0000-0000-000000000430",
+    "historical_fingerprint": "003a6236-23c4-5613-a9dd-a405032751b5",
+    "initial_state_fingerprint": "d0657c6f-e7a8-51ab-ba9e-bab0f2066396",
+    "metadata": [],
+    "ranking": {
+      "comparison_result_id": "9ce6d408-a4f9-5a89-9503-77451e350d71",
+      "criteria": [
+        {
+          "direction": "DESCENDING",
+          "metric": "SIMULATION_RETURN"
+        },
+        {
+          "direction": "ASCENDING",
+          "metric": "MAXIMUM_DRAWDOWN_PERCENTAGE"
+        }
+      ],
+      "policy_fingerprint": "33ab79ce-d3cd-5563-ab57-d354e3e1794a",
+      "policy_id": "00000000-0000-0000-0000-000000000420",
+      "tie_breaker": "CALLER_ORDER"
+    },
+    "report_id": "9140ef57-0777-5434-9005-1fa20b2c681f",
+    "schedule_fingerprint": "78f11882-ee4a-53f2-93cc-09edc1114dec",
+    "variant_source": "GRID",
+    "variants": [
+      {
+        "caller_ordinal": 0,
+        "comparison_values": [
+          {
+            "metric": "SIMULATION_RETURN",
+            "value": "0"
+          },
+          {
+            "metric": "MAXIMUM_DRAWDOWN_PERCENTAGE",
+            "value": "0"
+          }
+        ],
+        "experiment_run_id": "78266be7-847c-5795-9297-3e52cb0fd33a",
+        "grid_assignments": [
+          {
+            "parameter": "WINDOW_OBSERVATION_COUNT",
+            "value": 3
+          },
+          {
+            "parameter": "RISK_AVERSION",
+            "value": "1"
+          }
+        ],
+        "grid_ordinal": 0,
+        "metrics": {
+          "absolute_simulation_profit_loss": "0",
+          "adverse_slippage_cost": "0",
+          "aggregate_one_way_turnover": "0.599994",
+          "aggregate_two_way_turnover": "0.599994",
+          "applied_cycle_count": 1,
+          "approved_decisions": 1,
+          "final_equity": "10000",
+          "initial_equity": "10000",
+          "maximum_allocation_drift": "0.000006",
+          "maximum_drawdown_amount": "0",
+          "maximum_drawdown_percentage": "0",
+          "maximum_target_cash_weight": "0.4",
+          "mean_expected_portfolio_return": "0.0114296081277213352685050797",
+          "minimum_target_cash_weight": "0.4",
+          "no_action_cycle_count": 0,
+          "reduced_notional": "0",
+          "rejected_decisions": 0,
+          "rejected_notional": "0",
+          "resized_decisions": 0,
+          "simulation_realized_profit_loss": "0",
+          "simulation_return": "0",
+          "total_commissions": "0",
+          "total_execution_cost": "0",
+          "total_fills": 1,
+          "total_orders": 1,
+          "worst_cvar": "-0.011320754716981132075471698"
+        },
+        "rank": 1,
+        "rolling_result_id": "b3f2884b-12dd-59f9-9979-2d9918fdaefd",
+        "variant_id": "2760ea8a-84b9-5619-a2df-4755e460cb20",
+        "variant_name": "Grid Base | WINDOW_OBSERVATION_COUNT=3, RISK_AVERSION=1"
+      },
+      {
+        "caller_ordinal": 1,
+        "comparison_values": [
+          {
+            "metric": "SIMULATION_RETURN",
+            "value": "0"
+          },
+          {
+            "metric": "MAXIMUM_DRAWDOWN_PERCENTAGE",
+            "value": "0"
+          }
+        ],
+        "experiment_run_id": "e44e8e80-68f7-59b4-ac49-0a52067b167e",
+        "grid_assignments": [
+          {
+            "parameter": "WINDOW_OBSERVATION_COUNT",
+            "value": 3
+          },
+          {
+            "parameter": "RISK_AVERSION",
+            "value": "2"
+          }
+        ],
+        "grid_ordinal": 1,
+        "metrics": {
+          "absolute_simulation_profit_loss": "0",
+          "adverse_slippage_cost": "0",
+          "aggregate_one_way_turnover": "0.599994",
+          "aggregate_two_way_turnover": "0.599994",
+          "applied_cycle_count": 1,
+          "approved_decisions": 1,
+          "final_equity": "10000",
+          "initial_equity": "10000",
+          "maximum_allocation_drift": "0.000006",
+          "maximum_drawdown_amount": "0",
+          "maximum_drawdown_percentage": "0",
+          "maximum_target_cash_weight": "0.4",
+          "mean_expected_portfolio_return": "0.0114296081277213352685050797",
+          "minimum_target_cash_weight": "0.4",
+          "no_action_cycle_count": 0,
+          "reduced_notional": "0",
+          "rejected_decisions": 0,
+          "rejected_notional": "0",
+          "resized_decisions": 0,
+          "simulation_realized_profit_loss": "0",
+          "simulation_return": "0",
+          "total_commissions": "0",
+          "total_execution_cost": "0",
+          "total_fills": 1,
+          "total_orders": 1,
+          "worst_cvar": "-0.011320754716981132075471698"
+        },
+        "rank": 2,
+        "rolling_result_id": "edfd4ea9-8de2-51a3-bacd-e5c39fd8c70d",
+        "variant_id": "a3f9e1e2-d22c-5ada-b66e-eb3bf01c52ad",
+        "variant_name": "Grid Base | WINDOW_OBSERVATION_COUNT=3, RISK_AVERSION=2"
+      },
+      {
+        "caller_ordinal": 2,
+        "comparison_values": [
+          {
+            "metric": "SIMULATION_RETURN",
+            "value": "0"
+          },
+          {
+            "metric": "MAXIMUM_DRAWDOWN_PERCENTAGE",
+            "value": "0"
+          }
+        ],
+        "experiment_run_id": "6dce1e0e-44ef-5a3e-bf2b-ced2ee7a07de",
+        "grid_assignments": [
+          {
+            "parameter": "WINDOW_OBSERVATION_COUNT",
+            "value": 4
+          },
+          {
+            "parameter": "RISK_AVERSION",
+            "value": "1"
+          }
+        ],
+        "grid_ordinal": 2,
+        "metrics": {
+          "absolute_simulation_profit_loss": "0",
+          "adverse_slippage_cost": "0",
+          "aggregate_one_way_turnover": "0.599994",
+          "aggregate_two_way_turnover": "0.599994",
+          "applied_cycle_count": 1,
+          "approved_decisions": 1,
+          "final_equity": "10000",
+          "initial_equity": "10000",
+          "maximum_allocation_drift": "0.000006",
+          "maximum_drawdown_amount": "0",
+          "maximum_drawdown_percentage": "0",
+          "maximum_target_cash_weight": "0.4",
+          "mean_expected_portfolio_return": "0.0115413073792652039044935826",
+          "minimum_target_cash_weight": "0.4",
+          "no_action_cycle_count": 0,
+          "reduced_notional": "0",
+          "rejected_decisions": 0,
+          "rejected_notional": "0",
+          "resized_decisions": 0,
+          "simulation_realized_profit_loss": "0",
+          "simulation_return": "0",
+          "total_commissions": "0",
+          "total_execution_cost": "0",
+          "total_fills": 1,
+          "total_orders": 1,
+          "worst_cvar": "-0.011320754716981132075471698"
+        },
+        "rank": 3,
+        "rolling_result_id": "d95c9442-c045-5f63-86f3-872269c85471",
+        "variant_id": "310a50df-5817-5fc8-80b6-c6284f7d46f1",
+        "variant_name": "Grid Base | WINDOW_OBSERVATION_COUNT=4, RISK_AVERSION=1"
+      },
+      {
+        "caller_ordinal": 3,
+        "comparison_values": [
+          {
+            "metric": "SIMULATION_RETURN",
+            "value": "0"
+          },
+          {
+            "metric": "MAXIMUM_DRAWDOWN_PERCENTAGE",
+            "value": "0"
+          }
+        ],
+        "experiment_run_id": "2159072a-ae63-558f-8431-3c9edf508672",
+        "grid_assignments": [
+          {
+            "parameter": "WINDOW_OBSERVATION_COUNT",
+            "value": 4
+          },
+          {
+            "parameter": "RISK_AVERSION",
+            "value": "2"
+          }
+        ],
+        "grid_ordinal": 3,
+        "metrics": {
+          "absolute_simulation_profit_loss": "0",
+          "adverse_slippage_cost": "0",
+          "aggregate_one_way_turnover": "0.599994",
+          "aggregate_two_way_turnover": "0.599994",
+          "applied_cycle_count": 1,
+          "approved_decisions": 1,
+          "final_equity": "10000",
+          "initial_equity": "10000",
+          "maximum_allocation_drift": "0.000006",
+          "maximum_drawdown_amount": "0",
+          "maximum_drawdown_percentage": "0",
+          "maximum_target_cash_weight": "0.4",
+          "mean_expected_portfolio_return": "0.0115413073792652039044935826",
+          "minimum_target_cash_weight": "0.4",
+          "no_action_cycle_count": 0,
+          "reduced_notional": "0",
+          "rejected_decisions": 0,
+          "rejected_notional": "0",
+          "resized_decisions": 0,
+          "simulation_realized_profit_loss": "0",
+          "simulation_return": "0",
+          "total_commissions": "0",
+          "total_execution_cost": "0",
+          "total_fills": 1,
+          "total_orders": 1,
+          "worst_cvar": "-0.011320754716981132075471698"
+        },
+        "rank": 4,
+        "rolling_result_id": "fab9cee3-7d69-5956-b592-622f6ea07f93",
+        "variant_id": "416e5528-c33e-5d60-a311-c6fba4e7a403",
+        "variant_name": "Grid Base | WINDOW_OBSERVATION_COUNT=4, RISK_AVERSION=2"
+      }
+    ]
+  },
+  "schema_version": 1
+}

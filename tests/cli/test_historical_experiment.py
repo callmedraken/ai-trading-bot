@@ -22,6 +22,8 @@ from trading_bot.experiments import (
     HistoricalExperimentGridGenerator,
     HistoricalExperimentGridSizeError,
     HistoricalExperimentRankingError,
+    HistoricalExperimentReportBuilder,
+    HistoricalExperimentReportError,
     HistoricalExperimentRunner,
 )
 from trading_bot.market_data import CoordinatingHistoricalDataProvider
@@ -872,3 +874,381 @@ def test_output_collision_preserves_destination(
     )
     assert output.read_text(encoding="utf-8") == "keep"
     assert "already exists" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    (
+        ("--compact-json", "compact.json"),
+        ("--compact-csv", "compact.csv"),
+        (
+            "--compact-json",
+            "compact.json",
+            "--compact-csv",
+            "compact.csv",
+        ),
+    ),
+)
+def test_compact_outputs_build_one_report_and_skip_full_audit(
+    arguments: tuple[str, ...],
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    calls = []
+    original = HistoricalExperimentReportBuilder
+
+    class RecordingBuilder:
+        def build(
+            self,
+            experiment_result,
+            *,
+            grid_result,
+            comparison_result,
+            metadata,
+        ):  # type: ignore[no-untyped-def]
+            calls.append((experiment_result, grid_result, comparison_result, metadata))
+            return original().build(
+                experiment_result,
+                grid_result=grid_result,
+                comparison_result=comparison_result,
+                metadata=metadata,
+            )
+
+    def forbidden(*args, **kwargs):  # noqa: ANN002, ANN003, ANN202
+        raise AssertionError("full audit builder must not run")
+
+    resolved = tuple(
+        str(tmp_path / value) if value.endswith((".json", ".csv")) else value
+        for value in arguments
+    )
+    monkeypatch.setattr(historical_experiment, "_report_builder_type", RecordingBuilder)
+    monkeypatch.setattr(historical_experiment, "_audit_builder", forbidden)
+    assert (
+        historical_experiment.main(["--config", str(EXAMPLE), *resolved, "--quiet"])
+        == 0
+    )
+    assert len(calls) == 1
+    result, grid, comparison, metadata = calls[0]
+    assert grid is not None
+    assert comparison is not None
+    assert comparison.experiment_result is result
+    assert metadata == ()
+
+
+def test_no_file_output_constructs_no_report_or_compact_serializer(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class ForbiddenBuilder:
+        def __init__(self) -> None:
+            raise AssertionError("compact report builder must not run")
+
+    def forbidden(*args, **kwargs):  # noqa: ANN002, ANN003, ANN202
+        raise AssertionError("compact serializer must not run")
+
+    monkeypatch.setattr(historical_experiment, "_report_builder_type", ForbiddenBuilder)
+    monkeypatch.setattr(historical_experiment, "_compact_json_serializer", forbidden)
+    monkeypatch.setattr(historical_experiment, "_compact_csv_serializer", forbidden)
+    assert historical_experiment.main(["--config", str(EXAMPLE), "--quiet"]) == 0
+
+
+def test_full_only_constructs_no_compact_report(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    class ForbiddenBuilder:
+        def __init__(self) -> None:
+            raise AssertionError("compact report builder must not run")
+
+    monkeypatch.setattr(historical_experiment, "_report_builder_type", ForbiddenBuilder)
+    assert (
+        historical_experiment.main(
+            [
+                "--config",
+                str(EXAMPLE),
+                "--output",
+                str(tmp_path / "audit.json"),
+                "--quiet",
+            ]
+        )
+        == 0
+    )
+
+
+def test_json_and_csv_serializers_reuse_exact_report(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    seen = []
+    json_serializer = historical_experiment._compact_json_serializer
+    csv_serializer = historical_experiment._compact_csv_serializer
+
+    def json_recording(report, *, pretty):  # type: ignore[no-untyped-def]
+        seen.append(("json", report))
+        return json_serializer(report, pretty=pretty)
+
+    def csv_recording(report):  # type: ignore[no-untyped-def]
+        seen.append(("csv", report))
+        return csv_serializer(report)
+
+    monkeypatch.setattr(
+        historical_experiment, "_compact_json_serializer", json_recording
+    )
+    monkeypatch.setattr(historical_experiment, "_compact_csv_serializer", csv_recording)
+    assert (
+        historical_experiment.main(
+            [
+                "--config",
+                str(EXAMPLE),
+                "--compact-json",
+                str(tmp_path / "compact.json"),
+                "--compact-csv",
+                str(tmp_path / "compact.csv"),
+                "--quiet",
+            ]
+        )
+        == 0
+    )
+    assert [item[0] for item in seen] == ["json", "csv"]
+    assert seen[0][1] is seen[1][1]
+
+
+def test_normalized_duplicate_paths_are_usage_error(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    destination = tmp_path / "same.json"
+    with pytest.raises(SystemExit) as caught:
+        historical_experiment.main(
+            [
+                "--config",
+                str(EXAMPLE),
+                "--output",
+                str(destination),
+                "--compact-json",
+                str(tmp_path / "." / "same.json"),
+            ]
+        )
+    assert caught.value.code == 2
+    assert "pairwise distinct" in capsys.readouterr().err
+
+
+def test_all_destinations_are_preflighted_before_config_parsing(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    existing = tmp_path / "existing.csv"
+    existing.write_text("keep", encoding="utf-8")
+
+    def forbidden(*args, **kwargs):  # noqa: ANN002, ANN003, ANN202
+        raise AssertionError("config parsing must not run")
+
+    monkeypatch.setattr(
+        historical_experiment, "load_historical_experiment_config", forbidden
+    )
+    assert (
+        historical_experiment.main(
+            [
+                "--config",
+                str(EXAMPLE),
+                "--compact-csv",
+                str(existing),
+            ]
+        )
+        == 7
+    )
+    assert "already exists" in capsys.readouterr().err
+    assert existing.read_text(encoding="utf-8") == "keep"
+
+
+def test_full_audit_is_byte_identical_with_compact_outputs(
+    tmp_path: Path,
+) -> None:
+    full_only = tmp_path / "full-only.json"
+    combined = tmp_path / "combined.json"
+    assert (
+        historical_experiment.main(
+            ["--config", str(EXAMPLE), "--output", str(full_only), "--quiet"]
+        )
+        == 0
+    )
+    assert (
+        historical_experiment.main(
+            [
+                "--config",
+                str(EXAMPLE),
+                "--output",
+                str(combined),
+                "--compact-json",
+                str(tmp_path / "compact.json"),
+                "--compact-csv",
+                str(tmp_path / "compact.csv"),
+                "--quiet",
+            ]
+        )
+        == 0
+    )
+    assert full_only.read_bytes() == combined.read_bytes()
+    audit = json.loads(combined.read_text(encoding="utf-8"))
+    compact = json.loads((tmp_path / "compact.json").read_text(encoding="utf-8"))
+    assert compact["report"]["metadata"] == []
+    assert (
+        compact["report"]["experiment_result_id"]
+        == audit["experiment"]["result"]["result_id"]
+    )
+    assert [item["experiment_run_id"] for item in compact["report"]["variants"]] == [
+        item["run_id"] for item in audit["experiment"]["result"]["runs"]
+    ]
+    assert [item["rolling_result_id"] for item in compact["report"]["variants"]] == [
+        item["rolling"]["result"]["result_id"]
+        for item in audit["experiment"]["result"]["runs"]
+    ]
+    assert (
+        compact["report"]["grid_result_id"] == audit["variant_generation"]["result_id"]
+    )
+    assert (
+        compact["report"]["ranking"]["comparison_result_id"]
+        == audit["comparison"]["result_id"]
+    )
+
+
+def test_report_failure_is_exit_six_without_serialization_or_write(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    destination = tmp_path / "compact.json"
+
+    class FailingBuilder:
+        def build(self, *args, **kwargs):  # noqa: ANN002, ANN003, ANN202
+            raise HistoricalExperimentReportError("deliberate report failure")
+
+    def forbidden(*args, **kwargs):  # noqa: ANN002, ANN003, ANN202
+        raise AssertionError("serializer must not run")
+
+    monkeypatch.setattr(historical_experiment, "_report_builder_type", FailingBuilder)
+    monkeypatch.setattr(historical_experiment, "_compact_json_serializer", forbidden)
+    assert (
+        historical_experiment.main(
+            [
+                "--config",
+                str(EXAMPLE),
+                "--compact-json",
+                str(destination),
+            ]
+        )
+        == 6
+    )
+    assert not destination.exists()
+    assert "compact report construction failed" in capsys.readouterr().err
+
+
+def test_serialization_failure_preserves_every_destination(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    full = tmp_path / "full.json"
+    compact = tmp_path / "compact.json"
+    full.write_text("old full", encoding="utf-8")
+    compact.write_text("old compact", encoding="utf-8")
+
+    def failing(*args, **kwargs):  # noqa: ANN002, ANN003, ANN202
+        from trading_bot.cli.exceptions import (
+            HistoricalExperimentReportOutputError,
+        )
+
+        raise HistoricalExperimentReportOutputError("deliberate serialization")
+
+    monkeypatch.setattr(historical_experiment, "_compact_json_serializer", failing)
+    assert (
+        historical_experiment.main(
+            [
+                "--config",
+                str(EXAMPLE),
+                "--output",
+                str(full),
+                "--compact-json",
+                str(compact),
+                "--overwrite",
+            ]
+        )
+        == 7
+    )
+    assert full.read_text(encoding="utf-8") == "old full"
+    assert compact.read_text(encoding="utf-8") == "old compact"
+    assert not tuple(tmp_path.glob("*.tmp"))
+    assert "deliberate serialization" in capsys.readouterr().err
+
+
+def test_staging_failure_preserves_destinations_and_cleans_temps(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    full = tmp_path / "full.json"
+    compact = tmp_path / "compact.json"
+    full.write_text("old full", encoding="utf-8")
+    compact.write_text("old compact", encoding="utf-8")
+
+    def failing_fsync(descriptor):  # type: ignore[no-untyped-def]
+        raise OSError("deliberate staging failure")
+
+    monkeypatch.setattr(historical_experiment.os, "fsync", failing_fsync)
+    assert (
+        historical_experiment.main(
+            [
+                "--config",
+                str(EXAMPLE),
+                "--output",
+                str(full),
+                "--compact-json",
+                str(compact),
+                "--overwrite",
+            ]
+        )
+        == 7
+    )
+    assert full.read_text(encoding="utf-8") == "old full"
+    assert compact.read_text(encoding="utf-8") == "old compact"
+    assert not tuple(tmp_path.glob("*.tmp"))
+    assert "deliberate staging failure" in capsys.readouterr().err
+
+
+def test_later_replacement_failure_keeps_earlier_replace_and_cleans_temps(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    full = tmp_path / "full.json"
+    compact = tmp_path / "compact.json"
+    full.write_text("old full", encoding="utf-8")
+    compact.write_text("old compact", encoding="utf-8")
+    original_replace = historical_experiment.os.replace
+    calls = 0
+
+    def failing_second(source, destination):  # type: ignore[no-untyped-def]
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise OSError("deliberate replacement failure")
+        return original_replace(source, destination)
+
+    monkeypatch.setattr(historical_experiment.os, "replace", failing_second)
+    assert (
+        historical_experiment.main(
+            [
+                "--config",
+                str(EXAMPLE),
+                "--output",
+                str(full),
+                "--compact-json",
+                str(compact),
+                "--overwrite",
+            ]
+        )
+        == 7
+    )
+    assert json.loads(full.read_text(encoding="utf-8"))["schema_version"] == 3
+    assert compact.read_text(encoding="utf-8") == "old compact"
+    assert not tuple(tmp_path.glob("*.tmp"))
+    assert "deliberate replacement failure" in capsys.readouterr().err

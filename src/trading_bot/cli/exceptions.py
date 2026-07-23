@@ -100,3 +100,7 @@ class HistoricalExperimentExecutionCliError(HistoricalExperimentCliError):
 
 class HistoricalExperimentAuditError(HistoricalExperimentCliError):
     """Raised when experiment audit construction or reconciliation fails."""
+
+
+class HistoricalExperimentReportOutputError(HistoricalExperimentCliError):
+    """Raised when compact report output cannot be serialized or written."""

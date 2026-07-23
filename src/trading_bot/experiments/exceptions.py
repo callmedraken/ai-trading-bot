@@ -51,3 +51,33 @@ class InconsistentHistoricalExperimentResultError(
     HistoricalExperimentError, ValueError
 ):
     """Raised when a retained experiment run or result is inconsistent."""
+
+
+class HistoricalExperimentComparisonError(HistoricalExperimentError):
+    """Base exception for explicit historical experiment comparisons."""
+
+
+class InvalidHistoricalExperimentRankingPolicyError(
+    HistoricalExperimentComparisonError, ValueError
+):
+    """Raised when an explicit ranking policy is malformed."""
+
+
+class HistoricalExperimentMetricError(HistoricalExperimentComparisonError, ValueError):
+    """Raised when a selected comparison metric is invalid."""
+
+
+class HistoricalExperimentRankingError(HistoricalExperimentComparisonError):
+    """Raised when a deterministic total ordering cannot be established."""
+
+
+class HistoricalExperimentComparisonReconciliationError(
+    HistoricalExperimentComparisonError, ValueError
+):
+    """Raised when locally generated ranked records do not reconcile."""
+
+
+class InconsistentHistoricalExperimentComparisonResultError(
+    HistoricalExperimentComparisonError, ValueError
+):
+    """Raised when a retained comparison result is inconsistent."""

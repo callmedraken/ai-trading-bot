@@ -3,6 +3,7 @@
 import argparse
 import sys
 from dataclasses import dataclass
+from decimal import Decimal
 from pathlib import Path
 from uuid import UUID
 
@@ -35,6 +36,9 @@ from trading_bot.execution.state_fingerprints import (
     ledger_state_id,
 )
 from trading_bot.experiments import (
+    HistoricalExperimentComparator,
+    HistoricalExperimentComparisonError,
+    HistoricalExperimentComparisonResult,
     HistoricalExperimentError,
     HistoricalExperimentExecutionError,
     HistoricalExperimentInitializationError,
@@ -61,6 +65,7 @@ from trading_bot.simulation import OptimizedPaperPortfolioSimulator
 _BOOTSTRAP_NAMESPACE = UUID("8777c17e-0c37-55f8-bf91-a8cd307b73c8")
 _BOOTSTRAP_VERSION = "historical-experiment-cli-bootstrap-v1"
 _runner_type = HistoricalExperimentRunner
+_comparator_type = HistoricalExperimentComparator
 _coordinator_type = CoordinatingHistoricalDataProvider
 _audit_builder = build_historical_experiment_audit
 
@@ -137,6 +142,7 @@ class HistoricalExperimentCliRunResult:
     config: LoadedHistoricalExperimentConfig
     historical_data: MultiSymbolHistoricalDataResult
     result: HistoricalExperimentResult
+    comparison: HistoricalExperimentComparisonResult | None
     factory: _ExperimentSimulatorFactory
     summary: str
 
@@ -218,9 +224,19 @@ def run_cli(
         InconsistentHistoricalExperimentResultError,
     ) as error:
         raise HistoricalExperimentExecutionCliError(str(error)) from error
+    comparison = None
+    if config.ranking_policy is not None:
+        try:
+            comparison = _comparator_type().compare(result, config.ranking_policy)
+        except HistoricalExperimentComparisonError as error:
+            raise HistoricalExperimentExecutionCliError(
+                f"comparison failed: {error}"
+            ) from error
     summary = _format_summary(result)
+    if comparison is not None:
+        summary += _format_ranked_summary(comparison)
     return HistoricalExperimentCliRunResult(
-        config, historical, result, factory, summary
+        config, historical, result, comparison, factory, summary
     )
 
 
@@ -290,6 +306,39 @@ def _format_summary(result: HistoricalExperimentResult) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _format_ranked_summary(
+    comparison: HistoricalExperimentComparisonResult,
+) -> str:
+    policy = comparison.policy
+    lines = [
+        "Ranking policy:",
+        f"  policy ID: {policy.policy_id}",
+        "  criteria:",
+        *(
+            f"    {index}. {criterion.metric.value} {criterion.direction.value}"
+            for index, criterion in enumerate(policy.criteria, start=1)
+        ),
+        f"  tie breaker: {policy.tie_breaker.value}",
+        "Ranked comparison:",
+    ]
+    for ranked in comparison.ranked_runs:
+        lines.append(
+            f"  rank {ranked.rank} | caller ordinal {ranked.caller_ordinal} | "
+            f"{ranked.run.variant.name}"
+        )
+        lines.extend(
+            f"    {criterion.metric.value}: {_comparison_value(value)}"
+            for criterion, value in zip(
+                policy.criteria, ranked.comparison_values, strict=True
+            )
+        )
+    return "\n".join(lines) + "\n"
+
+
+def _comparison_value(value: Decimal | int) -> str:
+    return canonical_decimal(value) if isinstance(value, Decimal) else str(value)
+
+
 def _decimal(value) -> str:  # type: ignore[no-untyped-def]
     return canonical_decimal(value)
 
@@ -318,6 +367,7 @@ def main(argv: list[str] | None = None) -> int:
                 run.config,
                 run.historical_data,
                 run.result,
+                run.comparison,
                 run.factory.records,
             )
             content = serialize_audit(audit, pretty=args.pretty)

@@ -1,5 +1,6 @@
-"""Deterministic schema-one audit for offline historical experiments."""
+"""Deterministic schema-two audit for offline historical experiments."""
 
+from decimal import Decimal
 from typing import Any
 
 from trading_bot.cli._simulation_bootstrap import (
@@ -28,22 +29,52 @@ from trading_bot.execution.state_fingerprints import (
     ledger_state_id,
 )
 from trading_bot.experiments import (
+    HistoricalExperimentComparisonResult,
     HistoricalExperimentMetrics,
+    HistoricalExperimentRankingPolicy,
     HistoricalExperimentResult,
     HistoricalExperimentVariant,
 )
 from trading_bot.market_data import MultiSymbolHistoricalDataResult
 
-HISTORICAL_EXPERIMENT_AUDIT_SCHEMA_VERSION = 1
+HISTORICAL_EXPERIMENT_AUDIT_SCHEMA_VERSION = 2
 
 
 def build_historical_experiment_audit(
     config: LoadedHistoricalExperimentConfig,
     historical: MultiSymbolHistoricalDataResult,
     result: HistoricalExperimentResult,
+    comparison: HistoricalExperimentComparisonResult | None,
     factory_records: tuple,
 ) -> dict[str, Any]:
-    """Build a complete experiment audit after reconciling factory artifacts."""
+    """Build a complete raw and optional ranked historical experiment audit."""
+    raw = _build_raw_experiment_sections(config, historical, result, factory_records)
+    if config.ranking_policy is None:
+        if comparison is not None:
+            raise HistoricalExperimentAuditError(
+                "comparison exists without a configured ranking policy"
+            )
+        comparison_section = None
+    else:
+        if comparison is None:
+            raise HistoricalExperimentAuditError(
+                "configured ranking policy has no comparison result"
+            )
+        comparison_section = _comparison(config.ranking_policy, result, comparison)
+    return {
+        "schema_version": HISTORICAL_EXPERIMENT_AUDIT_SCHEMA_VERSION,
+        **raw,
+        "comparison": comparison_section,
+    }
+
+
+def _build_raw_experiment_sections(
+    config: LoadedHistoricalExperimentConfig,
+    historical: MultiSymbolHistoricalDataResult,
+    result: HistoricalExperimentResult,
+    factory_records: tuple,
+) -> dict[str, Any]:
+    """Build the raw schema-one sections without their former root wrapper."""
     if result.request.historical_data is not historical:
         raise HistoricalExperimentAuditError(
             "experiment result does not retain the exact loaded history"
@@ -103,7 +134,6 @@ def build_historical_experiment_audit(
             }
         )
     return {
-        "schema_version": HISTORICAL_EXPERIMENT_AUDIT_SCHEMA_VERSION,
         "configuration": _configuration(config),
         "historical_data": build_historical_data_section(
             config.historical_data.source_label, historical
@@ -180,7 +210,92 @@ def _configuration(config: LoadedHistoricalExperimentConfig) -> dict[str, Any]:
         },
         "variants": [_variant(item) for item in config.variants],
         "metadata": _metadata(config.metadata),
+        "ranking": (
+            None
+            if config.ranking_policy is None
+            else _ranking_policy(config.ranking_policy)
+        ),
     }
+
+
+def _ranking_policy(
+    policy: HistoricalExperimentRankingPolicy,
+) -> dict[str, Any]:
+    return {
+        "policy_id": str(policy.policy_id),
+        "criteria": [
+            {
+                "metric": item.metric.value,
+                "direction": item.direction.value,
+            }
+            for item in policy.criteria
+        ],
+        "tie_breaker": policy.tie_breaker.value,
+        "metadata": _metadata(policy.metadata),
+    }
+
+
+def _comparison(
+    configured_policy: HistoricalExperimentRankingPolicy,
+    experiment_result: HistoricalExperimentResult,
+    comparison: HistoricalExperimentComparisonResult,
+) -> dict[str, Any]:
+    if comparison.experiment_result is not experiment_result:
+        raise HistoricalExperimentAuditError(
+            "comparison does not retain the exact experiment result"
+        )
+    if comparison.policy is not configured_policy:
+        raise HistoricalExperimentAuditError(
+            "comparison does not retain the exact configured ranking policy"
+        )
+    source_runs = experiment_result.runs
+    ranked = comparison.ranked_runs
+    if len(ranked) != len(source_runs):
+        raise HistoricalExperimentAuditError(
+            "comparison ranked-run count differs from raw runs"
+        )
+    if len({id(item.run) for item in ranked}) != len(ranked) or {
+        id(item.run) for item in ranked
+    } != {id(item) for item in source_runs}:
+        raise HistoricalExperimentAuditError(
+            "comparison ranked runs do not exactly cover raw runs"
+        )
+    rows = []
+    for item in ranked:
+        if len(item.comparison_values) != len(configured_policy.criteria):
+            raise HistoricalExperimentAuditError(
+                "comparison value count differs from ranking criteria"
+            )
+        rows.append(
+            {
+                "rank": item.rank,
+                "caller_ordinal": item.caller_ordinal,
+                "source_run_id": str(item.run.run_id),
+                "source_variant_id": str(item.run.variant.variant_id),
+                "comparison_values": [
+                    {
+                        "metric": criterion.metric.value,
+                        "value": _ranked_value(value),
+                    }
+                    for criterion, value in zip(
+                        configured_policy.criteria,
+                        item.comparison_values,
+                        strict=True,
+                    )
+                ],
+            }
+        )
+    return {
+        "policy": _ranking_policy(configured_policy),
+        "policy_fingerprint": str(comparison.policy_fingerprint),
+        "result_id": str(comparison.result_id),
+        "source_experiment_result_id": str(experiment_result.result_id),
+        "ranked_runs": rows,
+    }
+
+
+def _ranked_value(value: Decimal | int) -> str | int:
+    return _decimal(value) if isinstance(value, Decimal) else value
 
 
 def _variant(item: HistoricalExperimentVariant) -> dict[str, Any]:

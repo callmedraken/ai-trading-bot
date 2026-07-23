@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "request_id": "00000000-0000-0000-0000-000000000401",
   "historical_data": {
     "symbols": ["SPY", "QQQ"],
@@ -162,5 +162,22 @@
       "metadata": [{"key": "variant_family", "value": "longer-window"}]
     }
   ],
+  "ranking": {
+    "policy_id": "00000000-0000-0000-0000-000000000420",
+    "criteria": [
+      {
+        "metric": "SIMULATION_RETURN",
+        "direction": "DESCENDING"
+      },
+      {
+        "metric": "MAXIMUM_DRAWDOWN_PERCENTAGE",
+        "direction": "ASCENDING"
+      }
+    ],
+    "tie_breaker": "CALLER_ORDER",
+    "metadata": [
+      {"key": "example", "value": "explicit-neutral-ranking"}
+    ]
+  },
   "metadata": [{"key": "example", "value": "historical-experiment"}]
 }

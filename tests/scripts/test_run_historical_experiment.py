@@ -28,6 +28,8 @@ def test_documented_repository_root_invocation_succeeds() -> None:
     assert "experiment result ID:" in completed.stdout
     assert "variant 0 | Shorter Window" in completed.stdout
     assert "variant 1 | Longer Window" in completed.stdout
+    assert "Ranking policy:" in completed.stdout
+    assert "Ranked comparison:" in completed.stdout
     assert completed.stderr == ""
 
 

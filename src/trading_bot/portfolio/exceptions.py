@@ -49,6 +49,46 @@ class ScenarioCompatibilityError(PortfolioDomainError, ValueError):
     """Raised when scenario time or forecast horizon does not match."""
 
 
+class HistoricalScenarioGenerationError(PortfolioDomainError):
+    """Base exception for deterministic historical scenario generation."""
+
+
+class InvalidHistoricalScenarioRequestError(
+    HistoricalScenarioGenerationError, ValueError
+):
+    """Raised when a historical scenario request or policy is invalid."""
+
+
+class HistoricalScenarioChronologyError(HistoricalScenarioGenerationError, ValueError):
+    """Raised when historical observations violate temporal requirements."""
+
+
+class HistoricalScenarioUniverseMismatchError(
+    HistoricalScenarioGenerationError, ValueError
+):
+    """Raised when historical frames do not share one complete ordered universe."""
+
+
+class HistoricalScenarioPriceError(HistoricalScenarioGenerationError, ValueError):
+    """Raised when a historical close price is invalid."""
+
+
+class HistoricalScenarioProbabilityError(HistoricalScenarioGenerationError, ValueError):
+    """Raised when generated scenario probabilities are invalid."""
+
+
+class HistoricalScenarioReconciliationError(
+    HistoricalScenarioGenerationError, ValueError
+):
+    """Raised when generated domain objects do not reconcile."""
+
+
+class InconsistentHistoricalScenarioResultError(
+    HistoricalScenarioGenerationError, ValueError
+):
+    """Raised when a historical scenario result is internally inconsistent."""
+
+
 class InvalidMeanCvarOptimizationRequestError(PortfolioDomainError, ValueError):
     """Raised when a specialized Mean-CVaR request is invalid."""
 

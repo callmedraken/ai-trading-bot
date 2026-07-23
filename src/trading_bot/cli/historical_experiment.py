@@ -1,7 +1,9 @@
 """Run deterministic offline historical experiments from local configuration."""
 
 import argparse
+import os
 import sys
+import tempfile
 from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
@@ -17,15 +19,20 @@ from trading_bot.cli.exceptions import (
     HistoricalExperimentDataError,
     HistoricalExperimentExecutionCliError,
     HistoricalExperimentInitializationCliError,
+    HistoricalExperimentReportOutputError,
 )
 from trading_bot.cli.historical_experiment_config import (
     LoadedHistoricalExperimentConfig,
     load_historical_experiment_config,
 )
+from trading_bot.cli.historical_experiment_report_serialization import (
+    serialize_compact_report_csv,
+    serialize_compact_report_json,
+)
 from trading_bot.cli.historical_experiment_serialization import (
     build_historical_experiment_audit,
 )
-from trading_bot.cli.serialization import serialize_audit, write_atomic
+from trading_bot.cli.serialization import serialize_audit
 from trading_bot.domain import OrderFill
 from trading_bot.execution import OrderEngine
 from trading_bot.execution.state_fingerprints import (
@@ -48,6 +55,9 @@ from trading_bot.experiments import (
     HistoricalExperimentInitialState,
     HistoricalExperimentIsolationError,
     HistoricalExperimentReconciliationError,
+    HistoricalExperimentReport,
+    HistoricalExperimentReportBuilder,
+    HistoricalExperimentReportError,
     HistoricalExperimentRequest,
     HistoricalExperimentResult,
     HistoricalExperimentRunner,
@@ -71,7 +81,10 @@ _runner_type = HistoricalExperimentRunner
 _comparator_type = HistoricalExperimentComparator
 _grid_generator_type = HistoricalExperimentGridGenerator
 _coordinator_type = CoordinatingHistoricalDataProvider
+_report_builder_type = HistoricalExperimentReportBuilder
 _audit_builder = build_historical_experiment_audit
+_compact_json_serializer = serialize_compact_report_json
+_compact_csv_serializer = serialize_compact_report_csv
 
 
 @dataclass(frozen=True, slots=True)
@@ -148,6 +161,7 @@ class HistoricalExperimentCliRunResult:
     historical_data: MultiSymbolHistoricalDataResult
     result: HistoricalExperimentResult
     comparison: HistoricalExperimentComparisonResult | None
+    compact_report: HistoricalExperimentReport | None
     factory: _ExperimentSimulatorFactory
     summary: str
 
@@ -159,13 +173,19 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--config", required=True, type=Path)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--pretty", action="store_true")
+    parser.add_argument("--compact-json", type=Path)
+    parser.add_argument("--compact-json-pretty", action="store_true")
+    parser.add_argument("--compact-csv", type=Path)
     parser.add_argument("--overwrite", action="store_true")
     parser.add_argument("--quiet", action="store_true")
     return parser
 
 
 def run_cli(
-    config_path: Path, *, collect_audit_records: bool = True
+    config_path: Path,
+    *,
+    collect_audit_records: bool = True,
+    build_compact_report: bool = False,
 ) -> HistoricalExperimentCliRunResult:
     """Load local history once and invoke one experiment runner once."""
     config = load_historical_experiment_config(config_path)
@@ -252,6 +272,19 @@ def run_cli(
             raise HistoricalExperimentExecutionCliError(
                 f"comparison failed: {error}"
             ) from error
+    compact_report = None
+    if build_compact_report:
+        try:
+            compact_report = _report_builder_type().build(
+                result,
+                grid_result=grid_result,
+                comparison_result=comparison,
+                metadata=(),
+            )
+        except HistoricalExperimentReportError as error:
+            raise HistoricalExperimentExecutionCliError(
+                f"compact report construction failed: {error}"
+            ) from error
     summary = ""
     if grid_result is not None:
         summary += _format_grid_summary(grid_result)
@@ -259,7 +292,14 @@ def run_cli(
     if comparison is not None:
         summary += _format_ranked_summary(comparison)
     return HistoricalExperimentCliRunResult(
-        config, grid_result, historical, result, comparison, factory, summary
+        config,
+        grid_result,
+        historical,
+        result,
+        comparison,
+        compact_report,
+        factory,
+        summary,
     )
 
 
@@ -391,26 +431,120 @@ def _decimal(value) -> str:  # type: ignore[no-untyped-def]
     return canonical_decimal(value)
 
 
+@dataclass(frozen=True, slots=True)
+class _OutputArtifact:
+    destination: Path
+    content: str
+
+
+def _normalized_destinations(args) -> tuple[Path | None, Path | None, Path | None]:  # type: ignore[no-untyped-def]
+    return tuple(
+        None if value is None else value.resolve(strict=False)
+        for value in (args.output, args.compact_json, args.compact_csv)
+    )  # type: ignore[return-value]
+
+
+def _preflight_destinations(
+    destinations: tuple[Path | None, ...], *, overwrite: bool
+) -> None:
+    for destination in destinations:
+        if destination is None:
+            continue
+        if not destination.parent.is_dir():
+            raise HistoricalExperimentReportOutputError(
+                f"output parent directory does not exist: {destination.parent}"
+            )
+        if destination.exists() and not overwrite:
+            raise HistoricalExperimentReportOutputError(
+                f"output already exists: {destination}"
+            )
+
+
+def _write_artifacts(
+    artifacts: tuple[_OutputArtifact, ...], *, overwrite: bool
+) -> None:
+    staged: list[tuple[Path, Path]] = []
+    try:
+        for artifact in artifacts:
+            destination = artifact.destination
+            if destination.exists() and not overwrite:
+                raise HistoricalExperimentReportOutputError(
+                    f"output already exists: {destination}"
+                )
+            descriptor, name = tempfile.mkstemp(
+                prefix=f".{destination.name}.",
+                suffix=".tmp",
+                dir=destination.parent,
+            )
+            temporary = Path(name)
+            try:
+                with os.fdopen(descriptor, "w", encoding="utf-8", newline="") as stream:
+                    stream.write(artifact.content)
+                    stream.flush()
+                    os.fsync(stream.fileno())
+            except (OSError, UnicodeError):
+                temporary.unlink(missing_ok=True)
+                raise
+            staged.append((destination, temporary))
+        for destination, temporary in staged:
+            if destination.exists() and not overwrite:
+                raise HistoricalExperimentReportOutputError(
+                    f"output already exists: {destination}"
+                )
+            os.replace(temporary, destination)
+    except HistoricalExperimentReportOutputError:
+        raise
+    except (OSError, UnicodeError) as error:
+        raise HistoricalExperimentReportOutputError(
+            f"cannot write compact experiment output: {error}"
+        ) from error
+    finally:
+        for _, temporary in staged:
+            try:
+                temporary.unlink(missing_ok=True)
+            except OSError:
+                pass
+
+
+def _compact_success(
+    report: HistoricalExperimentReport,
+    compact_json: Path | None,
+    compact_csv: Path | None,
+) -> str:
+    lines = ["Compact report:", f"  report ID: {report.report_id}"]
+    if compact_json is not None:
+        lines.append(f"  JSON: {compact_json}")
+    if compact_csv is not None:
+        lines.append(f"  CSV: {compact_csv}")
+    return "\n".join(lines) + "\n"
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     if args.pretty and args.output is None:
         parser.error("--pretty requires --output")
-    if args.overwrite and args.output is None:
-        parser.error("--overwrite requires --output")
-    if args.output is not None:
-        if not args.output.parent.is_dir():
-            print(
-                f"error: output parent directory does not exist: {args.output.parent}",
-                file=sys.stderr,
-            )
-            return 7
-        if args.output.exists() and not args.overwrite:
-            print(f"error: output already exists: {args.output}", file=sys.stderr)
-            return 7
+    if args.compact_json_pretty and args.compact_json is None:
+        parser.error("--compact-json-pretty requires --compact-json")
+    requested = (args.output, args.compact_json, args.compact_csv)
+    if args.overwrite and not any(value is not None for value in requested):
+        parser.error("--overwrite requires an output destination")
+    output, compact_json, compact_csv = _normalized_destinations(args)
+    destinations = tuple(
+        value for value in (output, compact_json, compact_csv) if value is not None
+    )
+    if len(set(destinations)) != len(destinations):
+        parser.error("output destinations must be pairwise distinct")
     try:
-        run = run_cli(args.config, collect_audit_records=args.output is not None)
-        if args.output is not None:
+        _preflight_destinations(destinations, overwrite=args.overwrite)
+        compact_requested = compact_json is not None or compact_csv is not None
+        run = run_cli(
+            args.config,
+            collect_audit_records=output is not None,
+            build_compact_report=compact_requested,
+        )
+        artifacts = []
+        if output is not None:
             audit = _audit_builder(
                 run.config,
                 run.grid_result,
@@ -420,7 +554,29 @@ def main(argv: list[str] | None = None) -> int:
                 run.factory.records,
             )
             content = serialize_audit(audit, pretty=args.pretty)
-            write_atomic(args.output, content, overwrite=args.overwrite)
+            artifacts.append(_OutputArtifact(output, content))
+        if compact_requested and run.compact_report is None:
+            raise HistoricalExperimentReportOutputError(
+                "requested compact report was not built"
+            )
+        if compact_json is not None:
+            artifacts.append(
+                _OutputArtifact(
+                    compact_json,
+                    _compact_json_serializer(
+                        run.compact_report,
+                        pretty=args.compact_json_pretty,
+                    ),
+                )
+            )
+        if compact_csv is not None:
+            artifacts.append(
+                _OutputArtifact(
+                    compact_csv,
+                    _compact_csv_serializer(run.compact_report),
+                )
+            )
+        _write_artifacts(tuple(artifacts), overwrite=args.overwrite)
     except (ConfigReadError, ConfigJsonError) as error:
         print(f"error: {error}", file=sys.stderr)
         return 3
@@ -433,9 +589,18 @@ def main(argv: list[str] | None = None) -> int:
     except HistoricalExperimentExecutionCliError as error:
         print(f"error: {error}", file=sys.stderr)
         return 6
-    except (HistoricalExperimentAuditError, AuditOutputError) as error:
+    except (
+        HistoricalExperimentAuditError,
+        HistoricalExperimentReportOutputError,
+        AuditOutputError,
+    ) as error:
         print(f"error: {error}", file=sys.stderr)
         return 7
     if not args.quiet:
         print(run.summary, end="")
+        if run.compact_report is not None:
+            print(
+                _compact_success(run.compact_report, compact_json, compact_csv),
+                end="",
+            )
     return 0

@@ -1,3 +1,4 @@
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -39,7 +40,8 @@ def test_documented_repository_root_invocation_succeeds() -> None:
     ("arguments", "message"),
     (
         (["--pretty"], "--pretty requires --output"),
-        (["--overwrite"], "--overwrite requires --output"),
+        (["--compact-json-pretty"], "--compact-json-pretty requires --compact-json"),
+        (["--overwrite"], "--overwrite requires an output destination"),
     ),
 )
 def test_dependent_arguments_are_usage_errors(
@@ -54,3 +56,26 @@ def test_dependent_arguments_are_usage_errors(
 def test_required_config_is_a_usage_error() -> None:
     with pytest.raises(SystemExit):
         historical_experiment.build_parser().parse_args([])
+
+
+def test_documented_compact_output_invocation_succeeds(tmp_path: Path) -> None:
+    compact_json = tmp_path / "compact.json"
+    compact_csv = tmp_path / "compact.csv"
+    completed = subprocess.run(
+        _command(
+            "--compact-json",
+            str(compact_json),
+            "--compact-json-pretty",
+            "--compact-csv",
+            str(compact_csv),
+        ),
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert "Compact report:" in completed.stdout
+    assert f"  JSON: {compact_json.resolve()}" in completed.stdout
+    assert f"  CSV: {compact_csv.resolve()}" in completed.stdout
+    assert json.loads(compact_json.read_text(encoding="utf-8"))["schema_version"] == 1
+    assert compact_csv.read_text(encoding="utf-8").startswith("report_id,")

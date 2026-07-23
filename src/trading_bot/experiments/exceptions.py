@@ -81,3 +81,56 @@ class InconsistentHistoricalExperimentComparisonResultError(
     HistoricalExperimentComparisonError, ValueError
 ):
     """Raised when a retained comparison result is inconsistent."""
+
+
+class HistoricalExperimentGridError(HistoricalExperimentError):
+    """Base exception for explicit historical experiment grids."""
+
+
+class InvalidHistoricalExperimentGridSpecificationError(
+    HistoricalExperimentGridError, ValueError
+):
+    """Raised when a grid specification is malformed."""
+
+
+class HistoricalExperimentGridAxisError(HistoricalExperimentGridError, ValueError):
+    """Raised when grid axis structure is malformed or ambiguous."""
+
+
+class HistoricalExperimentGridSizeError(HistoricalExperimentGridError, ValueError):
+    """Raised when a grid exceeds its explicit caller limit."""
+
+
+class HistoricalExperimentGridValueError(HistoricalExperimentGridError, ValueError):
+    """Raised when an explicit axis value is invalid."""
+
+
+class HistoricalExperimentGridVariantError(HistoricalExperimentGridError, ValueError):
+    """Raised when one explicit combination cannot produce a unique variant."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        ordinal: int | None = None,
+        assignments: tuple = (),
+        parameter=None,  # type: ignore[no-untyped-def]
+        cause: BaseException | None = None,
+    ) -> None:
+        self.ordinal = ordinal
+        self.assignments = assignments
+        self.parameter = parameter
+        self.cause = cause
+        super().__init__(message)
+
+
+class HistoricalExperimentGridReconciliationError(
+    HistoricalExperimentGridError, ValueError
+):
+    """Raised when locally generated grid rows do not reconcile."""
+
+
+class InconsistentHistoricalExperimentGridResultError(
+    HistoricalExperimentGridError, ValueError
+):
+    """Raised when a retained grid result is inconsistent."""

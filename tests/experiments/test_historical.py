@@ -196,6 +196,21 @@ class _Factory:
         )
 
 
+def test_representative_experiment_identity_regression() -> None:
+    request = _request()
+    result = HistoricalExperimentRunner(_Factory()).run(request)
+    assert str(request.request_id) == "00000000-0000-0000-0000-000000000001"
+    assert tuple(str(item.rolling_request_id) for item in result.runs) == (
+        "e6cb67f7-b46d-5331-a5e5-3c478f75f8d4",
+        "52e82b4f-c706-5d6f-9c43-2b2e99d16220",
+    )
+    assert tuple(str(item.run_id) for item in result.runs) == (
+        "7e077c26-658f-51d6-9bf6-4d8ed19e45f8",
+        "1ca0f113-a6d3-5b10-992c-75577a9afc08",
+    )
+    assert str(result.result_id) == "b8fffc32-d4dc-5e1d-a3ef-7e61b97e64c9"
+
+
 def test_initial_state_validation_and_defensive_copying() -> None:
     positions = [
         HistoricalExperimentBootstrapPosition(SPY, Decimal("1"), Decimal("100"))

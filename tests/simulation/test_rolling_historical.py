@@ -328,3 +328,15 @@ def test_runner_exposes_only_supplied_simulator_as_read_only_property() -> None:
     assert runner.simulator is runner._simulator
     with pytest.raises(AttributeError):
         runner.simulator = _runner().simulator  # type: ignore[misc]
+
+
+def test_historical_material_extraction_preserves_fixed_rolling_identities() -> None:
+    history = _historical()
+    result = _runner().run(_request(data=history))
+    assert result.frame_generations[0].scenario_request_id == UUID(
+        "04faf3bc-56cb-5ff8-bb79-86055437e1b9"
+    )
+    assert result.optimized_request.request_id == UUID(
+        "041fef8c-7c77-59f5-9a3a-b814368fef97"
+    )
+    assert result.result_id == UUID("76dd27de-f923-57a9-bcdd-edaaf2808d8c")

@@ -18,6 +18,7 @@ from trading_bot.market_data import (
     MultiSymbolHistoricalDataRequest,
     MultiSymbolHistoricalDataResult,
     Timeframe,
+    canonical_multi_symbol_historical_material,
 )
 from trading_bot.market_data.exceptions import HistoricalDataValidationError
 from trading_bot.portfolio import (
@@ -879,29 +880,7 @@ def _source_frame_id(frame) -> UUID:  # type: ignore[no-untyped-def]
 
 
 def _historical_fingerprint(data: MultiSymbolHistoricalDataResult) -> UUID:
-    request = data.request
-    material = [
-        request.start.isoformat(),
-        request.end.isoformat(),
-        request.timeframe.value,
-        request.adjustment.value,
-        request.missing_bar_policy.value,
-        data.provider_name,
-        *(str(symbol) for symbol in request.symbols),
-    ]
-    for frame in data.frames:
-        material.extend(
-            (
-                frame.timestamp.isoformat(),
-                *(str(symbol) for symbol in frame.missing_symbols),
-            )
-        )
-        for symbol in frame.symbols:
-            bar = frame.bars_by_symbol.get(symbol)
-            material.extend(
-                ("missing", str(symbol)) if bar is None else _bar_material(bar)
-            )
-    return _id("historical-data", *material)
+    return _id("historical-data", *canonical_multi_symbol_historical_material(data))
 
 
 def _bar_material(bar) -> tuple[str, ...]:  # type: ignore[no-untyped-def]

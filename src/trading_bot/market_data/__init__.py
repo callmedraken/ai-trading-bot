@@ -18,6 +18,9 @@ from trading_bot.market_data.exceptions import (
     UnsupportedAdjustmentError,
     UnsupportedTimeframeError,
 )
+from trading_bot.market_data.fingerprints import (
+    canonical_multi_symbol_historical_material,
+)
 from trading_bot.market_data.models import (
     AdjustmentType,
     AlignedMarketFrame,
@@ -39,6 +42,7 @@ __all__ = [
     "AdjustmentType",
     "AlignedMarketFrame",
     "CSVHistoricalDataProvider",
+    "canonical_multi_symbol_historical_material",
     "CSVRowError",
     "CSVSchemaError",
     "DuplicateBarTimestampError",

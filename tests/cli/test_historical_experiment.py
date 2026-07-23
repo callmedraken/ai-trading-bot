@@ -14,12 +14,13 @@ from trading_bot.cli.historical_experiment_config import (
     parse_historical_experiment_config,
 )
 from trading_bot.cli.historical_experiment_serialization import (
-    _build_raw_experiment_sections,
     build_historical_experiment_audit,
 )
 from trading_bot.cli.serialization import serialize_audit
 from trading_bot.experiments import (
     HistoricalExperimentComparator,
+    HistoricalExperimentGridGenerator,
+    HistoricalExperimentGridSizeError,
     HistoricalExperimentRankingError,
     HistoricalExperimentRunner,
 )
@@ -32,6 +33,21 @@ FIXTURES = ROOT / "tests" / "fixtures" / "cli"
 
 def _raw() -> dict:
     return json.loads(EXAMPLE.read_text(encoding="utf-8"))
+
+
+def _explicit_raw() -> dict:
+    raw = _raw()
+    first = deepcopy(raw["variant_grid"]["base_variant"])
+    first["variant_id"] = "00000000-0000-0000-0000-000000000411"
+    first["name"] = "Shorter Window"
+    second = deepcopy(first)
+    second["variant_id"] = "00000000-0000-0000-0000-000000000412"
+    second["name"] = "Longer Window"
+    second["rolling_window"]["observation_count"] = 4
+    second["optimization"]["risk_aversion"] = "2"
+    raw["variants"] = [first, second]
+    raw["variant_grid"] = None
+    return raw
 
 
 def _write_config(tmp_path: Path, raw: dict) -> Path:
@@ -50,42 +66,42 @@ def _write_config(tmp_path: Path, raw: dict) -> Path:
 
 def test_checked_in_example_parses_exact_ordered_domain_models() -> None:
     config = load_historical_experiment_config(EXAMPLE)
-    assert config.schema_version == 2
+    assert config.schema_version == 3
     assert config.ranking_policy is not None
     assert len(config.ranking_policy.criteria) == 2
     assert tuple(str(item) for item in config.historical_data.symbols) == (
         "SPY",
         "QQQ",
     )
-    assert tuple(item.name for item in config.variants) == (
-        "Shorter Window",
-        "Longer Window",
-    )
-    assert tuple(item.window_policy.observation_count for item in config.variants) == (
-        3,
-        4,
+    assert config.explicit_variants is None
+    assert config.grid_specification is not None
+    assert tuple(item.parameter.value for item in config.grid_specification.axes) == (
+        "WINDOW_OBSERVATION_COUNT",
+        "RISK_AVERSION",
     )
 
 
 @pytest.mark.parametrize(
     ("mutate", "path"),
     (
-        (lambda raw: raw.update(schema_version=1), "$.schema_version"),
+        (lambda raw: raw.update(schema_version=2), "$.schema_version"),
         (lambda raw: raw.update(extra=True), "$.extra"),
         (lambda raw: raw.pop("initial_state"), "$.initial_state"),
         (
-            lambda raw: raw["variants"][0].update(trading_enabled=1),
-            "$.variants[0].trading_enabled",
+            lambda raw: raw["variant_grid"]["base_variant"].update(trading_enabled=1),
+            "$.variant_grid.base_variant.trading_enabled",
         ),
         (
-            lambda raw: raw["variants"][0]["optimization"].update(risk_aversion=1),
-            "$.variants[0].optimization.risk_aversion",
+            lambda raw: raw["variant_grid"]["base_variant"]["optimization"].update(
+                risk_aversion=1
+            ),
+            "$.variant_grid.base_variant.optimization.risk_aversion",
         ),
         (
-            lambda raw: raw["variants"][0]["metadata"].append(
+            lambda raw: raw["variant_grid"]["base_variant"]["metadata"].append(
                 {"key": "historical_experiment_bad", "value": "x"}
             ),
-            "$.variants[0].metadata",
+            "$.variant_grid.base_variant.metadata",
         ),
     ),
 )
@@ -98,17 +114,17 @@ def test_strict_schema_reports_json_paths(mutate, path: str) -> None:  # type: i
 
 
 def test_schedule_and_variant_uniqueness_are_rejected() -> None:
-    raw = _raw()
+    raw = _explicit_raw()
     raw["rebalance_schedule"].append(raw["rebalance_schedule"][0])
     with pytest.raises(ConfigValidationError, match="strictly increasing"):
         parse_historical_experiment_config(raw, EXAMPLE.parent)
 
-    raw = _raw()
+    raw = _explicit_raw()
     raw["variants"][1]["variant_id"] = raw["variants"][0]["variant_id"]
     with pytest.raises(ConfigValidationError, match="variant IDs"):
         parse_historical_experiment_config(raw, EXAMPLE.parent)
 
-    raw = _raw()
+    raw = _explicit_raw()
     raw["variants"][1]["name"] = " shorter window "
     with pytest.raises(ConfigValidationError, match="variant names"):
         parse_historical_experiment_config(raw, EXAMPLE.parent)
@@ -120,31 +136,105 @@ def test_initial_state_and_commission_compatibility_are_strict() -> None:
     with pytest.raises(ConfigValidationError, match="exactly zero"):
         parse_historical_experiment_config(raw, EXAMPLE.parent)
 
-    raw = _raw()
+    raw = _explicit_raw()
     raw["variants"][0]["fills"]["fixed_commission"] = "1"
     with pytest.raises(ConfigValidationError, match="commissions must match"):
         parse_historical_experiment_config(raw, EXAMPLE.parent)
 
 
-def test_schema_one_rejection_has_migration_guidance() -> None:
+def test_schema_two_rejection_has_migration_guidance() -> None:
     raw = _raw()
-    raw["schema_version"] = 1
+    raw["schema_version"] = 2
     with pytest.raises(ConfigValidationError) as caught:
         parse_historical_experiment_config(raw, EXAMPLE.parent)
     assert caught.value.field_path == "$.schema_version"
-    assert "requires version 2" in str(caught.value)
+    assert "version 3" in str(caught.value)
 
 
-def test_missing_and_null_ranking_canonicalize_to_none() -> None:
+def test_ranking_is_required_and_null_is_supported() -> None:
     missing = _raw()
     missing.pop("ranking")
     explicit_null = _raw()
     explicit_null["ranking"] = None
-    first = parse_historical_experiment_config(missing, EXAMPLE.parent)
+    with pytest.raises(ConfigValidationError) as caught:
+        parse_historical_experiment_config(missing, EXAMPLE.parent)
+    assert caught.value.field_path == "$.ranking"
     second = parse_historical_experiment_config(explicit_null, EXAMPLE.parent)
-    assert first.ranking_policy is None
     assert second.ranking_policy is None
-    assert first == second
+
+
+def test_schema_three_explicit_and_grid_modes_are_mutually_exclusive() -> None:
+    explicit = parse_historical_experiment_config(_explicit_raw(), EXAMPLE.parent)
+    assert explicit.explicit_variants is not None
+    assert explicit.grid_specification is None
+
+    grid = parse_historical_experiment_config(_raw(), EXAMPLE.parent)
+    assert grid.explicit_variants is None
+    assert grid.grid_specification is not None
+
+    raw = _raw()
+    raw["variants"] = []
+    with pytest.raises(ConfigValidationError, match="cannot be active"):
+        parse_historical_experiment_config(raw, EXAMPLE.parent)
+
+    raw = _raw()
+    raw["variants"] = None
+    raw["variant_grid"] = None
+    with pytest.raises(ConfigValidationError, match="exactly one"):
+        parse_historical_experiment_config(raw, EXAMPLE.parent)
+
+    for field in ("variants", "variant_grid"):
+        raw = _raw()
+        raw.pop(field)
+        with pytest.raises(ConfigValidationError) as caught:
+            parse_historical_experiment_config(raw, EXAMPLE.parent)
+        assert caught.value.field_path == f"$.{field}"
+
+    raw = _explicit_raw()
+    raw["variants"] = []
+    with pytest.raises(ConfigValidationError) as caught:
+        parse_historical_experiment_config(raw, EXAMPLE.parent)
+    assert caught.value.field_path == "$.variants"
+
+
+@pytest.mark.parametrize(
+    ("parameter", "value", "path"),
+    (
+        ("WINDOW_OBSERVATION_COUNT", True, "$.variant_grid.axes[0].values[0]"),
+        ("WINDOW_OBSERVATION_COUNT", "3", "$.variant_grid.axes[0].values[0]"),
+        ("SCENARIO_CASH_RETURN", 0, "$.variant_grid.axes[0].values[0]"),
+        ("RISK_AVERSION", 1.0, "$.variant_grid.axes[0].values[0]"),
+        ("PROPOSAL_CONFIDENCE", 1, "$.variant_grid.axes[0].values[0]"),
+        ("TRADING_ENABLED", 1, "$.variant_grid.axes[0].values[0]"),
+    ),
+)
+def test_grid_axis_values_use_parameter_specific_json_types(
+    parameter: str, value: object, path: str
+) -> None:
+    raw = _raw()
+    raw["variant_grid"]["axes"] = [{"parameter": parameter, "values": [value]}]
+    with pytest.raises(ConfigValidationError) as caught:
+        parse_historical_experiment_config(raw, EXAMPLE.parent)
+    assert caught.value.field_path == path
+
+
+def test_grid_schema_rejects_unknown_search_fields_and_domain_errors() -> None:
+    raw = _raw()
+    raw["variant_grid"]["axes"][0]["start"] = 2
+    with pytest.raises(ConfigValidationError) as caught:
+        parse_historical_experiment_config(raw, EXAMPLE.parent)
+    assert caught.value.field_path == "$.variant_grid.axes[0].start"
+
+    raw = _raw()
+    raw["variant_grid"]["axes"][0]["values"] = [3, 3]
+    with pytest.raises(ConfigValidationError, match="duplicate"):
+        parse_historical_experiment_config(raw, EXAMPLE.parent)
+
+    raw = _raw()
+    raw["variant_grid"]["maximum_variant_count"] = True
+    with pytest.raises(ConfigValidationError) as caught:
+        parse_historical_experiment_config(raw, EXAMPLE.parent)
+    assert caught.value.field_path == "$.variant_grid.maximum_variant_count"
 
 
 @pytest.mark.parametrize(
@@ -224,6 +314,71 @@ def test_config_relative_paths_and_provider_are_used_once(
     assert run.historical_data.symbols == run.config.historical_data.symbols
 
 
+def test_grid_generator_runs_once_before_provider_with_exact_handoff(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    events: list[tuple[str, object]] = []
+
+    class RecordingGenerator:
+        def __init__(self) -> None:
+            events.append(("generator constructed", self))
+            self.delegate = HistoricalExperimentGridGenerator()
+
+        def generate(self, specification):  # type: ignore[no-untyped-def]
+            events.append(("generate", specification))
+            return self.delegate.generate(specification)
+
+    class RecordingCoordinator:
+        def __init__(self, provider):  # type: ignore[no-untyped-def]
+            self.delegate = CoordinatingHistoricalDataProvider(provider)
+
+        def get_bars(self, request):  # type: ignore[no-untyped-def]
+            events.append(("provider", request))
+            return self.delegate.get_bars(request)
+
+    monkeypatch.setattr(
+        historical_experiment, "_grid_generator_type", RecordingGenerator
+    )
+    monkeypatch.setattr(
+        historical_experiment, "_coordinator_type", RecordingCoordinator
+    )
+    run = historical_experiment.run_cli(EXAMPLE)
+    assert [item[0] for item in events] == [
+        "generator constructed",
+        "generate",
+        "provider",
+    ]
+    assert events[1][1] is run.config.grid_specification
+    assert run.grid_result is not None
+    assert all(
+        requested is generated.variant
+        for requested, generated in zip(
+            run.result.request.variants,
+            run.grid_result.generated_variants,
+            strict=True,
+        )
+    )
+
+
+def test_explicit_mode_never_constructs_grid_generator(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    class ForbiddenGenerator:
+        def __init__(self) -> None:
+            raise AssertionError("explicit mode must not construct a grid generator")
+
+    monkeypatch.setattr(
+        historical_experiment, "_grid_generator_type", ForbiddenGenerator
+    )
+    run = historical_experiment.run_cli(_write_config(tmp_path, _explicit_raw()))
+    assert run.grid_result is None
+    assert run.result.request.variants is run.config.explicit_variants
+    assert run.comparison is not None
+    assert run.summary == historical_experiment._format_summary(run.result) + (
+        historical_experiment._format_ranked_summary(run.comparison)
+    )
+
+
 def test_runner_is_constructed_and_called_once_with_exact_request(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -243,7 +398,15 @@ def test_runner_is_constructed_and_called_once_with_exact_request(
     assert events[0] == "constructed"
     assert events[1] is run.result.request
     assert len(events) == 2
-    assert run.result.request.variants == run.config.variants
+    assert run.grid_result is not None
+    assert all(
+        requested is generated.variant
+        for requested, generated in zip(
+            run.result.request.variants,
+            run.grid_result.generated_variants,
+            strict=True,
+        )
+    )
     assert run.result.request.rebalance_timestamps == run.config.rebalance_schedule
 
 
@@ -260,7 +423,7 @@ def test_factory_creates_fresh_stacks_and_variant_bootstrap_ids(
     }
     run = historical_experiment.run_cli(_write_config(tmp_path, raw))
     records = run.factory.records
-    assert len(records) == 2
+    assert len(records) == 4
     assert records[0].simulator is not records[1].simulator
     assert records[0].simulator.runtime is not records[1].simulator.runtime
     assert (
@@ -294,14 +457,19 @@ def test_summary_is_ordered_complete_and_neutral() -> None:
     run = historical_experiment.run_cli(EXAMPLE)
     summary = run.summary
     raw_summary = historical_experiment._format_summary(run.result)
-    assert summary.startswith(raw_summary)
+    assert run.grid_result is not None
+    grid_summary = historical_experiment._format_grid_summary(run.grid_result)
+    assert summary.startswith(grid_summary + raw_summary)
+    assert "generated variant count: 4" in grid_summary
+    assert "1. WINDOW_OBSERVATION_COUNT: 3, 4" in grid_summary
+    assert "2. RISK_AVERSION: 1, 2" in grid_summary
     assert "Ranking policy:" in summary
     assert "SIMULATION_RETURN: " in summary
     assert summary.index("SIMULATION_RETURN: ") < summary.index(
         "MAXIMUM_DRAWDOWN_PERCENTAGE: "
     )
-    assert summary.index("variant 0 | Shorter Window") < summary.index(
-        "variant 1 | Longer Window"
+    assert summary.index("variant 0 | Grid Base | WINDOW_OBSERVATION_COUNT=3") < (
+        summary.index("variant 1 | Grid Base | WINDOW_OBSERVATION_COUNT=3")
     )
     assert "simulation realized P&L:" in summary
     assert "maximum target cash weight:" in summary
@@ -396,10 +564,11 @@ def test_quiet_writes_complete_audit_without_history_duplication(
         "configuration",
         "historical_data",
         "initial_state",
+        "variant_generation",
         "experiment",
         "comparison",
     }
-    assert audit["schema_version"] == 2
+    assert audit["schema_version"] == 3
     assert audit["configuration"]["ranking"] == audit["comparison"]["policy"]
     assert (
         audit["comparison"]["source_experiment_result_id"]
@@ -407,7 +576,9 @@ def test_quiet_writes_complete_audit_without_history_duplication(
     )
     assert len(audit["historical_data"]["frames"]) == 5
     runs = audit["experiment"]["result"]["runs"]
-    assert [item["ordinal"] for item in runs] == [0, 1]
+    assert [item["ordinal"] for item in runs] == [0, 1, 2, 3]
+    assert len(audit["variant_generation"]["generated_variants"]) == 4
+    assert "rolling_window" not in audit["variant_generation"]["generated_variants"][0]
     assert "historical_data" not in json.dumps(runs)
     assert "configuration" not in runs[0]["rolling"]
     assert "schema_version" not in runs[0]["rolling"]
@@ -420,6 +591,7 @@ def test_compact_and_pretty_audits_are_byte_deterministic() -> None:
     audits = [
         build_historical_experiment_audit(
             run.config,
+            run.grid_result,
             run.historical_data,
             run.result,
             run.comparison,
@@ -436,16 +608,17 @@ def test_compact_and_pretty_audits_are_byte_deterministic() -> None:
 @pytest.mark.parametrize(
     ("pretty", "fixture_name"),
     (
-        (False, "historical-experiment-audit-v2-compact.json"),
-        (True, "historical-experiment-audit-v2-pretty.json"),
+        (False, "historical-experiment-audit-v3-compact.json"),
+        (True, "historical-experiment-audit-v3-pretty.json"),
     ),
 )
-def test_schema_two_audit_matches_exact_fixture(
+def test_schema_three_audit_matches_exact_fixture(
     pretty: bool, fixture_name: str
 ) -> None:
     run = historical_experiment.run_cli(EXAMPLE)
     audit = build_historical_experiment_audit(
         run.config,
+        run.grid_result,
         run.historical_data,
         run.result,
         run.comparison,
@@ -458,10 +631,11 @@ def test_schema_two_audit_matches_exact_fixture(
 
 def test_missing_ranking_audit_is_canonical_null(tmp_path: Path) -> None:
     raw = _raw()
-    raw.pop("ranking")
+    raw["ranking"] = None
     run = historical_experiment.run_cli(_write_config(tmp_path, raw))
     audit = build_historical_experiment_audit(
         run.config,
+        run.grid_result,
         run.historical_data,
         run.result,
         run.comparison,
@@ -471,24 +645,55 @@ def test_missing_ranking_audit_is_canonical_null(tmp_path: Path) -> None:
     assert audit["comparison"] is None
 
 
-def test_schema_one_raw_section_digest_sentinels() -> None:
-    run = historical_experiment.run_cli(EXAMPLE)
-    raw = _build_raw_experiment_sections(
-        run.config, run.historical_data, run.result, run.factory.records
+def test_explicit_audit_has_canonical_inactive_grid_source(tmp_path: Path) -> None:
+    run = historical_experiment.run_cli(_write_config(tmp_path, _explicit_raw()))
+    audit = build_historical_experiment_audit(
+        run.config,
+        run.grid_result,
+        run.historical_data,
+        run.result,
+        run.comparison,
+        run.factory.records,
     )
-    legacy = {"schema_version": 1, **raw}
-    legacy["configuration"] = dict(legacy["configuration"])
-    legacy["configuration"]["schema_version"] = 1
-    legacy["configuration"].pop("ranking")
+    assert audit["configuration"]["variants"] is not None
+    assert audit["configuration"]["variant_grid"] is None
+    assert audit["variant_generation"] is None
+
+
+def test_schema_two_fixture_digest_sentinels() -> None:
     expected = {
-        False: "9821bc983bec97939c8395251bee57dddb349072c317afb7898f4093a218138e",
-        True: "29dfd1c13189e65f579979e0721cc60b0e06e52d02d1ae72b7d81bafeabb5fff",
+        "historical-experiment-audit-v2-compact.json": (
+            "81184169a75fc51914f4b6dd71b7f16daeb685d676371c28c3164e0ae199e92f"
+        ),
+        "historical-experiment-audit-v2-pretty.json": (
+            "dd4b9d6e5a90918eb4af71b11ba50d1f340ace952b96e1b12c79cec16543f7b1"
+        ),
     }
-    for pretty, digest in expected.items():
-        assert (
-            sha256(serialize_audit(legacy, pretty=pretty).encode()).hexdigest()
-            == digest
+    for name, digest in expected.items():
+        content = (FIXTURES / name).read_bytes()
+        assert content.endswith(b"\n")
+        assert sha256(content).hexdigest() == digest
+
+
+def test_schema_three_preserves_raw_nested_section_shapes() -> None:
+    legacy = json.loads(
+        (FIXTURES / "historical-experiment-audit-v2-compact.json").read_text(
+            encoding="utf-8"
         )
+    )
+    current = json.loads(
+        (FIXTURES / "historical-experiment-audit-v3-compact.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert current["historical_data"] == legacy["historical_data"]
+    assert current["initial_state"] == legacy["initial_state"]
+    assert set(current["experiment"]["request"]) == set(legacy["experiment"]["request"])
+    assert set(current["experiment"]["result"]) == set(legacy["experiment"]["result"])
+    assert set(current["experiment"]["result"]["runs"][0]) == set(
+        legacy["experiment"]["result"]["runs"][0]
+    )
+    assert set(current["comparison"]) == set(legacy["comparison"])
 
 
 def test_raw_identities_do_not_depend_on_ranking_policy(tmp_path: Path) -> None:
@@ -527,6 +732,91 @@ def test_raw_identities_do_not_depend_on_ranking_policy(tmp_path: Path) -> None:
     assert runs[1].comparison is not None
     assert runs[2].comparison is not None
     assert runs[1].comparison.result_id != runs[2].comparison.result_id
+
+
+def test_grid_identity_effects_are_isolated_from_raw_experiment(
+    tmp_path: Path,
+) -> None:
+    raws = [_raw() for _ in range(8)]
+    raws[1]["variant_grid"]["maximum_variant_count"] = 5
+    raws[2]["variant_grid"]["metadata"] = [{"key": "purpose", "value": "changed"}]
+    raws[3]["variant_grid"]["specification_id"] = "00000000-0000-0000-0000-000000000431"
+    raws[4]["variant_grid"]["axes"].reverse()
+    raws[5]["variant_grid"]["base_variant"]["scenario"]["source_name"] = (
+        "changed-grid-base"
+    )
+    raws[6]["variant_grid"]["axes"][1]["values"] = ["1", "3"]
+    raws[7]["variant_grid"]["axes"][1]["parameter"] = "SCENARIO_CASH_RETURN"
+    runs = [
+        historical_experiment.run_cli(
+            _write_config(tmp_path / f"identity-{index}", raw)
+        )
+        for index, raw in enumerate(raws)
+    ]
+    assert all(run.grid_result is not None for run in runs)
+
+    def generated_ids(run):  # type: ignore[no-untyped-def]
+        return tuple(
+            item.variant.variant_id for item in run.grid_result.generated_variants
+        )
+
+    baseline = runs[0]
+    for changed in runs[1:3]:
+        assert generated_ids(changed) == generated_ids(baseline)
+        assert changed.grid_result.result_id != baseline.grid_result.result_id
+        assert changed.result.result_id == baseline.result.result_id
+        assert changed.comparison.result_id == baseline.comparison.result_id
+    for changed in runs[3:]:
+        assert generated_ids(changed) != generated_ids(baseline)
+        assert changed.grid_result.result_id != baseline.grid_result.result_id
+        assert changed.result.result_id != baseline.result.result_id
+        assert changed.comparison.result_id != baseline.comparison.result_id
+
+
+def test_grid_generation_failure_is_exit_six_before_provider_or_audit(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    output = tmp_path / "existing.json"
+    output.write_text("keep", encoding="utf-8")
+    events: list[str] = []
+
+    class FailingGenerator:
+        def generate(self, specification):  # type: ignore[no-untyped-def]
+            events.append("generate")
+            raise HistoricalExperimentGridSizeError("deliberate grid failure")
+
+    class ForbiddenCoordinator:
+        def __init__(self, provider):  # type: ignore[no-untyped-def]
+            raise AssertionError("historical provider must not be constructed")
+
+    def forbidden(*args, **kwargs):  # noqa: ANN002, ANN003, ANN202
+        raise AssertionError("audit builder must not run")
+
+    monkeypatch.setattr(historical_experiment, "_grid_generator_type", FailingGenerator)
+    monkeypatch.setattr(
+        historical_experiment, "_coordinator_type", ForbiddenCoordinator
+    )
+    monkeypatch.setattr(historical_experiment, "_audit_builder", forbidden)
+    assert (
+        historical_experiment.main(
+            [
+                "--config",
+                str(EXAMPLE),
+                "--output",
+                str(output),
+                "--overwrite",
+            ]
+        )
+        == 6
+    )
+    captured = capsys.readouterr()
+    assert events == ["generate"]
+    assert captured.out == ""
+    assert "variant-grid generation failed" in captured.err
+    assert output.read_text(encoding="utf-8") == "keep"
+    assert not tuple(tmp_path.glob("*.tmp"))
 
 
 def test_known_comparison_failure_is_exit_six_and_preserves_output(

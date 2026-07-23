@@ -1,4 +1,4 @@
-"""Deterministic schema-two audit for offline historical experiments."""
+"""Deterministic schema-three audit for offline historical experiments."""
 
 from decimal import Decimal
 from typing import Any
@@ -30,6 +30,8 @@ from trading_bot.execution.state_fingerprints import (
 )
 from trading_bot.experiments import (
     HistoricalExperimentComparisonResult,
+    HistoricalExperimentGridResult,
+    HistoricalExperimentGridSpecification,
     HistoricalExperimentMetrics,
     HistoricalExperimentRankingPolicy,
     HistoricalExperimentResult,
@@ -37,11 +39,12 @@ from trading_bot.experiments import (
 )
 from trading_bot.market_data import MultiSymbolHistoricalDataResult
 
-HISTORICAL_EXPERIMENT_AUDIT_SCHEMA_VERSION = 2
+HISTORICAL_EXPERIMENT_AUDIT_SCHEMA_VERSION = 3
 
 
 def build_historical_experiment_audit(
     config: LoadedHistoricalExperimentConfig,
+    grid_result: HistoricalExperimentGridResult | None,
     historical: MultiSymbolHistoricalDataResult,
     result: HistoricalExperimentResult,
     comparison: HistoricalExperimentComparisonResult | None,
@@ -63,7 +66,11 @@ def build_historical_experiment_audit(
         comparison_section = _comparison(config.ranking_policy, result, comparison)
     return {
         "schema_version": HISTORICAL_EXPERIMENT_AUDIT_SCHEMA_VERSION,
-        **raw,
+        "configuration": raw["configuration"],
+        "historical_data": raw["historical_data"],
+        "initial_state": raw["initial_state"],
+        "variant_generation": _variant_generation(config, grid_result, result),
+        "experiment": raw["experiment"],
         "comparison": comparison_section,
     }
 
@@ -208,7 +215,16 @@ def _configuration(config: LoadedHistoricalExperimentConfig) -> dict[str, Any]:
                 for item in config.initial_state.bootstrap_positions
             ],
         },
-        "variants": [_variant(item) for item in config.variants],
+        "variants": (
+            None
+            if config.explicit_variants is None
+            else [_variant(item) for item in config.explicit_variants]
+        ),
+        "variant_grid": (
+            None
+            if config.grid_specification is None
+            else _grid_specification(config.grid_specification)
+        ),
         "metadata": _metadata(config.metadata),
         "ranking": (
             None
@@ -216,6 +232,99 @@ def _configuration(config: LoadedHistoricalExperimentConfig) -> dict[str, Any]:
             else _ranking_policy(config.ranking_policy)
         ),
     }
+
+
+def _grid_specification(
+    specification: HistoricalExperimentGridSpecification,
+) -> dict[str, Any]:
+    return {
+        "specification_id": str(specification.specification_id),
+        "base_variant": _variant(specification.base_variant),
+        "axes": [
+            {
+                "parameter": axis.parameter.value,
+                "values": [_grid_value(value) for value in axis.values],
+            }
+            for axis in specification.axes
+        ],
+        "maximum_variant_count": specification.maximum_variant_count,
+        "metadata": _metadata(specification.metadata),
+    }
+
+
+def _variant_generation(
+    config: LoadedHistoricalExperimentConfig,
+    grid_result: HistoricalExperimentGridResult | None,
+    experiment_result: HistoricalExperimentResult,
+) -> dict[str, Any] | None:
+    specification = config.grid_specification
+    if specification is None:
+        if grid_result is not None:
+            raise HistoricalExperimentAuditError(
+                "explicit mode cannot retain a grid result"
+            )
+        if config.explicit_variants is None:
+            raise HistoricalExperimentAuditError(
+                "explicit mode has no configured variants"
+            )
+        requested = experiment_result.request.variants
+        if len(requested) != len(config.explicit_variants) or any(
+            requested_variant is not configured_variant
+            for requested_variant, configured_variant in zip(
+                requested, config.explicit_variants, strict=True
+            )
+        ):
+            raise HistoricalExperimentAuditError(
+                "explicit variants do not exactly match experiment request"
+            )
+        return None
+    if grid_result is None:
+        raise HistoricalExperimentAuditError("grid mode has no generated grid result")
+    if grid_result.specification is not specification:
+        raise HistoricalExperimentAuditError(
+            "grid result does not retain the exact configured specification"
+        )
+    generated = grid_result.generated_variants
+    requested = experiment_result.request.variants
+    if len(generated) != len(requested):
+        raise HistoricalExperimentAuditError(
+            "generated and requested variant counts differ"
+        )
+    for ordinal, (row, variant) in enumerate(zip(generated, requested, strict=True)):
+        if (
+            row.ordinal != ordinal
+            or row.variant is not variant
+            or row.variant.variant_id != variant.variant_id
+            or row.variant.name != variant.name
+        ):
+            raise HistoricalExperimentAuditError(
+                f"generated variant {ordinal} does not match experiment request"
+            )
+    return {
+        "specification": _grid_specification(specification),
+        "result_id": str(grid_result.result_id),
+        "generated_variants": [
+            {
+                "ordinal": row.ordinal,
+                "variant_id": str(row.variant.variant_id),
+                "variant_name": row.variant.name,
+                "assignments": [
+                    {
+                        "parameter": assignment.parameter.value,
+                        "value": _grid_value(assignment.value),
+                    }
+                    for assignment in row.assignments
+                ],
+            }
+            for row in generated
+        ],
+    }
+
+
+def _grid_value(value: Decimal | int | bool | None) -> str | int | bool | None:
+    if isinstance(value, Decimal):
+        return _decimal(value)
+    return value
 
 
 def _ranking_policy(

@@ -41,6 +41,9 @@ from trading_bot.experiments import (
     HistoricalExperimentComparisonResult,
     HistoricalExperimentError,
     HistoricalExperimentExecutionError,
+    HistoricalExperimentGridError,
+    HistoricalExperimentGridGenerator,
+    HistoricalExperimentGridResult,
     HistoricalExperimentInitializationError,
     HistoricalExperimentInitialState,
     HistoricalExperimentIsolationError,
@@ -66,6 +69,7 @@ _BOOTSTRAP_NAMESPACE = UUID("8777c17e-0c37-55f8-bf91-a8cd307b73c8")
 _BOOTSTRAP_VERSION = "historical-experiment-cli-bootstrap-v1"
 _runner_type = HistoricalExperimentRunner
 _comparator_type = HistoricalExperimentComparator
+_grid_generator_type = HistoricalExperimentGridGenerator
 _coordinator_type = CoordinatingHistoricalDataProvider
 _audit_builder = build_historical_experiment_audit
 
@@ -140,6 +144,7 @@ class _ExperimentSimulatorFactory:
 @dataclass(frozen=True, slots=True)
 class HistoricalExperimentCliRunResult:
     config: LoadedHistoricalExperimentConfig
+    grid_result: HistoricalExperimentGridResult | None
     historical_data: MultiSymbolHistoricalDataResult
     result: HistoricalExperimentResult
     comparison: HistoricalExperimentComparisonResult | None
@@ -164,6 +169,21 @@ def run_cli(
 ) -> HistoricalExperimentCliRunResult:
     """Load local history once and invoke one experiment runner once."""
     config = load_historical_experiment_config(config_path)
+    grid_result = None
+    if config.grid_specification is None:
+        variants = config.explicit_variants
+    else:
+        try:
+            grid_result = _grid_generator_type().generate(config.grid_specification)
+        except HistoricalExperimentGridError as error:
+            raise HistoricalExperimentExecutionCliError(
+                f"variant-grid generation failed: {error}"
+            ) from error
+        variants = tuple(item.variant for item in grid_result.generated_variants)
+    if variants is None:
+        raise HistoricalExperimentExecutionCliError(
+            "configuration did not resolve experiment variants"
+        )
     historical_config = config.historical_data
     coordinator = _coordinator_type(
         CSVHistoricalDataProvider(historical_config.common_parent)
@@ -198,7 +218,7 @@ def run_cli(
             historical,
             config.rebalance_schedule,
             config.initial_state,
-            config.variants,
+            variants,
             config.metadata,
         )
     except InvalidHistoricalExperimentRequestError as error:
@@ -232,12 +252,40 @@ def run_cli(
             raise HistoricalExperimentExecutionCliError(
                 f"comparison failed: {error}"
             ) from error
-    summary = _format_summary(result)
+    summary = ""
+    if grid_result is not None:
+        summary += _format_grid_summary(grid_result)
+    summary += _format_summary(result)
     if comparison is not None:
         summary += _format_ranked_summary(comparison)
     return HistoricalExperimentCliRunResult(
-        config, historical, result, comparison, factory, summary
+        config, grid_result, historical, result, comparison, factory, summary
     )
+
+
+def _format_grid_summary(result: HistoricalExperimentGridResult) -> str:
+    specification = result.specification
+    lines = [
+        "Variant grid:",
+        f"  specification ID: {specification.specification_id}",
+        f"  generated variant count: {len(result.generated_variants)}",
+        f"  maximum variant count: {specification.maximum_variant_count}",
+        "  axes:",
+    ]
+    for ordinal, axis in enumerate(specification.axes, start=1):
+        values = ", ".join(_grid_value(value) for value in axis.values)
+        lines.append(f"    {ordinal}. {axis.parameter.value}: {values}")
+    return "\n".join(lines) + "\n"
+
+
+def _grid_value(value: Decimal | int | bool | None) -> str:
+    if value is None:
+        return "NULL"
+    if type(value) is bool:
+        return "true" if value else "false"
+    if isinstance(value, Decimal):
+        return canonical_decimal(value)
+    return str(value)
 
 
 def _variant_failure_message(error: HistoricalExperimentError) -> str:
@@ -365,6 +413,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.output is not None:
             audit = _audit_builder(
                 run.config,
+                run.grid_result,
                 run.historical_data,
                 run.result,
                 run.comparison,

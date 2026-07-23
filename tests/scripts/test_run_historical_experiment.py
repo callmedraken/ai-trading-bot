@@ -26,8 +26,10 @@ def test_documented_repository_root_invocation_succeeds() -> None:
         _command(), cwd=ROOT, check=True, capture_output=True, text=True
     )
     assert "experiment result ID:" in completed.stdout
-    assert "variant 0 | Shorter Window" in completed.stdout
-    assert "variant 1 | Longer Window" in completed.stdout
+    assert "Variant grid:" in completed.stdout
+    assert "generated variant count: 4" in completed.stdout
+    assert "variant 0 | Grid Base | WINDOW_OBSERVATION_COUNT=3" in completed.stdout
+    assert "variant 3 | Grid Base | WINDOW_OBSERVATION_COUNT=4" in completed.stdout
     assert "Ranking policy:" in completed.stdout
     assert "Ranked comparison:" in completed.stdout
     assert completed.stderr == ""

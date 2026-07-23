@@ -1,0 +1,4338 @@
+{
+  "comparison": {
+    "policy": {
+      "criteria": [
+        {
+          "direction": "DESCENDING",
+          "metric": "SIMULATION_RETURN"
+        },
+        {
+          "direction": "ASCENDING",
+          "metric": "MAXIMUM_DRAWDOWN_PERCENTAGE"
+        }
+      ],
+      "metadata": [
+        {
+          "key": "example",
+          "value": "explicit-neutral-ranking"
+        }
+      ],
+      "policy_id": "00000000-0000-0000-0000-000000000420",
+      "tie_breaker": "CALLER_ORDER"
+    },
+    "policy_fingerprint": "33ab79ce-d3cd-5563-ab57-d354e3e1794a",
+    "ranked_runs": [
+      {
+        "caller_ordinal": 0,
+        "comparison_values": [
+          {
+            "metric": "SIMULATION_RETURN",
+            "value": "0"
+          },
+          {
+            "metric": "MAXIMUM_DRAWDOWN_PERCENTAGE",
+            "value": "0"
+          }
+        ],
+        "rank": 1,
+        "source_run_id": "78266be7-847c-5795-9297-3e52cb0fd33a",
+        "source_variant_id": "2760ea8a-84b9-5619-a2df-4755e460cb20"
+      },
+      {
+        "caller_ordinal": 1,
+        "comparison_values": [
+          {
+            "metric": "SIMULATION_RETURN",
+            "value": "0"
+          },
+          {
+            "metric": "MAXIMUM_DRAWDOWN_PERCENTAGE",
+            "value": "0"
+          }
+        ],
+        "rank": 2,
+        "source_run_id": "e44e8e80-68f7-59b4-ac49-0a52067b167e",
+        "source_variant_id": "a3f9e1e2-d22c-5ada-b66e-eb3bf01c52ad"
+      },
+      {
+        "caller_ordinal": 2,
+        "comparison_values": [
+          {
+            "metric": "SIMULATION_RETURN",
+            "value": "0"
+          },
+          {
+            "metric": "MAXIMUM_DRAWDOWN_PERCENTAGE",
+            "value": "0"
+          }
+        ],
+        "rank": 3,
+        "source_run_id": "6dce1e0e-44ef-5a3e-bf2b-ced2ee7a07de",
+        "source_variant_id": "310a50df-5817-5fc8-80b6-c6284f7d46f1"
+      },
+      {
+        "caller_ordinal": 3,
+        "comparison_values": [
+          {
+            "metric": "SIMULATION_RETURN",
+            "value": "0"
+          },
+          {
+            "metric": "MAXIMUM_DRAWDOWN_PERCENTAGE",
+            "value": "0"
+          }
+        ],
+        "rank": 4,
+        "source_run_id": "2159072a-ae63-558f-8431-3c9edf508672",
+        "source_variant_id": "416e5528-c33e-5d60-a311-c6fba4e7a403"
+      }
+    ],
+    "result_id": "9ce6d408-a4f9-5a89-9503-77451e350d71",
+    "source_experiment_result_id": "4f182fbf-dd86-5bd4-b301-5034e725948d"
+  },
+  "configuration": {
+    "historical_data": {
+      "adjustment": "RAW",
+      "end": "2026-01-10T00:00:00+00:00",
+      "missing_bar_policy": "INTERSECTION",
+      "source_label": "historical-experiment-local-csv",
+      "sources": [
+        {
+          "path": "data/rolling-historical/SPY.csv",
+          "symbol": "SPY"
+        },
+        {
+          "path": "data/rolling-historical/QQQ.csv",
+          "symbol": "QQQ"
+        }
+      ],
+      "start": "2026-01-05T00:00:00+00:00",
+      "symbols": [
+        "SPY",
+        "QQQ"
+      ],
+      "timeframe": "1D"
+    },
+    "initial_state": {
+      "as_of": "2026-01-05T19:00:00+00:00",
+      "available_cash": "10000",
+      "bootstrap_commission": "0",
+      "bootstrap_positions": [],
+      "mode": "CASH_ONLY"
+    },
+    "metadata": [
+      {
+        "key": "example",
+        "value": "historical-experiment"
+      }
+    ],
+    "ranking": {
+      "criteria": [
+        {
+          "direction": "DESCENDING",
+          "metric": "SIMULATION_RETURN"
+        },
+        {
+          "direction": "ASCENDING",
+          "metric": "MAXIMUM_DRAWDOWN_PERCENTAGE"
+        }
+      ],
+      "metadata": [
+        {
+          "key": "example",
+          "value": "explicit-neutral-ranking"
+        }
+      ],
+      "policy_id": "00000000-0000-0000-0000-000000000420",
+      "tie_breaker": "CALLER_ORDER"
+    },
+    "rebalance_schedule": [
+      "2026-01-09T20:00:00+00:00"
+    ],
+    "request_id": "00000000-0000-0000-0000-000000000401",
+    "schema_version": 3,
+    "variant_grid": {
+      "axes": [
+        {
+          "parameter": "WINDOW_OBSERVATION_COUNT",
+          "values": [
+            3,
+            4
+          ]
+        },
+        {
+          "parameter": "RISK_AVERSION",
+          "values": [
+            "1",
+            "2"
+          ]
+        }
+      ],
+      "base_variant": {
+        "execution_prices": {
+          "fill_reference_price_field": "CLOSE",
+          "risk_price_field": "CLOSE"
+        },
+        "fills": {
+          "fixed_commission": "0",
+          "slippage_basis_points": "0"
+        },
+        "metadata": [
+          {
+            "key": "variant_family",
+            "value": "grid-base"
+          }
+        ],
+        "name": "Grid Base",
+        "optimization": {
+          "confidence_level": "0.75",
+          "maximum_iterations": null,
+          "minimum_expected_return": null,
+          "output_quantum": "0.00000001",
+          "risk_aversion": "1",
+          "solver_tolerance": "0.00000001"
+        },
+        "portfolio_constraints": {
+          "allow_leverage": false,
+          "long_only": true,
+          "maximum_cash_weight": "1",
+          "maximum_one_way_rebalance_turnover": null,
+          "maximum_position_weight": "0.6",
+          "minimum_cash_weight": "0",
+          "minimum_position_weight": null
+        },
+        "rebalance": {
+          "assumptions": {
+            "additional_execution_cash_buffer": "0",
+            "allow_fractional_quantities": true,
+            "fixed_commission": "0",
+            "minimum_trade_notional": "0",
+            "minimum_trade_quantity": "0",
+            "quantity_increment": "0.001",
+            "target_weight_tolerance": "0",
+            "use_planned_sell_proceeds": true
+          },
+          "proposal_confidence": null,
+          "proposal_policy": {
+            "allow_partial_plans": true
+          }
+        },
+        "risk": {
+          "limits": {
+            "allow_buying": true,
+            "allow_fractional_shares": true,
+            "allow_selling": true,
+            "estimated_commission": "0",
+            "fractional_increment": "0.001",
+            "max_new_position_percent": null,
+            "max_order_notional": null,
+            "max_position_percent": "0.6",
+            "max_total_exposure_percent": "1",
+            "minimum_cash_reserve_percent": "0"
+          },
+          "policy": {
+            "allow_sell_proceeds_for_later_buys": false
+          }
+        },
+        "rolling_window": {
+          "observation_count": 3
+        },
+        "scenario": {
+          "cash_return": "0",
+          "price_field": "CLOSE",
+          "return_method": "SIMPLE",
+          "source_name": "historical-experiment-grid",
+          "window_policy": "ALL_SUPPLIED"
+        },
+        "timing": {
+          "fill_offset_microseconds": 120000000,
+          "submission_offset_microseconds": 60000000
+        },
+        "trading_enabled": true,
+        "variant_id": "00000000-0000-0000-0000-000000000411"
+      },
+      "maximum_variant_count": 4,
+      "metadata": [
+        {
+          "key": "example",
+          "value": "explicit-finite-grid"
+        }
+      ],
+      "specification_id": "00000000-0000-0000-0000-000000000430"
+    },
+    "variants": null
+  },
+  "experiment": {
+    "request": {
+      "metadata": [
+        {
+          "key": "example",
+          "value": "historical-experiment"
+        }
+      ],
+      "rebalance_schedule": [
+        "2026-01-09T20:00:00+00:00"
+      ],
+      "request_id": "00000000-0000-0000-0000-000000000401",
+      "variant_ids": [
+        "2760ea8a-84b9-5619-a2df-4755e460cb20",
+        "a3f9e1e2-d22c-5ada-b66e-eb3bf01c52ad",
+        "310a50df-5817-5fc8-80b6-c6284f7d46f1",
+        "416e5528-c33e-5d60-a311-c6fba4e7a403"
+      ]
+    },
+    "result": {
+      "historical_fingerprint": "003a6236-23c4-5613-a9dd-a405032751b5",
+      "initial_state_fingerprint": "d0657c6f-e7a8-51ab-ba9e-bab0f2066396",
+      "result_id": "4f182fbf-dd86-5bd4-b301-5034e725948d",
+      "runs": [
+        {
+          "initial_state_content_fingerprint": "d0657c6f-e7a8-51ab-ba9e-bab0f2066396",
+          "initialization": {
+            "bootstrap_fills": [],
+            "final_engine_state_id": "470016e6-5a83-5a39-91dd-ad3a2cf5e0fc",
+            "final_ledger_state_id": "099f0899-8007-561c-aadf-30c8dd352f0b",
+            "initial_engine_state_id": "6bec5d03-e88e-5383-b8ec-82b2ec4db4d4",
+            "initial_ledger_state_id": "b76293e6-25f2-53fc-93b1-108a172169e6"
+          },
+          "metrics": {
+            "absolute_simulation_profit_loss": "0",
+            "adverse_slippage_cost": "0",
+            "aggregate_one_way_turnover": "0.599994",
+            "aggregate_two_way_turnover": "0.599994",
+            "applied_cycle_count": 1,
+            "approved_decisions": 1,
+            "final_equity": "10000",
+            "initial_equity": "10000",
+            "maximum_allocation_drift": "0.000006",
+            "maximum_drawdown_amount": "0",
+            "maximum_drawdown_percentage": "0",
+            "maximum_target_cash_weight": "0.4",
+            "mean_expected_portfolio_return": "0.0114296081277213352685050797",
+            "minimum_target_cash_weight": "0.4",
+            "no_action_cycle_count": 0,
+            "reduced_notional": "0",
+            "rejected_decisions": 0,
+            "rejected_notional": "0",
+            "resized_decisions": 0,
+            "simulation_realized_profit_loss": "0",
+            "simulation_return": "0",
+            "total_commissions": "0",
+            "total_execution_cost": "0",
+            "total_fills": 1,
+            "total_orders": 1,
+            "worst_cvar": "-0.011320754716981132075471698"
+          },
+          "ordinal": 0,
+          "rolling": {
+            "request": {
+              "metadata": [
+                {
+                  "key": "historical_experiment_id",
+                  "value": "00000000-0000-0000-0000-000000000401"
+                },
+                {
+                  "key": "historical_experiment_variant_id",
+                  "value": "2760ea8a-84b9-5619-a2df-4755e460cb20"
+                },
+                {
+                  "key": "historical_experiment_variant_ordinal",
+                  "value": "0"
+                },
+                {
+                  "key": "historical_experiment_variant_name",
+                  "value": "Grid Base | WINDOW_OBSERVATION_COUNT=3, RISK_AVERSION=1"
+                }
+              ],
+              "observation_count": 3,
+              "rebalance_schedule": [
+                "2026-01-09T20:00:00+00:00"
+              ],
+              "request_id": "41ace164-b6ea-59e6-b825-adab43ac15b9",
+              "scenario_cash_return": "0",
+              "scenario_source_name": "historical-experiment-grid",
+              "trading_enabled": true
+            },
+            "result": {
+              "frame_generations": [
+                {
+                  "frame_ordinal": 0,
+                  "historical_frame_index": 4,
+                  "optimized_frame": {
+                    "as_of": "2026-01-09T20:00:00+00:00",
+                    "expected_returns": [
+                      {
+                        "symbol": "SPY",
+                        "value": "0.0190493468795355587808417995"
+                      },
+                      {
+                        "symbol": "QQQ",
+                        "value": "-0.01025667999158426257100778455"
+                      }
+                    ],
+                    "fill_policy": {
+                      "fixed_commission": "0",
+                      "slippage_basis_points": "0"
+                    },
+                    "filled_at": "2026-01-09T20:02:00+00:00",
+                    "metadata": [
+                      {
+                        "key": "rolling_historical_frame_ordinal",
+                        "value": "0"
+                      },
+                      {
+                        "key": "rolling_historical_window_start",
+                        "value": "2026-01-07T20:00:00+00:00"
+                      },
+                      {
+                        "key": "rolling_historical_window_end",
+                        "value": "2026-01-09T20:00:00+00:00"
+                      },
+                      {
+                        "key": "rolling_historical_observation_count",
+                        "value": "3"
+                      }
+                    ],
+                    "optimization": {
+                      "confidence_level": "0.75",
+                      "maximum_iterations": null,
+                      "minimum_expected_return": null,
+                      "output_quantum": "0.00000001",
+                      "risk_aversion": "1",
+                      "solver_tolerance": "0.00000001"
+                    },
+                    "portfolio_constraints": {
+                      "allow_leverage": false,
+                      "long_only": true,
+                      "maximum_cash_weight": "1",
+                      "maximum_one_way_rebalance_turnover": null,
+                      "maximum_position_weight": "0.6",
+                      "minimum_cash_weight": "0",
+                      "minimum_position_weight": null
+                    },
+                    "prices": [
+                      {
+                        "fill_reference_price": "108",
+                        "risk_price": "108",
+                        "symbol": "SPY"
+                      },
+                      {
+                        "fill_reference_price": "96",
+                        "risk_price": "96",
+                        "symbol": "QQQ"
+                      }
+                    ],
+                    "proposal_confidence": null,
+                    "proposal_policy": {
+                      "allow_partial_plans": true
+                    },
+                    "rebalance_assumptions": {
+                      "additional_execution_cash_buffer": "0",
+                      "allow_fractional_quantities": true,
+                      "fixed_commission": "0",
+                      "minimum_trade_notional": "0",
+                      "minimum_trade_quantity": "0",
+                      "quantity_increment": "0.001",
+                      "target_weight_tolerance": "0",
+                      "use_planned_sell_proceeds": true
+                    },
+                    "risk_limits": {
+                      "allow_buying": true,
+                      "allow_fractional_shares": true,
+                      "allow_selling": true,
+                      "estimated_commission": "0",
+                      "fractional_increment": "0.001",
+                      "max_new_position_percent": null,
+                      "max_order_notional": null,
+                      "max_position_percent": "0.6",
+                      "max_total_exposure_percent": "1",
+                      "minimum_cash_reserve_percent": "0"
+                    },
+                    "risk_policy": {
+                      "allow_sell_proceeds_for_later_buys": false
+                    },
+                    "scenarios": {
+                      "cash_return": "0",
+                      "forecast_horizon": {
+                        "periods": 1,
+                        "timeframe": "1D"
+                      },
+                      "metadata": [
+                        {
+                          "key": "rolling_historical_simulation_id",
+                          "value": "41ace164-b6ea-59e6-b825-adab43ac15b9"
+                        },
+                        {
+                          "key": "rolling_historical_frame_ordinal",
+                          "value": "0"
+                        },
+                        {
+                          "key": "rolling_historical_window_start",
+                          "value": "2026-01-07T20:00:00+00:00"
+                        },
+                        {
+                          "key": "rolling_historical_window_end",
+                          "value": "2026-01-09T20:00:00+00:00"
+                        },
+                        {
+                          "key": "rolling_historical_observation_count",
+                          "value": "3"
+                        },
+                        {
+                          "key": "historical_scenario_observation_start",
+                          "value": "2026-01-07T20:00:00+00:00"
+                        },
+                        {
+                          "key": "historical_scenario_observation_end",
+                          "value": "2026-01-09T20:00:00+00:00"
+                        },
+                        {
+                          "key": "historical_scenario_observation_count",
+                          "value": "3"
+                        },
+                        {
+                          "key": "historical_scenario_return_row_count",
+                          "value": "2"
+                        },
+                        {
+                          "key": "historical_scenario_price_field",
+                          "value": "CLOSE"
+                        },
+                        {
+                          "key": "historical_scenario_return_method",
+                          "value": "SIMPLE"
+                        },
+                        {
+                          "key": "historical_scenario_window_policy",
+                          "value": "ALL_SUPPLIED"
+                        }
+                      ],
+                      "rows": [
+                        {
+                          "metadata": [],
+                          "probability": "0.5",
+                          "returns": [
+                            "0.019230769230769230769230769",
+                            "-0.0102040816326530612244897959"
+                          ],
+                          "scenario_id": "27fa3e2c-707a-5734-aa7e-9d28245868c5"
+                        },
+                        {
+                          "metadata": [],
+                          "probability": "0.5",
+                          "returns": [
+                            "0.01886792452830188679245283",
+                            "-0.0103092783505154639175257732"
+                          ],
+                          "scenario_id": "ea26c8b9-3659-5223-8e5b-2a957e98893d"
+                        }
+                      ],
+                      "scenario_set_id": "b5af1448-3e2c-5205-a942-81e766275394",
+                      "source": "HISTORICAL",
+                      "source_name": "historical-experiment-grid",
+                      "symbols": [
+                        "SPY",
+                        "QQQ"
+                      ]
+                    },
+                    "submitted_at": "2026-01-09T20:01:00+00:00",
+                    "trading_enabled": true
+                  },
+                  "optimized_frame_fingerprint": "7c6914bb-a737-58e6-a9b0-ba21ac16be6c",
+                  "rebalance_timestamp": "2026-01-09T20:00:00+00:00",
+                  "scenario_request_id": "dc1bfbf6-f19e-575d-82ae-187bc1bdf810",
+                  "scenario_result": {
+                    "diagnostics": [],
+                    "expected_returns": [
+                      {
+                        "symbol": "SPY",
+                        "value": "0.0190493468795355587808417995"
+                      },
+                      {
+                        "symbol": "QQQ",
+                        "value": "-0.01025667999158426257100778455"
+                      }
+                    ],
+                    "request": {
+                      "as_of": "2026-01-09T20:00:00+00:00",
+                      "cash_return": "0",
+                      "forecast_horizon": {
+                        "periods": 1,
+                        "timeframe": "1D"
+                      },
+                      "historical_request": {
+                        "adjustment": "RAW",
+                        "end": "2026-01-10T00:00:00+00:00",
+                        "frame_count": 3,
+                        "missing_bar_policy": "INTERSECTION",
+                        "provider_name": "coordinating:trading_bot.market_data.csv_provider.CSVHistoricalDataProvider",
+                        "start": "2026-01-07T20:00:00+00:00",
+                        "symbols": [
+                          "SPY",
+                          "QQQ"
+                        ],
+                        "timeframe": "1D"
+                      },
+                      "metadata": [
+                        {
+                          "key": "rolling_historical_simulation_id",
+                          "value": "41ace164-b6ea-59e6-b825-adab43ac15b9"
+                        },
+                        {
+                          "key": "rolling_historical_frame_ordinal",
+                          "value": "0"
+                        },
+                        {
+                          "key": "rolling_historical_window_start",
+                          "value": "2026-01-07T20:00:00+00:00"
+                        },
+                        {
+                          "key": "rolling_historical_window_end",
+                          "value": "2026-01-09T20:00:00+00:00"
+                        },
+                        {
+                          "key": "rolling_historical_observation_count",
+                          "value": "3"
+                        }
+                      ],
+                      "policy": {
+                        "price_field": "CLOSE",
+                        "return_method": "SIMPLE",
+                        "window_policy": "ALL_SUPPLIED"
+                      },
+                      "request_id": "dc1bfbf6-f19e-575d-82ae-187bc1bdf810",
+                      "source_name": "historical-experiment-grid"
+                    },
+                    "result_id": "26dabf48-5ac8-505b-9745-c51f27129168",
+                    "scenario_set": {
+                      "as_of": "2026-01-09T20:00:00+00:00",
+                      "cash_return": "0",
+                      "forecast_horizon": {
+                        "periods": 1,
+                        "timeframe": "1D"
+                      },
+                      "metadata": [
+                        {
+                          "key": "rolling_historical_simulation_id",
+                          "value": "41ace164-b6ea-59e6-b825-adab43ac15b9"
+                        },
+                        {
+                          "key": "rolling_historical_frame_ordinal",
+                          "value": "0"
+                        },
+                        {
+                          "key": "rolling_historical_window_start",
+                          "value": "2026-01-07T20:00:00+00:00"
+                        },
+                        {
+                          "key": "rolling_historical_window_end",
+                          "value": "2026-01-09T20:00:00+00:00"
+                        },
+                        {
+                          "key": "rolling_historical_observation_count",
+                          "value": "3"
+                        },
+                        {
+                          "key": "historical_scenario_observation_start",
+                          "value": "2026-01-07T20:00:00+00:00"
+                        },
+                        {
+                          "key": "historical_scenario_observation_end",
+                          "value": "2026-01-09T20:00:00+00:00"
+                        },
+                        {
+                          "key": "historical_scenario_observation_count",
+                          "value": "3"
+                        },
+                        {
+                          "key": "historical_scenario_return_row_count",
+                          "value": "2"
+                        },
+                        {
+                          "key": "historical_scenario_price_field",
+                          "value": "CLOSE"
+                        },
+                        {
+                          "key": "historical_scenario_return_method",
+                          "value": "SIMPLE"
+                        },
+                        {
+                          "key": "historical_scenario_window_policy",
+                          "value": "ALL_SUPPLIED"
+                        }
+                      ],
+                      "rows": [
+                        {
+                          "metadata": [],
+                          "probability": "0.5",
+                          "returns": [
+                            "0.019230769230769230769230769",
+                            "-0.0102040816326530612244897959"
+                          ],
+                          "scenario_id": "27fa3e2c-707a-5734-aa7e-9d28245868c5"
+                        },
+                        {
+                          "metadata": [],
+                          "probability": "0.5",
+                          "returns": [
+                            "0.01886792452830188679245283",
+                            "-0.0103092783505154639175257732"
+                          ],
+                          "scenario_id": "ea26c8b9-3659-5223-8e5b-2a957e98893d"
+                        }
+                      ],
+                      "scenario_set_id": "b5af1448-3e2c-5205-a942-81e766275394",
+                      "source": "HISTORICAL",
+                      "source_name": "historical-experiment-grid",
+                      "symbols": [
+                        "SPY",
+                        "QQQ"
+                      ]
+                    }
+                  },
+                  "source_frame_id": "a085df97-f53f-5412-92d8-f492f26bcd2f",
+                  "window_end_index_inclusive": 4,
+                  "window_end_timestamp": "2026-01-09T20:00:00+00:00",
+                  "window_start_index": 2,
+                  "window_start_timestamp": "2026-01-07T20:00:00+00:00"
+                }
+              ],
+              "optimized_simulation": {
+                "counts": {
+                  "applied_cycle_count": 1,
+                  "frame_count": 1,
+                  "no_action_cycle_count": 0
+                },
+                "final_state": {
+                  "cash": "4000.06",
+                  "engine_state_id": "470016e6-5a83-5a39-91dd-ad3a2cf5e0fc",
+                  "ledger_fills": [
+                    {
+                      "commission": "0",
+                      "fill_id": "143cf77d-47e0-51dc-aeb6-be13ae34a5c6",
+                      "filled_at": "2026-01-09T20:02:00+00:00",
+                      "order_id": "aad7810a-d0f1-5de7-a06f-f7432b58793a",
+                      "origin": "SIMULATION",
+                      "price": "108",
+                      "quantity": "55.555",
+                      "side": "BUY",
+                      "symbol": "SPY"
+                    }
+                  ],
+                  "ledger_state_id": "099f0899-8007-561c-aadf-30c8dd352f0b",
+                  "positions": [
+                    {
+                      "average_cost": "108",
+                      "quantity": "55.555",
+                      "symbol": "SPY"
+                    }
+                  ],
+                  "realized_profit_loss": "0"
+                },
+                "frames": [
+                  {
+                    "application": {
+                      "evaluations": [
+                        {
+                          "application_event": {
+                            "event_id": "20beaac4-e5be-596b-86f3-1b1775e9ea30",
+                            "event_type": "FILLED",
+                            "fill_id": "143cf77d-47e0-51dc-aeb6-be13ae34a5c6",
+                            "occurred_at": "2026-01-09T20:02:00+00:00",
+                            "order_id": "aad7810a-d0f1-5de7-a06f-f7432b58793a",
+                            "reason": null
+                          },
+                          "fill_id": "143cf77d-47e0-51dc-aeb6-be13ae34a5c6",
+                          "ledger_cash_after": "4000.06",
+                          "ledger_position_after": {
+                            "average_cost": "108",
+                            "quantity": "55.555",
+                            "symbol": "SPY"
+                          },
+                          "ledger_realized_profit_loss_after": "0",
+                          "source_fill_ordinal": 0
+                        }
+                      ],
+                      "post_engine_state_id": "470016e6-5a83-5a39-91dd-ad3a2cf5e0fc",
+                      "post_ledger_state_id": "099f0899-8007-561c-aadf-30c8dd352f0b",
+                      "pre_engine_state_id": "fe8793c2-2725-51cd-b260-0a79461c06a9",
+                      "pre_ledger_state_id": "b76293e6-25f2-53fc-93b1-108a172169e6",
+                      "result_id": "fd1dbf0e-61c4-5d53-a071-a7a6791f7367",
+                      "status": "APPLIED"
+                    },
+                    "as_of": "2026-01-09T20:00:00+00:00",
+                    "certification": {
+                      "request_id": "4659c1d4-d997-532f-9730-a04a7cc24153",
+                      "result_id": "a865bc50-4eb7-5024-bcad-0f7c21a5de56",
+                      "target": {
+                        "allocations": [
+                          {
+                            "symbol": "SPY",
+                            "weight": "0.6"
+                          },
+                          {
+                            "symbol": "QQQ",
+                            "weight": "0"
+                          }
+                        ],
+                        "as_of": "2026-01-09T20:00:00+00:00",
+                        "cash_weight": "0.4",
+                        "metadata": [],
+                        "source": "OPTIMIZER",
+                        "source_name": "scipy-highs-1.18.0",
+                        "target_id": "4f88811d-3646-5112-93ad-9640bd8048ea"
+                      }
+                    },
+                    "ending_ledger": {
+                      "cash": "4000.06",
+                      "positions": [
+                        {
+                          "average_cost": "108",
+                          "quantity": "55.555",
+                          "symbol": "SPY"
+                        }
+                      ],
+                      "realized_profit_loss": "0"
+                    },
+                    "fill_batch_result_id": "30b71009-b48c-5b51-9115-90b779af5d6c",
+                    "fills": [
+                      {
+                        "commission": "0",
+                        "fill_id": "143cf77d-47e0-51dc-aeb6-be13ae34a5c6",
+                        "filled_at": "2026-01-09T20:02:00+00:00",
+                        "order_id": "aad7810a-d0f1-5de7-a06f-f7432b58793a",
+                        "origin": "SIMULATION",
+                        "price": "108",
+                        "quantity": "55.555",
+                        "reference_price": "108",
+                        "side": "BUY",
+                        "slippage_amount": "0",
+                        "source_order_ordinal": 0,
+                        "symbol": "SPY"
+                      }
+                    ],
+                    "optimization": {
+                      "cvar": "-0.011320754716981132075471698",
+                      "diagnostics": [
+                        {
+                          "code": "SOLVER_STATUS",
+                          "level": "WARNING",
+                          "message": "optimization completed successfully",
+                          "value": null
+                        },
+                        {
+                          "code": "OBJECTIVE_VALUE",
+                          "level": "INFO",
+                          "message": "objective value",
+                          "value": "-0.0227503628447024673439767777"
+                        },
+                        {
+                          "code": "MAX_CONSTRAINT_VIOLATION",
+                          "level": "INFO",
+                          "message": "max constraint violation",
+                          "value": "0"
+                        }
+                      ],
+                      "expected_portfolio_return": "0.0114296081277213352685050797",
+                      "objective_value": "-0.0227503628447024673439767777",
+                      "request_id": "33d0ca3c-25a2-55ba-9eca-3f7731961cc7",
+                      "result_id": "30411f28-c978-55dc-9908-1456b11a3bd1",
+                      "solver_name": "scipy-highs-1.18.0",
+                      "status": "OPTIMAL"
+                    },
+                    "order_batch_result_id": "7d1eea4b-ac17-5185-b5a4-7521a974f8f0",
+                    "orders": [
+                      {
+                        "average_fill_price": null,
+                        "creation_event_id": "ec574833-4744-545a-8372-b22f0906fea6",
+                        "filled_quantity": "0",
+                        "order_id": "aad7810a-d0f1-5de7-a06f-f7432b58793a",
+                        "order_type": "MARKET",
+                        "quantity": "55.555",
+                        "request_created_at": "2026-01-09T20:00:00+00:00",
+                        "side": "BUY",
+                        "status": "PENDING",
+                        "symbol": "SPY",
+                        "time_in_force": "DAY"
+                      }
+                    ],
+                    "ordinal": 0,
+                    "planning": {
+                      "planned_trade_ids": [
+                        "f47651ae-3ea9-5d04-a4d9-c444d8f43d7b"
+                      ],
+                      "result_id": "2e66a00b-f08a-520b-bfa4-7f50bffdcdff",
+                      "status": "PARTIAL"
+                    },
+                    "post_engine_state_id": "470016e6-5a83-5a39-91dd-ad3a2cf5e0fc",
+                    "post_ledger_state_id": "099f0899-8007-561c-aadf-30c8dd352f0b",
+                    "pre_engine_state_id": "6bec5d03-e88e-5383-b8ec-82b2ec4db4d4",
+                    "pre_ledger_state_id": "b76293e6-25f2-53fc-93b1-108a172169e6",
+                    "proposals": {
+                      "proposal_ids": [
+                        "d70ee679-6ad2-559e-bb9f-f1c6f030cfc6"
+                      ],
+                      "result_id": "7b798371-91f0-5134-80e1-53f619383263",
+                      "status": "CREATED"
+                    },
+                    "risk": {
+                      "approved_count": 1,
+                      "evaluations": [
+                        {
+                          "approved_quantity": "55.555",
+                          "ordinal": 0,
+                          "outcome": "APPROVED",
+                          "proposal_id": "d70ee679-6ad2-559e-bb9f-f1c6f030cfc6",
+                          "reasons": []
+                        }
+                      ],
+                      "rejected_count": 0,
+                      "resized_count": 0,
+                      "result_id": "ef32197a-67f4-5e3d-816a-d2b67ede4939",
+                      "status": "ALL_APPROVED"
+                    },
+                    "runtime": {
+                      "request_id": "4cfb6605-da1c-5a05-b5c8-7d7ec0a1b2c7",
+                      "result_id": "67c9ab3f-7b0e-50ba-bee8-42983a2f523e",
+                      "status": "APPLIED"
+                    },
+                    "submission_batch_result_id": "ae98ae47-2e63-58c8-800c-9c470a9e739b",
+                    "submissions": [
+                      {
+                        "average_fill_price": null,
+                        "filled_quantity": "0",
+                        "order_id": "aad7810a-d0f1-5de7-a06f-f7432b58793a",
+                        "order_type": "MARKET",
+                        "quantity": "55.555",
+                        "request_created_at": "2026-01-09T20:00:00+00:00",
+                        "side": "BUY",
+                        "status": "SUBMITTED",
+                        "submission_event_id": "e8e88c05-cd0b-56f2-988b-827add09062e",
+                        "symbol": "SPY",
+                        "time_in_force": "DAY"
+                      }
+                    ]
+                  }
+                ],
+                "request_id": "d54492c6-67e9-5b89-9e87-78c35e876799",
+                "result_id": "047ddfdf-8069-59c7-bed3-17efa4d2eda1",
+                "status": "COMPLETED"
+              },
+              "performance": {
+                "request": {
+                  "metadata": [
+                    {
+                      "key": "rolling_historical_simulation_id",
+                      "value": "41ace164-b6ea-59e6-b825-adab43ac15b9"
+                    },
+                    {
+                      "key": "rolling_historical_simulation_source",
+                      "value": "rolling-historical-runner"
+                    }
+                  ],
+                  "request_id": "a03c68f9-6b17-514e-9c86-ed4f33c5b94a",
+                  "source_simulation_request_id": "d54492c6-67e9-5b89-9e87-78c35e876799",
+                  "source_simulation_result_id": "047ddfdf-8069-59c7-bed3-17efa4d2eda1",
+                  "valuation_basis": "FRAME_RISK_PRICES"
+                },
+                "result": {
+                  "absolute_simulation_profit_loss": "0",
+                  "aggregate_one_way_turnover": "0.599994",
+                  "aggregate_two_way_turnover": "0.599994",
+                  "applied_cycle_count": 1,
+                  "cumulative_simulation_realized_profit_loss": "0",
+                  "diagnostics": [],
+                  "drawdowns": {
+                    "maximum_amount": {
+                      "amount": "0",
+                      "peak_equity": "10000",
+                      "peak_timestamp": "2026-01-09T20:00:00+00:00",
+                      "percentage": "0",
+                      "source_observation": {
+                        "equity": "10000",
+                        "frame_ordinal": 0,
+                        "phase": "PRE_CYCLE",
+                        "sequence_index": 0,
+                        "timestamp": "2026-01-09T20:00:00+00:00"
+                      },
+                      "trough_equity": "10000",
+                      "trough_timestamp": "2026-01-09T20:00:00+00:00"
+                    },
+                    "maximum_percentage": {
+                      "amount": "0",
+                      "peak_equity": "10000",
+                      "peak_timestamp": "2026-01-09T20:00:00+00:00",
+                      "percentage": "0",
+                      "source_observation": {
+                        "equity": "10000",
+                        "frame_ordinal": 0,
+                        "phase": "PRE_CYCLE",
+                        "sequence_index": 0,
+                        "timestamp": "2026-01-09T20:00:00+00:00"
+                      },
+                      "trough_equity": "10000",
+                      "trough_timestamp": "2026-01-09T20:00:00+00:00"
+                    }
+                  },
+                  "equity_observations": [
+                    {
+                      "drawdown_amount": "0",
+                      "drawdown_percentage": "0",
+                      "equity": "10000",
+                      "frame_ordinal": 0,
+                      "phase": "PRE_CYCLE",
+                      "running_peak": "10000",
+                      "sequence_index": 0,
+                      "timestamp": "2026-01-09T20:00:00+00:00"
+                    },
+                    {
+                      "drawdown_amount": "0",
+                      "drawdown_percentage": "0",
+                      "equity": "10000",
+                      "frame_ordinal": 0,
+                      "phase": "POST_CYCLE",
+                      "running_peak": "10000",
+                      "sequence_index": 1,
+                      "timestamp": "2026-01-09T20:02:00+00:00"
+                    }
+                  ],
+                  "final_equity": "10000",
+                  "final_unrealized_profit_loss": "0",
+                  "frames": [
+                    {
+                      "absolute_cash_weight_drift": "0.000006",
+                      "actual_cash_weight": "0.400006",
+                      "adverse_slippage_cost": "0",
+                      "allocation_drifts": [
+                        {
+                          "absolute_drift": "0.000006",
+                          "actual_weight": "0.599994",
+                          "drift": "-0.000006",
+                          "symbol": "SPY",
+                          "target_weight": "0.6"
+                        },
+                        {
+                          "absolute_drift": "0",
+                          "actual_weight": "0",
+                          "drift": "0",
+                          "symbol": "QQQ",
+                          "target_weight": "0"
+                        }
+                      ],
+                      "approved_risk_count": 1,
+                      "as_of": "2026-01-09T20:00:00+00:00",
+                      "cash_weight_drift": "0.000006",
+                      "commission_cost": "0",
+                      "cumulative_return": "0",
+                      "cumulative_simulation_profit_loss": "0",
+                      "cumulative_simulation_realized_profit_loss": "0",
+                      "cvar": "-0.011320754716981132075471698",
+                      "execution_profit_loss": "0",
+                      "expected_portfolio_return": "0.0114296081277213352685050797",
+                      "fill_count": 1,
+                      "filled_at": "2026-01-09T20:02:00+00:00",
+                      "forward_market_profit_loss": null,
+                      "frame_id": "c1c5539d-56bd-55ff-9715-4e8c8beffc41",
+                      "frame_ordinal": 0,
+                      "frame_simulation_realized_profit_loss": "0",
+                      "gross_buy_notional": "5999.94",
+                      "gross_sell_notional": "0",
+                      "gross_traded_notional": "5999.94",
+                      "maximum_absolute_allocation_drift": "0.000006",
+                      "net_buy_notional": "5999.94",
+                      "objective_value": "-0.0227503628447024673439767777",
+                      "one_way_turnover": "0.599994",
+                      "optimization_status": "OPTIMAL",
+                      "order_count": 1,
+                      "period_profit_loss": "0",
+                      "period_return": "0",
+                      "post_cycle_cash": "4000.06",
+                      "post_cycle_equity": "10000",
+                      "post_cycle_gross_exposure": "5999.94",
+                      "post_cycle_net_exposure": "5999.94",
+                      "post_cycle_position_count": 1,
+                      "post_cycle_unrealized_profit_loss": "0",
+                      "pre_cycle_cash": "10000",
+                      "pre_cycle_equity": "10000",
+                      "pre_cycle_gross_exposure": "0",
+                      "pre_cycle_net_exposure": "0",
+                      "pre_cycle_position_count": 0,
+                      "pre_cycle_unrealized_profit_loss": "0",
+                      "reduced_notional": "0",
+                      "rejected_notional": "0",
+                      "rejected_risk_count": 0,
+                      "resized_risk_count": 0,
+                      "signed_slippage_profit_loss": "0",
+                      "solver_name": "scipy-highs-1.18.0",
+                      "source_cycle_result_id": "67c9ab3f-7b0e-50ba-bee8-42983a2f523e",
+                      "target_allocation_count": 2,
+                      "target_cash_weight": "0.4",
+                      "total_absolute_allocation_drift": "0.000012",
+                      "total_execution_cost": "0",
+                      "two_way_turnover": "0.599994",
+                      "unrealized_profit_loss_change": "0"
+                    }
+                  ],
+                  "initial_equity": "10000",
+                  "initial_unrealized_profit_loss": "0",
+                  "maximum_absolute_allocation_drift": "0.000006",
+                  "no_action_cycle_count": 0,
+                  "optimization_summary": {
+                    "maximum_target_cash_weight": "0.4",
+                    "mean_expected_portfolio_return": "0.0114296081277213352685050797",
+                    "minimum_target_cash_weight": "0.4",
+                    "worst_cvar": "-0.011320754716981132075471698"
+                  },
+                  "result_id": "dcab48b4-16f1-50ce-a92b-c4e7816cb8ae",
+                  "simulation_return": "0",
+                  "source_simulation_result_id": "047ddfdf-8069-59c7-bed3-17efa4d2eda1",
+                  "total_absolute_allocation_drift": "0.000012",
+                  "total_adverse_slippage_cost": "0",
+                  "total_approved_risk_count": 1,
+                  "total_commissions": "0",
+                  "total_execution_cost": "0",
+                  "total_fill_count": 1,
+                  "total_gross_buy_notional": "5999.94",
+                  "total_gross_sell_notional": "0",
+                  "total_gross_traded_notional": "5999.94",
+                  "total_net_buy_notional": "5999.94",
+                  "total_order_count": 1,
+                  "total_reduced_notional": "0",
+                  "total_rejected_notional": "0",
+                  "total_rejected_risk_count": 0,
+                  "total_resized_risk_count": 0,
+                  "total_signed_slippage_profit_loss": "0"
+                }
+              },
+              "result_id": "b3f2884b-12dd-59f9-9979-2d9918fdaefd",
+              "state_ids": {
+                "final_engine": "470016e6-5a83-5a39-91dd-ad3a2cf5e0fc",
+                "final_ledger": "099f0899-8007-561c-aadf-30c8dd352f0b",
+                "initial_engine": "6bec5d03-e88e-5383-b8ec-82b2ec4db4d4",
+                "initial_ledger": "b76293e6-25f2-53fc-93b1-108a172169e6"
+              }
+            }
+          },
+          "rolling_request_id": "41ace164-b6ea-59e6-b825-adab43ac15b9",
+          "run_id": "78266be7-847c-5795-9297-3e52cb0fd33a",
+          "variant": {
+            "execution_prices": {
+              "fill_reference_price_field": "CLOSE",
+              "risk_price_field": "CLOSE"
+            },
+            "fills": {
+              "fixed_commission": "0",
+              "slippage_basis_points": "0"
+            },
+            "metadata": [
+              {
+                "key": "variant_family",
+                "value": "grid-base"
+              }
+            ],
+            "name": "Grid Base | WINDOW_OBSERVATION_COUNT=3, RISK_AVERSION=1",
+            "optimization": {
+              "confidence_level": "0.75",
+              "maximum_iterations": null,
+              "minimum_expected_return": null,
+              "output_quantum": "0.00000001",
+              "risk_aversion": "1",
+              "solver_tolerance": "0.00000001"
+            },
+            "portfolio_constraints": {
+              "allow_leverage": false,
+              "long_only": true,
+              "maximum_cash_weight": "1",
+              "maximum_one_way_rebalance_turnover": null,
+              "maximum_position_weight": "0.6",
+              "minimum_cash_weight": "0",
+              "minimum_position_weight": null
+            },
+            "rebalance": {
+              "assumptions": {
+                "additional_execution_cash_buffer": "0",
+                "allow_fractional_quantities": true,
+                "fixed_commission": "0",
+                "minimum_trade_notional": "0",
+                "minimum_trade_quantity": "0",
+                "quantity_increment": "0.001",
+                "target_weight_tolerance": "0",
+                "use_planned_sell_proceeds": true
+              },
+              "proposal_confidence": null,
+              "proposal_policy": {
+                "allow_partial_plans": true
+              }
+            },
+            "risk": {
+              "limits": {
+                "allow_buying": true,
+                "allow_fractional_shares": true,
+                "allow_selling": true,
+                "estimated_commission": "0",
+                "fractional_increment": "0.001",
+                "max_new_position_percent": null,
+                "max_order_notional": null,
+                "max_position_percent": "0.6",
+                "max_total_exposure_percent": "1",
+                "minimum_cash_reserve_percent": "0"
+              },
+              "policy": {
+                "allow_sell_proceeds_for_later_buys": false
+              }
+            },
+            "rolling_window": {
+              "observation_count": 3
+            },
+            "scenario": {
+              "cash_return": "0",
+              "price_field": "CLOSE",
+              "return_method": "SIMPLE",
+              "source_name": "historical-experiment-grid",
+              "window_policy": "ALL_SUPPLIED"
+            },
+            "timing": {
+              "fill_offset_microseconds": 120000000,
+              "submission_offset_microseconds": 60000000
+            },
+            "trading_enabled": true,
+            "variant_id": "2760ea8a-84b9-5619-a2df-4755e460cb20"
+          }
+        },
+        {
+          "initial_state_content_fingerprint": "d0657c6f-e7a8-51ab-ba9e-bab0f2066396",
+          "initialization": {
+            "bootstrap_fills": [],
+            "final_engine_state_id": "ea4488c1-e05b-57cb-99e6-e0da1c86f581",
+            "final_ledger_state_id": "be2d657c-ba37-5856-bd9a-92c2bf5cc091",
+            "initial_engine_state_id": "6bec5d03-e88e-5383-b8ec-82b2ec4db4d4",
+            "initial_ledger_state_id": "b76293e6-25f2-53fc-93b1-108a172169e6"
+          },
+          "metrics": {
+            "absolute_simulation_profit_loss": "0",
+            "adverse_slippage_cost": "0",
+            "aggregate_one_way_turnover": "0.599994",
+            "aggregate_two_way_turnover": "0.599994",
+            "applied_cycle_count": 1,
+            "approved_decisions": 1,
+            "final_equity": "10000",
+            "initial_equity": "10000",
+            "maximum_allocation_drift": "0.000006",
+            "maximum_drawdown_amount": "0",
+            "maximum_drawdown_percentage": "0",
+            "maximum_target_cash_weight": "0.4",
+            "mean_expected_portfolio_return": "0.0114296081277213352685050797",
+            "minimum_target_cash_weight": "0.4",
+            "no_action_cycle_count": 0,
+            "reduced_notional": "0",
+            "rejected_decisions": 0,
+            "rejected_notional": "0",
+            "resized_decisions": 0,
+            "simulation_realized_profit_loss": "0",
+            "simulation_return": "0",
+            "total_commissions": "0",
+            "total_execution_cost": "0",
+            "total_fills": 1,
+            "total_orders": 1,
+            "worst_cvar": "-0.011320754716981132075471698"
+          },
+          "ordinal": 1,
+          "rolling": {
+            "request": {
+              "metadata": [
+                {
+                  "key": "historical_experiment_id",
+                  "value": "00000000-0000-0000-0000-000000000401"
+                },
+                {
+                  "key": "historical_experiment_variant_id",
+                  "value": "a3f9e1e2-d22c-5ada-b66e-eb3bf01c52ad"
+                },
+                {
+                  "key": "historical_experiment_variant_ordinal",
+                  "value": "1"
+                },
+                {
+                  "key": "historical_experiment_variant_name",
+                  "value": "Grid Base | WINDOW_OBSERVATION_COUNT=3, RISK_AVERSION=2"
+                }
+              ],
+              "observation_count": 3,
+              "rebalance_schedule": [
+                "2026-01-09T20:00:00+00:00"
+              ],
+              "request_id": "4a2a6cc8-e479-5d1d-b712-b66bd861bb41",
+              "scenario_cash_return": "0",
+              "scenario_source_name": "historical-experiment-grid",
+              "trading_enabled": true
+            },
+            "result": {
+              "frame_generations": [
+                {
+                  "frame_ordinal": 0,
+                  "historical_frame_index": 4,
+                  "optimized_frame": {
+                    "as_of": "2026-01-09T20:00:00+00:00",
+                    "expected_returns": [
+                      {
+                        "symbol": "SPY",
+                        "value": "0.0190493468795355587808417995"
+                      },
+                      {
+                        "symbol": "QQQ",
+                        "value": "-0.01025667999158426257100778455"
+                      }
+                    ],
+                    "fill_policy": {
+                      "fixed_commission": "0",
+                      "slippage_basis_points": "0"
+                    },
+                    "filled_at": "2026-01-09T20:02:00+00:00",
+                    "metadata": [
+                      {
+                        "key": "rolling_historical_frame_ordinal",
+                        "value": "0"
+                      },
+                      {
+                        "key": "rolling_historical_window_start",
+                        "value": "2026-01-07T20:00:00+00:00"
+                      },
+                      {
+                        "key": "rolling_historical_window_end",
+                        "value": "2026-01-09T20:00:00+00:00"
+                      },
+                      {
+                        "key": "rolling_historical_observation_count",
+                        "value": "3"
+                      }
+                    ],
+                    "optimization": {
+                      "confidence_level": "0.75",
+                      "maximum_iterations": null,
+                      "minimum_expected_return": null,
+                      "output_quantum": "0.00000001",
+                      "risk_aversion": "2",
+                      "solver_tolerance": "0.00000001"
+                    },
+                    "portfolio_constraints": {
+                      "allow_leverage": false,
+                      "long_only": true,
+                      "maximum_cash_weight": "1",
+                      "maximum_one_way_rebalance_turnover": null,
+                      "maximum_position_weight": "0.6",
+                      "minimum_cash_weight": "0",
+                      "minimum_position_weight": null
+                    },
+                    "prices": [
+                      {
+                        "fill_reference_price": "108",
+                        "risk_price": "108",
+                        "symbol": "SPY"
+                      },
+                      {
+                        "fill_reference_price": "96",
+                        "risk_price": "96",
+                        "symbol": "QQQ"
+                      }
+                    ],
+                    "proposal_confidence": null,
+                    "proposal_policy": {
+                      "allow_partial_plans": true
+                    },
+                    "rebalance_assumptions": {
+                      "additional_execution_cash_buffer": "0",
+                      "allow_fractional_quantities": true,
+                      "fixed_commission": "0",
+                      "minimum_trade_notional": "0",
+                      "minimum_trade_quantity": "0",
+                      "quantity_increment": "0.001",
+                      "target_weight_tolerance": "0",
+                      "use_planned_sell_proceeds": true
+                    },
+                    "risk_limits": {
+                      "allow_buying": true,
+                      "allow_fractional_shares": true,
+                      "allow_selling": true,
+                      "estimated_commission": "0",
+                      "fractional_increment": "0.001",
+                      "max_new_position_percent": null,
+                      "max_order_notional": null,
+                      "max_position_percent": "0.6",
+                      "max_total_exposure_percent": "1",
+                      "minimum_cash_reserve_percent": "0"
+                    },
+                    "risk_policy": {
+                      "allow_sell_proceeds_for_later_buys": false
+                    },
+                    "scenarios": {
+                      "cash_return": "0",
+                      "forecast_horizon": {
+                        "periods": 1,
+                        "timeframe": "1D"
+                      },
+                      "metadata": [
+                        {
+                          "key": "rolling_historical_simulation_id",
+                          "value": "4a2a6cc8-e479-5d1d-b712-b66bd861bb41"
+                        },
+                        {
+                          "key": "rolling_historical_frame_ordinal",
+                          "value": "0"
+                        },
+                        {
+                          "key": "rolling_historical_window_start",
+                          "value": "2026-01-07T20:00:00+00:00"
+                        },
+                        {
+                          "key": "rolling_historical_window_end",
+                          "value": "2026-01-09T20:00:00+00:00"
+                        },
+                        {
+                          "key": "rolling_historical_observation_count",
+                          "value": "3"
+                        },
+                        {
+                          "key": "historical_scenario_observation_start",
+                          "value": "2026-01-07T20:00:00+00:00"
+                        },
+                        {
+                          "key": "historical_scenario_observation_end",
+                          "value": "2026-01-09T20:00:00+00:00"
+                        },
+                        {
+                          "key": "historical_scenario_observation_count",
+                          "value": "3"
+                        },
+                        {
+                          "key": "historical_scenario_return_row_count",
+                          "value": "2"
+                        },
+                        {
+                          "key": "historical_scenario_price_field",
+                          "value": "CLOSE"
+                        },
+                        {
+                          "key": "historical_scenario_return_method",
+                          "value": "SIMPLE"
+                        },
+                        {
+                          "key": "historical_scenario_window_policy",
+                          "value": "ALL_SUPPLIED"
+                        }
+                      ],
+                      "rows": [
+                        {
+                          "metadata": [],
+                          "probability": "0.5",
+                          "returns": [
+                            "0.019230769230769230769230769",
+                            "-0.0102040816326530612244897959"
+                          ],
+                          "scenario_id": "6c25290c-6805-5098-9804-2c908ea84869"
+                        },
+                        {
+                          "metadata": [],
+                          "probability": "0.5",
+                          "returns": [
+                            "0.01886792452830188679245283",
+                            "-0.0103092783505154639175257732"
+                          ],
+                          "scenario_id": "684358ec-7b01-5a06-876c-b3c44ae72cc1"
+                        }
+                      ],
+                      "scenario_set_id": "9677c8af-3cef-5785-a989-018b4b02d616",
+                      "source": "HISTORICAL",
+                      "source_name": "historical-experiment-grid",
+                      "symbols": [
+                        "SPY",
+                        "QQQ"
+                      ]
+                    },
+                    "submitted_at": "2026-01-09T20:01:00+00:00",
+                    "trading_enabled": true
+                  },
+                  "optimized_frame_fingerprint": "4847e267-d6dc-5b53-8245-951fe64b7f09",
+                  "rebalance_timestamp": "2026-01-09T20:00:00+00:00",
+                  "scenario_request_id": "783caa14-9e65-5297-b15a-dcd29619b068",
+                  "scenario_result": {
+                    "diagnostics": [],
+                    "expected_returns": [
+                      {
+                        "symbol": "SPY",
+                        "value": "0.0190493468795355587808417995"
+                      },
+                      {
+                        "symbol": "QQQ",
+                        "value": "-0.01025667999158426257100778455"
+                      }
+                    ],
+                    "request": {
+                      "as_of": "2026-01-09T20:00:00+00:00",
+                      "cash_return": "0",
+                      "forecast_horizon": {
+                        "periods": 1,
+                        "timeframe": "1D"
+                      },
+                      "historical_request": {
+                        "adjustment": "RAW",
+                        "end": "2026-01-10T00:00:00+00:00",
+                        "frame_count": 3,
+                        "missing_bar_policy": "INTERSECTION",
+                        "provider_name": "coordinating:trading_bot.market_data.csv_provider.CSVHistoricalDataProvider",
+                        "start": "2026-01-07T20:00:00+00:00",
+                        "symbols": [
+                          "SPY",
+                          "QQQ"
+                        ],
+                        "timeframe": "1D"
+                      },
+                      "metadata": [
+                        {
+                          "key": "rolling_historical_simulation_id",
+                          "value": "4a2a6cc8-e479-5d1d-b712-b66bd861bb41"
+                        },
+                        {
+                          "key": "rolling_historical_frame_ordinal",
+                          "value": "0"
+                        },
+                        {
+                          "key": "rolling_historical_window_start",
+                          "value": "2026-01-07T20:00:00+00:00"
+                        },
+                        {
+                          "key": "rolling_historical_window_end",
+                          "value": "2026-01-09T20:00:00+00:00"
+                        },
+                        {
+                          "key": "rolling_historical_observation_count",
+                          "value": "3"
+                        }
+                      ],
+                      "policy": {
+                        "price_field": "CLOSE",
+                        "return_method": "SIMPLE",
+                        "window_policy": "ALL_SUPPLIED"
+                      },
+                      "request_id": "783caa14-9e65-5297-b15a-dcd29619b068",
+                      "source_name": "historical-experiment-grid"
+                    },
+                    "result_id": "8d460d51-7218-5a1e-9973-9d269b5deba2",
+                    "scenario_set": {
+                      "as_of": "2026-01-09T20:00:00+00:00",
+                      "cash_return": "0",
+                      "forecast_horizon": {
+                        "periods": 1,
+                        "timeframe": "1D"
+                      },
+                      "metadata": [
+                        {
+                          "key": "rolling_historical_simulation_id",
+                          "value": "4a2a6cc8-e479-5d1d-b712-b66bd861bb41"
+                        },
+                        {
+                          "key": "rolling_historical_frame_ordinal",
+                          "value": "0"
+                        },
+                        {
+                          "key": "rolling_historical_window_start",
+                          "value": "2026-01-07T20:00:00+00:00"
+                        },
+                        {
+                          "key": "rolling_historical_window_end",
+                          "value": "2026-01-09T20:00:00+00:00"
+                        },
+                        {
+                          "key": "rolling_historical_observation_count",
+                          "value": "3"
+                        },
+                        {
+                          "key": "historical_scenario_observation_start",
+                          "value": "2026-01-07T20:00:00+00:00"
+                        },
+                        {
+                          "key": "historical_scenario_observation_end",
+                          "value": "2026-01-09T20:00:00+00:00"
+                        },
+                        {
+                          "key": "historical_scenario_observation_count",
+                          "value": "3"
+                        },
+                        {
+                          "key": "historical_scenario_return_row_count",
+                          "value": "2"
+                        },
+                        {
+                          "key": "historical_scenario_price_field",
+                          "value": "CLOSE"
+                        },
+                        {
+                          "key": "historical_scenario_return_method",
+                          "value": "SIMPLE"
+                        },
+                        {
+                          "key": "historical_scenario_window_policy",
+                          "value": "ALL_SUPPLIED"
+                        }
+                      ],
+                      "rows": [
+                        {
+                          "metadata": [],
+                          "probability": "0.5",
+                          "returns": [
+                            "0.019230769230769230769230769",
+                            "-0.0102040816326530612244897959"
+                          ],
+                          "scenario_id": "6c25290c-6805-5098-9804-2c908ea84869"
+                        },
+                        {
+                          "metadata": [],
+                          "probability": "0.5",
+                          "returns": [
+                            "0.01886792452830188679245283",
+                            "-0.0103092783505154639175257732"
+                          ],
+                          "scenario_id": "684358ec-7b01-5a06-876c-b3c44ae72cc1"
+                        }
+                      ],
+                      "scenario_set_id": "9677c8af-3cef-5785-a989-018b4b02d616",
+                      "source": "HISTORICAL",
+                      "source_name": "historical-experiment-grid",
+                      "symbols": [
+                        "SPY",
+                        "QQQ"
+                      ]
+                    }
+                  },
+                  "source_frame_id": "a085df97-f53f-5412-92d8-f492f26bcd2f",
+                  "window_end_index_inclusive": 4,
+                  "window_end_timestamp": "2026-01-09T20:00:00+00:00",
+                  "window_start_index": 2,
+                  "window_start_timestamp": "2026-01-07T20:00:00+00:00"
+                }
+              ],
+              "optimized_simulation": {
+                "counts": {
+                  "applied_cycle_count": 1,
+                  "frame_count": 1,
+                  "no_action_cycle_count": 0
+                },
+                "final_state": {
+                  "cash": "4000.06",
+                  "engine_state_id": "ea4488c1-e05b-57cb-99e6-e0da1c86f581",
+                  "ledger_fills": [
+                    {
+                      "commission": "0",
+                      "fill_id": "6adec6b3-f20a-52c8-8cb2-373dc27f1891",
+                      "filled_at": "2026-01-09T20:02:00+00:00",
+                      "order_id": "793a0389-ea33-582f-a9f8-77e06abc956f",
+                      "origin": "SIMULATION",
+                      "price": "108",
+                      "quantity": "55.555",
+                      "side": "BUY",
+                      "symbol": "SPY"
+                    }
+                  ],
+                  "ledger_state_id": "be2d657c-ba37-5856-bd9a-92c2bf5cc091",
+                  "positions": [
+                    {
+                      "average_cost": "108",
+                      "quantity": "55.555",
+                      "symbol": "SPY"
+                    }
+                  ],
+                  "realized_profit_loss": "0"
+                },
+                "frames": [
+                  {
+                    "application": {
+                      "evaluations": [
+                        {
+                          "application_event": {
+                            "event_id": "ff133076-43f8-5a8a-8ffe-3ffc8ba129ba",
+                            "event_type": "FILLED",
+                            "fill_id": "6adec6b3-f20a-52c8-8cb2-373dc27f1891",
+                            "occurred_at": "2026-01-09T20:02:00+00:00",
+                            "order_id": "793a0389-ea33-582f-a9f8-77e06abc956f",
+                            "reason": null
+                          },
+                          "fill_id": "6adec6b3-f20a-52c8-8cb2-373dc27f1891",
+                          "ledger_cash_after": "4000.06",
+                          "ledger_position_after": {
+                            "average_cost": "108",
+                            "quantity": "55.555",
+                            "symbol": "SPY"
+                          },
+                          "ledger_realized_profit_loss_after": "0",
+                          "source_fill_ordinal": 0
+                        }
+                      ],
+                      "post_engine_state_id": "ea4488c1-e05b-57cb-99e6-e0da1c86f581",
+                      "post_ledger_state_id": "be2d657c-ba37-5856-bd9a-92c2bf5cc091",
+                      "pre_engine_state_id": "dbb4aca2-4d12-592d-8a34-adcecd46dde3",
+                      "pre_ledger_state_id": "b76293e6-25f2-53fc-93b1-108a172169e6",
+                      "result_id": "797078ec-4c18-5383-a803-9f9a12291f23",
+                      "status": "APPLIED"
+                    },
+                    "as_of": "2026-01-09T20:00:00+00:00",
+                    "certification": {
+                      "request_id": "cbb5c96f-bcea-502f-9e50-8f1a8c5c32bd",
+                      "result_id": "e430d2d7-8f1a-5688-8d8c-ebbe727b02de",
+                      "target": {
+                        "allocations": [
+                          {
+                            "symbol": "SPY",
+                            "weight": "0.6"
+                          },
+                          {
+                            "symbol": "QQQ",
+                            "weight": "0"
+                          }
+                        ],
+                        "as_of": "2026-01-09T20:00:00+00:00",
+                        "cash_weight": "0.4",
+                        "metadata": [],
+                        "source": "OPTIMIZER",
+                        "source_name": "scipy-highs-1.18.0",
+                        "target_id": "41af9c9f-5bcb-5414-a681-26e12cbbf702"
+                      }
+                    },
+                    "ending_ledger": {
+                      "cash": "4000.06",
+                      "positions": [
+                        {
+                          "average_cost": "108",
+                          "quantity": "55.555",
+                          "symbol": "SPY"
+                        }
+                      ],
+                      "realized_profit_loss": "0"
+                    },
+                    "fill_batch_result_id": "8bfe28a5-6e14-5644-a7d8-b824a2480730",
+                    "fills": [
+                      {
+                        "commission": "0",
+                        "fill_id": "6adec6b3-f20a-52c8-8cb2-373dc27f1891",
+                        "filled_at": "2026-01-09T20:02:00+00:00",
+                        "order_id": "793a0389-ea33-582f-a9f8-77e06abc956f",
+                        "origin": "SIMULATION",
+                        "price": "108",
+                        "quantity": "55.555",
+                        "reference_price": "108",
+                        "side": "BUY",
+                        "slippage_amount": "0",
+                        "source_order_ordinal": 0,
+                        "symbol": "SPY"
+                      }
+                    ],
+                    "optimization": {
+                      "cvar": "-0.011320754716981132075471698",
+                      "diagnostics": [
+                        {
+                          "code": "SOLVER_STATUS",
+                          "level": "WARNING",
+                          "message": "optimization completed successfully",
+                          "value": null
+                        },
+                        {
+                          "code": "OBJECTIVE_VALUE",
+                          "level": "INFO",
+                          "message": "objective value",
+                          "value": "-0.0340711175616835994194484757"
+                        },
+                        {
+                          "code": "MAX_CONSTRAINT_VIOLATION",
+                          "level": "INFO",
+                          "message": "max constraint violation",
+                          "value": "0"
+                        }
+                      ],
+                      "expected_portfolio_return": "0.0114296081277213352685050797",
+                      "objective_value": "-0.0340711175616835994194484757",
+                      "request_id": "a372dc89-18f2-5d16-b501-26e13d3bf48b",
+                      "result_id": "e7069cfe-6fb6-5980-a78b-a88b6bd98437",
+                      "solver_name": "scipy-highs-1.18.0",
+                      "status": "OPTIMAL"
+                    },
+                    "order_batch_result_id": "b076e138-226c-5f16-8ed3-96b50872cd56",
+                    "orders": [
+                      {
+                        "average_fill_price": null,
+                        "creation_event_id": "2088d8fa-3ba2-54bc-a6bf-f68b68329f85",
+                        "filled_quantity": "0",
+                        "order_id": "793a0389-ea33-582f-a9f8-77e06abc956f",
+                        "order_type": "MARKET",
+                        "quantity": "55.555",
+                        "request_created_at": "2026-01-09T20:00:00+00:00",
+                        "side": "BUY",
+                        "status": "PENDING",
+                        "symbol": "SPY",
+                        "time_in_force": "DAY"
+                      }
+                    ],
+                    "ordinal": 0,
+                    "planning": {
+                      "planned_trade_ids": [
+                        "999db16a-ee01-5d1b-b676-ef0b4c9a6289"
+                      ],
+                      "result_id": "e69a536d-69f3-539f-a0eb-ef6395cea5c2",
+                      "status": "PARTIAL"
+                    },
+                    "post_engine_state_id": "ea4488c1-e05b-57cb-99e6-e0da1c86f581",
+                    "post_ledger_state_id": "be2d657c-ba37-5856-bd9a-92c2bf5cc091",
+                    "pre_engine_state_id": "6bec5d03-e88e-5383-b8ec-82b2ec4db4d4",
+                    "pre_ledger_state_id": "b76293e6-25f2-53fc-93b1-108a172169e6",
+                    "proposals": {
+                      "proposal_ids": [
+                        "183ae174-f013-5351-98aa-a383859b005c"
+                      ],
+                      "result_id": "2eb0cf74-a99a-59ac-9b72-bc49c68bf97b",
+                      "status": "CREATED"
+                    },
+                    "risk": {
+                      "approved_count": 1,
+                      "evaluations": [
+                        {
+                          "approved_quantity": "55.555",
+                          "ordinal": 0,
+                          "outcome": "APPROVED",
+                          "proposal_id": "183ae174-f013-5351-98aa-a383859b005c",
+                          "reasons": []
+                        }
+                      ],
+                      "rejected_count": 0,
+                      "resized_count": 0,
+                      "result_id": "adb52d61-23bb-50b5-a284-101cdd8781fa",
+                      "status": "ALL_APPROVED"
+                    },
+                    "runtime": {
+                      "request_id": "3d799fc0-af64-58ec-9cef-c91584c384b1",
+                      "result_id": "e5e16e5e-f94c-535a-a3e3-e7c615631d36",
+                      "status": "APPLIED"
+                    },
+                    "submission_batch_result_id": "8f7a1c08-c912-51b6-8fd8-25dccc5ccaec",
+                    "submissions": [
+                      {
+                        "average_fill_price": null,
+                        "filled_quantity": "0",
+                        "order_id": "793a0389-ea33-582f-a9f8-77e06abc956f",
+                        "order_type": "MARKET",
+                        "quantity": "55.555",
+                        "request_created_at": "2026-01-09T20:00:00+00:00",
+                        "side": "BUY",
+                        "status": "SUBMITTED",
+                        "submission_event_id": "80334c1d-3a7f-5676-8a83-8be5bae5878a",
+                        "symbol": "SPY",
+                        "time_in_force": "DAY"
+                      }
+                    ]
+                  }
+                ],
+                "request_id": "06c4d728-49b9-5390-8e67-5e86a39f1161",
+                "result_id": "07d25d84-f4b6-529f-a5a8-0c6522a77c09",
+                "status": "COMPLETED"
+              },
+              "performance": {
+                "request": {
+                  "metadata": [
+                    {
+                      "key": "rolling_historical_simulation_id",
+                      "value": "4a2a6cc8-e479-5d1d-b712-b66bd861bb41"
+                    },
+                    {
+                      "key": "rolling_historical_simulation_source",
+                      "value": "rolling-historical-runner"
+                    }
+                  ],
+                  "request_id": "53024f3f-f9b5-53c0-a4c9-0982e65ee478",
+                  "source_simulation_request_id": "06c4d728-49b9-5390-8e67-5e86a39f1161",
+                  "source_simulation_result_id": "07d25d84-f4b6-529f-a5a8-0c6522a77c09",
+                  "valuation_basis": "FRAME_RISK_PRICES"
+                },
+                "result": {
+                  "absolute_simulation_profit_loss": "0",
+                  "aggregate_one_way_turnover": "0.599994",
+                  "aggregate_two_way_turnover": "0.599994",
+                  "applied_cycle_count": 1,
+                  "cumulative_simulation_realized_profit_loss": "0",
+                  "diagnostics": [],
+                  "drawdowns": {
+                    "maximum_amount": {
+                      "amount": "0",
+                      "peak_equity": "10000",
+                      "peak_timestamp": "2026-01-09T20:00:00+00:00",
+                      "percentage": "0",
+                      "source_observation": {
+                        "equity": "10000",
+                        "frame_ordinal": 0,
+                        "phase": "PRE_CYCLE",
+                        "sequence_index": 0,
+                        "timestamp": "2026-01-09T20:00:00+00:00"
+                      },
+                      "trough_equity": "10000",
+                      "trough_timestamp": "2026-01-09T20:00:00+00:00"
+                    },
+                    "maximum_percentage": {
+                      "amount": "0",
+                      "peak_equity": "10000",
+                      "peak_timestamp": "2026-01-09T20:00:00+00:00",
+                      "percentage": "0",
+                      "source_observation": {
+                        "equity": "10000",
+                        "frame_ordinal": 0,
+                        "phase": "PRE_CYCLE",
+                        "sequence_index": 0,
+                        "timestamp": "2026-01-09T20:00:00+00:00"
+                      },
+                      "trough_equity": "10000",
+                      "trough_timestamp": "2026-01-09T20:00:00+00:00"
+                    }
+                  },
+                  "equity_observations": [
+                    {
+                      "drawdown_amount": "0",
+                      "drawdown_percentage": "0",
+                      "equity": "10000",
+                      "frame_ordinal": 0,
+                      "phase": "PRE_CYCLE",
+                      "running_peak": "10000",
+                      "sequence_index": 0,
+                      "timestamp": "2026-01-09T20:00:00+00:00"
+                    },
+                    {
+                      "drawdown_amount": "0",
+                      "drawdown_percentage": "0",
+                      "equity": "10000",
+                      "frame_ordinal": 0,
+                      "phase": "POST_CYCLE",
+                      "running_peak": "10000",
+                      "sequence_index": 1,
+                      "timestamp": "2026-01-09T20:02:00+00:00"
+                    }
+                  ],
+                  "final_equity": "10000",
+                  "final_unrealized_profit_loss": "0",
+                  "frames": [
+                    {
+                      "absolute_cash_weight_drift": "0.000006",
+                      "actual_cash_weight": "0.400006",
+                      "adverse_slippage_cost": "0",
+                      "allocation_drifts": [
+                        {
+                          "absolute_drift": "0.000006",
+                          "actual_weight": "0.599994",
+                          "drift": "-0.000006",
+                          "symbol": "SPY",
+                          "target_weight": "0.6"
+                        },
+                        {
+                          "absolute_drift": "0",
+                          "actual_weight": "0",
+                          "drift": "0",
+                          "symbol": "QQQ",
+                          "target_weight": "0"
+                        }
+                      ],
+                      "approved_risk_count": 1,
+                      "as_of": "2026-01-09T20:00:00+00:00",
+                      "cash_weight_drift": "0.000006",
+                      "commission_cost": "0",
+                      "cumulative_return": "0",
+                      "cumulative_simulation_profit_loss": "0",
+                      "cumulative_simulation_realized_profit_loss": "0",
+                      "cvar": "-0.011320754716981132075471698",
+                      "execution_profit_loss": "0",
+                      "expected_portfolio_return": "0.0114296081277213352685050797",
+                      "fill_count": 1,
+                      "filled_at": "2026-01-09T20:02:00+00:00",
+                      "forward_market_profit_loss": null,
+                      "frame_id": "4f3651ee-aa46-5ce5-8186-953d7b513359",
+                      "frame_ordinal": 0,
+                      "frame_simulation_realized_profit_loss": "0",
+                      "gross_buy_notional": "5999.94",
+                      "gross_sell_notional": "0",
+                      "gross_traded_notional": "5999.94",
+                      "maximum_absolute_allocation_drift": "0.000006",
+                      "net_buy_notional": "5999.94",
+                      "objective_value": "-0.0340711175616835994194484757",
+                      "one_way_turnover": "0.599994",
+                      "optimization_status": "OPTIMAL",
+                      "order_count": 1,
+                      "period_profit_loss": "0",
+                      "period_return": "0",
+                      "post_cycle_cash": "4000.06",
+                      "post_cycle_equity": "10000",
+                      "post_cycle_gross_exposure": "5999.94",
+                      "post_cycle_net_exposure": "5999.94",
+                      "post_cycle_position_count": 1,
+                      "post_cycle_unrealized_profit_loss": "0",
+                      "pre_cycle_cash": "10000",
+                      "pre_cycle_equity": "10000",
+                      "pre_cycle_gross_exposure": "0",
+                      "pre_cycle_net_exposure": "0",
+                      "pre_cycle_position_count": 0,
+                      "pre_cycle_unrealized_profit_loss": "0",
+                      "reduced_notional": "0",
+                      "rejected_notional": "0",
+                      "rejected_risk_count": 0,
+                      "resized_risk_count": 0,
+                      "signed_slippage_profit_loss": "0",
+                      "solver_name": "scipy-highs-1.18.0",
+                      "source_cycle_result_id": "e5e16e5e-f94c-535a-a3e3-e7c615631d36",
+                      "target_allocation_count": 2,
+                      "target_cash_weight": "0.4",
+                      "total_absolute_allocation_drift": "0.000012",
+                      "total_execution_cost": "0",
+                      "two_way_turnover": "0.599994",
+                      "unrealized_profit_loss_change": "0"
+                    }
+                  ],
+                  "initial_equity": "10000",
+                  "initial_unrealized_profit_loss": "0",
+                  "maximum_absolute_allocation_drift": "0.000006",
+                  "no_action_cycle_count": 0,
+                  "optimization_summary": {
+                    "maximum_target_cash_weight": "0.4",
+                    "mean_expected_portfolio_return": "0.0114296081277213352685050797",
+                    "minimum_target_cash_weight": "0.4",
+                    "worst_cvar": "-0.011320754716981132075471698"
+                  },
+                  "result_id": "5ebe62ff-36fc-5c7b-92e9-9d8f43cd2327",
+                  "simulation_return": "0",
+                  "source_simulation_result_id": "07d25d84-f4b6-529f-a5a8-0c6522a77c09",
+                  "total_absolute_allocation_drift": "0.000012",
+                  "total_adverse_slippage_cost": "0",
+                  "total_approved_risk_count": 1,
+                  "total_commissions": "0",
+                  "total_execution_cost": "0",
+                  "total_fill_count": 1,
+                  "total_gross_buy_notional": "5999.94",
+                  "total_gross_sell_notional": "0",
+                  "total_gross_traded_notional": "5999.94",
+                  "total_net_buy_notional": "5999.94",
+                  "total_order_count": 1,
+                  "total_reduced_notional": "0",
+                  "total_rejected_notional": "0",
+                  "total_rejected_risk_count": 0,
+                  "total_resized_risk_count": 0,
+                  "total_signed_slippage_profit_loss": "0"
+                }
+              },
+              "result_id": "edfd4ea9-8de2-51a3-bacd-e5c39fd8c70d",
+              "state_ids": {
+                "final_engine": "ea4488c1-e05b-57cb-99e6-e0da1c86f581",
+                "final_ledger": "be2d657c-ba37-5856-bd9a-92c2bf5cc091",
+                "initial_engine": "6bec5d03-e88e-5383-b8ec-82b2ec4db4d4",
+                "initial_ledger": "b76293e6-25f2-53fc-93b1-108a172169e6"
+              }
+            }
+          },
+          "rolling_request_id": "4a2a6cc8-e479-5d1d-b712-b66bd861bb41",
+          "run_id": "e44e8e80-68f7-59b4-ac49-0a52067b167e",
+          "variant": {
+            "execution_prices": {
+              "fill_reference_price_field": "CLOSE",
+              "risk_price_field": "CLOSE"
+            },
+            "fills": {
+              "fixed_commission": "0",
+              "slippage_basis_points": "0"
+            },
+            "metadata": [
+              {
+                "key": "variant_family",
+                "value": "grid-base"
+              }
+            ],
+            "name": "Grid Base | WINDOW_OBSERVATION_COUNT=3, RISK_AVERSION=2",
+            "optimization": {
+              "confidence_level": "0.75",
+              "maximum_iterations": null,
+              "minimum_expected_return": null,
+              "output_quantum": "0.00000001",
+              "risk_aversion": "2",
+              "solver_tolerance": "0.00000001"
+            },
+            "portfolio_constraints": {
+              "allow_leverage": false,
+              "long_only": true,
+              "maximum_cash_weight": "1",
+              "maximum_one_way_rebalance_turnover": null,
+              "maximum_position_weight": "0.6",
+              "minimum_cash_weight": "0",
+              "minimum_position_weight": null
+            },
+            "rebalance": {
+              "assumptions": {
+                "additional_execution_cash_buffer": "0",
+                "allow_fractional_quantities": true,
+                "fixed_commission": "0",
+                "minimum_trade_notional": "0",
+                "minimum_trade_quantity": "0",
+                "quantity_increment": "0.001",
+                "target_weight_tolerance": "0",
+                "use_planned_sell_proceeds": true
+              },
+              "proposal_confidence": null,
+              "proposal_policy": {
+                "allow_partial_plans": true
+              }
+            },
+            "risk": {
+              "limits": {
+                "allow_buying": true,
+                "allow_fractional_shares": true,
+                "allow_selling": true,
+                "estimated_commission": "0",
+                "fractional_increment": "0.001",
+                "max_new_position_percent": null,
+                "max_order_notional": null,
+                "max_position_percent": "0.6",
+                "max_total_exposure_percent": "1",
+                "minimum_cash_reserve_percent": "0"
+              },
+              "policy": {
+                "allow_sell_proceeds_for_later_buys": false
+              }
+            },
+            "rolling_window": {
+              "observation_count": 3
+            },
+            "scenario": {
+              "cash_return": "0",
+              "price_field": "CLOSE",
+              "return_method": "SIMPLE",
+              "source_name": "historical-experiment-grid",
+              "window_policy": "ALL_SUPPLIED"
+            },
+            "timing": {
+              "fill_offset_microseconds": 120000000,
+              "submission_offset_microseconds": 60000000
+            },
+            "trading_enabled": true,
+            "variant_id": "a3f9e1e2-d22c-5ada-b66e-eb3bf01c52ad"
+          }
+        },
+        {
+          "initial_state_content_fingerprint": "d0657c6f-e7a8-51ab-ba9e-bab0f2066396",
+          "initialization": {
+            "bootstrap_fills": [],
+            "final_engine_state_id": "7bf44080-a50f-52df-94d9-4344976c169e",
+            "final_ledger_state_id": "6b4b9d9b-703c-5a00-9d55-02c2e52fd8ea",
+            "initial_engine_state_id": "6bec5d03-e88e-5383-b8ec-82b2ec4db4d4",
+            "initial_ledger_state_id": "b76293e6-25f2-53fc-93b1-108a172169e6"
+          },
+          "metrics": {
+            "absolute_simulation_profit_loss": "0",
+            "adverse_slippage_cost": "0",
+            "aggregate_one_way_turnover": "0.599994",
+            "aggregate_two_way_turnover": "0.599994",
+            "applied_cycle_count": 1,
+            "approved_decisions": 1,
+            "final_equity": "10000",
+            "initial_equity": "10000",
+            "maximum_allocation_drift": "0.000006",
+            "maximum_drawdown_amount": "0",
+            "maximum_drawdown_percentage": "0",
+            "maximum_target_cash_weight": "0.4",
+            "mean_expected_portfolio_return": "0.0115413073792652039044935826",
+            "minimum_target_cash_weight": "0.4",
+            "no_action_cycle_count": 0,
+            "reduced_notional": "0",
+            "rejected_decisions": 0,
+            "rejected_notional": "0",
+            "resized_decisions": 0,
+            "simulation_realized_profit_loss": "0",
+            "simulation_return": "0",
+            "total_commissions": "0",
+            "total_execution_cost": "0",
+            "total_fills": 1,
+            "total_orders": 1,
+            "worst_cvar": "-0.011320754716981132075471698"
+          },
+          "ordinal": 2,
+          "rolling": {
+            "request": {
+              "metadata": [
+                {
+                  "key": "historical_experiment_id",
+                  "value": "00000000-0000-0000-0000-000000000401"
+                },
+                {
+                  "key": "historical_experiment_variant_id",
+                  "value": "310a50df-5817-5fc8-80b6-c6284f7d46f1"
+                },
+                {
+                  "key": "historical_experiment_variant_ordinal",
+                  "value": "2"
+                },
+                {
+                  "key": "historical_experiment_variant_name",
+                  "value": "Grid Base | WINDOW_OBSERVATION_COUNT=4, RISK_AVERSION=1"
+                }
+              ],
+              "observation_count": 4,
+              "rebalance_schedule": [
+                "2026-01-09T20:00:00+00:00"
+              ],
+              "request_id": "76195518-50e2-54c5-b49a-02fdf2df4a40",
+              "scenario_cash_return": "0",
+              "scenario_source_name": "historical-experiment-grid",
+              "trading_enabled": true
+            },
+            "result": {
+              "frame_generations": [
+                {
+                  "frame_ordinal": 0,
+                  "historical_frame_index": 4,
+                  "optimized_frame": {
+                    "as_of": "2026-01-09T20:00:00+00:00",
+                    "expected_returns": [
+                      {
+                        "symbol": "SPY",
+                        "value": "0.01923551229877533984082263767"
+                      },
+                      {
+                        "symbol": "QQQ",
+                        "value": "-0.0102047900280595420507055264"
+                      }
+                    ],
+                    "fill_policy": {
+                      "fixed_commission": "0",
+                      "slippage_basis_points": "0"
+                    },
+                    "filled_at": "2026-01-09T20:02:00+00:00",
+                    "metadata": [
+                      {
+                        "key": "rolling_historical_frame_ordinal",
+                        "value": "0"
+                      },
+                      {
+                        "key": "rolling_historical_window_start",
+                        "value": "2026-01-06T20:00:00+00:00"
+                      },
+                      {
+                        "key": "rolling_historical_window_end",
+                        "value": "2026-01-09T20:00:00+00:00"
+                      },
+                      {
+                        "key": "rolling_historical_observation_count",
+                        "value": "4"
+                      }
+                    ],
+                    "optimization": {
+                      "confidence_level": "0.75",
+                      "maximum_iterations": null,
+                      "minimum_expected_return": null,
+                      "output_quantum": "0.00000001",
+                      "risk_aversion": "1",
+                      "solver_tolerance": "0.00000001"
+                    },
+                    "portfolio_constraints": {
+                      "allow_leverage": false,
+                      "long_only": true,
+                      "maximum_cash_weight": "1",
+                      "maximum_one_way_rebalance_turnover": null,
+                      "maximum_position_weight": "0.6",
+                      "minimum_cash_weight": "0",
+                      "minimum_position_weight": null
+                    },
+                    "prices": [
+                      {
+                        "fill_reference_price": "108",
+                        "risk_price": "108",
+                        "symbol": "SPY"
+                      },
+                      {
+                        "fill_reference_price": "96",
+                        "risk_price": "96",
+                        "symbol": "QQQ"
+                      }
+                    ],
+                    "proposal_confidence": null,
+                    "proposal_policy": {
+                      "allow_partial_plans": true
+                    },
+                    "rebalance_assumptions": {
+                      "additional_execution_cash_buffer": "0",
+                      "allow_fractional_quantities": true,
+                      "fixed_commission": "0",
+                      "minimum_trade_notional": "0",
+                      "minimum_trade_quantity": "0",
+                      "quantity_increment": "0.001",
+                      "target_weight_tolerance": "0",
+                      "use_planned_sell_proceeds": true
+                    },
+                    "risk_limits": {
+                      "allow_buying": true,
+                      "allow_fractional_shares": true,
+                      "allow_selling": true,
+                      "estimated_commission": "0",
+                      "fractional_increment": "0.001",
+                      "max_new_position_percent": null,
+                      "max_order_notional": null,
+                      "max_position_percent": "0.6",
+                      "max_total_exposure_percent": "1",
+                      "minimum_cash_reserve_percent": "0"
+                    },
+                    "risk_policy": {
+                      "allow_sell_proceeds_for_later_buys": false
+                    },
+                    "scenarios": {
+                      "cash_return": "0",
+                      "forecast_horizon": {
+                        "periods": 1,
+                        "timeframe": "1D"
+                      },
+                      "metadata": [
+                        {
+                          "key": "rolling_historical_simulation_id",
+                          "value": "76195518-50e2-54c5-b49a-02fdf2df4a40"
+                        },
+                        {
+                          "key": "rolling_historical_frame_ordinal",
+                          "value": "0"
+                        },
+                        {
+                          "key": "rolling_historical_window_start",
+                          "value": "2026-01-06T20:00:00+00:00"
+                        },
+                        {
+                          "key": "rolling_historical_window_end",
+                          "value": "2026-01-09T20:00:00+00:00"
+                        },
+                        {
+                          "key": "rolling_historical_observation_count",
+                          "value": "4"
+                        },
+                        {
+                          "key": "historical_scenario_observation_start",
+                          "value": "2026-01-06T20:00:00+00:00"
+                        },
+                        {
+                          "key": "historical_scenario_observation_end",
+                          "value": "2026-01-09T20:00:00+00:00"
+                        },
+                        {
+                          "key": "historical_scenario_observation_count",
+                          "value": "4"
+                        },
+                        {
+                          "key": "historical_scenario_return_row_count",
+                          "value": "3"
+                        },
+                        {
+                          "key": "historical_scenario_price_field",
+                          "value": "CLOSE"
+                        },
+                        {
+                          "key": "historical_scenario_return_method",
+                          "value": "SIMPLE"
+                        },
+                        {
+                          "key": "historical_scenario_window_policy",
+                          "value": "ALL_SUPPLIED"
+                        }
+                      ],
+                      "rows": [
+                        {
+                          "metadata": [],
+                          "probability": "0.3333333333333333333333333333",
+                          "returns": [
+                            "0.019607843137254901960784314",
+                            "-0.0101010101010101010101010101"
+                          ],
+                          "scenario_id": "b7cced34-8631-5fe0-9e88-07b5219b74df"
+                        },
+                        {
+                          "metadata": [],
+                          "probability": "0.3333333333333333333333333333",
+                          "returns": [
+                            "0.019230769230769230769230769",
+                            "-0.0102040816326530612244897959"
+                          ],
+                          "scenario_id": "54989813-526d-580c-ad1d-f2c4fbfd893e"
+                        },
+                        {
+                          "metadata": [],
+                          "probability": "0.3333333333333333333333333334",
+                          "returns": [
+                            "0.01886792452830188679245283",
+                            "-0.0103092783505154639175257732"
+                          ],
+                          "scenario_id": "34580d2a-3e2f-5aac-b3c8-cb3ca55fa8c6"
+                        }
+                      ],
+                      "scenario_set_id": "81faeeb6-c316-5bdb-9e67-0eaeac8e7478",
+                      "source": "HISTORICAL",
+                      "source_name": "historical-experiment-grid",
+                      "symbols": [
+                        "SPY",
+                        "QQQ"
+                      ]
+                    },
+                    "submitted_at": "2026-01-09T20:01:00+00:00",
+                    "trading_enabled": true
+                  },
+                  "optimized_frame_fingerprint": "956a0d49-673a-57c6-843e-9ac74ef631fe",
+                  "rebalance_timestamp": "2026-01-09T20:00:00+00:00",
+                  "scenario_request_id": "0bcdd785-9d5f-5664-bbe0-a4ec1647d6b2",
+                  "scenario_result": {
+                    "diagnostics": [
+                      {
+                        "code": "UNEQUAL_FINAL_RESIDUAL_PROBABILITY",
+                        "message": "The final probability contains the deterministic residual.",
+                        "symbol": null
+                      }
+                    ],
+                    "expected_returns": [
+                      {
+                        "symbol": "SPY",
+                        "value": "0.01923551229877533984082263767"
+                      },
+                      {
+                        "symbol": "QQQ",
+                        "value": "-0.0102047900280595420507055264"
+                      }
+                    ],
+                    "request": {
+                      "as_of": "2026-01-09T20:00:00+00:00",
+                      "cash_return": "0",
+                      "forecast_horizon": {
+                        "periods": 1,
+                        "timeframe": "1D"
+                      },
+                      "historical_request": {
+                        "adjustment": "RAW",
+                        "end": "2026-01-10T00:00:00+00:00",
+                        "frame_count": 4,
+                        "missing_bar_policy": "INTERSECTION",
+                        "provider_name": "coordinating:trading_bot.market_data.csv_provider.CSVHistoricalDataProvider",
+                        "start": "2026-01-06T20:00:00+00:00",
+                        "symbols": [
+                          "SPY",
+                          "QQQ"
+                        ],
+                        "timeframe": "1D"
+                      },
+                      "metadata": [
+                        {
+                          "key": "rolling_historical_simulation_id",
+                          "value": "76195518-50e2-54c5-b49a-02fdf2df4a40"
+                        },
+                        {
+                          "key": "rolling_historical_frame_ordinal",
+                          "value": "0"
+                        },
+                        {
+                          "key": "rolling_historical_window_start",
+                          "value": "2026-01-06T20:00:00+00:00"
+                        },
+                        {
+                          "key": "rolling_historical_window_end",
+                          "value": "2026-01-09T20:00:00+00:00"
+                        },
+                        {
+                          "key": "rolling_historical_observation_count",
+                          "value": "4"
+                        }
+                      ],
+                      "policy": {
+                        "price_field": "CLOSE",
+                        "return_method": "SIMPLE",
+                        "window_policy": "ALL_SUPPLIED"
+                      },
+                      "request_id": "0bcdd785-9d5f-5664-bbe0-a4ec1647d6b2",
+                      "source_name": "historical-experiment-grid"
+                    },
+                    "result_id": "b5e1d89a-70dd-5047-b0e6-9c9784b53a6c",
+                    "scenario_set": {
+                      "as_of": "2026-01-09T20:00:00+00:00",
+                      "cash_return": "0",
+                      "forecast_horizon": {
+                        "periods": 1,
+                        "timeframe": "1D"
+                      },
+                      "metadata": [
+                        {
+                          "key": "rolling_historical_simulation_id",
+                          "value": "76195518-50e2-54c5-b49a-02fdf2df4a40"
+                        },
+                        {
+                          "key": "rolling_historical_frame_ordinal",
+                          "value": "0"
+                        },
+                        {
+                          "key": "rolling_historical_window_start",
+                          "value": "2026-01-06T20:00:00+00:00"
+                        },
+                        {
+                          "key": "rolling_historical_window_end",
+                          "value": "2026-01-09T20:00:00+00:00"
+                        },
+                        {
+                          "key": "rolling_historical_observation_count",
+                          "value": "4"
+                        },
+                        {
+                          "key": "historical_scenario_observation_start",
+                          "value": "2026-01-06T20:00:00+00:00"
+                        },
+                        {
+                          "key": "historical_scenario_observation_end",
+                          "value": "2026-01-09T20:00:00+00:00"
+                        },
+                        {
+                          "key": "historical_scenario_observation_count",
+                          "value": "4"
+                        },
+                        {
+                          "key": "historical_scenario_return_row_count",
+                          "value": "3"
+                        },
+                        {
+                          "key": "historical_scenario_price_field",
+                          "value": "CLOSE"
+                        },
+                        {
+                          "key": "historical_scenario_return_method",
+                          "value": "SIMPLE"
+                        },
+                        {
+                          "key": "historical_scenario_window_policy",
+                          "value": "ALL_SUPPLIED"
+                        }
+                      ],
+                      "rows": [
+                        {
+                          "metadata": [],
+                          "probability": "0.3333333333333333333333333333",
+                          "returns": [
+                            "0.019607843137254901960784314",
+                            "-0.0101010101010101010101010101"
+                          ],
+                          "scenario_id": "b7cced34-8631-5fe0-9e88-07b5219b74df"
+                        },
+                        {
+                          "metadata": [],
+                          "probability": "0.3333333333333333333333333333",
+                          "returns": [
+                            "0.019230769230769230769230769",
+                            "-0.0102040816326530612244897959"
+                          ],
+                          "scenario_id": "54989813-526d-580c-ad1d-f2c4fbfd893e"
+                        },
+                        {
+                          "metadata": [],
+                          "probability": "0.3333333333333333333333333334",
+                          "returns": [
+                            "0.01886792452830188679245283",
+                            "-0.0103092783505154639175257732"
+                          ],
+                          "scenario_id": "34580d2a-3e2f-5aac-b3c8-cb3ca55fa8c6"
+                        }
+                      ],
+                      "scenario_set_id": "81faeeb6-c316-5bdb-9e67-0eaeac8e7478",
+                      "source": "HISTORICAL",
+                      "source_name": "historical-experiment-grid",
+                      "symbols": [
+                        "SPY",
+                        "QQQ"
+                      ]
+                    }
+                  },
+                  "source_frame_id": "a085df97-f53f-5412-92d8-f492f26bcd2f",
+                  "window_end_index_inclusive": 4,
+                  "window_end_timestamp": "2026-01-09T20:00:00+00:00",
+                  "window_start_index": 1,
+                  "window_start_timestamp": "2026-01-06T20:00:00+00:00"
+                }
+              ],
+              "optimized_simulation": {
+                "counts": {
+                  "applied_cycle_count": 1,
+                  "frame_count": 1,
+                  "no_action_cycle_count": 0
+                },
+                "final_state": {
+                  "cash": "4000.06",
+                  "engine_state_id": "7bf44080-a50f-52df-94d9-4344976c169e",
+                  "ledger_fills": [
+                    {
+                      "commission": "0",
+                      "fill_id": "1480b3aa-1bfd-51d7-926b-79fafec6b9a4",
+                      "filled_at": "2026-01-09T20:02:00+00:00",
+                      "order_id": "b9bc488e-ffe5-5373-a8fc-cb3ca9907fe5",
+                      "origin": "SIMULATION",
+                      "price": "108",
+                      "quantity": "55.555",
+                      "side": "BUY",
+                      "symbol": "SPY"
+                    }
+                  ],
+                  "ledger_state_id": "6b4b9d9b-703c-5a00-9d55-02c2e52fd8ea",
+                  "positions": [
+                    {
+                      "average_cost": "108",
+                      "quantity": "55.555",
+                      "symbol": "SPY"
+                    }
+                  ],
+                  "realized_profit_loss": "0"
+                },
+                "frames": [
+                  {
+                    "application": {
+                      "evaluations": [
+                        {
+                          "application_event": {
+                            "event_id": "27867ad7-dc2e-552b-a27c-07b32f4335cc",
+                            "event_type": "FILLED",
+                            "fill_id": "1480b3aa-1bfd-51d7-926b-79fafec6b9a4",
+                            "occurred_at": "2026-01-09T20:02:00+00:00",
+                            "order_id": "b9bc488e-ffe5-5373-a8fc-cb3ca9907fe5",
+                            "reason": null
+                          },
+                          "fill_id": "1480b3aa-1bfd-51d7-926b-79fafec6b9a4",
+                          "ledger_cash_after": "4000.06",
+                          "ledger_position_after": {
+                            "average_cost": "108",
+                            "quantity": "55.555",
+                            "symbol": "SPY"
+                          },
+                          "ledger_realized_profit_loss_after": "0",
+                          "source_fill_ordinal": 0
+                        }
+                      ],
+                      "post_engine_state_id": "7bf44080-a50f-52df-94d9-4344976c169e",
+                      "post_ledger_state_id": "6b4b9d9b-703c-5a00-9d55-02c2e52fd8ea",
+                      "pre_engine_state_id": "14ee1221-a437-519b-9ef2-67e70a6de739",
+                      "pre_ledger_state_id": "b76293e6-25f2-53fc-93b1-108a172169e6",
+                      "result_id": "130d0de8-59ae-501e-b8d0-b91137045cb5",
+                      "status": "APPLIED"
+                    },
+                    "as_of": "2026-01-09T20:00:00+00:00",
+                    "certification": {
+                      "request_id": "05be4b36-cb45-545f-9c36-7656fde797bf",
+                      "result_id": "448a7cd3-5222-5f9e-8cbe-d6bd43dd556c",
+                      "target": {
+                        "allocations": [
+                          {
+                            "symbol": "SPY",
+                            "weight": "0.6"
+                          },
+                          {
+                            "symbol": "QQQ",
+                            "weight": "0"
+                          }
+                        ],
+                        "as_of": "2026-01-09T20:00:00+00:00",
+                        "cash_weight": "0.4",
+                        "metadata": [],
+                        "source": "OPTIMIZER",
+                        "source_name": "scipy-highs-1.18.0",
+                        "target_id": "94c5e1ef-adab-50df-9e4a-94b36f9fee76"
+                      }
+                    },
+                    "ending_ledger": {
+                      "cash": "4000.06",
+                      "positions": [
+                        {
+                          "average_cost": "108",
+                          "quantity": "55.555",
+                          "symbol": "SPY"
+                        }
+                      ],
+                      "realized_profit_loss": "0"
+                    },
+                    "fill_batch_result_id": "6b64bdbd-e074-5483-a9b4-b207ac35ec61",
+                    "fills": [
+                      {
+                        "commission": "0",
+                        "fill_id": "1480b3aa-1bfd-51d7-926b-79fafec6b9a4",
+                        "filled_at": "2026-01-09T20:02:00+00:00",
+                        "order_id": "b9bc488e-ffe5-5373-a8fc-cb3ca9907fe5",
+                        "origin": "SIMULATION",
+                        "price": "108",
+                        "quantity": "55.555",
+                        "reference_price": "108",
+                        "side": "BUY",
+                        "slippage_amount": "0",
+                        "source_order_ordinal": 0,
+                        "symbol": "SPY"
+                      }
+                    ],
+                    "optimization": {
+                      "cvar": "-0.011320754716981132075471698",
+                      "diagnostics": [
+                        {
+                          "code": "SOLVER_STATUS",
+                          "level": "WARNING",
+                          "message": "optimization completed successfully",
+                          "value": null
+                        },
+                        {
+                          "code": "OBJECTIVE_VALUE",
+                          "level": "INFO",
+                          "message": "objective value",
+                          "value": "-0.0228620620962463359799652806"
+                        },
+                        {
+                          "code": "MAX_CONSTRAINT_VIOLATION",
+                          "level": "INFO",
+                          "message": "max constraint violation",
+                          "value": "0"
+                        }
+                      ],
+                      "expected_portfolio_return": "0.0115413073792652039044935826",
+                      "objective_value": "-0.0228620620962463359799652806",
+                      "request_id": "3249cc67-22aa-5b1c-9f71-0d7537262871",
+                      "result_id": "57b0846c-94db-5d63-9a2b-a571aee8018f",
+                      "solver_name": "scipy-highs-1.18.0",
+                      "status": "OPTIMAL"
+                    },
+                    "order_batch_result_id": "bb348fd9-f85d-5d00-b590-2bd347c27097",
+                    "orders": [
+                      {
+                        "average_fill_price": null,
+                        "creation_event_id": "256007af-b0c6-5176-8819-60c0d84bbdba",
+                        "filled_quantity": "0",
+                        "order_id": "b9bc488e-ffe5-5373-a8fc-cb3ca9907fe5",
+                        "order_type": "MARKET",
+                        "quantity": "55.555",
+                        "request_created_at": "2026-01-09T20:00:00+00:00",
+                        "side": "BUY",
+                        "status": "PENDING",
+                        "symbol": "SPY",
+                        "time_in_force": "DAY"
+                      }
+                    ],
+                    "ordinal": 0,
+                    "planning": {
+                      "planned_trade_ids": [
+                        "8bb84f33-59b0-5820-8a4b-8b21965052c5"
+                      ],
+                      "result_id": "a98dc683-e89e-5e1e-bac2-164fba50ed3e",
+                      "status": "PARTIAL"
+                    },
+                    "post_engine_state_id": "7bf44080-a50f-52df-94d9-4344976c169e",
+                    "post_ledger_state_id": "6b4b9d9b-703c-5a00-9d55-02c2e52fd8ea",
+                    "pre_engine_state_id": "6bec5d03-e88e-5383-b8ec-82b2ec4db4d4",
+                    "pre_ledger_state_id": "b76293e6-25f2-53fc-93b1-108a172169e6",
+                    "proposals": {
+                      "proposal_ids": [
+                        "0fb87847-5dd9-54fb-8528-d0606c5a6255"
+                      ],
+                      "result_id": "f44f67db-a431-5e7f-bdc1-3f5db5d24a6d",
+                      "status": "CREATED"
+                    },
+                    "risk": {
+                      "approved_count": 1,
+                      "evaluations": [
+                        {
+                          "approved_quantity": "55.555",
+                          "ordinal": 0,
+                          "outcome": "APPROVED",
+                          "proposal_id": "0fb87847-5dd9-54fb-8528-d0606c5a6255",
+                          "reasons": []
+                        }
+                      ],
+                      "rejected_count": 0,
+                      "resized_count": 0,
+                      "result_id": "59a3cbbf-0c4f-52d1-826a-d31c7e9f79f4",
+                      "status": "ALL_APPROVED"
+                    },
+                    "runtime": {
+                      "request_id": "26a8a4ad-4be0-5b24-a178-a6e6af3c232a",
+                      "result_id": "ae12e5ce-a5d5-5e71-b853-41311b7b2877",
+                      "status": "APPLIED"
+                    },
+                    "submission_batch_result_id": "f60cfbe3-2b3d-59b0-809a-fe0903a38ef0",
+                    "submissions": [
+                      {
+                        "average_fill_price": null,
+                        "filled_quantity": "0",
+                        "order_id": "b9bc488e-ffe5-5373-a8fc-cb3ca9907fe5",
+                        "order_type": "MARKET",
+                        "quantity": "55.555",
+                        "request_created_at": "2026-01-09T20:00:00+00:00",
+                        "side": "BUY",
+                        "status": "SUBMITTED",
+                        "submission_event_id": "6c05bb07-3a02-5170-badd-c6abd668c0cc",
+                        "symbol": "SPY",
+                        "time_in_force": "DAY"
+                      }
+                    ]
+                  }
+                ],
+                "request_id": "2004a0fc-04b2-5fe6-a537-5e6045168ed6",
+                "result_id": "3ab1a3df-d141-5b9a-a030-d4c8461a5e2b",
+                "status": "COMPLETED"
+              },
+              "performance": {
+                "request": {
+                  "metadata": [
+                    {
+                      "key": "rolling_historical_simulation_id",
+                      "value": "76195518-50e2-54c5-b49a-02fdf2df4a40"
+                    },
+                    {
+                      "key": "rolling_historical_simulation_source",
+                      "value": "rolling-historical-runner"
+                    }
+                  ],
+                  "request_id": "65b9135e-53aa-553c-8ab0-6d1db56ac0d3",
+                  "source_simulation_request_id": "2004a0fc-04b2-5fe6-a537-5e6045168ed6",
+                  "source_simulation_result_id": "3ab1a3df-d141-5b9a-a030-d4c8461a5e2b",
+                  "valuation_basis": "FRAME_RISK_PRICES"
+                },
+                "result": {
+                  "absolute_simulation_profit_loss": "0",
+                  "aggregate_one_way_turnover": "0.599994",
+                  "aggregate_two_way_turnover": "0.599994",
+                  "applied_cycle_count": 1,
+                  "cumulative_simulation_realized_profit_loss": "0",
+                  "diagnostics": [],
+                  "drawdowns": {
+                    "maximum_amount": {
+                      "amount": "0",
+                      "peak_equity": "10000",
+                      "peak_timestamp": "2026-01-09T20:00:00+00:00",
+                      "percentage": "0",
+                      "source_observation": {
+                        "equity": "10000",
+                        "frame_ordinal": 0,
+                        "phase": "PRE_CYCLE",
+                        "sequence_index": 0,
+                        "timestamp": "2026-01-09T20:00:00+00:00"
+                      },
+                      "trough_equity": "10000",
+                      "trough_timestamp": "2026-01-09T20:00:00+00:00"
+                    },
+                    "maximum_percentage": {
+                      "amount": "0",
+                      "peak_equity": "10000",
+                      "peak_timestamp": "2026-01-09T20:00:00+00:00",
+                      "percentage": "0",
+                      "source_observation": {
+                        "equity": "10000",
+                        "frame_ordinal": 0,
+                        "phase": "PRE_CYCLE",
+                        "sequence_index": 0,
+                        "timestamp": "2026-01-09T20:00:00+00:00"
+                      },
+                      "trough_equity": "10000",
+                      "trough_timestamp": "2026-01-09T20:00:00+00:00"
+                    }
+                  },
+                  "equity_observations": [
+                    {
+                      "drawdown_amount": "0",
+                      "drawdown_percentage": "0",
+                      "equity": "10000",
+                      "frame_ordinal": 0,
+                      "phase": "PRE_CYCLE",
+                      "running_peak": "10000",
+                      "sequence_index": 0,
+                      "timestamp": "2026-01-09T20:00:00+00:00"
+                    },
+                    {
+                      "drawdown_amount": "0",
+                      "drawdown_percentage": "0",
+                      "equity": "10000",
+                      "frame_ordinal": 0,
+                      "phase": "POST_CYCLE",
+                      "running_peak": "10000",
+                      "sequence_index": 1,
+                      "timestamp": "2026-01-09T20:02:00+00:00"
+                    }
+                  ],
+                  "final_equity": "10000",
+                  "final_unrealized_profit_loss": "0",
+                  "frames": [
+                    {
+                      "absolute_cash_weight_drift": "0.000006",
+                      "actual_cash_weight": "0.400006",
+                      "adverse_slippage_cost": "0",
+                      "allocation_drifts": [
+                        {
+                          "absolute_drift": "0.000006",
+                          "actual_weight": "0.599994",
+                          "drift": "-0.000006",
+                          "symbol": "SPY",
+                          "target_weight": "0.6"
+                        },
+                        {
+                          "absolute_drift": "0",
+                          "actual_weight": "0",
+                          "drift": "0",
+                          "symbol": "QQQ",
+                          "target_weight": "0"
+                        }
+                      ],
+                      "approved_risk_count": 1,
+                      "as_of": "2026-01-09T20:00:00+00:00",
+                      "cash_weight_drift": "0.000006",
+                      "commission_cost": "0",
+                      "cumulative_return": "0",
+                      "cumulative_simulation_profit_loss": "0",
+                      "cumulative_simulation_realized_profit_loss": "0",
+                      "cvar": "-0.011320754716981132075471698",
+                      "execution_profit_loss": "0",
+                      "expected_portfolio_return": "0.0115413073792652039044935826",
+                      "fill_count": 1,
+                      "filled_at": "2026-01-09T20:02:00+00:00",
+                      "forward_market_profit_loss": null,
+                      "frame_id": "170d43ce-e138-5840-8749-170209b5236e",
+                      "frame_ordinal": 0,
+                      "frame_simulation_realized_profit_loss": "0",
+                      "gross_buy_notional": "5999.94",
+                      "gross_sell_notional": "0",
+                      "gross_traded_notional": "5999.94",
+                      "maximum_absolute_allocation_drift": "0.000006",
+                      "net_buy_notional": "5999.94",
+                      "objective_value": "-0.0228620620962463359799652806",
+                      "one_way_turnover": "0.599994",
+                      "optimization_status": "OPTIMAL",
+                      "order_count": 1,
+                      "period_profit_loss": "0",
+                      "period_return": "0",
+                      "post_cycle_cash": "4000.06",
+                      "post_cycle_equity": "10000",
+                      "post_cycle_gross_exposure": "5999.94",
+                      "post_cycle_net_exposure": "5999.94",
+                      "post_cycle_position_count": 1,
+                      "post_cycle_unrealized_profit_loss": "0",
+                      "pre_cycle_cash": "10000",
+                      "pre_cycle_equity": "10000",
+                      "pre_cycle_gross_exposure": "0",
+                      "pre_cycle_net_exposure": "0",
+                      "pre_cycle_position_count": 0,
+                      "pre_cycle_unrealized_profit_loss": "0",
+                      "reduced_notional": "0",
+                      "rejected_notional": "0",
+                      "rejected_risk_count": 0,
+                      "resized_risk_count": 0,
+                      "signed_slippage_profit_loss": "0",
+                      "solver_name": "scipy-highs-1.18.0",
+                      "source_cycle_result_id": "ae12e5ce-a5d5-5e71-b853-41311b7b2877",
+                      "target_allocation_count": 2,
+                      "target_cash_weight": "0.4",
+                      "total_absolute_allocation_drift": "0.000012",
+                      "total_execution_cost": "0",
+                      "two_way_turnover": "0.599994",
+                      "unrealized_profit_loss_change": "0"
+                    }
+                  ],
+                  "initial_equity": "10000",
+                  "initial_unrealized_profit_loss": "0",
+                  "maximum_absolute_allocation_drift": "0.000006",
+                  "no_action_cycle_count": 0,
+                  "optimization_summary": {
+                    "maximum_target_cash_weight": "0.4",
+                    "mean_expected_portfolio_return": "0.0115413073792652039044935826",
+                    "minimum_target_cash_weight": "0.4",
+                    "worst_cvar": "-0.011320754716981132075471698"
+                  },
+                  "result_id": "c24b3ed3-c797-573b-8ac9-0608418c2caf",
+                  "simulation_return": "0",
+                  "source_simulation_result_id": "3ab1a3df-d141-5b9a-a030-d4c8461a5e2b",
+                  "total_absolute_allocation_drift": "0.000012",
+                  "total_adverse_slippage_cost": "0",
+                  "total_approved_risk_count": 1,
+                  "total_commissions": "0",
+                  "total_execution_cost": "0",
+                  "total_fill_count": 1,
+                  "total_gross_buy_notional": "5999.94",
+                  "total_gross_sell_notional": "0",
+                  "total_gross_traded_notional": "5999.94",
+                  "total_net_buy_notional": "5999.94",
+                  "total_order_count": 1,
+                  "total_reduced_notional": "0",
+                  "total_rejected_notional": "0",
+                  "total_rejected_risk_count": 0,
+                  "total_resized_risk_count": 0,
+                  "total_signed_slippage_profit_loss": "0"
+                }
+              },
+              "result_id": "d95c9442-c045-5f63-86f3-872269c85471",
+              "state_ids": {
+                "final_engine": "7bf44080-a50f-52df-94d9-4344976c169e",
+                "final_ledger": "6b4b9d9b-703c-5a00-9d55-02c2e52fd8ea",
+                "initial_engine": "6bec5d03-e88e-5383-b8ec-82b2ec4db4d4",
+                "initial_ledger": "b76293e6-25f2-53fc-93b1-108a172169e6"
+              }
+            }
+          },
+          "rolling_request_id": "76195518-50e2-54c5-b49a-02fdf2df4a40",
+          "run_id": "6dce1e0e-44ef-5a3e-bf2b-ced2ee7a07de",
+          "variant": {
+            "execution_prices": {
+              "fill_reference_price_field": "CLOSE",
+              "risk_price_field": "CLOSE"
+            },
+            "fills": {
+              "fixed_commission": "0",
+              "slippage_basis_points": "0"
+            },
+            "metadata": [
+              {
+                "key": "variant_family",
+                "value": "grid-base"
+              }
+            ],
+            "name": "Grid Base | WINDOW_OBSERVATION_COUNT=4, RISK_AVERSION=1",
+            "optimization": {
+              "confidence_level": "0.75",
+              "maximum_iterations": null,
+              "minimum_expected_return": null,
+              "output_quantum": "0.00000001",
+              "risk_aversion": "1",
+              "solver_tolerance": "0.00000001"
+            },
+            "portfolio_constraints": {
+              "allow_leverage": false,
+              "long_only": true,
+              "maximum_cash_weight": "1",
+              "maximum_one_way_rebalance_turnover": null,
+              "maximum_position_weight": "0.6",
+              "minimum_cash_weight": "0",
+              "minimum_position_weight": null
+            },
+            "rebalance": {
+              "assumptions": {
+                "additional_execution_cash_buffer": "0",
+                "allow_fractional_quantities": true,
+                "fixed_commission": "0",
+                "minimum_trade_notional": "0",
+                "minimum_trade_quantity": "0",
+                "quantity_increment": "0.001",
+                "target_weight_tolerance": "0",
+                "use_planned_sell_proceeds": true
+              },
+              "proposal_confidence": null,
+              "proposal_policy": {
+                "allow_partial_plans": true
+              }
+            },
+            "risk": {
+              "limits": {
+                "allow_buying": true,
+                "allow_fractional_shares": true,
+                "allow_selling": true,
+                "estimated_commission": "0",
+                "fractional_increment": "0.001",
+                "max_new_position_percent": null,
+                "max_order_notional": null,
+                "max_position_percent": "0.6",
+                "max_total_exposure_percent": "1",
+                "minimum_cash_reserve_percent": "0"
+              },
+              "policy": {
+                "allow_sell_proceeds_for_later_buys": false
+              }
+            },
+            "rolling_window": {
+              "observation_count": 4
+            },
+            "scenario": {
+              "cash_return": "0",
+              "price_field": "CLOSE",
+              "return_method": "SIMPLE",
+              "source_name": "historical-experiment-grid",
+              "window_policy": "ALL_SUPPLIED"
+            },
+            "timing": {
+              "fill_offset_microseconds": 120000000,
+              "submission_offset_microseconds": 60000000
+            },
+            "trading_enabled": true,
+            "variant_id": "310a50df-5817-5fc8-80b6-c6284f7d46f1"
+          }
+        },
+        {
+          "initial_state_content_fingerprint": "d0657c6f-e7a8-51ab-ba9e-bab0f2066396",
+          "initialization": {
+            "bootstrap_fills": [],
+            "final_engine_state_id": "6fba463c-534c-52de-832a-da1777381975",
+            "final_ledger_state_id": "b98bc79c-8634-50b9-a52b-e3425122914e",
+            "initial_engine_state_id": "6bec5d03-e88e-5383-b8ec-82b2ec4db4d4",
+            "initial_ledger_state_id": "b76293e6-25f2-53fc-93b1-108a172169e6"
+          },
+          "metrics": {
+            "absolute_simulation_profit_loss": "0",
+            "adverse_slippage_cost": "0",
+            "aggregate_one_way_turnover": "0.599994",
+            "aggregate_two_way_turnover": "0.599994",
+            "applied_cycle_count": 1,
+            "approved_decisions": 1,
+            "final_equity": "10000",
+            "initial_equity": "10000",
+            "maximum_allocation_drift": "0.000006",
+            "maximum_drawdown_amount": "0",
+            "maximum_drawdown_percentage": "0",
+            "maximum_target_cash_weight": "0.4",
+            "mean_expected_portfolio_return": "0.0115413073792652039044935826",
+            "minimum_target_cash_weight": "0.4",
+            "no_action_cycle_count": 0,
+            "reduced_notional": "0",
+            "rejected_decisions": 0,
+            "rejected_notional": "0",
+            "resized_decisions": 0,
+            "simulation_realized_profit_loss": "0",
+            "simulation_return": "0",
+            "total_commissions": "0",
+            "total_execution_cost": "0",
+            "total_fills": 1,
+            "total_orders": 1,
+            "worst_cvar": "-0.011320754716981132075471698"
+          },
+          "ordinal": 3,
+          "rolling": {
+            "request": {
+              "metadata": [
+                {
+                  "key": "historical_experiment_id",
+                  "value": "00000000-0000-0000-0000-000000000401"
+                },
+                {
+                  "key": "historical_experiment_variant_id",
+                  "value": "416e5528-c33e-5d60-a311-c6fba4e7a403"
+                },
+                {
+                  "key": "historical_experiment_variant_ordinal",
+                  "value": "3"
+                },
+                {
+                  "key": "historical_experiment_variant_name",
+                  "value": "Grid Base | WINDOW_OBSERVATION_COUNT=4, RISK_AVERSION=2"
+                }
+              ],
+              "observation_count": 4,
+              "rebalance_schedule": [
+                "2026-01-09T20:00:00+00:00"
+              ],
+              "request_id": "7960cb3b-5f0d-5be9-8e02-94cdf4bdca0a",
+              "scenario_cash_return": "0",
+              "scenario_source_name": "historical-experiment-grid",
+              "trading_enabled": true
+            },
+            "result": {
+              "frame_generations": [
+                {
+                  "frame_ordinal": 0,
+                  "historical_frame_index": 4,
+                  "optimized_frame": {
+                    "as_of": "2026-01-09T20:00:00+00:00",
+                    "expected_returns": [
+                      {
+                        "symbol": "SPY",
+                        "value": "0.01923551229877533984082263767"
+                      },
+                      {
+                        "symbol": "QQQ",
+                        "value": "-0.0102047900280595420507055264"
+                      }
+                    ],
+                    "fill_policy": {
+                      "fixed_commission": "0",
+                      "slippage_basis_points": "0"
+                    },
+                    "filled_at": "2026-01-09T20:02:00+00:00",
+                    "metadata": [
+                      {
+                        "key": "rolling_historical_frame_ordinal",
+                        "value": "0"
+                      },
+                      {
+                        "key": "rolling_historical_window_start",
+                        "value": "2026-01-06T20:00:00+00:00"
+                      },
+                      {
+                        "key": "rolling_historical_window_end",
+                        "value": "2026-01-09T20:00:00+00:00"
+                      },
+                      {
+                        "key": "rolling_historical_observation_count",
+                        "value": "4"
+                      }
+                    ],
+                    "optimization": {
+                      "confidence_level": "0.75",
+                      "maximum_iterations": null,
+                      "minimum_expected_return": null,
+                      "output_quantum": "0.00000001",
+                      "risk_aversion": "2",
+                      "solver_tolerance": "0.00000001"
+                    },
+                    "portfolio_constraints": {
+                      "allow_leverage": false,
+                      "long_only": true,
+                      "maximum_cash_weight": "1",
+                      "maximum_one_way_rebalance_turnover": null,
+                      "maximum_position_weight": "0.6",
+                      "minimum_cash_weight": "0",
+                      "minimum_position_weight": null
+                    },
+                    "prices": [
+                      {
+                        "fill_reference_price": "108",
+                        "risk_price": "108",
+                        "symbol": "SPY"
+                      },
+                      {
+                        "fill_reference_price": "96",
+                        "risk_price": "96",
+                        "symbol": "QQQ"
+                      }
+                    ],
+                    "proposal_confidence": null,
+                    "proposal_policy": {
+                      "allow_partial_plans": true
+                    },
+                    "rebalance_assumptions": {
+                      "additional_execution_cash_buffer": "0",
+                      "allow_fractional_quantities": true,
+                      "fixed_commission": "0",
+                      "minimum_trade_notional": "0",
+                      "minimum_trade_quantity": "0",
+                      "quantity_increment": "0.001",
+                      "target_weight_tolerance": "0",
+                      "use_planned_sell_proceeds": true
+                    },
+                    "risk_limits": {
+                      "allow_buying": true,
+                      "allow_fractional_shares": true,
+                      "allow_selling": true,
+                      "estimated_commission": "0",
+                      "fractional_increment": "0.001",
+                      "max_new_position_percent": null,
+                      "max_order_notional": null,
+                      "max_position_percent": "0.6",
+                      "max_total_exposure_percent": "1",
+                      "minimum_cash_reserve_percent": "0"
+                    },
+                    "risk_policy": {
+                      "allow_sell_proceeds_for_later_buys": false
+                    },
+                    "scenarios": {
+                      "cash_return": "0",
+                      "forecast_horizon": {
+                        "periods": 1,
+                        "timeframe": "1D"
+                      },
+                      "metadata": [
+                        {
+                          "key": "rolling_historical_simulation_id",
+                          "value": "7960cb3b-5f0d-5be9-8e02-94cdf4bdca0a"
+                        },
+                        {
+                          "key": "rolling_historical_frame_ordinal",
+                          "value": "0"
+                        },
+                        {
+                          "key": "rolling_historical_window_start",
+                          "value": "2026-01-06T20:00:00+00:00"
+                        },
+                        {
+                          "key": "rolling_historical_window_end",
+                          "value": "2026-01-09T20:00:00+00:00"
+                        },
+                        {
+                          "key": "rolling_historical_observation_count",
+                          "value": "4"
+                        },
+                        {
+                          "key": "historical_scenario_observation_start",
+                          "value": "2026-01-06T20:00:00+00:00"
+                        },
+                        {
+                          "key": "historical_scenario_observation_end",
+                          "value": "2026-01-09T20:00:00+00:00"
+                        },
+                        {
+                          "key": "historical_scenario_observation_count",
+                          "value": "4"
+                        },
+                        {
+                          "key": "historical_scenario_return_row_count",
+                          "value": "3"
+                        },
+                        {
+                          "key": "historical_scenario_price_field",
+                          "value": "CLOSE"
+                        },
+                        {
+                          "key": "historical_scenario_return_method",
+                          "value": "SIMPLE"
+                        },
+                        {
+                          "key": "historical_scenario_window_policy",
+                          "value": "ALL_SUPPLIED"
+                        }
+                      ],
+                      "rows": [
+                        {
+                          "metadata": [],
+                          "probability": "0.3333333333333333333333333333",
+                          "returns": [
+                            "0.019607843137254901960784314",
+                            "-0.0101010101010101010101010101"
+                          ],
+                          "scenario_id": "f6d49e1b-f850-5469-909d-1834c20f4e9b"
+                        },
+                        {
+                          "metadata": [],
+                          "probability": "0.3333333333333333333333333333",
+                          "returns": [
+                            "0.019230769230769230769230769",
+                            "-0.0102040816326530612244897959"
+                          ],
+                          "scenario_id": "d8d205fa-93f9-5c7e-b8bd-60167d202182"
+                        },
+                        {
+                          "metadata": [],
+                          "probability": "0.3333333333333333333333333334",
+                          "returns": [
+                            "0.01886792452830188679245283",
+                            "-0.0103092783505154639175257732"
+                          ],
+                          "scenario_id": "b336fa71-ccc4-5283-8283-300cb7af723a"
+                        }
+                      ],
+                      "scenario_set_id": "fe39dc49-6260-5c4e-96e0-7aaf72cd7ada",
+                      "source": "HISTORICAL",
+                      "source_name": "historical-experiment-grid",
+                      "symbols": [
+                        "SPY",
+                        "QQQ"
+                      ]
+                    },
+                    "submitted_at": "2026-01-09T20:01:00+00:00",
+                    "trading_enabled": true
+                  },
+                  "optimized_frame_fingerprint": "40f53ab5-dbb8-5b0f-836b-44999e8389da",
+                  "rebalance_timestamp": "2026-01-09T20:00:00+00:00",
+                  "scenario_request_id": "c88c2471-f9c3-5aa3-84d3-a212bf67bc85",
+                  "scenario_result": {
+                    "diagnostics": [
+                      {
+                        "code": "UNEQUAL_FINAL_RESIDUAL_PROBABILITY",
+                        "message": "The final probability contains the deterministic residual.",
+                        "symbol": null
+                      }
+                    ],
+                    "expected_returns": [
+                      {
+                        "symbol": "SPY",
+                        "value": "0.01923551229877533984082263767"
+                      },
+                      {
+                        "symbol": "QQQ",
+                        "value": "-0.0102047900280595420507055264"
+                      }
+                    ],
+                    "request": {
+                      "as_of": "2026-01-09T20:00:00+00:00",
+                      "cash_return": "0",
+                      "forecast_horizon": {
+                        "periods": 1,
+                        "timeframe": "1D"
+                      },
+                      "historical_request": {
+                        "adjustment": "RAW",
+                        "end": "2026-01-10T00:00:00+00:00",
+                        "frame_count": 4,
+                        "missing_bar_policy": "INTERSECTION",
+                        "provider_name": "coordinating:trading_bot.market_data.csv_provider.CSVHistoricalDataProvider",
+                        "start": "2026-01-06T20:00:00+00:00",
+                        "symbols": [
+                          "SPY",
+                          "QQQ"
+                        ],
+                        "timeframe": "1D"
+                      },
+                      "metadata": [
+                        {
+                          "key": "rolling_historical_simulation_id",
+                          "value": "7960cb3b-5f0d-5be9-8e02-94cdf4bdca0a"
+                        },
+                        {
+                          "key": "rolling_historical_frame_ordinal",
+                          "value": "0"
+                        },
+                        {
+                          "key": "rolling_historical_window_start",
+                          "value": "2026-01-06T20:00:00+00:00"
+                        },
+                        {
+                          "key": "rolling_historical_window_end",
+                          "value": "2026-01-09T20:00:00+00:00"
+                        },
+                        {
+                          "key": "rolling_historical_observation_count",
+                          "value": "4"
+                        }
+                      ],
+                      "policy": {
+                        "price_field": "CLOSE",
+                        "return_method": "SIMPLE",
+                        "window_policy": "ALL_SUPPLIED"
+                      },
+                      "request_id": "c88c2471-f9c3-5aa3-84d3-a212bf67bc85",
+                      "source_name": "historical-experiment-grid"
+                    },
+                    "result_id": "905a9489-32d5-5729-a7e7-259da9fc9e88",
+                    "scenario_set": {
+                      "as_of": "2026-01-09T20:00:00+00:00",
+                      "cash_return": "0",
+                      "forecast_horizon": {
+                        "periods": 1,
+                        "timeframe": "1D"
+                      },
+                      "metadata": [
+                        {
+                          "key": "rolling_historical_simulation_id",
+                          "value": "7960cb3b-5f0d-5be9-8e02-94cdf4bdca0a"
+                        },
+                        {
+                          "key": "rolling_historical_frame_ordinal",
+                          "value": "0"
+                        },
+                        {
+                          "key": "rolling_historical_window_start",
+                          "value": "2026-01-06T20:00:00+00:00"
+                        },
+                        {
+                          "key": "rolling_historical_window_end",
+                          "value": "2026-01-09T20:00:00+00:00"
+                        },
+                        {
+                          "key": "rolling_historical_observation_count",
+                          "value": "4"
+                        },
+                        {
+                          "key": "historical_scenario_observation_start",
+                          "value": "2026-01-06T20:00:00+00:00"
+                        },
+                        {
+                          "key": "historical_scenario_observation_end",
+                          "value": "2026-01-09T20:00:00+00:00"
+                        },
+                        {
+                          "key": "historical_scenario_observation_count",
+                          "value": "4"
+                        },
+                        {
+                          "key": "historical_scenario_return_row_count",
+                          "value": "3"
+                        },
+                        {
+                          "key": "historical_scenario_price_field",
+                          "value": "CLOSE"
+                        },
+                        {
+                          "key": "historical_scenario_return_method",
+                          "value": "SIMPLE"
+                        },
+                        {
+                          "key": "historical_scenario_window_policy",
+                          "value": "ALL_SUPPLIED"
+                        }
+                      ],
+                      "rows": [
+                        {
+                          "metadata": [],
+                          "probability": "0.3333333333333333333333333333",
+                          "returns": [
+                            "0.019607843137254901960784314",
+                            "-0.0101010101010101010101010101"
+                          ],
+                          "scenario_id": "f6d49e1b-f850-5469-909d-1834c20f4e9b"
+                        },
+                        {
+                          "metadata": [],
+                          "probability": "0.3333333333333333333333333333",
+                          "returns": [
+                            "0.019230769230769230769230769",
+                            "-0.0102040816326530612244897959"
+                          ],
+                          "scenario_id": "d8d205fa-93f9-5c7e-b8bd-60167d202182"
+                        },
+                        {
+                          "metadata": [],
+                          "probability": "0.3333333333333333333333333334",
+                          "returns": [
+                            "0.01886792452830188679245283",
+                            "-0.0103092783505154639175257732"
+                          ],
+                          "scenario_id": "b336fa71-ccc4-5283-8283-300cb7af723a"
+                        }
+                      ],
+                      "scenario_set_id": "fe39dc49-6260-5c4e-96e0-7aaf72cd7ada",
+                      "source": "HISTORICAL",
+                      "source_name": "historical-experiment-grid",
+                      "symbols": [
+                        "SPY",
+                        "QQQ"
+                      ]
+                    }
+                  },
+                  "source_frame_id": "a085df97-f53f-5412-92d8-f492f26bcd2f",
+                  "window_end_index_inclusive": 4,
+                  "window_end_timestamp": "2026-01-09T20:00:00+00:00",
+                  "window_start_index": 1,
+                  "window_start_timestamp": "2026-01-06T20:00:00+00:00"
+                }
+              ],
+              "optimized_simulation": {
+                "counts": {
+                  "applied_cycle_count": 1,
+                  "frame_count": 1,
+                  "no_action_cycle_count": 0
+                },
+                "final_state": {
+                  "cash": "4000.06",
+                  "engine_state_id": "6fba463c-534c-52de-832a-da1777381975",
+                  "ledger_fills": [
+                    {
+                      "commission": "0",
+                      "fill_id": "386d36a3-d7af-5c45-ab1f-50c60eec8cb7",
+                      "filled_at": "2026-01-09T20:02:00+00:00",
+                      "order_id": "0f49a6bd-0ffd-5b22-b24d-aa24573e52bb",
+                      "origin": "SIMULATION",
+                      "price": "108",
+                      "quantity": "55.555",
+                      "side": "BUY",
+                      "symbol": "SPY"
+                    }
+                  ],
+                  "ledger_state_id": "b98bc79c-8634-50b9-a52b-e3425122914e",
+                  "positions": [
+                    {
+                      "average_cost": "108",
+                      "quantity": "55.555",
+                      "symbol": "SPY"
+                    }
+                  ],
+                  "realized_profit_loss": "0"
+                },
+                "frames": [
+                  {
+                    "application": {
+                      "evaluations": [
+                        {
+                          "application_event": {
+                            "event_id": "6b3fb93f-3861-5c38-b589-580ad11bfd9b",
+                            "event_type": "FILLED",
+                            "fill_id": "386d36a3-d7af-5c45-ab1f-50c60eec8cb7",
+                            "occurred_at": "2026-01-09T20:02:00+00:00",
+                            "order_id": "0f49a6bd-0ffd-5b22-b24d-aa24573e52bb",
+                            "reason": null
+                          },
+                          "fill_id": "386d36a3-d7af-5c45-ab1f-50c60eec8cb7",
+                          "ledger_cash_after": "4000.06",
+                          "ledger_position_after": {
+                            "average_cost": "108",
+                            "quantity": "55.555",
+                            "symbol": "SPY"
+                          },
+                          "ledger_realized_profit_loss_after": "0",
+                          "source_fill_ordinal": 0
+                        }
+                      ],
+                      "post_engine_state_id": "6fba463c-534c-52de-832a-da1777381975",
+                      "post_ledger_state_id": "b98bc79c-8634-50b9-a52b-e3425122914e",
+                      "pre_engine_state_id": "ce4bfa75-f5c8-57e5-b94e-f8b704f15666",
+                      "pre_ledger_state_id": "b76293e6-25f2-53fc-93b1-108a172169e6",
+                      "result_id": "746731e6-1cf3-5f4b-934b-a7a5a4d2d1c9",
+                      "status": "APPLIED"
+                    },
+                    "as_of": "2026-01-09T20:00:00+00:00",
+                    "certification": {
+                      "request_id": "611b4278-7e3c-5f7b-a52b-99e187839c6f",
+                      "result_id": "1a7ac4d5-58ae-57df-9ddd-f044284c071a",
+                      "target": {
+                        "allocations": [
+                          {
+                            "symbol": "SPY",
+                            "weight": "0.6"
+                          },
+                          {
+                            "symbol": "QQQ",
+                            "weight": "0"
+                          }
+                        ],
+                        "as_of": "2026-01-09T20:00:00+00:00",
+                        "cash_weight": "0.4",
+                        "metadata": [],
+                        "source": "OPTIMIZER",
+                        "source_name": "scipy-highs-1.18.0",
+                        "target_id": "d1ce4186-d25a-5660-85dd-dc2d225fa846"
+                      }
+                    },
+                    "ending_ledger": {
+                      "cash": "4000.06",
+                      "positions": [
+                        {
+                          "average_cost": "108",
+                          "quantity": "55.555",
+                          "symbol": "SPY"
+                        }
+                      ],
+                      "realized_profit_loss": "0"
+                    },
+                    "fill_batch_result_id": "ef30dde2-e7f2-5f13-bf18-4761a7192dd7",
+                    "fills": [
+                      {
+                        "commission": "0",
+                        "fill_id": "386d36a3-d7af-5c45-ab1f-50c60eec8cb7",
+                        "filled_at": "2026-01-09T20:02:00+00:00",
+                        "order_id": "0f49a6bd-0ffd-5b22-b24d-aa24573e52bb",
+                        "origin": "SIMULATION",
+                        "price": "108",
+                        "quantity": "55.555",
+                        "reference_price": "108",
+                        "side": "BUY",
+                        "slippage_amount": "0",
+                        "source_order_ordinal": 0,
+                        "symbol": "SPY"
+                      }
+                    ],
+                    "optimization": {
+                      "cvar": "-0.011320754716981132075471698",
+                      "diagnostics": [
+                        {
+                          "code": "SOLVER_STATUS",
+                          "level": "WARNING",
+                          "message": "optimization completed successfully",
+                          "value": null
+                        },
+                        {
+                          "code": "OBJECTIVE_VALUE",
+                          "level": "INFO",
+                          "message": "objective value",
+                          "value": "-0.0341828168132274680554369786"
+                        },
+                        {
+                          "code": "MAX_CONSTRAINT_VIOLATION",
+                          "level": "INFO",
+                          "message": "max constraint violation",
+                          "value": "0"
+                        }
+                      ],
+                      "expected_portfolio_return": "0.0115413073792652039044935826",
+                      "objective_value": "-0.0341828168132274680554369786",
+                      "request_id": "a4ea702d-b966-509e-a953-60b52a107e19",
+                      "result_id": "bd7fb260-3185-53a7-aa5e-18d25749ebbd",
+                      "solver_name": "scipy-highs-1.18.0",
+                      "status": "OPTIMAL"
+                    },
+                    "order_batch_result_id": "8248024c-a55c-53fe-aca7-f048a0dfe38a",
+                    "orders": [
+                      {
+                        "average_fill_price": null,
+                        "creation_event_id": "8cdda5c9-0a06-5464-a3dd-a40e14d00533",
+                        "filled_quantity": "0",
+                        "order_id": "0f49a6bd-0ffd-5b22-b24d-aa24573e52bb",
+                        "order_type": "MARKET",
+                        "quantity": "55.555",
+                        "request_created_at": "2026-01-09T20:00:00+00:00",
+                        "side": "BUY",
+                        "status": "PENDING",
+                        "symbol": "SPY",
+                        "time_in_force": "DAY"
+                      }
+                    ],
+                    "ordinal": 0,
+                    "planning": {
+                      "planned_trade_ids": [
+                        "ffd9af8f-284e-5754-964b-f52b2770b58b"
+                      ],
+                      "result_id": "00c83935-89b3-5f1d-beb5-536f7d4e0824",
+                      "status": "PARTIAL"
+                    },
+                    "post_engine_state_id": "6fba463c-534c-52de-832a-da1777381975",
+                    "post_ledger_state_id": "b98bc79c-8634-50b9-a52b-e3425122914e",
+                    "pre_engine_state_id": "6bec5d03-e88e-5383-b8ec-82b2ec4db4d4",
+                    "pre_ledger_state_id": "b76293e6-25f2-53fc-93b1-108a172169e6",
+                    "proposals": {
+                      "proposal_ids": [
+                        "9f693927-3b13-5496-aab5-6218ff1097de"
+                      ],
+                      "result_id": "18b0220f-e029-5dc1-af11-4159714e2470",
+                      "status": "CREATED"
+                    },
+                    "risk": {
+                      "approved_count": 1,
+                      "evaluations": [
+                        {
+                          "approved_quantity": "55.555",
+                          "ordinal": 0,
+                          "outcome": "APPROVED",
+                          "proposal_id": "9f693927-3b13-5496-aab5-6218ff1097de",
+                          "reasons": []
+                        }
+                      ],
+                      "rejected_count": 0,
+                      "resized_count": 0,
+                      "result_id": "e72048ab-a117-5d2b-bdbd-378c3a3548a7",
+                      "status": "ALL_APPROVED"
+                    },
+                    "runtime": {
+                      "request_id": "1422280b-b4d9-51c5-a0df-cedc11130f3f",
+                      "result_id": "34651a1a-c244-5355-845d-3260a7cef2d1",
+                      "status": "APPLIED"
+                    },
+                    "submission_batch_result_id": "f4639374-2349-542a-a9ab-7d01ff18c4db",
+                    "submissions": [
+                      {
+                        "average_fill_price": null,
+                        "filled_quantity": "0",
+                        "order_id": "0f49a6bd-0ffd-5b22-b24d-aa24573e52bb",
+                        "order_type": "MARKET",
+                        "quantity": "55.555",
+                        "request_created_at": "2026-01-09T20:00:00+00:00",
+                        "side": "BUY",
+                        "status": "SUBMITTED",
+                        "submission_event_id": "97ed889b-d552-51b7-9ee0-14454146f057",
+                        "symbol": "SPY",
+                        "time_in_force": "DAY"
+                      }
+                    ]
+                  }
+                ],
+                "request_id": "8bfeae9a-16ac-57f5-a58e-109c2008f4a4",
+                "result_id": "a24fbad3-e424-5f07-bd25-a7286049dd1d",
+                "status": "COMPLETED"
+              },
+              "performance": {
+                "request": {
+                  "metadata": [
+                    {
+                      "key": "rolling_historical_simulation_id",
+                      "value": "7960cb3b-5f0d-5be9-8e02-94cdf4bdca0a"
+                    },
+                    {
+                      "key": "rolling_historical_simulation_source",
+                      "value": "rolling-historical-runner"
+                    }
+                  ],
+                  "request_id": "53aded6b-c81c-5eda-a456-f7e70e0e4fbf",
+                  "source_simulation_request_id": "8bfeae9a-16ac-57f5-a58e-109c2008f4a4",
+                  "source_simulation_result_id": "a24fbad3-e424-5f07-bd25-a7286049dd1d",
+                  "valuation_basis": "FRAME_RISK_PRICES"
+                },
+                "result": {
+                  "absolute_simulation_profit_loss": "0",
+                  "aggregate_one_way_turnover": "0.599994",
+                  "aggregate_two_way_turnover": "0.599994",
+                  "applied_cycle_count": 1,
+                  "cumulative_simulation_realized_profit_loss": "0",
+                  "diagnostics": [],
+                  "drawdowns": {
+                    "maximum_amount": {
+                      "amount": "0",
+                      "peak_equity": "10000",
+                      "peak_timestamp": "2026-01-09T20:00:00+00:00",
+                      "percentage": "0",
+                      "source_observation": {
+                        "equity": "10000",
+                        "frame_ordinal": 0,
+                        "phase": "PRE_CYCLE",
+                        "sequence_index": 0,
+                        "timestamp": "2026-01-09T20:00:00+00:00"
+                      },
+                      "trough_equity": "10000",
+                      "trough_timestamp": "2026-01-09T20:00:00+00:00"
+                    },
+                    "maximum_percentage": {
+                      "amount": "0",
+                      "peak_equity": "10000",
+                      "peak_timestamp": "2026-01-09T20:00:00+00:00",
+                      "percentage": "0",
+                      "source_observation": {
+                        "equity": "10000",
+                        "frame_ordinal": 0,
+                        "phase": "PRE_CYCLE",
+                        "sequence_index": 0,
+                        "timestamp": "2026-01-09T20:00:00+00:00"
+                      },
+                      "trough_equity": "10000",
+                      "trough_timestamp": "2026-01-09T20:00:00+00:00"
+                    }
+                  },
+                  "equity_observations": [
+                    {
+                      "drawdown_amount": "0",
+                      "drawdown_percentage": "0",
+                      "equity": "10000",
+                      "frame_ordinal": 0,
+                      "phase": "PRE_CYCLE",
+                      "running_peak": "10000",
+                      "sequence_index": 0,
+                      "timestamp": "2026-01-09T20:00:00+00:00"
+                    },
+                    {
+                      "drawdown_amount": "0",
+                      "drawdown_percentage": "0",
+                      "equity": "10000",
+                      "frame_ordinal": 0,
+                      "phase": "POST_CYCLE",
+                      "running_peak": "10000",
+                      "sequence_index": 1,
+                      "timestamp": "2026-01-09T20:02:00+00:00"
+                    }
+                  ],
+                  "final_equity": "10000",
+                  "final_unrealized_profit_loss": "0",
+                  "frames": [
+                    {
+                      "absolute_cash_weight_drift": "0.000006",
+                      "actual_cash_weight": "0.400006",
+                      "adverse_slippage_cost": "0",
+                      "allocation_drifts": [
+                        {
+                          "absolute_drift": "0.000006",
+                          "actual_weight": "0.599994",
+                          "drift": "-0.000006",
+                          "symbol": "SPY",
+                          "target_weight": "0.6"
+                        },
+                        {
+                          "absolute_drift": "0",
+                          "actual_weight": "0",
+                          "drift": "0",
+                          "symbol": "QQQ",
+                          "target_weight": "0"
+                        }
+                      ],
+                      "approved_risk_count": 1,
+                      "as_of": "2026-01-09T20:00:00+00:00",
+                      "cash_weight_drift": "0.000006",
+                      "commission_cost": "0",
+                      "cumulative_return": "0",
+                      "cumulative_simulation_profit_loss": "0",
+                      "cumulative_simulation_realized_profit_loss": "0",
+                      "cvar": "-0.011320754716981132075471698",
+                      "execution_profit_loss": "0",
+                      "expected_portfolio_return": "0.0115413073792652039044935826",
+                      "fill_count": 1,
+                      "filled_at": "2026-01-09T20:02:00+00:00",
+                      "forward_market_profit_loss": null,
+                      "frame_id": "bdd99757-cd01-5523-b22c-4d21d9b6176a",
+                      "frame_ordinal": 0,
+                      "frame_simulation_realized_profit_loss": "0",
+                      "gross_buy_notional": "5999.94",
+                      "gross_sell_notional": "0",
+                      "gross_traded_notional": "5999.94",
+                      "maximum_absolute_allocation_drift": "0.000006",
+                      "net_buy_notional": "5999.94",
+                      "objective_value": "-0.0341828168132274680554369786",
+                      "one_way_turnover": "0.599994",
+                      "optimization_status": "OPTIMAL",
+                      "order_count": 1,
+                      "period_profit_loss": "0",
+                      "period_return": "0",
+                      "post_cycle_cash": "4000.06",
+                      "post_cycle_equity": "10000",
+                      "post_cycle_gross_exposure": "5999.94",
+                      "post_cycle_net_exposure": "5999.94",
+                      "post_cycle_position_count": 1,
+                      "post_cycle_unrealized_profit_loss": "0",
+                      "pre_cycle_cash": "10000",
+                      "pre_cycle_equity": "10000",
+                      "pre_cycle_gross_exposure": "0",
+                      "pre_cycle_net_exposure": "0",
+                      "pre_cycle_position_count": 0,
+                      "pre_cycle_unrealized_profit_loss": "0",
+                      "reduced_notional": "0",
+                      "rejected_notional": "0",
+                      "rejected_risk_count": 0,
+                      "resized_risk_count": 0,
+                      "signed_slippage_profit_loss": "0",
+                      "solver_name": "scipy-highs-1.18.0",
+                      "source_cycle_result_id": "34651a1a-c244-5355-845d-3260a7cef2d1",
+                      "target_allocation_count": 2,
+                      "target_cash_weight": "0.4",
+                      "total_absolute_allocation_drift": "0.000012",
+                      "total_execution_cost": "0",
+                      "two_way_turnover": "0.599994",
+                      "unrealized_profit_loss_change": "0"
+                    }
+                  ],
+                  "initial_equity": "10000",
+                  "initial_unrealized_profit_loss": "0",
+                  "maximum_absolute_allocation_drift": "0.000006",
+                  "no_action_cycle_count": 0,
+                  "optimization_summary": {
+                    "maximum_target_cash_weight": "0.4",
+                    "mean_expected_portfolio_return": "0.0115413073792652039044935826",
+                    "minimum_target_cash_weight": "0.4",
+                    "worst_cvar": "-0.011320754716981132075471698"
+                  },
+                  "result_id": "b69270b9-7186-5ca8-a17f-693d318d9b5d",
+                  "simulation_return": "0",
+                  "source_simulation_result_id": "a24fbad3-e424-5f07-bd25-a7286049dd1d",
+                  "total_absolute_allocation_drift": "0.000012",
+                  "total_adverse_slippage_cost": "0",
+                  "total_approved_risk_count": 1,
+                  "total_commissions": "0",
+                  "total_execution_cost": "0",
+                  "total_fill_count": 1,
+                  "total_gross_buy_notional": "5999.94",
+                  "total_gross_sell_notional": "0",
+                  "total_gross_traded_notional": "5999.94",
+                  "total_net_buy_notional": "5999.94",
+                  "total_order_count": 1,
+                  "total_reduced_notional": "0",
+                  "total_rejected_notional": "0",
+                  "total_rejected_risk_count": 0,
+                  "total_resized_risk_count": 0,
+                  "total_signed_slippage_profit_loss": "0"
+                }
+              },
+              "result_id": "fab9cee3-7d69-5956-b592-622f6ea07f93",
+              "state_ids": {
+                "final_engine": "6fba463c-534c-52de-832a-da1777381975",
+                "final_ledger": "b98bc79c-8634-50b9-a52b-e3425122914e",
+                "initial_engine": "6bec5d03-e88e-5383-b8ec-82b2ec4db4d4",
+                "initial_ledger": "b76293e6-25f2-53fc-93b1-108a172169e6"
+              }
+            }
+          },
+          "rolling_request_id": "7960cb3b-5f0d-5be9-8e02-94cdf4bdca0a",
+          "run_id": "2159072a-ae63-558f-8431-3c9edf508672",
+          "variant": {
+            "execution_prices": {
+              "fill_reference_price_field": "CLOSE",
+              "risk_price_field": "CLOSE"
+            },
+            "fills": {
+              "fixed_commission": "0",
+              "slippage_basis_points": "0"
+            },
+            "metadata": [
+              {
+                "key": "variant_family",
+                "value": "grid-base"
+              }
+            ],
+            "name": "Grid Base | WINDOW_OBSERVATION_COUNT=4, RISK_AVERSION=2",
+            "optimization": {
+              "confidence_level": "0.75",
+              "maximum_iterations": null,
+              "minimum_expected_return": null,
+              "output_quantum": "0.00000001",
+              "risk_aversion": "2",
+              "solver_tolerance": "0.00000001"
+            },
+            "portfolio_constraints": {
+              "allow_leverage": false,
+              "long_only": true,
+              "maximum_cash_weight": "1",
+              "maximum_one_way_rebalance_turnover": null,
+              "maximum_position_weight": "0.6",
+              "minimum_cash_weight": "0",
+              "minimum_position_weight": null
+            },
+            "rebalance": {
+              "assumptions": {
+                "additional_execution_cash_buffer": "0",
+                "allow_fractional_quantities": true,
+                "fixed_commission": "0",
+                "minimum_trade_notional": "0",
+                "minimum_trade_quantity": "0",
+                "quantity_increment": "0.001",
+                "target_weight_tolerance": "0",
+                "use_planned_sell_proceeds": true
+              },
+              "proposal_confidence": null,
+              "proposal_policy": {
+                "allow_partial_plans": true
+              }
+            },
+            "risk": {
+              "limits": {
+                "allow_buying": true,
+                "allow_fractional_shares": true,
+                "allow_selling": true,
+                "estimated_commission": "0",
+                "fractional_increment": "0.001",
+                "max_new_position_percent": null,
+                "max_order_notional": null,
+                "max_position_percent": "0.6",
+                "max_total_exposure_percent": "1",
+                "minimum_cash_reserve_percent": "0"
+              },
+              "policy": {
+                "allow_sell_proceeds_for_later_buys": false
+              }
+            },
+            "rolling_window": {
+              "observation_count": 4
+            },
+            "scenario": {
+              "cash_return": "0",
+              "price_field": "CLOSE",
+              "return_method": "SIMPLE",
+              "source_name": "historical-experiment-grid",
+              "window_policy": "ALL_SUPPLIED"
+            },
+            "timing": {
+              "fill_offset_microseconds": 120000000,
+              "submission_offset_microseconds": 60000000
+            },
+            "trading_enabled": true,
+            "variant_id": "416e5528-c33e-5d60-a311-c6fba4e7a403"
+          }
+        }
+      ],
+      "schedule_fingerprint": "78f11882-ee4a-53f2-93cc-09edc1114dec"
+    }
+  },
+  "historical_data": {
+    "content_fingerprint": "d1268c1d-4e6b-5f34-9a8a-fa4160e68c51",
+    "first_timestamp": "2026-01-05T20:00:00+00:00",
+    "frame_count": 5,
+    "frames": [
+      {
+        "bars": [
+          {
+            "close": "100",
+            "high": "101",
+            "low": "99",
+            "open": "100",
+            "symbol": "SPY",
+            "timestamp": "2026-01-05T20:00:00+00:00",
+            "volume": 1000
+          },
+          {
+            "close": "100",
+            "high": "101",
+            "low": "99",
+            "open": "100",
+            "symbol": "QQQ",
+            "timestamp": "2026-01-05T20:00:00+00:00",
+            "volume": 900
+          }
+        ],
+        "missing_symbols": [],
+        "symbols": [
+          "SPY",
+          "QQQ"
+        ],
+        "timestamp": "2026-01-05T20:00:00+00:00"
+      },
+      {
+        "bars": [
+          {
+            "close": "102",
+            "high": "103",
+            "low": "100",
+            "open": "100",
+            "symbol": "SPY",
+            "timestamp": "2026-01-06T20:00:00+00:00",
+            "volume": 1100
+          },
+          {
+            "close": "99",
+            "high": "101",
+            "low": "98",
+            "open": "100",
+            "symbol": "QQQ",
+            "timestamp": "2026-01-06T20:00:00+00:00",
+            "volume": 950
+          }
+        ],
+        "missing_symbols": [],
+        "symbols": [
+          "SPY",
+          "QQQ"
+        ],
+        "timestamp": "2026-01-06T20:00:00+00:00"
+      },
+      {
+        "bars": [
+          {
+            "close": "104",
+            "high": "105",
+            "low": "101",
+            "open": "102",
+            "symbol": "SPY",
+            "timestamp": "2026-01-07T20:00:00+00:00",
+            "volume": 1200
+          },
+          {
+            "close": "98",
+            "high": "100",
+            "low": "97",
+            "open": "99",
+            "symbol": "QQQ",
+            "timestamp": "2026-01-07T20:00:00+00:00",
+            "volume": 1000
+          }
+        ],
+        "missing_symbols": [],
+        "symbols": [
+          "SPY",
+          "QQQ"
+        ],
+        "timestamp": "2026-01-07T20:00:00+00:00"
+      },
+      {
+        "bars": [
+          {
+            "close": "106",
+            "high": "107",
+            "low": "103",
+            "open": "104",
+            "symbol": "SPY",
+            "timestamp": "2026-01-08T20:00:00+00:00",
+            "volume": 1300
+          },
+          {
+            "close": "97",
+            "high": "99",
+            "low": "96",
+            "open": "98",
+            "symbol": "QQQ",
+            "timestamp": "2026-01-08T20:00:00+00:00",
+            "volume": 1050
+          }
+        ],
+        "missing_symbols": [],
+        "symbols": [
+          "SPY",
+          "QQQ"
+        ],
+        "timestamp": "2026-01-08T20:00:00+00:00"
+      },
+      {
+        "bars": [
+          {
+            "close": "108",
+            "high": "109",
+            "low": "105",
+            "open": "106",
+            "symbol": "SPY",
+            "timestamp": "2026-01-09T20:00:00+00:00",
+            "volume": 1400
+          },
+          {
+            "close": "96",
+            "high": "98",
+            "low": "95",
+            "open": "97",
+            "symbol": "QQQ",
+            "timestamp": "2026-01-09T20:00:00+00:00",
+            "volume": 1100
+          }
+        ],
+        "missing_symbols": [],
+        "symbols": [
+          "SPY",
+          "QQQ"
+        ],
+        "timestamp": "2026-01-09T20:00:00+00:00"
+      }
+    ],
+    "is_complete": true,
+    "last_timestamp": "2026-01-09T20:00:00+00:00",
+    "provider_name": "coordinating:trading_bot.market_data.csv_provider.CSVHistoricalDataProvider",
+    "request": {
+      "adjustment": "RAW",
+      "end": "2026-01-10T00:00:00+00:00",
+      "missing_bar_policy": "INTERSECTION",
+      "start": "2026-01-05T00:00:00+00:00",
+      "symbols": [
+        "SPY",
+        "QQQ"
+      ],
+      "timeframe": "1D"
+    },
+    "source_label": "historical-experiment-local-csv"
+  },
+  "initial_state": {
+    "as_of": "2026-01-05T19:00:00+00:00",
+    "available_cash": "10000",
+    "bootstrap_commission": "0",
+    "bootstrap_positions": [],
+    "content_fingerprint": "d0657c6f-e7a8-51ab-ba9e-bab0f2066396",
+    "mode": "CASH_ONLY"
+  },
+  "schema_version": 3,
+  "variant_generation": {
+    "generated_variants": [
+      {
+        "assignments": [
+          {
+            "parameter": "WINDOW_OBSERVATION_COUNT",
+            "value": 3
+          },
+          {
+            "parameter": "RISK_AVERSION",
+            "value": "1"
+          }
+        ],
+        "ordinal": 0,
+        "variant_id": "2760ea8a-84b9-5619-a2df-4755e460cb20",
+        "variant_name": "Grid Base | WINDOW_OBSERVATION_COUNT=3, RISK_AVERSION=1"
+      },
+      {
+        "assignments": [
+          {
+            "parameter": "WINDOW_OBSERVATION_COUNT",
+            "value": 3
+          },
+          {
+            "parameter": "RISK_AVERSION",
+            "value": "2"
+          }
+        ],
+        "ordinal": 1,
+        "variant_id": "a3f9e1e2-d22c-5ada-b66e-eb3bf01c52ad",
+        "variant_name": "Grid Base | WINDOW_OBSERVATION_COUNT=3, RISK_AVERSION=2"
+      },
+      {
+        "assignments": [
+          {
+            "parameter": "WINDOW_OBSERVATION_COUNT",
+            "value": 4
+          },
+          {
+            "parameter": "RISK_AVERSION",
+            "value": "1"
+          }
+        ],
+        "ordinal": 2,
+        "variant_id": "310a50df-5817-5fc8-80b6-c6284f7d46f1",
+        "variant_name": "Grid Base | WINDOW_OBSERVATION_COUNT=4, RISK_AVERSION=1"
+      },
+      {
+        "assignments": [
+          {
+            "parameter": "WINDOW_OBSERVATION_COUNT",
+            "value": 4
+          },
+          {
+            "parameter": "RISK_AVERSION",
+            "value": "2"
+          }
+        ],
+        "ordinal": 3,
+        "variant_id": "416e5528-c33e-5d60-a311-c6fba4e7a403",
+        "variant_name": "Grid Base | WINDOW_OBSERVATION_COUNT=4, RISK_AVERSION=2"
+      }
+    ],
+    "result_id": "4dc71a10-7af5-5b59-ac2a-56d2ee8ca74b",
+    "specification": {
+      "axes": [
+        {
+          "parameter": "WINDOW_OBSERVATION_COUNT",
+          "values": [
+            3,
+            4
+          ]
+        },
+        {
+          "parameter": "RISK_AVERSION",
+          "values": [
+            "1",
+            "2"
+          ]
+        }
+      ],
+      "base_variant": {
+        "execution_prices": {
+          "fill_reference_price_field": "CLOSE",
+          "risk_price_field": "CLOSE"
+        },
+        "fills": {
+          "fixed_commission": "0",
+          "slippage_basis_points": "0"
+        },
+        "metadata": [
+          {
+            "key": "variant_family",
+            "value": "grid-base"
+          }
+        ],
+        "name": "Grid Base",
+        "optimization": {
+          "confidence_level": "0.75",
+          "maximum_iterations": null,
+          "minimum_expected_return": null,
+          "output_quantum": "0.00000001",
+          "risk_aversion": "1",
+          "solver_tolerance": "0.00000001"
+        },
+        "portfolio_constraints": {
+          "allow_leverage": false,
+          "long_only": true,
+          "maximum_cash_weight": "1",
+          "maximum_one_way_rebalance_turnover": null,
+          "maximum_position_weight": "0.6",
+          "minimum_cash_weight": "0",
+          "minimum_position_weight": null
+        },
+        "rebalance": {
+          "assumptions": {
+            "additional_execution_cash_buffer": "0",
+            "allow_fractional_quantities": true,
+            "fixed_commission": "0",
+            "minimum_trade_notional": "0",
+            "minimum_trade_quantity": "0",
+            "quantity_increment": "0.001",
+            "target_weight_tolerance": "0",
+            "use_planned_sell_proceeds": true
+          },
+          "proposal_confidence": null,
+          "proposal_policy": {
+            "allow_partial_plans": true
+          }
+        },
+        "risk": {
+          "limits": {
+            "allow_buying": true,
+            "allow_fractional_shares": true,
+            "allow_selling": true,
+            "estimated_commission": "0",
+            "fractional_increment": "0.001",
+            "max_new_position_percent": null,
+            "max_order_notional": null,
+            "max_position_percent": "0.6",
+            "max_total_exposure_percent": "1",
+            "minimum_cash_reserve_percent": "0"
+          },
+          "policy": {
+            "allow_sell_proceeds_for_later_buys": false
+          }
+        },
+        "rolling_window": {
+          "observation_count": 3
+        },
+        "scenario": {
+          "cash_return": "0",
+          "price_field": "CLOSE",
+          "return_method": "SIMPLE",
+          "source_name": "historical-experiment-grid",
+          "window_policy": "ALL_SUPPLIED"
+        },
+        "timing": {
+          "fill_offset_microseconds": 120000000,
+          "submission_offset_microseconds": 60000000
+        },
+        "trading_enabled": true,
+        "variant_id": "00000000-0000-0000-0000-000000000411"
+      },
+      "maximum_variant_count": 4,
+      "metadata": [
+        {
+          "key": "example",
+          "value": "explicit-finite-grid"
+        }
+      ],
+      "specification_id": "00000000-0000-0000-0000-000000000430"
+    }
+  }
+}

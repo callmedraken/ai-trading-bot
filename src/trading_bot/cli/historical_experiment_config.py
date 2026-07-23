@@ -1,4 +1,4 @@
-"""Strict version-one configuration for offline historical experiments."""
+"""Strict version-two configuration for offline historical experiments."""
 
 import json
 from dataclasses import dataclass
@@ -13,6 +13,7 @@ from trading_bot.cli.config import (
     _constraints,
     _datetime,
     _decimal,
+    _enum,
     _exact_keys,
     _fill_policy,
     _integer,
@@ -42,7 +43,13 @@ from trading_bot.experiments import (
     HistoricalExperimentBootstrapPosition,
     HistoricalExperimentInitializationMode,
     HistoricalExperimentInitialState,
+    HistoricalExperimentRankingCriterion,
+    HistoricalExperimentRankingDirection,
+    HistoricalExperimentRankingMetric,
+    HistoricalExperimentRankingPolicy,
+    HistoricalExperimentTieBreaker,
     HistoricalExperimentVariant,
+    InvalidHistoricalExperimentRankingPolicyError,
 )
 from trading_bot.portfolio import MetadataEntry
 
@@ -58,6 +65,7 @@ class LoadedHistoricalExperimentConfig:
     initial_state: HistoricalExperimentInitialState
     variants: tuple[HistoricalExperimentVariant, ...]
     metadata: tuple[MetadataEntry, ...]
+    ranking_policy: HistoricalExperimentRankingPolicy | None
 
 
 def load_historical_experiment_config(
@@ -81,7 +89,8 @@ def parse_historical_experiment_config(
     raw: Any, config_directory: Path
 ) -> LoadedHistoricalExperimentConfig:
     """Parse one strict experiment document without constructing rolling work."""
-    root = _object(raw, "$")
+    root = dict(_object(raw, "$"))
+    root.setdefault("ranking", None)
     _exact_keys(
         root,
         {
@@ -92,12 +101,16 @@ def parse_historical_experiment_config(
             "initial_state",
             "variants",
             "metadata",
+            "ranking",
         },
         "$",
     )
     version = _integer(root["schema_version"], "$.schema_version")
-    if version != 1:
-        raise ConfigValidationError("$.schema_version", "unsupported schema version")
+    if version != 2:
+        raise ConfigValidationError(
+            "$.schema_version",
+            "unsupported schema version; historical experiment CLI requires version 2",
+        )
     historical = _historical_data(root["historical_data"], config_directory)
     schedule = tuple(
         _datetime(value, f"$.rebalance_schedule[{index}]")
@@ -127,6 +140,7 @@ def parse_historical_experiment_config(
         )
     metadata = _metadata(root["metadata"], "$.metadata")
     _reject_reserved_metadata(metadata, "$.metadata")
+    ranking = _ranking(root["ranking"], "$.ranking")
     return LoadedHistoricalExperimentConfig(
         version,
         _uuid(root["request_id"], "$.request_id"),
@@ -135,7 +149,59 @@ def parse_historical_experiment_config(
         initial,
         variants,
         metadata,
+        ranking,
     )
+
+
+def _ranking(value: Any, path: str) -> HistoricalExperimentRankingPolicy | None:
+    if value is None:
+        return None
+    item = _object(value, path)
+    _exact_keys(item, {"policy_id", "criteria", "tie_breaker", "metadata"}, path)
+    criteria = tuple(
+        _ranking_criterion(raw, f"{path}.criteria[{index}]")
+        for index, raw in enumerate(
+            _array(item["criteria"], f"{path}.criteria", nonempty=True)
+        )
+    )
+    metadata = _metadata(item["metadata"], f"{path}.metadata")
+    try:
+        return HistoricalExperimentRankingPolicy(
+            _uuid(item["policy_id"], f"{path}.policy_id"),
+            criteria,
+            _enum(
+                item["tie_breaker"],
+                HistoricalExperimentTieBreaker,
+                f"{path}.tie_breaker",
+            ),
+            metadata,
+        )
+    except ConfigValidationError:
+        raise
+    except InvalidHistoricalExperimentRankingPolicyError as error:
+        raise ConfigValidationError(path, str(error)) from error
+
+
+def _ranking_criterion(value: Any, path: str) -> HistoricalExperimentRankingCriterion:
+    item = _object(value, path)
+    _exact_keys(item, {"metric", "direction"}, path)
+    try:
+        return HistoricalExperimentRankingCriterion(
+            _enum(
+                item["metric"],
+                HistoricalExperimentRankingMetric,
+                f"{path}.metric",
+            ),
+            _enum(
+                item["direction"],
+                HistoricalExperimentRankingDirection,
+                f"{path}.direction",
+            ),
+        )
+    except ConfigValidationError:
+        raise
+    except InvalidHistoricalExperimentRankingPolicyError as error:
+        raise ConfigValidationError(path, str(error)) from error
 
 
 def _initial_state(

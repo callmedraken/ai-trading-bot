@@ -3,12 +3,14 @@
 import argparse
 import sys
 from dataclasses import dataclass
-from decimal import Decimal
 from pathlib import Path
 from uuid import UUID, uuid5
 
+from trading_bot.cli._simulation_bootstrap import (
+    build_optimized_simulator,
+    initialize_ledger,
+)
 from trading_bot.cli.config import (
-    _InitializationMode,
     _LoadedSimulationConfig,
     load_config,
 )
@@ -27,8 +29,7 @@ from trading_bot.cli.serialization import (
     serialize_audit,
     write_atomic,
 )
-from trading_bot.domain import OrderFill, OrderSide
-from trading_bot.execution import OrderEngine
+from trading_bot.domain import OrderFill
 from trading_bot.execution.state_fingerprints import canonical_decimal
 from trading_bot.ledger import PaperLedger
 from trading_bot.portfolio import MetadataEntry, OptimizationStatus
@@ -43,7 +44,6 @@ from trading_bot.portfolio_analytics import (
     OptimizedSimulationValuationError,
     OptimizedSimulationValuationPolicy,
 )
-from trading_bot.runtime import PaperPortfolioRuntime
 from trading_bot.simulation import (
     OptimizedPaperPortfolioSimulator,
     OptimizedPaperSimulationCertificationError,
@@ -52,8 +52,6 @@ from trading_bot.simulation import (
     PaperPortfolioSimulationError,
 )
 
-_BOOTSTRAP_NAMESPACE = UUID("20e175f9-81ad-5985-b460-15a79acbb41e")
-_BOOTSTRAP_VERSION = "optimized-simulation-cli-bootstrap-v1"
 _ANALYTICS_NAMESPACE = UUID("a3a30d80-b64f-5d22-b546-a11ed06c1395")
 _ANALYTICS_VERSION = "optimized-simulation-cli-analytics-v1"
 _simulator_type = OptimizedPaperPortfolioSimulator
@@ -92,9 +90,9 @@ def build_parser() -> argparse.ArgumentParser:
 def run_cli(config_path: Path) -> _CliRunResult:
     """Load, assemble, and run exactly one self-contained simulation."""
     config = load_config(config_path)
-    ledger, bootstrap_fills = _initialize_ledger(config)
-    runtime = PaperPortfolioRuntime(OrderEngine(), ledger)
-    simulator = _simulator_type(runtime)
+    simulator, bootstrap_fills = build_optimized_simulator(
+        config.request.request_id, config.initial_ledger, _simulator_type
+    )
     try:
         result = simulator.run(config.request)
     except OptimizedPaperSimulationOptimizationError as error:
@@ -165,42 +163,7 @@ def _build_performance_request(
 def _initialize_ledger(
     config: _LoadedSimulationConfig,
 ) -> tuple[PaperLedger, tuple[OrderFill, ...]]:
-    initial = config.initial_ledger
-    if initial.initialization_mode is _InitializationMode.CASH_ONLY:
-        return PaperLedger(initial.available_cash), ()
-    basis = sum(
-        (item.quantity * item.average_cost for item in initial.positions),
-        start=Decimal("0"),
-    )
-    ledger = PaperLedger(initial.available_cash + basis)
-    fills = []
-    for ordinal, position in enumerate(initial.positions):
-        material = "|".join(
-            (
-                _BOOTSTRAP_VERSION,
-                str(config.request.request_id),
-                initial.initialization_mode.value,
-                str(ordinal),
-                str(position.symbol),
-                canonical_decimal(position.quantity),
-                canonical_decimal(position.average_cost),
-                initial.as_of.isoformat(),
-            )
-        )
-        order_id = uuid5(_BOOTSTRAP_NAMESPACE, f"{material}|order")
-        fill = OrderFill(
-            uuid5(_BOOTSTRAP_NAMESPACE, f"{material}|fill"),
-            order_id,
-            position.symbol,
-            OrderSide.BUY,
-            position.quantity,
-            position.average_cost,
-            Decimal("0"),
-            initial.as_of,
-        )
-        ledger.apply_fill(fill)
-        fills.append(fill)
-    return ledger, tuple(fills)
+    return initialize_ledger(config.request.request_id, config.initial_ledger)
 
 
 def _format_operational_summary(

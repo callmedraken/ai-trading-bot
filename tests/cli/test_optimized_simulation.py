@@ -20,6 +20,7 @@ from trading_bot.cli.serialization import (
     _serialize_drawdown_record,
     _serialize_frame_performance,
     build_audit,
+    serialize_audit,
     write_atomic,
 )
 from trading_bot.execution.state_fingerprints import canonical_decimal
@@ -50,6 +51,21 @@ def _write_config(tmp_path: Path, raw: dict) -> Path:
     path = tmp_path / "config.json"
     path.write_text(json.dumps(raw), encoding="utf-8")
     return path
+
+
+def test_schema_two_representative_serialization_has_fixed_exact_bytes() -> None:
+    representative = {
+        "schema_version": 2,
+        "configuration": {"schema_version": 1},
+        "initial_state": {"available_cash": "10000"},
+        "simulation": {"result_id": "result"},
+        "analytics": {"result": {"simulation_return": "0.01"}},
+    }
+    fixtures = ROOT / "tests" / "fixtures" / "cli"
+    compact = (fixtures / "optimized-audit-v2-compact.json").read_text(encoding="utf-8")
+    pretty = (fixtures / "optimized-audit-v2-pretty.json").read_text(encoding="utf-8")
+    assert serialize_audit(representative, pretty=False) == compact
+    assert serialize_audit(representative, pretty=True) == pretty
 
 
 def _command(*extra: str) -> list[str]:

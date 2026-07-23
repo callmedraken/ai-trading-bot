@@ -5,11 +5,19 @@ import re
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
-from enum import StrEnum
 from pathlib import Path
 from typing import Any
 from uuid import UUID
 
+from trading_bot.cli._simulation_bootstrap import (
+    InitializationMode as _InitializationMode,
+)
+from trading_bot.cli._simulation_bootstrap import (
+    InitialLedgerConfig as _InitialLedgerConfig,
+)
+from trading_bot.cli._simulation_bootstrap import (
+    InitialPositionConfig as _InitialPositionConfig,
+)
 from trading_bot.cli.exceptions import (
     ConfigJsonError,
     ConfigReadError,
@@ -38,26 +46,6 @@ from trading_bot.simulation import (
 )
 
 _DECIMAL_PATTERN = re.compile(r"^-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?$")
-
-
-class _InitializationMode(StrEnum):
-    CASH_ONLY = "CASH_ONLY"
-    BOOTSTRAP_FILLS = "BOOTSTRAP_FILLS"
-
-
-@dataclass(frozen=True, slots=True)
-class _InitialPositionConfig:
-    symbol: Symbol
-    quantity: Decimal
-    average_cost: Decimal
-
-
-@dataclass(frozen=True, slots=True)
-class _InitialLedgerConfig:
-    initialization_mode: _InitializationMode
-    as_of: datetime
-    available_cash: Decimal
-    positions: tuple[_InitialPositionConfig, ...]
 
 
 @dataclass(frozen=True, slots=True)

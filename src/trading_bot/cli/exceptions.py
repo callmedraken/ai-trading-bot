@@ -56,3 +56,27 @@ class AnalyticsCliError(OptimizedSimulationCliError):
 
 class AuditOutputError(OptimizedSimulationCliError):
     """Raised when deterministic audit output cannot be produced or replaced."""
+
+
+class RollingHistoricalCliError(Exception):
+    """Base exception for expected rolling historical CLI failures."""
+
+
+class RollingHistoricalConfigError(RollingHistoricalCliError, ValueError):
+    """Raised when rolling-specific configuration is inconsistent."""
+
+
+class HistoricalDataCliError(RollingHistoricalCliError):
+    """Raised when configured local historical data cannot be loaded."""
+
+
+class RollingInitializationCliError(RollingHistoricalCliError):
+    """Raised when deterministic simulator initialization fails."""
+
+
+class RollingExecutionCliError(RollingHistoricalCliError):
+    """Raised when rolling preparation, execution, or analytics fails."""
+
+
+class RollingAuditOutputError(RollingHistoricalCliError):
+    """Raised when the complete rolling audit cannot be constructed."""

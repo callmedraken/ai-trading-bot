@@ -101,19 +101,20 @@ def build_audit(
                 for fill in bootstrap_fills
             ],
         },
-        "simulation": _build_simulation_audit(config, result, ledger, bootstrap_fills),
-        "analytics": _build_analytics_audit(performance_result),
+        "simulation": build_optimized_simulation_section(
+            initial, result, ledger, bootstrap_fills
+        ),
+        "analytics": build_optimized_performance_section(performance_result),
     }
 
 
-def _build_simulation_audit(
-    config: _LoadedSimulationConfig,
+def build_optimized_simulation_section(
+    initial,
     result: OptimizedPaperSimulationResult,
     ledger: PaperLedger,
     bootstrap_fills: tuple[OrderFill, ...],
 ) -> dict[str, Any]:
-    """Build the complete operational simulation portion of the audit."""
-    initial = config.initial_ledger
+    """Build a reusable complete operational domain simulation section."""
     positions: dict[Symbol, Position] = {
         item.symbol: Position(item.symbol, item.quantity, item.average_cost)
         for item in initial.positions
@@ -179,10 +180,10 @@ def _build_simulation_audit(
     }
 
 
-def _build_analytics_audit(
+def build_optimized_performance_section(
     result: OptimizedSimulationPerformanceResult,
 ) -> dict[str, Any]:
-    """Build an explicit analytics request and result audit."""
+    """Build a reusable explicit performance request and result section."""
     request = result.request
     return {
         "request": {
@@ -541,6 +542,11 @@ def _frame_configuration(frame) -> dict[str, Any]:  # type: ignore[no-untyped-de
         "trading_enabled": frame.trading_enabled,
         "metadata": _metadata(frame.metadata),
     }
+
+
+def serialize_optimized_frame(frame) -> dict[str, Any]:  # type: ignore[no-untyped-def]
+    """Serialize one optimized frame's complete inputs without a root schema."""
+    return _frame_configuration(frame)
 
 
 def _frame_audit(evaluation, cash, realized, positions):  # type: ignore[no-untyped-def]

@@ -2,19 +2,37 @@ import json
 import subprocess
 import sys
 from copy import deepcopy
+from dataclasses import fields
 from decimal import Decimal
 from pathlib import Path
+from uuid import UUID
 
 import pytest
 
 from trading_bot.cli import optimized_simulation
 from trading_bot.cli.config import load_config, parse_config
 from trading_bot.cli.exceptions import (
+    AnalyticsCliError,
     AuditOutputError,
     ConfigValidationError,
 )
-from trading_bot.cli.serialization import build_audit, write_atomic
-from trading_bot.portfolio import OptimizationStatus
+from trading_bot.cli.serialization import (
+    _serialize_drawdown_record,
+    _serialize_frame_performance,
+    build_audit,
+    write_atomic,
+)
+from trading_bot.execution.state_fingerprints import canonical_decimal
+from trading_bot.portfolio import MetadataEntry, OptimizationStatus
+from trading_bot.portfolio_analytics import (
+    InconsistentOptimizedSimulationPerformanceResultError,
+    InvalidOptimizedSimulationPerformanceRequestError,
+    OptimizedSimulationFramePerformance,
+    OptimizedSimulationPerformanceAnalyzer,
+    OptimizedSimulationPerformanceReconciliationError,
+    OptimizedSimulationValuationBasis,
+    OptimizedSimulationValuationError,
+)
 from trading_bot.simulation import (
     OptimizedPaperSimulationOptimizationError,
     PaperPortfolioSimulationCycleError,
@@ -200,13 +218,24 @@ def test_bootstrap_audit_classifies_opening_and_simulation_fills(
         positions=[{"symbol": "SPY", "quantity": "1", "average_cost": "400"}],
     )
     run = optimized_simulation.run_cli(_write_config(tmp_path, raw))
-    audit = build_audit(run.config, run.result, run.ledger, run.bootstrap_fills)
+    audit = build_audit(
+        run.config,
+        run.result,
+        run.performance_result,
+        run.ledger,
+        run.bootstrap_fills,
+    )
     assert [item["origin"] for item in audit["initial_state"]["bootstrap_fills"]] == [
         "INITIAL_POSITION_BOOTSTRAP"
     ]
-    origins = [item["origin"] for item in audit["final_state"]["ledger_fills"]]
+    origins = [
+        item["origin"] for item in audit["simulation"]["final_state"]["ledger_fills"]
+    ]
     assert origins[0] == "INITIAL_POSITION_BOOTSTRAP"
-    assert all(item["origin"] == "SIMULATION" for item in audit["frames"][0]["fills"])
+    assert all(
+        item["origin"] == "SIMULATION"
+        for item in audit["simulation"]["frames"][0]["fills"]
+    )
 
 
 def test_multi_frame_and_no_action_runs(tmp_path: Path) -> None:
@@ -254,25 +283,55 @@ def test_compact_and_pretty_outputs_repeat_byte_for_byte(tmp_path: Path) -> None
         first = tmp_path / f"first-{pretty}.json"
         second = tmp_path / f"second-{pretty}.json"
         suffix = ["--pretty"] if pretty else []
-        subprocess.run(
-            _command("--output", str(first), "--quiet", *suffix),
-            cwd=ROOT,
-            check=True,
+        assert (
+            optimized_simulation.main(
+                [
+                    "--config",
+                    str(EXAMPLE),
+                    "--output",
+                    str(first),
+                    "--quiet",
+                    *suffix,
+                ]
+            )
+            == 0
         )
-        subprocess.run(
-            _command("--output", str(second), "--quiet", *suffix),
-            cwd=ROOT,
-            check=True,
+        assert (
+            optimized_simulation.main(
+                [
+                    "--config",
+                    str(EXAMPLE),
+                    "--output",
+                    str(second),
+                    "--quiet",
+                    *suffix,
+                ]
+            )
+            == 0
         )
         assert first.read_bytes() == second.read_bytes()
         report = json.loads(first.read_text(encoding="utf-8"))
-        assert report["schema_version"] == 1
+        assert report["schema_version"] == 2
+        assert set(report) == {
+            "schema_version",
+            "configuration",
+            "initial_state",
+            "simulation",
+            "analytics",
+        }
+        assert report["configuration"]["schema_version"] == 1
         assert report["configuration"]["frames"][0]["scenarios"]["symbols"] == [
             "SPY",
             "QQQ",
         ]
-        assert isinstance(report["final_state"]["cash"], str)
-        assert report["frames"][0]["optimization"]["status"] == "OPTIMAL"
+        assert isinstance(report["simulation"]["final_state"]["cash"], str)
+        assert report["simulation"]["frames"][0]["optimization"]["status"] == (
+            "OPTIMAL"
+        )
+        assert report["analytics"]["request"]["valuation_basis"] == (
+            "FRAME_RISK_PRICES"
+        )
+        assert report["analytics"]["result"]["frames"]
 
 
 def test_output_collision_and_overwrite_behavior(tmp_path: Path) -> None:
@@ -291,7 +350,7 @@ def test_output_collision_and_overwrite_behavior(tmp_path: Path) -> None:
         cwd=ROOT,
         check=True,
     )
-    assert json.loads(output.read_text(encoding="utf-8"))["schema_version"] == 1
+    assert json.loads(output.read_text(encoding="utf-8"))["schema_version"] == 2
 
 
 def test_atomic_replace_failure_preserves_destination_and_cleans_temp(
@@ -358,3 +417,233 @@ def test_configuration_input_is_not_mutated() -> None:
     original = deepcopy(raw)
     parse_config(raw)
     assert raw == original
+
+
+def test_analytics_runs_once_after_exact_simulation_result(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    simulator_type = optimized_simulation._simulator_type
+    events: list[str] = []
+    captured: dict[str, object] = {}
+
+    class RecordingSimulator:
+        def __init__(self, runtime):  # type: ignore[no-untyped-def]
+            self._delegate = simulator_type(runtime)
+
+        @property
+        def ledger(self):  # type: ignore[no-untyped-def]
+            return self._delegate.ledger
+
+        def run(self, request):  # type: ignore[no-untyped-def]
+            assert events == []
+            result = self._delegate.run(request)
+            events.append("simulation")
+            captured["simulation_result"] = result
+            return result
+
+    class RecordingAnalyzer:
+        def analyze(self, request):  # type: ignore[no-untyped-def]
+            assert events == ["simulation"]
+            events.append("analytics")
+            captured["performance_request"] = request
+            return OptimizedSimulationPerformanceAnalyzer().analyze(request)
+
+    monkeypatch.setattr(optimized_simulation, "_simulator_type", RecordingSimulator)
+    monkeypatch.setattr(optimized_simulation, "_analyzer_type", RecordingAnalyzer)
+    run = optimized_simulation.run_cli(EXAMPLE)
+    request = captured["performance_request"]
+    assert events == ["simulation", "analytics"]
+    assert request.simulation_result is captured["simulation_result"]  # type: ignore[union-attr]
+    assert request.simulation_result is run.result  # type: ignore[union-attr]
+    assert request.valuation_policy.valuation_basis is (  # type: ignore[union-attr]
+        OptimizedSimulationValuationBasis.FRAME_RISK_PRICES
+    )
+    assert request.metadata == (  # type: ignore[union-attr]
+        *run.result.request.metadata,
+        MetadataEntry("optimized_simulation_cli_schema_version", "2"),
+        MetadataEntry("optimized_simulation_cli_source", "offline-cli"),
+    )
+
+
+def test_analytics_request_identity_is_deterministic_and_metadata_committed(
+    tmp_path: Path,
+) -> None:
+    first = optimized_simulation.run_cli(EXAMPLE)
+    second = optimized_simulation.run_cli(EXAMPLE)
+    assert first.performance_result.request.request_id == (
+        second.performance_result.request.request_id
+    )
+    changed = _raw()
+    changed["metadata"][0]["value"] = "changed"
+    third = optimized_simulation.run_cli(_write_config(tmp_path, changed))
+    assert third.result.result_id != first.result.result_id
+    assert third.performance_result.request.request_id != (
+        first.performance_result.request.request_id
+    )
+
+
+def test_no_output_mode_skips_audit_and_prints_both_summaries(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    def unexpected(*args, **kwargs):  # type: ignore[no-untyped-def]
+        raise AssertionError("build_audit must not run without --output")
+
+    monkeypatch.setattr(optimized_simulation, "build_audit", unexpected)
+    assert optimized_simulation.main(["--config", str(EXAMPLE)]) == 0
+    output = capsys.readouterr()
+    assert "final ledger realized P&L:" in output.out
+    assert "Performance:" in output.out
+    assert "simulation realized P&L:" in output.out
+    assert "maximum drawdown amount source: frame=" in output.out
+    assert "Optimization summary:" in output.out
+    assert "Trading and risk summary:" in output.out
+    assert output.err == ""
+
+
+def test_quiet_suppresses_combined_success_summary(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    assert optimized_simulation.main(["--config", str(EXAMPLE), "--quiet"]) == 0
+    assert capsys.readouterr().out == ""
+
+
+def test_performance_summary_uses_raw_canonical_ratios() -> None:
+    run = optimized_simulation.run_cli(EXAMPLE)
+    summary = run.performance_summary
+    expected = run.performance_result.simulation_return
+    assert f"simulation return: {canonical_decimal(expected)}" in summary
+    assert "simulation return: " + format(expected * 100, "f") + "%" not in summary
+
+
+def test_schema_two_analytics_audit_is_complete_and_explicit() -> None:
+    run = optimized_simulation.run_cli(EXAMPLE)
+    audit = build_audit(
+        run.config,
+        run.result,
+        run.performance_result,
+        run.ledger,
+        run.bootstrap_fills,
+    )
+    analytics = audit["analytics"]
+    assert audit["schema_version"] == 2
+    assert audit["configuration"]["schema_version"] == 1
+    assert analytics["request"]["request_id"] == str(
+        run.performance_result.request.request_id
+    )
+    assert analytics["request"]["source_simulation_request_id"] == str(
+        run.result.request.request_id
+    )
+    serialized_frame = analytics["result"]["frames"][0]
+    assert set(serialized_frame) == {
+        item.name for item in fields(OptimizedSimulationFramePerformance)
+    }
+    assert [item["symbol"] for item in serialized_frame["allocation_drifts"]] == [
+        str(item.symbol) for item in run.performance_result.frames[0].allocation_drifts
+    ]
+    for name in ("maximum_amount", "maximum_percentage"):
+        source = analytics["result"]["drawdowns"][name]["source_observation"]
+        assert set(source) == {
+            "sequence_index",
+            "frame_ordinal",
+            "phase",
+            "timestamp",
+            "equity",
+        }
+    assert isinstance(analytics["result"]["simulation_return"], str)
+
+
+def test_frame_serializer_covers_every_public_field() -> None:
+    frame = optimized_simulation.run_cli(EXAMPLE).performance_result.frames[0]
+    assert set(_serialize_frame_performance(frame)) == {
+        item.name for item in fields(frame)
+    }
+
+
+def test_ambiguous_drawdown_source_is_an_output_error() -> None:
+    result = optimized_simulation.run_cli(EXAMPLE).performance_result
+    record = result.drawdowns.maximum_amount
+    observation = next(
+        item
+        for item in result.equity_observations
+        if item.timestamp == record.trough_timestamp
+        and item.equity == record.trough_equity
+        and item.running_peak == record.peak_equity
+        and item.drawdown_amount == record.amount
+        and item.drawdown_percentage == record.percentage
+    )
+    with pytest.raises(AuditOutputError, match="exactly one"):
+        _serialize_drawdown_record(record, (observation, observation))
+
+
+@pytest.mark.parametrize(
+    "error_type",
+    [
+        InvalidOptimizedSimulationPerformanceRequestError,
+        OptimizedSimulationValuationError,
+        OptimizedSimulationPerformanceReconciliationError,
+        InconsistentOptimizedSimulationPerformanceResultError,
+    ],
+)
+def test_known_analytics_failures_map_to_exit_six_without_output(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    error_type: type[Exception],
+) -> None:
+    calls = 0
+
+    class FailedAnalyzer:
+        def analyze(self, request):  # type: ignore[no-untyped-def]
+            nonlocal calls
+            calls += 1
+            raise error_type("forced analytics failure")
+
+    output = tmp_path / "audit.json"
+    output.write_text("old", encoding="utf-8")
+    monkeypatch.setattr(optimized_simulation, "_analyzer_type", FailedAnalyzer)
+    assert (
+        optimized_simulation.main(
+            [
+                "--config",
+                str(EXAMPLE),
+                "--output",
+                str(output),
+                "--overwrite",
+            ]
+        )
+        == 6
+    )
+    captured = capsys.readouterr()
+    assert calls == 1
+    assert captured.out == ""
+    assert "analytics error: simulation result" in captured.err
+    assert output.read_text(encoding="utf-8") == "old"
+    assert tuple(tmp_path.glob("*.tmp")) == ()
+
+
+def test_analytics_cli_error_retains_result_id_and_cause(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cause = OptimizedSimulationValuationError("forced")
+
+    class FailedAnalyzer:
+        def analyze(self, request):  # type: ignore[no-untyped-def]
+            raise cause
+
+    monkeypatch.setattr(optimized_simulation, "_analyzer_type", FailedAnalyzer)
+    with pytest.raises(AnalyticsCliError) as caught:
+        optimized_simulation.run_cli(EXAMPLE)
+    assert isinstance(caught.value.source_simulation_result_id, UUID)
+    assert caught.value.__cause__ is cause
+
+
+def test_unexpected_analytics_exception_propagates(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class FailedAnalyzer:
+        def analyze(self, request):  # type: ignore[no-untyped-def]
+            raise RuntimeError("unexpected")
+
+    monkeypatch.setattr(optimized_simulation, "_analyzer_type", FailedAnalyzer)
+    with pytest.raises(RuntimeError, match="unexpected"):
+        optimized_simulation.main(["--config", str(EXAMPLE)])

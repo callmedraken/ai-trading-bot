@@ -15,9 +15,16 @@ from trading_bot.execution import OrderEvent
 from trading_bot.execution.state_fingerprints import canonical_decimal
 from trading_bot.ledger import PaperLedger
 from trading_bot.portfolio import MetadataEntry, TargetPortfolio
+from trading_bot.portfolio_analytics import (
+    OptimizedSimulationAllocationDrift,
+    OptimizedSimulationEquityObservation,
+    OptimizedSimulationFramePerformance,
+    OptimizedSimulationOptimizationSummary,
+    OptimizedSimulationPerformanceResult,
+)
 from trading_bot.simulation import OptimizedPaperSimulationResult
 
-AUDIT_SCHEMA_VERSION = 1
+AUDIT_SCHEMA_VERSION = 2
 
 
 def serialize_audit(audit: dict[str, Any], *, pretty: bool) -> str:
@@ -73,10 +80,39 @@ def write_atomic(destination: Path, content: str, *, overwrite: bool) -> None:
 def build_audit(
     config: _LoadedSimulationConfig,
     result: OptimizedPaperSimulationResult,
+    performance_result: OptimizedSimulationPerformanceResult,
     ledger: PaperLedger,
     bootstrap_fills: tuple[OrderFill, ...],
 ) -> dict[str, Any]:
-    """Build the deliberate version-one optimized-simulation audit tree."""
+    """Build the deliberate version-two simulation and analytics audit tree."""
+    initial = config.initial_ledger
+    return {
+        "schema_version": AUDIT_SCHEMA_VERSION,
+        "configuration": _configuration(config),
+        "initial_state": {
+            "initialization_mode": initial.initialization_mode.value,
+            "as_of": _datetime(initial.as_of),
+            "available_cash": _decimal(initial.available_cash),
+            "engine_state_id": str(result.initial_engine_state_id),
+            "ledger_state_id": str(result.initial_ledger_state_id),
+            "positions": [_initial_position(item) for item in initial.positions],
+            "bootstrap_fills": [
+                _fill(fill, origin="INITIAL_POSITION_BOOTSTRAP")
+                for fill in bootstrap_fills
+            ],
+        },
+        "simulation": _build_simulation_audit(config, result, ledger, bootstrap_fills),
+        "analytics": _build_analytics_audit(performance_result),
+    }
+
+
+def _build_simulation_audit(
+    config: _LoadedSimulationConfig,
+    result: OptimizedPaperSimulationResult,
+    ledger: PaperLedger,
+    bootstrap_fills: tuple[OrderFill, ...],
+) -> dict[str, Any]:
+    """Build the complete operational simulation portion of the audit."""
     initial = config.initial_ledger
     positions: dict[Symbol, Position] = {
         item.symbol: Position(item.symbol, item.quantity, item.average_cost)
@@ -109,27 +145,13 @@ def build_audit(
     final_order = tuple(item.symbol for item in result.request.frames[-1].prices)
     bootstrap_ids = {fill.fill_id for fill in bootstrap_fills}
     return {
-        "schema_version": AUDIT_SCHEMA_VERSION,
-        "configuration": _configuration(config),
-        "simulation_request_id": str(result.request.request_id),
-        "simulation_result_id": str(result.result_id),
+        "request_id": str(result.request.request_id),
+        "result_id": str(result.result_id),
         "status": result.status.value,
         "counts": {
             "frame_count": len(result.evaluations),
             "applied_cycle_count": result.applied_cycle_count,
             "no_action_cycle_count": result.no_action_cycle_count,
-        },
-        "initial_state": {
-            "initialization_mode": initial.initialization_mode.value,
-            "as_of": _datetime(initial.as_of),
-            "available_cash": _decimal(initial.available_cash),
-            "engine_state_id": str(result.initial_engine_state_id),
-            "ledger_state_id": str(result.initial_ledger_state_id),
-            "positions": [_initial_position(item) for item in initial.positions],
-            "bootstrap_fills": [
-                _fill(fill, origin="INITIAL_POSITION_BOOTSTRAP")
-                for fill in bootstrap_fills
-            ],
         },
         "frames": frames,
         "final_state": {
@@ -153,6 +175,241 @@ def build_audit(
                 )
                 for fill in ledger.fills
             ],
+        },
+    }
+
+
+def _build_analytics_audit(
+    result: OptimizedSimulationPerformanceResult,
+) -> dict[str, Any]:
+    """Build an explicit analytics request and result audit."""
+    request = result.request
+    return {
+        "request": {
+            "request_id": str(request.request_id),
+            "source_simulation_request_id": str(
+                request.simulation_result.request.request_id
+            ),
+            "source_simulation_result_id": str(request.simulation_result.result_id),
+            "valuation_basis": request.valuation_policy.valuation_basis.value,
+            "metadata": _metadata(request.metadata),
+        },
+        "result": {
+            "result_id": str(result.result_id),
+            "source_simulation_result_id": str(request.simulation_result.result_id),
+            "initial_equity": _decimal(result.initial_equity),
+            "final_equity": _decimal(result.final_equity),
+            "absolute_simulation_profit_loss": _decimal(
+                result.absolute_simulation_profit_loss
+            ),
+            "simulation_return": _decimal(result.simulation_return),
+            "initial_unrealized_profit_loss": _decimal(
+                result.initial_unrealized_profit_loss
+            ),
+            "final_unrealized_profit_loss": _decimal(
+                result.final_unrealized_profit_loss
+            ),
+            "cumulative_simulation_realized_profit_loss": _decimal(
+                result.cumulative_simulation_realized_profit_loss
+            ),
+            "total_gross_buy_notional": _decimal(result.total_gross_buy_notional),
+            "total_gross_sell_notional": _decimal(result.total_gross_sell_notional),
+            "total_gross_traded_notional": _decimal(result.total_gross_traded_notional),
+            "total_net_buy_notional": _decimal(result.total_net_buy_notional),
+            "aggregate_one_way_turnover": _decimal(result.aggregate_one_way_turnover),
+            "aggregate_two_way_turnover": _decimal(result.aggregate_two_way_turnover),
+            "total_commissions": _decimal(result.total_commissions),
+            "total_signed_slippage_profit_loss": _decimal(
+                result.total_signed_slippage_profit_loss
+            ),
+            "total_adverse_slippage_cost": _decimal(result.total_adverse_slippage_cost),
+            "total_execution_cost": _decimal(result.total_execution_cost),
+            "total_order_count": result.total_order_count,
+            "total_fill_count": result.total_fill_count,
+            "total_approved_risk_count": result.total_approved_risk_count,
+            "total_resized_risk_count": result.total_resized_risk_count,
+            "total_rejected_risk_count": result.total_rejected_risk_count,
+            "total_rejected_notional": _decimal(result.total_rejected_notional),
+            "total_reduced_notional": _decimal(result.total_reduced_notional),
+            "applied_cycle_count": result.applied_cycle_count,
+            "no_action_cycle_count": result.no_action_cycle_count,
+            "optimization_summary": _serialize_optimization_summary(
+                result.optimization_summary
+            ),
+            "maximum_absolute_allocation_drift": _decimal(
+                result.maximum_absolute_allocation_drift
+            ),
+            "total_absolute_allocation_drift": _decimal(
+                result.total_absolute_allocation_drift
+            ),
+            "diagnostics": [
+                {"code": item.code.value, "message": item.message}
+                for item in result.diagnostics
+            ],
+            "frames": [_serialize_frame_performance(item) for item in result.frames],
+            "equity_observations": [
+                _serialize_equity_observation(item)
+                for item in result.equity_observations
+            ],
+            "drawdowns": {
+                "maximum_amount": _serialize_drawdown_record(
+                    result.drawdowns.maximum_amount, result.equity_observations
+                ),
+                "maximum_percentage": _serialize_drawdown_record(
+                    result.drawdowns.maximum_percentage, result.equity_observations
+                ),
+            },
+        },
+    }
+
+
+def _serialize_frame_performance(
+    item: OptimizedSimulationFramePerformance,
+) -> dict[str, Any]:
+    return {
+        "frame_id": str(item.frame_id),
+        "frame_ordinal": item.frame_ordinal,
+        "source_cycle_result_id": str(item.source_cycle_result_id),
+        "as_of": _datetime(item.as_of),
+        "filled_at": _datetime(item.filled_at),
+        "pre_cycle_equity": _decimal(item.pre_cycle_equity),
+        "post_cycle_equity": _decimal(item.post_cycle_equity),
+        "execution_profit_loss": _decimal(item.execution_profit_loss),
+        "forward_market_profit_loss": _optional_decimal(
+            item.forward_market_profit_loss
+        ),
+        "period_profit_loss": _decimal(item.period_profit_loss),
+        "period_return": _decimal(item.period_return),
+        "cumulative_return": _decimal(item.cumulative_return),
+        "cumulative_simulation_profit_loss": _decimal(
+            item.cumulative_simulation_profit_loss
+        ),
+        "pre_cycle_cash": _decimal(item.pre_cycle_cash),
+        "post_cycle_cash": _decimal(item.post_cycle_cash),
+        "pre_cycle_gross_exposure": _decimal(item.pre_cycle_gross_exposure),
+        "post_cycle_gross_exposure": _decimal(item.post_cycle_gross_exposure),
+        "pre_cycle_net_exposure": _decimal(item.pre_cycle_net_exposure),
+        "post_cycle_net_exposure": _decimal(item.post_cycle_net_exposure),
+        "pre_cycle_position_count": item.pre_cycle_position_count,
+        "post_cycle_position_count": item.post_cycle_position_count,
+        "frame_simulation_realized_profit_loss": _decimal(
+            item.frame_simulation_realized_profit_loss
+        ),
+        "cumulative_simulation_realized_profit_loss": _decimal(
+            item.cumulative_simulation_realized_profit_loss
+        ),
+        "pre_cycle_unrealized_profit_loss": _decimal(
+            item.pre_cycle_unrealized_profit_loss
+        ),
+        "post_cycle_unrealized_profit_loss": _decimal(
+            item.post_cycle_unrealized_profit_loss
+        ),
+        "unrealized_profit_loss_change": _decimal(item.unrealized_profit_loss_change),
+        "gross_buy_notional": _decimal(item.gross_buy_notional),
+        "gross_sell_notional": _decimal(item.gross_sell_notional),
+        "gross_traded_notional": _decimal(item.gross_traded_notional),
+        "net_buy_notional": _decimal(item.net_buy_notional),
+        "one_way_turnover": _decimal(item.one_way_turnover),
+        "two_way_turnover": _decimal(item.two_way_turnover),
+        "commission_cost": _decimal(item.commission_cost),
+        "signed_slippage_profit_loss": _decimal(item.signed_slippage_profit_loss),
+        "adverse_slippage_cost": _decimal(item.adverse_slippage_cost),
+        "total_execution_cost": _decimal(item.total_execution_cost),
+        "order_count": item.order_count,
+        "fill_count": item.fill_count,
+        "approved_risk_count": item.approved_risk_count,
+        "resized_risk_count": item.resized_risk_count,
+        "rejected_risk_count": item.rejected_risk_count,
+        "rejected_notional": _decimal(item.rejected_notional),
+        "reduced_notional": _decimal(item.reduced_notional),
+        "optimization_status": item.optimization_status.value,
+        "solver_name": item.solver_name,
+        "expected_portfolio_return": _decimal(item.expected_portfolio_return),
+        "cvar": _decimal(item.cvar),
+        "objective_value": _decimal(item.objective_value),
+        "target_cash_weight": _decimal(item.target_cash_weight),
+        "target_allocation_count": item.target_allocation_count,
+        "allocation_drifts": [
+            _serialize_allocation_drift(value) for value in item.allocation_drifts
+        ],
+        "actual_cash_weight": _decimal(item.actual_cash_weight),
+        "cash_weight_drift": _decimal(item.cash_weight_drift),
+        "absolute_cash_weight_drift": _decimal(item.absolute_cash_weight_drift),
+        "maximum_absolute_allocation_drift": _decimal(
+            item.maximum_absolute_allocation_drift
+        ),
+        "total_absolute_allocation_drift": _decimal(
+            item.total_absolute_allocation_drift
+        ),
+    }
+
+
+def _serialize_equity_observation(
+    item: OptimizedSimulationEquityObservation,
+) -> dict[str, Any]:
+    return {
+        "sequence_index": item.sequence_index,
+        "frame_ordinal": item.frame_ordinal,
+        "phase": item.phase.value,
+        "timestamp": _datetime(item.timestamp),
+        "equity": _decimal(item.equity),
+        "running_peak": _decimal(item.running_peak),
+        "drawdown_amount": _decimal(item.drawdown_amount),
+        "drawdown_percentage": _decimal(item.drawdown_percentage),
+    }
+
+
+def _serialize_allocation_drift(
+    item: OptimizedSimulationAllocationDrift,
+) -> dict[str, str]:
+    return {
+        "symbol": str(item.symbol),
+        "target_weight": _decimal(item.target_weight),
+        "actual_weight": _decimal(item.actual_weight),
+        "drift": _decimal(item.drift),
+        "absolute_drift": _decimal(item.absolute_drift),
+    }
+
+
+def _serialize_optimization_summary(
+    item: OptimizedSimulationOptimizationSummary,
+) -> dict[str, str]:
+    return {
+        "mean_expected_portfolio_return": _decimal(item.mean_expected_portfolio_return),
+        "worst_cvar": _decimal(item.worst_cvar),
+        "minimum_target_cash_weight": _decimal(item.minimum_target_cash_weight),
+        "maximum_target_cash_weight": _decimal(item.maximum_target_cash_weight),
+    }
+
+
+def _serialize_drawdown_record(record, observations):  # type: ignore[no-untyped-def]
+    matches = tuple(
+        item
+        for item in observations
+        if item.timestamp == record.trough_timestamp
+        and item.equity == record.trough_equity
+        and item.running_peak == record.peak_equity
+        and item.drawdown_amount == record.amount
+        and item.drawdown_percentage == record.percentage
+    )
+    if len(matches) != 1:
+        raise AuditOutputError(
+            "drawdown maximum must match exactly one retained equity observation"
+        )
+    source = matches[0]
+    return {
+        "peak_timestamp": _datetime(record.peak_timestamp),
+        "trough_timestamp": _datetime(record.trough_timestamp),
+        "peak_equity": _decimal(record.peak_equity),
+        "trough_equity": _decimal(record.trough_equity),
+        "amount": _decimal(record.amount),
+        "percentage": _decimal(record.percentage),
+        "source_observation": {
+            "sequence_index": source.sequence_index,
+            "frame_ordinal": source.frame_ordinal,
+            "phase": source.phase.value,
+            "timestamp": _datetime(source.timestamp),
+            "equity": _decimal(source.equity),
         },
     }
 

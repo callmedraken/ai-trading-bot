@@ -27,6 +27,11 @@ python -m scripts.run_optimized_paper_simulation \
 There are no prompts. Omitting `--output` prints only the summary; `--quiet`
 suppresses a successful summary but never suppresses errors.
 
+The command and version-one input schema remain unchanged. Successful runs now
+always perform optimized-simulation performance analytics and emit audit schema
+version 2 when output is requested, as specified in
+`29-optimized-simulation-cli-analytics.md`.
+
 The script only establishes the source-checkout import path and calls
 `trading_bot.cli.optimized_simulation.main`. CLI configuration records remain
 private and are not application-domain APIs.
@@ -131,7 +136,7 @@ target weights and cash weight, cycle status, risk counts, order and fill counts
 ending cash, and positions. Symbols follow frame order. Scenario matrices are
 not printed.
 
-Audit schema version `1` explicitly contains canonical configuration, initial
+Historical audit schema version `1` explicitly contained canonical configuration, initial
 mode and bootstrap fills, simulation request/result identities and counts,
 initial/final component state IDs, and ordered frame audits. Frame audits retain
 optimizer output and diagnostics, certification and target, runtime cycle, risk
@@ -139,6 +144,9 @@ evaluations, created orders and events, submitted orders and events, generated
 fills, fill application events and ledger values, and pre/post state IDs. Final
 state retains cash, realized P&L, ordered positions, and complete ledger fill
 history.
+
+Schema version 1 is no longer emitted. Its operational information is retained
+under the `simulation` member of schema version 2 alongside the analytics audit.
 
 Every final-history fill has origin `INITIAL_POSITION_BOOTSTRAP` or `SIMULATION`.
 Bootstrap fills appear in initial state and never in a frame-generated fill

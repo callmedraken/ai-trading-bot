@@ -1,5 +1,7 @@
 """Expected failures from the optimized simulation command-line adapter."""
 
+from uuid import UUID
+
 from trading_bot.portfolio import OptimizationStatus
 
 
@@ -42,6 +44,14 @@ class OptimizerCliError(OptimizedSimulationCliError):
 
 class SimulationCliError(OptimizedSimulationCliError):
     """Raised when certification, runtime, or reconciliation fails."""
+
+
+class AnalyticsCliError(OptimizedSimulationCliError):
+    """Raised when post-simulation performance analysis fails."""
+
+    def __init__(self, source_simulation_result_id: UUID, message: str) -> None:
+        self.source_simulation_result_id = source_simulation_result_id
+        super().__init__(message)
 
 
 class AuditOutputError(OptimizedSimulationCliError):

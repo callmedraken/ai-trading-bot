@@ -1,8 +1,9 @@
-"""Strict version-two configuration for offline historical experiments."""
+"""Strict version-three configuration for offline historical experiments."""
 
 import json
 from dataclasses import dataclass
 from datetime import datetime
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 from uuid import UUID
@@ -41,6 +42,10 @@ from trading_bot.cli.rolling_historical_config import (
 )
 from trading_bot.experiments import (
     HistoricalExperimentBootstrapPosition,
+    HistoricalExperimentGridAxis,
+    HistoricalExperimentGridError,
+    HistoricalExperimentGridParameter,
+    HistoricalExperimentGridSpecification,
     HistoricalExperimentInitializationMode,
     HistoricalExperimentInitialState,
     HistoricalExperimentRankingCriterion,
@@ -63,7 +68,8 @@ class LoadedHistoricalExperimentConfig:
     historical_data: RollingHistoricalDataConfig
     rebalance_schedule: tuple[datetime, ...]
     initial_state: HistoricalExperimentInitialState
-    variants: tuple[HistoricalExperimentVariant, ...]
+    explicit_variants: tuple[HistoricalExperimentVariant, ...] | None
+    grid_specification: HistoricalExperimentGridSpecification | None
     metadata: tuple[MetadataEntry, ...]
     ranking_policy: HistoricalExperimentRankingPolicy | None
 
@@ -89,8 +95,7 @@ def parse_historical_experiment_config(
     raw: Any, config_directory: Path
 ) -> LoadedHistoricalExperimentConfig:
     """Parse one strict experiment document without constructing rolling work."""
-    root = dict(_object(raw, "$"))
-    root.setdefault("ranking", None)
+    root = _object(raw, "$")
     _exact_keys(
         root,
         {
@@ -100,16 +105,18 @@ def parse_historical_experiment_config(
             "rebalance_schedule",
             "initial_state",
             "variants",
+            "variant_grid",
             "metadata",
             "ranking",
         },
         "$",
     )
     version = _integer(root["schema_version"], "$.schema_version")
-    if version != 2:
+    if version != 3:
         raise ConfigValidationError(
             "$.schema_version",
-            "unsupported schema version; historical experiment CLI requires version 2",
+            "unsupported schema version; migrate historical experiment CLI "
+            "configuration to version 3",
         )
     historical = _historical_data(root["historical_data"], config_directory)
     schedule = tuple(
@@ -125,19 +132,9 @@ def parse_historical_experiment_config(
                 "timestamps must be strictly increasing and unique",
             )
     initial = _initial_state(root["initial_state"], historical, schedule)
-    variants = tuple(
-        _variant(value, f"$.variants[{index}]")
-        for index, value in enumerate(
-            _array(root["variants"], "$.variants", nonempty=True)
-        )
+    explicit_variants, grid_specification = _variant_source(
+        root["variants"], root["variant_grid"]
     )
-    if len({item.variant_id for item in variants}) != len(variants):
-        raise ConfigValidationError("$.variants", "variant IDs must be unique")
-    names = tuple(item.name.strip().casefold() for item in variants)
-    if len(set(names)) != len(names):
-        raise ConfigValidationError(
-            "$.variants", "variant names must be unique after normalization"
-        )
     metadata = _metadata(root["metadata"], "$.metadata")
     _reject_reserved_metadata(metadata, "$.metadata")
     ranking = _ranking(root["ranking"], "$.ranking")
@@ -147,10 +144,106 @@ def parse_historical_experiment_config(
         historical,
         schedule,
         initial,
-        variants,
+        explicit_variants,
+        grid_specification,
         metadata,
         ranking,
     )
+
+
+def _variant_source(
+    variants_value: Any, grid_value: Any
+) -> tuple[
+    tuple[HistoricalExperimentVariant, ...] | None,
+    HistoricalExperimentGridSpecification | None,
+]:
+    if variants_value is None and grid_value is None:
+        raise ConfigValidationError(
+            "$.variants", "exactly one of variants and variant_grid must be active"
+        )
+    if variants_value is not None and grid_value is not None:
+        raise ConfigValidationError(
+            "$.variant_grid", "cannot be active when variants is active"
+        )
+    if variants_value is not None:
+        variants = tuple(
+            _variant(value, f"$.variants[{index}]")
+            for index, value in enumerate(
+                _array(variants_value, "$.variants", nonempty=True)
+            )
+        )
+        if len({item.variant_id for item in variants}) != len(variants):
+            raise ConfigValidationError("$.variants", "variant IDs must be unique")
+        names = tuple(item.name.strip().casefold() for item in variants)
+        if len(set(names)) != len(variants):
+            raise ConfigValidationError(
+                "$.variants", "variant names must be unique after normalization"
+            )
+        return variants, None
+    return None, _variant_grid(grid_value, "$.variant_grid")
+
+
+def _variant_grid(value: Any, path: str) -> HistoricalExperimentGridSpecification:
+    item = _object(value, path)
+    _exact_keys(
+        item,
+        {
+            "specification_id",
+            "base_variant",
+            "axes",
+            "maximum_variant_count",
+            "metadata",
+        },
+        path,
+    )
+    axes = tuple(
+        _grid_axis(raw, f"{path}.axes[{index}]")
+        for index, raw in enumerate(_array(item["axes"], f"{path}.axes", nonempty=True))
+    )
+    try:
+        return HistoricalExperimentGridSpecification(
+            _uuid(item["specification_id"], f"{path}.specification_id"),
+            _variant(item["base_variant"], f"{path}.base_variant"),
+            axes,
+            _integer(item["maximum_variant_count"], f"{path}.maximum_variant_count"),
+            _metadata(item["metadata"], f"{path}.metadata"),
+        )
+    except ConfigValidationError:
+        raise
+    except HistoricalExperimentGridError as error:
+        raise ConfigValidationError(path, str(error)) from error
+
+
+def _grid_axis(value: Any, path: str) -> HistoricalExperimentGridAxis:
+    item = _object(value, path)
+    _exact_keys(item, {"parameter", "values"}, path)
+    parameter = _enum(
+        item["parameter"], HistoricalExperimentGridParameter, f"{path}.parameter"
+    )
+    values = tuple(
+        _grid_value(parameter, raw, f"{path}.values[{index}]")
+        for index, raw in enumerate(
+            _array(item["values"], f"{path}.values", nonempty=True)
+        )
+    )
+    try:
+        return HistoricalExperimentGridAxis(parameter, values)
+    except HistoricalExperimentGridError as error:
+        raise ConfigValidationError(path, str(error)) from error
+
+
+def _grid_value(
+    parameter: HistoricalExperimentGridParameter, value: Any, path: str
+) -> int | Decimal | bool | None:
+    parsers = {
+        HistoricalExperimentGridParameter.WINDOW_OBSERVATION_COUNT: _integer,
+        HistoricalExperimentGridParameter.SCENARIO_CASH_RETURN: _decimal,
+        HistoricalExperimentGridParameter.RISK_AVERSION: _decimal,
+        HistoricalExperimentGridParameter.TRADING_ENABLED: _boolean,
+    }
+    if parameter is HistoricalExperimentGridParameter.PROPOSAL_CONFIDENCE:
+        return None if value is None else _decimal(value, path)
+    return parsers[parameter](value, path)
 
 
 def _ranking(value: Any, path: str) -> HistoricalExperimentRankingPolicy | None:

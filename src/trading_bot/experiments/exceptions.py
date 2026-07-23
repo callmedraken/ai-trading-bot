@@ -134,3 +134,41 @@ class InconsistentHistoricalExperimentGridResultError(
     HistoricalExperimentGridError, ValueError
 ):
     """Raised when a retained grid result is inconsistent."""
+
+
+class HistoricalExperimentReportError(HistoricalExperimentError):
+    """Base exception for compact historical experiment reports."""
+
+
+class InvalidHistoricalExperimentReportInputError(
+    HistoricalExperimentReportError, ValueError
+):
+    """Raised when compact-report source input is malformed."""
+
+
+class HistoricalExperimentReportGridError(HistoricalExperimentReportError, ValueError):
+    """Raised when supplied grid provenance is unrelated or inconsistent."""
+
+
+class HistoricalExperimentReportRankingError(
+    HistoricalExperimentReportError, ValueError
+):
+    """Raised when supplied ranking provenance is unrelated or inconsistent."""
+
+
+class HistoricalExperimentReportMetricError(
+    HistoricalExperimentReportError, ValueError
+):
+    """Raised when projected metrics or comparison values are malformed."""
+
+
+class HistoricalExperimentReportReconciliationError(
+    HistoricalExperimentReportError, ValueError
+):
+    """Raised when locally projected report rows do not reconcile."""
+
+
+class InconsistentHistoricalExperimentReportError(
+    HistoricalExperimentReportError, ValueError
+):
+    """Raised when a retained compact report is internally inconsistent."""

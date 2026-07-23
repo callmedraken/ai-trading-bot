@@ -26,12 +26,19 @@ from trading_bot.experiments.exceptions import (
     HistoricalExperimentMetricError,
     HistoricalExperimentRankingError,
     HistoricalExperimentReconciliationError,
+    HistoricalExperimentReportError,
+    HistoricalExperimentReportGridError,
+    HistoricalExperimentReportMetricError,
+    HistoricalExperimentReportRankingError,
+    HistoricalExperimentReportReconciliationError,
     HistoricalExperimentVariantError,
     InconsistentHistoricalExperimentComparisonResultError,
     InconsistentHistoricalExperimentGridResultError,
+    InconsistentHistoricalExperimentReportError,
     InconsistentHistoricalExperimentResultError,
     InvalidHistoricalExperimentGridSpecificationError,
     InvalidHistoricalExperimentRankingPolicyError,
+    InvalidHistoricalExperimentReportInputError,
     InvalidHistoricalExperimentRequestError,
 )
 from trading_bot.experiments.grid import (
@@ -54,6 +61,13 @@ from trading_bot.experiments.historical import (
     HistoricalExperimentRunner,
     HistoricalExperimentSimulatorFactory,
     HistoricalExperimentVariant,
+)
+from trading_bot.experiments.report import (
+    HistoricalExperimentReport,
+    HistoricalExperimentReportBuilder,
+    HistoricalExperimentReportRanking,
+    HistoricalExperimentReportVariant,
+    HistoricalExperimentReportVariantSource,
 )
 
 __all__ = [
@@ -90,6 +104,16 @@ __all__ = [
     "HistoricalExperimentRankingMetric",
     "HistoricalExperimentRankingPolicy",
     "HistoricalExperimentReconciliationError",
+    "HistoricalExperimentReport",
+    "HistoricalExperimentReportBuilder",
+    "HistoricalExperimentReportError",
+    "HistoricalExperimentReportGridError",
+    "HistoricalExperimentReportMetricError",
+    "HistoricalExperimentReportRanking",
+    "HistoricalExperimentReportRankingError",
+    "HistoricalExperimentReportReconciliationError",
+    "HistoricalExperimentReportVariant",
+    "HistoricalExperimentReportVariantSource",
     "HistoricalExperimentRequest",
     "HistoricalExperimentResult",
     "HistoricalExperimentRun",
@@ -101,7 +125,9 @@ __all__ = [
     "InconsistentHistoricalExperimentComparisonResultError",
     "InconsistentHistoricalExperimentGridResultError",
     "InconsistentHistoricalExperimentResultError",
+    "InconsistentHistoricalExperimentReportError",
     "InvalidHistoricalExperimentGridSpecificationError",
     "InvalidHistoricalExperimentRankingPolicyError",
+    "InvalidHistoricalExperimentReportInputError",
     "InvalidHistoricalExperimentRequestError",
 ]

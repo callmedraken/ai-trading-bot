@@ -1,13 +1,29 @@
 """Public API for deterministic historical experiment comparison."""
 
+from trading_bot.experiments.comparison import (
+    HistoricalExperimentComparator,
+    HistoricalExperimentComparisonResult,
+    HistoricalExperimentRankedRun,
+    HistoricalExperimentRankingCriterion,
+    HistoricalExperimentRankingDirection,
+    HistoricalExperimentRankingMetric,
+    HistoricalExperimentRankingPolicy,
+    HistoricalExperimentTieBreaker,
+)
 from trading_bot.experiments.exceptions import (
+    HistoricalExperimentComparisonError,
+    HistoricalExperimentComparisonReconciliationError,
     HistoricalExperimentError,
     HistoricalExperimentExecutionError,
     HistoricalExperimentInitializationError,
     HistoricalExperimentIsolationError,
+    HistoricalExperimentMetricError,
+    HistoricalExperimentRankingError,
     HistoricalExperimentReconciliationError,
     HistoricalExperimentVariantError,
+    InconsistentHistoricalExperimentComparisonResultError,
     InconsistentHistoricalExperimentResultError,
+    InvalidHistoricalExperimentRankingPolicyError,
     InvalidHistoricalExperimentRequestError,
 )
 from trading_bot.experiments.historical import (
@@ -25,6 +41,10 @@ from trading_bot.experiments.historical import (
 
 __all__ = [
     "HistoricalExperimentBootstrapPosition",
+    "HistoricalExperimentComparator",
+    "HistoricalExperimentComparisonError",
+    "HistoricalExperimentComparisonReconciliationError",
+    "HistoricalExperimentComparisonResult",
     "HistoricalExperimentError",
     "HistoricalExperimentExecutionError",
     "HistoricalExperimentInitialState",
@@ -32,14 +52,24 @@ __all__ = [
     "HistoricalExperimentInitializationMode",
     "HistoricalExperimentIsolationError",
     "HistoricalExperimentMetrics",
+    "HistoricalExperimentMetricError",
+    "HistoricalExperimentRankedRun",
+    "HistoricalExperimentRankingCriterion",
+    "HistoricalExperimentRankingDirection",
+    "HistoricalExperimentRankingError",
+    "HistoricalExperimentRankingMetric",
+    "HistoricalExperimentRankingPolicy",
     "HistoricalExperimentReconciliationError",
     "HistoricalExperimentRequest",
     "HistoricalExperimentResult",
     "HistoricalExperimentRun",
     "HistoricalExperimentRunner",
     "HistoricalExperimentSimulatorFactory",
+    "HistoricalExperimentTieBreaker",
     "HistoricalExperimentVariant",
     "HistoricalExperimentVariantError",
+    "InconsistentHistoricalExperimentComparisonResultError",
     "InconsistentHistoricalExperimentResultError",
+    "InvalidHistoricalExperimentRankingPolicyError",
     "InvalidHistoricalExperimentRequestError",
 ]

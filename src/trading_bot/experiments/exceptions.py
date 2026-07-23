@@ -172,3 +172,41 @@ class InconsistentHistoricalExperimentReportError(
     HistoricalExperimentReportError, ValueError
 ):
     """Raised when a retained compact report is internally inconsistent."""
+
+
+class HistoricalExperimentPairwiseError(HistoricalExperimentError):
+    """Base exception for deterministic pairwise experiment analysis."""
+
+
+class InvalidHistoricalExperimentPairwisePolicyError(
+    HistoricalExperimentPairwiseError, ValueError
+):
+    """Raised when a pairwise comparison policy is malformed."""
+
+
+class HistoricalExperimentPairwiseReportError(
+    HistoricalExperimentPairwiseError, ValueError
+):
+    """Raised when a compact source report cannot support pairwise analysis."""
+
+
+class HistoricalExperimentPairwiseMetricError(
+    HistoricalExperimentPairwiseError, ValueError
+):
+    """Raised when a selected pairwise metric value is malformed."""
+
+
+class HistoricalExperimentPairwiseArithmeticError(HistoricalExperimentPairwiseError):
+    """Raised when exact pairwise arithmetic cannot be completed."""
+
+
+class HistoricalExperimentPairwiseReconciliationError(
+    HistoricalExperimentPairwiseError, ValueError
+):
+    """Raised when locally generated pairwise records do not reconcile."""
+
+
+class InconsistentHistoricalExperimentPairwiseResultError(
+    HistoricalExperimentPairwiseError, ValueError
+):
+    """Raised when a retained pairwise result is internally inconsistent."""

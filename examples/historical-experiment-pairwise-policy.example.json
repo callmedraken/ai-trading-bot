@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "policy": {
+    "policy_id": "00000000-0000-0000-0000-000000000440",
+    "metrics": [
+      "SIMULATION_RETURN",
+      "MAXIMUM_DRAWDOWN_PERCENTAGE"
+    ],
+    "pairing": "BASELINE_VERSUS_ALL",
+    "orientation": "CALLER_ORDER",
+    "baseline_variant_id": "2760ea8a-84b9-5619-a2df-4755e460cb20",
+    "metadata": [
+      {
+        "key": "example",
+        "value": "neutral-pairwise-comparison"
+      }
+    ]
+  }
+}

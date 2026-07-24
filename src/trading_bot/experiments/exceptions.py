@@ -210,3 +210,37 @@ class InconsistentHistoricalExperimentPairwiseResultError(
     HistoricalExperimentPairwiseError, ValueError
 ):
     """Raised when a retained pairwise result is internally inconsistent."""
+
+
+class HistoricalExperimentParetoError(HistoricalExperimentError):
+    """Base exception for deterministic Pareto experiment analysis."""
+
+
+class InvalidHistoricalExperimentParetoPolicyError(
+    HistoricalExperimentParetoError, ValueError
+):
+    """Raised when a Pareto policy is malformed."""
+
+
+class HistoricalExperimentParetoReportError(
+    HistoricalExperimentParetoError, ValueError
+):
+    """Raised when a compact source report cannot support Pareto analysis."""
+
+
+class HistoricalExperimentParetoMetricError(
+    HistoricalExperimentParetoError, ValueError
+):
+    """Raised when a selected Pareto metric value is malformed."""
+
+
+class HistoricalExperimentParetoReconciliationError(
+    HistoricalExperimentParetoError, ValueError
+):
+    """Raised when locally generated Pareto relationships do not reconcile."""
+
+
+class InconsistentHistoricalExperimentParetoResultError(
+    HistoricalExperimentParetoError, ValueError
+):
+    """Raised when a retained Pareto result is internally inconsistent."""

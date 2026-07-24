@@ -244,3 +244,62 @@ class InconsistentHistoricalExperimentParetoResultError(
     HistoricalExperimentParetoError, ValueError
 ):
     """Raised when a retained Pareto result is internally inconsistent."""
+
+
+class HistoricalExperimentWalkForwardError(HistoricalExperimentError):
+    """Base exception for walk-forward experiment evaluation."""
+
+
+class InvalidHistoricalExperimentWalkForwardRequestError(
+    HistoricalExperimentWalkForwardError, ValueError
+):
+    """Raised when a walk-forward request or policy is malformed."""
+
+
+class HistoricalExperimentWalkForwardFoldError(HistoricalExperimentWalkForwardError):
+    """Raised when one fold fails at a known execution stage."""
+
+    def __init__(
+        self,
+        fold_ordinal: int,
+        fold_id: UUID,
+        stage: str,
+        message: str,
+        *,
+        cause: BaseException | None = None,
+    ) -> None:
+        self.fold_ordinal = fold_ordinal
+        self.fold_id = fold_id
+        self.stage = stage
+        self.cause = cause
+        super().__init__(message)
+
+
+class HistoricalExperimentWalkForwardDataError(
+    HistoricalExperimentWalkForwardError, ValueError
+):
+    """Raised when a fold's historical slice or schedule is invalid."""
+
+
+class HistoricalExperimentWalkForwardSelectionError(
+    HistoricalExperimentWalkForwardError, ValueError
+):
+    """Raised when training output cannot certify rank-one selection."""
+
+
+class HistoricalExperimentWalkForwardExecutionError(
+    HistoricalExperimentWalkForwardError
+):
+    """Raised when a child experiment, comparison, or report fails."""
+
+
+class HistoricalExperimentWalkForwardReconciliationError(
+    HistoricalExperimentWalkForwardError, ValueError
+):
+    """Raised when generated walk-forward provenance does not reconcile."""
+
+
+class InconsistentHistoricalExperimentWalkForwardResultError(
+    HistoricalExperimentWalkForwardError, ValueError
+):
+    """Raised when a retained walk-forward result is inconsistent."""

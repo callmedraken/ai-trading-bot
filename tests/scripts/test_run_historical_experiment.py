@@ -12,6 +12,7 @@ EXAMPLE = ROOT / "examples" / "historical-experiment.example.json"
 PAIRWISE_POLICY = (
     ROOT / "examples" / "historical-experiment-pairwise-policy.example.json"
 )
+PARETO_POLICY = ROOT / "examples" / "historical-experiment-pareto-policy.example.json"
 
 
 def _command(*extra: str) -> list[str]:
@@ -116,3 +117,29 @@ def test_documented_pairwise_output_invocation_succeeds(tmp_path: Path) -> None:
     assert f"  CSV: {pairwise_csv.resolve()}" in completed.stdout
     assert json.loads(pairwise_json.read_text(encoding="utf-8"))["schema_version"] == 1
     assert pairwise_csv.read_text(encoding="utf-8").startswith("pairwise_result_id,")
+
+
+def test_documented_pareto_output_invocation_succeeds(tmp_path: Path) -> None:
+    output_json = tmp_path / "pareto.json"
+    output_csv = tmp_path / "pareto.csv"
+    completed = subprocess.run(
+        _command(
+            "--pareto-policy",
+            str(PARETO_POLICY),
+            "--pareto-json",
+            str(output_json),
+            "--pareto-json-pretty",
+            "--pareto-csv",
+            str(output_csv),
+        ),
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert "Pareto analysis:" in completed.stdout
+    assert "  frontier count: 4" in completed.stdout
+    assert "Compact report:" not in completed.stdout
+    assert "Pareto artifacts:" in completed.stdout
+    assert json.loads(output_json.read_text(encoding="utf-8"))["schema_version"] == 1
+    assert output_csv.read_text(encoding="utf-8").startswith("row_type,")

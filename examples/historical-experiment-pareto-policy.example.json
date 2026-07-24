@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "policy": {
+    "policy_id": "00000000-0000-0000-0000-000000000450",
+    "objectives": [
+      {"metric": "SIMULATION_RETURN", "direction": "DESCENDING"},
+      {"metric": "MAXIMUM_DRAWDOWN_PERCENTAGE", "direction": "ASCENDING"}
+    ],
+    "metadata": [{"key": "example", "value": "neutral-pareto-analysis"}]
+  }
+}

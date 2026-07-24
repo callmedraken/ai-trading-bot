@@ -20,6 +20,7 @@ from trading_bot.cli.exceptions import (
     HistoricalExperimentExecutionCliError,
     HistoricalExperimentInitializationCliError,
     HistoricalExperimentPairwiseOutputError,
+    HistoricalExperimentParetoOutputError,
     HistoricalExperimentReportOutputError,
 )
 from trading_bot.cli.historical_experiment_config import (
@@ -32,6 +33,13 @@ from trading_bot.cli.historical_experiment_pairwise_config import (
 from trading_bot.cli.historical_experiment_pairwise_serialization import (
     serialize_pairwise_csv,
     serialize_pairwise_json,
+)
+from trading_bot.cli.historical_experiment_pareto_config import (
+    load_historical_experiment_pareto_policy,
+)
+from trading_bot.cli.historical_experiment_pareto_serialization import (
+    serialize_pareto_csv,
+    serialize_pareto_json,
 )
 from trading_bot.cli.historical_experiment_report_serialization import (
     serialize_compact_report_csv,
@@ -65,6 +73,9 @@ from trading_bot.experiments import (
     HistoricalExperimentPairwiseComparator,
     HistoricalExperimentPairwiseError,
     HistoricalExperimentPairwiseResult,
+    HistoricalExperimentParetoAnalyzer,
+    HistoricalExperimentParetoError,
+    HistoricalExperimentParetoResult,
     HistoricalExperimentReconciliationError,
     HistoricalExperimentReport,
     HistoricalExperimentReportBuilder,
@@ -90,6 +101,7 @@ _BOOTSTRAP_NAMESPACE = UUID("8777c17e-0c37-55f8-bf91-a8cd307b73c8")
 _BOOTSTRAP_VERSION = "historical-experiment-cli-bootstrap-v1"
 _runner_type = HistoricalExperimentRunner
 _pairwise_comparator_type = HistoricalExperimentPairwiseComparator
+_pareto_analyzer_type = HistoricalExperimentParetoAnalyzer
 _comparator_type = HistoricalExperimentComparator
 _grid_generator_type = HistoricalExperimentGridGenerator
 _coordinator_type = CoordinatingHistoricalDataProvider
@@ -175,6 +187,7 @@ class HistoricalExperimentCliRunResult:
     comparison: HistoricalExperimentComparisonResult | None
     compact_report: HistoricalExperimentReport | None
     pairwise_result: HistoricalExperimentPairwiseResult | None
+    pareto_result: HistoricalExperimentParetoResult | None
     factory: _ExperimentSimulatorFactory
     summary: str
 
@@ -193,6 +206,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--pairwise-json", type=Path)
     parser.add_argument("--pairwise-json-pretty", action="store_true")
     parser.add_argument("--pairwise-csv", type=Path)
+    parser.add_argument("--pareto-policy", type=Path)
+    parser.add_argument("--pareto-json", type=Path)
+    parser.add_argument("--pareto-json-pretty", action="store_true")
+    parser.add_argument("--pareto-csv", type=Path)
     parser.add_argument("--overwrite", action="store_true")
     parser.add_argument("--quiet", action="store_true")
     return parser
@@ -204,6 +221,7 @@ def run_cli(
     collect_audit_records: bool = True,
     build_compact_report: bool = False,
     pairwise_policy_path: Path | None = None,
+    pareto_policy_path: Path | None = None,
 ) -> HistoricalExperimentCliRunResult:
     """Load local history once and invoke one experiment runner once."""
     config = load_historical_experiment_config(config_path)
@@ -211,6 +229,11 @@ def run_cli(
         None
         if pairwise_policy_path is None
         else load_historical_experiment_pairwise_policy(pairwise_policy_path)
+    )
+    loaded_pareto_policy = (
+        None
+        if pareto_policy_path is None
+        else load_historical_experiment_pareto_policy(pareto_policy_path)
     )
     grid_result = None
     if config.grid_specification is None:
@@ -297,7 +320,11 @@ def run_cli(
             ) from error
     compact_report = None
     pairwise_result = None
-    report_required = build_compact_report or loaded_pairwise_policy is not None
+    report_required = (
+        build_compact_report
+        or loaded_pairwise_policy is not None
+        or loaded_pareto_policy is not None
+    )
     if report_required:
         try:
             compact_report = _report_builder_type().build(
@@ -320,6 +347,16 @@ def run_cli(
             raise HistoricalExperimentExecutionCliError(
                 f"pairwise comparison failed: {error}"
             ) from error
+    pareto_result = None
+    if loaded_pareto_policy is not None:
+        try:
+            pareto_result = _pareto_analyzer_type().analyze(
+                compact_report, loaded_pareto_policy.policy
+            )
+        except HistoricalExperimentParetoError as error:
+            raise HistoricalExperimentExecutionCliError(
+                f"Pareto analysis failed: {error}"
+            ) from error
     summary = ""
     if grid_result is not None:
         summary += _format_grid_summary(grid_result)
@@ -328,6 +365,8 @@ def run_cli(
         summary += _format_ranked_summary(comparison)
     if pairwise_result is not None:
         summary += _format_pairwise_summary(pairwise_result)
+    if pareto_result is not None:
+        summary += _format_pareto_summary(pareto_result)
     return HistoricalExperimentCliRunResult(
         config,
         grid_result,
@@ -336,9 +375,27 @@ def run_cli(
         comparison,
         compact_report,
         pairwise_result,
+        pareto_result,
         factory,
         summary,
     )
+
+
+def _format_pareto_summary(result: HistoricalExperimentParetoResult) -> str:
+    lines = [
+        "Pareto analysis:",
+        f"  result ID: {result.result_id}",
+        f"  policy ID: {result.policy.policy_id}",
+        "  objectives:",
+        *(
+            f"    {index}. {item.metric.value} | {item.direction.value}"
+            for index, item in enumerate(result.policy.objectives, start=1)
+        ),
+        f"  variant count: {len(result.variants)}",
+        f"  frontier count: {len(result.frontier_variant_ids)}",
+        f"  dominance record count: {len(result.dominance_records)}",
+    ]
+    return "\n".join(lines) + "\n"
 
 
 def _format_pairwise_summary(
@@ -503,6 +560,8 @@ def _normalized_destinations(
     Path | None,
     Path | None,
     Path | None,
+    Path | None,
+    Path | None,
 ]:
     return tuple(
         None if value is None else value.resolve(strict=False)
@@ -512,6 +571,8 @@ def _normalized_destinations(
             args.compact_csv,
             args.pairwise_json,
             args.pairwise_csv,
+            args.pareto_json,
+            args.pareto_csv,
         )
     )  # type: ignore[return-value]
 
@@ -603,6 +664,15 @@ def _pairwise_success(
     return "\n".join(lines) + "\n"
 
 
+def _pareto_success(pareto_json: Path | None, pareto_csv: Path | None) -> str:
+    lines = ["Pareto artifacts:"]
+    if pareto_json is not None:
+        lines.append(f"  JSON: {pareto_json}")
+    if pareto_csv is not None:
+        lines.append(f"  CSV: {pareto_csv}")
+    return "\n".join(lines) + "\n"
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -616,18 +686,32 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--pairwise-csv requires --pairwise-policy")
     if args.pairwise_json_pretty and args.pairwise_json is None:
         parser.error("--pairwise-json-pretty requires --pairwise-json")
+    if args.pareto_json is not None and args.pareto_policy is None:
+        parser.error("--pareto-json requires --pareto-policy")
+    if args.pareto_csv is not None and args.pareto_policy is None:
+        parser.error("--pareto-csv requires --pareto-policy")
+    if args.pareto_json_pretty and args.pareto_json is None:
+        parser.error("--pareto-json-pretty requires --pareto-json")
     requested = (
         args.output,
         args.compact_json,
         args.compact_csv,
         args.pairwise_json,
         args.pairwise_csv,
+        args.pareto_json,
+        args.pareto_csv,
     )
     if args.overwrite and not any(value is not None for value in requested):
         parser.error("--overwrite requires an output destination")
-    output, compact_json, compact_csv, pairwise_json, pairwise_csv = (
-        _normalized_destinations(args)
-    )
+    (
+        output,
+        compact_json,
+        compact_csv,
+        pairwise_json,
+        pairwise_csv,
+        pareto_json,
+        pareto_csv,
+    ) = _normalized_destinations(args)
     destinations = tuple(
         value
         for value in (
@@ -636,6 +720,8 @@ def main(argv: list[str] | None = None) -> int:
             compact_csv,
             pairwise_json,
             pairwise_csv,
+            pareto_json,
+            pareto_csv,
         )
         if value is not None
     )
@@ -649,6 +735,7 @@ def main(argv: list[str] | None = None) -> int:
             collect_audit_records=output is not None,
             build_compact_report=compact_requested,
             pairwise_policy_path=args.pairwise_policy,
+            pareto_policy_path=args.pareto_policy,
         )
         artifacts = []
         if output is not None:
@@ -704,6 +791,23 @@ def main(argv: list[str] | None = None) -> int:
                     serialize_pairwise_csv(run.pairwise_result),
                 )
             )
+        if args.pareto_policy is not None and run.pareto_result is None:
+            raise HistoricalExperimentParetoOutputError(
+                "requested Pareto result was not built"
+            )
+        if pareto_json is not None:
+            artifacts.append(
+                _OutputArtifact(
+                    pareto_json,
+                    serialize_pareto_json(
+                        run.pareto_result, pretty=args.pareto_json_pretty
+                    ),
+                )
+            )
+        if pareto_csv is not None:
+            artifacts.append(
+                _OutputArtifact(pareto_csv, serialize_pareto_csv(run.pareto_result))
+            )
         _write_artifacts(tuple(artifacts), overwrite=args.overwrite)
     except (ConfigReadError, ConfigJsonError) as error:
         print(f"error: {error}", file=sys.stderr)
@@ -720,6 +824,7 @@ def main(argv: list[str] | None = None) -> int:
     except (
         HistoricalExperimentAuditError,
         HistoricalExperimentPairwiseOutputError,
+        HistoricalExperimentParetoOutputError,
         HistoricalExperimentReportOutputError,
         AuditOutputError,
     ) as error:
@@ -734,4 +839,6 @@ def main(argv: list[str] | None = None) -> int:
             )
         if pairwise_json is not None or pairwise_csv is not None:
             print(_pairwise_success(pairwise_json, pairwise_csv), end="")
+        if pareto_json is not None or pareto_csv is not None:
+            print(_pareto_success(pareto_json, pareto_csv), end="")
     return 0

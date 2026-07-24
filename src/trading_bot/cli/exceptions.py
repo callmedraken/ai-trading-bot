@@ -108,3 +108,7 @@ class HistoricalExperimentReportOutputError(HistoricalExperimentCliError):
 
 class HistoricalExperimentPairwiseOutputError(HistoricalExperimentCliError):
     """Raised when pairwise output cannot be serialized."""
+
+
+class HistoricalExperimentParetoOutputError(HistoricalExperimentCliError):
+    """Raised when Pareto output cannot be serialized."""

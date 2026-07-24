@@ -1,0 +1,65 @@
+{
+  "pareto_result": {
+    "dominance_records": [],
+    "frontier_variant_ids": [
+      "2760ea8a-84b9-5619-a2df-4755e460cb20",
+      "a3f9e1e2-d22c-5ada-b66e-eb3bf01c52ad",
+      "310a50df-5817-5fc8-80b6-c6284f7d46f1",
+      "416e5528-c33e-5d60-a311-c6fba4e7a403"
+    ],
+    "policy": {
+      "metadata": [
+        {
+          "key": "example",
+          "value": "neutral-pareto-analysis"
+        }
+      ],
+      "objectives": [
+        {
+          "direction": "DESCENDING",
+          "metric": "SIMULATION_RETURN"
+        },
+        {
+          "direction": "ASCENDING",
+          "metric": "MAXIMUM_DRAWDOWN_PERCENTAGE"
+        }
+      ],
+      "policy_id": "00000000-0000-0000-0000-000000000450"
+    },
+    "result_id": "6f2cc66f-2d96-5896-ad71-2f9d2af83ecf",
+    "source_report_id": "9140ef57-0777-5434-9005-1fa20b2c681f",
+    "variants": [
+      {
+        "caller_ordinal": 0,
+        "dominated_by_variant_ids": [],
+        "dominates_variant_ids": [],
+        "is_nondominated": true,
+        "variant_id": "2760ea8a-84b9-5619-a2df-4755e460cb20"
+      },
+      {
+        "caller_ordinal": 1,
+        "dominated_by_variant_ids": [],
+        "dominates_variant_ids": [],
+        "is_nondominated": true,
+        "variant_id": "a3f9e1e2-d22c-5ada-b66e-eb3bf01c52ad"
+      },
+      {
+        "caller_ordinal": 2,
+        "dominated_by_variant_ids": [],
+        "dominates_variant_ids": [],
+        "is_nondominated": true,
+        "variant_id": "310a50df-5817-5fc8-80b6-c6284f7d46f1"
+      },
+      {
+        "caller_ordinal": 3,
+        "dominated_by_variant_ids": [],
+        "dominates_variant_ids": [],
+        "is_nondominated": true,
+        "variant_id": "416e5528-c33e-5d60-a311-c6fba4e7a403"
+      }
+    ]
+  },
+  "schema_version": 1
+}
+
+

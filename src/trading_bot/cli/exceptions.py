@@ -104,3 +104,7 @@ class HistoricalExperimentAuditError(HistoricalExperimentCliError):
 
 class HistoricalExperimentReportOutputError(HistoricalExperimentCliError):
     """Raised when compact report output cannot be serialized or written."""
+
+
+class HistoricalExperimentPairwiseOutputError(HistoricalExperimentCliError):
+    """Raised when pairwise output cannot be serialized."""

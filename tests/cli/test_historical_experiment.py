@@ -30,6 +30,9 @@ from trading_bot.market_data import CoordinatingHistoricalDataProvider
 
 ROOT = Path(__file__).resolve().parents[2]
 EXAMPLE = ROOT / "examples" / "historical-experiment.example.json"
+PAIRWISE_POLICY = (
+    ROOT / "examples" / "historical-experiment-pairwise-policy.example.json"
+)
 FIXTURES = ROOT / "tests" / "fixtures" / "cli"
 
 
@@ -64,6 +67,96 @@ def _write_config(tmp_path: Path, raw: dict) -> Path:
     path = tmp_path / "experiment.json"
     path.write_text(json.dumps(raw), encoding="utf-8")
     return path
+
+
+def test_pairwise_policy_builds_one_private_report_and_retains_result(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    report_calls = 0
+    comparison_calls = 0
+    report_type = historical_experiment._report_builder_type
+    comparator_type = historical_experiment._pairwise_comparator_type
+
+    class CountingReportBuilder:
+        def build(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+            nonlocal report_calls
+            report_calls += 1
+            return report_type().build(*args, **kwargs)
+
+    class CountingPairwiseComparator:
+        def compare(self, report, policy):  # type: ignore[no-untyped-def]
+            nonlocal comparison_calls
+            comparison_calls += 1
+            return comparator_type().compare(report, policy)
+
+    monkeypatch.setattr(
+        historical_experiment, "_report_builder_type", CountingReportBuilder
+    )
+    monkeypatch.setattr(
+        historical_experiment,
+        "_pairwise_comparator_type",
+        CountingPairwiseComparator,
+    )
+    run = historical_experiment.run_cli(
+        EXAMPLE,
+        collect_audit_records=False,
+        pairwise_policy_path=PAIRWISE_POLICY,
+    )
+    assert report_calls == comparison_calls == 1
+    assert run.compact_report is not None
+    assert run.pairwise_result is not None
+    assert run.pairwise_result.source_report_id == run.compact_report.report_id
+    assert "Pairwise comparison:" in run.summary
+    assert "record count: 3" in run.summary
+
+
+def test_no_pairwise_behavior_preserves_lazy_report_path() -> None:
+    run = historical_experiment.run_cli(EXAMPLE, collect_audit_records=False)
+    assert run.compact_report is None
+    assert run.pairwise_result is None
+    assert "Pairwise comparison:" not in run.summary
+
+
+def test_policy_only_mode_prints_summary_without_artifact_blocks(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    assert (
+        historical_experiment.main(
+            [
+                "--config",
+                str(EXAMPLE),
+                "--pairwise-policy",
+                str(PAIRWISE_POLICY),
+            ]
+        )
+        == 0
+    )
+    output = capsys.readouterr().out
+    assert "Pairwise comparison:" in output
+    assert "Compact report:" not in output
+    assert "Pairwise artifacts:" not in output
+
+
+def test_pairwise_destinations_join_normalized_collision_check(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    destination = tmp_path / "same.json"
+    with pytest.raises(SystemExit) as caught:
+        historical_experiment.main(
+            [
+                "--config",
+                str(EXAMPLE),
+                "--pairwise-policy",
+                str(PAIRWISE_POLICY),
+                "--output",
+                str(destination),
+                "--pairwise-json",
+                str(tmp_path / "." / "same.json"),
+            ]
+        )
+    assert caught.value.code == 2
+    assert "pairwise distinct" in capsys.readouterr().err
 
 
 def test_checked_in_example_parses_exact_ordered_domain_models() -> None:

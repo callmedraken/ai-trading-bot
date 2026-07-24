@@ -19,11 +19,19 @@ from trading_bot.cli.exceptions import (
     HistoricalExperimentDataError,
     HistoricalExperimentExecutionCliError,
     HistoricalExperimentInitializationCliError,
+    HistoricalExperimentPairwiseOutputError,
     HistoricalExperimentReportOutputError,
 )
 from trading_bot.cli.historical_experiment_config import (
     LoadedHistoricalExperimentConfig,
     load_historical_experiment_config,
+)
+from trading_bot.cli.historical_experiment_pairwise_config import (
+    load_historical_experiment_pairwise_policy,
+)
+from trading_bot.cli.historical_experiment_pairwise_serialization import (
+    serialize_pairwise_csv,
+    serialize_pairwise_json,
 )
 from trading_bot.cli.historical_experiment_report_serialization import (
     serialize_compact_report_csv,
@@ -54,6 +62,9 @@ from trading_bot.experiments import (
     HistoricalExperimentInitializationError,
     HistoricalExperimentInitialState,
     HistoricalExperimentIsolationError,
+    HistoricalExperimentPairwiseComparator,
+    HistoricalExperimentPairwiseError,
+    HistoricalExperimentPairwiseResult,
     HistoricalExperimentReconciliationError,
     HistoricalExperimentReport,
     HistoricalExperimentReportBuilder,
@@ -78,6 +89,7 @@ from trading_bot.simulation import OptimizedPaperPortfolioSimulator
 _BOOTSTRAP_NAMESPACE = UUID("8777c17e-0c37-55f8-bf91-a8cd307b73c8")
 _BOOTSTRAP_VERSION = "historical-experiment-cli-bootstrap-v1"
 _runner_type = HistoricalExperimentRunner
+_pairwise_comparator_type = HistoricalExperimentPairwiseComparator
 _comparator_type = HistoricalExperimentComparator
 _grid_generator_type = HistoricalExperimentGridGenerator
 _coordinator_type = CoordinatingHistoricalDataProvider
@@ -162,6 +174,7 @@ class HistoricalExperimentCliRunResult:
     result: HistoricalExperimentResult
     comparison: HistoricalExperimentComparisonResult | None
     compact_report: HistoricalExperimentReport | None
+    pairwise_result: HistoricalExperimentPairwiseResult | None
     factory: _ExperimentSimulatorFactory
     summary: str
 
@@ -176,6 +189,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--compact-json", type=Path)
     parser.add_argument("--compact-json-pretty", action="store_true")
     parser.add_argument("--compact-csv", type=Path)
+    parser.add_argument("--pairwise-policy", type=Path)
+    parser.add_argument("--pairwise-json", type=Path)
+    parser.add_argument("--pairwise-json-pretty", action="store_true")
+    parser.add_argument("--pairwise-csv", type=Path)
     parser.add_argument("--overwrite", action="store_true")
     parser.add_argument("--quiet", action="store_true")
     return parser
@@ -186,9 +203,15 @@ def run_cli(
     *,
     collect_audit_records: bool = True,
     build_compact_report: bool = False,
+    pairwise_policy_path: Path | None = None,
 ) -> HistoricalExperimentCliRunResult:
     """Load local history once and invoke one experiment runner once."""
     config = load_historical_experiment_config(config_path)
+    loaded_pairwise_policy = (
+        None
+        if pairwise_policy_path is None
+        else load_historical_experiment_pairwise_policy(pairwise_policy_path)
+    )
     grid_result = None
     if config.grid_specification is None:
         variants = config.explicit_variants
@@ -273,7 +296,9 @@ def run_cli(
                 f"comparison failed: {error}"
             ) from error
     compact_report = None
-    if build_compact_report:
+    pairwise_result = None
+    report_required = build_compact_report or loaded_pairwise_policy is not None
+    if report_required:
         try:
             compact_report = _report_builder_type().build(
                 result,
@@ -285,12 +310,24 @@ def run_cli(
             raise HistoricalExperimentExecutionCliError(
                 f"compact report construction failed: {error}"
             ) from error
+    if loaded_pairwise_policy is not None:
+        try:
+            pairwise_result = _pairwise_comparator_type().compare(
+                compact_report,
+                loaded_pairwise_policy.policy,
+            )
+        except HistoricalExperimentPairwiseError as error:
+            raise HistoricalExperimentExecutionCliError(
+                f"pairwise comparison failed: {error}"
+            ) from error
     summary = ""
     if grid_result is not None:
         summary += _format_grid_summary(grid_result)
     summary += _format_summary(result)
     if comparison is not None:
         summary += _format_ranked_summary(comparison)
+    if pairwise_result is not None:
+        summary += _format_pairwise_summary(pairwise_result)
     return HistoricalExperimentCliRunResult(
         config,
         grid_result,
@@ -298,9 +335,30 @@ def run_cli(
         result,
         comparison,
         compact_report,
+        pairwise_result,
         factory,
         summary,
     )
+
+
+def _format_pairwise_summary(
+    result: HistoricalExperimentPairwiseResult,
+) -> str:
+    policy = result.policy
+    lines = [
+        "Pairwise comparison:",
+        f"  result ID: {result.result_id}",
+        f"  policy ID: {policy.policy_id}",
+        f"  pairing: {policy.pairing.value}",
+        f"  orientation: {policy.orientation.value}",
+        "  metrics:",
+        *(
+            f"    {index}. {metric.value}"
+            for index, metric in enumerate(policy.metrics, start=1)
+        ),
+        f"  record count: {len(result.records)}",
+    ]
+    return "\n".join(lines) + "\n"
 
 
 def _format_grid_summary(result: HistoricalExperimentGridResult) -> str:
@@ -437,10 +495,24 @@ class _OutputArtifact:
     content: str
 
 
-def _normalized_destinations(args) -> tuple[Path | None, Path | None, Path | None]:  # type: ignore[no-untyped-def]
+def _normalized_destinations(
+    args,  # type: ignore[no-untyped-def]
+) -> tuple[
+    Path | None,
+    Path | None,
+    Path | None,
+    Path | None,
+    Path | None,
+]:
     return tuple(
         None if value is None else value.resolve(strict=False)
-        for value in (args.output, args.compact_json, args.compact_csv)
+        for value in (
+            args.output,
+            args.compact_json,
+            args.compact_csv,
+            args.pairwise_json,
+            args.pairwise_csv,
+        )
     )  # type: ignore[return-value]
 
 
@@ -519,6 +591,18 @@ def _compact_success(
     return "\n".join(lines) + "\n"
 
 
+def _pairwise_success(
+    pairwise_json: Path | None,
+    pairwise_csv: Path | None,
+) -> str:
+    lines = ["Pairwise artifacts:"]
+    if pairwise_json is not None:
+        lines.append(f"  JSON: {pairwise_json}")
+    if pairwise_csv is not None:
+        lines.append(f"  CSV: {pairwise_csv}")
+    return "\n".join(lines) + "\n"
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -526,12 +610,34 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--pretty requires --output")
     if args.compact_json_pretty and args.compact_json is None:
         parser.error("--compact-json-pretty requires --compact-json")
-    requested = (args.output, args.compact_json, args.compact_csv)
+    if args.pairwise_json is not None and args.pairwise_policy is None:
+        parser.error("--pairwise-json requires --pairwise-policy")
+    if args.pairwise_csv is not None and args.pairwise_policy is None:
+        parser.error("--pairwise-csv requires --pairwise-policy")
+    if args.pairwise_json_pretty and args.pairwise_json is None:
+        parser.error("--pairwise-json-pretty requires --pairwise-json")
+    requested = (
+        args.output,
+        args.compact_json,
+        args.compact_csv,
+        args.pairwise_json,
+        args.pairwise_csv,
+    )
     if args.overwrite and not any(value is not None for value in requested):
         parser.error("--overwrite requires an output destination")
-    output, compact_json, compact_csv = _normalized_destinations(args)
+    output, compact_json, compact_csv, pairwise_json, pairwise_csv = (
+        _normalized_destinations(args)
+    )
     destinations = tuple(
-        value for value in (output, compact_json, compact_csv) if value is not None
+        value
+        for value in (
+            output,
+            compact_json,
+            compact_csv,
+            pairwise_json,
+            pairwise_csv,
+        )
+        if value is not None
     )
     if len(set(destinations)) != len(destinations):
         parser.error("output destinations must be pairwise distinct")
@@ -542,6 +648,7 @@ def main(argv: list[str] | None = None) -> int:
             args.config,
             collect_audit_records=output is not None,
             build_compact_report=compact_requested,
+            pairwise_policy_path=args.pairwise_policy,
         )
         artifacts = []
         if output is not None:
@@ -576,6 +683,27 @@ def main(argv: list[str] | None = None) -> int:
                     _compact_csv_serializer(run.compact_report),
                 )
             )
+        if args.pairwise_policy is not None and run.pairwise_result is None:
+            raise HistoricalExperimentPairwiseOutputError(
+                "requested pairwise result was not built"
+            )
+        if pairwise_json is not None:
+            artifacts.append(
+                _OutputArtifact(
+                    pairwise_json,
+                    serialize_pairwise_json(
+                        run.pairwise_result,
+                        pretty=args.pairwise_json_pretty,
+                    ),
+                )
+            )
+        if pairwise_csv is not None:
+            artifacts.append(
+                _OutputArtifact(
+                    pairwise_csv,
+                    serialize_pairwise_csv(run.pairwise_result),
+                )
+            )
         _write_artifacts(tuple(artifacts), overwrite=args.overwrite)
     except (ConfigReadError, ConfigJsonError) as error:
         print(f"error: {error}", file=sys.stderr)
@@ -591,6 +719,7 @@ def main(argv: list[str] | None = None) -> int:
         return 6
     except (
         HistoricalExperimentAuditError,
+        HistoricalExperimentPairwiseOutputError,
         HistoricalExperimentReportOutputError,
         AuditOutputError,
     ) as error:
@@ -598,9 +727,11 @@ def main(argv: list[str] | None = None) -> int:
         return 7
     if not args.quiet:
         print(run.summary, end="")
-        if run.compact_report is not None:
+        if compact_requested:
             print(
                 _compact_success(run.compact_report, compact_json, compact_csv),
                 end="",
             )
+        if pairwise_json is not None or pairwise_csv is not None:
+            print(_pairwise_success(pairwise_json, pairwise_csv), end="")
     return 0

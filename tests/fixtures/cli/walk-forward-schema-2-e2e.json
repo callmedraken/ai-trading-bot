@@ -1,0 +1,226 @@
+{
+  "schema_version": 2,
+  "request_id": "00000000-0000-0000-0000-000000000600",
+  "historical_data": {
+    "symbols": ["SPY"],
+    "sources": [
+      {
+        "symbol": "SPY",
+        "path": "../market_data/walk-forward-e2e/SPY.csv"
+      }
+    ],
+    "start": "2026-01-01T20:00:00+00:00",
+    "end": "2026-01-10T20:00:00+00:00",
+    "timeframe": "1D",
+    "adjustment": "RAW",
+    "missing_bar_policy": "INTERSECTION",
+    "source_label": "walk-forward-schema-2-e2e"
+  },
+  "initial_state": {
+    "mode": "CASH_ONLY",
+    "as_of": "2026-01-01T19:00:00+00:00",
+    "available_cash": "10000",
+    "bootstrap_commission": "0",
+    "bootstrap_positions": []
+  },
+  "variants": [
+    {
+      "variant_id": "00000000-0000-0000-0000-000000000601",
+      "name": "E2E Candidate One",
+      "rolling_window": {"observation_count": 3},
+      "scenario": {
+        "price_field": "CLOSE",
+        "return_method": "SIMPLE",
+        "window_policy": "ALL_SUPPLIED",
+        "cash_return": "0",
+        "source_name": "walk-forward-e2e-one"
+      },
+      "execution_prices": {
+        "risk_price_field": "CLOSE",
+        "fill_reference_price_field": "CLOSE"
+      },
+      "timing": {
+        "submission_offset_microseconds": 60000000,
+        "fill_offset_microseconds": 120000000
+      },
+      "optimization": {
+        "confidence_level": "0.75",
+        "minimum_expected_return": null,
+        "solver_tolerance": "0.00000001",
+        "maximum_iterations": null,
+        "output_quantum": "0.00000001",
+        "risk_aversion": "1"
+      },
+      "portfolio_constraints": {
+        "minimum_cash_weight": "0",
+        "maximum_cash_weight": "1",
+        "maximum_position_weight": "0.60",
+        "maximum_one_way_rebalance_turnover": null,
+        "minimum_position_weight": null,
+        "long_only": true,
+        "allow_leverage": false
+      },
+      "rebalance": {
+        "assumptions": {
+          "fixed_commission": "0",
+          "allow_fractional_quantities": true,
+          "quantity_increment": "0.001",
+          "minimum_trade_notional": "0",
+          "minimum_trade_quantity": "0",
+          "target_weight_tolerance": "0",
+          "additional_execution_cash_buffer": "0",
+          "use_planned_sell_proceeds": true
+        },
+        "proposal_policy": {"allow_partial_plans": true},
+        "proposal_confidence": null
+      },
+      "risk": {
+        "limits": {
+          "max_position_percent": "0.60",
+          "max_total_exposure_percent": "1",
+          "max_order_notional": null,
+          "max_new_position_percent": null,
+          "minimum_cash_reserve_percent": "0",
+          "allow_fractional_shares": true,
+          "fractional_increment": "0.001",
+          "allow_buying": true,
+          "allow_selling": true,
+          "estimated_commission": "0"
+        },
+        "policy": {"allow_sell_proceeds_for_later_buys": false}
+      },
+      "fills": {"slippage_basis_points": "0", "fixed_commission": "0"},
+      "trading_enabled": true,
+      "metadata": [{"key": "candidate", "value": "one"}]
+    },
+    {
+      "variant_id": "00000000-0000-0000-0000-000000000602",
+      "name": "E2E Candidate Two",
+      "rolling_window": {"observation_count": 3},
+      "scenario": {
+        "price_field": "CLOSE",
+        "return_method": "SIMPLE",
+        "window_policy": "ALL_SUPPLIED",
+        "cash_return": "0",
+        "source_name": "walk-forward-e2e-two"
+      },
+      "execution_prices": {
+        "risk_price_field": "CLOSE",
+        "fill_reference_price_field": "CLOSE"
+      },
+      "timing": {
+        "submission_offset_microseconds": 60000000,
+        "fill_offset_microseconds": 120000000
+      },
+      "optimization": {
+        "confidence_level": "0.75",
+        "minimum_expected_return": null,
+        "solver_tolerance": "0.00000001",
+        "maximum_iterations": null,
+        "output_quantum": "0.00000001",
+        "risk_aversion": "2"
+      },
+      "portfolio_constraints": {
+        "minimum_cash_weight": "0",
+        "maximum_cash_weight": "1",
+        "maximum_position_weight": "0.60",
+        "maximum_one_way_rebalance_turnover": null,
+        "minimum_position_weight": null,
+        "long_only": true,
+        "allow_leverage": false
+      },
+      "rebalance": {
+        "assumptions": {
+          "fixed_commission": "0",
+          "allow_fractional_quantities": true,
+          "quantity_increment": "0.001",
+          "minimum_trade_notional": "0",
+          "minimum_trade_quantity": "0",
+          "target_weight_tolerance": "0",
+          "additional_execution_cash_buffer": "0",
+          "use_planned_sell_proceeds": true
+        },
+        "proposal_policy": {"allow_partial_plans": true},
+        "proposal_confidence": null
+      },
+      "risk": {
+        "limits": {
+          "max_position_percent": "0.60",
+          "max_total_exposure_percent": "1",
+          "max_order_notional": null,
+          "max_new_position_percent": null,
+          "minimum_cash_reserve_percent": "0",
+          "allow_fractional_shares": true,
+          "fractional_increment": "0.001",
+          "allow_buying": true,
+          "allow_selling": true,
+          "estimated_commission": "0"
+        },
+        "policy": {"allow_sell_proceeds_for_later_buys": false}
+      },
+      "fills": {"slippage_basis_points": "0", "fixed_commission": "0"},
+      "trading_enabled": true,
+      "metadata": [{"key": "candidate", "value": "two"}]
+    }
+  ],
+  "folds": [
+    {
+      "fold_id": "00000000-0000-0000-0000-000000000610",
+      "training_start": "2026-01-01T20:00:00+00:00",
+      "training_end": "2026-01-04T20:00:00+00:00",
+      "test_start": "2026-01-04T20:00:00+00:00",
+      "test_end": "2026-01-07T20:00:00+00:00",
+      "training_rebalance_timestamps": ["2026-01-03T20:00:00+00:00"],
+      "test_rebalance_timestamps": ["2026-01-06T20:00:00+00:00"],
+      "metadata": [{"key": "fold", "value": "one"}]
+    },
+    {
+      "fold_id": "00000000-0000-0000-0000-000000000611",
+      "training_start": "2026-01-04T20:00:00+00:00",
+      "training_end": "2026-01-07T20:00:00+00:00",
+      "test_start": "2026-01-07T20:00:00+00:00",
+      "test_end": "2026-01-10T20:00:00+00:00",
+      "training_rebalance_timestamps": ["2026-01-06T20:00:00+00:00"],
+      "test_rebalance_timestamps": ["2026-01-09T20:00:00+00:00"],
+      "metadata": [{"key": "fold", "value": "two"}]
+    }
+  ],
+  "selection_policy": {
+    "policy_id": "00000000-0000-0000-0000-000000000620",
+    "ranking_policy": {
+      "policy_id": "00000000-0000-0000-0000-000000000621",
+      "criteria": [
+        {"metric": "FINAL_EQUITY", "direction": "DESCENDING"}
+      ],
+      "tie_breaker": "CALLER_ORDER",
+      "metadata": [{"key": "purpose", "value": "e2e-selection"}]
+    },
+    "metadata": [{"key": "purpose", "value": "e2e-selection"}]
+  },
+  "aggregate_policy": {
+    "policy_id": "00000000-0000-0000-0000-000000000630",
+    "metrics": [
+      {
+        "metric": "SIMULATION_RETURN",
+        "operations": [
+          "MINIMUM",
+          "MAXIMUM",
+          "MEDIAN",
+          "EQUAL_FOLD_ARITHMETIC_MEAN",
+          "SIGN_COUNTS"
+        ]
+      },
+      {
+        "metric": "TOTAL_ORDERS",
+        "operations": [
+          "MINIMUM",
+          "MAXIMUM",
+          "MEDIAN",
+          "EQUAL_FOLD_ARITHMETIC_MEAN"
+        ]
+      }
+    ],
+    "metadata": [{"key": "purpose", "value": "e2e-distribution"}]
+  },
+  "metadata": [{"key": "purpose", "value": "walk-forward-e2e"}]
+}

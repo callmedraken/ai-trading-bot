@@ -253,3 +253,154 @@ def test_schema_one_aggregate_destination_fails_before_historical_loading(
         )
         == 4
     )
+
+
+def test_schema_three_runs_exact_analyzers_and_writes_stability_artifacts(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    config = write_config(tmp_path)
+    raw = json.loads(config.read_text(encoding="utf-8"))
+    raw["schema_version"] = 3
+    raw["aggregate_policy"] = None
+    raw["stability_policy"] = {
+        "policy_id": "00000000-0000-0000-0000-000000000540",
+        "metrics": [
+            {
+                "metric": "SIMULATION_RETURN",
+                "operations": [],
+                "comparability_rule": "NONE",
+            }
+        ],
+        "metadata": [],
+    }
+    config.write_text(json.dumps(raw), encoding="utf-8")
+    runner_type = walk_forward_experiment._runner_type
+    stability_type = walk_forward_experiment._stability_analyzer_type
+    seen = []
+
+    class CountingRunner:
+        calls = 0
+
+        def __init__(self, factory):
+            self._runner = runner_type(factory)
+
+        def run(self, request):
+            type(self).calls += 1
+            result = self._runner.run(request)
+            seen.append(result)
+            return result
+
+    class CountingStability:
+        calls = 0
+
+        def analyze(self, result, policy, aggregate):
+            type(self).calls += 1
+            assert result is seen[0]
+            assert aggregate is None
+            return stability_type().analyze(result, policy, aggregate)
+
+    monkeypatch.setattr(walk_forward_experiment, "_runner_type", CountingRunner)
+    monkeypatch.setattr(
+        walk_forward_experiment, "_stability_analyzer_type", CountingStability
+    )
+    json_path = tmp_path / "stability.json"
+    csv_path = tmp_path / "stability.csv"
+    assert (
+        walk_forward_experiment.main(
+            [
+                "--config",
+                str(config),
+                "--stability-json",
+                str(json_path),
+                "--stability-csv",
+                str(csv_path),
+                "--quiet",
+            ]
+        )
+        == 0
+    )
+    assert CountingRunner.calls == CountingStability.calls == 1
+    assert json_path.is_file() and csv_path.is_file()
+
+
+def test_schema_three_passes_exact_aggregate_to_stability_once(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    config = write_config(tmp_path)
+    raw = json.loads(config.read_text(encoding="utf-8"))
+    raw["schema_version"] = 3
+    raw["aggregate_policy"] = raw_schema_two()["aggregate_policy"]
+    raw["stability_policy"] = {
+        "policy_id": "00000000-0000-0000-0000-000000000541",
+        "metrics": [
+            {
+                "metric": "SIMULATION_RETURN",
+                "operations": [],
+                "comparability_rule": "NONE",
+            }
+        ],
+        "metadata": [],
+    }
+    config.write_text(json.dumps(raw), encoding="utf-8")
+    aggregate_type = walk_forward_experiment._aggregate_analyzer_type
+    stability_type = walk_forward_experiment._stability_analyzer_type
+    seen = []
+
+    class CountingAggregate:
+        calls = 0
+
+        def analyze(self, result, policy):
+            type(self).calls += 1
+            aggregate = aggregate_type().analyze(result, policy)
+            seen.append((result, aggregate))
+            return aggregate
+
+    class CountingStability:
+        calls = 0
+
+        def analyze(self, result, policy, aggregate):
+            type(self).calls += 1
+            assert result is seen[0][0]
+            assert aggregate is seen[0][1]
+            return stability_type().analyze(result, policy, aggregate)
+
+    monkeypatch.setattr(
+        walk_forward_experiment, "_aggregate_analyzer_type", CountingAggregate
+    )
+    monkeypatch.setattr(
+        walk_forward_experiment, "_stability_analyzer_type", CountingStability
+    )
+    run = walk_forward_experiment.run_cli(config)
+    assert CountingAggregate.calls == CountingStability.calls == 1
+    assert run.aggregate_result is seen[0][1]
+    assert run.stability_result is not None
+    assert (
+        run.stability_result.source_aggregate_result_id
+        == run.aggregate_result.result_id
+    )
+
+
+def test_stability_destination_compatibility_fails_before_loading(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    config = write_config(tmp_path)
+
+    class ForbiddenCoordinator:
+        def __init__(self, provider):
+            raise AssertionError("historical loading must not begin")
+
+    monkeypatch.setattr(
+        walk_forward_experiment, "_coordinator_type", ForbiddenCoordinator
+    )
+    assert (
+        walk_forward_experiment.main(
+            [
+                "--config",
+                str(config),
+                "--stability-json",
+                str(tmp_path / "stability.json"),
+                "--quiet",
+            ]
+        )
+        == 4
+    )

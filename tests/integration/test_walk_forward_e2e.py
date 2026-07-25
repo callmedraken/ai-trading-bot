@@ -11,13 +11,19 @@ SCRIPT = ROOT / "scripts" / "run_walk_forward_experiment.py"
 ARTIFACT_NAMES = ("walk.json", "walk.csv", "aggregate.json", "aggregate.csv")
 
 
-def _run_cli(destination: Path, *, aggregates: bool = True) -> None:
+def _run_cli(
+    destination: Path,
+    *,
+    aggregates: bool = True,
+    config: Path = CONFIG,
+    stability: bool = False,
+) -> None:
     destination.mkdir()
     arguments = [
         sys.executable,
         str(SCRIPT),
         "--config",
-        str(CONFIG),
+        str(config),
         "--json",
         str(destination / "walk.json"),
         "--csv",
@@ -31,6 +37,15 @@ def _run_cli(destination: Path, *, aggregates: bool = True) -> None:
                 str(destination / "aggregate.json"),
                 "--aggregate-csv",
                 str(destination / "aggregate.csv"),
+            ]
+        )
+    if stability:
+        arguments.extend(
+            [
+                "--stability-json",
+                str(destination / "stability.json"),
+                "--stability-csv",
+                str(destination / "stability.csv"),
             ]
         )
     subprocess.run(arguments, cwd=ROOT, check=True)
@@ -118,3 +133,72 @@ def test_schema_two_walk_forward_end_to_end_reconciles_exactly(tmp_path: Path) -
     assert _keys(aggregate).isdisjoint(prohibited)
     assert not any(ROOT.glob("walk.json"))
     assert not any(ROOT.glob("aggregate.json"))
+
+
+def test_schema_three_stability_artifacts_preserve_upstream_bytes(
+    tmp_path: Path,
+) -> None:
+    raw = json.loads(CONFIG.read_text(encoding="utf-8"))
+    source_path = (
+        CONFIG.parent / raw["historical_data"]["sources"][0]["path"]
+    ).resolve()
+    data_directory = tmp_path / "data"
+    data_directory.mkdir()
+    (data_directory / "SPY.csv").write_bytes(source_path.read_bytes())
+    raw["historical_data"]["sources"][0]["path"] = "data/SPY.csv"
+    raw["schema_version"] = 3
+    raw["stability_policy"] = {
+        "policy_id": "00000000-0000-0000-0000-000000000640",
+        "metrics": [
+            {
+                "metric": "SIMULATION_RETURN",
+                "operations": [
+                    "ADJACENT_ABSOLUTE_CHANGE",
+                    "RANGE",
+                    "MEDIAN_ABSOLUTE_DEVIATION",
+                    "SIGN_CHANGE_COUNT",
+                ],
+                "comparability_rule": "EQUAL_TEST_DURATION",
+            },
+            {
+                "metric": "TOTAL_ORDERS",
+                "operations": [
+                    "ADJACENT_ABSOLUTE_CHANGE",
+                    "RANGE",
+                    "MEDIAN_ABSOLUTE_DEVIATION",
+                ],
+                "comparability_rule": ("EQUAL_TEST_DURATION_AND_SCHEDULE_COUNT"),
+            },
+        ],
+        "metadata": [{"key": "purpose", "value": "stability-e2e"}],
+    }
+    config = tmp_path / "schema-three.json"
+    config.write_text(json.dumps(raw), encoding="utf-8")
+    schema_two = tmp_path / "schema-two"
+    schema_three = tmp_path / "schema-three"
+
+    _run_cli(schema_two)
+    _run_cli(schema_three, config=config, stability=True)
+
+    for name in ARTIFACT_NAMES:
+        assert (schema_two / name).read_bytes() == (schema_three / name).read_bytes()
+    stability_json = schema_three / "stability.json"
+    stability_csv = schema_three / "stability.csv"
+    assert stability_json.is_file() and stability_csv.is_file()
+    stability = json.loads(stability_json.read_bytes())["walk_forward_stability_result"]
+    walk = json.loads((schema_three / "walk.json").read_bytes())["walk_forward_result"]
+    aggregate = json.loads((schema_three / "aggregate.json").read_bytes())[
+        "walk_forward_aggregate_result"
+    ]
+    assert stability["source_walk_forward_result_id"] == walk["result_id"]
+    assert stability["source_aggregate_result_id"] == aggregate["result_id"]
+    selections = [fold["selection"]["selected_variant_id"] for fold in walk["folds"]]
+    transitions = stability["selection_stability"]["transitions"]
+    assert [
+        (item["from_variant_id"], item["to_variant_id"]) for item in transitions
+    ] == list(zip(selections, selections[1:], strict=False))
+    assert all(
+        type(item["test_duration_microseconds"]) is int
+        for item in stability["selection_stability"]["observations"]
+    )
+    assert not any(ROOT.glob("stability.json"))

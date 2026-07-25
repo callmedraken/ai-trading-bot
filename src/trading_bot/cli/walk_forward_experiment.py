@@ -35,6 +35,10 @@ from trading_bot.cli.walk_forward_experiment_serialization import (
     serialize_walk_forward_csv,
     serialize_walk_forward_json,
 )
+from trading_bot.cli.walk_forward_stability_serialization import (
+    serialize_walk_forward_stability_csv,
+    serialize_walk_forward_stability_json,
+)
 from trading_bot.execution import OrderEngine
 from trading_bot.execution.state_fingerprints import canonical_decimal
 from trading_bot.experiments import (
@@ -48,6 +52,9 @@ from trading_bot.experiments import (
     HistoricalExperimentWalkForwardRequest,
     HistoricalExperimentWalkForwardResult,
     HistoricalExperimentWalkForwardRunner,
+    HistoricalExperimentWalkForwardStabilityAnalyzer,
+    HistoricalExperimentWalkForwardStabilityError,
+    HistoricalExperimentWalkForwardStabilityResult,
     InvalidHistoricalExperimentWalkForwardRequestError,
 )
 from trading_bot.ledger import LedgerError
@@ -69,6 +76,9 @@ _csv_serializer = serialize_walk_forward_csv
 _aggregate_analyzer_type = HistoricalExperimentWalkForwardAggregateAnalyzer
 _aggregate_json_serializer = serialize_walk_forward_aggregate_json
 _aggregate_csv_serializer = serialize_walk_forward_aggregate_csv
+_stability_analyzer_type = HistoricalExperimentWalkForwardStabilityAnalyzer
+_stability_json_serializer = serialize_walk_forward_stability_json
+_stability_csv_serializer = serialize_walk_forward_stability_csv
 
 
 class _WalkForwardSimulatorFactory:
@@ -115,6 +125,7 @@ class WalkForwardExperimentCliRunResult:
     result: HistoricalExperimentWalkForwardResult
     summary: str
     aggregate_result: HistoricalExperimentWalkForwardAggregateResult | None = None
+    stability_result: HistoricalExperimentWalkForwardStabilityResult | None = None
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -128,6 +139,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--aggregate-json", type=Path)
     parser.add_argument("--aggregate-json-pretty", action="store_true")
     parser.add_argument("--aggregate-csv", type=Path)
+    parser.add_argument("--stability-json", type=Path)
+    parser.add_argument("--stability-json-pretty", action="store_true")
+    parser.add_argument("--stability-csv", type=Path)
     parser.add_argument("--overwrite", action="store_true")
     parser.add_argument("--quiet", action="store_true")
     return parser
@@ -208,10 +222,113 @@ def run_cli(
             raise WalkForwardExperimentExecutionCliError(
                 f"walk-forward aggregate analysis failed: {error}"
             ) from error
+    stability_result = None
+    if config.stability_policy is not None:
+        try:
+            stability_result = _stability_analyzer_type().analyze(
+                result, config.stability_policy, aggregate_result
+            )
+        except HistoricalExperimentWalkForwardStabilityError as error:
+            raise WalkForwardExperimentExecutionCliError(
+                f"walk-forward stability analysis failed: {error}"
+            ) from error
     summary = _format_summary(result)
     if aggregate_result is not None:
         summary += _format_aggregate_summary(aggregate_result)
-    return WalkForwardExperimentCliRunResult(config, result, summary, aggregate_result)
+    if stability_result is not None:
+        summary += _format_stability_summary(stability_result)
+    return WalkForwardExperimentCliRunResult(
+        config, result, summary, aggregate_result, stability_result
+    )
+
+
+def _format_stability_summary(
+    result: HistoricalExperimentWalkForwardStabilityResult,
+) -> str:
+    selection = result.selection_stability
+    ratio = selection.persistence_ratio
+    lines = [
+        "Walk-forward stability:",
+        "  Folds are independent simulations. Selection persistence, transitions, "
+        "frequencies, and metric changes describe retained fold-order evidence only.",
+        "  They do not define continuous capital, compounding, annualization, "
+        "aggregation across capital paths, or causal interpretation.",
+        f"  stability result ID: {result.result_id}",
+        f"  source walk-forward result ID: {result.source_walk_forward_result_id}",
+        "  source aggregate result ID: "
+        + (
+            "none"
+            if result.source_aggregate_result_id is None
+            else str(result.source_aggregate_result_id)
+        ),
+        f"  stability policy ID: {result.policy.policy_id}",
+        f"  fold count: {result.fold_count}",
+        f"  selected variant count: {selection.unique_selected_variant_count}",
+        f"  persistent adjacent selections: {selection.persistence_adjacency_count}",
+        f"  changed adjacent selections: {selection.changed_adjacency_count}",
+        "  persistence ratio: "
+        + ("none" if ratio is None else f"{ratio.numerator}/{ratio.denominator}"),
+        "  longest consecutive selection run: "
+        f"{selection.longest_consecutive_selection_run}",
+        "  selection observations:",
+    ]
+    lines.extend(
+        f"    fold {item.fold_ordinal} ({item.fold_id}): "
+        f"variant {item.selected_variant_id}, "
+        f"duration microseconds {_duration_microseconds(item.test_duration)}, "
+        f"schedule count {item.test_schedule_count}"
+        for item in selection.observations
+    )
+    lines.append("  consecutive selection runs:")
+    lines.extend(
+        f"    folds {item.start_fold_ordinal}->{item.end_fold_ordinal}: "
+        f"variant {item.variant_id}, count {item.consecutive_fold_count}"
+        for item in selection.runs
+    )
+    lines.append("  directional transitions:")
+    lines.extend(
+        f"    fold {item.previous_fold_ordinal} {item.from_variant_id} -> "
+        f"fold {item.current_fold_ordinal} {item.to_variant_id}; "
+        f"changed={'true' if item.changed else 'false'}"
+        for item in selection.transitions
+    )
+    lines.append("  directional transition frequencies:")
+    lines.extend(
+        f"    {item.from_variant_id} -> {item.to_variant_id}: {item.occurrence_count}"
+        for item in selection.transition_frequencies
+    )
+    lines.append("  selected variant frequencies:")
+    lines.extend(
+        f"    variant {item.variant_id}: folds {item.selected_fold_count}, "
+        f"first fold {item.first_selected_fold_ordinal}"
+        for item in selection.variant_frequencies
+    )
+    lines.append("  metric evidence:")
+    for item in result.metric_stability:
+        lines.append(f"    {item.metric.value}:")
+        lines.append(
+            "      observations: "
+            + ", ".join(_scalar(value.value) for value in item.observations)
+        )
+        for change in item.adjacent_changes:
+            lines.append(
+                f"      adjacent change {change.previous_fold_ordinal}->"
+                f"{change.current_fold_ordinal}: {_scalar(change.absolute_change)}"
+            )
+        for label, value in (
+            ("range", item.value_range),
+            ("median", item.median),
+            ("median absolute deviation", item.median_absolute_deviation),
+        ):
+            if value is not None:
+                lines.append(f"      {label}: {_scalar(value)}")
+        if item.sign_change_count is not None:
+            lines.append(f"      direct nonzero sign changes: {item.sign_change_count}")
+    return "\n".join(lines) + "\n"
+
+
+def _duration_microseconds(value):  # type: ignore[no-untyped-def]
+    return value.days * 86_400_000_000 + value.seconds * 1_000_000 + value.microseconds
 
 
 def _format_aggregate_summary(
@@ -350,6 +467,9 @@ def _success(
     aggregate_result: HistoricalExperimentWalkForwardAggregateResult | None = None,
     aggregate_json_path: Path | None = None,
     aggregate_csv_path: Path | None = None,
+    stability_result: HistoricalExperimentWalkForwardStabilityResult | None = None,
+    stability_json_path: Path | None = None,
+    stability_csv_path: Path | None = None,
 ) -> str:
     lines = ["Walk-forward artifacts:", f"  result ID: {result.result_id}"]
     if json_path is not None:
@@ -369,6 +489,19 @@ def _success(
         lines.append(f"  aggregate JSON: {aggregate_json_path}")
     if aggregate_csv_path is not None:
         lines.append(f"  aggregate CSV: {aggregate_csv_path}")
+    if stability_result is not None and (
+        stability_json_path is not None or stability_csv_path is not None
+    ):
+        lines.extend(
+            (
+                "Walk-forward stability artifacts:",
+                f"  result ID: {stability_result.result_id}",
+            )
+        )
+    if stability_json_path is not None:
+        lines.append(f"  stability JSON: {stability_json_path}")
+    if stability_csv_path is not None:
+        lines.append(f"  stability CSV: {stability_csv_path}")
     return "\n".join(lines) + "\n"
 
 
@@ -379,20 +512,36 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--json-pretty requires --json")
     if args.aggregate_json_pretty and args.aggregate_json is None:
         parser.error("--aggregate-json-pretty requires --aggregate-json")
+    if args.stability_json_pretty and args.stability_json is None:
+        parser.error("--stability-json-pretty requires --stability-json")
     raw_destinations = (
         args.json,
         args.csv,
         args.aggregate_json,
         args.aggregate_csv,
+        args.stability_json,
+        args.stability_csv,
     )
     if args.overwrite and not any(item is not None for item in raw_destinations):
         parser.error("--overwrite requires an output destination")
-    json_path, csv_path, aggregate_json_path, aggregate_csv_path = (
-        normalized_destinations(raw_destinations)
-    )
+    (
+        json_path,
+        csv_path,
+        aggregate_json_path,
+        aggregate_csv_path,
+        stability_json_path,
+        stability_csv_path,
+    ) = normalized_destinations(raw_destinations)
     destinations = tuple(
         item
-        for item in (json_path, csv_path, aggregate_json_path, aggregate_csv_path)
+        for item in (
+            json_path,
+            csv_path,
+            aggregate_json_path,
+            aggregate_csv_path,
+            stability_json_path,
+            stability_csv_path,
+        )
         if item is not None
     )
     if len(set(destinations)) != len(destinations):
@@ -410,6 +559,20 @@ def main(argv: list[str] | None = None) -> int:
             raise ConfigValidationError(
                 "$.schema_version",
                 "aggregate destinations require walk-forward schema version 2",
+            )
+        if config.aggregate_policy is None and (
+            aggregate_json_path is not None or aggregate_csv_path is not None
+        ):
+            raise ConfigValidationError(
+                "$.aggregate_policy",
+                "aggregate destinations require an enabled aggregate policy",
+            )
+        if config.schema_version != 3 and (
+            stability_json_path is not None or stability_csv_path is not None
+        ):
+            raise ConfigValidationError(
+                "$.schema_version",
+                "stability destinations require walk-forward schema version 3",
             )
         run = run_cli(args.config, loaded_config=config)
         artifacts = []
@@ -446,6 +609,30 @@ def main(argv: list[str] | None = None) -> int:
                     _aggregate_csv_serializer(run.aggregate_result),
                 )
             )
+        if stability_json_path is not None:
+            if run.stability_result is None:
+                raise WalkForwardExperimentOutputError(
+                    "stability result is unavailable"
+                )
+            artifacts.append(
+                OutputArtifact(
+                    stability_json_path,
+                    _stability_json_serializer(
+                        run.stability_result, pretty=args.stability_json_pretty
+                    ),
+                )
+            )
+        if stability_csv_path is not None:
+            if run.stability_result is None:
+                raise WalkForwardExperimentOutputError(
+                    "stability result is unavailable"
+                )
+            artifacts.append(
+                OutputArtifact(
+                    stability_csv_path,
+                    _stability_csv_serializer(run.stability_result),
+                )
+            )
         write_artifacts(
             tuple(artifacts),
             overwrite=args.overwrite,
@@ -478,6 +665,9 @@ def main(argv: list[str] | None = None) -> int:
                     run.aggregate_result,
                     aggregate_json_path,
                     aggregate_csv_path,
+                    run.stability_result,
+                    stability_json_path,
+                    stability_csv_path,
                 ),
                 end="",
             )

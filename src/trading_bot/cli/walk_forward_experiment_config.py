@@ -37,12 +37,19 @@ from trading_bot.experiments import (
     HistoricalExperimentWalkForwardAggregateOperation,
     HistoricalExperimentWalkForwardAggregateOperationError,
     HistoricalExperimentWalkForwardAggregatePolicy,
+    HistoricalExperimentWalkForwardComparabilityRule,
     HistoricalExperimentWalkForwardFold,
     HistoricalExperimentWalkForwardMetricPolicy,
     HistoricalExperimentWalkForwardSelectionPolicy,
+    HistoricalExperimentWalkForwardStabilityMetric,
+    HistoricalExperimentWalkForwardStabilityMetricPolicy,
+    HistoricalExperimentWalkForwardStabilityOperation,
+    HistoricalExperimentWalkForwardStabilityOperationError,
+    HistoricalExperimentWalkForwardStabilityPolicy,
     InvalidHistoricalExperimentRankingPolicyError,
     InvalidHistoricalExperimentWalkForwardAggregatePolicyError,
     InvalidHistoricalExperimentWalkForwardRequestError,
+    InvalidHistoricalExperimentWalkForwardStabilityPolicyError,
 )
 from trading_bot.portfolio import MetadataEntry
 
@@ -58,6 +65,7 @@ class LoadedWalkForwardExperimentConfig:
     selection_policy: HistoricalExperimentWalkForwardSelectionPolicy
     metadata: tuple[MetadataEntry, ...]
     aggregate_policy: HistoricalExperimentWalkForwardAggregatePolicy | None = None
+    stability_policy: HistoricalExperimentWalkForwardStabilityPolicy | None = None
 
 
 def load_walk_forward_experiment_config(
@@ -84,7 +92,7 @@ def parse_walk_forward_experiment_config(
 ) -> LoadedWalkForwardExperimentConfig:
     root = _object(raw, "$")
     version = _integer(root.get("schema_version"), "$.schema_version")
-    if version not in (1, 2):
+    if version not in (1, 2, 3):
         raise ConfigValidationError(
             "$.schema_version", "unsupported walk-forward schema version"
         )
@@ -100,6 +108,8 @@ def parse_walk_forward_experiment_config(
     }
     if version == 2:
         keys.add("aggregate_policy")
+    elif version == 3:
+        keys.update(("aggregate_policy", "stability_policy"))
     _exact_keys(root, keys, "$")
     raw_folds = _array(root["folds"], "$.folds", nonempty=True)
     first_fold = _object(raw_folds[0], "$.folds[0]")
@@ -137,10 +147,19 @@ def parse_walk_forward_experiment_config(
             "$.metadata",
             "historical_experiment_walk_forward_ metadata keys are reserved",
         )
-    aggregate_policy = (
-        None
-        if version == 1
-        else _aggregate_policy(root["aggregate_policy"], "$.aggregate_policy")
+    aggregate_policy = None
+    if version == 2:
+        aggregate_policy = _aggregate_policy(
+            root["aggregate_policy"], "$.aggregate_policy"
+        )
+    elif version == 3 and root["aggregate_policy"] is not None:
+        aggregate_policy = _aggregate_policy(
+            root["aggregate_policy"], "$.aggregate_policy"
+        )
+    stability_policy = (
+        _stability_policy(root["stability_policy"], "$.stability_policy")
+        if version == 3
+        else None
     )
     return LoadedWalkForwardExperimentConfig(
         version,
@@ -152,7 +171,68 @@ def parse_walk_forward_experiment_config(
         selection,
         metadata,
         aggregate_policy,
+        stability_policy,
     )
+
+
+def _stability_policy(
+    value: Any, path: str
+) -> HistoricalExperimentWalkForwardStabilityPolicy:
+    item = _object(value, path)
+    _exact_keys(item, {"policy_id", "metrics", "metadata"}, path)
+    metrics = []
+    for index, raw in enumerate(
+        _array(item["metrics"], f"{path}.metrics", nonempty=True)
+    ):
+        metric_path = f"{path}.metrics[{index}]"
+        metric_item = _object(raw, metric_path)
+        _exact_keys(
+            metric_item,
+            {"metric", "operations", "comparability_rule"},
+            metric_path,
+        )
+        operations = tuple(
+            _enum(
+                operation,
+                HistoricalExperimentWalkForwardStabilityOperation,
+                f"{metric_path}.operations[{operation_index}]",
+            )
+            for operation_index, operation in enumerate(
+                _array(metric_item["operations"], f"{metric_path}.operations")
+            )
+        )
+        try:
+            metrics.append(
+                HistoricalExperimentWalkForwardStabilityMetricPolicy(
+                    _enum(
+                        metric_item["metric"],
+                        HistoricalExperimentWalkForwardStabilityMetric,
+                        f"{metric_path}.metric",
+                    ),
+                    operations,
+                    _enum(
+                        metric_item["comparability_rule"],
+                        HistoricalExperimentWalkForwardComparabilityRule,
+                        f"{metric_path}.comparability_rule",
+                    ),
+                )
+            )
+        except (
+            InvalidHistoricalExperimentWalkForwardStabilityPolicyError,
+            HistoricalExperimentWalkForwardStabilityOperationError,
+        ) as error:
+            raise ConfigValidationError(metric_path, str(error)) from error
+    try:
+        return HistoricalExperimentWalkForwardStabilityPolicy(
+            _uuid(item["policy_id"], f"{path}.policy_id"),
+            tuple(metrics),
+            _metadata(item["metadata"], f"{path}.metadata"),
+        )
+    except (
+        InvalidHistoricalExperimentWalkForwardStabilityPolicyError,
+        HistoricalExperimentWalkForwardStabilityOperationError,
+    ) as error:
+        raise ConfigValidationError(path, str(error)) from error
 
 
 def _aggregate_policy(

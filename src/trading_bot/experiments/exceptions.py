@@ -303,3 +303,49 @@ class InconsistentHistoricalExperimentWalkForwardResultError(
     HistoricalExperimentWalkForwardError, ValueError
 ):
     """Raised when a retained walk-forward result is inconsistent."""
+
+
+class HistoricalExperimentWalkForwardAggregateError(HistoricalExperimentError):
+    """Base exception for deterministic walk-forward aggregate analytics."""
+
+
+class InvalidHistoricalExperimentWalkForwardAggregatePolicyError(
+    HistoricalExperimentWalkForwardAggregateError, ValueError
+):
+    """Raised when a walk-forward aggregate policy is malformed."""
+
+
+class HistoricalExperimentWalkForwardAggregateSourceError(
+    HistoricalExperimentWalkForwardAggregateError, ValueError
+):
+    """Raised when walk-forward source evidence cannot support aggregation."""
+
+
+class HistoricalExperimentWalkForwardAggregateMetricError(
+    HistoricalExperimentWalkForwardAggregateError, ValueError
+):
+    """Raised when a selected aggregate metric value is malformed."""
+
+
+class HistoricalExperimentWalkForwardAggregateOperationError(
+    HistoricalExperimentWalkForwardAggregateError, ValueError
+):
+    """Raised when a metric requests an ineligible aggregate operation."""
+
+
+class HistoricalExperimentWalkForwardAggregateArithmeticError(
+    HistoricalExperimentWalkForwardAggregateError
+):
+    """Raised when exact aggregate arithmetic cannot be completed."""
+
+
+class HistoricalExperimentWalkForwardAggregateReconciliationError(
+    HistoricalExperimentWalkForwardAggregateError, ValueError
+):
+    """Raised when generated aggregate evidence does not reconcile."""
+
+
+class InconsistentHistoricalExperimentWalkForwardAggregateResultError(
+    HistoricalExperimentWalkForwardAggregateError, ValueError
+):
+    """Raised when a retained walk-forward aggregate result is inconsistent."""

@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from trading_bot.cli import historical_experiment
+from trading_bot.cli import coordinated_output, historical_experiment
 from trading_bot.cli._simulation_bootstrap import initialize_ledger
 from trading_bot.cli.config import _initial_ledger
 from trading_bot.cli.exceptions import ConfigValidationError
@@ -1286,7 +1286,7 @@ def test_staging_failure_preserves_destinations_and_cleans_temps(
     def failing_fsync(descriptor):  # type: ignore[no-untyped-def]
         raise OSError("deliberate staging failure")
 
-    monkeypatch.setattr(historical_experiment.os, "fsync", failing_fsync)
+    monkeypatch.setattr(coordinated_output.os, "fsync", failing_fsync)
     assert (
         historical_experiment.main(
             [
@@ -1316,7 +1316,7 @@ def test_later_replacement_failure_keeps_earlier_replace_and_cleans_temps(
     compact = tmp_path / "compact.json"
     full.write_text("old full", encoding="utf-8")
     compact.write_text("old compact", encoding="utf-8")
-    original_replace = historical_experiment.os.replace
+    original_replace = coordinated_output.os.replace
     calls = 0
 
     def failing_second(source, destination):  # type: ignore[no-untyped-def]
@@ -1326,7 +1326,7 @@ def test_later_replacement_failure_keeps_earlier_replace_and_cleans_temps(
             raise OSError("deliberate replacement failure")
         return original_replace(source, destination)
 
-    monkeypatch.setattr(historical_experiment.os, "replace", failing_second)
+    monkeypatch.setattr(coordinated_output.os, "replace", failing_second)
     assert (
         historical_experiment.main(
             [

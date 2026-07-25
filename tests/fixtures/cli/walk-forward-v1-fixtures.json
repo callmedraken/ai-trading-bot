@@ -1,0 +1,14 @@
+{
+  "compact_json": {
+    "bytes": 12128,
+    "sha256": "8141d60f1c254b3b61ba15a2d374422046c12a2bb30e3698bbeaf657c8f16d62"
+  },
+  "pretty_json": {
+    "bytes": 19237,
+    "sha256": "e27431119b31252dc4b37d4104d9937eaa61e638c199ac7fc4a02cb34094f43c"
+  },
+  "csv": {
+    "bytes": 10425,
+    "sha256": "c2031e7441e62ceb220a49cdb6ecc6a7b166ac76d2bff19569e08ded1321b048"
+  }
+}

@@ -1,3 +1,5 @@
+import csv
+import io
 import json
 import subprocess
 import sys
@@ -57,6 +59,35 @@ def _keys(value: object) -> set[str]:
     if isinstance(value, list):
         return {key for child in value for key in _keys(child)}
     return set()
+
+
+def _median(values: list[Fraction]) -> Fraction:
+    ordered = sorted(values)
+    midpoint = len(ordered) // 2
+    if len(ordered) % 2:
+        return ordered[midpoint]
+    return (ordered[midpoint - 1] + ordered[midpoint]) / 2
+
+
+def _first_appearance_counts(values: list[object]) -> list[tuple[object, int]]:
+    order = []
+    counts = {}
+    for value in values:
+        if value not in counts:
+            order.append(value)
+            counts[value] = 0
+        counts[value] += 1
+    return [(value, counts[value]) for value in order]
+
+
+def _selection_runs(values: list[str]) -> list[tuple[int, int, str, int]]:
+    runs = []
+    start = 0
+    for index in range(1, len(values) + 1):
+        if index == len(values) or values[index] != values[start]:
+            runs.append((start, index - 1, values[start], index - start))
+            start = index
+    return runs
 
 
 def test_schema_two_walk_forward_end_to_end_reconciles_exactly(tmp_path: Path) -> None:
@@ -174,31 +205,181 @@ def test_schema_three_stability_artifacts_preserve_upstream_bytes(
     }
     config = tmp_path / "schema-three.json"
     config.write_text(json.dumps(raw), encoding="utf-8")
-    schema_two = tmp_path / "schema-two"
-    schema_three = tmp_path / "schema-three"
+    first = tmp_path / "schema-three-first"
+    second = tmp_path / "schema-three-second"
+    without_stability_destinations = tmp_path / "without-stability-destinations"
 
-    _run_cli(schema_two)
-    _run_cli(schema_three, config=config, stability=True)
+    _run_cli(first, config=config, stability=True)
+    _run_cli(second, config=config, stability=True)
+    _run_cli(without_stability_destinations, config=config)
 
+    all_artifacts = (*ARTIFACT_NAMES, "stability.json", "stability.csv")
+    assert {item.name for item in first.iterdir()} == set(all_artifacts)
+    for name in all_artifacts:
+        assert (first / name).read_bytes() == (second / name).read_bytes()
     for name in ARTIFACT_NAMES:
-        assert (schema_two / name).read_bytes() == (schema_three / name).read_bytes()
-    stability_json = schema_three / "stability.json"
-    stability_csv = schema_three / "stability.csv"
-    assert stability_json.is_file() and stability_csv.is_file()
-    stability = json.loads(stability_json.read_bytes())["walk_forward_stability_result"]
-    walk = json.loads((schema_three / "walk.json").read_bytes())["walk_forward_result"]
-    aggregate = json.loads((schema_three / "aggregate.json").read_bytes())[
+        assert (first / name).read_bytes() == (
+            without_stability_destinations / name
+        ).read_bytes()
+
+    stability = json.loads((first / "stability.json").read_bytes())[
+        "walk_forward_stability_result"
+    ]
+    repeated_stability = json.loads((second / "stability.json").read_bytes())[
+        "walk_forward_stability_result"
+    ]
+    walk = json.loads((first / "walk.json").read_bytes())["walk_forward_result"]
+    aggregate = json.loads((first / "aggregate.json").read_bytes())[
         "walk_forward_aggregate_result"
     ]
+    assert stability["result_id"] == repeated_stability["result_id"]
     assert stability["source_walk_forward_result_id"] == walk["result_id"]
     assert stability["source_aggregate_result_id"] == aggregate["result_id"]
+    assert aggregate["source_walk_forward_result_id"] == walk["result_id"]
+
+    stability_csv_rows = list(
+        csv.DictReader(io.StringIO((first / "stability.csv").read_text("utf-8")))
+    )
+    assert stability_csv_rows
+    assert {row["stability_result_id"] for row in stability_csv_rows} == {
+        stability["result_id"]
+    }
+    assert {row["source_walk_forward_result_id"] for row in stability_csv_rows} == {
+        walk["result_id"]
+    }
+    assert {row["source_aggregate_result_id"] for row in stability_csv_rows} == {
+        aggregate["result_id"]
+    }
+
+    folds = walk["folds"]
     selections = [fold["selection"]["selected_variant_id"] for fold in walk["folds"]]
-    transitions = stability["selection_stability"]["transitions"]
+    fold_ids = [fold["fold"]["fold_id"] for fold in folds]
+    selection = stability["selection_stability"]
+    observations = selection["observations"]
+    assert [
+        (item["fold_ordinal"], item["fold_id"], item["selected_variant_id"])
+        for item in observations
+    ] == [
+        (ordinal, fold_id, variant_id)
+        for ordinal, (fold_id, variant_id) in enumerate(
+            zip(fold_ids, selections, strict=True)
+        )
+    ]
+
+    transitions = selection["transitions"]
+    expected_pairs = list(zip(selections, selections[1:], strict=False))
     assert [
         (item["from_variant_id"], item["to_variant_id"]) for item in transitions
-    ] == list(zip(selections, selections[1:], strict=False))
-    assert all(
-        type(item["test_duration_microseconds"]) is int
-        for item in stability["selection_stability"]["observations"]
+    ] == expected_pairs
+    assert [item["changed"] for item in transitions] == [
+        previous != current for previous, current in expected_pairs
+    ]
+    assert any(item["from_variant_id"] == item["to_variant_id"] for item in transitions)
+
+    persistent = sum(previous == current for previous, current in expected_pairs)
+    changed = len(expected_pairs) - persistent
+    assert selection["persistence_adjacency_count"] == persistent
+    assert selection["changed_adjacency_count"] == changed
+    persistence = Fraction(persistent, len(expected_pairs))
+    assert selection["persistence_ratio"] == {
+        "numerator": persistence.numerator,
+        "denominator": persistence.denominator,
+    }
+
+    expected_runs = _selection_runs(selections)
+    assert [
+        (
+            item["start_fold_ordinal"],
+            item["end_fold_ordinal"],
+            item["variant_id"],
+            item["consecutive_fold_count"],
+        )
+        for item in selection["runs"]
+    ] == expected_runs
+    assert selection["longest_consecutive_selection_run"] == max(
+        item[3] for item in expected_runs
     )
+
+    expected_transition_frequencies = _first_appearance_counts(expected_pairs)
+    assert [
+        (
+            (item["from_variant_id"], item["to_variant_id"]),
+            item["occurrence_count"],
+        )
+        for item in selection["transition_frequencies"]
+    ] == expected_transition_frequencies
+    expected_variant_frequencies = _first_appearance_counts(selections)
+    assert [
+        (item["variant_id"], item["selected_fold_count"])
+        for item in selection["variant_frequencies"]
+    ] == expected_variant_frequencies
+    assert [
+        item["first_selected_fold_ordinal"] for item in selection["variant_frequencies"]
+    ] == [selections.index(item[0]) for item in expected_variant_frequencies]
+
+    metric_fields = {
+        "SIMULATION_RETURN": "simulation_return",
+        "TOTAL_ORDERS": "total_orders",
+    }
+    aggregate_observations = {
+        item["metric"]: [observation["value"] for observation in item["observations"]]
+        for item in aggregate["metric_summaries"]
+    }
+    for summary in stability["metric_stability"]:
+        metric = summary["metric"]
+        source_values = [
+            fold["test"]["report"]["variants"][0]["metrics"][metric_fields[metric]]
+            for fold in folds
+        ]
+        serialized_values = [
+            observation["value"] for observation in summary["observations"]
+        ]
+        assert serialized_values == source_values
+        if metric in aggregate_observations:
+            assert serialized_values == aggregate_observations[metric]
+
+        exact_values = [Fraction(str(value)) for value in serialized_values]
+        assert [
+            Fraction(str(item["absolute_change"]))
+            for item in summary["adjacent_changes"]
+        ] == [
+            abs(current - previous)
+            for previous, current in zip(exact_values, exact_values[1:], strict=False)
+        ]
+        assert Fraction(str(summary["value_range"])) == (
+            max(exact_values) - min(exact_values)
+        )
+        exact_median = _median(exact_values)
+        assert Fraction(str(summary["median"])) == exact_median
+        exact_mad = _median([abs(value - exact_median) for value in exact_values])
+        assert Fraction(str(summary["median_absolute_deviation"])) == exact_mad
+        if summary["sign_change_count"] is not None:
+            expected_sign_changes = sum(
+                previous != 0
+                and current != 0
+                and ((previous < 0 < current) or (current < 0 < previous))
+                for previous, current in zip(
+                    exact_values, exact_values[1:], strict=False
+                )
+            )
+            assert summary["sign_change_count"] == expected_sign_changes
+
+    assert all(type(item["test_duration_microseconds"]) is int for item in observations)
+    prohibited = {
+        "aggregate_total",
+        "annualization",
+        "annualized_return",
+        "causal",
+        "compounded_return",
+        "continuous_equity_curve",
+        "quality",
+        "ranking",
+        "recommendation",
+        "score",
+        "total",
+        "winner",
+    }
+    assert _keys(stability).isdisjoint(prohibited)
+    assert set(stability_csv_rows[0]).isdisjoint(prohibited)
     assert not any(ROOT.glob("stability.json"))
+    assert not any(ROOT.glob("stability.csv"))

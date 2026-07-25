@@ -23,6 +23,10 @@ from trading_bot.cli.exceptions import (
     WalkForwardExperimentInitializationCliError,
     WalkForwardExperimentOutputError,
 )
+from trading_bot.cli.walk_forward_aggregate_serialization import (
+    serialize_walk_forward_aggregate_csv,
+    serialize_walk_forward_aggregate_json,
+)
 from trading_bot.cli.walk_forward_experiment_config import (
     LoadedWalkForwardExperimentConfig,
     load_walk_forward_experiment_config,
@@ -35,6 +39,9 @@ from trading_bot.execution import OrderEngine
 from trading_bot.execution.state_fingerprints import canonical_decimal
 from trading_bot.experiments import (
     HistoricalExperimentInitializationError,
+    HistoricalExperimentWalkForwardAggregateAnalyzer,
+    HistoricalExperimentWalkForwardAggregateError,
+    HistoricalExperimentWalkForwardAggregateResult,
     HistoricalExperimentWalkForwardDataError,
     HistoricalExperimentWalkForwardError,
     HistoricalExperimentWalkForwardFoldError,
@@ -59,6 +66,9 @@ _runner_type = HistoricalExperimentWalkForwardRunner
 _coordinator_type = CoordinatingHistoricalDataProvider
 _json_serializer = serialize_walk_forward_json
 _csv_serializer = serialize_walk_forward_csv
+_aggregate_analyzer_type = HistoricalExperimentWalkForwardAggregateAnalyzer
+_aggregate_json_serializer = serialize_walk_forward_aggregate_json
+_aggregate_csv_serializer = serialize_walk_forward_aggregate_csv
 
 
 class _WalkForwardSimulatorFactory:
@@ -104,6 +114,7 @@ class WalkForwardExperimentCliRunResult:
     config: LoadedWalkForwardExperimentConfig
     result: HistoricalExperimentWalkForwardResult
     summary: str
+    aggregate_result: HistoricalExperimentWalkForwardAggregateResult | None = None
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -114,13 +125,24 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--json", type=Path)
     parser.add_argument("--json-pretty", action="store_true")
     parser.add_argument("--csv", type=Path)
+    parser.add_argument("--aggregate-json", type=Path)
+    parser.add_argument("--aggregate-json-pretty", action="store_true")
+    parser.add_argument("--aggregate-csv", type=Path)
     parser.add_argument("--overwrite", action="store_true")
     parser.add_argument("--quiet", action="store_true")
     return parser
 
 
-def run_cli(config_path: Path) -> WalkForwardExperimentCliRunResult:
-    config = load_walk_forward_experiment_config(config_path)
+def run_cli(
+    config_path: Path,
+    *,
+    loaded_config: LoadedWalkForwardExperimentConfig | None = None,
+) -> WalkForwardExperimentCliRunResult:
+    config = (
+        load_walk_forward_experiment_config(config_path)
+        if loaded_config is None
+        else loaded_config
+    )
     historical_config = config.historical_data
     coordinator = _coordinator_type(
         CSVHistoricalDataProvider(historical_config.common_parent)
@@ -176,7 +198,76 @@ def run_cli(config_path: Path) -> WalkForwardExperimentCliRunResult:
         raise WalkForwardExperimentExecutionCliError(message) from error
     except HistoricalExperimentWalkForwardError as error:
         raise WalkForwardExperimentExecutionCliError(str(error)) from error
-    return WalkForwardExperimentCliRunResult(config, result, _format_summary(result))
+    aggregate_result = None
+    if config.aggregate_policy is not None:
+        try:
+            aggregate_result = _aggregate_analyzer_type().analyze(
+                result, config.aggregate_policy
+            )
+        except HistoricalExperimentWalkForwardAggregateError as error:
+            raise WalkForwardExperimentExecutionCliError(
+                f"walk-forward aggregate analysis failed: {error}"
+            ) from error
+    summary = _format_summary(result)
+    if aggregate_result is not None:
+        summary += _format_aggregate_summary(aggregate_result)
+    return WalkForwardExperimentCliRunResult(config, result, summary, aggregate_result)
+
+
+def _format_aggregate_summary(
+    result: HistoricalExperimentWalkForwardAggregateResult,
+) -> str:
+    lines = [
+        "Walk-forward aggregate distribution:",
+        "  IMPORTANT: Every test fold is an independent simulation with "
+        "independently initialized capital.",
+        "  These statistics describe a distribution of fold observations; they "
+        "do not describe a continuous portfolio or equity curve.",
+        "  Values are not summed, compounded, annualized, weighted, ranked, or "
+        "recommendations.",
+        f"  aggregate result ID: {result.result_id}",
+        f"  source walk-forward result ID: {result.source_walk_forward_result_id}",
+        f"  aggregate policy ID: {result.policy.policy_id}",
+        f"  fold count: {result.fold_count}",
+        f"  successful test fold count: {result.successful_test_fold_count}",
+        "  metric distributions:",
+    ]
+    for summary in result.metric_summaries:
+        lines.append(f"    {summary.metric.value}:")
+        lines.append(
+            "      observations: "
+            + ", ".join(_scalar(item.value) for item in summary.observations)
+        )
+        for label, value in (
+            ("minimum", summary.minimum),
+            ("maximum", summary.maximum),
+            ("median", summary.median),
+        ):
+            if value is not None:
+                lines.append(f"      {label}: {_scalar(value)}")
+        if summary.arithmetic_mean is not None:
+            lines.append(
+                "      equal-fold arithmetic mean: "
+                f"{summary.arithmetic_mean.numerator}/"
+                f"{summary.arithmetic_mean.denominator}"
+            )
+        if summary.sign_counts is not None:
+            signs = summary.sign_counts
+            lines.append(
+                "      sign counts: "
+                f"positive={signs.positive}, zero={signs.zero}, "
+                f"negative={signs.negative}"
+            )
+    lines.append(
+        "  selection frequencies (descriptive only; they imply no quality ordering):"
+    )
+    lines.extend(
+        f"    variant {item.variant_id}: selected folds "
+        f"{item.selected_fold_count}, rank-one selected folds "
+        f"{item.rank_one_selected_fold_count}"
+        for item in result.variant_frequencies
+    )
+    return "\n".join(lines) + "\n"
 
 
 def _format_summary(result: HistoricalExperimentWalkForwardResult) -> str:
@@ -256,12 +347,28 @@ def _success(
     result: HistoricalExperimentWalkForwardResult,
     json_path: Path | None,
     csv_path: Path | None,
+    aggregate_result: HistoricalExperimentWalkForwardAggregateResult | None = None,
+    aggregate_json_path: Path | None = None,
+    aggregate_csv_path: Path | None = None,
 ) -> str:
     lines = ["Walk-forward artifacts:", f"  result ID: {result.result_id}"]
     if json_path is not None:
         lines.append(f"  JSON: {json_path}")
     if csv_path is not None:
         lines.append(f"  CSV: {csv_path}")
+    if aggregate_result is not None and (
+        aggregate_json_path is not None or aggregate_csv_path is not None
+    ):
+        lines.extend(
+            (
+                "Walk-forward aggregate artifacts:",
+                f"  result ID: {aggregate_result.result_id}",
+            )
+        )
+    if aggregate_json_path is not None:
+        lines.append(f"  aggregate JSON: {aggregate_json_path}")
+    if aggregate_csv_path is not None:
+        lines.append(f"  aggregate CSV: {aggregate_csv_path}")
     return "\n".join(lines) + "\n"
 
 
@@ -270,10 +377,24 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.json_pretty and args.json is None:
         parser.error("--json-pretty requires --json")
-    if args.overwrite and args.json is None and args.csv is None:
+    if args.aggregate_json_pretty and args.aggregate_json is None:
+        parser.error("--aggregate-json-pretty requires --aggregate-json")
+    raw_destinations = (
+        args.json,
+        args.csv,
+        args.aggregate_json,
+        args.aggregate_csv,
+    )
+    if args.overwrite and not any(item is not None for item in raw_destinations):
         parser.error("--overwrite requires an output destination")
-    json_path, csv_path = normalized_destinations((args.json, args.csv))
-    destinations = tuple(item for item in (json_path, csv_path) if item is not None)
+    json_path, csv_path, aggregate_json_path, aggregate_csv_path = (
+        normalized_destinations(raw_destinations)
+    )
+    destinations = tuple(
+        item
+        for item in (json_path, csv_path, aggregate_json_path, aggregate_csv_path)
+        if item is not None
+    )
     if len(set(destinations)) != len(destinations):
         parser.error("output destinations must be pairwise distinct")
     try:
@@ -282,7 +403,15 @@ def main(argv: list[str] | None = None) -> int:
             overwrite=args.overwrite,
             error_factory=WalkForwardExperimentOutputError,
         )
-        run = run_cli(args.config)
+        config = load_walk_forward_experiment_config(args.config)
+        if config.schema_version == 1 and (
+            aggregate_json_path is not None or aggregate_csv_path is not None
+        ):
+            raise ConfigValidationError(
+                "$.schema_version",
+                "aggregate destinations require walk-forward schema version 2",
+            )
+        run = run_cli(args.config, loaded_config=config)
         artifacts = []
         if json_path is not None:
             artifacts.append(
@@ -293,6 +422,30 @@ def main(argv: list[str] | None = None) -> int:
             )
         if csv_path is not None:
             artifacts.append(OutputArtifact(csv_path, _csv_serializer(run.result)))
+        if aggregate_json_path is not None:
+            if run.aggregate_result is None:
+                raise WalkForwardExperimentOutputError(
+                    "aggregate result is unavailable"
+                )
+            artifacts.append(
+                OutputArtifact(
+                    aggregate_json_path,
+                    _aggregate_json_serializer(
+                        run.aggregate_result, pretty=args.aggregate_json_pretty
+                    ),
+                )
+            )
+        if aggregate_csv_path is not None:
+            if run.aggregate_result is None:
+                raise WalkForwardExperimentOutputError(
+                    "aggregate result is unavailable"
+                )
+            artifacts.append(
+                OutputArtifact(
+                    aggregate_csv_path,
+                    _aggregate_csv_serializer(run.aggregate_result),
+                )
+            )
         write_artifacts(
             tuple(artifacts),
             overwrite=args.overwrite,
@@ -317,5 +470,15 @@ def main(argv: list[str] | None = None) -> int:
     if not args.quiet:
         print(run.summary, end="")
         if destinations:
-            print(_success(run.result, json_path, csv_path), end="")
+            print(
+                _success(
+                    run.result,
+                    json_path,
+                    csv_path,
+                    run.aggregate_result,
+                    aggregate_json_path,
+                    aggregate_csv_path,
+                ),
+                end="",
+            )
     return 0

@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 
 import pytest
+from tests.cli.test_walk_forward_aggregate_config import raw_schema_two
 from tests.cli.test_walk_forward_experiment_config import raw_walk_forward
 
 from trading_bot.cli import coordinated_output, walk_forward_experiment
@@ -182,3 +183,73 @@ def test_summary_explicitly_disclaims_aggregate_equity_curve(tmp_path: Path) -> 
     assert "selected rank: 1" in summary
     assert "no aggregate out-of-sample metrics" in summary
     assert "continuous equity curve" in summary
+
+
+def test_schema_two_runs_one_runner_and_one_analyzer_with_exact_source(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    config = write_config(tmp_path)
+    raw = json.loads(config.read_text(encoding="utf-8"))
+    aggregate = raw_schema_two()
+    raw["schema_version"] = 2
+    raw["aggregate_policy"] = aggregate["aggregate_policy"]
+    config.write_text(json.dumps(raw), encoding="utf-8")
+    runner_type = walk_forward_experiment._runner_type
+    analyzer_type = walk_forward_experiment._aggregate_analyzer_type
+    seen = []
+
+    class CountingRunner:
+        calls = 0
+
+        def __init__(self, factory):
+            self._runner = runner_type(factory)
+
+        def run(self, request):
+            type(self).calls += 1
+            result = self._runner.run(request)
+            seen.append(result)
+            return result
+
+    class CountingAnalyzer:
+        calls = 0
+
+        def analyze(self, result, policy):
+            type(self).calls += 1
+            assert result is seen[0]
+            return analyzer_type().analyze(result, policy)
+
+    monkeypatch.setattr(walk_forward_experiment, "_runner_type", CountingRunner)
+    monkeypatch.setattr(
+        walk_forward_experiment, "_aggregate_analyzer_type", CountingAnalyzer
+    )
+    run = walk_forward_experiment.run_cli(config)
+    assert CountingRunner.calls == CountingAnalyzer.calls == 1
+    assert run.aggregate_result is not None
+    assert "independent simulation" in run.summary
+    assert "distribution of fold observations" in run.summary
+
+
+def test_schema_one_aggregate_destination_fails_before_historical_loading(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    config = write_config(tmp_path)
+
+    class ForbiddenCoordinator:
+        def __init__(self, provider):
+            raise AssertionError("historical loading must not begin")
+
+    monkeypatch.setattr(
+        walk_forward_experiment, "_coordinator_type", ForbiddenCoordinator
+    )
+    assert (
+        walk_forward_experiment.main(
+            [
+                "--config",
+                str(config),
+                "--aggregate-json",
+                str(tmp_path / "aggregate.json"),
+                "--quiet",
+            ]
+        )
+        == 4
+    )

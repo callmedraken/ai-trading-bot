@@ -17,3 +17,12 @@ The aggregate checks also reject fields that would imply totals, compounding,
 a continuous equity curve, annualization, ranking, scoring, or recommendations.
 The fixtures use no network access, clock, randomness, external market data, or
 generated report files.
+
+Schema-3 coverage extends the same temporary-directory workflow through the
+stability analyzer and stability JSON/CSV projections. It verifies exact source
+identity handoff, optional aggregate provenance, retained fold ordering,
+directional transitions including self-transitions, first-appearance
+frequencies, exact timedelta microseconds, Decimal and integer scalar types,
+rational persistence, range, median, median absolute deviation, and direct
+nonzero sign changes. Existing walk-forward and aggregate artifact bytes remain
+independent of stability destinations.

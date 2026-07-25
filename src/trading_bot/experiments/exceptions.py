@@ -349,3 +349,61 @@ class InconsistentHistoricalExperimentWalkForwardAggregateResultError(
     HistoricalExperimentWalkForwardAggregateError, ValueError
 ):
     """Raised when a retained walk-forward aggregate result is inconsistent."""
+
+
+class HistoricalExperimentWalkForwardStabilityError(HistoricalExperimentError):
+    """Base exception for deterministic walk-forward stability analysis."""
+
+
+class InvalidHistoricalExperimentWalkForwardStabilityPolicyError(
+    HistoricalExperimentWalkForwardStabilityError, ValueError
+):
+    """Raised when a walk-forward stability policy is malformed."""
+
+
+class HistoricalExperimentWalkForwardStabilitySourceError(
+    HistoricalExperimentWalkForwardStabilityError, ValueError
+):
+    """Raised when retained walk-forward evidence is invalid."""
+
+
+class HistoricalExperimentWalkForwardStabilityAggregateSourceError(
+    HistoricalExperimentWalkForwardStabilityError, ValueError
+):
+    """Raised when optional aggregate provenance does not reconcile."""
+
+
+class HistoricalExperimentWalkForwardStabilityMetricError(
+    HistoricalExperimentWalkForwardStabilityError, ValueError
+):
+    """Raised when a selected stability metric value is malformed."""
+
+
+class HistoricalExperimentWalkForwardStabilityOperationError(
+    HistoricalExperimentWalkForwardStabilityError, ValueError
+):
+    """Raised when a metric requests an ineligible stability operation."""
+
+
+class HistoricalExperimentWalkForwardStabilityComparabilityError(
+    HistoricalExperimentWalkForwardStabilityError, ValueError
+):
+    """Raised when folds do not satisfy an explicit comparability rule."""
+
+
+class HistoricalExperimentWalkForwardStabilityArithmeticError(
+    HistoricalExperimentWalkForwardStabilityError
+):
+    """Raised when exact stability arithmetic cannot be completed."""
+
+
+class HistoricalExperimentWalkForwardStabilityReconciliationError(
+    HistoricalExperimentWalkForwardStabilityError, ValueError
+):
+    """Raised when generated stability evidence does not reconcile."""
+
+
+class InconsistentHistoricalExperimentWalkForwardStabilityResultError(
+    HistoricalExperimentWalkForwardStabilityError, ValueError
+):
+    """Raised when a retained walk-forward stability result is inconsistent."""

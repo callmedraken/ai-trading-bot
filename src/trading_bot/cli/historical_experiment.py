@@ -1,15 +1,21 @@
 """Run deterministic offline historical experiments from local configuration."""
 
 import argparse
-import os
 import sys
-import tempfile
 from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
 from uuid import UUID
 
 from trading_bot.cli._simulation_bootstrap import initialize_canonical_ledger
+from trading_bot.cli.coordinated_output import (
+    OutputArtifact as _OutputArtifact,
+)
+from trading_bot.cli.coordinated_output import (
+    normalized_destinations,
+    preflight_destinations,
+    write_artifacts,
+)
 from trading_bot.cli.exceptions import (
     AuditOutputError,
     ConfigJsonError,
@@ -546,12 +552,6 @@ def _decimal(value) -> str:  # type: ignore[no-untyped-def]
     return canonical_decimal(value)
 
 
-@dataclass(frozen=True, slots=True)
-class _OutputArtifact:
-    destination: Path
-    content: str
-
-
 def _normalized_destinations(
     args,  # type: ignore[no-untyped-def]
 ) -> tuple[
@@ -563,9 +563,8 @@ def _normalized_destinations(
     Path | None,
     Path | None,
 ]:
-    return tuple(
-        None if value is None else value.resolve(strict=False)
-        for value in (
+    return normalized_destinations(
+        (
             args.output,
             args.compact_json,
             args.compact_csv,
@@ -580,63 +579,22 @@ def _normalized_destinations(
 def _preflight_destinations(
     destinations: tuple[Path | None, ...], *, overwrite: bool
 ) -> None:
-    for destination in destinations:
-        if destination is None:
-            continue
-        if not destination.parent.is_dir():
-            raise HistoricalExperimentReportOutputError(
-                f"output parent directory does not exist: {destination.parent}"
-            )
-        if destination.exists() and not overwrite:
-            raise HistoricalExperimentReportOutputError(
-                f"output already exists: {destination}"
-            )
+    preflight_destinations(
+        (item for item in destinations if item is not None),
+        overwrite=overwrite,
+        error_factory=HistoricalExperimentReportOutputError,
+    )
 
 
 def _write_artifacts(
     artifacts: tuple[_OutputArtifact, ...], *, overwrite: bool
 ) -> None:
-    staged: list[tuple[Path, Path]] = []
-    try:
-        for artifact in artifacts:
-            destination = artifact.destination
-            if destination.exists() and not overwrite:
-                raise HistoricalExperimentReportOutputError(
-                    f"output already exists: {destination}"
-                )
-            descriptor, name = tempfile.mkstemp(
-                prefix=f".{destination.name}.",
-                suffix=".tmp",
-                dir=destination.parent,
-            )
-            temporary = Path(name)
-            try:
-                with os.fdopen(descriptor, "w", encoding="utf-8", newline="") as stream:
-                    stream.write(artifact.content)
-                    stream.flush()
-                    os.fsync(stream.fileno())
-            except (OSError, UnicodeError):
-                temporary.unlink(missing_ok=True)
-                raise
-            staged.append((destination, temporary))
-        for destination, temporary in staged:
-            if destination.exists() and not overwrite:
-                raise HistoricalExperimentReportOutputError(
-                    f"output already exists: {destination}"
-                )
-            os.replace(temporary, destination)
-    except HistoricalExperimentReportOutputError:
-        raise
-    except (OSError, UnicodeError) as error:
-        raise HistoricalExperimentReportOutputError(
-            f"cannot write compact experiment output: {error}"
-        ) from error
-    finally:
-        for _, temporary in staged:
-            try:
-                temporary.unlink(missing_ok=True)
-            except OSError:
-                pass
+    write_artifacts(
+        artifacts,
+        overwrite=overwrite,
+        error_factory=HistoricalExperimentReportOutputError,
+        write_error_prefix="cannot write compact experiment output",
+    )
 
 
 def _compact_success(

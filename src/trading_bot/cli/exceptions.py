@@ -112,3 +112,23 @@ class HistoricalExperimentPairwiseOutputError(HistoricalExperimentCliError):
 
 class HistoricalExperimentParetoOutputError(HistoricalExperimentCliError):
     """Raised when Pareto output cannot be serialized."""
+
+
+class WalkForwardExperimentCliError(Exception):
+    """Base exception for expected walk-forward CLI failures."""
+
+
+class WalkForwardExperimentDataError(WalkForwardExperimentCliError):
+    """Raised when configured walk-forward history cannot be loaded."""
+
+
+class WalkForwardExperimentInitializationCliError(WalkForwardExperimentCliError):
+    """Raised when a child simulator cannot be initialized."""
+
+
+class WalkForwardExperimentExecutionCliError(WalkForwardExperimentCliError):
+    """Raised when walk-forward execution or reconciliation fails."""
+
+
+class WalkForwardExperimentOutputError(WalkForwardExperimentCliError):
+    """Raised when walk-forward output cannot be serialized or written."""

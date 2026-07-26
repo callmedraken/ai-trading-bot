@@ -43,3 +43,12 @@ workflow.
 Copy-only relocation of the verified session into a fixed portable directory
 layout is covered by `docs/validation/walk-forward-research-bundle.md`. Bundle
 validation retains every primary artifact byte and the manifest identity.
+
+`tests/integration/test_walk_forward_research_transport_e2e.py` executes one
+real schema-3 workflow with all six primary artifacts, then validates the full
+manifest → bundle → canonical USTAR archive → restored-bundle round trip. It
+uses only pytest temporary paths, removes the original bundle before restore,
+checks offline verification and exact tree bytes, reconciles retained artifact
+evidence and manifest identity at every boundary, and proves deterministic
+archive output plus repeated restoration. It also distinguishes format-invariant
+manifest identity from format-sensitive completed-bundle and archive bytes.

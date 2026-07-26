@@ -59,3 +59,43 @@ class CSVSchemaError(HistoricalDataError):
 
 class CSVRowError(HistoricalDataError):
     """Raised when a CSV row cannot be parsed into a valid bar."""
+
+
+class DailySnapshotError(Exception):
+    """Base class for provider-neutral daily snapshot failures."""
+
+
+class DailySnapshotValidationError(DailySnapshotError, ValueError):
+    """Base class for invalid daily snapshot values."""
+
+
+class InvalidDailySnapshotRequestError(DailySnapshotValidationError):
+    """Raised when a daily snapshot request is invalid."""
+
+
+class InvalidDailySnapshotCalendarError(DailySnapshotValidationError):
+    """Raised when a calendar is absent, unsupported, or inconsistently bound."""
+
+
+class InvalidDailySnapshotProviderError(DailySnapshotValidationError):
+    """Raised when a provider contract or descriptor is invalid."""
+
+
+class InvalidDailySnapshotResponseError(DailySnapshotValidationError):
+    """Raised when a provider response envelope is invalid."""
+
+
+class InvalidDailySnapshotModelError(DailySnapshotValidationError):
+    """Raised when an accepted snapshot model is internally inconsistent."""
+
+
+class DailySnapshotSerializationError(DailySnapshotError, ValueError):
+    """Raised when canonical snapshot JSON cannot be parsed or serialized."""
+
+
+class DailySnapshotVerificationError(DailySnapshotError, ValueError):
+    """Raised when verification arguments are invalid."""
+
+
+class DailySnapshotReplayError(DailySnapshotError, ValueError):
+    """Raised when replay is requested from an unverified snapshot."""

@@ -30,3 +30,8 @@ This layer does not download data, use pandas, interpret market calendars,
 cache results, persist data, run strategies or backtests, execute orders,
 connect to brokers, or call AI services. Adjustments, intraday data, calendars,
 large-file indexing, provenance metadata, and network sources remain deferred.
+
+The provider-neutral completed daily snapshot boundary documented in
+`56-daily-market-data-snapshot.md` is separate from this historical-data
+contract. It reuses `Symbol`, `Bar`, `Timeframe`, and `AdjustmentType` without
+changing CSV parsing, historical requests/results, or their identities.

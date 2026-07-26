@@ -61,3 +61,7 @@ objects remain installed, and pre/post state IDs are equal.
 Deep copying at both the runtime and existing component boundaries is accepted
 for the current in-memory scale. A future shared transaction abstraction may
 reduce copy cost, but must preserve the same audit and atomicity guarantees.
+
+Verified daily snapshot replay remains a separate market-data boundary. It does
+not automatically construct cycle prices, targets, risk inputs, orders, or
+fills, and the runtime continues to perform no market-data retrieval.

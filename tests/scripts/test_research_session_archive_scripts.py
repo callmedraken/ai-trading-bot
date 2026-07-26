@@ -18,6 +18,10 @@ ROOT = Path(__file__).resolve().parents[2]
             "verify_walk_forward_research_bundle_archive.py",
             "verify_research_session_archive",
         ),
+        (
+            "restore_walk_forward_research_bundle_archive.py",
+            "restore_research_session_archive",
+        ),
     ],
 )
 def test_archive_script_delegates(

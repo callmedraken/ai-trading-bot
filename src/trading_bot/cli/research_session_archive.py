@@ -7,7 +7,7 @@ import stat
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path, PurePosixPath
-from typing import BinaryIO
+from typing import BinaryIO, Protocol
 from uuid import UUID
 
 from trading_bot.cli.exceptions import (
@@ -84,6 +84,46 @@ class ResearchSessionArchiveEntryEvidence:
         if type(self.byte_length) is not int or self.byte_length < 0:
             raise TypeError("byte_length must be an exact nonnegative integer")
         _validate_sha256(self.sha256, "sha256")
+
+
+@dataclass(frozen=True, slots=True)
+class CanonicalUstarEntry:
+    """One validated canonical USTAR entry about to be streamed."""
+
+    position: int
+    path: str
+    byte_length: int
+
+    def __post_init__(self) -> None:
+        if type(self.position) is not int or self.position < 1:
+            raise TypeError("position must be an exact positive integer")
+        _validate_entry_name(self.path)
+        if type(self.byte_length) is not int or self.byte_length < 0:
+            raise TypeError("byte_length must be an exact nonnegative integer")
+
+
+class CanonicalUstarPayloadConsumer(Protocol):
+    """Consumer for already validated entry headers and bounded payload chunks."""
+
+    def start_entry(self, entry: CanonicalUstarEntry) -> None:
+        """Prepare to consume one validated entry."""
+
+        ...
+
+    def consume_payload_chunk(self, entry: CanonicalUstarEntry, chunk: bytes) -> None:
+        """Consume one bounded payload chunk."""
+
+        ...
+
+    def finish_entry(
+        self,
+        entry: CanonicalUstarEntry,
+        evidence: ResearchSessionArchiveEntryEvidence,
+        manifest: WalkForwardResearchSessionManifest | None,
+    ) -> None:
+        """Finish one entry after its payload and zero padding validate."""
+
+        ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -600,24 +640,30 @@ def _parse_header(header: bytes) -> tuple[str, int]:
 
 
 def _read_payload(
-    reader: _HashingReader, byte_length: int, description: str
+    reader: _HashingReader,
+    entry: CanonicalUstarEntry,
+    consumer: CanonicalUstarPayloadConsumer | None,
 ) -> tuple[int, str, bytes | None]:
     digest = hashlib.sha256()
-    content = bytearray() if description == "manifest.json" else None
-    remaining = byte_length
+    content = bytearray() if entry.path == "manifest.json" else None
+    remaining = entry.byte_length
     total = 0
     while remaining:
         requested = min(remaining, ARCHIVE_COPY_CHUNK_BYTES)
-        chunk = reader.read_exact(requested, f"{description} payload")
+        chunk = reader.read_exact(requested, f"{entry.path} payload")
         digest.update(chunk)
         if content is not None:
             content.extend(chunk)
+        if consumer is not None:
+            consumer.consume_payload_chunk(entry, chunk)
         total += len(chunk)
         remaining -= len(chunk)
-    padding = reader.read_exact(_payload_padding(byte_length), f"{description} padding")
+    padding = reader.read_exact(
+        _payload_padding(entry.byte_length), f"{entry.path} padding"
+    )
     if any(padding):
         raise ResearchSessionArchiveStructureError(
-            f"{description} payload padding is not zero"
+            f"{entry.path} payload padding is not zero"
         )
     return total, digest.hexdigest(), None if content is None else bytes(content)
 
@@ -650,13 +696,15 @@ def _open_regular_archive(path: Path) -> tuple[BinaryIO, os.stat_result]:
     return stream, opened
 
 
-def verify_walk_forward_research_bundle_archive(
+def stream_canonical_walk_forward_research_bundle_archive(
     *,
     archive_path: Path,
     expected_sha256: str | None = None,
     expected_byte_length: int | None = None,
+    expected_manifest: WalkForwardResearchSessionManifest | None = None,
+    consumer: CanonicalUstarPayloadConsumer | None = None,
 ) -> WalkForwardResearchArchiveVerificationResult:
-    """Stream and verify one canonical USTAR archive without extraction."""
+    """Verify a canonical archive and optionally expose bounded payload chunks."""
 
     if not isinstance(archive_path, Path):
         raise ResearchSessionArchiveArgumentError("archive_path must be a Path")
@@ -667,6 +715,12 @@ def verify_walk_forward_research_bundle_archive(
     ):
         raise ResearchSessionArchiveArgumentError(
             "expected_byte_length must be an exact nonnegative integer"
+        )
+    if expected_manifest is not None and (
+        type(expected_manifest) is not WalkForwardResearchSessionManifest
+    ):
+        raise ResearchSessionArchiveArgumentError(
+            "expected_manifest must be an exact WalkForwardResearchSessionManifest"
         )
     normalized = _normalized_final_component(archive_path, "archive_path")
     stream, opened_before = _open_regular_archive(normalized)
@@ -683,8 +737,15 @@ def verify_walk_forward_research_bundle_archive(
                 raise ResearchSessionArchiveStructureError(
                     "embedded manifest exceeds maximum byte size of 4194304"
                 )
+            manifest_entry = CanonicalUstarEntry(
+                position=1,
+                path=manifest_path,
+                byte_length=manifest_length,
+            )
+            if consumer is not None:
+                consumer.start_entry(manifest_entry)
             actual_length, actual_hash, manifest_bytes = _read_payload(
-                reader, manifest_length, "manifest.json"
+                reader, manifest_entry, consumer
             )
             if manifest_bytes is None:
                 raise RuntimeError("manifest payload was not retained")
@@ -692,11 +753,20 @@ def verify_walk_forward_research_bundle_archive(
                 manifest_bytes
             )
             _fixed_bundle_manifest(manifest)
-            evidence = [
-                ResearchSessionArchiveEntryEvidence(
-                    1, "manifest.json", actual_length, actual_hash
+            if expected_manifest is not None and manifest != expected_manifest:
+                raise ResearchSessionArchiveStructureError(
+                    "embedded manifest changed between archive passes"
                 )
-            ]
+            manifest_evidence = ResearchSessionArchiveEntryEvidence(
+                1, "manifest.json", actual_length, actual_hash
+            )
+            evidence = [manifest_evidence]
+            if consumer is not None:
+                consumer.finish_entry(
+                    manifest_entry,
+                    manifest_evidence,
+                    manifest,
+                )
             seen = {"manifest.json"}
             seen_casefold = {"manifest.json"}
             for position, artifact in enumerate(manifest.artifacts, start=2):
@@ -716,7 +786,10 @@ def verify_walk_forward_research_bundle_archive(
                     raise ResearchSessionArchiveByteLengthMismatchError(
                         f"archive entry byte length mismatch: {path}"
                     )
-                entry_length, entry_hash, _ = _read_payload(reader, header_length, path)
+                entry = CanonicalUstarEntry(position, path, header_length)
+                if consumer is not None:
+                    consumer.start_entry(entry)
+                entry_length, entry_hash, _ = _read_payload(reader, entry, consumer)
                 if entry_length != artifact.byte_length:
                     raise ResearchSessionArchiveByteLengthMismatchError(
                         f"archive entry byte length mismatch: {path}"
@@ -725,11 +798,12 @@ def verify_walk_forward_research_bundle_archive(
                     raise ResearchSessionArchiveHashMismatchError(
                         f"archive entry SHA-256 mismatch: {path}"
                     )
-                evidence.append(
-                    ResearchSessionArchiveEntryEvidence(
-                        position, path, entry_length, entry_hash
-                    )
+                entry_evidence = ResearchSessionArchiveEntryEvidence(
+                    position, path, entry_length, entry_hash
                 )
+                evidence.append(entry_evidence)
+                if consumer is not None:
+                    consumer.finish_entry(entry, entry_evidence, None)
             for ordinal in range(1, USTAR_TERMINATOR_BLOCK_COUNT + 1):
                 terminator = reader.read_exact(
                     USTAR_BLOCK_SIZE, f"terminator block {ordinal}"
@@ -781,6 +855,21 @@ def verify_walk_forward_research_bundle_archive(
         entries=tuple(evidence),
         expected_byte_length_matched=length_matched,
         expected_sha256_matched=hash_matched,
+    )
+
+
+def verify_walk_forward_research_bundle_archive(
+    *,
+    archive_path: Path,
+    expected_sha256: str | None = None,
+    expected_byte_length: int | None = None,
+) -> WalkForwardResearchArchiveVerificationResult:
+    """Stream and verify one canonical USTAR archive without extraction."""
+
+    return stream_canonical_walk_forward_research_bundle_archive(
+        archive_path=archive_path,
+        expected_sha256=expected_sha256,
+        expected_byte_length=expected_byte_length,
     )
 
 

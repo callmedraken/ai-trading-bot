@@ -88,3 +88,7 @@ Files and destination directories are `fsync`ed where supported. Directory
 unsupported elsewhere. Post-rename parent flushing is best effort and cannot
 turn a successful rename into failure. These measures do not claim universal
 crash durability or atomic no-clobber behavior against concurrent creators.
+
+Deterministic archive-to-bundle restoration reuses the public canonical
+streaming reader and is defined in
+`docs/architecture/55-walk-forward-research-restoration.md`.

@@ -244,3 +244,26 @@ class ResearchSessionArchiveOutputError(ResearchSessionArchiveError):
         self.cleanup_message = cleanup_message
         self.primary_error = primary_error
         super().__init__(message)
+
+
+class ResearchSessionRestoreError(Exception):
+    """Base exception for deterministic archive restoration failures."""
+
+
+class ResearchSessionRestoreArgumentError(ResearchSessionRestoreError, ValueError):
+    """Raised when archive-restoration API arguments are invalid."""
+
+
+class ResearchSessionRestoreOutputError(ResearchSessionRestoreError):
+    """Raised for restoration destination, staging, or finalization failures."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        cleanup_message: str | None = None,
+        primary_error: Exception | None = None,
+    ) -> None:
+        self.cleanup_message = cleanup_message
+        self.primary_error = primary_error
+        super().__init__(message)

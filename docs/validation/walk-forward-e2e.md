@@ -26,3 +26,11 @@ frequencies, exact timedelta microseconds, Decimal and integer scalar types,
 rational persistence, range, median, median absolute deviation, and direct
 nonzero sign changes. Existing walk-forward and aggregate artifact bytes remain
 independent of stability destinations.
+
+The schema-3 validation also requests a research-session manifest from the real
+command. It reconciles the manifest's family result IDs to the three immutable
+JSON results and verifies canonical artifact order, relative paths,
+serializer-contract schema versions, exact byte lengths, and SHA-256 hashes for
+all six primary artifact bytes. Repeated runs produce identical primary and
+manifest bytes, and every generated file remains below pytest's temporary
+directory.

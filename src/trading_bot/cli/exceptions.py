@@ -132,3 +132,11 @@ class WalkForwardExperimentExecutionCliError(WalkForwardExperimentCliError):
 
 class WalkForwardExperimentOutputError(WalkForwardExperimentCliError):
     """Raised when walk-forward output cannot be serialized or written."""
+
+
+class ResearchSessionManifestError(WalkForwardExperimentOutputError, ValueError):
+    """Raised when a research-session manifest is invalid or cannot be built."""
+
+
+class ResearchSessionManifestVerificationError(ResearchSessionManifestError):
+    """Raised when offline artifact verification fails."""

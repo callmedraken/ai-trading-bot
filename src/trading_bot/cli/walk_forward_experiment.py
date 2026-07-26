@@ -1,6 +1,7 @@
 """Run deterministic offline walk-forward experiment evaluation."""
 
 import argparse
+import os
 import sys
 from dataclasses import dataclass
 from decimal import Decimal
@@ -23,7 +24,14 @@ from trading_bot.cli.exceptions import (
     WalkForwardExperimentInitializationCliError,
     WalkForwardExperimentOutputError,
 )
+from trading_bot.cli.research_session_manifest import (
+    CompletedResearchArtifact,
+    ResearchSessionArtifactKind,
+    build_walk_forward_research_session_manifest,
+    serialize_walk_forward_research_session_manifest_json,
+)
 from trading_bot.cli.walk_forward_aggregate_serialization import (
+    WALK_FORWARD_AGGREGATE_SCHEMA_VERSION,
     serialize_walk_forward_aggregate_csv,
     serialize_walk_forward_aggregate_json,
 )
@@ -32,10 +40,12 @@ from trading_bot.cli.walk_forward_experiment_config import (
     load_walk_forward_experiment_config,
 )
 from trading_bot.cli.walk_forward_experiment_serialization import (
+    WALK_FORWARD_REPORT_SCHEMA_VERSION,
     serialize_walk_forward_csv,
     serialize_walk_forward_json,
 )
 from trading_bot.cli.walk_forward_stability_serialization import (
+    WALK_FORWARD_STABILITY_SCHEMA_VERSION,
     serialize_walk_forward_stability_csv,
     serialize_walk_forward_stability_json,
 )
@@ -64,6 +74,7 @@ from trading_bot.market_data import (
     HistoricalDataError,
     MultiSymbolHistoricalDataRequest,
 )
+from trading_bot.portfolio import MetadataEntry
 from trading_bot.runtime import PaperPortfolioRuntime
 from trading_bot.simulation import OptimizedPaperPortfolioSimulator
 
@@ -142,6 +153,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--stability-json", type=Path)
     parser.add_argument("--stability-json-pretty", action="store_true")
     parser.add_argument("--stability-csv", type=Path)
+    parser.add_argument("--manifest", type=Path)
+    parser.add_argument("--manifest-pretty", action="store_true")
+    parser.add_argument("--session-label")
+    parser.add_argument("--session-metadata", action="append", default=[])
     parser.add_argument("--overwrite", action="store_true")
     parser.add_argument("--quiet", action="store_true")
     return parser
@@ -514,6 +529,12 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--aggregate-json-pretty requires --aggregate-json")
     if args.stability_json_pretty and args.stability_json is None:
         parser.error("--stability-json-pretty requires --stability-json")
+    if args.manifest_pretty and args.manifest is None:
+        parser.error("--manifest-pretty requires --manifest")
+    if args.session_label is not None and args.manifest is None:
+        parser.error("--session-label requires --manifest")
+    if args.session_metadata and args.manifest is None:
+        parser.error("--session-metadata requires --manifest")
     raw_destinations = (
         args.json,
         args.csv,
@@ -522,6 +543,10 @@ def main(argv: list[str] | None = None) -> int:
         args.stability_json,
         args.stability_csv,
     )
+    if args.manifest is not None and not any(
+        item is not None for item in raw_destinations
+    ):
+        parser.error("--manifest requires at least one primary artifact destination")
     if args.overwrite and not any(item is not None for item in raw_destinations):
         parser.error("--overwrite requires an output destination")
     (
@@ -531,7 +556,8 @@ def main(argv: list[str] | None = None) -> int:
         aggregate_csv_path,
         stability_json_path,
         stability_csv_path,
-    ) = normalized_destinations(raw_destinations)
+        manifest_path,
+    ) = normalized_destinations((*raw_destinations, args.manifest))
     destinations = tuple(
         item
         for item in (
@@ -541,17 +567,40 @@ def main(argv: list[str] | None = None) -> int:
             aggregate_csv_path,
             stability_json_path,
             stability_csv_path,
+            manifest_path,
         )
         if item is not None
     )
     if len(set(destinations)) != len(destinations):
         parser.error("output destinations must be pairwise distinct")
     try:
+        if manifest_path is not None and manifest_path.exists():
+            raise WalkForwardExperimentOutputError(
+                "manifest output already exists and cannot be overwritten in "
+                f"manifest schema version 1: {manifest_path}"
+            )
         preflight_destinations(
             destinations,
             overwrite=args.overwrite,
             error_factory=WalkForwardExperimentOutputError,
         )
+        if manifest_path is not None:
+            for destination in destinations:
+                if destination != manifest_path:
+                    try:
+                        os.path.relpath(destination, manifest_path.parent)
+                    except ValueError as error:
+                        raise WalkForwardExperimentOutputError(
+                            "primary artifact and manifest destinations must be "
+                            "on the same volume"
+                        ) from error
+        session_metadata = _parse_session_metadata(args.session_metadata)
+        if args.session_label is not None and (
+            not args.session_label or args.session_label != args.session_label.strip()
+        ):
+            raise WalkForwardExperimentOutputError(
+                "--session-label must be a nonblank unpadded string"
+            )
         config = load_walk_forward_experiment_config(args.config)
         if config.schema_version == 1 and (
             aggregate_json_path is not None or aggregate_csv_path is not None
@@ -576,26 +625,47 @@ def main(argv: list[str] | None = None) -> int:
             )
         run = run_cli(args.config, loaded_config=config)
         artifacts = []
+        completed_artifacts = []
         if json_path is not None:
-            artifacts.append(
-                OutputArtifact(
+            content = _json_serializer(run.result, pretty=args.json_pretty)
+            artifacts.append(OutputArtifact(json_path, content))
+            completed_artifacts.append(
+                CompletedResearchArtifact(
                     json_path,
-                    _json_serializer(run.result, pretty=args.json_pretty),
+                    ResearchSessionArtifactKind.WALK_FORWARD_JSON,
+                    WALK_FORWARD_REPORT_SCHEMA_VERSION,
+                    run.result.result_id,
+                    content.encode("utf-8"),
                 )
             )
         if csv_path is not None:
-            artifacts.append(OutputArtifact(csv_path, _csv_serializer(run.result)))
+            content = _csv_serializer(run.result)
+            artifacts.append(OutputArtifact(csv_path, content))
+            completed_artifacts.append(
+                CompletedResearchArtifact(
+                    csv_path,
+                    ResearchSessionArtifactKind.WALK_FORWARD_CSV,
+                    WALK_FORWARD_REPORT_SCHEMA_VERSION,
+                    run.result.result_id,
+                    content.encode("utf-8"),
+                )
+            )
         if aggregate_json_path is not None:
             if run.aggregate_result is None:
                 raise WalkForwardExperimentOutputError(
                     "aggregate result is unavailable"
                 )
-            artifacts.append(
-                OutputArtifact(
+            content = _aggregate_json_serializer(
+                run.aggregate_result, pretty=args.aggregate_json_pretty
+            )
+            artifacts.append(OutputArtifact(aggregate_json_path, content))
+            completed_artifacts.append(
+                CompletedResearchArtifact(
                     aggregate_json_path,
-                    _aggregate_json_serializer(
-                        run.aggregate_result, pretty=args.aggregate_json_pretty
-                    ),
+                    ResearchSessionArtifactKind.AGGREGATE_JSON,
+                    WALK_FORWARD_AGGREGATE_SCHEMA_VERSION,
+                    run.aggregate_result.result_id,
+                    content.encode("utf-8"),
                 )
             )
         if aggregate_csv_path is not None:
@@ -603,10 +673,15 @@ def main(argv: list[str] | None = None) -> int:
                 raise WalkForwardExperimentOutputError(
                     "aggregate result is unavailable"
                 )
-            artifacts.append(
-                OutputArtifact(
+            content = _aggregate_csv_serializer(run.aggregate_result)
+            artifacts.append(OutputArtifact(aggregate_csv_path, content))
+            completed_artifacts.append(
+                CompletedResearchArtifact(
                     aggregate_csv_path,
-                    _aggregate_csv_serializer(run.aggregate_result),
+                    ResearchSessionArtifactKind.AGGREGATE_CSV,
+                    WALK_FORWARD_AGGREGATE_SCHEMA_VERSION,
+                    run.aggregate_result.result_id,
+                    content.encode("utf-8"),
                 )
             )
         if stability_json_path is not None:
@@ -614,12 +689,17 @@ def main(argv: list[str] | None = None) -> int:
                 raise WalkForwardExperimentOutputError(
                     "stability result is unavailable"
                 )
-            artifacts.append(
-                OutputArtifact(
+            content = _stability_json_serializer(
+                run.stability_result, pretty=args.stability_json_pretty
+            )
+            artifacts.append(OutputArtifact(stability_json_path, content))
+            completed_artifacts.append(
+                CompletedResearchArtifact(
                     stability_json_path,
-                    _stability_json_serializer(
-                        run.stability_result, pretty=args.stability_json_pretty
-                    ),
+                    ResearchSessionArtifactKind.STABILITY_JSON,
+                    WALK_FORWARD_STABILITY_SCHEMA_VERSION,
+                    run.stability_result.result_id,
+                    content.encode("utf-8"),
                 )
             )
         if stability_csv_path is not None:
@@ -627,10 +707,32 @@ def main(argv: list[str] | None = None) -> int:
                 raise WalkForwardExperimentOutputError(
                     "stability result is unavailable"
                 )
+            content = _stability_csv_serializer(run.stability_result)
+            artifacts.append(OutputArtifact(stability_csv_path, content))
+            completed_artifacts.append(
+                CompletedResearchArtifact(
+                    stability_csv_path,
+                    ResearchSessionArtifactKind.STABILITY_CSV,
+                    WALK_FORWARD_STABILITY_SCHEMA_VERSION,
+                    run.stability_result.result_id,
+                    content.encode("utf-8"),
+                )
+            )
+        manifest = None
+        if manifest_path is not None:
+            manifest = build_walk_forward_research_session_manifest(
+                manifest_path=manifest_path,
+                walk_forward_config_schema_version=config.schema_version,
+                artifacts=tuple(completed_artifacts),
+                session_label=args.session_label,
+                metadata=session_metadata,
+            )
             artifacts.append(
                 OutputArtifact(
-                    stability_csv_path,
-                    _stability_csv_serializer(run.stability_result),
+                    manifest_path,
+                    serialize_walk_forward_research_session_manifest_json(
+                        manifest, pretty=args.manifest_pretty
+                    ),
                 )
             )
         write_artifacts(
@@ -671,4 +773,39 @@ def main(argv: list[str] | None = None) -> int:
                 ),
                 end="",
             )
+        if manifest_path is not None:
+            print(
+                "Walk-forward research-session manifest:\n"
+                f"  manifest ID: {manifest.manifest_id}\n"
+                f"  JSON: {manifest_path}"
+            )
     return 0
+
+
+def _parse_session_metadata(values: list[str]) -> tuple[MetadataEntry, ...]:
+    entries = []
+    for ordinal, value in enumerate(values):
+        if type(value) is not str or "=" not in value:
+            raise WalkForwardExperimentOutputError(
+                f"--session-metadata entry {ordinal + 1} must use KEY=VALUE"
+            )
+        key, item_value = value.split("=", 1)
+        try:
+            entries.append(MetadataEntry(key, item_value))
+        except (TypeError, ValueError) as error:
+            raise WalkForwardExperimentOutputError(
+                f"invalid --session-metadata entry {ordinal + 1}: {error}"
+            ) from error
+    if len({item.key for item in entries}) != len(entries):
+        raise WalkForwardExperimentOutputError("--session-metadata keys must be unique")
+    if any(
+        item.key.startswith("walk_forward_research_session_manifest_")
+        or item.key != item.key.strip()
+        or item.value != item.value.strip()
+        for item in entries
+    ):
+        raise WalkForwardExperimentOutputError(
+            "--session-metadata keys and values must be unpadded and use no "
+            "walk_forward_research_session_manifest_ reserved prefix"
+        )
+    return tuple(entries)

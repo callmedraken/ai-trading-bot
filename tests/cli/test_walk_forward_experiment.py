@@ -1,3 +1,4 @@
+import hashlib
 import json
 from pathlib import Path
 
@@ -110,6 +111,69 @@ def test_summary_only_and_exact_result_handoff_to_both_serializers(
     )
     assert len(seen) == 2
     assert seen[0] is seen[1]
+
+
+def test_manifest_uses_exact_once_rendered_bytes_and_is_rejected_if_existing(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config = write_config(tmp_path)
+    json_path = tmp_path / "result.json"
+    csv_path = tmp_path / "result.csv"
+    manifest_path = tmp_path / "manifest.json"
+    json_calls = 0
+    csv_calls = 0
+    json_serializer = walk_forward_experiment._json_serializer
+    csv_serializer = walk_forward_experiment._csv_serializer
+
+    def json_recording(result, *, pretty):  # type: ignore[no-untyped-def]
+        nonlocal json_calls
+        json_calls += 1
+        return json_serializer(result, pretty=pretty)
+
+    def csv_recording(result):  # type: ignore[no-untyped-def]
+        nonlocal csv_calls
+        csv_calls += 1
+        return csv_serializer(result)
+
+    monkeypatch.setattr(walk_forward_experiment, "_json_serializer", json_recording)
+    monkeypatch.setattr(walk_forward_experiment, "_csv_serializer", csv_recording)
+    arguments = [
+        "--config",
+        str(config),
+        "--json",
+        str(json_path),
+        "--csv",
+        str(csv_path),
+        "--manifest",
+        str(manifest_path),
+        "--session-label",
+        "local",
+        "--session-metadata",
+        "purpose=audit",
+        "--quiet",
+    ]
+    assert walk_forward_experiment.main(arguments) == 0
+    assert json_calls == csv_calls == 1
+    payload = json.loads(manifest_path.read_bytes())[
+        "walk_forward_research_session_manifest"
+    ]
+    records = payload["artifacts"]
+    assert [item["kind"] for item in records] == [
+        "WALK_FORWARD_JSON",
+        "WALK_FORWARD_CSV",
+    ]
+    for record, path in zip(records, (json_path, csv_path), strict=True):
+        content = path.read_bytes()
+        assert record["byte_length"] == len(content)
+        assert record["hash"]["value"] == hashlib.sha256(content).hexdigest()
+
+    assert walk_forward_experiment.main([*arguments, "--overwrite"]) == 7
+    assert (
+        "cannot be overwritten in manifest schema version 1" in capsys.readouterr().err
+    )
+    assert json_calls == csv_calls == 1
 
 
 def test_factory_key_includes_child_request_variant_and_ordinal(tmp_path: Path) -> None:

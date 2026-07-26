@@ -188,3 +188,59 @@ class ResearchSessionBundleOutputError(ResearchSessionBundleError):
         self.cleanup_message = cleanup_message
         self.primary_error = primary_error
         super().__init__(message)
+
+
+class ResearchSessionArchiveError(Exception):
+    """Base exception for canonical research-bundle archive failures."""
+
+
+class ResearchSessionArchiveArgumentError(ResearchSessionArchiveError, ValueError):
+    """Raised when archive API arguments are invalid."""
+
+
+class ResearchSessionArchiveReadError(ResearchSessionArchiveError):
+    """Raised when an archive cannot be opened or read safely."""
+
+
+class ResearchSessionArchiveStructureError(ResearchSessionArchiveError, ValueError):
+    """Raised when archive structure is unsupported or noncanonical."""
+
+
+class ResearchSessionArchiveByteLengthMismatchError(ResearchSessionArchiveError):
+    """Raised when retained or expected byte length does not match."""
+
+
+class ResearchSessionArchiveHashMismatchError(ResearchSessionArchiveError):
+    """Raised when retained or expected SHA-256 does not match."""
+
+
+class ResearchSessionArchiveSourceVerificationError(ResearchSessionArchiveError):
+    """Raised when the completed source bundle does not verify."""
+
+    def __init__(self, result: object) -> None:
+        self.result = result
+        super().__init__("source research bundle verification failed")
+
+
+class ResearchSessionArchiveSourceEntryError(ResearchSessionArchiveError):
+    """Raised when a bundle entry becomes unsafe during archive creation."""
+
+    def __init__(self, path: str, status: object) -> None:
+        self.path = path
+        self.status = status
+        super().__init__("source bundle entry failed revalidation")
+
+
+class ResearchSessionArchiveOutputError(ResearchSessionArchiveError):
+    """Raised for archive destination, staging, or finalization failures."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        cleanup_message: str | None = None,
+        primary_error: Exception | None = None,
+    ) -> None:
+        self.cleanup_message = cleanup_message
+        self.primary_error = primary_error
+        super().__init__(message)

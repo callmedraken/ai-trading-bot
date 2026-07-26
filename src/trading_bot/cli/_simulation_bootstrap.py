@@ -4,12 +4,17 @@ from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
-from uuid import UUID, uuid5
+from uuid import UUID
 
-from trading_bot.domain import OrderFill, OrderSide, Symbol
+from trading_bot.domain import OrderFill, Symbol
 from trading_bot.execution import OrderEngine
-from trading_bot.execution.state_fingerprints import canonical_decimal
-from trading_bot.ledger import PaperLedger
+from trading_bot.ledger import (
+    PaperLedger,
+    PaperLedgerInitializationMode,
+    PaperLedgerInitializationPosition,
+    PaperLedgerInitializationRequest,
+    initialize_paper_ledger,
+)
 from trading_bot.runtime import PaperPortfolioRuntime
 from trading_bot.simulation import OptimizedPaperPortfolioSimulator
 
@@ -67,39 +72,20 @@ def initialize_canonical_ledger(
     identity_namespace: UUID,
     identity_material: tuple[str, ...],
 ) -> tuple[PaperLedger, tuple[OrderFill, ...]]:
-    """Build a ledger from canonical values and caller-owned identity material."""
-    if mode == InitializationMode.CASH_ONLY.value:
-        return PaperLedger(available_cash), ()
-    basis = sum(
-        (quantity * unit_cost for _, quantity, unit_cost in positions),
-        start=Decimal("0"),
+    """Delegate canonical bootstrap construction to the public ledger boundary."""
+    request = PaperLedgerInitializationRequest(
+        PaperLedgerInitializationMode(mode),
+        as_of,
+        available_cash,
+        tuple(
+            PaperLedgerInitializationPosition(symbol, quantity, unit_cost)
+            for symbol, quantity, unit_cost in positions
+        ),
+        identity_namespace,
+        identity_material,
     )
-    ledger = PaperLedger(available_cash + basis)
-    fills = []
-    for ordinal, (symbol, quantity, unit_cost) in enumerate(positions):
-        material = "|".join(
-            (
-                *identity_material,
-                str(ordinal),
-                str(symbol),
-                canonical_decimal(quantity),
-                canonical_decimal(unit_cost),
-                as_of.isoformat(),
-            )
-        )
-        fill = OrderFill(
-            uuid5(identity_namespace, f"{material}|fill"),
-            uuid5(identity_namespace, f"{material}|order"),
-            symbol,
-            OrderSide.BUY,
-            quantity,
-            unit_cost,
-            Decimal("0"),
-            as_of,
-        )
-        ledger.apply_fill(fill)
-        fills.append(fill)
-    return ledger, tuple(fills)
+    ledger, evidence = initialize_paper_ledger(request)
+    return ledger, evidence.bootstrap_fills
 
 
 def build_optimized_simulator(

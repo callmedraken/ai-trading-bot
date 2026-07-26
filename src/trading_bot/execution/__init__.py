@@ -84,6 +84,10 @@ from trading_bot.execution.portfolio_orders import (
     PortfolioOrderDiagnosticCode,
     PortfolioOrderOrchestrator,
 )
+from trading_bot.execution.state_fingerprints import (
+    current_order_engine_state_id,
+    current_paper_ledger_state_id,
+)
 
 __all__ = [
     "DuplicateEventError",
@@ -158,4 +162,6 @@ __all__ = [
     "PortfolioOrderEngineCopyError",
     "PortfolioOrderOrchestrationError",
     "PortfolioOrderOrchestrator",
+    "current_order_engine_state_id",
+    "current_paper_ledger_state_id",
 ]

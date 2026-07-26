@@ -1,5 +1,26 @@
 """Public API for deterministic offline historical market data."""
 
+from trading_bot.market_data.alpaca_daily_snapshot import (
+    ALPACA_API_KEY_ID_ENVIRONMENT_VARIABLE,
+    ALPACA_API_SECRET_KEY_ENVIRONMENT_VARIABLE,
+    ALPACA_DAILY_SNAPSHOT_DESCRIPTOR,
+    AlpacaDailySnapshotProvider,
+    alpaca_target_interval_utc,
+    build_alpaca_historical_bars_request,
+    create_alpaca_daily_snapshot_provider,
+    parse_alpaca_historical_bars_response,
+)
+from trading_bot.market_data.alpaca_http import (
+    ALPACA_DATA_HOST,
+    ALPACA_HTTPS_PORT,
+    ALPACA_RESPONSE_CHUNK_BYTES,
+    ALPACA_SOCKET_TIMEOUT_SECONDS,
+    MAX_ALPACA_RESPONSE_BYTES,
+    AlpacaHistoricalBarsRequest,
+    AlpacaHistoricalBarsTransport,
+    AlpacaHttpResponse,
+    StdlibAlpacaHistoricalBarsTransport,
+)
 from trading_bot.market_data.csv_provider import CSVHistoricalDataProvider
 from trading_bot.market_data.daily_snapshot_acceptance import (
     REJECTION_CLASSIFICATION_PRECEDENCE,
@@ -66,6 +87,11 @@ from trading_bot.market_data.daily_snapshot_verification import (
     verify_daily_snapshot,
 )
 from trading_bot.market_data.exceptions import (
+    AlpacaCredentialError,
+    AlpacaDailySnapshotError,
+    AlpacaHttpStatusError,
+    AlpacaResponseError,
+    AlpacaTransportError,
     CSVRowError,
     CSVSchemaError,
     DailySnapshotError,
@@ -114,9 +140,27 @@ from trading_bot.market_data.provider import (
 
 __all__ = [
     "AdjustmentType",
+    "ALPACA_API_KEY_ID_ENVIRONMENT_VARIABLE",
+    "ALPACA_API_SECRET_KEY_ENVIRONMENT_VARIABLE",
+    "ALPACA_DAILY_SNAPSHOT_DESCRIPTOR",
+    "ALPACA_DATA_HOST",
+    "ALPACA_HTTPS_PORT",
+    "ALPACA_RESPONSE_CHUNK_BYTES",
+    "ALPACA_SOCKET_TIMEOUT_SECONDS",
+    "AlpacaCredentialError",
+    "AlpacaDailySnapshotError",
+    "AlpacaDailySnapshotProvider",
+    "AlpacaHistoricalBarsRequest",
+    "AlpacaHistoricalBarsTransport",
+    "AlpacaHttpResponse",
+    "AlpacaHttpStatusError",
+    "AlpacaResponseError",
+    "AlpacaTransportError",
     "AlignedMarketFrame",
+    "alpaca_target_interval_utc",
     "accept_daily_provider_response",
     "BoundMarketCalendar",
+    "build_alpaca_historical_bars_request",
     "build_daily_provider_request",
     "CalendarDescriptor",
     "CANONICAL_BARS_MATERIAL_VERSION",
@@ -179,6 +223,7 @@ __all__ = [
     "InvalidMultiSymbolHistoricalDataRequestError",
     "InvalidMultiSymbolHistoricalDataResultError",
     "InconsistentProviderResultError",
+    "MAX_ALPACA_RESPONSE_BYTES",
     "MAX_DAILY_SNAPSHOT_ARTIFACT_BYTES",
     "MAX_DAILY_SNAPSHOT_SYMBOLS",
     "MissingBarPolicy",
@@ -186,7 +231,9 @@ __all__ = [
     "MultiSymbolHistoricalDataRequest",
     "MultiSymbolHistoricalDataResult",
     "CoordinatingHistoricalDataProvider",
+    "create_alpaca_daily_snapshot_provider",
     "parse_daily_snapshot",
+    "parse_alpaca_historical_bars_response",
     "ProviderDescriptor",
     "REJECTION_CLASSIFICATION_PRECEDENCE",
     "replay_verified_daily_snapshot",
@@ -198,6 +245,7 @@ __all__ = [
     "SNAPSHOT_IDENTITY_MATERIAL_VERSION",
     "snapshot_identity_material",
     "SourcePayloadEvidence",
+    "StdlibAlpacaHistoricalBarsTransport",
     "SymbolBars",
     "Timeframe",
     "UnsupportedAdjustmentError",

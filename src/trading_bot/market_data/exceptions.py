@@ -99,3 +99,40 @@ class DailySnapshotVerificationError(DailySnapshotError, ValueError):
 
 class DailySnapshotReplayError(DailySnapshotError, ValueError):
     """Raised when replay is requested from an unverified snapshot."""
+
+
+class AlpacaDailySnapshotError(DailySnapshotError):
+    """Base class for sanitized Alpaca daily-snapshot failures."""
+
+
+class AlpacaCredentialError(AlpacaDailySnapshotError, ValueError):
+    """Raised when runtime Alpaca credentials are absent or invalid."""
+
+
+class AlpacaTransportError(AlpacaDailySnapshotError):
+    """Raised when the one permitted HTTPS attempt cannot complete safely."""
+
+
+class AlpacaHttpStatusError(AlpacaTransportError):
+    """Raised for a sanitized non-200 Alpaca response."""
+
+    def __init__(
+        self,
+        status: int,
+        *,
+        request_id: str | None = None,
+        provider_code: int | None = None,
+    ) -> None:
+        self.status = status
+        self.request_id = request_id
+        self.provider_code = provider_code
+        message = f"Alpaca market-data request failed with HTTP status {status}"
+        if provider_code is not None:
+            message += f" and provider code {provider_code}"
+        if request_id is not None:
+            message += f" (request ID {request_id})"
+        super().__init__(message)
+
+
+class AlpacaResponseError(AlpacaDailySnapshotError, ValueError):
+    """Raised when a successful Alpaca entity violates the fixed schema."""

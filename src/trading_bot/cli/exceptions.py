@@ -267,3 +267,45 @@ class ResearchSessionRestoreOutputError(ResearchSessionRestoreError):
         self.cleanup_message = cleanup_message
         self.primary_error = primary_error
         super().__init__(message)
+
+
+class DailySnapshotCaptureCliError(Exception):
+    """Base class for expected daily-snapshot capture CLI failures."""
+
+
+class DailySnapshotConfigReadError(DailySnapshotCaptureCliError):
+    """Raised when a daily-snapshot configuration cannot be read."""
+
+
+class DailySnapshotConfigJsonError(DailySnapshotCaptureCliError):
+    """Raised when daily-snapshot configuration JSON is invalid."""
+
+
+class DailySnapshotConfigValidationError(
+    DailySnapshotCaptureCliError,
+    ValueError,
+):
+    """Raised when daily-snapshot configuration violates its exact schema."""
+
+
+class DailySnapshotCaptureRejectedError(DailySnapshotCaptureCliError):
+    """Raised when the provider-neutral acceptance result is REJECTED."""
+
+    def __init__(self, result: object) -> None:
+        self.result = result
+        super().__init__("daily snapshot provider response was rejected")
+
+
+class DailySnapshotArtifactOutputError(DailySnapshotCaptureCliError):
+    """Raised for snapshot serialization, staging, or finalization failures."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        cleanup_message: str | None = None,
+        primary_error: Exception | None = None,
+    ) -> None:
+        self.cleanup_message = cleanup_message
+        self.primary_error = primary_error
+        super().__init__(message)

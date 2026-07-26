@@ -152,7 +152,9 @@ paper-runtime adapter.
 
 ## Deferred work
 
-Provider adapters, credentials, HTTP transport, provider schemas, capture and
-verification commands, scripts, filesystem staging, official exchange
-schedules, same-day post-close capture, raw response retention, signatures,
-schedulers, paper-runtime integration, and broker behavior remain deferred.
+The fixed Alpaca provider adapter, runtime credential boundary, one-attempt
+HTTPS transport, capture command, and no-clobber staged snapshot output are
+implemented separately by `57-alpaca-daily-snapshot-capture.md`. A standalone
+verification command, official exchange schedules, same-day post-close
+capture, raw response retention, signatures, schedulers, paper-runtime
+integration, and broker behavior remain deferred.

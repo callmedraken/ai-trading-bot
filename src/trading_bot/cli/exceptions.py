@@ -309,3 +309,55 @@ class DailySnapshotArtifactOutputError(DailySnapshotCaptureCliError):
         self.cleanup_message = cleanup_message
         self.primary_error = primary_error
         super().__init__(message)
+
+
+class VerifiedSnapshotPaperCycleCliError(Exception):
+    """Base class for expected verified-snapshot paper-cycle CLI failures."""
+
+
+class VerifiedSnapshotPaperCycleConfigReadError(VerifiedSnapshotPaperCycleCliError):
+    """Raised when a cycle configuration cannot be read."""
+
+
+class VerifiedSnapshotPaperCycleConfigJsonError(VerifiedSnapshotPaperCycleCliError):
+    """Raised when a cycle configuration is not strict JSON."""
+
+
+class VerifiedSnapshotPaperCycleConfigValidationError(
+    VerifiedSnapshotPaperCycleCliError,
+    ValueError,
+):
+    """Raised when an explicit cycle configuration is invalid."""
+
+
+class VerifiedSnapshotPaperCycleArtifactReadError(VerifiedSnapshotPaperCycleCliError):
+    """Raised when a supplied snapshot or report artifact cannot be read."""
+
+
+class VerifiedSnapshotPaperCycleSnapshotVerificationError(
+    VerifiedSnapshotPaperCycleCliError
+):
+    """Raised when a supplied snapshot is not a complete matching PASS artifact."""
+
+
+class VerifiedSnapshotPaperCyclePreparationCliError(VerifiedSnapshotPaperCycleCliError):
+    """Raised when explicit configuration cannot prepare one cycle."""
+
+
+class VerifiedSnapshotPaperCycleExecutionCliError(VerifiedSnapshotPaperCycleCliError):
+    """Raised when preparation, execution, or in-memory replay cannot complete."""
+
+
+class VerifiedSnapshotPaperCycleArtifactOutputError(VerifiedSnapshotPaperCycleCliError):
+    """Raised for report staging, verification, cleanup, or finalization failures."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        cleanup_message: str | None = None,
+        primary_error: Exception | None = None,
+    ) -> None:
+        self.cleanup_message = cleanup_message
+        self.primary_error = primary_error
+        super().__init__(message)

@@ -140,3 +140,11 @@ class ResearchSessionManifestError(WalkForwardExperimentOutputError, ValueError)
 
 class ResearchSessionManifestVerificationError(ResearchSessionManifestError):
     """Raised when offline artifact verification fails."""
+
+
+class ResearchSessionManifestReadError(Exception):
+    """Raised when a retained research-session manifest cannot be read."""
+
+
+class ResearchSessionManifestJsonError(Exception):
+    """Raised when retained research-session manifest JSON is invalid."""

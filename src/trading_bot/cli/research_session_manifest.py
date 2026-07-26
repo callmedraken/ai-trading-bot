@@ -3,13 +3,17 @@
 import hashlib
 import json
 import os
+import stat
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path, PurePosixPath
+from typing import Any
 from uuid import UUID, uuid5
 
 from trading_bot.cli.exceptions import (
     ResearchSessionManifestError,
+    ResearchSessionManifestJsonError,
+    ResearchSessionManifestReadError,
     ResearchSessionManifestVerificationError,
 )
 from trading_bot.portfolio import MetadataEntry
@@ -19,6 +23,9 @@ RESEARCH_SESSION_PRODUCER_PROTOCOL = "ai-trading-bot-walk-forward-research-sessi
 _IDENTITY_NAMESPACE = UUID("eaaeed7e-fc15-52d8-b35c-e1424621a913")
 _IDENTITY_VERSION = "walk-forward-research-session-manifest-identity-v1"
 _RESERVED_METADATA_PREFIX = "walk_forward_research_session_manifest_"
+MAX_RESEARCH_SESSION_MANIFEST_BYTES = 4 * 1024 * 1024
+_HASH_CHUNK_BYTES = 64 * 1024
+_UTF8_BOM = b"\xef\xbb\xbf"
 
 
 class ResearchSessionArtifactKind(StrEnum):
@@ -36,6 +43,16 @@ class ResearchSessionHashAlgorithm(StrEnum):
     """The fixed version-one content hash algorithm."""
 
     SHA256 = "SHA256"
+
+
+class ResearchSessionArtifactVerificationStatus(StrEnum):
+    """Stable terminal status for one retained artifact record."""
+
+    PASS = "PASS"
+    MISSING_OR_NONREGULAR = "MISSING_OR_NONREGULAR"
+    UNEXPECTED_IO = "UNEXPECTED_IO"
+    BYTE_LENGTH_MISMATCH = "BYTE_LENGTH_MISMATCH"
+    SHA256_MISMATCH = "SHA256_MISMATCH"
 
 
 _CANONICAL_KINDS = tuple(ResearchSessionArtifactKind)
@@ -197,6 +214,67 @@ class WalkForwardResearchSessionManifest:
             raise ResearchSessionManifestError(
                 "manifest_id does not reconcile with manifest contents"
             )
+
+
+@dataclass(frozen=True, slots=True)
+class ResearchSessionArtifactVerificationResult:
+    """Immutable verification evidence for one retained artifact."""
+
+    artifact: ResearchSessionArtifactRecord
+    status: ResearchSessionArtifactVerificationStatus
+    actual_byte_length: int | None = None
+    actual_content_hash: str | None = None
+
+    def __post_init__(self) -> None:
+        if type(self.artifact) is not ResearchSessionArtifactRecord:
+            raise TypeError("artifact must be an exact ResearchSessionArtifactRecord")
+        if not isinstance(self.status, ResearchSessionArtifactVerificationStatus):
+            raise TypeError(
+                "status must be a ResearchSessionArtifactVerificationStatus"
+            )
+        if self.actual_byte_length is not None:
+            _exact_nonnegative_int(self.actual_byte_length, "actual_byte_length")
+        if self.actual_content_hash is not None and (
+            type(self.actual_content_hash) is not str
+            or len(self.actual_content_hash) != 64
+            or any(
+                character not in "0123456789abcdef"
+                for character in self.actual_content_hash
+            )
+        ):
+            raise TypeError("actual_content_hash must be a lowercase SHA-256 digest")
+
+
+@dataclass(frozen=True, slots=True)
+class ResearchSessionManifestVerificationResult:
+    """Immutable complete result of one offline manifest verification."""
+
+    manifest: WalkForwardResearchSessionManifest
+    artifacts: tuple[ResearchSessionArtifactVerificationResult, ...]
+
+    def __post_init__(self) -> None:
+        if type(self.manifest) is not WalkForwardResearchSessionManifest:
+            raise TypeError(
+                "manifest must be an exact WalkForwardResearchSessionManifest"
+            )
+        if type(self.artifacts) is not tuple or not all(
+            type(item) is ResearchSessionArtifactVerificationResult
+            for item in self.artifacts
+        ):
+            raise TypeError("artifacts must be an exact tuple of verification results")
+        if tuple(item.artifact for item in self.artifacts) != self.manifest.artifacts:
+            raise ValueError(
+                "verification results must retain the exact manifest artifact order"
+            )
+
+    @property
+    def passed(self) -> bool:
+        """Whether every retained artifact passed."""
+
+        return all(
+            item.status is ResearchSessionArtifactVerificationStatus.PASS
+            for item in self.artifacts
+        )
 
 
 def _validate_label_and_metadata(
@@ -428,9 +506,424 @@ def serialize_walk_forward_research_session_manifest_json(
     return json.dumps(payload, sort_keys=True, ensure_ascii=False, **options) + "\n"
 
 
+class _DuplicateJsonKeyError(ValueError):
+    pass
+
+
+class _NonstandardJsonConstantError(ValueError):
+    pass
+
+
+def _reject_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise _DuplicateJsonKeyError(key)
+        result[key] = value
+    return result
+
+
+def _reject_json_constant(value: str) -> None:
+    raise _NonstandardJsonConstantError(value)
+
+
+def load_walk_forward_research_session_manifest(
+    path: Path,
+) -> WalkForwardResearchSessionManifest:
+    """Read and strictly reconstruct one retained manifest."""
+
+    try:
+        with path.open("rb") as stream:
+            content = stream.read(MAX_RESEARCH_SESSION_MANIFEST_BYTES + 1)
+    except (OSError, ValueError) as error:
+        raise ResearchSessionManifestReadError("cannot read manifest") from error
+    if len(content) > MAX_RESEARCH_SESSION_MANIFEST_BYTES:
+        raise ResearchSessionManifestReadError(
+            "manifest exceeds maximum byte size of 4194304"
+        )
+    return parse_walk_forward_research_session_manifest_bytes(content)
+
+
+def parse_walk_forward_research_session_manifest_bytes(
+    content: bytes,
+) -> WalkForwardResearchSessionManifest:
+    """Strictly reconstruct an immutable manifest without filesystem access."""
+
+    if type(content) is not bytes:
+        raise TypeError("content must be exact bytes")
+    if len(content) > MAX_RESEARCH_SESSION_MANIFEST_BYTES:
+        raise ResearchSessionManifestReadError(
+            "manifest exceeds maximum byte size of 4194304"
+        )
+    if content.startswith(_UTF8_BOM):
+        raise ResearchSessionManifestReadError("UTF-8 BOM is unsupported")
+    try:
+        text = content.decode("utf-8", errors="strict")
+    except UnicodeDecodeError as error:
+        raise ResearchSessionManifestReadError("manifest is not valid UTF-8") from error
+    try:
+        raw = json.loads(
+            text,
+            object_pairs_hook=_reject_duplicate_keys,
+            parse_constant=_reject_json_constant,
+        )
+    except _DuplicateJsonKeyError as error:
+        key = json.dumps(str(error), ensure_ascii=False)
+        raise ResearchSessionManifestJsonError(
+            f"duplicate JSON object key: {key}"
+        ) from error
+    except _NonstandardJsonConstantError as error:
+        value = json.dumps(str(error), ensure_ascii=False)
+        raise ResearchSessionManifestJsonError(
+            f"nonstandard JSON constant: {value}"
+        ) from error
+    except json.JSONDecodeError as error:
+        raise ResearchSessionManifestJsonError(
+            f"invalid JSON at line {error.lineno}, column {error.colno}: {error.msg}"
+        ) from error
+    return parse_walk_forward_research_session_manifest(raw)
+
+
+def _manifest_object(value: Any, path: str) -> dict[str, Any]:
+    if type(value) is not dict:
+        raise ResearchSessionManifestError(f"{path}: must be an object")
+    return value
+
+
+def _manifest_exact_keys(value: dict[str, Any], expected: set[str], path: str) -> None:
+    missing = sorted(expected - value.keys())
+    if missing:
+        raise ResearchSessionManifestError(
+            f"{path}.{missing[0]}: required field is missing"
+        )
+    unknown = sorted(value.keys() - expected)
+    if unknown:
+        raise ResearchSessionManifestError(f"{path}.{unknown[0]}: unknown field")
+
+
+def _manifest_integer(value: Any, path: str, *, nonnegative: bool = False) -> int:
+    if type(value) is not int:
+        raise ResearchSessionManifestError(f"{path}: must be an exact integer")
+    minimum = 0 if nonnegative else 1
+    if value < minimum:
+        qualifier = "nonnegative" if nonnegative else "positive"
+        raise ResearchSessionManifestError(
+            f"{path}: must be an exact {qualifier} integer"
+        )
+    return value
+
+
+def _manifest_string(value: Any, path: str) -> str:
+    if type(value) is not str:
+        raise ResearchSessionManifestError(f"{path}: must be an exact string")
+    return value
+
+
+def _manifest_uuid(value: Any, path: str) -> UUID:
+    text = _manifest_string(value, path)
+    try:
+        parsed = UUID(text)
+    except (ValueError, AttributeError) as error:
+        raise ResearchSessionManifestError(
+            f"{path}: must be a canonical UUID string"
+        ) from error
+    if str(parsed) != text:
+        raise ResearchSessionManifestError(f"{path}: must be a canonical UUID string")
+    return parsed
+
+
+def _manifest_enum(value: Any, enum_type: type[StrEnum], path: str) -> StrEnum:
+    text = _manifest_string(value, path)
+    try:
+        return enum_type(text)
+    except ValueError as error:
+        raise ResearchSessionManifestError(f"{path}: invalid enum value") from error
+
+
+def parse_walk_forward_research_session_manifest(
+    raw: Any,
+) -> WalkForwardResearchSessionManifest:
+    """Reconstruct schema-one JSON using only retained structural evidence."""
+
+    root = _manifest_object(raw, "$")
+    _manifest_exact_keys(
+        root, {"schema_version", "walk_forward_research_session_manifest"}, "$"
+    )
+    version = _manifest_integer(root["schema_version"], "$.schema_version")
+    if version != RESEARCH_SESSION_MANIFEST_SCHEMA_VERSION:
+        raise ResearchSessionManifestError(
+            "$.schema_version: unsupported manifest schema version"
+        )
+    base = "$.walk_forward_research_session_manifest"
+    item = _manifest_object(root["walk_forward_research_session_manifest"], base)
+    _manifest_exact_keys(
+        item,
+        {
+            "manifest_id",
+            "producer_protocol",
+            "walk_forward_config_schema_version",
+            "result_ids",
+            "session_label",
+            "metadata",
+            "artifacts",
+        },
+        base,
+    )
+    result_path = f"{base}.result_ids"
+    result_ids = _manifest_object(item["result_ids"], result_path)
+    _manifest_exact_keys(
+        result_ids, {"walk_forward", "aggregate", "stability"}, result_path
+    )
+    metadata_raw = item["metadata"]
+    if type(metadata_raw) is not list:
+        raise ResearchSessionManifestError(f"{base}.metadata: must be an array")
+    metadata = []
+    for index, raw_entry in enumerate(metadata_raw):
+        path = f"{base}.metadata[{index}]"
+        entry = _manifest_object(raw_entry, path)
+        _manifest_exact_keys(entry, {"key", "value"}, path)
+        try:
+            metadata.append(
+                MetadataEntry(
+                    _manifest_string(entry["key"], f"{path}.key"),
+                    _manifest_string(entry["value"], f"{path}.value"),
+                )
+            )
+        except (TypeError, ValueError) as error:
+            raise ResearchSessionManifestError(f"{path}: {error}") from error
+    artifacts_raw = item["artifacts"]
+    if type(artifacts_raw) is not list:
+        raise ResearchSessionManifestError(f"{base}.artifacts: must be an array")
+    artifacts = []
+    for index, raw_artifact in enumerate(artifacts_raw):
+        path = f"{base}.artifacts[{index}]"
+        artifact = _manifest_object(raw_artifact, path)
+        _manifest_exact_keys(
+            artifact,
+            {
+                "ordinal",
+                "kind",
+                "artifact_schema_version",
+                "result_id",
+                "path",
+                "path_base",
+                "hash",
+                "byte_length",
+            },
+            path,
+        )
+        if (
+            _manifest_string(artifact["path_base"], f"{path}.path_base")
+            != "MANIFEST_PARENT"
+        ):
+            raise ResearchSessionManifestError(f"{path}.path_base: invalid enum value")
+        hash_path = f"{path}.hash"
+        hash_item = _manifest_object(artifact["hash"], hash_path)
+        _manifest_exact_keys(hash_item, {"algorithm", "value"}, hash_path)
+        try:
+            artifacts.append(
+                ResearchSessionArtifactRecord(
+                    ordinal=_manifest_integer(artifact["ordinal"], f"{path}.ordinal"),
+                    kind=ResearchSessionArtifactKind(
+                        _manifest_enum(
+                            artifact["kind"],
+                            ResearchSessionArtifactKind,
+                            f"{path}.kind",
+                        )
+                    ),
+                    artifact_schema_version=_manifest_integer(
+                        artifact["artifact_schema_version"],
+                        f"{path}.artifact_schema_version",
+                    ),
+                    result_id=_manifest_uuid(
+                        artifact["result_id"], f"{path}.result_id"
+                    ),
+                    path=_manifest_string(artifact["path"], f"{path}.path"),
+                    hash_algorithm=ResearchSessionHashAlgorithm(
+                        _manifest_enum(
+                            hash_item["algorithm"],
+                            ResearchSessionHashAlgorithm,
+                            f"{hash_path}.algorithm",
+                        )
+                    ),
+                    content_hash=_manifest_string(
+                        hash_item["value"], f"{hash_path}.value"
+                    ),
+                    byte_length=_manifest_integer(
+                        artifact["byte_length"],
+                        f"{path}.byte_length",
+                        nonnegative=True,
+                    ),
+                )
+            )
+        except ResearchSessionManifestError:
+            raise
+        except (TypeError, ValueError) as error:
+            raise ResearchSessionManifestError(f"{path}: {error}") from error
+    paths = [artifact.path for artifact in artifacts]
+    if len(set(paths)) != len(paths):
+        raise ResearchSessionManifestError(
+            f"{base}.artifacts: retained artifact paths must be unique"
+        )
+    session_label = item["session_label"]
+    if session_label is not None:
+        session_label = _manifest_string(session_label, f"{base}.session_label")
+    aggregate_id = result_ids["aggregate"]
+    stability_id = result_ids["stability"]
+    try:
+        return WalkForwardResearchSessionManifest(
+            manifest_id=_manifest_uuid(item["manifest_id"], f"{base}.manifest_id"),
+            manifest_schema_version=version,
+            producer_protocol=_manifest_string(
+                item["producer_protocol"], f"{base}.producer_protocol"
+            ),
+            walk_forward_config_schema_version=_manifest_integer(
+                item["walk_forward_config_schema_version"],
+                f"{base}.walk_forward_config_schema_version",
+            ),
+            walk_forward_result_id=_manifest_uuid(
+                result_ids["walk_forward"], f"{result_path}.walk_forward"
+            ),
+            aggregate_result_id=(
+                None
+                if aggregate_id is None
+                else _manifest_uuid(aggregate_id, f"{result_path}.aggregate")
+            ),
+            stability_result_id=(
+                None
+                if stability_id is None
+                else _manifest_uuid(stability_id, f"{result_path}.stability")
+            ),
+            session_label=session_label,
+            metadata=tuple(metadata),
+            artifacts=tuple(artifacts),
+        )
+    except ResearchSessionManifestError as error:
+        if str(error).startswith("$"):
+            raise
+        raise ResearchSessionManifestError(f"{base}: {error}") from error
+
+
+def _is_reparse_point(result: os.stat_result) -> bool:
+    attributes = getattr(result, "st_file_attributes", 0)
+    reparse_flag = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
+    return bool(attributes & reparse_flag)
+
+
+def _changed_during_read(before: os.stat_result, after: os.stat_result) -> bool:
+    fields = ("st_dev", "st_ino", "st_mode", "st_size", "st_mtime_ns", "st_ctime_ns")
+    return any(getattr(before, name) != getattr(after, name) for name in fields)
+
+
+def _artifact_verification(
+    artifact: ResearchSessionArtifactRecord, manifest_parent: Path
+) -> ResearchSessionArtifactVerificationResult:
+    current = manifest_parent
+    parts = PurePosixPath(artifact.path).parts
+    for component in parts[:-1]:
+        current = current / component
+        try:
+            component_stat = current.lstat()
+        except FileNotFoundError:
+            return ResearchSessionArtifactVerificationResult(
+                artifact,
+                ResearchSessionArtifactVerificationStatus.MISSING_OR_NONREGULAR,
+            )
+        except OSError:
+            return ResearchSessionArtifactVerificationResult(
+                artifact, ResearchSessionArtifactVerificationStatus.UNEXPECTED_IO
+            )
+        if (
+            stat.S_ISLNK(component_stat.st_mode)
+            or _is_reparse_point(component_stat)
+            or not stat.S_ISDIR(component_stat.st_mode)
+        ):
+            return ResearchSessionArtifactVerificationResult(
+                artifact,
+                ResearchSessionArtifactVerificationStatus.MISSING_OR_NONREGULAR,
+            )
+    path = manifest_parent.joinpath(*parts)
+    try:
+        retained_stat = path.lstat()
+    except FileNotFoundError:
+        return ResearchSessionArtifactVerificationResult(
+            artifact,
+            ResearchSessionArtifactVerificationStatus.MISSING_OR_NONREGULAR,
+        )
+    except OSError:
+        return ResearchSessionArtifactVerificationResult(
+            artifact, ResearchSessionArtifactVerificationStatus.UNEXPECTED_IO
+        )
+    if (
+        stat.S_ISLNK(retained_stat.st_mode)
+        or _is_reparse_point(retained_stat)
+        or not stat.S_ISREG(retained_stat.st_mode)
+    ):
+        return ResearchSessionArtifactVerificationResult(
+            artifact,
+            ResearchSessionArtifactVerificationStatus.MISSING_OR_NONREGULAR,
+        )
+    try:
+        with path.open("rb") as stream:
+            opened_before = os.fstat(stream.fileno())
+            if (
+                not stat.S_ISREG(opened_before.st_mode)
+                or _is_reparse_point(opened_before)
+                or (retained_stat.st_dev, retained_stat.st_ino)
+                != (opened_before.st_dev, opened_before.st_ino)
+            ):
+                return ResearchSessionArtifactVerificationResult(
+                    artifact,
+                    ResearchSessionArtifactVerificationStatus.UNEXPECTED_IO,
+                )
+            digest = hashlib.sha256()
+            byte_length = 0
+            while chunk := stream.read(_HASH_CHUNK_BYTES):
+                byte_length += len(chunk)
+                digest.update(chunk)
+            opened_after = os.fstat(stream.fileno())
+    except FileNotFoundError:
+        return ResearchSessionArtifactVerificationResult(
+            artifact,
+            ResearchSessionArtifactVerificationStatus.MISSING_OR_NONREGULAR,
+        )
+    except OSError:
+        return ResearchSessionArtifactVerificationResult(
+            artifact, ResearchSessionArtifactVerificationStatus.UNEXPECTED_IO
+        )
+    actual_hash = digest.hexdigest()
+    if _changed_during_read(opened_before, opened_after):
+        return ResearchSessionArtifactVerificationResult(
+            artifact,
+            ResearchSessionArtifactVerificationStatus.UNEXPECTED_IO,
+            byte_length,
+            actual_hash,
+        )
+    if byte_length != artifact.byte_length:
+        return ResearchSessionArtifactVerificationResult(
+            artifact,
+            ResearchSessionArtifactVerificationStatus.BYTE_LENGTH_MISMATCH,
+            byte_length,
+            actual_hash,
+        )
+    if actual_hash != artifact.content_hash:
+        return ResearchSessionArtifactVerificationResult(
+            artifact,
+            ResearchSessionArtifactVerificationStatus.SHA256_MISMATCH,
+            byte_length,
+            actual_hash,
+        )
+    return ResearchSessionArtifactVerificationResult(
+        artifact,
+        ResearchSessionArtifactVerificationStatus.PASS,
+        byte_length,
+        actual_hash,
+    )
+
+
 def verify_walk_forward_research_session_manifest(
     manifest: WalkForwardResearchSessionManifest, *, manifest_path: Path
-) -> None:
+) -> ResearchSessionManifestVerificationResult:
     """Verify exact primary bytes without parsing or invoking workflow behavior."""
 
     if type(manifest) is not WalkForwardResearchSessionManifest:
@@ -438,23 +931,10 @@ def verify_walk_forward_research_session_manifest(
             "manifest must be an exact WalkForwardResearchSessionManifest"
         )
     manifest_path = _normalized_absolute(manifest_path, "manifest_path")
-    for artifact in manifest.artifacts:
-        path = manifest_path.parent.joinpath(*PurePosixPath(artifact.path).parts)
-        try:
-            if not path.is_file():
-                raise ResearchSessionManifestVerificationError(
-                    f"artifact is not a regular file: {path}"
-                )
-            content = path.read_bytes()
-        except OSError as error:
-            raise ResearchSessionManifestVerificationError(
-                f"cannot read artifact: {path}: {error}"
-            ) from error
-        if len(content) != artifact.byte_length:
-            raise ResearchSessionManifestVerificationError(
-                f"artifact byte length mismatch: {path}"
-            )
-        if hashlib.sha256(content).hexdigest() != artifact.content_hash:
-            raise ResearchSessionManifestVerificationError(
-                f"artifact SHA-256 mismatch: {path}"
-            )
+    return ResearchSessionManifestVerificationResult(
+        manifest,
+        tuple(
+            _artifact_verification(artifact, manifest_path.parent)
+            for artifact in manifest.artifacts
+        ),
+    )

@@ -34,3 +34,8 @@ serializer-contract schema versions, exact byte lengths, and SHA-256 hashes for
 all six primary artifact bytes. Repeated runs produce identical primary and
 manifest bytes, and every generated file remains below pytest's temporary
 directory.
+
+Separate retained-manifest reconstruction and read-only artifact verification
+are covered by `docs/validation/walk-forward-manifest-verification.md`. That
+offline command does not rerun or reinterpret any part of this financial
+workflow.

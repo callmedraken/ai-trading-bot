@@ -1,4 +1,5 @@
 import csv
+import hashlib
 import io
 import json
 import subprocess
@@ -19,6 +20,7 @@ def _run_cli(
     aggregates: bool = True,
     config: Path = CONFIG,
     stability: bool = False,
+    manifest: bool = False,
 ) -> None:
     destination.mkdir()
     arguments = [
@@ -48,6 +50,17 @@ def _run_cli(
                 str(destination / "stability.json"),
                 "--stability-csv",
                 str(destination / "stability.csv"),
+            ]
+        )
+    if manifest:
+        arguments.extend(
+            [
+                "--manifest",
+                str(destination / "manifest.json"),
+                "--session-label",
+                "schema-3-e2e",
+                "--session-metadata",
+                "purpose=cross-artifact-reconciliation",
             ]
         )
     subprocess.run(arguments, cwd=ROOT, check=True)
@@ -209,11 +222,16 @@ def test_schema_three_stability_artifacts_preserve_upstream_bytes(
     second = tmp_path / "schema-three-second"
     without_stability_destinations = tmp_path / "without-stability-destinations"
 
-    _run_cli(first, config=config, stability=True)
-    _run_cli(second, config=config, stability=True)
+    _run_cli(first, config=config, stability=True, manifest=True)
+    _run_cli(second, config=config, stability=True, manifest=True)
     _run_cli(without_stability_destinations, config=config)
 
-    all_artifacts = (*ARTIFACT_NAMES, "stability.json", "stability.csv")
+    all_artifacts = (
+        *ARTIFACT_NAMES,
+        "stability.json",
+        "stability.csv",
+        "manifest.json",
+    )
     assert {item.name for item in first.iterdir()} == set(all_artifacts)
     for name in all_artifacts:
         assert (first / name).read_bytes() == (second / name).read_bytes()
@@ -232,10 +250,41 @@ def test_schema_three_stability_artifacts_preserve_upstream_bytes(
     aggregate = json.loads((first / "aggregate.json").read_bytes())[
         "walk_forward_aggregate_result"
     ]
+    manifest = json.loads((first / "manifest.json").read_bytes())[
+        "walk_forward_research_session_manifest"
+    ]
     assert stability["result_id"] == repeated_stability["result_id"]
     assert stability["source_walk_forward_result_id"] == walk["result_id"]
     assert stability["source_aggregate_result_id"] == aggregate["result_id"]
     assert aggregate["source_walk_forward_result_id"] == walk["result_id"]
+    assert manifest["walk_forward_config_schema_version"] == 3
+    assert manifest["result_ids"] == {
+        "walk_forward": walk["result_id"],
+        "aggregate": aggregate["result_id"],
+        "stability": stability["result_id"],
+    }
+    assert manifest["session_label"] == "schema-3-e2e"
+    assert manifest["metadata"] == [
+        {"key": "purpose", "value": "cross-artifact-reconciliation"}
+    ]
+    primary_names = (
+        "walk.json",
+        "walk.csv",
+        "aggregate.json",
+        "aggregate.csv",
+        "stability.json",
+        "stability.csv",
+    )
+    assert [item["path"] for item in manifest["artifacts"]] == list(primary_names)
+    assert [item["ordinal"] for item in manifest["artifacts"]] == list(range(1, 7))
+    for record, name in zip(manifest["artifacts"], primary_names, strict=True):
+        exact_bytes = (first / name).read_bytes()
+        assert record["path_base"] == "MANIFEST_PARENT"
+        assert record["byte_length"] == len(exact_bytes)
+        assert record["hash"] == {
+            "algorithm": "SHA256",
+            "value": hashlib.sha256(exact_bytes).hexdigest(),
+        }
 
     stability_csv_rows = list(
         csv.DictReader(io.StringIO((first / "stability.csv").read_text("utf-8")))

@@ -48,3 +48,6 @@ metadata, standard-library read compatibility, source layout and mutation
 failures, outer evidence, payload tampering, zero padding and terminators,
 unsupported entries, staging cleanup, CLI exit classifications, and streaming
 verification without extraction.
+
+Restoration validation is covered by
+`docs/validation/walk-forward-research-restoration.md`.

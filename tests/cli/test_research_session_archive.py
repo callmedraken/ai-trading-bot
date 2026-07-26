@@ -17,8 +17,11 @@ from trading_bot.cli.exceptions import (
 )
 from trading_bot.cli.research_session_archive import (
     USTAR_BLOCK_SIZE,
+    CanonicalUstarEntry,
+    ResearchSessionArchiveEntryEvidence,
     build_canonical_ustar_header,
     create_walk_forward_research_bundle_archive,
+    stream_canonical_walk_forward_research_bundle_archive,
     verify_walk_forward_research_bundle_archive,
 )
 from trading_bot.cli.research_session_bundle import (
@@ -171,6 +174,56 @@ def test_golden_archive_length_and_sha256(tmp_path: Path) -> None:
     assert result.archive_sha256 == (
         "12d33bf0b7b614c18aae3627daf76aee5575c5f3e390d9ffaed352c5f5bb0359"
     )
+
+
+def test_public_stream_reader_preserves_verifier_behavior(tmp_path: Path) -> None:
+    bundle = _bundle(tmp_path)
+    destination = tmp_path / "archives"
+    destination.mkdir()
+    archive = create_walk_forward_research_bundle_archive(
+        bundle_path=bundle,
+        destination_directory=destination,
+    )
+    started: list[CanonicalUstarEntry] = []
+    finished: list[ResearchSessionArchiveEntryEvidence] = []
+    chunks: list[tuple[str, int]] = []
+
+    class Consumer:
+        def start_entry(self, entry: CanonicalUstarEntry) -> None:
+            started.append(entry)
+
+        def consume_payload_chunk(
+            self, entry: CanonicalUstarEntry, chunk: bytes
+        ) -> None:
+            chunks.append((entry.path, len(chunk)))
+
+        def finish_entry(
+            self,
+            entry: CanonicalUstarEntry,
+            evidence: ResearchSessionArchiveEntryEvidence,
+            manifest,
+        ) -> None:
+            finished.append(evidence)
+
+    direct = stream_canonical_walk_forward_research_bundle_archive(
+        archive_path=archive.archive_path,
+        expected_sha256=archive.archive_sha256,
+        expected_byte_length=archive.archive_byte_length,
+        consumer=Consumer(),
+    )
+    wrapped = verify_walk_forward_research_bundle_archive(
+        archive_path=archive.archive_path,
+        expected_sha256=archive.archive_sha256,
+        expected_byte_length=archive.archive_byte_length,
+    )
+
+    assert direct == wrapped
+    assert tuple(item.path for item in started) == tuple(
+        item.path for item in wrapped.entries
+    )
+    assert tuple(finished) == wrapped.entries
+    assert chunks
+    assert all(0 < size <= 64 * 1024 for _, size in chunks)
 
 
 def test_outer_evidence_mismatches_are_distinct(tmp_path: Path) -> None:

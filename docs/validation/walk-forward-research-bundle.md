@@ -64,3 +64,6 @@ positions, omitted formats, exact opaque-byte copies, source revalidation,
 staged reloading and verification, destination and staging rejection, cleanup,
 source-verifier exit classifications, quiet behavior, and offline verification
 after source removal.
+
+Canonical uncompressed archive creation and no-extraction verification are
+covered by `docs/validation/walk-forward-research-archive.md`.

@@ -86,3 +86,7 @@ Version one creates no archive, README, checksum file, signature, encryption,
 compression, registry entry, upload, publication, network operation, database
 record, Git operation, or background process. Verification proves equality to
 manifest-retained SHA-256 and byte length, not authorship or authenticity.
+
+Archive creation is a separate downstream operation over an already completed
+and verified bundle. It never recreates or modifies the bundle. See
+`docs/architecture/54-walk-forward-research-archive.md`.

@@ -39,3 +39,7 @@ Separate retained-manifest reconstruction and read-only artifact verification
 are covered by `docs/validation/walk-forward-manifest-verification.md`. That
 offline command does not rerun or reinterpret any part of this financial
 workflow.
+
+Copy-only relocation of the verified session into a fixed portable directory
+layout is covered by `docs/validation/walk-forward-research-bundle.md`. Bundle
+validation retains every primary artifact byte and the manifest identity.

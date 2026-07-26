@@ -60,3 +60,8 @@ primary replacement order is preserved and the manifest is replaced last.
 Later replacement failure does not roll back earlier replacements. No output
 failure retries or reruns financial work or serialization. Version one defines
 no CSV manifest, signing, database, registry, network storage, or concurrency.
+
+The separately defined portable research-bundle workflow may rewrite only
+retained artifact paths into a fixed directory layout. Since paths are excluded
+from manifest identity, strict reconstruction must retain the exact manifest ID.
+See `docs/architecture/53-walk-forward-research-bundle.md`.

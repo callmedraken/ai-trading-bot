@@ -99,3 +99,8 @@ There are no retries and no files are modified.
 Verification proves equality to the lengths and SHA-256 hashes retained by the
 manifest. It does not establish authorship or authenticity. A separately
 designed signing or trust system would be required for that purpose.
+
+The portable research-bundle workflow uses this loader and verifier before
+copying and again against its staged relocated manifest. The same command
+verifies a finalized bundle at `bundle-root/manifest.json` without access to the
+source tree. See `docs/architecture/53-walk-forward-research-bundle.md`.

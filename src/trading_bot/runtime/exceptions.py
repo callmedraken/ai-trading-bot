@@ -55,3 +55,65 @@ class InconsistentPaperPortfolioCycleResultError(
     PaperPortfolioRuntimeError, ValueError
 ):
     """Raised when the complete stage audit chain does not reconcile."""
+
+
+class VerifiedSnapshotPaperCyclePreparationError(Exception):
+    """Base class for verified-snapshot paper-cycle preparation failures."""
+
+    def __init__(self, diagnostic: object) -> None:
+        self.diagnostic = diagnostic
+        detail = getattr(diagnostic, "detail", None)
+        super().__init__(
+            detail
+            if isinstance(detail, str)
+            else "verified-snapshot paper-cycle preparation failed"
+        )
+
+
+class InvalidVerifiedSnapshotPaperCyclePreparationRequestError(
+    VerifiedSnapshotPaperCyclePreparationError,
+    ValueError,
+):
+    """Raised when a preparation request or one of its values is invalid."""
+
+
+class VerifiedSnapshotPaperCycleSnapshotError(
+    VerifiedSnapshotPaperCyclePreparationError,
+    ValueError,
+):
+    """Raised when verified snapshot evidence cannot be accepted or reconciled."""
+
+
+class VerifiedSnapshotPaperCycleUniverseError(
+    VerifiedSnapshotPaperCyclePreparationError,
+    ValueError,
+):
+    """Raised when account, target, or open-reference universes do not reconcile."""
+
+
+class VerifiedSnapshotPaperCycleTargetError(
+    VerifiedSnapshotPaperCyclePreparationError,
+    ValueError,
+):
+    """Raised when explicit quantity targets cannot form exact planner inputs."""
+
+
+class VerifiedSnapshotPaperCycleTemporalError(
+    VerifiedSnapshotPaperCyclePreparationError,
+    ValueError,
+):
+    """Raised when sessions or caller-supplied timestamps are inconsistent."""
+
+
+class VerifiedSnapshotPaperCyclePolicyError(
+    VerifiedSnapshotPaperCyclePreparationError,
+    ValueError,
+):
+    """Raised when duplicated planner, risk, and fill policies disagree."""
+
+
+class InconsistentPreparedVerifiedSnapshotPaperCycleError(
+    VerifiedSnapshotPaperCyclePreparationError,
+    ValueError,
+):
+    """Raised when an immutable prepared result does not reconcile."""

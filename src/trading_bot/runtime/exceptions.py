@@ -117,3 +117,57 @@ class InconsistentPreparedVerifiedSnapshotPaperCycleError(
     ValueError,
 ):
     """Raised when an immutable prepared result does not reconcile."""
+
+
+class VerifiedSnapshotPaperCycleExecutionError(Exception):
+    """Base class for prepared verified-snapshot execution failures."""
+
+
+class InvalidPreparedVerifiedSnapshotPaperCycleError(
+    VerifiedSnapshotPaperCycleExecutionError,
+    TypeError,
+):
+    """Raised when execution does not receive an exact prepared result."""
+
+
+class VerifiedSnapshotPaperCycleInitializationError(
+    VerifiedSnapshotPaperCycleExecutionError
+):
+    """Raised when the fresh private paper ledger cannot be initialized."""
+
+
+class VerifiedSnapshotPaperCycleRequestReconstructionError(
+    VerifiedSnapshotPaperCycleExecutionError
+):
+    """Raised when exact existing runtime inputs cannot be reconstructed."""
+
+
+class VerifiedSnapshotPaperCycleRuntimeExecutionError(
+    VerifiedSnapshotPaperCycleExecutionError
+):
+    """Raised when the existing paper runtime cannot complete its one cycle."""
+
+
+class VerifiedSnapshotPaperCycleApplicationError(
+    VerifiedSnapshotPaperCycleRuntimeExecutionError
+):
+    """Raised when existing atomic fill application fails."""
+
+
+class VerifiedSnapshotPaperCycleInsufficientCashError(
+    VerifiedSnapshotPaperCycleApplicationError
+):
+    """Raised when asserted fill prices cause atomic insufficient-cash failure."""
+
+
+class VerifiedSnapshotPaperCycleReconciliationError(
+    VerifiedSnapshotPaperCycleExecutionError,
+    ValueError,
+):
+    """Raised when private runtime state and immutable evidence do not reconcile."""
+
+
+class InconsistentVerifiedSnapshotPaperCycleResultError(
+    VerifiedSnapshotPaperCycleReconciliationError
+):
+    """Raised when an immutable adapter result is internally inconsistent."""

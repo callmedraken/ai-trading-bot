@@ -115,3 +115,17 @@ def ledger_state_id(snapshot) -> UUID:  # type: ignore[no-untyped-def]
         )
     )
     return uuid5(_NAMESPACE, material)
+
+
+def current_order_engine_state_id(engine: OrderEngine) -> UUID:
+    """Return the deterministic identity of one engine's current public state."""
+    if not isinstance(engine, OrderEngine):
+        raise TypeError("engine must be an OrderEngine")
+    return engine_state_id(engine_snapshot(engine))
+
+
+def current_paper_ledger_state_id(ledger: PaperLedger) -> UUID:
+    """Return the deterministic identity of one ledger's current public state."""
+    if not isinstance(ledger, PaperLedger):
+        raise TypeError("ledger must be a PaperLedger")
+    return ledger_state_id(ledger_snapshot(ledger))

@@ -7,11 +7,11 @@ import pytest
 
 from trading_bot.cli.exceptions import (
     ResearchSessionManifestError,
-    ResearchSessionManifestVerificationError,
 )
 from trading_bot.cli.research_session_manifest import (
     CompletedResearchArtifact,
     ResearchSessionArtifactKind,
+    ResearchSessionArtifactVerificationStatus,
     build_walk_forward_research_session_manifest,
     serialize_walk_forward_research_session_manifest_json,
     verify_walk_forward_research_session_manifest,
@@ -167,13 +167,14 @@ def test_offline_verification_reads_only_exact_artifact_bytes(tmp_path: Path) ->
             ),
         ),
     )
-    verify_walk_forward_research_session_manifest(
+    verified = verify_walk_forward_research_session_manifest(
         manifest, manifest_path=parent / "manifest.json"
     )
+    assert verified.passed
     destination.write_bytes(content + b"changed")
-    with pytest.raises(
-        ResearchSessionManifestVerificationError, match="byte length mismatch"
-    ):
-        verify_walk_forward_research_session_manifest(
-            manifest, manifest_path=parent / "manifest.json"
-        )
+    changed = verify_walk_forward_research_session_manifest(
+        manifest, manifest_path=parent / "manifest.json"
+    )
+    assert changed.artifacts[0].status is (
+        ResearchSessionArtifactVerificationStatus.BYTE_LENGTH_MISMATCH
+    )

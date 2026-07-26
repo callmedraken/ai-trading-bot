@@ -5,6 +5,10 @@ class LedgerError(Exception):
     """Base class for expected ledger failures."""
 
 
+class InvalidPaperLedgerInitializationError(LedgerError, ValueError):
+    """Raised when explicit opening-account state is invalid."""
+
+
 class InsufficientCashError(LedgerError):
     """Raised when a purchase would make cash negative."""
 

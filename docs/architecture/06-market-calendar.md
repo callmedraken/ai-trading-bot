@@ -34,3 +34,8 @@ presidential funeral closures, circuit breakers, or intraday schedules. Future
 extensions may add versioned official schedules, richer session models, other
 exchanges, and explicit early-close metadata without changing the core
 calendar protocol.
+
+The daily snapshot boundary binds this implementation to an explicit versioned
+XNYS descriptor. Because this calendar has dates but no close/finalization
+times, snapshot schema 1 accepts only the most recent modeled session strictly
+before the exchange-local request date. It does not infer same-day completion.

@@ -171,3 +171,37 @@ class InconsistentVerifiedSnapshotPaperCycleResultError(
     VerifiedSnapshotPaperCycleReconciliationError
 ):
     """Raised when an immutable adapter result is internally inconsistent."""
+
+
+class VerifiedSnapshotPaperCycleReportError(Exception):
+    """Base class for canonical cycle-report failures."""
+
+
+class VerifiedSnapshotPaperCycleReportSyntaxError(
+    VerifiedSnapshotPaperCycleReportError, ValueError
+):
+    """Raised when report bytes are not bounded strict JSON input."""
+
+
+class VerifiedSnapshotPaperCycleReportSchemaError(
+    VerifiedSnapshotPaperCycleReportError, ValueError
+):
+    """Raised when report JSON violates canonical schema 1."""
+
+
+class VerifiedSnapshotPaperCycleReportReconciliationError(
+    VerifiedSnapshotPaperCycleReportError, ValueError
+):
+    """Raised when parsed retained models do not reconcile."""
+
+
+class VerifiedSnapshotPaperCycleReportVerificationError(
+    VerifiedSnapshotPaperCycleReportError, ValueError
+):
+    """Raised when offline verification arguments or evidence are invalid."""
+
+
+class VerifiedSnapshotPaperCycleReplayError(
+    VerifiedSnapshotPaperCycleReportError, ValueError
+):
+    """Raised when replay access is attempted without a complete PASS."""

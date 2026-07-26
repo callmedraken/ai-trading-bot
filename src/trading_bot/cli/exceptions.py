@@ -148,3 +148,43 @@ class ResearchSessionManifestReadError(Exception):
 
 class ResearchSessionManifestJsonError(Exception):
     """Raised when retained research-session manifest JSON is invalid."""
+
+
+class ResearchSessionBundleError(Exception):
+    """Base exception for expected portable research-bundle failures."""
+
+
+class ResearchSessionBundlePlanError(ResearchSessionBundleError, ValueError):
+    """Raised when a deterministic bundle path plan is invalid."""
+
+
+class ResearchSessionBundleSourceVerificationError(ResearchSessionBundleError):
+    """Raised when source artifacts do not pass offline verification."""
+
+    def __init__(self, result: object) -> None:
+        self.result = result
+        super().__init__("source research-session verification failed")
+
+
+class ResearchSessionBundleSourceArtifactError(ResearchSessionBundleError):
+    """Raised when a source artifact changes or becomes unsafe during copying."""
+
+    def __init__(self, artifact: object, status: object) -> None:
+        self.artifact = artifact
+        self.status = status
+        super().__init__("source artifact failed revalidation during copying")
+
+
+class ResearchSessionBundleOutputError(ResearchSessionBundleError):
+    """Raised for destination, staging, copy, verification, or cleanup failures."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        cleanup_message: str | None = None,
+        primary_error: Exception | None = None,
+    ) -> None:
+        self.cleanup_message = cleanup_message
+        self.primary_error = primary_error
+        super().__init__(message)

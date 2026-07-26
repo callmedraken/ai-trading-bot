@@ -27,3 +27,6 @@ status, and adapter result identity.
 
 Provider, network, and filesystem sentinels must remain uncalled. No generated
 report is created or modified by validation.
+
+The CLI suite also validates strict cycle configuration parsing, no-clobber
+report staging, report replay, quiet output, and stable failure exit codes.

@@ -237,3 +237,58 @@ class PaperAccountCheckpointVerificationError(PaperAccountCheckpointError, Value
 
 class PaperAccountCheckpointReplayError(PaperAccountCheckpointError, ValueError):
     """Raised when checkpoint restoration is requested without a PASS result."""
+
+
+class CheckpointedVerifiedSnapshotPaperCycleError(Exception):
+    """Base class for checkpoint-restored verified-snapshot cycle failures."""
+
+
+class InvalidCheckpointedVerifiedSnapshotPaperCycleRequestError(
+    CheckpointedVerifiedSnapshotPaperCycleError,
+    ValueError,
+):
+    """Raised when caller-authored checkpointed-cycle inputs are invalid."""
+
+
+class CheckpointedVerifiedSnapshotPaperCycleCheckpointError(
+    CheckpointedVerifiedSnapshotPaperCycleError,
+    ValueError,
+):
+    """Raised when prior-checkpoint verification is incomplete or inconsistent."""
+
+
+class CheckpointedVerifiedSnapshotPaperCycleRestorationError(
+    CheckpointedVerifiedSnapshotPaperCycleError,
+):
+    """Raised when exact public compact-ledger restoration fails."""
+
+
+class CheckpointedVerifiedSnapshotPaperCycleRuntimeExecutionError(
+    CheckpointedVerifiedSnapshotPaperCycleError,
+):
+    """Raised when the existing paper runtime cannot complete exactly once."""
+
+
+class CheckpointedVerifiedSnapshotPaperCycleApplicationError(
+    CheckpointedVerifiedSnapshotPaperCycleRuntimeExecutionError,
+):
+    """Raised when existing atomic fill application fails."""
+
+
+class CheckpointedVerifiedSnapshotPaperCycleInsufficientCashError(
+    CheckpointedVerifiedSnapshotPaperCycleApplicationError,
+):
+    """Raised when caller-asserted open prices cause atomic cash failure."""
+
+
+class CheckpointedVerifiedSnapshotPaperCycleReconciliationError(
+    CheckpointedVerifiedSnapshotPaperCycleError,
+    ValueError,
+):
+    """Raised when restored, prepared, runtime, or compact evidence differs."""
+
+
+class InconsistentCheckpointedVerifiedSnapshotPaperCycleResultError(
+    CheckpointedVerifiedSnapshotPaperCycleReconciliationError,
+):
+    """Raised when an immutable checkpointed-cycle result is inconsistent."""

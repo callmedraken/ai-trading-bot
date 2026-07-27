@@ -292,3 +292,57 @@ class InconsistentCheckpointedVerifiedSnapshotPaperCycleResultError(
     CheckpointedVerifiedSnapshotPaperCycleReconciliationError,
 ):
     """Raised when an immutable checkpointed-cycle result is inconsistent."""
+
+
+class CheckpointedPaperCycleReportError(Exception):
+    """Base class for canonical checkpointed-cycle report failures."""
+
+
+class CheckpointedPaperCycleReportSyntaxError(
+    CheckpointedPaperCycleReportError, ValueError
+):
+    """Raised when checkpointed-cycle report bytes are not strict JSON."""
+
+
+class CheckpointedPaperCycleReportSchemaError(
+    CheckpointedPaperCycleReportError, ValueError
+):
+    """Raised when a checkpointed-cycle report violates its schema."""
+
+
+class CheckpointedPaperCycleReportReconciliationError(
+    CheckpointedPaperCycleReportError, ValueError
+):
+    """Raised when retained checkpointed-cycle report evidence disagrees."""
+
+
+class CheckpointedPaperCycleReportVerificationError(
+    CheckpointedPaperCycleReportError, ValueError
+):
+    """Raised when offline edge-verification arguments are invalid."""
+
+
+class CheckpointedPaperCycleReplayError(CheckpointedPaperCycleReportError, ValueError):
+    """Raised when PASS-only one-edge replay access is requested early."""
+
+
+class SuccessorPaperAccountCheckpointError(Exception):
+    """Base class for immutable checkpointed-cycle successor checkpoints."""
+
+
+class SuccessorPaperAccountCheckpointSchemaError(
+    SuccessorPaperAccountCheckpointError, ValueError
+):
+    """Raised when successor checkpoint JSON violates its strict schema."""
+
+
+class SuccessorPaperAccountCheckpointSyntaxError(
+    SuccessorPaperAccountCheckpointError, ValueError
+):
+    """Raised when successor checkpoint bytes are malformed."""
+
+
+class SuccessorPaperAccountCheckpointReconciliationError(
+    SuccessorPaperAccountCheckpointError, ValueError
+):
+    """Raised when successor state, lineage, or identity disagrees."""

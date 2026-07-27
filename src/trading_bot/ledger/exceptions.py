@@ -9,6 +9,14 @@ class InvalidPaperLedgerInitializationError(LedgerError, ValueError):
     """Raised when explicit opening-account state is invalid."""
 
 
+class InvalidCompactPaperLedgerStateError(LedgerError, ValueError):
+    """Raised when exact compact paper-ledger state is invalid."""
+
+
+class CompactPaperLedgerRestorationError(LedgerError):
+    """Raised when compact state cannot be restored and reconciled exactly."""
+
+
 class InsufficientCashError(LedgerError):
     """Raised when a purchase would make cash negative."""
 

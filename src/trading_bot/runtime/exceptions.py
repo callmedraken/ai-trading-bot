@@ -205,3 +205,35 @@ class VerifiedSnapshotPaperCycleReplayError(
     VerifiedSnapshotPaperCycleReportError, ValueError
 ):
     """Raised when replay access is attempted without a complete PASS."""
+
+
+class PaperAccountCheckpointError(Exception):
+    """Base class for deterministic paper-account checkpoint failures."""
+
+
+class InvalidPaperAccountCheckpointRequestError(
+    PaperAccountCheckpointError, ValueError
+):
+    """Raised when a caller-authored genesis checkpoint is invalid."""
+
+
+class PaperAccountCheckpointSyntaxError(PaperAccountCheckpointError, ValueError):
+    """Raised when checkpoint bytes are not bounded strict JSON input."""
+
+
+class PaperAccountCheckpointSchemaError(PaperAccountCheckpointError, ValueError):
+    """Raised when checkpoint JSON violates the canonical schema."""
+
+
+class PaperAccountCheckpointReconciliationError(
+    PaperAccountCheckpointError, ValueError
+):
+    """Raised when retained checkpoint state does not reconcile exactly."""
+
+
+class PaperAccountCheckpointVerificationError(PaperAccountCheckpointError, ValueError):
+    """Raised when offline checkpoint verification arguments are invalid."""
+
+
+class PaperAccountCheckpointReplayError(PaperAccountCheckpointError, ValueError):
+    """Raised when checkpoint restoration is requested without a PASS result."""

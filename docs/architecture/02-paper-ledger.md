@@ -23,3 +23,11 @@ prohibited.
 
 The ledger does not generate or execute orders, assess strategies, download
 market data, persist records, connect to brokers, or make trading decisions.
+
+The public compact-checkpoint boundary can export and restore exact cash,
+ordered quantities, exact total cost bases, derived average costs, cumulative
+realized profit and loss, and an explicit UTC as-of timestamp. Compact
+restoration intentionally starts with empty fill history and duplicate-fill
+membership and is visibly marked on the restored ledger. It does not claim to
+restore historical fills, orders, events, or their collision behavior. See
+`docs/architecture/60-exact-compact-paper-ledger-state.md`.

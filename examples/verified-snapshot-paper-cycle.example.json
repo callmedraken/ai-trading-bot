@@ -1,0 +1,61 @@
+{
+  "account_state": {
+    "account_state_id": "11111111-1111-1111-1111-111111111111",
+    "as_of": "2025-01-06T19:59:00Z",
+    "cash": "10000",
+    "positions": []
+  },
+  "filled_at": "2025-01-07T20:00:00Z",
+  "metadata": [],
+  "open_references": [
+    {
+      "caller_asserted_open_reference_price": "100",
+      "session": "2025-01-07",
+      "symbol": "SPY"
+    }
+  ],
+  "planning_at": "2025-01-06T20:01:00Z",
+  "policies": {
+    "fill_policy": {"fixed_commission": "0", "slippage_basis_points": "0"},
+    "portfolio_constraints": null,
+    "proposal_confidence": null,
+    "proposal_policy": {"allow_partial_plans": true},
+    "rebalance_assumptions": {
+      "additional_execution_cash_buffer": "0",
+      "allow_fractional_quantities": true,
+      "fixed_commission": "0",
+      "minimum_trade_notional": "0",
+      "minimum_trade_quantity": "0",
+      "quantity_increment": "0.001",
+      "target_weight_tolerance": "0",
+      "use_planned_sell_proceeds": true
+    },
+    "risk_limits": {
+      "allow_buying": true,
+      "allow_fractional_shares": true,
+      "allow_selling": true,
+      "estimated_commission": "0",
+      "fractional_increment": "0.001",
+      "max_new_position_percent": null,
+      "max_order_notional": null,
+      "max_position_percent": "1",
+      "max_total_exposure_percent": "1",
+      "minimum_cash_reserve_percent": "0"
+    },
+    "risk_policy": {"allow_sell_proceeds_for_later_buys": true},
+    "trading_enabled": true
+  },
+  "request_id": "00000000-0000-0000-0000-000000000001",
+  "schema_version": 1,
+  "snapshot_reference": {
+    "artifact_byte_length": 1,
+    "artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "snapshot_id": "00000000-0000-0000-0000-000000000002"
+  },
+  "submitted_at": "2025-01-06T20:02:00Z",
+  "target": {
+    "quantities": [{"quantity": "0", "symbol": "SPY"}],
+    "target_cash": "10000",
+    "target_id": "00000000-0000-0000-0000-000000000003"
+  }
+}

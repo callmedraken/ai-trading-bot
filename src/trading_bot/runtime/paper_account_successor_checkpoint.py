@@ -24,6 +24,7 @@ from trading_bot.market_data.daily_snapshot_identity import canonical_timestamp
 from trading_bot.portfolio import MetadataEntry
 from trading_bot.runtime.checkpointed_verified_snapshot_execution import (
     CheckpointedVerifiedSnapshotPaperCycleResult,
+    VerifiedPriorCheckpoint,
 )
 from trading_bot.runtime.exceptions import (
     SuccessorPaperAccountCheckpointReconciliationError,
@@ -975,6 +976,7 @@ def verify_checkpointed_paper_cycle_successor_edge(
     *,
     expected_successor_sha256: str | None = None,
     expected_successor_byte_length: int | None = None,
+    verified_prior: VerifiedPriorCheckpoint | None = None,
 ) -> PaperAccountCheckpointEdgeVerificationResult:
     """Verify one complete checkpointed-cycle edge without lineage traversal."""
     from trading_bot.ledger import export_compact_paper_ledger_state
@@ -1037,6 +1039,7 @@ def verify_checkpointed_paper_cycle_successor_edge(
         prior_checkpoint_payload,
         snapshot_payload,
         calendar,
+        verified_prior=verified_prior,
     )
     if (
         report_verification.status

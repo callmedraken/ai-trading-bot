@@ -30,7 +30,9 @@ from trading_bot.runtime.checkpointed_verified_snapshot_execution import (
     CheckpointedVerifiedSnapshotPaperCycleRequest,
     CheckpointedVerifiedSnapshotPaperCycleResult,
     CheckpointedVerifiedSnapshotPaperCycleStatus,
+    VerifiedPriorCheckpoint,
     execute_checkpointed_verified_snapshot_paper_cycle,
+    verified_prior_from_genesis,
 )
 from trading_bot.runtime.exceptions import (
     CheckpointedPaperCycleReportReconciliationError,
@@ -39,7 +41,6 @@ from trading_bot.runtime.exceptions import (
     CheckpointedPaperCycleReportVerificationError,
 )
 from trading_bot.runtime.paper_account_checkpoint import (
-    PaperAccountCheckpointVerificationStatus,
     verify_genesis_paper_account_checkpoint,
 )
 from trading_bot.runtime.paper_account_successor_checkpoint import (
@@ -517,6 +518,7 @@ def verify_checkpointed_paper_cycle_report(
     *,
     expected_report_sha256: str | None = None,
     expected_report_byte_length: int | None = None,
+    verified_prior: VerifiedPriorCheckpoint | None = None,
 ) -> CheckpointedPaperCycleReportVerificationResult:
     """Verify a report by restoring its prior checkpoint and replaying once."""
     if (
@@ -574,18 +576,32 @@ def verify_checkpointed_paper_cycle_report(
             report_length, report_hash, snapshot_length, snapshot_hash, diagnostics
         )
     evidence = report.evidence
-    prior = verify_genesis_paper_account_checkpoint(
-        prior_checkpoint_payload,
-        expected_checkpoint_sha256=evidence.prior_checkpoint.artifact_sha256,
-        expected_checkpoint_byte_length=evidence.prior_checkpoint.artifact_byte_length,
-    )
+    try:
+        if type(verified_prior) is VerifiedPriorCheckpoint:
+            prior = verified_prior
+            if (
+                sha256(prior_checkpoint_payload).hexdigest() != prior.checkpoint_sha256
+                or len(prior_checkpoint_payload) != prior.checkpoint_byte_length
+            ):
+                prior = None
+        else:
+            prior = verified_prior_from_genesis(
+                verify_genesis_paper_account_checkpoint(
+                    prior_checkpoint_payload,
+                    expected_checkpoint_sha256=evidence.prior_checkpoint.artifact_sha256,
+                    expected_checkpoint_byte_length=evidence.prior_checkpoint.artifact_byte_length,
+                )
+            )
+    except Exception:
+        prior = None
     if (
-        prior.status is not PaperAccountCheckpointVerificationStatus.PASS
-        or prior.checkpoint is None
-        or prior.diagnostics
-        or prior.checkpoint.checkpoint_id != evidence.prior_checkpoint.checkpoint_id
-        or prior.checkpoint.sequence != evidence.prior_checkpoint.sequence
-        or prior.checkpoint.lineage_id != evidence.prior_lineage_id
+        prior is None
+        or prior.checkpoint_id != evidence.prior_checkpoint.checkpoint_id
+        or prior.sequence != evidence.prior_checkpoint.sequence
+        or prior.lineage_id != evidence.prior_lineage_id
+        or prior.checkpoint_sha256 != evidence.prior_checkpoint.artifact_sha256
+        or prior.checkpoint_byte_length
+        != evidence.prior_checkpoint.artifact_byte_length
     ):
         diagnostics.append(
             _diagnostic(

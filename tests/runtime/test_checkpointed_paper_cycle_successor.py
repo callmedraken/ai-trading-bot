@@ -1,14 +1,18 @@
 """Focused immutable successor-checkpoint and one-edge verification coverage."""
 
 from dataclasses import replace
+from datetime import timedelta
 from decimal import Decimal
 from hashlib import sha256
+from uuid import UUID
 
 import pytest
+from tests.market_data.daily_snapshot_test_support import CAPTURED_AT, accepted_result
 from tests.runtime.test_checkpointed_verified_snapshot_execution import (
     _checkpoint_verification,
     _execute,
     _position,
+    _request,
     _target,
 )
 from tests.runtime.test_verified_snapshot_preparation import (
@@ -18,7 +22,7 @@ from tests.runtime.test_verified_snapshot_preparation import (
 )
 
 from trading_bot.execution import PaperFillPolicy
-from trading_bot.market_data import serialize_daily_snapshot
+from trading_bot.market_data import serialize_daily_snapshot, verify_daily_snapshot
 from trading_bot.rebalancing import RebalanceAssumptions
 from trading_bot.risk import RiskLimits
 from trading_bot.runtime import (
@@ -29,10 +33,12 @@ from trading_bot.runtime import (
     checkpointed_paper_cycle_report_from_result,
     checkpointed_paper_cycle_report_reference,
     create_successor_paper_account_checkpoint,
+    execute_checkpointed_verified_snapshot_paper_cycle,
     parse_checkpointed_paper_cycle_report,
     parse_successor_paper_account_checkpoint,
     serialize_checkpointed_paper_cycle_report,
     serialize_successor_paper_account_checkpoint,
+    verified_prior_from_successor_edge,
     verify_checkpointed_paper_cycle_report,
     verify_checkpointed_paper_cycle_successor_edge,
 )
@@ -68,6 +74,22 @@ def _edge_artifacts(*, target=None, checkpoint=None, policies=None):
         snapshot_payload,
         successor,
         successor_payload,
+    )
+
+
+def _later_snapshot_verification():
+    snapshot = accepted_result(captured_at=CAPTURED_AT + timedelta(hours=3)).snapshot
+    assert snapshot is not None
+    return verify_daily_snapshot(serialize_daily_snapshot(snapshot), calendar())
+
+
+def _later_cycle_request(snapshot_verification):
+    return replace(
+        _request(snapshot_verification, target=_target("0", "0", "1997.50")),
+        request_id=UUID("01a3fceb-4e75-581f-bbeb-6d405e51cc0a"),
+        planning_at=CAPTURED_AT + timedelta(hours=3, minutes=1),
+        submitted_at=CAPTURED_AT + timedelta(hours=3, minutes=2),
+        filled_at=CAPTURED_AT + timedelta(hours=5),
     )
 
 
@@ -294,4 +316,134 @@ def test_successor_preserves_negative_pnl_and_commissioned_fill_evidence() -> No
     )
     assert commission_successor.account_state.realized_profit_loss_after == (
         commission_result.final_realized_profit_loss
+    )
+
+
+def test_verified_successor_edge_can_authorize_one_later_cycle() -> None:
+    (
+        _,
+        _,
+        first_report_payload,
+        genesis_payload,
+        snapshot_payload,
+        _,
+        first_successor,
+    ) = _edge_artifacts()
+    first_edge = verify_checkpointed_paper_cycle_successor_edge(
+        first_report_payload,
+        genesis_payload,
+        snapshot_payload,
+        first_successor,
+        calendar(),
+    )
+    prior = verified_prior_from_successor_edge(first_edge)
+    snapshot_verification = _later_snapshot_verification()
+    later_request = _later_cycle_request(snapshot_verification)
+
+    later = execute_checkpointed_verified_snapshot_paper_cycle(
+        later_request,
+        prior,
+        snapshot_verification,
+        calendar(),
+    )
+
+    assert later.prior_checkpoint_id == prior.checkpoint_id
+    assert later.prior_sequence == 1
+    assert later.prior_lineage_id == prior.lineage_id
+    assert later.opening_compact_state == prior.compact_state
+    assert later.application_id != first_edge.successor_checkpoint.application_id
+
+
+def test_successor_prior_replays_and_verifies_a_second_complete_edge() -> None:
+    _, _, first_report_payload, genesis_payload, snapshot_payload, _, first_payload = (
+        _edge_artifacts()
+    )
+    first_edge = verify_checkpointed_paper_cycle_successor_edge(
+        first_report_payload,
+        genesis_payload,
+        snapshot_payload,
+        first_payload,
+        calendar(),
+    )
+    prior = verified_prior_from_successor_edge(first_edge)
+    snapshot_verification = _later_snapshot_verification()
+    later_request = _later_cycle_request(snapshot_verification)
+    later = execute_checkpointed_verified_snapshot_paper_cycle(
+        later_request,
+        prior,
+        snapshot_verification,
+        calendar(),
+    )
+    later_report = checkpointed_paper_cycle_report_from_result(later)
+    later_report_payload = serialize_checkpointed_paper_cycle_report(later_report)
+    later_successor = create_successor_paper_account_checkpoint(
+        later_report.evidence.prior_checkpoint,
+        later_report.evidence.prior_lineage_id,
+        later,
+        checkpointed_paper_cycle_report_reference(later_report_payload),
+    )
+    later_successor_payload = serialize_successor_paper_account_checkpoint(
+        later_successor
+    )
+
+    report_verification = verify_checkpointed_paper_cycle_report(
+        later_report_payload,
+        first_payload,
+        serialize_daily_snapshot(snapshot_verification.snapshot),
+        calendar(),
+        verified_prior=prior,
+    )
+    second_edge = verify_checkpointed_paper_cycle_successor_edge(
+        later_report_payload,
+        first_payload,
+        serialize_daily_snapshot(snapshot_verification.snapshot),
+        later_successor_payload,
+        calendar(),
+        verified_prior=prior,
+    )
+
+    assert (
+        report_verification.status
+        is CheckpointedPaperCycleReportVerificationStatus.PASS
+    )
+    assert report_verification.cycle_result == later
+    assert second_edge.status is PaperAccountCheckpointEdgeVerificationStatus.PASS
+    assert second_edge.successor_checkpoint == later_successor
+    assert verified_prior_from_successor_edge(second_edge).sequence == 2
+
+
+def test_successor_prior_rejects_bytes_not_bound_to_its_verified_edge() -> None:
+    _, _, first_report_payload, genesis_payload, snapshot_payload, _, first_payload = (
+        _edge_artifacts()
+    )
+    first_edge = verify_checkpointed_paper_cycle_successor_edge(
+        first_report_payload,
+        genesis_payload,
+        snapshot_payload,
+        first_payload,
+        calendar(),
+    )
+    prior = verified_prior_from_successor_edge(first_edge)
+    snapshot_verification = _later_snapshot_verification()
+    later = execute_checkpointed_verified_snapshot_paper_cycle(
+        _later_cycle_request(snapshot_verification),
+        prior,
+        snapshot_verification,
+        calendar(),
+    )
+    report_payload = serialize_checkpointed_paper_cycle_report(
+        checkpointed_paper_cycle_report_from_result(later)
+    )
+
+    verification = verify_checkpointed_paper_cycle_report(
+        report_payload,
+        genesis_payload,
+        serialize_daily_snapshot(snapshot_verification.snapshot),
+        calendar(),
+        verified_prior=prior,
+    )
+
+    assert verification.status is CheckpointedPaperCycleReportVerificationStatus.FAIL
+    assert verification.diagnostics[0].code is (
+        CheckpointedPaperCycleReportVerificationCode.PRIOR_CHECKPOINT_LINKAGE_FAILURE
     )

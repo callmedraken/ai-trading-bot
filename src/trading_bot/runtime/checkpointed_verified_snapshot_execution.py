@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import InitVar, dataclass
 from datetime import UTC, datetime
 from decimal import Context, Decimal, localcontext
 from enum import StrEnum
@@ -91,6 +91,7 @@ _RESERVED_METADATA_PREFIXES = ("checkpoint.", "lineage.", "application.")
 _SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 _ZERO = Decimal("0")
 _ARITHMETIC_CONTEXT = Context(prec=1024, Emax=999_999, Emin=-999_999)
+_VERIFIED_PRIOR_AUTHORITY = object()
 
 
 class CheckpointedVerifiedSnapshotPaperCycleStatus(StrEnum):
@@ -104,6 +105,152 @@ class CheckpointedVerifiedSnapshotPaperCycleDiagnosticCode(StrEnum):
     """Stable successful-result diagnostic codes."""
 
     NO_ACTION = "NO_ACTION"
+
+
+class VerifiedPriorCheckpointKind(StrEnum):
+    """The fully verified prior checkpoint sources accepted by one cycle."""
+
+    GENESIS = "GENESIS"
+    CYCLE_SUCCESSOR = "CYCLE_SUCCESSOR"
+
+
+@dataclass(frozen=True, slots=True)
+class VerifiedPriorCheckpoint:
+    """Public immutable prior authority after complete offline verification."""
+
+    kind: VerifiedPriorCheckpointKind
+    checkpoint_id: UUID
+    sequence: int
+    lineage_id: UUID
+    account_state_id: UUID
+    compact_state: CompactPaperLedgerState
+    empty_engine_state_id: UUID
+    checkpoint_sha256: str
+    checkpoint_byte_length: int
+    _authority: InitVar[object]
+
+    def __post_init__(self, _authority: object) -> None:
+        if _authority is not _VERIFIED_PRIOR_AUTHORITY:
+            raise CheckpointedVerifiedSnapshotPaperCycleCheckpointError(
+                "verified prior must be created from complete verification evidence"
+            )
+        if type(self.kind) is not VerifiedPriorCheckpointKind:
+            raise CheckpointedVerifiedSnapshotPaperCycleCheckpointError(
+                "verified prior kind is invalid"
+            )
+        if (
+            any(
+                type(getattr(self, name)) is not UUID
+                for name in (
+                    "checkpoint_id",
+                    "lineage_id",
+                    "account_state_id",
+                    "empty_engine_state_id",
+                )
+            )
+            or type(self.compact_state) is not CompactPaperLedgerState
+        ):
+            raise CheckpointedVerifiedSnapshotPaperCycleCheckpointError(
+                "verified prior identity or compact state is invalid"
+            )
+        if type(self.sequence) is not int or self.sequence < 0:
+            raise CheckpointedVerifiedSnapshotPaperCycleCheckpointError(
+                "verified prior sequence is invalid"
+            )
+        if (
+            type(self.checkpoint_sha256) is not str
+            or _SHA256_PATTERN.fullmatch(self.checkpoint_sha256) is None
+            or type(self.checkpoint_byte_length) is not int
+            or self.checkpoint_byte_length < 0
+        ):
+            raise CheckpointedVerifiedSnapshotPaperCycleCheckpointError(
+                "verified prior artifact evidence is invalid"
+            )
+
+
+def verified_prior_from_genesis(
+    verification: PaperAccountCheckpointVerificationResult,
+) -> VerifiedPriorCheckpoint:
+    """Normalize a complete verified genesis checkpoint into common authority."""
+    if (
+        type(verification) is not PaperAccountCheckpointVerificationResult
+        or verification.status is not PaperAccountCheckpointVerificationStatus.PASS
+        or verification.checkpoint is None
+        or verification.diagnostics
+    ):
+        raise CheckpointedVerifiedSnapshotPaperCycleCheckpointError(
+            "invalid genesis prior"
+        )
+    checkpoint, ledger, evidence = replay_verified_genesis_paper_account_checkpoint(
+        verification
+    )
+    compact = checkpoint.account_state.compact_state()
+    if (
+        ledger.fills
+        or not ledger.is_compact_restored
+        or evidence.compact_state_id != compact.compact_state_id
+        or export_compact_paper_ledger_state(ledger, as_of=compact.as_of) != compact
+    ):
+        raise CheckpointedVerifiedSnapshotPaperCycleCheckpointError(
+            "genesis prior state mismatch"
+        )
+    return VerifiedPriorCheckpoint(
+        VerifiedPriorCheckpointKind.GENESIS,
+        checkpoint.checkpoint_id,
+        checkpoint.sequence,
+        checkpoint.lineage_id,
+        checkpoint.account_state.account_state_id,
+        compact,
+        checkpoint.empty_engine_state_id,
+        verification.checkpoint_sha256,
+        verification.checkpoint_byte_length,
+        _VERIFIED_PRIOR_AUTHORITY,
+    )
+
+
+def verified_prior_from_successor_edge(
+    edge_verification: object,
+) -> VerifiedPriorCheckpoint:
+    """Normalize only a complete successor-edge PASS into common authority."""
+    from trading_bot.runtime.paper_account_successor_checkpoint import (
+        PaperAccountCheckpointEdgeVerificationResult,
+        PaperAccountCheckpointEdgeVerificationStatus,
+    )
+
+    if (
+        type(edge_verification) is not PaperAccountCheckpointEdgeVerificationResult
+        or edge_verification.status
+        is not PaperAccountCheckpointEdgeVerificationStatus.PASS
+        or edge_verification.successor_checkpoint is None
+        or edge_verification.restored_successor_ledger is None
+        or edge_verification.diagnostics
+    ):
+        raise CheckpointedVerifiedSnapshotPaperCycleCheckpointError(
+            "invalid successor edge prior"
+        )
+    successor = edge_verification.successor_checkpoint
+    ledger = edge_verification.restored_successor_ledger
+    compact = successor.account_state.compact_state
+    if (
+        ledger.fills
+        or not ledger.is_compact_restored
+        or export_compact_paper_ledger_state(ledger, as_of=compact.as_of) != compact
+    ):
+        raise CheckpointedVerifiedSnapshotPaperCycleCheckpointError(
+            "successor prior state mismatch"
+        )
+    return VerifiedPriorCheckpoint(
+        VerifiedPriorCheckpointKind.CYCLE_SUCCESSOR,
+        successor.checkpoint_id,
+        successor.sequence,
+        successor.lineage_id,
+        successor.account_state.account_state_id,
+        compact,
+        successor.empty_engine_state_id,
+        edge_verification.successor_sha256,
+        edge_verification.successor_byte_length,
+        _VERIFIED_PRIOR_AUTHORITY,
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -319,7 +466,9 @@ def derive_checkpointed_verified_snapshot_application_id(
 
 def execute_checkpointed_verified_snapshot_paper_cycle(
     request: CheckpointedVerifiedSnapshotPaperCycleRequest,
-    checkpoint_verification: PaperAccountCheckpointVerificationResult,
+    checkpoint_verification: (
+        PaperAccountCheckpointVerificationResult | VerifiedPriorCheckpoint
+    ),
     snapshot_verification: DailySnapshotVerificationResult,
     calendar: IdentifiedMarketCalendar,
 ) -> CheckpointedVerifiedSnapshotPaperCycleResult:
@@ -349,7 +498,7 @@ def execute_checkpointed_verified_snapshot_paper_cycle(
         MetadataEntry(APPLICATION_ID_METADATA_KEY, str(application_id)),
     )
     account_state = VerifiedSnapshotAccountState(
-        checkpoint.account_state.account_state_id,
+        checkpoint.account_state_id,
         opening_state.as_of,
         opening_state.cash,
         tuple(
@@ -382,7 +531,7 @@ def execute_checkpointed_verified_snapshot_paper_cycle(
         _reconcile_preparation_account(
             preparation,
             opening_state,
-            checkpoint.account_state.account_state_id,
+            checkpoint.account_state_id,
         )
         runtime_request = _runtime_request(preparation)
         engine = OrderEngine()
@@ -447,9 +596,9 @@ def execute_checkpointed_verified_snapshot_paper_cycle(
                 checkpoint.checkpoint_id,
                 checkpoint.sequence,
                 checkpoint.lineage_id,
-                checkpoint.account_state.account_state_id,
-                checkpoint_verification.checkpoint_sha256,
-                checkpoint_verification.checkpoint_byte_length,
+                checkpoint.account_state_id,
+                checkpoint.checkpoint_sha256,
+                checkpoint.checkpoint_byte_length,
                 application_id,
                 opening_state,
                 preparation,
@@ -463,9 +612,9 @@ def execute_checkpointed_verified_snapshot_paper_cycle(
                 checkpoint.checkpoint_id,
                 checkpoint.sequence,
                 checkpoint.lineage_id,
-                checkpoint.account_state.account_state_id,
-                checkpoint_verification.checkpoint_sha256,
-                checkpoint_verification.checkpoint_byte_length,
+                checkpoint.account_state_id,
+                checkpoint.checkpoint_sha256,
+                checkpoint.checkpoint_byte_length,
                 application_id,
                 restoration,
                 opening_state,
@@ -500,37 +649,17 @@ def _require_complete_snapshot_verification(
 
 
 def _restore_verified_checkpoint(
-    verification: PaperAccountCheckpointVerificationResult,
+    verification: PaperAccountCheckpointVerificationResult | VerifiedPriorCheckpoint,
 ):
-    if (
-        type(verification) is not PaperAccountCheckpointVerificationResult
-        or verification.status is not PaperAccountCheckpointVerificationStatus.PASS
-        or verification.checkpoint is None
-        or verification.restored_ledger is None
-        or verification.restoration_evidence is None
-        or verification.diagnostics
-    ):
-        raise CheckpointedVerifiedSnapshotPaperCycleCheckpointError(
-            "checkpoint_verification must be one complete PASS result"
-        )
+    checkpoint = (
+        verified_prior_from_genesis(verification)
+        if type(verification) is PaperAccountCheckpointVerificationResult
+        else verification
+    )
+    if type(checkpoint) is not VerifiedPriorCheckpoint:
+        raise CheckpointedVerifiedSnapshotPaperCycleCheckpointError("prior is invalid")
     try:
-        checkpoint, verified_ledger, verified_evidence = (
-            replay_verified_genesis_paper_account_checkpoint(verification)
-        )
-        opening_state = checkpoint.account_state.compact_state()
-        verified_state = export_compact_paper_ledger_state(
-            verified_ledger,
-            as_of=opening_state.as_of,
-        )
-        if (
-            verified_state != opening_state
-            or verified_ledger.fills
-            or not verified_ledger.is_compact_restored
-            or verified_evidence.compact_state_id != opening_state.compact_state_id
-        ):
-            raise CheckpointedVerifiedSnapshotPaperCycleCheckpointError(
-                "verified checkpoint replay no longer reconciles"
-            )
+        opening_state = checkpoint.compact_state
         ledger, restoration = restore_paper_ledger_from_compact_state(opening_state)
     except CheckpointedVerifiedSnapshotPaperCycleCheckpointError:
         raise
@@ -541,7 +670,7 @@ def _restore_verified_checkpoint(
     if (
         not ledger.is_compact_restored
         or ledger.fills
-        or restoration != verified_evidence
+        or restoration.compact_state_id != opening_state.compact_state_id
         or export_compact_paper_ledger_state(ledger, as_of=opening_state.as_of)
         != opening_state
     ):

@@ -471,6 +471,30 @@ def serialize_checkpointed_paper_cycle_report(
     return payload
 
 
+def serialize_checkpointed_verified_snapshot_paper_cycle_request(
+    request: CheckpointedVerifiedSnapshotPaperCycleRequest,
+) -> bytes:
+    """Serialize one normalized checkpointed-cycle request canonically."""
+    if type(request) is not CheckpointedVerifiedSnapshotPaperCycleRequest:
+        raise CheckpointedPaperCycleReportReconciliationError(
+            "request must be an exact CheckpointedVerifiedSnapshotPaperCycleRequest"
+        )
+    _validate_request_bounds(request)
+    return _canonical_json_bytes(_request_tree(request))
+
+
+def parse_checkpointed_verified_snapshot_paper_cycle_request(
+    payload: bytes,
+) -> CheckpointedVerifiedSnapshotPaperCycleRequest:
+    """Parse one standalone canonical checkpointed-cycle request."""
+    tree = _load_json(payload)
+    request = _request(tree)
+    _validate_request_bounds(request)
+    if serialize_checkpointed_verified_snapshot_paper_cycle_request(request) != payload:
+        raise CheckpointedPaperCycleReportSchemaError("request bytes are not canonical")
+    return request
+
+
 def parse_checkpointed_paper_cycle_report(
     payload: bytes,
 ) -> CheckpointedPaperCycleReport:

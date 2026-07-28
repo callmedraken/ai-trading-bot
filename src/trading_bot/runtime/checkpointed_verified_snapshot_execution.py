@@ -45,6 +45,7 @@ from trading_bot.runtime.exceptions import (
     PaperPortfolioRuntimeError,
 )
 from trading_bot.runtime.paper_account_checkpoint import (
+    PaperAccountCheckpoint,
     PaperAccountCheckpointVerificationResult,
     PaperAccountCheckpointVerificationStatus,
     replay_verified_genesis_paper_account_checkpoint,
@@ -249,6 +250,66 @@ def verified_prior_from_successor_edge(
         successor.empty_engine_state_id,
         edge_verification.successor_sha256,
         edge_verification.successor_byte_length,
+        _VERIFIED_PRIOR_AUTHORITY,
+    )
+
+
+def verified_prior_from_full_lineage(
+    lineage_verification: object,
+) -> VerifiedPriorCheckpoint:
+    """Create later-cycle authority from one complete full-lineage PASS result."""
+    from trading_bot.runtime.paper_account_lineage_verification import (
+        PaperAccountLineageVerificationResult,
+        PaperAccountLineageVerificationStatus,
+    )
+    from trading_bot.runtime.paper_account_successor_checkpoint import (
+        PaperAccountSuccessorCheckpoint,
+    )
+
+    if (
+        type(lineage_verification) is not PaperAccountLineageVerificationResult
+        or lineage_verification.status is not PaperAccountLineageVerificationStatus.PASS
+        or lineage_verification.evidence is None
+        or lineage_verification.terminal_checkpoint is None
+        or lineage_verification.terminal_restored_ledger is None
+    ):
+        raise CheckpointedVerifiedSnapshotPaperCycleCheckpointError(
+            "full lineage must be a complete PASS result"
+        )
+    evidence = lineage_verification.evidence
+    checkpoint = lineage_verification.terminal_checkpoint
+    artifact = evidence.checkpoint_artifacts[-1]
+    if type(checkpoint) is PaperAccountCheckpoint:
+        kind = VerifiedPriorCheckpointKind.GENESIS
+        account_state_id = checkpoint.account_state.account_state_id
+        compact_state = checkpoint.account_state.compact_state()
+    elif type(checkpoint) is PaperAccountSuccessorCheckpoint:
+        kind = VerifiedPriorCheckpointKind.CYCLE_SUCCESSOR
+        account_state_id = checkpoint.account_state.account_state_id
+        compact_state = checkpoint.account_state.compact_state
+    else:
+        raise CheckpointedVerifiedSnapshotPaperCycleCheckpointError(
+            "full lineage terminal checkpoint is invalid"
+        )
+    if (
+        checkpoint.checkpoint_id != evidence.terminal_checkpoint_id
+        or checkpoint.lineage_id != evidence.lineage_id
+        or compact_state != evidence.terminal_compact_state
+        or artifact.artifact_id != checkpoint.checkpoint_id
+    ):
+        raise CheckpointedVerifiedSnapshotPaperCycleCheckpointError(
+            "full lineage terminal authority does not reconcile"
+        )
+    return VerifiedPriorCheckpoint(
+        kind,
+        checkpoint.checkpoint_id,
+        checkpoint.sequence,
+        checkpoint.lineage_id,
+        account_state_id,
+        compact_state,
+        checkpoint.empty_engine_state_id,
+        artifact.sha256,
+        artifact.byte_length,
         _VERIFIED_PRIOR_AUTHORITY,
     )
 

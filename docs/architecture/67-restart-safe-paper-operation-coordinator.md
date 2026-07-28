@@ -172,11 +172,59 @@ registry could provide complete conflict discovery. Milestone 2 intentionally
 introduces none of those mechanisms and does not alter the milestone-1 receipt
 schema.
 
+## Milestone-3 one-shot transition execution
+
+Milestone 3 adds an explicit `--execute-once` mode. Execution is admitted only
+after the milestone-2 inspection result is exactly `PENDING`, the operation-root
+identity remains stable, and the exact transition final and staging names remain
+unoccupied. Every other inspection classification returns without invoking the
+runtime.
+
+An admitted invocation calls
+`execute_checkpointed_verified_snapshot_paper_cycle` exactly once. It never
+retries a domain rejection, exception, verification failure, or filesystem
+failure. The normalized caller-authored request, verified terminal authority,
+and completed snapshot verification are passed directly to that existing
+runtime.
+
+The pre-commit order is fixed:
+
+1. execute exactly one private paper cycle;
+2. canonicalize its checkpointed-cycle report;
+3. create and canonicalize its successor checkpoint;
+4. verify the prospective successor edge using the fully verified prior;
+5. append exactly the new report, successor checkpoint, and current snapshot to
+   the caller-provided prior artifacts;
+6. verify the complete prospective lineage with the successor as terminal;
+7. exclusively create the sibling transition staging directory;
+8. write and flush the exact two files;
+9. safely reread the staged bytes and repeat edge and full-lineage verification;
+10. no-clobber rename the staging directory within the same parent;
+11. safely reread the finalized bytes and repeat edge and full-lineage
+    verification;
+12. return `TRANSITION_COMMITTED`.
+
+The finalized transition directory is the authoritative paper-account commit
+point. It cannot become visible before prospective and staged verification both
+pass. `APPLIED` and `NO_ACTION` are successful outcomes; both commit a successor
+checkpoint because the compact ledger `as_of` advances.
+
+The milestone-3 commit path deliberately preserves invocation-created staging
+after any interrupted or failed staging phase. It never deletes, repairs,
+overwrites, merges, or automatically retries crash-left work. A verification
+failure after rename reports blocked state while preserving the already
+authoritative finalized transition.
+
+Milestone 3 creates no operation directory and no receipt. Consequently, a
+later invocation that finds the exact verified finalized transition but no
+receipt remains `BLOCKED` with
+`FINALIZED_TRANSITION_WITHOUT_RECEIPT`. Transition-to-receipt reconstruction is
+reserved for milestone 4.
+
 ## Deferred coordinator work
 
-Later milestones may add the manually invoked one-shot execution coordinator,
-no-clobber transition and receipt staging/finalization, restart inspection, and
-receipt recovery after an already committed verified transition.
+Later milestones may add receipt staging/finalization and receipt recovery after
+an already committed verified transition.
 
 Schedulers, services, loops, polling, databases, distributed locks, multi-host
 coordination, provider capture, external paper accounts, and real-money

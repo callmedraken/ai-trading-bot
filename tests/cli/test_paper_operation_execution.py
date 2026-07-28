@@ -1,0 +1,689 @@
+"""Focused one-shot paper-operation execution and transition commit coverage."""
+
+from __future__ import annotations
+
+import os
+import socket
+import time
+from dataclasses import replace
+from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
+from tests.cli.test_checkpoint_transition import _no_action_transition_bytes
+from tests.cli.test_paper_operation_inspection import (
+    _changed_request_cycle,
+    _failed_fixture,
+    _install_completed_receipt,
+    _setup,
+    _setup_from_lineage,
+)
+from tests.runtime.test_paper_account_lineage_verification import _two_edges
+
+from trading_bot.cli.paper_operation import main
+from trading_bot.cli.paper_operation_execution import (
+    PaperOperationExecutionClassification,
+    PaperOperationExecutionDiagnosticCode,
+    execute_paper_operation_once,
+)
+from trading_bot.runtime import (
+    CheckpointedVerifiedSnapshotPaperCycleInsufficientCashError,
+)
+
+
+def _transition_paths(fixture) -> tuple[Path, Path]:
+    final = (
+        fixture.operation_root
+        / f"paper-account-transition-{fixture.inputs.application_id}"
+    )
+    staging = (
+        fixture.operation_root
+        / f".paper-account-transition-{fixture.inputs.application_id}.staging"
+    )
+    return final, staging
+
+
+def test_pending_execution_invokes_runtime_once_and_commits_exact_layout(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = _setup(tmp_path)
+    final, staging = _transition_paths(fixture)
+    from trading_bot.cli import paper_operation_execution as execution_module
+
+    original = execution_module.execute_checkpointed_verified_snapshot_paper_cycle
+    calls = 0
+
+    def counted(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(
+        execution_module,
+        "execute_checkpointed_verified_snapshot_paper_cycle",
+        counted,
+    )
+
+    result = execute_paper_operation_once(
+        fixture.operation_root,
+        fixture.inputs,
+    )
+
+    assert calls == 1
+    assert (
+        result.classification
+        is PaperOperationExecutionClassification.TRANSITION_COMMITTED
+    )
+    assert result.outcome is not None
+    assert result.outcome.value == "APPLIED"
+    assert result.transition_path == final
+    assert final.is_dir()
+    assert not staging.exists()
+    assert not (fixture.operation_root / "paper-operations").exists()
+    assert {item.name for item in final.iterdir()} == {
+        f"checkpointed-paper-cycle-report-{result.cycle_result_id}.json",
+        f"paper-account-checkpoint-{result.successor_checkpoint_id}.json",
+    }
+
+    repeated = execute_paper_operation_once(
+        fixture.operation_root,
+        fixture.inputs,
+    )
+    assert calls == 1
+    assert repeated.classification is PaperOperationExecutionClassification.BLOCKED
+    assert repeated.diagnostic_code == "FINALIZED_TRANSITION_WITHOUT_RECEIPT"
+
+
+def test_no_action_still_commits_successor_checkpoint(tmp_path: Path) -> None:
+    fixture = _setup(
+        tmp_path,
+        cycle_payload=_no_action_transition_bytes(),
+    )
+
+    result = execute_paper_operation_once(
+        fixture.operation_root,
+        fixture.inputs,
+    )
+
+    assert (
+        result.classification
+        is PaperOperationExecutionClassification.TRANSITION_COMMITTED
+    )
+    assert result.outcome is not None
+    assert result.outcome.value == "NO_ACTION"
+    assert result.successor_checkpoint_id is not None
+    assert result.transition_path is not None
+
+
+@pytest.mark.parametrize(
+    ("failure_target", "diagnostic"),
+    (
+        (
+            "verify_checkpointed_paper_cycle_successor_edge",
+            PaperOperationExecutionDiagnosticCode.PROSPECTIVE_EDGE_VERIFICATION_FAILED,
+        ),
+        (
+            "verify_paper_account_lineage",
+            PaperOperationExecutionDiagnosticCode.PROSPECTIVE_LINEAGE_VERIFICATION_FAILED,
+        ),
+    ),
+)
+def test_prospective_verification_failure_prevents_staging(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    failure_target: str,
+    diagnostic: PaperOperationExecutionDiagnosticCode,
+) -> None:
+    fixture = _setup(tmp_path)
+    final, staging = _transition_paths(fixture)
+    monkeypatch.setattr(
+        f"trading_bot.cli.paper_operation_execution.{failure_target}",
+        lambda *args, **kwargs: SimpleNamespace(status=None, cycle_result=None),
+    )
+
+    result = execute_paper_operation_once(
+        fixture.operation_root,
+        fixture.inputs,
+    )
+
+    assert result.classification is PaperOperationExecutionClassification.BLOCKED
+    assert result.diagnostic_code == diagnostic.value
+    assert not staging.exists()
+    assert not final.exists()
+
+
+@pytest.mark.parametrize(
+    (
+        "failure_target",
+        "failed_phase",
+        "diagnostic",
+        "final_exists",
+        "staging_exists",
+    ),
+    (
+        (
+            "verify_checkpointed_paper_cycle_successor_edge",
+            "STAGED",
+            PaperOperationExecutionDiagnosticCode.STAGED_EDGE_VERIFICATION_FAILED,
+            False,
+            True,
+        ),
+        (
+            "verify_paper_account_lineage",
+            "STAGED",
+            PaperOperationExecutionDiagnosticCode.STAGED_LINEAGE_VERIFICATION_FAILED,
+            False,
+            True,
+        ),
+        (
+            "verify_checkpointed_paper_cycle_successor_edge",
+            "FINALIZED",
+            PaperOperationExecutionDiagnosticCode.FINALIZED_EDGE_VERIFICATION_FAILED,
+            True,
+            False,
+        ),
+        (
+            "verify_paper_account_lineage",
+            "FINALIZED",
+            PaperOperationExecutionDiagnosticCode.FINALIZED_LINEAGE_VERIFICATION_FAILED,
+            True,
+            False,
+        ),
+    ),
+)
+def test_reread_verification_failure_fails_closed_at_durable_phase(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    failure_target: str,
+    failed_phase: str,
+    diagnostic: PaperOperationExecutionDiagnosticCode,
+    final_exists: bool,
+    staging_exists: bool,
+) -> None:
+    fixture = _setup(tmp_path)
+    final, staging = _transition_paths(fixture)
+    from trading_bot.cli import paper_operation_execution as execution_module
+
+    original = getattr(execution_module, failure_target)
+    calls = 0
+
+    def fail_selected(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        if (failed_phase == "STAGED" and calls == 2) or (
+            failed_phase == "FINALIZED" and calls == 3
+        ):
+            return SimpleNamespace(status=None, cycle_result=None)
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(
+        execution_module,
+        failure_target,
+        fail_selected,
+    )
+
+    result = execute_paper_operation_once(
+        fixture.operation_root,
+        fixture.inputs,
+    )
+
+    assert result.classification is PaperOperationExecutionClassification.BLOCKED
+    assert result.diagnostic_code == diagnostic.value
+    assert final.exists() is final_exists
+    assert staging.exists() is staging_exists
+
+
+def test_deterministic_runtime_failure_and_exception_are_not_retried(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    deterministic = _failed_fixture(tmp_path / "deterministic")
+    first = execute_paper_operation_once(
+        deterministic.operation_root,
+        deterministic.inputs,
+    )
+    final, staging = _transition_paths(deterministic)
+    assert (
+        first.classification is PaperOperationExecutionClassification.EXECUTION_FAILED
+    )
+    assert first.diagnostic_code == "INSUFFICIENT_CASH"
+    assert not final.exists()
+    assert not staging.exists()
+
+    exceptional = _setup(tmp_path / "exception")
+    calls = 0
+
+    def fail_once(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        raise RuntimeError("environmental failure")
+
+    monkeypatch.setattr(
+        "trading_bot.cli.paper_operation_execution."
+        "execute_checkpointed_verified_snapshot_paper_cycle",
+        fail_once,
+    )
+    second = execute_paper_operation_once(
+        exceptional.operation_root,
+        exceptional.inputs,
+    )
+    final, staging = _transition_paths(exceptional)
+    assert calls == 1
+    assert second.classification is PaperOperationExecutionClassification.BLOCKED
+    assert second.diagnostic_code == "RUNTIME_EXCEPTION"
+    assert not final.exists()
+    assert not staging.exists()
+
+
+@pytest.mark.parametrize("state", ("staging", "stale", "hostile-final"))
+def test_non_pending_state_never_invokes_runtime(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    state: str,
+) -> None:
+    fixture = _setup(tmp_path)
+    final, staging = _transition_paths(fixture)
+    if state == "staging":
+        staging.mkdir()
+    elif state == "stale":
+        changed = _changed_request_cycle(fixture)
+        from trading_bot.cli.checkpoint_transition import run_checkpointed_cycle
+
+        run_checkpointed_cycle(
+            checkpoint_path=fixture.checkpoint_path,
+            snapshot_path=fixture.snapshot_path,
+            config_path=changed,
+            output_directory=fixture.operation_root,
+        )
+    else:
+        final.mkdir()
+        (final / "hostile.txt").write_bytes(b"x")
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("runtime must not execute")
+
+    monkeypatch.setattr(
+        "trading_bot.cli.paper_operation_execution."
+        "execute_checkpointed_verified_snapshot_paper_cycle",
+        forbidden,
+    )
+    result = execute_paper_operation_once(
+        fixture.operation_root,
+        fixture.inputs,
+    )
+
+    assert result.classification in (
+        PaperOperationExecutionClassification.BLOCKED,
+        PaperOperationExecutionClassification.CONFLICTING,
+    )
+    if state == "staging":
+        assert staging.is_dir()
+    if state == "hostile-final":
+        assert (final / "hostile.txt").read_bytes() == b"x"
+
+
+def test_already_applied_and_verified_caller_conflict_never_execute(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    already = _setup(tmp_path / "already")
+    _install_completed_receipt(already)
+
+    conflicting = _setup(tmp_path / "conflicting")
+    changed_cycle = _changed_request_cycle(conflicting)
+    _install_completed_receipt(
+        conflicting,
+        transition_cycle_path=changed_cycle,
+        configuration_evidence=(conflicting.inputs.intent.cycle_configuration_artifact),
+    )
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("runtime must not execute")
+
+    monkeypatch.setattr(
+        "trading_bot.cli.paper_operation_execution."
+        "execute_checkpointed_verified_snapshot_paper_cycle",
+        forbidden,
+    )
+
+    already_result = execute_paper_operation_once(
+        already.operation_root,
+        already.inputs,
+    )
+    conflict_result = execute_paper_operation_once(
+        conflicting.operation_root,
+        conflicting.inputs,
+    )
+
+    assert (
+        already_result.classification
+        is PaperOperationExecutionClassification.ALREADY_APPLIED
+    )
+    assert (
+        conflict_result.classification
+        is PaperOperationExecutionClassification.CONFLICTING
+    )
+
+
+def test_parent_identity_change_before_runtime_blocks_without_execution(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = _setup(tmp_path)
+    from trading_bot.cli import paper_operation_execution as execution_module
+
+    original = execution_module.validate_output_parent
+    validations = 0
+
+    def changed_on_second(path):
+        nonlocal validations
+        validations += 1
+        parent = original(path)
+        return replace(parent, inode=parent.inode + 1) if validations == 2 else parent
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("runtime must not execute")
+
+    monkeypatch.setattr(
+        execution_module,
+        "validate_output_parent",
+        changed_on_second,
+    )
+    monkeypatch.setattr(
+        execution_module,
+        "execute_checkpointed_verified_snapshot_paper_cycle",
+        forbidden,
+    )
+
+    result = execute_paper_operation_once(
+        fixture.operation_root,
+        fixture.inputs,
+    )
+
+    assert result.classification is PaperOperationExecutionClassification.BLOCKED
+    assert result.diagnostic_code == "OPERATION_ROOT_CHANGED"
+
+
+def test_multi_edge_terminal_predecessor_reaches_runtime_with_verified_authority(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    lineage = _two_edges()
+    fixture = _setup_from_lineage(
+        tmp_path,
+        genesis=lineage.genesis,
+        terminal_id=lineage.terminal_id,
+        successors=lineage.successors,
+        reports=lineage.reports,
+        lineage_snapshots=lineage.snapshots,
+    )
+
+    calls = 0
+
+    def accepted(request, verified_prior, snapshot, calendar):
+        nonlocal calls
+        calls += 1
+        assert verified_prior.sequence == 2
+        assert verified_prior.checkpoint_id == lineage.terminal_id
+        raise CheckpointedVerifiedSnapshotPaperCycleInsufficientCashError(
+            "deterministic test rejection"
+        )
+
+    monkeypatch.setattr(
+        "trading_bot.cli.paper_operation_execution."
+        "execute_checkpointed_verified_snapshot_paper_cycle",
+        accepted,
+    )
+    result = execute_paper_operation_once(
+        fixture.operation_root,
+        fixture.inputs,
+    )
+
+    assert calls == 1
+    assert (
+        result.classification is PaperOperationExecutionClassification.EXECUTION_FAILED
+    )
+    assert result.diagnostic_code == "INSUFFICIENT_CASH"
+
+
+@pytest.mark.parametrize(
+    ("crash_target", "staging_exists"),
+    (
+        ("execute_checkpointed_verified_snapshot_paper_cycle", False),
+        ("serialize_checkpointed_paper_cycle_report", False),
+        ("verify_checkpointed_paper_cycle_successor_edge", False),
+        ("commit_transition_directory", False),
+    ),
+)
+def test_crash_before_or_at_staging_boundary_never_finalizes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    crash_target: str,
+    staging_exists: bool,
+) -> None:
+    fixture = _setup(tmp_path)
+    final, staging = _transition_paths(fixture)
+
+    def crash(*args, **kwargs):
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(
+        f"trading_bot.cli.paper_operation_execution.{crash_target}",
+        crash,
+    )
+    with pytest.raises(KeyboardInterrupt):
+        execute_paper_operation_once(fixture.operation_root, fixture.inputs)
+
+    assert not final.exists()
+    assert staging.exists() is staging_exists
+
+
+def test_crash_after_staging_creation_is_preserved_without_cleanup(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = _setup(tmp_path)
+    final, staging = _transition_paths(fixture)
+
+    def crash_write(*args, **kwargs):
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(
+        "trading_bot.cli.checkpoint_transition_output._write_file",
+        crash_write,
+    )
+    with pytest.raises(KeyboardInterrupt):
+        execute_paper_operation_once(fixture.operation_root, fixture.inputs)
+
+    assert staging.is_dir()
+    assert not final.exists()
+
+
+@pytest.mark.parametrize(
+    ("boundary", "final_exists", "staging_exists"),
+    (
+        ("staged-verification", False, True),
+        ("rename", False, True),
+        ("finalized-verification", True, False),
+    ),
+)
+def test_crash_at_durable_commit_boundaries_preserves_observable_state(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    boundary: str,
+    final_exists: bool,
+    staging_exists: bool,
+) -> None:
+    fixture = _setup(tmp_path)
+    final, staging = _transition_paths(fixture)
+    if boundary == "rename":
+        monkeypatch.setattr(
+            "trading_bot.cli.checkpoint_transition_output.os.rename",
+            lambda *args, **kwargs: (_ for _ in ()).throw(KeyboardInterrupt()),
+        )
+    else:
+        from trading_bot.cli import paper_operation_execution as execution_module
+
+        original = execution_module.verify_checkpointed_paper_cycle_successor_edge
+        calls = 0
+        selected = 2 if boundary == "staged-verification" else 3
+
+        def crash_selected(*args, **kwargs):
+            nonlocal calls
+            calls += 1
+            if calls == selected:
+                raise KeyboardInterrupt
+            return original(*args, **kwargs)
+
+        monkeypatch.setattr(
+            execution_module,
+            "verify_checkpointed_paper_cycle_successor_edge",
+            crash_selected,
+        )
+
+    with pytest.raises(KeyboardInterrupt):
+        execute_paper_operation_once(fixture.operation_root, fixture.inputs)
+
+    assert final.exists() is final_exists
+    assert staging.exists() is staging_exists
+
+
+def test_success_path_never_deletes_repairs_or_creates_operation_directory(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = _setup(tmp_path)
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("delete or repair is forbidden")
+
+    monkeypatch.setattr(Path, "unlink", forbidden)
+    monkeypatch.setattr(Path, "rmdir", forbidden)
+    monkeypatch.setattr(os, "remove", forbidden)
+    monkeypatch.setattr(os, "unlink", forbidden)
+    monkeypatch.setattr(socket, "create_connection", forbidden)
+    monkeypatch.setattr(time, "time", forbidden)
+    monkeypatch.setattr(
+        "trading_bot.market_data.AlpacaDailySnapshotProvider.fetch",
+        forbidden,
+    )
+
+    result = execute_paper_operation_once(
+        fixture.operation_root,
+        fixture.inputs,
+    )
+
+    assert (
+        result.classification
+        is PaperOperationExecutionClassification.TRANSITION_COMMITTED
+    )
+    assert not (fixture.operation_root / "paper-operations").exists()
+
+
+def test_cli_requires_one_mode_and_execute_once_reports_commit(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    fixture = _setup(tmp_path)
+    missing = main(
+        [
+            "--config",
+            str(fixture.config_path),
+            "--operation-root",
+            str(fixture.operation_root),
+        ]
+    )
+    assert missing == 2
+    capsys.readouterr()
+    both = main(
+        [
+            "--config",
+            str(fixture.config_path),
+            "--operation-root",
+            str(fixture.operation_root),
+            "--inspect-only",
+            "--execute-once",
+        ]
+    )
+    assert both == 2
+    capsys.readouterr()
+
+    exit_code = main(
+        [
+            "--config",
+            str(fixture.config_path),
+            "--operation-root",
+            str(fixture.operation_root),
+            "--execute-once",
+        ]
+    )
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    assert "pre-execution classification: PENDING" in captured.out
+    assert "classification: TRANSITION_COMMITTED" in captured.out
+    assert "outcome: APPLIED" in captured.out
+    assert "transition path:" in captured.out
+
+
+def test_cli_execution_failure_exit_codes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    def invoke(fixture) -> int:
+        return main(
+            [
+                "--config",
+                str(fixture.config_path),
+                "--operation-root",
+                str(fixture.operation_root),
+                "--execute-once",
+            ]
+        )
+
+    deterministic = _failed_fixture(tmp_path / "deterministic")
+    assert invoke(deterministic) == 6
+    capsys.readouterr()
+
+    staged = _setup(tmp_path / "staged")
+    _, staging_path = _transition_paths(staged)
+    staging_path.mkdir()
+    assert invoke(staged) == 8
+    capsys.readouterr()
+
+    stale = _setup(tmp_path / "stale")
+    changed = _changed_request_cycle(stale)
+    from trading_bot.cli.checkpoint_transition import run_checkpointed_cycle
+
+    run_checkpointed_cycle(
+        checkpoint_path=stale.checkpoint_path,
+        snapshot_path=stale.snapshot_path,
+        config_path=changed,
+        output_directory=stale.operation_root,
+    )
+    assert invoke(stale) == 5
+    capsys.readouterr()
+
+    verification = _setup(tmp_path / "verification")
+    monkeypatch.setattr(
+        "trading_bot.cli.paper_operation_execution."
+        "verify_checkpointed_paper_cycle_successor_edge",
+        lambda *args, **kwargs: SimpleNamespace(status=None, cycle_result=None),
+    )
+    assert invoke(verification) == 4
+    capsys.readouterr()
+    monkeypatch.undo()
+
+    environmental = _setup(tmp_path / "environmental")
+
+    def fail(*args, **kwargs):
+        raise RuntimeError("environmental")
+
+    monkeypatch.setattr(
+        "trading_bot.cli.paper_operation_execution."
+        "execute_checkpointed_verified_snapshot_paper_cycle",
+        fail,
+    )
+    assert invoke(environmental) == 7

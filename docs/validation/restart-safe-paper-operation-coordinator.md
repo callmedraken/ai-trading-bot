@@ -2,11 +2,11 @@
 
 ## Milestone boundary
 
-Milestone 2 is read-only. It provides strict operation-input loading, explicit
-dependency verification, bounded operation-root inspection, deterministic
-classification, and an inspect-only command. It does not execute a paper cycle,
-create staging, finalize a transition or receipt, recover a missing receipt, or
-contact a provider, broker, network service, scheduler, or clock.
+Milestone 2 provides strict operation-input loading, explicit dependency
+verification, bounded operation-root inspection, deterministic classification,
+and an inspect-only command. Milestone 3 adds one explicit execution attempt and
+verified transition commit. Neither milestone creates or recovers a receipt or
+contacts a provider, external broker, network service, scheduler, or clock.
 
 The command is:
 
@@ -17,7 +17,18 @@ python scripts/run_paper_operation.py \
   --inspect-only
 ```
 
-`--inspect-only` is mandatory in this milestone.
+`--inspect-only` remains the explicit read-only mode.
+
+Milestone-3 execution is:
+
+```text
+python scripts/run_paper_operation.py \
+  --config <operation-config.json> \
+  --operation-root <existing-directory> \
+  --execute-once
+```
+
+Exactly one of `--inspect-only` and `--execute-once` is required.
 
 ## Configuration schema
 
@@ -106,7 +117,43 @@ performs no filesystem mutation.
   layout, unavailable foreign dependencies, or invalid evidence.
 
 A verified requested transition without a receipt is reported but never repaired
-in milestone 2.
+in milestones 2 and 3.
+
+## One-shot execution and commit
+
+Execution proceeds only from an exact `PENDING` inspection. The coordinator
+rechecks the operation-root identity and transition destination before invoking
+the runtime. Non-pending, unsafe, stale, conflicting, staged, ambiguous, and
+missing-receipt states invoke the runtime zero times.
+
+An admitted operation invokes the existing checkpointed verified-snapshot
+runtime exactly once. There is no retry path. The result remains private while
+the coordinator:
+
+1. serializes the report and successor checkpoint;
+2. verifies the prospective successor edge;
+3. appends exactly the current snapshot, new report, and new successor to the
+   verified prior artifacts;
+4. verifies the complete prospective successor lineage;
+5. creates `.paper-account-transition-<application-id>.staging` exclusively;
+6. writes and flushes the fixed report and checkpoint files;
+7. safely rereads the staging directory and repeats edge and lineage
+   verification;
+8. renames staging to the final transition directory without clobber;
+9. safely rereads the final directory and repeats edge and lineage verification.
+
+Only then is `TRANSITION_COMMITTED` returned. The final transition directory is
+the authoritative account-state commit point.
+
+Both `APPLIED` and `NO_ACTION` produce the same fixed two-file transition
+layout. `NO_ACTION` still commits its successor checkpoint because the ledger
+time advances.
+
+Any crash or failure before rename leaves no final transition. Once staging has
+been created, it is preserved for manual review; no cleanup, repair, merge, or
+overwrite occurs. A failure after rename preserves the finalized transition and
+reports fail-closed. Until milestone 4 adds receipt recovery, that transition
+without a receipt remains blocked on later inspection.
 
 ## Caller-key limitation
 
@@ -136,6 +183,16 @@ milestone 2.
 - `8`: incomplete, ambiguous, unsafe, or crash-left state requiring manual
   review
 
+Execution additionally uses:
+
+- `0`: `TRANSITION_COMMITTED`
+- `4`: prospective, staged, or finalized edge/lineage verification failure
+- `5`: stale terminal or verified conflict
+- `6`: recognized deterministic paper-cycle rejection
+- `7`: serialization, runtime exception, staging, rename, or output-safety
+  failure
+- `8`: staging, ambiguity, or a finalized transition without its receipt
+
 Human output is limited to the operation UUID when derivable, classification,
 terminal checkpoint UUID, application UUID when derivable, a receipt path only
 for a fully verified receipt, and stable diagnostic codes.
@@ -144,6 +201,7 @@ for a fully verified receipt, and stable diagnostic codes.
 
 ```text
 python -m pytest tests/cli/test_paper_operation_config.py tests/cli/test_paper_operation_inspection.py -q
+python -m pytest tests/cli/test_paper_operation_execution.py -q
 python -m pytest tests/runtime/test_paper_operation.py -q
 python -m pytest tests/cli/test_checkpoint_transition.py tests/cli/test_checkpoint_lineage.py tests/runtime/test_paper_account_lineage_verification.py -q
 python -m pytest

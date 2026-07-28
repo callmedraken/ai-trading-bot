@@ -8,11 +8,17 @@ import errno
 import hashlib
 import os
 import stat
+from collections.abc import Callable
 from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
+from uuid import UUID
 
+from trading_bot.cli.checkpoint_lineage_config import read_safe_regular_file
 from trading_bot.market_data import IdentifiedMarketCalendar
 from trading_bot.runtime import (
+    MAX_CHECKPOINTED_PAPER_CYCLE_REPORT_BYTES,
+    MAX_PAPER_ACCOUNT_SUCCESSOR_CHECKPOINT_BYTES,
     CheckpointedPaperCycleReport,
     CheckpointedVerifiedSnapshotPaperCycleResult,
     PaperAccountCheckpoint,
@@ -33,6 +39,13 @@ class CheckpointTransitionOutputError(Exception):
 
 class CheckpointTransitionConflictError(CheckpointTransitionOutputError):
     """Raised when a destination already contains conflicting checkpoint work."""
+
+
+class TransitionCommitVerificationPhase(StrEnum):
+    """The two durable reread points in a transition commit."""
+
+    STAGED_REREAD = "STAGED_REREAD"
+    FINALIZED_REREAD = "FINALIZED_REREAD"
 
 
 @dataclass(frozen=True, slots=True)
@@ -240,6 +253,134 @@ def install_transition_directory(
         successor,
         report_payload,
         successor_payload,
+    )
+
+
+def preflight_transition_directory(
+    parent: OutputParent,
+    *,
+    application_id: str,
+) -> None:
+    """Require the exact final and staging transition names to be unoccupied."""
+    if type(application_id) is not str or not application_id.strip():
+        raise CheckpointTransitionOutputError("application ID is invalid")
+    try:
+        parsed_application = UUID(application_id)
+    except ValueError as error:
+        raise CheckpointTransitionOutputError("application ID is invalid") from error
+    if str(parsed_application) != application_id:
+        raise CheckpointTransitionOutputError("application ID is not canonical")
+    _preflight(parent, f"paper-account-transition-{application_id}")
+
+
+def commit_transition_directory(
+    parent: OutputParent,
+    *,
+    result: CheckpointedVerifiedSnapshotPaperCycleResult,
+    report: CheckpointedPaperCycleReport,
+    report_payload: bytes,
+    successor: PaperAccountSuccessorCheckpoint,
+    successor_payload: bytes,
+    verifier: Callable[[bytes, bytes, TransitionCommitVerificationPhase], None],
+) -> TransitionDirectoryResult:
+    """Commit one preverified transition and preserve every crash-left staging."""
+    if (
+        type(parent) is not OutputParent
+        or type(result) is not CheckpointedVerifiedSnapshotPaperCycleResult
+        or type(report) is not CheckpointedPaperCycleReport
+        or type(report_payload) is not bytes
+        or not report_payload
+        or len(report_payload) > MAX_CHECKPOINTED_PAPER_CYCLE_REPORT_BYTES
+        or type(successor) is not PaperAccountSuccessorCheckpoint
+        or type(successor_payload) is not bytes
+        or not successor_payload
+        or len(successor_payload) > MAX_PAPER_ACCOUNT_SUCCESSOR_CHECKPOINT_BYTES
+        or not callable(verifier)
+    ):
+        raise CheckpointTransitionOutputError("transition commit input is invalid")
+    application = str(result.application_id)
+    if (
+        report.evidence.application_id != result.application_id
+        or successor.application_id != result.application_id
+    ):
+        raise CheckpointTransitionOutputError("transition commit identity is invalid")
+    name = f"paper-account-transition-{application}"
+    report_name = f"checkpointed-paper-cycle-report-{result.result_id}.json"
+    checkpoint_name = f"paper-account-checkpoint-{successor.checkpoint_id}.json"
+    staging = parent.path / f".{name}.staging"
+    final = parent.path / name
+    preflight_transition_directory(parent, application_id=application)
+    try:
+        os.mkdir(staging)
+    except OSError as error:
+        raise CheckpointTransitionOutputError(
+            "cannot exclusively create staging directory"
+        ) from error
+    retained = _lstat_directory(staging, "staging directory")
+    identity = (retained.st_dev, retained.st_ino)
+    _write_file(staging / report_name, report_payload)
+    _write_file(staging / checkpoint_name, successor_payload)
+    _fsync_directory(staging)
+    expected = {report_name, checkpoint_name}
+    _verify_staging_layout(staging, expected)
+    staged_report = _read_commit_regular(
+        staging / report_name,
+        MAX_CHECKPOINTED_PAPER_CYCLE_REPORT_BYTES,
+        "staged cycle report",
+    )
+    staged_checkpoint = _read_commit_regular(
+        staging / checkpoint_name,
+        MAX_PAPER_ACCOUNT_SUCCESSOR_CHECKPOINT_BYTES,
+        "staged successor checkpoint",
+    )
+    verifier(
+        staged_report,
+        staged_checkpoint,
+        TransitionCommitVerificationPhase.STAGED_REREAD,
+    )
+    _require_parent(parent)
+    _require_directory_identity(staging, identity, "staging directory")
+    _reject_collisions(parent.path, {name}, allowed={staging.name})
+    if _entry_exists(final):
+        raise CheckpointTransitionOutputError("final transition already exists")
+    _fsync_directory(parent.path)
+    try:
+        os.rename(staging, final)
+    except OSError as error:
+        raise CheckpointTransitionOutputError(
+            "cannot finalize staged directory"
+        ) from error
+    _fsync_directory(parent.path)
+    _require_parent(parent)
+    _require_directory_identity(final, identity, "final transition directory")
+    _verify_staging_layout(final, expected)
+    finalized_report = _read_commit_regular(
+        final / report_name,
+        MAX_CHECKPOINTED_PAPER_CYCLE_REPORT_BYTES,
+        "finalized cycle report",
+    )
+    finalized_checkpoint = _read_commit_regular(
+        final / checkpoint_name,
+        MAX_PAPER_ACCOUNT_SUCCESSOR_CHECKPOINT_BYTES,
+        "finalized successor checkpoint",
+    )
+    verifier(
+        finalized_report,
+        finalized_checkpoint,
+        TransitionCommitVerificationPhase.FINALIZED_REREAD,
+    )
+    _require_parent(parent)
+    _require_directory_identity(final, identity, "final transition directory")
+    return _transition_result(
+        "ACCEPTED",
+        final,
+        report_name,
+        checkpoint_name,
+        result,
+        report,
+        successor,
+        finalized_report,
+        finalized_checkpoint,
     )
 
 
@@ -511,6 +652,15 @@ def _read_regular(path: Path, label: str) -> bytes:
         raise
     except OSError as error:
         raise CheckpointTransitionOutputError(f"{label} cannot be read") from error
+
+
+def _read_commit_regular(path: Path, maximum: int, label: str) -> bytes:
+    try:
+        return read_safe_regular_file(path, maximum, label)
+    except Exception as error:
+        raise CheckpointTransitionOutputError(
+            f"{label} cannot be read safely"
+        ) from error
 
 
 def _reject_collisions(

@@ -135,10 +135,46 @@ may be finalized only after that committed transition is reread and continues
 to verify. This ordering prevents a transition directory from committing an
 edge that was never proven to extend the verified prior lineage.
 
+## Milestone-2 read-only inspection
+
+Milestone 2 adds strict schema-1 operation configuration loading and a manually
+invoked, read-only inspection command. The configuration names the caller
+idempotency UUID and explicit prior-lineage manifest, terminal checkpoint,
+completed snapshot, and cycle-configuration artifacts. Each artifact reference
+contains its domain UUID, lowercase SHA-256, byte length, and a transport-only
+path. The operation root remains a separate CLI input.
+
+Inspection verifies the complete prior lineage, requires the configured
+checkpoint to be its terminal artifact, verifies the completed snapshot, parses
+the existing checkpoint-transition request, requires its snapshot reference to
+match, and derives the established operation and application identities without
+executing the cycle.
+
+The operation root is inspected with bounded enumeration and fixed layouts.
+Recognized transition directories are parsed and, when relevant to the requested
+predecessor, verified through the existing successor-edge API. Receipt authority
+always requires the milestone-1 offline receipt verifier. Unsafe links, reparse
+points, changed parent identities, case-fold collisions, unexpected recognized
+layout contents, staging, and ambiguous state fail closed.
+
+Schema-1 receipt-only operation directories do not contain enough dependencies
+to perform complete global caller-key reuse verification. Canonical parsing of a
+foreign receipt is not authority. A foreign same-key receipt may establish a
+conflict only when all exact milestone-1 verifier dependencies are available and
+the full offline verification passes. If its lineage, snapshot, cycle
+configuration, report, successor checkpoint, or another required dependency is
+unavailable, inspection returns `BLOCKED` with
+`FOREIGN_RECEIPT_DEPENDENCIES_UNAVAILABLE`; it does not return `CONFLICTING`,
+skip the receipt, or infer authority from names or retained hash claims.
+
+A future receipt schema, immutable dependency bundle, or authoritative operation
+registry could provide complete conflict discovery. Milestone 2 intentionally
+introduces none of those mechanisms and does not alter the milestone-1 receipt
+schema.
+
 ## Deferred coordinator work
 
-Later milestones may add a manually invoked one-shot coordinator, bounded safe
-operation-root inspection, immutable-receipt idempotency-key reuse detection,
+Later milestones may add the manually invoked one-shot execution coordinator,
 no-clobber transition and receipt staging/finalization, restart inspection, and
 receipt recovery after an already committed verified transition.
 

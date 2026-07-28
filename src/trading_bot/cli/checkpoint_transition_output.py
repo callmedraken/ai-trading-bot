@@ -19,6 +19,7 @@ from trading_bot.runtime import (
     PaperAccountCheckpointEdgeVerificationStatus,
     PaperAccountCheckpointVerificationStatus,
     PaperAccountSuccessorCheckpoint,
+    VerifiedPriorCheckpoint,
     parse_checkpointed_paper_cycle_report,
     parse_successor_paper_account_checkpoint,
     verify_checkpointed_paper_cycle_successor_edge,
@@ -126,6 +127,7 @@ def inspect_transition_directory(
     snapshot_payload: bytes,
     calendar: IdentifiedMarketCalendar,
     expected_request: object,
+    verified_prior: VerifiedPriorCheckpoint | None = None,
 ) -> TransitionDirectoryResult | None:
     """Return a complete matching transition without execution, or reject it."""
     name = f"paper-account-transition-{application_id}"
@@ -138,6 +140,7 @@ def inspect_transition_directory(
             calendar,
             expected_request,
             required_application_id=application_id,
+            verified_prior=verified_prior,
         )
     return None
 
@@ -248,6 +251,7 @@ def _load_transition(
     expected_request: object,
     *,
     required_application_id: str,
+    verified_prior: VerifiedPriorCheckpoint | None,
 ) -> TransitionDirectoryResult:
     _lstat_directory(directory, "existing transition directory")
     expected_name = f"paper-account-transition-{required_application_id}"
@@ -297,6 +301,7 @@ def _load_transition(
         calendar,
         expected_successor_sha256=hashlib.sha256(checkpoint_payload).hexdigest(),
         expected_successor_byte_length=len(checkpoint_payload),
+        verified_prior=verified_prior,
     )
     if (
         edge.status is not PaperAccountCheckpointEdgeVerificationStatus.PASS

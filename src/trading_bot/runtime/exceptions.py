@@ -346,3 +346,7 @@ class SuccessorPaperAccountCheckpointReconciliationError(
     SuccessorPaperAccountCheckpointError, ValueError
 ):
     """Raised when successor state, lineage, or identity disagrees."""
+
+
+class PaperAccountLineageVerificationError(Exception):
+    """Raised when full-lineage verification inputs or results are invalid."""

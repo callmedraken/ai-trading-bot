@@ -74,6 +74,7 @@ from trading_bot.runtime.exceptions import (  # noqa: F401
     PaperAccountCheckpointSchemaError,
     PaperAccountCheckpointSyntaxError,
     PaperAccountCheckpointVerificationError,
+    PaperAccountLineageVerificationError,
     PaperPortfolioCycleEngineCopyError,
     PaperPortfolioCycleLedgerCopyError,
     PaperPortfolioFillApplicationError,
@@ -134,6 +135,21 @@ from trading_bot.runtime.paper_account_checkpoint import (
     replay_verified_genesis_paper_account_checkpoint,
     serialize_paper_account_checkpoint,
     verify_genesis_paper_account_checkpoint,
+)
+from trading_bot.runtime.paper_account_lineage_verification import (  # noqa: F401
+    MAX_PAPER_ACCOUNT_LINEAGE_ARTIFACTS,
+    PAPER_ACCOUNT_LINEAGE_EVIDENCE_MATERIAL_VERSION,
+    PAPER_ACCOUNT_LINEAGE_EVIDENCE_NAMESPACE,
+    PaperAccountLineageArtifact,
+    PaperAccountLineageArtifactEvidence,
+    PaperAccountLineageArtifactKind,
+    PaperAccountLineageEvidence,
+    PaperAccountLineageVerificationCode,
+    PaperAccountLineageVerificationDiagnostic,
+    PaperAccountLineageVerificationResult,
+    PaperAccountLineageVerificationStatus,
+    derive_paper_account_lineage_evidence_id,
+    verify_paper_account_lineage,
 )
 from trading_bot.runtime.paper_account_successor_checkpoint import (  # noqa: F401
     MAX_PAPER_ACCOUNT_SUCCESSOR_CHECKPOINT_BYTES,
@@ -422,5 +438,24 @@ __all__.extend(
         "serialize_successor_paper_account_checkpoint",
         "verify_checkpointed_paper_cycle_report",
         "verify_checkpointed_paper_cycle_successor_edge",
+    ]
+)
+
+__all__.extend(
+    [
+        "MAX_PAPER_ACCOUNT_LINEAGE_ARTIFACTS",
+        "PAPER_ACCOUNT_LINEAGE_EVIDENCE_MATERIAL_VERSION",
+        "PAPER_ACCOUNT_LINEAGE_EVIDENCE_NAMESPACE",
+        "PaperAccountLineageArtifact",
+        "PaperAccountLineageArtifactEvidence",
+        "PaperAccountLineageArtifactKind",
+        "PaperAccountLineageEvidence",
+        "PaperAccountLineageVerificationCode",
+        "PaperAccountLineageVerificationDiagnostic",
+        "PaperAccountLineageVerificationError",
+        "PaperAccountLineageVerificationResult",
+        "PaperAccountLineageVerificationStatus",
+        "derive_paper_account_lineage_evidence_id",
+        "verify_paper_account_lineage",
     ]
 )

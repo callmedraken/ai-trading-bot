@@ -50,9 +50,12 @@ from trading_bot.runtime import (
     create_successor_paper_account_checkpoint,
     derive_checkpointed_verified_snapshot_application_id,
     execute_checkpointed_verified_snapshot_paper_cycle,
+    parse_successor_paper_account_checkpoint,
     serialize_checkpointed_paper_cycle_report,
     serialize_paper_account_checkpoint,
     serialize_successor_paper_account_checkpoint,
+    verified_prior_from_genesis,
+    verified_prior_from_successor_edge,
     verify_checkpointed_paper_cycle_report,
     verify_checkpointed_paper_cycle_successor_edge,
     verify_genesis_paper_account_checkpoint,
@@ -111,14 +114,17 @@ def run_checkpointed_cycle(
     checkpoint_byte_length: int | None = None,
     snapshot_sha256: str | None = None,
     snapshot_byte_length: int | None = None,
+    prior_checkpoint_path: Path | None = None,
+    prior_cycle_report_path: Path | None = None,
+    prior_snapshot_path: Path | None = None,
 ) -> TransitionDirectoryResult:
     """Execute at most one deterministic checkpoint-restored paper cycle."""
     _evidence(checkpoint_sha256, checkpoint_byte_length)
     _evidence(snapshot_sha256, snapshot_byte_length)
     config = load_checkpoint_transition_config(config_path)
     parent = validate_output_parent(output_directory)
-    prior_payload = _read(
-        checkpoint_path, MAX_PAPER_ACCOUNT_CHECKPOINT_BYTES, "checkpoint"
+    starting_payload = _read(
+        checkpoint_path, MAX_PAPER_ACCOUNT_SUCCESSOR_CHECKPOINT_BYTES, "checkpoint"
     )
     snapshot_payload = _read(
         snapshot_path, MAX_DAILY_SNAPSHOT_ARTIFACT_BYTES, "snapshot"
@@ -126,10 +132,10 @@ def run_checkpointed_cycle(
     request = config.request
     if (
         checkpoint_sha256 is not None
-        and checkpoint_sha256 != hashlib.sha256(prior_payload).hexdigest()
+        and checkpoint_sha256 != hashlib.sha256(starting_payload).hexdigest()
     ) or (
         checkpoint_byte_length is not None
-        and checkpoint_byte_length != len(prior_payload)
+        and checkpoint_byte_length != len(starting_payload)
     ):
         raise CheckpointTransitionVerificationError(
             "checkpoint command evidence mismatches artifact"
@@ -144,15 +150,78 @@ def run_checkpointed_cycle(
         raise CheckpointTransitionVerificationError(
             "snapshot command evidence conflicts with configuration"
         )
-    prior = verify_genesis_paper_account_checkpoint(
-        prior_payload,
+    supplied_starting_edge = (
+        prior_checkpoint_path,
+        prior_cycle_report_path,
+        prior_snapshot_path,
+    )
+    genesis = verify_genesis_paper_account_checkpoint(
+        starting_payload,
         expected_checkpoint_sha256=checkpoint_sha256,
         expected_checkpoint_byte_length=checkpoint_byte_length,
     )
     if (
-        prior.status is not PaperAccountCheckpointVerificationStatus.PASS
-        or prior.checkpoint is None
+        genesis.status is PaperAccountCheckpointVerificationStatus.PASS
+        and genesis.checkpoint is not None
+        and not genesis.diagnostics
     ):
+        if any(item is not None for item in supplied_starting_edge):
+            raise CheckpointTransitionVerificationError(
+                "genesis starting checkpoint cannot receive predecessor-edge artifacts"
+            )
+        starting_prior = verified_prior_from_genesis(genesis)
+    else:
+        if any(item is None for item in supplied_starting_edge):
+            raise CheckpointTransitionVerificationError(
+                "successor starting checkpoint requires prior checkpoint, report, and snapshot"
+            )
+        try:
+            parse_successor_paper_account_checkpoint(starting_payload)
+        except ValueError as error:
+            raise CheckpointTransitionVerificationError(
+                "starting checkpoint verification did not pass"
+            ) from error
+        try:
+            predecessor_payload = _read(
+                prior_checkpoint_path,
+                MAX_PAPER_ACCOUNT_SUCCESSOR_CHECKPOINT_BYTES,
+                "prior checkpoint",
+            )
+            predecessor_report_payload = _read(
+                prior_cycle_report_path,
+                MAX_CHECKPOINTED_PAPER_CYCLE_REPORT_BYTES,
+                "prior cycle report",
+            )
+            predecessor_snapshot_payload = _read(
+                prior_snapshot_path,
+                MAX_DAILY_SNAPSHOT_ARTIFACT_BYTES,
+                "prior snapshot",
+            )
+        except CheckpointTransitionArtifactReadError as error:
+            raise CheckpointTransitionVerificationError(
+                "starting checkpoint verification did not pass"
+            ) from error
+        starting_edge = verify_checkpointed_paper_cycle_successor_edge(
+            predecessor_report_payload,
+            predecessor_payload,
+            predecessor_snapshot_payload,
+            starting_payload,
+            _calendar(),
+            expected_successor_sha256=checkpoint_sha256,
+            expected_successor_byte_length=checkpoint_byte_length,
+        )
+        if (
+            starting_edge.status
+            is not PaperAccountCheckpointEdgeVerificationStatus.PASS
+            or starting_edge.successor_checkpoint is None
+            or starting_edge.restored_successor_ledger is None
+            or starting_edge.diagnostics
+        ):
+            raise CheckpointTransitionVerificationError(
+                "starting checkpoint verification did not pass"
+            )
+        starting_prior = verified_prior_from_successor_edge(starting_edge)
+    if starting_prior is None:
         raise CheckpointTransitionVerificationError(
             "starting checkpoint verification did not pass"
         )
@@ -171,39 +240,41 @@ def run_checkpointed_cycle(
             "snapshot verification did not pass"
         )
     application_id = derive_checkpointed_verified_snapshot_application_id(
-        prior.checkpoint.checkpoint_id, request.request_id
+        starting_prior.checkpoint_id, request.request_id
     )
     existing = inspect_transition_directory(
         parent,
         application_id=str(application_id),
-        prior_payload=prior_payload,
+        prior_payload=starting_payload,
         snapshot_payload=snapshot_payload,
         calendar=calendar,
         expected_request=request,
+        verified_prior=starting_prior,
     )
     if existing is not None:
         return existing
     reject_prior_lineage_conflict(
         parent,
-        prior_checkpoint_id=str(prior.checkpoint.checkpoint_id),
+        prior_checkpoint_id=str(starting_prior.checkpoint_id),
         expected_application_id=str(application_id),
-        prior_payload=prior_payload,
+        prior_payload=starting_payload,
         snapshot_payload=snapshot_payload,
         calendar=calendar,
     )
     try:
         result = execute_checkpointed_verified_snapshot_paper_cycle(
-            request, prior, snapshot, calendar
+            request, starting_prior, snapshot, calendar
         )
         report = checkpointed_paper_cycle_report_from_result(result)
         report_payload = serialize_checkpointed_paper_cycle_report(report)
         report_verified = verify_checkpointed_paper_cycle_report(
             report_payload,
-            prior_payload,
+            starting_payload,
             snapshot_payload,
             calendar,
             expected_report_sha256=hashlib.sha256(report_payload).hexdigest(),
             expected_report_byte_length=len(report_payload),
+            verified_prior=starting_prior,
         )
         if (
             report_verified.status
@@ -222,12 +293,13 @@ def run_checkpointed_cycle(
         successor_payload = serialize_successor_paper_account_checkpoint(successor)
         edge = verify_checkpointed_paper_cycle_successor_edge(
             report_payload,
-            prior_payload,
+            starting_payload,
             snapshot_payload,
             successor_payload,
             calendar,
             expected_successor_sha256=hashlib.sha256(successor_payload).hexdigest(),
             expected_successor_byte_length=len(successor_payload),
+            verified_prior=starting_prior,
         )
     except CheckpointTransitionExecutionError:
         raise
@@ -249,9 +321,10 @@ def run_checkpointed_cycle(
         report_payload=report_payload,
         successor=successor,
         successor_payload=successor_payload,
-        prior_payload=prior_payload,
+        prior_payload=starting_payload,
         snapshot_payload=snapshot_payload,
         calendar=calendar,
+        verified_prior=starting_prior,
     )
 
 
@@ -342,6 +415,9 @@ def build_run_parser() -> argparse.ArgumentParser:
     parser.add_argument("--checkpoint-byte-length", type=int)
     parser.add_argument("--snapshot-sha256")
     parser.add_argument("--snapshot-byte-length", type=int)
+    parser.add_argument("--prior-checkpoint", type=Path)
+    parser.add_argument("--prior-cycle-report", type=Path)
+    parser.add_argument("--prior-snapshot", type=Path)
     parser.add_argument("--quiet", action="store_true")
     return parser
 
@@ -407,6 +483,9 @@ def run_main(argv: list[str] | None = None) -> int:
             checkpoint_byte_length=args.checkpoint_byte_length,
             snapshot_sha256=args.snapshot_sha256,
             snapshot_byte_length=args.snapshot_byte_length,
+            prior_checkpoint_path=args.prior_checkpoint,
+            prior_cycle_report_path=args.prior_cycle_report,
+            prior_snapshot_path=args.prior_snapshot,
         )
     except (
         CheckpointTransitionConfigReadError,

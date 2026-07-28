@@ -6,6 +6,16 @@ its sole canonical checkpoint file. A successor transition is written to
 `paper-account-transition-<application-id>/` with exactly one canonical cycle
 report and one canonical successor checkpoint.
 
+The run command accepts either a verified `GENESIS` starting checkpoint or a
+verified `CYCLE_SUCCESSOR` starting checkpoint. Genesis mode preserves the
+original command shape and rejects all predecessor-edge arguments. Successor
+mode requires all three explicit arguments: `--prior-checkpoint`,
+`--prior-cycle-report`, and `--prior-snapshot`. Before any preparation or
+execution, it verifies that complete immediate producing edge and converts its
+PASS result into `VerifiedPriorCheckpoint`. The successor artifact alone is
+never authority. It does not scan directories or infer paths to discover
+predecessor dependencies; after its explicit artifact reads it remains offline.
+
 All domain work, canonical serialization, and in-memory verification complete
 before output staging exists. The output parent must be an existing real
 directory. Final and sibling `.<final>.staging` entries are preflighted with

@@ -19,6 +19,7 @@ from trading_bot.runtime import (
     PaperAccountCheckpointEdgeVerificationStatus,
     PaperAccountCheckpointVerificationStatus,
     PaperAccountSuccessorCheckpoint,
+    VerifiedPriorCheckpoint,
     parse_checkpointed_paper_cycle_report,
     parse_successor_paper_account_checkpoint,
     verify_checkpointed_paper_cycle_successor_edge,
@@ -126,6 +127,7 @@ def inspect_transition_directory(
     snapshot_payload: bytes,
     calendar: IdentifiedMarketCalendar,
     expected_request: object,
+    verified_prior: VerifiedPriorCheckpoint | None = None,
 ) -> TransitionDirectoryResult | None:
     """Return a complete matching transition without execution, or reject it."""
     name = f"paper-account-transition-{application_id}"
@@ -137,6 +139,7 @@ def inspect_transition_directory(
             snapshot_payload,
             calendar,
             expected_request,
+            verified_prior,
             required_application_id=application_id,
         )
     return None
@@ -205,6 +208,7 @@ def install_transition_directory(
     prior_payload: bytes,
     snapshot_payload: bytes,
     calendar: IdentifiedMarketCalendar,
+    verified_prior: VerifiedPriorCheckpoint | None = None,
 ) -> TransitionDirectoryResult:
     """Install one fully verified successor transition with no replacement path."""
     application = str(result.application_id)
@@ -225,6 +229,7 @@ def install_transition_directory(
             result,
             report,
             successor,
+            verified_prior,
         ),
     )
     return _transition_result(
@@ -246,6 +251,7 @@ def _load_transition(
     snapshot_payload: bytes,
     calendar: IdentifiedMarketCalendar,
     expected_request: object,
+    verified_prior: VerifiedPriorCheckpoint | None,
     *,
     required_application_id: str,
 ) -> TransitionDirectoryResult:
@@ -297,6 +303,7 @@ def _load_transition(
         calendar,
         expected_successor_sha256=hashlib.sha256(checkpoint_payload).hexdigest(),
         expected_successor_byte_length=len(checkpoint_payload),
+        verified_prior=verified_prior,
     )
     if (
         edge.status is not PaperAccountCheckpointEdgeVerificationStatus.PASS
@@ -375,6 +382,7 @@ def _verify_transition(
     result: CheckpointedVerifiedSnapshotPaperCycleResult,
     report: CheckpointedPaperCycleReport,
     successor: PaperAccountSuccessorCheckpoint,
+    verified_prior: VerifiedPriorCheckpoint | None,
 ) -> None:
     report_payload = _read_regular(report_path, "staged cycle report")
     checkpoint_payload = _read_regular(checkpoint_path, "staged successor checkpoint")
@@ -391,6 +399,7 @@ def _verify_transition(
         calendar,
         expected_successor_sha256=hashlib.sha256(checkpoint_payload).hexdigest(),
         expected_successor_byte_length=len(checkpoint_payload),
+        verified_prior=verified_prior,
     )
     if (
         verified.status is not PaperAccountCheckpointEdgeVerificationStatus.PASS

@@ -10,6 +10,9 @@ Run from the repository root:
 git diff --check
 ```
 
-Focused coverage creates and verifies the fixed genesis layout, creates an
-accepted successor transition, verifies its one edge offline, and proves
+Focused coverage preserves genesis-start behavior, creates and verifies the
+fixed genesis layout, creates an accepted successor transition, and starts a
+sequence-two cycle only after a complete explicit sequence-one producing edge
+passes verification. It rejects missing, genesis-inapplicable, wrong, and
+tampered predecessor-edge artifacts before execution, and proves
 destination-local `ALREADY_APPLIED` returns byte-identical existing artifacts.

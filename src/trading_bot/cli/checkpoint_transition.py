@@ -11,6 +11,14 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+from trading_bot.cli.checkpoint_lineage_config import (
+    PaperAccountLineageManifest,
+    PaperAccountLineageManifestReadError,
+    PaperAccountLineageManifestSyntaxError,
+    PaperAccountLineageManifestValidationError,
+    load_paper_account_lineage_manifest,
+    read_safe_regular_file,
+)
 from trading_bot.cli.checkpoint_transition_config import (
     CheckpointTransitionConfigReadError,
     CheckpointTransitionConfigSyntaxError,
@@ -44,6 +52,9 @@ from trading_bot.runtime import (
     CheckpointedPaperCycleReportVerificationStatus,
     PaperAccountCheckpointEdgeVerificationStatus,
     PaperAccountCheckpointVerificationStatus,
+    PaperAccountLineageArtifact,
+    PaperAccountLineageVerificationStatus,
+    VerifiedPriorCheckpoint,
     checkpointed_paper_cycle_report_from_result,
     checkpointed_paper_cycle_report_reference,
     create_genesis_paper_account_checkpoint,
@@ -54,11 +65,13 @@ from trading_bot.runtime import (
     serialize_checkpointed_paper_cycle_report,
     serialize_paper_account_checkpoint,
     serialize_successor_paper_account_checkpoint,
+    verified_prior_from_full_lineage,
     verified_prior_from_genesis,
     verified_prior_from_successor_edge,
     verify_checkpointed_paper_cycle_report,
     verify_checkpointed_paper_cycle_successor_edge,
     verify_genesis_paper_account_checkpoint,
+    verify_paper_account_lineage,
 )
 
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
@@ -336,11 +349,15 @@ def verify_checkpoint(
     prior_checkpoint_path: Path | None = None,
     cycle_report_path: Path | None = None,
     snapshot_path: Path | None = None,
+    prior_lineage_manifest_path: Path | None = None,
 ) -> VerifyResult:
     """Verify one genesis checkpoint or exactly one predecessor-successor edge."""
     _evidence(checkpoint_sha256, checkpoint_byte_length)
-    payload = _read(
-        checkpoint_path, MAX_PAPER_ACCOUNT_SUCCESSOR_CHECKPOINT_BYTES, "checkpoint"
+    read = _read if prior_lineage_manifest_path is None else _read_safe
+    payload = read(
+        checkpoint_path,
+        MAX_PAPER_ACCOUNT_SUCCESSOR_CHECKPOINT_BYTES,
+        "checkpoint",
     )
     supplied = (prior_checkpoint_path, cycle_report_path, snapshot_path)
     if any(item is not None for item in supplied):
@@ -348,15 +365,29 @@ def verify_checkpoint(
             raise CheckpointTransitionVerificationError(
                 "edge verification requires prior checkpoint, report, and snapshot"
             )
-        prior = _read(
+        prior = read(
             prior_checkpoint_path,
-            MAX_PAPER_ACCOUNT_CHECKPOINT_BYTES,
+            (
+                MAX_PAPER_ACCOUNT_CHECKPOINT_BYTES
+                if prior_lineage_manifest_path is None
+                else MAX_PAPER_ACCOUNT_SUCCESSOR_CHECKPOINT_BYTES
+            ),
             "prior checkpoint",
         )
-        report = _read(
+        report = read(
             cycle_report_path, MAX_CHECKPOINTED_PAPER_CYCLE_REPORT_BYTES, "cycle report"
         )
-        snapshot = _read(snapshot_path, MAX_DAILY_SNAPSHOT_ARTIFACT_BYTES, "snapshot")
+        snapshot = read(
+            snapshot_path,
+            MAX_DAILY_SNAPSHOT_ARTIFACT_BYTES,
+            "snapshot",
+        )
+        verified_prior = None
+        if prior_lineage_manifest_path is not None:
+            verified_prior = _verified_prior_from_manifest(
+                prior_lineage_manifest_path,
+                prior,
+            )
         edge = verify_checkpointed_paper_cycle_successor_edge(
             report,
             prior,
@@ -365,6 +396,7 @@ def verify_checkpoint(
             _calendar(),
             expected_successor_sha256=checkpoint_sha256,
             expected_successor_byte_length=checkpoint_byte_length,
+            verified_prior=verified_prior,
         )
         if (
             edge.status is not PaperAccountCheckpointEdgeVerificationStatus.PASS
@@ -377,6 +409,10 @@ def verify_checkpoint(
             str(edge.successor_checkpoint.checkpoint_id),
             True,
             str(edge.successor_checkpoint.checkpoint_id),
+        )
+    if prior_lineage_manifest_path is not None:
+        raise CheckpointTransitionVerificationError(
+            "prior lineage manifest requires complete edge inputs"
         )
     verified = verify_genesis_paper_account_checkpoint(
         payload,
@@ -432,6 +468,7 @@ def build_verify_parser() -> argparse.ArgumentParser:
     parser.add_argument("--prior-checkpoint", type=Path)
     parser.add_argument("--cycle-report", type=Path)
     parser.add_argument("--snapshot", type=Path)
+    parser.add_argument("--prior-lineage-manifest", type=Path)
     parser.add_argument("--quiet", action="store_true")
     return parser
 
@@ -542,11 +579,18 @@ def verify_main(argv: list[str] | None = None) -> int:
             prior_checkpoint_path=args.prior_checkpoint,
             cycle_report_path=args.cycle_report,
             snapshot_path=args.snapshot,
+            prior_lineage_manifest_path=args.prior_lineage_manifest,
         )
-    except CheckpointTransitionArtifactReadError as error:
+    except (
+        CheckpointTransitionArtifactReadError,
+        PaperAccountLineageManifestReadError,
+        PaperAccountLineageManifestSyntaxError,
+    ) as error:
         return _failure(3, error)
     except CheckpointTransitionVerificationError as error:
         return _failure(4, error)
+    except PaperAccountLineageManifestValidationError as error:
+        return _failure(5, error)
     except CheckpointTransitionExecutionError as error:
         return _failure(6, error)
     except Exception:
@@ -572,6 +616,65 @@ def _read(path: Path, maximum: int, label: str) -> bytes:
     if len(payload) > maximum:
         raise CheckpointTransitionArtifactReadError(f"{label} exceeds its byte bound")
     return payload
+
+
+def _read_safe(path: Path, maximum: int, label: str) -> bytes:
+    return read_safe_regular_file(path, maximum, label)
+
+
+def _verified_prior_from_manifest(
+    manifest_path: Path,
+    prior_payload: bytes,
+) -> VerifiedPriorCheckpoint:
+    manifest = load_paper_account_lineage_manifest(manifest_path)
+    lineage = verify_paper_account_lineage(
+        manifest.genesis_checkpoint,
+        manifest.terminal_checkpoint_id,
+        manifest.successor_checkpoints,
+        manifest.cycle_reports,
+        manifest.snapshots,
+        _calendar(),
+    )
+    if (
+        lineage.status is not PaperAccountLineageVerificationStatus.PASS
+        or lineage.evidence is None
+        or lineage.terminal_checkpoint is None
+        or lineage.terminal_restored_ledger is None
+        or lineage.diagnostics
+    ):
+        raise CheckpointTransitionVerificationError(
+            "prior lineage verification did not pass"
+        )
+    verified_prior = verified_prior_from_full_lineage(lineage)
+    terminal = _terminal_artifact(manifest)
+    if (
+        terminal is None
+        or terminal.artifact_id != verified_prior.checkpoint_id
+        or terminal.sha256 != verified_prior.checkpoint_sha256
+        or terminal.byte_length != verified_prior.checkpoint_byte_length
+        or hashlib.sha256(prior_payload).hexdigest() != terminal.sha256
+        or len(prior_payload) != terminal.byte_length
+        or prior_payload != terminal.payload
+    ):
+        raise CheckpointTransitionVerificationError(
+            "prior checkpoint does not match verified lineage terminal"
+        )
+    return verified_prior
+
+
+def _terminal_artifact(
+    manifest: PaperAccountLineageManifest,
+) -> PaperAccountLineageArtifact | None:
+    if manifest.genesis_checkpoint.artifact_id == manifest.terminal_checkpoint_id:
+        return manifest.genesis_checkpoint
+    return next(
+        (
+            artifact
+            for artifact in manifest.successor_checkpoints
+            if artifact.artifact_id == manifest.terminal_checkpoint_id
+        ),
+        None,
+    )
 
 
 def _evidence(digest: str | None, length: int | None) -> None:

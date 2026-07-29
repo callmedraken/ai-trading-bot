@@ -116,6 +116,21 @@ def load_paper_account_lineage_manifest(
     )
 
 
+def read_safe_regular_file(path: Path, maximum: int, label: str) -> bytes:
+    """Read one explicit real regular file with stable identity and a byte bound."""
+    if (
+        not isinstance(path, Path)
+        or type(maximum) is not int
+        or maximum < 0
+        or type(label) is not str
+        or not label.strip()
+    ):
+        raise PaperAccountLineageManifestReadError(
+            "safe regular-file read arguments are invalid"
+        )
+    return _read_regular(_absolute(path), maximum, label)
+
+
 def _artifact_array(
     value: object,
     label: str,

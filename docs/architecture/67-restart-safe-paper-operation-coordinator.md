@@ -215,17 +215,85 @@ overwrites, merges, or automatically retries crash-left work. A verification
 failure after rename reports blocked state while preserving the already
 authoritative finalized transition.
 
-Milestone 3 creates no operation directory and no receipt. Consequently, a
-later invocation that finds the exact verified finalized transition but no
-receipt remains `BLOCKED` with
-`FINALIZED_TRANSITION_WITHOUT_RECEIPT`. Transition-to-receipt reconstruction is
-reserved for milestone 4.
+Milestone 3 creates no operation directory and no receipt. Consequently, at
+that milestone boundary a later invocation that found the exact verified
+finalized transition but no receipt remained `BLOCKED` with
+`FINALIZED_TRANSITION_WITHOUT_RECEIPT`.
+
+## Milestone-4 receipt commitment and recovery
+
+Milestone 4 preserves the finalized transition directory as the authoritative
+paper-account state commit point. It adds a second, operation-level audit
+commitment: the immutable schema-1 `COMPLETED` receipt. The receipt is stored
+separately from the transition because the transition is identified by the
+existing application UUID and remains reusable account-lineage evidence,
+whereas the receipt is identified by the operation UUID and retains caller
+idempotency and complete operation intent.
+
+Normal completion has this fixed order:
+
+1. complete every milestone-3 prospective, staged, and finalized transition
+   verification;
+2. construct the canonical receipt from the exact intent, verified prior and
+   successor lineage, report, successor checkpoint, application, result, and
+   outcome;
+3. run the milestone-1 offline verifier against the in-memory receipt bytes and
+   all exact dependencies;
+4. exclusively create receipt staging and write its one canonical file;
+5. bounded-reread and fully offline-verify the staged receipt;
+6. no-clobber rename staging to the final operation directory in the same
+   `paper-operations` parent;
+7. bounded-reread and fully offline-verify the finalized receipt;
+8. return `COMPLETED`.
+
+`APPLIED` and `NO_ACTION` receipts use the unchanged milestone-1 schema. The
+receipt UUID equals the operation UUID, status is `COMPLETED`, outcome exactly
+matches the verified cycle result, and diagnostic code is `NONE`. No clock,
+path, mutable status, or diagnostic prose enters canonical evidence.
+
+The fixed layout is:
+
+```text
+<operation-root>/
+  paper-account-transition-<application-id>/
+  paper-operations/
+    paper-operation-<operation-id>/
+      paper-operation-receipt-<operation-id>.json
+```
+
+Receipt staging is the sibling
+`.paper-operation-<operation-id>.staging`. The `paper-operations` parent is
+created only by the receipt output helper after verifying the retained
+operation-root identity and rejecting bounded case-fold collisions. Staging is
+exclusive and contains exactly one file. The helper flushes canonical bytes,
+uses bounded safe rereads, retains parent and directory identities, rejects
+links and reparse points, and finalizes by same-parent no-clobber rename. It
+never deletes, repairs, replaces, merges, or resumes staging.
+
+A process may stop after transition finalization but before receipt
+finalization. A later exact invocation may recover only when read-only
+inspection establishes one verified finalized requested transition, no
+finalized receipt, no receipt staging, and no ambiguous or conflicting state.
+Recovery safely rereads the fixed transition, proves the predecessor, snapshot,
+request, application, result, report, successor edge, and complete successor
+lineage, reconstructs the same canonical receipt, and performs the same
+in-memory, staged, and finalized milestone-1 verification. It invokes the
+paper-cycle runtime zero times and returns `RECEIPT_RECOVERED`.
+
+An exact verified finalized receipt returns `ALREADY_APPLIED` with zero runtime
+calls and zero writes. A receipt staging directory blocks both execution and
+recovery and is preserved for manual review. A receipt without its matching
+verified transition, a noncanonical or altered receipt, an invalid transition,
+or a dependency mismatch remains blocked and is never overwritten. Milestone 4
+does not produce `FAILED` receipts and does not retry failed runtime execution.
 
 ## Deferred coordinator work
 
-Later milestones may add receipt staging/finalization and receipt recovery after
-an already committed verified transition.
-
 Schedulers, services, loops, polling, databases, distributed locks, multi-host
 coordination, provider capture, external paper accounts, and real-money
-execution remain outside this design.
+execution remain outside this design. Before unattended scheduling, the system
+still needs an explicit scheduling policy, single-writer ownership and stale
+invocation rules, bounded dependency retention, alerting and manual-review
+procedures, credential/provider boundaries, and a decision on stronger global
+caller-key authority. Schema-1 receipt-only directories still cannot establish
+complete global caller-key reuse when foreign dependencies are unavailable.

@@ -5,8 +5,10 @@
 Milestone 2 provides strict operation-input loading, explicit dependency
 verification, bounded operation-root inspection, deterministic classification,
 and an inspect-only command. Milestone 3 adds one explicit execution attempt and
-verified transition commit. Neither milestone creates or recovers a receipt or
-contacts a provider, external broker, network service, scheduler, or clock.
+verified transition commit. Milestone 4 adds completed-receipt commitment,
+missing-receipt recovery, and repeated-invocation completion detection. None of
+these milestones contacts a provider, external broker, network service,
+scheduler, or clock.
 
 The command is:
 
@@ -142,18 +144,70 @@ the coordinator:
 8. renames staging to the final transition directory without clobber;
 9. safely rereads the final directory and repeats edge and lineage verification.
 
-Only then is `TRANSITION_COMMITTED` returned. The final transition directory is
-the authoritative account-state commit point.
+Only then is the account-state transition committed. The final transition
+directory is the authoritative account-state commit point. Milestone 4
+continues by constructing and committing the immutable receipt before returning
+`COMPLETED`.
 
 Both `APPLIED` and `NO_ACTION` produce the same fixed two-file transition
 layout. `NO_ACTION` still commits its successor checkpoint because the ledger
 time advances.
 
-Any crash or failure before rename leaves no final transition. Once staging has
-been created, it is preserved for manual review; no cleanup, repair, merge, or
-overwrite occurs. A failure after rename preserves the finalized transition and
-reports fail-closed. Until milestone 4 adds receipt recovery, that transition
-without a receipt remains blocked on later inspection.
+Any crash or failure before transition rename leaves no final transition. Once
+transition staging has been created, it is preserved for manual review; no
+cleanup, repair, merge, or overwrite occurs. A failure after transition rename
+preserves the finalized account-state commit.
+
+## Completed receipt finalization
+
+After the finalized transition reread passes, execution constructs exactly one
+schema-1 `COMPLETED` receipt. Its outcome is `APPLIED` or `NO_ACTION` exactly as
+reported by the verified cycle. Its operation, caller key, normalized intent,
+prior and successor lineage, terminal checkpoint, snapshot, cycle
+configuration, application, result, report, and successor checkpoint evidence
+must reconcile.
+
+Before output, the exact receipt bytes pass the milestone-1 offline verifier
+with all explicit configuration, prior-lineage, snapshot, calendar, report, and
+successor dependencies. Receipt output then:
+
+1. safely creates or validates the exact `paper-operations` parent;
+2. rejects link, reparse, case-fold, enumeration, identity, and destination
+   hazards;
+3. exclusively creates `.paper-operation-<operation-id>.staging`;
+4. writes and flushes exactly one canonical receipt file;
+5. bounded-rereads and fully verifies the staged receipt;
+6. rechecks fixed layout and identities;
+7. performs a same-parent no-clobber rename;
+8. bounded-rereads and fully verifies the finalized receipt;
+9. rechecks fixed layout and identities before returning `COMPLETED`.
+
+There is no cleanup path. A staged-verification or rename failure preserves
+staging. A finalized-verification failure preserves the final directory and
+fails closed.
+
+## Recovery and repeated invocation
+
+When initial inspection reports the exact verified finalized transition without
+a receipt, `--execute-once` enters recovery instead of runtime execution.
+Recovery requires no receipt staging or ambiguous state, safely reloads the
+fixed report and successor files, checks their retained evidence, repeats
+successor-edge verification, and verifies the full lineage to the successor.
+Only then does it reconstruct and commit the same canonical receipt. Runtime
+invocation count is zero, transition bytes are never modified, and success is
+`RECEIPT_RECOVERED`.
+
+When the exact finalized receipt and transition pass full milestone-1 offline
+verification, a repeated invocation returns `ALREADY_APPLIED`, invokes runtime
+zero times, and performs no writes. Receipt staging, a receipt without its
+transition, malformed or altered receipt bytes, transition mismatch, edge or
+lineage mismatch, and ambiguous state remain blocked without deletion, repair,
+replacement, finalization, or retry.
+
+A canonically readable completed receipt without its matching finalized
+transition is `BLOCKED_INVALID_OPERATION_STATE` and exits 8. A malformed or
+noncanonical receipt remains an `INVALID_RECEIPT` verification failure and exits
+4.
 
 ## Caller-key limitation
 
@@ -185,23 +239,36 @@ milestone 2.
 
 Execution additionally uses:
 
-- `0`: `TRANSITION_COMMITTED`
+- `0`: `COMPLETED`, `RECEIPT_RECOVERED`, or `ALREADY_APPLIED`
 - `4`: prospective, staged, or finalized edge/lineage verification failure
 - `5`: stale terminal or verified conflict
 - `6`: recognized deterministic paper-cycle rejection
-- `7`: serialization, runtime exception, staging, rename, or output-safety
-  failure
-- `8`: staging, ambiguity, or a finalized transition without its receipt
+- `7`: receipt serialization, runtime exception, staging, rename, or
+  output-safety failure
+- `8`: staging, ambiguity, or another incomplete state requiring manual review
 
-Human output is limited to the operation UUID when derivable, classification,
-terminal checkpoint UUID, application UUID when derivable, a receipt path only
-for a fully verified receipt, and stable diagnostic codes.
+Execution output is limited to operation UUID, initial inspection
+classification, terminal checkpoint UUID, application UUID, result UUID,
+successor checkpoint UUID, verified transition path, verified receipt path,
+outcome, final classification, and stable diagnostic codes.
+
+Focused milestone-4 validation covers `APPLIED` and `NO_ACTION` receipt
+completion, both receipt reread verifier phases, exact one-file layout,
+full offline verification, byte-identical recovery, zero-runtime repeated and
+recovery invocations, transition immutability during recovery, crash-left
+staging, staged and finalized verification failures, rename failure, and
+case-fold collisions. Milestones 1 through 3 and the related snapshot,
+checkpoint, transition, and lineage suites remain regression requirements.
+
+`FAILED` receipt creation, retry, cleanup, scheduling, provider capture,
+external broker access, registries, and multi-host coordination remain
+deferred.
 
 ## Verification commands
 
 ```text
 python -m pytest tests/cli/test_paper_operation_config.py tests/cli/test_paper_operation_inspection.py -q
-python -m pytest tests/cli/test_paper_operation_execution.py -q
+python -m pytest tests/cli/test_paper_operation_receipt_output.py tests/cli/test_paper_operation_execution.py -q
 python -m pytest tests/runtime/test_paper_operation.py -q
 python -m pytest tests/cli/test_checkpoint_transition.py tests/cli/test_checkpoint_lineage.py tests/runtime/test_paper_account_lineage_verification.py -q
 python -m pytest

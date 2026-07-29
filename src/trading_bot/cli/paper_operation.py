@@ -115,8 +115,10 @@ def _minimal_failure(code: str) -> None:
 
 def _print_execution_result(result: PaperOperationExecutionResult) -> None:
     print(f"operation ID: {result.operation_id}")
-    print(f"pre-execution classification: {result.pre_execution_classification.value}")
-    print(f"classification: {result.classification.value}")
+    print(
+        "initial inspection classification: "
+        f"{result.pre_execution_classification.value}"
+    )
     print(f"terminal checkpoint ID: {result.terminal_checkpoint_id}")
     print(f"application ID: {result.application_id}")
     if result.cycle_result_id is not None:
@@ -125,8 +127,11 @@ def _print_execution_result(result: PaperOperationExecutionResult) -> None:
         print(f"successor checkpoint ID: {result.successor_checkpoint_id}")
     if result.transition_path is not None:
         print(f"transition path: {result.transition_path}")
+    if result.receipt_path is not None:
+        print(f"receipt path: {result.receipt_path}")
     if result.outcome is not None:
         print(f"outcome: {result.outcome.value}")
+    print(f"classification: {result.classification.value}")
     print(f"diagnostic: {result.diagnostic_code}")
 
 
@@ -151,9 +156,9 @@ def _exit_code(result: PaperOperationInspectionResult) -> int:
 
 
 def _execution_exit_code(result: PaperOperationExecutionResult) -> int:
-    if (
-        result.classification
-        is PaperOperationExecutionClassification.TRANSITION_COMMITTED
+    if result.classification in (
+        PaperOperationExecutionClassification.COMPLETED,
+        PaperOperationExecutionClassification.RECEIPT_RECOVERED,
     ):
         return 0
     if result.classification is PaperOperationExecutionClassification.EXECUTION_FAILED:
@@ -170,6 +175,15 @@ def _execution_exit_code(result: PaperOperationExecutionResult) -> int:
         PaperOperationInspectionCode.OPERATION_STAGING_EXISTS.value,
         PaperOperationInspectionCode.TRANSITION_STAGING_EXISTS.value,
         PaperOperationInspectionCode.AMBIGUOUS_OPERATION_STATE.value,
+        PaperOperationInspectionCode.INVALID_OPERATION_STATE.value,
+        PaperOperationInspectionCode.UNSAFE_OPERATION_ROOT.value,
+        PaperOperationInspectionCode.ENUMERATION_LIMIT_EXCEEDED.value,
+        PaperOperationInspectionCode.CASEFOLD_COLLISION.value,
+        PaperOperationInspectionCode.MALFORMED_OPERATION_LAYOUT.value,
+        PaperOperationInspectionCode.MALFORMED_TRANSITION_LAYOUT.value,
+        PaperOperationInspectionCode.FOREIGN_RECEIPT_DEPENDENCIES_UNAVAILABLE.value,
+        PaperOperationInspectionCode.FOREIGN_TRANSITION_DEPENDENCIES_UNAVAILABLE.value,
+        PaperOperationInspectionCode.VALID_FAILED_RECEIPT.value,
     }:
         return 8
     if code in {
@@ -182,6 +196,11 @@ def _execution_exit_code(result: PaperOperationExecutionResult) -> int:
         "FINALIZED_EDGE_VERIFICATION_FAILED",
         "FINALIZED_LINEAGE_VERIFICATION_FAILED",
         "FINALIZED_VERIFICATION_EXCEPTION",
+        "RECOVERY_EDGE_VERIFICATION_FAILED",
+        "RECOVERY_LINEAGE_VERIFICATION_FAILED",
+        "RECOVERY_VERIFICATION_EXCEPTION",
+        "STAGED_RECEIPT_VERIFICATION_FAILED",
+        "FINALIZED_RECEIPT_VERIFICATION_FAILED",
         PaperOperationInspectionCode.INVALID_RECEIPT.value,
         PaperOperationInspectionCode.INVALID_FOREIGN_RECEIPT.value,
         PaperOperationInspectionCode.INVALID_TRANSITION.value,

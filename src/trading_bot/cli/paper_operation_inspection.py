@@ -73,6 +73,7 @@ class PaperOperationInspectionCode(StrEnum):
     )
     INVALID_RECEIPT = "INVALID_RECEIPT"
     INVALID_FOREIGN_RECEIPT = "INVALID_FOREIGN_RECEIPT"
+    INVALID_OPERATION_STATE = "BLOCKED_INVALID_OPERATION_STATE"
     INVALID_TRANSITION = "INVALID_TRANSITION"
     FINALIZED_TRANSITION_WITHOUT_RECEIPT = "FINALIZED_TRANSITION_WITHOUT_RECEIPT"
     OPERATION_STAGING_EXISTS = "OPERATION_STAGING_EXISTS"
@@ -400,8 +401,8 @@ def inspect_paper_operation_root(
                 return _result(
                     inputs,
                     PaperOperationClassification.BLOCKED,
-                    None,
-                    PaperOperationInspectionCode.INVALID_RECEIPT,
+                    exact.path,
+                    PaperOperationInspectionCode.INVALID_OPERATION_STATE,
                 )
             verified = _verify_receipt(
                 exact,

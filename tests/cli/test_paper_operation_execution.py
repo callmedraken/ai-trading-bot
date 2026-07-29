@@ -438,6 +438,17 @@ def test_multi_edge_terminal_predecessor_reaches_runtime_with_verified_authority
         "execute_checkpointed_verified_snapshot_paper_cycle",
         accepted,
     )
+
+    def replay_failure(*args, **kwargs):
+        raise CheckpointedVerifiedSnapshotPaperCycleInsufficientCashError(
+            "deterministic replay rejection"
+        )
+
+    monkeypatch.setattr(
+        "trading_bot.runtime.paper_operation."
+        "execute_checkpointed_verified_snapshot_paper_cycle",
+        replay_failure,
+    )
     result = execute_paper_operation_once(
         fixture.operation_root,
         fixture.inputs,

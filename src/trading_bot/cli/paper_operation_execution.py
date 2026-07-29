@@ -33,6 +33,7 @@ from trading_bot.cli.paper_operation_receipt_output import (
 from trading_bot.runtime import (
     MAX_CHECKPOINTED_PAPER_CYCLE_REPORT_BYTES,
     MAX_PAPER_ACCOUNT_SUCCESSOR_CHECKPOINT_BYTES,
+    MAX_PAPER_OPERATION_RECEIPT_BYTES,
     PAPER_OPERATION_RECEIPT_SCHEMA_VERSION,
     CheckpointedVerifiedSnapshotPaperCycleApplicationError,
     CheckpointedVerifiedSnapshotPaperCycleInsufficientCashError,
@@ -61,6 +62,18 @@ from trading_bot.runtime import (
     verify_checkpointed_paper_cycle_successor_edge,
     verify_paper_account_lineage,
     verify_paper_operation_receipt,
+)
+
+ELIGIBLE_FAILED_RECEIPT_DIAGNOSTICS: frozenset[PaperOperationDiagnosticCode] = (
+    frozenset(
+        {
+            PaperOperationDiagnosticCode.INSUFFICIENT_CASH,
+            PaperOperationDiagnosticCode.APPLICATION_FAILURE,
+            PaperOperationDiagnosticCode.RESTORATION_FAILURE,
+            PaperOperationDiagnosticCode.RECONCILIATION_FAILURE,
+            PaperOperationDiagnosticCode.RUNTIME_EXECUTION_FAILURE,
+        }
+    )
 )
 
 
@@ -100,6 +113,9 @@ class PaperOperationExecutionDiagnosticCode(StrEnum):
     RECEIPT_SERIALIZATION_FAILURE = "RECEIPT_SERIALIZATION_FAILURE"
     STAGED_RECEIPT_VERIFICATION_FAILED = "STAGED_RECEIPT_VERIFICATION_FAILED"
     FINALIZED_RECEIPT_VERIFICATION_FAILED = "FINALIZED_RECEIPT_VERIFICATION_FAILED"
+    FAILED_RECEIPT_REPLAY_VERIFICATION_FAILED = (
+        "FAILED_RECEIPT_REPLAY_VERIFICATION_FAILED"
+    )
     RECEIPT_OUTPUT_SAFETY_FAILURE = "RECEIPT_OUTPUT_SAFETY_FAILURE"
     OUTPUT_SAFETY_FAILURE = "OUTPUT_SAFETY_FAILURE"
     OPERATION_ROOT_CHANGED = "OPERATION_ROOT_CHANGED"
@@ -221,6 +237,12 @@ def execute_paper_operation_once(
                 inspection,
                 inputs,
             )
+        if (
+            inspection.classification is PaperOperationClassification.BLOCKED
+            and inspection.diagnostics[0]
+            is PaperOperationInspectionCode.VALID_FAILED_RECEIPT
+        ):
+            return _recorded_failed_receipt(inspection, inputs)
         classification = (
             PaperOperationExecutionClassification.ALREADY_APPLIED
             if inspection.classification is PaperOperationClassification.ALREADY_APPLIED
@@ -267,12 +289,13 @@ def execute_paper_operation_once(
             inputs.calendar,
         )
     except Exception as error:
-        diagnostic = _runtime_failure(error)
+        diagnostic = _eligible_failed_receipt_diagnostic(error)
         if diagnostic is not None:
-            return _from_inspection(
+            return _finalize_failed_receipt(
+                current_parent,
                 inspection,
-                PaperOperationExecutionClassification.EXECUTION_FAILED,
-                diagnostic.value,
+                inputs,
+                diagnostic,
             )
         return _from_inspection(
             inspection,
@@ -493,6 +516,173 @@ def _recover_receipt(
         PaperOperationExecutionClassification.RECEIPT_RECOVERED,
         PaperOperationExecutionDiagnosticCode.RECEIPT_RECOVERED,
     )
+
+
+def _recorded_failed_receipt(
+    inspection: PaperOperationInspectionResult,
+    inputs: VerifiedPaperOperationInputs,
+) -> PaperOperationExecutionResult:
+    if inspection.receipt_path is None:
+        return _from_inspection(
+            inspection,
+            PaperOperationExecutionClassification.BLOCKED,
+            PaperOperationInspectionCode.INVALID_RECEIPT.value,
+        )
+    try:
+        payload = read_safe_regular_file(
+            inspection.receipt_path,
+            MAX_PAPER_OPERATION_RECEIPT_BYTES,
+            "recorded failed receipt",
+        )
+        receipt = _verify_failed_receipt(payload, inputs)
+    except Exception:
+        receipt = None
+    if (
+        receipt is None
+        or receipt.status is not PaperOperationStatus.FAILED
+        or receipt.diagnostic_code not in ELIGIBLE_FAILED_RECEIPT_DIAGNOSTICS
+    ):
+        return _from_inspection(
+            inspection,
+            PaperOperationExecutionClassification.BLOCKED,
+            PaperOperationInspectionCode.INVALID_RECEIPT.value,
+        )
+    return _from_inspection(
+        inspection,
+        PaperOperationExecutionClassification.EXECUTION_FAILED,
+        receipt.diagnostic_code.value,
+        receipt_path=inspection.receipt_path,
+    )
+
+
+def _finalize_failed_receipt(
+    parent: OutputParent,
+    inspection: PaperOperationInspectionResult,
+    inputs: VerifiedPaperOperationInputs,
+    diagnostic: PaperOperationDiagnosticCode,
+) -> PaperOperationExecutionResult:
+    if diagnostic not in ELIGIBLE_FAILED_RECEIPT_DIAGNOSTICS:
+        return _from_inspection(
+            inspection,
+            PaperOperationExecutionClassification.BLOCKED,
+            PaperOperationExecutionDiagnosticCode.RUNTIME_EXCEPTION.value,
+        )
+    try:
+        current_parent = validate_output_parent(parent.path)
+        if current_parent != parent:
+            return _from_inspection(
+                inspection,
+                PaperOperationExecutionClassification.BLOCKED,
+                PaperOperationExecutionDiagnosticCode.OPERATION_ROOT_CHANGED.value,
+            )
+        preflight_transition_directory(
+            current_parent,
+            application_id=str(inputs.application_id),
+        )
+    except CheckpointTransitionOutputError:
+        return _from_inspection(
+            inspection,
+            PaperOperationExecutionClassification.BLOCKED,
+            PaperOperationExecutionDiagnosticCode.OUTPUT_SAFETY_FAILURE.value,
+        )
+    try:
+        receipt = PaperOperationReceipt(
+            PAPER_OPERATION_RECEIPT_SCHEMA_VERSION,
+            inputs.intent.operation_id,
+            inputs.intent,
+            PaperOperationStatus.FAILED,
+            None,
+            diagnostic,
+            inputs.intent.prior_lineage_evidence,
+            None,
+            None,
+            None,
+            inputs.application_id,
+            None,
+        )
+        receipt_payload = serialize_paper_operation_receipt(receipt)
+    except Exception:
+        return _from_inspection(
+            inspection,
+            PaperOperationExecutionClassification.BLOCKED,
+            PaperOperationExecutionDiagnosticCode.RECEIPT_SERIALIZATION_FAILURE.value,
+        )
+    if _verify_failed_receipt(receipt_payload, inputs) != receipt:
+        return _from_inspection(
+            inspection,
+            PaperOperationExecutionClassification.BLOCKED,
+            PaperOperationExecutionDiagnosticCode.FAILED_RECEIPT_REPLAY_VERIFICATION_FAILED.value,
+        )
+
+    def verify_receipt_reread(
+        reread_payload: bytes,
+        phase: ReceiptCommitVerificationPhase,
+    ) -> None:
+        if _verify_failed_receipt(reread_payload, inputs) != receipt:
+            code = (
+                PaperOperationExecutionDiagnosticCode.STAGED_RECEIPT_VERIFICATION_FAILED
+                if phase is ReceiptCommitVerificationPhase.STAGED_REREAD
+                else (
+                    PaperOperationExecutionDiagnosticCode.FINALIZED_RECEIPT_VERIFICATION_FAILED
+                )
+            )
+            raise _VerificationFailure(code)
+
+    try:
+        committed = commit_paper_operation_receipt(
+            current_parent,
+            operation_id=inputs.intent.operation_id,
+            receipt_payload=receipt_payload,
+            verifier=verify_receipt_reread,
+        )
+    except _VerificationFailure as error:
+        return _from_inspection(
+            inspection,
+            PaperOperationExecutionClassification.BLOCKED,
+            error.code.value,
+        )
+    except PaperOperationReceiptOutputError:
+        return _from_inspection(
+            inspection,
+            PaperOperationExecutionClassification.BLOCKED,
+            PaperOperationExecutionDiagnosticCode.RECEIPT_OUTPUT_SAFETY_FAILURE.value,
+        )
+    except Exception:
+        return _from_inspection(
+            inspection,
+            PaperOperationExecutionClassification.BLOCKED,
+            PaperOperationExecutionDiagnosticCode.RECEIPT_OUTPUT_SAFETY_FAILURE.value,
+        )
+    return _from_inspection(
+        inspection,
+        PaperOperationExecutionClassification.EXECUTION_FAILED,
+        diagnostic.value,
+        receipt_path=committed.receipt_path,
+    )
+
+
+def _verify_failed_receipt(
+    payload: bytes,
+    inputs: VerifiedPaperOperationInputs,
+) -> PaperOperationReceipt | None:
+    manifest = inputs.lineage_manifest
+    verification = verify_paper_operation_receipt(
+        payload,
+        cycle_configuration_payload=inputs.cycle_configuration_payload,
+        prior_genesis_checkpoint=manifest.genesis_checkpoint,
+        prior_successor_checkpoints=manifest.successor_checkpoints,
+        prior_cycle_reports=manifest.cycle_reports,
+        prior_snapshots=manifest.snapshots,
+        completed_snapshot_payload=inputs.completed_snapshot_payload,
+        calendar=inputs.calendar,
+    )
+    if (
+        verification.status is not PaperOperationReceiptVerificationStatus.PASS
+        or verification.receipt is None
+        or verification.receipt.status is not PaperOperationStatus.FAILED
+    ):
+        return None
+    return verification.receipt
 
 
 def _finalize_completed_receipt(
@@ -741,19 +931,19 @@ def _lineage_failure_code(
     }[phase]
 
 
-def _runtime_failure(
+def _eligible_failed_receipt_diagnostic(
     error: Exception,
-) -> PaperOperationExecutionDiagnosticCode | None:
+) -> PaperOperationDiagnosticCode | None:
     if isinstance(error, CheckpointedVerifiedSnapshotPaperCycleInsufficientCashError):
-        return PaperOperationExecutionDiagnosticCode.INSUFFICIENT_CASH
+        return PaperOperationDiagnosticCode.INSUFFICIENT_CASH
     if isinstance(error, CheckpointedVerifiedSnapshotPaperCycleApplicationError):
-        return PaperOperationExecutionDiagnosticCode.APPLICATION_FAILURE
+        return PaperOperationDiagnosticCode.APPLICATION_FAILURE
     if isinstance(error, CheckpointedVerifiedSnapshotPaperCycleRestorationError):
-        return PaperOperationExecutionDiagnosticCode.RESTORATION_FAILURE
+        return PaperOperationDiagnosticCode.RESTORATION_FAILURE
     if isinstance(error, CheckpointedVerifiedSnapshotPaperCycleReconciliationError):
-        return PaperOperationExecutionDiagnosticCode.RECONCILIATION_FAILURE
+        return PaperOperationDiagnosticCode.RECONCILIATION_FAILURE
     if isinstance(error, CheckpointedVerifiedSnapshotPaperCycleRuntimeExecutionError):
-        return PaperOperationExecutionDiagnosticCode.RUNTIME_EXECUTION_FAILURE
+        return PaperOperationDiagnosticCode.RUNTIME_EXECUTION_FAILURE
     return None
 
 

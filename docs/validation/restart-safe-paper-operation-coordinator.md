@@ -6,9 +6,10 @@ Milestone 2 provides strict operation-input loading, explicit dependency
 verification, bounded operation-root inspection, deterministic classification,
 and an inspect-only command. Milestone 3 adds one explicit execution attempt and
 verified transition commit. Milestone 4 adds completed-receipt commitment,
-missing-receipt recovery, and repeated-invocation completion detection. None of
-these milestones contacts a provider, external broker, network service,
-scheduler, or clock.
+missing-receipt recovery, and repeated-invocation completion detection.
+Milestone 5 adds deterministic failed-receipt commitment and terminal no-retry
+behavior. None of these milestones contacts a provider, external broker,
+network service, scheduler, or clock.
 
 The command is:
 
@@ -242,7 +243,7 @@ Execution additionally uses:
 - `0`: `COMPLETED`, `RECEIPT_RECOVERED`, or `ALREADY_APPLIED`
 - `4`: prospective, staged, or finalized edge/lineage verification failure
 - `5`: stale terminal or verified conflict
-- `6`: recognized deterministic paper-cycle rejection
+- `6`: newly recorded or previously verified deterministic paper-cycle failure
 - `7`: receipt serialization, runtime exception, staging, rename, or
   output-safety failure
 - `8`: staging, ambiguity, or another incomplete state requiring manual review
@@ -262,13 +263,54 @@ checkpoint, transition, and lineage suites remain regression requirements.
 
 `FAILED` receipt creation, retry, cleanup, scheduling, provider capture,
 external broker access, registries, and multi-host coordination remain
-deferred.
+deferred from milestones 1 through 4.
+
+## Deterministic failed receipts
+
+Milestone 5 permits `FAILED` receipt production only for the closed existing
+diagnostic set `INSUFFICIENT_CASH`, `APPLICATION_FAILURE`,
+`RESTORATION_FAILURE`, `RECONCILIATION_FAILURE`, and
+`RUNTIME_EXECUTION_FAILURE`. Each classification must arise after verified
+inputs and exact `PENDING` inspection, from the one admitted runtime attempt,
+and must be reproduced by milestone-1 offline replay of the exact intent.
+
+The coordinator proves that neither
+`paper-account-transition-<application-id>` nor its staging sibling exists
+after the deterministic exception. It then builds the unchanged schema-1
+`FAILED` receipt with prior authority and application evidence but without
+outcome, result, successor, report, transition, or state-advance evidence.
+In-memory, staged-reread, and finalized-reread verification each run the full
+milestone-1 verifier and require the exact same receipt and diagnostic.
+
+Successful failure recording returns `EXECUTION_FAILED`, exits 6, and exposes
+the verified receipt path. Repeated execution fully verifies the existing
+receipt, returns the same diagnostic and exit code, performs no writes, and
+does not invoke the coordinator runtime. Offline replay remains an explicit
+verification operation, not a retry or new account-state attempt.
+Failed execution output omits cycle-result UUID, successor UUID, transition
+path, and outcome because no account-state transition exists.
+
+Unexpected exceptions and all configuration, dependency, evidence, stale
+authority, conflict, filesystem, permission, disk, link, reparse, staging,
+serialization, write, flush, reread, rename, collision, interruption,
+provider, broker, network, scheduler, clock, and environment failures produce
+no failed receipt. Receipt-output failure preserves any staging or finalized
+state exactly as observed and returns blocked/output failure rather than
+terminal execution failure.
+
+A finalized failed receipt alongside a transition is
+`BLOCKED_INVALID_OPERATION_STATE`. Failed-receipt staging remains
+`OPERATION_STAGING_EXISTS` incomplete state. Altered intent, evidence,
+diagnostic, operation UUID, canonical bytes, or replay behavior invalidates
+receipt authority. No path repairs, cleanup, deletion, replacement operation,
+generated caller key, or automatic retry exists.
 
 ## Verification commands
 
 ```text
 python -m pytest tests/cli/test_paper_operation_config.py tests/cli/test_paper_operation_inspection.py -q
 python -m pytest tests/cli/test_paper_operation_receipt_output.py tests/cli/test_paper_operation_execution.py -q
+python -m pytest tests/cli/test_paper_operation_failed_receipt.py -q
 python -m pytest tests/runtime/test_paper_operation.py -q
 python -m pytest tests/cli/test_checkpoint_transition.py tests/cli/test_checkpoint_lineage.py tests/runtime/test_paper_account_lineage_verification.py -q
 python -m pytest

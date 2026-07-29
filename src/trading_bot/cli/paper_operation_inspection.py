@@ -434,8 +434,8 @@ def inspect_paper_operation_root(
             return _result(
                 inputs,
                 PaperOperationClassification.BLOCKED,
-                None,
-                PaperOperationInspectionCode.AMBIGUOUS_OPERATION_STATE,
+                exact.path,
+                PaperOperationInspectionCode.INVALID_OPERATION_STATE,
             )
         if not _verify_receipt(exact, inputs):
             return _result(

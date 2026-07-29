@@ -287,6 +287,73 @@ verified transition, a noncanonical or altered receipt, an invalid transition,
 or a dependency mismatch remains blocked and is never overwritten. Milestone 4
 does not produce `FAILED` receipts and does not retry failed runtime execution.
 
+## Milestone-5 deterministic failure commitment
+
+Milestone 5 adds terminal audit commitment for a closed set of deterministic
+checkpointed-cycle failures. A failure is receipt-eligible only after all
+operation inputs and prior authority verify, initial inspection is exactly
+`PENDING`, the one permitted runtime attempt raises an existing recognized
+deterministic cycle exception, the exact transition final and staging names
+remain absent, and milestone-1 offline replay reproduces the same stable
+diagnostic.
+
+The closed eligibility set is:
+
+- `INSUFFICIENT_CASH`;
+- `APPLICATION_FAILURE`;
+- `RESTORATION_FAILURE`;
+- `RECONCILIATION_FAILURE`;
+- `RUNTIME_EXECUTION_FAILURE`.
+
+These are the existing milestone-1 mappings for the corresponding exact
+checkpointed verified-snapshot cycle exception hierarchy. Ordering preserves
+the most specific classification: insufficient cash precedes application
+failure, and application failure precedes the general runtime-execution
+failure.
+
+A milestone-5 receipt uses the unchanged schema-1 `FAILED` model. Its receipt
+UUID equals the operation UUID. It embeds the complete normalized intent and
+verified prior-lineage evidence, retains the derived application UUID, and
+contains exactly one allowlisted diagnostic. It has no outcome, result UUID,
+successor lineage, transition report, successor checkpoint, fabricated state
+advance, path, clock, environment value, or prose.
+
+Failure commitment ordering is fixed:
+
+1. verify inputs, prior lineage, snapshot, request, and exact `PENDING` state;
+2. invoke the cycle runtime once;
+3. classify only an allowlisted deterministic exception;
+4. revalidate the operation-root identity and prove the requested transition
+   final and staging names remain absent;
+5. construct and canonically serialize the schema-1 `FAILED` receipt;
+6. use the milestone-1 verifier to replay the exact operation offline and
+   require the same diagnostic;
+7. use the milestone-4 receipt helper to stage the one receipt file;
+8. bounded-reread and repeat full offline replay verification;
+9. no-clobber finalize the receipt directory;
+10. bounded-reread and repeat full offline replay verification;
+11. return `EXECUTION_FAILED`.
+
+The finalized failed receipt is the terminal audit commitment. It commits no
+account state and creates no transition. Repeated `--execute-once` invocation
+fully verifies and replays the exact receipt, returns `EXECUTION_FAILED` with
+exit code 6, invokes the coordinator runtime zero times, performs no writes, and
+never retries the operation.
+
+A failed receipt plus a finalized transition is
+`BLOCKED_INVALID_OPERATION_STATE`. Failed-receipt staging is incomplete state
+that is preserved and never resumed. A malformed, altered, noncanonical,
+non-allowlisted, or unreproducible failed receipt has no authority and is never
+repaired or overwritten.
+
+Configuration, dependency, authority, evidence, conflict, filesystem, staging,
+serialization, reread, rename, interruption, provider, broker, network,
+scheduler, clock, and unexpected runtime failures are not receipt-eligible.
+They remain blocked, conflicting, verification, or output failures and create
+no terminal receipt. A different caller-authored idempotency key creates a
+different operation only after separate manual review; the coordinator never
+generates a replacement key or operation automatically.
+
 ## Deferred coordinator work
 
 Schedulers, services, loops, polling, databases, distributed locks, multi-host

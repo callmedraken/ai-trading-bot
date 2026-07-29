@@ -201,6 +201,7 @@ def _execution_exit_code(result: PaperOperationExecutionResult) -> int:
         "RECOVERY_VERIFICATION_EXCEPTION",
         "STAGED_RECEIPT_VERIFICATION_FAILED",
         "FINALIZED_RECEIPT_VERIFICATION_FAILED",
+        "FAILED_RECEIPT_REPLAY_VERIFICATION_FAILED",
         PaperOperationInspectionCode.INVALID_RECEIPT.value,
         PaperOperationInspectionCode.INVALID_FOREIGN_RECEIPT.value,
         PaperOperationInspectionCode.INVALID_TRANSITION.value,

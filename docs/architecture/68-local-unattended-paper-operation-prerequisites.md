@@ -19,10 +19,11 @@ The incremental order is:
 2. deterministic scheduled-session, launch, capture-attempt, and operation
    identities plus a read-only readiness evaluator;
 3. a Windows local single-writer guard;
-4. capture-only unattended operation with dry-run evidence;
-5. an optional separately approved, human-authored target execution boundary;
-6. a narrow Windows scheduling adapter;
-7. repeated unattended simulated-paper validation.
+4. a guarded capture-readiness dry-run with immutable decision evidence;
+5. capture-only unattended operation;
+6. an optional separately approved, human-authored target execution boundary;
+7. a narrow Windows scheduling adapter;
+8. repeated unattended simulated-paper validation.
 
 Every milestone has an independent stop/go decision. Capture-only operation is
 the recommended first stopping point.
@@ -105,6 +106,11 @@ fail-closed abandoned-owner handling. It does not approve scheduling, capture,
 readiness orchestration, paper-operation execution, or head advancement.
 Verified mutex ACL hardening remains explicitly unimplemented; callers that
 require it receive `UNSUPPORTED`.
+
+Milestone 72 composes milestones 69 through 71 into a one-shot guarded
+capture-readiness dry run. It publishes immutable decision evidence but cannot
+invoke a provider or create a snapshot. Capture-only unattended operation
+remains a later separate approval.
 
 Milestone 69 assumes one caller already holds exclusive publication authority.
 It contains no lock, lease, PID, timeout, scheduler, or stale-owner logic.

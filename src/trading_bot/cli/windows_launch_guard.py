@@ -229,6 +229,7 @@ class LaunchGuardAcquireRequest:
     launch_policy: str
     timeout_seconds: int
     acl_policy: LaunchGuardAclPolicy
+    validate_audit_root_before_acquire: bool = True
     context_release_input: LaunchLeaseReleaseInput | None = None
 
     def __post_init__(self) -> None:
@@ -242,6 +243,8 @@ class LaunchGuardAcquireRequest:
             raise ValueError("timeout_seconds is outside the bounded Win32 range")
         if not isinstance(self.acl_policy, LaunchGuardAclPolicy):
             raise ValueError("acl_policy must be LaunchGuardAclPolicy")
+        if type(self.validate_audit_root_before_acquire) is not bool:
+            raise ValueError("validate_audit_root_before_acquire must be a bool")
         if self.context_release_input is not None and not isinstance(
             self.context_release_input,
             LaunchLeaseReleaseInput,
@@ -689,17 +692,18 @@ def acquire_windows_launch_guard(
             native_error_code=None,
             diagnostic="VERIFIED_DACL_NOT_IMPLEMENTED",
         )
-    try:
-        validate_output_parent(request.audit_root)
-    except Exception as exc:
-        return LaunchGuardAcquireResult(
-            classification=LaunchGuardAcquisitionClassification.ERROR,
-            mutex_name=mutex_name,
-            acl_enforcement=acl_enforcement,
-            ownership=None,
-            native_error_code=None,
-            diagnostic=f"AUDIT_ROOT_INVALID:{type(exc).__name__}",
-        )
+    if request.validate_audit_root_before_acquire:
+        try:
+            validate_output_parent(request.audit_root)
+        except Exception as exc:
+            return LaunchGuardAcquireResult(
+                classification=LaunchGuardAcquisitionClassification.ERROR,
+                mutex_name=mutex_name,
+                acl_enforcement=acl_enforcement,
+                ownership=None,
+                native_error_code=None,
+                diagnostic=f"AUDIT_ROOT_INVALID:{type(exc).__name__}",
+            )
     if native_api is None and os.name != "nt":
         return LaunchGuardAcquireResult(
             classification=LaunchGuardAcquisitionClassification.UNSUPPORTED,
@@ -738,6 +742,9 @@ def acquire_windows_launch_guard(
         )
     failure_stage = "START_CONSTRUCTION_FAILED"
     try:
+        if not request.validate_audit_root_before_acquire:
+            failure_stage = "AUDIT_ROOT_INVALID"
+            validate_output_parent(request.audit_root)
         start_record = create_launch_lease_start(
             scheduled_launch_id=request.scheduled_launch_id,
             authority_epoch_id=request.authority_epoch_id,

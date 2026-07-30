@@ -58,6 +58,7 @@ class ScheduledArtifactSyntaxError(ScheduledReadinessModelError):
 class ScheduledPhase(StrEnum):
     CAPTURE = "CAPTURE"
     OPERATION = "OPERATION"
+    CAPTURE_READINESS_DRY_RUN = "CAPTURE_READINESS_DRY_RUN"
 
 
 class MarketSessionHoursKind(StrEnum):
@@ -1459,6 +1460,135 @@ def evaluate_scheduled_readiness(
         inputs.scheduled_session_id,
         caller_key,
         snapshot,
+    )
+
+
+def evaluate_scheduled_capture_readiness(
+    inputs: ScheduledReadinessInputs,
+) -> ScheduledReadinessResult:
+    """Evaluate only whether the next capture attempt may be invoked.
+
+    This pure capture-only view deliberately excludes every operation, target,
+    receipt, and coordinator gate from :func:`evaluate_scheduled_readiness`.
+    """
+    if type(inputs) is not ScheduledReadinessInputs:
+        raise TypeError("inputs must be ScheduledReadinessInputs")
+    snapshot = evaluate_snapshot_readiness(inputs)
+    codes: set[ScheduledReadinessCode] = set(snapshot.diagnostics)
+    categories: set[ScheduledReadinessClassification] = set()
+    if _capture_selection_context_conflicts(inputs):
+        codes.add(ScheduledReadinessCode.SNAPSHOT_SELECTION_CONFLICT)
+        categories.add(ScheduledReadinessClassification.CONFLICTING)
+    head = inputs.authoritative_head
+    if head is None or not head.verification_passed:
+        codes.add(ScheduledReadinessCode.HEAD_UNVERIFIED)
+        categories.add(ScheduledReadinessClassification.BLOCKED)
+    if inputs.manual_disable_active:
+        codes.add(ScheduledReadinessCode.MANUAL_DISABLE_ACTIVE)
+        categories.add(ScheduledReadinessClassification.BLOCKED)
+    if inputs.market_hours is None:
+        codes.add(ScheduledReadinessCode.MARKET_HOURS_UNAVAILABLE)
+        categories.add(ScheduledReadinessClassification.BLOCKED)
+    else:
+        later_sessions = tuple(
+            item.session
+            for item in inputs.market_hours.entries
+            if item.session.session_date > inputs.target_session.session_date
+        )
+        if (
+            inputs.market_hours.hours_for(inputs.target_session) is None
+            or not later_sessions
+            or later_sessions[0] != inputs.execution_session
+        ):
+            codes.add(ScheduledReadinessCode.SESSION_MISMATCH)
+            categories.add(ScheduledReadinessClassification.BLOCKED)
+    if not inputs.health.disk_watermark_ok:
+        codes.add(ScheduledReadinessCode.DISK_WATERMARK_BLOCKED)
+        categories.add(ScheduledReadinessClassification.BLOCKED)
+    if not inputs.health.audit_ok:
+        codes.add(ScheduledReadinessCode.AUDIT_UNHEALTHY)
+        categories.add(ScheduledReadinessClassification.BLOCKED)
+    if not inputs.health.notification_ok:
+        codes.add(ScheduledReadinessCode.NOTIFICATION_UNAVAILABLE)
+        categories.add(ScheduledReadinessClassification.BLOCKED)
+    if not inputs.health.backup_ok:
+        codes.add(ScheduledReadinessCode.BACKUP_REQUIREMENT_UNMET)
+        categories.add(ScheduledReadinessClassification.BLOCKED)
+    if snapshot.classification in {
+        SnapshotReadinessClassification.CONFLICTING_CAPTURE_RECORDS,
+        SnapshotReadinessClassification.DUPLICATE_ELIGIBLE_CAPTURES,
+        SnapshotReadinessClassification.SELECTION_RECORD_MISMATCH,
+    }:
+        categories.add(ScheduledReadinessClassification.CONFLICTING)
+    elif snapshot.classification in {
+        SnapshotReadinessClassification.CAPTURE_DEADLINE_PASSED,
+        SnapshotReadinessClassification.CAPTURE_ATTEMPTS_EXHAUSTED,
+    }:
+        categories.add(ScheduledReadinessClassification.BLOCKED)
+    elif snapshot.classification is (
+        SnapshotReadinessClassification.VALID_SELECTED_SNAPSHOT
+    ):
+        categories.add(ScheduledReadinessClassification.ALREADY_COMPLETED)
+    elif snapshot.classification in {
+        SnapshotReadinessClassification.NO_ATTEMPTS,
+        SnapshotReadinessClassification.CAPTURE_WINDOW_OPEN,
+    }:
+        codes.discard(ScheduledReadinessCode.SNAPSHOT_NOT_SELECTED)
+    else:
+        categories.add(ScheduledReadinessClassification.NOT_READY)
+    if head is not None:
+        expected_session_id = derive_scheduled_paper_session_id(
+            head.head_record.authority_epoch_id,
+            XNYS_CALENDAR_DESCRIPTOR,
+            inputs.target_session,
+            inputs.execution_session,
+            inputs.capture_policy.symbols,
+            inputs.universe_policy_version,
+            inputs.readiness_policy_version,
+        )
+        if expected_session_id != inputs.scheduled_session_id:
+            codes.add(ScheduledReadinessCode.SCHEDULED_IDENTITY_MISMATCH)
+            categories.add(ScheduledReadinessClassification.CONFLICTING)
+    return ScheduledReadinessResult(
+        _precedence(categories),
+        tuple(code for code in ScheduledReadinessCode if code in codes),
+        inputs.scheduled_session_id,
+        None,
+        snapshot,
+    )
+
+
+def _capture_selection_context_conflicts(
+    inputs: ScheduledReadinessInputs,
+) -> bool:
+    selection = inputs.snapshot_selection
+    snapshot = inputs.selected_snapshot
+    if selection is None:
+        return snapshot is not None
+    head = inputs.authoritative_head
+    if head is None or snapshot is None:
+        return True
+    attempts = tuple(
+        capture_attempt_record_evidence(item) for item in inputs.capture_attempts
+    )
+    selected = next(
+        (
+            item
+            for item in inputs.capture_attempts
+            if item.attempt_id == selection.selected_attempt_id
+        ),
+        None,
+    )
+    return (
+        selection.scheduled_session_id != inputs.scheduled_session_id
+        or selection.head_record != head.head_record
+        or selection.terminal_checkpoint != head.terminal_checkpoint
+        or selection.capture_attempts != attempts
+        or selection.selection_policy_version != inputs.selection_policy_version
+        or selection.chronology_result is not SnapshotChronologyResult.PASS
+        or selected is None
+        or selected.snapshot != snapshot
+        or selection.selected_snapshot != snapshot.artifact
     )
 
 

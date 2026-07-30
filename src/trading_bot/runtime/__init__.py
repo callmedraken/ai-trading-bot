@@ -501,6 +501,50 @@ __all__.extend(
     ]
 )
 
+from trading_bot.runtime.guarded_capture_readiness import (  # noqa: E402,F401
+    CAPTURE_POLICY_ARTIFACT_SCHEMA_VERSION,
+    MARKET_SESSION_HOURS_SCHEDULE_SCHEMA_VERSION,
+    MAX_GUARDED_CAPTURE_READINESS_ARTIFACT_BYTES,
+    SCHEDULED_CAPTURE_READINESS_DECISION_MATERIAL_VERSION,
+    SCHEDULED_CAPTURE_READINESS_DECISION_NAMESPACE,
+    SCHEDULED_CAPTURE_READINESS_DECISION_SCHEMA_VERSION,
+    GuardedCaptureReadinessArtifactError,
+    NextEligibleAction,
+    ScheduledCaptureReadinessDecision,
+    create_scheduled_capture_readiness_decision,
+    derive_scheduled_capture_readiness_decision_id,
+    parse_capture_policy_artifact,
+    parse_market_session_hours_schedule,
+    parse_scheduled_capture_readiness_decision,
+    proposed_capture_attempt_id,
+    serialize_capture_policy_artifact,
+    serialize_market_session_hours_schedule,
+    serialize_scheduled_capture_readiness_decision,
+)
+
+__all__.extend(
+    [
+        "CAPTURE_POLICY_ARTIFACT_SCHEMA_VERSION",
+        "MARKET_SESSION_HOURS_SCHEDULE_SCHEMA_VERSION",
+        "MAX_GUARDED_CAPTURE_READINESS_ARTIFACT_BYTES",
+        "SCHEDULED_CAPTURE_READINESS_DECISION_MATERIAL_VERSION",
+        "SCHEDULED_CAPTURE_READINESS_DECISION_NAMESPACE",
+        "SCHEDULED_CAPTURE_READINESS_DECISION_SCHEMA_VERSION",
+        "GuardedCaptureReadinessArtifactError",
+        "NextEligibleAction",
+        "ScheduledCaptureReadinessDecision",
+        "create_scheduled_capture_readiness_decision",
+        "derive_scheduled_capture_readiness_decision_id",
+        "parse_capture_policy_artifact",
+        "parse_market_session_hours_schedule",
+        "parse_scheduled_capture_readiness_decision",
+        "proposed_capture_attempt_id",
+        "serialize_capture_policy_artifact",
+        "serialize_market_session_hours_schedule",
+        "serialize_scheduled_capture_readiness_decision",
+    ]
+)
+
 from trading_bot.runtime.launch_guard import (  # noqa: E402,F401
     LAUNCH_LEASE_RELEASE_MATERIAL_VERSION,
     LAUNCH_LEASE_RELEASE_NAMESPACE,
@@ -609,6 +653,7 @@ from trading_bot.runtime.scheduled_readiness import (  # noqa: E402,F401
     derive_scheduled_paper_session_id,
     derive_scheduled_snapshot_selection_id,
     derive_scheduler_caller_idempotency_key,
+    evaluate_scheduled_capture_readiness,
     evaluate_scheduled_readiness,
     evaluate_snapshot_readiness,
     parse_scheduled_capture_attempt_record,
@@ -667,6 +712,7 @@ __all__.extend(
         "derive_scheduled_paper_session_id",
         "derive_scheduled_snapshot_selection_id",
         "derive_scheduler_caller_idempotency_key",
+        "evaluate_scheduled_capture_readiness",
         "evaluate_scheduled_readiness",
         "evaluate_snapshot_readiness",
         "parse_scheduled_capture_attempt_record",

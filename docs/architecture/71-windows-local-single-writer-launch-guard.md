@@ -123,8 +123,17 @@ validate explicit inputs and safe root
 → return scoped ownership
 ```
 
-If construction or start publication fails after native acquisition, the code
-immediately attempts `ReleaseMutex` and `CloseHandle` and returns `ERROR`.
+This remains the public request's default order. The separately approved
+guarded capture-readiness runner selects explicit deferred audit-root
+validation so native acquisition occurs before any audit filesystem work. In
+that mode safe-root validation moves immediately after acquisition and before
+lease-start construction/publication. Validation failure attempts
+`ReleaseMutex` and `CloseHandle` and returns `ERROR`; no readiness work is
+authorized.
+
+If validation, construction, or start publication fails after native
+acquisition, the code immediately attempts `ReleaseMutex` and `CloseHandle` and
+returns `ERROR`.
 
 Release order is fixed:
 

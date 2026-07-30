@@ -55,6 +55,7 @@ from trading_bot.runtime import (
     derive_scheduled_paper_session_id,
     derive_scheduled_snapshot_selection_id,
     derive_scheduler_caller_idempotency_key,
+    evaluate_scheduled_capture_readiness,
     evaluate_scheduled_readiness,
     evaluate_snapshot_readiness,
     parse_scheduled_capture_attempt_record,
@@ -262,6 +263,64 @@ def _ready_inputs() -> ScheduledReadinessInputs:
         ScheduledHealthInputs(True, True, True, True, True, False),
         CoordinatorInspectionInput("PENDING", CHECKPOINT_ID, "PENDING"),
     )
+
+
+def test_capture_only_readiness_allows_first_attempt_without_operation_inputs() -> None:
+    inputs = replace(
+        _ready_inputs(),
+        capture_attempts=(),
+        selected_snapshot=None,
+        snapshot_selection=None,
+        cycle=None,
+        coordinator=None,
+    )
+
+    result = evaluate_scheduled_capture_readiness(inputs)
+
+    assert result.classification is ScheduledReadinessClassification.READY
+    assert result.diagnostics == ()
+    assert result.caller_idempotency_key is None
+
+
+def test_capture_only_readiness_maps_time_disable_and_completion() -> None:
+    base = replace(_ready_inputs(), cycle=None, coordinator=None)
+    too_early = replace(
+        base,
+        capture_attempts=(),
+        selected_snapshot=None,
+        snapshot_selection=None,
+        observed_at=datetime(2026, 7, 2, 17, 1, tzinfo=UTC),
+    )
+    disabled = replace(too_early, manual_disable_active=True)
+
+    assert (
+        evaluate_scheduled_capture_readiness(too_early).classification
+        is ScheduledReadinessClassification.NOT_READY
+    )
+    assert (
+        evaluate_scheduled_capture_readiness(disabled).classification
+        is ScheduledReadinessClassification.BLOCKED
+    )
+    assert (
+        evaluate_scheduled_capture_readiness(base).classification
+        is ScheduledReadinessClassification.ALREADY_COMPLETED
+    )
+
+
+def test_capture_only_readiness_rejects_selection_outside_attempt_history() -> None:
+    ready = _ready_inputs()
+    inconsistent = replace(
+        ready,
+        capture_attempts=(),
+        selected_snapshot=None,
+        cycle=None,
+        coordinator=None,
+    )
+
+    result = evaluate_scheduled_capture_readiness(inconsistent)
+
+    assert result.classification is ScheduledReadinessClassification.CONFLICTING
+    assert ScheduledReadinessCode.SNAPSHOT_SELECTION_CONFLICT in result.diagnostics
 
 
 def test_identity_golden_vectors_and_retry_scopes() -> None:

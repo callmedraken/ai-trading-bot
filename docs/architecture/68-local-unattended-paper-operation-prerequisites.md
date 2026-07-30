@@ -45,11 +45,13 @@ after commit. Until that transition is explicitly nominated, verified, and
 published into a new head, the scheduler-selection pointer remains at the prior
 head and no later operation may run.
 
-Milestone 69 implements only this authority prerequisite.
+Milestone 69 implements only this authority prerequisite. Milestone 70 consumes
+its verified immutable evidence without reopening, scanning, or mutating the
+authority root.
 
-## Later deterministic identities
+## Deterministic identities and readiness
 
-Future scheduled identities must use dedicated UUID5 namespaces and versioned,
+Milestone 70 scheduled identities use dedicated UUID5 namespaces and versioned,
 byte-length-framed material. They must bind the intended XNYS session, ordered
 SPY/QQQ universe, provider/config versions, selected authoritative terminal,
 selected snapshot evidence, and exact target/config evidence. Repeated launches
@@ -59,12 +61,16 @@ Human approval attests to an already fixed operation and must not change its
 identity. A material target, configuration, snapshot, or terminal change creates
 a different reviewed operation.
 
-## Later readiness policy
+Milestone 70 remains read-only. It does not approve scheduling or capture and
+does not weaken any later single-writer, credential, retry, alert, backup, or
+human-approval prerequisite.
+
+## Readiness policy
 
 The current market calendar identifies session dates but not official hours or
-early closes. Scheduling therefore requires a separately versioned XNYS
-readiness schedule and explicit publication delay, retry window, lateness, and
-clock-skew policies.
+early closes. Milestone 70 therefore accepts a separately versioned, explicit
+XNYS readiness schedule plus publication delay, retry window, lateness, and
+clock-skew policies. It does not fetch or generate official hours.
 
 Snapshot eligibility must include:
 
@@ -82,7 +88,9 @@ session and chronology, coordinator `PENDING` state, absence of receipts,
 transitions, staging, conflicts, and credentials, and any required human
 approval.
 
-Coordinator `PENDING` alone is not scheduled `READY`.
+Coordinator `PENDING` alone is not scheduled `READY`. The deterministic
+classification precedence is `CONFLICTING`, `MANUAL_REVIEW_REQUIRED`, `BLOCKED`,
+`ALREADY_COMPLETED`, `NOT_READY`, then `READY`.
 
 ## Later single-writer prerequisite
 

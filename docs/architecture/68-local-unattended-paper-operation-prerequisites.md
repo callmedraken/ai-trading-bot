@@ -99,6 +99,13 @@ with immutable lease evidence. The kernel primitive, not a timestamped file or
 directory, is lock authority. An abandoned operation owner requires manual
 review. No lock may be deleted merely because it is old.
 
+Milestone 71 implements that local exclusion boundary with the exact global
+mutex name, bounded acquisition outcomes, immutable start/release evidence, and
+fail-closed abandoned-owner handling. It does not approve scheduling, capture,
+readiness orchestration, paper-operation execution, or head advancement.
+Verified mutex ACL hardening remains explicitly unimplemented; callers that
+require it receive `UNSUPPORTED`.
+
 Milestone 69 assumes one caller already holds exclusive publication authority.
 It contains no lock, lease, PID, timeout, scheduler, or stale-owner logic.
 

@@ -112,6 +112,31 @@ from trading_bot.runtime.exceptions import (  # noqa: F401
     VerifiedSnapshotPaperCycleTemporalError,
     VerifiedSnapshotPaperCycleUniverseError,
 )
+from trading_bot.runtime.local_lineage_head import (  # noqa: F401
+    LOCAL_LINEAGE_HEAD_REFERENCE_SCHEMA_VERSION,
+    MAX_LOCAL_LINEAGE_HEAD_INTEGER,
+    MAX_LOCAL_LINEAGE_HEAD_RECORD_BYTES,
+    MAX_LOCAL_LINEAGE_HEAD_REFERENCE_BYTES,
+    PAPER_ACCOUNT_LINEAGE_HEAD_RECORD_MATERIAL_VERSION,
+    PAPER_ACCOUNT_LINEAGE_HEAD_RECORD_NAMESPACE,
+    PAPER_ACCOUNT_LINEAGE_HEAD_RECORD_SCHEMA_VERSION,
+    LineageHeadAdvancementCauseEvidence,
+    LineageHeadAdvancementCauseKind,
+    LineageHeadRecordReference,
+    LineageHeadTerminalCheckpointEvidence,
+    LineageManifestEvidence,
+    LocalLineageHeadError,
+    LocalLineageHeadReference,
+    LocalLineageHeadSchemaError,
+    LocalLineageHeadSyntaxError,
+    PaperAccountLineageHeadRecord,
+    create_paper_account_lineage_head_record,
+    derive_paper_account_lineage_head_record_id,
+    parse_local_lineage_head_reference,
+    parse_paper_account_lineage_head_record,
+    serialize_local_lineage_head_reference,
+    serialize_paper_account_lineage_head_record,
+)
 from trading_bot.runtime.paper_account_checkpoint import (
     MAX_PAPER_ACCOUNT_CHECKPOINT_BYTES,
     MAX_PAPER_ACCOUNT_CHECKPOINT_DECIMAL_CHARACTERS,
@@ -473,6 +498,34 @@ __all__.extend(
         "serialize_successor_paper_account_checkpoint",
         "verify_checkpointed_paper_cycle_report",
         "verify_checkpointed_paper_cycle_successor_edge",
+    ]
+)
+
+__all__.extend(
+    [
+        "LOCAL_LINEAGE_HEAD_REFERENCE_SCHEMA_VERSION",
+        "MAX_LOCAL_LINEAGE_HEAD_INTEGER",
+        "MAX_LOCAL_LINEAGE_HEAD_RECORD_BYTES",
+        "MAX_LOCAL_LINEAGE_HEAD_REFERENCE_BYTES",
+        "PAPER_ACCOUNT_LINEAGE_HEAD_RECORD_MATERIAL_VERSION",
+        "PAPER_ACCOUNT_LINEAGE_HEAD_RECORD_NAMESPACE",
+        "PAPER_ACCOUNT_LINEAGE_HEAD_RECORD_SCHEMA_VERSION",
+        "LineageHeadAdvancementCauseEvidence",
+        "LineageHeadAdvancementCauseKind",
+        "LineageHeadRecordReference",
+        "LineageHeadTerminalCheckpointEvidence",
+        "LineageManifestEvidence",
+        "LocalLineageHeadError",
+        "LocalLineageHeadReference",
+        "LocalLineageHeadSchemaError",
+        "LocalLineageHeadSyntaxError",
+        "PaperAccountLineageHeadRecord",
+        "create_paper_account_lineage_head_record",
+        "derive_paper_account_lineage_head_record_id",
+        "parse_local_lineage_head_reference",
+        "parse_paper_account_lineage_head_record",
+        "serialize_local_lineage_head_reference",
+        "serialize_paper_account_lineage_head_record",
     ]
 )
 

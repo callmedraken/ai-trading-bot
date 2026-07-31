@@ -18,3 +18,17 @@ The fixed values are `WINDOWS_CREDENTIAL_MANAGER_GENERIC`, `LOCAL_MACHINE`,
 `ALPACA_MARKET_DATA`, and `MARKET_DATA_CAPTURE_ONLY`. The target names are
 versioned and distinct. Actual unattended provider access remains separately
 unapproved.
+
+## Milestone-75 implementation clarification
+
+The isolated one-call capture child is now the sole consumer of this reference.
+It verifies the exact current-process SID before calling a narrow read-only
+`CredReadW` adapter for exactly the two target names. It has no enumeration,
+write, rotation, deletion, environment, file, or command-line fallback.
+Credential values remain child-only and are never available to the parent
+launcher.
+
+This does not change the reference identity or canonical bytes. It also does
+not approve unattended provider use. Python immutable-string zeroization
+cannot be guaranteed; writable native copies are cleared where safely possible
+before `CredFree`, and scoped Python references are dropped after the one call.

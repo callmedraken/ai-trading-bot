@@ -62,3 +62,18 @@ and no-clobber finalization. Pointer replacement uses the approved Windows
 replacement failure retains immutable artifacts and leaves the old pointer
 authoritative. The module assumes the caller already holds the wider launch
 guard; it is intentionally lock-unaware.
+
+## Milestone-75 implementation clarification
+
+The manual isolated child consumes exactly one already-published allocation
+record and its `provider_call_budget=1`. It reconciles that allocation with the
+child request, credential reference, capture configuration, snapshot request,
+target session/date, universe, provider policy, destination, and release
+evidence before credential access.
+
+The new child result and process creation/resume/termination records provide
+the concrete evidence slots anticipated by schema-2 terminal and zero-call
+proof construction. They are not automatically inserted into attempt history,
+selected as a terminal, used to select a snapshot, or interpreted as retry
+authority. A resumed timeout or termination remains ambiguous and is never a
+zero-call proof.

@@ -686,6 +686,7 @@ from trading_bot.runtime.capture_attempt_authority import (  # noqa: E402,F401,I
     CaptureAttemptArtifactSyntaxError,
     CaptureAttemptAuthorityError,
     CaptureAttemptHistoryClassification,
+    CaptureAttemptHistoryFacts,
     CaptureAttemptTerminalClassification,
     CaptureAttemptTerminalRecordV2,
     CaptureRetryClassification,
@@ -727,6 +728,8 @@ from trading_bot.runtime.capture_attempt_authority import (  # noqa: E402,F401,I
     derive_manual_capture_attempt_recovery_id,
     derive_windows_market_data_credential_reference_id,
     derive_zero_provider_call_proof_id,
+    capture_attempt_allocation_path,
+    capture_attempt_session_root,
     initialize_capture_attempt_history,
     parse_attempt_history_head_record,
     parse_capture_attempt_allocation,
@@ -751,6 +754,7 @@ from trading_bot.runtime.capture_attempt_authority import (  # noqa: E402,F401,I
     serialize_windows_market_data_credential_reference,
     serialize_zero_provider_call_proof,
     verify_capture_attempt_history,
+    load_capture_attempt_history_facts,
     verify_zero_provider_call_proof,
 )
 
@@ -779,6 +783,7 @@ __all__.extend(
         "CaptureAttemptArtifactSyntaxError",
         "CaptureAttemptAuthorityError",
         "CaptureAttemptHistoryClassification",
+        "CaptureAttemptHistoryFacts",
         "CaptureAttemptTerminalClassification",
         "CaptureAttemptTerminalRecordV2",
         "CaptureRetryClassification",
@@ -820,6 +825,8 @@ __all__.extend(
         "derive_manual_capture_attempt_recovery_id",
         "derive_windows_market_data_credential_reference_id",
         "derive_zero_provider_call_proof_id",
+        "capture_attempt_allocation_path",
+        "capture_attempt_session_root",
         "initialize_capture_attempt_history",
         "parse_attempt_history_head_record",
         "parse_capture_attempt_allocation",
@@ -844,6 +851,7 @@ __all__.extend(
         "serialize_windows_market_data_credential_reference",
         "serialize_zero_provider_call_proof",
         "verify_capture_attempt_history",
+        "load_capture_attempt_history_facts",
         "verify_zero_provider_call_proof",
     ]
 )

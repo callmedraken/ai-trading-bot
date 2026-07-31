@@ -37,3 +37,10 @@ Thumbs.db
 .coverage
 htmlcov/
 coverage.xml
+# Local generated reports and operational evidence at repository root
+/checkpointed-cycle-*.json
+/historical-experiment-*.json
+/historical-experiment-*.csv
+/optimized-simulation-report*.json
+/paper-account-genesis.json
+/rolling-historical-report*.json

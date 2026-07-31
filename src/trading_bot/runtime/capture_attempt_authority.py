@@ -1547,6 +1547,94 @@ class AttemptHistoryVerificationResult:
     diagnostics: tuple[str, ...]
 
 
+@dataclass(frozen=True, slots=True)
+class CaptureAttemptHistoryFacts:
+    """Pointer-selected allocation and terminal facts in chronological order."""
+
+    verification: AttemptHistoryVerificationResult
+    allocations: tuple[CaptureAttemptAllocationRecord, ...]
+    terminals: tuple[CaptureAttemptTerminalRecordV2, ...]
+
+
+def capture_attempt_session_root(root: Path, scheduled_session_id: UUID) -> Path:
+    """Return the fixed session root without discovering any artifacts."""
+    return _history_session_root(root, scheduled_session_id)
+
+
+def capture_attempt_allocation_path(
+    root: Path,
+    scheduled_session_id: UUID,
+    allocation_record_id: UUID,
+) -> Path:
+    """Resolve one allocation by its explicit immutable identity."""
+    _uuid(allocation_record_id, "allocation_record_id")
+    return (
+        _history_session_root(root, scheduled_session_id)
+        / "allocations"
+        / _allocation_filename(allocation_record_id)
+    )
+
+
+def load_capture_attempt_history_facts(
+    root: Path,
+    scheduled_session_id: UUID,
+) -> CaptureAttemptHistoryFacts:
+    """Read only the pointer-selected history chain and named evidence."""
+    verification = verify_capture_attempt_history(root, scheduled_session_id)
+    if (
+        verification.classification is not CaptureAttemptHistoryClassification.PASS
+        or verification.pointer is None
+        or verification.head is None
+    ):
+        raise CaptureAttemptAuthorityError("capture-attempt history is not verified")
+    session_root = _history_session_root(root, scheduled_session_id)
+    allocations_newest: list[CaptureAttemptAllocationRecord] = []
+    terminals_newest: list[CaptureAttemptTerminalRecordV2] = []
+    allocation_ids: set[UUID] = set()
+    terminal_ids: set[UUID] = set()
+    current = verification.head
+    for _ in range(MAX_CAPTURE_ATTEMPT_ITEMS + 1):
+        if current.latest_allocation is not None:
+            evidence = current.latest_allocation
+            if evidence.artifact_id not in allocation_ids:
+                payload = _safe_read(
+                    session_root
+                    / "allocations"
+                    / _allocation_filename(evidence.artifact_id)
+                )
+                if _artifact_evidence(evidence.artifact_id, payload) != evidence:
+                    raise CaptureAttemptAuthorityError(
+                        "allocation evidence changed during history read"
+                    )
+                allocation = parse_capture_attempt_allocation(payload)
+                if allocation.scheduled_session_id != scheduled_session_id:
+                    raise CaptureAttemptAuthorityError("allocation session mismatch")
+                allocations_newest.append(allocation)
+                allocation_ids.add(evidence.artifact_id)
+        if current.latest_terminal is not None:
+            evidence = current.latest_terminal
+            if evidence.artifact_id not in terminal_ids:
+                terminal = _read_named_terminal(session_root, evidence)
+                if terminal.scheduled_session_id != scheduled_session_id:
+                    raise CaptureAttemptAuthorityError("terminal session mismatch")
+                terminals_newest.append(terminal)
+                terminal_ids.add(evidence.artifact_id)
+        if current.predecessor is None:
+            break
+        current = _read_named_head(session_root, current.predecessor)
+    else:
+        raise CaptureAttemptAuthorityError("history chain exceeds bound")
+    allocations = tuple(reversed(allocations_newest))
+    terminals = tuple(reversed(terminals_newest))
+    if tuple(item.attempt_ordinal for item in allocations) != tuple(
+        range(len(allocations))
+    ):
+        raise CaptureAttemptAuthorityError("attempt ordinals are not contiguous")
+    if len(terminals) > len(allocations):
+        raise CaptureAttemptAuthorityError("terminal history exceeds allocations")
+    return CaptureAttemptHistoryFacts(verification, allocations, terminals)
+
+
 def initialize_capture_attempt_history(
     root: Path,
     scheduled_session_id: UUID,

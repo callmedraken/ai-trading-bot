@@ -306,8 +306,17 @@ class CtypesWindowsCredentialNativeApi:
         self._kernel32.LocalFree.restype = ctypes.c_void_p
         self._kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
         self._kernel32.CloseHandle.restype = wintypes.BOOL
-        self._ntdll.RtlSecureZeroMemory.argtypes = [ctypes.c_void_p, ctypes.c_size_t]
-        self._ntdll.RtlSecureZeroMemory.restype = ctypes.c_void_p
+        # ``RtlSecureZeroMemory`` is a Windows SDK intrinsic and is not
+        # exported by every supported ntdll build.  Use the exported
+        # ``RtlZeroMemory`` entry point when the intrinsic is unavailable so
+        # native credential buffers are still cleared before ``CredFree``.
+        self._zero_memory = getattr(
+            self._ntdll,
+            "RtlSecureZeroMemory",
+            self._ntdll.RtlZeroMemory,
+        )
+        self._zero_memory.argtypes = [ctypes.c_void_p, ctypes.c_size_t]
+        self._zero_memory.restype = ctypes.c_void_p
 
     def current_process_sid(self) -> str:
         token = self._wintypes.HANDLE()
@@ -393,7 +402,7 @@ class CtypesWindowsCredentialNativeApi:
         if entry.released:
             return
         if entry.native_blob_address is not None and entry.blob:
-            self._ntdll.RtlSecureZeroMemory(
+            self._zero_memory(
                 entry.native_blob_address,
                 len(entry.blob),
             )

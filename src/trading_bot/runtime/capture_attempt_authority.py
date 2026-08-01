@@ -67,10 +67,20 @@ CAPTURE_ATTEMPT_ALLOCATION_SCHEMA_VERSION = 1
 CAPTURE_ATTEMPT_ALLOCATION_MATERIAL_VERSION = "capture-attempt-allocation-v1"
 CAPTURE_ATTEMPT_ALLOCATION_NAMESPACE = UUID("f759d6d6-b147-5b82-883a-4a0f1e3b3a1c")
 
-ATTEMPT_HISTORY_HEAD_SCHEMA_VERSION = 1
-ATTEMPT_HISTORY_HEAD_MATERIAL_VERSION = "capture-attempt-history-head-v1"
+ATTEMPT_HISTORY_HEAD_LEGACY_SCHEMA_VERSION = 1
+ATTEMPT_HISTORY_HEAD_SCHEMA_VERSION = 2
+ATTEMPT_HISTORY_HEAD_LEGACY_MATERIAL_VERSION = "capture-attempt-history-head-v1"
+ATTEMPT_HISTORY_HEAD_SCHEMA_2_MATERIAL_VERSION = "capture-attempt-history-head-v2"
+# Retain the historic name as the schema-1 material alias for callers that
+# imported it before schema-2 success heads were introduced.
+ATTEMPT_HISTORY_HEAD_MATERIAL_VERSION = ATTEMPT_HISTORY_HEAD_LEGACY_MATERIAL_VERSION
 ATTEMPT_HISTORY_HEAD_NAMESPACE = UUID("e55f1b39-6f42-58c5-95cb-34f0b3aa9f0c")
 CURRENT_ATTEMPT_HISTORY_REFERENCE_SCHEMA_VERSION = 1
+
+LEGACY_SUCCESS_SELECTED_HISTORY_DIAGNOSTIC = (
+    "LEGACY_SUCCESS_SELECTED_REQUIRES_MIGRATION"
+)
+MANUAL_RECOVERY_SELECTION_POLICY_VERSION = "capture-recovery-selection-v1"
 
 CAPTURE_ATTEMPT_TERMINAL_SCHEMA_VERSION = 2
 CAPTURE_ATTEMPT_TERMINAL_MATERIAL_VERSION = "capture-attempt-terminal-v2"
@@ -104,6 +114,10 @@ class CaptureAttemptAuthorityError(ValueError):
 
 class CaptureAttemptArtifactSyntaxError(CaptureAttemptAuthorityError):
     """Raised when canonical artifact bytes cannot be parsed."""
+
+
+class LegacySuccessSelectedHistoryCompatibilityError(CaptureAttemptAuthorityError):
+    """Raised when schema-1 success lacks schema-2 selection evidence."""
 
 
 class CaptureAttemptHistoryClassification(StrEnum):
@@ -211,6 +225,163 @@ class CaptureRetryClassification(StrEnum):
     BLOCKED = "BLOCKED"
     CONFLICTING = "CONFLICTING"
     MANUAL_REVIEW_REQUIRED = "MANUAL_REVIEW_REQUIRED"
+
+
+_AMBIGUOUS_TERMINAL_CLASSIFICATIONS = frozenset(
+    {
+        CaptureAttemptTerminalClassification.TIMEOUT,
+        CaptureAttemptTerminalClassification.UNKNOWN_AFTER_LAUNCH,
+        CaptureAttemptTerminalClassification.CHILD_CRASHED,
+    }
+)
+_AMBIGUOUS_PROVIDER_CALL_DISPOSITIONS = frozenset(
+    {
+        ProviderCallDisposition.MAY_HAVE_STARTED,
+        ProviderCallDisposition.UNKNOWN,
+    }
+)
+
+_HISTORY_TRANSITIONS = {
+    AttemptHistoryState.EMPTY: frozenset(
+        {(AttemptHistoryState.ALLOCATED_NOT_LAUNCHED, AttemptHistoryCause.ALLOCATION)}
+    ),
+    AttemptHistoryState.ALLOCATED_NOT_LAUNCHED: frozenset(
+        {
+            (
+                AttemptHistoryState.ALLOCATED_NOT_LAUNCHED,
+                AttemptHistoryCause.MANUAL_RECOVERY,
+            ),
+            (
+                AttemptHistoryState.LAUNCH_MAY_HAVE_OCCURRED,
+                AttemptHistoryCause.TERMINAL,
+            ),
+            (AttemptHistoryState.TERMINAL_SELECTED, AttemptHistoryCause.TERMINAL),
+            (AttemptHistoryState.SESSION_CLOSED, AttemptHistoryCause.MANUAL_RECOVERY),
+        }
+    ),
+    AttemptHistoryState.LAUNCH_MAY_HAVE_OCCURRED: frozenset(
+        {
+            (
+                AttemptHistoryState.RECOVERY_REQUIRED,
+                AttemptHistoryCause.MANUAL_RECOVERY,
+            ),
+            (AttemptHistoryState.SESSION_CLOSED, AttemptHistoryCause.MANUAL_RECOVERY),
+        }
+    ),
+    AttemptHistoryState.TERMINAL_SELECTED: frozenset(
+        {
+            (
+                AttemptHistoryState.ALLOCATED_NOT_LAUNCHED,
+                AttemptHistoryCause.ALLOCATION,
+            ),
+            (
+                AttemptHistoryState.TERMINAL_SELECTED,
+                AttemptHistoryCause.MANUAL_RECOVERY,
+            ),
+            (
+                AttemptHistoryState.SUCCESS_SELECTED,
+                AttemptHistoryCause.TERMINAL_SELECTION,
+            ),
+            (
+                AttemptHistoryState.SUCCESS_SELECTED,
+                AttemptHistoryCause.MANUAL_RECOVERY,
+            ),
+            (AttemptHistoryState.SESSION_CLOSED, AttemptHistoryCause.MANUAL_RECOVERY),
+        }
+    ),
+    AttemptHistoryState.RECOVERY_REQUIRED: frozenset(
+        {
+            (
+                AttemptHistoryState.RECOVERY_REQUIRED,
+                AttemptHistoryCause.MANUAL_RECOVERY,
+            ),
+            (AttemptHistoryState.SESSION_CLOSED, AttemptHistoryCause.MANUAL_RECOVERY),
+        }
+    ),
+    AttemptHistoryState.SUCCESS_SELECTED: frozenset(),
+    AttemptHistoryState.SESSION_CLOSED: frozenset(),
+}
+
+_RECOVERY_TRANSITIONS = {
+    (
+        ManualCaptureAttemptRecoveryAction.CONTINUE_ALLOCATED_ATTEMPT_WITH_ZERO_CALL_PROOF
+    ): {
+        (
+            AttemptHistoryState.ALLOCATED_NOT_LAUNCHED,
+            AttemptHistoryState.ALLOCATED_NOT_LAUNCHED,
+        )
+    },
+    ManualCaptureAttemptRecoveryAction.SELECT_EXISTING_TERMINAL: {
+        (
+            AttemptHistoryState.TERMINAL_SELECTED,
+            AttemptHistoryState.TERMINAL_SELECTED,
+        )
+    },
+    ManualCaptureAttemptRecoveryAction.RECOVER_COMMITTED_SNAPSHOT_AS_SUCCESS: {
+        (AttemptHistoryState.TERMINAL_SELECTED, AttemptHistoryState.SUCCESS_SELECTED),
+    },
+    (
+        ManualCaptureAttemptRecoveryAction.MARK_ATTEMPT_AMBIGUOUS_AND_REQUIRE_NEW_REVIEW
+    ): {
+        (
+            AttemptHistoryState.LAUNCH_MAY_HAVE_OCCURRED,
+            AttemptHistoryState.RECOVERY_REQUIRED,
+        ),
+        (AttemptHistoryState.RECOVERY_REQUIRED, AttemptHistoryState.RECOVERY_REQUIRED),
+    },
+    ManualCaptureAttemptRecoveryAction.CLOSE_SESSION_WITHOUT_CAPTURE: {
+        (
+            AttemptHistoryState.ALLOCATED_NOT_LAUNCHED,
+            AttemptHistoryState.SESSION_CLOSED,
+        ),
+        (
+            AttemptHistoryState.LAUNCH_MAY_HAVE_OCCURRED,
+            AttemptHistoryState.SESSION_CLOSED,
+        ),
+        (AttemptHistoryState.TERMINAL_SELECTED, AttemptHistoryState.SESSION_CLOSED),
+        (AttemptHistoryState.RECOVERY_REQUIRED, AttemptHistoryState.SESSION_CLOSED),
+    },
+}
+_RECOVER_COMMITTED_SNAPSHOT_ACTION = (
+    ManualCaptureAttemptRecoveryAction.RECOVER_COMMITTED_SNAPSHOT_AS_SUCCESS
+)
+_CONTINUE_ZERO_CALL_ACTION = (
+    ManualCaptureAttemptRecoveryAction.CONTINUE_ALLOCATED_ATTEMPT_WITH_ZERO_CALL_PROOF
+)
+_AMBIGUOUS_REVIEW_ACTION = (
+    ManualCaptureAttemptRecoveryAction.MARK_ATTEMPT_AMBIGUOUS_AND_REQUIRE_NEW_REVIEW
+)
+_CLOSE_SESSION_ACTION = ManualCaptureAttemptRecoveryAction.CLOSE_SESSION_WITHOUT_CAPTURE
+
+
+def is_capture_terminal_ambiguous(
+    classification: CaptureAttemptTerminalClassification | None,
+    provider_call_disposition: ProviderCallDisposition | None,
+) -> bool:
+    """Return the single fail-closed policy classification for a terminal."""
+    if classification is None or provider_call_disposition is None:
+        return True
+    if type(classification) is not CaptureAttemptTerminalClassification:
+        raise TypeError("classification must be CaptureAttemptTerminalClassification")
+    if type(provider_call_disposition) is not ProviderCallDisposition:
+        raise TypeError("provider_call_disposition must be ProviderCallDisposition")
+    return (
+        classification in _AMBIGUOUS_TERMINAL_CLASSIFICATIONS
+        or provider_call_disposition in _AMBIGUOUS_PROVIDER_CALL_DISPOSITIONS
+    )
+
+
+def _validate_history_transition(
+    predecessor: AttemptHistoryHeadRecord,
+    current: AttemptHistoryHeadRecord,
+) -> None:
+    if (
+        current.state,
+        current.advancement_cause,
+    ) not in _HISTORY_TRANSITIONS[predecessor.state]:
+        raise CaptureAttemptAuthorityError(
+            "history state and advancement cause transition is impossible"
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -643,14 +814,20 @@ class AttemptHistoryHeadRecord:
     latest_terminal: ArtifactEvidence | None
     latest_zero_call_proof: ArtifactEvidence | None
     latest_recovery: ArtifactEvidence | None
+    latest_selection: ArtifactEvidence | None
     state: AttemptHistoryState
     next_attempt_ordinal: int
     advancement_cause: AttemptHistoryCause
     policy_version: str
 
     def __post_init__(self) -> None:
-        if self.schema_version != ATTEMPT_HISTORY_HEAD_SCHEMA_VERSION:
-            raise CaptureAttemptAuthorityError("history-head schema_version must be 1")
+        if self.schema_version not in {
+            ATTEMPT_HISTORY_HEAD_LEGACY_SCHEMA_VERSION,
+            ATTEMPT_HISTORY_HEAD_SCHEMA_VERSION,
+        }:
+            raise CaptureAttemptAuthorityError(
+                "history-head schema_version is unsupported"
+            )
         _uuid(self.history_head_record_id, "history_head_record_id")
         _uuid(self.scheduled_session_id, "scheduled_session_id")
         _uuid(self.authority_epoch_id, "authority_epoch_id")
@@ -661,6 +838,7 @@ class AttemptHistoryHeadRecord:
             (self.latest_terminal, "latest_terminal"),
             (self.latest_zero_call_proof, "latest_zero_call_proof"),
             (self.latest_recovery, "latest_recovery"),
+            (self.latest_selection, "latest_selection"),
         ):
             if value is not None and type(value) is not ArtifactEvidence:
                 raise CaptureAttemptAuthorityError(f"{label} evidence is invalid")
@@ -681,6 +859,7 @@ class AttemptHistoryHeadRecord:
                         self.latest_terminal,
                         self.latest_zero_call_proof,
                         self.latest_recovery,
+                        self.latest_selection,
                     )
                 )
                 or self.state is not AttemptHistoryState.EMPTY
@@ -725,6 +904,66 @@ class AttemptHistoryHeadRecord:
             raise CaptureAttemptAuthorityError(
                 "terminal-selected state requires terminal evidence"
             )
+        valid_causes = {
+            AttemptHistoryState.EMPTY: {AttemptHistoryCause.GENESIS},
+            AttemptHistoryState.ALLOCATED_NOT_LAUNCHED: {
+                AttemptHistoryCause.ALLOCATION,
+                AttemptHistoryCause.MANUAL_RECOVERY,
+            },
+            AttemptHistoryState.LAUNCH_MAY_HAVE_OCCURRED: {
+                AttemptHistoryCause.TERMINAL,
+            },
+            AttemptHistoryState.TERMINAL_SELECTED: {
+                AttemptHistoryCause.TERMINAL,
+                AttemptHistoryCause.MANUAL_RECOVERY,
+            },
+            AttemptHistoryState.RECOVERY_REQUIRED: {
+                AttemptHistoryCause.MANUAL_RECOVERY,
+            },
+            AttemptHistoryState.SUCCESS_SELECTED: {
+                AttemptHistoryCause.TERMINAL_SELECTION,
+                AttemptHistoryCause.MANUAL_RECOVERY,
+            },
+            AttemptHistoryState.SESSION_CLOSED: {
+                AttemptHistoryCause.MANUAL_RECOVERY,
+            },
+        }
+        if self.advancement_cause not in valid_causes[self.state]:
+            raise CaptureAttemptAuthorityError(
+                "history state and advancement cause are incompatible"
+            )
+        if self.state is AttemptHistoryState.SUCCESS_SELECTED:
+            if self.schema_version == ATTEMPT_HISTORY_HEAD_SCHEMA_VERSION:
+                if self.latest_selection is None:
+                    raise CaptureAttemptAuthorityError(
+                        "successful state requires schema-2 selection evidence"
+                    )
+            elif self.latest_selection is not None:
+                raise CaptureAttemptAuthorityError(
+                    "legacy history head cannot contain selection evidence"
+                )
+        elif self.latest_selection is not None:
+            raise CaptureAttemptAuthorityError(
+                "selection evidence requires successful state"
+            )
+        elif self.schema_version == ATTEMPT_HISTORY_HEAD_SCHEMA_VERSION:
+            raise CaptureAttemptAuthorityError(
+                "schema-2 history head requires successful state"
+            )
+        if (
+            self.schema_version == ATTEMPT_HISTORY_HEAD_LEGACY_SCHEMA_VERSION
+            and self.latest_selection is not None
+        ):
+            raise CaptureAttemptAuthorityError(
+                "legacy history head cannot contain selection evidence"
+            )
+        if (
+            self.latest_recovery is not None
+            and self.advancement_cause is not AttemptHistoryCause.MANUAL_RECOVERY
+        ):
+            raise CaptureAttemptAuthorityError(
+                "recovery evidence requires manual recovery cause"
+            )
         if (
             self.state is AttemptHistoryState.RECOVERY_REQUIRED
             and self.latest_recovery is None
@@ -742,8 +981,13 @@ class AttemptHistoryHeadRecord:
 def derive_attempt_history_head_id(record: AttemptHistoryHeadRecord) -> UUID:
     if type(record) is not AttemptHistoryHeadRecord:
         raise TypeError("record must be AttemptHistoryHeadRecord")
+    material_version = (
+        ATTEMPT_HISTORY_HEAD_LEGACY_MATERIAL_VERSION
+        if record.schema_version == ATTEMPT_HISTORY_HEAD_LEGACY_SCHEMA_VERSION
+        else ATTEMPT_HISTORY_HEAD_SCHEMA_2_MATERIAL_VERSION
+    )
     parts = [
-        ATTEMPT_HISTORY_HEAD_MATERIAL_VERSION,
+        material_version,
         str(record.scheduled_session_id),
         str(record.authority_epoch_id),
         str(record.generation),
@@ -757,6 +1001,11 @@ def derive_attempt_history_head_id(record: AttemptHistoryHeadRecord) -> UUID:
         record.latest_zero_call_proof,
         record.latest_recovery,
     ):
+        parts.append("NONE" if value is None else "PRESENT")
+        if value is not None:
+            parts.extend(_evidence_parts(value))
+    if record.schema_version != ATTEMPT_HISTORY_HEAD_LEGACY_SCHEMA_VERSION:
+        value = record.latest_selection
         parts.append("NONE" if value is None else "PRESENT")
         if value is not None:
             parts.extend(_evidence_parts(value))
@@ -1241,6 +1490,8 @@ class ManualCaptureAttemptRecoveryRecord:
                 self.zero_call_proof is None
                 or self.resulting_state
                 is not AttemptHistoryState.ALLOCATED_NOT_LAUNCHED
+                or self.terminal is not None
+                or self.snapshot_candidate is not None
             ):
                 raise CaptureAttemptAuthorityError(
                     "continuation requires zero-call proof"
@@ -1250,6 +1501,8 @@ class ManualCaptureAttemptRecoveryRecord:
             and (
                 self.terminal is None
                 or self.resulting_state is not AttemptHistoryState.TERMINAL_SELECTED
+                or self.zero_call_proof is not None
+                or self.snapshot_candidate is not None
             )
         ):
             raise CaptureAttemptAuthorityError(
@@ -1261,6 +1514,8 @@ class ManualCaptureAttemptRecoveryRecord:
             and (
                 self.snapshot_candidate is None
                 or self.resulting_state is not AttemptHistoryState.SUCCESS_SELECTED
+                or self.terminal is None
+                or self.zero_call_proof is not None
             )
         ):
             raise CaptureAttemptAuthorityError(
@@ -1274,10 +1529,27 @@ class ManualCaptureAttemptRecoveryRecord:
             and self.resulting_state is not AttemptHistoryState.RECOVERY_REQUIRED
         ):
             raise CaptureAttemptAuthorityError("ambiguous recovery must require review")
+        if self.action is ambiguous_action and any(
+            value is not None
+            for value in (self.zero_call_proof, self.terminal, self.snapshot_candidate)
+        ):
+            raise CaptureAttemptAuthorityError(
+                "ambiguous recovery cannot carry terminal evidence"
+            )
         if (
             self.action
             is ManualCaptureAttemptRecoveryAction.CLOSE_SESSION_WITHOUT_CAPTURE
-            and self.resulting_state is not AttemptHistoryState.SESSION_CLOSED
+            and (
+                self.resulting_state is not AttemptHistoryState.SESSION_CLOSED
+                or any(
+                    value is not None
+                    for value in (
+                        self.zero_call_proof,
+                        self.terminal,
+                        self.snapshot_candidate,
+                    )
+                )
+            )
         ):
             raise CaptureAttemptAuthorityError(
                 "close-session recovery must close the session"
@@ -1510,14 +1782,13 @@ def classify_capture_retry_policy(
             CaptureRetryClassification.MANUAL_REVIEW_REQUIRED,
             "AUTHENTICATION_REQUIRES_CREDENTIAL_ROTATION",
         )
-    if inputs.terminal_classification in {
-        CaptureAttemptTerminalClassification.TIMEOUT,
-        CaptureAttemptTerminalClassification.UNKNOWN_AFTER_LAUNCH,
-        CaptureAttemptTerminalClassification.CHILD_CRASHED,
-    } or inputs.provider_call_disposition in {
-        ProviderCallDisposition.MAY_HAVE_STARTED,
-        ProviderCallDisposition.UNKNOWN,
-    }:
+    if (
+        inputs.terminal_classification is not None
+        or inputs.provider_call_disposition is not None
+    ) and is_capture_terminal_ambiguous(
+        inputs.terminal_classification,
+        inputs.provider_call_disposition,
+    ):
         return CaptureRetryPolicyDecision(
             CaptureRetryClassification.MANUAL_REVIEW_REQUIRED, "AMBIGUOUS_PROVIDER_CALL"
         )
@@ -1581,6 +1852,10 @@ def load_capture_attempt_history_facts(
 ) -> CaptureAttemptHistoryFacts:
     """Read only the pointer-selected history chain and named evidence."""
     verification = verify_capture_attempt_history(root, scheduled_session_id)
+    if verification.diagnostics == (LEGACY_SUCCESS_SELECTED_HISTORY_DIAGNOSTIC,):
+        raise LegacySuccessSelectedHistoryCompatibilityError(
+            LEGACY_SUCCESS_SELECTED_HISTORY_DIAGNOSTIC
+        )
     if (
         verification.classification is not CaptureAttemptHistoryClassification.PASS
         or verification.pointer is None
@@ -1661,11 +1936,12 @@ def initialize_capture_attempt_history(
             )
         return result.head
     genesis = _build_history_head(
-        ATTEMPT_HISTORY_HEAD_SCHEMA_VERSION,
+        ATTEMPT_HISTORY_HEAD_LEGACY_SCHEMA_VERSION,
         UUID(int=0),
         scheduled_session_id,
         authority_epoch_id,
         0,
+        None,
         None,
         None,
         None,
@@ -1722,14 +1998,19 @@ def verify_capture_attempt_history(
             if current.history_head_record_id in seen:
                 raise CaptureAttemptAuthorityError("history predecessor cycle")
             seen.add(current.history_head_record_id)
-            _verify_selected_state_artifacts(session_root, current)
             if current.predecessor is None:
+                _verify_selected_state_artifacts(session_root, current)
                 if current.generation != 0:
                     raise CaptureAttemptAuthorityError(
                         "history generation does not reach genesis"
                     )
                 break
-            predecessor = _read_named_head(session_root, current.predecessor)
+            try:
+                predecessor = _read_named_head(session_root, current.predecessor)
+            except LegacySuccessSelectedHistoryCompatibilityError:
+                raise CaptureAttemptAuthorityError(
+                    "legacy successful history cannot have an outgoing transition"
+                ) from None
             if (
                 predecessor.generation + 1 != current.generation
                 or predecessor.scheduled_session_id != current.scheduled_session_id
@@ -1738,6 +2019,7 @@ def verify_capture_attempt_history(
                 raise CaptureAttemptAuthorityError(
                     "history predecessor generation or authority mismatch"
                 )
+            _verify_history_transition_candidate(session_root, predecessor, current)
             if current.next_attempt_ordinal < predecessor.next_attempt_ordinal:
                 raise CaptureAttemptAuthorityError("history ordinal regressed")
             current = predecessor
@@ -1745,6 +2027,13 @@ def verify_capture_attempt_history(
             raise CaptureAttemptAuthorityError("history chain exceeds bound")
         return AttemptHistoryVerificationResult(
             CaptureAttemptHistoryClassification.PASS, pointer, head, ()
+        )
+    except LegacySuccessSelectedHistoryCompatibilityError:
+        return AttemptHistoryVerificationResult(
+            CaptureAttemptHistoryClassification.MANUAL_REVIEW_REQUIRED,
+            None,
+            None,
+            (LEGACY_SUCCESS_SELECTED_HISTORY_DIAGNOSTIC,),
         )
     except FileNotFoundError:
         return AttemptHistoryVerificationResult(
@@ -1786,6 +2075,11 @@ def allocate_capture_attempt(
         raise CaptureAttemptAuthorityError(
             "allocation does not extend current attempt history"
         )
+    if result.head.state in {
+        AttemptHistoryState.SUCCESS_SELECTED,
+        AttemptHistoryState.SESSION_CLOSED,
+    }:
+        raise CaptureAttemptAuthorityError("completed history is absorbing")
     if result.head.state not in {
         AttemptHistoryState.EMPTY,
         AttemptHistoryState.TERMINAL_SELECTED,
@@ -1793,6 +2087,19 @@ def allocate_capture_attempt(
         raise CaptureAttemptAuthorityError(
             "allocation is not permitted from current history state"
         )
+    if result.head.state is AttemptHistoryState.TERMINAL_SELECTED:
+        if result.head.latest_terminal is None:
+            raise CaptureAttemptAuthorityError(
+                "terminal-selected history has no terminal evidence"
+            )
+        terminal = _read_named_terminal(
+            _history_session_root(root, allocation.scheduled_session_id),
+            result.head.latest_terminal,
+        )
+        if terminal.classification is CaptureAttemptTerminalClassification.SUCCEEDED:
+            raise CaptureAttemptAuthorityError(
+                "successful terminal must be selected before another allocation"
+            )
     allocation_payload = serialize_capture_attempt_allocation(allocation)
     allocation_evidence = _artifact_evidence(
         allocation.allocation_record_id, allocation_payload
@@ -1805,7 +2112,7 @@ def allocate_capture_attempt(
         parse_capture_attempt_allocation,
     )
     new_head = _build_history_head(
-        ATTEMPT_HISTORY_HEAD_SCHEMA_VERSION,
+        ATTEMPT_HISTORY_HEAD_LEGACY_SCHEMA_VERSION,
         UUID(int=0),
         allocation.scheduled_session_id,
         allocation.authority_epoch_id,
@@ -1815,11 +2122,13 @@ def allocate_capture_attempt(
         None,
         None,
         None,
+        None,
         AttemptHistoryState.ALLOCATED_NOT_LAUNCHED,
         result.head.next_attempt_ordinal + 1,
         AttemptHistoryCause.ALLOCATION,
         allocation.allocation_policy_version,
     )
+    _verify_history_transition_candidate(session_root, result.head, new_head)
     head_payload = serialize_attempt_history_head_record(new_head)
     head_evidence = _artifact_evidence(new_head.history_head_record_id, head_payload)
     _publish_immutable(
@@ -1900,20 +2209,18 @@ def publish_capture_attempt_terminal(
         parse_capture_attempt_terminal_v2,
     )
     # An ambiguous terminal is a fact that requires review, but it is not
-    # itself a manual recovery record.  Keep the history in the explicit
+    # itself a manual recovery record. Keep the history in the explicit
     # launch-may-have-occurred state until an operator publishes recovery
     # evidence; RECOVERY_REQUIRED requires that immutable recovery artifact.
     new_state = (
         AttemptHistoryState.LAUNCH_MAY_HAVE_OCCURRED
-        if terminal.classification
-        in {
-            CaptureAttemptTerminalClassification.UNKNOWN_AFTER_LAUNCH,
-            CaptureAttemptTerminalClassification.TIMEOUT,
-        }
+        if is_capture_terminal_ambiguous(
+            terminal.classification, terminal.provider_call_disposition
+        )
         else AttemptHistoryState.TERMINAL_SELECTED
     )
     new_head = _build_history_head(
-        1,
+        ATTEMPT_HISTORY_HEAD_LEGACY_SCHEMA_VERSION,
         UUID(int=0),
         terminal.scheduled_session_id,
         result.pointer.authority_epoch_id,
@@ -1923,11 +2230,13 @@ def publish_capture_attempt_terminal(
         evidence,
         None,
         None,
+        None,
         new_state,
         result.head.next_attempt_ordinal,
         AttemptHistoryCause.TERMINAL,
         terminal.terminal_policy_version,
     )
+    _verify_history_transition_candidate(session_root, result.head, new_head)
     head_payload = serialize_attempt_history_head_record(new_head)
     head_evidence = _artifact_evidence(new_head.history_head_record_id, head_payload)
     _publish_immutable(
@@ -1989,6 +2298,7 @@ def select_capture_attempt_terminal(
         result.classification is not CaptureAttemptHistoryClassification.PASS
         or result.pointer is None
         or result.head is None
+        or result.head.state is not AttemptHistoryState.TERMINAL_SELECTED
         or result.head.latest_terminal is None
         or result.head.latest_allocation is None
     ):
@@ -2021,8 +2331,11 @@ def select_capture_attempt_terminal(
         selection_payload,
         parse_capture_terminal_selection,
     )
+    selection_evidence = _artifact_evidence(
+        selection.selection_record_id, selection_payload
+    )
     new_head = _build_history_head(
-        1,
+        ATTEMPT_HISTORY_HEAD_SCHEMA_VERSION,
         UUID(int=0),
         scheduled_session_id,
         result.pointer.authority_epoch_id,
@@ -2032,11 +2345,13 @@ def select_capture_attempt_terminal(
         result.head.latest_terminal,
         None,
         None,
+        selection_evidence,
         AttemptHistoryState.SUCCESS_SELECTED,
         result.head.next_attempt_ordinal,
         AttemptHistoryCause.TERMINAL_SELECTION,
         selection_policy_version,
     )
+    _verify_history_transition_candidate(session_root, result.head, new_head)
     head_payload = serialize_attempt_history_head_record(new_head)
     head_evidence = _artifact_evidence(new_head.history_head_record_id, head_payload)
     _publish_immutable(
@@ -2090,6 +2405,12 @@ def apply_capture_attempt_recovery(
         raise CaptureAttemptAuthorityError(
             "recovery is not bound to current head and allocation"
         )
+    if (result.head.state, recovery.resulting_state) not in _RECOVERY_TRANSITIONS[
+        recovery.action
+    ]:
+        raise CaptureAttemptAuthorityError(
+            "recovery action is not permitted from current history state"
+        )
     if (
         recovery.resulting_state is AttemptHistoryState.SUCCESS_SELECTED
         and result.head.latest_terminal is None
@@ -2105,6 +2426,7 @@ def apply_capture_attempt_recovery(
             "terminal recovery evidence is not the current terminal"
         )
     session_root = _history_session_root(root, allocation_session)
+    terminal: CaptureAttemptTerminalRecordV2 | None = None
     if recovery.action in {
         ManualCaptureAttemptRecoveryAction.SELECT_EXISTING_TERMINAL,
         ManualCaptureAttemptRecoveryAction.RECOVER_COMMITTED_SNAPSHOT_AS_SUCCESS,
@@ -2114,15 +2436,7 @@ def apply_capture_attempt_recovery(
                 "terminal recovery requires the current terminal"
             )
         terminal = _read_named_terminal(session_root, result.head.latest_terminal)
-        if (
-            terminal.classification
-            is not CaptureAttemptTerminalClassification.SUCCEEDED
-            or terminal.snapshot is None
-            or terminal.snapshot_verification is not SnapshotTerminalVerification.PASS
-        ):
-            raise CaptureAttemptAuthorityError(
-                "terminal recovery requires a verified successful terminal"
-            )
+        _require_verified_success_terminal(terminal)
         if (
             recovery.action
             is ManualCaptureAttemptRecoveryAction.RECOVER_COMMITTED_SNAPSHOT_AS_SUCCESS
@@ -2132,18 +2446,14 @@ def apply_capture_attempt_recovery(
                 "snapshot candidate is not the committed terminal snapshot"
             )
     if recovery.zero_call_proof is not None:
-        proof_payload = _safe_read(
-            session_root
-            / "zero-call-proofs"
-            / _proof_filename(recovery.zero_call_proof.artifact_id)
-        )
+        proof = _read_named_zero_call_proof(session_root, recovery.zero_call_proof)
+        allocation = _read_named_allocation(session_root, recovery.allocation)
         if (
-            _artifact_evidence(recovery.zero_call_proof.artifact_id, proof_payload)
-            != recovery.zero_call_proof
+            proof.allocation != recovery.allocation
+            or proof.attempt_id != allocation.attempt_id
+            or proof.scheduled_session_id != allocation.scheduled_session_id
+            or proof.scheduled_launch_id != allocation.scheduled_launch_id
         ):
-            raise CaptureAttemptAuthorityError("recovery zero-call evidence mismatch")
-        proof = parse_zero_provider_call_proof(proof_payload)
-        if proof.allocation != recovery.allocation:
             raise CaptureAttemptAuthorityError(
                 "recovery zero-call proof does not bind allocation"
             )
@@ -2155,8 +2465,45 @@ def apply_capture_attempt_recovery(
         payload,
         parse_manual_capture_attempt_recovery,
     )
+    selection_evidence = (
+        result.head.latest_selection
+        if recovery.resulting_state is AttemptHistoryState.SUCCESS_SELECTED
+        else None
+    )
+    if recovery.resulting_state is AttemptHistoryState.SUCCESS_SELECTED:
+        if terminal is None or terminal.snapshot is None:
+            raise CaptureAttemptAuthorityError(
+                "successful recovery has no verified terminal snapshot"
+            )
+        selection = _build_selection(
+            CAPTURE_TERMINAL_SELECTION_SCHEMA_VERSION,
+            UUID(int=0),
+            allocation_session,
+            result.head.latest_allocation,
+            result.head.latest_terminal,
+            terminal.snapshot,
+            MANUAL_RECOVERY_SELECTION_POLICY_VERSION,
+            "SUCCESS_SELECTED",
+        )
+        selection_payload = serialize_capture_terminal_selection(selection)
+        _publish_immutable(
+            session_root / "terminals",
+            _selection_filename(selection.selection_record_id),
+            selection_payload,
+            parse_capture_terminal_selection,
+        )
+        selection_evidence = _artifact_evidence(
+            selection.selection_record_id, selection_payload
+        )
+    zero_call_proof = (
+        recovery.zero_call_proof
+        if recovery.action is _CONTINUE_ZERO_CALL_ACTION
+        else result.head.latest_zero_call_proof
+    )
     new_head = _build_history_head(
-        ATTEMPT_HISTORY_HEAD_SCHEMA_VERSION,
+        ATTEMPT_HISTORY_HEAD_SCHEMA_VERSION
+        if recovery.resulting_state is AttemptHistoryState.SUCCESS_SELECTED
+        else ATTEMPT_HISTORY_HEAD_LEGACY_SCHEMA_VERSION,
         UUID(int=0),
         allocation_session,
         result.pointer.authority_epoch_id,
@@ -2164,13 +2511,15 @@ def apply_capture_attempt_recovery(
         result.pointer.head_record,
         result.head.latest_allocation,
         result.head.latest_terminal,
-        recovery.zero_call_proof,
+        zero_call_proof,
         evidence,
+        selection_evidence,
         recovery.resulting_state,
         result.head.next_attempt_ordinal,
         AttemptHistoryCause.MANUAL_RECOVERY,
         recovery.recovery_policy_version,
     )
+    _verify_history_transition_candidate(session_root, result.head, new_head)
     head_payload = serialize_attempt_history_head_record(new_head)
     head_evidence = _artifact_evidence(new_head.history_head_record_id, head_payload)
     _publish_immutable(
@@ -2364,9 +2713,19 @@ def serialize_attempt_history_head_record(record: AttemptHistoryHeadRecord) -> b
 
 
 def parse_attempt_history_head_record(payload: bytes) -> AttemptHistoryHeadRecord:
-    root = _object(_load_json(payload), _HEAD_FIELDS, "history head")
+    root_value = _load_json(payload)
+    if type(root_value) is not dict:
+        raise CaptureAttemptAuthorityError("history head fields are invalid")
+    schema_version = _integer(root_value.get("schema_version"), "schema_version")
+    if schema_version == ATTEMPT_HISTORY_HEAD_SCHEMA_VERSION:
+        fields = _HEAD_FIELDS
+    elif schema_version == ATTEMPT_HISTORY_HEAD_LEGACY_SCHEMA_VERSION:
+        fields = _LEGACY_HEAD_FIELDS
+    else:
+        raise CaptureAttemptAuthorityError("history-head schema_version is unsupported")
+    root = _object(root_value, fields, "history head")
     record = AttemptHistoryHeadRecord(
-        _integer(root["schema_version"], "schema_version"),
+        schema_version,
         _uuid_value(root["history_head_record_id"], "history_head_record_id"),
         _uuid_value(root["scheduled_session_id"], "scheduled_session_id"),
         _uuid_value(root["authority_epoch_id"], "authority_epoch_id"),
@@ -2376,6 +2735,9 @@ def parse_attempt_history_head_record(payload: bytes) -> AttemptHistoryHeadRecor
         _nullable_artifact(root["latest_terminal"], "latest_terminal"),
         _nullable_artifact(root["latest_zero_call_proof"], "latest_zero_call_proof"),
         _nullable_artifact(root["latest_recovery"], "latest_recovery"),
+        None
+        if schema_version == ATTEMPT_HISTORY_HEAD_LEGACY_SCHEMA_VERSION
+        else _nullable_artifact(root["latest_selection"], "latest_selection"),
         _enum(AttemptHistoryState, root["state"], "state"),
         _nonnegative_value(root["next_attempt_ordinal"], "next_attempt_ordinal"),
         _enum(AttemptHistoryCause, root["advancement_cause"], "advancement_cause"),
@@ -2383,6 +2745,13 @@ def parse_attempt_history_head_record(payload: bytes) -> AttemptHistoryHeadRecor
     )
     if serialize_attempt_history_head_record(record) != payload:
         raise CaptureAttemptArtifactSyntaxError("history head bytes are not canonical")
+    if (
+        schema_version == ATTEMPT_HISTORY_HEAD_LEGACY_SCHEMA_VERSION
+        and record.state is AttemptHistoryState.SUCCESS_SELECTED
+    ):
+        raise LegacySuccessSelectedHistoryCompatibilityError(
+            LEGACY_SUCCESS_SELECTED_HISTORY_DIAGNOSTIC
+        )
     return record
 
 
@@ -2637,11 +3006,13 @@ _HEAD_FIELDS = {
     "latest_terminal",
     "latest_zero_call_proof",
     "latest_recovery",
+    "latest_selection",
     "state",
     "next_attempt_ordinal",
     "advancement_cause",
     "policy_version",
 }
+_LEGACY_HEAD_FIELDS = _HEAD_FIELDS - {"latest_selection"}
 _POINTER_FIELDS = {
     "schema_version",
     "scheduled_session_id",
@@ -2781,7 +3152,7 @@ def _allocation_tree(record: CaptureAttemptAllocationRecord) -> dict[str, object
 
 
 def _history_head_tree(record: AttemptHistoryHeadRecord) -> dict[str, object]:
-    return {
+    tree: dict[str, object] = {
         "schema_version": record.schema_version,
         "history_head_record_id": str(record.history_head_record_id),
         "scheduled_session_id": str(record.scheduled_session_id),
@@ -2799,6 +3170,9 @@ def _history_head_tree(record: AttemptHistoryHeadRecord) -> dict[str, object]:
         "advancement_cause": record.advancement_cause.value,
         "policy_version": record.policy_version,
     }
+    if record.schema_version != ATTEMPT_HISTORY_HEAD_LEGACY_SCHEMA_VERSION:
+        tree["latest_selection"] = _nullable_artifact_tree(record.latest_selection)
+    return tree
 
 
 def _pointer_tree(reference: CurrentAttemptHistoryReference) -> dict[str, object]:
@@ -3237,8 +3611,9 @@ def create_attempt_history_head(**values: object) -> AttemptHistoryHeadRecord:
     """Create an immutable history head with a derived record identity."""
     names = tuple(field.name for field in fields(AttemptHistoryHeadRecord))
     supplied = dict(values)
-    supplied.setdefault("schema_version", ATTEMPT_HISTORY_HEAD_SCHEMA_VERSION)
+    supplied.setdefault("schema_version", ATTEMPT_HISTORY_HEAD_LEGACY_SCHEMA_VERSION)
     supplied.setdefault("history_head_record_id", UUID(int=0))
+    supplied.setdefault("latest_selection", None)
     missing = [name for name in names if name not in supplied]
     if missing:
         raise TypeError(f"missing history-head fields: {', '.join(missing)}")
@@ -3435,9 +3810,370 @@ def _read_named_terminal(
     return record
 
 
+def _read_named_allocation(
+    session_root: Path, evidence: ArtifactEvidence
+) -> CaptureAttemptAllocationRecord:
+    payload = _safe_read(
+        session_root / "allocations" / _allocation_filename(evidence.artifact_id)
+    )
+    if _artifact_evidence(evidence.artifact_id, payload) != evidence:
+        raise CaptureAttemptAuthorityError("allocation evidence mismatch")
+    record = parse_capture_attempt_allocation(payload)
+    if record.allocation_record_id != evidence.artifact_id:
+        raise CaptureAttemptAuthorityError("allocation identity mismatch")
+    return record
+
+
+def _read_named_zero_call_proof(
+    session_root: Path, evidence: ArtifactEvidence
+) -> ZeroProviderCallProof:
+    payload = _safe_read(
+        session_root / "zero-call-proofs" / _proof_filename(evidence.artifact_id)
+    )
+    if _artifact_evidence(evidence.artifact_id, payload) != evidence:
+        raise CaptureAttemptAuthorityError("zero-call proof evidence mismatch")
+    record = parse_zero_provider_call_proof(payload)
+    if record.proof_id != evidence.artifact_id:
+        raise CaptureAttemptAuthorityError("zero-call proof identity mismatch")
+    verify_zero_provider_call_proof(record)
+    return record
+
+
+def _read_named_recovery(
+    session_root: Path, evidence: ArtifactEvidence
+) -> ManualCaptureAttemptRecoveryRecord:
+    payload = _safe_read(
+        session_root / "recovery-records" / _recovery_filename(evidence.artifact_id)
+    )
+    if _artifact_evidence(evidence.artifact_id, payload) != evidence:
+        raise CaptureAttemptAuthorityError("recovery evidence mismatch")
+    record = parse_manual_capture_attempt_recovery(payload)
+    if record.recovery_record_id != evidence.artifact_id:
+        raise CaptureAttemptAuthorityError("recovery identity mismatch")
+    return record
+
+
+def _read_named_selection(
+    session_root: Path, evidence: ArtifactEvidence
+) -> CaptureTerminalSelectionRecord:
+    payload = _safe_read(
+        session_root / "terminals" / _selection_filename(evidence.artifact_id)
+    )
+    if _artifact_evidence(evidence.artifact_id, payload) != evidence:
+        raise CaptureAttemptAuthorityError("selection evidence mismatch")
+    record = parse_capture_terminal_selection(payload)
+    if record.selection_record_id != evidence.artifact_id:
+        raise CaptureAttemptAuthorityError("selection identity mismatch")
+    return record
+
+
+def _require_verified_success_terminal(
+    terminal: CaptureAttemptTerminalRecordV2,
+) -> None:
+    if (
+        terminal.classification is not CaptureAttemptTerminalClassification.SUCCEEDED
+        or terminal.snapshot is None
+        or terminal.snapshot_verification is not SnapshotTerminalVerification.PASS
+        or terminal.provider_call_disposition
+        is not ProviderCallDisposition.RESPONSE_CONFIRMED
+    ):
+        raise CaptureAttemptAuthorityError(
+            "terminal recovery requires a verified successful terminal"
+        )
+
+
+def _validate_allocation_transition_evidence(
+    session_root: Path,
+    predecessor: AttemptHistoryHeadRecord,
+    current: AttemptHistoryHeadRecord,
+) -> None:
+    if (
+        current.latest_allocation is None
+        or current.latest_terminal is not None
+        or current.latest_zero_call_proof is not None
+        or current.latest_recovery is not None
+        or current.latest_selection is not None
+    ):
+        raise CaptureAttemptAuthorityError(
+            "allocation transition carries unsupported history evidence"
+        )
+    allocation = _read_named_allocation(session_root, current.latest_allocation)
+    if (
+        allocation.previous_attempt_history_head != current.predecessor
+        or allocation.scheduled_session_id != current.scheduled_session_id
+        or allocation.authority_epoch_id != current.authority_epoch_id
+        or allocation.attempt_ordinal != predecessor.next_attempt_ordinal
+        or current.next_attempt_ordinal != predecessor.next_attempt_ordinal + 1
+        or current.policy_version != allocation.allocation_policy_version
+    ):
+        raise CaptureAttemptAuthorityError(
+            "allocation transition is not bound to its predecessor"
+        )
+    if predecessor.latest_terminal is not None:
+        terminal = _read_named_terminal(session_root, predecessor.latest_terminal)
+        if (
+            terminal.classification is CaptureAttemptTerminalClassification.SUCCEEDED
+            or is_capture_terminal_ambiguous(
+                terminal.classification, terminal.provider_call_disposition
+            )
+        ):
+            raise CaptureAttemptAuthorityError(
+                "allocation cannot extend a successful or ambiguous terminal"
+            )
+
+
+def _validate_terminal_transition_evidence(
+    session_root: Path,
+    predecessor: AttemptHistoryHeadRecord,
+    current: AttemptHistoryHeadRecord,
+) -> None:
+    if (
+        current.latest_allocation != predecessor.latest_allocation
+        or current.latest_allocation is None
+        or current.latest_terminal is None
+        or current.latest_zero_call_proof is not None
+        or current.latest_recovery is not None
+        or current.latest_selection is not None
+        or current.next_attempt_ordinal != predecessor.next_attempt_ordinal
+    ):
+        raise CaptureAttemptAuthorityError(
+            "terminal transition carries unsupported history evidence"
+        )
+    allocation = _read_named_allocation(session_root, current.latest_allocation)
+    terminal = _read_named_terminal(session_root, current.latest_terminal)
+    if (
+        terminal.allocation != current.latest_allocation
+        or terminal.attempt_id != allocation.attempt_id
+        or terminal.attempt_ordinal != allocation.attempt_ordinal
+        or terminal.scheduled_session_id != allocation.scheduled_session_id
+        or terminal.scheduled_launch_id != allocation.scheduled_launch_id
+        or current.policy_version != terminal.terminal_policy_version
+    ):
+        raise CaptureAttemptAuthorityError(
+            "terminal transition is not bound to its allocation"
+        )
+    expected_state = (
+        AttemptHistoryState.LAUNCH_MAY_HAVE_OCCURRED
+        if is_capture_terminal_ambiguous(
+            terminal.classification, terminal.provider_call_disposition
+        )
+        else AttemptHistoryState.TERMINAL_SELECTED
+    )
+    if current.state is not expected_state:
+        raise CaptureAttemptAuthorityError(
+            "terminal transition state does not match ambiguity classification"
+        )
+
+
+def _validate_manual_recovery_transition_evidence(
+    session_root: Path,
+    predecessor: AttemptHistoryHeadRecord,
+    current: AttemptHistoryHeadRecord,
+) -> None:
+    continuation_action = _CONTINUE_ZERO_CALL_ACTION
+    committed_success_action = _RECOVER_COMMITTED_SNAPSHOT_ACTION
+    ambiguous_action = _AMBIGUOUS_REVIEW_ACTION
+    close_action = _CLOSE_SESSION_ACTION
+    if current.latest_recovery is None:
+        raise CaptureAttemptAuthorityError(
+            "manual recovery transition is missing recovery evidence"
+        )
+    recovery = _read_named_recovery(session_root, current.latest_recovery)
+    if (
+        recovery.history_head != current.predecessor
+        or recovery.allocation != current.latest_allocation
+        or current.latest_allocation != predecessor.latest_allocation
+        or current.latest_allocation is None
+    ):
+        raise CaptureAttemptAuthorityError(
+            "manual recovery transition is not bound to its predecessor"
+        )
+    if (predecessor.state, current.state) not in _RECOVERY_TRANSITIONS[recovery.action]:
+        raise CaptureAttemptAuthorityError(
+            "manual recovery action is not permitted from predecessor state"
+        )
+    if predecessor.state is AttemptHistoryState.ALLOCATED_NOT_LAUNCHED:
+        if predecessor.latest_terminal is not None:
+            raise CaptureAttemptAuthorityError(
+                "allocated predecessor cannot carry terminal evidence"
+            )
+    elif predecessor.state in {
+        AttemptHistoryState.LAUNCH_MAY_HAVE_OCCURRED,
+        AttemptHistoryState.RECOVERY_REQUIRED,
+    }:
+        if predecessor.latest_terminal is None:
+            raise CaptureAttemptAuthorityError(
+                "review predecessor must carry an ambiguous terminal"
+            )
+        terminal = _read_named_terminal(session_root, predecessor.latest_terminal)
+        if not is_capture_terminal_ambiguous(
+            terminal.classification, terminal.provider_call_disposition
+        ):
+            raise CaptureAttemptAuthorityError(
+                "review predecessor must carry an ambiguous terminal"
+            )
+    elif predecessor.state is AttemptHistoryState.TERMINAL_SELECTED:
+        if predecessor.latest_terminal is None:
+            raise CaptureAttemptAuthorityError(
+                "terminal-selected predecessor has no terminal evidence"
+            )
+        terminal = _read_named_terminal(session_root, predecessor.latest_terminal)
+        if is_capture_terminal_ambiguous(
+            terminal.classification, terminal.provider_call_disposition
+        ):
+            raise CaptureAttemptAuthorityError(
+                "terminal-selected predecessor has an ambiguous terminal"
+            )
+    if (
+        current.next_attempt_ordinal != predecessor.next_attempt_ordinal
+        or current.latest_selection is not None
+        and recovery.action
+        is not ManualCaptureAttemptRecoveryAction.RECOVER_COMMITTED_SNAPSHOT_AS_SUCCESS
+    ):
+        raise CaptureAttemptAuthorityError(
+            "manual recovery transition has invalid advancement evidence"
+        )
+    if recovery.action is continuation_action:
+        if (
+            current.latest_terminal is not None
+            or current.latest_zero_call_proof != recovery.zero_call_proof
+            or recovery.zero_call_proof is None
+        ):
+            raise CaptureAttemptAuthorityError(
+                "continuation recovery proof is not the current proof"
+            )
+        proof = _read_named_zero_call_proof(session_root, recovery.zero_call_proof)
+        allocation = _read_named_allocation(session_root, current.latest_allocation)
+        if (
+            proof.allocation != current.latest_allocation
+            or proof.attempt_id != allocation.attempt_id
+            or proof.scheduled_session_id != allocation.scheduled_session_id
+            or proof.scheduled_launch_id != allocation.scheduled_launch_id
+        ):
+            raise CaptureAttemptAuthorityError(
+                "continuation recovery proof is not bound to the allocation"
+            )
+        return
+    if current.latest_terminal != predecessor.latest_terminal:
+        raise CaptureAttemptAuthorityError(
+            "manual recovery changed the current terminal"
+        )
+    if current.latest_zero_call_proof != predecessor.latest_zero_call_proof:
+        raise CaptureAttemptAuthorityError(
+            "manual recovery changed the current zero-call proof"
+        )
+    if recovery.action is ManualCaptureAttemptRecoveryAction.SELECT_EXISTING_TERMINAL:
+        if (
+            recovery.terminal != current.latest_terminal
+            or current.latest_terminal is None
+            or current.latest_selection is not None
+        ):
+            raise CaptureAttemptAuthorityError(
+                "terminal selection recovery linkage is invalid"
+            )
+        _require_verified_success_terminal(
+            _read_named_terminal(session_root, current.latest_terminal)
+        )
+        return
+    if recovery.action is committed_success_action:
+        if (
+            recovery.terminal != current.latest_terminal
+            or current.latest_terminal is None
+            or recovery.snapshot_candidate is None
+            or current.latest_selection is None
+        ):
+            raise CaptureAttemptAuthorityError(
+                "snapshot recovery linkage is incomplete"
+            )
+        terminal = _read_named_terminal(session_root, current.latest_terminal)
+        _require_verified_success_terminal(terminal)
+        selection = _read_named_selection(session_root, current.latest_selection)
+        if (
+            selection.selection_policy_version
+            != MANUAL_RECOVERY_SELECTION_POLICY_VERSION
+            or selection.allocation != current.latest_allocation
+            or selection.terminal != current.latest_terminal
+            or selection.snapshot != recovery.snapshot_candidate
+            or selection.snapshot != terminal.snapshot
+        ):
+            raise CaptureAttemptAuthorityError(
+                "snapshot recovery selection linkage is invalid"
+            )
+        return
+    if recovery.action is ambiguous_action:
+        if current.latest_selection is not None:
+            raise CaptureAttemptAuthorityError(
+                "ambiguous recovery cannot carry selection evidence"
+            )
+        if current.latest_terminal is None:
+            raise CaptureAttemptAuthorityError(
+                "ambiguous recovery requires terminal evidence"
+            )
+        terminal = _read_named_terminal(session_root, current.latest_terminal)
+        if not is_capture_terminal_ambiguous(
+            terminal.classification, terminal.provider_call_disposition
+        ):
+            raise CaptureAttemptAuthorityError(
+                "ambiguous recovery requires an ambiguous terminal"
+            )
+        return
+    if recovery.action is close_action:
+        if current.latest_selection is not None:
+            raise CaptureAttemptAuthorityError(
+                "session close cannot carry selection evidence"
+            )
+        return
+    raise CaptureAttemptAuthorityError("manual recovery action is unsupported")
+
+
+def _validate_history_transition_evidence(
+    session_root: Path,
+    predecessor: AttemptHistoryHeadRecord,
+    current: AttemptHistoryHeadRecord,
+) -> None:
+    _validate_history_transition(predecessor, current)
+    if (
+        current.state is AttemptHistoryState.ALLOCATED_NOT_LAUNCHED
+        and current.advancement_cause is AttemptHistoryCause.ALLOCATION
+    ):
+        _validate_allocation_transition_evidence(session_root, predecessor, current)
+    elif current.advancement_cause is AttemptHistoryCause.TERMINAL:
+        _validate_terminal_transition_evidence(session_root, predecessor, current)
+    elif current.advancement_cause is AttemptHistoryCause.MANUAL_RECOVERY:
+        _validate_manual_recovery_transition_evidence(
+            session_root, predecessor, current
+        )
+    elif current.state is AttemptHistoryState.SUCCESS_SELECTED:
+        if (
+            current.latest_allocation != predecessor.latest_allocation
+            or current.latest_terminal != predecessor.latest_terminal
+            or current.latest_zero_call_proof is not None
+            or current.latest_recovery is not None
+            or current.latest_selection is None
+            or current.next_attempt_ordinal != predecessor.next_attempt_ordinal
+        ):
+            raise CaptureAttemptAuthorityError(
+                "terminal selection transition has invalid evidence"
+            )
+
+
+def _verify_history_transition_candidate(
+    session_root: Path,
+    predecessor: AttemptHistoryHeadRecord,
+    current: AttemptHistoryHeadRecord,
+) -> None:
+    """Apply the same artifact and transition contract to writers and disk."""
+    _verify_selected_state_artifacts(session_root, current)
+    _validate_history_transition_evidence(session_root, predecessor, current)
+
+
 def _verify_selected_state_artifacts(
     session_root: Path, head: AttemptHistoryHeadRecord
 ) -> None:
+    allocation = None
+    terminal = None
+    selection = None
+    recovery = None
     if head.latest_allocation is not None:
         payload = _safe_read(
             session_root
@@ -3461,6 +4197,56 @@ def _verify_selected_state_artifacts(
             or terminal.allocation != head.latest_allocation
         ):
             raise CaptureAttemptAuthorityError("terminal/allocation history mismatch")
+        if head.state in {
+            AttemptHistoryState.LAUNCH_MAY_HAVE_OCCURRED,
+            AttemptHistoryState.RECOVERY_REQUIRED,
+        } and not is_capture_terminal_ambiguous(
+            terminal.classification, terminal.provider_call_disposition
+        ):
+            raise CaptureAttemptAuthorityError(
+                "review-required history has a non-ambiguous terminal"
+            )
+        if (
+            head.state is AttemptHistoryState.TERMINAL_SELECTED
+            and is_capture_terminal_ambiguous(
+                terminal.classification, terminal.provider_call_disposition
+            )
+        ):
+            raise CaptureAttemptAuthorityError(
+                "terminal-selected history has an ambiguous terminal"
+            )
+    if head.latest_selection is not None:
+        payload = _safe_read(
+            session_root
+            / "terminals"
+            / _selection_filename(head.latest_selection.artifact_id)
+        )
+        if (
+            _artifact_evidence(head.latest_selection.artifact_id, payload)
+            != head.latest_selection
+        ):
+            raise CaptureAttemptAuthorityError("selection evidence mismatch")
+        selection = parse_capture_terminal_selection(payload)
+        if selection.selection_record_id != head.latest_selection.artifact_id:
+            raise CaptureAttemptAuthorityError("selection identity mismatch")
+        if (
+            head.state is not AttemptHistoryState.SUCCESS_SELECTED
+            or head.latest_allocation != selection.allocation
+            or head.latest_terminal != selection.terminal
+            or selection.scheduled_session_id != head.scheduled_session_id
+        ):
+            raise CaptureAttemptAuthorityError("selection history linkage mismatch")
+        if head.latest_terminal is None:
+            raise CaptureAttemptAuthorityError("selection terminal is missing")
+        terminal = _read_named_terminal(session_root, head.latest_terminal)
+        if (
+            terminal.classification
+            is not CaptureAttemptTerminalClassification.SUCCEEDED
+            or terminal.snapshot is None
+            or terminal.snapshot_verification is not SnapshotTerminalVerification.PASS
+            or selection.snapshot != terminal.snapshot
+        ):
+            raise CaptureAttemptAuthorityError("selection snapshot linkage mismatch")
     if head.latest_recovery is not None:
         payload = _safe_read(
             session_root
@@ -3490,6 +4276,51 @@ def _verify_selected_state_artifacts(
         if proof.proof_id != head.latest_zero_call_proof.artifact_id:
             raise CaptureAttemptAuthorityError("zero-call proof identity mismatch")
         verify_zero_provider_call_proof(proof)
+    if head.state is AttemptHistoryState.SUCCESS_SELECTED:
+        if selection is None or terminal is None or allocation is None:
+            raise CaptureAttemptAuthorityError(
+                "successful history is missing selected evidence"
+            )
+        if head.advancement_cause is AttemptHistoryCause.TERMINAL_SELECTION:
+            if head.latest_recovery is not None:
+                raise CaptureAttemptAuthorityError(
+                    "terminal selection cannot carry recovery evidence"
+                )
+            if head.policy_version != selection.selection_policy_version:
+                raise CaptureAttemptAuthorityError(
+                    "terminal selection policy is not bound to the history head"
+                )
+        elif head.advancement_cause is AttemptHistoryCause.MANUAL_RECOVERY:
+            if (
+                selection.selection_policy_version
+                != MANUAL_RECOVERY_SELECTION_POLICY_VERSION
+                or recovery is None
+                or head.latest_recovery is None
+                or recovery.history_head != head.predecessor
+                or recovery.allocation != head.latest_allocation
+                or recovery.terminal != head.latest_terminal
+                or recovery.snapshot_candidate != selection.snapshot
+                or (recovery.action is not _RECOVER_COMMITTED_SNAPSHOT_ACTION)
+                or recovery.resulting_state is not AttemptHistoryState.SUCCESS_SELECTED
+                or recovery.recovery_policy_version != head.policy_version
+            ):
+                raise CaptureAttemptAuthorityError(
+                    "manual success recovery linkage is invalid"
+                )
+        else:
+            raise CaptureAttemptAuthorityError(
+                "successful history cause is unsupported"
+            )
+    if recovery is not None:
+        if (
+            recovery.history_head != head.predecessor
+            or recovery.allocation != head.latest_allocation
+            or recovery.resulting_state is not head.state
+            or recovery.recovery_policy_version != head.policy_version
+        ):
+            raise CaptureAttemptAuthorityError(
+                "recovery artifact is not bound to current history head"
+            )
 
 
 def _head_filename(value: UUID) -> str:

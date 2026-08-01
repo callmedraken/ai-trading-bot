@@ -17,6 +17,9 @@ CRED_TYPE_GENERIC = 1
 CRED_PERSIST_LOCAL_MACHINE = 2
 ERROR_NOT_FOUND = 1168
 MAX_WINDOWS_CREDENTIAL_BLOB_BYTES = 1024
+CRED_MAX_CREDENTIAL_BLOB_SIZE = 5 * 512
+MAX_WINDOWS_CREDENTIAL_NATIVE_BLOB_BYTES = CRED_MAX_CREDENTIAL_BLOB_SIZE
+_MAX_NATIVE_ADDRESS = (1 << (8 * ctypes.sizeof(ctypes.c_void_p))) - 1
 
 
 class WindowsCredentialReadError(RuntimeError):
@@ -39,6 +42,31 @@ class WindowsCredentialUnsupportedError(WindowsCredentialReadError):
     """The Credential Manager boundary is unavailable."""
 
 
+def _validate_native_blob_range(
+    address: int | None,
+    size: int,
+) -> tuple[int, int] | None:
+    """Validate the CRED_MAX_CREDENTIAL_BLOB_SIZE half-open range."""
+    if type(size) is not int or not 0 <= size <= CRED_MAX_CREDENTIAL_BLOB_SIZE:
+        raise WindowsCredentialInvalidError("native credential blob range is invalid")
+    if size == 0:
+        if address is not None and (
+            type(address) is not int or not 0 <= address <= _MAX_NATIVE_ADDRESS
+        ):
+            raise WindowsCredentialInvalidError(
+                "native credential blob range is invalid"
+            )
+        return None
+    if (
+        type(address) is not int
+        or address <= 0
+        or address > _MAX_NATIVE_ADDRESS
+        or address + size > _MAX_NATIVE_ADDRESS + 1
+    ):
+        raise WindowsCredentialInvalidError("native credential blob range is invalid")
+    return address, size
+
+
 @dataclass(slots=True, repr=False)
 class NativeCredentialEntry:
     """One native generic credential; blob and handle are always redacted."""
@@ -49,6 +77,7 @@ class NativeCredentialEntry:
     blob: bytearray = field(repr=False)
     native_pointer: object | None = field(default=None, repr=False)
     native_blob_address: int | None = field(default=None, repr=False)
+    native_blob_size: int | None = field(default=None, repr=False)
     released: bool = field(default=False, repr=False)
 
     def __repr__(self) -> str:
@@ -194,6 +223,21 @@ class WindowsCredentialManagerReader:
             if entry.persistence != CRED_PERSIST_LOCAL_MACHINE:
                 raise WindowsCredentialInvalidError(
                     "credential persistence is unsupported"
+                )
+            if entry.native_blob_size is not None:
+                _validate_native_blob_range(
+                    entry.native_blob_address, entry.native_blob_size
+                )
+                if entry.native_blob_size > MAX_WINDOWS_CREDENTIAL_BLOB_BYTES:
+                    raise WindowsCredentialInvalidError(
+                        "credential value exceeds the approved copy bound"
+                    )
+            elif (
+                entry.native_blob_address is not None
+                or entry.native_pointer is not None
+            ):
+                raise WindowsCredentialInvalidError(
+                    "native credential blob range is invalid"
                 )
             if (
                 type(entry.blob) is not bytearray
@@ -376,40 +420,84 @@ class CtypesWindowsCredentialNativeApi:
             if error == ERROR_NOT_FOUND:
                 raise WindowsCredentialNotFoundError("credential was not found")
             raise WindowsCredentialInvalidError("credential read failed")
-        credential = pointer.contents
-        blob_size = int(credential.CredentialBlobSize)
-        copied_size = min(blob_size, MAX_WINDOWS_CREDENTIAL_BLOB_BYTES + 1)
-        blob_address = (
-            ctypes.addressof(credential.CredentialBlob.contents)
-            if copied_size and credential.CredentialBlob
-            else None
-        )
-        blob = (
-            bytearray(ctypes.string_at(blob_address, copied_size))
-            if blob_address is not None
-            else bytearray()
-        )
-        return NativeCredentialEntry(
-            target_name=credential.TargetName or "",
-            credential_type=int(credential.Type),
-            persistence=int(credential.Persist),
-            blob=blob,
-            native_pointer=pointer,
-            native_blob_address=blob_address,
-        )
+        blob_size = 0
+        blob_address: int | None = None
+        blob = bytearray()
+        try:
+            credential = pointer.contents
+            blob_size = int(credential.CredentialBlobSize)
+            raw_address = ctypes.cast(credential.CredentialBlob, ctypes.c_void_p).value
+            blob_address = int(raw_address) if raw_address is not None else None
+            native_range = _validate_native_blob_range(blob_address, blob_size)
+            copied_size = min(blob_size, MAX_WINDOWS_CREDENTIAL_BLOB_BYTES)
+            if copied_size:
+                if native_range is None:
+                    raise WindowsCredentialInvalidError(
+                        "native credential blob range is invalid"
+                    )
+                blob.extend(ctypes.string_at(native_range[0], copied_size))
+            return NativeCredentialEntry(
+                target_name=credential.TargetName or "",
+                credential_type=int(credential.Type),
+                persistence=int(credential.Persist),
+                blob=blob,
+                native_pointer=pointer,
+                native_blob_address=blob_address,
+                native_blob_size=blob_size,
+            )
+        except Exception:
+            cleanup_failed = False
+            try:
+                native_range = _validate_native_blob_range(blob_address, blob_size)
+                if native_range is not None:
+                    self._zero_memory(*native_range)
+            except Exception:
+                cleanup_failed = True
+            finally:
+                for index in range(len(blob)):
+                    blob[index] = 0
+                try:
+                    self._advapi32.CredFree(pointer)
+                except Exception:
+                    cleanup_failed = True
+            if cleanup_failed:
+                raise WindowsCredentialInvalidError(
+                    "credential read cleanup failed"
+                ) from None
+            raise WindowsCredentialInvalidError("credential read failed") from None
 
     def release(self, entry: NativeCredentialEntry) -> None:
         if entry.released:
             return
-        if entry.native_blob_address is not None and entry.blob:
-            self._zero_memory(
-                entry.native_blob_address,
-                len(entry.blob),
-            )
-        for index in range(len(entry.blob)):
-            entry.blob[index] = 0
-        if entry.native_pointer is not None:
-            self._advapi32.CredFree(entry.native_pointer)
+        native_pointer = entry.native_pointer
+        native_blob_address = entry.native_blob_address
+        native_blob_size = entry.native_blob_size
         entry.native_pointer = None
         entry.native_blob_address = None
+        entry.native_blob_size = None
         entry.released = True
+        cleanup_failed = False
+        try:
+            if native_pointer is not None:
+                if native_blob_size is None:
+                    cleanup_failed = True
+                else:
+                    native_range = _validate_native_blob_range(
+                        native_blob_address, native_blob_size
+                    )
+                    if native_range is not None:
+                        self._zero_memory(*native_range)
+            elif native_blob_address is not None or native_blob_size is not None:
+                cleanup_failed = True
+        except Exception:
+            cleanup_failed = True
+        finally:
+            for index in range(len(entry.blob)):
+                entry.blob[index] = 0
+            if native_pointer is not None:
+                try:
+                    self._advapi32.CredFree(native_pointer)
+                except Exception:
+                    cleanup_failed = True
+        if cleanup_failed:
+            raise WindowsCredentialInvalidError("native credential cleanup failed")

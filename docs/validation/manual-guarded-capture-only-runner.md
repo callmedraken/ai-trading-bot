@@ -4,6 +4,10 @@ The focused validation covers strict nonsecret configuration, deterministic
 session/launch identities, guard contention and abandoned ownership, lineage
 and production-hours fail-closed behavior, fixed SPY/QQQ policy binding,
 Credential Manager reference isolation, pointer-selected attempt history,
+restart retry-policy authorization before readiness, authentication and
+provider-rejection blocking, ambiguous terminal preservation,
+successful-but-unselected terminal manual-review blocking,
+absorbing success/closed history behavior,
 readiness decision publication, exactly-one allocation, child-request and
 process-evidence binding, successful and failed terminal publication, timeout
 ambiguity, snapshot verification, selection, readiness re-evaluation, lease

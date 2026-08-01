@@ -29,7 +29,12 @@ Focused tests cover:
 - strict request/result/process canonical parsing and hostile JSON;
 - path-independent request identity and exact allocation reconciliation;
 - fake Credential Manager success, missing/invalid values, type,
-  persistence, size, SID-before-read, native cleanup, and redaction;
+  persistence, size, SID-before-read, full native-blob cleanup before
+  `CredFree`, native cleanup on rejection/decoding/exception paths, the
+  `CRED_MAX_CREDENTIAL_BLOB_SIZE` 2,560-byte native bound, valid 1,025- and
+  2,560-byte oversized ranges, invalid 2,561-byte, null, and overflowing
+  ranges, one-time `CredFree`, the 1,024-byte application copy bound, and
+  redaction;
 - unchanged `os.environ` and a private two-key provider mapping;
 - exactly one provider/transport call and a pre-transport second-call fence;
 - canonical snapshot success, authentication/provider/network/incomplete/output

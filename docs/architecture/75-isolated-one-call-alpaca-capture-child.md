@@ -58,10 +58,15 @@ nonempty strict UTF-8 value, and the approved bound. Missing, malformed,
 empty, oversized, wrong-type, wrong-persistence, or inconsistent entries fail
 closed.
 
-Native writable copies are cleared and native credential blobs are cleared
-where safely possible before `CredFree`. Scoped Python objects redact `repr`
-and `str` and drop references on close. Python immutable-string storage cannot
-be guaranteed to be zeroized; this is a language-runtime limitation, not a
+Native writable copies are cleared and the entire native credential blob range
+reported by `CredentialBlobSize` is cleared before `CredFree`, including an
+oversized blob rejected by the application bound. The child copies at most the
+approved application bound and retains the original native size only for
+cleanup. Pointer/size validation, one-time release state, and cleanup on
+success, rejection, decoding failure, validation failure, and exceptions keep
+native cleanup fail-closed. Scoped Python objects redact `repr` and `str` and
+drop references on close. Python immutable-string storage cannot be
+guaranteed to be zeroized; this is a language-runtime limitation, not a
 secret-lifetime claim. All credential exceptions are stable and sanitized.
 Non-Windows construction fails closed.
 

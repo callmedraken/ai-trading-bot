@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import json
 from dataclasses import replace
-from datetime import date
+from datetime import UTC, date, datetime
 from pathlib import Path
+from types import SimpleNamespace
 from uuid import UUID
 
 import pytest
 
+import trading_bot.cli.guarded_capture_runner as guarded_runner_module
 from trading_bot.cli.guarded_capture_readiness_config import (
     CaptureOnlyHealthConfig,
     ExplicitArtifactReference,
@@ -18,6 +20,7 @@ from trading_bot.cli.guarded_capture_runner import (
     GuardedCaptureRunnerClassification,
     GuardedCaptureRunnerDiagnostic,
     GuardedCaptureRunnerResult,
+    _classify_prior_terminal_retry_policy,
     exit_code_for_guarded_capture_runner,
     run_guarded_capture_runner,
     terminal_classification_for_child,
@@ -37,9 +40,12 @@ from trading_bot.domain import Symbol
 from trading_bot.market_calendar import TradingSession
 from trading_bot.runtime import (
     ArtifactEvidence,
+    AttemptHistoryState,
     CaptureAttemptTerminalClassification,
+    CaptureRetryClassification,
     IsolatedCaptureChildClassification,
     LaunchGuardAcquisitionClassification,
+    ProviderCallDisposition,
     capture_attempt_allocation_path,
 )
 
@@ -266,6 +272,230 @@ def test_production_hours_authority_requires_official_provenance() -> None:
 )
 def test_child_classification_mapping_is_closed(child, terminal) -> None:
     assert terminal_classification_for_child(child) is terminal
+
+
+@pytest.mark.parametrize(
+    "terminal_classification",
+    [
+        CaptureAttemptTerminalClassification.AUTHENTICATION_FAILED,
+        CaptureAttemptTerminalClassification.PROVIDER_REJECTED,
+    ],
+)
+def test_prior_terminal_retry_policy_blocks_before_readiness(
+    tmp_path: Path,
+    terminal_classification: CaptureAttemptTerminalClassification,
+) -> None:
+    config = _load_config(tmp_path)
+    terminal_id = UUID(int=20)
+    attempt_id = UUID(int=21)
+    current_credential = config.credential_reference_artifact.evidence
+    historical_credential = ArtifactEvidence(UUID(int=22), "a" * 64, 1)
+    history = SimpleNamespace(
+        verification=SimpleNamespace(
+            head=SimpleNamespace(
+                state=AttemptHistoryState.TERMINAL_SELECTED,
+                latest_terminal=ArtifactEvidence(terminal_id, "b" * 64, 1),
+            )
+        ),
+        terminals=(
+            SimpleNamespace(
+                terminal_record_id=terminal_id,
+                attempt_id=attempt_id,
+                attempt_ordinal=0,
+                classification=terminal_classification,
+                provider_call_disposition=ProviderCallDisposition.RESPONSE_CONFIRMED,
+                completed_at=datetime(2026, 7, 30, 18, 0, tzinfo=UTC),
+            ),
+        ),
+        allocations=(
+            SimpleNamespace(
+                attempt_id=attempt_id,
+                credential_reference=historical_credential,
+            ),
+        ),
+    )
+    hours = SimpleNamespace(
+        hours_for=lambda _session: SimpleNamespace(
+            opens_at=datetime(2026, 7, 30, 19, 0, tzinfo=UTC)
+        )
+    )
+    policy = SimpleNamespace(
+        fixed_backoffs_seconds=(0,),
+        maximum_attempts=2,
+        capture_cutoff_guard_seconds=0,
+    )
+    decision = _classify_prior_terminal_retry_policy(config, hours, policy, history)
+    assert decision.classification is CaptureRetryClassification.MANUAL_REVIEW_REQUIRED
+    assert current_credential != historical_credential
+
+
+@pytest.mark.parametrize(
+    (
+        "history_state",
+        "terminal_classification",
+        "backoff_seconds",
+        "expected_diagnostic",
+        "expected_classification",
+    ),
+    [
+        (
+            AttemptHistoryState.TERMINAL_SELECTED,
+            CaptureAttemptTerminalClassification.AUTHENTICATION_FAILED,
+            0,
+            GuardedCaptureRunnerDiagnostic.RETRY_POLICY_BLOCKED,
+            GuardedCaptureRunnerClassification.MANUAL_REVIEW_REQUIRED,
+        ),
+        (
+            AttemptHistoryState.TERMINAL_SELECTED,
+            CaptureAttemptTerminalClassification.PROVIDER_REJECTED,
+            0,
+            GuardedCaptureRunnerDiagnostic.RETRY_POLICY_BLOCKED,
+            GuardedCaptureRunnerClassification.MANUAL_REVIEW_REQUIRED,
+        ),
+        (
+            AttemptHistoryState.TERMINAL_SELECTED,
+            CaptureAttemptTerminalClassification.AUTHENTICATION_FAILED,
+            3600,
+            GuardedCaptureRunnerDiagnostic.RETRY_POLICY_BLOCKED,
+            GuardedCaptureRunnerClassification.MANUAL_REVIEW_REQUIRED,
+        ),
+        (
+            AttemptHistoryState.TERMINAL_SELECTED,
+            CaptureAttemptTerminalClassification.SUCCEEDED,
+            0,
+            GuardedCaptureRunnerDiagnostic.SUCCESS_TERMINAL_UNSELECTED,
+            GuardedCaptureRunnerClassification.MANUAL_REVIEW_REQUIRED,
+        ),
+        (
+            AttemptHistoryState.SUCCESS_SELECTED,
+            None,
+            0,
+            GuardedCaptureRunnerDiagnostic.ATTEMPT_HISTORY_ALREADY_COMPLETED,
+            GuardedCaptureRunnerClassification.SUCCEEDED,
+        ),
+    ],
+)
+def test_retry_policy_gate_precedes_readiness_allocation_and_child(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    history_state: AttemptHistoryState,
+    terminal_classification: CaptureAttemptTerminalClassification | None,
+    backoff_seconds: int,
+    expected_diagnostic: GuardedCaptureRunnerDiagnostic,
+    expected_classification: GuardedCaptureRunnerClassification,
+) -> None:
+    config = _load_config(tmp_path)
+    terminal_id = UUID(int=30)
+    attempt_id = UUID(int=31)
+    historical_credential = ArtifactEvidence(UUID(int=32), "a" * 64, 1)
+    history = SimpleNamespace(
+        verification=SimpleNamespace(
+            pointer=SimpleNamespace(),
+            head=SimpleNamespace(
+                state=history_state,
+                latest_terminal=ArtifactEvidence(terminal_id, "b" * 64, 1),
+            ),
+        ),
+        terminals=(
+            SimpleNamespace(
+                terminal_record_id=terminal_id,
+                attempt_id=attempt_id,
+                attempt_ordinal=0,
+                classification=terminal_classification,
+                provider_call_disposition=ProviderCallDisposition.RESPONSE_CONFIRMED,
+                completed_at=datetime(2026, 7, 30, 18, 0, tzinfo=UTC),
+            ),
+        ),
+        allocations=(
+            SimpleNamespace(
+                attempt_id=attempt_id,
+                credential_reference=historical_credential,
+            ),
+        ),
+    )
+    hours = SimpleNamespace(
+        hours_for=lambda _session: SimpleNamespace(
+            opens_at=datetime(2026, 7, 30, 19, 0, tzinfo=UTC)
+        )
+    )
+    policy = SimpleNamespace(
+        configuration_evidence=config.capture_configuration_artifact.evidence,
+        fixed_backoffs_seconds=(backoff_seconds,),
+        maximum_attempts=2,
+        capture_cutoff_guard_seconds=0,
+    )
+    readiness_calls: list[object] = []
+    allocation_calls: list[object] = []
+    child_calls: list[object] = []
+    decision_publications: list[object] = []
+
+    class _Ownership:
+        released = False
+        start_record = SimpleNamespace(record_id=UUID(int=33))
+
+        def release(self, _release_input: object) -> SimpleNamespace:
+            self.released = True
+            return SimpleNamespace(
+                classification=guarded_runner_module.ReleaseOperationalClassification.RELEASED,
+                release_record=SimpleNamespace(release_id=UUID(int=34)),
+            )
+
+    ownership = _Ownership()
+    monkeypatch.setattr(
+        guarded_runner_module,
+        "acquire_windows_launch_guard",
+        lambda *args, **kwargs: SimpleNamespace(
+            classification=LaunchGuardAcquisitionClassification.ACQUIRED,
+            ownership=ownership,
+        ),
+    )
+    monkeypatch.setattr(
+        guarded_runner_module, "_validate_runtime_directories", lambda _config: None
+    )
+    monkeypatch.setattr(guarded_runner_module, "_load_hours", lambda _config: hours)
+    monkeypatch.setattr(guarded_runner_module, "_load_policy", lambda _config: policy)
+    monkeypatch.setattr(
+        guarded_runner_module, "_verified_payload", lambda *args: b"credential"
+    )
+    monkeypatch.setattr(
+        guarded_runner_module, "_parse_credential", lambda *args: object()
+    )
+    monkeypatch.setattr(
+        guarded_runner_module,
+        "load_daily_snapshot_capture_config",
+        lambda *args: SimpleNamespace(
+            request_id=config.snapshot_capture_request_id,
+            symbols=config.symbols,
+        ),
+    )
+    monkeypatch.setattr(guarded_runner_module, "_readiness_attempts", lambda *args: ())
+    monkeypatch.setattr(
+        guarded_runner_module,
+        "scheduled_head_input_from_verified_authority",
+        lambda _authority: SimpleNamespace(),
+    )
+    result = run_guarded_capture_runner(
+        config,
+        head_verifier=lambda _root: SimpleNamespace(
+            classification=guarded_runner_module.LocalLineageHeadClassification.PASS,
+            authority=SimpleNamespace(
+                pointer=SimpleNamespace(authority_epoch_id=config.authority_epoch_id)
+            ),
+        ),
+        readiness_evaluator=lambda inputs: readiness_calls.append(inputs),
+        decision_publisher=lambda *args: decision_publications.append(args),
+        history_loader=lambda *args: history,
+        allocator=lambda *args: allocation_calls.append(args),
+        child_launcher=lambda *args: child_calls.append(args),
+    )
+
+    assert result.classification is expected_classification
+    assert result.diagnostics[0] == expected_diagnostic
+    assert readiness_calls == []
+    assert decision_publications == []
+    assert allocation_calls == []
+    assert child_calls == []
+    assert ownership.released is True
 
 
 def test_guard_contention_returns_without_reading_artifacts(tmp_path: Path) -> None:

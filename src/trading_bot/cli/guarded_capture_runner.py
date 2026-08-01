@@ -7,6 +7,7 @@ import hashlib
 import json
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, replace
+from datetime import timedelta
 from enum import StrEnum
 from pathlib import Path
 from typing import Any
@@ -57,6 +58,8 @@ from trading_bot.runtime import (
     CaptureAllocationClassification,
     CaptureAttemptHistoryFacts,
     CaptureAttemptTerminalClassification,
+    CaptureRetryClassification,
+    CaptureRetryPolicyInputs,
     IsolatedCaptureChildClassification,
     IsolatedCaptureChildRequest,
     IsolatedCaptureLauncherConfig,
@@ -90,6 +93,10 @@ from trading_bot.runtime import (
     serialize_capture_attempt_allocation,
 )
 from trading_bot.runtime.capture_attempt_authority import (
+    LEGACY_SUCCESS_SELECTED_HISTORY_DIAGNOSTIC,
+    LegacySuccessSelectedHistoryCompatibilityError,
+    classify_capture_retry_policy,
+    is_capture_terminal_ambiguous,
     parse_windows_market_data_credential_reference,
 )
 from trading_bot.runtime.guarded_capture_readiness import (
@@ -139,8 +146,13 @@ class GuardedCaptureRunnerDiagnostic(StrEnum):
     CREDENTIAL_REFERENCE_INVALID = "CREDENTIAL_REFERENCE_INVALID"
     CAPTURE_CONFIGURATION_INVALID = "CAPTURE_CONFIGURATION_INVALID"
     ATTEMPT_HISTORY_INVALID = "ATTEMPT_HISTORY_INVALID"
+    LEGACY_SUCCESS_SELECTED_REQUIRES_MIGRATION = (
+        LEGACY_SUCCESS_SELECTED_HISTORY_DIAGNOSTIC
+    )
     ATTEMPT_HISTORY_AMBIGUOUS = "ATTEMPT_HISTORY_AMBIGUOUS"
     ATTEMPT_HISTORY_ALREADY_COMPLETED = "ATTEMPT_HISTORY_ALREADY_COMPLETED"
+    SUCCESS_TERMINAL_UNSELECTED = "SUCCESS_TERMINAL_UNSELECTED"
+    RETRY_POLICY_BLOCKED = "RETRY_POLICY_BLOCKED"
     READINESS_NOT_READY = "READINESS_NOT_READY"
     READINESS_BLOCKED = "READINESS_BLOCKED"
     READINESS_CONFLICTING = "READINESS_CONFLICTING"
@@ -351,7 +363,6 @@ def run_guarded_capture_runner(
             )
         try:
             history = history_loader(config.capture_attempt_root, session_id)
-            attempts = _readiness_attempts(config, policy, history)
             if (
                 history.verification.head is None
                 or history.verification.pointer is None
@@ -372,6 +383,46 @@ def run_guarded_capture_runner(
                     ),
                     LaunchResultClassification.SUCCESS,
                 )
+            if state is AttemptHistoryState.TERMINAL_SELECTED:
+                terminal = _pointer_selected_terminal(history)
+                if (
+                    terminal.classification
+                    is CaptureAttemptTerminalClassification.SUCCEEDED
+                ):
+                    return _release(
+                        config,
+                        ownership,
+                        replace(
+                            base,
+                            classification=GuardedCaptureRunnerClassification.MANUAL_REVIEW_REQUIRED,
+                            diagnostics=(
+                                GuardedCaptureRunnerDiagnostic.SUCCESS_TERMINAL_UNSELECTED.value,
+                            ),
+                        ),
+                        LaunchResultClassification.FAILURE,
+                    )
+                retry_policy = _classify_prior_terminal_retry_policy(
+                    config, hours, policy, history
+                )
+                if (
+                    retry_policy.classification
+                    is not CaptureRetryClassification.NEW_ATTEMPT_AFTER_BACKOFF
+                ):
+                    return _release(
+                        config,
+                        ownership,
+                        replace(
+                            base,
+                            classification=_runner_classification_for_retry_policy(
+                                retry_policy.classification
+                            ),
+                            diagnostics=(
+                                GuardedCaptureRunnerDiagnostic.RETRY_POLICY_BLOCKED.value,
+                                retry_policy.diagnostic,
+                            ),
+                        ),
+                        LaunchResultClassification.FAILURE,
+                    )
             if state in {
                 AttemptHistoryState.ALLOCATED_NOT_LAUNCHED,
                 AttemptHistoryState.LAUNCH_MAY_HAVE_OCCURRED,
@@ -402,6 +453,20 @@ def run_guarded_capture_runner(
                     ),
                     LaunchResultClassification.FAILURE,
                 )
+            attempts = _readiness_attempts(config, policy, history)
+        except LegacySuccessSelectedHistoryCompatibilityError:
+            return _release(
+                config,
+                ownership,
+                replace(
+                    base,
+                    classification=GuardedCaptureRunnerClassification.MANUAL_REVIEW_REQUIRED,
+                    diagnostics=(
+                        GuardedCaptureRunnerDiagnostic.LEGACY_SUCCESS_SELECTED_REQUIRES_MIGRATION.value,
+                    ),
+                ),
+                LaunchResultClassification.FAILURE,
+            )
         except Exception:
             return _release(
                 config,
@@ -693,14 +758,9 @@ def run_guarded_capture_runner(
             terminal.classification
             is not CaptureAttemptTerminalClassification.SUCCEEDED
         ):
-            ambiguous = terminal.classification in {
-                CaptureAttemptTerminalClassification.TIMEOUT,
-                CaptureAttemptTerminalClassification.UNKNOWN_AFTER_LAUNCH,
-                CaptureAttemptTerminalClassification.CHILD_CRASHED,
-            } or terminal.provider_call_disposition in {
-                ProviderCallDisposition.MAY_HAVE_STARTED,
-                ProviderCallDisposition.UNKNOWN,
-            }
+            ambiguous = is_capture_terminal_ambiguous(
+                terminal.classification, terminal.provider_call_disposition
+            )
             return _release(
                 config,
                 ownership,
@@ -928,6 +988,75 @@ def _readiness_attempts(
             )
         )
     return tuple(records)
+
+
+def _classify_prior_terminal_retry_policy(
+    config: GuardedCaptureRunnerConfig,
+    hours: Any,
+    policy: Any,
+    history: CaptureAttemptHistoryFacts,
+) -> Any:
+    """Classify a pointer-selected terminal before readiness can authorize."""
+    terminal = _pointer_selected_terminal(history)
+    head = history.verification.head
+    if head is None:
+        raise ValueError("terminal-selected history has no head")
+    allocation_by_attempt = {item.attempt_id: item for item in history.allocations}
+    allocation = allocation_by_attempt.get(terminal.attempt_id)
+    if allocation is None:
+        raise ValueError("terminal-selected history allocation is unavailable")
+    execution_hours = hours.hours_for(config.execution_session)
+    if execution_hours is None:
+        raise ValueError("execution session hours are unavailable")
+    backoff_until = None
+    if terminal.attempt_ordinal < len(policy.fixed_backoffs_seconds):
+        backoff_until = terminal.completed_at + timedelta(
+            seconds=policy.fixed_backoffs_seconds[terminal.attempt_ordinal]
+        )
+    return classify_capture_retry_policy(
+        CaptureRetryPolicyInputs(
+            history_state=head.state,
+            terminal_classification=terminal.classification,
+            provider_call_disposition=terminal.provider_call_disposition,
+            zero_call_proof_verified=False,
+            observed_at=config.observed_current_utc_timestamp,
+            deadline=execution_hours.opens_at
+            - timedelta(seconds=policy.capture_cutoff_guard_seconds),
+            attempts_remaining=max(policy.maximum_attempts - len(history.terminals), 0),
+            backoff_until=backoff_until,
+            credential_reference_changed=(
+                allocation.credential_reference
+                != config.credential_reference_artifact.evidence
+            ),
+            manual_approval=None,
+        )
+    )
+
+
+def _pointer_selected_terminal(history: CaptureAttemptHistoryFacts) -> Any:
+    head = history.verification.head
+    if head is None or head.latest_terminal is None:
+        raise ValueError("terminal-selected history has no terminal evidence")
+    terminal_by_id = {item.terminal_record_id: item for item in history.terminals}
+    terminal = terminal_by_id.get(head.latest_terminal.artifact_id)
+    if terminal is None:
+        raise ValueError("terminal-selected history terminal is unavailable")
+    return terminal
+
+
+def _runner_classification_for_retry_policy(
+    classification: CaptureRetryClassification,
+) -> GuardedCaptureRunnerClassification:
+    if classification is CaptureRetryClassification.NOT_READY:
+        return GuardedCaptureRunnerClassification.NOT_READY
+    if classification is CaptureRetryClassification.SESSION_COMPLETED:
+        return GuardedCaptureRunnerClassification.SUCCEEDED
+    if classification in {
+        CaptureRetryClassification.BLOCKED,
+        CaptureRetryClassification.SESSION_CLOSED,
+    }:
+        return GuardedCaptureRunnerClassification.BLOCKED
+    return GuardedCaptureRunnerClassification.MANUAL_REVIEW_REQUIRED
 
 
 def _snapshot_evidence(

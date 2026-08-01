@@ -28,7 +28,22 @@ write, rotation, deletion, environment, file, or command-line fallback.
 Credential values remain child-only and are never available to the parent
 launcher.
 
+The native `CredentialBlobSize` contract is the Windows
+`CRED_MAX_CREDENTIAL_BLOB_SIZE` bound of `5 * 512` bytes, not the full unsigned
+`DWORD` range. The reader validates the complete pointer-plus-size range
+without pointer or `size_t` truncation or overflow before any zeroing. It
+copies or accepts at most the separate 1,024-byte application bound, but
+cleanup zeroes every valid native range up to 2,560 bytes, including a valid
+native blob larger than that bound. Sizes above 2,560 bytes, null nonzero
+ranges, and overflowing ranges are never passed to zeroing; `CredFree` is
+attempted exactly once and cleanup errors are reduced to a secret-free fixed
+diagnostic.
+
 This does not change the reference identity or canonical bytes. It also does
 not approve unattended provider use. Python immutable-string zeroization
-cannot be guaranteed; writable native copies are cleared where safely possible
-before `CredFree`, and scoped Python references are dropped after the one call.
+cannot be guaranteed; the child copies no more than the approved application
+bound, retains the original native `CredentialBlobSize` only for cleanup, and
+clears the entire reported native blob range before `CredFree`, including
+oversized rejected credentials. Scoped Python references are dropped after the
+one call and all cleanup paths fail closed without exposing credential
+material.

@@ -46,8 +46,8 @@ The design explicitly covers:
   influence authority material;
 - copied or cloned capture roots, including a root presented through a
   different path or volume;
-- database replacement and rollback, including a restored database from an
-  older bootstrap generation or an unapproved same-generation copy;
+- rollback cases that are visible through independently retained signed
+  bootstrap state, including an older bootstrap generation or an old epoch;
 - filesystem links, junctions, mount points, and other reparse points in any
   authority or capture path component;
 - process and credential isolation, including secret-free parent state,
@@ -92,6 +92,38 @@ Protecting against hostile same-account code would require a separately
 designed broker service that owns the authority and provider boundary; that
 broker is not part of this architecture.
 
+### Rollback boundary and replacement cases
+
+The authority distinguishes three classes of replacement and rollback:
+
+1. **Detectable with independently retained signed/bootstrap state.** An
+   older-generation database, an epoch that no longer matches the signed
+   bootstrap, altered bootstrap or signature material, a copied root, and a
+   path alias can be rejected when the approved release has independently
+   retained signed/bootstrap facts, fixed-path/final-handle checks, or both.
+   The database's own metadata is reconciled with those independently retained
+   facts before executable use.
+2. **Approved restore.** Every administrator-approved restore is
+   historical-only. It requires a rotated signed bootstrap generation, a new
+   `authority_epoch_id`, a newly provisioned empty executable database, and no
+   import or executable reuse of old allocations or claims. The restored
+   database may be inspected and preserved as evidence, but it is never the
+   executable authority for the new epoch.
+3. **Outside the trust boundary.** A database cannot prove its own freshness
+   after the database and persistent journal have been completely replaced by
+   an internally consistent same-generation pair. Replacement by
+   Administrator/SYSTEM, malicious direct database modification by the trusted
+   `Trading` account, or arbitrary code controlling that account is outside
+   this threat model. This milestone adds no external service, hardware
+   monotonic anchor, or other independent freshness authority to detect those
+   cases.
+
+An internally consistent same-generation replacement is therefore not a
+validation failure for this design; it is an explicit trust-boundary
+limitation. `database_identity_digest` is a database-local consistency field,
+not an externally retained rollback anchor and not proof of freshness after a
+complete replacement.
+
 ## 2. Deployment-pinned signed bootstrap
 
 ### Fixed location and fields
@@ -115,8 +147,8 @@ The bootstrap's canonical JSON object contains exactly these semantic fields:
 | `bootstrap_schema` | Bootstrap schema number, initially `1`. |
 | `bootstrap_generation` | Positive administrator-controlled generation; it increases on controlled rotation. |
 | `signing_key_id` | Identifier for the public key pinned in the approved release. |
-| `machine_authority_id` | Stable UUID for this provisioned machine authority. |
-| `authority_epoch_id` | UUID for this executable authority epoch. |
+| `machine_authority_id` | Stable signed administrator-provisioned UUID fact for this machine authority; not runtime-derived UUID5 material. |
+| `authority_epoch_id` | Signed administrator-provisioned UUID fact for this executable authority epoch; not runtime-derived UUID5 material. |
 | `approved_account_sid` | Exact Windows SID allowed to consume the authority and child boundary. |
 | `authority_database_path` | Exact absolute path `F:\AITradingBot\Authority\authority.sqlite3`. |
 | `capture_output_root` | Exact absolute path `F:\AITradingBot\Authority\capture-output\`. |
@@ -245,11 +277,14 @@ root.
 
 ### Common storage rules
 
-All IDs are lowercase UUID text with explicit UUID5 material versions. All
-digests are 32-byte SHA-256 values stored as BLOBs, with canonical lowercase
-hex used only in human-readable diagnostics. All policy, schema, provider,
-epoch, and operation fields are explicit columns. UTC timestamps are facts,
-not identity inputs.
+All deterministic transactional IDs are lowercase UUID text produced with the
+repository-owned UUID5 contract below. `machine_authority_id` and
+`authority_epoch_id` are signed administrator-provisioned authority facts;
+they may be UUID-formatted, but runtime implementations do not independently
+derive them as UUID5 values. All digests are 32-byte SHA-256 values stored as
+BLOBs, with canonical lowercase hex used only in human-readable diagnostics.
+All policy, schema, provider, epoch, and operation fields are explicit
+columns. UTC timestamps are facts, not identity inputs.
 
 Canonical JSON evidence is stored as exact UTF-8 BLOBs in `*_json` columns;
 the corresponding `*_digest` is stored beside it. Normalized columns hold
@@ -290,6 +325,11 @@ authority_metadata(
 
 It must contain exactly one row for the active epoch. Its values must match
 the verified bootstrap before any transaction.
+
+`database_identity_digest` is checked against the database-local metadata and
+the currently verified bootstrap as a consistency binding. It is not an
+external rollback anchor: because it is retained in the database, it cannot
+prove freshness if the database and persistent journal are replaced together.
 
 `schema_migrations` is an append-only record of the exact database schema:
 
@@ -341,7 +381,8 @@ allocations(
   attempt_id TEXT NOT NULL,
   ordinal INTEGER NOT NULL CHECK(ordinal >= 0),
   state TEXT NOT NULL CHECK(state IN ('ALLOCATED_NOT_LAUNCHED','CLAIM_COMMITTED',
-    'LAUNCH_MAY_HAVE_OCCURRED','TERMINAL_RECORDED','SUCCESS_SELECTED','CLOSED')),
+    'LAUNCH_RESERVED','LAUNCH_MAY_HAVE_OCCURRED','TERMINAL_RECORDED',
+    'SUCCESS_SELECTED','CLOSED')),
   allocation_schema INTEGER NOT NULL,
   claim_policy_version TEXT NOT NULL,
   provider_call_budget INTEGER NOT NULL CHECK(provider_call_budget=1),
@@ -355,6 +396,7 @@ allocations(
   allocated_at_utc TEXT NOT NULL,
   UNIQUE(authority_epoch_id, session_id, ordinal),
   UNIQUE(authority_epoch_id, session_id, attempt_id),
+  UNIQUE(authority_epoch_id, allocation_id),
   FOREIGN KEY(authority_epoch_id, session_id) REFERENCES sessions(authority_epoch_id, session_id)
 )
 ```
@@ -378,17 +420,73 @@ provider_call_claims(
   claim_digest BLOB NOT NULL CHECK(length(claim_digest)=32),
   committed_at_utc TEXT NOT NULL,
   state TEXT NOT NULL CHECK(state='COMMITTED'),
-  UNIQUE(authority_epoch_id, attempt_id)
+  UNIQUE(authority_epoch_id, attempt_id),
+  UNIQUE(authority_epoch_id, claim_id)
 )
 ```
 
-`launch_executions` contains the one process execution for a committed claim.
-The phase columns are write-once facts; transitions can only move forward:
+`launch_reservations` is the permanent transactional boundary between a
+committed claim and process creation. Its reservation identity and binding
+facts are immutable; only the explicitly controlled outcome state and
+process-creation-failure evidence may move forward.
+
+```text
+launch_reservations(
+  launch_reservation_id TEXT PRIMARY KEY,
+  authority_epoch_id TEXT NOT NULL REFERENCES authority_metadata,
+  session_id TEXT NOT NULL REFERENCES sessions,
+  allocation_id TEXT NOT NULL REFERENCES allocations,
+  attempt_id TEXT NOT NULL,
+  claim_id TEXT NOT NULL UNIQUE REFERENCES provider_call_claims,
+  launch_reservation_schema INTEGER NOT NULL,
+  application_release_version TEXT NOT NULL,
+  authority_policy_version TEXT NOT NULL,
+  claim_policy_version TEXT NOT NULL,
+  request_digest BLOB NOT NULL CHECK(length(request_digest)=32),
+  reservation_json BLOB NOT NULL,
+  reservation_digest BLOB NOT NULL CHECK(length(reservation_digest)=32),
+  reservation_state TEXT NOT NULL CHECK(reservation_state IN
+    ('COMMITTED','PROCESS_CREATED','PROCESS_CREATION_FAILED','MANUAL_REVIEW')),
+  process_creation_failure_json BLOB,
+  process_creation_failure_digest BLOB CHECK(
+    process_creation_failure_digest IS NULL OR
+    length(process_creation_failure_digest)=32),
+  committed_at_utc TEXT NOT NULL,
+  outcome_recorded_at_utc TEXT,
+  UNIQUE(authority_epoch_id, session_id, allocation_id, attempt_id),
+  UNIQUE(authority_epoch_id, launch_reservation_id),
+  FOREIGN KEY(authority_epoch_id, session_id) REFERENCES
+    sessions(authority_epoch_id, session_id),
+  FOREIGN KEY(authority_epoch_id, allocation_id) REFERENCES
+    allocations(authority_epoch_id, allocation_id),
+  FOREIGN KEY(authority_epoch_id, attempt_id) REFERENCES
+    allocations(authority_epoch_id, attempt_id)
+)
+```
+
+The permanent `UNIQUE(claim_id)` constraint is the launch fence. A reservation
+is inserted only for the exact committed claim, epoch, session, allocation,
+attempt, request digest, application release, and policy versions. A
+reservation winner is the only process permitted to call
+`CreateProcessW(CREATE_SUSPENDED)`.
+
+Triggers make the reservation identity and binding columns immutable, prohibit
+deletion, and allow only forward outcome transitions. The
+`PROCESS_CREATION_FAILED` state requires one sanitized failure JSON/digest;
+`PROCESS_CREATED` requires the reservation-bound `launch_executions` row; and
+`MANUAL_REVIEW` is absorbing until an administrator records the permitted
+recovery fact. No outcome transition creates a second reservation or launch
+attempt.
+
+`launch_executions` contains the one process execution actually created by a
+committed reservation. The phase columns are write-once facts; transitions can
+only move forward:
 
 ```text
 launch_executions(
   launch_execution_id TEXT PRIMARY KEY,
   authority_epoch_id TEXT NOT NULL REFERENCES authority_metadata,
+  launch_reservation_id TEXT NOT NULL UNIQUE REFERENCES launch_reservations,
   claim_id TEXT NOT NULL UNIQUE REFERENCES provider_call_claims,
   allocation_id TEXT NOT NULL REFERENCES allocations,
   attempt_id TEXT NOT NULL,
@@ -408,7 +506,11 @@ launch_executions(
   cleanup_json BLOB,
   cleanup_digest BLOB CHECK(cleanup_digest IS NULL OR length(cleanup_digest)=32),
   created_at_utc TEXT NOT NULL,
-  UNIQUE(authority_epoch_id, attempt_id)
+  UNIQUE(authority_epoch_id, attempt_id),
+  FOREIGN KEY(authority_epoch_id, claim_id) REFERENCES
+    provider_call_claims(authority_epoch_id, claim_id),
+  FOREIGN KEY(authority_epoch_id, launch_reservation_id) REFERENCES
+    launch_reservations(authority_epoch_id, launch_reservation_id)
 )
 ```
 
@@ -420,6 +522,7 @@ terminals(
   authority_epoch_id TEXT NOT NULL REFERENCES authority_metadata,
   claim_id TEXT NOT NULL UNIQUE REFERENCES provider_call_claims,
   allocation_id TEXT NOT NULL REFERENCES allocations,
+  launch_reservation_id TEXT NOT NULL REFERENCES launch_reservations,
   launch_execution_id TEXT REFERENCES launch_executions,
   attempt_id TEXT NOT NULL,
   terminal_schema INTEGER NOT NULL,
@@ -433,7 +536,9 @@ terminals(
   evidence_digest BLOB NOT NULL CHECK(length(evidence_digest)=32),
   snapshot_digest BLOB CHECK(snapshot_digest IS NULL OR length(snapshot_digest)=32),
   sanitized_diagnostics_json BLOB NOT NULL,
-  recorded_at_utc TEXT NOT NULL
+  recorded_at_utc TEXT NOT NULL,
+  FOREIGN KEY(authority_epoch_id, launch_reservation_id) REFERENCES
+    launch_reservations(authority_epoch_id, launch_reservation_id)
 )
 ```
 
@@ -472,13 +577,16 @@ manual_recoveries(
   session_id TEXT NOT NULL REFERENCES sessions,
   target_allocation_id TEXT REFERENCES allocations,
   target_claim_id TEXT REFERENCES provider_call_claims,
+  target_launch_reservation_id TEXT REFERENCES launch_reservations,
   target_terminal_id TEXT REFERENCES terminals,
   recovery_schema INTEGER NOT NULL,
   recovery_policy_version TEXT NOT NULL,
-  action TEXT NOT NULL CHECK(action IN ('RECORD_AMBIGUITY','SELECT_COMMITTED_SUCCESS',
-    'CLOSE_SESSION','ACKNOWLEDGE_RESTORE')),
+  action TEXT NOT NULL CHECK(action IN ('RECORD_AMBIGUITY',
+    'CLASSIFY_LAUNCH_RESERVATION','SELECT_COMMITTED_SUCCESS','CLOSE_SESSION',
+    'ACKNOWLEDGE_RESTORE')),
   predecessor_state TEXT NOT NULL,
   resulting_state TEXT NOT NULL,
+  recovery_ordinal INTEGER NOT NULL CHECK(recovery_ordinal >= 0),
   operator_evidence_json BLOB NOT NULL,
   operator_evidence_digest BLOB NOT NULL CHECK(length(operator_evidence_digest)=32),
   created_at_utc TEXT NOT NULL,
@@ -487,26 +595,109 @@ manual_recoveries(
 ```
 
 Foreign-key and trigger rules reject cross-epoch references, mismatched
-session/allocation/claim/terminal identities, duplicate allocations, updates
-to canonical facts, deletes, state regressions, and transitions out of
-`SUCCESS_SELECTED` or `CLOSED`. `provider_call_claims` has no expiry,
-reclamation, automatic deletion, or repair path. Every immutable table is
-append-only; controlled state/counter updates are trigger-enforced and only
-write fields that were explicitly left mutable. An integrity check treats any
-trigger violation, orphan, duplicate, digest mismatch, or impossible state as
+session/allocation/claim/reservation/terminal identities, duplicate
+allocations or launch reservations, updates to canonical facts, deletes,
+state regressions, and transitions out of `SUCCESS_SELECTED` or `CLOSED`.
+`provider_call_claims` and `launch_reservations` have no expiry, reclamation,
+automatic deletion, or repair path. Every immutable table is append-only;
+controlled state/counter updates are trigger-enforced and only write fields
+that were explicitly left mutable. An integrity check treats any trigger
+violation, orphan, duplicate, digest mismatch, or impossible state as
 authority corruption.
 
 ### Deterministic identities
 
-The attempt identity is UUID5 over a versioned, length-framed tuple of
-`authority_epoch_id`, `session_id`, `ordinal`, provider ID, permitted
-operation, and claim-policy version. `allocation_id`, `claim_id`,
-`launch_execution_id`, `terminal_id`, and `selection_id` derive from their
-parent identity with separate material versions. No identity uses a clock,
-UUID4, Python hash, object identity, locale, filesystem path, secret,
-serialized JSON bytes, or database row order. The unique `(epoch, session,
-ordinal)` constraint and the unique attempt/claim constraints make a second
-claim impossible even if two approved processes race.
+The repository owns one fixed UUID5 namespace for all deterministic
+transactional identities:
+
+```text
+TRANSACTIONAL_IDENTITY_NAMESPACE_UUID =
+  7c2d5a44-3b2e-5f8f-9a1c-6d4e7b8f9012
+```
+
+This constant is part of the release contract and never changes. Each identity
+domain has its own material-version label, so a tuple change requires a new
+label or a new repository-owned namespace. For a Unicode string `s`, define
+the exact length frame as:
+
+```text
+LF(s) = ASCII(decimal number of UTF-8 bytes in s) + ":" + s
+```
+
+The UUID5 name is the UTF-8 encoding of the concatenation
+`LF(material_label) || LF(field_1) || ... || LF(field_n)`. Integers use
+canonical base-10 ASCII with no leading zeroes except `0`; UUIDs use lowercase
+canonical text; dates use `YYYY-MM-DD`; booleans use `true` or `false`; an
+optional value is represented by an explicit empty frame and is never omitted.
+For an ordered list, define `UL(items) = LF(decimal item count) || LF(item_1)
+|| ... || LF(item_n)` in caller-defined order; `UL(items)` is one field in the
+outer tuple and is not replaced by a set or digest. The UUID5 result is
+lowercased for storage.
+This is a text/UTF-8 contract, not a language serializer contract.
+
+The root session identity is exactly:
+
+```text
+session_id = UUID5(
+  TRANSACTIONAL_IDENTITY_NAMESPACE_UUID,
+  LF("session_id/v1") ||
+  LF(machine_authority_id) ||
+  LF(authority_epoch_id) ||
+  LF(session_schema) ||
+  LF(authority_policy_version) ||
+  LF(claim_policy_version) ||
+  LF("capture_request/v1") ||
+  LF(target_session_date) ||
+  LF(provider_id) ||
+  LF(permitted_provider_operation) ||
+  UL(ordered_universe) ||
+  LF(bar_interval) ||
+  LF(request_window_start_date) ||
+  LF(request_window_end_date) ||
+  LF(request_limit) ||
+  LF(child_operation_version) ||
+  LF(output_policy_version)
+)
+```
+
+The fields are semantic request fields, not canonical JSON bytes, filesystem
+paths, output names, or digests of serialized artifacts. The listed fields are
+the complete `capture_request/v1` contract; a new semantic field requires a
+new request/material version. Consequently, identical semantic session
+requests under one authority epoch produce the same `session_id`, while a
+different machine authority, epoch, policy, target date, provider, operation,
+ordered universe, request limit, child operation, output policy, or other
+versioned request meaning produces a different UUID5 input.
+
+Every derived identity has a separate material label and exact tuple:
+
+| Identity | Exact UUID5 tuple after the material label |
+| --- | --- |
+| `attempt_id` | `authority_epoch_id, session_id, ordinal, provider_id, permitted_provider_operation, claim_policy_version, capture_request/v1` |
+| `allocation_id` | `authority_epoch_id, session_id, attempt_id, ordinal, allocation_schema, claim_policy_version, provider_id, permitted_provider_operation` |
+| `claim_id` | `authority_epoch_id, allocation_id, attempt_id, claim_schema, claim_policy_version, provider_id, permitted_provider_operation, provider_call_budget` |
+| `launch_reservation_id` | `authority_epoch_id, session_id, allocation_id, attempt_id, claim_id, launch_reservation_schema, application_release_version, authority_policy_version, claim_policy_version` |
+| `launch_execution_id` | `authority_epoch_id, launch_reservation_id, claim_id, attempt_id, launch_schema, application_release_version, authority_policy_version` |
+| `terminal_id` | `authority_epoch_id, claim_id, launch_reservation_id, launch_execution_id-or-empty, attempt_id, terminal_schema, terminal_policy_version` |
+| `selection_id` | `authority_epoch_id, session_id, terminal_id, allocation_id, attempt_id, selection_schema, selection_policy_version` |
+| `recovery_id` | `authority_epoch_id, session_id, target_allocation_id-or-empty, target_claim_id-or-empty, target_launch_reservation_id-or-empty, target_terminal_id-or-empty, action, predecessor_state, resulting_state, recovery_schema, recovery_policy_version, recovery_ordinal` |
+
+The material labels are respectively
+`attempt_id/v1`, `allocation_id/v1`, `claim_id/v1`,
+`launch_reservation_id/v1`, `launch_execution_id/v1`, `terminal_id/v1`,
+`selection_id/v1`, and `recovery_id/v1`. `recovery_ordinal` is an explicit
+transactionally allocated domain ordinal, not database row order. Request
+digests are stored and verified bindings, but are not substitutes for the
+semantic identity tuple and are not identity inputs when they represent
+serialized artifact bytes. No identity uses clocks, UUID4, Python hashes,
+object identity, locale, filesystem paths, secrets, serialized artifact
+bytes, or database row order. Distinct tuples have distinct UUID5 inputs;
+the usual cryptographic collision assumption applies to the UUID5 result.
+
+The unique `(authority_epoch_id, session_id, ordinal)` constraint and the
+unique attempt, claim, and launch-reservation constraints make a second
+allocation, claim, or launch reservation impossible even if two approved
+processes race.
 
 ## 5. Transaction boundaries and crash outcomes
 
@@ -572,30 +763,60 @@ before commit permits the exact claim transaction to be retried because no
 provider side effect is allowed before commitment. A crash after commit is
 permanent authority: the process may not assume that no provider call occurred.
 
+### Reserve the launch before creating a process
+
+1. Begin immediate.
+2. Verify the singleton metadata, permanent committed claim, exact epoch,
+   session, allocation, attempt, canonical request, request digest, release
+   version, and policy versions. Verify that the claim has no committed launch
+   reservation and that no absorbing state or manual-review block permits a
+   launch.
+3. Construct the deterministic `launch_reservation_id` and insert exactly one
+   `launch_reservations` row. The permanent `UNIQUE(claim_id)` constraint is
+   the authority fence.
+4. Advance the allocation to `LAUNCH_RESERVED` and commit the reservation
+   before any process-creation call.
+
+Only the process that commits this reservation may call
+`CreateProcessW(CREATE_SUSPENDED)`. A concurrent loser stops before process
+creation after a deterministic unique-conflict or already-reserved result; it
+does not create a second reservation, launch attempt, child, or provider call.
+A crash before reservation commit rolls back the reservation and permits the
+same deterministic reservation transaction to be retried. A crash immediately
+after reservation commit and before `CreateProcessW` leaves the claim and
+reservation permanently consumed; it requires manual classification and does
+not authorize another automatic launch.
+
 ### Create the process and record pre-resume launch facts
 
-1. Call `CreateProcessW` with `CREATE_SUSPENDED` using the already committed
-   request. If creation fails, record the exact sanitized creation-failure fact
-   transactionally as a failed, non-retried terminal; the committed claim
-   remains consumed.
+1. The reservation winner calls `CreateProcessW` with `CREATE_SUSPENDED` using
+   the already committed request. If process creation fails, begin immediate,
+   verify the existing reservation, and record the exact sanitized failure
+   evidence against that reservation. Advance its controlled outcome to
+   `PROCESS_CREATION_FAILED` and record a failed, non-retried terminal without
+   creating a second reservation, launch attempt, or `launch_executions` row.
+   The committed claim remains consumed.
 2. For a created process, assign it to the Job Object and verify the Job
    assignment, active-process limit, kill-on-close policy, and no-inherited-
    handle posture.
-3. Begin immediate and verify the committed claim and exact canonical request.
-4. Insert the one `launch_executions` row containing exact process creation,
-   executable/release digests, Job Object assignment, constrained environment
-   digest, resume authorization, and all sanitized native facts available
-   before resume.
-5. Commit with `phase=PRE_RESUME_READY`.
+3. Begin immediate and verify the committed reservation, claim, and exact
+   canonical request.
+4. Insert the one `launch_executions` row, including the committed
+   `launch_reservation_id`, exact process creation, executable/release
+   digests, Job Object assignment, constrained environment digest, resume
+   authorization, and all sanitized native facts available before resume.
+5. Advance the reservation outcome to `PROCESS_CREATED` and commit with
+   `phase=PRE_RESUME_READY`.
 
-Only after this commit may the launcher call `ResumeThread`. A crash before
-process creation leaves a committed claim with no process and no retry
-authorization. A crash after process creation or Job assignment but before
-this commit leaves a committed claim with incomplete launch facts; it is
-manual review, not automatic claim reuse. A crash after commit but before
-resume can be proven zero-call only by a later explicit native evidence review
-that proves the child remained suspended and was terminated. The database
-itself does not infer that proof.
+Only after this commit may the launcher call `ResumeThread`. A crash after
+reservation commit but before process creation leaves a consumed reservation
+with no process and no retry authorization. A crash after process creation or
+Job assignment but before the launch-evidence commit leaves a consumed
+reservation with incomplete facts; it is manual review, not automatic claim
+or reservation reuse. A crash after the evidence commit but before resume can
+be proven zero-call only by a later explicit native evidence review that
+proves the child remained suspended and was terminated. The database itself
+does not infer that proof.
 
 ### Record post-resume ambiguous facts
 
@@ -660,9 +881,12 @@ A crash before commit leaves the prior state authoritative. After commit,
 1. Begin immediate and verify the current epoch, target digests, predecessor
    state, operator evidence, recovery policy, and requested action.
 2. Insert one immutable `manual_recoveries` row.
-3. Apply only the action's allowed state transition: record ambiguity, select
-   an already committed and verified success, close a session, or acknowledge
-   an administrator-approved restore.
+3. Apply only the action's allowed state transition: record ambiguity,
+   classify a consumed launch reservation (including a reservation with no
+   known process after a crash), select an already committed and verified
+   success, close a session, or acknowledge an administrator-approved restore.
+   Reservation classification never deletes, resets, or reopens the
+   reservation and never authorizes another launch or provider call.
 4. Commit.
 
 Manual recovery never creates or deletes a claim, invokes a provider, changes
@@ -691,6 +915,10 @@ manual fact and resulting absorbing state together.
   `SQLITE_LOCKED`: a bounded number of fresh `BEGIN IMMEDIATE` attempts using
   the same deterministic inputs. The retry is allowed only while no claim has
   committed and no provider side effect has occurred.
+- The launch-reservation transaction is post-claim and is attempted once for
+  that committed claim. A busy result, unique conflict, or existing
+  reservation stops that runner before process creation; it is never converted
+  into a new reservation or automatic launch retry.
 - There is no generic transaction decorator or automatic retry loop. After a
   claim commits, no provider-attempt retry is permitted. A later database
   write may be retried only as an explicitly idempotent persistence operation
@@ -735,10 +963,12 @@ The integration retains the existing safety concepts:
   named Credential Manager entries;
 - one provider instance and one provider-call fence are created in the child,
   with no retry, pagination continuation, fallback endpoint, or second call;
-- the parent uses suspended `CreateProcessW`, assigns and verifies the child in
-  a Job Object with kill-on-close and active-process limit one, records exact
-  process creation and resume-authorization facts transactionally, commits
-  those facts, and only then calls `ResumeThread`;
+- the parent commits a unique launch reservation for the claim before calling
+  suspended `CreateProcessW`; only its reservation winner may create the
+  child, assign and verify it in a Job Object with kill-on-close and
+  active-process limit one, record exact process creation and
+  resume-authorization facts transactionally, commit those facts, and only
+  then call `ResumeThread`;
 - no handles are inherited and the child receives only the constrained
   reviewed environment;
 - any uncertainty after resume is ambiguous and never a zero-call proof;
@@ -754,22 +984,26 @@ signed bootstrap and path/ACL verification
   -> canonical request construction and in-memory reconciliation
   -> session verification and ordinal-allocation transaction
   -> permanent request-bound claim transaction and commit
-  -> CreateProcessW(CREATE_SUSPENDED)
+  -> unique launch-reservation transaction and commit
+  -> reservation winner calls CreateProcessW(CREATE_SUSPENDED)
   -> Job Object assignment and verification
-  -> process-creation/resume-authorization transaction and commit
+  -> reservation-bound process-creation/resume-authorization transaction and commit
   -> ResumeThread
   -> post-resume fact transaction, or conservative missing-fact ambiguity
   -> terminal transaction
   -> success-selection transaction, if eligible
 ```
 
-Launcher/process evidence is represented by the normalized `launch_executions`
-row plus its canonical creation, resume, post-resume, and cleanup evidence
-blobs and digests. Terminal evidence stores the sanitized child result,
-provider disposition, snapshot digest, and cleanup result. The database rows
-are the single transactional authority. Temporary request or output files
-may be transport artifacts, but no mutually validating claim/history file web
-is executable and no directory scan can create authority.
+Launcher/process evidence is represented by the normalized
+`launch_reservations` row, any reservation-bound process-creation failure
+evidence, and the normalized `launch_executions` row plus its canonical
+creation, resume, post-resume, and cleanup evidence blobs and digests.
+`launch_executions` exists only when the reservation winner actually created a
+process. Terminal evidence stores the sanitized child result, provider
+disposition, snapshot digest, and cleanup result. The database rows are the
+single transactional authority. Temporary request or output files may be
+transport artifacts, but no mutually validating claim/history file web is
+executable and no directory scan can create authority.
 
 ## 8. Compatibility and migration
 
@@ -795,25 +1029,34 @@ authority from legacy artifacts.
 ### Restore and rollback validation
 
 Restore is administrator-only and begins by preserving the failed database and
-the persistent journal for forensic review. The candidate backup
-is restored to an isolated staging path, then validated as historical evidence
-for exact owner/DACL/reparse/final-path semantics, signed-bootstrap digest,
-machine authority, epoch, schema migrations, SQLite integrity, foreign keys,
-canonical evidence digests, state transitions, claims, and ambiguity facts.
-It is never made executable by copying it over the live path.
+the persistent journal for forensic review. The candidate backup is restored
+to an isolated staging path, then validated as historical evidence for exact
+owner/DACL/reparse/final-path semantics, independently retained signed
+bootstrap generation and digest, machine authority, epoch, schema migrations,
+SQLite integrity, foreign keys, canonical evidence digests, state
+transitions, claims, and ambiguity facts. It is never made executable by
+copying it over the live path.
 
-Every restore is epoch-reset only. After historical validation, an
-administrator must rotate the signed `bootstrap_generation`, create a new
-`authority_epoch_id`, and provision a new empty executable authority database.
-The old database and all of its allocations, claims, terminals, selections,
-and ambiguity facts remain preserved as historical evidence. No restored
-database may resume executable operation under its old epoch, and no old row
-may be imported as executable provider authority.
+Rollback rejection is required only where independently retained trusted state
+can show a mismatch: an older-generation database, an epoch that does not
+match the current signed bootstrap, altered bootstrap or signature material,
+copied roots, and path aliases. A database-local digest, including
+`database_identity_digest`, is a consistency check and not an external
+freshness anchor. If the database and persistent journal are completely
+replaced with an internally consistent same-generation pair, the database
+cannot prove that replacement from its own contents. Replacement by
+Administrator/SYSTEM, malicious direct database modification by `Trading`,
+and arbitrary code controlling that account remain outside the stated threat
+model; no external service or monotonic hardware anchor is added here.
 
-A database cannot prove its own non-rollback after it has been replaced. The
-generation rotation and new epoch are the executable rollback boundary; an
-administrator's historical validation record explains what was preserved but
-does not authorize old claims for reuse.
+Every administrator-approved restore is epoch-reset only. After historical
+validation, the administrator must rotate the signed `bootstrap_generation`,
+create a new `authority_epoch_id`, and provision a new empty executable
+authority database. The old database and all of its allocations, claims,
+terminals, selections, and ambiguity facts remain preserved as historical
+evidence. No restored database may resume executable operation under its old
+epoch, and no old row may be imported or reused as executable provider
+authority.
 
 ### Unavailable or corrupt material
 
@@ -873,43 +1116,51 @@ and restore manifest contract.
 automatic migrations, claim-file fallback, or runtime implementation in this
 documentation milestone.
 
-**Focused tests:** deterministic identity vectors; schema/foreign-key/trigger
-checks; concurrent session/ordinal allocation; duplicate claim races;
+**Focused tests:** exact deterministic identity vectors for the root session and
+every derived identity; schema/foreign-key/trigger checks; concurrent
+session/ordinal allocation; duplicate claim and launch-reservation races;
 crash-injected boundaries; PERSIST durability and journal lifecycle;
-integrity checks; backup/restore;
-database replacement and rollback rejection.
+integrity checks; backup/restore; and fail-closed rejection of rollback cases
+that conflict with independently retained signed/bootstrap state.
 
 **Manual Windows validation:** run multiple approved processes under the
 dedicated account; inspect PERSIST journal locking and ACLs; stop/kill at each
-transaction boundary; validate that journal recreation and directory rights are
-not required; validate a restored database and an intentionally older/copy
-database.
+transaction boundary; validate that journal recreation and directory rights
+are not required; validate a restored database and intentionally older,
+copied-root, and path-alias databases. The validation records the explicit
+limitation that an internally consistent same-generation database/journal
+replacement cannot be detected without independent trusted state.
 
 **Exit criteria:** one allocation has at most one permanent claim; claim
 commit precedes all provider-side effects; ambiguity survives all crash
 points; success and closed states are absorbing; no generic retry or repair
 exists; and backup/restore evidence is reproducible.
 
-**Remaining NO-GO:** any duplicate claim, claim deletion/expiry, state
-regression, PERSIST failure under the approved ACL, journal recreation
-requirement, unreviewed migration, rollback not detected, or authority
-decision based on a legacy file.
+**Remaining NO-GO:** any duplicate claim or launch reservation, claim or
+reservation deletion/expiry, state regression, PERSIST failure under the
+approved ACL, journal recreation requirement, unreviewed migration, a
+detectable rollback accepted despite an independently retained signed-state
+mismatch, or an authority decision based on a legacy file. Same-generation
+replacement by an out-of-boundary privileged actor is not represented as a
+guarantee of this milestone.
 
 ### C. Child/launcher integration
 
 **Deliverables:** transaction-bound child request and process evidence model;
-pre-resume and post-resume recording; one-call provider fence; SID and
-Credential Manager boundary; Job Object, handle, environment, and cleanup
-contract.
+permanent claim and launch-reservation boundary; pre-resume and post-resume
+recording; one-call provider fence; SID and Credential Manager boundary; Job
+Object, handle, environment, and cleanup contract.
 
 **Non-goals:** unattended scheduling, automatic retry, paper-lineage advance,
 provider fallback, or real-money trading.
 
-**Focused tests:** exactly-one provider call; duplicate/concurrent launch
-attempts; crash before/after claim and resume; SID mismatch; child-only
-credential reads; native cleanup; sanitized malicious responses; suspended
-creation, Job containment, no inherited handles, and unconditional handle
-cleanup.
+**Focused tests:** exactly-one provider call; two-runner launch-reservation
+races proving one reservation and no losing `CreateProcessW`; crash before and
+after reservation commit, before process creation, and after process-creation
+failure; duplicate/concurrent launch attempts; crash before/after claim and
+resume; SID mismatch; child-only credential reads; native cleanup; sanitized
+malicious responses; suspended creation, Job containment, no inherited handles,
+and unconditional handle cleanup.
 
 **Manual Windows validation:** dedicated non-administrative account, real
 `CreateProcessW`/Job Object behavior with test-only nonsecret fixtures, ACL
@@ -918,8 +1169,10 @@ review. Any provider-connected exercise requires separate explicit approval
 and must remain a single manually initiated call.
 
 **Exit criteria:** parent memory and environment are secret-free; exactly one
-claim maps to exactly one child/provider fence; evidence is transactional;
-resume uncertainty is never reused; and cleanup is proven on every path.
+claim maps to exactly one permanent launch reservation; exactly one
+reservation-bound child/provider fence can exist; the losing runner never
+calls `CreateProcessW`; evidence is transactional; resume uncertainty is never
+reused; and cleanup is proven on every path.
 
 **Remaining NO-GO:** any secret in parent/output, SID bypass, second call,
 credential cleanup gap, handle leak, inherited handle, process escape, or

@@ -130,7 +130,7 @@ The normalized derived vectors are asserted as independent golden outputs:
 | `launch_execution_id` | `4ce95417-de13-569f-923b-e17d2d9854c6` |
 | `terminal_id` | `5fda0305-878a-550f-b724-a7ce775e6a30` |
 | `selection_id` | `77b12359-7413-536c-a03c-d6604588aee1` |
-| `recovery_id` | `40eff555-9402-598d-868c-e0ad8776249e` |
+| `recovery_id` | `4fa8af52-ab1d-50b5-ba95-540c4b0fbe94` |
 
 The review perturbs clocks, UUID4 values, Python hash seeds, object identity,
 working directories, path spellings, environment values, process IDs, and
@@ -154,6 +154,16 @@ metadata + migration
   -> owning session selection
 ```
 
+The request propagation gate is exact and immediate-parent scoped. Session
+creation is the only operation that accepts or constructs canonical request
+bytes. Attempt allocation reads the session bytes/digest; claim creation reads
+the attempt bytes/digest; reservation creation reads the claim digest; and
+terminal creation reads the reservation digest. Each insert rejects any
+request-byte or digest mismatch, and descendant helpers do not reconstruct the
+request. The valid-lifecycle test uses a non-default date, ordered universe,
+limit, and output policy, then compares the exact bytes/digest in every stored
+request-bearing row.
+
 The focused suite asserts:
 
 - metadata and migration insert successfully and remain immutable;
@@ -165,6 +175,22 @@ The focused suite asserts:
 - one terminal can reference a reservation, including a process-creation
   failure with no execution row; and
 - one confirmed successful terminal can be selected only by its owning session.
+
+Terminal insertion is accepted only for this matrix:
+
+| Terminal state | Provider disposition | Snapshot | Evidence gate |
+| --- | --- | --- | --- |
+| `SUCCEEDED` | `CONFIRMED` | present | `RESUME_RECORDED` execution with post-resume and cleanup pairs |
+| `FAILED` | `NOT_STARTED` | absent | `PROCESS_CREATION_FAILED` reservation with failure evidence |
+| `FAILED` | `CONFIRMED` | absent | `RESUME_RECORDED` execution with post-resume and cleanup pairs |
+| `AMBIGUOUS` | `MAY_HAVE_OCCURRED` | absent | `RESUME_RECORDED` or `POST_RESUME_AMBIGUOUS` execution with both pairs |
+| `CLOSED` | `MAY_HAVE_OCCURRED` | absent | `MANUAL_REVIEW` reservation |
+
+The table-driven negative cases reject ambiguity with `NOT_STARTED` or
+`CONFIRMED`, success without a snapshot, and every non-success snapshot. A
+terminal request digest must equal the immediate reservation parent. After a
+valid insert, execution, reservation, and attempt are advanced to
+`TERMINAL_RECORDED` in the same transaction.
 
 The following duplicate operations must fail without a second side effect:
 
@@ -178,6 +204,12 @@ The following duplicate operations must fail without a second side effect:
 The suite also attempts updates and deletes against immutable evidence. The
 trigger or foreign-key result must preserve the original row and must not
 create a repair path.
+
+The lifecycle must also prove that a successful terminal is not a shortcut:
+execution evidence is recorded as paired post-resume and cleanup evidence,
+the execution reaches `RESUME_RECORDED`, the terminal matrix is satisfied, and
+the terminal, execution, reservation, and attempt terminal-recorded updates
+commit together before selection.
 
 ## 6. Lineage gates
 
@@ -198,7 +230,22 @@ has no such tuple.
 
 The review also verifies that a recovery cannot be inserted for
 `SUCCESS_SELECTED` or `CLOSED`, cannot reopen a claim/reservation, cannot
-delete evidence, and cannot authorize another provider call.
+delete evidence, and cannot authorize another provider call. The permitted
+action matrix is closed:
+
+| Action | Target | Predecessor -> result | Permitted effect |
+| --- | --- | --- | --- |
+| `RECORD_ATTEMPT_AMBIGUITY` | `ATTEMPT` | `LAUNCH_RESERVED` -> `AMBIGUITY_RECORDED` | evidence-only uncertainty record |
+| `RECORD_CLAIM_AMBIGUITY` | `CLAIM` | `COMMITTED` -> `AMBIGUITY_RECORDED` | evidence-only uncertainty record |
+| `CLASSIFY_LAUNCH_RESERVATION` | `LAUNCH_RESERVATION` | `COMMITTED` -> `MANUAL_REVIEW` | classify the existing reservation |
+| `SELECT_COMMITTED_SUCCESS` | `TERMINAL` | `SUCCEEDED` -> `SUCCESS_SELECTED` | normal owning-session selection |
+| `CLOSE_SESSION` | `SESSION` | `OPEN` -> `CLOSED` | close only after terminal/no-ambiguity preconditions |
+| `ACKNOWLEDGE_RESTORE` | `SESSION` | `OPEN` -> `RESTORE_ACKNOWLEDGED` | acknowledgement evidence only |
+
+There is no generic recovery state ladder. Recovery cannot manufacture normal
+workflow states or fabricate an attempt progression. A legitimate concurrent
+recovery race may commit consecutive ordinals for distinct existing uncertain
+targets; a duplicate target or fabricated target is rejected.
 
 ## 7. Attempt ordinal and crash gates
 
@@ -227,7 +274,8 @@ Recovery is tested with the same single-insert pattern:
   consecutive ordinals 0 and 1;
 - stale, future, duplicate, no-op, and invalid target ordinals fail;
 - direct recovery-counter updates fail;
-- rollback preserves row, counter, and target-state atomicity;
+- rollback preserves row, counter, and any matrix-authorized target-state
+  atomicity;
 - commit preserves the immutable recovery row, increment, and authorized
   target state together;
 - recovery rows cannot be updated or deleted;
@@ -235,9 +283,11 @@ Recovery is tested with the same single-insert pattern:
 - recovery after a successful selection or closed session fails.
 
 The trigger verifies open-session eligibility, target existence, same-session
-lineage, current ordinal, and non-empty predecessor/resulting state. The test
-transaction service additionally verifies action-specific authorization and
-performs any target-state update in the same `BEGIN IMMEDIATE` transaction.
+lineage, current ordinal, and an exact action-matrix entry. The test transaction
+service additionally performs any matrix-authorized state update in the same
+`BEGIN IMMEDIATE` transaction. It never manufactures `CLAIM_COMMITTED`,
+`LAUNCH_RESERVED`, `TERMINAL_RECORDED`, or `SUCCESS_SELECTED` through a generic
+recovery update.
 
 ## 9. Transaction boundary gates
 
@@ -254,6 +304,18 @@ The test proves the following event order:
 The fake hooks do not read secrets, construct a provider, create a Windows
 process, call a network, or authorize a real resume. They only prove the
 database visibility boundary.
+
+Launch-execution evidence is append-only. The tests reject post-resume or
+cleanup writes in the same `PRE_RESUME_READY` phase, partial JSON/digest pairs,
+wrong digests, replacement, clearing, same-phase rewrites, and any rewrite
+after terminal recording. The only permitted evidence mutation is one forward
+`PRE_RESUME_READY` -> `RESUME_RECORDED` update that appends both complete,
+matching pairs; identity and all pre-resume evidence remain immutable.
+
+The whole-model audit is compact and table-driven: invalid transitions are
+attempted independently at the attempt, claim, reservation, execution,
+terminal, selection, and recovery boundaries. Every rejection must leave the
+original row, counters, lineage, and evidence unchanged.
 
 ## 10. Security and operational gates not claimed by this fixture
 

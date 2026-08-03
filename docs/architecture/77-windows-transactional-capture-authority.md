@@ -152,6 +152,12 @@ transaction helper before the insert; the trigger checks that the session is
 open, the ordinal is exactly the current counter, the initial state is
 `ALLOCATED`, and the budget is one.
 
+The session is the sole canonical request owner. Only session creation accepts
+or constructs the canonical request bytes and digest. Attempt allocation reads
+those exact stored bytes and digest from its immediate parent; it does not
+reconstruct the request or call a request-building helper. The attempt insert
+trigger rejects any request-byte or digest mismatch.
+
 ### 2.5 provider_call_claims
 
 Claims reference only `attempt_id`, which is `NOT NULL UNIQUE` and references
@@ -159,6 +165,10 @@ Claims reference only `attempt_id`, which is `NOT NULL UNIQUE` and references
 claim schema/policy, provider/operation/budget, request/digest bindings,
 immutable claim evidence, and commit timestamp. It has no session, epoch,
 ordinal, or allocation columns. Claim rows cannot be updated or deleted.
+
+Claim creation reads the exact request bytes and digest from its immediate
+attempt parent. The claim insert trigger compares both values and rejects
+reconstructed or mismatched request material.
 
 ### 2.6 launch_reservations
 
@@ -173,6 +183,12 @@ and timestamps. They have no session, attempt, allocation, or epoch columns.
 `TERMINAL_RECORDED`. There is no reclamation, expiry, replacement, or second
 reservation path.
 
+Reservation creation reads the exact request digest from its immediate claim
+parent. The reservation insert trigger verifies that digest binding. A known
+process-creation failure is a one-time null-to-paired evidence append that may
+move only `COMMITTED` to `PROCESS_CREATION_FAILED`; the failure JSON and digest
+must match and cannot be replaced, cleared, or partially written.
+
 ### 2.7 launch_executions
 
 Executions reference only `launch_reservation_id`, which is `NOT NULL UNIQUE`
@@ -180,9 +196,13 @@ and references `launch_reservations(launch_reservation_id)`. They store
 process-creation, Job Object, resume-authorization, phase, post-resume, and
 cleanup evidence. The phase moves forward through
 `PRE_RESUME_READY`, `RESUME_RECORDED`, `POST_RESUME_AMBIGUOUS`,
-`TERMINAL_RECORDED`, and `CLOSED`. Execution evidence is immutable except for
-these explicitly controlled phase/evidence additions. An execution is
-optional: a process-creation failure may still receive a terminal directly
+`TERMINAL_RECORDED`, and `CLOSED`. Post-resume evidence is an append-only
+null-to-paired JSON/digest write that is allowed only while moving
+`PRE_RESUME_READY` to `RESUME_RECORDED`; cleanup evidence follows the same rule
+in the same forward transaction. Neither pair may be replaced, cleared,
+partially written, or rewritten in the same phase. Identity, pre-resume
+evidence, and execution rows are immutable and cannot be deleted. An execution
+is optional: a process-creation failure may still receive a terminal directly
 from its reservation.
 
 ### 2.8 terminals
@@ -197,7 +217,23 @@ relationship tells the transaction service whether an execution exists.
 
 `SUCCEEDED` requires `CONFIRMED` and a snapshot digest. `AMBIGUOUS` requires
 `MAY_HAVE_OCCURRED`; failed process creation may be `FAILED` with
-`NOT_STARTED`. Terminal rows are immutable and cannot be deleted.
+`NOT_STARTED`. The complete terminal state/disposition matrix is:
+
+| Terminal state | Provider disposition | Snapshot | Required evidence |
+| --- | --- | --- | --- |
+| `SUCCEEDED` | `CONFIRMED` | present | execution is `RESUME_RECORDED` with both post-resume and cleanup pairs |
+| `FAILED` | `NOT_STARTED` | absent | reservation is `PROCESS_CREATION_FAILED` with paired failure evidence |
+| `FAILED` | `CONFIRMED` | absent | execution is `RESUME_RECORDED` with both post-resume and cleanup pairs |
+| `AMBIGUOUS` | `MAY_HAVE_OCCURRED` | absent | execution is `RESUME_RECORDED` or `POST_RESUME_AMBIGUOUS` with both pairs |
+| `CLOSED` | `MAY_HAVE_OCCURRED` | absent | reservation is `MANUAL_REVIEW` with sanitized terminal evidence |
+
+No other combination is permitted: in particular, ambiguity cannot claim
+`NOT_STARTED` or `CONFIRMED`, success cannot omit its snapshot, and a
+non-success terminal cannot carry a snapshot. The terminal insert trigger
+verifies the exact request digest from its immediate reservation parent. After
+the terminal row is inserted, the execution (when present), reservation, and
+attempt are advanced to their terminal-recorded states in the same transaction.
+Terminal rows are immutable and cannot be deleted.
 
 ### 2.9 session_selections
 
@@ -232,13 +268,26 @@ operator evidence, and creation timestamp. `UNIQUE(session_id,
 recovery_ordinal)` fences each per-session ordinal.
 
 The `BEFORE INSERT` trigger requires an open session, the current recovery
-counter, a non-empty state change, and a target that resolves through the
-immediate-parent chain to that same session. The `AFTER INSERT` trigger owns
-the exact counter increment. The reviewed test transaction service validates
-the action, operator evidence, target state, and authorized state update in the
-same `BEGIN IMMEDIATE` transaction. Recovery never deletes or reopens a claim
-or reservation, never authorizes another provider call, and is rejected after
-an absorbing session state.
+counter, a target that resolves through the immediate-parent chain to that
+same session, and one exact closed action-matrix entry:
+
+| Action | Target | Predecessor -> result | Effect |
+| --- | --- | --- | --- |
+| `RECORD_ATTEMPT_AMBIGUITY` | `ATTEMPT` | `LAUNCH_RESERVED` -> `AMBIGUITY_RECORDED` | record resume uncertainty; no fabricated attempt state |
+| `RECORD_CLAIM_AMBIGUITY` | `CLAIM` | `COMMITTED` -> `AMBIGUITY_RECORDED` | record uncertainty; claim remains permanent |
+| `CLASSIFY_LAUNCH_RESERVATION` | `LAUNCH_RESERVATION` | `COMMITTED` -> `MANUAL_REVIEW` | classify the existing reservation |
+| `SELECT_COMMITTED_SUCCESS` | `TERMINAL` | `SUCCEEDED` -> `SUCCESS_SELECTED` | invoke normal owning-session selection |
+| `CLOSE_SESSION` | `SESSION` | `OPEN` -> `CLOSED` | close only when all attempts are terminal and none is ambiguous |
+| `ACKNOWLEDGE_RESTORE` | `SESSION` | `OPEN` -> `RESTORE_ACKNOWLEDGED` | record restore acknowledgement only |
+
+No generic recovery state ladder exists. Recovery cannot manufacture
+`CLAIM_COMMITTED`, `LAUNCH_RESERVED`, `TERMINAL_RECORDED`, or
+`SUCCESS_SELECTED` by arbitrary state update, cannot reopen or delete evidence,
+and cannot authorize another provider call. A legitimate race may record
+uncertainty for distinct existing targets, but it cannot fabricate an attempt
+or advance one target twice. The `AFTER INSERT` trigger owns the exact counter
+increment, and the reviewed transaction service performs any matrix-authorized
+state update in the same `BEGIN IMMEDIATE` transaction.
 
 ## 3. Enforcement split
 
@@ -385,7 +434,7 @@ semantic example:
 | `launch_execution_id` | `4ce95417-de13-569f-923b-e17d2d9854c6` |
 | `terminal_id` | `5fda0305-878a-550f-b724-a7ce775e6a30` |
 | `selection_id` | `77b12359-7413-536c-a03c-d6604588aee1` |
-| `recovery_id` | `40eff555-9402-598d-868c-e0ad8776249e` |
+| `recovery_id` | `4fa8af52-ab1d-50b5-ba95-540c4b0fbe94` |
 
 The retained migration vector is:
 
@@ -423,8 +472,9 @@ fixed bootstrap/CNG/ACL/path verification
   -> CreateProcessW(CREATE_SUSPENDED)
   -> Job Object and process evidence transaction and COMMIT
   -> ResumeThread
-  -> post-resume evidence or conservative ambiguity
-  -> immutable terminal transaction
+  -> paired post-resume and cleanup evidence transaction and COMMIT
+  -> terminal matrix validation and immutable terminal transaction
+  -> execution/reservation/attempt terminal-recorded transitions in that transaction
   -> explicit successful session selection
 ```
 
@@ -436,9 +486,12 @@ present; it never authorizes a new claim, provider call, reservation, or
 launch attempt. A known process-creation failure is recorded on the existing
 reservation and may receive a terminal without an execution row.
 
-Manual recovery records uncertainty and an operator-authorized classification;
-it does not turn uncertainty into `NOT_STARTED`, erase a claim, reopen a
-reservation, or infer a successful selection.
+Manual recovery records uncertainty and an operator-authorized classification
+through the closed action matrix above. It does not turn uncertainty into
+`NOT_STARTED`, manufacture normal workflow states, erase a claim, reopen a
+reservation, or infer a successful selection. `SELECT_COMMITTED_SUCCESS` is the
+only recovery action that invokes normal selection authority, and it still
+requires the successful terminal matrix entry.
 
 ## 7. SQLite durability and rollback contract
 
@@ -475,8 +528,13 @@ The focused executable evidence is
   lifecycle and terminal selection;
 - one-to-one fences and same-session selection/recovery lineage;
 - deterministic identity vectors;
+- exact session-to-immediate-parent request propagation and mismatch rejection;
+- the complete terminal state/disposition matrix and append-only paired launch
+  evidence rules;
 - attempt and recovery ordinal races, stale/future ordinals, direct-counter
   rejection, rollback atomicity, and independent session ordinals;
+- the closed recovery action matrix, including distinct-target races and
+  table-driven invalid lifecycle transitions;
 - a process-creation failure terminal without an execution row; and
 - fake side-effect hooks proving claim, reservation, and evidence commit
   boundaries plus no claim reuse after ambiguity.

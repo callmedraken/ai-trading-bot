@@ -160,11 +160,7 @@ CREATE TABLE terminals (
     sanitized_diagnostics_json BLOB NOT NULL,
     sanitized_diagnostics_digest BLOB NOT NULL CHECK (length(sanitized_diagnostics_digest) = 32),
     recorded_at_utc TEXT NOT NULL,
-    CHECK (snapshot_digest IS NULL OR length(snapshot_digest) = 32),
-    CHECK (
-        (terminal_state = 'SUCCEEDED' AND provider_call_disposition = 'CONFIRMED' AND snapshot_digest IS NOT NULL)
-        OR (terminal_state <> 'SUCCEEDED')
-    )
+    CHECK (snapshot_digest IS NULL OR length(snapshot_digest) = 32)
 );
 
 CREATE TABLE session_selections (
@@ -187,7 +183,14 @@ CREATE TABLE manual_recoveries (
         'SESSION', 'ATTEMPT', 'CLAIM', 'LAUNCH_RESERVATION', 'TERMINAL'
     )),
     target_id TEXT NOT NULL CHECK (length(target_id) > 0),
-    action TEXT NOT NULL,
+    action TEXT NOT NULL CHECK (action IN (
+        'RECORD_ATTEMPT_AMBIGUITY',
+        'RECORD_CLAIM_AMBIGUITY',
+        'CLASSIFY_LAUNCH_RESERVATION',
+        'SELECT_COMMITTED_SUCCESS',
+        'CLOSE_SESSION',
+        'ACKNOWLEDGE_RESTORE'
+    )),
     predecessor_state TEXT NOT NULL,
     resulting_state TEXT NOT NULL,
     recovery_schema INTEGER NOT NULL CHECK (recovery_schema > 0),
@@ -296,6 +299,12 @@ BEGIN
     SELECT CASE WHEN NEW.ordinal <> (
         SELECT next_attempt_ordinal FROM sessions WHERE session_id = NEW.session_id
     ) THEN RAISE(ABORT, 'attempt ordinal is not the session counter') END;
+    SELECT CASE WHEN NOT EXISTS (
+        SELECT 1 FROM sessions
+        WHERE session_id = NEW.session_id
+          AND request_json IS NEW.request_json
+          AND request_digest IS NEW.request_digest
+    ) THEN RAISE(ABORT, 'attempt request binding differs from session') END;
     SELECT CASE WHEN NEW.state <> 'ALLOCATED'
         THEN RAISE(ABORT, 'new attempts must start allocated') END;
     SELECT CASE WHEN NEW.provider_call_budget <> 1
@@ -365,6 +374,18 @@ BEGIN
     SELECT RAISE(ABORT, 'provider call claims are immutable');
 END;
 
+CREATE TRIGGER provider_call_claims_before_insert
+BEFORE INSERT ON provider_call_claims
+FOR EACH ROW
+BEGIN
+    SELECT CASE WHEN NOT EXISTS (
+        SELECT 1 FROM attempts
+        WHERE attempt_id = NEW.attempt_id
+          AND request_json IS NEW.request_json
+          AND request_digest IS NEW.request_digest
+    ) THEN RAISE(ABORT, 'claim request binding differs from attempt') END;
+END;
+
 CREATE TRIGGER provider_call_claims_no_delete
 BEFORE DELETE ON provider_call_claims
 BEGIN
@@ -385,6 +406,48 @@ WHEN NEW.launch_reservation_id <> OLD.launch_reservation_id
   OR NEW.committed_at_utc <> OLD.committed_at_utc
 BEGIN
     SELECT RAISE(ABORT, 'launch reservation identity and evidence are immutable');
+END;
+
+CREATE TRIGGER launch_reservations_before_insert
+BEFORE INSERT ON launch_reservations
+FOR EACH ROW
+BEGIN
+    SELECT CASE WHEN NOT EXISTS (
+        SELECT 1 FROM provider_call_claims
+        WHERE claim_id = NEW.claim_id
+          AND request_digest IS NEW.request_digest
+    ) THEN RAISE(ABORT, 'reservation request binding differs from claim') END;
+END;
+
+CREATE TRIGGER launch_reservations_failure_evidence_before_insert
+BEFORE INSERT ON launch_reservations
+FOR EACH ROW
+WHEN NEW.reservation_state = 'PROCESS_CREATION_FAILED'
+  OR NEW.process_creation_failure_json IS NOT NULL
+  OR NEW.process_creation_failure_digest IS NOT NULL
+BEGIN
+    SELECT CASE WHEN NOT (
+        NEW.reservation_state = 'PROCESS_CREATION_FAILED'
+        AND NEW.process_creation_failure_json IS NOT NULL
+        AND NEW.process_creation_failure_digest IS NOT NULL
+        AND sha256(NEW.process_creation_failure_json) IS NEW.process_creation_failure_digest
+    ) THEN RAISE(ABORT, 'process creation failure evidence is required and paired') END;
+END;
+
+CREATE TRIGGER launch_reservations_failure_evidence_guard
+BEFORE UPDATE ON launch_reservations
+WHEN OLD.process_creation_failure_json IS NOT NEW.process_creation_failure_json
+  OR OLD.process_creation_failure_digest IS NOT NEW.process_creation_failure_digest
+BEGIN
+    SELECT CASE WHEN NOT (
+        OLD.process_creation_failure_json IS NULL
+        AND OLD.process_creation_failure_digest IS NULL
+        AND NEW.process_creation_failure_json IS NOT NULL
+        AND NEW.process_creation_failure_digest IS NOT NULL
+        AND sha256(NEW.process_creation_failure_json) IS NEW.process_creation_failure_digest
+        AND OLD.reservation_state = 'COMMITTED'
+        AND NEW.reservation_state = 'PROCESS_CREATION_FAILED'
+    ) THEN RAISE(ABORT, 'process creation failure evidence is write-once') END;
 END;
 
 CREATE TRIGGER launch_reservations_state_guard
@@ -426,7 +489,14 @@ CREATE TRIGGER launch_executions_phase_guard
 BEFORE UPDATE OF phase ON launch_executions
 WHEN NOT (
     NEW.phase = OLD.phase
-    OR (OLD.phase = 'PRE_RESUME_READY' AND NEW.phase IN ('RESUME_RECORDED', 'POST_RESUME_AMBIGUOUS'))
+    OR (OLD.phase = 'PRE_RESUME_READY'
+        AND NEW.phase = 'RESUME_RECORDED'
+        AND NEW.post_resume_json IS NOT NULL
+        AND NEW.post_resume_digest IS NOT NULL
+        AND sha256(NEW.post_resume_json) IS NEW.post_resume_digest
+        AND NEW.cleanup_json IS NOT NULL
+        AND NEW.cleanup_digest IS NOT NULL
+        AND sha256(NEW.cleanup_json) IS NEW.cleanup_digest)
     OR (OLD.phase = 'RESUME_RECORDED' AND NEW.phase IN ('POST_RESUME_AMBIGUOUS', 'TERMINAL_RECORDED'))
     OR (OLD.phase = 'POST_RESUME_AMBIGUOUS' AND NEW.phase IN ('TERMINAL_RECORDED', 'CLOSED'))
     OR (OLD.phase = 'TERMINAL_RECORDED' AND NEW.phase = 'CLOSED')
@@ -435,16 +505,127 @@ BEGIN
     SELECT RAISE(ABORT, 'invalid launch execution phase transition');
 END;
 
+CREATE TRIGGER launch_executions_before_insert
+BEFORE INSERT ON launch_executions
+FOR EACH ROW
+WHEN NEW.phase <> 'PRE_RESUME_READY'
+  OR NEW.post_resume_json IS NOT NULL
+  OR NEW.post_resume_digest IS NOT NULL
+  OR NEW.cleanup_json IS NOT NULL
+  OR NEW.cleanup_digest IS NOT NULL
+BEGIN
+    SELECT RAISE(ABORT, 'launch execution must begin pre-resume without post evidence');
+END;
+
 CREATE TRIGGER launch_executions_no_delete
 BEFORE DELETE ON launch_executions
 BEGIN
     SELECT RAISE(ABORT, 'launch executions cannot be deleted');
 END;
 
+CREATE TRIGGER launch_executions_post_resume_append_only
+BEFORE UPDATE ON launch_executions
+WHEN OLD.post_resume_json IS NOT NEW.post_resume_json
+  OR OLD.post_resume_digest IS NOT NEW.post_resume_digest
+BEGIN
+    SELECT CASE WHEN NOT (
+        OLD.post_resume_json IS NULL
+        AND OLD.post_resume_digest IS NULL
+        AND NEW.post_resume_json IS NOT NULL
+        AND NEW.post_resume_digest IS NOT NULL
+        AND sha256(NEW.post_resume_json) IS NEW.post_resume_digest
+        AND OLD.phase = 'PRE_RESUME_READY'
+        AND NEW.phase = 'RESUME_RECORDED'
+    ) THEN RAISE(ABORT, 'post-resume evidence is append-only') END;
+END;
+
+CREATE TRIGGER launch_executions_cleanup_append_only
+BEFORE UPDATE ON launch_executions
+WHEN OLD.cleanup_json IS NOT NEW.cleanup_json
+  OR OLD.cleanup_digest IS NOT NEW.cleanup_digest
+BEGIN
+    SELECT CASE WHEN NOT (
+        OLD.cleanup_json IS NULL
+        AND OLD.cleanup_digest IS NULL
+        AND NEW.cleanup_json IS NOT NULL
+        AND NEW.cleanup_digest IS NOT NULL
+        AND sha256(NEW.cleanup_json) IS NEW.cleanup_digest
+        AND OLD.phase = 'PRE_RESUME_READY'
+        AND NEW.phase = 'RESUME_RECORDED'
+    ) THEN RAISE(ABORT, 'cleanup evidence is append-only') END;
+END;
+
 CREATE TRIGGER terminals_no_update
 BEFORE UPDATE ON terminals
 BEGIN
     SELECT RAISE(ABORT, 'terminals are immutable');
+END;
+
+CREATE TRIGGER terminals_before_insert
+BEFORE INSERT ON terminals
+FOR EACH ROW
+BEGIN
+    SELECT CASE WHEN NOT EXISTS (
+        SELECT 1 FROM launch_reservations
+        WHERE launch_reservation_id = NEW.launch_reservation_id
+          AND request_digest IS NEW.request_digest
+    ) THEN RAISE(ABORT, 'terminal request binding differs from reservation') END;
+
+    SELECT CASE WHEN NEW.terminal_state = 'SUCCEEDED' AND NOT EXISTS (
+        SELECT 1
+        FROM launch_executions e
+        WHERE e.launch_reservation_id = NEW.launch_reservation_id
+          AND e.phase = 'RESUME_RECORDED'
+          AND e.post_resume_json IS NOT NULL
+          AND e.post_resume_digest IS NOT NULL
+          AND e.cleanup_json IS NOT NULL
+          AND e.cleanup_digest IS NOT NULL
+    ) THEN RAISE(ABORT, 'successful terminal requires resumed execution evidence') END;
+    SELECT CASE WHEN NEW.terminal_state = 'SUCCEEDED'
+        AND (NEW.provider_call_disposition <> 'CONFIRMED' OR NEW.snapshot_digest IS NULL)
+        THEN RAISE(ABORT, 'successful terminal matrix entry is invalid') END;
+    SELECT CASE WHEN NEW.terminal_state = 'AMBIGUOUS'
+        AND (NEW.provider_call_disposition <> 'MAY_HAVE_OCCURRED' OR NEW.snapshot_digest IS NOT NULL)
+        THEN RAISE(ABORT, 'ambiguous terminal matrix entry is invalid') END;
+    SELECT CASE WHEN NEW.terminal_state = 'AMBIGUOUS' AND NOT EXISTS (
+        SELECT 1
+        FROM launch_executions e
+        WHERE e.launch_reservation_id = NEW.launch_reservation_id
+          AND e.phase IN ('RESUME_RECORDED', 'POST_RESUME_AMBIGUOUS')
+          AND e.post_resume_json IS NOT NULL
+          AND e.post_resume_digest IS NOT NULL
+          AND e.cleanup_json IS NOT NULL
+          AND e.cleanup_digest IS NOT NULL
+    ) THEN RAISE(ABORT, 'ambiguous terminal requires resume evidence') END;
+    SELECT CASE WHEN NEW.terminal_state = 'FAILED' AND NOT (
+        (NEW.provider_call_disposition = 'NOT_STARTED'
+         AND NEW.snapshot_digest IS NULL
+         AND EXISTS (
+             SELECT 1 FROM launch_reservations r
+             WHERE r.launch_reservation_id = NEW.launch_reservation_id
+               AND r.reservation_state = 'PROCESS_CREATION_FAILED'
+               AND r.process_creation_failure_json IS NOT NULL
+               AND r.process_creation_failure_digest IS NOT NULL
+         ))
+        OR (NEW.provider_call_disposition = 'CONFIRMED'
+            AND NEW.snapshot_digest IS NULL
+            AND EXISTS (
+                SELECT 1 FROM launch_executions e
+                WHERE e.launch_reservation_id = NEW.launch_reservation_id
+                  AND e.phase = 'RESUME_RECORDED'
+                  AND e.post_resume_json IS NOT NULL
+                  AND e.cleanup_json IS NOT NULL
+            ))
+    ) THEN RAISE(ABORT, 'failed terminal matrix entry is invalid') END;
+    SELECT CASE WHEN NEW.terminal_state = 'CLOSED' AND NOT (
+        NEW.provider_call_disposition = 'MAY_HAVE_OCCURRED'
+        AND NEW.snapshot_digest IS NULL
+        AND EXISTS (
+            SELECT 1 FROM launch_reservations r
+            WHERE r.launch_reservation_id = NEW.launch_reservation_id
+              AND r.reservation_state = 'MANUAL_REVIEW'
+        )
+    ) THEN RAISE(ABORT, 'closed terminal matrix entry is invalid') END;
 END;
 
 CREATE TRIGGER terminals_no_delete
@@ -498,8 +679,13 @@ BEGIN
     SELECT CASE WHEN NEW.recovery_ordinal <> (
         SELECT next_recovery_ordinal FROM sessions WHERE session_id = NEW.session_id
     ) THEN RAISE(ABORT, 'recovery ordinal is not the session counter') END;
-    SELECT CASE WHEN NEW.predecessor_state = NEW.resulting_state
-        THEN RAISE(ABORT, 'recovery state transition is empty') END;
+    SELECT CASE WHEN EXISTS (
+        SELECT 1 FROM manual_recoveries
+        WHERE session_id = NEW.session_id
+          AND target_kind = NEW.target_kind
+          AND target_id = NEW.target_id
+          AND action = NEW.action
+    ) THEN RAISE(ABORT, 'recovery action already recorded for target') END;
     SELECT CASE WHEN NEW.target_kind = 'SESSION' AND NOT EXISTS (
         SELECT 1 FROM sessions
         WHERE session_id = NEW.target_id AND session_id = NEW.session_id
@@ -530,6 +716,83 @@ BEGIN
         JOIN attempts a ON a.attempt_id = c.attempt_id
         WHERE t.terminal_id = NEW.target_id AND a.session_id = NEW.session_id
     ) THEN RAISE(ABORT, 'recovery terminal target binding is invalid') END;
+
+    SELECT CASE WHEN NOT (
+        (NEW.action = 'RECORD_ATTEMPT_AMBIGUITY'
+         AND NEW.target_kind = 'ATTEMPT'
+         AND NEW.predecessor_state = 'LAUNCH_RESERVED'
+         AND NEW.resulting_state = 'AMBIGUITY_RECORDED'
+         AND EXISTS (
+             SELECT 1 FROM attempts a
+             WHERE a.attempt_id = NEW.target_id
+               AND a.state = 'LAUNCH_RESERVED'
+         )
+         AND EXISTS (
+             SELECT 1
+             FROM provider_call_claims c
+             JOIN launch_reservations r ON r.claim_id = c.claim_id
+             JOIN launch_executions e ON e.launch_reservation_id = r.launch_reservation_id
+             WHERE c.attempt_id = NEW.target_id
+               AND e.phase = 'RESUME_RECORDED'
+               AND e.post_resume_json IS NOT NULL
+               AND e.cleanup_json IS NOT NULL
+         ))
+        OR (NEW.action = 'RECORD_CLAIM_AMBIGUITY'
+            AND NEW.target_kind = 'CLAIM'
+            AND NEW.predecessor_state = 'COMMITTED'
+            AND NEW.resulting_state = 'AMBIGUITY_RECORDED'
+            AND EXISTS (
+                SELECT 1
+                FROM launch_reservations r
+                JOIN launch_executions e ON e.launch_reservation_id = r.launch_reservation_id
+                WHERE r.claim_id = NEW.target_id
+                  AND e.phase = 'RESUME_RECORDED'
+                  AND e.post_resume_json IS NOT NULL
+                  AND e.cleanup_json IS NOT NULL
+            ))
+        OR (NEW.action = 'CLASSIFY_LAUNCH_RESERVATION'
+            AND NEW.target_kind = 'LAUNCH_RESERVATION'
+            AND NEW.predecessor_state = 'COMMITTED'
+            AND NEW.resulting_state = 'MANUAL_REVIEW'
+            AND EXISTS (
+                SELECT 1 FROM launch_reservations
+                WHERE launch_reservation_id = NEW.target_id
+                  AND reservation_state = 'COMMITTED'
+            ))
+        OR (NEW.action = 'SELECT_COMMITTED_SUCCESS'
+            AND NEW.target_kind = 'TERMINAL'
+            AND NEW.predecessor_state = 'SUCCEEDED'
+            AND NEW.resulting_state = 'SUCCESS_SELECTED'
+            AND EXISTS (
+                SELECT 1 FROM terminals
+                WHERE terminal_id = NEW.target_id
+                  AND terminal_state = 'SUCCEEDED'
+                  AND provider_call_disposition = 'CONFIRMED'
+                  AND snapshot_digest IS NOT NULL
+            ))
+        OR (NEW.action = 'CLOSE_SESSION'
+            AND NEW.target_kind = 'SESSION'
+            AND NEW.predecessor_state = 'OPEN'
+            AND NEW.resulting_state = 'CLOSED'
+            AND NOT EXISTS (
+                SELECT 1 FROM attempts
+                WHERE session_id = NEW.target_id
+                  AND state NOT IN ('TERMINAL_RECORDED', 'SUCCESS_SELECTED', 'CLOSED')
+            )
+            AND NOT EXISTS (
+                SELECT 1
+                FROM terminals t
+                JOIN launch_reservations r ON r.launch_reservation_id = t.launch_reservation_id
+                JOIN provider_call_claims c ON c.claim_id = r.claim_id
+                JOIN attempts a ON a.attempt_id = c.attempt_id
+                WHERE a.session_id = NEW.target_id
+                  AND t.terminal_state = 'AMBIGUOUS'
+            ))
+        OR (NEW.action = 'ACKNOWLEDGE_RESTORE'
+            AND NEW.target_kind = 'SESSION'
+            AND NEW.predecessor_state = 'OPEN'
+            AND NEW.resulting_state = 'RESTORE_ACKNOWLEDGED')
+    ) THEN RAISE(ABORT, 'recovery action matrix entry is invalid') END;
 END;
 
 CREATE TRIGGER manual_recoveries_after_insert

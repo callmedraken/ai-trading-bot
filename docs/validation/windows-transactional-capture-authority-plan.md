@@ -18,7 +18,7 @@ administrator check. No test may use real-money trading or place a real order.
 - Deterministic identity tests use the fixed repository namespace, exact
   material labels, and exact length-framed semantic tuples. They include a
   golden vector for the root `session_id` and for every derived identity:
-  `attempt_id`, `allocation_id`, `claim_id`, `launch_reservation_id`,
+  `migration_id`, `attempt_id`, `allocation_id`, `claim_id`, `launch_reservation_id`,
   `launch_execution_id`, `terminal_id`, `selection_id`, and `recovery_id`.
   Each vector records the exact framed UTF-8 preimage and expected lowercase
   UUID5 result so a test cannot pass by merely recomputing the implementation.
@@ -42,6 +42,20 @@ administrator check. No test may use real-money trading or place a real order.
 - A passing focused test is not an operational approval. Unattended scheduling
   remains NO-GO until the separately listed prerequisites are approved.
 
+The required `migration_id/v1` golden vector is:
+
+```text
+authority_epoch_id       = 12345678-1234-5678-9abc-def012345678
+schema_version           = 3
+migration_policy_version = migration-policy/v1
+framed UTF-8 preimage    = 15:migration_id/v136:12345678-1234-5678-9abc-def0123456781:319:migration-policy/v1
+migration_id             = b1114fec-2247-506d-bfda-74008355b312
+```
+
+The expected UUID5 namespace is the architecture constant
+`7c2d5a44-3b2e-5f8f-9a1c-6d4e7b8f9012`; the vector is rejected if the
+implementation derives it from either digest or from serialized row bytes.
+
 ## Invariant-to-evidence matrix
 
 | Architecture invariant | Planned automated evidence | Planned manual Windows evidence | Failure meaning |
@@ -55,10 +69,11 @@ administrator check. No test may use real-money trading or place a real order.
 | Owner, DACL, inheritance, reparse, final-path, and local-volume requirements hold | ACL decision tests for missing/extra ACEs, inherited write, wrong owner, reparse metadata, path mismatch, UNC/volume mismatch, and inaccessible handles | Inspect every object with Windows security tools; attempt Trading writes, deletes, renames, ACL changes, bootstrap replacement, directory replacement, junction creation, and copied-root execution | Any writable trust material or path alias is a fail-closed result |
 | Trading has only exact SQLite and capture-output rights | Access tests assert permitted database page/persistent-journal/lock operations and denied trust/backup operations | Run the authority as Trading; verify bootstrap is readable, database and pre-created journal are writable/lockable, backup is inaccessible, and directory replacement is denied | An ACL workaround that grants broad directory rights is not accepted |
 | Authority metadata binds machine, epoch, bootstrap generation/digest, SID, policy, schema, and database identity | Insert altered metadata, cross-epoch rows, wrong generation, wrong digest, or wrong release digest and assert startup/transaction rejection; verify `database_identity_digest` is treated only as a database-local consistency field, never as an external freshness anchor | Restore a metadata-mismatched database and inspect the typed refusal; record that a complete internally consistent same-generation replacement has no expected detection result without independent trusted state | Mismatched authority metadata is corruption, not a repair prompt; same-generation privileged replacement remains outside the threat model |
-| Schema migrations are reviewed, append-only, and exact | Verify primary/foreign keys, unique constraints, check constraints, migration digest, one active schema, no runtime DDL, and no unreviewed migration | Start with an older or extra migration row and verify the release refuses operation | Automatic schema evolution is prohibited |
-| Proposed authority DDL has executable foreign-key and recovery-ordinal integrity | Execute the complete proposed SQLite DDL in a temporary database with `PRAGMA foreign_keys=ON`; insert one valid metadata/session/allocation/claim/reservation/recovery chain; assert the valid `launch_reservations` and `manual_recoveries` inserts succeed, mismatched epoch/session/allocation/attempt combinations are rejected, `UNIQUE(authority_epoch_id, session_id, recovery_ordinal)` rejects a duplicate, `PRAGMA foreign_key_check` returns no rows, and reservation insertion never raises `foreign key mismatch` | Run the DDL smoke script with the reviewed SQLite build and retain the schema plus `foreign_key_check` output as evidence | Any invalid parent-key sequence, accepted mismatched composite binding, duplicate recovery ordinal, `foreign_key_check` row, or foreign-key mismatch is a schema NO-GO |
+| Schema migrations are reviewed, append-only, deterministic, and exact | Verify primary/foreign keys, unique constraints, check constraints, the exact `migration_id/v1` UUID5 tuple and golden vector, independently verified `migration_digest` and `application_release_digest`, conflicting facts for an existing `migration_id`, one active schema, no runtime DDL, and no unreviewed migration | Start with an older, extra, or conflicting migration row and verify the release refuses operation | Automatic schema evolution or reuse of an identity with different facts is prohibited |
+| Proposed authority DDL has executable foreign-key and recovery-ordinal integrity | Execute the complete proposed SQLite DDL in a temporary database with `PRAGMA foreign_keys=ON`; insert one valid metadata/session/allocation/claim/reservation chain, then allocate one recovery ordinal with exactly one single-row `INSERT` into `manual_recoveries`; assert the `BEFORE INSERT` eligibility/binding checks and `AFTER INSERT` exact `+1` counter update succeed, mismatched epoch/session/allocation/attempt combinations are rejected, direct or standalone counter updates are rejected, `UNIQUE(authority_epoch_id, session_id, recovery_ordinal)` rejects a duplicate, `PRAGMA foreign_key_check` returns no rows, and reservation insertion never raises `foreign key mismatch` | Run the executable DDL smoke script with the reviewed SQLite build and retain the schema, trigger outcomes, and `foreign_key_check` output as evidence | Any invalid parent-key sequence, accepted mismatched composite binding, unpaired counter update, duplicate recovery ordinal, `PRAGMA foreign_key_check` row, or foreign-key mismatch is a schema NO-GO |
 | Canonical JSON evidence is preserved; normalized columns reconcile | Round-trip exact BLOB bytes/digests; mutate normalized columns or evidence separately; reject secrets, raw bodies, environment, stdout, stderr, and arbitrary exceptions | Inspect an authority DB and evidence bundle for exact canonical bytes and sanitized diagnostics | Evidence mutation or secret retention invalidates the record |
-| Deterministic identities and ordinal uniqueness are stable | Verify the fixed repository UUID5 namespace, exact length framing, and golden vectors for `session_id`, `attempt_id`, `allocation_id`, `claim_id`, `launch_reservation_id`, `launch_execution_id`, `terminal_id`, `selection_id`, and `recovery_id`; recovery vectors use the ordinal allocated from `sessions.next_recovery_ordinal`; same semantic inputs across paths/processes yield the same IDs; clock/UUID4/hash/object/path/serialized-byte perturbations do not change identity; changing epoch, policy, date, provider, operation, or request semantics changes the UUID5 input; duplicate `(epoch,session,ordinal)` fails | Repeat the root session and every derived identity from different directories and processes, with altered environment values and path spellings, and compare IDs/digests | Identity instability, an omitted semantic field, or duplicate ordinal is a NO-GO |
+| Deterministic identities and ordinal uniqueness are stable | Verify the fixed repository UUID5 namespace, exact length framing, and golden vectors for `session_id`, `migration_id`, `attempt_id`, `allocation_id`, `claim_id`, `launch_reservation_id`, `launch_execution_id`, `terminal_id`, `selection_id`, and `recovery_id`; the `migration_id/v1` vector uses exactly `authority_epoch_id`, `schema_version`, and `migration_policy_version`; recovery vectors use the ordinal allocated from `sessions.next_recovery_ordinal`; same semantic inputs across paths/processes yield the same IDs; clock/UUID4/hash/object/path/serialized-byte perturbations do not change identity; changing epoch, policy, date, provider, operation, or request semantics changes the UUID5 input; duplicate `(epoch,session,ordinal)` fails | Repeat the root session, migration identity, and every derived identity from different directories and processes, with altered environment values and path spellings, and compare IDs/digests | Identity instability, an omitted semantic field, or duplicate ordinal is a NO-GO |
+| Every persistent `*_id` column has an explicit identity classification | Static schema/architecture assertion maps generated identities to their exact UUID5 tuples, administrator-provisioned `machine_authority_id`/`authority_epoch_id`/`signing_key_id` facts, and child `target_*_id` values to immutable parent references; reject any unclassified persistent identity column | Review the signed bootstrap and approved key inventory against the identity classification | An unclassified or accidentally runtime-derived identity is a deterministic-authority NO-GO |
 | Session creation is atomic | Crash before/after session commit; assert both `next_ordinal=0` and `next_recovery_ordinal=0`; duplicate exact session and conflicting session tests | Kill the process during session creation and inspect the database and persistent journal | Partial session facts, nonzero initial counter, or overwrite is a failure |
 | Allocation consumes one ordinal atomically | Concurrent `BEGIN IMMEDIATE` allocation race; crash before and after commit; unique ordinal/attempt checks | Run two Trading processes against one session and inspect one committed allocation per ordinal | Lost, reused, or silently skipped ordinals are failures |
 | Exactly one permanent provider-call claim exists per allocation | Concurrent duplicate-claim race; `UNIQUE(allocation_id)` and attempt uniqueness; claim deletion/expiry/reclamation/repair attempts fail | Kill/restart around claim commit and verify the committed row remains and cannot be replaced | A second claim or claim deletion is a NO-GO |
@@ -78,7 +93,7 @@ administrator check. No test may use real-money trading or place a real order.
 | Manual recovery is explicit, session-scoped, atomic, and non-authoritative for provider calls | Race two `BEGIN IMMEDIATE` recovery transactions in one session; require consecutive ordinals from `next_recovery_ordinal`, one row/counter/state commit per transaction, `UNIQUE(authority_epoch_id, session_id, recovery_ordinal)` duplicate rejection, UUID5 golden vectors using the allocated ordinal, and fail-closed rejection of counter regression, skipped ordinals, reassignment, standalone updates, and absorbing-state mutation; classify a reservation left committed without a known process after a crash; reject claim/reservation creation or deletion, provider calls, falsified `NOT_STARTED`, and recovery from closed success | Administrator signs/records each recovery classification and action; Trading cannot author recovery or alter history; run two separate sessions and verify each independently begins at recovery ordinal zero without conflict | Recovery must explain uncertainty, preserve row/counter/state atomicity, never erase it, reopen a consumed reservation, or mutate `SUCCESS_SELECTED`/`CLOSED` |
 | PERSIST, synchronous, foreign keys, one-database scope, lock waits, and integrity checks are fixed | Assert `PERSIST`, `FULL`, foreign keys, no `ATTACH`, no `VACUUM`, no runtime DDL/automatic migration, bounded pre-claim `BEGIN IMMEDIATE` waits, local-file assumptions, `quick_check`, `foreign_key_check`, and full integrity-check results | Inspect SQLite pragmas and file locks on Windows; hold locks and corrupt a copy only, not the live authority | Unsupported durability, extra database attachment, or corruption must fail closed |
 | PERSIST journal lifecycle is compatible with the exact ACL | Provision the main database and persistent rollback journal in advance; assert normal transactions never require journal recreation, deletion, rename, or arbitrary directory creation; fail the test if those rights are requested | Run under the exact Trading DACL, interrupt transactions, inspect journal persistence, and verify the authority refuses rather than weakening directory permissions when the build needs recreation | PERSIST failure under the approved ACL is a Milestone B blocker; broker service is the fallback architecture decision |
-| Database and persistent-journal backups are consistent and signed | Validate SQLite online-backup API output or a fully quiesced reviewed main-database/journal copy; reject main-file-only or active-journal copies; validate backup manifest, DB digest, bootstrap digest/signature, schema, and release digest | Administrator performs online and quiesced file-level backup drills; Trading cannot read backup | An inconsistent or unsigned backup is not recoverable authority |
+| Database and persistent-journal backups are consistent and independently signed | Validate SQLite online-backup API output or a fully quiesced reviewed main-database/journal copy; build canonical `backup_manifest/v1` bytes; compute SHA-256 database/journal/manifest digests; verify the offline domain-separated CNG P-256/SHA-256 P1363 signature and signer key ID; reject unsigned manifests, copied bootstrap signatures, altered DB/journal digests, wrong epoch/generation/schema/release, wrong signing purpose/key, malformed or noncanonical envelopes, and manifest/backup mismatches | Administrator performs online and quiesced file-level backup drills, signs the manifest offline, verifies the independent manifest signature before staging restore, and confirms Trading cannot read backup material | An inconsistent, unsigned, bootstrap-signed, malformed, wrong-fact, or mismatched backup is not recoverable authority |
 | Rollback cases visible through independently retained signed/bootstrap state fail closed | In isolated copies, test an older-generation database, altered bootstrap or signature, mismatched database/bootstrap digest, copied or cloned root, path alias, and old-epoch executable restart; assert refusal before mutation, process creation, credentials, or provider access. Do not require detection of an internally consistent same-generation database/persistent-journal replacement; record that the database cannot prove its own freshness without independent trusted state | Administrator validates each detectable mismatch and confirms the old-epoch executable path is blocked. A same-generation replacement by Administrator/SYSTEM or trusted-token code is recorded as outside the threat model, not as a passing detection test | Accepting a detectable mismatch or reusing an old epoch is a NO-GO; inability to detect the explicitly out-of-boundary same-generation replacement is not a failure of this milestone |
 | Corruption and unavailable material fail closed | Remove/lock/corrupt DB, persistent journal, bootstrap, signature, output root, or backup; assert no new DB, journal deletion/recreation, repair, process, SID, credential, provider, or transport | Stop/rename only test copies, interrupt access, and observe stable refusal and preserved forensic files | Unavailability must never cause fallback or claim inference |
 | Schema-1/2 JSON remains historical-only | Parse/verify existing schema-1/2 fixtures and legacy-success diagnostics; assert no row or executable claim is imported | Point a validation-only tool at legacy roots and then run the authority; verify SQLite remains independent | Legacy artifacts must not authorize a call |
@@ -157,12 +172,22 @@ unique consecutive recovery ordinals. It proves that:
   `UNIQUE(authority_epoch_id, session_id, recovery_ordinal)`;
 - the recovery UUID5 golden vector uses the exact ordinal read from
   `sessions.next_recovery_ordinal`;
+- each application transaction allocates its ordinal with exactly one
+  single-row `INSERT` into `manual_recoveries`; no application-issued counter
+  update is used;
+- the `BEFORE INSERT` trigger rejects an ineligible/absorbing session, a
+  wrong epoch/session or target binding, a non-current ordinal, and an empty
+  state transition;
+- the `AFTER INSERT` trigger performs the sole counter write, and the counter
+  guard accepts only `OLD + 1` when the newly inserted immutable row is at the
+  old ordinal and the new counter equals the session recovery-row count;
 - crashes immediately before and after the recovery commit leave, respectively,
   no row/counter/state change or the recovery row, counter increment, and
   authorized state transition together;
-- trigger tests reject counter regression, skipped ordinals, reassignment,
-  standalone counter updates, and a recovery insertion without its paired
-  counter increment; and
+- failures from either trigger roll back the insertion statement, and trigger
+  tests reject counter regression, skipped ordinals, reassignment, no-op or
+  standalone counter updates, immutable-row updates/deletes, and any
+  unpaired counter increment; and
 - two separate sessions may each begin at recovery ordinal `0` without a
   cross-session uniqueness conflict.
 
@@ -182,6 +207,15 @@ restore procedure. It separately tests:
   exact Trading ACL;
 - older bootstrap generation;
 - altered bootstrap/signature;
+- unsigned backup manifest;
+- bootstrap signature presented as the manifest signature;
+- malformed or noncanonical manifest/signature envelopes, wrong signature
+  encoding, wrong signing purpose, or wrong signer key;
+- altered database or persistent-journal digest;
+- wrong epoch, bootstrap generation, schema version, or application release
+  digest;
+- manifest/backup file mismatch, including an invalid persistent-journal
+  absence claim;
 - attempted same-epoch executable restart after restore;
 - copied/cloned root on another path or volume;
 - path aliases and database/bootstrap digest mismatch;

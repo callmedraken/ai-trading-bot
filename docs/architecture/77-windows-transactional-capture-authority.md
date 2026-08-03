@@ -180,6 +180,13 @@ Windows CNG (`BCryptVerifySignature`) using a fixed signature encoding and
 explicit test vectors. Provisioning may sign offline with a CNG-compatible
 tool, but the private signing key is never present in the deployment tree.
 
+The fixed signature encoding is IEEE P1363: exactly 64 bytes consisting of a
+32-byte big-endian `r` followed by a 32-byte big-endian `s`; DER encoding is
+not accepted. The verifier hashes the exact canonical signed bytes with
+SHA-256 before calling `BCryptVerifySignature`. The backup-manifest signature
+uses this same primitive and encoding with the explicit
+`backup_manifest_signature/v1` domain separation described below.
+
 This is preferred here over a bundled cryptographic library because the
 Windows verifier is supplied by the operating system, avoids a runtime
 OpenSSL/PyPI dependency in the authority path, and can be constrained to the
@@ -347,8 +354,15 @@ schema_migrations(
 )
 ```
 
-The runtime accepts only the reviewed schema version. It does not run an
-unreviewed migration or silently change this table.
+`migration_id` is deterministic UUID5 material defined below. On insertion,
+the runtime recomputes it from the exact epoch, schema version, and migration
+policy version. `migration_digest` and `application_release_digest` are
+independently verified bindings to the reviewed migration and approved
+release; neither digest is substituted for an identity input. An existing
+`migration_id` with different epoch, schema, policy, migration digest, or
+release digest is conflicting authority and fails closed. The runtime accepts
+only the reviewed schema version. It does not run an unreviewed migration or
+silently change this table.
 
 `sessions` owns the session state, allocation ordinal counter, and separately
 owned manual-recovery ordinal counter:
@@ -601,6 +615,144 @@ manual_recoveries(
 )
 ```
 
+The recovery ordinal is allocated by the following executable SQLite trigger
+contract. The application issues exactly one single-row `INSERT` into
+`manual_recoveries`; it never issues an independent update of
+`sessions.next_recovery_ordinal`. SQLite triggers are immediate row triggers,
+so an `ABORT` from either trigger rolls back the insertion statement, including
+the row and the counter update made by that statement.
+
+```sql
+CREATE TRIGGER manual_recoveries_before_insert
+BEFORE INSERT ON manual_recoveries
+FOR EACH ROW
+BEGIN
+  SELECT CASE WHEN NOT EXISTS (
+    SELECT 1
+    FROM sessions
+    WHERE authority_epoch_id = NEW.authority_epoch_id
+      AND session_id = NEW.session_id
+      AND state = 'OPEN'
+  ) THEN RAISE(ABORT, 'recovery session is not eligible') END;
+
+  SELECT CASE WHEN NEW.recovery_ordinal <> (
+    SELECT next_recovery_ordinal
+    FROM sessions
+    WHERE authority_epoch_id = NEW.authority_epoch_id
+      AND session_id = NEW.session_id
+  ) THEN RAISE(ABORT, 'recovery ordinal is not the session counter') END;
+
+  SELECT CASE WHEN NEW.target_allocation_id IS NOT NULL AND NOT EXISTS (
+    SELECT 1
+    FROM allocations
+    WHERE authority_epoch_id = NEW.authority_epoch_id
+      AND session_id = NEW.session_id
+      AND allocation_id = NEW.target_allocation_id
+  ) THEN RAISE(ABORT, 'recovery allocation binding is invalid') END;
+
+  SELECT CASE WHEN NEW.target_claim_id IS NOT NULL AND NOT EXISTS (
+    SELECT 1
+    FROM provider_call_claims
+    WHERE authority_epoch_id = NEW.authority_epoch_id
+      AND session_id = NEW.session_id
+      AND claim_id = NEW.target_claim_id
+  ) THEN RAISE(ABORT, 'recovery claim binding is invalid') END;
+
+  SELECT CASE WHEN NEW.target_launch_reservation_id IS NOT NULL AND NOT EXISTS (
+    SELECT 1
+    FROM launch_reservations
+    WHERE authority_epoch_id = NEW.authority_epoch_id
+      AND session_id = NEW.session_id
+      AND launch_reservation_id = NEW.target_launch_reservation_id
+  ) THEN RAISE(ABORT, 'recovery reservation binding is invalid') END;
+
+  SELECT CASE WHEN NEW.target_terminal_id IS NOT NULL AND NOT EXISTS (
+    SELECT 1
+    FROM terminals t
+    JOIN provider_call_claims c
+      ON c.authority_epoch_id = t.authority_epoch_id
+     AND c.claim_id = t.claim_id
+    WHERE t.authority_epoch_id = NEW.authority_epoch_id
+      AND t.terminal_id = NEW.target_terminal_id
+      AND c.session_id = NEW.session_id
+  ) THEN RAISE(ABORT, 'recovery terminal binding is invalid') END;
+
+  SELECT CASE WHEN NEW.predecessor_state = NEW.resulting_state
+    THEN RAISE(ABORT, 'recovery state transition is empty') END;
+END;
+
+CREATE TRIGGER manual_recoveries_after_insert
+AFTER INSERT ON manual_recoveries
+FOR EACH ROW
+BEGIN
+  UPDATE sessions
+  SET next_recovery_ordinal = next_recovery_ordinal + 1
+  WHERE authority_epoch_id = NEW.authority_epoch_id
+    AND session_id = NEW.session_id
+    AND next_recovery_ordinal = NEW.recovery_ordinal;
+
+  SELECT CASE WHEN NOT EXISTS (
+    SELECT 1
+    FROM sessions
+    WHERE authority_epoch_id = NEW.authority_epoch_id
+      AND session_id = NEW.session_id
+      AND next_recovery_ordinal = NEW.recovery_ordinal + 1
+  ) THEN RAISE(ABORT, 'recovery counter was not incremented exactly once') END;
+END;
+
+CREATE TRIGGER sessions_recovery_counter_guard
+BEFORE UPDATE OF next_recovery_ordinal ON sessions
+FOR EACH ROW
+BEGIN
+  SELECT CASE WHEN NEW.next_recovery_ordinal = OLD.next_recovery_ordinal
+    THEN RAISE(ABORT, 'standalone recovery counter update') END;
+
+  SELECT CASE WHEN NEW.next_recovery_ordinal <> OLD.next_recovery_ordinal + 1
+    THEN RAISE(ABORT, 'recovery counter must advance by one') END;
+
+  SELECT CASE WHEN NOT EXISTS (
+    SELECT 1
+    FROM manual_recoveries
+    WHERE authority_epoch_id = OLD.authority_epoch_id
+      AND session_id = OLD.session_id
+      AND recovery_ordinal = OLD.next_recovery_ordinal
+  ) THEN RAISE(ABORT, 'counter update has no paired recovery row') END;
+
+  SELECT CASE WHEN NEW.next_recovery_ordinal <> (
+    SELECT COUNT(*)
+    FROM manual_recoveries
+    WHERE authority_epoch_id = OLD.authority_epoch_id
+      AND session_id = OLD.session_id
+  ) THEN RAISE(ABORT, 'counter does not equal committed recovery count') END;
+END;
+
+CREATE TRIGGER manual_recoveries_no_update
+BEFORE UPDATE ON manual_recoveries
+FOR EACH ROW
+BEGIN
+  SELECT RAISE(ABORT, 'manual recovery rows are immutable');
+END;
+
+CREATE TRIGGER manual_recoveries_no_delete
+BEFORE DELETE ON manual_recoveries
+FOR EACH ROW
+BEGIN
+  SELECT RAISE(ABORT, 'manual recovery rows cannot be deleted');
+END;
+```
+
+The guard is deliberately a proof over committed rows, not an impossible
+per-statement flag. Before the `AFTER INSERT` update, the new immutable row
+exists at `OLD.next_recovery_ordinal`; after the update, the counter is exactly
+one greater and equals the session's recovery-row count. A direct update has
+no newly inserted row at the old counter and fails; a regression, skip, no-op,
+or second increment fails. The before-insert ordinal check and no-update/no-
+delete triggers prevent a caller from manufacturing the guard's proof. The
+application's transaction verifier performs the action-specific policy,
+target digest, operator-evidence, and requested-transition checks before the
+single insert; the trigger performs the structural identity and eligibility
+checks that SQLite can evaluate immediately.
+
 Foreign-key and trigger rules reject cross-epoch references, mismatched
 session/allocation/claim/reservation/terminal identities, duplicate
 allocations or launch reservations, updates to canonical facts, deletes,
@@ -706,6 +858,7 @@ Every derived identity has a separate material label and exact tuple:
 
 | Identity | Exact UUID5 tuple after the material label |
 | --- | --- |
+| `migration_id` | `authority_epoch_id, schema_version, migration_policy_version` |
 | `attempt_id` | `authority_epoch_id, session_id, ordinal, provider_id, permitted_provider_operation, claim_policy_version, capture_request/v1` |
 | `allocation_id` | `authority_epoch_id, session_id, attempt_id, ordinal, allocation_schema, claim_policy_version, provider_id, permitted_provider_operation` |
 | `claim_id` | `authority_epoch_id, allocation_id, attempt_id, claim_schema, claim_policy_version, provider_id, permitted_provider_operation, provider_call_budget` |
@@ -716,7 +869,7 @@ Every derived identity has a separate material label and exact tuple:
 | `recovery_id` | `authority_epoch_id, session_id, target_allocation_id-or-empty, target_claim_id-or-empty, target_launch_reservation_id-or-empty, target_terminal_id-or-empty, action, predecessor_state, resulting_state, recovery_schema, recovery_policy_version, recovery_ordinal` |
 
 The material labels are respectively
-`attempt_id/v1`, `allocation_id/v1`, `claim_id/v1`,
+`migration_id/v1`, `attempt_id/v1`, `allocation_id/v1`, `claim_id/v1`,
 `launch_reservation_id/v1`, `launch_execution_id/v1`, `terminal_id/v1`,
 `selection_id/v1`, and `recovery_id/v1`. `recovery_ordinal` is an explicit
 per-session ordinal allocated from `sessions.next_recovery_ordinal`, not
@@ -727,6 +880,28 @@ serialized artifact bytes. No identity uses clocks, UUID4, Python hashes,
 object identity, locale, filesystem paths, secrets, serialized artifact
 bytes, or database row order. Distinct tuples have distinct UUID5 inputs;
 the usual cryptographic collision assumption applies to the UUID5 result.
+
+The exact migration identity is:
+
+```text
+migration_id = UUID5(
+  TRANSACTIONAL_IDENTITY_NAMESPACE_UUID,
+  LF("migration_id/v1") ||
+  LF(authority_epoch_id) ||
+  LF(schema_version) ||
+  LF(migration_policy_version)
+)
+```
+
+All persistent identity columns have one of these classifications:
+
+| Columns | Classification |
+| --- | --- |
+| `session_id`, `attempt_id`, `allocation_id`, `claim_id`, `launch_reservation_id`, `launch_execution_id`, `terminal_id`, `selection_id`, `recovery_id`, `migration_id` | Deterministic UUID5 identities with the exact material above. |
+| `machine_authority_id`, `authority_epoch_id`, `signing_key_id` | Administrator-provisioned authority/key facts bound by the signed bootstrap or approved key inventory; they are not runtime-derived UUID5 values. |
+| `session_id`, `allocation_id`, `attempt_id`, `claim_id`, `launch_reservation_id`, `terminal_id`, and other `target_*_id` copies in child rows | Immutable foreign-key references to the parent identity; they do not introduce a second identity tuple. Composite bindings and trigger checks require the reference to belong to the same epoch and session. |
+
+No other persistent `*_id` column is an independently generated identity.
 
 The unique `(authority_epoch_id, session_id, ordinal)` constraint and the
 unique attempt, claim, and launch-reservation constraints make a second
@@ -920,7 +1095,8 @@ counter or append a recovery row after the session reaches `SUCCESS_SELECTED`
 or `CLOSED`. `SELECT_COMMITTED_SUCCESS` and `CLOSE_SESSION` are the actions
 that enter those absorbing states.
 
-The recovery operation is one `BEGIN IMMEDIATE` transaction:
+The recovery operation is one `BEGIN IMMEDIATE` transaction and has exactly
+one application SQL primitive for ordinal allocation:
 
 1. Verify the current epoch, the `OPEN` session, target identities and
    digests, predecessor state, operator evidence, recovery policy, and
@@ -929,21 +1105,29 @@ The recovery operation is one `BEGIN IMMEDIATE` transaction:
 2. Read `sessions.next_recovery_ordinal` for that session.
 3. Construct `recovery_id` from that exact recovery ordinal using the
    deterministic recovery UUID5 material.
-4. Insert one immutable `manual_recoveries` row with that ordinal.
-5. Increment `sessions.next_recovery_ordinal` by exactly one.
-6. Apply the action's authorized state transition: record ambiguity, classify
+4. Insert exactly one immutable `manual_recoveries` row with that ordinal.
+   The `BEFORE INSERT` trigger verifies session eligibility, the exact ordinal,
+   epoch/session and target bindings, and structural recovery facts. Its
+   `AFTER INSERT` trigger increments `next_recovery_ordinal` by exactly one;
+   no application-issued counter update is permitted.
+5. Apply the action's authorized state transition: record ambiguity, classify
    a consumed launch reservation, select an already committed and verified
    success, close a session, or acknowledge an administrator-approved restore.
    Reservation classification never deletes, resets, or reopens the
    reservation and never authorizes another launch or provider call.
-7. Commit the recovery row, counter increment, and state transition together.
+6. Commit the recovery row, trigger-owned counter increment, and state
+   transition together.
 
-Triggers and invariants require the counter update and recovery insertion to
-form one pair: the new counter must equal the old counter plus one, and the
-inserted `recovery_ordinal` must equal the old counter. They reject regression,
-skipped ordinals, reassignment, duplicate ordinals, standalone counter
-updates, recovery insertion without the paired increment, and state
-regression. The absorbing session and allocation states remain absorbing.
+The executable trigger pair requires the inserted `recovery_ordinal` to equal
+the old counter, requires the trigger-owned counter update to be exactly
+`OLD + 1`, and requires the new counter to equal the immutable recovery-row
+count for that session. It rejects regression, skipped ordinals,
+reassignment, duplicate ordinals, no-op or standalone counter updates,
+recovery insertion without the paired increment, and state regression. The
+guard does not require both the application and a trigger to update the
+counter; the application performs only the insert and the `AFTER INSERT`
+trigger is the sole allowed writer for this transition. The absorbing session
+and allocation states remain absorbing.
 Manual recovery never creates or deletes a claim, invokes a provider, changes
 canonical evidence, or converts uncertainty into `NOT_STARTED`; it cannot
 authorize another launch, claim, or provider call.
@@ -1009,8 +1193,9 @@ alternate ordinal.
 An administrator performs a consistent SQLite online backup, or a fully
 quiesced reviewed file backup, and records the backup result, database digest,
 bootstrap digest/generation, schema version, and application release digest in
-an administrator-only manifest. The signed bootstrap and detached signature
-are copied with that manifest; the offline signing private key is never
+an administrator-only signed manifest. The signed bootstrap and its detached
+signature are copied with that manifest, but the bootstrap signature is never
+presented as the manifest signature. The offline signing private key is never
 copied.
 
 A fully quiesced file backup stops all authority writers, verifies that no
@@ -1019,6 +1204,72 @@ journal as one reviewed set, and validates the copy with SQLite integrity and
 digest checks. A main-file-only copy or a copy while the journal is active is
 invalid. The procedure never deletes or recreates the live journal to make a
 backup appear clean.
+
+#### Signed `backup_manifest/v1` envelope
+
+The accepted backup consists of the reviewed backup files,
+`authority.backup-manifest.json`, and a separate
+`authority.backup-manifest.sig`. The manifest body is one canonical JSON
+`backup_manifest/v1` object with exactly these semantic members:
+
+```text
+{
+  "application_release_digest": "<64 lowercase hex SHA-256>",
+  "authority_epoch_id": "<canonical UUID text>",
+  "backup_method": "SQLITE_ONLINE_BACKUP" | "QUIESCED_FILE_COPY",
+  "backup_result": "SUCCESS",
+  "bootstrap_digest": "<64 lowercase hex SHA-256>",
+  "bootstrap_generation": <positive integer>,
+  "created_at_utc": "<canonical UTC timestamp>",
+  "database_digest": "<64 lowercase hex SHA-256>",
+  "digest_algorithm": "SHA-256",
+  "machine_authority_id": "<canonical administrator-provisioned fact>",
+  "manifest_schema": 1,
+  "persistent_journal_digest": "<64 lowercase hex SHA-256>" | null,
+  "persistent_journal_state": "PRESENT" | "REVIEWED_ABSENT",
+  "schema_version": <positive integer>,
+  "signer_key_id": "<approved key identifier>",
+  "signature_encoding": "ECDSA_P256_SHA256_P1363",
+  "signing_purpose": "backup_manifest/v1"
+}
+```
+
+The canonical bytes are UTF-8 JSON with no BOM, no insignificant whitespace,
+lexicographically sorted object members, exact lowercase field spellings,
+canonical integer and timestamp representations, and no duplicate or
+unknown members. Digest strings are lowercase hexadecimal encodings of the
+raw 32-byte SHA-256 digest. `persistent_journal_digest` is required when the
+state is `PRESENT` and must be JSON `null` when the state is
+`REVIEWED_ABSENT`; an absence state is accepted only when the reviewed backup
+method produced no journal artifact and the administrator recorded that fact.
+`backup_result=SUCCESS` is not inferred from a copied file: the database and,
+when present, journal bytes must match the manifest digests.
+
+The signature envelope is canonical JSON with exactly
+`signature_envelope_schema=1`, `signature_domain`, `signer_key_id`,
+`manifest_digest`, `signature_encoding`, and `signature` members. Its
+`signature_domain` is exactly `backup_manifest_signature/v1`, its
+`manifest_digest` is `SHA-256(canonical backup_manifest/v1 bytes)`, and its
+`signature` is fixed-width IEEE P1363 ECDSA: 32-byte big-endian `r` followed
+by 32-byte big-endian `s`, encoded as base64url without padding. The CNG
+verifier hashes the domain-separated bytes
+`LF("backup_manifest_signature/v1") || canonical_manifest_bytes` with
+SHA-256 and verifies that hash using the approved NIST P-256 public key and
+`BCryptVerifySignature`.
+
+The verifier requires `signer_key_id` to equal the approved offline key ID
+bound by the signed bootstrap/key inventory, requires the exact manifest
+purpose and signature domain, and verifies both the manifest digest and the
+signature. This is cryptographic domain separation from the bootstrap
+signature: a copied bootstrap signature, even with a matching key ID, cannot
+verify the manifest. The private key is never copied with the backup.
+
+Backup acceptance and restore validation fail closed for unsigned manifests,
+bootstrap signatures presented as manifest signatures, altered database or
+journal digests, wrong epoch or generation, wrong schema or release digest,
+wrong signing purpose or key, malformed or noncanonical body/signature
+envelopes, invalid digest/signature encodings, and any manifest/backup file
+mismatch.
 
 ## 7. Child and launcher integration
 
@@ -1097,12 +1348,15 @@ authority from legacy artifacts.
 
 Restore is administrator-only and begins by preserving the failed database and
 the persistent journal for forensic review. The candidate backup is restored
-to an isolated staging path, then validated as historical evidence for exact
-owner/DACL/reparse/final-path semantics, independently retained signed
-bootstrap generation and digest, machine authority, epoch, schema migrations,
-SQLite integrity, foreign keys, canonical evidence digests, state
-transitions, claims, and ambiguity facts. It is never made executable by
-copying it over the live path.
+to an isolated staging path. Before any SQLite acceptance, the administrator
+parses the canonical `backup_manifest/v1`, verifies its independent
+domain-separated signature and manifest digest, matches the database and
+persistent-journal bytes to the recorded digests, and reconciles the signed
+bootstrap generation/digest, machine authority, epoch, schema, and release
+facts. Only then is the candidate validated as historical evidence for exact
+owner/DACL/reparse/final-path semantics, schema migrations, SQLite integrity,
+foreign keys, canonical evidence digests, state transitions, claims, and
+ambiguity facts. It is never made executable by copying it over the live path.
 
 Rollback rejection is required only where independently retained trusted state
 can show a mismatch: an older-generation database, an epoch that does not
@@ -1130,6 +1384,9 @@ authority.
 - Missing, unreadable, unsigned, mismatched, or invalid bootstrap/signature:
   stop before database mutation, process creation, SID access, Credential
   Manager access, provider construction, or transport.
+- Missing, unsigned, malformed, noncanonical, wrongly purposed, wrongly keyed,
+  or digest-mismatched backup manifest: reject the backup before restore
+  validation. A copied bootstrap signature is not a manifest signature.
 - Missing, unreadable, locked-inconsistently, corrupt, or mismatched database
   or persistent journal: do not create a new database at the pinned path,
   delete or recreate the journal, repair in place, or call a provider.
@@ -1183,15 +1440,16 @@ and restore manifest contract.
 automatic migrations, claim-file fallback, or runtime implementation in this
 documentation milestone.
 
-**Focused tests:** exact deterministic identity vectors for the root session and
-every derived identity; executable SQLite DDL smoke validation with
+**Focused tests:** exact deterministic identity vectors for the root session,
+`migration_id`, and every derived identity; executable SQLite DDL smoke validation with
 `PRAGMA foreign_keys=ON`, valid and mismatched launch-reservation inserts, and
 `PRAGMA foreign_key_check`; schema/foreign-key/trigger checks; concurrent
 session/allocation/recovery-ordinal allocation; duplicate claim and
 launch-reservation races; recovery counter/state atomicity and absorbing-state
 rejection; crash-injected boundaries; PERSIST durability and journal lifecycle;
-integrity checks; backup/restore; and fail-closed rejection of rollback cases
-that conflict with independently retained signed/bootstrap state.
+integrity checks; canonical signed backup-manifest bytes, independent
+signature verification, backup/restore; and fail-closed rejection of rollback
+cases that conflict with independently retained signed/bootstrap state.
 
 **Manual Windows validation:** run multiple approved processes under the
 dedicated account; inspect PERSIST journal locking and ACLs; stop/kill at each

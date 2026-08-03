@@ -106,6 +106,14 @@ singleton key constrained to `1`. It is immutable and cannot be deleted.
 identities. They are administrator-provisioned facts bound by the signed
 bootstrap.
 
+The permitted provider contract is the existing public
+`trading_bot.market_data.ALPACA_DAILY_SNAPSHOT_DESCRIPTOR`, whose exact
+`provider_id` is `alpaca-market-data` and whose exact `operation` is
+`historical-stock-bars-v2-raw-usd-no-asof`. The signed bootstrap and immutable
+`authority_metadata` row own those two strings. The authority design does not
+define aliases or a second authority-specific provider contract; this keeps it
+compatible with `DailySnapshotCaptureConfig` and the strict Alpaca adapter.
+
 ### 2.2 schema_migrations
 
 `schema_migrations` is an append-only direct child of metadata. It stores
@@ -133,6 +141,17 @@ must both be null before closure, may be populated exactly once while moving
 either `OPEN` or `SUCCESS_SELECTED` to `CLOSED`, and cannot thereafter be
 replaced, cleared, partially changed, or changed by a same-state `CLOSED`
 update. Session identity and request evidence are immutable.
+
+Session creation reconciles the proposed request before canonicalization or
+identity derivation. In one `BEGIN IMMEDIATE` transaction, the reviewed
+service reads the singleton `authority_metadata` row, verifies its provider and
+operation exactly match `ALPACA_DAILY_SNAPSHOT_DESCRIPTOR`, then requires the
+request's string `provider_id` and `permitted_provider_operation` to equal the
+metadata values byte-for-byte. Missing fields, non-strings, casing changes,
+underscores, legacy labels, and alternate operation names fail closed. Only
+after those checks may the service construct canonical request bytes, derive
+`session_id`, and insert the session. Rejection leaves no session, attempt,
+claim, or consumed ordinal and cannot reach a side-effect hook.
 
 ### 2.4 attempts
 
@@ -345,6 +364,12 @@ The fixture deliberately enforces only facts that SQLite can evaluate at the
 row boundary. The reviewed transaction service and transaction tests enforce
 the multi-statement semantic contract.
 
+The signed bootstrap and immutable metadata own the permitted public Alpaca
+descriptor. The reviewed service performs descriptor and canonical-request
+semantic reconciliation before session insertion. SQLite then preserves the
+immutable canonical bytes/digest and exact descendant propagation; it does not
+parse requests to authenticate or validate external provider behavior.
+
 | SQLite schema, constraints, and triggers | Reviewed transaction service/tests |
 | --- | --- |
 | Immediate-parent foreign keys and `foreign_key_check` integrity | Workflow ordering across multiple statements and tables |
@@ -466,6 +491,12 @@ child_operation_version,
 output_policy_version
 ```
 
+For the documented vectors, `provider_id` and
+`permitted_provider_operation` are sourced directly from the public Alpaca
+descriptor as `alpaca-market-data` and
+`historical-stock-bars-v2-raw-usd-no-asof`. They are not independent literals
+owned by this authority design.
+
 Every derived identity uses its immediate parent plus the minimum semantic
 facts needed to distinguish that row:
 
@@ -485,14 +516,14 @@ semantic example:
 
 | Identity | Expected lowercase UUID5 |
 | --- | --- |
-| `session_id` | `e5179727-d0f1-5eac-8c01-2e2105a1a9c1` |
-| `attempt_id` | `be483fa1-abe3-5721-90bc-84868cf3dd19` |
-| `claim_id` | `6ec45116-d8a8-50ea-8d94-7ac47329c7e9` |
-| `launch_reservation_id` | `222adedb-e4e7-5bbc-acc2-e7022a1785ac` |
-| `launch_execution_id` | `4ce95417-de13-569f-923b-e17d2d9854c6` |
-| `terminal_id` | `5fda0305-878a-550f-b724-a7ce775e6a30` |
-| `selection_id` | `77b12359-7413-536c-a03c-d6604588aee1` |
-| `recovery_id` | `4fa8af52-ab1d-50b5-ba95-540c4b0fbe94` |
+| `session_id` | `80e64e2b-689f-5c0f-9076-bd251b55a9ee` |
+| `attempt_id` | `550d4a64-0306-5f15-a0ab-f65722c790a2` |
+| `claim_id` | `8a3ba04b-6548-577f-9773-2b30744b929f` |
+| `launch_reservation_id` | `51e87e09-cea2-5828-8598-14dd053be048` |
+| `launch_execution_id` | `f5727d7d-dd0b-50d8-8bf3-6ff2e44414e7` |
+| `terminal_id` | `bfee46cc-85a7-5fa7-88cd-0d5468dc51ef` |
+| `selection_id` | `f10c3fc1-49b0-554a-8fa7-d36fa4d1bee8` |
+| `recovery_id` | `9aaadbb2-62af-58db-af21-b5208551ec01` |
 
 The retained migration vector is:
 
@@ -513,16 +544,19 @@ model.
 ## 6. Transaction boundaries and crash outcomes
 
 All writes in the fixture harness use one local SQLite database and
-`BEGIN IMMEDIATE`. The service verifies the fixed bootstrap/epoch/schema and
-canonical request before authority mutation. Uncommitted work rolls back;
-committed evidence is never repaired by deleting rows.
+`BEGIN IMMEDIATE`. The service verifies the fixed bootstrap/epoch/schema before
+opening the session-creation transaction, then reconciles metadata and request
+descriptor semantics before canonicalization, identity derivation, or session
+insertion. Uncommitted work rolls back; committed evidence is never repaired
+by deleting rows.
 
 The required order is:
 
 ```text
 fixed bootstrap/CNG/ACL/path verification
-  -> canonical request and digest reconciliation
-  -> session transaction
+  -> session BEGIN IMMEDIATE
+  -> read singleton metadata and reconcile the exact public Alpaca descriptor
+  -> canonical request bytes, digest, session identity, insert, and COMMIT
   -> attempt ordinal transaction
   -> permanent claim transaction and COMMIT
   -> credential/provider/network construction
@@ -613,6 +647,8 @@ The focused executable evidence is
   lifecycle and terminal selection;
 - one-to-one fences and same-session selection/recovery lineage;
 - deterministic identity vectors;
+- exact public Alpaca descriptor sourcing, metadata/request reconciliation,
+  drift rejection before persistence, and regenerated descendant vectors;
 - exact session-to-immediate-parent request propagation and mismatch rejection;
 - the complete terminal state/disposition matrix and append-only paired launch
   evidence rules;

@@ -13,14 +13,16 @@ from typing import Any
 
 import pytest
 
+from trading_bot.market_data import ALPACA_DAILY_SNAPSHOT_DESCRIPTOR
+
 SCHEMA_PATH = (
     Path(__file__).parents[1] / "fixtures" / "transactional_authority_schema.sql"
 )
 NAMESPACE = uuid.UUID("7c2d5a44-3b2e-5f8f-9a1c-6d4e7b8f9012")
 EPOCH = "12345678-1234-5678-9abc-def012345678"
 MACHINE = "87654321-4321-8765-cba9-876543210987"
-PROVIDER = "ALPACA_MARKET_DATA"
-OPERATION = "HISTORICAL_DAILY_BARS"
+PROVIDER = ALPACA_DAILY_SNAPSHOT_DESCRIPTOR.provider_id
+OPERATION = ALPACA_DAILY_SNAPSHOT_DESCRIPTOR.operation
 POLICY = "authority-policy/v1"
 CLAIM_POLICY = "claim-policy/v1"
 RELEASE = "release/v1"
@@ -51,6 +53,18 @@ def test_fixed_authority_timestamps_are_causally_ordered() -> None:
         < TERMINAL_TIMESTAMP
         < SELECTION_TIMESTAMP
         < CLOSE_TIMESTAMP
+    )
+
+
+def test_authority_values_are_sourced_from_public_alpaca_descriptor() -> None:
+    assert ALPACA_DAILY_SNAPSHOT_DESCRIPTOR.provider_id == "alpaca-market-data"
+    assert (
+        ALPACA_DAILY_SNAPSHOT_DESCRIPTOR.operation
+        == "historical-stock-bars-v2-raw-usd-no-asof"
+    )
+    assert (PROVIDER, OPERATION) == (
+        ALPACA_DAILY_SNAPSHOT_DESCRIPTOR.provider_id,
+        ALPACA_DAILY_SNAPSHOT_DESCRIPTOR.operation,
     )
 
 
@@ -258,14 +272,21 @@ def _request(target_date: str = "2026-01-01") -> dict[str, Any]:
     }
 
 
-def _session_id(request: dict[str, Any]) -> str:
+def _session_id(
+    request: dict[str, Any],
+    *,
+    machine_authority_id: str = MACHINE,
+    authority_epoch_id: str = EPOCH,
+    authority_policy_version: str = POLICY,
+    claim_policy_version: str = CLAIM_POLICY,
+) -> str:
     return _identity(
         "session_id/v2",
-        MACHINE,
-        EPOCH,
+        machine_authority_id,
+        authority_epoch_id,
         "1",
-        POLICY,
-        CLAIM_POLICY,
+        authority_policy_version,
+        claim_policy_version,
         "capture_request/v2",
         request["target_session_date"],
         request["provider_id"],
@@ -366,7 +387,12 @@ def _install_schema(connection: sqlite3.Connection) -> None:
     connection.execute("PRAGMA foreign_keys = ON")
 
 
-def _insert_metadata(connection: sqlite3.Connection) -> None:
+def _insert_metadata(
+    connection: sqlite3.Connection,
+    *,
+    provider_id: str = PROVIDER,
+    permitted_provider_operation: str = OPERATION,
+) -> None:
     metadata = _json({"authority_epoch_id": EPOCH, "machine_authority_id": MACHINE})
     connection.execute(
         """
@@ -381,8 +407,8 @@ def _insert_metadata(connection: sqlite3.Connection) -> None:
         (
             EPOCH,
             MACHINE,
-            PROVIDER,
-            OPERATION,
+            provider_id,
+            permitted_provider_operation,
             POLICY,
             CLAIM_POLICY,
             TIMESTAMP,
@@ -429,10 +455,54 @@ def create_session(
     connection: sqlite3.Connection, request: dict[str, Any] | None = None
 ) -> str:
     request = _request() if request is None else request
-    session_id = _session_id(request)
-    request_bytes = _json(request)
     _begin(connection)
     try:
+        metadata = connection.execute(
+            """
+            SELECT authority_epoch_id, machine_authority_id, provider_id,
+                   permitted_provider_operation, authority_policy_version,
+                   claim_policy_version
+            FROM authority_metadata
+            WHERE singleton_key = 1
+            """
+        ).fetchone()
+        if metadata is None:
+            raise ValueError("authority metadata is missing")
+        (
+            authority_epoch_id,
+            machine_authority_id,
+            metadata_provider_id,
+            metadata_operation,
+            authority_policy_version,
+            claim_policy_version,
+        ) = metadata
+        if (
+            metadata_provider_id != ALPACA_DAILY_SNAPSHOT_DESCRIPTOR.provider_id
+            or metadata_operation != ALPACA_DAILY_SNAPSHOT_DESCRIPTOR.operation
+        ):
+            raise ValueError("authority metadata does not match the Alpaca descriptor")
+        if type(request) is not dict:
+            raise ValueError("session request must be an exact object")
+        request_provider_id = request.get("provider_id")
+        request_operation = request.get("permitted_provider_operation")
+        if type(request_provider_id) is not str:
+            raise ValueError("request provider_id must be a string")
+        if type(request_operation) is not str:
+            raise ValueError("request permitted_provider_operation must be a string")
+        if request_provider_id != metadata_provider_id:
+            raise ValueError("request provider_id does not match authority metadata")
+        if request_operation != metadata_operation:
+            raise ValueError(
+                "request permitted_provider_operation does not match authority metadata"
+            )
+        request_bytes = _json(request)
+        session_id = _session_id(
+            request,
+            machine_authority_id=machine_authority_id,
+            authority_epoch_id=authority_epoch_id,
+            authority_policy_version=authority_policy_version,
+            claim_policy_version=claim_policy_version,
+        )
         connection.execute(
             """
             INSERT INTO sessions (
@@ -445,9 +515,9 @@ def create_session(
             """,
             (
                 session_id,
-                EPOCH,
-                POLICY,
-                CLAIM_POLICY,
+                authority_epoch_id,
+                authority_policy_version,
+                claim_policy_version,
                 request["target_session_date"],
                 request_bytes,
                 _digest(request_bytes),
@@ -1127,6 +1197,95 @@ def db_path(tmp_path: Path) -> Path:
     return path
 
 
+@pytest.mark.parametrize(
+    (
+        "request_field",
+        "request_value",
+        "remove_field",
+        "metadata_provider_id",
+        "metadata_operation",
+    ),
+    [
+        ("provider_id", "different-provider", False, PROVIDER, OPERATION),
+        (
+            "permitted_provider_operation",
+            "different-operation",
+            False,
+            PROVIDER,
+            OPERATION,
+        ),
+        (None, None, False, "different-provider", OPERATION),
+        (None, None, False, PROVIDER, "different-operation"),
+        ("provider_id", "", False, PROVIDER, OPERATION),
+        ("permitted_provider_operation", "", False, PROVIDER, OPERATION),
+        ("provider_id", "ALPACA_MARKET_DATA", False, PROVIDER, OPERATION),
+        (
+            "permitted_provider_operation",
+            "HISTORICAL_DAILY_BARS",
+            False,
+            PROVIDER,
+            OPERATION,
+        ),
+        ("provider_id", None, True, PROVIDER, OPERATION),
+        ("permitted_provider_operation", None, True, PROVIDER, OPERATION),
+        ("provider_id", 1, False, PROVIDER, OPERATION),
+        ("permitted_provider_operation", [OPERATION], False, PROVIDER, OPERATION),
+    ],
+    ids=[
+        "request-provider-mismatch",
+        "request-operation-mismatch",
+        "metadata-provider-mismatch",
+        "metadata-operation-mismatch",
+        "blank-provider",
+        "blank-operation",
+        "legacy-provider",
+        "legacy-operation",
+        "missing-provider",
+        "missing-operation",
+        "provider-wrong-type",
+        "operation-wrong-type",
+    ],
+)
+def test_session_creation_rejects_descriptor_drift_before_persistence(
+    tmp_path: Path,
+    request_field: str | None,
+    request_value: object,
+    remove_field: bool,
+    metadata_provider_id: str,
+    metadata_operation: str,
+) -> None:
+    path = tmp_path / "descriptor-drift.sqlite3"
+    connection = _connect(path)
+    _install_schema(connection)
+    _insert_metadata(
+        connection,
+        provider_id=metadata_provider_id,
+        permitted_provider_operation=metadata_operation,
+    )
+    _insert_migration(connection)
+    side_effects = FakeSideEffects(connection)
+    request = _request()
+    if request_field is not None:
+        if remove_field:
+            del request[request_field]
+        else:
+            request[request_field] = request_value
+
+    with pytest.raises(ValueError):
+        create_session(connection, request)
+
+    assert connection.execute(
+        "SELECT count(*), coalesce(sum(next_attempt_ordinal), 0), "
+        "coalesce(sum(next_recovery_ordinal), 0) FROM sessions"
+    ).fetchone() == (0, 0, 0)
+    assert connection.execute("SELECT count(*) FROM attempts").fetchone() == (0,)
+    assert connection.execute(
+        "SELECT count(*) FROM provider_call_claims"
+    ).fetchone() == (0,)
+    assert side_effects.events == []
+    connection.close()
+
+
 def _seed_lifecycle(path: Path) -> dict[str, str]:
     connection = _connect(path)
     session_id = create_session(connection)
@@ -1257,14 +1416,21 @@ def test_identity_vectors_use_normalized_immediate_parent_material() -> None:
         0,
     )
     assert migration_id == "b1114fec-2247-506d-bfda-74008355b312"
-    assert session_id == "e5179727-d0f1-5eac-8c01-2e2105a1a9c1"
-    assert attempt_id == "be483fa1-abe3-5721-90bc-84868cf3dd19"
-    assert claim_id == "6ec45116-d8a8-50ea-8d94-7ac47329c7e9"
-    assert reservation_id == "222adedb-e4e7-5bbc-acc2-e7022a1785ac"
-    assert execution_id == "4ce95417-de13-569f-923b-e17d2d9854c6"
-    assert terminal_id == "5fda0305-878a-550f-b724-a7ce775e6a30"
-    assert selection_id == "77b12359-7413-536c-a03c-d6604588aee1"
-    assert recovery_id == "4fa8af52-ab1d-50b5-ba95-540c4b0fbe94"
+    assert session_id == "80e64e2b-689f-5c0f-9076-bd251b55a9ee"
+    assert attempt_id == "550d4a64-0306-5f15-a0ab-f65722c790a2"
+    assert claim_id == "8a3ba04b-6548-577f-9773-2b30744b929f"
+    assert reservation_id == "51e87e09-cea2-5828-8598-14dd053be048"
+    assert execution_id == "f5727d7d-dd0b-50d8-8bf3-6ff2e44414e7"
+    assert terminal_id == "bfee46cc-85a7-5fa7-88cd-0d5468dc51ef"
+    assert selection_id == "f10c3fc1-49b0-554a-8fa7-d36fa4d1bee8"
+    assert recovery_id == "9aaadbb2-62af-58db-af21-b5208551ec01"
+    assert _session_id(_request()) == session_id
+    for field, value in (
+        ("provider_id", "provider-drift"),
+        ("permitted_provider_operation", "operation-drift"),
+    ):
+        drifted_request = {**request, field: value}
+        assert _session_id(drifted_request) != session_id
 
 
 def test_valid_lifecycle_from_metadata_to_selection(db_path: Path) -> None:
@@ -1287,6 +1453,8 @@ def test_valid_lifecycle_from_metadata_to_selection(db_path: Path) -> None:
     selection_id = select_terminal(connection, session_id, terminal_id)
     expected_request = _json(request)
     expected_digest = _digest(expected_request)
+    assert b"ALPACA_MARKET_DATA" not in expected_request
+    assert b"HISTORICAL_DAILY_BARS" not in expected_request
     assert connection.execute(
         "SELECT request_json, request_digest FROM sessions WHERE session_id = ?",
         (session_id,),
@@ -1308,6 +1476,19 @@ def test_valid_lifecycle_from_metadata_to_selection(db_path: Path) -> None:
     assert connection.execute(
         "SELECT request_digest FROM terminals WHERE terminal_id = ?", (terminal_id,)
     ).fetchone() == (expected_digest,)
+    assert connection.execute(
+        "SELECT provider_id, permitted_provider_operation FROM authority_metadata"
+    ).fetchone() == (PROVIDER, OPERATION)
+    assert connection.execute(
+        "SELECT provider_id, permitted_provider_operation FROM attempts "
+        "WHERE attempt_id = ?",
+        (attempt_id,),
+    ).fetchone() == (PROVIDER, OPERATION)
+    assert connection.execute(
+        "SELECT provider_id, permitted_provider_operation FROM provider_call_claims "
+        "WHERE claim_id = ?",
+        (claim_id,),
+    ).fetchone() == (PROVIDER, OPERATION)
     assert connection.execute("SELECT state FROM sessions").fetchone() == (
         "SUCCESS_SELECTED",
     )

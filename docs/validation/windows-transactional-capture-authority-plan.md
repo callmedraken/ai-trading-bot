@@ -29,6 +29,12 @@ The fixture and tests must not discover a schema by scanning a directory or
 accept a legacy JSON claim as authority. Paths are test transport inputs only;
 they are not deterministic identity inputs.
 
+Authority provider and operation values must be sourced from the public
+`trading_bot.market_data.ALPACA_DAILY_SNAPSHOT_DESCRIPTOR`: exactly
+`alpaca-market-data` and `historical-stock-bars-v2-raw-usd-no-asof`. The test
+harness may repeat those literals only in assertions that verify the public
+descriptor; executable authority inputs must read its attributes.
+
 The trusted `Trading` account assumption is explicit. Tests cover accidental
 duplicates, cooperating approved processes, foreign-key integrity, and
 transaction ordering. They do not claim to authenticate executables or defend
@@ -36,7 +42,13 @@ against malicious direct SQL by code already controlling the trusted token.
 
 ## 2. Enforcement acceptance split
 
-The validation review must classify each assertion before accepting it:
+The validation review must classify each assertion before accepting it.
+
+The signed bootstrap and immutable `authority_metadata` own the permitted
+descriptor. The reviewed transaction helper reconciles metadata and request
+semantics before session identity construction or insertion. SQLite preserves
+the accepted canonical request bytes/digest and descendant propagation, but is
+not claimed to parse requests or authenticate external Alpaca behavior.
 
 | SQLite fixture proves | Reviewed transaction harness proves |
 | --- | --- |
@@ -135,14 +147,21 @@ The normalized derived vectors are asserted as independent golden outputs:
 
 | Identity | Expected value |
 | --- | --- |
-| `session_id` | `e5179727-d0f1-5eac-8c01-2e2105a1a9c1` |
-| `attempt_id` | `be483fa1-abe3-5721-90bc-84868cf3dd19` |
-| `claim_id` | `6ec45116-d8a8-50ea-8d94-7ac47329c7e9` |
-| `launch_reservation_id` | `222adedb-e4e7-5bbc-acc2-e7022a1785ac` |
-| `launch_execution_id` | `4ce95417-de13-569f-923b-e17d2d9854c6` |
-| `terminal_id` | `5fda0305-878a-550f-b724-a7ce775e6a30` |
-| `selection_id` | `77b12359-7413-536c-a03c-d6604588aee1` |
-| `recovery_id` | `4fa8af52-ab1d-50b5-ba95-540c4b0fbe94` |
+| `session_id` | `80e64e2b-689f-5c0f-9076-bd251b55a9ee` |
+| `attempt_id` | `550d4a64-0306-5f15-a0ab-f65722c790a2` |
+| `claim_id` | `8a3ba04b-6548-577f-9773-2b30744b929f` |
+| `launch_reservation_id` | `51e87e09-cea2-5828-8598-14dd053be048` |
+| `launch_execution_id` | `f5727d7d-dd0b-50d8-8bf3-6ff2e44414e7` |
+| `terminal_id` | `bfee46cc-85a7-5fa7-88cd-0d5468dc51ef` |
+| `selection_id` | `f10c3fc1-49b0-554a-8fa7-d36fa4d1bee8` |
+| `recovery_id` | `9aaadbb2-62af-58db-af21-b5208551ec01` |
+
+These vectors use `ALPACA_DAILY_SNAPSHOT_DESCRIPTOR.provider_id` and
+`.operation` as identity material. Repeating the same descriptor-bound inputs
+must reproduce every lowercase UUID5 value. Provider or operation drift must
+either change the pure identity material or be rejected by session creation
+before persistence. The migration vector remains unchanged because its
+material contains neither field.
 
 The review perturbs clocks, UUID4 values, Python hash seeds, object identity,
 working directories, path spellings, environment values, process IDs, and
@@ -175,6 +194,20 @@ request-byte or digest mismatch, and descendant helpers do not reconstruct the
 request. The valid-lifecycle test uses a non-default date, ordered universe,
 limit, and output policy, then compares the exact bytes/digest in every stored
 request-bearing row.
+
+Before that construction, the session helper must begin `BEGIN IMMEDIATE`,
+read the singleton metadata row, verify its provider and operation against the
+public Alpaca descriptor, and require the proposed request's two corresponding
+fields to be present strings with exact byte-for-byte equality. It must not
+normalize casing, underscores, legacy names, or alternate operation labels.
+
+Table-driven negative tests cover request provider drift, request operation
+drift, metadata provider drift, metadata operation drift, legacy
+`ALPACA_MARKET_DATA`, legacy `HISTORICAL_DAILY_BARS`, both missing fields, and
+both non-string fields. Every rejection must leave no session, attempt, or
+claim, zero ordinal consumption, and no fake side-effect event. The positive
+complete lifecycle must persist the public descriptor values in metadata,
+attempt, claim, canonical request bytes, and all dependent identity material.
 
 The focused suite asserts:
 
@@ -420,6 +453,7 @@ Run from the repository root:
 
 ```text
 .venv\Scripts\python.exe -m pytest -q tests/runtime/test_windows_transactional_capture_authority.py
+.venv\Scripts\python.exe -m pytest -q tests/market_data/test_alpaca_daily_snapshot.py tests/cli/test_daily_snapshot_config.py
 .venv\Scripts\python.exe -m pytest -q
 .venv\Scripts\ruff.exe check .
 .venv\Scripts\ruff.exe format --check .

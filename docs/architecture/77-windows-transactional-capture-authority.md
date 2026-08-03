@@ -350,7 +350,8 @@ schema_migrations(
 The runtime accepts only the reviewed schema version. It does not run an
 unreviewed migration or silently change this table.
 
-`sessions` owns the session state and ordinal counter:
+`sessions` owns the session state, allocation ordinal counter, and separately
+owned manual-recovery ordinal counter:
 
 ```text
 sessions(
@@ -361,6 +362,7 @@ sessions(
   target_session_date TEXT NOT NULL,
   state TEXT NOT NULL CHECK(state IN ('OPEN','SUCCESS_SELECTED','CLOSED')),
   next_ordinal INTEGER NOT NULL CHECK(next_ordinal >= 0),
+  next_recovery_ordinal INTEGER NOT NULL CHECK(next_recovery_ordinal >= 0),
   session_request_json BLOB NOT NULL,
   session_request_digest BLOB NOT NULL CHECK(length(session_request_digest)=32),
   created_at_utc TEXT NOT NULL,
@@ -594,6 +596,7 @@ manual_recoveries(
   operator_evidence_json BLOB NOT NULL,
   operator_evidence_digest BLOB NOT NULL CHECK(length(operator_evidence_digest)=32),
   created_at_utc TEXT NOT NULL,
+  UNIQUE(authority_epoch_id, session_id, recovery_ordinal),
   UNIQUE(authority_epoch_id, recovery_id)
 )
 ```
@@ -716,8 +719,9 @@ The material labels are respectively
 `attempt_id/v1`, `allocation_id/v1`, `claim_id/v1`,
 `launch_reservation_id/v1`, `launch_execution_id/v1`, `terminal_id/v1`,
 `selection_id/v1`, and `recovery_id/v1`. `recovery_ordinal` is an explicit
-transactionally allocated domain ordinal, not database row order. Request
-digests are stored and verified bindings, but are not substitutes for the
+per-session ordinal allocated from `sessions.next_recovery_ordinal`, not
+database row order. Request digests are stored and verified bindings, but are
+not substitutes for the
 semantic identity tuple and are not identity inputs when they represent
 serialized artifact bytes. No identity uses clocks, UUID4, Python hashes,
 object identity, locale, filesystem paths, secrets, serialized artifact
@@ -753,7 +757,8 @@ allocation and permanent claim.
 1. Begin immediate.
 2. Verify singleton metadata, current epoch, reviewed schema/policies, and the
    exact session request.
-3. Insert one `OPEN` session with `next_ordinal=0` and its request digest.
+3. Insert one `OPEN` session with `next_ordinal=0`,
+   `next_recovery_ordinal=0`, and its request digest.
 4. Commit.
 
 A crash before commit leaves no session. A crash after commit leaves the
@@ -908,21 +913,46 @@ A crash before commit leaves the prior state authoritative. After commit,
 
 ### Manual recovery
 
-1. Begin immediate and verify the current epoch, target digests, predecessor
-   state, operator evidence, recovery policy, and requested action.
-2. Insert one immutable `manual_recoveries` row.
-3. Apply only the action's allowed state transition: record ambiguity,
-   classify a consumed launch reservation (including a reservation with no
-   known process after a crash), select an already committed and verified
+Manual recovery is permitted only while the session is `OPEN` and the target
+allocation is not in an absorbing `SUCCESS_SELECTED` or `CLOSED` state. No
+manual-recovery action, including `ACKNOWLEDGE_RESTORE`, may mutate the
+counter or append a recovery row after the session reaches `SUCCESS_SELECTED`
+or `CLOSED`. `SELECT_COMMITTED_SUCCESS` and `CLOSE_SESSION` are the actions
+that enter those absorbing states.
+
+The recovery operation is one `BEGIN IMMEDIATE` transaction:
+
+1. Verify the current epoch, the `OPEN` session, target identities and
+   digests, predecessor state, operator evidence, recovery policy, and
+   requested action. Reject an absorbing session or allocation, a mismatched
+   target, or a state transition not authorized by the action.
+2. Read `sessions.next_recovery_ordinal` for that session.
+3. Construct `recovery_id` from that exact recovery ordinal using the
+   deterministic recovery UUID5 material.
+4. Insert one immutable `manual_recoveries` row with that ordinal.
+5. Increment `sessions.next_recovery_ordinal` by exactly one.
+6. Apply the action's authorized state transition: record ambiguity, classify
+   a consumed launch reservation, select an already committed and verified
    success, close a session, or acknowledge an administrator-approved restore.
    Reservation classification never deletes, resets, or reopens the
    reservation and never authorizes another launch or provider call.
-4. Commit.
+7. Commit the recovery row, counter increment, and state transition together.
 
+Triggers and invariants require the counter update and recovery insertion to
+form one pair: the new counter must equal the old counter plus one, and the
+inserted `recovery_ordinal` must equal the old counter. They reject regression,
+skipped ordinals, reassignment, duplicate ordinals, standalone counter
+updates, recovery insertion without the paired increment, and state
+regression. The absorbing session and allocation states remain absorbing.
 Manual recovery never creates or deletes a claim, invokes a provider, changes
-canonical evidence, or converts uncertainty into `NOT_STARTED`. A crash
-before commit leaves the predecessor state. A crash after commit leaves the
-manual fact and resulting absorbing state together.
+canonical evidence, or converts uncertainty into `NOT_STARTED`; it cannot
+authorize another launch, claim, or provider call.
+
+A crash before commit leaves no recovery row, consumes no ordinal, and leaves
+the predecessor state authoritative. A crash after commit preserves the
+recovery row, counter increment, and state transition together. A duplicate
+ordinal fails closed, and no failure or conflict may silently select an
+alternate ordinal.
 
 ## 6. SQLite durability and concurrency
 
@@ -949,6 +979,13 @@ manual fact and resulting absorbing state together.
   that committed claim. A busy result, unique conflict, or existing
   reservation stops that runner before process creation; it is never converted
   into a new reservation or automatic launch retry.
+- Manual recovery ordinal allocation is session-scoped and uses the same
+  `BEGIN IMMEDIATE` transaction as the recovery row and authorized state
+  transition. Two recovery transactions in one session therefore serialize
+  through `next_recovery_ordinal` and produce consecutive ordinals; separate
+  sessions may each begin at zero. No recovery counter update is valid without
+  its paired recovery insertion, and no recovery transaction is permitted
+  after `SUCCESS_SELECTED` or `CLOSED`.
 - There is no generic transaction decorator or automatic retry loop. After a
   claim commits, no provider-attempt retry is permitted. A later database
   write may be retried only as an explicitly idempotent persistence operation
@@ -1150,8 +1187,9 @@ documentation milestone.
 every derived identity; executable SQLite DDL smoke validation with
 `PRAGMA foreign_keys=ON`, valid and mismatched launch-reservation inserts, and
 `PRAGMA foreign_key_check`; schema/foreign-key/trigger checks; concurrent
-session/ordinal allocation; duplicate claim and launch-reservation races;
-crash-injected boundaries; PERSIST durability and journal lifecycle;
+session/allocation/recovery-ordinal allocation; duplicate claim and
+launch-reservation races; recovery counter/state atomicity and absorbing-state
+rejection; crash-injected boundaries; PERSIST durability and journal lifecycle;
 integrity checks; backup/restore; and fail-closed rejection of rollback cases
 that conflict with independently retained signed/bootstrap state.
 
@@ -1221,7 +1259,8 @@ single run.
 
 **Focused tests:** full session-to-selection transaction, failed and ambiguous
 terminal paths, duplicate invocation, backup/restore, rollback, output digest
-verification, and manual committed-success selection.
+verification, manual recovery ordinal allocation and crash outcomes, and
+manual committed-success selection.
 
 **Manual Windows validation:** execute only from the approved Trading account
 with the fixed bootstrap and local NTFS paths; inspect ACLs and final paths;

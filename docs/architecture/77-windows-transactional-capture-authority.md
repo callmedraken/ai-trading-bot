@@ -145,13 +145,33 @@ update. Session identity and request evidence are immutable.
 Session creation reconciles the proposed request before canonicalization or
 identity derivation. In one `BEGIN IMMEDIATE` transaction, the reviewed
 service reads the singleton `authority_metadata` row, verifies its provider and
-operation exactly match `ALPACA_DAILY_SNAPSHOT_DESCRIPTOR`, then requires the
-request's string `provider_id` and `permitted_provider_operation` to equal the
-metadata values byte-for-byte. Missing fields, non-strings, casing changes,
-underscores, legacy labels, and alternate operation names fail closed. Only
-after those checks may the service construct canonical request bytes, derive
-`session_id`, and insert the session. Rejection leaves no session, attempt,
-claim, or consumed ordinal and cannot reach a side-effect hook.
+operation exactly match `ALPACA_DAILY_SNAPSHOT_DESCRIPTOR`, and validates one
+exact `capture_request/v2` object. Its key set is exactly
+`bar_interval`, `child_operation_version`, `ordered_universe`,
+`output_policy_version`, `permitted_provider_operation`, `provider_id`,
+`request_limit`, `request_window_end_date`, `request_window_start_date`, and
+`target_session_date`; no key is optional and no unknown key is accepted.
+
+Every scalar string has exact string type. `ordered_universe` has exact list
+type, is nonempty, contains at most the public
+`MAX_DAILY_SNAPSHOT_SYMBOLS` bound, and contains only nonempty exact strings
+with no duplicates. A tuple or other iterable is not equivalent.
+`request_limit` has exact positive integer type (a boolean is not an integer
+for this contract), equals the universe length, and does not exceed the same
+bound. The three dates are exact canonical `YYYY-MM-DD`; the request window
+start is no later than its end, and its end is strictly before the target
+session date. `bar_interval=1d`, `child_operation_version=child/v1`,
+`output_policy_version=output/v1`, and the provider/operation from the public
+descriptor are fixed byte-for-byte. Metadata and request descriptor values
+must also agree.
+
+Only after every shape, type, bound, date, fixed-value, metadata, and
+descriptor check succeeds may the service construct canonical JSON bytes,
+derive `session_id`, and insert the session. Rejection leaves no session,
+counter, attempt, claim, reservation, execution, terminal, selection, or
+recovery side effect. Invalid alternate representations cannot enter storage
+or exploit an identity collision with a valid request. Existing valid request
+bytes and UUID5 vectors remain unchanged.
 
 ### 2.4 attempts
 
@@ -203,7 +223,7 @@ process-creation-failure evidence, a `FAILED`/`NOT_STARTED` terminal without a
 snapshot, and no `launch_execution`. All other prior lineages block: no
 reservation; `COMMITTED`; `PROCESS_CREATION_FAILED` without its terminal;
 `PROCESS_CREATED` without an execution; `MANUAL_REVIEW`; any execution phase,
-including `PRE_RESUME_READY`, `RESUME_RECORDED`, or
+including `PRE_RESUME_READY`, `RESUME_INTENT_COMMITTED`, `RESUME_RECORDED`, or
 `POST_RESUME_AMBIGUOUS`; any `SUCCEEDED`, `AMBIGUOUS`, or `CLOSED` terminal;
 any `CONFIRMED` or `MAY_HAVE_OCCURRED` disposition; success awaiting
 selection; an absorbing session; or incomplete/contradictory lineage. The
@@ -244,16 +264,51 @@ supply a missing timestamp or overwrite, clear, or replace the first one.
 Executions reference only `launch_reservation_id`, which is `NOT NULL UNIQUE`
 and references `launch_reservations(launch_reservation_id)`. They store
 process-creation, Job Object, resume-authorization, phase, post-resume, and
-cleanup evidence. The phase moves forward through
-`PRE_RESUME_READY`, `RESUME_RECORDED`, `POST_RESUME_AMBIGUOUS`,
-`TERMINAL_RECORDED`, and `CLOSED`. Post-resume evidence is an append-only
-null-to-paired JSON/digest write that is allowed only while moving
-`PRE_RESUME_READY` to `RESUME_RECORDED`; cleanup evidence follows the same rule
-in the same forward transaction. Neither pair may be replaced, cleared,
-partially written, or rewritten in the same phase. Identity, pre-resume
-evidence, and execution rows are immutable and cannot be deleted. An execution
-is optional: a process-creation failure may still receive a terminal directly
-from its reservation.
+cleanup evidence, plus `resume_intent_json`, `resume_intent_digest`, and
+`resume_intent_committed_at_utc`. The phase moves forward through
+`PRE_RESUME_READY`, `RESUME_INTENT_COMMITTED`, `RESUME_RECORDED`,
+`POST_RESUME_AMBIGUOUS`, `TERMINAL_RECORDED`, and `CLOSED`.
+
+`commit_resume_intent(connection, execution_id) -> FakeResumeIntent` owns the
+one-shot resume fence. In one `BEGIN IMMEDIATE` transaction it requires exactly
+`PRE_RESUME_READY`, verifies the process-creation, Job Object, and
+resume-authorization JSON/digest pairs, appends this exact canonical evidence,
+and commits the phase change:
+
+```json
+{"execution_id":"<exact execution_id>","resume_operation":"ResumeThread","schema":1}
+```
+
+Only the transaction winner receives the opaque, typed in-memory permit.
+Intent JSON, digest, and timestamp are one append-only triple: a second intent,
+standalone field write, direct phase jump, clearing, replacement, reassignment,
+or use for another execution fails closed. The permit is consumable once and
+is not reconstructible from the database after restart. This durable intent is
+the authority fence; it does not prove that Windows executed `ResumeThread`.
+
+The fake external boundary accepts only that `FakeResumeIntent`, rechecks the
+committed canonical intent and all pre-resume evidence, consumes the permit,
+and returns a receipt only after the modeled call succeeds. A modeled failure
+returns no successful receipt and leaves the database at
+`RESUME_INTENT_COMMITTED`. The successful receipt body is exactly canonical
+UTF-8 JSON:
+
+```json
+{"execution_id":"<exact execution_id>","resume_intent_digest":"<lowercase 64-character SHA-256 hex>","resume_result":"RESUMED","schema":1}
+```
+
+`record_post_resume_evidence` requires exact `FakeResumeReceipt` type, the
+same execution and committed intent digest, exact field set and field types,
+integer schema `1`, literal `RESUMED`, exact canonical bytes, and the exact
+SHA-256 digest. `FAILED`, `ERROR`, `UNKNOWN`, missing/extra fields, wrong or
+string schema, noncanonical bytes, wrong execution/intent/digest, receipt
+reuse, and cross-execution reuse all fail. Only one
+`RESUME_INTENT_COMMITTED -> RESUME_RECORDED` transaction may append that
+receipt and the complete cleanup pair. Intent, post-resume, and cleanup
+evidence cannot be replaced, cleared, partially written, or rewritten.
+Identity, pre-resume evidence, and execution rows are immutable and cannot be
+deleted. An execution is optional: a process-creation failure may still
+receive a terminal directly from its reservation.
 
 ### 2.8 terminals
 
@@ -271,7 +326,7 @@ relationship tells the transaction service whether an execution exists.
 
 | Terminal state | Provider disposition | Snapshot | Required evidence |
 | --- | --- | --- | --- |
-| `SUCCEEDED` | `CONFIRMED` | present | execution is `RESUME_RECORDED` with both post-resume and cleanup pairs |
+| `SUCCEEDED` | `CONFIRMED` | present | execution is `RESUME_RECORDED` with the exact canonical success receipt bound to its committed intent and a cleanup pair |
 | `FAILED` | `NOT_STARTED` | absent | reservation is `PROCESS_CREATION_FAILED` with paired failure evidence |
 | `FAILED` | `CONFIRMED` | absent | execution is `RESUME_RECORDED` with both post-resume and cleanup pairs |
 | `AMBIGUOUS` | `MAY_HAVE_OCCURRED` | absent | execution is `RESUME_RECORDED` or `POST_RESUME_AMBIGUOUS` with both pairs |
@@ -284,7 +339,7 @@ verifies the exact request digest from its immediate reservation parent. After
 the terminal row is inserted, the execution (when present), reservation, and
 attempt are advanced to their terminal-recorded states in the same transaction.
 For a manually classified unknown-resume execution, the execution instead
-remains frozen at `PRE_RESUME_READY`; the closure terminal advances only the
+remains frozen at `RESUME_INTENT_COMMITTED`; the closure terminal advances only the
 reservation and attempt and preserves the first reservation outcome timestamp.
 Terminal rows are immutable and cannot be deleted.
 
@@ -329,7 +384,8 @@ same session, and one exact closed action-matrix entry:
 | `RECORD_ATTEMPT_AMBIGUITY` | `ATTEMPT` | `LAUNCH_RESERVED` -> `AMBIGUITY_RECORDED` | record resume uncertainty; no fabricated attempt state |
 | `RECORD_CLAIM_AMBIGUITY` | `CLAIM` | `COMMITTED` -> `AMBIGUITY_RECORDED` | record uncertainty; claim remains permanent |
 | `CLASSIFY_LAUNCH_RESERVATION` | `LAUNCH_RESERVATION` | `COMMITTED` -> `MANUAL_REVIEW` | classify the existing reservation |
-| `CLASSIFY_RESUME_OUTCOME_UNKNOWN` | `LAUNCH_RESERVATION` | `PROCESS_CREATED` -> `MANUAL_REVIEW` | conservatively classify the unresolved pre-resume execution |
+| `CLASSIFY_PRE_RESUME_READY` | `LAUNCH_RESERVATION` | `PROCESS_CREATED` -> `MANUAL_REVIEW` | conservatively abandon a process that never received a resume intent |
+| `CLASSIFY_RESUME_OUTCOME_UNKNOWN` | `LAUNCH_RESERVATION` | `PROCESS_CREATED` -> `MANUAL_REVIEW` | conservatively classify the committed-intent/no-receipt ambiguity |
 | `SELECT_COMMITTED_SUCCESS` | `TERMINAL` | `SUCCEEDED` -> `SUCCESS_SELECTED` | invoke normal owning-session selection |
 | `CLOSE_SESSION` | `SESSION` | `OPEN` -> `CLOSED` | close only when all attempts are terminal and none is ambiguous |
 | `ACKNOWLEDGE_RESTORE` | `SESSION` | `OPEN` -> `RESTORE_ACKNOWLEDGED` | record restore acknowledgement only |
@@ -343,11 +399,19 @@ or advance one target twice. The `AFTER INSERT` trigger owns the exact counter
 increment, and the reviewed transaction service performs any matrix-authorized
 state update in the same `BEGIN IMMEDIATE` transaction.
 
+`CLASSIFY_PRE_RESUME_READY` preserves the conservative operator path before
+intent allocation. It requires one digest-valid `PRE_RESUME_READY` execution
+with no intent, post-resume, or cleanup evidence, records `MANUAL_REVIEW`, and
+grants no resume or other external authority.
+
 `CLASSIFY_RESUME_OUTCOME_UNKNOWN` is deliberately narrow. The reservation
 must belong to the open session, be `PROCESS_CREATED`, and own exactly one
-`PRE_RESUME_READY` execution with digest-valid process-creation, Job Object,
-and resume-authorization evidence. No post-resume receipt/evidence or cleanup
-may have been persisted. The transaction verifies the target identity,
+`RESUME_INTENT_COMMITTED` execution with digest-valid process-creation, Job
+Object, resume-authorization, and canonical resume-intent evidence. No
+post-resume receipt/evidence or cleanup may have been persisted. This is the
+persistently indistinguishable state for both a crash after intent commit but
+before `ResumeThread` and a crash after `ResumeThread` but before receipt
+persistence. The transaction verifies the target identity,
 operator evidence digest, recovery schema/policy, predecessor, and requested
 action; appends the immutable recovery row; advances the trigger-owned
 recovery counter; and moves only the reservation to `MANUAL_REVIEW`. The
@@ -373,7 +437,7 @@ parse requests to authenticate or validate external provider behavior.
 | SQLite schema, constraints, and triggers | Reviewed transaction service/tests |
 | --- | --- |
 | Immediate-parent foreign keys and `foreign_key_check` integrity | Workflow ordering across multiple statements and tables |
-| Append-only immutable evidence and prohibited deletes | Canonical request construction, digest reconciliation, and policy reconciliation |
+| Append-only immutable evidence, canonical resume-intent/receipt bytes, and prohibited deletes | Exact capture-request shape/type/date validation, canonical construction, digest reconciliation, and policy reconciliation |
 | One-to-one claim, reservation, execution, terminal, selection, and ordinal fences | Multi-statement parent-state update sequencing |
 | Unique per-session ordinals and trigger-owned exact increments | Commit-before-side-effect boundaries |
 | Session-wide claim admission and normalized retry-safe lineage joins | Complete transaction atomicity and crash classification |
@@ -563,8 +627,9 @@ fixed bootstrap/CNG/ACL/path verification
   -> launch reservation transaction and COMMIT
   -> CreateProcessW(CREATE_SUSPENDED)
   -> Job Object and process evidence transaction and COMMIT
-  -> external ResumeThread through the reviewed adapter
-  -> typed resume receipt returned to the transaction service
+  -> resume intent transaction and RESUME_INTENT_COMMITTED COMMIT
+  -> external ResumeThread through the reviewed adapter using the one-shot permit
+  -> exact canonical successful resume receipt returned to the transaction service
   -> paired post-resume and cleanup evidence transaction and COMMIT
   -> terminal matrix validation and immutable terminal transaction
   -> execution/reservation/attempt terminal-recorded transitions in that transaction
@@ -577,26 +642,34 @@ trigger rejects every prior outcome except the exact digest-valid
 process-creation-failure `FAILED`/`NOT_STARTED` lineage with no execution. The
 helper does not run an ad hoc unresolved-execution query.
 
-The reservation commit precedes process creation. The `PRE_RESUME_READY` execution
-row commits process, Job Object, and resume-authorization evidence before the
-reviewed adapter invokes external `ResumeThread`. The adapter observes that
-committed state, performs the external call, and returns a typed canonical
-receipt. Only then may the transaction service persist the receipt as
-post-resume evidence, persist cleanup evidence, verify both digests, and
-advance the execution to `RESUME_RECORDED`. SQLite enforces the persisted
-evidence and phase rules; it cannot prove that an external Windows API call
-occurred.
+The reservation commit precedes process creation. The `PRE_RESUME_READY`
+execution row commits process, Job Object, and resume-authorization evidence.
+A separate `BEGIN IMMEDIATE` transaction then appends the canonical intent and
+commits `RESUME_INTENT_COMMITTED`; only that winner receives the one-shot
+permit accepted by the reviewed adapter. The adapter observes that committed
+state, performs the modeled external call once, and returns the exact canonical
+success receipt bound to the execution and intent digest. Only then may the
+transaction service persist the receipt as post-resume evidence, persist
+cleanup evidence, verify both digests, and advance the execution to
+`RESUME_RECORDED`. SQLite enforces the durable one-reservation and one-intent
+fences, exact persisted bytes, and phase rules; it cannot prove that an
+external Windows API call occurred.
 
 A crash after a claim or reservation commit leaves that fence consumed. A
-crash after `ResumeThread` but before post-resume persistence leaves the
-database at `PRE_RESUME_READY` with no terminal; the service must treat that
-execution as unresolved/manual and cannot authorize a new claim. A known
-process-creation failure is recorded on the existing reservation and may
-receive a terminal without an execution row.
+crash before resume-intent commit leaves `PRE_RESUME_READY`, where the separate
+conservative pre-intent recovery action remains available. Once intent commits,
+neither a second intent nor another `ResumeThread` attempt may be authorized.
+A crash immediately after intent commit but before the call and a crash after
+the call but before receipt persistence both leave exactly
+`RESUME_INTENT_COMMITTED` with no receipt, cleanup, or terminal. The service
+must treat both as unresolved/manual, never reconstruct the permit, never
+retry the hook, never create another claim or intent, and never relabel the
+outcome `NOT_STARTED`. A known process-creation failure is recorded on the
+existing reservation and may receive a terminal without an execution row.
 
 The only recovery for that exact unresolved resume window is
 `CLASSIFY_RESUME_OUTCOME_UNKNOWN`. In one `BEGIN IMMEDIATE` transaction it
-verifies the normalized lineage and digest-valid pre-resume evidence, appends
+verifies the normalized lineage and digest-valid pre-resume plus intent evidence, appends
 the recovery at the current session recovery ordinal, advances that counter
 exactly once, and changes the reservation from `PROCESS_CREATED` to
 `MANUAL_REVIEW` while preserving its original outcome timestamp and leaving
@@ -604,6 +677,19 @@ the execution unchanged. It may then be recorded as
 `CLOSED`/`MAY_HAVE_OCCURRED` and the session may be closed under the normal
 close policy. It cannot produce `NOT_STARTED` or authorize another side
 effect.
+
+The whole-boundary audit treats every arrow from claim commit through
+selection as an authority handoff: claim commit -> provider construction ->
+reservation commit -> `CreateProcessW` -> `PRE_RESUME_READY` commit -> resume
+intent commit -> `ResumeThread` -> exact receipt/evidence commit -> terminal
+-> selection. Positive, rejection, two-connection concurrency, and crash
+cases cover each handoff. Exactly one reservation fences process creation;
+exactly one committed intent and its opaque winner permit fence
+`ResumeThread`; and only the exact intent-bound `RESUMED` receipt can prove
+modeled success and unlock a successful terminal. Every uncertainty path
+remains claim-blocking. The canonical request bytes propagated through the
+lineage and the UUID5 identity material describe the same validated request
+semantics; alternate representations never reach either boundary.
 
 Manual recovery records uncertainty and an operator-authorized classification
 through the closed action matrix above. It does not turn uncertainty into

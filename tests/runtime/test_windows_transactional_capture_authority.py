@@ -7,13 +7,17 @@ import json
 import sqlite3
 import threading
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import date
 from pathlib import Path
 from typing import Any
 
 import pytest
 
-from trading_bot.market_data import ALPACA_DAILY_SNAPSHOT_DESCRIPTOR
+from trading_bot.market_data import (
+    ALPACA_DAILY_SNAPSHOT_DESCRIPTOR,
+    MAX_DAILY_SNAPSHOT_SYMBOLS,
+)
 
 SCHEMA_PATH = (
     Path(__file__).parents[1] / "fixtures" / "transactional_authority_schema.sql"
@@ -28,11 +32,52 @@ CLAIM_POLICY = "claim-policy/v1"
 RELEASE = "release/v1"
 TIMESTAMP = "2026-01-01T00:00:00Z"
 PROCESS_CREATED_TIMESTAMP = "2026-01-01T00:01:00Z"
+RESUME_INTENT_TIMESTAMP = "2026-01-01T00:01:30Z"
 PROCESS_FAILURE_TIMESTAMP = "2026-01-01T00:02:00Z"
 MANUAL_REVIEW_TIMESTAMP = "2026-01-01T00:03:00Z"
 TERMINAL_TIMESTAMP = "2026-01-01T00:04:00Z"
 SELECTION_TIMESTAMP = "2026-01-01T00:05:00Z"
 CLOSE_TIMESTAMP = "2026-01-01T00:06:00Z"
+CAPTURE_REQUEST_FIELDS = frozenset(
+    {
+        "bar_interval",
+        "child_operation_version",
+        "ordered_universe",
+        "output_policy_version",
+        "permitted_provider_operation",
+        "provider_id",
+        "request_limit",
+        "request_window_end_date",
+        "request_window_start_date",
+        "target_session_date",
+    }
+)
+_RESUME_INTENT_ISSUER = object()
+_ISSUED_RESUME_PERMITS_LOCK = threading.Lock()
+
+
+@dataclass(eq=False)
+class _ResumePermit:
+    lock: threading.Lock = field(default_factory=threading.Lock)
+    consumed: bool = False
+
+
+_ISSUED_RESUME_PERMITS: set[_ResumePermit] = set()
+
+
+@dataclass(frozen=True)
+class FakeResumeIntent:
+    """Opaque one-shot authority returned only by the intent transaction."""
+
+    execution_id: str
+    intent_json: bytes
+    intent_digest: bytes
+    _issuer: object = field(repr=False, compare=False)
+    _permit: _ResumePermit = field(repr=False, compare=False)
+
+    def __post_init__(self) -> None:
+        if self._issuer is not _RESUME_INTENT_ISSUER:
+            raise TypeError("fake resume intents can only be issued after commit")
 
 
 @dataclass(frozen=True)
@@ -40,6 +85,7 @@ class FakeResumeReceipt:
     """Canonical result returned by the fake external ResumeThread boundary."""
 
     execution_id: str
+    resume_intent_digest: bytes
     result_json: bytes
     result_digest: bytes
 
@@ -48,6 +94,7 @@ def test_fixed_authority_timestamps_are_causally_ordered() -> None:
     assert (
         TIMESTAMP
         < PROCESS_CREATED_TIMESTAMP
+        < RESUME_INTENT_TIMESTAMP
         < PROCESS_FAILURE_TIMESTAMP
         < MANUAL_REVIEW_TIMESTAMP
         < TERMINAL_TIMESTAMP
@@ -272,6 +319,60 @@ def _request(target_date: str = "2026-01-01") -> dict[str, Any]:
     }
 
 
+def _validate_capture_request(request: object) -> dict[str, Any]:
+    if type(request) is not dict:
+        raise ValueError("capture_request/v2 must be an exact object")
+    if set(request) != CAPTURE_REQUEST_FIELDS:
+        raise ValueError("capture_request/v2 has a missing or unknown field")
+
+    string_fields = CAPTURE_REQUEST_FIELDS - {"ordered_universe", "request_limit"}
+    if any(type(request[field]) is not str for field in string_fields):
+        raise ValueError("capture_request/v2 string fields require exact strings")
+    if type(request["ordered_universe"]) is not list:
+        raise ValueError("ordered_universe must be an exact list")
+    universe = request["ordered_universe"]
+    if not 1 <= len(universe) <= MAX_DAILY_SNAPSHOT_SYMBOLS:
+        raise ValueError("ordered_universe is empty or exceeds its bound")
+    if any(type(symbol) is not str or not symbol for symbol in universe):
+        raise ValueError("ordered_universe members must be nonempty exact strings")
+    if len(set(universe)) != len(universe):
+        raise ValueError("ordered_universe must be duplicate-free")
+    request_limit = request["request_limit"]
+    if type(request_limit) is not int or request_limit <= 0:
+        raise ValueError("request_limit must be an exact positive integer")
+    if request_limit != len(universe) or request_limit > MAX_DAILY_SNAPSHOT_SYMBOLS:
+        raise ValueError("request_limit must equal the bounded universe size")
+
+    for field_name in (
+        "request_window_start_date",
+        "request_window_end_date",
+        "target_session_date",
+    ):
+        value = request[field_name]
+        try:
+            parsed = date.fromisoformat(value)
+        except ValueError as error:
+            raise ValueError(f"{field_name} is not a canonical date") from error
+        if parsed.isoformat() != value:
+            raise ValueError(f"{field_name} is not a canonical date")
+    window_start = date.fromisoformat(request["request_window_start_date"])
+    window_end = date.fromisoformat(request["request_window_end_date"])
+    target_session = date.fromisoformat(request["target_session_date"])
+    if not window_start <= window_end < target_session:
+        raise ValueError("capture request dates are not causally ordered")
+
+    fixed_values = {
+        "bar_interval": "1d",
+        "child_operation_version": "child/v1",
+        "output_policy_version": "output/v1",
+        "provider_id": ALPACA_DAILY_SNAPSHOT_DESCRIPTOR.provider_id,
+        "permitted_provider_operation": ALPACA_DAILY_SNAPSHOT_DESCRIPTOR.operation,
+    }
+    if any(request[field] != value for field, value in fixed_values.items()):
+        raise ValueError("capture_request/v2 fixed semantics are invalid")
+    return request
+
+
 def _session_id(
     request: dict[str, Any],
     *,
@@ -454,7 +555,7 @@ def _finish(connection: sqlite3.Connection, commit: bool) -> None:
 def create_session(
     connection: sqlite3.Connection, request: dict[str, Any] | None = None
 ) -> str:
-    request = _request() if request is None else request
+    request = _validate_capture_request(_request() if request is None else request)
     _begin(connection)
     try:
         metadata = connection.execute(
@@ -481,14 +582,8 @@ def create_session(
             or metadata_operation != ALPACA_DAILY_SNAPSHOT_DESCRIPTOR.operation
         ):
             raise ValueError("authority metadata does not match the Alpaca descriptor")
-        if type(request) is not dict:
-            raise ValueError("session request must be an exact object")
-        request_provider_id = request.get("provider_id")
-        request_operation = request.get("permitted_provider_operation")
-        if type(request_provider_id) is not str:
-            raise ValueError("request provider_id must be a string")
-        if type(request_operation) is not str:
-            raise ValueError("request permitted_provider_operation must be a string")
+        request_provider_id = request["provider_id"]
+        request_operation = request["permitted_provider_operation"]
         if request_provider_id != metadata_provider_id:
             raise ValueError("request provider_id does not match authority metadata")
         if request_operation != metadata_operation:
@@ -698,10 +793,12 @@ def record_execution(connection: sqlite3.Connection, reservation_id: str) -> str
                 application_release_version, authority_policy_version, phase,
                 process_creation_json, process_creation_digest, job_object_json,
                 job_object_digest, resume_authorization_json,
-                resume_authorization_digest, post_resume_json, post_resume_digest,
-                cleanup_json, cleanup_digest, created_at_utc
+                resume_authorization_digest, resume_intent_json,
+                resume_intent_digest, resume_intent_committed_at_utc,
+                post_resume_json, post_resume_digest, cleanup_json,
+                cleanup_digest, created_at_utc
             ) VALUES (?, ?, 1, ?, ?, 'PRE_RESUME_READY', ?, ?, ?, ?, ?, ?,
-                      NULL, NULL, NULL, NULL, ?)
+                      NULL, NULL, NULL, NULL, NULL, NULL, NULL, ?)
             """,
             (
                 execution_id,
@@ -732,6 +829,66 @@ def record_execution(connection: sqlite3.Connection, reservation_id: str) -> str
     return execution_id
 
 
+def commit_resume_intent(
+    connection: sqlite3.Connection, execution_id: str
+) -> FakeResumeIntent:
+    intent_json = _json(
+        {
+            "execution_id": execution_id,
+            "resume_operation": "ResumeThread",
+            "schema": 1,
+        }
+    )
+    intent_digest = _digest(intent_json)
+    _begin(connection)
+    try:
+        row = connection.execute(
+            """
+            SELECT phase, process_creation_json, process_creation_digest,
+                   job_object_json, job_object_digest, resume_authorization_json,
+                   resume_authorization_digest
+            FROM launch_executions WHERE launch_execution_id = ?
+            """,
+            (execution_id,),
+        ).fetchone()
+        if row is None:
+            raise ValueError("cannot authorize resume for an unknown execution")
+        if row[0] != "PRE_RESUME_READY":
+            raise ValueError("resume intent requires PRE_RESUME_READY")
+        for evidence_json, evidence_digest in (
+            (row[1], row[2]),
+            (row[3], row[4]),
+            (row[5], row[6]),
+        ):
+            if evidence_json is None or _digest(evidence_json) != evidence_digest:
+                raise ValueError("resume intent requires exact pre-resume evidence")
+        cursor = connection.execute(
+            """
+            UPDATE launch_executions
+            SET phase = 'RESUME_INTENT_COMMITTED', resume_intent_json = ?,
+                resume_intent_digest = ?, resume_intent_committed_at_utc = ?
+            WHERE launch_execution_id = ? AND phase = 'PRE_RESUME_READY'
+            """,
+            (intent_json, intent_digest, RESUME_INTENT_TIMESTAMP, execution_id),
+        )
+        if cursor.rowcount != 1:
+            raise ValueError("resume intent ownership was not acquired")
+        _finish(connection, True)
+    except BaseException:
+        _finish(connection, False)
+        raise
+    permit = _ResumePermit()
+    with _ISSUED_RESUME_PERMITS_LOCK:
+        _ISSUED_RESUME_PERMITS.add(permit)
+    return FakeResumeIntent(
+        execution_id=execution_id,
+        intent_json=intent_json,
+        intent_digest=intent_digest,
+        _issuer=_RESUME_INTENT_ISSUER,
+        _permit=permit,
+    )
+
+
 def record_process_creation_failure(
     connection: sqlite3.Connection, reservation_id: str
 ) -> None:
@@ -760,28 +917,38 @@ def record_post_resume_evidence(
     execution_id: str,
     resume_receipt: FakeResumeReceipt,
 ) -> None:
-    if not isinstance(resume_receipt, FakeResumeReceipt):
+    if type(resume_receipt) is not FakeResumeReceipt:
         raise TypeError("post-resume evidence requires a fake resume receipt")
     if resume_receipt.execution_id != execution_id:
         raise ValueError("fake resume receipt belongs to another execution")
-    if _digest(resume_receipt.result_json) != resume_receipt.result_digest:
-        raise ValueError("fake resume receipt digest is invalid")
-
-    post_resume = resume_receipt.result_json
-    post_resume_digest = resume_receipt.result_digest
     cleanup, cleanup_digest = _evidence(f"cleanup:{execution_id}")
     if _digest(cleanup) != cleanup_digest:
         raise ValueError("cleanup evidence digest is invalid")
     _begin(connection)
     try:
         row = connection.execute(
-            "SELECT phase FROM launch_executions WHERE launch_execution_id = ?",
+            "SELECT phase, resume_intent_digest FROM launch_executions "
+            "WHERE launch_execution_id = ?",
             (execution_id,),
         ).fetchone()
         if row is None:
             raise ValueError("unknown launch execution")
-        if row[0] != "PRE_RESUME_READY":
-            raise ValueError("post-resume evidence requires pre-resume phase")
+        if row[0] != "RESUME_INTENT_COMMITTED":
+            raise ValueError("post-resume evidence requires committed resume intent")
+        if resume_receipt.resume_intent_digest != row[1]:
+            raise ValueError("fake resume receipt binds another resume intent")
+        expected_result = _json(
+            {
+                "execution_id": execution_id,
+                "resume_intent_digest": row[1].hex(),
+                "resume_result": "RESUMED",
+                "schema": 1,
+            }
+        )
+        if resume_receipt.result_json != expected_result:
+            raise ValueError("fake resume receipt is not the exact canonical success")
+        if resume_receipt.result_digest != _digest(expected_result):
+            raise ValueError("fake resume receipt digest is invalid")
         connection.execute(
             """
             UPDATE launch_executions
@@ -789,7 +956,13 @@ def record_post_resume_evidence(
                 post_resume_digest = ?, cleanup_json = ?, cleanup_digest = ?
             WHERE launch_execution_id = ?
             """,
-            (post_resume, post_resume_digest, cleanup, cleanup_digest, execution_id),
+            (
+                expected_result,
+                resume_receipt.result_digest,
+                cleanup,
+                cleanup_digest,
+                execution_id,
+            ),
         )
         _finish(connection, True)
     except BaseException:
@@ -986,6 +1159,11 @@ _RECOVERY_ACTIONS: dict[str, tuple[str, str, str]] = {
         "COMMITTED",
         "MANUAL_REVIEW",
     ),
+    "CLASSIFY_PRE_RESUME_READY": (
+        "LAUNCH_RESERVATION",
+        "PROCESS_CREATED",
+        "MANUAL_REVIEW",
+    ),
     "CLASSIFY_RESUME_OUTCOME_UNKNOWN": (
         "LAUNCH_RESERVATION",
         "PROCESS_CREATED",
@@ -1074,7 +1252,10 @@ def record_recovery(
                 """,
                 (MANUAL_REVIEW_TIMESTAMP, target_id),
             )
-        elif action == "CLASSIFY_RESUME_OUTCOME_UNKNOWN":
+        elif action in (
+            "CLASSIFY_PRE_RESUME_READY",
+            "CLASSIFY_RESUME_OUTCOME_UNKNOWN",
+        ):
             connection.execute(
                 """
                 UPDATE launch_reservations
@@ -1104,15 +1285,25 @@ def record_recovery(
 class FakeSideEffects:
     """Test-only hooks that can observe committed authority facts."""
 
-    def __init__(self, observer: sqlite3.Connection) -> None:
+    def __init__(
+        self,
+        observer: sqlite3.Connection,
+        events: list[str] | None = None,
+        event_lock: threading.Lock | None = None,
+    ) -> None:
         self.observer = observer
-        self.events: list[str] = []
+        self.events = [] if events is None else events
+        self._event_lock = threading.Lock() if event_lock is None else event_lock
+
+    def _emit(self, event: str) -> None:
+        with self._event_lock:
+            self.events.append(event)
 
     def construct_provider_after_claim(self, claim_id: str) -> None:
         assert self.observer.execute(
             "SELECT state FROM provider_call_claims WHERE claim_id = ?", (claim_id,)
         ).fetchone() == ("COMMITTED",)
-        self.events.append("provider-constructed")
+        self._emit("provider-constructed")
 
     def create_process_after_reservation(self, reservation_id: str) -> None:
         assert self.observer.execute(
@@ -1120,22 +1311,28 @@ class FakeSideEffects:
             "WHERE launch_reservation_id = ?",
             (reservation_id,),
         ).fetchone() == ("COMMITTED",)
-        self.events.append("process-created")
+        self._emit("process-created")
 
-    def resume_thread(self, execution_id: str) -> FakeResumeReceipt:
+    def resume_thread(
+        self, resume_intent: FakeResumeIntent, *, fail: bool = False
+    ) -> FakeResumeReceipt:
+        if type(resume_intent) is not FakeResumeIntent:
+            raise TypeError("ResumeThread requires an opaque fake resume intent")
+        execution_id = resume_intent.execution_id
         row = self.observer.execute(
             """
             SELECT phase, process_creation_json, process_creation_digest,
                    job_object_json, job_object_digest, resume_authorization_json,
-                   resume_authorization_digest
+                   resume_authorization_digest, resume_intent_json,
+                   resume_intent_digest
             FROM launch_executions WHERE launch_execution_id = ?
             """,
             (execution_id,),
         ).fetchone()
         if row is None:
             raise ValueError("cannot resume an unknown execution")
-        if row[0] != "PRE_RESUME_READY":
-            raise ValueError("ResumeThread requires PRE_RESUME_READY")
+        if row[0] != "RESUME_INTENT_COMMITTED":
+            raise ValueError("ResumeThread requires RESUME_INTENT_COMMITTED")
         for evidence_json, evidence_digest in (
             (row[1], row[2]),
             (row[3], row[4]),
@@ -1143,14 +1340,47 @@ class FakeSideEffects:
         ):
             if evidence_json is None or evidence_digest != _digest(evidence_json):
                 raise AssertionError("pre-resume evidence is not committed")
+        if row[7] != resume_intent.intent_json or row[8] != resume_intent.intent_digest:
+            raise ValueError("ResumeThread intent does not match committed authority")
+        expected_intent = _json(
+            {
+                "execution_id": execution_id,
+                "resume_operation": "ResumeThread",
+                "schema": 1,
+            }
+        )
+        if (
+            resume_intent.intent_json != expected_intent
+            or resume_intent.intent_digest != _digest(expected_intent)
+        ):
+            raise ValueError("ResumeThread intent is not canonical")
+        with resume_intent._permit.lock:
+            if resume_intent._permit.consumed:
+                raise ValueError("ResumeThread intent was already consumed")
+            with _ISSUED_RESUME_PERMITS_LOCK:
+                if resume_intent._permit not in _ISSUED_RESUME_PERMITS:
+                    raise ValueError(
+                        "ResumeThread intent was not issued to this process"
+                    )
+                _ISSUED_RESUME_PERMITS.remove(resume_intent._permit)
+            resume_intent._permit.consumed = True
 
-        self.events.append("pre-resume-ready")
-        self.events.append("resume-thread")
+        self._emit("resume-intent-committed")
+        self._emit("resume-thread")
+        if fail:
+            self._emit("resume-thread-failed")
+            raise RuntimeError("modeled ResumeThread failure")
         result_json = _json(
-            {"execution_id": execution_id, "resume_result": "RESUMED", "schema": 1}
+            {
+                "execution_id": execution_id,
+                "resume_intent_digest": resume_intent.intent_digest.hex(),
+                "resume_result": "RESUMED",
+                "schema": 1,
+            }
         )
         return FakeResumeReceipt(
             execution_id=execution_id,
+            resume_intent_digest=resume_intent.intent_digest,
             result_json=result_json,
             result_digest=_digest(result_json),
         )
@@ -1165,7 +1395,7 @@ class FakeSideEffects:
             ).fetchone()[0]
             == "RESUME_RECORDED"
         )
-        self.events.append("post-resume-evidence")
+        self._emit("post-resume-evidence")
 
     def observe_terminal(self, reservation_id: str) -> None:
         assert (
@@ -1175,13 +1405,14 @@ class FakeSideEffects:
             ).fetchone()
             is not None
         )
-        self.events.append("terminal")
+        self._emit("terminal")
 
 
 def _resume_and_persist(
     connection: sqlite3.Connection, execution_id: str
 ) -> FakeResumeReceipt:
-    receipt = FakeSideEffects(connection).resume_thread(execution_id)
+    intent = commit_resume_intent(connection, execution_id)
+    receipt = FakeSideEffects(connection).resume_thread(intent)
     record_post_resume_evidence(connection, execution_id, receipt)
     return receipt
 
@@ -1286,6 +1517,138 @@ def test_session_creation_rejects_descriptor_drift_before_persistence(
     connection.close()
 
 
+def _assert_no_capture_authority_side_effects(
+    connection: sqlite3.Connection,
+) -> None:
+    for table in (
+        "sessions",
+        "attempts",
+        "provider_call_claims",
+        "launch_reservations",
+        "launch_executions",
+        "terminals",
+        "session_selections",
+        "manual_recoveries",
+    ):
+        assert connection.execute(f"SELECT count(*) FROM {table}").fetchone() == (0,)
+
+
+@pytest.mark.parametrize("missing_field", sorted(CAPTURE_REQUEST_FIELDS))
+def test_capture_request_requires_every_exact_field(
+    db_path: Path, missing_field: str
+) -> None:
+    connection = _connect(db_path)
+    request = _request()
+    del request[missing_field]
+    with pytest.raises(ValueError):
+        create_session(connection, request)
+    _assert_no_capture_authority_side_effects(connection)
+    connection.close()
+
+
+def _invalid_capture_request(case: str) -> object:
+    request: object = _request()
+    assert isinstance(request, dict)
+    if case == "not-exact-dict":
+        return list(request.items())
+    if case == "unknown-field":
+        request["unknown"] = "value"
+    elif case == "request-limit-string":
+        request["request_limit"] = "2"
+    elif case == "request-limit-bool":
+        request["request_limit"] = True
+    elif case == "request-limit-zero":
+        request["request_limit"] = 0
+    elif case == "request-limit-mismatch":
+        request["request_limit"] = 1
+    elif case == "tuple-universe":
+        request["ordered_universe"] = ("QQQ", "SPY")
+    elif case == "nonstring-universe-member":
+        request["ordered_universe"] = ["QQQ", 1]
+    elif case == "duplicate-universe":
+        request["ordered_universe"] = ["QQQ", "QQQ"]
+    elif case == "empty-universe":
+        request["ordered_universe"] = []
+        request["request_limit"] = 0
+    elif case == "oversized-universe":
+        request["ordered_universe"] = [
+            f"SYM{index}" for index in range(MAX_DAILY_SNAPSHOT_SYMBOLS + 1)
+        ]
+        request["request_limit"] = MAX_DAILY_SNAPSHOT_SYMBOLS + 1
+    elif case == "blank-universe-member":
+        request["ordered_universe"] = ["QQQ", ""]
+    elif case == "malformed-date":
+        request["request_window_start_date"] = "2025-13-01"
+    elif case == "noncanonical-date":
+        request["target_session_date"] = "20260101"
+    elif case == "window-reversed":
+        request["request_window_start_date"] = "2026-01-01"
+    elif case == "window-not-before-target":
+        request["request_window_end_date"] = "2026-01-01"
+    elif case.startswith("invalid-fixed-"):
+        field_name = case.removeprefix("invalid-fixed-")
+        request[field_name] = "invalid"
+    elif case == "string-field-bool":
+        request["bar_interval"] = True
+    else:
+        raise AssertionError(f"unhandled invalid capture request: {case}")
+    return request
+
+
+@pytest.mark.parametrize(
+    "case",
+    [
+        "not-exact-dict",
+        "unknown-field",
+        "request-limit-string",
+        "request-limit-bool",
+        "request-limit-zero",
+        "request-limit-mismatch",
+        "tuple-universe",
+        "nonstring-universe-member",
+        "duplicate-universe",
+        "empty-universe",
+        "oversized-universe",
+        "blank-universe-member",
+        "malformed-date",
+        "noncanonical-date",
+        "window-reversed",
+        "window-not-before-target",
+        "invalid-fixed-bar_interval",
+        "invalid-fixed-child_operation_version",
+        "invalid-fixed-output_policy_version",
+        "invalid-fixed-provider_id",
+        "invalid-fixed-permitted_provider_operation",
+        "string-field-bool",
+    ],
+)
+def test_capture_request_rejects_noncanonical_shapes_without_side_effects(
+    db_path: Path, case: str
+) -> None:
+    connection = _connect(db_path)
+    with pytest.raises(ValueError):
+        create_session(connection, _invalid_capture_request(case))  # type: ignore[arg-type]
+    _assert_no_capture_authority_side_effects(connection)
+    connection.close()
+
+
+def test_invalid_alternate_request_cannot_collide_with_persisted_session(
+    db_path: Path,
+) -> None:
+    connection = _connect(db_path)
+    valid_request = _request()
+    session_id = create_session(connection, valid_request)
+    alternate = {**valid_request, "ordered_universe": ("QQQ", "SPY")}
+    assert _session_id(alternate) == session_id  # type: ignore[arg-type]
+    with pytest.raises(ValueError, match="exact list"):
+        create_session(connection, alternate)  # type: ignore[arg-type]
+    assert connection.execute(
+        "SELECT session_id, request_json, next_attempt_ordinal, "
+        "next_recovery_ordinal FROM sessions"
+    ).fetchall() == [(session_id, _json(valid_request), 0, 0)]
+    connection.close()
+
+
 def _seed_lifecycle(path: Path) -> dict[str, str]:
     connection = _connect(path)
     session_id = create_session(connection)
@@ -1344,6 +1707,18 @@ def test_complete_ddl_and_immediate_parent_chain(db_path: Path) -> None:
             row[2] for row in connection.execute(f"PRAGMA foreign_key_list({table})")
         }
         assert actual == set(expected.split(","))
+    execution_columns = {
+        row[1] for row in connection.execute("PRAGMA table_info(launch_executions)")
+    }
+    assert {
+        "resume_intent_json",
+        "resume_intent_digest",
+        "resume_intent_committed_at_utc",
+    } <= execution_columns
+    assert connection.execute(
+        "SELECT count(*) FROM sqlite_master WHERE type = 'trigger' "
+        "AND name = 'launch_executions_resume_intent_append_only'"
+    ).fetchone() == (1,)
     connection.close()
 
 
@@ -1425,11 +1800,11 @@ def test_identity_vectors_use_normalized_immediate_parent_material() -> None:
     assert selection_id == "f10c3fc1-49b0-554a-8fa7-d36fa4d1bee8"
     assert recovery_id == "9aaadbb2-62af-58db-af21-b5208551ec01"
     assert _session_id(_request()) == session_id
-    for field, value in (
+    for field_name, value in (
         ("provider_id", "provider-drift"),
         ("permitted_provider_operation", "operation-drift"),
     ):
-        drifted_request = {**request, field: value}
+        drifted_request = {**request, field_name: value}
         assert _session_id(drifted_request) != session_id
 
 
@@ -1440,7 +1815,6 @@ def test_valid_lifecycle_from_metadata_to_selection(db_path: Path) -> None:
         {
             "ordered_universe": ["DIA", "SPY", "QQQ"],
             "request_limit": 3,
-            "output_policy_version": "output/v2",
         }
     )
     session_id = create_session(connection, request)
@@ -1519,7 +1893,6 @@ def test_valid_lifecycle_from_metadata_to_selection(db_path: Path) -> None:
 def test_immediate_parent_request_mismatches_are_rejected(db_path: Path) -> None:
     connection = _connect(db_path)
     request = _request("2026-07-15")
-    request["request_limit"] = 9
     session_id = create_session(connection, request)
     request_bytes = _json(request)
     request_digest = _digest(request_bytes)
@@ -2074,7 +2447,8 @@ def test_claim_and_launch_boundaries_commit_before_fake_side_effects(
     reservation_id = reserve_launch(connection, claim_id)
     hooks.create_process_after_reservation(reservation_id)
     execution_id = record_execution(connection, reservation_id)
-    resume_receipt = hooks.resume_thread(execution_id)
+    resume_intent = commit_resume_intent(connection, execution_id)
+    resume_receipt = hooks.resume_thread(resume_intent)
     record_post_resume_evidence(connection, execution_id, resume_receipt)
     hooks.observe_post_resume_evidence(execution_id)
     terminal_id = record_terminal(
@@ -2087,7 +2461,7 @@ def test_claim_and_launch_boundaries_commit_before_fake_side_effects(
     assert hooks.events == [
         "provider-constructed",
         "process-created",
-        "pre-resume-ready",
+        "resume-intent-committed",
         "resume-thread",
         "post-resume-evidence",
         "terminal",
@@ -2163,7 +2537,8 @@ def test_claim_admission_blocks_non_retry_safe_prior_outcomes(
     elif blocked_case == "resume_crash":
         assert first_reservation is not None
         execution_id = record_execution(connection, first_reservation)
-        FakeSideEffects(connection).resume_thread(execution_id)
+        intent = commit_resume_intent(connection, execution_id)
+        FakeSideEffects(connection).resume_thread(intent)
     elif blocked_case in ("resume_recorded", "post_resume_ambiguous"):
         assert first_reservation is not None
         execution_id = record_execution(connection, first_reservation)
@@ -2401,7 +2776,8 @@ def test_resume_outcome_unknown_recovery_is_conservative_and_closable(
     first_claim = commit_claim(connection, first_attempt)
     reservation_id = reserve_launch(connection, first_claim)
     execution_id = record_execution(connection, reservation_id)
-    FakeSideEffects(connection).resume_thread(execution_id)
+    intent = commit_resume_intent(connection, execution_id)
+    FakeSideEffects(connection).resume_thread(intent)
 
     recovery_id = record_recovery(
         connection,
@@ -2420,7 +2796,7 @@ def test_resume_outcome_unknown_recovery_is_conservative_and_closable(
         "SELECT phase, post_resume_json, cleanup_json FROM launch_executions "
         "WHERE launch_execution_id = ?",
         (execution_id,),
-    ).fetchone() == ("PRE_RESUME_READY", None, None)
+    ).fetchone() == ("RESUME_INTENT_COMMITTED", None, None)
     with pytest.raises(sqlite3.IntegrityError):
         record_recovery(
             connection,
@@ -2443,6 +2819,44 @@ def test_resume_outcome_unknown_recovery_is_conservative_and_closable(
     connection.close()
 
 
+def test_pre_resume_ready_has_separate_conservative_recovery_path(
+    db_path: Path,
+) -> None:
+    connection = _connect(db_path)
+    session_id = create_session(connection)
+    attempt_id = allocate_attempt(connection, session_id)
+    claim_id = commit_claim(connection, attempt_id)
+    reservation_id = reserve_launch(connection, claim_id)
+    execution_id = record_execution(connection, reservation_id)
+    with pytest.raises(sqlite3.IntegrityError):
+        record_recovery(
+            connection,
+            session_id,
+            "LAUNCH_RESERVATION",
+            reservation_id,
+            "CLASSIFY_RESUME_OUTCOME_UNKNOWN",
+        )
+    recovery_id = record_recovery(
+        connection,
+        session_id,
+        "LAUNCH_RESERVATION",
+        reservation_id,
+        "CLASSIFY_PRE_RESUME_READY",
+    )
+    assert recovery_id
+    assert connection.execute(
+        "SELECT reservation_state FROM launch_reservations "
+        "WHERE launch_reservation_id = ?",
+        (reservation_id,),
+    ).fetchone() == ("MANUAL_REVIEW",)
+    assert connection.execute(
+        "SELECT phase, resume_intent_json FROM launch_executions "
+        "WHERE launch_execution_id = ?",
+        (execution_id,),
+    ).fetchone() == ("PRE_RESUME_READY", None)
+    connection.close()
+
+
 def test_resume_outcome_unknown_recovery_grants_no_new_claim(db_path: Path) -> None:
     connection = _connect(db_path)
     session_id = create_session(connection)
@@ -2451,7 +2865,8 @@ def test_resume_outcome_unknown_recovery_grants_no_new_claim(db_path: Path) -> N
     reservation_id = reserve_launch(connection, first_claim)
     second_attempt = allocate_attempt(connection, session_id)
     execution_id = record_execution(connection, reservation_id)
-    FakeSideEffects(connection).resume_thread(execution_id)
+    intent = commit_resume_intent(connection, execution_id)
+    FakeSideEffects(connection).resume_thread(intent)
     record_recovery(
         connection,
         session_id,
@@ -2594,7 +3009,7 @@ def test_resume_boundary_requires_pre_resume_and_receipt(db_path: Path) -> None:
     execution_id = _execution_id(reservation_id)
 
     with pytest.raises(ValueError, match="unknown execution"):
-        hooks.resume_thread(execution_id)
+        hooks.resume_thread(commit_resume_intent(connection, execution_id))
 
     execution_id = record_execution(connection, reservation_id)
     with pytest.raises(TypeError, match="fake resume receipt"):
@@ -2608,8 +3023,58 @@ def test_resume_boundary_requires_pre_resume_and_receipt(db_path: Path) -> None:
     connection.close()
 
 
-def test_crash_after_resume_before_persistence_requires_manual_handling(
-    db_path: Path,
+def test_resume_intent_race_grants_exactly_one_hook_authority(db_path: Path) -> None:
+    setup = _connect(db_path)
+    session_id = create_session(setup)
+    attempt_id = allocate_attempt(setup, session_id)
+    claim_id = commit_claim(setup, attempt_id)
+    reservation_id = reserve_launch(setup, claim_id)
+    execution_id = record_execution(setup, reservation_id)
+    setup.close()
+
+    barrier = threading.Barrier(2)
+    results: list[str] = []
+    result_lock = threading.Lock()
+    events: list[str] = []
+    event_lock = threading.Lock()
+
+    def worker() -> None:
+        connection = _connect(db_path)
+        hooks = FakeSideEffects(connection, events, event_lock)
+        barrier.wait()
+        try:
+            intent = commit_resume_intent(connection, execution_id)
+            hooks.resume_thread(intent)
+            outcome = "winner"
+        except ValueError:
+            outcome = "loser"
+        with result_lock:
+            results.append(outcome)
+        connection.close()
+
+    threads = [threading.Thread(target=worker) for _ in range(2)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert sorted(results) == ["loser", "winner"]
+    assert events == ["resume-intent-committed", "resume-thread"]
+    verify = _connect(db_path)
+    assert verify.execute(
+        "SELECT phase, resume_intent_json IS NOT NULL, "
+        "resume_intent_digest IS NOT NULL, resume_intent_committed_at_utc "
+        "FROM launch_executions WHERE launch_execution_id = ?",
+        (execution_id,),
+    ).fetchone() == ("RESUME_INTENT_COMMITTED", 1, 1, RESUME_INTENT_TIMESTAMP)
+    with pytest.raises(ValueError, match="PRE_RESUME_READY"):
+        commit_resume_intent(verify, execution_id)
+    verify.close()
+
+
+@pytest.mark.parametrize("invoke_resume_thread", [False, True])
+def test_crash_around_resume_leaves_same_unretryable_intent_state(
+    db_path: Path, invoke_resume_thread: bool
 ) -> None:
     connection = _connect(db_path)
     hooks = FakeSideEffects(connection)
@@ -2618,15 +3083,26 @@ def test_crash_after_resume_before_persistence_requires_manual_handling(
     claim_id = commit_claim(connection, attempt_id)
     reservation_id = reserve_launch(connection, claim_id)
     execution_id = record_execution(connection, reservation_id)
-    hooks.resume_thread(execution_id)
+    intent = commit_resume_intent(connection, execution_id)
+    if invoke_resume_thread:
+        hooks.resume_thread(intent)
     connection.close()
+    with _ISSUED_RESUME_PERMITS_LOCK:
+        _ISSUED_RESUME_PERMITS.discard(intent._permit)
 
     recovered = _connect(db_path)
     assert recovered.execute(
-        "SELECT phase, post_resume_json, cleanup_json FROM launch_executions "
+        "SELECT phase, resume_intent_json, resume_intent_digest, "
+        "post_resume_json, cleanup_json FROM launch_executions "
         "WHERE launch_execution_id = ?",
         (execution_id,),
-    ).fetchone() == ("PRE_RESUME_READY", None, None)
+    ).fetchone() == (
+        "RESUME_INTENT_COMMITTED",
+        intent.intent_json,
+        intent.intent_digest,
+        None,
+        None,
+    )
     assert recovered.execute(
         "SELECT reservation_state FROM launch_reservations "
         "WHERE launch_reservation_id = ?",
@@ -2634,6 +3110,12 @@ def test_crash_after_resume_before_persistence_requires_manual_handling(
     ).fetchone() == ("PROCESS_CREATED",)
     with pytest.raises(sqlite3.IntegrityError):
         record_terminal(recovered, reservation_id)
+    with pytest.raises(ValueError, match="PRE_RESUME_READY"):
+        commit_resume_intent(recovered, execution_id)
+    with pytest.raises(ValueError, match="already consumed|not issued"):
+        FakeSideEffects(recovered).resume_thread(intent)
+    with pytest.raises(TypeError, match="opaque fake resume intent"):
+        FakeSideEffects(recovered).resume_thread(execution_id)  # type: ignore[arg-type]
     with pytest.raises(sqlite3.IntegrityError):
         record_recovery(
             recovered,
@@ -2653,6 +3135,101 @@ def test_crash_after_resume_before_persistence_requires_manual_handling(
         0,
     )
     recovered.close()
+
+
+def test_resume_hook_failure_returns_no_receipt_and_consumes_permit(
+    db_path: Path,
+) -> None:
+    connection = _connect(db_path)
+    session_id = create_session(connection)
+    attempt_id = allocate_attempt(connection, session_id)
+    claim_id = commit_claim(connection, attempt_id)
+    reservation_id = reserve_launch(connection, claim_id)
+    execution_id = record_execution(connection, reservation_id)
+    intent = commit_resume_intent(connection, execution_id)
+    hooks = FakeSideEffects(connection)
+    with pytest.raises(RuntimeError, match="modeled ResumeThread failure"):
+        hooks.resume_thread(intent, fail=True)
+    with pytest.raises(ValueError, match="already consumed"):
+        hooks.resume_thread(intent)
+    assert connection.execute(
+        "SELECT phase, post_resume_json, post_resume_digest FROM launch_executions "
+        "WHERE launch_execution_id = ?",
+        (execution_id,),
+    ).fetchone() == ("RESUME_INTENT_COMMITTED", None, None)
+    connection.close()
+
+
+@pytest.mark.parametrize(
+    "invalid_receipt",
+    [
+        "failed-result",
+        "error-result",
+        "unknown-result",
+        "wrong-schema",
+        "string-schema",
+        "wrong-execution",
+        "wrong-intent",
+        "extra-field",
+        "missing-field",
+        "noncanonical-bytes",
+        "wrong-digest",
+    ],
+)
+def test_post_resume_evidence_requires_exact_canonical_success_receipt(
+    db_path: Path, invalid_receipt: str
+) -> None:
+    connection = _connect(db_path)
+    session_id = create_session(connection)
+    attempt_id = allocate_attempt(connection, session_id)
+    claim_id = commit_claim(connection, attempt_id)
+    reservation_id = reserve_launch(connection, claim_id)
+    execution_id = record_execution(connection, reservation_id)
+    intent = commit_resume_intent(connection, execution_id)
+    valid = FakeSideEffects(connection).resume_thread(intent)
+    envelope: dict[str, object] = json.loads(valid.result_json)
+    receipt_execution = execution_id
+    receipt_intent_digest = intent.intent_digest
+    if invalid_receipt == "failed-result":
+        envelope["resume_result"] = "FAILED"
+    elif invalid_receipt == "error-result":
+        envelope["resume_result"] = "ERROR"
+    elif invalid_receipt == "unknown-result":
+        envelope["resume_result"] = "UNKNOWN"
+    elif invalid_receipt == "wrong-schema":
+        envelope["schema"] = 2
+    elif invalid_receipt == "string-schema":
+        envelope["schema"] = "1"
+    elif invalid_receipt == "wrong-execution":
+        receipt_execution = str(uuid.UUID(int=0))
+    elif invalid_receipt == "wrong-intent":
+        receipt_intent_digest = _digest(b"wrong-intent")
+    elif invalid_receipt == "extra-field":
+        envelope["extra"] = True
+    elif invalid_receipt == "missing-field":
+        del envelope["resume_result"]
+    result_json = _json(envelope)
+    if invalid_receipt == "noncanonical-bytes":
+        result_json = json.dumps(envelope, indent=2).encode("utf-8")
+    result_digest = _digest(result_json)
+    if invalid_receipt == "wrong-digest":
+        result_digest = _digest(b"wrong-result")
+    receipt = FakeResumeReceipt(
+        execution_id=receipt_execution,
+        resume_intent_digest=receipt_intent_digest,
+        result_json=result_json,
+        result_digest=result_digest,
+    )
+    with pytest.raises(ValueError):
+        record_post_resume_evidence(connection, execution_id, receipt)
+    assert connection.execute(
+        "SELECT phase, post_resume_json, cleanup_json FROM launch_executions "
+        "WHERE launch_execution_id = ?",
+        (execution_id,),
+    ).fetchone() == ("RESUME_INTENT_COMMITTED", None, None)
+    with pytest.raises(sqlite3.IntegrityError):
+        record_terminal(connection, reservation_id)
+    connection.close()
 
 
 def test_fake_resume_receipt_cannot_be_reused_for_another_execution(
@@ -2675,15 +3252,25 @@ def test_fake_resume_receipt_cannot_be_reused_for_another_execution(
         record_execution(connection, reservation) for reservation in reservations
     ]
     hooks = FakeSideEffects(connection)
-    receipt = hooks.resume_thread(executions[0])
+    intents = [commit_resume_intent(connection, execution) for execution in executions]
+    reused_intent = FakeResumeIntent(
+        execution_id=executions[1],
+        intent_json=intents[0].intent_json,
+        intent_digest=intents[0].intent_digest,
+        _issuer=_RESUME_INTENT_ISSUER,
+        _permit=intents[0]._permit,
+    )
+    with pytest.raises(ValueError, match="committed authority"):
+        hooks.resume_thread(reused_intent)
+    receipt = hooks.resume_thread(intents[0])
     with pytest.raises(ValueError, match="another execution"):
         record_post_resume_evidence(connection, executions[1], receipt)
     assert connection.execute(
         "SELECT phase FROM launch_executions WHERE launch_execution_id = ?",
         (executions[1],),
-    ).fetchone() == ("PRE_RESUME_READY",)
+    ).fetchone() == ("RESUME_INTENT_COMMITTED",)
     record_post_resume_evidence(connection, executions[0], receipt)
-    second_receipt = hooks.resume_thread(executions[1])
+    second_receipt = hooks.resume_thread(intents[1])
     record_post_resume_evidence(connection, executions[1], second_receipt)
     assert attempts
     connection.close()
@@ -2698,6 +3285,32 @@ def test_launch_execution_evidence_is_append_only(db_path: Path) -> None:
     execution_id = record_execution(connection, reservation_id)
     post_resume, post_digest = _evidence("post-resume-test")
     cleanup, cleanup_digest = _evidence("cleanup-test")
+    intent_json = _json(
+        {
+            "execution_id": execution_id,
+            "resume_operation": "ResumeThread",
+            "schema": 1,
+        }
+    )
+
+    with pytest.raises(sqlite3.IntegrityError):
+        connection.execute(
+            "UPDATE launch_executions SET phase = 'RESUME_INTENT_COMMITTED' "
+            "WHERE launch_execution_id = ?",
+            (execution_id,),
+        )
+    with pytest.raises(sqlite3.IntegrityError):
+        connection.execute(
+            "UPDATE launch_executions SET resume_intent_json = ?, "
+            "resume_intent_digest = ?, resume_intent_committed_at_utc = ? "
+            "WHERE launch_execution_id = ?",
+            (
+                intent_json,
+                _digest(intent_json),
+                RESUME_INTENT_TIMESTAMP,
+                execution_id,
+            ),
+        )
 
     with pytest.raises(sqlite3.IntegrityError):
         connection.execute(
@@ -2725,7 +3338,63 @@ def test_launch_execution_evidence_is_append_only(db_path: Path) -> None:
             (post_resume, _digest(b"wrong-post-digest"), execution_id),
         )
 
-    resume_receipt = FakeSideEffects(connection).resume_thread(execution_id)
+    resume_intent = commit_resume_intent(connection, execution_id)
+    reconstructed_intent = FakeResumeIntent(
+        execution_id=execution_id,
+        intent_json=resume_intent.intent_json,
+        intent_digest=resume_intent.intent_digest,
+        _issuer=_RESUME_INTENT_ISSUER,
+        _permit=_ResumePermit(),
+    )
+    with pytest.raises(ValueError, match="not issued"):
+        FakeSideEffects(connection).resume_thread(reconstructed_intent)
+    for sql, params in (
+        (
+            "UPDATE launch_executions SET resume_intent_json = ? "
+            "WHERE launch_execution_id = ?",
+            (_json({"replacement": True}), execution_id),
+        ),
+        (
+            "UPDATE launch_executions SET resume_intent_digest = ? "
+            "WHERE launch_execution_id = ?",
+            (_digest(b"replacement"), execution_id),
+        ),
+        (
+            "UPDATE launch_executions SET resume_intent_committed_at_utc = ? "
+            "WHERE launch_execution_id = ?",
+            (MANUAL_REVIEW_TIMESTAMP, execution_id),
+        ),
+        (
+            "UPDATE launch_executions SET resume_intent_json = NULL, "
+            "resume_intent_digest = NULL, resume_intent_committed_at_utc = NULL "
+            "WHERE launch_execution_id = ?",
+            (execution_id,),
+        ),
+    ):
+        with pytest.raises(sqlite3.IntegrityError):
+            connection.execute(sql, params)
+    invalid_receipt_json = _json(
+        {
+            "execution_id": execution_id,
+            "resume_intent_digest": resume_intent.intent_digest.hex(),
+            "resume_result": "FAILED",
+            "schema": 1,
+        }
+    )
+    with pytest.raises(sqlite3.IntegrityError):
+        connection.execute(
+            "UPDATE launch_executions SET phase = 'RESUME_RECORDED', "
+            "post_resume_json = ?, post_resume_digest = ?, cleanup_json = ?, "
+            "cleanup_digest = ? WHERE launch_execution_id = ?",
+            (
+                invalid_receipt_json,
+                _digest(invalid_receipt_json),
+                cleanup,
+                cleanup_digest,
+                execution_id,
+            ),
+        )
+    resume_receipt = FakeSideEffects(connection).resume_thread(resume_intent)
     record_post_resume_evidence(connection, execution_id, resume_receipt)
     for sql, params in (
         (

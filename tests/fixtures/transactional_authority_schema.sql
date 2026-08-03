@@ -124,8 +124,8 @@ CREATE TABLE launch_executions (
     application_release_version TEXT NOT NULL,
     authority_policy_version TEXT NOT NULL,
     phase TEXT NOT NULL CHECK (phase IN (
-        'PRE_RESUME_READY', 'RESUME_RECORDED', 'POST_RESUME_AMBIGUOUS',
-        'TERMINAL_RECORDED', 'CLOSED'
+        'PRE_RESUME_READY', 'RESUME_INTENT_COMMITTED', 'RESUME_RECORDED',
+        'POST_RESUME_AMBIGUOUS', 'TERMINAL_RECORDED', 'CLOSED'
     )),
     process_creation_json BLOB NOT NULL,
     process_creation_digest BLOB NOT NULL CHECK (length(process_creation_digest) = 32),
@@ -133,13 +133,19 @@ CREATE TABLE launch_executions (
     job_object_digest BLOB NOT NULL CHECK (length(job_object_digest) = 32),
     resume_authorization_json BLOB NOT NULL,
     resume_authorization_digest BLOB NOT NULL CHECK (length(resume_authorization_digest) = 32),
+    resume_intent_json BLOB,
+    resume_intent_digest BLOB,
+    resume_intent_committed_at_utc TEXT,
     post_resume_json BLOB,
     post_resume_digest BLOB,
     cleanup_json BLOB,
     cleanup_digest BLOB,
     created_at_utc TEXT NOT NULL,
+    CHECK (resume_intent_digest IS NULL OR length(resume_intent_digest) = 32),
     CHECK (post_resume_digest IS NULL OR length(post_resume_digest) = 32),
     CHECK (cleanup_digest IS NULL OR length(cleanup_digest) = 32),
+    CHECK ((resume_intent_json IS NULL) = (resume_intent_digest IS NULL)),
+    CHECK ((resume_intent_json IS NULL) = (resume_intent_committed_at_utc IS NULL)),
     CHECK ((post_resume_json IS NULL) = (post_resume_digest IS NULL)),
     CHECK ((cleanup_json IS NULL) = (cleanup_digest IS NULL))
 );
@@ -187,6 +193,7 @@ CREATE TABLE manual_recoveries (
         'RECORD_ATTEMPT_AMBIGUITY',
         'RECORD_CLAIM_AMBIGUITY',
         'CLASSIFY_LAUNCH_RESERVATION',
+        'CLASSIFY_PRE_RESUME_READY',
         'CLASSIFY_RESUME_OUTCOME_UNKNOWN',
         'SELECT_COMMITTED_SUCCESS',
         'CLOSE_SESSION',
@@ -571,10 +578,22 @@ BEFORE UPDATE OF phase ON launch_executions
 WHEN NOT (
     NEW.phase = OLD.phase
     OR (OLD.phase = 'PRE_RESUME_READY'
+        AND NEW.phase = 'RESUME_INTENT_COMMITTED'
+        AND NEW.resume_intent_json IS NOT NULL
+        AND NEW.resume_intent_digest IS NOT NULL
+        AND sha256(NEW.resume_intent_json) IS NEW.resume_intent_digest
+        AND CAST(NEW.resume_intent_json AS TEXT) =
+            '{"execution_id":"' || NEW.launch_execution_id ||
+            '","resume_operation":"ResumeThread","schema":1}')
+    OR (OLD.phase = 'RESUME_INTENT_COMMITTED'
         AND NEW.phase = 'RESUME_RECORDED'
         AND NEW.post_resume_json IS NOT NULL
         AND NEW.post_resume_digest IS NOT NULL
         AND sha256(NEW.post_resume_json) IS NEW.post_resume_digest
+        AND CAST(NEW.post_resume_json AS TEXT) =
+            '{"execution_id":"' || NEW.launch_execution_id ||
+            '","resume_intent_digest":"' || lower(hex(NEW.resume_intent_digest)) ||
+            '","resume_result":"RESUMED","schema":1}'
         AND NEW.cleanup_json IS NOT NULL
         AND NEW.cleanup_digest IS NOT NULL
         AND sha256(NEW.cleanup_json) IS NEW.cleanup_digest)
@@ -590,6 +609,9 @@ CREATE TRIGGER launch_executions_before_insert
 BEFORE INSERT ON launch_executions
 FOR EACH ROW
 WHEN NEW.phase <> 'PRE_RESUME_READY'
+  OR NEW.resume_intent_json IS NOT NULL
+  OR NEW.resume_intent_digest IS NOT NULL
+  OR NEW.resume_intent_committed_at_utc IS NOT NULL
   OR NEW.post_resume_json IS NOT NULL
   OR NEW.post_resume_digest IS NOT NULL
   OR NEW.cleanup_json IS NOT NULL
@@ -604,6 +626,28 @@ BEGIN
     SELECT RAISE(ABORT, 'launch executions cannot be deleted');
 END;
 
+CREATE TRIGGER launch_executions_resume_intent_append_only
+BEFORE UPDATE ON launch_executions
+WHEN OLD.resume_intent_json IS NOT NEW.resume_intent_json
+  OR OLD.resume_intent_digest IS NOT NEW.resume_intent_digest
+  OR OLD.resume_intent_committed_at_utc IS NOT NEW.resume_intent_committed_at_utc
+BEGIN
+    SELECT CASE WHEN NOT (
+        OLD.resume_intent_json IS NULL
+        AND OLD.resume_intent_digest IS NULL
+        AND OLD.resume_intent_committed_at_utc IS NULL
+        AND NEW.resume_intent_json IS NOT NULL
+        AND NEW.resume_intent_digest IS NOT NULL
+        AND NEW.resume_intent_committed_at_utc IS NOT NULL
+        AND sha256(NEW.resume_intent_json) IS NEW.resume_intent_digest
+        AND CAST(NEW.resume_intent_json AS TEXT) =
+            '{"execution_id":"' || NEW.launch_execution_id ||
+            '","resume_operation":"ResumeThread","schema":1}'
+        AND OLD.phase = 'PRE_RESUME_READY'
+        AND NEW.phase = 'RESUME_INTENT_COMMITTED'
+    ) THEN RAISE(ABORT, 'resume intent is append-only') END;
+END;
+
 CREATE TRIGGER launch_executions_post_resume_append_only
 BEFORE UPDATE ON launch_executions
 WHEN OLD.post_resume_json IS NOT NEW.post_resume_json
@@ -615,7 +659,11 @@ BEGIN
         AND NEW.post_resume_json IS NOT NULL
         AND NEW.post_resume_digest IS NOT NULL
         AND sha256(NEW.post_resume_json) IS NEW.post_resume_digest
-        AND OLD.phase = 'PRE_RESUME_READY'
+        AND CAST(NEW.post_resume_json AS TEXT) =
+            '{"execution_id":"' || NEW.launch_execution_id ||
+            '","resume_intent_digest":"' || lower(hex(NEW.resume_intent_digest)) ||
+            '","resume_result":"RESUMED","schema":1}'
+        AND OLD.phase = 'RESUME_INTENT_COMMITTED'
         AND NEW.phase = 'RESUME_RECORDED'
     ) THEN RAISE(ABORT, 'post-resume evidence is append-only') END;
 END;
@@ -631,7 +679,7 @@ BEGIN
         AND NEW.cleanup_json IS NOT NULL
         AND NEW.cleanup_digest IS NOT NULL
         AND sha256(NEW.cleanup_json) IS NEW.cleanup_digest
-        AND OLD.phase = 'PRE_RESUME_READY'
+        AND OLD.phase = 'RESUME_INTENT_COMMITTED'
         AND NEW.phase = 'RESUME_RECORDED'
     ) THEN RAISE(ABORT, 'cleanup evidence is append-only') END;
 END;
@@ -846,6 +894,32 @@ BEGIN
                 WHERE launch_reservation_id = NEW.target_id
                   AND reservation_state = 'COMMITTED'
             ))
+        OR (NEW.action = 'CLASSIFY_PRE_RESUME_READY'
+            AND NEW.target_kind = 'LAUNCH_RESERVATION'
+            AND NEW.predecessor_state = 'PROCESS_CREATED'
+            AND NEW.resulting_state = 'MANUAL_REVIEW'
+            AND EXISTS (
+                SELECT 1 FROM launch_reservations
+                WHERE launch_reservation_id = NEW.target_id
+                  AND reservation_state = 'PROCESS_CREATED'
+            )
+            AND (SELECT count(*) FROM launch_executions e
+                 WHERE e.launch_reservation_id = NEW.target_id) = 1
+            AND EXISTS (
+                SELECT 1 FROM launch_executions e
+                WHERE e.launch_reservation_id = NEW.target_id
+                  AND e.phase = 'PRE_RESUME_READY'
+                  AND sha256(e.process_creation_json) IS e.process_creation_digest
+                  AND sha256(e.job_object_json) IS e.job_object_digest
+                  AND sha256(e.resume_authorization_json) IS e.resume_authorization_digest
+                  AND e.resume_intent_json IS NULL
+                  AND e.resume_intent_digest IS NULL
+                  AND e.resume_intent_committed_at_utc IS NULL
+                  AND e.post_resume_json IS NULL
+                  AND e.post_resume_digest IS NULL
+                  AND e.cleanup_json IS NULL
+                  AND e.cleanup_digest IS NULL
+            ))
         OR (NEW.action = 'CLASSIFY_RESUME_OUTCOME_UNKNOWN'
             AND NEW.target_kind = 'LAUNCH_RESERVATION'
             AND NEW.predecessor_state = 'PROCESS_CREATED'
@@ -862,7 +936,7 @@ BEGIN
                 SELECT 1
                 FROM launch_executions e
                 WHERE e.launch_reservation_id = NEW.target_id
-                  AND e.phase = 'PRE_RESUME_READY'
+                  AND e.phase = 'RESUME_INTENT_COMMITTED'
                   AND e.process_creation_json IS NOT NULL
                   AND e.process_creation_digest IS NOT NULL
                   AND sha256(e.process_creation_json) IS e.process_creation_digest
@@ -872,6 +946,10 @@ BEGIN
                   AND e.resume_authorization_json IS NOT NULL
                   AND e.resume_authorization_digest IS NOT NULL
                   AND sha256(e.resume_authorization_json) IS e.resume_authorization_digest
+                  AND e.resume_intent_json IS NOT NULL
+                  AND e.resume_intent_digest IS NOT NULL
+                  AND sha256(e.resume_intent_json) IS e.resume_intent_digest
+                  AND e.resume_intent_committed_at_utc IS NOT NULL
                   AND e.post_resume_json IS NULL
                   AND e.post_resume_digest IS NULL
                   AND e.cleanup_json IS NULL

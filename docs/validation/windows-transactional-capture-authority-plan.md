@@ -53,7 +53,7 @@ not claimed to parse requests or authenticate external Alpaca behavior.
 | SQLite fixture proves | Reviewed transaction harness proves |
 | --- | --- |
 | Immediate-parent foreign keys and `PRAGMA foreign_key_check` | Multi-statement workflow ordering |
-| Append-only evidence, immutable rows, and prohibited deletes | Canonical request/digest and policy reconciliation |
+| Append-only evidence, canonical resume-intent/receipt bytes, immutable rows, and prohibited deletes | Exact request shape/type/date validation, canonical request/digest, and policy reconciliation |
 | Unique one-to-one claim/reservation/execution/terminal/selection fences | UUID5 identity construction and comparison |
 | Per-session uniqueness and trigger-owned ordinal increments | Commit-before-side-effect boundaries |
 | Session-wide claim admission through normalized lineage joins | Complete atomicity of state plus evidence updates |
@@ -108,8 +108,12 @@ The executable DDL smoke test must also confirm that:
   null;
 - the first reservation outcome timestamp and both session close facts are
   write-once; and
-- `CLASSIFY_RESUME_OUTCOME_UNKNOWN` and its recovery policy/digest checks are
-  present without copied ancestor columns.
+- `launch_executions` contains the three nullable resume-intent columns, the
+  `RESUME_INTENT_COMMITTED` phase, and executable append/phase triggers that
+  require exact canonical intent and receipt bytes; and
+- `CLASSIFY_PRE_RESUME_READY`, `CLASSIFY_RESUME_OUTCOME_UNKNOWN`, and their
+  distinct recovery phase/policy/digest checks are present without copied
+  ancestor columns.
 
 ## 4. Deterministic identity gates
 
@@ -185,27 +189,42 @@ metadata + migration
   -> owning session selection
 ```
 
-The request propagation gate is exact and immediate-parent scoped. Session
-creation is the only operation that accepts or constructs canonical request
-bytes. Attempt allocation reads the session bytes/digest; claim creation reads
+The request propagation gate is exact and immediate-parent scoped. Before any
+canonicalization, UUID5 computation, or insert, session creation is the only
+operation that accepts and validates the exact `capture_request/v2` object.
+Its exact key set is `bar_interval`, `child_operation_version`,
+`ordered_universe`, `output_policy_version`,
+`permitted_provider_operation`, `provider_id`, `request_limit`,
+`request_window_end_date`, `request_window_start_date`, and
+`target_session_date`. Attempt allocation reads the accepted session
+bytes/digest; claim creation reads
 the attempt bytes/digest; reservation creation reads the claim digest; and
 terminal creation reads the reservation digest. Each insert rejects any
 request-byte or digest mismatch, and descendant helpers do not reconstruct the
 request. The valid-lifecycle test uses a non-default date, ordered universe,
-limit, and output policy, then compares the exact bytes/digest in every stored
+and consistent limit, then compares the exact bytes/digest in every stored
 request-bearing row.
 
 Before that construction, the session helper must begin `BEGIN IMMEDIATE`,
 read the singleton metadata row, verify its provider and operation against the
-public Alpaca descriptor, and require the proposed request's two corresponding
-fields to be present strings with exact byte-for-byte equality. It must not
-normalize casing, underscores, legacy names, or alternate operation labels.
+public Alpaca descriptor, and require the proposed request's corresponding
+fields to agree exactly. The validator requires exact dict/list/string/integer
+types; boolean is not an integer; a nonempty, bounded, duplicate-free universe
+of nonempty strings; a positive limit equal to the universe length; canonical
+`YYYY-MM-DD` values ordered `window_start <= window_end < target_session`; and
+the exact fixed bar interval, child/output policy versions, provider, and
+operation. It must not coerce tuples, integers, dates, casing, underscores,
+legacy names, or alternate operation labels.
 
-Table-driven negative tests cover request provider drift, request operation
-drift, metadata provider drift, metadata operation drift, legacy
-`ALPACA_MARKET_DATA`, legacy `HISTORICAL_DAILY_BARS`, both missing fields, and
-both non-string fields. Every rejection must leave no session, attempt, or
-claim, zero ordinal consumption, and no fake side-effect event. The positive
+Table-driven negative tests remove each required field in turn and cover an
+unknown field; request-limit string, boolean, zero, and universe mismatch;
+tuple, empty, oversized, duplicate, blank-member, and non-string-member
+universes; malformed/noncanonical dates and invalid ordering; wrong scalar
+types; every fixed-value drift; metadata drift; and legacy labels. Every
+rejection must leave no session, counter, attempt, claim, reservation,
+execution, terminal, selection, recovery, or fake side-effect event. A
+collision test proves that an alternate tuple representation which would feed
+the same pure list framing cannot persist under the valid session ID. The positive
 complete lifecycle must persist the public descriptor values in metadata,
 attempt, claim, canonical request bytes, and all dependent identity material.
 
@@ -227,7 +246,7 @@ claim insertion. The only accepted prior claim lineage is
 evidence plus `FAILED`/`NOT_STARTED` terminal plus no execution. The same
 table-driven matrix rejects no reservation, `COMMITTED`, incomplete
 `PROCESS_CREATION_FAILED`, `PROCESS_CREATED` without execution,
-`MANUAL_REVIEW`, `PRE_RESUME_READY`, `RESUME_RECORDED`,
+`MANUAL_REVIEW`, `PRE_RESUME_READY`, `RESUME_INTENT_COMMITTED`, `RESUME_RECORDED`,
 `POST_RESUME_AMBIGUOUS`, `SUCCEEDED`, `AMBIGUOUS`, `CLOSED`, `CONFIRMED`,
 `MAY_HAVE_OCCURRED`, success awaiting selection, `SUCCESS_SELECTED`,
 `CLOSED`, and incomplete or contradictory lineage. The helper must contain no
@@ -244,7 +263,7 @@ Terminal insertion is accepted only for this matrix:
 
 | Terminal state | Provider disposition | Snapshot | Evidence gate |
 | --- | --- | --- | --- |
-| `SUCCEEDED` | `CONFIRMED` | present | `RESUME_RECORDED` execution with post-resume and cleanup pairs |
+| `SUCCEEDED` | `CONFIRMED` | present | `RESUME_RECORDED` execution with exact canonical intent-bound `RESUMED` receipt and cleanup pair |
 | `FAILED` | `NOT_STARTED` | absent | `PROCESS_CREATION_FAILED` reservation with failure evidence |
 | `FAILED` | `CONFIRMED` | absent | `RESUME_RECORDED` execution with post-resume and cleanup pairs |
 | `AMBIGUOUS` | `MAY_HAVE_OCCURRED` | absent | `RESUME_RECORDED` or `POST_RESUME_AMBIGUOUS` execution with both pairs |
@@ -257,9 +276,11 @@ valid insert, execution, reservation, and attempt are advanced to
 `TERMINAL_RECORDED` in the same transaction.
 
 For an execution-backed lifecycle, the executable order is explicitly
-`record_execution` -> fake `ResumeThread` hook while `PRE_RESUME_READY` ->
-`record_post_resume_evidence` with the returned receipt -> `record_terminal` ->
-selection when applicable. No persistence helper creates a resume result.
+`record_execution` -> `commit_resume_intent` and
+`RESUME_INTENT_COMMITTED` -> fake `ResumeThread` hook with the winner's opaque
+permit -> `record_post_resume_evidence` with the exact returned receipt ->
+`record_terminal` -> selection when applicable. No persistence helper creates
+a resume result.
 
 The following duplicate operations must fail without a second side effect:
 
@@ -307,7 +328,8 @@ action matrix is closed:
 | `RECORD_ATTEMPT_AMBIGUITY` | `ATTEMPT` | `LAUNCH_RESERVED` -> `AMBIGUITY_RECORDED` | evidence-only uncertainty record |
 | `RECORD_CLAIM_AMBIGUITY` | `CLAIM` | `COMMITTED` -> `AMBIGUITY_RECORDED` | evidence-only uncertainty record |
 | `CLASSIFY_LAUNCH_RESERVATION` | `LAUNCH_RESERVATION` | `COMMITTED` -> `MANUAL_REVIEW` | classify the existing reservation |
-| `CLASSIFY_RESUME_OUTCOME_UNKNOWN` | `LAUNCH_RESERVATION` | `PROCESS_CREATED` -> `MANUAL_REVIEW` | freeze and conservatively classify unresolved pre-resume evidence |
+| `CLASSIFY_PRE_RESUME_READY` | `LAUNCH_RESERVATION` | `PROCESS_CREATED` -> `MANUAL_REVIEW` | conservative path before any resume intent exists |
+| `CLASSIFY_RESUME_OUTCOME_UNKNOWN` | `LAUNCH_RESERVATION` | `PROCESS_CREATED` -> `MANUAL_REVIEW` | freeze and conservatively classify committed-intent/no-receipt ambiguity |
 | `SELECT_COMMITTED_SUCCESS` | `TERMINAL` | `SUCCEEDED` -> `SUCCESS_SELECTED` | normal owning-session selection |
 | `CLOSE_SESSION` | `SESSION` | `OPEN` -> `CLOSED` | close only after terminal/no-ambiguity preconditions |
 | `ACKNOWLEDGE_RESTORE` | `SESSION` | `OPEN` -> `RESTORE_ACKNOWLEDGED` | acknowledgement evidence only |
@@ -365,10 +387,16 @@ service additionally performs any matrix-authorized state update in the same
 `LAUNCH_RESERVED`, `TERMINAL_RECORDED`, or `SUCCESS_SELECTED` through a generic
 recovery update.
 
+The pre-intent recovery gate separately requires one `PRE_RESUME_READY`
+execution with digest-valid process, Job Object, and resume-authorization
+evidence and no intent, receipt, or cleanup. It preserves manual handling
+without granting resume authority.
+
 The unknown-resume recovery gate requires one reservation in the owning open
-session, exactly one `PRE_RESUME_READY` execution, digest-valid process, Job
-Object, and resume-authorization evidence, and no persisted post-resume receipt
-or cleanup. Invalid target lineage, predecessor, policy, operator digest,
+session, exactly one `RESUME_INTENT_COMMITTED` execution, digest-valid process,
+Job Object, resume-authorization, and canonical intent evidence, and no
+persisted post-resume receipt or cleanup. Invalid target lineage, predecessor,
+policy, operator digest,
 execution count/phase, or post-resume evidence fails before a state change.
 The accepted transaction appends one immutable recovery, consumes exactly its
 allocated ordinal, changes only the reservation to `MANUAL_REVIEW`, preserves
@@ -386,25 +414,29 @@ The test proves the following event order:
 | --- | --- |
 | Claim commit -> credential/provider construction | The observer sees `COMMITTED` before the fake provider hook runs |
 | Reservation commit -> process creation | The observer sees `COMMITTED` before the fake process hook runs |
-| `PRE_RESUME_READY` commit -> external `ResumeThread` | The fake adapter sees committed process, Job Object, and resume-authorization evidence before returning a typed receipt |
-| External `ResumeThread` -> post-resume/cleanup commit | The receipt is required by the persistence helper, which then exposes `RESUME_RECORDED` to the observer |
+| `PRE_RESUME_READY` -> resume-intent commit | One `BEGIN IMMEDIATE` winner appends the exact intent triple, exposes `RESUME_INTENT_COMMITTED`, and alone receives the opaque permit |
+| Resume-intent commit -> external `ResumeThread` | The fake adapter accepts only that permit and sees the committed canonical intent plus process, Job Object, and resume-authorization evidence |
+| External `ResumeThread` -> post-resume/cleanup commit | The exact canonical `RESUMED` receipt bound to execution and intent digest is required before `RESUME_RECORDED` |
 | Ambiguous terminal -> retry | A second claim cannot be inserted and the claim count remains one |
 | Any prior session claim -> new claim | The trigger admits only the exact retry-safe process-creation-failure lineage |
 | Unknown resume recovery -> closure | Recovery row, ordinal increment, `MANUAL_REVIEW`, `CLOSED`/`MAY_HAVE_OCCURRED` terminal, and authorized session close preserve the frozen execution |
 
 The fake hooks do not read secrets, construct a provider, create a Windows
 process, call a network, or invoke a real Windows API. The fake resume adapter
-records the modeled external event and returns a canonical receipt; the
-transaction helper persists that receipt only after the hook returns. SQLite
-proves the committed database facts and phase transition, not that an external
-Windows API call occurred.
+records the modeled external event and returns a canonical receipt only after
+modeled success; modeled failure returns no receipt. The transaction helper
+persists the success receipt only after the hook returns. SQLite proves the
+one-reservation and one-intent durable fences, exact persisted bytes, and phase
+transition, not that an external Windows API call occurred.
 
-Launch-execution evidence is append-only. The tests reject post-resume or
-cleanup writes in the same `PRE_RESUME_READY` phase, partial JSON/digest pairs,
-wrong digests, replacement, clearing, same-phase rewrites, and any rewrite
-after terminal recording. The only permitted evidence mutation is one forward
-`PRE_RESUME_READY` -> `RESUME_RECORDED` update that appends both complete,
-matching pairs; identity and all pre-resume evidence remain immutable.
+Launch-execution evidence is append-only. The tests reject standalone intent
+writes, direct phase jumps, partial triples/pairs, wrong digests, replacement,
+clearing, reassignment, same-phase rewrites, and any rewrite after terminal
+recording. The only permitted mutations are
+`PRE_RESUME_READY -> RESUME_INTENT_COMMITTED` with the exact canonical intent
+triple, followed by `RESUME_INTENT_COMMITTED -> RESUME_RECORDED` with the exact
+canonical receipt and complete cleanup pair. Identity and all pre-resume
+evidence remain immutable.
 
 The whole-model audit is compact and table-driven. It covers every insert-only
 initial state, every mutable write-once field, one authoritative session claim
@@ -415,13 +447,35 @@ authorize a claim, launch, resume, provider call, or other side effect. Every
 rejection must leave the original row, counters, lineage, and evidence
 unchanged.
 
-The resume-specific negative gates prove that the adapter cannot run before a
-`PRE_RESUME_READY` row exists, post-resume evidence requires a typed fake
-receipt, a terminal cannot be inserted between `ResumeThread` and evidence
-persistence, a crash at that boundary leaves an unresolved/manual execution
-and blocks a new claim, and a receipt cannot be reused for another execution.
-SQLite validates only these persisted facts and fake-hook ordering; the suite
-does not claim that SQLite proves a real `CreateProcessW`, `ResumeThread`, Job
+Two independent connections race `commit_resume_intent` for one execution:
+exactly one gets a permit and reaches the hook, the loser fails before the
+hook, one intent is stored, and one modeled `ResumeThread` event occurs. A
+second intent, second use of the same permit, reconstructed/non-typed permit,
+and cross-execution intent reuse all fail. A crash immediately after intent
+commit before the hook and a crash immediately after the hook before receipt
+persistence expose the same `RESUME_INTENT_COMMITTED` row with no receipt or
+cleanup. Neither permits intent reacquisition, another hook attempt, a new
+claim, or a `NOT_STARTED` classification. The separate pre-intent recovery
+test proves `PRE_RESUME_READY` remains conservatively closable.
+
+Receipt gates require exact `FakeResumeReceipt` type and the canonical object
+`execution_id`, lowercase intent-digest hex, literal `RESUMED`, and exact
+integer schema `1`. They reject `FAILED`, `ERROR`, `UNKNOWN`, wrong/string
+schema, wrong execution or intent, missing/extra fields, noncanonical bytes,
+wrong digest, reuse, and cross-execution use. Every rejection leaves
+`RESUME_INTENT_COMMITTED` unchanged and prevents a successful terminal. The
+positive path persists the same bytes/digest and proves `SUCCEEDED` is
+impossible until exact receipt and cleanup evidence commit.
+
+The whole-boundary matrix covers positive, negative, concurrency, and crash
+outcomes for claim commit -> provider construction -> reservation commit ->
+`CreateProcessW` -> `PRE_RESUME_READY` commit -> resume-intent commit ->
+`ResumeThread` -> exact receipt/evidence commit -> terminal -> selection. One
+reservation fences process creation, one intent fences resume, exact receipt
+proves modeled success, every uncertainty blocks a claim, and canonical
+request bytes and identity material retain the same validated semantics.
+SQLite validates only persisted facts and fake-hook ordering; the suite does
+not claim that SQLite proves a real `CreateProcessW`, `ResumeThread`, Job
 Object, or other Windows API effect.
 
 ## 10. Security and operational gates not claimed by this fixture

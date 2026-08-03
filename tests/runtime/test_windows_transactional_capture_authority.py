@@ -29,7 +29,8 @@ PROCESS_CREATED_TIMESTAMP = "2026-01-01T00:01:00Z"
 PROCESS_FAILURE_TIMESTAMP = "2026-01-01T00:02:00Z"
 MANUAL_REVIEW_TIMESTAMP = "2026-01-01T00:03:00Z"
 TERMINAL_TIMESTAMP = "2026-01-01T00:04:00Z"
-CLOSE_TIMESTAMP = "2026-01-01T00:05:00Z"
+SELECTION_TIMESTAMP = "2026-01-01T00:05:00Z"
+CLOSE_TIMESTAMP = "2026-01-01T00:06:00Z"
 
 
 @dataclass(frozen=True)
@@ -39,6 +40,18 @@ class FakeResumeReceipt:
     execution_id: str
     result_json: bytes
     result_digest: bytes
+
+
+def test_fixed_authority_timestamps_are_causally_ordered() -> None:
+    assert (
+        TIMESTAMP
+        < PROCESS_CREATED_TIMESTAMP
+        < PROCESS_FAILURE_TIMESTAMP
+        < MANUAL_REVIEW_TIMESTAMP
+        < TERMINAL_TIMESTAMP
+        < SELECTION_TIMESTAMP
+        < CLOSE_TIMESTAMP
+    )
 
 
 def _frame(value: str) -> str:
@@ -224,7 +237,7 @@ def _insert_terminal_row_for_test(
             snapshot,
             diagnostics,
             diagnostics_digest,
-            TIMESTAMP,
+            TERMINAL_TIMESTAMP,
         ),
     )
     return terminal_id
@@ -822,7 +835,7 @@ def _insert_selection_in_transaction(
             snapshot[0],
             evidence,
             evidence_digest,
-            TIMESTAMP,
+            SELECTION_TIMESTAMP,
         ),
     )
     attempt_id = connection.execute(
@@ -954,6 +967,10 @@ def record_recovery(
             recovery_ordinal,
         )
         evidence, evidence_digest = _evidence(f"recovery:{recovery_id}")
+        recovery_timestamp = {
+            "SELECT_COMMITTED_SUCCESS": SELECTION_TIMESTAMP,
+            "CLOSE_SESSION": CLOSE_TIMESTAMP,
+        }.get(action, MANUAL_REVIEW_TIMESTAMP)
         connection.execute(
             """
             INSERT INTO manual_recoveries (
@@ -975,7 +992,7 @@ def record_recovery(
                 resulting,
                 evidence,
                 evidence_digest,
-                TIMESTAMP,
+                recovery_timestamp,
             ),
         )
         if action == "CLASSIFY_LAUNCH_RESERVATION":
@@ -1300,6 +1317,20 @@ def test_valid_lifecycle_from_metadata_to_selection(db_path: Path) -> None:
     assert connection.execute(
         "SELECT selection_id FROM session_selections"
     ).fetchone() == (selection_id,)
+    terminal_recorded_at, selection_selected_at = connection.execute(
+        """
+        SELECT t.recorded_at_utc, ss.selected_at_utc
+        FROM terminals t
+        JOIN session_selections ss ON ss.terminal_id = t.terminal_id
+        WHERE t.terminal_id = ?
+        """,
+        (terminal_id,),
+    ).fetchone()
+    assert (terminal_recorded_at, selection_selected_at) == (
+        TERMINAL_TIMESTAMP,
+        SELECTION_TIMESTAMP,
+    )
+    assert terminal_recorded_at <= selection_selected_at
     assert connection.execute("PRAGMA foreign_key_check").fetchall() == []
     connection.close()
 
@@ -1513,6 +1544,25 @@ def test_recovery_action_matrix_allows_documented_actions(db_path: Path) -> None
         "SELECT terminal_id FROM session_selections WHERE session_id = ?",
         (select_session,),
     ).fetchone() == (select_terminal,)
+    terminal_recorded_at, recovery_created_at, selection_selected_at = (
+        connection.execute(
+            """
+            SELECT t.recorded_at_utc, mr.created_at_utc, ss.selected_at_utc
+            FROM terminals t
+            JOIN manual_recoveries mr ON mr.target_id = t.terminal_id
+            JOIN session_selections ss ON ss.terminal_id = t.terminal_id
+            WHERE t.terminal_id = ?
+              AND mr.action = 'SELECT_COMMITTED_SUCCESS'
+            """,
+            (select_terminal,),
+        ).fetchone()
+    )
+    assert (terminal_recorded_at, recovery_created_at, selection_selected_at) == (
+        TERMINAL_TIMESTAMP,
+        SELECTION_TIMESTAMP,
+        SELECTION_TIMESTAMP,
+    )
+    assert terminal_recorded_at <= selection_selected_at
     assert select_recovery
 
     close_session = create_session(connection, _request("2026-01-04"))
@@ -2336,6 +2386,20 @@ def test_session_close_facts_are_write_once_and_only_close_with_state(
         "SELECT state, closed_at_utc, close_reason FROM sessions WHERE session_id = ?",
         (selected_session,),
     ).fetchone() == ("CLOSED", CLOSE_TIMESTAMP, "selected-close")
+    selection_selected_at, session_closed_at = connection.execute(
+        """
+        SELECT ss.selected_at_utc, s.closed_at_utc
+        FROM session_selections ss
+        JOIN sessions s ON s.session_id = ss.session_id
+        WHERE ss.session_id = ?
+        """,
+        (selected_session,),
+    ).fetchone()
+    assert (selection_selected_at, session_closed_at) == (
+        SELECTION_TIMESTAMP,
+        CLOSE_TIMESTAMP,
+    )
+    assert selection_selected_at <= session_closed_at
     connection.close()
 
 

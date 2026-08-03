@@ -42,16 +42,18 @@ The validation review must classify each assertion before accepting it:
 | --- | --- |
 | Immediate-parent foreign keys and `PRAGMA foreign_key_check` | Multi-statement workflow ordering |
 | Append-only evidence, immutable rows, and prohibited deletes | Canonical request/digest and policy reconciliation |
-| Unique one-to-one claim/reservation/execution/terminal/selection fences | Action-specific recovery policy and operator evidence |
+| Unique one-to-one claim/reservation/execution/terminal/selection fences | UUID5 identity construction and comparison |
 | Per-session uniqueness and trigger-owned ordinal increments | Commit-before-side-effect boundaries |
-| Monotonic local state transitions and local absorbing fences | Complete atomicity of state plus evidence updates |
-| Typed recovery target existence and same-session lineage | Cross-table semantic checks that do not need copied ancestor columns |
+| Session-wide claim admission through normalized lineage joins | Complete atomicity of state plus evidence updates |
+| Typed recovery target lineage, exact action matrix, policy, and operator digest | Pairing recovery insertion, counter allocation, and state update |
+| Monotonic local state transitions and absorbing fences | External Windows evidence acquisition and classification |
 | Fixed enums, budget, digest lengths, and typed success facts | UUID5 computation and exact material contract |
 
 The review rejects any document or test claim that SQLite authenticates an
 executable, verifies Windows CNG/ACL state, validates a provider response, or
-protects against compromised trusted-token code. Complex triggers are not
-added for that excluded threat.
+protects against compromised trusted-token code. Cross-row triggers are
+limited to database facts reachable through normalized immediate-parent joins
+and do not inspect or prove excluded Windows effects.
 
 ## 3. Schema execution gates
 
@@ -86,6 +88,16 @@ The first gate runs the complete DDL with foreign keys enabled and asserts:
 
 The review must not reintroduce a separate allocation table, allocation
 identity, large composite lineage foreign key, or redundant ancestor column.
+The executable DDL smoke test must also confirm that:
+
+- `provider_call_claims_before_insert` can traverse only the normalized
+  immediate-parent chain and is the authoritative claim-admission gate;
+- reservation inserts accept only `COMMITTED` with all failure/outcome fields
+  null;
+- the first reservation outcome timestamp and both session close facts are
+  write-once; and
+- `CLASSIFY_RESUME_OUTCOME_UNKNOWN` and its recovery policy/digest checks are
+  present without copied ancestor columns.
 
 ## 4. Deterministic identity gates
 
@@ -176,6 +188,25 @@ The focused suite asserts:
   failure with no execution row; and
 - one confirmed successful terminal can be selected only by its owning session.
 
+Claim admission is exercised through both the transaction helper and direct
+claim insertion. The only accepted prior claim lineage is
+`TERMINAL_RECORDED` reservation plus digest-valid process-creation-failure
+evidence plus `FAILED`/`NOT_STARTED` terminal plus no execution. The same
+table-driven matrix rejects no reservation, `COMMITTED`, incomplete
+`PROCESS_CREATION_FAILED`, `PROCESS_CREATED` without execution,
+`MANUAL_REVIEW`, `PRE_RESUME_READY`, `RESUME_RECORDED`,
+`POST_RESUME_AMBIGUOUS`, `SUCCEEDED`, `AMBIGUOUS`, `CLOSED`, `CONFIRMED`,
+`MAY_HAVE_OCCURRED`, success awaiting selection, `SUCCESS_SELECTED`,
+`CLOSED`, and incomplete or contradictory lineage. The helper must contain no
+independent unresolved-execution query.
+
+Reservation insertion tests reject every state other than `COMMITTED` and
+reject a `COMMITTED` insert with prepopulated failure evidence or an outcome
+timestamp. Separate transition tests prove the timestamp is assigned exactly
+once by `PROCESS_CREATED`, `PROCESS_CREATION_FAILED`, or first
+`MANUAL_REVIEW`; later terminal/recovery transitions preserve it; replacement
+and clearing fail; and terminal recording cannot supply a missing value.
+
 Terminal insertion is accepted only for this matrix:
 
 | Terminal state | Provider disposition | Snapshot | Evidence gate |
@@ -243,6 +274,7 @@ action matrix is closed:
 | `RECORD_ATTEMPT_AMBIGUITY` | `ATTEMPT` | `LAUNCH_RESERVED` -> `AMBIGUITY_RECORDED` | evidence-only uncertainty record |
 | `RECORD_CLAIM_AMBIGUITY` | `CLAIM` | `COMMITTED` -> `AMBIGUITY_RECORDED` | evidence-only uncertainty record |
 | `CLASSIFY_LAUNCH_RESERVATION` | `LAUNCH_RESERVATION` | `COMMITTED` -> `MANUAL_REVIEW` | classify the existing reservation |
+| `CLASSIFY_RESUME_OUTCOME_UNKNOWN` | `LAUNCH_RESERVATION` | `PROCESS_CREATED` -> `MANUAL_REVIEW` | freeze and conservatively classify unresolved pre-resume evidence |
 | `SELECT_COMMITTED_SUCCESS` | `TERMINAL` | `SUCCEEDED` -> `SUCCESS_SELECTED` | normal owning-session selection |
 | `CLOSE_SESSION` | `SESSION` | `OPEN` -> `CLOSED` | close only after terminal/no-ambiguity preconditions |
 | `ACKNOWLEDGE_RESTORE` | `SESSION` | `OPEN` -> `RESTORE_ACKNOWLEDGED` | acknowledgement evidence only |
@@ -287,12 +319,30 @@ Recovery is tested with the same single-insert pattern:
 - each independent session begins recovery at ordinal zero; and
 - recovery after a successful selection or closed session fails.
 
+Session close-fact tests require `closed_at_utc` and `close_reason` to remain
+jointly null before closure, become jointly non-null only on
+`OPEN -> CLOSED` or `SUCCESS_SELECTED -> CLOSED`, and remain unchanged
+forever. Partial population, pre-closure population, replacement, clearing,
+and same-state `CLOSED` mutation all fail.
+
 The trigger verifies open-session eligibility, target existence, same-session
 lineage, current ordinal, and an exact action-matrix entry. The test transaction
 service additionally performs any matrix-authorized state update in the same
 `BEGIN IMMEDIATE` transaction. It never manufactures `CLAIM_COMMITTED`,
 `LAUNCH_RESERVED`, `TERMINAL_RECORDED`, or `SUCCESS_SELECTED` through a generic
 recovery update.
+
+The unknown-resume recovery gate requires one reservation in the owning open
+session, exactly one `PRE_RESUME_READY` execution, digest-valid process, Job
+Object, and resume-authorization evidence, and no persisted post-resume receipt
+or cleanup. Invalid target lineage, predecessor, policy, operator digest,
+execution count/phase, or post-resume evidence fails before a state change.
+The accepted transaction appends one immutable recovery, consumes exactly its
+allocated ordinal, changes only the reservation to `MANUAL_REVIEW`, preserves
+the first outcome timestamp and frozen execution/evidence, and grants no new
+claim or provider call. It permits only a subsequent
+`CLOSED`/`MAY_HAVE_OCCURRED` terminal and authorized session close. Recovery
+after `SUCCESS_SELECTED` or `CLOSED` remains rejected.
 
 ## 9. Transaction boundary gates
 
@@ -306,6 +356,8 @@ The test proves the following event order:
 | `PRE_RESUME_READY` commit -> external `ResumeThread` | The fake adapter sees committed process, Job Object, and resume-authorization evidence before returning a typed receipt |
 | External `ResumeThread` -> post-resume/cleanup commit | The receipt is required by the persistence helper, which then exposes `RESUME_RECORDED` to the observer |
 | Ambiguous terminal -> retry | A second claim cannot be inserted and the claim count remains one |
+| Any prior session claim -> new claim | The trigger admits only the exact retry-safe process-creation-failure lineage |
+| Unknown resume recovery -> closure | Recovery row, ordinal increment, `MANUAL_REVIEW`, `CLOSED`/`MAY_HAVE_OCCURRED` terminal, and authorized session close preserve the frozen execution |
 
 The fake hooks do not read secrets, construct a provider, create a Windows
 process, call a network, or invoke a real Windows API. The fake resume adapter
@@ -321,16 +373,23 @@ after terminal recording. The only permitted evidence mutation is one forward
 `PRE_RESUME_READY` -> `RESUME_RECORDED` update that appends both complete,
 matching pairs; identity and all pre-resume evidence remain immutable.
 
-The whole-model audit is compact and table-driven: invalid transitions are
-attempted independently at the attempt, claim, reservation, execution,
-terminal, selection, and recovery boundaries. Every rejection must leave the
-original row, counters, lineage, and evidence unchanged.
+The whole-model audit is compact and table-driven. It covers every insert-only
+initial state, every mutable write-once field, one authoritative session claim
+matrix, conservative recovery/closure for each ambiguous window, and every
+attempt, claim, reservation, execution, terminal, selection, and recovery
+transition. No ambiguity, success, `SUCCESS_SELECTED`, or `CLOSED` state may
+authorize a claim, launch, resume, provider call, or other side effect. Every
+rejection must leave the original row, counters, lineage, and evidence
+unchanged.
 
 The resume-specific negative gates prove that the adapter cannot run before a
 `PRE_RESUME_READY` row exists, post-resume evidence requires a typed fake
 receipt, a terminal cannot be inserted between `ResumeThread` and evidence
 persistence, a crash at that boundary leaves an unresolved/manual execution
 and blocks a new claim, and a receipt cannot be reused for another execution.
+SQLite validates only these persisted facts and fake-hook ordering; the suite
+does not claim that SQLite proves a real `CreateProcessW`, `ResumeThread`, Job
+Object, or other Windows API effect.
 
 ## 10. Security and operational gates not claimed by this fixture
 

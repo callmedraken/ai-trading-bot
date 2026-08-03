@@ -25,6 +25,11 @@ POLICY = "authority-policy/v1"
 CLAIM_POLICY = "claim-policy/v1"
 RELEASE = "release/v1"
 TIMESTAMP = "2026-01-01T00:00:00Z"
+PROCESS_CREATED_TIMESTAMP = "2026-01-01T00:01:00Z"
+PROCESS_FAILURE_TIMESTAMP = "2026-01-01T00:02:00Z"
+MANUAL_REVIEW_TIMESTAMP = "2026-01-01T00:03:00Z"
+TERMINAL_TIMESTAMP = "2026-01-01T00:04:00Z"
+CLOSE_TIMESTAMP = "2026-01-01T00:05:00Z"
 
 
 @dataclass(frozen=True)
@@ -143,9 +148,14 @@ def _insert_reservation_row_for_test(
     claim_id: str,
     request_digest: bytes,
     reservation_state: str = "COMMITTED",
+    failure_mode: bool = False,
+    outcome_timestamp: str | None = None,
 ) -> str:
     reservation_id = _reservation_id(claim_id)
     evidence, evidence_digest = _evidence(f"raw-reservation:{claim_id}")
+    failure = failure_digest = None
+    if failure_mode:
+        failure, failure_digest = _evidence(f"raw-failure:{claim_id}")
     connection.execute(
         """
         INSERT INTO launch_reservations (
@@ -155,7 +165,7 @@ def _insert_reservation_row_for_test(
             reservation_evidence_digest, reservation_state,
             process_creation_failure_json, process_creation_failure_digest,
             committed_at_utc, outcome_recorded_at_utc
-        ) VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, NULL)
+        ) VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             reservation_id,
@@ -167,7 +177,10 @@ def _insert_reservation_row_for_test(
             evidence,
             evidence_digest,
             reservation_state,
+            failure,
+            failure_digest,
             TIMESTAMP,
+            outcome_timestamp,
         ),
     )
     return reservation_id
@@ -505,23 +518,6 @@ def commit_claim(connection: sqlite3.Connection, attempt_id: str) -> str:
         ).fetchone()
         if attempt is None:
             raise ValueError("unknown attempt")
-        unresolved = connection.execute(
-            """
-            SELECT 1
-            FROM attempts a
-            JOIN provider_call_claims c ON c.attempt_id = a.attempt_id
-            JOIN launch_reservations r ON r.claim_id = c.claim_id
-            JOIN launch_executions e
-              ON e.launch_reservation_id = r.launch_reservation_id
-            WHERE a.session_id = ?
-              AND e.phase IN ('PRE_RESUME_READY', 'RESUME_RECORDED',
-                              'POST_RESUME_AMBIGUOUS')
-            LIMIT 1
-            """,
-            (attempt[0],),
-        ).fetchone()
-        if unresolved is not None:
-            raise ValueError("session has unresolved resume outcome")
         _, request_bytes, request_digest, provider_id, operation, budget = attempt
         connection.execute(
             """
@@ -644,7 +640,7 @@ def record_execution(connection: sqlite3.Connection, reservation_id: str) -> str
             SET reservation_state = 'PROCESS_CREATED', outcome_recorded_at_utc = ?
             WHERE launch_reservation_id = ?
             """,
-            (TIMESTAMP, reservation_id),
+            (PROCESS_CREATED_TIMESTAMP, reservation_id),
         )
         _finish(connection, True)
     except BaseException:
@@ -668,7 +664,7 @@ def record_process_creation_failure(
                 outcome_recorded_at_utc = ?
             WHERE launch_reservation_id = ?
             """,
-            (failure, failure_digest, TIMESTAMP, reservation_id),
+            (failure, failure_digest, PROCESS_FAILURE_TIMESTAMP, reservation_id),
         )
         _finish(connection, True)
     except BaseException:
@@ -761,24 +757,25 @@ def record_terminal(
                 snapshot,
                 diagnostics,
                 diagnostics_digest,
-                TIMESTAMP,
+                TERMINAL_TIMESTAMP,
             ),
         )
-        connection.execute(
-            """
-            UPDATE launch_executions
-            SET phase = 'TERMINAL_RECORDED'
-            WHERE launch_reservation_id = ?
-            """,
-            (reservation_id,),
-        )
+        if reservation[2] != "MANUAL_REVIEW":
+            connection.execute(
+                """
+                UPDATE launch_executions
+                SET phase = 'TERMINAL_RECORDED'
+                WHERE launch_reservation_id = ?
+                """,
+                (reservation_id,),
+            )
         connection.execute(
             """
             UPDATE launch_reservations
-            SET reservation_state = 'TERMINAL_RECORDED', outcome_recorded_at_utc = ?
+            SET reservation_state = 'TERMINAL_RECORDED'
             WHERE launch_reservation_id = ?
             """,
-            (TIMESTAMP, reservation_id),
+            (reservation_id,),
         )
         attempt_id = connection.execute(
             """
@@ -906,6 +903,11 @@ _RECOVERY_ACTIONS: dict[str, tuple[str, str, str]] = {
         "COMMITTED",
         "MANUAL_REVIEW",
     ),
+    "CLASSIFY_RESUME_OUTCOME_UNKNOWN": (
+        "LAUNCH_RESERVATION",
+        "PROCESS_CREATED",
+        "MANUAL_REVIEW",
+    ),
     "SELECT_COMMITTED_SUCCESS": (
         "TERMINAL",
         "SUCCEEDED",
@@ -983,7 +985,16 @@ def record_recovery(
                 SET reservation_state = 'MANUAL_REVIEW', outcome_recorded_at_utc = ?
                 WHERE launch_reservation_id = ?
                 """,
-                (TIMESTAMP, target_id),
+                (MANUAL_REVIEW_TIMESTAMP, target_id),
+            )
+        elif action == "CLASSIFY_RESUME_OUTCOME_UNKNOWN":
+            connection.execute(
+                """
+                UPDATE launch_reservations
+                SET reservation_state = 'MANUAL_REVIEW'
+                WHERE launch_reservation_id = ?
+                """,
+                (target_id,),
             )
         elif action == "SELECT_COMMITTED_SUCCESS":
             _insert_selection_in_transaction(connection, session_id, target_id)
@@ -994,7 +1005,7 @@ def record_recovery(
                 SET state = 'CLOSED', closed_at_utc = ?, close_reason = ?
                 WHERE session_id = ?
                 """,
-                (TIMESTAMP, "recovery-approved-close", session_id),
+                (CLOSE_TIMESTAMP, "recovery-approved-close", session_id),
             )
         _finish(connection, True)
     except BaseException:
@@ -1695,28 +1706,22 @@ def test_attempt_ordinals_serialize_across_connections_and_sessions(
 def test_recovery_ordinal_trigger_is_atomic_and_session_local(db_path: Path) -> None:
     connection = _connect(db_path)
     session_id = create_session(connection)
-    target_attempts: list[str] = []
-    target_reservations: list[str] = []
-    for _ in range(2):
-        attempt_id = allocate_attempt(connection, session_id)
-        claim_id = commit_claim(connection, attempt_id)
-        reservation_id = reserve_launch(connection, claim_id)
-        target_attempts.append(attempt_id)
-        target_reservations.append(reservation_id)
-    for reservation_id in target_reservations:
-        execution_id = record_execution(connection, reservation_id)
-        _resume_and_persist(connection, execution_id)
+    target_attempt = allocate_attempt(connection, session_id)
+    claim_id = commit_claim(connection, target_attempt)
+    reservation_id = reserve_launch(connection, claim_id)
+    execution_id = record_execution(connection, reservation_id)
+    _resume_and_persist(connection, execution_id)
     first_recovery = record_recovery(
         connection,
         session_id,
         "ATTEMPT",
-        target_attempts[0],
+        target_attempt,
         "RECORD_ATTEMPT_AMBIGUITY",
     )
     assert first_recovery == _recovery_id(
         session_id,
         "ATTEMPT",
-        target_attempts[0],
+        target_attempt,
         "RECORD_ATTEMPT_AMBIGUITY",
         "LAUNCH_RESERVED",
         "AMBIGUITY_RECORDED",
@@ -1726,18 +1731,18 @@ def test_recovery_ordinal_trigger_is_atomic_and_session_local(db_path: Path) -> 
         record_recovery(
             connection,
             session_id,
-            "ATTEMPT",
-            target_attempts[1],
-            "RECORD_ATTEMPT_AMBIGUITY",
+            "SESSION",
+            session_id,
+            "ACKNOWLEDGE_RESTORE",
             ordinal=0,
         )
     with pytest.raises(sqlite3.IntegrityError):
         record_recovery(
             connection,
             session_id,
-            "ATTEMPT",
-            target_attempts[1],
-            "RECORD_ATTEMPT_AMBIGUITY",
+            "SESSION",
+            session_id,
+            "ACKNOWLEDGE_RESTORE",
             ordinal=2,
         )
     with pytest.raises(sqlite3.IntegrityError):
@@ -1748,11 +1753,11 @@ def test_recovery_ordinal_trigger_is_atomic_and_session_local(db_path: Path) -> 
     _begin(connection)
     recovery_id = _recovery_id(
         session_id,
-        "ATTEMPT",
-        target_attempts[1],
-        "RECORD_ATTEMPT_AMBIGUITY",
-        "LAUNCH_RESERVED",
-        "AMBIGUITY_RECORDED",
+        "SESSION",
+        session_id,
+        "ACKNOWLEDGE_RESTORE",
+        "OPEN",
+        "RESTORE_ACKNOWLEDGED",
         1,
     )
     evidence, evidence_digest = _evidence("rollback-recovery")
@@ -1763,14 +1768,14 @@ def test_recovery_ordinal_trigger_is_atomic_and_session_local(db_path: Path) -> 
             action, predecessor_state, resulting_state, recovery_schema,
             recovery_policy_version, operator_evidence_json,
             operator_evidence_digest, created_at_utc
-        ) VALUES (?, ?, 1, 'ATTEMPT', ?, 'RECORD_ATTEMPT_AMBIGUITY',
-                  'LAUNCH_RESERVED', 'AMBIGUITY_RECORDED', 1,
+        ) VALUES (?, ?, 1, 'SESSION', ?, 'ACKNOWLEDGE_RESTORE',
+                  'OPEN', 'RESTORE_ACKNOWLEDGED', 1,
                   'recovery-policy/v1', ?, ?, ?)
         """,
         (
             recovery_id,
             session_id,
-            target_attempts[1],
+            session_id,
             evidence,
             evidence_digest,
             TIMESTAMP,
@@ -1786,26 +1791,21 @@ def test_recovery_ordinal_trigger_is_atomic_and_session_local(db_path: Path) -> 
     second_recovery = record_recovery(
         connection,
         session_id,
-        "ATTEMPT",
-        target_attempts[1],
-        "RECORD_ATTEMPT_AMBIGUITY",
+        "SESSION",
+        session_id,
+        "ACKNOWLEDGE_RESTORE",
     )
     assert second_recovery != first_recovery
     assert connection.execute(
         "SELECT next_recovery_ordinal FROM sessions WHERE session_id = ?", (session_id,)
     ).fetchone() == (2,)
     second_session = create_session(connection, _request("2026-01-02"))
-    second_attempt = allocate_attempt(connection, second_session)
-    second_claim = commit_claim(connection, second_attempt)
-    second_reservation = reserve_launch(connection, second_claim)
-    second_execution = record_execution(connection, second_reservation)
-    _resume_and_persist(connection, second_execution)
     second_recovery = record_recovery(
         connection,
         second_session,
-        "ATTEMPT",
-        second_attempt,
-        "RECORD_ATTEMPT_AMBIGUITY",
+        "SESSION",
+        second_session,
+        "ACKNOWLEDGE_RESTORE",
     )
     assert second_recovery != first_recovery
     assert connection.execute(
@@ -1865,6 +1865,477 @@ def test_claim_and_launch_boundaries_commit_before_fake_side_effects(
         "SELECT count(*) FROM provider_call_claims"
     ).fetchone() == (1,)
     observer.close()
+    connection.close()
+
+
+@pytest.mark.parametrize(
+    "blocked_case",
+    [
+        "claim_without_reservation",
+        "committed_without_execution",
+        "process_creation_failed_without_terminal",
+        "process_created_without_execution",
+        "manual_review_without_terminal",
+        "pre_resume_ready",
+        "resume_crash",
+        "resume_recorded",
+        "post_resume_ambiguous",
+        "ambiguous_terminal",
+        "closed_terminal",
+        "closed_session",
+        "failed_confirmed",
+        "successful_terminal",
+        "successful_selection",
+    ],
+)
+def test_claim_admission_blocks_non_retry_safe_prior_outcomes(
+    db_path: Path, blocked_case: str
+) -> None:
+    connection = _connect(db_path)
+    session_id = create_session(connection)
+    first_attempt = allocate_attempt(connection, session_id)
+    first_claim = commit_claim(connection, first_attempt)
+    first_reservation = (
+        None
+        if blocked_case == "claim_without_reservation"
+        else reserve_launch(connection, first_claim)
+    )
+    second_attempt = allocate_attempt(connection, session_id)
+
+    if blocked_case == "claim_without_reservation":
+        pass
+    elif blocked_case == "committed_without_execution":
+        pass
+    elif blocked_case == "process_creation_failed_without_terminal":
+        assert first_reservation is not None
+        record_process_creation_failure(connection, first_reservation)
+    elif blocked_case == "process_created_without_execution":
+        assert first_reservation is not None
+        connection.execute(
+            "UPDATE launch_reservations SET reservation_state = ?, "
+            "outcome_recorded_at_utc = ? WHERE launch_reservation_id = ?",
+            ("PROCESS_CREATED", PROCESS_CREATED_TIMESTAMP, first_reservation),
+        )
+        connection.commit()
+    elif blocked_case == "manual_review_without_terminal":
+        assert first_reservation is not None
+        record_recovery(
+            connection,
+            session_id,
+            "LAUNCH_RESERVATION",
+            first_reservation,
+            "CLASSIFY_LAUNCH_RESERVATION",
+        )
+    elif blocked_case == "pre_resume_ready":
+        assert first_reservation is not None
+        record_execution(connection, first_reservation)
+    elif blocked_case == "resume_crash":
+        assert first_reservation is not None
+        execution_id = record_execution(connection, first_reservation)
+        FakeSideEffects(connection).resume_thread(execution_id)
+    elif blocked_case in ("resume_recorded", "post_resume_ambiguous"):
+        assert first_reservation is not None
+        execution_id = record_execution(connection, first_reservation)
+        _resume_and_persist(connection, execution_id)
+        if blocked_case == "post_resume_ambiguous":
+            connection.execute(
+                "UPDATE launch_executions SET phase = 'POST_RESUME_AMBIGUOUS' "
+                "WHERE launch_execution_id = ?",
+                (execution_id,),
+            )
+            connection.commit()
+    elif blocked_case == "ambiguous_terminal":
+        assert first_reservation is not None
+        execution_id = record_execution(connection, first_reservation)
+        _resume_and_persist(connection, execution_id)
+        record_terminal(connection, first_reservation, "AMBIGUOUS", "MAY_HAVE_OCCURRED")
+    elif blocked_case == "closed_terminal":
+        assert first_reservation is not None
+        record_recovery(
+            connection,
+            session_id,
+            "LAUNCH_RESERVATION",
+            first_reservation,
+            "CLASSIFY_LAUNCH_RESERVATION",
+        )
+        record_terminal(connection, first_reservation, "CLOSED", "MAY_HAVE_OCCURRED")
+    elif blocked_case == "closed_session":
+        assert first_reservation is not None
+        record_process_creation_failure(connection, first_reservation)
+        record_terminal(connection, first_reservation, "FAILED", "NOT_STARTED")
+        connection.execute(
+            "UPDATE sessions SET state = 'CLOSED', closed_at_utc = ?, "
+            "close_reason = ? WHERE session_id = ?",
+            (CLOSE_TIMESTAMP, "claim-admission-test-close", session_id),
+        )
+        connection.commit()
+    elif blocked_case == "failed_confirmed":
+        assert first_reservation is not None
+        execution_id = record_execution(connection, first_reservation)
+        _resume_and_persist(connection, execution_id)
+        record_terminal(connection, first_reservation, "FAILED", "CONFIRMED")
+    elif blocked_case == "successful_terminal":
+        assert first_reservation is not None
+        execution_id = record_execution(connection, first_reservation)
+        _resume_and_persist(connection, execution_id)
+        record_terminal(connection, first_reservation)
+    elif blocked_case == "successful_selection":
+        assert first_reservation is not None
+        execution_id = record_execution(connection, first_reservation)
+        _resume_and_persist(connection, execution_id)
+        terminal_id = record_terminal(connection, first_reservation)
+        select_terminal(connection, session_id, terminal_id)
+    else:
+        raise AssertionError(f"unhandled blocked case: {blocked_case}")
+
+    with pytest.raises(sqlite3.IntegrityError, match="claim admission policy rejected"):
+        commit_claim(connection, second_attempt)
+    request_bytes, request_digest = connection.execute(
+        "SELECT request_json, request_digest FROM attempts WHERE attempt_id = ?",
+        (second_attempt,),
+    ).fetchone()
+    _begin(connection)
+    with pytest.raises(sqlite3.IntegrityError, match="claim admission policy rejected"):
+        _insert_claim_row_for_test(
+            connection, second_attempt, request_bytes, request_digest
+        )
+    connection.rollback()
+    assert connection.execute(
+        "SELECT count(*) FROM provider_call_claims"
+    ).fetchone() == (1,)
+    connection.close()
+
+
+@pytest.mark.parametrize("insertion_path", ["helper", "direct"])
+def test_claim_admission_allows_only_retry_safe_failed_not_started(
+    db_path: Path, insertion_path: str
+) -> None:
+    connection = _connect(db_path)
+    session_id = create_session(connection)
+    first_attempt = allocate_attempt(connection, session_id)
+    first_claim = commit_claim(connection, first_attempt)
+    first_reservation = reserve_launch(connection, first_claim)
+    record_process_creation_failure(connection, first_reservation)
+    record_terminal(connection, first_reservation, "FAILED", "NOT_STARTED")
+    assert connection.execute(
+        "SELECT reservation_state, outcome_recorded_at_utc "
+        "FROM launch_reservations WHERE launch_reservation_id = ?",
+        (first_reservation,),
+    ).fetchone() == ("TERMINAL_RECORDED", PROCESS_FAILURE_TIMESTAMP)
+
+    second_attempt = allocate_attempt(connection, session_id)
+    if insertion_path == "helper":
+        second_claim = commit_claim(connection, second_attempt)
+    else:
+        request_bytes, request_digest = connection.execute(
+            "SELECT request_json, request_digest FROM attempts WHERE attempt_id = ?",
+            (second_attempt,),
+        ).fetchone()
+        _begin(connection)
+        second_claim = _insert_claim_row_for_test(
+            connection, second_attempt, request_bytes, request_digest
+        )
+        connection.commit()
+    assert second_claim == _claim_id(second_attempt)
+    assert connection.execute(
+        "SELECT count(*) FROM provider_call_claims"
+    ).fetchone() == (2,)
+    connection.close()
+
+
+@pytest.mark.parametrize(
+    ("reservation_state", "failure_mode", "outcome_timestamp"),
+    [
+        ("PROCESS_CREATED", False, None),
+        ("PROCESS_CREATION_FAILED", True, None),
+        ("MANUAL_REVIEW", False, None),
+        ("TERMINAL_RECORDED", False, None),
+        ("COMMITTED", True, None),
+        ("COMMITTED", False, PROCESS_CREATED_TIMESTAMP),
+    ],
+)
+def test_reservations_require_a_committed_initial_fence(
+    db_path: Path,
+    reservation_state: str,
+    failure_mode: bool,
+    outcome_timestamp: str | None,
+) -> None:
+    connection = _connect(db_path)
+    session_id = create_session(connection)
+    attempt_id = allocate_attempt(connection, session_id)
+    claim_id = commit_claim(connection, attempt_id)
+    request_digest = connection.execute(
+        "SELECT request_digest FROM provider_call_claims WHERE claim_id = ?",
+        (claim_id,),
+    ).fetchone()[0]
+    _begin(connection)
+    with pytest.raises(sqlite3.IntegrityError, match="committed fences"):
+        _insert_reservation_row_for_test(
+            connection,
+            claim_id,
+            request_digest,
+            reservation_state,
+            failure_mode,
+            outcome_timestamp,
+        )
+    connection.rollback()
+    assert connection.execute(
+        "SELECT count(*) FROM launch_reservations"
+    ).fetchone() == (0,)
+    connection.close()
+
+
+@pytest.mark.parametrize("outcome_kind", ["process", "failure", "manual"])
+def test_reservation_outcome_timestamp_is_preserved_and_write_once(
+    db_path: Path, outcome_kind: str
+) -> None:
+    connection = _connect(db_path)
+    session_id = create_session(connection)
+    attempt_id = allocate_attempt(connection, session_id)
+    claim_id = commit_claim(connection, attempt_id)
+    reservation_id = reserve_launch(connection, claim_id)
+    if outcome_kind == "process":
+        execution_id = record_execution(connection, reservation_id)
+        _resume_and_persist(connection, execution_id)
+        expected_timestamp = PROCESS_CREATED_TIMESTAMP
+        record_terminal(connection, reservation_id, "AMBIGUOUS", "MAY_HAVE_OCCURRED")
+    elif outcome_kind == "failure":
+        record_process_creation_failure(connection, reservation_id)
+        expected_timestamp = PROCESS_FAILURE_TIMESTAMP
+        record_terminal(connection, reservation_id, "FAILED", "NOT_STARTED")
+    else:
+        record_recovery(
+            connection,
+            session_id,
+            "LAUNCH_RESERVATION",
+            reservation_id,
+            "CLASSIFY_LAUNCH_RESERVATION",
+        )
+        expected_timestamp = MANUAL_REVIEW_TIMESTAMP
+        record_terminal(connection, reservation_id, "CLOSED", "MAY_HAVE_OCCURRED")
+
+    assert connection.execute(
+        "SELECT outcome_recorded_at_utc FROM launch_reservations "
+        "WHERE launch_reservation_id = ?",
+        (reservation_id,),
+    ).fetchone() == (expected_timestamp,)
+    with pytest.raises(sqlite3.IntegrityError):
+        connection.execute(
+            "UPDATE launch_reservations SET outcome_recorded_at_utc = ? "
+            "WHERE launch_reservation_id = ?",
+            ("2026-01-09T00:00:00Z", reservation_id),
+        )
+    with pytest.raises(sqlite3.IntegrityError):
+        connection.execute(
+            "UPDATE launch_reservations SET outcome_recorded_at_utc = NULL "
+            "WHERE launch_reservation_id = ?",
+            (reservation_id,),
+        )
+    assert connection.execute(
+        "SELECT outcome_recorded_at_utc FROM launch_reservations "
+        "WHERE launch_reservation_id = ?",
+        (reservation_id,),
+    ).fetchone() == (expected_timestamp,)
+    connection.close()
+
+
+def test_terminal_transition_requires_a_prior_outcome_timestamp(db_path: Path) -> None:
+    connection = _connect(db_path)
+    session_id = create_session(connection)
+    attempt_id = allocate_attempt(connection, session_id)
+    claim_id = commit_claim(connection, attempt_id)
+    reservation_id = reserve_launch(connection, claim_id)
+    _begin(connection)
+    with pytest.raises(sqlite3.IntegrityError):
+        connection.execute(
+            "UPDATE launch_reservations SET reservation_state = ? "
+            "WHERE launch_reservation_id = ?",
+            ("TERMINAL_RECORDED", reservation_id),
+        )
+    connection.rollback()
+    assert connection.execute(
+        "SELECT reservation_state, outcome_recorded_at_utc "
+        "FROM launch_reservations WHERE launch_reservation_id = ?",
+        (reservation_id,),
+    ).fetchone() == ("COMMITTED", None)
+    connection.close()
+
+
+def test_resume_outcome_unknown_recovery_is_conservative_and_closable(
+    db_path: Path,
+) -> None:
+    connection = _connect(db_path)
+    session_id = create_session(connection)
+    first_attempt = allocate_attempt(connection, session_id)
+    first_claim = commit_claim(connection, first_attempt)
+    reservation_id = reserve_launch(connection, first_claim)
+    execution_id = record_execution(connection, reservation_id)
+    FakeSideEffects(connection).resume_thread(execution_id)
+
+    recovery_id = record_recovery(
+        connection,
+        session_id,
+        "LAUNCH_RESERVATION",
+        reservation_id,
+        "CLASSIFY_RESUME_OUTCOME_UNKNOWN",
+    )
+    assert recovery_id
+    assert connection.execute(
+        "SELECT reservation_state, outcome_recorded_at_utc "
+        "FROM launch_reservations WHERE launch_reservation_id = ?",
+        (reservation_id,),
+    ).fetchone() == ("MANUAL_REVIEW", PROCESS_CREATED_TIMESTAMP)
+    assert connection.execute(
+        "SELECT phase, post_resume_json, cleanup_json FROM launch_executions "
+        "WHERE launch_execution_id = ?",
+        (execution_id,),
+    ).fetchone() == ("PRE_RESUME_READY", None, None)
+    with pytest.raises(sqlite3.IntegrityError):
+        record_recovery(
+            connection,
+            session_id,
+            "LAUNCH_RESERVATION",
+            reservation_id,
+            "CLASSIFY_RESUME_OUTCOME_UNKNOWN",
+        )
+    with pytest.raises(sqlite3.IntegrityError):
+        record_terminal(connection, reservation_id, "SUCCEEDED", "CONFIRMED")
+    terminal_id = record_terminal(
+        connection, reservation_id, "CLOSED", "MAY_HAVE_OCCURRED"
+    )
+    assert terminal_id
+    record_recovery(connection, session_id, "SESSION", session_id, "CLOSE_SESSION")
+    assert connection.execute(
+        "SELECT state, closed_at_utc, close_reason FROM sessions WHERE session_id = ?",
+        (session_id,),
+    ).fetchone() == ("CLOSED", CLOSE_TIMESTAMP, "recovery-approved-close")
+    connection.close()
+
+
+def test_resume_outcome_unknown_recovery_grants_no_new_claim(db_path: Path) -> None:
+    connection = _connect(db_path)
+    session_id = create_session(connection)
+    first_attempt = allocate_attempt(connection, session_id)
+    first_claim = commit_claim(connection, first_attempt)
+    reservation_id = reserve_launch(connection, first_claim)
+    second_attempt = allocate_attempt(connection, session_id)
+    execution_id = record_execution(connection, reservation_id)
+    FakeSideEffects(connection).resume_thread(execution_id)
+    record_recovery(
+        connection,
+        session_id,
+        "LAUNCH_RESERVATION",
+        reservation_id,
+        "CLASSIFY_RESUME_OUTCOME_UNKNOWN",
+    )
+
+    with pytest.raises(sqlite3.IntegrityError, match="claim admission policy rejected"):
+        commit_claim(connection, second_attempt)
+    request_bytes, request_digest = connection.execute(
+        "SELECT request_json, request_digest FROM attempts WHERE attempt_id = ?",
+        (second_attempt,),
+    ).fetchone()
+    _begin(connection)
+    with pytest.raises(sqlite3.IntegrityError, match="claim admission policy rejected"):
+        _insert_claim_row_for_test(
+            connection, second_attempt, request_bytes, request_digest
+        )
+    connection.rollback()
+    assert connection.execute(
+        "SELECT count(*) FROM provider_call_claims"
+    ).fetchone() == (1,)
+    connection.close()
+
+
+@pytest.mark.parametrize("failure_point", ["without_execution", "after_resume"])
+def test_resume_outcome_unknown_requires_exact_unresolved_pre_resume_execution(
+    db_path: Path, failure_point: str
+) -> None:
+    connection = _connect(db_path)
+    session_id = create_session(connection)
+    attempt_id = allocate_attempt(connection, session_id)
+    claim_id = commit_claim(connection, attempt_id)
+    reservation_id = reserve_launch(connection, claim_id)
+    if failure_point == "after_resume":
+        execution_id = record_execution(connection, reservation_id)
+        _resume_and_persist(connection, execution_id)
+    with pytest.raises(sqlite3.IntegrityError):
+        record_recovery(
+            connection,
+            session_id,
+            "LAUNCH_RESERVATION",
+            reservation_id,
+            "CLASSIFY_RESUME_OUTCOME_UNKNOWN",
+        )
+    assert connection.execute("SELECT count(*) FROM manual_recoveries").fetchone() == (
+        0,
+    )
+    connection.close()
+
+
+def test_session_close_facts_are_write_once_and_only_close_with_state(
+    db_path: Path,
+) -> None:
+    connection = _connect(db_path)
+    session_id = create_session(connection)
+    with pytest.raises(sqlite3.IntegrityError):
+        connection.execute(
+            "UPDATE sessions SET closed_at_utc = ? WHERE session_id = ?",
+            (CLOSE_TIMESTAMP, session_id),
+        )
+    with pytest.raises(sqlite3.IntegrityError):
+        connection.execute(
+            "UPDATE sessions SET closed_at_utc = ?, close_reason = ? "
+            "WHERE session_id = ?",
+            (CLOSE_TIMESTAMP, "invalid-preclose", session_id),
+        )
+    with pytest.raises(sqlite3.IntegrityError):
+        connection.execute(
+            "UPDATE sessions SET state = 'CLOSED', closed_at_utc = NULL, "
+            "close_reason = ? WHERE session_id = ?",
+            ("partial-close", session_id),
+        )
+    connection.execute(
+        "UPDATE sessions SET state = 'CLOSED', closed_at_utc = ?, close_reason = ? "
+        "WHERE session_id = ?",
+        (CLOSE_TIMESTAMP, "direct-close", session_id),
+    )
+    connection.commit()
+    with pytest.raises(sqlite3.IntegrityError):
+        connection.execute(
+            "UPDATE sessions SET closed_at_utc = ? WHERE session_id = ?",
+            ("2026-01-10T00:00:00Z", session_id),
+        )
+    with pytest.raises(sqlite3.IntegrityError):
+        connection.execute(
+            "UPDATE sessions SET close_reason = ? WHERE session_id = ?",
+            ("replacement-close-reason", session_id),
+        )
+    with pytest.raises(sqlite3.IntegrityError):
+        connection.execute(
+            "UPDATE sessions SET closed_at_utc = NULL, close_reason = NULL "
+            "WHERE session_id = ?",
+            (session_id,),
+        )
+
+    selected_session = create_session(connection, _request("2026-01-02"))
+    selected_attempt = allocate_attempt(connection, selected_session)
+    selected_claim = commit_claim(connection, selected_attempt)
+    selected_reservation = reserve_launch(connection, selected_claim)
+    selected_execution = record_execution(connection, selected_reservation)
+    _resume_and_persist(connection, selected_execution)
+    selected_terminal = record_terminal(connection, selected_reservation)
+    select_terminal(connection, selected_session, selected_terminal)
+    connection.execute(
+        "UPDATE sessions SET state = 'CLOSED', closed_at_utc = ?, close_reason = ? "
+        "WHERE session_id = ?",
+        (CLOSE_TIMESTAMP, "selected-close", selected_session),
+    )
+    connection.commit()
+    assert connection.execute(
+        "SELECT state, closed_at_utc, close_reason FROM sessions WHERE session_id = ?",
+        (selected_session,),
+    ).fetchone() == ("CLOSED", CLOSE_TIMESTAMP, "selected-close")
     connection.close()
 
 
@@ -1928,7 +2399,7 @@ def test_crash_after_resume_before_persistence_requires_manual_handling(
         )
 
     second_attempt = allocate_attempt(recovered, session_id)
-    with pytest.raises(ValueError, match="unresolved resume outcome"):
+    with pytest.raises(sqlite3.IntegrityError, match="claim admission policy rejected"):
         commit_claim(recovered, second_attempt)
     assert recovered.execute(
         "SELECT count(*) FROM provider_call_claims"
@@ -1943,10 +2414,13 @@ def test_fake_resume_receipt_cannot_be_reused_for_another_execution(
     db_path: Path,
 ) -> None:
     connection = _connect(db_path)
-    session_id = create_session(connection)
+    session_ids = [
+        create_session(connection, _request("2026-01-01")),
+        create_session(connection, _request("2026-01-02")),
+    ]
     attempts: list[str] = []
     reservations: list[str] = []
-    for _ in range(2):
+    for session_id in session_ids:
         attempt_id = allocate_attempt(connection, session_id)
         claim_id = commit_claim(connection, attempt_id)
         reservations.append(reserve_launch(connection, claim_id))
@@ -2143,33 +2617,27 @@ def test_invalid_lifecycle_transitions_are_rejected(
 def test_recovery_race_produces_consecutive_ordinals(db_path: Path) -> None:
     setup = _connect(db_path)
     session_id = create_session(setup)
-    target_attempts: list[str] = []
-    target_reservations: list[str] = []
-    for _ in range(2):
-        attempt_id = allocate_attempt(setup, session_id)
-        claim_id = commit_claim(setup, attempt_id)
-        reservation_id = reserve_launch(setup, claim_id)
-        target_attempts.append(attempt_id)
-        target_reservations.append(reservation_id)
-    for reservation_id in target_reservations:
-        execution_id = record_execution(setup, reservation_id)
-        _resume_and_persist(setup, execution_id)
+    target_attempt = allocate_attempt(setup, session_id)
+    claim_id = commit_claim(setup, target_attempt)
+    reservation_id = reserve_launch(setup, claim_id)
+    execution_id = record_execution(setup, reservation_id)
+    _resume_and_persist(setup, execution_id)
     setup.close()
     barrier = threading.Barrier(2)
     results: list[str] = []
     errors: list[BaseException] = []
     lock = threading.Lock()
 
-    def worker(target_attempt_id: str) -> None:
+    def worker(target_kind: str, target_id: str, action: str) -> None:
         connection = _connect(db_path)
         try:
             barrier.wait()
             recovery_id = record_recovery(
                 connection,
                 session_id,
-                "ATTEMPT",
-                target_attempt_id,
-                "RECORD_ATTEMPT_AMBIGUITY",
+                target_kind,
+                target_id,
+                action,
             )
             with lock:
                 results.append(recovery_id)
@@ -2180,8 +2648,14 @@ def test_recovery_race_produces_consecutive_ordinals(db_path: Path) -> None:
             connection.close()
 
     threads = [
-        threading.Thread(target=worker, args=(target_attempt_id,))
-        for target_attempt_id in target_attempts
+        threading.Thread(
+            target=worker,
+            args=("ATTEMPT", target_attempt, "RECORD_ATTEMPT_AMBIGUITY"),
+        ),
+        threading.Thread(
+            target=worker,
+            args=("SESSION", session_id, "ACKNOWLEDGE_RESTORE"),
+        ),
     ]
     for thread in threads:
         thread.start()

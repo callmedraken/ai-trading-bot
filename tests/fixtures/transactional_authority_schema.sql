@@ -187,6 +187,7 @@ CREATE TABLE manual_recoveries (
         'RECORD_ATTEMPT_AMBIGUITY',
         'RECORD_CLAIM_AMBIGUITY',
         'CLASSIFY_LAUNCH_RESERVATION',
+        'CLASSIFY_RESUME_OUTCOME_UNKNOWN',
         'SELECT_COMMITTED_SUCCESS',
         'CLOSE_SESSION',
         'ACKNOWLEDGE_RESTORE'
@@ -249,6 +250,21 @@ WHEN NOT (
 )
 BEGIN
     SELECT RAISE(ABORT, 'invalid session state transition');
+END;
+
+CREATE TRIGGER sessions_close_facts_guard
+BEFORE UPDATE ON sessions
+WHEN NOT (
+    (NEW.closed_at_utc IS OLD.closed_at_utc
+     AND NEW.close_reason IS OLD.close_reason)
+    OR (OLD.closed_at_utc IS NULL
+        AND OLD.close_reason IS NULL
+        AND NEW.state = 'CLOSED'
+        AND NEW.closed_at_utc IS NOT NULL
+        AND NEW.close_reason IS NOT NULL)
+)
+BEGIN
+    SELECT RAISE(ABORT, 'session close facts are write-once');
 END;
 
 CREATE TRIGGER sessions_attempt_counter_guard
@@ -379,11 +395,63 @@ BEFORE INSERT ON provider_call_claims
 FOR EACH ROW
 BEGIN
     SELECT CASE WHEN NOT EXISTS (
-        SELECT 1 FROM attempts
-        WHERE attempt_id = NEW.attempt_id
-          AND request_json IS NEW.request_json
-          AND request_digest IS NEW.request_digest
-    ) THEN RAISE(ABORT, 'claim request binding differs from attempt') END;
+        SELECT 1
+        FROM attempts a
+        JOIN sessions s ON s.session_id = a.session_id
+        WHERE a.attempt_id = NEW.attempt_id
+          AND a.state = 'ALLOCATED'
+          AND s.state = 'OPEN'
+          AND NEW.state = 'COMMITTED'
+          AND a.provider_id IS NEW.provider_id
+          AND a.permitted_provider_operation IS NEW.permitted_provider_operation
+          AND a.provider_call_budget = NEW.provider_call_budget
+          AND a.request_json IS NEW.request_json
+          AND a.request_digest IS NEW.request_digest
+          AND NOT EXISTS (
+              SELECT 1 FROM session_selections ss
+              WHERE ss.session_id = s.session_id
+          )
+          AND NOT EXISTS (
+              SELECT 1
+              FROM terminals t
+              JOIN launch_reservations r
+                ON r.launch_reservation_id = t.launch_reservation_id
+              JOIN provider_call_claims prior_success
+                ON prior_success.claim_id = r.claim_id
+              JOIN attempts prior_attempt
+                ON prior_attempt.attempt_id = prior_success.attempt_id
+              WHERE prior_attempt.session_id = s.session_id
+                AND t.terminal_state = 'SUCCEEDED'
+          )
+          AND NOT EXISTS (
+              SELECT 1
+              FROM provider_call_claims prior_claim
+              JOIN attempts prior_attempt
+                ON prior_attempt.attempt_id = prior_claim.attempt_id
+              WHERE prior_attempt.session_id = s.session_id
+                AND NOT EXISTS (
+                    SELECT 1
+                    FROM launch_reservations safe_reservation
+                    JOIN terminals safe_terminal
+                      ON safe_terminal.launch_reservation_id = safe_reservation.launch_reservation_id
+                    WHERE safe_reservation.claim_id = prior_claim.claim_id
+                      AND prior_attempt.state = 'TERMINAL_RECORDED'
+                      AND safe_reservation.reservation_state = 'TERMINAL_RECORDED'
+                      AND safe_reservation.process_creation_failure_json IS NOT NULL
+                      AND safe_reservation.process_creation_failure_digest IS NOT NULL
+                      AND sha256(safe_reservation.process_creation_failure_json)
+                          IS safe_reservation.process_creation_failure_digest
+                      AND safe_terminal.terminal_state = 'FAILED'
+                      AND safe_terminal.provider_call_disposition = 'NOT_STARTED'
+                      AND safe_terminal.snapshot_digest IS NULL
+                      AND NOT EXISTS (
+                          SELECT 1
+                          FROM launch_executions prior_execution
+                          WHERE prior_execution.launch_reservation_id = safe_reservation.launch_reservation_id
+                      )
+                )
+          )
+    ) THEN RAISE(ABORT, 'claim admission policy rejected') END;
 END;
 
 CREATE TRIGGER provider_call_claims_no_delete
@@ -412,26 +480,17 @@ CREATE TRIGGER launch_reservations_before_insert
 BEFORE INSERT ON launch_reservations
 FOR EACH ROW
 BEGIN
+    SELECT CASE WHEN NOT (
+        NEW.reservation_state = 'COMMITTED'
+        AND NEW.process_creation_failure_json IS NULL
+        AND NEW.process_creation_failure_digest IS NULL
+        AND NEW.outcome_recorded_at_utc IS NULL
+    ) THEN RAISE(ABORT, 'new reservations must start as committed fences') END;
     SELECT CASE WHEN NOT EXISTS (
         SELECT 1 FROM provider_call_claims
         WHERE claim_id = NEW.claim_id
           AND request_digest IS NEW.request_digest
     ) THEN RAISE(ABORT, 'reservation request binding differs from claim') END;
-END;
-
-CREATE TRIGGER launch_reservations_failure_evidence_before_insert
-BEFORE INSERT ON launch_reservations
-FOR EACH ROW
-WHEN NEW.reservation_state = 'PROCESS_CREATION_FAILED'
-  OR NEW.process_creation_failure_json IS NOT NULL
-  OR NEW.process_creation_failure_digest IS NOT NULL
-BEGIN
-    SELECT CASE WHEN NOT (
-        NEW.reservation_state = 'PROCESS_CREATION_FAILED'
-        AND NEW.process_creation_failure_json IS NOT NULL
-        AND NEW.process_creation_failure_digest IS NOT NULL
-        AND sha256(NEW.process_creation_failure_json) IS NEW.process_creation_failure_digest
-    ) THEN RAISE(ABORT, 'process creation failure evidence is required and paired') END;
 END;
 
 CREATE TRIGGER launch_reservations_failure_evidence_guard
@@ -447,7 +506,28 @@ BEGIN
         AND sha256(NEW.process_creation_failure_json) IS NEW.process_creation_failure_digest
         AND OLD.reservation_state = 'COMMITTED'
         AND NEW.reservation_state = 'PROCESS_CREATION_FAILED'
+        AND OLD.outcome_recorded_at_utc IS NULL
+        AND NEW.outcome_recorded_at_utc IS NOT NULL
     ) THEN RAISE(ABORT, 'process creation failure evidence is write-once') END;
+END;
+
+CREATE TRIGGER launch_reservations_outcome_timestamp_guard
+BEFORE UPDATE ON launch_reservations
+WHEN NOT (
+    (OLD.outcome_recorded_at_utc IS NULL
+     AND NEW.outcome_recorded_at_utc IS NULL
+     AND NEW.reservation_state = OLD.reservation_state)
+    OR (OLD.outcome_recorded_at_utc IS NULL
+        AND NEW.outcome_recorded_at_utc IS NOT NULL
+        AND OLD.reservation_state = 'COMMITTED'
+        AND NEW.reservation_state IN (
+            'PROCESS_CREATED', 'PROCESS_CREATION_FAILED', 'MANUAL_REVIEW'
+        ))
+    OR (OLD.outcome_recorded_at_utc IS NOT NULL
+        AND NEW.outcome_recorded_at_utc IS OLD.outcome_recorded_at_utc)
+)
+BEGIN
+    SELECT RAISE(ABORT, 'reservation outcome timestamp is write-once');
 END;
 
 CREATE TRIGGER launch_reservations_state_guard
@@ -455,6 +535,7 @@ BEFORE UPDATE OF reservation_state ON launch_reservations
 WHEN NOT (
     NEW.reservation_state = OLD.reservation_state
     OR (OLD.reservation_state = 'COMMITTED' AND NEW.reservation_state IN ('PROCESS_CREATED', 'PROCESS_CREATION_FAILED', 'MANUAL_REVIEW'))
+    OR (OLD.reservation_state = 'PROCESS_CREATED' AND NEW.reservation_state = 'MANUAL_REVIEW')
     OR (OLD.reservation_state IN ('PROCESS_CREATED', 'PROCESS_CREATION_FAILED', 'MANUAL_REVIEW') AND NEW.reservation_state = 'TERMINAL_RECORDED')
 )
 BEGIN
@@ -716,6 +797,12 @@ BEGIN
         JOIN attempts a ON a.attempt_id = c.attempt_id
         WHERE t.terminal_id = NEW.target_id AND a.session_id = NEW.session_id
     ) THEN RAISE(ABORT, 'recovery terminal target binding is invalid') END;
+    SELECT CASE WHEN sha256(NEW.operator_evidence_json) IS NOT NEW.operator_evidence_digest
+        THEN RAISE(ABORT, 'recovery operator evidence digest is invalid') END;
+    SELECT CASE WHEN NOT (
+        NEW.recovery_schema = 1
+        AND NEW.recovery_policy_version = 'recovery-policy/v1'
+    ) THEN RAISE(ABORT, 'recovery schema or policy is invalid') END;
 
     SELECT CASE WHEN NOT (
         (NEW.action = 'RECORD_ATTEMPT_AMBIGUITY'
@@ -758,6 +845,37 @@ BEGIN
                 SELECT 1 FROM launch_reservations
                 WHERE launch_reservation_id = NEW.target_id
                   AND reservation_state = 'COMMITTED'
+            ))
+        OR (NEW.action = 'CLASSIFY_RESUME_OUTCOME_UNKNOWN'
+            AND NEW.target_kind = 'LAUNCH_RESERVATION'
+            AND NEW.predecessor_state = 'PROCESS_CREATED'
+            AND NEW.resulting_state = 'MANUAL_REVIEW'
+            AND EXISTS (
+                SELECT 1
+                FROM launch_reservations r
+                WHERE r.launch_reservation_id = NEW.target_id
+                  AND r.reservation_state = 'PROCESS_CREATED'
+            )
+            AND (SELECT count(*) FROM launch_executions e
+                 WHERE e.launch_reservation_id = NEW.target_id) = 1
+            AND EXISTS (
+                SELECT 1
+                FROM launch_executions e
+                WHERE e.launch_reservation_id = NEW.target_id
+                  AND e.phase = 'PRE_RESUME_READY'
+                  AND e.process_creation_json IS NOT NULL
+                  AND e.process_creation_digest IS NOT NULL
+                  AND sha256(e.process_creation_json) IS e.process_creation_digest
+                  AND e.job_object_json IS NOT NULL
+                  AND e.job_object_digest IS NOT NULL
+                  AND sha256(e.job_object_json) IS e.job_object_digest
+                  AND e.resume_authorization_json IS NOT NULL
+                  AND e.resume_authorization_digest IS NOT NULL
+                  AND sha256(e.resume_authorization_json) IS e.resume_authorization_digest
+                  AND e.post_resume_json IS NULL
+                  AND e.post_resume_digest IS NULL
+                  AND e.cleanup_json IS NULL
+                  AND e.cleanup_digest IS NULL
             ))
         OR (NEW.action = 'SELECT_COMMITTED_SUCCESS'
             AND NEW.target_kind = 'TERMINAL'

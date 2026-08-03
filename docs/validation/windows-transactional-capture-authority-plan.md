@@ -192,6 +192,11 @@ terminal request digest must equal the immediate reservation parent. After a
 valid insert, execution, reservation, and attempt are advanced to
 `TERMINAL_RECORDED` in the same transaction.
 
+For an execution-backed lifecycle, the executable order is explicitly
+`record_execution` -> fake `ResumeThread` hook while `PRE_RESUME_READY` ->
+`record_post_resume_evidence` with the returned receipt -> `record_terminal` ->
+selection when applicable. No persistence helper creates a resume result.
+
 The following duplicate operations must fail without a second side effect:
 
 - a second claim for one attempt;
@@ -298,12 +303,16 @@ The test proves the following event order:
 | --- | --- |
 | Claim commit -> credential/provider construction | The observer sees `COMMITTED` before the fake provider hook runs |
 | Reservation commit -> process creation | The observer sees `COMMITTED` before the fake process hook runs |
-| Launch evidence commit -> resume authorization | The observer sees `RESUME_RECORDED` before the fake resume hook runs |
+| `PRE_RESUME_READY` commit -> external `ResumeThread` | The fake adapter sees committed process, Job Object, and resume-authorization evidence before returning a typed receipt |
+| External `ResumeThread` -> post-resume/cleanup commit | The receipt is required by the persistence helper, which then exposes `RESUME_RECORDED` to the observer |
 | Ambiguous terminal -> retry | A second claim cannot be inserted and the claim count remains one |
 
 The fake hooks do not read secrets, construct a provider, create a Windows
-process, call a network, or authorize a real resume. They only prove the
-database visibility boundary.
+process, call a network, or invoke a real Windows API. The fake resume adapter
+records the modeled external event and returns a canonical receipt; the
+transaction helper persists that receipt only after the hook returns. SQLite
+proves the committed database facts and phase transition, not that an external
+Windows API call occurred.
 
 Launch-execution evidence is append-only. The tests reject post-resume or
 cleanup writes in the same `PRE_RESUME_READY` phase, partial JSON/digest pairs,
@@ -316,6 +325,12 @@ The whole-model audit is compact and table-driven: invalid transitions are
 attempted independently at the attempt, claim, reservation, execution,
 terminal, selection, and recovery boundaries. Every rejection must leave the
 original row, counters, lineage, and evidence unchanged.
+
+The resume-specific negative gates prove that the adapter cannot run before a
+`PRE_RESUME_READY` row exists, post-resume evidence requires a typed fake
+receipt, a terminal cannot be inserted between `ResumeThread` and evidence
+persistence, a crash at that boundary leaves an unresolved/manual execution
+and blocks a new claim, and a receipt cannot be reused for another execution.
 
 ## 10. Security and operational gates not claimed by this fixture
 

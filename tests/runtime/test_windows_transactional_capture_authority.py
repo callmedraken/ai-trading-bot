@@ -7,6 +7,7 @@ import json
 import sqlite3
 import threading
 import uuid
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -24,6 +25,15 @@ POLICY = "authority-policy/v1"
 CLAIM_POLICY = "claim-policy/v1"
 RELEASE = "release/v1"
 TIMESTAMP = "2026-01-01T00:00:00Z"
+
+
+@dataclass(frozen=True)
+class FakeResumeReceipt:
+    """Canonical result returned by the fake external ResumeThread boundary."""
+
+    execution_id: str
+    result_json: bytes
+    result_digest: bytes
 
 
 def _frame(value: str) -> str:
@@ -487,15 +497,32 @@ def commit_claim(connection: sqlite3.Connection, attempt_id: str) -> str:
     try:
         attempt = connection.execute(
             """
-            SELECT request_json, request_digest, provider_id,
+            SELECT a.session_id, a.request_json, a.request_digest, a.provider_id,
                    permitted_provider_operation, provider_call_budget
-            FROM attempts WHERE attempt_id = ?
+            FROM attempts a WHERE attempt_id = ?
             """,
             (attempt_id,),
         ).fetchone()
         if attempt is None:
             raise ValueError("unknown attempt")
-        request_bytes, request_digest, provider_id, operation, budget = attempt
+        unresolved = connection.execute(
+            """
+            SELECT 1
+            FROM attempts a
+            JOIN provider_call_claims c ON c.attempt_id = a.attempt_id
+            JOIN launch_reservations r ON r.claim_id = c.claim_id
+            JOIN launch_executions e
+              ON e.launch_reservation_id = r.launch_reservation_id
+            WHERE a.session_id = ?
+              AND e.phase IN ('PRE_RESUME_READY', 'RESUME_RECORDED',
+                              'POST_RESUME_AMBIGUOUS')
+            LIMIT 1
+            """,
+            (attempt[0],),
+        ).fetchone()
+        if unresolved is not None:
+            raise ValueError("session has unresolved resume outcome")
+        _, request_bytes, request_digest, provider_id, operation, budget = attempt
         connection.execute(
             """
             INSERT INTO provider_call_claims (
@@ -649,11 +676,33 @@ def record_process_creation_failure(
         raise
 
 
-def record_resume_evidence(connection: sqlite3.Connection, execution_id: str) -> None:
-    post_resume, post_resume_digest = _evidence(f"post-resume:{execution_id}")
+def record_post_resume_evidence(
+    connection: sqlite3.Connection,
+    execution_id: str,
+    resume_receipt: FakeResumeReceipt,
+) -> None:
+    if not isinstance(resume_receipt, FakeResumeReceipt):
+        raise TypeError("post-resume evidence requires a fake resume receipt")
+    if resume_receipt.execution_id != execution_id:
+        raise ValueError("fake resume receipt belongs to another execution")
+    if _digest(resume_receipt.result_json) != resume_receipt.result_digest:
+        raise ValueError("fake resume receipt digest is invalid")
+
+    post_resume = resume_receipt.result_json
+    post_resume_digest = resume_receipt.result_digest
     cleanup, cleanup_digest = _evidence(f"cleanup:{execution_id}")
+    if _digest(cleanup) != cleanup_digest:
+        raise ValueError("cleanup evidence digest is invalid")
     _begin(connection)
     try:
+        row = connection.execute(
+            "SELECT phase FROM launch_executions WHERE launch_execution_id = ?",
+            (execution_id,),
+        ).fetchone()
+        if row is None:
+            raise ValueError("unknown launch execution")
+        if row[0] != "PRE_RESUME_READY":
+            raise ValueError("post-resume evidence requires pre-resume phase")
         connection.execute(
             """
             UPDATE launch_executions
@@ -975,12 +1024,68 @@ class FakeSideEffects:
         ).fetchone() == ("COMMITTED",)
         self.events.append("process-created")
 
-    def resume_after_evidence(self, execution_id: str) -> None:
-        assert self.observer.execute(
-            "SELECT phase FROM launch_executions WHERE launch_execution_id = ?",
+    def resume_thread(self, execution_id: str) -> FakeResumeReceipt:
+        row = self.observer.execute(
+            """
+            SELECT phase, process_creation_json, process_creation_digest,
+                   job_object_json, job_object_digest, resume_authorization_json,
+                   resume_authorization_digest
+            FROM launch_executions WHERE launch_execution_id = ?
+            """,
             (execution_id,),
-        ).fetchone() == ("RESUME_RECORDED",)
-        self.events.append("resumed")
+        ).fetchone()
+        if row is None:
+            raise ValueError("cannot resume an unknown execution")
+        if row[0] != "PRE_RESUME_READY":
+            raise ValueError("ResumeThread requires PRE_RESUME_READY")
+        for evidence_json, evidence_digest in (
+            (row[1], row[2]),
+            (row[3], row[4]),
+            (row[5], row[6]),
+        ):
+            if evidence_json is None or evidence_digest != _digest(evidence_json):
+                raise AssertionError("pre-resume evidence is not committed")
+
+        self.events.append("pre-resume-ready")
+        self.events.append("resume-thread")
+        result_json = _json(
+            {"execution_id": execution_id, "resume_result": "RESUMED", "schema": 1}
+        )
+        return FakeResumeReceipt(
+            execution_id=execution_id,
+            result_json=result_json,
+            result_digest=_digest(result_json),
+        )
+
+    def observe_post_resume_evidence(self, execution_id: str) -> None:
+        assert (
+            self.observer.execute(
+                "SELECT phase, post_resume_json, post_resume_digest, cleanup_json, "
+                "cleanup_digest FROM launch_executions "
+                "WHERE launch_execution_id = ?",
+                (execution_id,),
+            ).fetchone()[0]
+            == "RESUME_RECORDED"
+        )
+        self.events.append("post-resume-evidence")
+
+    def observe_terminal(self, reservation_id: str) -> None:
+        assert (
+            self.observer.execute(
+                "SELECT terminal_id FROM terminals WHERE launch_reservation_id = ?",
+                (reservation_id,),
+            ).fetchone()
+            is not None
+        )
+        self.events.append("terminal")
+
+
+def _resume_and_persist(
+    connection: sqlite3.Connection, execution_id: str
+) -> FakeResumeReceipt:
+    receipt = FakeSideEffects(connection).resume_thread(execution_id)
+    record_post_resume_evidence(connection, execution_id, receipt)
+    return receipt
 
 
 @pytest.fixture
@@ -1001,7 +1106,7 @@ def _seed_lifecycle(path: Path) -> dict[str, str]:
     claim_id = commit_claim(connection, attempt_id)
     reservation_id = reserve_launch(connection, claim_id)
     execution_id = record_execution(connection, reservation_id)
-    record_resume_evidence(connection, execution_id)
+    _resume_and_persist(connection, execution_id)
     terminal_id = record_terminal(connection, reservation_id)
     connection.close()
     return {
@@ -1149,7 +1254,7 @@ def test_valid_lifecycle_from_metadata_to_selection(db_path: Path) -> None:
     claim_id = commit_claim(connection, attempt_id)
     reservation_id = reserve_launch(connection, claim_id)
     execution_id = record_execution(connection, reservation_id)
-    record_resume_evidence(connection, execution_id)
+    _resume_and_persist(connection, execution_id)
     terminal_id = record_terminal(connection, reservation_id)
     selection_id = select_terminal(connection, session_id, terminal_id)
     expected_request = _json(request)
@@ -1295,7 +1400,7 @@ def test_terminal_state_disposition_matrix(
     reservation_id = reserve_launch(connection, claim_id)
     if preparation == "resumed":
         execution_id = record_execution(connection, reservation_id)
-        record_resume_evidence(connection, execution_id)
+        _resume_and_persist(connection, execution_id)
     elif preparation == "process_failure":
         record_process_creation_failure(connection, reservation_id)
     else:
@@ -1342,7 +1447,7 @@ def test_recovery_action_matrix_allows_documented_actions(db_path: Path) -> None
     claim_id = commit_claim(connection, claim_attempt)
     claim_reservation = reserve_launch(connection, claim_id)
     claim_execution = record_execution(connection, claim_reservation)
-    record_resume_evidence(connection, claim_execution)
+    _resume_and_persist(connection, claim_execution)
     claim_recovery = record_recovery(
         connection,
         claim_session,
@@ -1381,7 +1486,7 @@ def test_recovery_action_matrix_allows_documented_actions(db_path: Path) -> None
     select_claim = commit_claim(connection, select_attempt)
     select_reservation = reserve_launch(connection, select_claim)
     select_execution = record_execution(connection, select_reservation)
-    record_resume_evidence(connection, select_execution)
+    _resume_and_persist(connection, select_execution)
     select_terminal = record_terminal(connection, select_reservation)
     select_recovery = record_recovery(
         connection,
@@ -1454,14 +1559,14 @@ def test_selection_and_recovery_lineage_is_session_scoped(db_path: Path) -> None
     first_claim = commit_claim(connection, first_attempt)
     first_reservation = reserve_launch(connection, first_claim)
     first_execution = record_execution(connection, first_reservation)
-    record_resume_evidence(connection, first_execution)
+    _resume_and_persist(connection, first_execution)
     first_terminal = record_terminal(connection, first_reservation)
     second_session = create_session(connection, _request("2026-01-02"))
     second_attempt = allocate_attempt(connection, second_session)
     second_claim = commit_claim(connection, second_attempt)
     second_reservation = reserve_launch(connection, second_claim)
     second_execution = record_execution(connection, second_reservation)
-    record_resume_evidence(connection, second_execution)
+    _resume_and_persist(connection, second_execution)
     second_terminal = record_terminal(connection, second_reservation)
     with pytest.raises(sqlite3.IntegrityError):
         select_terminal(connection, second_session, first_terminal)
@@ -1591,13 +1696,16 @@ def test_recovery_ordinal_trigger_is_atomic_and_session_local(db_path: Path) -> 
     connection = _connect(db_path)
     session_id = create_session(connection)
     target_attempts: list[str] = []
+    target_reservations: list[str] = []
     for _ in range(2):
         attempt_id = allocate_attempt(connection, session_id)
         claim_id = commit_claim(connection, attempt_id)
         reservation_id = reserve_launch(connection, claim_id)
-        execution_id = record_execution(connection, reservation_id)
-        record_resume_evidence(connection, execution_id)
         target_attempts.append(attempt_id)
+        target_reservations.append(reservation_id)
+    for reservation_id in target_reservations:
+        execution_id = record_execution(connection, reservation_id)
+        _resume_and_persist(connection, execution_id)
     first_recovery = record_recovery(
         connection,
         session_id,
@@ -1691,7 +1799,7 @@ def test_recovery_ordinal_trigger_is_atomic_and_session_local(db_path: Path) -> 
     second_claim = commit_claim(connection, second_attempt)
     second_reservation = reserve_launch(connection, second_claim)
     second_execution = record_execution(connection, second_reservation)
-    record_resume_evidence(connection, second_execution)
+    _resume_and_persist(connection, second_execution)
     second_recovery = record_recovery(
         connection,
         second_session,
@@ -1735,23 +1843,130 @@ def test_claim_and_launch_boundaries_commit_before_fake_side_effects(
     reservation_id = reserve_launch(connection, claim_id)
     hooks.create_process_after_reservation(reservation_id)
     execution_id = record_execution(connection, reservation_id)
-    assert observer.execute(
-        "SELECT phase FROM launch_executions WHERE launch_execution_id = ?",
-        (execution_id,),
-    ).fetchone() == ("PRE_RESUME_READY",)
-    record_resume_evidence(connection, execution_id)
-    hooks.resume_after_evidence(execution_id)
+    resume_receipt = hooks.resume_thread(execution_id)
+    record_post_resume_evidence(connection, execution_id, resume_receipt)
+    hooks.observe_post_resume_evidence(execution_id)
     terminal_id = record_terminal(
         connection, reservation_id, "AMBIGUOUS", "MAY_HAVE_OCCURRED"
     )
     assert terminal_id
+    hooks.observe_terminal(reservation_id)
     with pytest.raises(sqlite3.IntegrityError):
         commit_claim(connection, attempt_id)
-    assert hooks.events == ["provider-constructed", "process-created", "resumed"]
+    assert hooks.events == [
+        "provider-constructed",
+        "process-created",
+        "pre-resume-ready",
+        "resume-thread",
+        "post-resume-evidence",
+        "terminal",
+    ]
     assert connection.execute(
         "SELECT count(*) FROM provider_call_claims"
     ).fetchone() == (1,)
     observer.close()
+    connection.close()
+
+
+def test_resume_boundary_requires_pre_resume_and_receipt(db_path: Path) -> None:
+    connection = _connect(db_path)
+    hooks = FakeSideEffects(connection)
+    session_id = create_session(connection)
+    attempt_id = allocate_attempt(connection, session_id)
+    claim_id = commit_claim(connection, attempt_id)
+    reservation_id = reserve_launch(connection, claim_id)
+    execution_id = _execution_id(reservation_id)
+
+    with pytest.raises(ValueError, match="unknown execution"):
+        hooks.resume_thread(execution_id)
+
+    execution_id = record_execution(connection, reservation_id)
+    with pytest.raises(TypeError, match="fake resume receipt"):
+        record_post_resume_evidence(connection, execution_id, None)  # type: ignore[arg-type]
+    with pytest.raises(sqlite3.IntegrityError):
+        record_terminal(connection, reservation_id)
+    assert connection.execute(
+        "SELECT phase FROM launch_executions WHERE launch_execution_id = ?",
+        (execution_id,),
+    ).fetchone() == ("PRE_RESUME_READY",)
+    connection.close()
+
+
+def test_crash_after_resume_before_persistence_requires_manual_handling(
+    db_path: Path,
+) -> None:
+    connection = _connect(db_path)
+    hooks = FakeSideEffects(connection)
+    session_id = create_session(connection)
+    attempt_id = allocate_attempt(connection, session_id)
+    claim_id = commit_claim(connection, attempt_id)
+    reservation_id = reserve_launch(connection, claim_id)
+    execution_id = record_execution(connection, reservation_id)
+    hooks.resume_thread(execution_id)
+    connection.close()
+
+    recovered = _connect(db_path)
+    assert recovered.execute(
+        "SELECT phase, post_resume_json, cleanup_json FROM launch_executions "
+        "WHERE launch_execution_id = ?",
+        (execution_id,),
+    ).fetchone() == ("PRE_RESUME_READY", None, None)
+    assert recovered.execute(
+        "SELECT reservation_state FROM launch_reservations "
+        "WHERE launch_reservation_id = ?",
+        (reservation_id,),
+    ).fetchone() == ("PROCESS_CREATED",)
+    with pytest.raises(sqlite3.IntegrityError):
+        record_terminal(recovered, reservation_id)
+    with pytest.raises(sqlite3.IntegrityError):
+        record_recovery(
+            recovered,
+            session_id,
+            "ATTEMPT",
+            attempt_id,
+            "RECORD_ATTEMPT_AMBIGUITY",
+        )
+
+    second_attempt = allocate_attempt(recovered, session_id)
+    with pytest.raises(ValueError, match="unresolved resume outcome"):
+        commit_claim(recovered, second_attempt)
+    assert recovered.execute(
+        "SELECT count(*) FROM provider_call_claims"
+    ).fetchone() == (1,)
+    assert recovered.execute("SELECT count(*) FROM manual_recoveries").fetchone() == (
+        0,
+    )
+    recovered.close()
+
+
+def test_fake_resume_receipt_cannot_be_reused_for_another_execution(
+    db_path: Path,
+) -> None:
+    connection = _connect(db_path)
+    session_id = create_session(connection)
+    attempts: list[str] = []
+    reservations: list[str] = []
+    for _ in range(2):
+        attempt_id = allocate_attempt(connection, session_id)
+        claim_id = commit_claim(connection, attempt_id)
+        reservations.append(reserve_launch(connection, claim_id))
+        attempts.append(attempt_id)
+
+    executions = [
+        record_execution(connection, reservation) for reservation in reservations
+    ]
+    hooks = FakeSideEffects(connection)
+    receipt = hooks.resume_thread(executions[0])
+    with pytest.raises(ValueError, match="another execution"):
+        record_post_resume_evidence(connection, executions[1], receipt)
+    assert connection.execute(
+        "SELECT phase FROM launch_executions WHERE launch_execution_id = ?",
+        (executions[1],),
+    ).fetchone() == ("PRE_RESUME_READY",)
+    record_post_resume_evidence(connection, executions[0], receipt)
+    second_receipt = hooks.resume_thread(executions[1])
+    record_post_resume_evidence(connection, executions[1], second_receipt)
+    assert attempts
     connection.close()
 
 
@@ -1791,7 +2006,8 @@ def test_launch_execution_evidence_is_append_only(db_path: Path) -> None:
             (post_resume, _digest(b"wrong-post-digest"), execution_id),
         )
 
-    record_resume_evidence(connection, execution_id)
+    resume_receipt = FakeSideEffects(connection).resume_thread(execution_id)
+    record_post_resume_evidence(connection, execution_id, resume_receipt)
     for sql, params in (
         (
             "UPDATE launch_executions SET post_resume_json = ? "
@@ -1888,7 +2104,7 @@ def test_invalid_lifecycle_transitions_are_rejected(
         claim_id = commit_claim(connection, attempt_id)
         reservation_id = reserve_launch(connection, claim_id)
         execution_id = record_execution(connection, reservation_id)
-        record_resume_evidence(connection, execution_id)
+        _resume_and_persist(connection, execution_id)
         terminal_id = record_terminal(connection, reservation_id)
         mutation = (
             "UPDATE terminals SET terminal_state = 'FAILED' WHERE terminal_id = ?",
@@ -1898,7 +2114,7 @@ def test_invalid_lifecycle_transitions_are_rejected(
         claim_id = commit_claim(connection, attempt_id)
         reservation_id = reserve_launch(connection, claim_id)
         execution_id = record_execution(connection, reservation_id)
-        record_resume_evidence(connection, execution_id)
+        _resume_and_persist(connection, execution_id)
         terminal_id = record_terminal(connection, reservation_id)
         selection_id = select_terminal(connection, session_id, terminal_id)
         mutation = (
@@ -1928,13 +2144,16 @@ def test_recovery_race_produces_consecutive_ordinals(db_path: Path) -> None:
     setup = _connect(db_path)
     session_id = create_session(setup)
     target_attempts: list[str] = []
+    target_reservations: list[str] = []
     for _ in range(2):
         attempt_id = allocate_attempt(setup, session_id)
         claim_id = commit_claim(setup, attempt_id)
         reservation_id = reserve_launch(setup, claim_id)
-        execution_id = record_execution(setup, reservation_id)
-        record_resume_evidence(setup, execution_id)
         target_attempts.append(attempt_id)
+        target_reservations.append(reservation_id)
+    for reservation_id in target_reservations:
+        execution_id = record_execution(setup, reservation_id)
+        _resume_and_persist(setup, execution_id)
     setup.close()
     barrier = threading.Barrier(2)
     results: list[str] = []

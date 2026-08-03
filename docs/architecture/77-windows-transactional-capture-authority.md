@@ -471,7 +471,8 @@ fixed bootstrap/CNG/ACL/path verification
   -> launch reservation transaction and COMMIT
   -> CreateProcessW(CREATE_SUSPENDED)
   -> Job Object and process evidence transaction and COMMIT
-  -> ResumeThread
+  -> external ResumeThread through the reviewed adapter
+  -> typed resume receipt returned to the transaction service
   -> paired post-resume and cleanup evidence transaction and COMMIT
   -> terminal matrix validation and immutable terminal transaction
   -> execution/reservation/attempt terminal-recorded transitions in that transaction
@@ -479,12 +480,22 @@ fixed bootstrap/CNG/ACL/path verification
 ```
 
 The claim commit precedes all credential/provider/network construction. The
-reservation commit precedes process creation. Launch evidence commits before
-resume authorization. A crash after a claim or reservation commit leaves that
-fence consumed. A crash after resume is ambiguous even when no child result is
-present; it never authorizes a new claim, provider call, reservation, or
-launch attempt. A known process-creation failure is recorded on the existing
-reservation and may receive a terminal without an execution row.
+reservation commit precedes process creation. The `PRE_RESUME_READY` execution
+row commits process, Job Object, and resume-authorization evidence before the
+reviewed adapter invokes external `ResumeThread`. The adapter observes that
+committed state, performs the external call, and returns a typed canonical
+receipt. Only then may the transaction service persist the receipt as
+post-resume evidence, persist cleanup evidence, verify both digests, and
+advance the execution to `RESUME_RECORDED`. SQLite enforces the persisted
+evidence and phase rules; it cannot prove that an external Windows API call
+occurred.
+
+A crash after a claim or reservation commit leaves that fence consumed. A
+crash after `ResumeThread` but before post-resume persistence leaves the
+database at `PRE_RESUME_READY` with no terminal; the service must treat that
+execution as unresolved/manual and cannot authorize a new claim. A known
+process-creation failure is recorded on the existing reservation and may
+receive a terminal without an execution row.
 
 Manual recovery records uncertainty and an operator-authorized classification
 through the closed action matrix above. It does not turn uncertainty into
@@ -536,8 +547,9 @@ The focused executable evidence is
 - the closed recovery action matrix, including distinct-target races and
   table-driven invalid lifecycle transitions;
 - a process-creation failure terminal without an execution row; and
-- fake side-effect hooks proving claim, reservation, and evidence commit
-  boundaries plus no claim reuse after ambiguity.
+- fake side-effect hooks proving claim, reservation, pre-resume, external
+  resume, post-resume, and terminal ordering; receipt binding; and no new
+  claim after an unresolved resume outcome.
 
 The following remain future production milestones:
 

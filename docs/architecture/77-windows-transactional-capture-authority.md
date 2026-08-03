@@ -396,7 +396,7 @@ allocations(
   allocated_at_utc TEXT NOT NULL,
   UNIQUE(authority_epoch_id, session_id, ordinal),
   UNIQUE(authority_epoch_id, session_id, attempt_id),
-  UNIQUE(authority_epoch_id, allocation_id),
+  UNIQUE(authority_epoch_id, session_id, allocation_id, attempt_id),
   FOREIGN KEY(authority_epoch_id, session_id) REFERENCES sessions(authority_epoch_id, session_id)
 )
 ```
@@ -434,8 +434,8 @@ process-creation-failure evidence may move forward.
 launch_reservations(
   launch_reservation_id TEXT PRIMARY KEY,
   authority_epoch_id TEXT NOT NULL REFERENCES authority_metadata,
-  session_id TEXT NOT NULL REFERENCES sessions,
-  allocation_id TEXT NOT NULL REFERENCES allocations,
+  session_id TEXT NOT NULL,
+  allocation_id TEXT NOT NULL,
   attempt_id TEXT NOT NULL,
   claim_id TEXT NOT NULL UNIQUE REFERENCES provider_call_claims,
   launch_reservation_schema INTEGER NOT NULL,
@@ -455,12 +455,11 @@ launch_reservations(
   outcome_recorded_at_utc TEXT,
   UNIQUE(authority_epoch_id, session_id, allocation_id, attempt_id),
   UNIQUE(authority_epoch_id, launch_reservation_id),
-  FOREIGN KEY(authority_epoch_id, session_id) REFERENCES
-    sessions(authority_epoch_id, session_id),
-  FOREIGN KEY(authority_epoch_id, allocation_id) REFERENCES
-    allocations(authority_epoch_id, allocation_id),
-  FOREIGN KEY(authority_epoch_id, attempt_id) REFERENCES
-    allocations(authority_epoch_id, attempt_id)
+  FOREIGN KEY(
+    authority_epoch_id, session_id, allocation_id, attempt_id
+  ) REFERENCES allocations(
+    authority_epoch_id, session_id, allocation_id, attempt_id
+  )
 )
 ```
 
@@ -469,6 +468,11 @@ is inserted only for the exact committed claim, epoch, session, allocation,
 attempt, request digest, application release, and policy versions. A
 reservation winner is the only process permitted to call
 `CreateProcessW(CREATE_SUSPENDED)`.
+
+No separate session foreign key is retained on `launch_reservations`: the
+exact composite allocation binding intentionally validates the epoch, session,
+allocation, and attempt as one relationship, avoiding independent constraints
+that could permit a mismatched combination.
 
 Triggers make the reservation identity and binding columns immutable, prohibit
 deletion, and allow only forward outcome transitions. The
@@ -604,6 +608,32 @@ controlled state/counter updates are trigger-enforced and only write fields
 that were explicitly left mutable. An integrity check treats any trigger
 violation, orphan, duplicate, digest mismatch, or impossible state as
 authority corruption.
+
+### Foreign-key parent-key audit
+
+Every foreign key in the proposed schema is required to reference a parent
+`PRIMARY KEY` or a same-order `UNIQUE` constraint. The reviewed bindings are:
+
+| Child reference | Parent key | Parent constraint |
+| --- | --- | --- |
+| Any `authority_epoch_id` reference in `schema_migrations`, `sessions`, `allocations`, `provider_call_claims`, `launch_reservations`, `launch_executions`, `terminals`, `selections`, and `manual_recoveries` | `authority_metadata(authority_epoch_id)` | Primary key |
+| `allocations(authority_epoch_id, session_id)` | `sessions(authority_epoch_id, session_id)` | `UNIQUE(authority_epoch_id, session_id)` |
+| `provider_call_claims(allocation_id)` | `allocations(allocation_id)` | Primary key |
+| `provider_call_claims(session_id)` and `selections(session_id)` / `manual_recoveries(session_id)` | `sessions(session_id)` | Primary key |
+| `launch_reservations(claim_id)` and `launch_executions(claim_id)` / `terminals(claim_id)` / `manual_recoveries(target_claim_id)` | `provider_call_claims(claim_id)` | Primary key |
+| `launch_reservations(authority_epoch_id, session_id, allocation_id, attempt_id)` | `allocations(authority_epoch_id, session_id, allocation_id, attempt_id)` | `UNIQUE(authority_epoch_id, session_id, allocation_id, attempt_id)` |
+| `launch_executions(launch_reservation_id)` / `terminals(launch_reservation_id)` / `manual_recoveries(target_launch_reservation_id)` | `launch_reservations(launch_reservation_id)` | Primary key |
+| `launch_executions(authority_epoch_id, claim_id)` | `provider_call_claims(authority_epoch_id, claim_id)` | `UNIQUE(authority_epoch_id, claim_id)` |
+| `launch_executions(authority_epoch_id, launch_reservation_id)` / `terminals(authority_epoch_id, launch_reservation_id)` | `launch_reservations(authority_epoch_id, launch_reservation_id)` | `UNIQUE(authority_epoch_id, launch_reservation_id)` |
+| `launch_executions(allocation_id)` / `terminals(allocation_id)` / `selections(allocation_id)` / `manual_recoveries(target_allocation_id)` | `allocations(allocation_id)` | Primary key |
+| `terminals(launch_execution_id)` | `launch_executions(launch_execution_id)` | Primary key |
+| `selections(terminal_id)` / `manual_recoveries(target_terminal_id)` | `terminals(terminal_id)` | Primary key |
+
+The launch reservation intentionally has no independent `session_id` or
+`allocation_id` foreign key: its one four-column allocation binding is the
+authoritative relationship and its parent key exists in the same column order.
+The validation plan must execute this DDL with foreign keys enabled before any
+runtime implementation is accepted.
 
 ### Deterministic identities
 
@@ -1117,7 +1147,9 @@ automatic migrations, claim-file fallback, or runtime implementation in this
 documentation milestone.
 
 **Focused tests:** exact deterministic identity vectors for the root session and
-every derived identity; schema/foreign-key/trigger checks; concurrent
+every derived identity; executable SQLite DDL smoke validation with
+`PRAGMA foreign_keys=ON`, valid and mismatched launch-reservation inserts, and
+`PRAGMA foreign_key_check`; schema/foreign-key/trigger checks; concurrent
 session/ordinal allocation; duplicate claim and launch-reservation races;
 crash-injected boundaries; PERSIST durability and journal lifecycle;
 integrity checks; backup/restore; and fail-closed rejection of rollback cases

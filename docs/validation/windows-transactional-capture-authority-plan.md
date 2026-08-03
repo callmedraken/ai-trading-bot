@@ -1,48 +1,115 @@
 # Windows transactional capture authority validation plan
 
-This plan is evidence for the architecture in
-`docs/architecture/77-windows-transactional-capture-authority.md`. It is a
-future validation plan, not an implementation or an approval for unattended or
-provider-connected operation. Tests use fake providers, fake Credential
-Manager/native adapters, crash injection, temporary test databases, and
-dedicated Windows accounts unless a row below explicitly requires a manual
-administrator check. No test may use real-money trading or place a real order.
+This plan validates the normalized test-only authority described in
+`docs/architecture/77-windows-transactional-capture-authority.md`. The
+executable fixture is
+`tests/fixtures/transactional_authority_schema.sql`; the focused harness is
+`tests/runtime/test_windows_transactional_capture_authority.py`.
 
-## Evidence rules
+This milestone does not implement production capture, credentials, provider
+transport, Windows provisioning, scheduling, brokerage access, or real-money
+trading. All external effects are fake hooks or database observations.
 
-- Every test records the release digest, bootstrap generation, authority epoch,
-  schema version, SQLite version, journal/synchronous settings, and sanitized
-  diagnostics.
-- Tests compare canonical bytes and SHA-256 digests, not object equality or
-  filesystem discovery. Paths are transport inputs and never identity inputs.
-- Deterministic identity tests use the fixed repository namespace, exact
-  material labels, and exact length-framed semantic tuples. They include a
-  golden vector for the root `session_id` and for every derived identity:
-  `migration_id`, `attempt_id`, `allocation_id`, `claim_id`, `launch_reservation_id`,
-  `launch_execution_id`, `terminal_id`, `selection_id`, and `recovery_id`.
-  Each vector records the exact framed UTF-8 preimage and expected lowercase
-  UUID5 result so a test cannot pass by merely recomputing the implementation.
-- A crash test preserves the database, persistent rollback journal, bootstrap,
-  signature, and output evidence for inspection. It never deletes a committed
-  claim to make the next run pass.
-- The dedicated Trading account and approved processes running under its token
-  are trusted participants in the architecture. Validation covers accidental
-  duplicate/cooperating approved processes and other Windows accounts; it does
-  not claim to protect against a compromised Trading account, arbitrary code
-  under that token, or direct malicious database modification by that account.
-- Rollback validation distinguishes mismatches visible through independently
-  retained signed/bootstrap state, administrator-approved historical-only
-  restores, and complete same-generation replacement by Administrator/SYSTEM
-  or trusted-token code. The last case is outside the trust boundary and has
-  no expected detection result; no external service or monotonic anchor is
-  introduced by this milestone.
-- Windows manual checks run on a local NTFS volume under the dedicated
-  non-administrative Trading account and repeat administrator checks under an
-  administrator account. No test grants Trading administrator rights.
-- A passing focused test is not an operational approval. Unattended scheduling
-  remains NO-GO until the separately listed prerequisites are approved.
+## 1. Evidence rules
 
-The required `migration_id/v1` golden vector is:
+Every schema/transaction test must:
+
+- use a temporary local SQLite database with `PRAGMA foreign_keys=ON`;
+- execute the complete fixture before inserting authority facts;
+- use `BEGIN IMMEDIATE` for write workflows;
+- use fixed semantic timestamps and explicit canonical bytes in deterministic
+  test data; timestamps are facts and never UUID5 inputs;
+- compare exact canonical bytes and SHA-256 digests where evidence is stored;
+- preserve the database after rollback/crash-style assertions for inspection;
+- report sanitized SQLite version, integrity results, and failure class; and
+- never use credentials, real provider calls, brokerage APIs, or real-money
+  orders.
+
+The fixture and tests must not discover a schema by scanning a directory or
+accept a legacy JSON claim as authority. Paths are test transport inputs only;
+they are not deterministic identity inputs.
+
+The trusted `Trading` account assumption is explicit. Tests cover accidental
+duplicates, cooperating approved processes, foreign-key integrity, and
+transaction ordering. They do not claim to authenticate executables or defend
+against malicious direct SQL by code already controlling the trusted token.
+
+## 2. Enforcement acceptance split
+
+The validation review must classify each assertion before accepting it:
+
+| SQLite fixture proves | Reviewed transaction harness proves |
+| --- | --- |
+| Immediate-parent foreign keys and `PRAGMA foreign_key_check` | Multi-statement workflow ordering |
+| Append-only evidence, immutable rows, and prohibited deletes | Canonical request/digest and policy reconciliation |
+| Unique one-to-one claim/reservation/execution/terminal/selection fences | Action-specific recovery policy and operator evidence |
+| Per-session uniqueness and trigger-owned ordinal increments | Commit-before-side-effect boundaries |
+| Monotonic local state transitions and local absorbing fences | Complete atomicity of state plus evidence updates |
+| Typed recovery target existence and same-session lineage | Cross-table semantic checks that do not need copied ancestor columns |
+| Fixed enums, budget, digest lengths, and typed success facts | UUID5 computation and exact material contract |
+
+The review rejects any document or test claim that SQLite authenticates an
+executable, verifies Windows CNG/ACL state, validates a provider response, or
+protects against compromised trusted-token code. Complex triggers are not
+added for that excluded threat.
+
+## 3. Schema execution gates
+
+The first gate runs the complete DDL with foreign keys enabled and asserts:
+
+1. all ten intended tables are present:
+   `authority_metadata`, `schema_migrations`, `sessions`, `attempts`,
+   `provider_call_claims`, `launch_reservations`, `launch_executions`,
+   `terminals`, `session_selections`, and `manual_recoveries`;
+2. every foreign key points to a primary key or unique parent key, with the
+   immediate-parent chain:
+
+   ```text
+   authority_metadata -> sessions -> attempts -> provider_call_claims
+       -> launch_reservations -> launch_executions
+       -> launch_reservations -> terminals
+   ```
+
+   and direct boundary references from migrations, selections, and recoveries;
+3. `PRAGMA foreign_key_check` returns no rows after the valid lifecycle;
+4. `PRAGMA integrity_check` returns `ok`; and
+5. no prohibited copied ancestor identity columns exist:
+
+   | Table | Allowed parent identity | Forbidden copied identities |
+   | --- | --- | --- |
+   | `provider_call_claims` | `attempt_id` | epoch, session, ordinal, allocation, copied claim parent |
+   | `launch_reservations` | `claim_id` | epoch, session, attempt, allocation |
+   | `launch_executions` | `launch_reservation_id` | epoch, session, attempt, claim |
+   | `terminals` | `launch_reservation_id` | epoch, session, attempt, claim, execution |
+   | `session_selections` | session and terminal | copied claim/attempt/epoch ancestry |
+   | `manual_recoveries` | session plus typed target | five nullable target ancestor columns |
+
+The review must not reintroduce a separate allocation table, allocation
+identity, large composite lineage foreign key, or redundant ancestor column.
+
+## 4. Deterministic identity gates
+
+The test harness uses the fixed namespace
+`7c2d5a44-3b2e-5f8f-9a1c-6d4e7b8f9012` and the exact UTF-8 length framing:
+
+```text
+LF(s) = ASCII(decimal UTF-8 byte length) + ":" + s
+```
+
+It verifies the root request tuple and the exact normalized tuples for:
+
+```text
+migration_id/v1
+attempt_id/v2
+claim_id/v2
+launch_reservation_id/v2
+launch_execution_id/v2
+terminal_id/v2
+selection_id/v2
+recovery_id/v2
+```
+
+The fixed migration vector remains:
 
 ```text
 authority_epoch_id       = 12345678-1234-5678-9abc-def012345678
@@ -52,226 +119,178 @@ framed UTF-8 preimage    = 15:migration_id/v136:12345678-1234-5678-9abc-def01234
 migration_id             = b1114fec-2247-506d-bfda-74008355b312
 ```
 
-The expected UUID5 namespace is the architecture constant
-`7c2d5a44-3b2e-5f8f-9a1c-6d4e7b8f9012`; the vector is rejected if the
-implementation derives it from either digest or from serialized row bytes.
+The normalized derived vectors are asserted as independent golden outputs:
 
-## Invariant-to-evidence matrix
+| Identity | Expected value |
+| --- | --- |
+| `session_id` | `e5179727-d0f1-5eac-8c01-2e2105a1a9c1` |
+| `attempt_id` | `be483fa1-abe3-5721-90bc-84868cf3dd19` |
+| `claim_id` | `6ec45116-d8a8-50ea-8d94-7ac47329c7e9` |
+| `launch_reservation_id` | `222adedb-e4e7-5bbc-acc2-e7022a1785ac` |
+| `launch_execution_id` | `4ce95417-de13-569f-923b-e17d2d9854c6` |
+| `terminal_id` | `5fda0305-878a-550f-b724-a7ce775e6a30` |
+| `selection_id` | `77b12359-7413-536c-a03c-d6604588aee1` |
+| `recovery_id` | `40eff555-9402-598d-868c-e0ad8776249e` |
 
-| Architecture invariant | Planned automated evidence | Planned manual Windows evidence | Failure meaning |
-| --- | --- | --- | --- |
-| Only the fixed `F:\AITradingBot\Authority\` bootstrap path is executable | Verify caller config, CLI, environment, database rows, copied roots, and alternate absolute paths cannot change the bootstrap/database/output paths; assert the release constant is used | Move/copy the tree, invoke from another current directory, supply junctioned and UNC-like paths, and verify the fixed deployment is the only accepted location | Any caller-selected authority path is a security failure |
-| Bootstrap canonical fields, generation, epoch, SID, policy, provider, operation, and provisioning timestamp are exact | Golden canonical JSON/UUID/digest vectors; reject missing, extra, duplicate, float, path-alias, invalid-SID, and noncanonical timestamp fields | Provision two generations and inspect that the exact values are bound to the machine, account, database, and output root | Field drift or identity dependence on a runtime clock invalidates the bootstrap |
-| Detached signature and pinned key are required | Valid CNG P-256 vector; wrong key ID, wrong digest, malformed signature, altered byte, old key, and absent signature all fail before SQLite mutation | Replace bootstrap/signature as Trading, alter bytes as administrator, and confirm no DB write, process creation, SID access, Credential Manager access, provider construction, or transport occurs | Any side effect before verification is a NO-GO |
-| Trust boundary excludes compromised Administrator/SYSTEM, release replacement, signing-key compromise, and kernel compromise | Documented negative security assumptions and release/key identity checks | Administrator-led compromise/re-provisioning drill records that the system stops and requires a new approved release/epoch | The design must not claim to mitigate these conditions |
-| Trusted-account boundary is explicit | Verify that approved-process identity and token assumptions are documented, while SQLite constraints are treated only as serialization/integrity controls and not executable authentication | Review the Trading token, approved process launch path, and scope statement; record that hostile same-account code requires a separately designed broker service | Any claim that SQLite authenticates an executable or protects against compromised same-account code is rejected |
-| Direct malicious same-Trading-account behavior is out of scope | Negative documentation/security-review evidence confirms no hostile same-token guarantee is tested as a security property | Attempted malicious same-account database modification may be recorded as an out-of-scope limitation, not as a passing protection test | The architecture must not overclaim same-account isolation |
-| Owner, DACL, inheritance, reparse, final-path, and local-volume requirements hold | ACL decision tests for missing/extra ACEs, inherited write, wrong owner, reparse metadata, path mismatch, UNC/volume mismatch, and inaccessible handles | Inspect every object with Windows security tools; attempt Trading writes, deletes, renames, ACL changes, bootstrap replacement, directory replacement, junction creation, and copied-root execution | Any writable trust material or path alias is a fail-closed result |
-| Trading has only exact SQLite and capture-output rights | Access tests assert permitted database page/persistent-journal/lock operations and denied trust/backup operations | Run the authority as Trading; verify bootstrap is readable, database and pre-created journal are writable/lockable, backup is inaccessible, and directory replacement is denied | An ACL workaround that grants broad directory rights is not accepted |
-| Authority metadata binds machine, epoch, bootstrap generation/digest, SID, policy, schema, and database identity | Insert altered metadata, cross-epoch rows, wrong generation, wrong digest, or wrong release digest and assert startup/transaction rejection; verify `database_identity_digest` is treated only as a database-local consistency field, never as an external freshness anchor | Restore a metadata-mismatched database and inspect the typed refusal; record that a complete internally consistent same-generation replacement has no expected detection result without independent trusted state | Mismatched authority metadata is corruption, not a repair prompt; same-generation privileged replacement remains outside the threat model |
-| Schema migrations are reviewed, append-only, deterministic, and exact | Verify primary/foreign keys, unique constraints, check constraints, the exact `migration_id/v1` UUID5 tuple and golden vector, independently verified `migration_digest` and `application_release_digest`, conflicting facts for an existing `migration_id`, one active schema, no runtime DDL, and no unreviewed migration | Start with an older, extra, or conflicting migration row and verify the release refuses operation | Automatic schema evolution or reuse of an identity with different facts is prohibited |
-| Proposed authority DDL has executable foreign-key and recovery-ordinal integrity | Execute the complete proposed SQLite DDL in a temporary database with `PRAGMA foreign_keys=ON`; insert one valid metadata/session/allocation/claim/reservation chain, then allocate one recovery ordinal with exactly one single-row `INSERT` into `manual_recoveries`; assert the `BEFORE INSERT` eligibility/binding checks and `AFTER INSERT` exact `+1` counter update succeed, mismatched epoch/session/allocation/attempt combinations are rejected, direct or standalone counter updates are rejected, `UNIQUE(authority_epoch_id, session_id, recovery_ordinal)` rejects a duplicate, `PRAGMA foreign_key_check` returns no rows, and reservation insertion never raises `foreign key mismatch` | Run the executable DDL smoke script with the reviewed SQLite build and retain the schema, trigger outcomes, and `foreign_key_check` output as evidence | Any invalid parent-key sequence, accepted mismatched composite binding, unpaired counter update, duplicate recovery ordinal, `PRAGMA foreign_key_check` row, or foreign-key mismatch is a schema NO-GO |
-| Canonical JSON evidence is preserved; normalized columns reconcile | Round-trip exact BLOB bytes/digests; mutate normalized columns or evidence separately; reject secrets, raw bodies, environment, stdout, stderr, and arbitrary exceptions | Inspect an authority DB and evidence bundle for exact canonical bytes and sanitized diagnostics | Evidence mutation or secret retention invalidates the record |
-| Deterministic identities and ordinal uniqueness are stable | Verify the fixed repository UUID5 namespace, exact length framing, and golden vectors for `session_id`, `migration_id`, `attempt_id`, `allocation_id`, `claim_id`, `launch_reservation_id`, `launch_execution_id`, `terminal_id`, `selection_id`, and `recovery_id`; the `migration_id/v1` vector uses exactly `authority_epoch_id`, `schema_version`, and `migration_policy_version`; recovery vectors use the ordinal allocated from `sessions.next_recovery_ordinal`; same semantic inputs across paths/processes yield the same IDs; clock/UUID4/hash/object/path/serialized-byte perturbations do not change identity; changing epoch, policy, date, provider, operation, or request semantics changes the UUID5 input; duplicate `(epoch,session,ordinal)` fails | Repeat the root session, migration identity, and every derived identity from different directories and processes, with altered environment values and path spellings, and compare IDs/digests | Identity instability, an omitted semantic field, or duplicate ordinal is a NO-GO |
-| Every persistent `*_id` column has an explicit identity classification | Static schema/architecture assertion maps generated identities to their exact UUID5 tuples, administrator-provisioned `machine_authority_id`/`authority_epoch_id`/`signing_key_id` facts, and child `target_*_id` values to immutable parent references; reject any unclassified persistent identity column | Review the signed bootstrap and approved key inventory against the identity classification | An unclassified or accidentally runtime-derived identity is a deterministic-authority NO-GO |
-| Session creation is atomic | Crash before/after session commit; assert both `next_ordinal=0` and `next_recovery_ordinal=0`; duplicate exact session and conflicting session tests | Kill the process during session creation and inspect the database and persistent journal | Partial session facts, nonzero initial counter, or overwrite is a failure |
-| Allocation consumes one ordinal atomically | Concurrent `BEGIN IMMEDIATE` allocation race; crash before and after commit; unique ordinal/attempt checks | Run two Trading processes against one session and inspect one committed allocation per ordinal | Lost, reused, or silently skipped ordinals are failures |
-| Exactly one permanent provider-call claim exists per allocation | Concurrent duplicate-claim race; `UNIQUE(allocation_id)` and attempt uniqueness; claim deletion/expiry/reclamation/repair attempts fail | Kill/restart around claim commit and verify the committed row remains and cannot be replaced | A second claim or claim deletion is a NO-GO |
-| Claim commit precedes SID, credential, provider, and network effects | Instrument fake native credential/provider/transport constructors and assert no call before claim commit; crash injection between every precondition | Observe process and Credential Manager audit/test hooks around the boundary | Any provider-side effect before a durable claim is a security failure |
-| Canonical request is constructed and reconciled before session/allocation/claim work | Supply conflicting caller config, paths, policy, provider, operation, universe, output, and epoch values; assert one canonical in-memory request/digest is formed before any authority write | Review a trace showing fixed bootstrap verification, in-memory request reconciliation, then session/allocation, then claim; verify no credential or process access occurs during construction | Request reconciliation after claim commitment or authority based on caller-selected paths is a failure |
-| Safe lock retries occur only before claim acquisition | Hold the DB lock during session/allocation/pre-claim operations and verify bounded same-input retry; test lock after claim and assert no provider-attempt retry | Use two Windows processes to hold locks and inspect retry diagnostics and absence of duplicate calls | Generic retry loops are prohibited |
-| Transactional launch reservation permits only one process creator | Fake two independent runners with one committed claim; both execute `BEGIN IMMEDIATE` reservation logic; assert exactly one immutable `launch_reservations` row commits because of permanent `UNIQUE(claim_id)`, only its winner may call `CreateProcessW(CREATE_SUSPENDED)`, and the losing runner stops before process creation; bind the row to exact epoch/session/allocation/attempt/request digest/release/policy values | Race two approved runners and inspect one reservation, one process-creation invocation, no losing invocation, and no provider call from either loser path | Two reservations, a losing `CreateProcessW`, reservation reuse, or any provider call from the loser is a NO-GO |
-| Process creation, Job verification, evidence commit, and resume have the required order | Fake `CreateProcessW`, Job, database, and `ResumeThread` adapters; assert the reservation commits first, the winner calls `CreateProcessW`, Job assignment is verified second, exact creation/resume facts are recorded against the committed reservation third, and only then is `ResumeThread` invoked; inject creation failure and record it against the existing reservation without a second reservation or `launch_executions` row | Opt-in real suspended process check verifies reservation, creation, Job assignment, transactional evidence commit, and resume order; inspect that no evidence is published before process creation | Any process creation before reservation, evidence publication before process creation, process execution without a reservation, request reconciliation after claim, resume before evidence commit, or reservation/claim reuse after creation failure is a NO-GO |
-| Post-resume uncertainty is conservative | Inject crash after `ResumeThread`, during timeout, after termination request, before post-resume commit, and after commit; all cases remain ambiguous/manual | Force termination and kill the parent after resume; inspect that no same-attempt reuse or automatic retry is authorized | Any ambiguous attempt reused as `NOT_STARTED` is a failure |
-| Terminal facts are immutable and typed | Success requires confirmed response, verified snapshot, exit/cleanup success; failed terminal rejects accepted snapshot; timeout/crash/missing result maps to ambiguous | Inspect terminal rows after provider/child failures and manual review | A terminal that overclaims success or no-call is invalid |
-| Exactly one provider call is fenced | Fake provider counts construction and transport calls; second fetch, pagination, reconnect, fallback endpoint, and retry all fail before transport | If separately approved, run one manually initiated provider-connected capture and verify provider-side call count plus local fence evidence | More than one provider call is a NO-GO |
-| Parent remains secret-free and child owns credential reads | Seed parent env/config/CLI with hostile credential-like values; assert rejection and unchanged environment; fake Credential Manager asserts exact child SID gate and target reads | Inspect parent process/environment and child token; attempt wrong SID and wrong target/persistence/type/size values | Secret crossing or SID bypass is a security failure |
-| Credential and native cleanup is exactly once | Inject success, missing, malformed, oversized, null, overflow, decoding, provider, timeout, and exception paths; assert full native range clearing, one `CredFree`, redaction, and dropped references | Use Windows test-only Credential Manager targets and native tracing under the dedicated account; verify no writes/enumeration/deletion | Any cleanup omission, double release, or secret diagnostic is a NO-GO |
-| Process containment and cleanup are unconditional | Fake and opt-in real `CreateProcessW`/Job adapters verify suspended creation, active-process limit one, kill-on-close, no inherited handles, bounded streams, and all handle closes | Inspect Job membership, process tree, handles, environment allowlist, and forced termination behavior | Process escape or leaked handle invalidates integration |
-| Selection requires a verified success and is absorbing | Race selection transactions; reject failed/ambiguous/unselected/mismatched snapshot, duplicate session selection, and state reopening | Kill around selection commit and verify old state/manual review; complete one explicit selection and verify no reallocation | Selection must never be inferred or repeated |
-| Session close is absorbing and does not hide unresolved claims | Close with clean terminals; reject unresolved claims without recovery; crash before/after close; reject reopen/allocation | Review close evidence and try restart/reallocation as Trading | Closing over uncertainty without explicit evidence is invalid |
-| Manual recovery is explicit, session-scoped, atomic, and non-authoritative for provider calls | Race two `BEGIN IMMEDIATE` recovery transactions in one session; require consecutive ordinals from `next_recovery_ordinal`, one row/counter/state commit per transaction, `UNIQUE(authority_epoch_id, session_id, recovery_ordinal)` duplicate rejection, UUID5 golden vectors using the allocated ordinal, and fail-closed rejection of counter regression, skipped ordinals, reassignment, standalone updates, and absorbing-state mutation; classify a reservation left committed without a known process after a crash; reject claim/reservation creation or deletion, provider calls, falsified `NOT_STARTED`, and recovery from closed success | Administrator signs/records each recovery classification and action; Trading cannot author recovery or alter history; run two separate sessions and verify each independently begins at recovery ordinal zero without conflict | Recovery must explain uncertainty, preserve row/counter/state atomicity, never erase it, reopen a consumed reservation, or mutate `SUCCESS_SELECTED`/`CLOSED` |
-| PERSIST, synchronous, foreign keys, one-database scope, lock waits, and integrity checks are fixed | Assert `PERSIST`, `FULL`, foreign keys, no `ATTACH`, no `VACUUM`, no runtime DDL/automatic migration, bounded pre-claim `BEGIN IMMEDIATE` waits, local-file assumptions, `quick_check`, `foreign_key_check`, and full integrity-check results | Inspect SQLite pragmas and file locks on Windows; hold locks and corrupt a copy only, not the live authority | Unsupported durability, extra database attachment, or corruption must fail closed |
-| PERSIST journal lifecycle is compatible with the exact ACL | Provision the main database and persistent rollback journal in advance; assert normal transactions never require journal recreation, deletion, rename, or arbitrary directory creation; fail the test if those rights are requested | Run under the exact Trading DACL, interrupt transactions, inspect journal persistence, and verify the authority refuses rather than weakening directory permissions when the build needs recreation | PERSIST failure under the approved ACL is a Milestone B blocker; broker service is the fallback architecture decision |
-| Database and persistent-journal backups are consistent and independently signed | Validate SQLite online-backup API output or a fully quiesced reviewed main-database/journal copy; build canonical `backup_manifest/v1` bytes; compute SHA-256 database/journal/manifest digests; verify the offline domain-separated CNG P-256/SHA-256 P1363 signature and signer key ID; reject unsigned manifests, copied bootstrap signatures, altered DB/journal digests, wrong epoch/generation/schema/release, wrong signing purpose/key, malformed or noncanonical envelopes, and manifest/backup mismatches | Administrator performs online and quiesced file-level backup drills, signs the manifest offline, verifies the independent manifest signature before staging restore, and confirms Trading cannot read backup material | An inconsistent, unsigned, bootstrap-signed, malformed, wrong-fact, or mismatched backup is not recoverable authority |
-| Rollback cases visible through independently retained signed/bootstrap state fail closed | In isolated copies, test an older-generation database, altered bootstrap or signature, mismatched database/bootstrap digest, copied or cloned root, path alias, and old-epoch executable restart; assert refusal before mutation, process creation, credentials, or provider access. Do not require detection of an internally consistent same-generation database/persistent-journal replacement; record that the database cannot prove its own freshness without independent trusted state | Administrator validates each detectable mismatch and confirms the old-epoch executable path is blocked. A same-generation replacement by Administrator/SYSTEM or trusted-token code is recorded as outside the threat model, not as a passing detection test | Accepting a detectable mismatch or reusing an old epoch is a NO-GO; inability to detect the explicitly out-of-boundary same-generation replacement is not a failure of this milestone |
-| Corruption and unavailable material fail closed | Remove/lock/corrupt DB, persistent journal, bootstrap, signature, output root, or backup; assert no new DB, journal deletion/recreation, repair, process, SID, credential, provider, or transport | Stop/rename only test copies, interrupt access, and observe stable refusal and preserved forensic files | Unavailability must never cause fallback or claim inference |
-| Schema-1/2 JSON remains historical-only | Parse/verify existing schema-1/2 fixtures and legacy-success diagnostics; assert no row or executable claim is imported | Point a validation-only tool at legacy roots and then run the authority; verify SQLite remains independent | Legacy artifacts must not authorize a call |
-| File-based claim authority is not a fallback | Remove SQLite authority or inject valid legacy claim files; assert the capture refuses rather than scanning/repairing/selecting files | Run with old capture root available and SQLite unavailable | Any fallback resurrects the retired authority model |
-| Every approved restore is historical-only and creates a new executable epoch | Restore a database containing claims and ambiguity facts; validate and preserve those rows as historical evidence, rotate the signed bootstrap generation, create a new `authority_epoch_id`, and create a newly provisioned empty executable database; assert no old allocation or claim is imported or executablely reused | Administrator performs the restore drill and verifies executable startup is blocked under the old epoch and permitted only after new-bootstrap/new-database provisioning; old restored claims remain historical-only | Any same-epoch executable restore, old-allocation/claim import or reuse, or claim-loss inference is a NO-GO |
-| Milestone gates and unattended NO-GO conditions are enforced | Gate evaluation tests require all A-D evidence and separately approved E prerequisites; missing any one blocks unattended mode | Review hardened launch-guard DACL, official XNYS-hours authority, trusted time/process evidence, monitoring/notification, backup/restore, scheduler config, and account rights | A passing manual capture cannot approve unattended scheduling |
+The review perturbs clocks, UUID4 values, Python hash seeds, object identity,
+working directories, path spellings, environment values, process IDs, and
+serialized evidence bytes. None may change an identity unless a semantic tuple
+field changes. Changing the immediate parent or required semantic policy must
+change the derived identity. Administrator-provisioned machine/epoch/key IDs
+are classified as signed facts, not runtime UUID5 values.
 
-## Crash-injection matrix
+## 5. Lifecycle and parent-fence gates
 
-The authority implementation must expose test-only barriers around these
-boundaries without adding production bypasses:
-
-1. before and after session commit;
-2. before and after allocation/ordinal commit;
-3. before and after permanent request-bound claim commit;
-4. immediately before and after launch-reservation `BEGIN IMMEDIATE`;
-5. immediately before and after launch-reservation commit;
-6. after reservation commit and immediately before `CreateProcessW`;
-7. immediately before and after `CreateProcessW(CREATE_SUSPENDED)`;
-8. after process-creation failure while recording the failure against the
-   existing reservation;
-9. before and after Job assignment/verification;
-10. before and after process-creation/resume-authorization evidence commit;
-11. immediately before and after `ResumeThread`;
-12. before and after post-resume ambiguity commit;
-13. before and after terminal commit;
-14. before and after selection commit; and
-15. before and after close or manual-recovery commit.
-
-For each injection, restart verification must classify the database without
-directory scans, preserve all committed facts, prevent a second claim/provider
-call, and produce a stable sanitized outcome. In particular, a crash after
-reservation commit but before process creation leaves the claim and reservation
-permanently consumed and requires manual classification; it never authorizes
-an automatic second reservation, process, launch attempt, or provider call. A
-known process-creation failure is recorded against that reservation and also
-cannot authorize a second launch. The expected result after a possible resume
-is ambiguity even if no child result is present.
-
-## Concurrency and duplicate-claim matrix
-
-The focused suite launches at least two independent authority clients against
-one session, allocation, and committed claim, with barriers at `BEGIN
-IMMEDIATE`, ordinal consumption, claim insertion, launch-reservation
-insertion/commit, process creation, and terminal/selection transitions. It
-verifies that:
-
-- only one allocation can consume each ordinal;
-- only one `provider_call_claims` row can reference an allocation;
-- exactly one `launch_reservations` row can reference a claim;
-- exactly one runner can commit that reservation;
-- the losing runner never calls `CreateProcessW(CREATE_SUSPENDED)`;
-- a loser receives a deterministic conflict or busy result and cannot call a
-  provider;
-- a committed claim remains after the winner exits unexpectedly; and
-- a crash after reservation commit, a crash before process creation, or a
-  process-creation failure never permits an automatic second reservation,
-  process, launch attempt, or provider call; and
-- concurrent selection and close operations serialize according to the
-  transition rules without state regression.
-
-The test repeats with different working directories, path spellings, process
-IDs, and environment values to prove they do not create another identity.
-
-## Recovery ordinal concurrency and crash matrix
-
-The focused suite runs two independent recovery transactions against one
-`OPEN` session and verifies that `BEGIN IMMEDIATE` serialization produces
-unique consecutive recovery ordinals. It proves that:
-
-- the first committed recovery consumes ordinal `0` and the next committed
-  recovery consumes ordinal `1`;
-- a racing transaction either observes the incremented counter and commits the
-  next ordinal or fails closed, never reassigning an ordinal;
-- an explicit duplicate ordinal is rejected by
-  `UNIQUE(authority_epoch_id, session_id, recovery_ordinal)`;
-- the recovery UUID5 golden vector uses the exact ordinal read from
-  `sessions.next_recovery_ordinal`;
-- each application transaction allocates its ordinal with exactly one
-  single-row `INSERT` into `manual_recoveries`; no application-issued counter
-  update is used;
-- the `BEFORE INSERT` trigger rejects an ineligible/absorbing session, a
-  wrong epoch/session or target binding, a non-current ordinal, and an empty
-  state transition;
-- the `AFTER INSERT` trigger performs the sole counter write, and the counter
-  guard accepts only `OLD + 1` when the newly inserted immutable row is at the
-  old ordinal and the new counter equals the session recovery-row count;
-- crashes immediately before and after the recovery commit leave, respectively,
-  no row/counter/state change or the recovery row, counter increment, and
-  authorized state transition together;
-- failures from either trigger roll back the insertion statement, and trigger
-  tests reject counter regression, skipped ordinals, reassignment, no-op or
-  standalone counter updates, immutable-row updates/deletes, and any
-  unpaired counter increment; and
-- two separate sessions may each begin at recovery ordinal `0` without a
-  cross-session uniqueness conflict.
-
-No recovery transaction may mutate a `SUCCESS_SELECTED` or `CLOSED` session or
-allocation, and no recovery outcome may authorize another launch, claim, or
-provider call.
-
-## Backup, restore, and rollback matrix
-
-The administrator validation creates an SQLite online backup or fully
-quiesced reviewed backup, validates it in staging, runs all integrity,
-generation, epoch, and digest checks, and only then exercises the epoch-reset
-restore procedure. It separately tests:
-
-- active persistent journal during a raw-copy attempt;
-- journal recreation or arbitrary directory-create requirements under the
-  exact Trading ACL;
-- older bootstrap generation;
-- altered bootstrap/signature;
-- unsigned backup manifest;
-- bootstrap signature presented as the manifest signature;
-- malformed or noncanonical manifest/signature envelopes, wrong signature
-  encoding, wrong signing purpose, or wrong signer key;
-- altered database or persistent-journal digest;
-- wrong epoch, bootstrap generation, schema version, or application release
-  digest;
-- manifest/backup file mismatch, including an invalid persistent-journal
-  absence claim;
-- attempted same-epoch executable restart after restore;
-- copied/cloned root on another path or volume;
-- path aliases and database/bootstrap digest mismatch;
-- database corruption with a valid prior backup; and
-- corruption with no valid backup, which must require a new epoch.
-
-It does not claim that a complete replacement of the database and persistent
-journal by an internally consistent same-generation pair is detectable from
-the database itself. That case is recorded as outside the stated trust
-boundary unless independently retained signed/bootstrap state supplies a
-mismatch.
-
-The evidence preserves every claim, terminal, and ambiguity fact in the
-restored database as historical evidence. It then verifies signed bootstrap
-generation rotation, a new `authority_epoch_id`, and a new empty executable
-database. No old allocation or claim may authorize a call in the new epoch,
-and uncertainty is never converted into proof that a claim did not occur.
-
-## Manual Windows acceptance runbook
-
-The final manual run is performed only after A-C focused tests pass:
-
-1. Administrator verifies the signed bootstrap, owner/DACL, final paths,
-   reparse status, local NTFS volume, database/persistent-journal health, and
-   recent backup.
-2. The Trading account starts exactly one manually invoked capture using no
-   credential values in its configuration or environment.
-3. The reviewer verifies the claim commit, exactly one committed launch
-   reservation, the reservation winner, child SID, Credential Manager read
-   boundary, suspended process/Job evidence, one-call fence, result digest,
-   cleanup evidence, and terminal state. A two-runner drill verifies that the
-   loser never calls `CreateProcessW`.
-4. The reviewer repeats with forced termination after resume and confirms
-   ambiguity, no retry, no claim deletion, and manual recovery requirement.
-5. The administrator restores a test backup as historical evidence, checks
-   generation/epoch-reset behavior, preserves the old claims, and provisions a
-   new empty executable authority without modifying the old evidence.
-6. The operator signs the manual-only result. No scheduler is installed or
-   enabled.
-
-Unattended scheduling remains NO-GO unless the later operational milestone
-separately approves all of: hardened launch-guard DACL, official XNYS-hours
-authority, trusted time/process evidence, monitoring and notification, backup
-and restore, and scheduler configuration and account rights.
-
-## Planned verification commands
-
-These are future commands for the implementation milestone, not commands run
-for this architecture-only change. They must be adapted to the final test
-paths and must not access real credentials or a real brokerage unless a
-separate manual approval exists.
+The valid path is one transaction helper at each boundary:
 
 ```text
-.venv\Scripts\python.exe -m pytest -q <focused transactional-authority tests>
-.venv\Scripts\python.exe -m pytest -q <focused Windows process/ACL tests>
+metadata + migration
+  -> session
+  -> attempt ordinal 0
+  -> permanent claim
+  -> launch reservation
+  -> launch execution (optional)
+  -> successful terminal
+  -> owning session selection
+```
+
+The focused suite asserts:
+
+- metadata and migration insert successfully and remain immutable;
+- session counters start at zero;
+- attempt zero consumes exactly one ordinal;
+- one claim can reference an attempt and remains `COMMITTED` permanently;
+- one reservation can reference a claim;
+- one execution can reference a reservation;
+- one terminal can reference a reservation, including a process-creation
+  failure with no execution row; and
+- one confirmed successful terminal can be selected only by its owning session.
+
+The following duplicate operations must fail without a second side effect:
+
+- a second claim for one attempt;
+- a second reservation for one claim;
+- a second execution for one reservation;
+- a second terminal for one reservation;
+- a second selection for one session; and
+- selecting one terminal for two sessions.
+
+The suite also attempts updates and deletes against immutable evidence. The
+trigger or foreign-key result must preserve the original row and must not
+create a repair path.
+
+## 6. Lineage gates
+
+Selection uses one executable trigger to resolve:
+
+```text
+terminal -> launch_reservation -> claim -> attempt -> session
+```
+
+The test attempts to select another session's successful terminal and expects
+an immediate failure.
+
+Recovery uses one `target_kind`/`target_id` pair. For each supported target
+kind (`SESSION`, `ATTEMPT`, `CLAIM`, `LAUNCH_RESERVATION`, `TERMINAL`), the
+suite attempts to recover another session's target and expects failure. No
+large mismatched composite tuple is constructed because the normalized schema
+has no such tuple.
+
+The review also verifies that a recovery cannot be inserted for
+`SUCCESS_SELECTED` or `CLOSED`, cannot reopen a claim/reservation, cannot
+delete evidence, and cannot authorize another provider call.
+
+## 7. Attempt ordinal and crash gates
+
+The attempt primitive is tested under immediate SQLite row-trigger semantics:
+
+- two independent connections racing on one open session commit ordinals 0
+  and 1 without duplication;
+- stale ordinal 0 after allocation and future ordinal 2 fail;
+- direct, no-op, regression, skip, and second counter updates fail;
+- inserting an attempt and rolling back restores both the original counter and
+  absence of the row;
+- committing preserves the attempt and exact increment;
+- the application helper performs one insert and no independent counter
+  update; and
+- two separate sessions each begin at ordinal zero.
+
+The counter proof depends only on immutable attempts and contiguous committed
+per-session ordinals. It does not use an application-maintained trigger flag,
+deferred trigger, clock, or alternate ordinal search.
+
+## 8. Recovery ordinal and crash gates
+
+Recovery is tested with the same single-insert pattern:
+
+- two independent connections racing recoveries on one open session commit
+  consecutive ordinals 0 and 1;
+- stale, future, duplicate, no-op, and invalid target ordinals fail;
+- direct recovery-counter updates fail;
+- rollback preserves row, counter, and target-state atomicity;
+- commit preserves the immutable recovery row, increment, and authorized
+  target state together;
+- recovery rows cannot be updated or deleted;
+- each independent session begins recovery at ordinal zero; and
+- recovery after a successful selection or closed session fails.
+
+The trigger verifies open-session eligibility, target existence, same-session
+lineage, current ordinal, and non-empty predecessor/resulting state. The test
+transaction service additionally verifies action-specific authorization and
+performs any target-state update in the same `BEGIN IMMEDIATE` transaction.
+
+## 9. Transaction boundary gates
+
+`FakeSideEffects` observes the database through an independent connection.
+The test proves the following event order:
+
+| Commit/effect boundary | Required evidence |
+| --- | --- |
+| Claim commit -> credential/provider construction | The observer sees `COMMITTED` before the fake provider hook runs |
+| Reservation commit -> process creation | The observer sees `COMMITTED` before the fake process hook runs |
+| Launch evidence commit -> resume authorization | The observer sees `RESUME_RECORDED` before the fake resume hook runs |
+| Ambiguous terminal -> retry | A second claim cannot be inserted and the claim count remains one |
+
+The fake hooks do not read secrets, construct a provider, create a Windows
+process, call a network, or authorize a real resume. They only prove the
+database visibility boundary.
+
+## 10. Security and operational gates not claimed by this fixture
+
+The following remain administrator/manual or future production acceptance
+work:
+
+- fixed bootstrap canonicalization and detached signature verification through
+  Windows CNG;
+- owner/DACL, SID, reparse-point, final-handle, local-volume, and exact
+  persistent-journal access checks;
+- `PERSIST`/`synchronous=FULL` behavior under the dedicated Trading ACL,
+  including no journal recreation, deletion, rename, or directory workaround;
+- child-only Credential Manager reads, secret cleanup, process containment,
+  Job Object verification, bounded streams, and native handle closure;
+- real suspended-process evidence and conservative post-resume ambiguity;
+- independently signed `backup_manifest/v1`, database/journal digest checks,
+  historical-only restore, new generation/epoch, and empty executable DB;
+- historical parsing of schema-1/2 artifacts without import or fallback; and
+- unattended scheduling prerequisites and approval.
+
+The validation must explicitly record that an internally consistent
+same-generation database/journal replacement by Administrator/SYSTEM or
+trusted-token code is outside this design's detection boundary.
+
+## 11. Focused verification commands
+
+Run from the repository root:
+
+```text
+.venv\Scripts\python.exe -m pytest -q tests/runtime/test_windows_transactional_capture_authority.py
 .venv\Scripts\python.exe -m pytest -q
 .venv\Scripts\ruff.exe check .
 .venv\Scripts\ruff.exe format --check .
+git diff --check
 ```
+
+The focused suite is the executable acceptance gate for this schema revision.
+The full suite and repository lint/format/diff checks are required before the
+scoped commit. No command may access real credentials, real providers,
+brokerage APIs, or real-money trading.

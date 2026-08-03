@@ -2,18 +2,19 @@
 
 ## Scope and decision
 
-This architecture replaces the executable file-based provider-call authority
-with a deployment-pinned, signed bootstrap and a single SQLite authority
-database. It is a design milestone only. It does not implement runtime code,
-database code, provisioning, credential access, provider access, migrations, or
-tests. Paper operation and real-money trading remain outside this boundary.
+This milestone defines a normalized, executable SQLite authority for one
+manually guarded, long-only market-data capture. It is a design and test
+milestone, not production runtime, provisioning, credential, provider,
+launcher, scheduling, or brokerage implementation. Paper operation remains
+the default. Real-money trading is outside this boundary and is not enabled
+by this design.
 
-The authority is for one manually guarded, long-only market-data capture at a
-time. A committed provider-call claim is permanent. The database, not a
-directory scan, a history pointer, a claim file, or a launcher-supplied path,
-decides whether a provider call may be attempted.
+The authority is a deployment-pinned signed bootstrap plus one SQLite
+database. A committed provider-call claim is permanent. The database, rather
+than a directory scan, legacy file, launcher path, or output artifact, decides
+whether the one permitted provider call may be attempted.
 
-The initial deployment is fixed to:
+The fixed deployment is:
 
 ```text
 F:\AITradingBot\Authority\
@@ -25,1538 +26,473 @@ F:\AITradingBot\Authority\
   backup\
 ```
 
-The bootstrap records the exact database and capture-output paths. The
-bootstrap directory is not configurable by a runner, launcher, child,
-environment, allocation, request, or database row.
+The bootstrap and its exact database/output paths are administrator-provisioned
+facts. A caller, environment variable, child argument, current directory,
+request, or database row cannot select an alternate authority root.
 
-## 1. Threat model and trust boundary
+## 1. Security boundary retained by this revision
 
-### Covered threats
+The approved security invariants are unchanged:
 
-The design explicitly covers:
+- The release reads only the fixed bootstrap and detached-signature paths.
+- The bootstrap binds the machine authority, epoch, generation, approved SID,
+  database path, output root, provider, operation, and policy versions.
+- Bootstrap bytes are canonical and signed with the pinned P-256 key. Windows
+  CNG verifies SHA-256 over the exact canonical bytes and accepts only the
+  fixed 64-byte IEEE P1363 signature envelope.
+- Every path component and final handle is checked for the exact local path,
+  expected owner/DACL, and absence of reparse points, junctions, mounts,
+  aliases, and UNC substitution.
+- The administrator owns the bootstrap, signature, database replacement,
+  persistent journal provisioning, and backup tree. Trading receives only the
+  reviewed database/journal and capture-output rights.
+- The trusted `Trading` token is an explicit assumption. SQLite constraints
+  serialize accidental duplicate or cooperating approved processes; they do
+  not authenticate an executable or protect against malicious direct SQL from
+  code that already controls that token.
+- Parent state is secret-free. Credential Manager access, provider transport,
+  process creation, Job Object containment, native cleanup, and child
+  isolation remain separate future runtime work.
+- A provider response is hostile input and becomes evidence only after strict
+  bounded validation and sanitization. Credentials, raw provider bodies,
+  environment dumps, stdout, stderr, and arbitrary exception text are not
+  authority evidence.
 
-- duplicate or concurrent runner and child processes, including two processes
-  accidentally or cooperatively attempting the same allocation under the
-  trusted Trading token;
-- crashes before claim commitment, after claim commitment, before resume,
-  after resume, during result recording, and during success selection;
-- caller-controlled configuration, paths, files, current directory, and
-  environment variables;
-- other non-administrative Windows accounts attempting to read, replace, or
-  influence authority material;
-- copied or cloned capture roots, including a root presented through a
-  different path or volume;
-- rollback cases that are visible through independently retained signed
-  bootstrap state, including an older bootstrap generation or an old epoch;
-- filesystem links, junctions, mount points, and other reparse points in any
-  authority or capture path component;
-- process and credential isolation, including secret-free parent state,
-  current-process SID verification, child-only Credential Manager reads,
-  constrained child environment, and native cleanup; and
-- malicious provider responses and diagnostics that contain secrets, arbitrary
-  text, or misleading status. Only bounded, typed, sanitized evidence is
-  admitted to the database or output.
+An older signed bootstrap, old epoch, altered signature, copied root, path
+alias, mismatched database binding, or other independently detectable rollback
+condition fails closed before mutation or side effect. A complete same-
+generation replacement of the database and persistent journal is not
+detectable from database-local state alone; that case is outside the stated
+trust boundary. An approved restore is historical-only: rotate the signed
+generation and epoch, provision a new empty executable database, and never
+import old claims or attempts into the new executable epoch.
 
-The threat model assumes that provider responses, child output, launcher
-configuration, and all non-authoritative files are hostile input. It also
-assumes that a process can disappear at any instruction boundary after a
-provider claim is committed.
+Unattended scheduling remains NO-GO until a separately approved milestone
+covers launch-guard ACLs, trusted time and exchange-hours evidence, monitoring,
+backup/restore, and scheduler/account rights.
 
-### Trust boundary
+## 2. Executable normalized relational model
 
-The trusted path is the approved signed application release, its pinned
-bootstrap-verification key, the administrator-provisioned bootstrap and ACLs,
-the exact local NTFS paths, the verified authority epoch, SQLite's durable
-transaction result, and the Windows native process/credential primitives used
-by the child boundary. The dedicated `Trading` account and approved processes
-running under its token are trusted to honor this contract. SQLite constraints
-serialize accidental duplicate or cooperating approved processes; they do not
-authenticate an executable or protect against code that already controls the
-trusted token. A provider response is never trusted as authority; it becomes
-evidence only after strict validation and sanitization.
-
-The following are explicitly outside the trust boundary:
-
-- compromise of the dedicated `Trading` account;
-- arbitrary or unapproved code executing under the Trading token;
-- direct malicious database modification by the Trading account;
-- a compromised local Administrator or SYSTEM account;
-- replacement of the approved signed application release;
-- compromise of the offline bootstrap signing key; and
-- kernel compromise.
-
-Those conditions invalidate the deployment assumption and require
-administrator-led recovery or re-provisioning. The design does not claim to
-make a compromised privileged host or compromised Trading token safe.
-Protecting against hostile same-account code would require a separately
-designed broker service that owns the authority and provider boundary; that
-broker is not part of this architecture.
-
-### Rollback boundary and replacement cases
-
-The authority distinguishes three classes of replacement and rollback:
-
-1. **Detectable with independently retained signed/bootstrap state.** An
-   older-generation database, an epoch that no longer matches the signed
-   bootstrap, altered bootstrap or signature material, a copied root, and a
-   path alias can be rejected when the approved release has independently
-   retained signed/bootstrap facts, fixed-path/final-handle checks, or both.
-   The database's own metadata is reconciled with those independently retained
-   facts before executable use.
-2. **Approved restore.** Every administrator-approved restore is
-   historical-only. It requires a rotated signed bootstrap generation, a new
-   `authority_epoch_id`, a newly provisioned empty executable database, and no
-   import or executable reuse of old allocations or claims. The restored
-   database may be inspected and preserved as evidence, but it is never the
-   executable authority for the new epoch.
-3. **Outside the trust boundary.** A database cannot prove its own freshness
-   after the database and persistent journal have been completely replaced by
-   an internally consistent same-generation pair. Replacement by
-   Administrator/SYSTEM, malicious direct database modification by the trusted
-   `Trading` account, or arbitrary code controlling that account is outside
-   this threat model. This milestone adds no external service, hardware
-   monotonic anchor, or other independent freshness authority to detect those
-   cases.
-
-An internally consistent same-generation replacement is therefore not a
-validation failure for this design; it is an explicit trust-boundary
-limitation. `database_identity_digest` is a database-local consistency field,
-not an externally retained rollback anchor and not proof of freshness after a
-complete replacement.
-
-## 2. Deployment-pinned signed bootstrap
-
-### Fixed location and fields
-
-The only accepted bootstrap location is:
+The test-only source of truth is
+`tests/fixtures/transactional_authority_schema.sql`. It executes with
+`PRAGMA foreign_keys=ON` and contains all tables, indexes supplied by SQLite
+for primary/unique keys, and triggers. There are no composite lineage foreign
+keys. The authority chain is:
 
 ```text
-F:\AITradingBot\Authority\authority.bootstrap.json
-F:\AITradingBot\Authority\authority.bootstrap.sig
+authority_metadata
+└── sessions
+    └── attempts
+        └── provider_call_claims
+            └── launch_reservations
+                ├── launch_executions
+                └── terminals
 ```
 
-The release contains this location as a constant. It is not read from runner
-configuration, launcher configuration, child CLI arguments, environment,
-allocation data, request data, or SQLite content. The database path and output
-root are likewise fixed by the signed bootstrap, not selected by a caller.
+The two boundary branches are `schema_migrations` directly below
+`authority_metadata`, and `session_selections` plus `manual_recoveries`
+directly below `sessions`.
 
-The bootstrap's canonical JSON object contains exactly these semantic fields:
+### 2.1 authority_metadata
 
-| Field | Meaning |
+`authority_metadata` is a singleton active epoch row. It retains the signed
+administrator facts: `authority_epoch_id` primary key,
+`machine_authority_id`, bootstrap schema/generation, signing key, approved
+SID, provider/operation, policy versions, provisioning timestamp, bootstrap
+digest, database-local identity digest, canonical metadata bytes/digest, and a
+singleton key constrained to `1`. It is immutable and cannot be deleted.
+
+`authority_epoch_id` and `machine_authority_id` are not runtime UUID5
+identities. They are administrator-provisioned facts bound by the signed
+bootstrap.
+
+### 2.2 schema_migrations
+
+`schema_migrations` is an append-only direct child of metadata. It stores
+`migration_id`, `authority_epoch_id`, schema/policy versions, migration and
+release digests, canonical migration evidence, and the applied timestamp.
+`UNIQUE(authority_epoch_id, schema_version)` permits one reviewed migration
+fact for each schema in an epoch. It has no runtime migration or automatic DDL
+path.
+
+### 2.3 sessions
+
+`sessions` is a direct child of metadata with:
+
+- `session_id` primary key and `authority_epoch_id` foreign key;
+- session/authority/claim policy versions and target session date;
+- `state` in `OPEN`, `SUCCESS_SELECTED`, or `CLOSED`;
+- `next_attempt_ordinal` and `next_recovery_ordinal`, both initially zero;
+- canonical request bytes and digest; and
+- creation plus controlled close facts.
+
+Only forward session transitions are permitted. `SUCCESS_SELECTED` and
+`CLOSED` are absorbing with respect to selection/recovery eligibility;
+`CLOSED` also requires close facts. Session identity and request evidence are
+immutable.
+
+### 2.4 attempts
+
+`attempts` replaces the former separate allocation entity. An attempt owns:
+
+- `attempt_id` primary key and `session_id` immediate-parent foreign key;
+- the unique per-session `ordinal`;
+- provider and permitted operation;
+- `provider_call_budget=1`;
+- canonical request/digest bindings;
+- attempt schema and policy versions;
+- immutable allocation and attempt evidence bytes/digests;
+- controlled local state; and
+- creation timestamp.
+
+`UNIQUE(session_id, ordinal)` is the ordinal fence. There is no
+`allocation_id`, no separate allocation row, and no copied epoch or session
+lineage on descendants. Attempt identity is checked by the reviewed
+transaction helper before the insert; the trigger checks that the session is
+open, the ordinal is exactly the current counter, the initial state is
+`ALLOCATED`, and the budget is one.
+
+### 2.5 provider_call_claims
+
+Claims reference only `attempt_id`, which is `NOT NULL UNIQUE` and references
+`attempts(attempt_id)`. The table stores the permanent `COMMITTED` state,
+claim schema/policy, provider/operation/budget, request/digest bindings,
+immutable claim evidence, and commit timestamp. It has no session, epoch,
+ordinal, or allocation columns. Claim rows cannot be updated or deleted.
+
+### 2.6 launch_reservations
+
+Reservations reference only `claim_id`, which is `NOT NULL UNIQUE` and
+references `provider_call_claims(claim_id)`. They store their own deterministic
+identity, schema/release/policy bindings, request digest, immutable reservation
+evidence, controlled reservation outcome, process-creation-failure evidence,
+and timestamps. They have no session, attempt, allocation, or epoch columns.
+
+`COMMITTED` is the pre-`CreateProcessW` fence. The controlled outcomes are
+`PROCESS_CREATED`, `PROCESS_CREATION_FAILED`, `MANUAL_REVIEW`, and
+`TERMINAL_RECORDED`. There is no reclamation, expiry, replacement, or second
+reservation path.
+
+### 2.7 launch_executions
+
+Executions reference only `launch_reservation_id`, which is `NOT NULL UNIQUE`
+and references `launch_reservations(launch_reservation_id)`. They store
+process-creation, Job Object, resume-authorization, phase, post-resume, and
+cleanup evidence. The phase moves forward through
+`PRE_RESUME_READY`, `RESUME_RECORDED`, `POST_RESUME_AMBIGUOUS`,
+`TERMINAL_RECORDED`, and `CLOSED`. Execution evidence is immutable except for
+these explicitly controlled phase/evidence additions. An execution is
+optional: a process-creation failure may still receive a terminal directly
+from its reservation.
+
+### 2.8 terminals
+
+Terminals reference only `launch_reservation_id`, which is `NOT NULL UNIQUE`
+and references `launch_reservations(launch_reservation_id)`. They contain
+typed terminal state, provider-call disposition, request digest, immutable
+evidence, optional verified snapshot digest, sanitized diagnostics, and the
+recorded timestamp. They do not copy claim, attempt, session, epoch, or
+execution identities. The reservation's one-to-zero-or-one execution
+relationship tells the transaction service whether an execution exists.
+
+`SUCCEEDED` requires `CONFIRMED` and a snapshot digest. `AMBIGUOUS` requires
+`MAY_HAVE_OCCURRED`; failed process creation may be `FAILED` with
+`NOT_STARTED`. Terminal rows are immutable and cannot be deleted.
+
+### 2.9 session_selections
+
+`session_selections` is intentionally narrow:
+
+```text
+selection_id       TEXT NOT NULL UNIQUE
+session_id         TEXT PRIMARY KEY REFERENCES sessions(session_id)
+terminal_id        TEXT NOT NULL UNIQUE REFERENCES terminals(terminal_id)
+selection_schema   INTEGER NOT NULL
+selection_policy_version
+snapshot_digest
+selection_evidence_json / selection_evidence_digest
+selected_at_utc
+```
+
+One immediate foreign key points to the owning session and one to the selected
+terminal. A `BEFORE INSERT` trigger verifies the terminal path
+`terminal -> launch_reservation -> claim -> attempt` resolves to the same
+`session_id`, that the terminal is a confirmed success, and that the selected
+snapshot digest matches. The application transaction then commits the
+selection and the session/attempt success transitions together.
+
+### 2.10 manual_recoveries
+
+Recoveries are direct session children with `recovery_id`,
+`recovery_ordinal`, `target_kind`, and `target_id`. `target_kind` is exactly
+one of `SESSION`, `ATTEMPT`, `CLAIM`, `LAUNCH_RESERVATION`, and `TERMINAL`.
+There are no five nullable target columns and no copied ancestor identities.
+The row also stores action, predecessor/resulting state, recovery policy/schema,
+operator evidence, and creation timestamp. `UNIQUE(session_id,
+recovery_ordinal)` fences each per-session ordinal.
+
+The `BEFORE INSERT` trigger requires an open session, the current recovery
+counter, a non-empty state change, and a target that resolves through the
+immediate-parent chain to that same session. The `AFTER INSERT` trigger owns
+the exact counter increment. The reviewed test transaction service validates
+the action, operator evidence, target state, and authorized state update in the
+same `BEGIN IMMEDIATE` transaction. Recovery never deletes or reopens a claim
+or reservation, never authorizes another provider call, and is rejected after
+an absorbing session state.
+
+## 3. Enforcement split
+
+The fixture deliberately enforces only facts that SQLite can evaluate at the
+row boundary. The reviewed transaction service and transaction tests enforce
+the multi-statement semantic contract.
+
+| SQLite schema, constraints, and triggers | Reviewed transaction service/tests |
 | --- | --- |
-| `bootstrap_schema` | Bootstrap schema number, initially `1`. |
-| `bootstrap_generation` | Positive administrator-controlled generation; it increases on controlled rotation. |
-| `signing_key_id` | Identifier for the public key pinned in the approved release. |
-| `machine_authority_id` | Stable signed administrator-provisioned UUID fact for this machine authority; not runtime-derived UUID5 material. |
-| `authority_epoch_id` | Signed administrator-provisioned UUID fact for this executable authority epoch; not runtime-derived UUID5 material. |
-| `approved_account_sid` | Exact Windows SID allowed to consume the authority and child boundary. |
-| `authority_database_path` | Exact absolute path `F:\AITradingBot\Authority\authority.sqlite3`. |
-| `capture_output_root` | Exact absolute path `F:\AITradingBot\Authority\capture-output\`. |
-| `provider_id` | Fixed provider descriptor, initially `ALPACA_MARKET_DATA`. |
-| `permitted_provider_operation` | Exact approved operation, initially historical daily-bars capture. |
-| `authority_policy_version` | Version of state, evidence, and authority rules. |
-| `claim_policy_version` | Version of the one-per-allocation claim rules. |
-| `created_at_utc` | Provisioning-supplied UTC fact; never generated as an identity input. |
-| `predecessor_bootstrap_digest` | Optional SHA-256 digest of the predecessor bootstrap for controlled rotation. |
+| Immediate-parent foreign keys and `foreign_key_check` integrity | Workflow ordering across multiple statements and tables |
+| Append-only immutable evidence and prohibited deletes | Canonical request construction, digest reconciliation, and policy reconciliation |
+| One-to-one claim, reservation, execution, terminal, selection, and ordinal fences | Action-specific recovery authorization and operator evidence |
+| Unique per-session ordinals and trigger-owned exact increments | Commit-before-side-effect boundaries |
+| Valid local monotonic state transitions and locally provable absorbing states | Complete transaction atomicity and crash classification |
+| Typed recovery target existence and same-session lineage | Cross-table semantic rules that would otherwise require copied ancestor columns |
+| Digest lengths, fixed enum values, provider budget, and typed success facts | UUID5 identity computation and comparison against the reviewed contract |
 
-The canonical serializer rejects duplicate or unknown members, floats,
-noncanonical timestamps, invalid SIDs, path aliases, non-absolute paths, and
-noncanonical JSON bytes. Identity material is explicit and length-framed; it
-contains the schema, generation, key ID, machine authority, epoch, account
-SID, provider operation, and policy versions, but not paths, clocks supplied at
-runtime, serialized artifact bytes, or secrets.
+SQLite does not authenticate executables, inspect Windows ACLs, verify CNG
+signatures, read Credential Manager, validate provider responses, or protect
+against malicious direct SQL from compromised trusted-token code. Complex
+triggers are not added for that excluded threat.
 
-The detached signature covers the exact canonical UTF-8 bootstrap bytes. The
-signature file has a fixed binary envelope containing a signature-envelope
-schema, `signing_key_id`, signed-bootstrap SHA-256, and the signature. The
-envelope is not authority by itself: the verifier checks that its key ID and
-digest match the canonical bootstrap and then verifies the signature. The
-signature and bootstrap are never rewritten by a trading process.
+## 4. Ordinal primitives
 
-### Selected signing design
+### 4.1 Attempt allocation
 
-The selected primitive is ECDSA over NIST P-256 with SHA-256, verified through
-Windows CNG (`BCryptVerifySignature`) using a fixed signature encoding and
-explicit test vectors. Provisioning may sign offline with a CNG-compatible
-tool, but the private signing key is never present in the deployment tree.
-
-The fixed signature encoding is IEEE P1363: exactly 64 bytes consisting of a
-32-byte big-endian `r` followed by a 32-byte big-endian `s`; DER encoding is
-not accepted. The verifier hashes the exact canonical signed bytes with
-SHA-256 before calling `BCryptVerifySignature`. The backup-manifest signature
-uses this same primitive and encoding with the explicit
-`backup_manifest_signature/v1` domain separation described below.
-
-This is preferred here over a bundled cryptographic library because the
-Windows verifier is supplied by the operating system, avoids a runtime
-OpenSSL/PyPI dependency in the authority path, and can be constrained to the
-approved algorithm and public key. ECDSA signatures are not used as
-deterministic domain identities; only the signed canonical bytes and public-key
-verification matter. The exact CNG signature encoding, hash input, and key
-serialization are part of the release contract and must have golden vectors.
-The trade-off is a Windows-native verifier and a requirement to validate CNG
-behavior on every supported Windows release. A release that cannot perform
-the pinned CNG verification fails closed.
-
-### Verification order
-
-Before any database mutation, process creation, SID access, Credential Manager
-access, provider construction, or transport, the approved release must:
-
-1. open only the fixed bootstrap and signature paths;
-2. verify every path component and final handle path is the exact expected
-   local path, with no reparse point, junction, mount point, or link;
-3. verify owner and DACL semantics;
-4. parse strict canonical bytes and verify the detached signature, key ID,
-   bootstrap digest, field policy, and generation/epoch constraints; and
-5. bind the verified values to the current release, exact database path,
-   exact capture root, and approved account SID.
-
-Failure at any step stops before SQLite is opened for mutation and before any
-process or secret boundary is entered.
-
-## 3. Windows provisioning and ACL contract
-
-### Administrator-only provisioning
-
-Provisioning is an explicit administrator workflow. It creates the fixed
-directory, writes the bootstrap and detached signature, creates the empty
-authority database and persistent rollback journal in advance, applies ACLs,
-verifies final paths, and records the provisioning evidence. It may rotate an
-epoch only as a reviewed operation. Unattended operation is not approved by
-this contract.
-
-The dedicated `Trading` account is a standard non-administrative account. It
-does not own the authority tree, cannot grant itself rights, and cannot access
-the offline signing key or backup directory.
-
-### Owner and DACL semantics
-
-Inheritance is disabled on the authority directory and on each authority
-file. Expected owner and DACL semantics are:
-
-| Object | Owner | Required allows | Required denies / prohibitions |
-| --- | --- | --- | --- |
-| `F:\AITradingBot\Authority\` | `BUILTIN\Administrators` (or `SYSTEM` when the reviewed provisioning policy selects it) | SYSTEM full control; Administrators full control; Trading traverse/list/read only | Trading cannot create, delete, rename, replace, change owner, change DACL, or write trust material. No inherited user or Everyone write ACE. |
-| Bootstrap and signature | Administrators/SYSTEM | Administrators/SYSTEM read/write; Trading read-only if the approved release needs to read them | Trading has no write data, delete, rename, `WRITE_DAC`, or `WRITE_OWNER`. |
-| `authority.sqlite3` | Administrators/SYSTEM | Administrators/SYSTEM full control; Trading read/write data and byte-range locking on this exact file | Trading cannot delete, rename, replace, change owner/DACL, or open a different final path as this file. |
-| `authority.sqlite3-journal` | Administrators/SYSTEM | Administrators/SYSTEM full control; Trading read/write/truncate/lock on the pre-provisioned persistent rollback journal | Trading cannot delete, rename, replace, recreate, change owner/DACL, or create an alternate authoritative journal. |
-| `capture-output\` | Administrators/SYSTEM | Administrators/SYSTEM full control; Trading may create and write capture outputs beneath the reviewed root | Trading cannot replace the root, alter its ACL, or use links/reparse points to escape it. |
-| `backup\` | Administrators/SYSTEM | Administrators/SYSTEM full control only | Trading has no read, write, delete, or list access. |
-
-The exact SQLite access contract is limited to opening the already named main
-database and persistent rollback journal, reading pages, writing or truncating
-those files as SQLite requires, obtaining and releasing SQLite byte-range
-locks, flushing data, and querying file metadata. It does not include directory
-deletion, database replacement, journal deletion or recreation, rename-based
-installation, ACL changes, or access to backups. Provisioning must pre-create
-the main database and persistent journal and validate that the selected
-Python/SQLite build can operate with those exact rights. If journal
-recreation, journal deletion, arbitrary directory creation, or another
-unreviewed right is required, the deployment is a milestone blocker. The ACL
-is not weakened automatically. A separately designed broker service is the
-fallback architecture decision if a direct client cannot satisfy this ACL
-contract.
-
-The capture-output root may be writable only for bounded files created by the
-approved release. Output filenames and final paths are validated against the
-signed root and reparse-free final handles. Output bytes are evidence, never
-authority.
-
-### Fail-closed verification
-
-At provisioning and every authority start, the release verifies for the
-directory, bootstrap, signature, database, persistent journal, capture root,
-and any selected output path:
-
-- expected owner SID and exact DACL semantics;
-- no reparse-point attribute on every component and final handle;
-- `GetFinalPathNameByHandleW` equality with the pinned, normalized path;
-- expected local volume and path prefix, without a UNC or alternate path; and
-- no unauthorized hard-link or replacement condition detectable through the
-  approved Windows handle checks.
-
-An owner, ACE, reparse, final-path, volume, or access-right mismatch is a
-typed fail-closed result. It does not fall back to a caller path or a copied
-root.
-
-## 4. SQLite authority model
-
-### Common storage rules
-
-All deterministic transactional IDs are lowercase UUID text produced with the
-repository-owned UUID5 contract below. `machine_authority_id` and
-`authority_epoch_id` are signed administrator-provisioned authority facts;
-they may be UUID-formatted, but runtime implementations do not independently
-derive them as UUID5 values. All digests are 32-byte SHA-256 values stored as
-BLOBs, with canonical lowercase hex used only in human-readable diagnostics.
-All policy, schema, provider, epoch, and operation fields are explicit
-columns. UTC timestamps are facts, not identity inputs.
-
-Canonical JSON evidence is stored as exact UTF-8 BLOBs in `*_json` columns;
-the corresponding `*_digest` is stored beside it. Normalized columns hold
-keys, foreign keys, state, ordinal, provider operation, policy versions,
-epoch, disposition, and other fields required for constraints or indexed
-state decisions. The normalized values must reconcile with the canonical JSON
-before insertion. Raw provider bodies, credentials, environment dumps,
-stdout, stderr, and arbitrary exception text are not stored.
-
-Every table below includes `authority_epoch_id` and a foreign key to
-`authority_metadata(authority_epoch_id)`, unless it is the metadata table
-itself. Foreign keys are enabled for every connection.
-
-### Tables and constraints
-
-`authority_metadata` is a singleton deployment row:
+The application transaction is:
 
 ```text
-authority_metadata(
-  authority_epoch_id TEXT PRIMARY KEY,
-  machine_authority_id TEXT NOT NULL UNIQUE,
-  bootstrap_schema INTEGER NOT NULL,
-  bootstrap_generation INTEGER NOT NULL,
-  signing_key_id TEXT NOT NULL,
-  approved_account_sid TEXT NOT NULL,
-  provider_id TEXT NOT NULL,
-  permitted_provider_operation TEXT NOT NULL,
-  authority_policy_version TEXT NOT NULL,
-  claim_policy_version TEXT NOT NULL,
-  created_at_utc TEXT NOT NULL,
-  bootstrap_digest BLOB NOT NULL CHECK(length(bootstrap_digest)=32),
-  database_identity_digest BLOB NOT NULL CHECK(length(database_identity_digest)=32),
-  metadata_json BLOB NOT NULL,
-  metadata_digest BLOB NOT NULL CHECK(length(metadata_digest)=32),
-  CHECK(bootstrap_generation > 0)
-)
+BEGIN IMMEDIATE
+read sessions.next_attempt_ordinal
+construct attempt_id from session_id and the read ordinal
+INSERT exactly one attempts row
+-- no independent counter UPDATE
+COMMIT
 ```
 
-It must contain exactly one row for the active epoch. Its values must match
-the verified bootstrap before any transaction.
+The immediate `BEFORE INSERT` trigger verifies the session is `OPEN`, the
+inserted ordinal equals the counter, the row starts in `ALLOCATED`, and the
+provider budget is one. The immediate `AFTER INSERT` trigger performs the sole
+`next_attempt_ordinal = next_attempt_ordinal + 1` update. The counter guard
+accepts only `OLD + 1`, only when an immutable attempt row exists at the old
+counter, and only when the new counter equals the committed attempt count.
 
-`database_identity_digest` is checked against the database-local metadata and
-the currently verified bootstrap as a consistency binding. It is not an
-external rollback anchor: because it is retained in the database, it cannot
-prove freshness if the database and persistent journal are replaced together.
+Consequently a standalone update, no-op, regression, skipped ordinal, second
+increment, attempt identity mutation, or deletion aborts. SQLite row triggers
+run inside the inserting statement, so an abort rolls back both the attempt
+row and the trigger-owned increment. Separate sessions independently begin at
+ordinal zero.
 
-`schema_migrations` is an append-only record of the exact database schema:
+### 4.2 Recovery allocation
+
+Recovery uses the same single-insert primitive:
 
 ```text
-schema_migrations(
-  migration_id TEXT PRIMARY KEY,
-  authority_epoch_id TEXT NOT NULL REFERENCES authority_metadata,
-  schema_version INTEGER NOT NULL,
-  migration_policy_version TEXT NOT NULL,
-  migration_digest BLOB NOT NULL CHECK(length(migration_digest)=32),
-  application_release_digest BLOB NOT NULL CHECK(length(application_release_digest)=32),
-  applied_at_utc TEXT NOT NULL,
-  migration_json BLOB NOT NULL,
-  UNIQUE(authority_epoch_id, schema_version)
-)
+BEGIN IMMEDIATE
+read sessions.next_recovery_ordinal
+validate target and authorized transition
+perform any allowed target-state update in this transaction
+INSERT exactly one manual_recoveries row
+-- no independent counter UPDATE
+COMMIT
 ```
 
-`migration_id` is deterministic UUID5 material defined below. On insertion,
-the runtime recomputes it from the exact epoch, schema version, and migration
-policy version. `migration_digest` and `application_release_digest` are
-independently verified bindings to the reviewed migration and approved
-release; neither digest is substituted for an identity input. An existing
-`migration_id` with different epoch, schema, policy, migration digest, or
-release digest is conflicting authority and fails closed. The runtime accepts
-only the reviewed schema version. It does not run an unreviewed migration or
-silently change this table.
+The `BEFORE INSERT` trigger validates open-session eligibility, the current
+ordinal, supported target kind, same-session target lineage, and a non-empty
+state change. The `AFTER INSERT` trigger performs the sole exact counter
+increment. Its guard uses the immutable recovery row at the old counter and
+the committed per-session row count to reject direct updates, no-ops,
+regressions, skips, second increments, and unpaired writes. Recovery rows
+cannot be updated or deleted.
 
-`sessions` owns the session state, allocation ordinal counter, and separately
-owned manual-recovery ordinal counter:
+The trigger cannot and does not attempt to express the complete deferred
+workflow. The reviewed transaction service, not an impossible deferred
+SQLite trigger, enforces the action-specific policy and complete atomic
+multi-statement state transition.
+
+## 5. Deterministic identities
+
+The repository-owned namespace is:
 
 ```text
-sessions(
-  session_id TEXT PRIMARY KEY,
-  authority_epoch_id TEXT NOT NULL REFERENCES authority_metadata,
-  session_schema INTEGER NOT NULL,
-  authority_policy_version TEXT NOT NULL,
-  target_session_date TEXT NOT NULL,
-  state TEXT NOT NULL CHECK(state IN ('OPEN','SUCCESS_SELECTED','CLOSED')),
-  next_ordinal INTEGER NOT NULL CHECK(next_ordinal >= 0),
-  next_recovery_ordinal INTEGER NOT NULL CHECK(next_recovery_ordinal >= 0),
-  session_request_json BLOB NOT NULL,
-  session_request_digest BLOB NOT NULL CHECK(length(session_request_digest)=32),
-  created_at_utc TEXT NOT NULL,
-  closed_at_utc TEXT,
-  close_reason TEXT,
-  UNIQUE(authority_epoch_id, session_id)
-)
+7c2d5a44-3b2e-5f8f-9a1c-6d4e7b8f9012
 ```
 
-`allocations` consumes one ordinal and is immutable after insertion except for
-the controlled forward state field:
+For a Unicode string `s`, the exact length frame is:
 
 ```text
-allocations(
-  allocation_id TEXT PRIMARY KEY,
-  authority_epoch_id TEXT NOT NULL REFERENCES authority_metadata,
-  session_id TEXT NOT NULL REFERENCES sessions,
-  attempt_id TEXT NOT NULL,
-  ordinal INTEGER NOT NULL CHECK(ordinal >= 0),
-  state TEXT NOT NULL CHECK(state IN ('ALLOCATED_NOT_LAUNCHED','CLAIM_COMMITTED',
-    'LAUNCH_RESERVED','LAUNCH_MAY_HAVE_OCCURRED','TERMINAL_RECORDED',
-    'SUCCESS_SELECTED','CLOSED')),
-  allocation_schema INTEGER NOT NULL,
-  claim_policy_version TEXT NOT NULL,
-  provider_call_budget INTEGER NOT NULL CHECK(provider_call_budget=1),
-  provider_id TEXT NOT NULL,
-  permitted_provider_operation TEXT NOT NULL,
-  ordered_universe_digest BLOB NOT NULL CHECK(length(ordered_universe_digest)=32),
-  request_json BLOB NOT NULL,
-  request_digest BLOB NOT NULL CHECK(length(request_digest)=32),
-  allocation_json BLOB NOT NULL,
-  allocation_digest BLOB NOT NULL CHECK(length(allocation_digest)=32),
-  allocated_at_utc TEXT NOT NULL,
-  UNIQUE(authority_epoch_id, session_id, ordinal),
-  UNIQUE(authority_epoch_id, session_id, attempt_id),
-  UNIQUE(authority_epoch_id, session_id, allocation_id, attempt_id),
-  FOREIGN KEY(authority_epoch_id, session_id) REFERENCES sessions(authority_epoch_id, session_id)
-)
+LF(s) = ASCII(decimal UTF-8 byte length) + ":" + s
 ```
 
-`provider_call_claims` is the permanent exactly-once fence:
+The UUID5 name is the UTF-8 concatenation of `LF(material_label)` followed by
+one length frame per tuple field. Integers are canonical base-10 ASCII;
+UUIDs are lowercase canonical text; dates are `YYYY-MM-DD`; and an optional
+value is an explicit empty frame. An ordered list is one framed field whose
+contents are `LF(item_count)` followed by each item frame in caller-defined
+order. No identity uses a clock, UUID4, Python hash, object identity, locale,
+filesystem path, secret, row order, or serialized artifact bytes.
+
+The root `session_id/v2` tuple is:
 
 ```text
-provider_call_claims(
-  claim_id TEXT PRIMARY KEY,
-  authority_epoch_id TEXT NOT NULL REFERENCES authority_metadata,
-  allocation_id TEXT NOT NULL UNIQUE REFERENCES allocations,
-  session_id TEXT NOT NULL REFERENCES sessions,
-  attempt_id TEXT NOT NULL,
-  claim_schema INTEGER NOT NULL,
-  claim_policy_version TEXT NOT NULL,
-  provider_id TEXT NOT NULL,
-  permitted_provider_operation TEXT NOT NULL,
-  provider_call_budget INTEGER NOT NULL CHECK(provider_call_budget=1),
-  request_json BLOB NOT NULL,
-  request_digest BLOB NOT NULL CHECK(length(request_digest)=32),
-  claim_digest BLOB NOT NULL CHECK(length(claim_digest)=32),
-  committed_at_utc TEXT NOT NULL,
-  state TEXT NOT NULL CHECK(state='COMMITTED'),
-  UNIQUE(authority_epoch_id, attempt_id),
-  UNIQUE(authority_epoch_id, claim_id)
-)
+machine_authority_id,
+authority_epoch_id,
+session_schema,
+authority_policy_version,
+claim_policy_version,
+capture_request/v2,
+target_session_date,
+provider_id,
+permitted_provider_operation,
+UL(ordered_universe),
+bar_interval,
+request_window_start_date,
+request_window_end_date,
+request_limit,
+child_operation_version,
+output_policy_version
 ```
 
-`launch_reservations` is the permanent transactional boundary between a
-committed claim and process creation. Its reservation identity and binding
-facts are immutable; only the explicitly controlled outcome state and
-process-creation-failure evidence may move forward.
+Every derived identity uses its immediate parent plus the minimum semantic
+facts needed to distinguish that row:
 
-```text
-launch_reservations(
-  launch_reservation_id TEXT PRIMARY KEY,
-  authority_epoch_id TEXT NOT NULL REFERENCES authority_metadata,
-  session_id TEXT NOT NULL,
-  allocation_id TEXT NOT NULL,
-  attempt_id TEXT NOT NULL,
-  claim_id TEXT NOT NULL UNIQUE REFERENCES provider_call_claims,
-  launch_reservation_schema INTEGER NOT NULL,
-  application_release_version TEXT NOT NULL,
-  authority_policy_version TEXT NOT NULL,
-  claim_policy_version TEXT NOT NULL,
-  request_digest BLOB NOT NULL CHECK(length(request_digest)=32),
-  reservation_json BLOB NOT NULL,
-  reservation_digest BLOB NOT NULL CHECK(length(reservation_digest)=32),
-  reservation_state TEXT NOT NULL CHECK(reservation_state IN
-    ('COMMITTED','PROCESS_CREATED','PROCESS_CREATION_FAILED','MANUAL_REVIEW')),
-  process_creation_failure_json BLOB,
-  process_creation_failure_digest BLOB CHECK(
-    process_creation_failure_digest IS NULL OR
-    length(process_creation_failure_digest)=32),
-  committed_at_utc TEXT NOT NULL,
-  outcome_recorded_at_utc TEXT,
-  UNIQUE(authority_epoch_id, session_id, allocation_id, attempt_id),
-  UNIQUE(authority_epoch_id, launch_reservation_id),
-  FOREIGN KEY(
-    authority_epoch_id, session_id, allocation_id, attempt_id
-  ) REFERENCES allocations(
-    authority_epoch_id, session_id, allocation_id, attempt_id
-  )
-)
-```
-
-The permanent `UNIQUE(claim_id)` constraint is the launch fence. A reservation
-is inserted only for the exact committed claim, epoch, session, allocation,
-attempt, request digest, application release, and policy versions. A
-reservation winner is the only process permitted to call
-`CreateProcessW(CREATE_SUSPENDED)`.
-
-No separate session foreign key is retained on `launch_reservations`: the
-exact composite allocation binding intentionally validates the epoch, session,
-allocation, and attempt as one relationship, avoiding independent constraints
-that could permit a mismatched combination.
-
-Triggers make the reservation identity and binding columns immutable, prohibit
-deletion, and allow only forward outcome transitions. The
-`PROCESS_CREATION_FAILED` state requires one sanitized failure JSON/digest;
-`PROCESS_CREATED` requires the reservation-bound `launch_executions` row; and
-`MANUAL_REVIEW` is absorbing until an administrator records the permitted
-recovery fact. No outcome transition creates a second reservation or launch
-attempt.
-
-`launch_executions` contains the one process execution actually created by a
-committed reservation. The phase columns are write-once facts; transitions can
-only move forward:
-
-```text
-launch_executions(
-  launch_execution_id TEXT PRIMARY KEY,
-  authority_epoch_id TEXT NOT NULL REFERENCES authority_metadata,
-  launch_reservation_id TEXT NOT NULL UNIQUE REFERENCES launch_reservations,
-  claim_id TEXT NOT NULL UNIQUE REFERENCES provider_call_claims,
-  allocation_id TEXT NOT NULL REFERENCES allocations,
-  attempt_id TEXT NOT NULL,
-  launch_schema INTEGER NOT NULL,
-  phase TEXT NOT NULL CHECK(phase IN ('PRE_RESUME_READY','RESUME_RECORDED',
-    'POST_RESUME_AMBIGUOUS','TERMINAL_RECORDED','CLOSED')),
-  process_creation_json BLOB NOT NULL,
-  process_creation_digest BLOB NOT NULL CHECK(length(process_creation_digest)=32),
-  resume_authorization_json BLOB NOT NULL,
-  resume_authorization_digest BLOB NOT NULL CHECK(length(resume_authorization_digest)=32),
-  post_resume_json BLOB,
-  post_resume_digest BLOB CHECK(post_resume_digest IS NULL OR length(post_resume_digest)=32),
-  normalized_pid INTEGER,
-  normalized_job_assignment TEXT,
-  normalized_resume_result TEXT,
-  normalized_exit_code INTEGER,
-  cleanup_json BLOB,
-  cleanup_digest BLOB CHECK(cleanup_digest IS NULL OR length(cleanup_digest)=32),
-  created_at_utc TEXT NOT NULL,
-  UNIQUE(authority_epoch_id, attempt_id),
-  FOREIGN KEY(authority_epoch_id, claim_id) REFERENCES
-    provider_call_claims(authority_epoch_id, claim_id),
-  FOREIGN KEY(authority_epoch_id, launch_reservation_id) REFERENCES
-    launch_reservations(authority_epoch_id, launch_reservation_id)
-)
-```
-
-`terminals` is an immutable final fact for the claim:
-
-```text
-terminals(
-  terminal_id TEXT PRIMARY KEY,
-  authority_epoch_id TEXT NOT NULL REFERENCES authority_metadata,
-  claim_id TEXT NOT NULL UNIQUE REFERENCES provider_call_claims,
-  allocation_id TEXT NOT NULL REFERENCES allocations,
-  launch_reservation_id TEXT NOT NULL REFERENCES launch_reservations,
-  launch_execution_id TEXT REFERENCES launch_executions,
-  attempt_id TEXT NOT NULL,
-  terminal_schema INTEGER NOT NULL,
-  terminal_state TEXT NOT NULL CHECK(terminal_state IN ('SUCCEEDED','FAILED',
-    'AMBIGUOUS','CLOSED')),
-  provider_call_disposition TEXT NOT NULL CHECK(provider_call_disposition IN
-    ('NOT_STARTED','CONFIRMED','MAY_HAVE_OCCURRED')),
-  terminal_policy_version TEXT NOT NULL,
-  request_digest BLOB NOT NULL CHECK(length(request_digest)=32),
-  evidence_json BLOB NOT NULL,
-  evidence_digest BLOB NOT NULL CHECK(length(evidence_digest)=32),
-  snapshot_digest BLOB CHECK(snapshot_digest IS NULL OR length(snapshot_digest)=32),
-  sanitized_diagnostics_json BLOB NOT NULL,
-  recorded_at_utc TEXT NOT NULL,
-  FOREIGN KEY(authority_epoch_id, launch_reservation_id) REFERENCES
-    launch_reservations(authority_epoch_id, launch_reservation_id)
-)
-```
-
-`SUCCEEDED` requires a confirmed response, independently verified snapshot,
-and passing cleanup. `AMBIGUOUS` requires `MAY_HAVE_OCCURRED`; a resumed
-timeout, crash, missing result, or unconfirmed termination cannot be marked
-`NOT_STARTED`. `FAILED` cannot contain an accepted snapshot.
-
-`selections` records the one success selected for a session:
-
-```text
-selections(
-  selection_id TEXT PRIMARY KEY,
-  authority_epoch_id TEXT NOT NULL REFERENCES authority_metadata,
-  session_id TEXT NOT NULL REFERENCES sessions,
-  terminal_id TEXT NOT NULL UNIQUE REFERENCES terminals,
-  allocation_id TEXT NOT NULL REFERENCES allocations,
-  attempt_id TEXT NOT NULL,
-  selection_schema INTEGER NOT NULL,
-  selection_policy_version TEXT NOT NULL,
-  snapshot_digest BLOB NOT NULL CHECK(length(snapshot_digest)=32),
-  selection_json BLOB NOT NULL,
-  selection_digest BLOB NOT NULL CHECK(length(selection_digest)=32),
-  selected_at_utc TEXT NOT NULL,
-  UNIQUE(authority_epoch_id, session_id)
-)
-```
-
-`manual_recoveries` is an immutable operator fact and authorization, never a
-claim repair:
-
-```text
-manual_recoveries(
-  recovery_id TEXT PRIMARY KEY,
-  authority_epoch_id TEXT NOT NULL REFERENCES authority_metadata,
-  session_id TEXT NOT NULL REFERENCES sessions,
-  target_allocation_id TEXT REFERENCES allocations,
-  target_claim_id TEXT REFERENCES provider_call_claims,
-  target_launch_reservation_id TEXT REFERENCES launch_reservations,
-  target_terminal_id TEXT REFERENCES terminals,
-  recovery_schema INTEGER NOT NULL,
-  recovery_policy_version TEXT NOT NULL,
-  action TEXT NOT NULL CHECK(action IN ('RECORD_AMBIGUITY',
-    'CLASSIFY_LAUNCH_RESERVATION','SELECT_COMMITTED_SUCCESS','CLOSE_SESSION',
-    'ACKNOWLEDGE_RESTORE')),
-  predecessor_state TEXT NOT NULL,
-  resulting_state TEXT NOT NULL,
-  recovery_ordinal INTEGER NOT NULL CHECK(recovery_ordinal >= 0),
-  operator_evidence_json BLOB NOT NULL,
-  operator_evidence_digest BLOB NOT NULL CHECK(length(operator_evidence_digest)=32),
-  created_at_utc TEXT NOT NULL,
-  UNIQUE(authority_epoch_id, session_id, recovery_ordinal),
-  UNIQUE(authority_epoch_id, recovery_id)
-)
-```
-
-The recovery ordinal is allocated by the following executable SQLite trigger
-contract. The application issues exactly one single-row `INSERT` into
-`manual_recoveries`; it never issues an independent update of
-`sessions.next_recovery_ordinal`. SQLite triggers are immediate row triggers,
-so an `ABORT` from either trigger rolls back the insertion statement, including
-the row and the counter update made by that statement.
-
-```sql
-CREATE TRIGGER manual_recoveries_before_insert
-BEFORE INSERT ON manual_recoveries
-FOR EACH ROW
-BEGIN
-  SELECT CASE WHEN NOT EXISTS (
-    SELECT 1
-    FROM sessions
-    WHERE authority_epoch_id = NEW.authority_epoch_id
-      AND session_id = NEW.session_id
-      AND state = 'OPEN'
-  ) THEN RAISE(ABORT, 'recovery session is not eligible') END;
-
-  SELECT CASE WHEN NEW.recovery_ordinal <> (
-    SELECT next_recovery_ordinal
-    FROM sessions
-    WHERE authority_epoch_id = NEW.authority_epoch_id
-      AND session_id = NEW.session_id
-  ) THEN RAISE(ABORT, 'recovery ordinal is not the session counter') END;
-
-  SELECT CASE WHEN NEW.target_allocation_id IS NOT NULL AND NOT EXISTS (
-    SELECT 1
-    FROM allocations
-    WHERE authority_epoch_id = NEW.authority_epoch_id
-      AND session_id = NEW.session_id
-      AND allocation_id = NEW.target_allocation_id
-  ) THEN RAISE(ABORT, 'recovery allocation binding is invalid') END;
-
-  SELECT CASE WHEN NEW.target_claim_id IS NOT NULL AND NOT EXISTS (
-    SELECT 1
-    FROM provider_call_claims
-    WHERE authority_epoch_id = NEW.authority_epoch_id
-      AND session_id = NEW.session_id
-      AND claim_id = NEW.target_claim_id
-  ) THEN RAISE(ABORT, 'recovery claim binding is invalid') END;
-
-  SELECT CASE WHEN NEW.target_launch_reservation_id IS NOT NULL AND NOT EXISTS (
-    SELECT 1
-    FROM launch_reservations
-    WHERE authority_epoch_id = NEW.authority_epoch_id
-      AND session_id = NEW.session_id
-      AND launch_reservation_id = NEW.target_launch_reservation_id
-  ) THEN RAISE(ABORT, 'recovery reservation binding is invalid') END;
-
-  SELECT CASE WHEN NEW.target_terminal_id IS NOT NULL AND NOT EXISTS (
-    SELECT 1
-    FROM terminals t
-    JOIN provider_call_claims c
-      ON c.authority_epoch_id = t.authority_epoch_id
-     AND c.claim_id = t.claim_id
-    WHERE t.authority_epoch_id = NEW.authority_epoch_id
-      AND t.terminal_id = NEW.target_terminal_id
-      AND c.session_id = NEW.session_id
-  ) THEN RAISE(ABORT, 'recovery terminal binding is invalid') END;
-
-  SELECT CASE WHEN NEW.predecessor_state = NEW.resulting_state
-    THEN RAISE(ABORT, 'recovery state transition is empty') END;
-END;
-
-CREATE TRIGGER manual_recoveries_after_insert
-AFTER INSERT ON manual_recoveries
-FOR EACH ROW
-BEGIN
-  UPDATE sessions
-  SET next_recovery_ordinal = next_recovery_ordinal + 1
-  WHERE authority_epoch_id = NEW.authority_epoch_id
-    AND session_id = NEW.session_id
-    AND next_recovery_ordinal = NEW.recovery_ordinal;
-
-  SELECT CASE WHEN NOT EXISTS (
-    SELECT 1
-    FROM sessions
-    WHERE authority_epoch_id = NEW.authority_epoch_id
-      AND session_id = NEW.session_id
-      AND next_recovery_ordinal = NEW.recovery_ordinal + 1
-  ) THEN RAISE(ABORT, 'recovery counter was not incremented exactly once') END;
-END;
-
-CREATE TRIGGER sessions_recovery_counter_guard
-BEFORE UPDATE OF next_recovery_ordinal ON sessions
-FOR EACH ROW
-BEGIN
-  SELECT CASE WHEN NEW.next_recovery_ordinal = OLD.next_recovery_ordinal
-    THEN RAISE(ABORT, 'standalone recovery counter update') END;
-
-  SELECT CASE WHEN NEW.next_recovery_ordinal <> OLD.next_recovery_ordinal + 1
-    THEN RAISE(ABORT, 'recovery counter must advance by one') END;
-
-  SELECT CASE WHEN NOT EXISTS (
-    SELECT 1
-    FROM manual_recoveries
-    WHERE authority_epoch_id = OLD.authority_epoch_id
-      AND session_id = OLD.session_id
-      AND recovery_ordinal = OLD.next_recovery_ordinal
-  ) THEN RAISE(ABORT, 'counter update has no paired recovery row') END;
-
-  SELECT CASE WHEN NEW.next_recovery_ordinal <> (
-    SELECT COUNT(*)
-    FROM manual_recoveries
-    WHERE authority_epoch_id = OLD.authority_epoch_id
-      AND session_id = OLD.session_id
-  ) THEN RAISE(ABORT, 'counter does not equal committed recovery count') END;
-END;
-
-CREATE TRIGGER manual_recoveries_no_update
-BEFORE UPDATE ON manual_recoveries
-FOR EACH ROW
-BEGIN
-  SELECT RAISE(ABORT, 'manual recovery rows are immutable');
-END;
-
-CREATE TRIGGER manual_recoveries_no_delete
-BEFORE DELETE ON manual_recoveries
-FOR EACH ROW
-BEGIN
-  SELECT RAISE(ABORT, 'manual recovery rows cannot be deleted');
-END;
-```
-
-The guard is deliberately a proof over committed rows, not an impossible
-per-statement flag. Before the `AFTER INSERT` update, the new immutable row
-exists at `OLD.next_recovery_ordinal`; after the update, the counter is exactly
-one greater and equals the session's recovery-row count. A direct update has
-no newly inserted row at the old counter and fails; a regression, skip, no-op,
-or second increment fails. The before-insert ordinal check and no-update/no-
-delete triggers prevent a caller from manufacturing the guard's proof. The
-application's transaction verifier performs the action-specific policy,
-target digest, operator-evidence, and requested-transition checks before the
-single insert; the trigger performs the structural identity and eligibility
-checks that SQLite can evaluate immediately.
-
-Foreign-key and trigger rules reject cross-epoch references, mismatched
-session/allocation/claim/reservation/terminal identities, duplicate
-allocations or launch reservations, updates to canonical facts, deletes,
-state regressions, and transitions out of `SUCCESS_SELECTED` or `CLOSED`.
-`provider_call_claims` and `launch_reservations` have no expiry, reclamation,
-automatic deletion, or repair path. Every immutable table is append-only;
-controlled state/counter updates are trigger-enforced and only write fields
-that were explicitly left mutable. An integrity check treats any trigger
-violation, orphan, duplicate, digest mismatch, or impossible state as
-authority corruption.
-
-### Foreign-key parent-key audit
-
-Every foreign key in the proposed schema is required to reference a parent
-`PRIMARY KEY` or a same-order `UNIQUE` constraint. The reviewed bindings are:
-
-| Child reference | Parent key | Parent constraint |
-| --- | --- | --- |
-| Any `authority_epoch_id` reference in `schema_migrations`, `sessions`, `allocations`, `provider_call_claims`, `launch_reservations`, `launch_executions`, `terminals`, `selections`, and `manual_recoveries` | `authority_metadata(authority_epoch_id)` | Primary key |
-| `allocations(authority_epoch_id, session_id)` | `sessions(authority_epoch_id, session_id)` | `UNIQUE(authority_epoch_id, session_id)` |
-| `provider_call_claims(allocation_id)` | `allocations(allocation_id)` | Primary key |
-| `provider_call_claims(session_id)` and `selections(session_id)` / `manual_recoveries(session_id)` | `sessions(session_id)` | Primary key |
-| `launch_reservations(claim_id)` and `launch_executions(claim_id)` / `terminals(claim_id)` / `manual_recoveries(target_claim_id)` | `provider_call_claims(claim_id)` | Primary key |
-| `launch_reservations(authority_epoch_id, session_id, allocation_id, attempt_id)` | `allocations(authority_epoch_id, session_id, allocation_id, attempt_id)` | `UNIQUE(authority_epoch_id, session_id, allocation_id, attempt_id)` |
-| `launch_executions(launch_reservation_id)` / `terminals(launch_reservation_id)` / `manual_recoveries(target_launch_reservation_id)` | `launch_reservations(launch_reservation_id)` | Primary key |
-| `launch_executions(authority_epoch_id, claim_id)` | `provider_call_claims(authority_epoch_id, claim_id)` | `UNIQUE(authority_epoch_id, claim_id)` |
-| `launch_executions(authority_epoch_id, launch_reservation_id)` / `terminals(authority_epoch_id, launch_reservation_id)` | `launch_reservations(authority_epoch_id, launch_reservation_id)` | `UNIQUE(authority_epoch_id, launch_reservation_id)` |
-| `launch_executions(allocation_id)` / `terminals(allocation_id)` / `selections(allocation_id)` / `manual_recoveries(target_allocation_id)` | `allocations(allocation_id)` | Primary key |
-| `terminals(launch_execution_id)` | `launch_executions(launch_execution_id)` | Primary key |
-| `selections(terminal_id)` / `manual_recoveries(target_terminal_id)` | `terminals(terminal_id)` | Primary key |
-
-The launch reservation intentionally has no independent `session_id` or
-`allocation_id` foreign key: its one four-column allocation binding is the
-authoritative relationship and its parent key exists in the same column order.
-The validation plan must execute this DDL with foreign keys enabled before any
-runtime implementation is accepted.
-
-### Deterministic identities
-
-The repository owns one fixed UUID5 namespace for all deterministic
-transactional identities:
-
-```text
-TRANSACTIONAL_IDENTITY_NAMESPACE_UUID =
-  7c2d5a44-3b2e-5f8f-9a1c-6d4e7b8f9012
-```
-
-This constant is part of the release contract and never changes. Each identity
-domain has its own material-version label, so a tuple change requires a new
-label or a new repository-owned namespace. For a Unicode string `s`, define
-the exact length frame as:
-
-```text
-LF(s) = ASCII(decimal number of UTF-8 bytes in s) + ":" + s
-```
-
-The UUID5 name is the UTF-8 encoding of the concatenation
-`LF(material_label) || LF(field_1) || ... || LF(field_n)`. Integers use
-canonical base-10 ASCII with no leading zeroes except `0`; UUIDs use lowercase
-canonical text; dates use `YYYY-MM-DD`; booleans use `true` or `false`; an
-optional value is represented by an explicit empty frame and is never omitted.
-For an ordered list, define `UL(items) = LF(decimal item count) || LF(item_1)
-|| ... || LF(item_n)` in caller-defined order; `UL(items)` is one field in the
-outer tuple and is not replaced by a set or digest. The UUID5 result is
-lowercased for storage.
-This is a text/UTF-8 contract, not a language serializer contract.
-
-The root session identity is exactly:
-
-```text
-session_id = UUID5(
-  TRANSACTIONAL_IDENTITY_NAMESPACE_UUID,
-  LF("session_id/v1") ||
-  LF(machine_authority_id) ||
-  LF(authority_epoch_id) ||
-  LF(session_schema) ||
-  LF(authority_policy_version) ||
-  LF(claim_policy_version) ||
-  LF("capture_request/v1") ||
-  LF(target_session_date) ||
-  LF(provider_id) ||
-  LF(permitted_provider_operation) ||
-  UL(ordered_universe) ||
-  LF(bar_interval) ||
-  LF(request_window_start_date) ||
-  LF(request_window_end_date) ||
-  LF(request_limit) ||
-  LF(child_operation_version) ||
-  LF(output_policy_version)
-)
-```
-
-The fields are semantic request fields, not canonical JSON bytes, filesystem
-paths, output names, or digests of serialized artifacts. The listed fields are
-the complete `capture_request/v1` contract; a new semantic field requires a
-new request/material version. Consequently, identical semantic session
-requests under one authority epoch produce the same `session_id`, while a
-different machine authority, epoch, policy, target date, provider, operation,
-ordered universe, request limit, child operation, output policy, or other
-versioned request meaning produces a different UUID5 input.
-
-Every derived identity has a separate material label and exact tuple:
-
-| Identity | Exact UUID5 tuple after the material label |
+| Identity/material label | Exact tuple after the label |
 | --- | --- |
-| `migration_id` | `authority_epoch_id, schema_version, migration_policy_version` |
-| `attempt_id` | `authority_epoch_id, session_id, ordinal, provider_id, permitted_provider_operation, claim_policy_version, capture_request/v1` |
-| `allocation_id` | `authority_epoch_id, session_id, attempt_id, ordinal, allocation_schema, claim_policy_version, provider_id, permitted_provider_operation` |
-| `claim_id` | `authority_epoch_id, allocation_id, attempt_id, claim_schema, claim_policy_version, provider_id, permitted_provider_operation, provider_call_budget` |
-| `launch_reservation_id` | `authority_epoch_id, session_id, allocation_id, attempt_id, claim_id, launch_reservation_schema, application_release_version, authority_policy_version, claim_policy_version` |
-| `launch_execution_id` | `authority_epoch_id, launch_reservation_id, claim_id, attempt_id, launch_schema, application_release_version, authority_policy_version` |
-| `terminal_id` | `authority_epoch_id, claim_id, launch_reservation_id, launch_execution_id-or-empty, attempt_id, terminal_schema, terminal_policy_version` |
-| `selection_id` | `authority_epoch_id, session_id, terminal_id, allocation_id, attempt_id, selection_schema, selection_policy_version` |
-| `recovery_id` | `authority_epoch_id, session_id, target_allocation_id-or-empty, target_claim_id-or-empty, target_launch_reservation_id-or-empty, target_terminal_id-or-empty, action, predecessor_state, resulting_state, recovery_schema, recovery_policy_version, recovery_ordinal` |
+| `migration_id/v1` | `authority_epoch_id, schema_version, migration_policy_version` |
+| `attempt_id/v2` | `session_id, ordinal, provider_id, permitted_provider_operation, attempt_schema, attempt_policy_version` |
+| `claim_id/v2` | `attempt_id, claim_schema, claim_policy_version, provider_id, permitted_provider_operation, provider_call_budget` |
+| `launch_reservation_id/v2` | `claim_id, launch_reservation_schema, application_release_version, authority_policy_version, claim_policy_version` |
+| `launch_execution_id/v2` | `launch_reservation_id, launch_schema, application_release_version, authority_policy_version` |
+| `terminal_id/v2` | `launch_reservation_id, terminal_schema, terminal_policy_version` |
+| `selection_id/v2` | `session_id, terminal_id, selection_schema, selection_policy_version` |
+| `recovery_id/v2` | `session_id, target_kind, target_id, action, predecessor_state, resulting_state, recovery_schema, recovery_policy_version, recovery_ordinal` |
 
-The material labels are respectively
-`migration_id/v1`, `attempt_id/v1`, `allocation_id/v1`, `claim_id/v1`,
-`launch_reservation_id/v1`, `launch_execution_id/v1`, `terminal_id/v1`,
-`selection_id/v1`, and `recovery_id/v1`. `recovery_ordinal` is an explicit
-per-session ordinal allocated from `sessions.next_recovery_ordinal`, not
-database row order. Request digests are stored and verified bindings, but are
-not substitutes for the
-semantic identity tuple and are not identity inputs when they represent
-serialized artifact bytes. No identity uses clocks, UUID4, Python hashes,
-object identity, locale, filesystem paths, secrets, serialized artifact
-bytes, or database row order. Distinct tuples have distinct UUID5 inputs;
-the usual cryptographic collision assumption applies to the UUID5 result.
+The test harness hard-codes these affected golden vectors for the fixed
+semantic example:
 
-The exact migration identity is:
-
-```text
-migration_id = UUID5(
-  TRANSACTIONAL_IDENTITY_NAMESPACE_UUID,
-  LF("migration_id/v1") ||
-  LF(authority_epoch_id) ||
-  LF(schema_version) ||
-  LF(migration_policy_version)
-)
-```
-
-All persistent identity columns have one of these classifications:
-
-| Columns | Classification |
+| Identity | Expected lowercase UUID5 |
 | --- | --- |
-| `session_id`, `attempt_id`, `allocation_id`, `claim_id`, `launch_reservation_id`, `launch_execution_id`, `terminal_id`, `selection_id`, `recovery_id`, `migration_id` | Deterministic UUID5 identities with the exact material above. |
-| `machine_authority_id`, `authority_epoch_id`, `signing_key_id` | Administrator-provisioned authority/key facts bound by the signed bootstrap or approved key inventory; they are not runtime-derived UUID5 values. |
-| `session_id`, `allocation_id`, `attempt_id`, `claim_id`, `launch_reservation_id`, `terminal_id`, and other `target_*_id` copies in child rows | Immutable foreign-key references to the parent identity; they do not introduce a second identity tuple. Composite bindings and trigger checks require the reference to belong to the same epoch and session. |
+| `session_id` | `e5179727-d0f1-5eac-8c01-2e2105a1a9c1` |
+| `attempt_id` | `be483fa1-abe3-5721-90bc-84868cf3dd19` |
+| `claim_id` | `6ec45116-d8a8-50ea-8d94-7ac47329c7e9` |
+| `launch_reservation_id` | `222adedb-e4e7-5bbc-acc2-e7022a1785ac` |
+| `launch_execution_id` | `4ce95417-de13-569f-923b-e17d2d9854c6` |
+| `terminal_id` | `5fda0305-878a-550f-b724-a7ce775e6a30` |
+| `selection_id` | `77b12359-7413-536c-a03c-d6604588aee1` |
+| `recovery_id` | `40eff555-9402-598d-868c-e0ad8776249e` |
 
-No other persistent `*_id` column is an independently generated identity.
-
-The unique `(authority_epoch_id, session_id, ordinal)` constraint and the
-unique attempt, claim, and launch-reservation constraints make a second
-allocation, claim, or launch reservation impossible even if two approved
-processes race.
-
-## 5. Transaction boundaries and crash outcomes
-
-All write transactions below are `BEGIN IMMEDIATE` transactions on the fixed
-database. They verify the current signed bootstrap digest, epoch, schema and
-policy before changing state. They commit before an external side effect when
-the boundary says so. A failed transaction rolls back its uncommitted changes;
-it never rolls back a committed claim.
-
-### Construct and reconcile the canonical request
-
-Before any session or allocation write, the parent constructs the complete
-nonsecret canonical request in memory from the verified bootstrap and the
-fixed capture policy. It reconciles provider, operation, account/epoch,
-ordered universe, target date, request limits, output root, child operation,
-and all policy versions, then computes the request digest. This step does not
-read credentials, create a process, contact a provider, or trust a caller
-path. The exact in-memory request and digest are the values later bound by the
-allocation and permanent claim.
-
-### Session creation
-
-1. Begin immediate.
-2. Verify singleton metadata, current epoch, reviewed schema/policies, and the
-   exact session request.
-3. Insert one `OPEN` session with `next_ordinal=0`,
-   `next_recovery_ordinal=0`, and its request digest.
-4. Commit.
-
-A crash before commit leaves no session. A crash after commit leaves the
-session open and reusable by the same deterministic session identity after
-exact verification. A duplicate session identity with different facts is a
-conflict, not an overwrite.
-
-### Allocate and consume an ordinal
-
-1. Begin immediate and verify the session is `OPEN`, the epoch matches, and
-   no success, closed state, or unresolved policy block prohibits allocation.
-2. Read `next_ordinal`; construct the deterministic attempt and allocation
-   identities.
-3. Insert the immutable allocation with `provider_call_budget=1`.
-4. Update `sessions.next_ordinal` by exactly one under the trigger rule.
-5. Commit.
-
-The allocation and ordinal consumption are one atomic decision. A crash before
-commit consumes nothing. A crash after commit consumes the ordinal forever,
-even if no child is launched. A unique conflict is treated as conflicting
-authority; no alternate ordinal is silently selected.
-
-### Create the permanent provider-call claim
-
-1. Begin immediate.
-2. Verify the allocation, request digest, provider operation, claim policy,
-   session state, and authority epoch.
-3. Insert the one `COMMITTED` row into `provider_call_claims`, relying on
-   `UNIQUE(allocation_id)` and the attempt uniqueness constraint.
-4. Advance the allocation to `CLAIM_COMMITTED`.
-5. Commit.
-
-This transaction must commit before current-process SID access, Credential
-Manager reads, provider construction, or network access. There is no delete,
-expiry, repair, reclamation, or retry that creates another claim. A crash
-before commit permits the exact claim transaction to be retried because no
-provider side effect is allowed before commitment. A crash after commit is
-permanent authority: the process may not assume that no provider call occurred.
-
-### Reserve the launch before creating a process
-
-1. Begin immediate.
-2. Verify the singleton metadata, permanent committed claim, exact epoch,
-   session, allocation, attempt, canonical request, request digest, release
-   version, and policy versions. Verify that the claim has no committed launch
-   reservation and that no absorbing state or manual-review block permits a
-   launch.
-3. Construct the deterministic `launch_reservation_id` and insert exactly one
-   `launch_reservations` row. The permanent `UNIQUE(claim_id)` constraint is
-   the authority fence.
-4. Advance the allocation to `LAUNCH_RESERVED` and commit the reservation
-   before any process-creation call.
-
-Only the process that commits this reservation may call
-`CreateProcessW(CREATE_SUSPENDED)`. A concurrent loser stops before process
-creation after a deterministic unique-conflict or already-reserved result; it
-does not create a second reservation, launch attempt, child, or provider call.
-A crash before reservation commit rolls back the reservation and permits the
-same deterministic reservation transaction to be retried. A crash immediately
-after reservation commit and before `CreateProcessW` leaves the claim and
-reservation permanently consumed; it requires manual classification and does
-not authorize another automatic launch.
-
-### Create the process and record pre-resume launch facts
-
-1. The reservation winner calls `CreateProcessW` with `CREATE_SUSPENDED` using
-   the already committed request. If process creation fails, begin immediate,
-   verify the existing reservation, and record the exact sanitized failure
-   evidence against that reservation. Advance its controlled outcome to
-   `PROCESS_CREATION_FAILED` and record a failed, non-retried terminal without
-   creating a second reservation, launch attempt, or `launch_executions` row.
-   The committed claim remains consumed.
-2. For a created process, assign it to the Job Object and verify the Job
-   assignment, active-process limit, kill-on-close policy, and no-inherited-
-   handle posture.
-3. Begin immediate and verify the committed reservation, claim, and exact
-   canonical request.
-4. Insert the one `launch_executions` row, including the committed
-   `launch_reservation_id`, exact process creation, executable/release
-   digests, Job Object assignment, constrained environment digest, resume
-   authorization, and all sanitized native facts available before resume.
-5. Advance the reservation outcome to `PROCESS_CREATED` and commit with
-   `phase=PRE_RESUME_READY`.
-
-Only after this commit may the launcher call `ResumeThread`. A crash after
-reservation commit but before process creation leaves a consumed reservation
-with no process and no retry authorization. A crash after process creation or
-Job assignment but before the launch-evidence commit leaves a consumed
-reservation with incomplete facts; it is manual review, not automatic claim
-or reservation reuse. A crash after the evidence commit but before resume can
-be proven zero-call only by a later explicit native evidence review that
-proves the child remained suspended and was terminated. The database itself
-does not infer that proof.
-
-### Record post-resume ambiguous facts
-
-After resume, or when the launcher cannot prove a clean pre-resume outcome:
-
-1. Begin immediate and verify `PRE_RESUME_READY`, claim, attempt, and process
-   identities.
-2. Write the post-resume/timeout/termination facts once, including bounded
-   exit and cleanup evidence, and advance the phase to
-   `POST_RESUME_AMBIGUOUS`.
-3. Commit.
-
-A crash before this commit does not make the attempt reusable. On restart, a
-committed claim with a missing post-resume row is conservatively treated as
-possibly resumed and requires manual review. A crash after commit preserves an
-ambiguous fact that cannot authorize another provider call.
-
-### Record successful or failed terminal facts
-
-1. Begin immediate and verify the claim, launch evidence, request digest, and
-   exact provider disposition.
-2. Insert one immutable `terminals` row with canonical evidence and sanitized
-   diagnostics.
-3. Advance the allocation to `TERMINAL_RECORDED`.
-4. Commit.
-
-`SUCCEEDED` is admitted only with a confirmed response, an independently
-verified exact snapshot, and exactly-once credential/handle cleanup. A
-post-resume timeout, crash, missing result, or unconfirmed termination is
-`AMBIGUOUS`, not `FAILED` or `NOT_STARTED`. If the process crashes before
-terminal commit, the committed claim remains ambiguous; a snapshot found on
-disk is evidence only until a terminal or manual selection is recorded.
-
-### Select success
-
-1. Begin immediate and verify the session is `OPEN`, the terminal is the
-   pointer-equivalent database fact `SUCCEEDED`, the snapshot digest matches,
-   and no selection exists.
-2. Insert the unique `selections` row with explicit selection-policy evidence.
-3. Advance the allocation and session to `SUCCESS_SELECTED`.
-4. Commit.
-
-A crash before commit leaves a valid but unselected success requiring explicit
-manual review; it does not reopen the attempt or run readiness again. After
-commit, `SUCCESS_SELECTED` is absorbing and no allocation, selection, repair,
-or recovery can alter it.
-
-### Close a session
-
-1. Begin immediate and verify no unreviewed allocation or claim is being
-   silently abandoned. Any unresolved claim requires an explicit manual
-   recovery record.
-2. Write the close fact and advance the session to `CLOSED`; controlled
-   completed allocations may also advance to `CLOSED`.
-3. Commit.
-
-A crash before commit leaves the prior state authoritative. After commit,
-`CLOSED` is absorbing. It is never reopened for a call.
-
-### Manual recovery
-
-Manual recovery is permitted only while the session is `OPEN` and the target
-allocation is not in an absorbing `SUCCESS_SELECTED` or `CLOSED` state. No
-manual-recovery action, including `ACKNOWLEDGE_RESTORE`, may mutate the
-counter or append a recovery row after the session reaches `SUCCESS_SELECTED`
-or `CLOSED`. `SELECT_COMMITTED_SUCCESS` and `CLOSE_SESSION` are the actions
-that enter those absorbing states.
-
-The recovery operation is one `BEGIN IMMEDIATE` transaction and has exactly
-one application SQL primitive for ordinal allocation:
-
-1. Verify the current epoch, the `OPEN` session, target identities and
-   digests, predecessor state, operator evidence, recovery policy, and
-   requested action. Reject an absorbing session or allocation, a mismatched
-   target, or a state transition not authorized by the action.
-2. Read `sessions.next_recovery_ordinal` for that session.
-3. Construct `recovery_id` from that exact recovery ordinal using the
-   deterministic recovery UUID5 material.
-4. Insert exactly one immutable `manual_recoveries` row with that ordinal.
-   The `BEFORE INSERT` trigger verifies session eligibility, the exact ordinal,
-   epoch/session and target bindings, and structural recovery facts. Its
-   `AFTER INSERT` trigger increments `next_recovery_ordinal` by exactly one;
-   no application-issued counter update is permitted.
-5. Apply the action's authorized state transition: record ambiguity, classify
-   a consumed launch reservation, select an already committed and verified
-   success, close a session, or acknowledge an administrator-approved restore.
-   Reservation classification never deletes, resets, or reopens the
-   reservation and never authorizes another launch or provider call.
-6. Commit the recovery row, trigger-owned counter increment, and state
-   transition together.
-
-The executable trigger pair requires the inserted `recovery_ordinal` to equal
-the old counter, requires the trigger-owned counter update to be exactly
-`OLD + 1`, and requires the new counter to equal the immutable recovery-row
-count for that session. It rejects regression, skipped ordinals,
-reassignment, duplicate ordinals, no-op or standalone counter updates,
-recovery insertion without the paired increment, and state regression. The
-guard does not require both the application and a trigger to update the
-counter; the application performs only the insert and the `AFTER INSERT`
-trigger is the sole allowed writer for this transition. The absorbing session
-and allocation states remain absorbing.
-Manual recovery never creates or deletes a claim, invokes a provider, changes
-canonical evidence, or converts uncertainty into `NOT_STARTED`; it cannot
-authorize another launch, claim, or provider call.
-
-A crash before commit leaves no recovery row, consumes no ordinal, and leaves
-the predecessor state authoritative. A crash after commit preserves the
-recovery row, counter increment, and state transition together. A duplicate
-ordinal fails closed, and no failure or conflict may silently select an
-alternate ordinal.
-
-## 6. SQLite durability and concurrency
-
-- `journal_mode=PERSIST` is the initial reviewed design. The main database and
-  persistent rollback journal are provisioned in advance and remain the only
-  authority files used by SQLite.
-- `synchronous=FULL` is required. A commit is not reported successful until
-  SQLite's full durability contract completes; `NORMAL`, `OFF`, or an
-  environment-controlled override is not accepted.
-- `PRAGMA foreign_keys=ON` is required on every connection. A connection that
-  cannot prove it is enabled is rejected.
-- There is one authority database only. `ATTACH`, `VACUUM`, runtime DDL, and
-  automatic migration are prohibited. The reviewed schema is selected during
-  administrator provisioning and checked at startup.
-- A bounded `busy_timeout` of 5 seconds applies to `BEGIN IMMEDIATE` lock
-  waits before claim commitment. It is a lock-wait policy, not an authority
-  retry policy. The timeout and exact Python/SQLite build are recorded in
-  sanitized authority diagnostics.
-- Only the named pre-claim transactions may retry `SQLITE_BUSY` or
-  `SQLITE_LOCKED`: a bounded number of fresh `BEGIN IMMEDIATE` attempts using
-  the same deterministic inputs. The retry is allowed only while no claim has
-  committed and no provider side effect has occurred.
-- The launch-reservation transaction is post-claim and is attempted once for
-  that committed claim. A busy result, unique conflict, or existing
-  reservation stops that runner before process creation; it is never converted
-  into a new reservation or automatic launch retry.
-- Manual recovery ordinal allocation is session-scoped and uses the same
-  `BEGIN IMMEDIATE` transaction as the recovery row and authorized state
-  transition. Two recovery transactions in one session therefore serialize
-  through `next_recovery_ordinal` and produce consecutive ordinals; separate
-  sessions may each begin at zero. No recovery counter update is valid without
-  its paired recovery insertion, and no recovery transaction is permitted
-  after `SUCCESS_SELECTED` or `CLOSED`.
-- There is no generic transaction decorator or automatic retry loop. After a
-  claim commits, no provider-attempt retry is permitted. A later database
-  write may be retried only as an explicitly idempotent persistence operation
-  for the same already-known evidence identity; it must never reconstruct or
-  re-run a provider attempt.
-- SQLite locking assumes one local NTFS volume, no SMB/UNC path, no cloud
-  sync, no copied live database, and all participants use the exact reviewed
-  Python/SQLite build, PERSIST behavior, and ACL. A different locking
-  environment is NO-GO.
-- Authority start and recovery run `PRAGMA quick_check`,
-  `PRAGMA foreign_key_check`, and the reviewed schema/trigger checks. A
-  scheduled full `PRAGMA integrity_check` is required before promotion and
-  after historical restore validation. Any result other than `ok`, any
-  persistent-journal mismatch, or any digest or epoch mismatch fails closed.
-  No automatic repair is permitted. Failure of PERSIST mode under the
-  approved ACL is a Milestone B blocker; directory permissions are not
-  weakened to compensate.
-
-### Backup requirements
-
-An administrator performs a consistent SQLite online backup, or a fully
-quiesced reviewed file backup, and records the backup result, database digest,
-bootstrap digest/generation, schema version, and application release digest in
-an administrator-only signed manifest. The signed bootstrap and its detached
-signature are copied with that manifest, but the bootstrap signature is never
-presented as the manifest signature. The offline signing private key is never
-copied.
-
-A fully quiesced file backup stops all authority writers, verifies that no
-transaction is active, copies the main database and its persistent rollback
-journal as one reviewed set, and validates the copy with SQLite integrity and
-digest checks. A main-file-only copy or a copy while the journal is active is
-invalid. The procedure never deletes or recreates the live journal to make a
-backup appear clean.
-
-#### Signed `backup_manifest/v1` envelope
-
-The accepted backup consists of the reviewed backup files,
-`authority.backup-manifest.json`, and a separate
-`authority.backup-manifest.sig`. The manifest body is one canonical JSON
-`backup_manifest/v1` object with exactly these semantic members:
+The retained migration vector is:
 
 ```text
-{
-  "application_release_digest": "<64 lowercase hex SHA-256>",
-  "authority_epoch_id": "<canonical UUID text>",
-  "backup_method": "SQLITE_ONLINE_BACKUP" | "QUIESCED_FILE_COPY",
-  "backup_result": "SUCCESS",
-  "bootstrap_digest": "<64 lowercase hex SHA-256>",
-  "bootstrap_generation": <positive integer>,
-  "created_at_utc": "<canonical UTC timestamp>",
-  "database_digest": "<64 lowercase hex SHA-256>",
-  "digest_algorithm": "SHA-256",
-  "machine_authority_id": "<canonical administrator-provisioned fact>",
-  "manifest_schema": 1,
-  "persistent_journal_digest": "<64 lowercase hex SHA-256>" | null,
-  "persistent_journal_state": "PRESENT" | "REVIEWED_ABSENT",
-  "schema_version": <positive integer>,
-  "signer_key_id": "<approved key identifier>",
-  "signature_encoding": "ECDSA_P256_SHA256_P1363",
-  "signing_purpose": "backup_manifest/v1"
-}
+authority_epoch_id       = 12345678-1234-5678-9abc-def012345678
+schema_version           = 3
+migration_policy_version = migration-policy/v1
+framed UTF-8 preimage    = 15:migration_id/v136:12345678-1234-5678-9abc-def0123456781:319:migration-policy/v1
+migration_id             = b1114fec-2247-506d-bfda-74008355b312
 ```
 
-The canonical bytes are UTF-8 JSON with no BOM, no insignificant whitespace,
-lexicographically sorted object members, exact lowercase field spellings,
-canonical integer and timestamp representations, and no duplicate or
-unknown members. Digest strings are lowercase hexadecimal encodings of the
-raw 32-byte SHA-256 digest. `persistent_journal_digest` is required when the
-state is `PRESENT` and must be JSON `null` when the state is
-`REVIEWED_ABSENT`; an absence state is accepted only when the reviewed backup
-method produced no journal artifact and the administrator recorded that fact.
-`backup_result=SUCCESS` is not inferred from a copied file: the database and,
-when present, journal bytes must match the manifest digests.
+Administrator-provisioned `machine_authority_id`, `authority_epoch_id`, and
+`signing_key_id` remain signed authority/key facts. Child references such as
+`attempt_id` on a claim are foreign-key references, not a second identity
+tuple. There is no `allocation_id` identity or identity material in this
+model.
 
-The signature envelope is canonical JSON with exactly
-`signature_envelope_schema=1`, `signature_domain`, `signer_key_id`,
-`manifest_digest`, `signature_encoding`, and `signature` members. Its
-`signature_domain` is exactly `backup_manifest_signature/v1`, its
-`manifest_digest` is `SHA-256(canonical backup_manifest/v1 bytes)`, and its
-`signature` is fixed-width IEEE P1363 ECDSA: 32-byte big-endian `r` followed
-by 32-byte big-endian `s`, encoded as base64url without padding. The CNG
-verifier hashes the domain-separated bytes
-`LF("backup_manifest_signature/v1") || canonical_manifest_bytes` with
-SHA-256 and verifies that hash using the approved NIST P-256 public key and
-`BCryptVerifySignature`.
+## 6. Transaction boundaries and crash outcomes
 
-The verifier requires `signer_key_id` to equal the approved offline key ID
-bound by the signed bootstrap/key inventory, requires the exact manifest
-purpose and signature domain, and verifies both the manifest digest and the
-signature. This is cryptographic domain separation from the bootstrap
-signature: a copied bootstrap signature, even with a matching key ID, cannot
-verify the manifest. The private key is never copied with the backup.
+All writes in the fixture harness use one local SQLite database and
+`BEGIN IMMEDIATE`. The service verifies the fixed bootstrap/epoch/schema and
+canonical request before authority mutation. Uncommitted work rolls back;
+committed evidence is never repaired by deleting rows.
 
-Backup acceptance and restore validation fail closed for unsigned manifests,
-bootstrap signatures presented as manifest signatures, altered database or
-journal digests, wrong epoch or generation, wrong schema or release digest,
-wrong signing purpose or key, malformed or noncanonical body/signature
-envelopes, invalid digest/signature encodings, and any manifest/backup file
-mismatch.
-
-## 7. Child and launcher integration
-
-The integration retains the existing safety concepts:
-
-- the parent remains secret-free and rejects Alpaca variables in its own
-  environment;
-- only the child performs the exact current-process SID gate and reads the two
-  named Credential Manager entries;
-- one provider instance and one provider-call fence are created in the child,
-  with no retry, pagination continuation, fallback endpoint, or second call;
-- the parent commits a unique launch reservation for the claim before calling
-  suspended `CreateProcessW`; only its reservation winner may create the
-  child, assign and verify it in a Job Object with kill-on-close and
-  active-process limit one, record exact process creation and
-  resume-authorization facts transactionally, commit those facts, and only
-  then call `ResumeThread`;
-- no handles are inherited and the child receives only the constrained
-  reviewed environment;
-- any uncertainty after resume is ambiguous and never a zero-call proof;
-- native credential release occurs exactly once across all success and failure
-  paths, with the full valid native blob range cleared before `CredFree`; and
-- every owned process, thread, Job Object, and native resource handle is
-  cleaned up unconditionally, with only stable sanitized diagnostics retained.
-
-The transaction sequence is:
+The required order is:
 
 ```text
-signed bootstrap and path/ACL verification
-  -> canonical request construction and in-memory reconciliation
-  -> session verification and ordinal-allocation transaction
-  -> permanent request-bound claim transaction and commit
-  -> unique launch-reservation transaction and commit
-  -> reservation winner calls CreateProcessW(CREATE_SUSPENDED)
-  -> Job Object assignment and verification
-  -> reservation-bound process-creation/resume-authorization transaction and commit
+fixed bootstrap/CNG/ACL/path verification
+  -> canonical request and digest reconciliation
+  -> session transaction
+  -> attempt ordinal transaction
+  -> permanent claim transaction and COMMIT
+  -> credential/provider/network construction
+  -> launch reservation transaction and COMMIT
+  -> CreateProcessW(CREATE_SUSPENDED)
+  -> Job Object and process evidence transaction and COMMIT
   -> ResumeThread
-  -> post-resume fact transaction, or conservative missing-fact ambiguity
-  -> terminal transaction
-  -> success-selection transaction, if eligible
+  -> post-resume evidence or conservative ambiguity
+  -> immutable terminal transaction
+  -> explicit successful session selection
 ```
 
-Launcher/process evidence is represented by the normalized
-`launch_reservations` row, any reservation-bound process-creation failure
-evidence, and the normalized `launch_executions` row plus its canonical
-creation, resume, post-resume, and cleanup evidence blobs and digests.
-`launch_executions` exists only when the reservation winner actually created a
-process. Terminal evidence stores the sanitized child result, provider
-disposition, snapshot digest, and cleanup result. The database rows are the
-single transactional authority. Temporary request or output files may be
-transport artifacts, but no mutually validating claim/history file web is
-executable and no directory scan can create authority.
+The claim commit precedes all credential/provider/network construction. The
+reservation commit precedes process creation. Launch evidence commits before
+resume authorization. A crash after a claim or reservation commit leaves that
+fence consumed. A crash after resume is ambiguous even when no child result is
+present; it never authorizes a new claim, provider call, reservation, or
+launch attempt. A known process-creation failure is recorded on the existing
+reservation and may receive a terminal without an execution row.
 
-## 8. Compatibility and migration
+Manual recovery records uncertainty and an operator-authorized classification;
+it does not turn uncertainty into `NOT_STARTED`, erase a claim, reopen a
+reservation, or infer a successful selection.
 
-Schema-1 and schema-2 JSON artifacts from the existing milestones remain
-parseable for historical validation only. Historical validation may verify
-their canonical bytes, UUID5 identities, predecessor relationships, and
-legacy diagnostics, but it must not import them as executable provider
-authority.
+## 7. SQLite durability and rollback contract
 
-The selected compatibility decision is a new `authority_epoch_id` with no
-executable migration. Provisioning creates a new empty SQLite authority and a
-new signed bootstrap generation/epoch. Existing file-based allocations,
-claims, history heads, terminals, and recovery files are retained as
-historical evidence and are never consumed to authorize a provider call.
+The production deployment must use the reviewed local NTFS SQLite build with
+foreign keys enabled, one database scope, `PERSIST` journaling, and
+`synchronous=FULL`. The database and persistent journal are provisioned in
+advance and validated against the exact Trading ACL. No runtime `ATTACH`,
+`VACUUM`, automatic migration, journal-rights workaround, database replacement,
+or legacy file fallback is allowed.
 
-The current file-based provider-call claim system is not an executable
-fallback. If the SQLite authority is unavailable or invalid, the capture is
-blocked; it does not switch to claim files, choose a highest ordinal, or infer
-authority from legacy artifacts.
+The test-only fixture proves schema execution, `foreign_key_check`, integrity
+checks, parent keys, unique fences, trigger behavior, concurrency, and rollback.
+Windows provisioning and durability acceptance remain future manual gates.
 
-## 9. Backup and recovery
+Administrator backups are consistent SQLite online backups or fully quiesced
+reviewed copies of the database/journal. A separate signed
+`backup_manifest/v1` binds database/journal digests to generation, epoch,
+schema, release, and purpose. A bootstrap signature is not a backup-manifest
+signature. Restore validation is historical-only and requires a new signed
+generation/epoch plus a new empty executable database.
 
-### Restore and rollback validation
+Schema-1 and schema-2 file artifacts remain parseable historical evidence only.
+They cannot be imported as claims, selected as authority, or used as a
+fallback when SQLite is unavailable.
 
-Restore is administrator-only and begins by preserving the failed database and
-the persistent journal for forensic review. The candidate backup is restored
-to an isolated staging path. Before any SQLite acceptance, the administrator
-parses the canonical `backup_manifest/v1`, verifies its independent
-domain-separated signature and manifest digest, matches the database and
-persistent-journal bytes to the recorded digests, and reconciles the signed
-bootstrap generation/digest, machine authority, epoch, schema, and release
-facts. Only then is the candidate validated as historical evidence for exact
-owner/DACL/reparse/final-path semantics, schema migrations, SQLite integrity,
-foreign keys, canonical evidence digests, state transitions, claims, and
-ambiguity facts. It is never made executable by copying it over the live path.
+## 8. Design evidence and future milestones
 
-Rollback rejection is required only where independently retained trusted state
-can show a mismatch: an older-generation database, an epoch that does not
-match the current signed bootstrap, altered bootstrap or signature material,
-copied roots, and path aliases. A database-local digest, including
-`database_identity_digest`, is a consistency check and not an external
-freshness anchor. If the database and persistent journal are completely
-replaced with an internally consistent same-generation pair, the database
-cannot prove that replacement from its own contents. Replacement by
-Administrator/SYSTEM, malicious direct database modification by `Trading`,
-and arbitrary code controlling that account remain outside the stated threat
-model; no external service or monotonic hardware anchor is added here.
+The focused executable evidence is
+`tests/runtime/test_windows_transactional_capture_authority.py`. It covers:
 
-Every administrator-approved restore is epoch-reset only. After historical
-validation, the administrator must rotate the signed `bootstrap_generation`,
-create a new `authority_epoch_id`, and provision a new empty executable
-authority database. The old database and all of its allocations, claims,
-terminals, selections, and ambiguity facts remain preserved as historical
-evidence. No restored database may resume executable operation under its old
-epoch, and no old row may be imported or reused as executable provider
-authority.
+- complete DDL execution, `foreign_key_check`, integrity, FK parent keys, and
+  prohibited ancestor columns;
+- the metadata/migration/session/attempt/claim/reservation/execution/terminal
+  lifecycle and terminal selection;
+- one-to-one fences and same-session selection/recovery lineage;
+- deterministic identity vectors;
+- attempt and recovery ordinal races, stale/future ordinals, direct-counter
+  rejection, rollback atomicity, and independent session ordinals;
+- a process-creation failure terminal without an execution row; and
+- fake side-effect hooks proving claim, reservation, and evidence commit
+  boundaries plus no claim reuse after ambiguity.
 
-### Unavailable or corrupt material
+The following remain future production milestones:
 
-- Missing, unreadable, unsigned, mismatched, or invalid bootstrap/signature:
-  stop before database mutation, process creation, SID access, Credential
-  Manager access, provider construction, or transport.
-- Missing, unsigned, malformed, noncanonical, wrongly purposed, wrongly keyed,
-  or digest-mismatched backup manifest: reject the backup before restore
-  validation. A copied bootstrap signature is not a manifest signature.
-- Missing, unreadable, locked-inconsistently, corrupt, or mismatched database
-  or persistent journal: do not create a new database at the pinned path,
-  delete or recreate the journal, repair in place, or call a provider.
-  Preserve the evidence and invoke administrator recovery.
-- Missing or unverifiable backup: the deployment cannot pass the operational
-  backup gate. A manual development validation may inspect the authority only
-  if its policy explicitly permits it; it may not perform provider capture.
-- Capture-output root unavailable or outside its final pinned path: no
-  provider call is authorized because a verified result cannot be committed.
+1. implement the fixed Windows bootstrap, CNG verification, ACL, reparse,
+   final-handle, SID, and local-volume checks;
+2. implement the reviewed transaction service against this schema without
+   introducing denormalized ancestor columns;
+3. implement the child credential/provider/process boundary and sanitized
+   evidence adapters;
+4. perform administrator backup/restore and dedicated-account Windows
+   acceptance; and
+5. separately approve or reject any unattended scheduler design.
 
-If no valid backup exists, recovery is still a new administrator-reviewed
-signed bootstrap and new authority epoch with an empty executable database.
-The operator must preserve the failed database as historical evidence and
-record that prior claims may be unknown; the system never infers that a
-committed claim did not occur.
-
-## 10. Milestones and acceptance gates
-
-### A. Bootstrap and provisioning
-
-**Deliverables:** canonical bootstrap and detached-envelope specification;
-CNG P-256 verification design and vectors; fixed-path/final-path checks;
-owner/DACL/reparse contract; administrator provisioning and rotation runbook.
-
-**Non-goals:** SQLite transactions, provider construction, Credential Manager
-reads, capture, scheduling, live trading, or unattended approval.
-
-**Focused tests:** canonical field rejection, signature verification and key
-ID mismatch, generation/epoch binding, path traversal/reparse rejection,
-owner/DACL decision tests, and release-key vector tests.
-
-**Manual Windows validation:** provision on a local NTFS volume; inspect owner,
-explicit ACEs, inheritance, final paths, persistent journal, and the Trading account's
-denied writes/replacements; test a copied root and junctioned path.
-
-**Exit criteria:** the approved release accepts only the signed fixed bootstrap;
-all path and ACL checks fail closed; the Trading account cannot replace trust
-material or the authority directory; and the provisioning evidence is
-administrator-reviewed.
-
-**Remaining NO-GO:** any unsigned/rotated-key ambiguity, writable trust
-material, reparse path, unsupported CNG verifier, or unattended launch.
-
-### B. Transactional authority database
-
-**Deliverables:** reviewed SQLite schema, constraints and triggers; repository
-transaction contract; epoch binding; canonical evidence/digest rules; backup
-and restore manifest contract.
-
-**Non-goals:** provider calls, child credentials, scheduler, live brokerage,
-automatic migrations, claim-file fallback, or runtime implementation in this
-documentation milestone.
-
-**Focused tests:** exact deterministic identity vectors for the root session,
-`migration_id`, and every derived identity; executable SQLite DDL smoke validation with
-`PRAGMA foreign_keys=ON`, valid and mismatched launch-reservation inserts, and
-`PRAGMA foreign_key_check`; schema/foreign-key/trigger checks; concurrent
-session/allocation/recovery-ordinal allocation; duplicate claim and
-launch-reservation races; recovery counter/state atomicity and absorbing-state
-rejection; crash-injected boundaries; PERSIST durability and journal lifecycle;
-integrity checks; canonical signed backup-manifest bytes, independent
-signature verification, backup/restore; and fail-closed rejection of rollback
-cases that conflict with independently retained signed/bootstrap state.
-
-**Manual Windows validation:** run multiple approved processes under the
-dedicated account; inspect PERSIST journal locking and ACLs; stop/kill at each
-transaction boundary; validate that journal recreation and directory rights
-are not required; validate a restored database and intentionally older,
-copied-root, and path-alias databases. The validation records the explicit
-limitation that an internally consistent same-generation database/journal
-replacement cannot be detected without independent trusted state.
-
-**Exit criteria:** one allocation has at most one permanent claim; claim
-commit precedes all provider-side effects; ambiguity survives all crash
-points; success and closed states are absorbing; no generic retry or repair
-exists; and backup/restore evidence is reproducible.
-
-**Remaining NO-GO:** any duplicate claim or launch reservation, claim or
-reservation deletion/expiry, state regression, PERSIST failure under the
-approved ACL, journal recreation requirement, unreviewed migration, a
-detectable rollback accepted despite an independently retained signed-state
-mismatch, or an authority decision based on a legacy file. Same-generation
-replacement by an out-of-boundary privileged actor is not represented as a
-guarantee of this milestone.
-
-### C. Child/launcher integration
-
-**Deliverables:** transaction-bound child request and process evidence model;
-permanent claim and launch-reservation boundary; pre-resume and post-resume
-recording; one-call provider fence; SID and Credential Manager boundary; Job
-Object, handle, environment, and cleanup contract.
-
-**Non-goals:** unattended scheduling, automatic retry, paper-lineage advance,
-provider fallback, or real-money trading.
-
-**Focused tests:** exactly-one provider call; two-runner launch-reservation
-races proving one reservation and no losing `CreateProcessW`; crash before and
-after reservation commit, before process creation, and after process-creation
-failure; duplicate/concurrent launch attempts; crash before/after claim and
-resume; SID mismatch; child-only credential reads; native cleanup; sanitized
-malicious responses; suspended creation, Job containment, no inherited handles,
-and unconditional handle cleanup.
-
-**Manual Windows validation:** dedicated non-administrative account, real
-`CreateProcessW`/Job Object behavior with test-only nonsecret fixtures, ACL
-and environment inspection, forced termination, and post-resume ambiguity
-review. Any provider-connected exercise requires separate explicit approval
-and must remain a single manually initiated call.
-
-**Exit criteria:** parent memory and environment are secret-free; exactly one
-claim maps to exactly one permanent launch reservation; exactly one
-reservation-bound child/provider fence can exist; the losing runner never
-calls `CreateProcessW`; evidence is transactional; resume uncertainty is never
-reused; and cleanup is proven on every path.
-
-**Remaining NO-GO:** any secret in parent/output, SID bypass, second call,
-credential cleanup gap, handle leak, inherited handle, process escape, or
-automatic ambiguity retry.
-
-### D. Manual dedicated-account end-to-end validation
-
-**Deliverables:** administrator-reviewed runbook, evidence bundle format,
-operator sign-off form, backup-before-run proof, and manual recovery procedure.
-
-**Non-goals:** unattended scheduling, scheduler installation, always-on service,
-automatic recovery, live-money orders, or approval inferred from a passing
-single run.
-
-**Focused tests:** full session-to-selection transaction, failed and ambiguous
-terminal paths, duplicate invocation, backup/restore, rollback, output digest
-verification, manual recovery ordinal allocation and crash outcomes, and
-manual committed-success selection.
-
-**Manual Windows validation:** execute only from the approved Trading account
-with the fixed bootstrap and local NTFS paths; inspect ACLs and final paths;
-perform one explicitly authorized manual capture attempt; verify exactly one
-provider call if a provider-connected test is separately approved; and review
-all sanitized evidence and cleanup facts.
-
-**Exit criteria:** the runbook demonstrates durable authority, exact account
-binding, one-call behavior, truthful ambiguity, recoverable backups, and no
-file-based fallback. This is still manual-only.
-
-**Remaining NO-GO:** unresolved official XNYS-hours authority, weak launch
-guard DACL, missing trusted process/time evidence, missing monitoring,
-unverified restore, or any scheduler/account-rights gap.
-
-### E. Later operational prerequisites
-
-**Deliverables:** separately reviewed hardened launch-guard DACL; official
-XNYS-hours authority; trusted time/process evidence; monitoring and
-notification; backup and restore operations; scheduler configuration and
-account-rights review.
-
-**Non-goals:** this architecture milestone does not approve unattended
-operation or real-money trading.
-
-**Focused tests:** launch-guard contention and DACL tests, official-hours
-provenance tests, trusted-evidence freshness/rollback tests, notification
-failure tests, backup restore drills, and scheduler least-privilege tests.
-
-**Manual Windows validation:** administrator-led review of the scheduler,
-account token, task ACLs, service/interactive-session behavior, monitoring
-alerts, restore drill, and controlled out-of-hours refusal.
-
-**Exit criteria:** each prerequisite has independent evidence and explicit
-approval; no single successful capture substitutes for operational controls.
-
-**Remaining NO-GO:** unattended scheduling remains NO-GO until all of the
-following are separately approved: hardened launch-guard DACL; official
-XNYS-hours authority; trusted time/process evidence; monitoring and
-notification; backup and restore; and scheduler configuration and account
-rights.
+Until those gates pass, this is test-only research infrastructure. No real
+credentials, real provider calls, brokerage calls, or real-money orders are
+used or authorized.

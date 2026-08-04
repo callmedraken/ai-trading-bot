@@ -314,23 +314,33 @@ SHA-256 digest and commit timestamp; advances to
 ```
 
 Only the winning transaction receives an opaque in-memory `FakeProcessIntent`.
-The external adapter accepts that exact type and issuer, resolves its
-reservation, verifies the durable state and canonical bytes/digest, and
-consumes the permit once. A second acquisition, restart reconstruction,
-cross-reservation use, and permit reuse fail before the modeled external call.
-SQLite proves the durable ownership decision, not that Windows executed
-`CreateProcessW`.
+Under the per-reservation lifecycle arbiter, the external adapter accepts only
+the exact registered object, private issuer, and permit; resolves the normalized
+reservation -> claim -> attempt -> session lineage; requires
+`PROCESS_INTENT_COMMITTED`, `COMMITTED`, `LAUNCH_RESERVED`, and `OPEN` with no
+terminal or selection; verifies the durable canonical bytes/digest; and consumes
+the permit immediately before the modeled call. The arbiter remains held through
+typed result production but no SQLite transaction remains open across the call.
+A second acquisition, copied or reconstructed object, wrong permit,
+cross-reservation use, permit reuse, and delayed dispatch after recovery fail
+before the modeled external call. SQLite proves the durable ownership decision,
+not that Windows executed `CreateProcessW` or that no call is already in flight.
 
 The adapter returns either an exact typed `FakeProcessCreationReceipt` for a
 suspended child with Job Object setup and resume authority, or an exact typed
 `FakeProcessCreationFailure` whose sole outcome is `NOT_CREATED`. Each result
-binds the reservation and committed intent digest and carries canonical
-schema-1 bytes plus SHA-256 digests. `record_execution` accepts only the exact
-successful receipt and persists its process, Job Object, and resume evidence;
-`record_process_creation_failure` accepts only the exact definitive failure.
-Missing, malformed, noncanonical, unknown/failed success, wrong-intent,
-cross-reservation, and reused results fail closed. Application helpers cannot
-fabricate process results.
+binds the reservation and committed intent digest, carries canonical schema-1
+bytes plus SHA-256 digests, and has a private adapter issuer plus a registered
+one-shot result permit. Under the same lifecycle arbiter, `record_execution`
+and `record_process_creation_failure` recheck the complete active lineage in a
+`BEGIN IMMEDIATE` transaction and accept only the exact registered adapter
+object. They consume its result permit only after commit. A transient rollback
+while the lineage remains active leaves the original result registered and
+retryable; recovery, terminal recording, selection, or closure instead revokes
+it permanently. Missing, malformed, noncanonical, copied, reconstructed,
+wrong-issuer, wrong-permit, wrong-intent, cross-reservation, and reused results
+fail closed. Application helpers cannot fabricate process results. Canonical
+bytes and digests prove content integrity, not adapter provenance.
 
 A known process-creation failure is a one-time
 `PROCESS_INTENT_COMMITTED -> PROCESS_CREATION_FAILED` update with matching
@@ -386,14 +396,16 @@ still prove the same active lineage. `MANUAL_REVIEW`, any terminal-recorded
 lineage, `SUCCESS_SELECTED`, and `CLOSED` are irreversible revocation barriers
 for all outstanding or delayed resume authority.
 
-The fake external boundary accepts only that `FakeResumeIntent`, then under the
+The fake external boundary accepts only that exact registered
+`FakeResumeIntent`, then under the
 per-reservation lifecycle arbiter immediately re-resolves and rechecks the
 complete normalized active lineage, committed canonical intent, and all
 pre-resume evidence. It consumes the permit only after those checks and returns
-a receipt only after the modeled call succeeds. A modeled failure
-returns no successful receipt and leaves the database at
+a privately issued, registered one-shot receipt only after the modeled call
+succeeds. A modeled failure creates no receipt and leaves the database at
 `RESUME_INTENT_COMMITTED`. The successful receipt body is exactly canonical
-UTF-8 JSON:
+UTF-8 JSON; its bytes and digest prove content integrity but cannot reconstruct
+adapter provenance:
 
 ```json
 {"execution_id":"<exact execution_id>","resume_intent_digest":"<lowercase 64-character SHA-256 hex>","resume_result":"RESUMED","schema":1}
@@ -404,14 +416,19 @@ UTF-8 JSON:
 lineage both before and in its guarded update, so a structurally successful but
 delayed receipt cannot advance a reservation classified by recovery or a
 lineage already terminal, selected, or closed. It requires exact
-`FakeResumeReceipt` type, the
+`FakeResumeReceipt` type, private adapter issuer, the exact registered and
+unconsumed result permit, the
 same execution and committed intent digest, exact field set and field types,
 integer schema `1`, literal `RESUMED`, exact canonical bytes, and the exact
 SHA-256 digest. `FAILED`, `ERROR`, `UNKNOWN`, missing/extra fields, wrong or
 string schema, noncanonical bytes, wrong execution/intent/digest, receipt
 reuse, and cross-execution reuse all fail. Only one
 `RESUME_INTENT_COMMITTED -> RESUME_RECORDED` transaction may append that
-receipt and the complete cleanup pair. Intent, post-resume, and cleanup
+receipt and the complete cleanup pair. The result permit is consumed only
+after that transaction commits. Validation or transient database rollback
+while the parent remains active preserves the original issued receipt for an
+exact retry; a persisted revocation leaves it structurally valid but unusable.
+Intent, post-resume, and cleanup
 evidence cannot be replaced, cleared, partially written, or rewritten.
 Identity, pre-resume evidence, and execution rows are immutable and cannot be
 deleted. An execution is optional: a process-creation failure may still
@@ -566,6 +583,29 @@ it cannot prove that a real Windows call is not already in flight. Production
 adapters must therefore use the reviewed per-lineage lifecycle arbiter or an
 equivalent quiescence protocol that makes the final hook recheck and manual
 classification mutually exclusive.
+
+### 3.1 Final capability matrix
+
+Canonical bytes and SHA-256 digests establish content integrity only. In the
+test harness, private typed issuers plus registries that bind each one-shot
+permit to the exact issued object model provenance. A copied, reconstructed,
+wrong-issuer, or wrong-permit object has no authority even when its public bytes
+are exact. Persisted parent state can independently revoke an otherwise valid
+object.
+
+| Boundary | Required persisted parent | Capability/evidence | Issuer/provenance | Consumption point | Lifecycle arbiter | Database transaction | Revoking facts | Crash result / recovery | Direct-SQL enforcement |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Provider construction | `COMMITTED` claim in an `OPEN` session | Committed claim identity and canonical request | Reviewed service; no adapter result | No opaque permit; construction follows the claim fence once in the workflow | No external-dispatch arbitration | No | Later reservation state, `MANUAL_REVIEW`, terminal, selection, `CLOSED` | Claim remains consumed; do not reconstruct a provider action | Claim insert/admission triggers; SQL cannot prove construction |
+| Process-intent issuance | `COMMITTED` reservation and exact normalized claim/session lineage | Transaction-issued `FakeProcessIntent` | Private intent issuer; exact object/permit registry | Permit remains live until process dispatch | Persisted writers serialize through `BEGIN IMMEDIATE` | Yes, `BEGIN IMMEDIATE` | `MANUAL_REVIEW`, terminal, selection, `CLOSED` | Before commit: none; after commit: no permit reconstruction, use `CLASSIFY_PROCESS_OUTCOME_UNKNOWN` | Process-intent append/state triggers |
+| Process dispatch | `PROCESS_INTENT_COMMITTED`, committed claim, launch-reserved attempt, `OPEN`, no terminal/selection | Exact `FakeProcessIntent` | Private issuer and exact registered one-shot permit | Immediately before `CreateProcessW` | Required; held through typed result production | No transaction across call | `MANUAL_REVIEW`, terminal, selection, `CLOSED` | No result is indistinguishable from unpersisted result; classify unknown | SQL cannot perform or prove the API call |
+| Process-success persistence | Same active process lineage; no execution | Exact `FakeProcessCreationReceipt` | Private result issuer and exact registered result permit | After execution/reservation commit | Required | Yes, `BEGIN IMMEDIATE` | `MANUAL_REVIEW`, terminal, selection, `CLOSED` | Rollback while active keeps receipt retryable; otherwise classify unknown | Execution parent trigger and reservation state trigger; provenance remains service-only |
+| Process-failure persistence | Same active process lineage; no execution/failure | Exact `FakeProcessCreationFailure` with `NOT_CREATED` | Private result issuer and exact registered result permit | After failure/state commit | Required | Yes, `BEGIN IMMEDIATE` | `MANUAL_REVIEW`, terminal, selection, `CLOSED` | Rollback while active keeps failure retryable; otherwise classify unknown | Failure evidence/state triggers; provenance remains service-only |
+| Resume-intent issuance | `PRE_RESUME_READY`, `PROCESS_CREATED`, `OPEN`, no terminal/selection | Transaction-issued `FakeResumeIntent` | Private intent issuer; exact object/permit registry | Permit remains live until resume dispatch | Required against reservation classification | Yes, `BEGIN IMMEDIATE` | `MANUAL_REVIEW`, terminal, selection, `CLOSED` | Before commit use pre-resume recovery; after commit classify unknown | Execution phase/evidence trigger with normalized parent join |
+| `ResumeThread` dispatch | `RESUME_INTENT_COMMITTED` with exact active lineage | Exact `FakeResumeIntent` | Private issuer and exact registered one-shot permit | Immediately before `ResumeThread` | Required; held through receipt production | No transaction across call | `MANUAL_REVIEW`, terminal, selection, `CLOSED` | Missing persisted receipt is unknown; classify unknown | SQL cannot perform or prove the API call |
+| Resume-success persistence | Same active resume lineage and current intent | Exact `FakeResumeReceipt` | Private resume-result issuer and exact registered result permit | After receipt/cleanup commit | Required | Yes, `BEGIN IMMEDIATE` | `MANUAL_REVIEW`, terminal, selection, `CLOSED` | Rollback while active keeps receipt retryable; otherwise classify unknown | Execution phase/evidence trigger; provenance remains service-only |
+| Terminal recording | State-specific reservation matrix | Canonical terminal evidence and optional verified snapshot | Reviewed transaction service and terminal policy | Unique terminal insert | No external-dispatch arbiter | Yes, `BEGIN IMMEDIATE` | Existing terminal, selection, `CLOSED`; `MANUAL_REVIEW` permits only conservative close | Rollback leaves no terminal; retry only under unchanged state | Terminal matrix, uniqueness, and normalized lineage triggers |
+| Selection | Confirmed successful terminal in owning `OPEN` session | Terminal identity and normal or recovery-authorized selection request | Reviewed transaction service and selection policy | Unique session selection insert | No external-dispatch arbiter | Yes, `BEGIN IMMEDIATE` | Existing selection, `SUCCESS_SELECTED`, `CLOSED` | Rollback leaves no selection; retry under unchanged success | Selection ownership/state trigger and uniqueness |
+| Recovery classification | `OPEN` session and exact action-matrix predecessor | Typed target, operator evidence, policy, current recovery ordinal | Reviewed recovery service; immutable operator evidence | Recovery row and ordinal consumed atomically | Required for reservation actions that arbitrate external work | Yes, `BEGIN IMMEDIATE` | `SUCCESS_SELECTED`, `CLOSED`, changed predecessor, prior classification | Rollback consumes no ordinal; commit is irreversible and authorizes no replacement operation | Recovery target/action trigger; service pairs row, counter, and state transition |
 
 The signed bootstrap and immutable metadata own the permitted public Alpaca
 descriptor and select authority/claim policy versions. The reviewed service
@@ -803,9 +843,14 @@ helper does not run an ad hoc unresolved-execution query.
 
 The reservation commit and a separate `BEGIN IMMEDIATE` process-intent commit
 both precede process creation. Only the process-intent winner receives the
-one-shot permit accepted by the reviewed adapter. The exact successful result
-then authorizes the `PRE_RESUME_READY` execution row containing process, Job
-Object, and resume-authorization evidence. A separate `BEGIN IMMEDIATE`
+one-shot permit accepted by the reviewed adapter. Process dispatch and manual
+classification are mutually exclusive under the per-reservation lifecycle
+arbiter: recovery-first emits no call, while dispatch-first emits exactly one
+call and produces exactly one privately issued result before releasing the
+arbiter. The exact registered successful result then authorizes the
+`PRE_RESUME_READY` execution row containing process, Job Object, and
+resume-authorization evidence. Result persistence uses the same arbiter and
+consumes the result only after commit. A separate `BEGIN IMMEDIATE`
 transaction then appends the canonical resume intent and
 commits `RESUME_INTENT_COMMITTED`; only that winner receives the one-shot
 permit accepted by the reviewed adapter. The adapter observes that committed

@@ -683,7 +683,56 @@ adapters must therefore use the reviewed deterministic Windows named mutex.
 An in-process substitute or SQLite transaction alone cannot make the final
 hook recheck and manual classification mutually exclusive across processes.
 
-### 3.1 Final capability matrix
+### 3.1 Persisted evidence-pair inventory
+
+Every persisted column whose name ends in `_json` has one declared SHA-256
+digest and an authoritative SQLite validation boundary. Digest length alone is
+never content integrity. The complete executable inventory is:
+
+| Table | JSON/BLOB and digest | Ownership class | Authoritative validation |
+| --- | --- | --- | --- |
+| `authority_metadata` | `metadata_json` / `metadata_digest` | owned at insert | metadata `BEFORE INSERT` trigger |
+| `schema_migrations` | `migration_json` / `migration_digest` | owned at insert | migration `BEFORE INSERT` trigger |
+| `sessions` | `request_json` / `request_digest` | owned at insert | session `BEFORE INSERT` trigger |
+| `attempts` | `request_json` / `request_digest` | copied from session | exact parent bytes/digest plus hash at attempt insert |
+| `attempts` | allocation evidence and attempt evidence JSON/digest pairs | owned at insert | attempt `BEFORE INSERT` trigger |
+| `provider_call_claims` | `request_json` / `request_digest` | copied from attempt | exact parent bytes/digest plus hash at claim insert |
+| `provider_call_claims` | claim evidence JSON/digest | owned at insert | claim `BEFORE INSERT` trigger |
+| `launch_reservations` | reservation evidence JSON/digest | owned at insert | reservation `BEFORE INSERT` trigger |
+| `launch_reservations` | process-intent and process-creation-failure JSON/digest pairs | appended on update | controlled null-to-value transition triggers |
+| `launch_executions` | process-creation, Job Object, and resume-authorization JSON/digest pairs | owned at insert | execution `BEFORE INSERT` trigger |
+| `launch_executions` | resume-intent, post-resume, and cleanup JSON/digest pairs | appended on update | controlled null-to-value transition triggers |
+| `terminals` | terminal evidence and sanitized-diagnostics JSON/digest pairs | owned at insert | terminal `BEFORE INSERT` trigger, before the terminal matrix |
+| `session_selections` | selection evidence JSON/digest | owned at insert | selection `BEFORE INSERT` trigger |
+| `manual_recoveries` | operator evidence JSON/digest | owned at insert | recovery `BEFORE INSERT` trigger |
+
+For every owned or appended pair, SQLite requires
+`sha256(blob) IS digest` at the write that first persists the bytes. Copied
+request pairs additionally require exact immediate-parent byte and digest
+equality. Parent evidence is immutable, so later parent drift is rejected.
+Append triggers require an exact null-to-paired-value transition and reject the
+whole update atomically on a wrong digest. Terminal evidence and sanitized
+diagnostics are validated before any `SUCCEEDED`, `FAILED`, `AMBIGUOUS`, or
+`CLOSED` matrix entry can be accepted; malformed terminal evidence therefore
+cannot become a selected success.
+
+Several digest columns intentionally have different semantics and are not the
+hash of an adjacent JSON column: `bootstrap_digest` authenticates the signed
+bootstrap bytes; `database_identity_digest` binds the provisioned database;
+`application_release_digest` binds release material; reservation and terminal
+`request_digest` values copy the canonical request hash without another local
+request blob; terminal `snapshot_digest` hashes verified snapshot content; and
+selection `snapshot_digest` copies that terminal snapshot hash. These columns
+retain their existing lineage or external-artifact rules and are not falsely
+treated as JSON pairs.
+
+This content-integrity layer is separate from lineage, which proves copied
+facts match their immediate parent; provenance, which is modeled by private
+typed issuers and process-local one-shot permits; exclusion, which is provided
+by the OS-backed inter-process arbiter; and external effects, which SQLite
+cannot prove occurred at a provider or Windows API boundary.
+
+### 3.2 Final capability matrix
 
 Canonical bytes and SHA-256 digests establish content integrity only. The
 matrix deliberately separates durable SQLite state, process-local typed-object

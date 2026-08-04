@@ -220,6 +220,14 @@ CREATE TABLE manual_recoveries (
     UNIQUE (session_id, recovery_ordinal)
 );
 
+CREATE TRIGGER authority_metadata_before_insert
+BEFORE INSERT ON authority_metadata
+FOR EACH ROW
+BEGIN
+    SELECT CASE WHEN sha256(NEW.metadata_json) IS NOT NEW.metadata_digest
+        THEN RAISE(ABORT, 'authority metadata evidence digest is invalid') END;
+END;
+
 CREATE TRIGGER authority_metadata_no_update
 BEFORE UPDATE ON authority_metadata
 BEGIN
@@ -238,6 +246,14 @@ BEGIN
     SELECT RAISE(ABORT, 'schema migrations are immutable');
 END;
 
+CREATE TRIGGER schema_migrations_before_insert
+BEFORE INSERT ON schema_migrations
+FOR EACH ROW
+BEGIN
+    SELECT CASE WHEN sha256(NEW.migration_json) IS NOT NEW.migration_digest
+        THEN RAISE(ABORT, 'migration evidence digest is invalid') END;
+END;
+
 CREATE TRIGGER schema_migrations_no_delete
 BEFORE DELETE ON schema_migrations
 BEGIN
@@ -248,6 +264,8 @@ CREATE TRIGGER sessions_before_insert
 BEFORE INSERT ON sessions
 FOR EACH ROW
 BEGIN
+    SELECT CASE WHEN sha256(NEW.request_json) IS NOT NEW.request_digest
+        THEN RAISE(ABORT, 'session request digest is invalid') END;
     SELECT CASE WHEN NOT EXISTS (
         SELECT 1 FROM authority_metadata m
         WHERE m.authority_epoch_id = NEW.authority_epoch_id
@@ -338,6 +356,14 @@ CREATE TRIGGER attempts_before_insert
 BEFORE INSERT ON attempts
 FOR EACH ROW
 BEGIN
+    SELECT CASE WHEN sha256(NEW.request_json) IS NOT NEW.request_digest
+        THEN RAISE(ABORT, 'attempt request digest is invalid') END;
+    SELECT CASE WHEN sha256(NEW.allocation_evidence_json)
+        IS NOT NEW.allocation_evidence_digest
+        THEN RAISE(ABORT, 'attempt allocation evidence digest is invalid') END;
+    SELECT CASE WHEN sha256(NEW.attempt_evidence_json)
+        IS NOT NEW.attempt_evidence_digest
+        THEN RAISE(ABORT, 'attempt evidence digest is invalid') END;
     SELECT CASE WHEN NOT EXISTS (
         SELECT 1 FROM sessions
         WHERE session_id = NEW.session_id AND state = 'OPEN'
@@ -430,6 +456,10 @@ CREATE TRIGGER provider_call_claims_before_insert
 BEFORE INSERT ON provider_call_claims
 FOR EACH ROW
 BEGIN
+    SELECT CASE WHEN sha256(NEW.request_json) IS NOT NEW.request_digest
+        THEN RAISE(ABORT, 'claim request digest is invalid') END;
+    SELECT CASE WHEN sha256(NEW.claim_evidence_json) IS NOT NEW.claim_evidence_digest
+        THEN RAISE(ABORT, 'claim evidence digest is invalid') END;
     SELECT CASE WHEN NOT EXISTS (
         SELECT 1
         FROM attempts a
@@ -521,6 +551,9 @@ CREATE TRIGGER launch_reservations_before_insert
 BEFORE INSERT ON launch_reservations
 FOR EACH ROW
 BEGIN
+    SELECT CASE WHEN sha256(NEW.reservation_evidence_json)
+        IS NOT NEW.reservation_evidence_digest
+        THEN RAISE(ABORT, 'reservation evidence digest is invalid') END;
     SELECT CASE WHEN NOT (
         NEW.reservation_state = 'COMMITTED'
         AND NEW.process_intent_json IS NULL
@@ -738,16 +771,25 @@ END;
 CREATE TRIGGER launch_executions_before_insert
 BEFORE INSERT ON launch_executions
 FOR EACH ROW
-WHEN NEW.phase <> 'PRE_RESUME_READY'
-  OR NEW.resume_intent_json IS NOT NULL
-  OR NEW.resume_intent_digest IS NOT NULL
-  OR NEW.resume_intent_committed_at_utc IS NOT NULL
-  OR NEW.post_resume_json IS NOT NULL
-  OR NEW.post_resume_digest IS NOT NULL
-  OR NEW.cleanup_json IS NOT NULL
-  OR NEW.cleanup_digest IS NOT NULL
 BEGIN
-    SELECT RAISE(ABORT, 'launch execution must begin pre-resume without post evidence');
+    SELECT CASE WHEN sha256(NEW.process_creation_json)
+        IS NOT NEW.process_creation_digest
+        THEN RAISE(ABORT, 'process creation evidence digest is invalid') END;
+    SELECT CASE WHEN sha256(NEW.job_object_json) IS NOT NEW.job_object_digest
+        THEN RAISE(ABORT, 'job object evidence digest is invalid') END;
+    SELECT CASE WHEN sha256(NEW.resume_authorization_json)
+        IS NOT NEW.resume_authorization_digest
+        THEN RAISE(ABORT, 'resume authorization evidence digest is invalid') END;
+    SELECT CASE WHEN NOT (
+        NEW.phase = 'PRE_RESUME_READY'
+        AND NEW.resume_intent_json IS NULL
+        AND NEW.resume_intent_digest IS NULL
+        AND NEW.resume_intent_committed_at_utc IS NULL
+        AND NEW.post_resume_json IS NULL
+        AND NEW.post_resume_digest IS NULL
+        AND NEW.cleanup_json IS NULL
+        AND NEW.cleanup_digest IS NULL
+    ) THEN RAISE(ABORT, 'launch execution must begin pre-resume without post evidence') END;
 END;
 
 CREATE TRIGGER launch_executions_parent_policy_before_insert
@@ -840,6 +882,11 @@ CREATE TRIGGER terminals_before_insert
 BEFORE INSERT ON terminals
 FOR EACH ROW
 BEGIN
+    SELECT CASE WHEN sha256(NEW.evidence_json) IS NOT NEW.evidence_digest
+        THEN RAISE(ABORT, 'terminal evidence digest is invalid') END;
+    SELECT CASE WHEN sha256(NEW.sanitized_diagnostics_json)
+        IS NOT NEW.sanitized_diagnostics_digest
+        THEN RAISE(ABORT, 'terminal diagnostics digest is invalid') END;
     SELECT CASE WHEN NOT EXISTS (
         SELECT 1 FROM launch_reservations
         WHERE launch_reservation_id = NEW.launch_reservation_id
@@ -916,6 +963,9 @@ CREATE TRIGGER session_selections_before_insert
 BEFORE INSERT ON session_selections
 FOR EACH ROW
 BEGIN
+    SELECT CASE WHEN sha256(NEW.selection_evidence_json)
+        IS NOT NEW.selection_evidence_digest
+        THEN RAISE(ABORT, 'selection evidence digest is invalid') END;
     SELECT CASE WHEN NOT EXISTS (
         SELECT 1 FROM sessions
         WHERE session_id = NEW.session_id AND state = 'OPEN'

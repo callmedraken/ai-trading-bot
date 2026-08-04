@@ -130,6 +130,59 @@ protects against compromised trusted-token code. Cross-row triggers are
 limited to database facts reachable through normalized immediate-parent joins
 and do not inspect or prove excluded Windows effects.
 
+### Persisted evidence-pair inventory and negative matrix
+
+The schema audit must discover every column ending in `_json`, map it to its
+declared SHA-256 digest, and compare the discovered set with this complete
+inventory. A future persisted JSON column without an inventory entry or an
+authoritative digest guard fails the test.
+
+| Table | Persisted JSON/digest pairs | Ownership and authoritative boundary |
+| --- | --- | --- |
+| `authority_metadata` | metadata | owned; metadata insert trigger |
+| `schema_migrations` | migration | owned; migration insert trigger |
+| `sessions` | request | owned; session insert trigger |
+| `attempts` | request; allocation evidence; attempt evidence | copied from session; owned; owned; attempt insert trigger |
+| `provider_call_claims` | request; claim evidence | copied from attempt; owned; claim insert trigger |
+| `launch_reservations` | reservation evidence; process intent; process-creation failure | owned at insert; appended on update; appended on update |
+| `launch_executions` | process creation; Job Object; resume authorization; resume intent; post-resume; cleanup | first three owned at insert; last three appended on update |
+| `terminals` | terminal evidence; sanitized diagnostics | owned; terminal insert trigger before the state/disposition matrix |
+| `session_selections` | selection evidence | owned; selection insert trigger |
+| `manual_recoveries` | operator evidence | owned; recovery insert trigger |
+
+For each owned-at-insert pair, the table-driven boundary test supplies changed
+bytes with the prior digest and a changed digest with the prior bytes, and
+requires the whole direct-SQL insert to fail. For copied request pairs, it also
+supplies internally hash-valid child bytes/digest that differ from the
+immediate parent, then attempts parent drift; both fail without child, state,
+or counter side effects. For append-on-update pairs, it supplies the wrong
+digest during the only permitted null-to-value transition and requires the
+entire row to remain unchanged.
+
+Terminal cases exercise `SUCCEEDED`, `FAILED`, `AMBIGUOUS`, and `CLOSED` with
+both terminal-evidence and diagnostics bytes/digest mismatches. A malformed
+successful terminal must not exist and therefore cannot be selected. Selection
+cases independently corrupt the selection-evidence bytes and digest and prove
+that the session state, attempt state, and counters remain unchanged. Every
+negative path is followed by the corresponding valid insert or lifecycle so
+the test distinguishes a digest rejection from an accidentally impossible
+fixture state.
+
+The audit treats `migration_digest` as the SHA-256 of `migration_json`.
+`bootstrap_digest`, `database_identity_digest`, and
+`application_release_digest` instead bind their named signed/bootstrap,
+database, and release material. Reservation/terminal request digests are
+lineage copies without a local JSON blob; terminal snapshot digest validates
+snapshot content and selection snapshot digest copies it. These intentionally
+different semantics are asserted so the `_json` inventory neither omits a
+content pair nor invents a false adjacent pair.
+
+Acceptance distinguishes five independent properties: content integrity is
+the SQLite `sha256(blob) IS digest` write guard; lineage is exact
+immediate-parent equality; provenance is the reviewed private typed issuer and
+one-shot permit model; exclusion is the OS-backed inter-process arbiter; and
+external provider or Windows effects remain outside SQLite's proof boundary.
+
 ## 3. Schema execution gates
 
 The first gate runs the complete DDL with foreign keys enabled and asserts:

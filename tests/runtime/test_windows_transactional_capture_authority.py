@@ -63,6 +63,101 @@ CAPTURE_REQUEST_FIELDS = frozenset(
         "target_session_date",
     }
 )
+EVIDENCE_PAIR_INVENTORY = {
+    ("authority_metadata", "metadata_json", "metadata_digest"): (
+        "owned-insert",
+        "authority_metadata_before_insert",
+    ),
+    ("schema_migrations", "migration_json", "migration_digest"): (
+        "owned-insert",
+        "schema_migrations_before_insert",
+    ),
+    ("sessions", "request_json", "request_digest"): (
+        "owned-insert",
+        "sessions_before_insert",
+    ),
+    ("attempts", "request_json", "request_digest"): (
+        "copied-parent",
+        "attempts_before_insert",
+    ),
+    (
+        "attempts",
+        "allocation_evidence_json",
+        "allocation_evidence_digest",
+    ): ("owned-insert", "attempts_before_insert"),
+    ("attempts", "attempt_evidence_json", "attempt_evidence_digest"): (
+        "owned-insert",
+        "attempts_before_insert",
+    ),
+    ("provider_call_claims", "request_json", "request_digest"): (
+        "copied-parent",
+        "provider_call_claims_before_insert",
+    ),
+    (
+        "provider_call_claims",
+        "claim_evidence_json",
+        "claim_evidence_digest",
+    ): ("owned-insert", "provider_call_claims_before_insert"),
+    (
+        "launch_reservations",
+        "reservation_evidence_json",
+        "reservation_evidence_digest",
+    ): ("owned-insert", "launch_reservations_before_insert"),
+    ("launch_reservations", "process_intent_json", "process_intent_digest"): (
+        "appended-update",
+        "launch_reservations_process_intent_append_only",
+    ),
+    (
+        "launch_reservations",
+        "process_creation_failure_json",
+        "process_creation_failure_digest",
+    ): ("appended-update", "launch_reservations_failure_evidence_guard"),
+    (
+        "launch_executions",
+        "process_creation_json",
+        "process_creation_digest",
+    ): ("owned-insert", "launch_executions_before_insert"),
+    ("launch_executions", "job_object_json", "job_object_digest"): (
+        "owned-insert",
+        "launch_executions_before_insert",
+    ),
+    (
+        "launch_executions",
+        "resume_authorization_json",
+        "resume_authorization_digest",
+    ): ("owned-insert", "launch_executions_before_insert"),
+    ("launch_executions", "resume_intent_json", "resume_intent_digest"): (
+        "appended-update",
+        "launch_executions_resume_intent_append_only",
+    ),
+    ("launch_executions", "post_resume_json", "post_resume_digest"): (
+        "appended-update",
+        "launch_executions_post_resume_append_only",
+    ),
+    ("launch_executions", "cleanup_json", "cleanup_digest"): (
+        "appended-update",
+        "launch_executions_cleanup_append_only",
+    ),
+    ("terminals", "evidence_json", "evidence_digest"): (
+        "owned-insert",
+        "terminals_before_insert",
+    ),
+    (
+        "terminals",
+        "sanitized_diagnostics_json",
+        "sanitized_diagnostics_digest",
+    ): ("owned-insert", "terminals_before_insert"),
+    (
+        "session_selections",
+        "selection_evidence_json",
+        "selection_evidence_digest",
+    ): ("owned-insert", "session_selections_before_insert"),
+    (
+        "manual_recoveries",
+        "operator_evidence_json",
+        "operator_evidence_digest",
+    ): ("owned-insert", "manual_recoveries_before_insert"),
+}
 _RESUME_INTENT_ISSUER = object()
 _PROCESS_INTENT_ISSUER = object()
 _PROCESS_RESULT_ISSUER = object()
@@ -605,10 +700,29 @@ def _insert_terminal_row_for_test(
     state: str,
     disposition: str,
     snapshot_mode: str = "auto",
+    *,
+    evidence_json: bytes | None = None,
+    evidence_digest: bytes | None = None,
+    diagnostics_json: bytes | None = None,
+    diagnostics_digest: bytes | None = None,
 ) -> str:
     terminal_id = _terminal_id(reservation_id, TERMINAL_POLICY)
-    evidence, evidence_digest = _evidence(f"raw-terminal:{reservation_id}")
-    diagnostics, diagnostics_digest = _evidence("raw-diagnostics")
+    generated_evidence, generated_evidence_digest = _evidence(
+        f"raw-terminal:{reservation_id}"
+    )
+    generated_diagnostics, generated_diagnostics_digest = _evidence("raw-diagnostics")
+    evidence = generated_evidence if evidence_json is None else evidence_json
+    evidence_hash = (
+        generated_evidence_digest if evidence_digest is None else evidence_digest
+    )
+    diagnostics = (
+        generated_diagnostics if diagnostics_json is None else diagnostics_json
+    )
+    diagnostics_hash = (
+        generated_diagnostics_digest
+        if diagnostics_digest is None
+        else diagnostics_digest
+    )
     snapshot = (
         _digest(b"raw-snapshot")
         if snapshot_mode == "present"
@@ -633,10 +747,10 @@ def _insert_terminal_row_for_test(
             disposition,
             request_digest,
             evidence,
-            evidence_digest,
+            evidence_hash,
             snapshot,
             diagnostics,
-            diagnostics_digest,
+            diagnostics_hash,
             TERMINAL_TIMESTAMP,
         ),
     )
@@ -3840,6 +3954,427 @@ def test_complete_ddl_and_immediate_parent_chain(db_path: Path) -> None:
     connection.close()
 
 
+def test_complete_evidence_pair_inventory_has_authoritative_digest_guards(
+    db_path: Path,
+) -> None:
+    connection = _connect(db_path)
+    discovered: set[tuple[str, str, str]] = set()
+    tables = [
+        row[0]
+        for row in connection.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'table'"
+        )
+    ]
+    for table in tables:
+        columns = {row[1] for row in connection.execute(f"PRAGMA table_info({table})")}
+        for blob_column in (column for column in columns if column.endswith("_json")):
+            digest_column = (
+                "migration_digest"
+                if (table, blob_column) == ("schema_migrations", "migration_json")
+                else f"{blob_column.removesuffix('json')}digest"
+            )
+            assert digest_column in columns
+            discovered.add((table, blob_column, digest_column))
+    assert discovered == set(EVIDENCE_PAIR_INVENTORY)
+
+    for (table, blob_column, digest_column), (
+        classification,
+        trigger,
+    ) in EVIDENCE_PAIR_INVENTORY.items():
+        assert classification in {"owned-insert", "copied-parent", "appended-update"}
+        trigger_sql = connection.execute(
+            "SELECT sql FROM sqlite_master WHERE type = 'trigger' AND name = ?",
+            (trigger,),
+        ).fetchone()
+        assert trigger_sql is not None, (table, blob_column, trigger)
+        compact_sql = " ".join(trigger_sql[0].split())
+        valid_pair = f"sha256(NEW.{blob_column}) IS NEW.{digest_column}"
+        invalid_pair = f"sha256(NEW.{blob_column}) IS NOT NEW.{digest_column}"
+        assert valid_pair in compact_sql or invalid_pair in compact_sql
+
+    distinct_digest_semantics = {
+        ("authority_metadata", "bootstrap_digest"),
+        ("authority_metadata", "database_identity_digest"),
+        ("schema_migrations", "application_release_digest"),
+        ("launch_reservations", "request_digest"),
+        ("terminals", "request_digest"),
+        ("terminals", "snapshot_digest"),
+        ("session_selections", "snapshot_digest"),
+    }
+    for table, digest_column in distinct_digest_semantics:
+        columns = {row[1] for row in connection.execute(f"PRAGMA table_info({table})")}
+        assert digest_column in columns
+        assert all(
+            not (inventory_table == table and inventory_digest == digest_column)
+            for inventory_table, _, inventory_digest in EVIDENCE_PAIR_INVENTORY
+        )
+    connection.close()
+
+
+def _prepare_owned_insert_parent(
+    connection: sqlite3.Connection, table: str
+) -> dict[str, Any]:
+    context: dict[str, Any] = {}
+    if table == "authority_metadata":
+        return context
+    _insert_metadata(connection)
+    if table == "schema_migrations":
+        return context
+    _insert_migration(connection)
+    if table == "sessions":
+        return context
+    context["session_id"] = create_session(connection)
+    if table == "attempts":
+        return context
+    context["attempt_id"] = allocate_attempt(connection, context["session_id"])
+    if table == "provider_call_claims":
+        return context
+    context["claim_id"] = commit_claim(connection, context["attempt_id"])
+    if table == "launch_reservations":
+        return context
+    context["reservation_id"] = reserve_launch(connection, context["claim_id"])
+    if table == "manual_recoveries":
+        return context
+    if table == "launch_executions":
+        context["process_intent"] = _construct_provider_and_commit_process_intent(
+            connection, context["reservation_id"]
+        )
+        return context
+    context["execution_id"] = _record_successful_process(
+        connection, context["reservation_id"]
+    )
+    _resume_and_persist(connection, context["execution_id"], context["reservation_id"])
+    if table == "terminals":
+        return context
+    assert table == "session_selections"
+    context["terminal_id"] = record_terminal(connection, context["reservation_id"])
+    return context
+
+
+def _create_owned_insert_candidate(
+    connection: sqlite3.Connection, table: str, context: dict[str, Any]
+) -> None:
+    if table == "authority_metadata":
+        _insert_metadata(connection)
+    elif table == "schema_migrations":
+        _insert_migration(connection)
+    elif table == "sessions":
+        create_session(connection)
+    elif table == "attempts":
+        allocate_attempt(connection, context["session_id"])
+    elif table == "provider_call_claims":
+        commit_claim(connection, context["attempt_id"])
+    elif table == "launch_reservations":
+        reserve_launch(connection, context["claim_id"])
+    elif table == "launch_executions":
+        receipt = FakeSideEffects(connection).create_process(context["process_intent"])
+        assert type(receipt) is FakeProcessCreationReceipt
+        record_execution(connection, context["reservation_id"], receipt)
+    elif table == "terminals":
+        record_terminal(connection, context["reservation_id"])
+    elif table == "session_selections":
+        select_terminal(connection, context["session_id"], context["terminal_id"])
+    else:
+        assert table == "manual_recoveries"
+        record_recovery(
+            connection,
+            context["session_id"],
+            "LAUNCH_RESERVATION",
+            context["reservation_id"],
+            "CLASSIFY_LAUNCH_RESERVATION",
+        )
+
+
+def _database_rows(connection: sqlite3.Connection) -> dict[str, list[tuple[Any, ...]]]:
+    tables = [
+        row[0]
+        for row in connection.execute(
+            "SELECT name FROM sqlite_master "
+            "WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
+        )
+    ]
+    return {
+        table: connection.execute(f"SELECT * FROM {table} ORDER BY rowid").fetchall()
+        for table in tables
+    }
+
+
+@pytest.mark.parametrize(
+    "owned_pair",
+    [
+        pair
+        for pair, (classification, _) in EVIDENCE_PAIR_INVENTORY.items()
+        if classification == "owned-insert"
+    ],
+    ids=lambda pair: f"{pair[0]}-{pair[1]}",
+)
+@pytest.mark.parametrize("invalid_part", ["bytes", "digest"])
+def test_every_owned_insert_pair_rejects_direct_sql_mismatch_atomically(
+    tmp_path: Path,
+    owned_pair: tuple[str, str, str],
+    invalid_part: str,
+) -> None:
+    table, blob_column, digest_column = owned_pair
+    base = _connect(tmp_path / "owned-pair-base.sqlite3")
+    _install_schema(base)
+    context = _prepare_owned_insert_parent(base, table)
+
+    candidate = _connect(tmp_path / "owned-pair-candidate.sqlite3")
+    base.backup(candidate)
+    _create_owned_insert_candidate(candidate, table, context)
+    columns = [row[1] for row in candidate.execute(f"PRAGMA table_info({table})")]
+    values = list(candidate.execute(f"SELECT * FROM {table}").fetchone())
+    candidate.close()
+
+    if invalid_part == "bytes":
+        values[columns.index(blob_column)] += b" "
+    else:
+        values[columns.index(digest_column)] = _digest(b"wrong-owned-pair-digest")
+    placeholders = ", ".join("?" for _ in columns)
+    before = _database_rows(base)
+    with pytest.raises(sqlite3.IntegrityError, match="digest is invalid"):
+        base.execute(
+            f"INSERT INTO {table} ({', '.join(columns)}) VALUES ({placeholders})",
+            values,
+        )
+    assert _database_rows(base) == before
+    base.close()
+
+
+@pytest.mark.parametrize("copied_pair", ["attempt-request", "claim-request"])
+def test_copied_request_pairs_reject_child_mismatch_and_parent_drift(
+    db_path: Path, copied_pair: str
+) -> None:
+    connection = _connect(db_path)
+    session_id = create_session(connection)
+    request_json, request_digest = connection.execute(
+        "SELECT request_json, request_digest FROM sessions WHERE session_id = ?",
+        (session_id,),
+    ).fetchone()
+    drifted_json = request_json + b" "
+    drifted_digest = _digest(drifted_json)
+    if copied_pair == "attempt-request":
+        with pytest.raises(sqlite3.IntegrityError, match="attempt parent binding"):
+            _insert_attempt_row_for_test(
+                connection,
+                session_id,
+                0,
+                drifted_json,
+                drifted_digest,
+            )
+        assert connection.execute("SELECT count(*) FROM attempts").fetchone() == (0,)
+        assert connection.execute(
+            "SELECT next_attempt_ordinal FROM sessions WHERE session_id = ?",
+            (session_id,),
+        ).fetchone() == (0,)
+        parent_table = "sessions"
+        parent_key = "session_id"
+        parent_id = session_id
+    else:
+        attempt_id = allocate_attempt(connection, session_id)
+        with pytest.raises(sqlite3.IntegrityError, match="claim admission"):
+            _insert_claim_row_for_test(
+                connection,
+                attempt_id,
+                drifted_json,
+                drifted_digest,
+            )
+        assert connection.execute(
+            "SELECT count(*) FROM provider_call_claims"
+        ).fetchone() == (0,)
+        assert connection.execute(
+            "SELECT state FROM attempts WHERE attempt_id = ?", (attempt_id,)
+        ).fetchone() == ("ALLOCATED",)
+        parent_table = "attempts"
+        parent_key = "attempt_id"
+        parent_id = attempt_id
+
+    with pytest.raises(sqlite3.IntegrityError, match="immutable"):
+        connection.execute(
+            f"UPDATE {parent_table} SET request_json = ?, request_digest = ? "
+            f"WHERE {parent_key} = ?",
+            (drifted_json, drifted_digest, parent_id),
+        )
+    assert connection.execute(
+        f"SELECT request_json, request_digest FROM {parent_table} "
+        f"WHERE {parent_key} = ?",
+        (parent_id,),
+    ).fetchone() == (request_json, request_digest)
+    connection.close()
+
+
+@pytest.mark.parametrize(
+    "appended_pair",
+    [
+        "process-intent",
+        "process-failure",
+        "resume-intent",
+        "post-resume",
+        "cleanup",
+    ],
+)
+def test_append_on_update_pairs_reject_wrong_digest_atomically(
+    db_path: Path, appended_pair: str
+) -> None:
+    connection = _connect(db_path)
+    session_id = create_session(connection)
+    attempt_id = allocate_attempt(connection, session_id)
+    claim_id = commit_claim(connection, attempt_id)
+    reservation_id = reserve_launch(connection, claim_id)
+    wrong_digest = _digest(b"wrong-appended-evidence")
+
+    if appended_pair == "process-intent":
+        request_digest, authority_policy, claim_policy = connection.execute(
+            "SELECT request_digest, authority_policy_version, claim_policy_version "
+            "FROM launch_reservations WHERE launch_reservation_id = ?",
+            (reservation_id,),
+        ).fetchone()
+        intent_json = _process_intent_json(
+            reservation_id, request_digest, authority_policy, claim_policy
+        )
+        before = connection.execute(
+            "SELECT reservation_state, process_intent_json, process_intent_digest, "
+            "process_intent_committed_at_utc FROM launch_reservations "
+            "WHERE launch_reservation_id = ?",
+            (reservation_id,),
+        ).fetchone()
+        with pytest.raises(
+            sqlite3.IntegrityError, match="process intent|state transition"
+        ):
+            connection.execute(
+                "UPDATE launch_reservations SET reservation_state = "
+                "'PROCESS_INTENT_COMMITTED', process_intent_json = ?, "
+                "process_intent_digest = ?, process_intent_committed_at_utc = ? "
+                "WHERE launch_reservation_id = ?",
+                (
+                    intent_json,
+                    wrong_digest,
+                    PROCESS_INTENT_TIMESTAMP,
+                    reservation_id,
+                ),
+            )
+        after = connection.execute(
+            "SELECT reservation_state, process_intent_json, process_intent_digest, "
+            "process_intent_committed_at_utc FROM launch_reservations "
+            "WHERE launch_reservation_id = ?",
+            (reservation_id,),
+        ).fetchone()
+    elif appended_pair == "process-failure":
+        intent = _construct_provider_and_commit_process_intent(
+            connection, reservation_id
+        )
+        failure_json = _process_failure_json(reservation_id, intent.intent_digest)
+        before = connection.execute(
+            "SELECT reservation_state, process_creation_failure_json, "
+            "process_creation_failure_digest, outcome_recorded_at_utc "
+            "FROM launch_reservations WHERE launch_reservation_id = ?",
+            (reservation_id,),
+        ).fetchone()
+        with pytest.raises(sqlite3.IntegrityError, match="process.*failure|write-once"):
+            connection.execute(
+                "UPDATE launch_reservations SET reservation_state = "
+                "'PROCESS_CREATION_FAILED', process_creation_failure_json = ?, "
+                "process_creation_failure_digest = ?, outcome_recorded_at_utc = ? "
+                "WHERE launch_reservation_id = ?",
+                (
+                    failure_json,
+                    wrong_digest,
+                    PROCESS_FAILURE_TIMESTAMP,
+                    reservation_id,
+                ),
+            )
+        after = connection.execute(
+            "SELECT reservation_state, process_creation_failure_json, "
+            "process_creation_failure_digest, outcome_recorded_at_utc "
+            "FROM launch_reservations WHERE launch_reservation_id = ?",
+            (reservation_id,),
+        ).fetchone()
+        with _ISSUED_PROCESS_PERMITS_LOCK:
+            _ISSUED_PROCESS_PERMITS.pop(intent._permit, None)
+    else:
+        execution_id = _record_successful_process(connection, reservation_id)
+        if appended_pair == "resume-intent":
+            intent_json = _json(
+                {
+                    "execution_id": execution_id,
+                    "resume_operation": "ResumeThread",
+                    "schema": 1,
+                }
+            )
+            before = connection.execute(
+                "SELECT phase, resume_intent_json, resume_intent_digest, "
+                "resume_intent_committed_at_utc FROM launch_executions "
+                "WHERE launch_execution_id = ?",
+                (execution_id,),
+            ).fetchone()
+            with pytest.raises(sqlite3.IntegrityError, match="resume intent"):
+                connection.execute(
+                    "UPDATE launch_executions SET phase = 'RESUME_INTENT_COMMITTED', "
+                    "resume_intent_json = ?, resume_intent_digest = ?, "
+                    "resume_intent_committed_at_utc = ? WHERE launch_execution_id = ?",
+                    (
+                        intent_json,
+                        wrong_digest,
+                        RESUME_INTENT_TIMESTAMP,
+                        execution_id,
+                    ),
+                )
+            after = connection.execute(
+                "SELECT phase, resume_intent_json, resume_intent_digest, "
+                "resume_intent_committed_at_utc FROM launch_executions "
+                "WHERE launch_execution_id = ?",
+                (execution_id,),
+            ).fetchone()
+        else:
+            intent = commit_resume_intent(connection, execution_id, reservation_id)
+            post_resume = _json(
+                {
+                    "execution_id": execution_id,
+                    "resume_intent_digest": intent.intent_digest.hex(),
+                    "resume_result": "RESUMED",
+                    "schema": 1,
+                }
+            )
+            cleanup, cleanup_digest = _evidence(f"cleanup:{execution_id}")
+            post_digest = _digest(post_resume)
+            if appended_pair == "post-resume":
+                post_digest = wrong_digest
+            else:
+                cleanup_digest = wrong_digest
+            before = connection.execute(
+                "SELECT phase, post_resume_json, post_resume_digest, cleanup_json, "
+                "cleanup_digest FROM launch_executions WHERE launch_execution_id = ?",
+                (execution_id,),
+            ).fetchone()
+            with pytest.raises(sqlite3.IntegrityError, match="evidence|cleanup"):
+                connection.execute(
+                    "UPDATE launch_executions SET phase = 'RESUME_RECORDED', "
+                    "post_resume_json = ?, post_resume_digest = ?, cleanup_json = ?, "
+                    "cleanup_digest = ? WHERE launch_execution_id = ?",
+                    (
+                        post_resume,
+                        post_digest,
+                        cleanup,
+                        cleanup_digest,
+                        execution_id,
+                    ),
+                )
+            after = connection.execute(
+                "SELECT phase, post_resume_json, post_resume_digest, cleanup_json, "
+                "cleanup_digest FROM launch_executions WHERE launch_execution_id = ?",
+                (execution_id,),
+            ).fetchone()
+            with _ISSUED_RESUME_PERMITS_LOCK:
+                _ISSUED_RESUME_PERMITS.pop(intent._permit, None)
+    assert after == before
+    assert connection.execute(
+        "SELECT next_attempt_ordinal, next_recovery_ordinal FROM sessions "
+        "WHERE session_id = ?",
+        (session_id,),
+    ).fetchone() == (1, 0)
+    connection.close()
+
+
 def test_descendants_do_not_copy_ancestor_identity_columns(db_path: Path) -> None:
     connection = _connect(db_path)
     columns = {
@@ -4306,6 +4841,33 @@ def test_process_creation_failure_can_record_terminal_without_execution(
     connection.close()
 
 
+def _prepare_terminal_insert_path(
+    connection: sqlite3.Connection, state: str
+) -> tuple[str, str, str, str]:
+    session_id = create_session(connection)
+    attempt_id = allocate_attempt(connection, session_id)
+    claim_id = commit_claim(connection, attempt_id)
+    reservation_id = reserve_launch(connection, claim_id)
+    if state in {"SUCCEEDED", "AMBIGUOUS"}:
+        execution_id = _record_successful_process(connection, reservation_id)
+        _resume_and_persist(connection, execution_id, reservation_id)
+        disposition = "CONFIRMED" if state == "SUCCEEDED" else "MAY_HAVE_OCCURRED"
+    elif state == "FAILED":
+        _record_definitive_process_failure(connection, reservation_id)
+        disposition = "NOT_STARTED"
+    else:
+        assert state == "CLOSED"
+        record_recovery(
+            connection,
+            session_id,
+            "LAUNCH_RESERVATION",
+            reservation_id,
+            "CLASSIFY_LAUNCH_RESERVATION",
+        )
+        disposition = "MAY_HAVE_OCCURRED"
+    return session_id, attempt_id, reservation_id, disposition
+
+
 @pytest.mark.parametrize(
     ("state", "disposition", "preparation", "valid", "snapshot_mode"),
     [
@@ -4373,6 +4935,185 @@ def test_terminal_state_disposition_matrix(
                 snapshot_mode,
             )
         connection.rollback()
+    connection.close()
+
+
+@pytest.mark.parametrize("state", ["SUCCEEDED", "FAILED", "AMBIGUOUS", "CLOSED"])
+@pytest.mark.parametrize(
+    ("invalid_field", "invalid_value", "error"),
+    [
+        ("evidence_json", b'{"malformed":true}', "terminal evidence digest"),
+        ("evidence_digest", b"x" * 32, "terminal evidence digest"),
+        (
+            "diagnostics_json",
+            b'{"malformed":true}',
+            "terminal diagnostics digest",
+        ),
+        ("diagnostics_digest", b"y" * 32, "terminal diagnostics digest"),
+    ],
+)
+def test_terminal_owned_evidence_pairs_fail_atomically_at_direct_sql_insert(
+    db_path: Path,
+    state: str,
+    invalid_field: str,
+    invalid_value: bytes,
+    error: str,
+) -> None:
+    connection = _connect(db_path)
+    session_id, attempt_id, reservation_id, disposition = _prepare_terminal_insert_path(
+        connection, state
+    )
+    request_digest = connection.execute(
+        "SELECT request_digest FROM launch_reservations "
+        "WHERE launch_reservation_id = ?",
+        (reservation_id,),
+    ).fetchone()[0]
+    before = (
+        connection.execute(
+            "SELECT state, next_attempt_ordinal, next_recovery_ordinal "
+            "FROM sessions WHERE session_id = ?",
+            (session_id,),
+        ).fetchone(),
+        connection.execute(
+            "SELECT state FROM attempts WHERE attempt_id = ?", (attempt_id,)
+        ).fetchone(),
+        connection.execute(
+            "SELECT reservation_state, outcome_recorded_at_utc "
+            "FROM launch_reservations WHERE launch_reservation_id = ?",
+            (reservation_id,),
+        ).fetchone(),
+    )
+    with pytest.raises(sqlite3.IntegrityError, match=error):
+        _insert_terminal_row_for_test(
+            connection,
+            reservation_id,
+            request_digest,
+            state,
+            disposition,
+            **{invalid_field: invalid_value},
+        )
+    assert connection.execute("SELECT count(*) FROM terminals").fetchone() == (0,)
+    assert connection.execute("SELECT count(*) FROM session_selections").fetchone() == (
+        0,
+    )
+    after = (
+        connection.execute(
+            "SELECT state, next_attempt_ordinal, next_recovery_ordinal "
+            "FROM sessions WHERE session_id = ?",
+            (session_id,),
+        ).fetchone(),
+        connection.execute(
+            "SELECT state FROM attempts WHERE attempt_id = ?", (attempt_id,)
+        ).fetchone(),
+        connection.execute(
+            "SELECT reservation_state, outcome_recorded_at_utc "
+            "FROM launch_reservations WHERE launch_reservation_id = ?",
+            (reservation_id,),
+        ).fetchone(),
+    )
+    assert after == before
+
+    if state == "SUCCEEDED":
+        terminal_id = _terminal_id(reservation_id, TERMINAL_POLICY)
+        selection_evidence, selection_digest = _evidence("missing-terminal-selection")
+        with pytest.raises(sqlite3.IntegrityError):
+            connection.execute(
+                """
+                INSERT INTO session_selections (
+                    selection_id, session_id, terminal_id, selection_schema,
+                    selection_policy_version, snapshot_digest,
+                    selection_evidence_json, selection_evidence_digest,
+                    selected_at_utc
+                ) VALUES (?, ?, ?, 1, ?, ?, ?, ?, ?)
+                """,
+                (
+                    _selection_id(session_id, terminal_id, SELECTION_POLICY),
+                    session_id,
+                    terminal_id,
+                    SELECTION_POLICY,
+                    _digest(b"raw-snapshot"),
+                    selection_evidence,
+                    selection_digest,
+                    SELECTION_TIMESTAMP,
+                ),
+            )
+        assert connection.execute(
+            "SELECT state FROM sessions WHERE session_id = ?", (session_id,)
+        ).fetchone() == ("OPEN",)
+
+    valid_terminal_id = _insert_terminal_row_for_test(
+        connection, reservation_id, request_digest, state, disposition
+    )
+    assert connection.execute(
+        "SELECT terminal_id FROM terminals WHERE terminal_id = ?",
+        (valid_terminal_id,),
+    ).fetchone() == (valid_terminal_id,)
+    connection.close()
+
+
+@pytest.mark.parametrize("invalid_part", ["bytes", "digest"])
+def test_selection_evidence_pair_fails_atomically_at_direct_sql_insert(
+    db_path: Path, invalid_part: str
+) -> None:
+    connection = _connect(db_path)
+    session_id = create_session(connection)
+    attempt_id = allocate_attempt(connection, session_id)
+    claim_id = commit_claim(connection, attempt_id)
+    reservation_id = reserve_launch(connection, claim_id)
+    execution_id = _record_successful_process(connection, reservation_id)
+    _resume_and_persist(connection, execution_id, reservation_id)
+    terminal_id = record_terminal(connection, reservation_id)
+    snapshot_digest = connection.execute(
+        "SELECT snapshot_digest FROM terminals WHERE terminal_id = ?",
+        (terminal_id,),
+    ).fetchone()[0]
+    evidence, evidence_digest = _evidence(f"selection:{terminal_id}")
+    if invalid_part == "bytes":
+        evidence = b'{"malformed":true}'
+    else:
+        evidence_digest = b"z" * 32
+    before = connection.execute(
+        "SELECT state, next_attempt_ordinal, next_recovery_ordinal "
+        "FROM sessions WHERE session_id = ?",
+        (session_id,),
+    ).fetchone()
+    with pytest.raises(sqlite3.IntegrityError, match="selection evidence digest"):
+        connection.execute(
+            """
+            INSERT INTO session_selections (
+                selection_id, session_id, terminal_id, selection_schema,
+                selection_policy_version, snapshot_digest,
+                selection_evidence_json, selection_evidence_digest,
+                selected_at_utc
+            ) VALUES (?, ?, ?, 1, ?, ?, ?, ?, ?)
+            """,
+            (
+                _selection_id(session_id, terminal_id, SELECTION_POLICY),
+                session_id,
+                terminal_id,
+                SELECTION_POLICY,
+                snapshot_digest,
+                evidence,
+                evidence_digest,
+                SELECTION_TIMESTAMP,
+            ),
+        )
+    assert connection.execute("SELECT count(*) FROM session_selections").fetchone() == (
+        0,
+    )
+    assert (
+        connection.execute(
+            "SELECT state, next_attempt_ordinal, next_recovery_ordinal "
+            "FROM sessions WHERE session_id = ?",
+            (session_id,),
+        ).fetchone()
+        == before
+    )
+    assert connection.execute(
+        "SELECT state FROM attempts WHERE attempt_id = ?", (attempt_id,)
+    ).fetchone() == ("TERMINAL_RECORDED",)
+    selection_id = select_terminal(connection, session_id, terminal_id)
+    assert selection_id
     connection.close()
 
 

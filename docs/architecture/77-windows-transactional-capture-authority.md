@@ -263,9 +263,10 @@ claim in that session has the one retry-safe prior outcome.
 
 That sole retry-safe outcome is an attempt in `TERMINAL_RECORDED` whose claim
 has one reservation in `TERMINAL_RECORDED`, immutable SHA-256-valid
-process-creation-failure evidence, a `FAILED`/`NOT_STARTED` terminal without a
-snapshot, and no `launch_execution`. All other prior lineages block: no
-reservation; `COMMITTED`; `PROCESS_CREATION_FAILED` without its terminal;
+process-intent and process-creation-failure evidence, a
+`FAILED`/`NOT_STARTED` terminal without a snapshot, and no `launch_execution`.
+All other prior lineages block: no reservation; `COMMITTED`;
+`PROCESS_INTENT_COMMITTED`; `PROCESS_CREATION_FAILED` without its terminal;
 `PROCESS_CREATED` without an execution; `MANUAL_REVIEW`; any execution phase,
 including `PRE_RESUME_READY`, `RESUME_INTENT_COMMITTED`, `RESUME_RECORDED`, or
 `POST_RESUME_AMBIGUOUS`; any `SUCCEEDED`, `AMBIGUOUS`, or `CLOSED` terminal;
@@ -279,30 +280,69 @@ on this trigger for the same direct-SQL and helper boundary.
 Reservations reference only `claim_id`, which is `NOT NULL UNIQUE` and
 references `provider_call_claims(claim_id)`. They store their own deterministic
 identity, schema/release/policy bindings, request digest, immutable reservation
-evidence, controlled reservation outcome, process-creation-failure evidence,
-and timestamps. They have no session, attempt, allocation, or epoch columns.
+evidence, append-only process-intent evidence, controlled reservation outcome,
+process-creation-failure evidence, and timestamps. They have no session,
+attempt, allocation, or epoch columns.
 
-`COMMITTED` is the pre-`CreateProcessW` fence. The controlled outcomes are
-`PROCESS_CREATED`, `PROCESS_CREATION_FAILED`, `MANUAL_REVIEW`, and
-`TERMINAL_RECORDED`. There is no reclamation, expiry, replacement, or second
-reservation path.
+`COMMITTED` is the conservative reservation-only state before process authority
+is allocated. The controlled sequence is `COMMITTED ->
+PROCESS_INTENT_COMMITTED -> PROCESS_CREATED | PROCESS_CREATION_FAILED |
+MANUAL_REVIEW`, followed where valid by `TERMINAL_RECORDED`. The separate
+`COMMITTED -> MANUAL_REVIEW` recovery path remains available before an intent
+exists. There is no reclamation, expiry, replacement, or second reservation or
+intent path.
 
 Reservation creation reads the exact request digest from its immediate claim
 parent, its claim policy from that claim, and authority policy from the
 normalized `claim -> attempt -> session` lineage. Reservation identity and row
 values receive those persisted facts explicitly. The reservation insert
 trigger verifies the request, claim-policy, and session-authority-policy
-bindings and requires every inserted reservation to start exactly in `COMMITTED`, with
-process-creation-failure evidence and `outcome_recorded_at_utc` all null. A
-known process-creation failure is therefore a later one-time
-`COMMITTED -> PROCESS_CREATION_FAILED` update with matching evidence and a
-non-null outcome timestamp; the failure pair cannot be replaced, cleared, or
-partially written.
+bindings and requires every inserted reservation to start exactly in
+`COMMITTED`, with process-intent, process-creation-failure, and outcome facts
+all null.
+
+`commit_process_intent(connection, reservation_id) -> FakeProcessIntent` owns
+the one-shot `CreateProcessW` fence. In one `BEGIN IMMEDIATE` transaction it
+requires exactly `COMMITTED`; verifies the claim state, request bytes/digests,
+claim and reservation evidence digests, provider operation and budget, and
+authority/claim policy lineage; appends one exact canonical intent; records its
+SHA-256 digest and commit timestamp; advances to
+`PROCESS_INTENT_COMMITTED`; and commits before any process hook:
+
+```json
+{"authority_policy_version":"<authority policy>","claim_policy_version":"<claim policy>","launch_reservation_id":"<reservation id>","process_operation":"CreateProcessW","request_digest":"<lowercase hex>","schema":1}
+```
+
+Only the winning transaction receives an opaque in-memory `FakeProcessIntent`.
+The external adapter accepts that exact type and issuer, resolves its
+reservation, verifies the durable state and canonical bytes/digest, and
+consumes the permit once. A second acquisition, restart reconstruction,
+cross-reservation use, and permit reuse fail before the modeled external call.
+SQLite proves the durable ownership decision, not that Windows executed
+`CreateProcessW`.
+
+The adapter returns either an exact typed `FakeProcessCreationReceipt` for a
+suspended child with Job Object setup and resume authority, or an exact typed
+`FakeProcessCreationFailure` whose sole outcome is `NOT_CREATED`. Each result
+binds the reservation and committed intent digest and carries canonical
+schema-1 bytes plus SHA-256 digests. `record_execution` accepts only the exact
+successful receipt and persists its process, Job Object, and resume evidence;
+`record_process_creation_failure` accepts only the exact definitive failure.
+Missing, malformed, noncanonical, unknown/failed success, wrong-intent,
+cross-reservation, and reused results fail closed. Application helpers cannot
+fabricate process results.
+
+A known process-creation failure is a one-time
+`PROCESS_INTENT_COMMITTED -> PROCESS_CREATION_FAILED` update with matching
+canonical failure evidence and a non-null outcome timestamp. The intent and
+failure facts cannot be replaced, cleared, or partially written. This remains
+the only path to a retry-safe `FAILED`/`NOT_STARTED` terminal.
 
 `outcome_recorded_at_utc` records the first post-reservation outcome. It moves
-from null to a value exactly once on the first transition from `COMMITTED` to
-`PROCESS_CREATED`, `PROCESS_CREATION_FAILED`, or `MANUAL_REVIEW`. Every later
-transition, including `PROCESS_CREATED -> MANUAL_REVIEW` and
+from null to a value exactly once on the first transition to
+`PROCESS_CREATED`, `PROCESS_CREATION_FAILED`, or `MANUAL_REVIEW`. Committing a
+process intent leaves it null. Every later transition, including
+`PROCESS_CREATED -> MANUAL_REVIEW` and
 `TERMINAL_RECORDED`, preserves that exact value. Terminal recording cannot
 supply a missing timestamp or overwrite, clear, or replace the first one.
 
@@ -318,7 +358,9 @@ cleanup evidence, plus `resume_intent_json`, `resume_intent_digest`, and
 Execution creation reads `application_release_version` and
 `authority_policy_version` from its reservation and passes both explicitly to
 `launch_execution_id/v2` and the row. A normalized parent-policy trigger
-rejects a direct insert that changes either copied fact.
+rejects a direct insert that changes either copied fact or lacks a digest-valid
+`PROCESS_INTENT_COMMITTED` immediate parent. Execution evidence is copied only
+from the exact successful adapter receipt.
 
 `commit_resume_intent(connection, execution_id) -> FakeResumeIntent` owns the
 one-shot resume fence. In one `BEGIN IMMEDIATE` transaction it requires exactly
@@ -435,6 +477,7 @@ same session, and one exact closed action-matrix entry:
 | `RECORD_ATTEMPT_AMBIGUITY` | `ATTEMPT` | `LAUNCH_RESERVED` -> `AMBIGUITY_RECORDED` | record resume uncertainty; no fabricated attempt state |
 | `RECORD_CLAIM_AMBIGUITY` | `CLAIM` | `COMMITTED` -> `AMBIGUITY_RECORDED` | record uncertainty; claim remains permanent |
 | `CLASSIFY_LAUNCH_RESERVATION` | `LAUNCH_RESERVATION` | `COMMITTED` -> `MANUAL_REVIEW` | classify the existing reservation |
+| `CLASSIFY_PROCESS_OUTCOME_UNKNOWN` | `LAUNCH_RESERVATION` | `PROCESS_INTENT_COMMITTED` -> `MANUAL_REVIEW` | conservatively classify committed-process-intent uncertainty |
 | `CLASSIFY_PRE_RESUME_READY` | `LAUNCH_RESERVATION` | `PROCESS_CREATED` -> `MANUAL_REVIEW` | conservatively abandon a process that never received a resume intent |
 | `CLASSIFY_RESUME_OUTCOME_UNKNOWN` | `LAUNCH_RESERVATION` | `PROCESS_CREATED` -> `MANUAL_REVIEW` | conservatively classify the committed-intent/no-receipt ambiguity |
 | `SELECT_COMMITTED_SUCCESS` | `TERMINAL` | `SUCCEEDED` -> `SUCCESS_SELECTED` | invoke normal owning-session selection |
@@ -451,9 +494,21 @@ increment, and the reviewed transaction service performs any matrix-authorized
 state update in the same `BEGIN IMMEDIATE` transaction.
 
 `CLASSIFY_PRE_RESUME_READY` preserves the conservative operator path before
-intent allocation. It requires one digest-valid `PRE_RESUME_READY` execution
-with no intent, post-resume, or cleanup evidence, records `MANUAL_REVIEW`, and
-grants no resume or other external authority.
+resume-intent allocation. It requires one digest-valid `PRE_RESUME_READY`
+execution with no resume intent, post-resume, or cleanup evidence, records
+`MANUAL_REVIEW`, and grants no resume or other external authority.
+
+`CLASSIFY_PROCESS_OUTCOME_UNKNOWN` is the sole recovery from
+`PROCESS_INTENT_COMMITTED`. It requires digest-valid committed process-intent
+evidence, no execution, no definitive process-creation-failure evidence, and
+valid operator evidence. A crash after process-intent commit but before
+`CreateProcessW` and a crash after `CreateProcessW` but before result/evidence
+commit are persistently indistinguishable and therefore share this fail-closed
+classification. The transaction appends the immutable recovery row, advances
+the recovery counter, and moves the reservation to `MANUAL_REVIEW` atomically
+without changing the process-intent facts. It grants no replacement permit,
+process call, claim, or provider call and permits only the conservative
+`CLOSED`/`MAY_HAVE_OCCURRED` terminal and authorized session-close path.
 
 `CLASSIFY_RESUME_OUTCOME_UNKNOWN` is deliberately narrow. The reservation
 must belong to the open session, be `PROCESS_CREATED`, and own exactly one
@@ -694,8 +749,10 @@ fixed bootstrap/CNG/ACL/path verification
   -> permanent claim transaction and COMMIT
   -> credential/provider/network construction
   -> launch reservation transaction and COMMIT
-  -> CreateProcessW(CREATE_SUSPENDED)
-  -> Job Object and process evidence transaction and COMMIT
+  -> process-intent transaction and PROCESS_INTENT_COMMITTED COMMIT
+  -> external CreateProcessW(CREATE_SUSPENDED) through the reviewed adapter using the one-shot permit
+  -> exact typed process/Job Object result returned to the transaction service
+  -> successful process/Job Object/PRE_RESUME_READY evidence transaction and COMMIT
   -> resume intent transaction and RESUME_INTENT_COMMITTED COMMIT
   -> external ResumeThread through the reviewed adapter using the one-shot permit
   -> exact canonical successful resume receipt returned to the transaction service
@@ -711,9 +768,12 @@ trigger rejects every prior outcome except the exact digest-valid
 process-creation-failure `FAILED`/`NOT_STARTED` lineage with no execution. The
 helper does not run an ad hoc unresolved-execution query.
 
-The reservation commit precedes process creation. The `PRE_RESUME_READY`
-execution row commits process, Job Object, and resume-authorization evidence.
-A separate `BEGIN IMMEDIATE` transaction then appends the canonical intent and
+The reservation commit and a separate `BEGIN IMMEDIATE` process-intent commit
+both precede process creation. Only the process-intent winner receives the
+one-shot permit accepted by the reviewed adapter. The exact successful result
+then authorizes the `PRE_RESUME_READY` execution row containing process, Job
+Object, and resume-authorization evidence. A separate `BEGIN IMMEDIATE`
+transaction then appends the canonical resume intent and
 commits `RESUME_INTENT_COMMITTED`; only that winner receives the one-shot
 permit accepted by the reviewed adapter. The adapter observes that committed
 state, performs the modeled external call once, and returns the exact canonical
@@ -725,7 +785,12 @@ fences, exact persisted bytes, and phase rules; it cannot prove that an
 external Windows API call occurred.
 
 A crash after a claim or reservation commit leaves that fence consumed. A
-crash before resume-intent commit leaves `PRE_RESUME_READY`, where the separate
+crash after process-intent commit but before `CreateProcessW` and a crash after
+`CreateProcessW` but before its typed result is committed both leave
+`PROCESS_INTENT_COMMITTED` with no execution or definitive failure evidence.
+The service must not recreate a permit or retry the call; it uses only
+`CLASSIFY_PROCESS_OUTCOME_UNKNOWN` and the conservative close path. A crash
+before resume-intent commit leaves `PRE_RESUME_READY`, where the separate
 conservative pre-intent recovery action remains available. Once intent commits,
 neither a second intent nor another `ResumeThread` attempt may be authorized.
 A crash immediately after intent commit but before the call and a crash after
@@ -749,14 +814,15 @@ effect.
 
 The whole-boundary audit treats every arrow from claim commit through
 selection as an authority handoff: claim commit -> provider construction ->
-reservation commit -> `CreateProcessW` -> `PRE_RESUME_READY` commit -> resume
-intent commit -> `ResumeThread` -> exact receipt/evidence commit -> terminal
--> selection. Positive, rejection, two-connection concurrency, and crash
-cases cover each handoff. Exactly one reservation fences process creation;
-exactly one committed intent and its opaque winner permit fence
-`ResumeThread`; and only the exact intent-bound `RESUMED` receipt can prove
-modeled success and unlock a successful terminal. Every uncertainty path
-remains claim-blocking. The canonical request bytes propagated through the
+reservation commit -> process-intent commit -> `CreateProcessW` -> exact typed
+process result -> `PRE_RESUME_READY` commit -> resume-intent commit ->
+`ResumeThread` -> exact receipt/evidence commit -> terminal -> selection.
+Positive, rejection, two-connection concurrency, and crash cases cover each
+handoff. One reservation plus one committed process intent and its opaque
+winner permit fence `CreateProcessW`; one committed resume intent and its
+opaque winner permit fence `ResumeThread`. Only exact intent-bound typed
+results advance either boundary. Every uncertainty path remains
+claim-blocking. The canonical request bytes propagated through the
 lineage, target date, and UUID5 identity material all come from one frozen
 validated snapshot; caller mutation and alternate representations never reach
 or split those boundaries.
@@ -810,17 +876,19 @@ The focused executable evidence is
   evidence rules;
 - the authoritative session-wide claim-admission matrix through both helper
   and direct insertion, including the sole retry-safe prior lineage;
-- reservation-only `COMMITTED` insertion, first-outcome timestamp preservation,
-  and write-once session close facts;
+- reservation-only `COMMITTED` insertion, append-only canonical process intent,
+  first-outcome timestamp preservation, and write-once session close facts;
 - attempt and recovery ordinal races, stale/future ordinals, direct-counter
   rejection, rollback atomicity, and independent session ordinals;
 - the closed recovery action matrix, including distinct-target races and
   table-driven invalid lifecycle transitions;
-- a process-creation failure terminal without an execution row, plus the
-  conservative unknown-resume recovery and close path; and
-- fake side-effect hooks proving claim, reservation, pre-resume, external
-  resume, post-resume, and terminal ordering; receipt binding; and no new
-  claim after an unresolved resume outcome.
+- a process-intent concurrency winner, one-shot typed process result contracts,
+  a process-creation failure terminal without an execution row, and
+  conservative unknown-process and unknown-resume recovery/close paths; and
+- fake side-effect hooks proving claim, reservation, process-intent,
+  `CreateProcessW`, pre-resume, resume-intent, `ResumeThread`, post-resume, and
+  terminal ordering; exact receipt binding; and no new claim after either
+  unresolved external-call outcome.
 
 The following remain future production milestones:
 

@@ -102,14 +102,24 @@ CREATE TABLE launch_reservations (
     request_digest BLOB NOT NULL CHECK (length(request_digest) = 32),
     reservation_evidence_json BLOB NOT NULL,
     reservation_evidence_digest BLOB NOT NULL CHECK (length(reservation_evidence_digest) = 32),
+    process_intent_json BLOB,
+    process_intent_digest BLOB,
+    process_intent_committed_at_utc TEXT,
     reservation_state TEXT NOT NULL CHECK (reservation_state IN (
-        'COMMITTED', 'PROCESS_CREATED', 'PROCESS_CREATION_FAILED',
-        'MANUAL_REVIEW', 'TERMINAL_RECORDED'
+        'COMMITTED', 'PROCESS_INTENT_COMMITTED', 'PROCESS_CREATED',
+        'PROCESS_CREATION_FAILED', 'MANUAL_REVIEW', 'TERMINAL_RECORDED'
     )),
     process_creation_failure_json BLOB,
     process_creation_failure_digest BLOB,
     committed_at_utc TEXT NOT NULL,
     outcome_recorded_at_utc TEXT,
+    CHECK (
+        (process_intent_json IS NULL)
+        = (process_intent_digest IS NULL)
+        AND (process_intent_json IS NULL)
+        = (process_intent_committed_at_utc IS NULL)
+    ),
+    CHECK (process_intent_digest IS NULL OR length(process_intent_digest) = 32),
     CHECK ((process_creation_failure_json IS NULL) = (process_creation_failure_digest IS NULL)),
     CHECK (
         process_creation_failure_digest IS NULL
@@ -193,6 +203,7 @@ CREATE TABLE manual_recoveries (
         'RECORD_ATTEMPT_AMBIGUITY',
         'RECORD_CLAIM_AMBIGUITY',
         'CLASSIFY_LAUNCH_RESERVATION',
+        'CLASSIFY_PROCESS_OUTCOME_UNKNOWN',
         'CLASSIFY_PRE_RESUME_READY',
         'CLASSIFY_RESUME_OUTCOME_UNKNOWN',
         'SELECT_COMMITTED_SUCCESS',
@@ -467,6 +478,10 @@ BEGIN
                       AND safe_reservation.process_creation_failure_digest IS NOT NULL
                       AND sha256(safe_reservation.process_creation_failure_json)
                           IS safe_reservation.process_creation_failure_digest
+                      AND safe_reservation.process_intent_json IS NOT NULL
+                      AND safe_reservation.process_intent_digest IS NOT NULL
+                      AND sha256(safe_reservation.process_intent_json)
+                          IS safe_reservation.process_intent_digest
                       AND safe_terminal.terminal_state = 'FAILED'
                       AND safe_terminal.provider_call_disposition = 'NOT_STARTED'
                       AND safe_terminal.snapshot_digest IS NULL
@@ -508,6 +523,9 @@ FOR EACH ROW
 BEGIN
     SELECT CASE WHEN NOT (
         NEW.reservation_state = 'COMMITTED'
+        AND NEW.process_intent_json IS NULL
+        AND NEW.process_intent_digest IS NULL
+        AND NEW.process_intent_committed_at_utc IS NULL
         AND NEW.process_creation_failure_json IS NULL
         AND NEW.process_creation_failure_digest IS NULL
         AND NEW.outcome_recorded_at_utc IS NULL
@@ -524,6 +542,33 @@ BEGIN
     ) THEN RAISE(ABORT, 'reservation parent binding differs from claim lineage') END;
 END;
 
+CREATE TRIGGER launch_reservations_process_intent_append_only
+BEFORE UPDATE ON launch_reservations
+WHEN OLD.process_intent_json IS NOT NEW.process_intent_json
+  OR OLD.process_intent_digest IS NOT NEW.process_intent_digest
+  OR OLD.process_intent_committed_at_utc IS NOT NEW.process_intent_committed_at_utc
+BEGIN
+    SELECT CASE WHEN NOT (
+        OLD.process_intent_json IS NULL
+        AND OLD.process_intent_digest IS NULL
+        AND OLD.process_intent_committed_at_utc IS NULL
+        AND NEW.process_intent_json IS NOT NULL
+        AND NEW.process_intent_digest IS NOT NULL
+        AND NEW.process_intent_committed_at_utc IS NOT NULL
+        AND sha256(NEW.process_intent_json) IS NEW.process_intent_digest
+        AND CAST(NEW.process_intent_json AS TEXT) =
+            '{"authority_policy_version":"' || OLD.authority_policy_version ||
+            '","claim_policy_version":"' || OLD.claim_policy_version ||
+            '","launch_reservation_id":"' || OLD.launch_reservation_id ||
+            '","process_operation":"CreateProcessW","request_digest":"' ||
+            lower(hex(OLD.request_digest)) || '","schema":1}'
+        AND OLD.reservation_state = 'COMMITTED'
+        AND NEW.reservation_state = 'PROCESS_INTENT_COMMITTED'
+        AND OLD.outcome_recorded_at_utc IS NULL
+        AND NEW.outcome_recorded_at_utc IS NULL
+    ) THEN RAISE(ABORT, 'process intent is append-only') END;
+END;
+
 CREATE TRIGGER launch_reservations_failure_evidence_guard
 BEFORE UPDATE ON launch_reservations
 WHEN OLD.process_creation_failure_json IS NOT NEW.process_creation_failure_json
@@ -535,8 +580,16 @@ BEGIN
         AND NEW.process_creation_failure_json IS NOT NULL
         AND NEW.process_creation_failure_digest IS NOT NULL
         AND sha256(NEW.process_creation_failure_json) IS NEW.process_creation_failure_digest
-        AND OLD.reservation_state = 'COMMITTED'
+        AND OLD.reservation_state = 'PROCESS_INTENT_COMMITTED'
         AND NEW.reservation_state = 'PROCESS_CREATION_FAILED'
+        AND OLD.process_intent_json IS NOT NULL
+        AND OLD.process_intent_digest IS NOT NULL
+        AND sha256(OLD.process_intent_json) IS OLD.process_intent_digest
+        AND CAST(NEW.process_creation_failure_json AS TEXT) =
+            '{"creation_result":"NOT_CREATED","process_intent_digest":"' ||
+            lower(hex(OLD.process_intent_digest)) ||
+            '","reservation_id":"' || OLD.launch_reservation_id ||
+            '","schema":1}'
         AND OLD.outcome_recorded_at_utc IS NULL
         AND NEW.outcome_recorded_at_utc IS NOT NULL
     ) THEN RAISE(ABORT, 'process creation failure evidence is write-once') END;
@@ -549,8 +602,12 @@ WHEN NOT (
      AND NEW.outcome_recorded_at_utc IS NULL
      AND NEW.reservation_state = OLD.reservation_state)
     OR (OLD.outcome_recorded_at_utc IS NULL
-        AND NEW.outcome_recorded_at_utc IS NOT NULL
+        AND NEW.outcome_recorded_at_utc IS NULL
         AND OLD.reservation_state = 'COMMITTED'
+        AND NEW.reservation_state = 'PROCESS_INTENT_COMMITTED')
+    OR (OLD.outcome_recorded_at_utc IS NULL
+        AND NEW.outcome_recorded_at_utc IS NOT NULL
+        AND OLD.reservation_state IN ('COMMITTED', 'PROCESS_INTENT_COMMITTED')
         AND NEW.reservation_state IN (
             'PROCESS_CREATED', 'PROCESS_CREATION_FAILED', 'MANUAL_REVIEW'
         ))
@@ -565,7 +622,20 @@ CREATE TRIGGER launch_reservations_state_guard
 BEFORE UPDATE OF reservation_state ON launch_reservations
 WHEN NOT (
     NEW.reservation_state = OLD.reservation_state
-    OR (OLD.reservation_state = 'COMMITTED' AND NEW.reservation_state IN ('PROCESS_CREATED', 'PROCESS_CREATION_FAILED', 'MANUAL_REVIEW'))
+    OR (OLD.reservation_state = 'COMMITTED'
+        AND NEW.reservation_state = 'PROCESS_INTENT_COMMITTED'
+        AND NEW.process_intent_json IS NOT NULL
+        AND NEW.process_intent_digest IS NOT NULL
+        AND NEW.process_intent_committed_at_utc IS NOT NULL
+        AND sha256(NEW.process_intent_json) IS NEW.process_intent_digest)
+    OR (OLD.reservation_state = 'COMMITTED'
+        AND NEW.reservation_state = 'MANUAL_REVIEW')
+    OR (OLD.reservation_state = 'PROCESS_INTENT_COMMITTED'
+        AND NEW.reservation_state IN ('PROCESS_CREATED', 'PROCESS_CREATION_FAILED', 'MANUAL_REVIEW')
+        AND OLD.process_intent_json IS NOT NULL
+        AND OLD.process_intent_digest IS NOT NULL
+        AND OLD.process_intent_committed_at_utc IS NOT NULL
+        AND sha256(OLD.process_intent_json) IS OLD.process_intent_digest)
     OR (OLD.reservation_state = 'PROCESS_CREATED' AND NEW.reservation_state = 'MANUAL_REVIEW')
     OR (OLD.reservation_state IN ('PROCESS_CREATED', 'PROCESS_CREATION_FAILED', 'MANUAL_REVIEW') AND NEW.reservation_state = 'TERMINAL_RECORDED')
 )
@@ -653,6 +723,10 @@ BEGIN
         WHERE r.launch_reservation_id = NEW.launch_reservation_id
           AND r.application_release_version IS NEW.application_release_version
           AND r.authority_policy_version IS NEW.authority_policy_version
+          AND r.reservation_state = 'PROCESS_INTENT_COMMITTED'
+          AND r.process_intent_json IS NOT NULL
+          AND r.process_intent_digest IS NOT NULL
+          AND sha256(r.process_intent_json) IS r.process_intent_digest
     ) THEN RAISE(ABORT, 'execution policy binding differs from reservation') END;
 END;
 
@@ -769,6 +843,9 @@ BEGIN
              SELECT 1 FROM launch_reservations r
              WHERE r.launch_reservation_id = NEW.launch_reservation_id
                AND r.reservation_state = 'PROCESS_CREATION_FAILED'
+               AND r.process_intent_json IS NOT NULL
+               AND r.process_intent_digest IS NOT NULL
+               AND sha256(r.process_intent_json) IS r.process_intent_digest
                AND r.process_creation_failure_json IS NOT NULL
                AND r.process_creation_failure_digest IS NOT NULL
          ))
@@ -929,6 +1006,25 @@ BEGIN
                 SELECT 1 FROM launch_reservations
                 WHERE launch_reservation_id = NEW.target_id
                   AND reservation_state = 'COMMITTED'
+            ))
+        OR (NEW.action = 'CLASSIFY_PROCESS_OUTCOME_UNKNOWN'
+            AND NEW.target_kind = 'LAUNCH_RESERVATION'
+            AND NEW.predecessor_state = 'PROCESS_INTENT_COMMITTED'
+            AND NEW.resulting_state = 'MANUAL_REVIEW'
+            AND EXISTS (
+                SELECT 1 FROM launch_reservations r
+                WHERE r.launch_reservation_id = NEW.target_id
+                  AND r.reservation_state = 'PROCESS_INTENT_COMMITTED'
+                  AND r.process_intent_json IS NOT NULL
+                  AND r.process_intent_digest IS NOT NULL
+                  AND r.process_intent_committed_at_utc IS NOT NULL
+                  AND sha256(r.process_intent_json) IS r.process_intent_digest
+                  AND r.process_creation_failure_json IS NULL
+                  AND r.process_creation_failure_digest IS NULL
+            )
+            AND NOT EXISTS (
+                SELECT 1 FROM launch_executions e
+                WHERE e.launch_reservation_id = NEW.target_id
             ))
         OR (NEW.action = 'CLASSIFY_PRE_RESUME_READY'
             AND NEW.target_kind = 'LAUNCH_RESERVATION'

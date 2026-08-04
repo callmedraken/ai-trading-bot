@@ -200,7 +200,9 @@ metadata + migration
   -> attempt ordinal 0
   -> permanent claim
   -> launch reservation
-  -> launch execution (optional)
+  -> committed process intent
+  -> typed CreateProcessW result
+  -> launch execution (success only)
   -> successful terminal
   -> owning session selection
 ```
@@ -300,9 +302,10 @@ The focused suite asserts:
 
 Claim admission is exercised through both the transaction helper and direct
 claim insertion. The only accepted prior claim lineage is
-`TERMINAL_RECORDED` reservation plus digest-valid process-creation-failure
-evidence plus `FAILED`/`NOT_STARTED` terminal plus no execution. The same
-table-driven matrix rejects no reservation, `COMMITTED`, incomplete
+`TERMINAL_RECORDED` reservation plus digest-valid process-intent and
+process-creation-failure evidence plus `FAILED`/`NOT_STARTED` terminal plus no
+execution. The same table-driven matrix rejects no reservation, `COMMITTED`,
+`PROCESS_INTENT_COMMITTED`, incomplete
 `PROCESS_CREATION_FAILED`, `PROCESS_CREATED` without execution,
 `MANUAL_REVIEW`, `PRE_RESUME_READY`, `RESUME_INTENT_COMMITTED`, `RESUME_RECORDED`,
 `POST_RESUME_AMBIGUOUS`, `SUCCEEDED`, `AMBIGUOUS`, `CLOSED`, `CONFIRMED`,
@@ -311,18 +314,25 @@ table-driven matrix rejects no reservation, `COMMITTED`, incomplete
 independent unresolved-execution query.
 
 Reservation insertion tests reject every state other than `COMMITTED` and
-reject a `COMMITTED` insert with prepopulated failure evidence or an outcome
-timestamp. Separate transition tests prove the timestamp is assigned exactly
-once by `PROCESS_CREATED`, `PROCESS_CREATION_FAILED`, or first
-`MANUAL_REVIEW`; later terminal/recovery transitions preserve it; replacement
-and clearing fail; and terminal recording cannot supply a missing value.
+reject a `COMMITTED` insert with prepopulated intent/failure evidence or an
+outcome timestamp. A `BEGIN IMMEDIATE` process-intent transaction must verify
+the normalized claim/request/policy/evidence lineage, append exact canonical
+intent bytes/digest/timestamp, advance exactly to `PROCESS_INTENT_COMMITTED`,
+commit before the hook, and return an opaque permit only to its winner. Direct
+state transition without paired evidence, second acquisition, replacement,
+clearing, partial updates, and standalone timestamp mutation all fail.
+Separate transition tests prove the outcome timestamp remains null at intent
+commit and is assigned exactly once by `PROCESS_CREATED`,
+`PROCESS_CREATION_FAILED`, or first `MANUAL_REVIEW`; later terminal/recovery
+transitions preserve it; replacement and clearing fail; and terminal recording
+cannot supply a missing value.
 
 Terminal insertion is accepted only for this matrix:
 
 | Terminal state | Provider disposition | Snapshot | Evidence gate |
 | --- | --- | --- | --- |
 | `SUCCEEDED` | `CONFIRMED` | present | `RESUME_RECORDED` execution with exact canonical intent-bound `RESUMED` receipt and cleanup pair |
-| `FAILED` | `NOT_STARTED` | absent | `PROCESS_CREATION_FAILED` reservation with failure evidence |
+| `FAILED` | `NOT_STARTED` | absent | `PROCESS_CREATION_FAILED` reservation with exact intent-bound `NOT_CREATED` failure evidence |
 | `FAILED` | `CONFIRMED` | absent | `RESUME_RECORDED` execution with post-resume and cleanup pairs |
 | `AMBIGUOUS` | `MAY_HAVE_OCCURRED` | absent | `RESUME_RECORDED` or `POST_RESUME_AMBIGUOUS` execution with both pairs |
 | `CLOSED` | `MAY_HAVE_OCCURRED` | absent | `MANUAL_REVIEW` reservation |
@@ -334,7 +344,9 @@ valid insert, execution, reservation, and attempt are advanced to
 `TERMINAL_RECORDED` in the same transaction.
 
 For an execution-backed lifecycle, the executable order is explicitly
-`record_execution` -> `commit_resume_intent` and
+`commit_process_intent` -> fake `CreateProcessW` hook with the winner's opaque
+permit -> `record_execution` with the exact typed successful process/Job
+receipt -> `commit_resume_intent` and
 `RESUME_INTENT_COMMITTED` -> fake `ResumeThread` hook with the winner's opaque
 permit -> `record_post_resume_evidence` with the exact returned receipt ->
 `record_terminal` -> selection when applicable. No persistence helper creates
@@ -344,6 +356,7 @@ The following duplicate operations must fail without a second side effect:
 
 - a second claim for one attempt;
 - a second reservation for one claim;
+- a second process intent or process-hook use for one reservation;
 - a second execution for one reservation;
 - a second terminal for one reservation;
 - a second selection for one session; and
@@ -386,6 +399,7 @@ action matrix is closed:
 | `RECORD_ATTEMPT_AMBIGUITY` | `ATTEMPT` | `LAUNCH_RESERVED` -> `AMBIGUITY_RECORDED` | evidence-only uncertainty record |
 | `RECORD_CLAIM_AMBIGUITY` | `CLAIM` | `COMMITTED` -> `AMBIGUITY_RECORDED` | evidence-only uncertainty record |
 | `CLASSIFY_LAUNCH_RESERVATION` | `LAUNCH_RESERVATION` | `COMMITTED` -> `MANUAL_REVIEW` | classify the existing reservation |
+| `CLASSIFY_PROCESS_OUTCOME_UNKNOWN` | `LAUNCH_RESERVATION` | `PROCESS_INTENT_COMMITTED` -> `MANUAL_REVIEW` | freeze and conservatively classify committed-process-intent uncertainty |
 | `CLASSIFY_PRE_RESUME_READY` | `LAUNCH_RESERVATION` | `PROCESS_CREATED` -> `MANUAL_REVIEW` | conservative path before any resume intent exists |
 | `CLASSIFY_RESUME_OUTCOME_UNKNOWN` | `LAUNCH_RESERVATION` | `PROCESS_CREATED` -> `MANUAL_REVIEW` | freeze and conservatively classify committed-intent/no-receipt ambiguity |
 | `SELECT_COMMITTED_SUCCESS` | `TERMINAL` | `SUCCEEDED` -> `SUCCESS_SELECTED` | normal owning-session selection |
@@ -396,6 +410,14 @@ There is no generic recovery state ladder. Recovery cannot manufacture normal
 workflow states or fabricate an attempt progression. A legitimate concurrent
 recovery race may commit consecutive ordinals for distinct existing uncertain
 targets; a duplicate target or fabricated target is rejected.
+
+The process-outcome recovery test requires `PROCESS_INTENT_COMMITTED`, paired
+digest-valid intent evidence, no execution, no definitive failure evidence,
+and valid operator evidence. It proves the recovery row, exact counter
+increment, `MANUAL_REVIEW` transition, and preserved intent commit atomically;
+then proves no process permit, hook, claim, or retry can be authorized. The
+reservation-only `COMMITTED` recovery remains distinct and valid before any
+process intent exists.
 
 ## 7. Attempt ordinal and crash gates
 
@@ -505,6 +527,32 @@ authorize a claim, launch, resume, provider call, or other side effect. Every
 rejection must leave the original row, counters, lineage, and evidence
 unchanged.
 
+Two independent connections first race `commit_process_intent` for one
+reservation: exactly one gets an opaque permit and reaches the process hook,
+the loser fails before the hook, one canonical intent is stored, and exactly
+one modeled `CreateProcessW` event occurs. Direct hook use without a permit,
+second use, reconstructed/non-typed authority, and cross-reservation use fail.
+A restart after intent commit reconstructs neither a permit nor process-call
+authority.
+
+Exact `FakeProcessCreationReceipt` and `FakeProcessCreationFailure` gates bind
+the reservation and committed process-intent digest. Success requires canonical
+schema-1 suspended-child, Job Object, and resume-authority evidence. Failure
+requires canonical schema-1 `NOT_CREATED` evidence. Missing, malformed,
+missing/extra-field, noncanonical, wrong-digest, unknown-outcome,
+wrong-intent/reservation, reused, and cross-reservation results fail before
+execution or failure persistence. Only the successful receipt may create a
+`PRE_RESUME_READY` execution; only the definitive failure may create the sole
+retry-safe `FAILED`/`NOT_STARTED` lineage.
+
+A crash after process-intent commit before `CreateProcessW` and a crash after
+the hook before result persistence expose the same
+`PROCESS_INTENT_COMMITTED` row with no execution or definitive failure. Neither
+case permits intent reacquisition, permit reconstruction, another process call,
+or another claim. `CLASSIFY_PROCESS_OUTCOME_UNKNOWN` preserves the intent,
+records `MANUAL_REVIEW`, and allows only `CLOSED`/`MAY_HAVE_OCCURRED` plus the
+authorized session-close path.
+
 Two independent connections race `commit_resume_intent` for one execution:
 exactly one gets a permit and reaches the hook, the loser fails before the
 hook, one intent is stored, and one modeled `ResumeThread` event occurs. A
@@ -527,14 +575,15 @@ impossible until exact receipt and cleanup evidence commit.
 
 The whole-boundary matrix covers positive, negative, concurrency, and crash
 outcomes for claim commit -> provider construction -> reservation commit ->
-`CreateProcessW` -> `PRE_RESUME_READY` commit -> resume-intent commit ->
-`ResumeThread` -> exact receipt/evidence commit -> terminal -> selection. One
-reservation fences process creation, one intent fences resume, exact receipt
-proves modeled success, every uncertainty blocks a claim, and canonical
-request bytes and identity material retain the same validated semantics.
-SQLite validates only persisted facts and fake-hook ordering; the suite does
-not claim that SQLite proves a real `CreateProcessW`, `ResumeThread`, Job
-Object, or other Windows API effect.
+process-intent commit -> `CreateProcessW` -> exact typed process result ->
+`PRE_RESUME_READY` commit -> resume-intent commit -> `ResumeThread` -> exact
+receipt/evidence commit -> terminal -> selection. One reservation plus one
+process intent fences process creation; one resume intent fences resume; exact
+typed results advance each boundary; every uncertainty blocks a claim; and
+canonical request bytes and identity material retain the same validated
+semantics. SQLite validates only persisted facts and fake-hook ordering; the
+suite does not claim that SQLite proves a real `CreateProcessW`, `ResumeThread`,
+Job Object, or other Windows API effect.
 
 ## 10. Security and operational gates not claimed by this fixture
 
@@ -565,6 +614,7 @@ Run from the repository root:
 
 ```text
 .venv\Scripts\python.exe -m pytest -q tests/runtime/test_windows_transactional_capture_authority.py
+.venv\Scripts\python.exe -m pytest -q tests/runtime/test_windows_transactional_capture_authority.py -k "complete_ddl or process_intent or process_hook or process_success_receipt or process_failure_result or crash_around_process or process_unknown_recovery"
 .venv\Scripts\python.exe -m pytest -q tests/market_data/test_alpaca_daily_snapshot.py tests/cli/test_daily_snapshot_config.py
 .venv\Scripts\python.exe -m pytest -q
 .venv\Scripts\ruff.exe check .

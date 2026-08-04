@@ -63,10 +63,14 @@ _RESUME_INTENT_ISSUER = object()
 _PROCESS_INTENT_ISSUER = object()
 _PROCESS_RESULT_ISSUER = object()
 _RESUME_RESULT_ISSUER = object()
+_PROVIDER_CONSTRUCTION_ISSUER = object()
+_CONSTRUCTED_PROVIDER_ISSUER = object()
 _ISSUED_RESUME_PERMITS_LOCK = threading.Lock()
 _ISSUED_PROCESS_PERMITS_LOCK = threading.Lock()
 _ISSUED_PROCESS_RESULTS_LOCK = threading.Lock()
 _ISSUED_RESUME_RESULTS_LOCK = threading.Lock()
+_ISSUED_PROVIDER_CONSTRUCTION_PERMITS_LOCK = threading.Lock()
+_ISSUED_CONSTRUCTED_PROVIDERS_LOCK = threading.Lock()
 _RESERVATION_LIFECYCLE_LOCKS_GUARD = threading.Lock()
 _RESERVATION_LIFECYCLE_LOCKS: dict[str, threading.RLock] = {}
 
@@ -102,10 +106,62 @@ class _ResumeResultPermit:
     consumed: bool = False
 
 
+@dataclass(eq=False)
+class _ProviderConstructionOneShot:
+    lock: threading.Lock = field(default_factory=threading.Lock)
+    consumed: bool = False
+
+
+@dataclass(eq=False)
+class _ConstructedProviderOneShot:
+    lock: threading.Lock = field(default_factory=threading.Lock)
+    consumed: bool = False
+
+
 _ISSUED_RESUME_PERMITS: dict[_ResumePermit, object] = {}
 _ISSUED_PROCESS_PERMITS: dict[_ProcessPermit, object] = {}
 _ISSUED_PROCESS_RESULTS: dict[_ProcessResultPermit, object] = {}
 _ISSUED_RESUME_RESULTS: dict[_ResumeResultPermit, object] = {}
+_ISSUED_PROVIDER_CONSTRUCTION_PERMITS: dict[_ProviderConstructionOneShot, object] = {}
+_ISSUED_CONSTRUCTED_PROVIDERS: dict[_ConstructedProviderOneShot, object] = {}
+
+
+class FakeProviderConstructionPermit(str):
+    """Reservation identity plus opaque one-shot provider-construction authority."""
+
+    reservation_id: str
+    _issuer: object
+    _permit: _ProviderConstructionOneShot
+
+    def __new__(
+        cls,
+        reservation_id: str,
+        *,
+        _issuer: object,
+        _permit: _ProviderConstructionOneShot,
+    ) -> FakeProviderConstructionPermit:
+        if _issuer is not _PROVIDER_CONSTRUCTION_ISSUER:
+            raise TypeError(
+                "fake provider construction permits require reservation commit"
+            )
+        value = str.__new__(cls, reservation_id)
+        value.reservation_id = reservation_id
+        value._issuer = _issuer
+        value._permit = _permit
+        return value
+
+
+@dataclass(frozen=True)
+class FakeConstructedProvider:
+    """Opaque one-shot handoff from provider construction to process intent."""
+
+    reservation_id: str
+    _issuer: object = field(repr=False, compare=False)
+    _permit: _ConstructedProviderOneShot = field(repr=False, compare=False)
+
+    def __post_init__(self) -> None:
+        if self._issuer is not _CONSTRUCTED_PROVIDER_ISSUER:
+            raise TypeError("fake constructed providers can only come from the adapter")
 
 
 @dataclass(frozen=True)
@@ -1116,7 +1172,9 @@ def commit_claim(connection: sqlite3.Connection, attempt_id: str) -> str:
     return claim_id
 
 
-def reserve_launch(connection: sqlite3.Connection, claim_id: str) -> str:
+def reserve_launch(
+    connection: sqlite3.Connection, claim_id: str
+) -> FakeProviderConstructionPermit:
     evidence, evidence_digest = _evidence(f"reservation:{claim_id}")
     _begin(connection)
     try:
@@ -1173,7 +1231,15 @@ def reserve_launch(connection: sqlite3.Connection, claim_id: str) -> str:
     except BaseException:
         _finish(connection, False)
         raise
-    return reservation_id
+    one_shot = _ProviderConstructionOneShot()
+    capability = FakeProviderConstructionPermit(
+        reservation_id,
+        _issuer=_PROVIDER_CONSTRUCTION_ISSUER,
+        _permit=one_shot,
+    )
+    with _ISSUED_PROVIDER_CONSTRUCTION_PERMITS_LOCK:
+        _ISSUED_PROVIDER_CONSTRUCTION_PERMITS[one_shot] = capability
+    return capability
 
 
 def _process_intent_json(
@@ -1194,9 +1260,50 @@ def _process_intent_json(
     )
 
 
+def _require_constructed_provider(provider: FakeConstructedProvider) -> None:
+    if provider._issuer is not _CONSTRUCTED_PROVIDER_ISSUER:
+        raise TypeError("constructed provider issuer is invalid")
+    with provider._permit.lock:
+        with _ISSUED_CONSTRUCTED_PROVIDERS_LOCK:
+            if (
+                provider._permit.consumed
+                or _ISSUED_CONSTRUCTED_PROVIDERS.get(provider._permit) is not provider
+            ):
+                raise ValueError(
+                    "constructed provider was already consumed or not issued"
+                )
+
+
+def _consume_constructed_provider(provider: FakeConstructedProvider) -> None:
+    with provider._permit.lock:
+        with _ISSUED_CONSTRUCTED_PROVIDERS_LOCK:
+            if _ISSUED_CONSTRUCTED_PROVIDERS.get(provider._permit) is not provider:
+                raise ValueError(
+                    "constructed provider was already consumed or not issued"
+                )
+            del _ISSUED_CONSTRUCTED_PROVIDERS[provider._permit]
+        provider._permit.consumed = True
+
+
 def commit_process_intent(
-    connection: sqlite3.Connection, reservation_id: str
+    connection: sqlite3.Connection,
+    reservation_id: str,
+    provider: FakeConstructedProvider | None = None,
 ) -> FakeProcessIntent:
+    if type(provider) is not FakeConstructedProvider:
+        raise TypeError("process intent requires an opaque constructed provider")
+    if provider.reservation_id != reservation_id:
+        raise ValueError("constructed provider belongs to another reservation")
+    with _reservation_lifecycle_lock(reservation_id):
+        return _commit_process_intent_locked(connection, reservation_id, provider)
+
+
+def _commit_process_intent_locked(
+    connection: sqlite3.Connection,
+    reservation_id: str,
+    provider: FakeConstructedProvider,
+) -> FakeProcessIntent:
+    _require_constructed_provider(provider)
     _begin(connection)
     try:
         row = connection.execute(
@@ -1308,6 +1415,7 @@ def commit_process_intent(
     except BaseException:
         _finish(connection, False)
         raise
+    _consume_constructed_provider(provider)
     permit = _ProcessPermit()
     intent = FakeProcessIntent(
         reservation_id=reservation_id,
@@ -2257,11 +2365,122 @@ class FakeSideEffects:
         with self._event_lock:
             self.events.append(event)
 
-    def construct_provider_after_claim(self, claim_id: str) -> None:
-        assert self.observer.execute(
-            "SELECT state FROM provider_call_claims WHERE claim_id = ?", (claim_id,)
-        ).fetchone() == ("COMMITTED",)
-        self._emit("provider-constructed")
+    def construct_provider(
+        self,
+        capability: FakeProviderConstructionPermit,
+        *,
+        fail: bool = False,
+    ) -> FakeConstructedProvider:
+        if type(capability) is not FakeProviderConstructionPermit:
+            raise TypeError(
+                "provider construction requires a reservation-issued permit"
+            )
+        reservation_id = capability.reservation_id
+        with _reservation_lifecycle_lock(reservation_id):
+            row = self.observer.execute(
+                """
+                SELECT r.reservation_state, r.request_digest,
+                       r.authority_policy_version, r.claim_policy_version,
+                       r.reservation_evidence_json,
+                       r.reservation_evidence_digest, r.process_intent_json,
+                       r.process_intent_digest, r.process_intent_committed_at_utc,
+                       c.state, c.request_json, c.request_digest,
+                       c.claim_policy_version, c.provider_id,
+                       c.permitted_provider_operation, c.provider_call_budget,
+                       c.claim_evidence_json, c.claim_evidence_digest,
+                       a.state, a.request_json, a.request_digest,
+                       a.attempt_policy_version, a.provider_id,
+                       a.permitted_provider_operation, a.provider_call_budget,
+                       s.state, s.request_json, s.request_digest,
+                       s.authority_policy_version, s.claim_policy_version,
+                       m.provider_id, m.permitted_provider_operation,
+                       m.authority_policy_version, m.claim_policy_version
+                FROM launch_reservations r
+                JOIN provider_call_claims c ON c.claim_id = r.claim_id
+                JOIN attempts a ON a.attempt_id = c.attempt_id
+                JOIN sessions s ON s.session_id = a.session_id
+                JOIN authority_metadata m ON m.singleton_key = 1
+                WHERE r.launch_reservation_id = ?
+                  AND NOT EXISTS (
+                      SELECT 1 FROM launch_executions e
+                      WHERE e.launch_reservation_id = r.launch_reservation_id
+                  )
+                  AND NOT EXISTS (
+                      SELECT 1 FROM terminals t
+                      WHERE t.launch_reservation_id = r.launch_reservation_id
+                  )
+                  AND NOT EXISTS (
+                      SELECT 1 FROM session_selections ss
+                      WHERE ss.session_id = s.session_id
+                  )
+                """,
+                (reservation_id,),
+            ).fetchone()
+            if row is None:
+                raise ValueError("provider construction active lineage is unavailable")
+            if (
+                row[0] != "COMMITTED"
+                or row[6] is not None
+                or row[7] is not None
+                or row[8] is not None
+                or row[9] != "COMMITTED"
+                or row[18] != "LAUNCH_RESERVED"
+                or row[25] != "OPEN"
+            ):
+                raise ValueError("provider construction active lineage is revoked")
+            if (
+                _digest(row[4]) != row[5]
+                or _digest(row[16]) != row[17]
+                or _digest(row[10]) != row[11]
+                or row[10] != row[19]
+                or row[10] != row[26]
+                or row[1] != row[11]
+                or row[1] != row[20]
+                or row[1] != row[27]
+                or row[3] != row[12]
+                or row[3] != row[21]
+                or row[3] != row[29]
+                or row[3] != row[33]
+                or row[2] != row[28]
+                or row[2] != row[32]
+                or row[13] != row[22]
+                or row[13] != row[30]
+                or row[13] != PROVIDER
+                or row[14] != row[23]
+                or row[14] != row[31]
+                or row[14] != OPERATION
+                or row[15] != 1
+                or row[24] != 1
+            ):
+                raise ValueError("provider construction lineage evidence is invalid")
+            if capability._issuer is not _PROVIDER_CONSTRUCTION_ISSUER:
+                raise TypeError("provider construction permit issuer is invalid")
+            with capability._permit.lock:
+                with _ISSUED_PROVIDER_CONSTRUCTION_PERMITS_LOCK:
+                    if (
+                        capability._permit.consumed
+                        or _ISSUED_PROVIDER_CONSTRUCTION_PERMITS.get(capability._permit)
+                        is not capability
+                    ):
+                        raise ValueError(
+                            "provider construction permit was consumed or not issued"
+                        )
+                    del _ISSUED_PROVIDER_CONSTRUCTION_PERMITS[capability._permit]
+                capability._permit.consumed = True
+
+            self._emit("provider-constructed")
+            if fail:
+                self._emit("provider-construction-failed")
+                raise RuntimeError("modeled provider construction failure")
+            one_shot = _ConstructedProviderOneShot()
+            provider = FakeConstructedProvider(
+                reservation_id=reservation_id,
+                _issuer=_CONSTRUCTED_PROVIDER_ISSUER,
+                _permit=one_shot,
+            )
+            with _ISSUED_CONSTRUCTED_PROVIDERS_LOCK:
+                _ISSUED_CONSTRUCTED_PROVIDERS[one_shot] = provider
+            return provider
 
     def create_process(
         self, process_intent: FakeProcessIntent, *, fail: bool = False
@@ -2504,7 +2723,7 @@ class FakeSideEffects:
 def _create_process_receipt(
     connection: sqlite3.Connection, reservation_id: str
 ) -> FakeProcessCreationReceipt:
-    intent = commit_process_intent(connection, reservation_id)
+    intent = _construct_provider_and_commit_process_intent(connection, reservation_id)
     result = FakeSideEffects(connection).create_process(intent)
     assert type(result) is FakeProcessCreationReceipt
     return result
@@ -2520,10 +2739,23 @@ def _record_successful_process(
 def _record_definitive_process_failure(
     connection: sqlite3.Connection, reservation_id: str
 ) -> None:
-    intent = commit_process_intent(connection, reservation_id)
+    intent = _construct_provider_and_commit_process_intent(connection, reservation_id)
     result = FakeSideEffects(connection).create_process(intent, fail=True)
     assert type(result) is FakeProcessCreationFailure
     record_process_creation_failure(connection, reservation_id, result)
+
+
+def _construct_provider_and_commit_process_intent(
+    connection: sqlite3.Connection,
+    reservation_id: str,
+    hooks: FakeSideEffects | None = None,
+) -> FakeProcessIntent:
+    if type(reservation_id) is not FakeProviderConstructionPermit:
+        raise TypeError("provider handoff requires the reservation-issued permit")
+    provider = (
+        FakeSideEffects(connection) if hooks is None else hooks
+    ).construct_provider(reservation_id)
+    return commit_process_intent(connection, reservation_id, provider)
 
 
 def _resume_and_persist(
@@ -3987,9 +4219,10 @@ def test_claim_and_launch_boundaries_commit_before_fake_side_effects(
     session_id = create_session(connection)
     attempt_id = allocate_attempt(connection, session_id)
     claim_id = commit_claim(connection, attempt_id)
-    hooks.construct_provider_after_claim(claim_id)
     reservation_id = reserve_launch(connection, claim_id)
-    process_intent = commit_process_intent(connection, reservation_id)
+    process_intent = _construct_provider_and_commit_process_intent(
+        connection, reservation_id, hooks
+    )
     process_receipt = hooks.create_process(process_intent)
     assert type(process_receipt) is FakeProcessCreationReceipt
     execution_id = record_execution(connection, reservation_id, process_receipt)
@@ -4030,9 +4263,10 @@ def test_valid_capability_matrix_lifecycle_has_exactly_one_of_each(
     session_id = create_session(connection)
     attempt_id = allocate_attempt(connection, session_id)
     claim_id = commit_claim(connection, attempt_id)
-    hooks.construct_provider_after_claim(claim_id)
     reservation_id = reserve_launch(connection, claim_id)
-    process_intent = commit_process_intent(connection, reservation_id)
+    process_intent = _construct_provider_and_commit_process_intent(
+        connection, reservation_id, hooks
+    )
     process_result = hooks.create_process(process_intent)
     assert type(process_result) is FakeProcessCreationReceipt
     execution_id = record_execution(connection, reservation_id, process_result)
@@ -4111,7 +4345,7 @@ def test_claim_admission_blocks_non_retry_safe_prior_outcomes(
         _record_definitive_process_failure(connection, first_reservation)
     elif blocked_case == "process_created_without_execution":
         assert first_reservation is not None
-        commit_process_intent(connection, first_reservation)
+        _construct_provider_and_commit_process_intent(connection, first_reservation)
         connection.execute(
             "UPDATE launch_reservations SET reservation_state = ?, "
             "outcome_recorded_at_utc = ? WHERE launch_reservation_id = ?",
@@ -4617,7 +4851,9 @@ def test_process_intent_race_grants_exactly_one_process_call(db_path: Path) -> N
         hooks = FakeSideEffects(connection, events, event_lock)
         barrier.wait()
         try:
-            intent = commit_process_intent(connection, reservation_id)
+            intent = _construct_provider_and_commit_process_intent(
+                connection, reservation_id, hooks
+            )
             result = hooks.create_process(intent)
             assert type(result) is FakeProcessCreationReceipt
             record_execution(connection, reservation_id, result)
@@ -4636,6 +4872,7 @@ def test_process_intent_race_grants_exactly_one_process_call(db_path: Path) -> N
 
     assert sorted(outcomes) == ["loser", "winner"]
     assert events == [
+        "provider-constructed",
         "process-intent-committed",
         "create-process",
         "process-created",
@@ -4651,6 +4888,213 @@ def test_process_intent_race_grants_exactly_one_process_call(db_path: Path) -> N
     verify.close()
 
 
+def test_reservation_race_issues_one_provider_permit_and_construction(
+    db_path: Path,
+) -> None:
+    setup = _connect(db_path)
+    session_id = create_session(setup)
+    attempt_id = allocate_attempt(setup, session_id)
+    claim_id = commit_claim(setup, attempt_id)
+    setup.close()
+    barrier = threading.Barrier(2)
+    outcomes: list[tuple[str, FakeConstructedProvider | None]] = []
+    outcomes_lock = threading.Lock()
+    events: list[str] = []
+    event_lock = threading.Lock()
+
+    def worker() -> None:
+        connection = _connect(db_path)
+        hooks = FakeSideEffects(connection, events, event_lock)
+        barrier.wait()
+        try:
+            permit = reserve_launch(connection, claim_id)
+            provider = hooks.construct_provider(permit)
+            outcome = ("winner", provider)
+        except (ValueError, sqlite3.IntegrityError):
+            outcome = ("loser", None)
+        with outcomes_lock:
+            outcomes.append(outcome)
+        connection.close()
+
+    threads = [threading.Thread(target=worker) for _ in range(2)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert sorted(name for name, _ in outcomes) == ["loser", "winner"]
+    assert events == ["provider-constructed"]
+    verify = _connect(db_path)
+    assert verify.execute("SELECT count(*) FROM launch_reservations").fetchone() == (1,)
+    verify.close()
+    provider = next(provider for name, provider in outcomes if name == "winner")
+    assert provider is not None
+    with _ISSUED_CONSTRUCTED_PROVIDERS_LOCK:
+        _ISSUED_CONSTRUCTED_PROVIDERS.pop(provider._permit, None)
+
+
+def test_provider_permit_and_constructed_provider_are_exact_one_shot_objects(
+    db_path: Path,
+) -> None:
+    connection = _connect(db_path)
+    first_session = create_session(connection)
+    first_attempt = allocate_attempt(connection, first_session)
+    first_claim = commit_claim(connection, first_attempt)
+    first_permit = reserve_launch(connection, first_claim)
+    hooks = FakeSideEffects(connection)
+
+    with pytest.raises(TypeError, match="require reservation commit"):
+        FakeProviderConstructionPermit(
+            first_permit.reservation_id,
+            _issuer=object(),
+            _permit=_ProviderConstructionOneShot(),
+        )
+    reconstructed = FakeProviderConstructionPermit(
+        first_permit.reservation_id,
+        _issuer=_PROVIDER_CONSTRUCTION_ISSUER,
+        _permit=_ProviderConstructionOneShot(),
+    )
+    copied = FakeProviderConstructionPermit(
+        first_permit.reservation_id,
+        _issuer=_PROVIDER_CONSTRUCTION_ISSUER,
+        _permit=first_permit._permit,
+    )
+    for invalid in (reconstructed, copied):
+        with pytest.raises(ValueError, match="not issued"):
+            hooks.construct_provider(invalid)
+    with pytest.raises(TypeError, match="reservation-issued"):
+        hooks.construct_provider(first_claim)  # type: ignore[arg-type]
+
+    second_session = create_session(connection, _request("2026-01-02"))
+    second_attempt = allocate_attempt(connection, second_session)
+    second_claim = commit_claim(connection, second_attempt)
+    second_permit = reserve_launch(connection, second_claim)
+    cross_reservation = FakeProviderConstructionPermit(
+        second_permit.reservation_id,
+        _issuer=_PROVIDER_CONSTRUCTION_ISSUER,
+        _permit=first_permit._permit,
+    )
+    with pytest.raises(ValueError, match="not issued"):
+        hooks.construct_provider(cross_reservation)
+
+    provider = hooks.construct_provider(first_permit)
+    with pytest.raises(ValueError, match="consumed|not issued"):
+        hooks.construct_provider(first_permit)
+    with pytest.raises(TypeError, match="opaque constructed provider"):
+        commit_process_intent(connection, first_permit)  # type: ignore[call-arg]
+    with pytest.raises(TypeError, match="only come from the adapter"):
+        replace(provider, _issuer=object())
+    for invalid_provider in (
+        replace(provider),
+        replace(provider, _permit=_ConstructedProviderOneShot()),
+    ):
+        with pytest.raises(ValueError, match="not issued"):
+            commit_process_intent(connection, first_permit, invalid_provider)
+    with pytest.raises(ValueError, match="another reservation"):
+        commit_process_intent(connection, second_permit, provider)
+
+    commit_process_intent(connection, first_permit, provider)
+    with pytest.raises(ValueError, match="consumed|not issued"):
+        commit_process_intent(connection, first_permit, provider)
+    with _ISSUED_PROVIDER_CONSTRUCTION_PERMITS_LOCK:
+        _ISSUED_PROVIDER_CONSTRUCTION_PERMITS.pop(second_permit._permit, None)
+    connection.close()
+
+
+@pytest.mark.parametrize("recover_after_rollback", [False, True])
+def test_constructed_provider_retry_survives_rollback_until_recovery(
+    db_path: Path, recover_after_rollback: bool
+) -> None:
+    connection = _connect(db_path)
+    session_id = create_session(connection)
+    attempt_id = allocate_attempt(connection, session_id)
+    claim_id = commit_claim(connection, attempt_id)
+    permit = reserve_launch(connection, claim_id)
+    provider = FakeSideEffects(connection).construct_provider(permit)
+    connection.execute(
+        """
+        CREATE TRIGGER fail_provider_handoff_for_test
+        BEFORE UPDATE OF reservation_state ON launch_reservations
+        WHEN NEW.reservation_state = 'PROCESS_INTENT_COMMITTED'
+        BEGIN
+            SELECT RAISE(ABORT, 'transient provider handoff failure');
+        END
+        """
+    )
+    connection.commit()
+
+    with pytest.raises(sqlite3.IntegrityError, match="transient provider"):
+        commit_process_intent(connection, permit, provider)
+    assert not provider._permit.consumed
+    with _ISSUED_CONSTRUCTED_PROVIDERS_LOCK:
+        assert _ISSUED_CONSTRUCTED_PROVIDERS.get(provider._permit) is provider
+    connection.execute("DROP TRIGGER fail_provider_handoff_for_test")
+    connection.commit()
+
+    if recover_after_rollback:
+        record_recovery(
+            connection,
+            session_id,
+            "LAUNCH_RESERVATION",
+            permit,
+            "CLASSIFY_LAUNCH_RESERVATION",
+        )
+        with pytest.raises(ValueError, match="COMMITTED|revoked"):
+            commit_process_intent(connection, permit, provider)
+        assert not provider._permit.consumed
+        with _ISSUED_CONSTRUCTED_PROVIDERS_LOCK:
+            _ISSUED_CONSTRUCTED_PROVIDERS.pop(provider._permit, None)
+    else:
+        intent = commit_process_intent(connection, permit, provider)
+        assert intent
+        assert provider._permit.consumed
+        with _ISSUED_PROCESS_PERMITS_LOCK:
+            _ISSUED_PROCESS_PERMITS.pop(intent._permit, None)
+    connection.close()
+
+
+@pytest.mark.parametrize("failure_mode", ["lost-result", "modeled-failure"])
+def test_provider_construction_loss_allows_only_reservation_recovery(
+    db_path: Path, failure_mode: str
+) -> None:
+    connection = _connect(db_path)
+    events: list[str] = []
+    hooks = FakeSideEffects(connection, events)
+    session_id = create_session(connection)
+    attempt_id = allocate_attempt(connection, session_id)
+    claim_id = commit_claim(connection, attempt_id)
+    permit = reserve_launch(connection, claim_id)
+    provider: FakeConstructedProvider | None = None
+    if failure_mode == "modeled-failure":
+        with pytest.raises(RuntimeError, match="modeled provider"):
+            hooks.construct_provider(permit, fail=True)
+        assert events == ["provider-constructed", "provider-construction-failed"]
+    else:
+        provider = hooks.construct_provider(permit)
+        with _ISSUED_CONSTRUCTED_PROVIDERS_LOCK:
+            _ISSUED_CONSTRUCTED_PROVIDERS.pop(provider._permit, None)
+        assert events == ["provider-constructed"]
+
+    with pytest.raises(ValueError, match="consumed|not issued"):
+        hooks.construct_provider(permit)
+    if provider is not None:
+        with pytest.raises(ValueError, match="not issued"):
+            commit_process_intent(connection, permit, provider)
+    assert connection.execute(
+        "SELECT reservation_state, process_intent_json FROM launch_reservations "
+        "WHERE launch_reservation_id = ?",
+        (permit,),
+    ).fetchone() == ("COMMITTED", None)
+    record_recovery(
+        connection,
+        session_id,
+        "LAUNCH_RESERVATION",
+        permit,
+        "CLASSIFY_LAUNCH_RESERVATION",
+    )
+    connection.close()
+
+
 def test_process_hook_requires_matching_one_shot_opaque_permit(db_path: Path) -> None:
     connection = _connect(db_path)
     first_session = create_session(connection)
@@ -4661,7 +5105,9 @@ def test_process_hook_requires_matching_one_shot_opaque_permit(db_path: Path) ->
     with pytest.raises(TypeError, match="opaque fake process intent"):
         hooks.create_process(first_reservation)  # type: ignore[arg-type]
 
-    intent = commit_process_intent(connection, first_reservation)
+    intent = _construct_provider_and_commit_process_intent(
+        connection, first_reservation, hooks
+    )
     with pytest.raises(TypeError, match="only be issued after commit"):
         replace(intent, _issuer=object())
     for fabricated in (replace(intent), replace(intent, _permit=_ProcessPermit())):
@@ -4700,7 +5146,7 @@ def test_process_success_receipt_is_exact_canonical_and_one_shot(
     with pytest.raises(TypeError, match="fake process creation receipt"):
         record_execution(connection, reservation_id, None)  # type: ignore[arg-type]
 
-    intent = commit_process_intent(connection, reservation_id)
+    intent = _construct_provider_and_commit_process_intent(connection, reservation_id)
     receipt = FakeSideEffects(connection).create_process(intent)
     assert type(receipt) is FakeProcessCreationReceipt
     canonical_process = json.loads(receipt.process_json)
@@ -4754,7 +5200,7 @@ def test_process_failure_result_is_exact_and_only_not_started_path(
     attempt_id = allocate_attempt(connection, session_id)
     claim_id = commit_claim(connection, attempt_id)
     reservation_id = reserve_launch(connection, claim_id)
-    intent = commit_process_intent(connection, reservation_id)
+    intent = _construct_provider_and_commit_process_intent(connection, reservation_id)
     failure = FakeSideEffects(connection).create_process(intent, fail=True)
     assert type(failure) is FakeProcessCreationFailure
     with pytest.raises(TypeError, match="fake process creation receipt"):
@@ -4801,7 +5247,7 @@ def test_process_result_requires_adapter_provenance_and_survives_rollback(
     attempt_id = allocate_attempt(connection, session_id)
     claim_id = commit_claim(connection, attempt_id)
     reservation_id = reserve_launch(connection, claim_id)
-    intent = commit_process_intent(connection, reservation_id)
+    intent = _construct_provider_and_commit_process_intent(connection, reservation_id)
     result = FakeSideEffects(connection).create_process(intent, fail=failure_result)
 
     with pytest.raises(TypeError, match="only come from the adapter"):
@@ -4876,7 +5322,7 @@ def test_process_dispatch_and_recovery_share_lifecycle_arbiter(
     attempt_id = allocate_attempt(setup, session_id)
     claim_id = commit_claim(setup, attempt_id)
     reservation_id = reserve_launch(setup, claim_id)
-    intent = commit_process_intent(setup, reservation_id)
+    intent = _construct_provider_and_commit_process_intent(setup, reservation_id)
     setup.close()
     lifecycle_lock = _reservation_lifecycle_lock(reservation_id)
     winner_has_lock = threading.Event()
@@ -4982,7 +5428,7 @@ def test_process_result_persistence_and_recovery_are_serialized(
     attempt_id = allocate_attempt(setup, session_id)
     claim_id = commit_claim(setup, attempt_id)
     reservation_id = reserve_launch(setup, claim_id)
-    intent = commit_process_intent(setup, reservation_id)
+    intent = _construct_provider_and_commit_process_intent(setup, reservation_id)
     result = FakeSideEffects(setup).create_process(intent, fail=failure_result)
     setup.close()
     lifecycle_lock = _reservation_lifecycle_lock(reservation_id)
@@ -5084,6 +5530,8 @@ def test_process_result_persistence_and_recovery_are_serialized(
     [
         (capability, revoking_state)
         for capability in (
+            "provider-construction-permit",
+            "constructed-provider",
             "process-intent",
             "process-success-result",
             "process-failure-result",
@@ -5095,12 +5543,18 @@ def test_process_result_persistence_and_recovery_are_serialized(
     + [
         (capability, revoking_state)
         for capability in (
+            "provider-construction-permit",
+            "constructed-provider",
             "process-intent",
             "process-success-result",
             "resume-intent",
             "resume-success-result",
         )
         for revoking_state in ("SUCCESS_SELECTED", "CLOSED_AFTER_SELECTION")
+    ]
+    + [
+        ("provider-construction-permit", "PROCESS_INTENT_COMMITTED"),
+        ("constructed-provider", "PROCESS_INTENT_COMMITTED"),
     ],
 )
 def test_authority_capability_revocation_matrix(
@@ -5117,7 +5571,11 @@ def test_authority_capability_revocation_matrix(
     execution_id: str | None = None
 
     if revoking_state in {"SUCCESS_SELECTED", "CLOSED_AFTER_SELECTION"}:
-        process_intent = commit_process_intent(connection, reservation_id)
+        provider_permit = reservation_id
+        constructed_provider = hooks.construct_provider(provider_permit)
+        process_intent = commit_process_intent(
+            connection, reservation_id, constructed_provider
+        )
         process_result = hooks.create_process(process_intent)
         assert type(process_result) is FakeProcessCreationReceipt
         execution_id = record_execution(connection, reservation_id, process_result)
@@ -5134,13 +5592,45 @@ def test_authority_capability_revocation_matrix(
             )
             connection.commit()
         authority = {
+            "provider-construction-permit": provider_permit,
+            "constructed-provider": constructed_provider,
             "process-intent": process_intent,
             "process-success-result": process_result,
             "resume-intent": resume_intent,
             "resume-success-result": resume_result,
         }[capability]
+    elif capability in {
+        "provider-construction-permit",
+        "constructed-provider",
+    }:
+        provider_permit = reservation_id
+        constructed_provider: FakeConstructedProvider | None = None
+        if (
+            capability == "constructed-provider"
+            or revoking_state == "PROCESS_INTENT_COMMITTED"
+        ):
+            constructed_provider = hooks.construct_provider(provider_permit)
+        authority = (
+            provider_permit
+            if capability == "provider-construction-permit"
+            else constructed_provider
+        )
+        assert authority is not None
+        if revoking_state == "PROCESS_INTENT_COMMITTED":
+            assert constructed_provider is not None
+            commit_process_intent(connection, reservation_id, constructed_provider)
+        else:
+            record_recovery(
+                connection,
+                session_id,
+                "LAUNCH_RESERVATION",
+                reservation_id,
+                "CLASSIFY_LAUNCH_RESERVATION",
+            )
     elif capability.startswith("process"):
-        process_intent = commit_process_intent(connection, reservation_id)
+        process_intent = _construct_provider_and_commit_process_intent(
+            connection, reservation_id, hooks
+        )
         if capability == "process-intent":
             authority = process_intent
         else:
@@ -5197,7 +5687,13 @@ def test_authority_capability_revocation_matrix(
     events_before = list(events)
 
     with pytest.raises((ValueError, sqlite3.IntegrityError)):
-        if capability == "process-intent":
+        if capability == "provider-construction-permit":
+            assert type(authority) is FakeProviderConstructionPermit
+            hooks.construct_provider(authority)
+        elif capability == "constructed-provider":
+            assert type(authority) is FakeConstructedProvider
+            commit_process_intent(connection, reservation_id, authority)
+        elif capability == "process-intent":
             assert type(authority) is FakeProcessIntent
             hooks.create_process(authority)
         elif capability == "process-success-result":
@@ -5236,7 +5732,13 @@ def test_authority_capability_revocation_matrix(
     assert after == before
     assert events == events_before
 
-    if isinstance(authority, FakeProcessIntent):
+    if type(authority) is FakeProviderConstructionPermit:
+        with _ISSUED_PROVIDER_CONSTRUCTION_PERMITS_LOCK:
+            _ISSUED_PROVIDER_CONSTRUCTION_PERMITS.pop(authority._permit, None)
+    elif isinstance(authority, FakeConstructedProvider):
+        with _ISSUED_CONSTRUCTED_PROVIDERS_LOCK:
+            _ISSUED_CONSTRUCTED_PROVIDERS.pop(authority._permit, None)
+    elif isinstance(authority, FakeProcessIntent):
         with _ISSUED_PROCESS_PERMITS_LOCK:
             _ISSUED_PROCESS_PERMITS.pop(authority._permit, None)
     elif isinstance(
@@ -5263,7 +5765,7 @@ def test_crash_around_process_call_is_unretryable_and_conservative(
     attempt_id = allocate_attempt(connection, session_id)
     claim_id = commit_claim(connection, attempt_id)
     reservation_id = reserve_launch(connection, claim_id)
-    intent = commit_process_intent(connection, reservation_id)
+    intent = _construct_provider_and_commit_process_intent(connection, reservation_id)
     result: FakeProcessCreationReceipt | FakeProcessCreationFailure | None = None
     if invoke_create_process:
         result = FakeSideEffects(connection).create_process(intent)
@@ -5287,8 +5789,8 @@ def test_crash_around_process_call_is_unretryable_and_conservative(
         intent.intent_digest,
         PROCESS_INTENT_TIMESTAMP,
     )
-    with pytest.raises(ValueError, match="COMMITTED"):
-        commit_process_intent(recovered, reservation_id)
+    with pytest.raises(ValueError, match="COMMITTED|revoked"):
+        _construct_provider_and_commit_process_intent(recovered, reservation_id)
     with pytest.raises(ValueError, match="already consumed|not issued"):
         FakeSideEffects(recovered).create_process(intent)
     second_attempt = allocate_attempt(recovered, session_id)
@@ -5339,7 +5841,7 @@ def test_process_unknown_recovery_allows_only_conservative_close_path(
     attempt_id = allocate_attempt(connection, session_id)
     claim_id = commit_claim(connection, attempt_id)
     reservation_id = reserve_launch(connection, claim_id)
-    intent = commit_process_intent(connection, reservation_id)
+    intent = _construct_provider_and_commit_process_intent(connection, reservation_id)
     with _ISSUED_PROCESS_PERMITS_LOCK:
         _ISSUED_PROCESS_PERMITS.pop(intent._permit, None)
     record_recovery(
@@ -5376,7 +5878,7 @@ def test_process_intent_evidence_is_paired_digest_valid_and_append_only(
         )
     connection.rollback()
 
-    intent = commit_process_intent(connection, reservation_id)
+    intent = _construct_provider_and_commit_process_intent(connection, reservation_id)
     assert connection.execute(
         "SELECT reservation_state, process_intent_json, process_intent_digest, "
         "process_intent_committed_at_utc, outcome_recorded_at_utc "
@@ -5405,8 +5907,8 @@ def test_process_intent_evidence_is_paired_digest_valid_and_append_only(
                 (*values, reservation_id),
             )
         connection.rollback()
-    with pytest.raises(ValueError, match="COMMITTED"):
-        commit_process_intent(connection, reservation_id)
+    with pytest.raises(ValueError, match="COMMITTED|revoked"):
+        _construct_provider_and_commit_process_intent(connection, reservation_id)
     connection.close()
 
 
@@ -5893,7 +6395,9 @@ def test_process_receipt_cannot_persist_after_process_recovery(db_path: Path) ->
     attempt_id = allocate_attempt(connection, session_id)
     claim_id = commit_claim(connection, attempt_id)
     reservation_id = reserve_launch(connection, claim_id)
-    process_intent = commit_process_intent(connection, reservation_id)
+    process_intent = _construct_provider_and_commit_process_intent(
+        connection, reservation_id
+    )
     process_receipt = FakeSideEffects(connection).create_process(process_intent)
     assert type(process_receipt) is FakeProcessCreationReceipt
     record_recovery(

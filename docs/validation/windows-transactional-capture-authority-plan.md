@@ -344,8 +344,10 @@ valid insert, execution, reservation, and attempt are advanced to
 `TERMINAL_RECORDED` in the same transaction.
 
 For an execution-backed lifecycle, the executable order is explicitly
-`commit_process_intent` -> fake `CreateProcessW` hook with the winner's opaque
-permit -> `record_execution` with the exact typed successful process/Job
+reservation commit -> fake provider construction with its reservation-issued
+permit -> `commit_process_intent` with the resulting one-shot constructed
+provider -> fake `CreateProcessW` hook with the winner's opaque process permit
+-> `record_execution` with the exact typed successful process/Job
 receipt -> `commit_resume_intent` and
 `RESUME_INTENT_COMMITTED` -> fake `ResumeThread` hook with the winner's opaque
 permit -> `record_post_resume_evidence` with the exact returned receipt ->
@@ -356,6 +358,7 @@ The following duplicate operations must fail without a second side effect:
 
 - a second claim for one attempt;
 - a second reservation for one claim;
+- a second provider construction or constructed-provider use for one reservation;
 - a second process intent or process-hook use for one reservation;
 - a second execution for one reservation;
 - a second terminal for one reservation;
@@ -516,8 +519,9 @@ objects delayed past a persisted revocation all fail.
 
 | Boundary | Required persisted parent | Capability/evidence | Issuer/provenance | Consumption point | Lifecycle arbiter | Database transaction | Revoking facts | Crash result / recovery | Direct-SQL gate tested |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Provider construction | `COMMITTED` claim, `OPEN` session | Claim identity and canonical request | Reviewed service; no adapter result | No opaque permit; once in normal workflow | No | No | Later reservation/recovery/terminal/selection/close facts | Claim remains consumed; no reconstructed provider action | Claim admission triggers; API occurrence is not SQL-provable |
-| Process-intent issuance | `COMMITTED` reservation and normalized active lineage | `FakeProcessIntent` | Private issuer and exact object/permit registry | At dispatch | Persisted writers use SQLite serialization | `BEGIN IMMEDIATE` | `MANUAL_REVIEW`, terminal, selection, `CLOSED` | No commit means no intent; committed intent is never reconstructed and uses unknown-process recovery | Intent append/state triggers |
+| Reservation/provider-permit issuance | `COMMITTED` claim in an `OPEN` session | Unique reservation insert produces `FakeProviderConstructionPermit` | Private reservation-transaction issuer and exact registry binding | At provider construction | SQLite serializes reservation writers | `BEGIN IMMEDIATE` | `MANUAL_REVIEW`, process intent, terminal, selection, `CLOSED` | Lost post-commit permit uses `CLASSIFY_LAUNCH_RESERVATION` | Unique claim reservation and normalized insert trigger; SQL cannot issue the permit |
+| Provider construction | `COMMITTED` reservation and exact active normalized lineage; no process intent/execution/terminal/selection | Exact reservation-issued permit produces `FakeConstructedProvider` | Private issuers and exact one-shot registries | Reservation permit immediately before construction; provider result after process-intent commit | Required through constructed-provider production | No transaction across hook | `MANUAL_REVIEW`, process intent, terminal, selection, `CLOSED` | Failure/loss remains `COMMITTED`; no reconstruction or repeat, classify reservation | SQLite proves reservation ownership, not provider construction |
+| Process-intent issuance | `COMMITTED` reservation and normalized active lineage | Exact `FakeConstructedProvider` produces `FakeProcessIntent` | Private issuers and exact object/permit registries | Provider capability after commit; process permit at dispatch | Required against reservation recovery | `BEGIN IMMEDIATE` | `MANUAL_REVIEW`, terminal, selection, `CLOSED` | Transient rollback preserves exact provider capability; committed process intent uses unknown-process recovery | Intent append/state triggers; provider provenance is service-only |
 | Process dispatch | `PROCESS_INTENT_COMMITTED`, committed claim, launch-reserved attempt, `OPEN`, no terminal/selection | Exact process intent | Private issuer and exact registered permit | Immediately before modeled `CreateProcessW` | Required through result production | No transaction across hook | `MANUAL_REVIEW`, terminal, selection, `CLOSED` | Missing persisted result is conservatively unknown | SQL cannot prove dispatch |
 | Process-success persistence | Same active process lineage, no execution | `FakeProcessCreationReceipt` | Private adapter issuer and exact registered result permit | After successful commit | Required | `BEGIN IMMEDIATE` | `MANUAL_REVIEW`, terminal, selection, `CLOSED` | Transient rollback preserves retry while active; otherwise unknown-process recovery | Execution parent and reservation state triggers; provenance is service-only |
 | Process-failure persistence | Same active process lineage, no execution/failure | `FakeProcessCreationFailure` with `NOT_CREATED` | Private adapter issuer and exact registered result permit | After successful commit | Required | `BEGIN IMMEDIATE` | `MANUAL_REVIEW`, terminal, selection, `CLOSED` | Transient rollback preserves retry while active; otherwise unknown-process recovery | Failure evidence/state triggers; provenance is service-only |
@@ -528,7 +532,8 @@ objects delayed past a persisted revocation all fail.
 | Selection | Confirmed successful terminal and owning `OPEN` session | Terminal identity and selection request | Reviewed service and selection policy | Unique session selection | No | `BEGIN IMMEDIATE` | Existing selection, `SUCCESS_SELECTED`, `CLOSED` | Rollback leaves no selection | Selection ownership/state trigger |
 | Recovery classification | `OPEN` session and exact action predecessor | Target, operator evidence, policy, current ordinal | Reviewed recovery service | Recovery row, ordinal, and state commit together | Required for reservation actions | `BEGIN IMMEDIATE` | Changed predecessor, prior classification, `SUCCESS_SELECTED`, `CLOSED` | Rollback consumes no ordinal; commit grants no replacement capability | Recovery action/target trigger plus paired service transaction |
 
-The table-driven capability test retains process intents, process success and
+The table-driven capability test retains provider-construction permits,
+constructed-provider capabilities, process intents, process success and
 failure results, resume intents, and resume success receipts across every
 relevant `MANUAL_REVIEW`, `TERMINAL_RECORDED`, `SUCCESS_SELECTED`, and `CLOSED`
 boundary. Each delayed dispatch or persistence attempt must fail without a new
@@ -545,8 +550,10 @@ The test proves the following event order:
 
 | Commit/effect boundary | Required evidence |
 | --- | --- |
-| Claim commit -> credential/provider construction | The observer sees `COMMITTED` before the fake provider hook runs |
-| Reservation commit -> process creation | The observer sees `COMMITTED` before the fake process hook runs |
+| Claim commit -> reservation commit | Exactly one reservation transaction wins and alone receives the opaque provider-construction permit |
+| Reservation commit -> credential/provider construction | The observer sees the exact active `COMMITTED` reservation before consuming its one-shot permit |
+| Provider construction -> process-intent commit | The exact registered `FakeConstructedProvider` is consumed only after `PROCESS_INTENT_COMMITTED` commits |
+| Process-intent commit -> process creation | The observer sees `PROCESS_INTENT_COMMITTED` before the fake process hook runs |
 | `PRE_RESUME_READY` -> resume-intent commit | One `BEGIN IMMEDIATE` winner appends the exact intent triple, exposes `RESUME_INTENT_COMMITTED`, and alone receives the opaque permit |
 | Resume-intent commit -> external `ResumeThread` | The fake adapter accepts only that permit and sees the committed canonical intent plus process, Job Object, and resume-authorization evidence |
 | External `ResumeThread` -> post-resume/cleanup commit | The exact canonical `RESUMED` receipt bound to execution and intent digest is required before `RESUME_RECORDED` |
@@ -556,8 +563,10 @@ The test proves the following event order:
 | Recovery classification -> outstanding resume permit | Per-reservation arbitration makes exactly one side first; a recovery winner emits no hook event, while a hook winner may be conservatively classified before receipt persistence |
 | Recovery classification -> delayed resume receipt | Exactly one of classification or receipt persistence commits first; classification rejects the delayed receipt, while a committed receipt makes the narrow recovery ineligible |
 
-The fake hooks do not read secrets, construct a provider, create a Windows
-process, call a network, or invoke a real Windows API. The fake resume adapter
+The fake hooks do not read secrets, construct a real provider, create a Windows
+process, call a network, or invoke a real Windows API. The modeled provider
+boundary consumes only the exact reservation-issued permit and returns one
+registered constructed-provider capability. The fake resume adapter
 records the modeled external event and returns a canonical receipt only after
 modeled success; modeled failure returns no receipt. The transaction helper
 persists the success receipt only after the hook returns. SQLite proves the
@@ -589,6 +598,19 @@ one modeled `CreateProcessW` event occurs. Direct hook use without a permit,
 second use, reconstructed/non-typed authority, and cross-reservation use fail.
 A restart after intent commit reconstructs neither a permit nor process-call
 authority.
+
+Two independent reservation transactions race one claim: exactly one inserts
+the unique reservation, receives a provider-construction permit, and can emit
+one modeled provider event; the loser has no capability and emits nothing.
+Provider tests reject the original claim ID, existing-reservation
+reconstruction, direct construction, copied objects, wrong issuers or permits,
+cross-reservation use, and reuse. The resulting `FakeConstructedProvider` is
+also exact, registered, one-shot, and same-reservation bound. Process-intent
+issuance without it fails. An injected transaction rollback preserves that
+exact provider object for one retry while active; recovery revokes the retry.
+Modeled construction failure or loss before process-intent commit leaves the
+reservation `COMMITTED`, permits no second construction, and uses only
+`CLASSIFY_LAUNCH_RESERVATION`.
 
 Exact `FakeProcessCreationReceipt` and `FakeProcessCreationFailure` gates bind
 the reservation and committed process-intent digest. Success requires canonical
@@ -660,7 +682,7 @@ receipt. An injected transient database failure leaves the valid receipt
 registered and unconsumed for one exact retry while the lineage remains active.
 
 The whole-boundary matrix covers positive, negative, concurrency, and crash
-outcomes for claim commit -> provider construction -> reservation commit ->
+outcomes for claim commit -> reservation commit -> provider construction ->
 process-intent commit -> `CreateProcessW` -> exact typed process result ->
 `PRE_RESUME_READY` commit -> resume-intent commit -> `ResumeThread` -> exact
 receipt/evidence commit -> terminal -> selection. One reservation plus one

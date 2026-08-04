@@ -301,17 +301,45 @@ bindings and requires every inserted reservation to start exactly in
 `COMMITTED`, with process-intent, process-creation-failure, and outcome facts
 all null.
 
-`commit_process_intent(connection, reservation_id) -> FakeProcessIntent` owns
+The unique reservation is also the durable claim-to-provider handoff fence.
+Only the transaction that inserts it receives an exact typed
+`FakeProviderConstructionPermit` containing the reservation identity, a
+private issuer, and a registered one-shot permit. The permanent claim alone,
+an existing reservation, restart state, copied or reconstructed objects, and
+wrong issuers or permits cannot recreate this authority.
+
+Under the per-reservation lifecycle arbiter, provider construction accepts only
+that exact registered permit and rechecks the normalized reservation -> claim
+-> attempt -> session lineage: reservation `COMMITTED` with no process intent,
+claim `COMMITTED`, attempt `LAUNCH_RESERVED`, session `OPEN`, no execution,
+terminal, or selection, and exact request/provider/operation/budget/policy
+evidence. It consumes the permit immediately before the modeled construction
+event and holds the arbiter through production of one exact typed
+`FakeConstructedProvider`; no SQLite transaction spans construction. A modeled
+failure returns no capability. Recovery, process-intent commitment, terminal
+recording, selection, or closure revokes an outstanding permit.
+
+`commit_process_intent(connection, reservation_id, constructed_provider) ->
+FakeProcessIntent` requires the exact privately issued, registered, one-shot
+`FakeConstructedProvider` for the same reservation and owns
 the one-shot `CreateProcessW` fence. In one `BEGIN IMMEDIATE` transaction it
 requires exactly `COMMITTED`; verifies the claim state, request bytes/digests,
 claim and reservation evidence digests, provider operation and budget, and
 authority/claim policy lineage; appends one exact canonical intent; records its
 SHA-256 digest and commit timestamp; advances to
-`PROCESS_INTENT_COMMITTED`; and commits before any process hook:
+`PROCESS_INTENT_COMMITTED`; commits before any process hook; and only then
+consumes the constructed-provider capability:
 
 ```json
 {"authority_policy_version":"<authority policy>","claim_policy_version":"<claim policy>","launch_reservation_id":"<reservation id>","process_operation":"CreateProcessW","request_digest":"<lowercase hex>","schema":1}
 ```
+
+A transient process-intent rollback while the lineage remains active preserves
+that exact capability for one retry. A crash after reservation commit but
+before construction, a modeled construction failure, or loss of the
+constructed-provider capability before process-intent commit leaves
+`COMMITTED` and permits only `CLASSIFY_LAUNCH_RESERVATION`; construction and
+capability reconstruction are never retried.
 
 Only the winning transaction receives an opaque in-memory `FakeProcessIntent`.
 Under the per-reservation lifecycle arbiter, the external adapter accepts only
@@ -595,8 +623,9 @@ object.
 
 | Boundary | Required persisted parent | Capability/evidence | Issuer/provenance | Consumption point | Lifecycle arbiter | Database transaction | Revoking facts | Crash result / recovery | Direct-SQL enforcement |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Provider construction | `COMMITTED` claim in an `OPEN` session | Committed claim identity and canonical request | Reviewed service; no adapter result | No opaque permit; construction follows the claim fence once in the workflow | No external-dispatch arbitration | No | Later reservation state, `MANUAL_REVIEW`, terminal, selection, `CLOSED` | Claim remains consumed; do not reconstruct a provider action | Claim insert/admission triggers; SQL cannot prove construction |
-| Process-intent issuance | `COMMITTED` reservation and exact normalized claim/session lineage | Transaction-issued `FakeProcessIntent` | Private intent issuer; exact object/permit registry | Permit remains live until process dispatch | Persisted writers serialize through `BEGIN IMMEDIATE` | Yes, `BEGIN IMMEDIATE` | `MANUAL_REVIEW`, terminal, selection, `CLOSED` | Before commit: none; after commit: no permit reconstruction, use `CLASSIFY_PROCESS_OUTCOME_UNKNOWN` | Process-intent append/state triggers |
+| Reservation/provider-permit issuance | `COMMITTED` claim in an `OPEN` session | Unique reservation insert produces `FakeProviderConstructionPermit` | Private reservation-transaction issuer and exact object/permit registry | Permit remains live until provider construction | Persisted writers serialize through `BEGIN IMMEDIATE` | Yes, `BEGIN IMMEDIATE` | `MANUAL_REVIEW`, process intent, terminal, selection, `CLOSED` | Before commit: no reservation/permit; after commit with lost permit: `CLASSIFY_LAUNCH_RESERVATION` | Unique `claim_id`, reservation lineage trigger; SQL cannot issue the permit |
+| Provider construction | `COMMITTED` reservation, exact normalized active lineage, no process intent/execution/terminal/selection | Exact `FakeProviderConstructionPermit` produces `FakeConstructedProvider` | Both objects use private issuers and exact one-shot registries | Reservation permit immediately before construction; constructed provider after process-intent commit | Required; held through constructed-provider production | No transaction across construction | `MANUAL_REVIEW`, process intent, terminal, selection, `CLOSED` | Failure or loss leaves `COMMITTED`; never reconstruct/repeat, use `CLASSIFY_LAUNCH_RESERVATION` | SQLite proves reservation ownership, not provider-object construction |
+| Process-intent issuance | `COMMITTED` reservation and exact normalized claim/session lineage | Exact `FakeConstructedProvider` produces transaction-issued `FakeProcessIntent` | Private issuers and exact object/permit registries | Constructed provider after commit; process permit at dispatch | Required against reservation classification | Yes, `BEGIN IMMEDIATE` | `MANUAL_REVIEW`, terminal, selection, `CLOSED` | Rollback while active preserves exact provider capability; after commit no process-permit reconstruction, use `CLASSIFY_PROCESS_OUTCOME_UNKNOWN` | Process-intent append/state triggers; provider provenance remains service-only |
 | Process dispatch | `PROCESS_INTENT_COMMITTED`, committed claim, launch-reserved attempt, `OPEN`, no terminal/selection | Exact `FakeProcessIntent` | Private issuer and exact registered one-shot permit | Immediately before `CreateProcessW` | Required; held through typed result production | No transaction across call | `MANUAL_REVIEW`, terminal, selection, `CLOSED` | No result is indistinguishable from unpersisted result; classify unknown | SQL cannot perform or prove the API call |
 | Process-success persistence | Same active process lineage; no execution | Exact `FakeProcessCreationReceipt` | Private result issuer and exact registered result permit | After execution/reservation commit | Required | Yes, `BEGIN IMMEDIATE` | `MANUAL_REVIEW`, terminal, selection, `CLOSED` | Rollback while active keeps receipt retryable; otherwise classify unknown | Execution parent trigger and reservation state trigger; provenance remains service-only |
 | Process-failure persistence | Same active process lineage; no execution/failure | Exact `FakeProcessCreationFailure` with `NOT_CREATED` | Private result issuer and exact registered result permit | After failure/state commit | Required | Yes, `BEGIN IMMEDIATE` | `MANUAL_REVIEW`, terminal, selection, `CLOSED` | Rollback while active keeps failure retryable; otherwise classify unknown | Failure evidence/state triggers; provenance remains service-only |
@@ -820,8 +849,8 @@ fixed bootstrap/CNG/ACL/path verification
   -> snapshot serialization, digest, session identity, insert, and COMMIT
   -> attempt ordinal transaction
   -> permanent claim transaction and COMMIT
-  -> credential/provider/network construction
   -> launch reservation transaction and COMMIT
+  -> one-shot credential/provider/network construction using the reservation-issued permit
   -> process-intent transaction and PROCESS_INTENT_COMMITTED COMMIT
   -> external CreateProcessW(CREATE_SUSPENDED) through the reviewed adapter using the one-shot permit
   -> exact typed process/Job Object result returned to the transaction service
@@ -835,15 +864,21 @@ fixed bootstrap/CNG/ACL/path verification
   -> explicit successful session selection
 ```
 
-The claim commit precedes all credential/provider/network construction. The
-claim insertion itself is the session-wide admission point: the authoritative
-trigger rejects every prior outcome except the exact digest-valid
+The claim and unique reservation commits both precede all
+credential/provider/network construction. The claim insertion is the
+session-wide admission point: the authoritative trigger rejects every prior
+outcome except the exact digest-valid
 process-creation-failure `FAILED`/`NOT_STARTED` lineage with no execution. The
-helper does not run an ad hoc unresolved-execution query.
+reservation insert is the durable construction handoff and alone issues its
+opaque permit. The permanent claim cannot reconstruct it. The helper does not
+run an ad hoc unresolved-execution query.
 
-The reservation commit and a separate `BEGIN IMMEDIATE` process-intent commit
-both precede process creation. Only the process-intent winner receives the
-one-shot permit accepted by the reviewed adapter. Process dispatch and manual
+The reservation permit is consumed immediately before one provider construction
+under the lifecycle arbiter. Its exact typed result is consumed only after the
+separate `BEGIN IMMEDIATE` process-intent transaction commits. The reservation,
+provider construction, and process-intent commits all precede process creation.
+Only the process-intent winner receives the one-shot permit accepted by the
+reviewed adapter. Process dispatch and manual
 classification are mutually exclusive under the per-reservation lifecycle
 arbiter: recovery-first emits no call, while dispatch-first emits exactly one
 call and produces exactly one privately issued result before releasing the
@@ -864,8 +899,13 @@ one-reservation and one-intent fences, exact persisted bytes, active-parent
 phase guards, and persisted barriers; it cannot prove that an external Windows
 API call occurred or arbitrate a call already outside SQLite.
 
-A crash after a claim or reservation commit leaves that fence consumed. A
-crash after process-intent commit but before `CreateProcessW` and a crash after
+A crash after reservation commit but before provider construction, a provider
+construction failure, or loss of its successful in-memory result before
+process-intent commit leaves `COMMITTED`. The service must never reconstruct or
+repeat construction and uses only `CLASSIFY_LAUNCH_RESERVATION`. A transient
+process-intent rollback in the same live service may retry once with the exact
+still-registered constructed-provider capability. A crash after process-intent
+commit but before `CreateProcessW` and a crash after
 `CreateProcessW` but before its typed result is committed both leave
 `PROCESS_INTENT_COMMITTED` with no execution or definitive failure evidence.
 The service must not recreate a permit or retry the call; it uses only
@@ -899,8 +939,8 @@ successful process receipt cannot create an execution after
 `CLASSIFY_PROCESS_OUTCOME_UNKNOWN`.
 
 The whole-boundary audit treats every arrow from claim commit through
-selection as an authority handoff: claim commit -> provider construction ->
-reservation commit -> process-intent commit -> `CreateProcessW` -> exact typed
+selection as an authority handoff: claim commit -> reservation commit ->
+provider construction -> process-intent commit -> `CreateProcessW` -> exact typed
 process result -> `PRE_RESUME_READY` commit -> resume-intent commit ->
 `ResumeThread` -> exact receipt/evidence commit -> terminal -> selection.
 Positive, rejection, two-connection concurrency, and crash cases cover each

@@ -30,6 +30,9 @@ OPERATION = ALPACA_DAILY_SNAPSHOT_DESCRIPTOR.operation
 POLICY = "authority-policy/v1"
 CLAIM_POLICY = "claim-policy/v1"
 RELEASE = "release/v1"
+TERMINAL_POLICY = "terminal-policy/v1"
+SELECTION_POLICY = "selection-policy/v1"
+RECOVERY_POLICY = "recovery-policy/v1"
 TIMESTAMP = "2026-01-01T00:00:00Z"
 PROCESS_CREATED_TIMESTAMP = "2026-01-01T00:01:00Z"
 RESUME_INTENT_TIMESTAMP = "2026-01-01T00:01:30Z"
@@ -150,8 +153,33 @@ def _insert_attempt_row_for_test(
     ordinal: int,
     request_bytes: bytes,
     request_digest: bytes,
+    *,
+    attempt_policy_version: str | None = None,
+    provider_id: str | None = None,
+    permitted_provider_operation: str | None = None,
 ) -> str:
-    attempt_id = _attempt_id(session_id, ordinal)
+    parent = connection.execute(
+        """
+        SELECT s.claim_policy_version, m.provider_id,
+               m.permitted_provider_operation
+        FROM sessions s
+        JOIN authority_metadata m
+          ON m.authority_epoch_id = s.authority_epoch_id
+        WHERE s.session_id = ?
+        """,
+        (session_id,),
+    ).fetchone()
+    if parent is None:
+        raise ValueError("unknown raw attempt session")
+    parent_policy, parent_provider, parent_operation = parent
+    policy = parent_policy if attempt_policy_version is None else attempt_policy_version
+    provider = parent_provider if provider_id is None else provider_id
+    operation = (
+        parent_operation
+        if permitted_provider_operation is None
+        else permitted_provider_operation
+    )
+    attempt_id = _attempt_id(session_id, ordinal, provider, operation, policy)
     allocation, allocation_digest = _evidence(f"raw-allocation:{ordinal}")
     attempt, attempt_digest = _evidence(f"raw-attempt:{ordinal}")
     connection.execute(
@@ -169,11 +197,11 @@ def _insert_attempt_row_for_test(
             attempt_id,
             session_id,
             ordinal,
-            PROVIDER,
-            OPERATION,
+            provider,
+            operation,
             request_bytes,
             request_digest,
-            CLAIM_POLICY,
+            policy,
             allocation,
             allocation_digest,
             attempt,
@@ -189,8 +217,22 @@ def _insert_claim_row_for_test(
     attempt_id: str,
     request_bytes: bytes,
     request_digest: bytes,
+    *,
+    claim_policy_version: str | None = None,
 ) -> str:
-    claim_id = _claim_id(attempt_id)
+    parent = connection.execute(
+        """
+        SELECT attempt_policy_version, provider_id,
+               permitted_provider_operation, provider_call_budget
+        FROM attempts WHERE attempt_id = ?
+        """,
+        (attempt_id,),
+    ).fetchone()
+    if parent is None:
+        raise ValueError("unknown raw claim attempt")
+    parent_policy, provider_id, operation, budget = parent
+    policy = parent_policy if claim_policy_version is None else claim_policy_version
+    claim_id = _claim_id(attempt_id, policy, provider_id, operation, budget)
     evidence, evidence_digest = _evidence(f"raw-claim:{attempt_id}")
     connection.execute(
         """
@@ -199,14 +241,15 @@ def _insert_claim_row_for_test(
             provider_id, permitted_provider_operation, provider_call_budget,
             request_json, request_digest, claim_evidence_json,
             claim_evidence_digest, state, committed_at_utc
-        ) VALUES (?, ?, 1, ?, ?, ?, 1, ?, ?, ?, ?, 'COMMITTED', ?)
+        ) VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, 'COMMITTED', ?)
         """,
         (
             claim_id,
             attempt_id,
-            CLAIM_POLICY,
-            PROVIDER,
-            OPERATION,
+            policy,
+            provider_id,
+            operation,
+            budget,
             request_bytes,
             request_digest,
             evidence,
@@ -224,8 +267,32 @@ def _insert_reservation_row_for_test(
     reservation_state: str = "COMMITTED",
     failure_mode: bool = False,
     outcome_timestamp: str | None = None,
+    *,
+    authority_policy_version: str | None = None,
+    claim_policy_version: str | None = None,
 ) -> str:
-    reservation_id = _reservation_id(claim_id)
+    parent = connection.execute(
+        """
+        SELECT c.claim_policy_version, s.authority_policy_version
+        FROM provider_call_claims c
+        JOIN attempts a ON a.attempt_id = c.attempt_id
+        JOIN sessions s ON s.session_id = a.session_id
+        WHERE c.claim_id = ?
+        """,
+        (claim_id,),
+    ).fetchone()
+    if parent is None:
+        raise ValueError("unknown raw reservation claim")
+    parent_claim_policy, parent_authority_policy = parent
+    claim_policy = (
+        parent_claim_policy if claim_policy_version is None else claim_policy_version
+    )
+    authority_policy = (
+        parent_authority_policy
+        if authority_policy_version is None
+        else authority_policy_version
+    )
+    reservation_id = _reservation_id(claim_id, RELEASE, authority_policy, claim_policy)
     evidence, evidence_digest = _evidence(f"raw-reservation:{claim_id}")
     failure = failure_digest = None
     if failure_mode:
@@ -245,8 +312,8 @@ def _insert_reservation_row_for_test(
             reservation_id,
             claim_id,
             RELEASE,
-            POLICY,
-            CLAIM_POLICY,
+            authority_policy,
+            claim_policy,
             request_digest,
             evidence,
             evidence_digest,
@@ -268,7 +335,7 @@ def _insert_terminal_row_for_test(
     disposition: str,
     snapshot_mode: str = "auto",
 ) -> str:
-    terminal_id = _terminal_id(reservation_id)
+    terminal_id = _terminal_id(reservation_id, TERMINAL_POLICY)
     evidence, evidence_digest = _evidence(f"raw-terminal:{reservation_id}")
     diagnostics, diagnostics_digest = _evidence("raw-diagnostics")
     snapshot = (
@@ -285,11 +352,12 @@ def _insert_terminal_row_for_test(
             provider_call_disposition, request_digest, evidence_json,
             evidence_digest, snapshot_digest, sanitized_diagnostics_json,
             sanitized_diagnostics_digest, recorded_at_utc
-        ) VALUES (?, ?, 1, 'terminal-policy/v1', ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             terminal_id,
             reservation_id,
+            TERMINAL_POLICY,
             state,
             disposition,
             request_digest,
@@ -302,6 +370,64 @@ def _insert_terminal_row_for_test(
         ),
     )
     return terminal_id
+
+
+def _insert_execution_row_for_test(
+    connection: sqlite3.Connection,
+    reservation_id: str,
+    *,
+    authority_policy_version: str | None = None,
+) -> str:
+    parent = connection.execute(
+        """
+        SELECT application_release_version, authority_policy_version
+        FROM launch_reservations WHERE launch_reservation_id = ?
+        """,
+        (reservation_id,),
+    ).fetchone()
+    if parent is None:
+        raise ValueError("unknown raw execution reservation")
+    application_release_version, parent_authority_policy = parent
+    authority_policy = (
+        parent_authority_policy
+        if authority_policy_version is None
+        else authority_policy_version
+    )
+    execution_id = _execution_id(
+        reservation_id, application_release_version, authority_policy
+    )
+    process, process_digest = _evidence(f"raw-process:{reservation_id}")
+    job, job_digest = _evidence(f"raw-job:{reservation_id}")
+    resume, resume_digest = _evidence(f"raw-resume:{reservation_id}")
+    connection.execute(
+        """
+        INSERT INTO launch_executions (
+            launch_execution_id, launch_reservation_id, launch_schema,
+            application_release_version, authority_policy_version, phase,
+            process_creation_json, process_creation_digest, job_object_json,
+            job_object_digest, resume_authorization_json,
+            resume_authorization_digest, resume_intent_json,
+            resume_intent_digest, resume_intent_committed_at_utc,
+            post_resume_json, post_resume_digest, cleanup_json,
+            cleanup_digest, created_at_utc
+        ) VALUES (?, ?, 1, ?, ?, 'PRE_RESUME_READY', ?, ?, ?, ?, ?, ?,
+                  NULL, NULL, NULL, NULL, NULL, NULL, NULL, ?)
+        """,
+        (
+            execution_id,
+            reservation_id,
+            application_release_version,
+            authority_policy,
+            process,
+            process_digest,
+            job,
+            job_digest,
+            resume,
+            resume_digest,
+            TIMESTAMP,
+        ),
+    )
+    return execution_id
 
 
 def _request(target_date: str = "2026-01-01") -> dict[str, Any]:
@@ -376,10 +502,10 @@ def _validate_capture_request(request: object) -> dict[str, Any]:
 def _session_id(
     request: dict[str, Any],
     *,
-    machine_authority_id: str = MACHINE,
-    authority_epoch_id: str = EPOCH,
-    authority_policy_version: str = POLICY,
-    claim_policy_version: str = CLAIM_POLICY,
+    machine_authority_id: str,
+    authority_epoch_id: str,
+    authority_policy_version: str,
+    claim_policy_version: str,
 ) -> str:
     return _identity(
         "session_id/v2",
@@ -402,46 +528,85 @@ def _session_id(
     )
 
 
-def _attempt_id(session_id: str, ordinal: int) -> str:
+def _attempt_id(
+    session_id: str,
+    ordinal: int,
+    provider_id: str,
+    permitted_provider_operation: str,
+    attempt_policy_version: str,
+) -> str:
     return _identity(
         "attempt_id/v2",
         session_id,
         str(ordinal),
-        PROVIDER,
-        OPERATION,
+        provider_id,
+        permitted_provider_operation,
         "1",
-        CLAIM_POLICY,
+        attempt_policy_version,
     )
 
 
-def _claim_id(attempt_id: str) -> str:
+def _claim_id(
+    attempt_id: str,
+    claim_policy_version: str,
+    provider_id: str,
+    permitted_provider_operation: str,
+    provider_call_budget: int,
+) -> str:
     return _identity(
-        "claim_id/v2", attempt_id, "1", CLAIM_POLICY, PROVIDER, OPERATION, "1"
+        "claim_id/v2",
+        attempt_id,
+        "1",
+        claim_policy_version,
+        provider_id,
+        permitted_provider_operation,
+        str(provider_call_budget),
     )
 
 
-def _reservation_id(claim_id: str) -> str:
+def _reservation_id(
+    claim_id: str,
+    application_release_version: str,
+    authority_policy_version: str,
+    claim_policy_version: str,
+) -> str:
     return _identity(
         "launch_reservation_id/v2",
         claim_id,
         "1",
-        RELEASE,
-        POLICY,
-        CLAIM_POLICY,
+        application_release_version,
+        authority_policy_version,
+        claim_policy_version,
     )
 
 
-def _execution_id(reservation_id: str) -> str:
-    return _identity("launch_execution_id/v2", reservation_id, "1", RELEASE, POLICY)
-
-
-def _terminal_id(reservation_id: str) -> str:
-    return _identity("terminal_id/v2", reservation_id, "1", "terminal-policy/v1")
-
-
-def _selection_id(session_id: str, terminal_id: str) -> str:
+def _execution_id(
+    reservation_id: str,
+    application_release_version: str,
+    authority_policy_version: str,
+) -> str:
     return _identity(
-        "selection_id/v2", session_id, terminal_id, "1", "selection-policy/v1"
+        "launch_execution_id/v2",
+        reservation_id,
+        "1",
+        application_release_version,
+        authority_policy_version,
+    )
+
+
+def _terminal_id(reservation_id: str, terminal_policy_version: str) -> str:
+    return _identity("terminal_id/v2", reservation_id, "1", terminal_policy_version)
+
+
+def _selection_id(
+    session_id: str, terminal_id: str, selection_policy_version: str
+) -> str:
+    return _identity(
+        "selection_id/v2",
+        session_id,
+        terminal_id,
+        "1",
+        selection_policy_version,
     )
 
 
@@ -453,6 +618,7 @@ def _recovery_id(
     predecessor_state: str,
     resulting_state: str,
     ordinal: int,
+    recovery_policy_version: str,
 ) -> str:
     return _identity(
         "recovery_id/v2",
@@ -463,7 +629,7 @@ def _recovery_id(
         predecessor_state,
         resulting_state,
         "1",
-        "recovery-policy/v1",
+        recovery_policy_version,
         str(ordinal),
     )
 
@@ -493,6 +659,8 @@ def _insert_metadata(
     *,
     provider_id: str = PROVIDER,
     permitted_provider_operation: str = OPERATION,
+    authority_policy_version: str = POLICY,
+    claim_policy_version: str = CLAIM_POLICY,
 ) -> None:
     metadata = _json({"authority_epoch_id": EPOCH, "machine_authority_id": MACHINE})
     connection.execute(
@@ -510,8 +678,8 @@ def _insert_metadata(
             MACHINE,
             provider_id,
             permitted_provider_operation,
-            POLICY,
-            CLAIM_POLICY,
+            authority_policy_version,
+            claim_policy_version,
             TIMESTAMP,
             _digest(b"bootstrap"),
             _digest(b"database"),
@@ -577,6 +745,10 @@ def create_session(
             authority_policy_version,
             claim_policy_version,
         ) = metadata
+        if authority_policy_version != POLICY:
+            raise ValueError("authority policy is unsupported by this release")
+        if claim_policy_version != CLAIM_POLICY:
+            raise ValueError("claim policy is unsupported by this release")
         if (
             metadata_provider_id != ALPACA_DAILY_SNAPSHOT_DESCRIPTOR.provider_id
             or metadata_operation != ALPACA_DAILY_SNAPSHOT_DESCRIPTOR.operation
@@ -633,16 +805,43 @@ def allocate_attempt(
     try:
         row = connection.execute(
             """
-            SELECT next_attempt_ordinal, request_json, request_digest
-            FROM sessions WHERE session_id = ?
+            SELECT s.next_attempt_ordinal, s.request_json, s.request_digest,
+                   m.provider_id, m.permitted_provider_operation,
+                   s.authority_policy_version, s.claim_policy_version,
+                   m.authority_policy_version, m.claim_policy_version
+            FROM sessions s
+            JOIN authority_metadata m
+              ON m.authority_epoch_id = s.authority_epoch_id
+            WHERE s.session_id = ?
             """,
             (session_id,),
         ).fetchone()
         if row is None:
             raise ValueError("unknown session")
-        current_ordinal, request_bytes, request_digest = row
+        (
+            current_ordinal,
+            request_bytes,
+            request_digest,
+            provider_id,
+            operation,
+            authority_policy_version,
+            claim_policy_version,
+            metadata_authority_policy,
+            metadata_claim_policy,
+        ) = row
+        if (
+            authority_policy_version != metadata_authority_policy
+            or claim_policy_version != metadata_claim_policy
+        ):
+            raise ValueError("session policy lineage does not match metadata")
         allocated_ordinal = current_ordinal if ordinal is None else ordinal
-        attempt_id = _attempt_id(session_id, allocated_ordinal)
+        attempt_id = _attempt_id(
+            session_id,
+            allocated_ordinal,
+            provider_id,
+            operation,
+            claim_policy_version,
+        )
         allocation_evidence, allocation_digest = _evidence(
             f"allocation:{allocated_ordinal}"
         )
@@ -662,11 +861,11 @@ def allocate_attempt(
                 attempt_id,
                 session_id,
                 allocated_ordinal,
-                PROVIDER,
-                OPERATION,
+                provider_id,
+                operation,
                 request_bytes,
                 request_digest,
-                CLAIM_POLICY,
+                claim_policy_version,
                 allocation_evidence,
                 allocation_digest,
                 attempt_evidence,
@@ -682,21 +881,36 @@ def allocate_attempt(
 
 
 def commit_claim(connection: sqlite3.Connection, attempt_id: str) -> str:
-    claim_id = _claim_id(attempt_id)
     evidence, evidence_digest = _evidence(f"claim:{attempt_id}")
     _begin(connection)
     try:
         attempt = connection.execute(
             """
             SELECT a.session_id, a.request_json, a.request_digest, a.provider_id,
-                   permitted_provider_operation, provider_call_budget
+                   a.permitted_provider_operation, a.provider_call_budget,
+                   a.attempt_policy_version
             FROM attempts a WHERE attempt_id = ?
             """,
             (attempt_id,),
         ).fetchone()
         if attempt is None:
             raise ValueError("unknown attempt")
-        _, request_bytes, request_digest, provider_id, operation, budget = attempt
+        (
+            _,
+            request_bytes,
+            request_digest,
+            provider_id,
+            operation,
+            budget,
+            claim_policy_version,
+        ) = attempt
+        claim_id = _claim_id(
+            attempt_id,
+            claim_policy_version,
+            provider_id,
+            operation,
+            budget,
+        )
         connection.execute(
             """
             INSERT INTO provider_call_claims (
@@ -709,7 +923,7 @@ def commit_claim(connection: sqlite3.Connection, attempt_id: str) -> str:
             (
                 claim_id,
                 attempt_id,
-                CLAIM_POLICY,
+                claim_policy_version,
                 provider_id,
                 operation,
                 budget,
@@ -732,19 +946,31 @@ def commit_claim(connection: sqlite3.Connection, attempt_id: str) -> str:
 
 
 def reserve_launch(connection: sqlite3.Connection, claim_id: str) -> str:
-    reservation_id = _reservation_id(claim_id)
     evidence, evidence_digest = _evidence(f"reservation:{claim_id}")
     _begin(connection)
     try:
         claim = connection.execute(
             """
-            SELECT attempt_id, request_digest
-            FROM provider_call_claims WHERE claim_id = ?
+            SELECT c.attempt_id, c.request_digest, c.claim_policy_version,
+                   s.authority_policy_version
+            FROM provider_call_claims c
+            JOIN attempts a ON a.attempt_id = c.attempt_id
+            JOIN sessions s ON s.session_id = a.session_id
+            WHERE c.claim_id = ?
             """,
             (claim_id,),
         ).fetchone()
         if claim is None:
             raise ValueError("unknown claim")
+        attempt_id, request_digest, claim_policy_version, authority_policy_version = (
+            claim
+        )
+        reservation_id = _reservation_id(
+            claim_id,
+            RELEASE,
+            authority_policy_version,
+            claim_policy_version,
+        )
         connection.execute(
             """
             INSERT INTO launch_reservations (
@@ -760,9 +986,9 @@ def reserve_launch(connection: sqlite3.Connection, claim_id: str) -> str:
                 reservation_id,
                 claim_id,
                 RELEASE,
-                POLICY,
-                CLAIM_POLICY,
-                claim[1],
+                authority_policy_version,
+                claim_policy_version,
+                request_digest,
                 evidence,
                 evidence_digest,
                 TIMESTAMP,
@@ -770,7 +996,7 @@ def reserve_launch(connection: sqlite3.Connection, claim_id: str) -> str:
         )
         connection.execute(
             "UPDATE attempts SET state = 'LAUNCH_RESERVED' WHERE attempt_id = ?",
-            (claim[0],),
+            (attempt_id,),
         )
         _finish(connection, True)
     except BaseException:
@@ -780,12 +1006,26 @@ def reserve_launch(connection: sqlite3.Connection, claim_id: str) -> str:
 
 
 def record_execution(connection: sqlite3.Connection, reservation_id: str) -> str:
-    execution_id = _execution_id(reservation_id)
     process, process_digest = _evidence(f"process:{reservation_id}")
     job, job_digest = _evidence(f"job:{reservation_id}")
     resume, resume_digest = _evidence(f"resume:{reservation_id}")
     _begin(connection)
     try:
+        reservation = connection.execute(
+            """
+            SELECT application_release_version, authority_policy_version
+            FROM launch_reservations WHERE launch_reservation_id = ?
+            """,
+            (reservation_id,),
+        ).fetchone()
+        if reservation is None:
+            raise ValueError("unknown reservation")
+        application_release_version, authority_policy_version = reservation
+        execution_id = _execution_id(
+            reservation_id,
+            application_release_version,
+            authority_policy_version,
+        )
         connection.execute(
             """
             INSERT INTO launch_executions (
@@ -803,8 +1043,8 @@ def record_execution(connection: sqlite3.Connection, reservation_id: str) -> str
             (
                 execution_id,
                 reservation_id,
-                RELEASE,
-                POLICY,
+                application_release_version,
+                authority_policy_version,
                 process,
                 process_digest,
                 job,
@@ -976,7 +1216,8 @@ def record_terminal(
     state: str = "SUCCEEDED",
     disposition: str = "CONFIRMED",
 ) -> str:
-    terminal_id = _terminal_id(reservation_id)
+    terminal_policy_version = TERMINAL_POLICY
+    terminal_id = _terminal_id(reservation_id, terminal_policy_version)
     evidence, evidence_digest = _evidence(f"terminal:{reservation_id}")
     diagnostics, diagnostics_digest = _evidence("sanitized-diagnostics")
     snapshot = _digest(b"verified-snapshot") if state == "SUCCEEDED" else None
@@ -1000,11 +1241,12 @@ def record_terminal(
                 provider_call_disposition, request_digest, evidence_json,
                 evidence_digest, snapshot_digest, sanitized_diagnostics_json,
                 sanitized_diagnostics_digest, recorded_at_utc
-            ) VALUES (?, ?, 1, 'terminal-policy/v1', ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 terminal_id,
                 reservation_id,
+                terminal_policy_version,
                 state,
                 disposition,
                 reservation[1],
@@ -1060,7 +1302,8 @@ def _insert_selection_in_transaction(
     ).fetchone()
     if snapshot is None or snapshot[0] is None:
         raise ValueError("terminal has no snapshot")
-    selection_id = _selection_id(session_id, terminal_id)
+    selection_policy_version = SELECTION_POLICY
+    selection_id = _selection_id(session_id, terminal_id, selection_policy_version)
     evidence, evidence_digest = _evidence(f"selection:{terminal_id}")
     connection.execute(
         """
@@ -1069,12 +1312,13 @@ def _insert_selection_in_transaction(
             selection_policy_version, snapshot_digest,
             selection_evidence_json, selection_evidence_digest,
             selected_at_utc
-        ) VALUES (?, ?, ?, 1, 'selection-policy/v1', ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, 1, ?, ?, ?, ?, ?)
         """,
         (
             selection_id,
             session_id,
             terminal_id,
+            selection_policy_version,
             snapshot[0],
             evidence,
             evidence_digest,
@@ -1213,6 +1457,7 @@ def record_recovery(
             predecessor,
             resulting,
             recovery_ordinal,
+            RECOVERY_POLICY,
         )
         evidence, evidence_digest = _evidence(f"recovery:{recovery_id}")
         recovery_timestamp = {
@@ -1227,7 +1472,7 @@ def record_recovery(
                 recovery_schema, recovery_policy_version,
                 operator_evidence_json, operator_evidence_digest,
                 created_at_utc
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, 'recovery-policy/v1', ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)
             """,
             (
                 recovery_id,
@@ -1238,6 +1483,7 @@ def record_recovery(
                 action,
                 predecessor,
                 resulting,
+                RECOVERY_POLICY,
                 evidence,
                 evidence_digest,
                 recovery_timestamp,
@@ -1533,6 +1779,38 @@ def _assert_no_capture_authority_side_effects(
         assert connection.execute(f"SELECT count(*) FROM {table}").fetchone() == (0,)
 
 
+@pytest.mark.parametrize(
+    ("authority_policy_version", "claim_policy_version"),
+    [
+        ("authority-policy/v2", CLAIM_POLICY),
+        (POLICY, "claim-policy/v2"),
+    ],
+    ids=["unsupported-authority-policy", "unsupported-claim-policy"],
+)
+def test_session_creation_rejects_unsupported_signed_policy_before_persistence(
+    tmp_path: Path,
+    authority_policy_version: str,
+    claim_policy_version: str,
+) -> None:
+    path = tmp_path / "unsupported-policy.sqlite3"
+    connection = _connect(path)
+    _install_schema(connection)
+    _insert_metadata(
+        connection,
+        authority_policy_version=authority_policy_version,
+        claim_policy_version=claim_policy_version,
+    )
+    _insert_migration(connection)
+    side_effects = FakeSideEffects(connection)
+
+    with pytest.raises(ValueError, match="policy is unsupported"):
+        create_session(connection)
+
+    _assert_no_capture_authority_side_effects(connection)
+    assert side_effects.events == []
+    connection.close()
+
+
 @pytest.mark.parametrize("missing_field", sorted(CAPTURE_REQUEST_FIELDS))
 def test_capture_request_requires_every_exact_field(
     db_path: Path, missing_field: str
@@ -1639,7 +1917,16 @@ def test_invalid_alternate_request_cannot_collide_with_persisted_session(
     valid_request = _request()
     session_id = create_session(connection, valid_request)
     alternate = {**valid_request, "ordered_universe": ("QQQ", "SPY")}
-    assert _session_id(alternate) == session_id  # type: ignore[arg-type]
+    assert (
+        _session_id(
+            alternate,  # type: ignore[arg-type]
+            machine_authority_id=MACHINE,
+            authority_epoch_id=EPOCH,
+            authority_policy_version=POLICY,
+            claim_policy_version=CLAIM_POLICY,
+        )
+        == session_id
+    )
     with pytest.raises(ValueError, match="exact list"):
         create_session(connection, alternate)  # type: ignore[arg-type]
     assert connection.execute(
@@ -1719,6 +2006,23 @@ def test_complete_ddl_and_immediate_parent_chain(db_path: Path) -> None:
         "SELECT count(*) FROM sqlite_master WHERE type = 'trigger' "
         "AND name = 'launch_executions_resume_intent_append_only'"
     ).fetchone() == (1,)
+    policy_triggers = {
+        row[0]
+        for row in connection.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'trigger' "
+            "AND name IN ('sessions_before_insert', 'attempts_before_insert', "
+            "'provider_call_claims_before_insert', "
+            "'launch_reservations_before_insert', "
+            "'launch_executions_parent_policy_before_insert')"
+        )
+    }
+    assert policy_triggers == {
+        "sessions_before_insert",
+        "attempts_before_insert",
+        "provider_call_claims_before_insert",
+        "launch_reservations_before_insert",
+        "launch_executions_parent_policy_before_insert",
+    }
     connection.close()
 
 
@@ -1774,13 +2078,19 @@ def test_descendants_do_not_copy_ancestor_identity_columns(db_path: Path) -> Non
 def test_identity_vectors_use_normalized_immediate_parent_material() -> None:
     request = _request()
     migration_id = _identity("migration_id/v1", EPOCH, "3", "migration-policy/v1")
-    session_id = _session_id(request)
-    attempt_id = _attempt_id(session_id, 0)
-    claim_id = _claim_id(attempt_id)
-    reservation_id = _reservation_id(claim_id)
-    execution_id = _execution_id(reservation_id)
-    terminal_id = _terminal_id(reservation_id)
-    selection_id = _selection_id(session_id, terminal_id)
+    session_id = _session_id(
+        request,
+        machine_authority_id=MACHINE,
+        authority_epoch_id=EPOCH,
+        authority_policy_version=POLICY,
+        claim_policy_version=CLAIM_POLICY,
+    )
+    attempt_id = _attempt_id(session_id, 0, PROVIDER, OPERATION, CLAIM_POLICY)
+    claim_id = _claim_id(attempt_id, CLAIM_POLICY, PROVIDER, OPERATION, 1)
+    reservation_id = _reservation_id(claim_id, RELEASE, POLICY, CLAIM_POLICY)
+    execution_id = _execution_id(reservation_id, RELEASE, POLICY)
+    terminal_id = _terminal_id(reservation_id, TERMINAL_POLICY)
+    selection_id = _selection_id(session_id, terminal_id, SELECTION_POLICY)
     recovery_id = _recovery_id(
         session_id,
         "ATTEMPT",
@@ -1789,6 +2099,7 @@ def test_identity_vectors_use_normalized_immediate_parent_material() -> None:
         "LAUNCH_RESERVED",
         "AMBIGUITY_RECORDED",
         0,
+        RECOVERY_POLICY,
     )
     assert migration_id == "b1114fec-2247-506d-bfda-74008355b312"
     assert session_id == "80e64e2b-689f-5c0f-9076-bd251b55a9ee"
@@ -1799,13 +2110,97 @@ def test_identity_vectors_use_normalized_immediate_parent_material() -> None:
     assert terminal_id == "bfee46cc-85a7-5fa7-88cd-0d5468dc51ef"
     assert selection_id == "f10c3fc1-49b0-554a-8fa7-d36fa4d1bee8"
     assert recovery_id == "9aaadbb2-62af-58db-af21-b5208551ec01"
-    assert _session_id(_request()) == session_id
+    assert (
+        _session_id(
+            _request(),
+            machine_authority_id=MACHINE,
+            authority_epoch_id=EPOCH,
+            authority_policy_version=POLICY,
+            claim_policy_version=CLAIM_POLICY,
+        )
+        == session_id
+    )
     for field_name, value in (
         ("provider_id", "provider-drift"),
         ("permitted_provider_operation", "operation-drift"),
     ):
         drifted_request = {**request, field_name: value}
-        assert _session_id(drifted_request) != session_id
+        assert (
+            _session_id(
+                drifted_request,
+                machine_authority_id=MACHINE,
+                authority_epoch_id=EPOCH,
+                authority_policy_version=POLICY,
+                claim_policy_version=CLAIM_POLICY,
+            )
+            != session_id
+        )
+    assert (
+        _session_id(
+            request,
+            machine_authority_id=MACHINE,
+            authority_epoch_id=EPOCH,
+            authority_policy_version="authority-policy/drift",
+            claim_policy_version=CLAIM_POLICY,
+        )
+        != session_id
+    )
+    assert (
+        _session_id(
+            request,
+            machine_authority_id=MACHINE,
+            authority_epoch_id=EPOCH,
+            authority_policy_version=POLICY,
+            claim_policy_version="claim-policy/drift",
+        )
+        != session_id
+    )
+    assert (
+        _attempt_id(session_id, 0, PROVIDER, OPERATION, "claim-policy/drift")
+        != attempt_id
+    )
+    assert (
+        _claim_id(attempt_id, "claim-policy/drift", PROVIDER, OPERATION, 1) != claim_id
+    )
+    assert (
+        _reservation_id(claim_id, RELEASE, "authority-policy/drift", CLAIM_POLICY)
+        != reservation_id
+    )
+    assert (
+        _reservation_id(claim_id, RELEASE, POLICY, "claim-policy/drift")
+        != reservation_id
+    )
+    assert (
+        _execution_id(reservation_id, RELEASE, "authority-policy/drift") != execution_id
+    )
+
+
+def test_identity_helpers_require_explicit_persisted_policy_inputs() -> None:
+    request = _request()
+    with pytest.raises(TypeError):
+        _session_id(request)  # type: ignore[call-arg]
+    with pytest.raises(TypeError):
+        _attempt_id("session", 0)  # type: ignore[call-arg]
+    with pytest.raises(TypeError):
+        _claim_id("attempt")  # type: ignore[call-arg]
+    with pytest.raises(TypeError):
+        _reservation_id("claim")  # type: ignore[call-arg]
+    with pytest.raises(TypeError):
+        _execution_id("reservation")  # type: ignore[call-arg]
+    with pytest.raises(TypeError):
+        _terminal_id("reservation")  # type: ignore[call-arg]
+    with pytest.raises(TypeError):
+        _selection_id("session", "terminal")  # type: ignore[call-arg]
+    with pytest.raises(TypeError):
+        _recovery_id(
+            "session",
+            "SESSION",
+            "session",
+            "ACKNOWLEDGE_RESTORE",
+            "OPEN",
+            "RESTORE_ACKNOWLEDGED",
+            0,
+        )  # type: ignore[call-arg]
 
 
 def test_valid_lifecycle_from_metadata_to_selection(db_path: Path) -> None:
@@ -1863,6 +2258,34 @@ def test_valid_lifecycle_from_metadata_to_selection(db_path: Path) -> None:
         "WHERE claim_id = ?",
         (claim_id,),
     ).fetchone() == (PROVIDER, OPERATION)
+    assert connection.execute(
+        """
+        SELECT m.authority_policy_version, m.claim_policy_version,
+               s.authority_policy_version, s.claim_policy_version,
+               a.attempt_policy_version, c.claim_policy_version,
+               r.authority_policy_version, r.claim_policy_version,
+               e.authority_policy_version
+        FROM authority_metadata m
+        JOIN sessions s ON s.authority_epoch_id = m.authority_epoch_id
+        JOIN attempts a ON a.session_id = s.session_id
+        JOIN provider_call_claims c ON c.attempt_id = a.attempt_id
+        JOIN launch_reservations r ON r.claim_id = c.claim_id
+        JOIN launch_executions e
+          ON e.launch_reservation_id = r.launch_reservation_id
+        WHERE s.session_id = ?
+        """,
+        (session_id,),
+    ).fetchone() == (
+        POLICY,
+        CLAIM_POLICY,
+        POLICY,
+        CLAIM_POLICY,
+        CLAIM_POLICY,
+        CLAIM_POLICY,
+        POLICY,
+        CLAIM_POLICY,
+        POLICY,
+    )
     assert connection.execute("SELECT state FROM sessions").fetchone() == (
         "SUCCESS_SELECTED",
     )
@@ -1941,6 +2364,117 @@ def test_immediate_parent_request_mismatches_are_rejected(db_path: Path) -> None
         "SELECT request_json, request_digest FROM sessions WHERE session_id = ?",
         (session_id,),
     ).fetchone() == (request_bytes, request_digest)
+    connection.close()
+
+
+def test_direct_sql_rejects_every_copied_parent_policy_drift(db_path: Path) -> None:
+    connection = _connect(db_path)
+    session_id = create_session(connection)
+    request_bytes, request_digest = connection.execute(
+        "SELECT request_json, request_digest FROM sessions WHERE session_id = ?",
+        (session_id,),
+    ).fetchone()
+
+    _begin(connection)
+    with pytest.raises(sqlite3.IntegrityError):
+        _insert_attempt_row_for_test(
+            connection,
+            session_id,
+            0,
+            request_bytes,
+            request_digest,
+            attempt_policy_version="claim-policy/drift",
+        )
+    connection.rollback()
+    assert connection.execute(
+        "SELECT next_attempt_ordinal FROM sessions WHERE session_id = ?",
+        (session_id,),
+    ).fetchone() == (0,)
+
+    attempt_id = allocate_attempt(connection, session_id)
+    _begin(connection)
+    with pytest.raises(sqlite3.IntegrityError):
+        _insert_claim_row_for_test(
+            connection,
+            attempt_id,
+            request_bytes,
+            request_digest,
+            claim_policy_version="claim-policy/drift",
+        )
+    connection.rollback()
+
+    claim_id = commit_claim(connection, attempt_id)
+    for authority_policy, claim_policy in (
+        ("authority-policy/drift", CLAIM_POLICY),
+        (POLICY, "claim-policy/drift"),
+    ):
+        _begin(connection)
+        with pytest.raises(sqlite3.IntegrityError):
+            _insert_reservation_row_for_test(
+                connection,
+                claim_id,
+                request_digest,
+                authority_policy_version=authority_policy,
+                claim_policy_version=claim_policy,
+            )
+        connection.rollback()
+
+    reservation_id = reserve_launch(connection, claim_id)
+    _begin(connection)
+    with pytest.raises(sqlite3.IntegrityError):
+        _insert_execution_row_for_test(
+            connection,
+            reservation_id,
+            authority_policy_version="authority-policy/drift",
+        )
+    connection.rollback()
+    assert connection.execute("SELECT count(*) FROM attempts").fetchone() == (1,)
+    assert connection.execute(
+        "SELECT count(*) FROM provider_call_claims"
+    ).fetchone() == (1,)
+    assert connection.execute(
+        "SELECT count(*) FROM launch_reservations"
+    ).fetchone() == (1,)
+    assert connection.execute("SELECT count(*) FROM launch_executions").fetchone() == (
+        0,
+    )
+    connection.close()
+
+
+def test_descendant_helpers_ignore_reset_release_constants_after_session_commit(
+    db_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    connection = _connect(db_path)
+    session_id = create_session(connection)
+    monkeypatch.setitem(globals(), "POLICY", "authority-policy/reset")
+    monkeypatch.setitem(globals(), "CLAIM_POLICY", "claim-policy/reset")
+
+    attempt_id = allocate_attempt(connection, session_id)
+    claim_id = commit_claim(connection, attempt_id)
+    reservation_id = reserve_launch(connection, claim_id)
+    execution_id = record_execution(connection, reservation_id)
+
+    assert connection.execute(
+        """
+        SELECT a.attempt_policy_version, c.claim_policy_version,
+               r.authority_policy_version, r.claim_policy_version,
+               e.authority_policy_version
+        FROM attempts a
+        JOIN provider_call_claims c ON c.attempt_id = a.attempt_id
+        JOIN launch_reservations r ON r.claim_id = c.claim_id
+        JOIN launch_executions e
+          ON e.launch_reservation_id = r.launch_reservation_id
+        WHERE a.attempt_id = ?
+        """,
+        (attempt_id,),
+    ).fetchone() == (
+        "claim-policy/v1",
+        "claim-policy/v1",
+        "authority-policy/v1",
+        "claim-policy/v1",
+        "authority-policy/v1",
+    )
+    assert claim_id and reservation_id and execution_id
     connection.close()
 
 
@@ -2215,11 +2749,20 @@ def test_attempt_ordinal_trigger_is_single_insert_and_atomic(db_path: Path) -> N
             (session_id,),
         )
     _begin(connection)
-    attempt_id = _attempt_id(session_id, 0)
-    request_bytes, request_digest = connection.execute(
-        "SELECT request_json, request_digest FROM sessions WHERE session_id = ?",
-        (session_id,),
-    ).fetchone()
+    request_bytes, request_digest, provider_id, operation, attempt_policy = (
+        connection.execute(
+            """
+            SELECT s.request_json, s.request_digest, m.provider_id,
+                   m.permitted_provider_operation, s.claim_policy_version
+            FROM sessions s
+            JOIN authority_metadata m
+              ON m.authority_epoch_id = s.authority_epoch_id
+            WHERE s.session_id = ?
+            """,
+            (session_id,),
+        ).fetchone()
+    )
+    attempt_id = _attempt_id(session_id, 0, provider_id, operation, attempt_policy)
     allocation, allocation_digest = _evidence("rollback-allocation")
     attempt, attempt_digest = _evidence("rollback-attempt")
     connection.execute(
@@ -2236,11 +2779,11 @@ def test_attempt_ordinal_trigger_is_single_insert_and_atomic(db_path: Path) -> N
         (
             attempt_id,
             session_id,
-            PROVIDER,
-            OPERATION,
+            provider_id,
+            operation,
             request_bytes,
             request_digest,
-            CLAIM_POLICY,
+            attempt_policy,
             allocation,
             allocation_digest,
             attempt,
@@ -2302,7 +2845,7 @@ def test_attempt_ordinals_serialize_across_connections_and_sessions(
     assert sorted(ordinal for _, ordinal in results) == [0, 1]
     second_connection = _connect(db_path)
     assert allocate_attempt(second_connection, second_session) == _attempt_id(
-        second_session, 0
+        second_session, 0, PROVIDER, OPERATION, CLAIM_POLICY
     )
     second_connection.close()
 
@@ -2330,6 +2873,7 @@ def test_recovery_ordinal_trigger_is_atomic_and_session_local(db_path: Path) -> 
         "LAUNCH_RESERVED",
         "AMBIGUITY_RECORDED",
         0,
+        RECOVERY_POLICY,
     )
     with pytest.raises(sqlite3.IntegrityError):
         record_recovery(
@@ -2363,6 +2907,7 @@ def test_recovery_ordinal_trigger_is_atomic_and_session_local(db_path: Path) -> 
         "OPEN",
         "RESTORE_ACKNOWLEDGED",
         1,
+        RECOVERY_POLICY,
     )
     evidence, evidence_digest = _evidence("rollback-recovery")
     connection.execute(
@@ -2373,13 +2918,13 @@ def test_recovery_ordinal_trigger_is_atomic_and_session_local(db_path: Path) -> 
             recovery_policy_version, operator_evidence_json,
             operator_evidence_digest, created_at_utc
         ) VALUES (?, ?, 1, 'SESSION', ?, 'ACKNOWLEDGE_RESTORE',
-                  'OPEN', 'RESTORE_ACKNOWLEDGED', 1,
-                  'recovery-policy/v1', ?, ?, ?)
+                  'OPEN', 'RESTORE_ACKNOWLEDGED', 1, ?, ?, ?, ?)
         """,
         (
             recovery_id,
             session_id,
             session_id,
+            RECOVERY_POLICY,
             evidence,
             evidence_digest,
             TIMESTAMP,
@@ -2642,7 +3187,9 @@ def test_claim_admission_allows_only_retry_safe_failed_not_started(
             connection, second_attempt, request_bytes, request_digest
         )
         connection.commit()
-    assert second_claim == _claim_id(second_attempt)
+    assert second_claim == _claim_id(
+        second_attempt, CLAIM_POLICY, PROVIDER, OPERATION, 1
+    )
     assert connection.execute(
         "SELECT count(*) FROM provider_call_claims"
     ).fetchone() == (2,)
@@ -3006,7 +3553,12 @@ def test_resume_boundary_requires_pre_resume_and_receipt(db_path: Path) -> None:
     attempt_id = allocate_attempt(connection, session_id)
     claim_id = commit_claim(connection, attempt_id)
     reservation_id = reserve_launch(connection, claim_id)
-    execution_id = _execution_id(reservation_id)
+    application_release, authority_policy = connection.execute(
+        "SELECT application_release_version, authority_policy_version "
+        "FROM launch_reservations WHERE launch_reservation_id = ?",
+        (reservation_id,),
+    ).fetchone()
+    execution_id = _execution_id(reservation_id, application_release, authority_policy)
 
     with pytest.raises(ValueError, match="unknown execution"):
         hooks.resume_thread(commit_resume_intent(connection, execution_id))

@@ -106,6 +106,13 @@ singleton key constrained to `1`. It is immutable and cannot be deleted.
 identities. They are administrator-provisioned facts bound by the signed
 bootstrap.
 
+The signed bootstrap and immutable metadata also select the authority and
+claim policy versions. This release implements exactly
+`authority-policy/v1` and `claim-policy/v1`. A signed alias, casing variant,
+legacy value, or unknown future version is not forward-compatible authority:
+the release fails closed rather than execute policy semantics it does not
+implement.
+
 The permitted provider contract is the existing public
 `trading_bot.market_data.ALPACA_DAILY_SNAPSHOT_DESCRIPTOR`, whose exact
 `provider_id` is `alpaca-market-data` and whose exact `operation` is
@@ -145,8 +152,12 @@ update. Session identity and request evidence are immutable.
 Session creation reconciles the proposed request before canonicalization or
 identity derivation. In one `BEGIN IMMEDIATE` transaction, the reviewed
 service reads the singleton `authority_metadata` row, verifies its provider and
-operation exactly match `ALPACA_DAILY_SNAPSHOT_DESCRIPTOR`, and validates one
-exact `capture_request/v2` object. Its key set is exactly
+operation exactly match `ALPACA_DAILY_SNAPSHOT_DESCRIPTOR`, verifies
+`authority_policy_version=authority-policy/v1` and
+`claim_policy_version=claim-policy/v1` exactly, and validates one exact
+`capture_request/v2` object. Unsupported signed policy is rejected in that
+transaction before request canonicalization, `session_id` derivation, or
+insertion. Its key set is exactly
 `bar_interval`, `child_operation_version`, `ordered_universe`,
 `output_policy_version`, `permitted_provider_operation`, `provider_id`,
 `request_limit`, `request_window_end_date`, `request_window_start_date`, and
@@ -173,6 +184,10 @@ recovery side effect. Invalid alternate representations cannot enter storage
 or exploit an identity collision with a valid request. Existing valid request
 bytes and UUID5 vectors remain unchanged.
 
+The session insert trigger independently requires both copied policy fields to
+match the referenced metadata row. This protects direct SQL while the service
+gate additionally decides whether this release supports the signed versions.
+
 ### 2.4 attempts
 
 `attempts` replaces the former separate allocation entity. An attempt owns:
@@ -196,9 +211,14 @@ open, the ordinal is exactly the current counter, the initial state is
 
 The session is the sole canonical request owner. Only session creation accepts
 or constructs the canonical request bytes and digest. Attempt allocation reads
-those exact stored bytes and digest from its immediate parent; it does not
-reconstruct the request or call a request-building helper. The attempt insert
-trigger rejects any request-byte or digest mismatch.
+those exact stored bytes/digest, authority and claim policy values from the
+session, and provider/operation from the session's metadata lineage; it does
+not reconstruct the request or substitute release constants. The
+`attempt_id/v2` helper receives the persisted provider, operation, and claim
+policy explicitly, and `attempt_policy_version` is the owning session's claim
+policy. The attempt insert trigger uses the normalized
+`attempt -> session -> metadata` path to reject request, claim-policy,
+provider, or operation drift.
 
 ### 2.5 provider_call_claims
 
@@ -208,8 +228,10 @@ claim schema/policy, provider/operation/budget, request/digest bindings,
 immutable claim evidence, and commit timestamp. It has no session, epoch,
 ordinal, or allocation columns. Claim rows cannot be updated or deleted.
 
-Claim creation reads the exact provider, operation, budget, request bytes, and
-digest from its immediate attempt parent. The authoritative
+Claim creation reads the exact provider, operation, budget, policy, request
+bytes, and digest from its immediate attempt parent. `claim_id/v2` receives
+those persisted attempt values explicitly, and the inserted claim policy must
+equal `attempt_policy_version`; no module default can reset it. The authoritative
 `provider_call_claims BEFORE INSERT` trigger resolves the normalized
 `claim -> attempt -> session` path and admits a claim only when the owning
 attempt is `ALLOCATED`, its session is `OPEN`, the inserted claim is
@@ -244,8 +266,11 @@ and timestamps. They have no session, attempt, allocation, or epoch columns.
 reservation path.
 
 Reservation creation reads the exact request digest from its immediate claim
-parent. The reservation insert trigger verifies that digest binding and
-requires every inserted reservation to start exactly in `COMMITTED`, with
+parent, its claim policy from that claim, and authority policy from the
+normalized `claim -> attempt -> session` lineage. Reservation identity and row
+values receive those persisted facts explicitly. The reservation insert
+trigger verifies the request, claim-policy, and session-authority-policy
+bindings and requires every inserted reservation to start exactly in `COMMITTED`, with
 process-creation-failure evidence and `outcome_recorded_at_utc` all null. A
 known process-creation failure is therefore a later one-time
 `COMMITTED -> PROCESS_CREATION_FAILED` update with matching evidence and a
@@ -268,6 +293,10 @@ cleanup evidence, plus `resume_intent_json`, `resume_intent_digest`, and
 `resume_intent_committed_at_utc`. The phase moves forward through
 `PRE_RESUME_READY`, `RESUME_INTENT_COMMITTED`, `RESUME_RECORDED`,
 `POST_RESUME_AMBIGUOUS`, `TERMINAL_RECORDED`, and `CLOSED`.
+Execution creation reads `application_release_version` and
+`authority_policy_version` from its reservation and passes both explicitly to
+`launch_execution_id/v2` and the row. A normalized parent-policy trigger
+rejects a direct insert that changes either copied fact.
 
 `commit_resume_intent(connection, execution_id) -> FakeResumeIntent` owns the
 one-shot resume fence. In one `BEGIN IMMEDIATE` transaction it requires exactly
@@ -429,14 +458,17 @@ row boundary. The reviewed transaction service and transaction tests enforce
 the multi-statement semantic contract.
 
 The signed bootstrap and immutable metadata own the permitted public Alpaca
-descriptor. The reviewed service performs descriptor and canonical-request
-semantic reconciliation before session insertion. SQLite then preserves the
-immutable canonical bytes/digest and exact descendant propagation; it does not
-parse requests to authenticate or validate external provider behavior.
+descriptor and select authority/claim policy versions. The reviewed service
+first rejects metadata policies this release does not implement, then performs
+descriptor and canonical-request semantic reconciliation before session
+insertion. SQLite preserves the immutable canonical bytes/digest and checks
+each copied child policy against its persisted immediate-parent lineage; it
+does not parse requests to authenticate or validate external provider behavior.
 
 | SQLite schema, constraints, and triggers | Reviewed transaction service/tests |
 | --- | --- |
 | Immediate-parent foreign keys and `foreign_key_check` integrity | Workflow ordering across multiple statements and tables |
+| Normalized metadata/session/attempt/claim/reservation/execution policy-binding checks | Release-support validation before session canonicalization or identity derivation |
 | Append-only immutable evidence, canonical resume-intent/receipt bytes, and prohibited deletes | Exact capture-request shape/type/date validation, canonical construction, digest reconciliation, and policy reconciliation |
 | One-to-one claim, reservation, execution, terminal, selection, and ordinal fences | Multi-statement parent-state update sequencing |
 | Unique per-session ordinals and trigger-owned exact increments | Commit-before-side-effect boundaries |
@@ -574,6 +606,15 @@ facts needed to distinguish that row:
 | `terminal_id/v2` | `launch_reservation_id, terminal_schema, terminal_policy_version` |
 | `selection_id/v2` | `session_id, terminal_id, selection_schema, selection_policy_version` |
 | `recovery_id/v2` | `session_id, target_kind, target_id, action, predecessor_state, resulting_state, recovery_schema, recovery_policy_version, recovery_ordinal` |
+
+Identity helpers have no hidden policy defaults. Each policy-bearing tuple
+receives the exact value that will be persisted in that row, sourced from its
+already-persisted parent where the policy is copied. Terminal, selection, and
+recovery helpers likewise receive their row policy explicitly. Their
+normalized parent references preserve the upstream authority/claim lineage
+without copying ancestor IDs or independently choosing those policy versions.
+Changing an explicit policy input changes the identity material; an
+unsupported metadata policy is rejected before any identity is constructed.
 
 The test harness hard-codes these affected golden vectors for the fixed
 semantic example:

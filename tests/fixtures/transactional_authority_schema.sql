@@ -233,6 +233,18 @@ BEGIN
     SELECT RAISE(ABORT, 'schema migrations cannot be deleted');
 END;
 
+CREATE TRIGGER sessions_before_insert
+BEFORE INSERT ON sessions
+FOR EACH ROW
+BEGIN
+    SELECT CASE WHEN NOT EXISTS (
+        SELECT 1 FROM authority_metadata m
+        WHERE m.authority_epoch_id = NEW.authority_epoch_id
+          AND m.authority_policy_version IS NEW.authority_policy_version
+          AND m.claim_policy_version IS NEW.claim_policy_version
+    ) THEN RAISE(ABORT, 'session policy binding differs from metadata') END;
+END;
+
 CREATE TRIGGER sessions_immutable_fields
 BEFORE UPDATE ON sessions
 WHEN NEW.session_id <> OLD.session_id
@@ -323,11 +335,17 @@ BEGIN
         SELECT next_attempt_ordinal FROM sessions WHERE session_id = NEW.session_id
     ) THEN RAISE(ABORT, 'attempt ordinal is not the session counter') END;
     SELECT CASE WHEN NOT EXISTS (
-        SELECT 1 FROM sessions
-        WHERE session_id = NEW.session_id
-          AND request_json IS NEW.request_json
-          AND request_digest IS NEW.request_digest
-    ) THEN RAISE(ABORT, 'attempt request binding differs from session') END;
+        SELECT 1
+        FROM sessions s
+        JOIN authority_metadata m
+          ON m.authority_epoch_id = s.authority_epoch_id
+        WHERE s.session_id = NEW.session_id
+          AND s.request_json IS NEW.request_json
+          AND s.request_digest IS NEW.request_digest
+          AND s.claim_policy_version IS NEW.attempt_policy_version
+          AND m.provider_id IS NEW.provider_id
+          AND m.permitted_provider_operation IS NEW.permitted_provider_operation
+    ) THEN RAISE(ABORT, 'attempt parent binding differs from session or metadata') END;
     SELECT CASE WHEN NEW.state <> 'ALLOCATED'
         THEN RAISE(ABORT, 'new attempts must start allocated') END;
     SELECT CASE WHEN NEW.provider_call_budget <> 1
@@ -412,6 +430,7 @@ BEGIN
           AND a.provider_id IS NEW.provider_id
           AND a.permitted_provider_operation IS NEW.permitted_provider_operation
           AND a.provider_call_budget = NEW.provider_call_budget
+          AND a.attempt_policy_version IS NEW.claim_policy_version
           AND a.request_json IS NEW.request_json
           AND a.request_digest IS NEW.request_digest
           AND NOT EXISTS (
@@ -494,10 +513,15 @@ BEGIN
         AND NEW.outcome_recorded_at_utc IS NULL
     ) THEN RAISE(ABORT, 'new reservations must start as committed fences') END;
     SELECT CASE WHEN NOT EXISTS (
-        SELECT 1 FROM provider_call_claims
-        WHERE claim_id = NEW.claim_id
-          AND request_digest IS NEW.request_digest
-    ) THEN RAISE(ABORT, 'reservation request binding differs from claim') END;
+        SELECT 1
+        FROM provider_call_claims c
+        JOIN attempts a ON a.attempt_id = c.attempt_id
+        JOIN sessions s ON s.session_id = a.session_id
+        WHERE c.claim_id = NEW.claim_id
+          AND c.request_digest IS NEW.request_digest
+          AND c.claim_policy_version IS NEW.claim_policy_version
+          AND s.authority_policy_version IS NEW.authority_policy_version
+    ) THEN RAISE(ABORT, 'reservation parent binding differs from claim lineage') END;
 END;
 
 CREATE TRIGGER launch_reservations_failure_evidence_guard
@@ -618,6 +642,18 @@ WHEN NEW.phase <> 'PRE_RESUME_READY'
   OR NEW.cleanup_digest IS NOT NULL
 BEGIN
     SELECT RAISE(ABORT, 'launch execution must begin pre-resume without post evidence');
+END;
+
+CREATE TRIGGER launch_executions_parent_policy_before_insert
+BEFORE INSERT ON launch_executions
+FOR EACH ROW
+BEGIN
+    SELECT CASE WHEN NOT EXISTS (
+        SELECT 1 FROM launch_reservations r
+        WHERE r.launch_reservation_id = NEW.launch_reservation_id
+          AND r.application_release_version IS NEW.application_release_version
+          AND r.authority_policy_version IS NEW.authority_policy_version
+    ) THEN RAISE(ABORT, 'execution policy binding differs from reservation') END;
 END;
 
 CREATE TRIGGER launch_executions_no_delete

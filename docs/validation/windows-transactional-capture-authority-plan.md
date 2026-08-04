@@ -45,14 +45,18 @@ against malicious direct SQL by code already controlling the trusted token.
 The validation review must classify each assertion before accepting it.
 
 The signed bootstrap and immutable `authority_metadata` own the permitted
-descriptor. The reviewed transaction helper reconciles metadata and request
-semantics before session identity construction or insertion. SQLite preserves
-the accepted canonical request bytes/digest and descendant propagation, but is
-not claimed to parse requests or authenticate external Alpaca behavior.
+descriptor and select authority/claim policy versions. This release supports
+exactly `authority-policy/v1` and `claim-policy/v1`; the reviewed transaction
+helper rejects any other signed value before request canonicalization, session
+identity construction, or insertion, then reconciles metadata and request
+semantics. SQLite preserves accepted canonical request bytes/digest and checks
+copied descendant policy fields, but is not claimed to decide which future
+policies a release implements or authenticate external Alpaca behavior.
 
 | SQLite fixture proves | Reviewed transaction harness proves |
 | --- | --- |
 | Immediate-parent foreign keys and `PRAGMA foreign_key_check` | Multi-statement workflow ordering |
+| Normalized copied-policy checks from metadata through execution | Exact release-supported metadata policy validation before session creation |
 | Append-only evidence, canonical resume-intent/receipt bytes, immutable rows, and prohibited deletes | Exact request shape/type/date validation, canonical request/digest, and policy reconciliation |
 | Unique one-to-one claim/reservation/execution/terminal/selection fences | UUID5 identity construction and comparison |
 | Per-session uniqueness and trigger-owned ordinal increments | Commit-before-side-effect boundaries |
@@ -104,6 +108,10 @@ The executable DDL smoke test must also confirm that:
 
 - `provider_call_claims_before_insert` can traverse only the normalized
   immediate-parent chain and is the authoritative claim-admission gate;
+- session inserts match both signed metadata policies; attempts match their
+  session claim policy and metadata provider/operation; claims match attempt
+  policy; reservations match claim policy and owning-session authority policy;
+  and executions match reservation authority policy/release;
 - reservation inserts accept only `COMMITTED` with all failure/outcome fields
   null;
 - the first reservation outcome timestamp and both session close facts are
@@ -174,6 +182,13 @@ field changes. Changing the immediate parent or required semantic policy must
 change the derived identity. Administrator-provisioned machine/epoch/key IDs
 are classified as signed facts, not runtime UUID5 values.
 
+Every policy-bearing identity helper requires its policy inputs explicitly;
+calling one without them fails rather than silently selecting module
+constants. Golden tests change supplied authority/claim policies and require
+different session, attempt, claim, reservation, or execution identity
+material. The supported values are unchanged, so all documented vectors must
+remain byte-for-byte unchanged.
+
 ## 5. Lifecycle and parent-fence gates
 
 The valid path is one transaction helper at each boundary:
@@ -206,9 +221,12 @@ and consistent limit, then compares the exact bytes/digest in every stored
 request-bearing row.
 
 Before that construction, the session helper must begin `BEGIN IMMEDIATE`,
-read the singleton metadata row, verify its provider and operation against the
-public Alpaca descriptor, and require the proposed request's corresponding
-fields to agree exactly. The validator requires exact dict/list/string/integer
+read the singleton metadata row, first require exact release-supported
+`authority-policy/v1` and `claim-policy/v1`, verify its provider and operation
+against the public Alpaca descriptor, and require the proposed request's
+corresponding fields to agree exactly. Unsupported, aliased, legacy, cased, or
+unknown future policy values fail before canonical bytes, UUID5, or insertion.
+The validator requires exact dict/list/string/integer
 types; boolean is not an integer; a nonempty, bounded, duplicate-free universe
 of nonempty strings; a positive limit equal to the universe length; canonical
 `YYYY-MM-DD` values ordered `window_start <= window_end < target_session`; and
@@ -228,6 +246,21 @@ the same pure list framing cannot persist under the valid session ID. The positi
 complete lifecycle must persist the public descriptor values in metadata,
 attempt, claim, canonical request bytes, and all dependent identity material.
 
+Policy-lineage tests insert unsupported authority and claim metadata policies
+separately and require no session, counter, descendant row, or fake side
+effect. The valid lifecycle compares one exact lineage:
+metadata authority/claim -> session authority/claim -> attempt claim -> claim
+claim -> reservation authority/claim -> execution authority. The helpers must
+read these values from persisted parents. A reset-resistance test changes the
+module's release-supported constants only after session commit and requires
+all descendants to retain the original signed parent values.
+
+Direct-SQL negative tests supply a mismatched attempt policy, claim policy,
+reservation authority policy, reservation claim policy, and execution
+authority policy while every other binding remains valid. Each insert must
+abort without consuming an ordinal or leaving a child row. These checks use
+normalized joins and add no copied ancestor identity or composite foreign key.
+
 The focused suite asserts:
 
 - metadata and migration insert successfully and remain immutable;
@@ -239,6 +272,9 @@ The focused suite asserts:
 - one terminal can reference a reservation, including a process-creation
   failure with no execution row; and
 - one confirmed successful terminal can be selected only by its owning session.
+- all supported policy versions remain exact across the complete lineage, and
+  terminal/selection/recovery identities receive their own row policy
+  explicitly rather than through hidden identity-helper defaults.
 
 Claim admission is exercised through both the transaction helper and direct
 claim insertion. The only accepted prior claim lineage is

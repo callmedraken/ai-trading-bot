@@ -3240,6 +3240,8 @@ def test_spawned_process_crash_releases_lifecycle_arbiter_without_retry(
     result_queue = context.Queue()
     go = context.Event()
     started = context.Event()
+    recovery_acquired = context.Event()
+    recovery_release = context.Event()
     recovery = context.Process(
         target=_spawn_recovery_worker,
         args=(
@@ -3250,8 +3252,8 @@ def test_spawned_process_crash_releases_lifecycle_arbiter_without_retry(
             False,
             result_queue,
             go,
-            context.Event(),
-            context.Event(),
+            recovery_acquired,
+            recovery_release,
             started,
         ),
     )

@@ -50,14 +50,15 @@ exactly `authority-policy/v1` and `claim-policy/v1`; the reviewed transaction
 helper rejects any other signed value before request canonicalization, session
 identity construction, or insertion, then reconciles metadata and request
 semantics. SQLite preserves accepted canonical request bytes/digest and checks
-copied descendant policy fields, but is not claimed to decide which future
-policies a release implements or authenticate external Alpaca behavior.
+copied descendant policy fields, but does not parse request JSON, validate
+`Symbol` semantics, decide which future policies a release implements, or
+authenticate external Alpaca behavior.
 
 | SQLite fixture proves | Reviewed transaction harness proves |
 | --- | --- |
 | Immediate-parent foreign keys and `PRAGMA foreign_key_check` | Multi-statement workflow ordering |
 | Normalized copied-policy checks from metadata through execution | Exact release-supported metadata policy validation before session creation |
-| Append-only evidence, canonical resume-intent/receipt bytes, immutable rows, and prohibited deletes | Exact request shape/type/date validation, canonical request/digest, and policy reconciliation |
+| Append-only evidence, canonical resume-intent/receipt bytes, immutable rows, and prohibited deletes | Exact request snapshot, shape/type/date/Symbol validation, canonical request/digest, and policy reconciliation |
 | Unique one-to-one claim/reservation/execution/terminal/selection fences | UUID5 identity construction and comparison |
 | Per-session uniqueness and trigger-owned ordinal increments | Commit-before-side-effect boundaries |
 | Session-wide claim admission through normalized lineage joins | Complete atomicity of state plus evidence updates |
@@ -205,18 +206,25 @@ metadata + migration
 ```
 
 The request propagation gate is exact and immediate-parent scoped. Before any
-canonicalization, UUID5 computation, or insert, session creation is the only
-operation that accepts and validates the exact `capture_request/v2` object.
-Its exact key set is `bar_interval`, `child_operation_version`,
+canonicalization, UUID5 computation, transaction, or insert, session creation
+is the only operation that accepts the caller-owned `capture_request/v2`
+object. The service requires an exact dictionary, copies its top level once,
+captures the exact input list as a new tuple, validates only those captured
+values, and returns one frozen, slots-backed `ValidatedCaptureRequest` with no
+reference to the caller's dictionary or list. Its exact ten-field key set is
+`bar_interval`, `child_operation_version`,
 `ordered_universe`, `output_policy_version`,
 `permitted_provider_operation`, `provider_id`, `request_limit`,
 `request_window_end_date`, `request_window_start_date`, and
-`target_session_date`. Attempt allocation reads the accepted session
+`target_session_date`. No session-creation operation may read the caller-owned
+objects after the snapshot exists. Attempt allocation reads the accepted session
 bytes/digest; claim creation reads
 the attempt bytes/digest; reservation creation reads the claim digest; and
 terminal creation reads the reservation digest. Each insert rejects any
 request-byte or digest mismatch, and descendant helpers do not reconstruct the
-request. The valid-lifecycle test uses a non-default date, ordered universe,
+request. Snapshot serialization, request digest, `session_id` material,
+`target_session_date`, and the inserted row must all consume that same
+snapshot. The valid-lifecycle test uses a non-default date, ordered universe,
 and consistent limit, then compares the exact bytes/digest in every stored
 request-bearing row.
 
@@ -227,24 +235,38 @@ against the public Alpaca descriptor, and require the proposed request's
 corresponding fields to agree exactly. Unsupported, aliased, legacy, cased, or
 unknown future policy values fail before canonical bytes, UUID5, or insertion.
 The validator requires exact dict/list/string/integer
-types; boolean is not an integer; a nonempty, bounded, duplicate-free universe
-of nonempty strings; a positive limit equal to the universe length; canonical
+types; boolean is not an integer; a nonempty and bounded universe; a positive
+limit equal to the universe length; canonical
 `YYYY-MM-DD` values ordered `window_start <= window_end < target_session`; and
 the exact fixed bar interval, child/output policy versions, provider, and
 operation. It must not coerce tuples, integers, dates, casing, underscores,
-legacy names, or alternate operation labels.
+legacy names, or alternate operation labels. Every universe member is an exact
+string passed to the public `trading_bot.domain.Symbol`; the validator requires
+the original text to equal `str(Symbol(entry))` and detects duplicates over
+those canonical strings. It rejects blank, whitespace-only, lowercase,
+padded, over-ten-character, unsupported-punctuation, and
+normalization-equivalent entries without trimming or uppercasing. Canonical
+period and hyphen symbols remain accepted.
 
 Table-driven negative tests remove each required field in turn and cover an
 unknown field; request-limit string, boolean, zero, and universe mismatch;
-tuple, empty, oversized, duplicate, blank-member, and non-string-member
+tuple, empty, oversized, duplicate, blank/whitespace/lowercase/padded/overlong/
+unsupported-punctuation/normalization-equivalent, and non-string-member
 universes; malformed/noncanonical dates and invalid ordering; wrong scalar
 types; every fixed-value drift; metadata drift; and legacy labels. Every
 rejection must leave no session, counter, attempt, claim, reservation,
 execution, terminal, selection, recovery, or fake side-effect event. A
 collision test proves that an alternate tuple representation which would feed
-the same pure list framing cannot persist under the valid session ID. The positive
-complete lifecycle must persist the public descriptor values in metadata,
-attempt, claim, canonical request bytes, and all dependent identity material.
+the same pure list framing cannot persist under the valid session ID. Mutation
+tests change the original list, replace request fields, and alter target/date
+facts after snapshot creation; the frozen snapshot, canonical bytes, digest,
+identity, target date, and persisted row must remain mutually consistent. Tests
+also prove that the snapshot has no mutable caller-owned fields, cannot be
+assigned to, and serializes `ordered_universe` back to the established JSON
+list representation. The positive complete lifecycle must persist the public
+descriptor values in metadata, attempt, claim, canonical request bytes, and
+all dependent identity material.
+Existing canonical JSON bytes and UUID5 golden vectors must remain unchanged.
 
 Policy-lineage tests insert unsupported authority and claim metadata policies
 separately and require no session, counter, descendant row, or fake side

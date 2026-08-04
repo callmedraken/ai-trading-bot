@@ -149,9 +149,17 @@ either `OPEN` or `SUCCESS_SELECTED` to `CLOSED`, and cannot thereafter be
 replaced, cleared, partially changed, or changed by a same-state `CLOSED`
 update. Session identity and request evidence are immutable.
 
-Session creation reconciles the proposed request before canonicalization or
-identity derivation. In one `BEGIN IMMEDIATE` transaction, the reviewed
-service reads the singleton `authority_metadata` row, verifies its provider and
+Caller-owned request dictionaries and lists are untrusted mutable inputs. The
+transaction service first requires an exact dictionary, copies its top-level
+fields once, captures `ordered_universe` into a new tuple, validates only those
+captured values, and returns one frozen, slots-backed
+`ValidatedCaptureRequest`. The snapshot contains the exact ten semantic fields
+and no reference to the caller's dictionary or list. After it exists, no
+session operation may read the caller-owned objects again.
+
+Session creation reconciles that immutable snapshot before canonicalization or
+identity derivation. In one `BEGIN IMMEDIATE` transaction, the reviewed service
+reads the singleton `authority_metadata` row, verifies its provider and
 operation exactly match `ALPACA_DAILY_SNAPSHOT_DESCRIPTOR`, verifies
 `authority_policy_version=authority-policy/v1` and
 `claim_policy_version=claim-policy/v1` exactly, and validates one exact
@@ -163,10 +171,18 @@ insertion. Its key set is exactly
 `request_limit`, `request_window_end_date`, `request_window_start_date`, and
 `target_session_date`; no key is optional and no unknown key is accepted.
 
-Every scalar string has exact string type. `ordered_universe` has exact list
-type, is nonempty, contains at most the public
-`MAX_DAILY_SNAPSHOT_SYMBOLS` bound, and contains only nonempty exact strings
-with no duplicates. A tuple or other iterable is not equivalent.
+Every captured scalar string has exact string type. The caller's
+`ordered_universe` has exact list type; the snapshot stores a newly allocated
+`tuple[str, ...]`. It is nonempty and contains at most the public
+`MAX_DAILY_SNAPSHOT_SYMBOLS` bound. Every entry has exact string type and is
+validated through the public `trading_bot.domain.Symbol`. The authority
+computes `canonical_text = str(Symbol(entry))` and requires
+`entry == canonical_text` exactly. It does not trim, uppercase, or otherwise
+normalize an alias. Lowercase, padded, blank, over-ten-character, and
+unsupported-punctuation forms fail closed; canonical uppercase letters,
+periods, and hyphens remain accepted. Duplicate detection uses the canonical
+Symbol strings, so normalization-equivalent entries cannot evade it. A tuple
+or other caller iterable is not equivalent to the required input list.
 `request_limit` has exact positive integer type (a boolean is not an integer
 for this contract), equals the universe length, and does not exceed the same
 bound. The three dates are exact canonical `YYYY-MM-DD`; the request window
@@ -176,12 +192,17 @@ session date. `bar_interval=1d`, `child_operation_version=child/v1`,
 descriptor are fixed byte-for-byte. Metadata and request descriptor values
 must also agree.
 
-Only after every shape, type, bound, date, fixed-value, metadata, and
-descriptor check succeeds may the service construct canonical JSON bytes,
-derive `session_id`, and insert the session. Rejection leaves no session,
-counter, attempt, claim, reservation, execution, terminal, selection, or
-recovery side effect. Invalid alternate representations cannot enter storage
-or exploit an identity collision with a valid request. Existing valid request
+Only after every snapshot shape, type, Symbol, bound, date, fixed-value,
+metadata, and descriptor check succeeds may the service call the snapshot's
+single canonical serialization method, derive `session_id` from that same
+snapshot, read `target_session_date` from it, and insert using only those
+snapshot facts. Serialization recreates the established JSON object and emits
+`ordered_universe` as a JSON list, so valid request bytes and UUID5 vectors do
+not change. A caller mutation after snapshot creation cannot desynchronize
+JSON, digest, identity material, target date, or insertion. Rejection leaves
+no session, counter, attempt, claim, reservation, execution, terminal,
+selection, or recovery side effect. Invalid alternate representations cannot
+enter storage or exploit an identity collision with a valid request. Existing valid request
 bytes and UUID5 vectors remain unchanged.
 
 The session insert trigger independently requires both copied policy fields to
@@ -209,8 +230,9 @@ transaction helper before the insert; the trigger checks that the session is
 open, the ordinal is exactly the current counter, the initial state is
 `ALLOCATED`, and the budget is one.
 
-The session is the sole canonical request owner. Only session creation accepts
-or constructs the canonical request bytes and digest. Attempt allocation reads
+The session is the sole canonical request owner. Only the validated immutable
+snapshot constructs the canonical request bytes used by session creation.
+Attempt allocation reads
 those exact stored bytes/digest, authority and claim policy values from the
 session, and provider/operation from the session's metadata lineage; it does
 not reconstruct the request or substitute release constants. The
@@ -462,8 +484,9 @@ descriptor and select authority/claim policy versions. The reviewed service
 first rejects metadata policies this release does not implement, then performs
 descriptor and canonical-request semantic reconciliation before session
 insertion. SQLite preserves the immutable canonical bytes/digest and checks
-each copied child policy against its persisted immediate-parent lineage; it
-does not parse requests to authenticate or validate external provider behavior.
+each copied child policy against its persisted immediate-parent lineage. It
+does not parse request JSON, validate `Symbol` semantics, authenticate callers,
+or validate external provider behavior.
 
 | SQLite schema, constraints, and triggers | Reviewed transaction service/tests |
 | --- | --- |
@@ -562,8 +585,9 @@ The UUID5 name is the UTF-8 concatenation of `LF(material_label)` followed by
 one length frame per tuple field. Integers are canonical base-10 ASCII;
 UUIDs are lowercase canonical text; dates are `YYYY-MM-DD`; and an optional
 value is an explicit empty frame. An ordered list is one framed field whose
-contents are `LF(item_count)` followed by each item frame in caller-defined
-order. No identity uses a clock, UUID4, Python hash, object identity, locale,
+contents are `LF(item_count)` followed by each item frame in the order captured
+by the immutable validated request snapshot. No identity uses a clock, UUID4,
+Python hash, object identity, locale,
 filesystem path, secret, row order, or serialized artifact bytes.
 
 The root `session_id/v2` tuple is:
@@ -649,19 +673,23 @@ model.
 ## 6. Transaction boundaries and crash outcomes
 
 All writes in the fixture harness use one local SQLite database and
-`BEGIN IMMEDIATE`. The service verifies the fixed bootstrap/epoch/schema before
-opening the session-creation transaction, then reconciles metadata and request
-descriptor semantics before canonicalization, identity derivation, or session
-insertion. Uncommitted work rolls back; committed evidence is never repaired
-by deleting rows.
+`BEGIN IMMEDIATE`. The service verifies the fixed bootstrap/epoch/schema, then
+copies and validates the caller request into one immutable
+`ValidatedCaptureRequest` before opening the session-creation transaction. The
+transaction reconciles metadata and snapshot descriptor semantics before
+canonicalization, identity derivation, or session insertion. Every later read
+for canonical bytes, digest, identity material, target date, and inserted
+session facts comes from that same snapshot. Uncommitted work rolls back;
+committed evidence is never repaired by deleting rows.
 
 The required order is:
 
 ```text
 fixed bootstrap/CNG/ACL/path verification
+  -> exact caller-request copy, Symbol validation, and immutable snapshot
   -> session BEGIN IMMEDIATE
   -> read singleton metadata and reconcile the exact public Alpaca descriptor
-  -> canonical request bytes, digest, session identity, insert, and COMMIT
+  -> snapshot serialization, digest, session identity, insert, and COMMIT
   -> attempt ordinal transaction
   -> permanent claim transaction and COMMIT
   -> credential/provider/network construction
@@ -729,8 +757,9 @@ exactly one committed intent and its opaque winner permit fence
 `ResumeThread`; and only the exact intent-bound `RESUMED` receipt can prove
 modeled success and unlock a successful terminal. Every uncertainty path
 remains claim-blocking. The canonical request bytes propagated through the
-lineage and the UUID5 identity material describe the same validated request
-semantics; alternate representations never reach either boundary.
+lineage, target date, and UUID5 identity material all come from one frozen
+validated snapshot; caller mutation and alternate representations never reach
+or split those boundaries.
 
 Manual recovery records uncertainty and an operator-authorized classification
 through the closed action matrix above. It does not turn uncertainty into

@@ -7,13 +7,14 @@ import json
 import sqlite3
 import threading
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import FrozenInstanceError, dataclass, field
 from datetime import date
 from pathlib import Path
 from typing import Any
 
 import pytest
 
+from trading_bot.domain import Symbol
 from trading_bot.market_data import (
     ALPACA_DAILY_SNAPSHOT_DESCRIPTOR,
     MAX_DAILY_SNAPSHOT_SYMBOLS,
@@ -445,28 +446,76 @@ def _request(target_date: str = "2026-01-01") -> dict[str, Any]:
     }
 
 
-def _validate_capture_request(request: object) -> dict[str, Any]:
+@dataclass(frozen=True, slots=True)
+class ValidatedCaptureRequest:
+    bar_interval: str
+    child_operation_version: str
+    ordered_universe: tuple[str, ...]
+    output_policy_version: str
+    permitted_provider_operation: str
+    provider_id: str
+    request_limit: int
+    request_window_end_date: str
+    request_window_start_date: str
+    target_session_date: str
+
+    def canonical_json(self) -> bytes:
+        return _json(
+            {
+                "bar_interval": self.bar_interval,
+                "child_operation_version": self.child_operation_version,
+                "ordered_universe": list(self.ordered_universe),
+                "output_policy_version": self.output_policy_version,
+                "permitted_provider_operation": self.permitted_provider_operation,
+                "provider_id": self.provider_id,
+                "request_limit": self.request_limit,
+                "request_window_end_date": self.request_window_end_date,
+                "request_window_start_date": self.request_window_start_date,
+                "target_session_date": self.target_session_date,
+            }
+        )
+
+
+def _snapshot_capture_request(request: object) -> ValidatedCaptureRequest:
     if type(request) is not dict:
         raise ValueError("capture_request/v2 must be an exact object")
-    if set(request) != CAPTURE_REQUEST_FIELDS:
+    captured = request.copy()
+    if set(captured) != CAPTURE_REQUEST_FIELDS:
         raise ValueError("capture_request/v2 has a missing or unknown field")
 
     string_fields = CAPTURE_REQUEST_FIELDS - {"ordered_universe", "request_limit"}
-    if any(type(request[field]) is not str for field in string_fields):
+    if any(type(captured[field]) is not str for field in string_fields):
         raise ValueError("capture_request/v2 string fields require exact strings")
-    if type(request["ordered_universe"]) is not list:
+    if type(captured["ordered_universe"]) is not list:
         raise ValueError("ordered_universe must be an exact list")
-    universe = request["ordered_universe"]
-    if not 1 <= len(universe) <= MAX_DAILY_SNAPSHOT_SYMBOLS:
+    captured_universe = tuple(captured["ordered_universe"])
+    if not 1 <= len(captured_universe) <= MAX_DAILY_SNAPSHOT_SYMBOLS:
         raise ValueError("ordered_universe is empty or exceeds its bound")
-    if any(type(symbol) is not str or not symbol for symbol in universe):
-        raise ValueError("ordered_universe members must be nonempty exact strings")
-    if len(set(universe)) != len(universe):
+    canonical_universe: list[str] = []
+    for entry in captured_universe:
+        if type(entry) is not str:
+            raise ValueError("ordered_universe members must be exact strings")
+        try:
+            canonical_text = str(Symbol(entry))
+        except (TypeError, ValueError) as error:
+            raise ValueError("ordered_universe member is not a valid Symbol") from error
+        canonical_universe.append(canonical_text)
+    if len(set(canonical_universe)) != len(canonical_universe):
         raise ValueError("ordered_universe must be duplicate-free")
-    request_limit = request["request_limit"]
+    if any(
+        entry != canonical_text
+        for entry, canonical_text in zip(
+            captured_universe, canonical_universe, strict=True
+        )
+    ):
+        raise ValueError("ordered_universe members must already be canonical Symbols")
+    request_limit = captured["request_limit"]
     if type(request_limit) is not int or request_limit <= 0:
         raise ValueError("request_limit must be an exact positive integer")
-    if request_limit != len(universe) or request_limit > MAX_DAILY_SNAPSHOT_SYMBOLS:
+    if (
+        request_limit != len(canonical_universe)
+        or request_limit > MAX_DAILY_SNAPSHOT_SYMBOLS
+    ):
         raise ValueError("request_limit must equal the bounded universe size")
 
     for field_name in (
@@ -474,16 +523,16 @@ def _validate_capture_request(request: object) -> dict[str, Any]:
         "request_window_end_date",
         "target_session_date",
     ):
-        value = request[field_name]
+        value = captured[field_name]
         try:
             parsed = date.fromisoformat(value)
         except ValueError as error:
             raise ValueError(f"{field_name} is not a canonical date") from error
         if parsed.isoformat() != value:
             raise ValueError(f"{field_name} is not a canonical date")
-    window_start = date.fromisoformat(request["request_window_start_date"])
-    window_end = date.fromisoformat(request["request_window_end_date"])
-    target_session = date.fromisoformat(request["target_session_date"])
+    window_start = date.fromisoformat(captured["request_window_start_date"])
+    window_end = date.fromisoformat(captured["request_window_end_date"])
+    target_session = date.fromisoformat(captured["target_session_date"])
     if not window_start <= window_end < target_session:
         raise ValueError("capture request dates are not causally ordered")
 
@@ -494,13 +543,24 @@ def _validate_capture_request(request: object) -> dict[str, Any]:
         "provider_id": ALPACA_DAILY_SNAPSHOT_DESCRIPTOR.provider_id,
         "permitted_provider_operation": ALPACA_DAILY_SNAPSHOT_DESCRIPTOR.operation,
     }
-    if any(request[field] != value for field, value in fixed_values.items()):
+    if any(captured[field] != value for field, value in fixed_values.items()):
         raise ValueError("capture_request/v2 fixed semantics are invalid")
-    return request
+    return ValidatedCaptureRequest(
+        bar_interval=captured["bar_interval"],
+        child_operation_version=captured["child_operation_version"],
+        ordered_universe=tuple(canonical_universe),
+        output_policy_version=captured["output_policy_version"],
+        permitted_provider_operation=captured["permitted_provider_operation"],
+        provider_id=captured["provider_id"],
+        request_limit=request_limit,
+        request_window_end_date=captured["request_window_end_date"],
+        request_window_start_date=captured["request_window_start_date"],
+        target_session_date=captured["target_session_date"],
+    )
 
 
 def _session_id(
-    request: dict[str, Any],
+    request: ValidatedCaptureRequest,
     *,
     machine_authority_id: str,
     authority_epoch_id: str,
@@ -515,16 +575,16 @@ def _session_id(
         authority_policy_version,
         claim_policy_version,
         "capture_request/v2",
-        request["target_session_date"],
-        request["provider_id"],
-        request["permitted_provider_operation"],
-        _ordered_list(tuple(request["ordered_universe"])),
-        request["bar_interval"],
-        request["request_window_start_date"],
-        request["request_window_end_date"],
-        str(request["request_limit"]),
-        request["child_operation_version"],
-        request["output_policy_version"],
+        request.target_session_date,
+        request.provider_id,
+        request.permitted_provider_operation,
+        _ordered_list(request.ordered_universe),
+        request.bar_interval,
+        request.request_window_start_date,
+        request.request_window_end_date,
+        str(request.request_limit),
+        request.child_operation_version,
+        request.output_policy_version,
     )
 
 
@@ -723,7 +783,7 @@ def _finish(connection: sqlite3.Connection, commit: bool) -> None:
 def create_session(
     connection: sqlite3.Connection, request: dict[str, Any] | None = None
 ) -> str:
-    request = _validate_capture_request(_request() if request is None else request)
+    snapshot = _snapshot_capture_request(_request() if request is None else request)
     _begin(connection)
     try:
         metadata = connection.execute(
@@ -754,17 +814,17 @@ def create_session(
             or metadata_operation != ALPACA_DAILY_SNAPSHOT_DESCRIPTOR.operation
         ):
             raise ValueError("authority metadata does not match the Alpaca descriptor")
-        request_provider_id = request["provider_id"]
-        request_operation = request["permitted_provider_operation"]
+        request_provider_id = snapshot.provider_id
+        request_operation = snapshot.permitted_provider_operation
         if request_provider_id != metadata_provider_id:
             raise ValueError("request provider_id does not match authority metadata")
         if request_operation != metadata_operation:
             raise ValueError(
                 "request permitted_provider_operation does not match authority metadata"
             )
-        request_bytes = _json(request)
+        request_bytes = snapshot.canonical_json()
         session_id = _session_id(
-            request,
+            snapshot,
             machine_authority_id=machine_authority_id,
             authority_epoch_id=authority_epoch_id,
             authority_policy_version=authority_policy_version,
@@ -785,7 +845,7 @@ def create_session(
                 authority_epoch_id,
                 authority_policy_version,
                 claim_policy_version,
-                request["target_session_date"],
+                snapshot.target_session_date,
                 request_bytes,
                 _digest(request_bytes),
                 TIMESTAMP,
@@ -1779,6 +1839,111 @@ def _assert_no_capture_authority_side_effects(
         assert connection.execute(f"SELECT count(*) FROM {table}").fetchone() == (0,)
 
 
+def test_validated_capture_request_is_frozen_and_detached_from_caller() -> None:
+    caller_request = _request()
+    caller_universe = caller_request["ordered_universe"]
+    assert type(caller_universe) is list
+    snapshot = _snapshot_capture_request(caller_request)
+
+    caller_universe.append("IWM")
+    caller_request["ordered_universe"] = ["DIA"]
+    caller_request["request_limit"] = 1
+    caller_request["target_session_date"] = "2099-12-31"
+
+    assert snapshot.ordered_universe == ("QQQ", "SPY")
+    assert snapshot.request_limit == 2
+    assert snapshot.target_session_date == "2026-01-01"
+    assert snapshot.ordered_universe is not caller_universe
+    assert not hasattr(snapshot, "__dict__")
+    assert all(
+        type(getattr(snapshot, field_name)) not in (dict, list)
+        for field_name in snapshot.__dataclass_fields__
+    )
+    with pytest.raises(FrozenInstanceError):
+        snapshot.target_session_date = "2099-12-31"  # type: ignore[misc]
+
+
+def test_capture_snapshot_recreates_existing_exact_canonical_json() -> None:
+    snapshot = _snapshot_capture_request(_request())
+    expected = (
+        b'{"bar_interval":"1d","child_operation_version":"child/v1",'
+        b'"ordered_universe":["QQQ","SPY"],"output_policy_version":"output/v1",'
+        b'"permitted_provider_operation":"historical-stock-bars-v2-raw-usd-no-asof",'
+        b'"provider_id":"alpaca-market-data","request_limit":2,'
+        b'"request_window_end_date":"2025-12-31",'
+        b'"request_window_start_date":"2025-12-01",'
+        b'"target_session_date":"2026-01-01"}'
+    )
+    assert snapshot.canonical_json() == expected == _json(_request())
+
+
+def test_caller_mutation_after_snapshot_cannot_desynchronize_session(
+    db_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    connection = _connect(db_path)
+    caller_request = _request()
+    caller_universe = caller_request["ordered_universe"]
+    assert type(caller_universe) is list
+    snapshots: list[ValidatedCaptureRequest] = []
+    snapshot_function = _snapshot_capture_request
+
+    def snapshot_then_mutate(request: object) -> ValidatedCaptureRequest:
+        snapshot = snapshot_function(request)
+        snapshots.append(snapshot)
+        assert type(request) is dict
+        caller_universe.append("IWM")
+        request["ordered_universe"] = ["DIA"]
+        request["request_limit"] = 1
+        request["target_session_date"] = "2099-12-31"
+        return snapshot
+
+    monkeypatch.setitem(globals(), "_snapshot_capture_request", snapshot_then_mutate)
+    session_id = create_session(connection, caller_request)
+    snapshot = snapshots[0]
+    expected_bytes = snapshot.canonical_json()
+    expected_id = _session_id(
+        snapshot,
+        machine_authority_id=MACHINE,
+        authority_epoch_id=EPOCH,
+        authority_policy_version=POLICY,
+        claim_policy_version=CLAIM_POLICY,
+    )
+    assert session_id == expected_id
+    assert connection.execute(
+        "SELECT target_session_date, request_json, request_digest "
+        "FROM sessions WHERE session_id = ?",
+        (session_id,),
+    ).fetchone() == (
+        snapshot.target_session_date,
+        expected_bytes,
+        _digest(expected_bytes),
+    )
+    assert caller_request != json.loads(expected_bytes)
+    assert connection.execute("SELECT count(*) FROM attempts").fetchone() == (0,)
+    assert connection.execute(
+        "SELECT count(*) FROM provider_call_claims"
+    ).fetchone() == (0,)
+    connection.close()
+
+
+def test_capture_snapshot_accepts_canonical_period_and_hyphen_symbols() -> None:
+    request = _request()
+    request["ordered_universe"] = ["BRK.B", "ABC-1"]
+    snapshot = _snapshot_capture_request(request)
+    assert snapshot.ordered_universe == ("BRK.B", "ABC-1")
+    assert json.loads(snapshot.canonical_json())["ordered_universe"] == [
+        "BRK.B",
+        "ABC-1",
+    ]
+
+
+def test_symbol_normalization_equivalence_is_detected_as_duplicate() -> None:
+    request = _request()
+    request["ordered_universe"] = ["SPY", "spy"]
+    with pytest.raises(ValueError, match="duplicate-free"):
+        _snapshot_capture_request(request)
+
+
 @pytest.mark.parametrize(
     ("authority_policy_version", "claim_policy_version"),
     [
@@ -1855,6 +2020,18 @@ def _invalid_capture_request(case: str) -> object:
         request["request_limit"] = MAX_DAILY_SNAPSHOT_SYMBOLS + 1
     elif case == "blank-universe-member":
         request["ordered_universe"] = ["QQQ", ""]
+    elif case == "whitespace-universe-member":
+        request["ordered_universe"] = ["QQQ", "   "]
+    elif case == "lowercase-symbol":
+        request["ordered_universe"] = ["QQQ", "spy"]
+    elif case == "padded-symbol":
+        request["ordered_universe"] = ["QQQ", " SPY "]
+    elif case == "overlong-symbol":
+        request["ordered_universe"] = ["QQQ", "ABCDEFGHIJK"]
+    elif case == "unsupported-symbol-punctuation":
+        request["ordered_universe"] = ["QQQ", "BRK_B"]
+    elif case == "normalization-equivalent-symbols":
+        request["ordered_universe"] = ["SPY", "spy"]
     elif case == "malformed-date":
         request["request_window_start_date"] = "2025-13-01"
     elif case == "noncanonical-date":
@@ -1888,6 +2065,12 @@ def _invalid_capture_request(case: str) -> object:
         "empty-universe",
         "oversized-universe",
         "blank-universe-member",
+        "whitespace-universe-member",
+        "lowercase-symbol",
+        "padded-symbol",
+        "overlong-symbol",
+        "unsupported-symbol-punctuation",
+        "normalization-equivalent-symbols",
         "malformed-date",
         "noncanonical-date",
         "window-reversed",
@@ -1904,9 +2087,11 @@ def test_capture_request_rejects_noncanonical_shapes_without_side_effects(
     db_path: Path, case: str
 ) -> None:
     connection = _connect(db_path)
+    side_effects = FakeSideEffects(connection)
     with pytest.raises(ValueError):
         create_session(connection, _invalid_capture_request(case))  # type: ignore[arg-type]
     _assert_no_capture_authority_side_effects(connection)
+    assert side_effects.events == []
     connection.close()
 
 
@@ -1917,22 +2102,19 @@ def test_invalid_alternate_request_cannot_collide_with_persisted_session(
     valid_request = _request()
     session_id = create_session(connection, valid_request)
     alternate = {**valid_request, "ordered_universe": ("QQQ", "SPY")}
-    assert (
-        _session_id(
-            alternate,  # type: ignore[arg-type]
-            machine_authority_id=MACHINE,
-            authority_epoch_id=EPOCH,
-            authority_policy_version=POLICY,
-            claim_policy_version=CLAIM_POLICY,
-        )
-        == session_id
-    )
     with pytest.raises(ValueError, match="exact list"):
         create_session(connection, alternate)  # type: ignore[arg-type]
     assert connection.execute(
         "SELECT session_id, request_json, next_attempt_ordinal, "
         "next_recovery_ordinal FROM sessions"
-    ).fetchall() == [(session_id, _json(valid_request), 0, 0)]
+    ).fetchall() == [
+        (
+            session_id,
+            _snapshot_capture_request(valid_request).canonical_json(),
+            0,
+            0,
+        )
+    ]
     connection.close()
 
 
@@ -2077,9 +2259,10 @@ def test_descendants_do_not_copy_ancestor_identity_columns(db_path: Path) -> Non
 
 def test_identity_vectors_use_normalized_immediate_parent_material() -> None:
     request = _request()
+    snapshot = _snapshot_capture_request(request)
     migration_id = _identity("migration_id/v1", EPOCH, "3", "migration-policy/v1")
     session_id = _session_id(
-        request,
+        snapshot,
         machine_authority_id=MACHINE,
         authority_epoch_id=EPOCH,
         authority_policy_version=POLICY,
@@ -2112,7 +2295,7 @@ def test_identity_vectors_use_normalized_immediate_parent_material() -> None:
     assert recovery_id == "9aaadbb2-62af-58db-af21-b5208551ec01"
     assert (
         _session_id(
-            _request(),
+            _snapshot_capture_request(_request()),
             machine_authority_id=MACHINE,
             authority_epoch_id=EPOCH,
             authority_policy_version=POLICY,
@@ -2125,19 +2308,11 @@ def test_identity_vectors_use_normalized_immediate_parent_material() -> None:
         ("permitted_provider_operation", "operation-drift"),
     ):
         drifted_request = {**request, field_name: value}
-        assert (
-            _session_id(
-                drifted_request,
-                machine_authority_id=MACHINE,
-                authority_epoch_id=EPOCH,
-                authority_policy_version=POLICY,
-                claim_policy_version=CLAIM_POLICY,
-            )
-            != session_id
-        )
+        with pytest.raises(ValueError):
+            _snapshot_capture_request(drifted_request)
     assert (
         _session_id(
-            request,
+            snapshot,
             machine_authority_id=MACHINE,
             authority_epoch_id=EPOCH,
             authority_policy_version="authority-policy/drift",
@@ -2147,7 +2322,7 @@ def test_identity_vectors_use_normalized_immediate_parent_material() -> None:
     )
     assert (
         _session_id(
-            request,
+            snapshot,
             machine_authority_id=MACHINE,
             authority_epoch_id=EPOCH,
             authority_policy_version=POLICY,
@@ -2176,7 +2351,7 @@ def test_identity_vectors_use_normalized_immediate_parent_material() -> None:
 
 
 def test_identity_helpers_require_explicit_persisted_policy_inputs() -> None:
-    request = _request()
+    request = _snapshot_capture_request(_request())
     with pytest.raises(TypeError):
         _session_id(request)  # type: ignore[call-arg]
     with pytest.raises(TypeError):
@@ -2220,7 +2395,7 @@ def test_valid_lifecycle_from_metadata_to_selection(db_path: Path) -> None:
     _resume_and_persist(connection, execution_id)
     terminal_id = record_terminal(connection, reservation_id)
     selection_id = select_terminal(connection, session_id, terminal_id)
-    expected_request = _json(request)
+    expected_request = _snapshot_capture_request(request).canonical_json()
     expected_digest = _digest(expected_request)
     assert b"ALPACA_MARKET_DATA" not in expected_request
     assert b"HISTORICAL_DAILY_BARS" not in expected_request
@@ -2317,7 +2492,7 @@ def test_immediate_parent_request_mismatches_are_rejected(db_path: Path) -> None
     connection = _connect(db_path)
     request = _request("2026-07-15")
     session_id = create_session(connection, request)
-    request_bytes = _json(request)
+    request_bytes = _snapshot_capture_request(request).canonical_json()
     request_digest = _digest(request_bytes)
     wrong_request = _json({**request, "request_limit": 99})
     wrong_digest = _digest(wrong_request)

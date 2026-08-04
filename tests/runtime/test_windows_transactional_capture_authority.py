@@ -3,8 +3,12 @@
 from __future__ import annotations
 
 import hashlib
+import inspect
 import json
+import multiprocessing
+import os
 import sqlite3
+import tempfile
 import threading
 import uuid
 from collections.abc import Iterator
@@ -71,15 +75,112 @@ _ISSUED_PROCESS_RESULTS_LOCK = threading.Lock()
 _ISSUED_RESUME_RESULTS_LOCK = threading.Lock()
 _ISSUED_PROVIDER_CONSTRUCTION_PERMITS_LOCK = threading.Lock()
 _ISSUED_CONSTRUCTED_PROVIDERS_LOCK = threading.Lock()
-_RESERVATION_LIFECYCLE_LOCKS_GUARD = threading.Lock()
-_RESERVATION_LIFECYCLE_LOCKS: dict[str, threading.RLock] = {}
 
 
-def _reservation_lifecycle_lock(reservation_id: str) -> threading.RLock:
-    with _RESERVATION_LIFECYCLE_LOCKS_GUARD:
-        return _RESERVATION_LIFECYCLE_LOCKS.setdefault(
-            reservation_id, threading.RLock()
+class InterprocessLifecycleArbiter:
+    """Test adapter for the deterministic OS-backed reservation arbiter."""
+
+    LABEL = "lifecycle-arbiter/v1"
+
+    def __init__(
+        self,
+        reservation_id: str,
+        *,
+        machine_authority_id: str = MACHINE,
+        authority_epoch_id: str = EPOCH,
+    ) -> None:
+        material = json.dumps(
+            {
+                "authority_epoch_id": authority_epoch_id,
+                "label": self.LABEL,
+                "launch_reservation_id": reservation_id,
+                "machine_authority_id": machine_authority_id,
+            },
+            ensure_ascii=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode("utf-8")
+        self.identity = hashlib.sha256(material).hexdigest()
+        self.path = (
+            Path(tempfile.gettempdir())
+            / "ai-trading-bot-lifecycle-arbiters-v1"
+            / f"{self.identity}.lock"
         )
+        self._stream: Any | None = None
+        self._overlapped: Any | None = None
+
+    def __enter__(self) -> InterprocessLifecycleArbiter:
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        stream = self.path.open("a+b", buffering=0)
+        if os.name == "nt":
+            self._lock_windows(stream)
+        else:
+            import fcntl
+
+            fcntl.flock(stream.fileno(), fcntl.LOCK_EX)
+        self._stream = stream
+        return self
+
+    def __exit__(self, exc_type: object, exc: object, traceback: object) -> None:
+        stream = self._stream
+        if stream is None:
+            return
+        try:
+            if os.name == "nt":
+                self._unlock_windows(stream)
+            else:
+                import fcntl
+
+                fcntl.flock(stream.fileno(), fcntl.LOCK_UN)
+        finally:
+            stream.close()
+            self._stream = None
+            self._overlapped = None
+
+    def _lock_windows(self, stream: Any) -> None:
+        import ctypes
+        import msvcrt
+        from ctypes import wintypes
+
+        class Overlapped(ctypes.Structure):
+            _fields_ = [
+                ("Internal", ctypes.c_size_t),
+                ("InternalHigh", ctypes.c_size_t),
+                ("Offset", wintypes.DWORD),
+                ("OffsetHigh", wintypes.DWORD),
+                ("hEvent", wintypes.HANDLE),
+            ]
+
+        overlapped = Overlapped()
+        handle = wintypes.HANDLE(msvcrt.get_osfhandle(stream.fileno()))
+        lock_file_ex = ctypes.windll.kernel32.LockFileEx
+        lock_file_ex.argtypes = [
+            wintypes.HANDLE,
+            wintypes.DWORD,
+            wintypes.DWORD,
+            wintypes.DWORD,
+            wintypes.DWORD,
+            ctypes.POINTER(Overlapped),
+        ]
+        lock_file_ex.restype = wintypes.BOOL
+        if not lock_file_ex(handle, 0x2, 0, 1, 0, ctypes.byref(overlapped)):
+            stream.close()
+            raise ctypes.WinError()
+        self._overlapped = overlapped
+
+    def _unlock_windows(self, stream: Any) -> None:
+        import ctypes
+        import msvcrt
+        from ctypes import wintypes
+
+        overlapped = self._overlapped
+        if overlapped is None:
+            raise RuntimeError("Windows lifecycle arbiter was not acquired")
+        handle = wintypes.HANDLE(msvcrt.get_osfhandle(stream.fileno()))
+        unlock_file_ex = ctypes.windll.kernel32.UnlockFileEx
+        unlock_file_ex.restype = wintypes.BOOL
+        if not unlock_file_ex(handle, 0, 1, 0, ctypes.byref(overlapped)):
+            raise ctypes.WinError()
 
 
 @dataclass(eq=False)
@@ -220,6 +321,7 @@ class FakeResumeIntent:
     """Opaque one-shot authority returned only by the intent transaction."""
 
     execution_id: str
+    reservation_id: str
     intent_json: bytes
     intent_digest: bytes
     _issuer: object = field(repr=False, compare=False)
@@ -235,6 +337,7 @@ class FakeResumeReceipt:
     """Canonical result returned by the fake external ResumeThread boundary."""
 
     execution_id: str
+    reservation_id: str
     resume_intent_digest: bytes
     result_json: bytes
     result_digest: bytes
@@ -1294,7 +1397,7 @@ def commit_process_intent(
         raise TypeError("process intent requires an opaque constructed provider")
     if provider.reservation_id != reservation_id:
         raise ValueError("constructed provider belongs to another reservation")
-    with _reservation_lifecycle_lock(reservation_id):
+    with InterprocessLifecycleArbiter(reservation_id):
         return _commit_process_intent_locked(connection, reservation_id, provider)
 
 
@@ -1508,7 +1611,7 @@ def record_execution(
 ) -> str:
     if type(receipt) is not FakeProcessCreationReceipt:
         raise TypeError("record_execution requires a fake process creation receipt")
-    with _reservation_lifecycle_lock(reservation_id):
+    with InterprocessLifecycleArbiter(reservation_id):
         return _record_execution_locked(connection, reservation_id, receipt)
 
 
@@ -1654,21 +1757,16 @@ def _record_execution_locked(
 
 
 def commit_resume_intent(
-    connection: sqlite3.Connection, execution_id: str
+    connection: sqlite3.Connection,
+    execution_id: str,
+    reservation_id: str,
 ) -> FakeResumeIntent:
-    parent = connection.execute(
-        "SELECT launch_reservation_id FROM launch_executions "
-        "WHERE launch_execution_id = ?",
-        (execution_id,),
-    ).fetchone()
-    if parent is None:
-        raise ValueError("cannot authorize resume for an unknown execution")
-    with _reservation_lifecycle_lock(parent[0]):
-        return _commit_resume_intent_locked(connection, execution_id)
+    with InterprocessLifecycleArbiter(reservation_id):
+        return _commit_resume_intent_locked(connection, execution_id, reservation_id)
 
 
 def _commit_resume_intent_locked(
-    connection: sqlite3.Connection, execution_id: str
+    connection: sqlite3.Connection, execution_id: str, reservation_id: str
 ) -> FakeResumeIntent:
     intent_json = _json(
         {
@@ -1685,7 +1783,7 @@ def _commit_resume_intent_locked(
             SELECT e.phase, e.process_creation_json, e.process_creation_digest,
                    e.job_object_json, e.job_object_digest,
                    e.resume_authorization_json, e.resume_authorization_digest,
-                   r.reservation_state, s.state
+                   r.reservation_state, s.state, e.launch_reservation_id
             FROM launch_executions e
             JOIN launch_reservations r
               ON r.launch_reservation_id = e.launch_reservation_id
@@ -1705,7 +1803,11 @@ def _commit_resume_intent_locked(
             (execution_id,),
         ).fetchone()
         if row is None:
-            raise ValueError("resume intent active lineage is unavailable")
+            raise ValueError(
+                "unknown execution or resume intent active lineage is unavailable"
+            )
+        if row[9] != reservation_id:
+            raise ValueError("resume execution belongs to another reservation")
         if row[0] != "PRE_RESUME_READY":
             raise ValueError("resume intent requires PRE_RESUME_READY")
         if row[7] != "PROCESS_CREATED" or row[8] != "OPEN":
@@ -1758,6 +1860,7 @@ def _commit_resume_intent_locked(
     permit = _ResumePermit()
     intent = FakeResumeIntent(
         execution_id=execution_id,
+        reservation_id=reservation_id,
         intent_json=intent_json,
         intent_digest=intent_digest,
         _issuer=_RESUME_INTENT_ISSUER,
@@ -1777,7 +1880,7 @@ def record_process_creation_failure(
         raise TypeError(
             "record_process_creation_failure requires a fake process creation failure"
         )
-    with _reservation_lifecycle_lock(reservation_id):
+    with InterprocessLifecycleArbiter(reservation_id):
         _record_process_creation_failure_locked(connection, reservation_id, failure)
 
 
@@ -1878,14 +1981,9 @@ def record_post_resume_evidence(
     execution_id: str,
     resume_receipt: FakeResumeReceipt,
 ) -> None:
-    parent = connection.execute(
-        "SELECT launch_reservation_id FROM launch_executions "
-        "WHERE launch_execution_id = ?",
-        (execution_id,),
-    ).fetchone()
-    if parent is None:
-        raise ValueError("unknown launch execution")
-    with _reservation_lifecycle_lock(parent[0]):
+    if type(resume_receipt) is not FakeResumeReceipt:
+        raise TypeError("post-resume evidence requires a fake resume receipt")
+    with InterprocessLifecycleArbiter(resume_receipt.reservation_id):
         _record_post_resume_evidence_locked(connection, execution_id, resume_receipt)
 
 
@@ -1907,7 +2005,7 @@ def _record_post_resume_evidence_locked(
         row = connection.execute(
             """
             SELECT e.phase, e.resume_intent_digest, e.resume_intent_json,
-                   r.reservation_state, s.state
+                   r.reservation_state, s.state, e.launch_reservation_id
             FROM launch_executions e
             JOIN launch_reservations r
               ON r.launch_reservation_id = e.launch_reservation_id
@@ -1932,6 +2030,8 @@ def _record_post_resume_evidence_locked(
             raise ValueError("post-resume evidence requires committed resume intent")
         if row[3] != "PROCESS_CREATED" or row[4] != "OPEN":
             raise ValueError("post-resume active parent lineage is revoked")
+        if row[5] != resume_receipt.reservation_id:
+            raise ValueError("fake resume receipt belongs to another reservation")
         if row[2] is None or _digest(row[2]) != row[1]:
             raise ValueError("post-resume committed intent evidence is invalid")
         if resume_receipt.resume_intent_digest != row[1]:
@@ -1999,6 +2099,16 @@ def record_terminal(
     reservation_id: str,
     state: str = "SUCCEEDED",
     disposition: str = "CONFIRMED",
+) -> str:
+    with InterprocessLifecycleArbiter(reservation_id):
+        return _record_terminal_locked(connection, reservation_id, state, disposition)
+
+
+def _record_terminal_locked(
+    connection: sqlite3.Connection,
+    reservation_id: str,
+    state: str,
+    disposition: str,
 ) -> str:
     terminal_policy_version = TERMINAL_POLICY
     terminal_id = _terminal_id(reservation_id, terminal_policy_version)
@@ -2225,7 +2335,7 @@ def record_recovery(
     ordinal: int | None = None,
 ) -> str:
     if target_kind == "LAUNCH_RESERVATION" and action.startswith("CLASSIFY_"):
-        with _reservation_lifecycle_lock(target_id):
+        with InterprocessLifecycleArbiter(target_id):
             return _record_recovery_locked(
                 connection,
                 session_id,
@@ -2376,111 +2486,118 @@ class FakeSideEffects:
                 "provider construction requires a reservation-issued permit"
             )
         reservation_id = capability.reservation_id
-        with _reservation_lifecycle_lock(reservation_id):
-            row = self.observer.execute(
-                """
-                SELECT r.reservation_state, r.request_digest,
-                       r.authority_policy_version, r.claim_policy_version,
-                       r.reservation_evidence_json,
-                       r.reservation_evidence_digest, r.process_intent_json,
-                       r.process_intent_digest, r.process_intent_committed_at_utc,
-                       c.state, c.request_json, c.request_digest,
-                       c.claim_policy_version, c.provider_id,
-                       c.permitted_provider_operation, c.provider_call_budget,
-                       c.claim_evidence_json, c.claim_evidence_digest,
-                       a.state, a.request_json, a.request_digest,
-                       a.attempt_policy_version, a.provider_id,
-                       a.permitted_provider_operation, a.provider_call_budget,
-                       s.state, s.request_json, s.request_digest,
-                       s.authority_policy_version, s.claim_policy_version,
-                       m.provider_id, m.permitted_provider_operation,
-                       m.authority_policy_version, m.claim_policy_version
-                FROM launch_reservations r
-                JOIN provider_call_claims c ON c.claim_id = r.claim_id
-                JOIN attempts a ON a.attempt_id = c.attempt_id
-                JOIN sessions s ON s.session_id = a.session_id
-                JOIN authority_metadata m ON m.singleton_key = 1
-                WHERE r.launch_reservation_id = ?
-                  AND NOT EXISTS (
-                      SELECT 1 FROM launch_executions e
-                      WHERE e.launch_reservation_id = r.launch_reservation_id
-                  )
-                  AND NOT EXISTS (
-                      SELECT 1 FROM terminals t
-                      WHERE t.launch_reservation_id = r.launch_reservation_id
-                  )
-                  AND NOT EXISTS (
-                      SELECT 1 FROM session_selections ss
-                      WHERE ss.session_id = s.session_id
-                  )
-                """,
-                (reservation_id,),
-            ).fetchone()
-            if row is None:
-                raise ValueError("provider construction active lineage is unavailable")
-            if (
-                row[0] != "COMMITTED"
-                or row[6] is not None
-                or row[7] is not None
-                or row[8] is not None
-                or row[9] != "COMMITTED"
-                or row[18] != "LAUNCH_RESERVED"
-                or row[25] != "OPEN"
-            ):
-                raise ValueError("provider construction active lineage is revoked")
-            if (
-                _digest(row[4]) != row[5]
-                or _digest(row[16]) != row[17]
-                or _digest(row[10]) != row[11]
-                or row[10] != row[19]
-                or row[10] != row[26]
-                or row[1] != row[11]
-                or row[1] != row[20]
-                or row[1] != row[27]
-                or row[3] != row[12]
-                or row[3] != row[21]
-                or row[3] != row[29]
-                or row[3] != row[33]
-                or row[2] != row[28]
-                or row[2] != row[32]
-                or row[13] != row[22]
-                or row[13] != row[30]
-                or row[13] != PROVIDER
-                or row[14] != row[23]
-                or row[14] != row[31]
-                or row[14] != OPERATION
-                or row[15] != 1
-                or row[24] != 1
-            ):
-                raise ValueError("provider construction lineage evidence is invalid")
-            if capability._issuer is not _PROVIDER_CONSTRUCTION_ISSUER:
-                raise TypeError("provider construction permit issuer is invalid")
-            with capability._permit.lock:
-                with _ISSUED_PROVIDER_CONSTRUCTION_PERMITS_LOCK:
-                    if (
-                        capability._permit.consumed
-                        or _ISSUED_PROVIDER_CONSTRUCTION_PERMITS.get(capability._permit)
-                        is not capability
-                    ):
-                        raise ValueError(
-                            "provider construction permit was consumed or not issued"
-                        )
-                    del _ISSUED_PROVIDER_CONSTRUCTION_PERMITS[capability._permit]
-                capability._permit.consumed = True
+        with InterprocessLifecycleArbiter(reservation_id):
+            return self._construct_provider_locked(capability, fail=fail)
 
-            self._emit("provider-constructed")
-            if fail:
-                self._emit("provider-construction-failed")
-                raise RuntimeError("modeled provider construction failure")
-            one_shot = _ConstructedProviderOneShot()
-            provider = FakeConstructedProvider(
-                reservation_id=reservation_id,
-                _issuer=_CONSTRUCTED_PROVIDER_ISSUER,
-                _permit=one_shot,
-            )
-            with _ISSUED_CONSTRUCTED_PROVIDERS_LOCK:
-                _ISSUED_CONSTRUCTED_PROVIDERS[one_shot] = provider
-            return provider
+    def _construct_provider_locked(
+        self, capability: FakeProviderConstructionPermit, *, fail: bool
+    ) -> FakeConstructedProvider:
+        reservation_id = capability.reservation_id
+        row = self.observer.execute(
+            """
+            SELECT r.reservation_state, r.request_digest,
+                   r.authority_policy_version, r.claim_policy_version,
+                   r.reservation_evidence_json,
+                   r.reservation_evidence_digest, r.process_intent_json,
+                   r.process_intent_digest, r.process_intent_committed_at_utc,
+                   c.state, c.request_json, c.request_digest,
+                   c.claim_policy_version, c.provider_id,
+                   c.permitted_provider_operation, c.provider_call_budget,
+                   c.claim_evidence_json, c.claim_evidence_digest,
+                   a.state, a.request_json, a.request_digest,
+                   a.attempt_policy_version, a.provider_id,
+                   a.permitted_provider_operation, a.provider_call_budget,
+                   s.state, s.request_json, s.request_digest,
+                   s.authority_policy_version, s.claim_policy_version,
+                   m.provider_id, m.permitted_provider_operation,
+                   m.authority_policy_version, m.claim_policy_version
+            FROM launch_reservations r
+            JOIN provider_call_claims c ON c.claim_id = r.claim_id
+            JOIN attempts a ON a.attempt_id = c.attempt_id
+            JOIN sessions s ON s.session_id = a.session_id
+            JOIN authority_metadata m ON m.singleton_key = 1
+            WHERE r.launch_reservation_id = ?
+              AND NOT EXISTS (
+                  SELECT 1 FROM launch_executions e
+                  WHERE e.launch_reservation_id = r.launch_reservation_id
+              )
+              AND NOT EXISTS (
+                  SELECT 1 FROM terminals t
+                  WHERE t.launch_reservation_id = r.launch_reservation_id
+              )
+              AND NOT EXISTS (
+                  SELECT 1 FROM session_selections ss
+                  WHERE ss.session_id = s.session_id
+              )
+            """,
+            (reservation_id,),
+        ).fetchone()
+        if row is None:
+            raise ValueError("provider construction active lineage is unavailable")
+        if (
+            row[0] != "COMMITTED"
+            or row[6] is not None
+            or row[7] is not None
+            or row[8] is not None
+            or row[9] != "COMMITTED"
+            or row[18] != "LAUNCH_RESERVED"
+            or row[25] != "OPEN"
+        ):
+            raise ValueError("provider construction active lineage is revoked")
+        if (
+            _digest(row[4]) != row[5]
+            or _digest(row[16]) != row[17]
+            or _digest(row[10]) != row[11]
+            or row[10] != row[19]
+            or row[10] != row[26]
+            or row[1] != row[11]
+            or row[1] != row[20]
+            or row[1] != row[27]
+            or row[3] != row[12]
+            or row[3] != row[21]
+            or row[3] != row[29]
+            or row[3] != row[33]
+            or row[2] != row[28]
+            or row[2] != row[32]
+            or row[13] != row[22]
+            or row[13] != row[30]
+            or row[13] != PROVIDER
+            or row[14] != row[23]
+            or row[14] != row[31]
+            or row[14] != OPERATION
+            or row[15] != 1
+            or row[24] != 1
+        ):
+            raise ValueError("provider construction lineage evidence is invalid")
+        if capability._issuer is not _PROVIDER_CONSTRUCTION_ISSUER:
+            raise TypeError("provider construction permit issuer is invalid")
+        with capability._permit.lock:
+            with _ISSUED_PROVIDER_CONSTRUCTION_PERMITS_LOCK:
+                if (
+                    capability._permit.consumed
+                    or _ISSUED_PROVIDER_CONSTRUCTION_PERMITS.get(capability._permit)
+                    is not capability
+                ):
+                    raise ValueError(
+                        "provider construction permit was consumed or not issued"
+                    )
+                del _ISSUED_PROVIDER_CONSTRUCTION_PERMITS[capability._permit]
+            capability._permit.consumed = True
+
+        assert not self.observer.in_transaction
+        self._emit("provider-constructed")
+        if fail:
+            self._emit("provider-construction-failed")
+            raise RuntimeError("modeled provider construction failure")
+        one_shot = _ConstructedProviderOneShot()
+        provider = FakeConstructedProvider(
+            reservation_id=reservation_id,
+            _issuer=_CONSTRUCTED_PROVIDER_ISSUER,
+            _permit=one_shot,
+        )
+        with _ISSUED_CONSTRUCTED_PROVIDERS_LOCK:
+            _ISSUED_CONSTRUCTED_PROVIDERS[one_shot] = provider
+        return provider
 
     def create_process(
         self, process_intent: FakeProcessIntent, *, fail: bool = False
@@ -2490,7 +2607,7 @@ class FakeSideEffects:
         if process_intent._issuer is not _PROCESS_INTENT_ISSUER:
             raise TypeError("CreateProcessW process intent issuer is invalid")
         reservation_id = process_intent.reservation_id
-        with _reservation_lifecycle_lock(reservation_id):
+        with InterprocessLifecycleArbiter(reservation_id):
             return self._create_process_locked(process_intent, fail=fail)
 
     def _create_process_locked(
@@ -2548,6 +2665,7 @@ class FakeSideEffects:
             process_intent._permit.consumed = True
 
         self._emit("process-intent-committed")
+        assert not self.observer.in_transaction
         self._emit("create-process")
         result_permit = _ProcessResultPermit()
         if fail:
@@ -2591,14 +2709,7 @@ class FakeSideEffects:
     ) -> FakeResumeReceipt:
         if type(resume_intent) is not FakeResumeIntent:
             raise TypeError("ResumeThread requires an opaque fake resume intent")
-        parent = self.observer.execute(
-            "SELECT launch_reservation_id FROM launch_executions "
-            "WHERE launch_execution_id = ?",
-            (resume_intent.execution_id,),
-        ).fetchone()
-        if parent is None:
-            raise ValueError("cannot resume an unknown execution")
-        with _reservation_lifecycle_lock(parent[0]):
+        with InterprocessLifecycleArbiter(resume_intent.reservation_id):
             return self._resume_thread_locked(resume_intent, fail=fail)
 
     def _resume_thread_locked(
@@ -2611,7 +2722,7 @@ class FakeSideEffects:
                    e.job_object_json, e.job_object_digest,
                    e.resume_authorization_json, e.resume_authorization_digest,
                    e.resume_intent_json, e.resume_intent_digest,
-                   r.reservation_state, s.state
+                   r.reservation_state, s.state, e.launch_reservation_id
             FROM launch_executions e
             JOIN launch_reservations r
               ON r.launch_reservation_id = e.launch_reservation_id
@@ -2636,6 +2747,8 @@ class FakeSideEffects:
             raise ValueError("ResumeThread requires RESUME_INTENT_COMMITTED")
         if row[9] != "PROCESS_CREATED" or row[10] != "OPEN":
             raise ValueError("ResumeThread active parent lineage is revoked")
+        if row[11] != resume_intent.reservation_id:
+            raise ValueError("ResumeThread intent belongs to another reservation")
         for evidence_json, evidence_digest in (
             (row[1], row[2]),
             (row[3], row[4]),
@@ -2672,6 +2785,7 @@ class FakeSideEffects:
             resume_intent._permit.consumed = True
 
         self._emit("resume-intent-committed")
+        assert not self.observer.in_transaction
         self._emit("resume-thread")
         if fail:
             self._emit("resume-thread-failed")
@@ -2687,6 +2801,7 @@ class FakeSideEffects:
         result_permit = _ResumeResultPermit()
         result = FakeResumeReceipt(
             execution_id=execution_id,
+            reservation_id=resume_intent.reservation_id,
             resume_intent_digest=resume_intent.intent_digest,
             result_json=result_json,
             result_digest=_digest(result_json),
@@ -2759,12 +2874,182 @@ def _construct_provider_and_commit_process_intent(
 
 
 def _resume_and_persist(
-    connection: sqlite3.Connection, execution_id: str
+    connection: sqlite3.Connection, execution_id: str, reservation_id: str
 ) -> FakeResumeReceipt:
-    intent = commit_resume_intent(connection, execution_id)
+    intent = commit_resume_intent(connection, execution_id, reservation_id)
     receipt = FakeSideEffects(connection).resume_thread(intent)
     record_post_resume_evidence(connection, execution_id, receipt)
     return receipt
+
+
+def _spawn_boundary_worker(
+    db_path: str,
+    scenario: str,
+    first: bool,
+    setup_queue: Any,
+    result_queue: Any,
+    go: Any,
+    acquired: Any,
+    release: Any,
+    started: Any,
+) -> None:
+    connection = _connect(Path(db_path))
+    events: list[str] = []
+    hooks = FakeSideEffects(connection, events)
+    try:
+        session_id = create_session(connection)
+        attempt_id = allocate_attempt(connection, session_id)
+        claim_id = commit_claim(connection, attempt_id)
+        permit = reserve_launch(connection, claim_id)
+        reservation_id = str(permit)
+        capability: object = permit
+        execution_id: str | None = None
+
+        if scenario != "provider-dispatch":
+            provider = hooks.construct_provider(permit)
+            capability = commit_process_intent(connection, reservation_id, provider)
+        if scenario in {
+            "process-persistence",
+            "resume-dispatch",
+            "resume-persistence",
+        }:
+            assert type(capability) is FakeProcessIntent
+            capability = hooks.create_process(capability)
+        if scenario in {"resume-dispatch", "resume-persistence"}:
+            assert type(capability) is FakeProcessCreationReceipt
+            execution_id = record_execution(connection, reservation_id, capability)
+            capability = commit_resume_intent(connection, execution_id, reservation_id)
+        if scenario == "resume-persistence":
+            assert type(capability) is FakeResumeIntent
+            capability = hooks.resume_thread(capability)
+
+        setup_queue.put((session_id, reservation_id, execution_id))
+        connection.close()
+        connection = None
+        if not go.wait(20):
+            raise TimeoutError("boundary worker was not released to race")
+
+        def invoke_locked() -> None:
+            if scenario == "provider-dispatch":
+                assert type(capability) is FakeProviderConstructionPermit
+                hooks._construct_provider_locked(capability, fail=False)
+            elif scenario == "process-dispatch":
+                assert type(capability) is FakeProcessIntent
+                hooks._create_process_locked(capability, fail=False)
+            elif scenario == "process-persistence":
+                assert type(capability) is FakeProcessCreationReceipt
+                _record_execution_locked(connection, reservation_id, capability)
+            elif scenario == "resume-dispatch":
+                assert type(capability) is FakeResumeIntent
+                hooks._resume_thread_locked(capability, fail=False)
+            else:
+                assert scenario == "resume-persistence"
+                assert execution_id is not None
+                assert type(capability) is FakeResumeReceipt
+                _record_post_resume_evidence_locked(
+                    connection, execution_id, capability
+                )
+
+        try:
+            if not first:
+                started.set()
+            with InterprocessLifecycleArbiter(reservation_id):
+                if first:
+                    acquired.set()
+                    if not release.wait(20):
+                        raise TimeoutError("boundary winner was not released")
+                connection = _connect(Path(db_path))
+                hooks.observer = connection
+                invoke_locked()
+            outcome = "ok"
+        except (TypeError, ValueError, sqlite3.IntegrityError) as exc:
+            outcome = f"rejected:{type(exc).__name__}"
+        result_queue.put(("boundary", outcome, events))
+    except BaseException as exc:
+        result_queue.put(("boundary-error", repr(exc), events))
+    finally:
+        if connection is not None:
+            connection.close()
+
+
+def _spawn_recovery_worker(
+    db_path: str,
+    session_id: str,
+    reservation_id: str,
+    action: str,
+    first: bool,
+    result_queue: Any,
+    go: Any,
+    acquired: Any,
+    release: Any,
+    started: Any,
+) -> None:
+    connection: sqlite3.Connection | None = None
+    try:
+        if not go.wait(20):
+            raise TimeoutError("recovery worker was not released to race")
+        try:
+            if not first:
+                started.set()
+            with InterprocessLifecycleArbiter(reservation_id):
+                if first:
+                    acquired.set()
+                    if not release.wait(20):
+                        raise TimeoutError("recovery winner was not released")
+                connection = _connect(Path(db_path))
+                _record_recovery_locked(
+                    connection,
+                    session_id,
+                    "LAUNCH_RESERVATION",
+                    reservation_id,
+                    action,
+                    None,
+                )
+            outcome = "ok"
+        except (TypeError, ValueError, sqlite3.IntegrityError) as exc:
+            outcome = f"rejected:{type(exc).__name__}"
+        result_queue.put(("recovery", outcome, []))
+    except BaseException as exc:
+        result_queue.put(("recovery-error", repr(exc), []))
+    finally:
+        if connection is not None:
+            connection.close()
+
+
+def _spawn_crash_while_holding_arbiter(reservation_id: str, acquired: Any) -> None:
+    with InterprocessLifecycleArbiter(reservation_id):
+        acquired.set()
+        os._exit(23)
+
+
+def _spawn_reconstructed_capability_worker(
+    db_path: str, reservation_id: str, result_queue: Any
+) -> None:
+    connection = _connect(Path(db_path))
+    hooks = FakeSideEffects(connection)
+    outcomes: list[str] = []
+    try:
+        reconstructed_permit = FakeProviderConstructionPermit(
+            reservation_id,
+            _issuer=_PROVIDER_CONSTRUCTION_ISSUER,
+            _permit=_ProviderConstructionOneShot(),
+        )
+        try:
+            hooks.construct_provider(reconstructed_permit)
+        except ValueError as exc:
+            outcomes.append(str(exc))
+        reconstructed_provider = FakeConstructedProvider(
+            reservation_id=reservation_id,
+            _issuer=_CONSTRUCTED_PROVIDER_ISSUER,
+            _permit=_ConstructedProviderOneShot(),
+        )
+        try:
+            commit_process_intent(connection, reservation_id, reconstructed_provider)
+        except ValueError as exc:
+            outcomes.append(str(exc))
+        result_queue.put(outcomes)
+    finally:
+        connection.close()
 
 
 @pytest.fixture
@@ -2776,6 +3061,295 @@ def db_path(tmp_path: Path) -> Path:
     _insert_migration(connection)
     connection.close()
     return path
+
+
+def _run_spawn_race(
+    db_path: Path, scenario: str, winner: str
+) -> tuple[dict[str, tuple[str, list[str]]], str, str | None]:
+    context = multiprocessing.get_context("spawn")
+    setup_queue = context.Queue()
+    result_queue = context.Queue()
+    boundary_go = context.Event()
+    boundary_acquired = context.Event()
+    boundary_release = context.Event()
+    boundary_started = context.Event()
+    recovery_go = context.Event()
+    recovery_acquired = context.Event()
+    recovery_release = context.Event()
+    recovery_started = context.Event()
+    boundary = context.Process(
+        target=_spawn_boundary_worker,
+        args=(
+            str(db_path),
+            scenario,
+            winner == "boundary",
+            setup_queue,
+            result_queue,
+            boundary_go,
+            boundary_acquired,
+            boundary_release,
+            boundary_started,
+        ),
+    )
+    boundary.start()
+    session_id, reservation_id, execution_id = setup_queue.get(timeout=30)
+    action = {
+        "provider-dispatch": "CLASSIFY_LAUNCH_RESERVATION",
+        "process-dispatch": "CLASSIFY_PROCESS_OUTCOME_UNKNOWN",
+        "process-persistence": "CLASSIFY_PROCESS_OUTCOME_UNKNOWN",
+        "resume-dispatch": "CLASSIFY_RESUME_OUTCOME_UNKNOWN",
+        "resume-persistence": "CLASSIFY_RESUME_OUTCOME_UNKNOWN",
+    }[scenario]
+    recovery = context.Process(
+        target=_spawn_recovery_worker,
+        args=(
+            str(db_path),
+            session_id,
+            reservation_id,
+            action,
+            winner == "recovery",
+            result_queue,
+            recovery_go,
+            recovery_acquired,
+            recovery_release,
+            recovery_started,
+        ),
+    )
+    recovery.start()
+    if winner == "boundary":
+        boundary_go.set()
+        assert boundary_acquired.wait(20)
+        recovery_go.set()
+        assert recovery_started.wait(20)
+        boundary_release.set()
+    else:
+        recovery_go.set()
+        assert recovery_acquired.wait(20)
+        boundary_go.set()
+        assert boundary_started.wait(20)
+        recovery_release.set()
+    boundary.join(30)
+    recovery.join(30)
+    assert boundary.exitcode == 0
+    assert recovery.exitcode == 0
+    raw = [result_queue.get(timeout=10), result_queue.get(timeout=10)]
+    outcomes = {source: (result, events) for source, result, events in raw}
+    assert set(outcomes) == {"boundary", "recovery"}
+    return outcomes, reservation_id, execution_id
+
+
+@pytest.mark.parametrize(
+    "scenario",
+    [
+        "provider-dispatch",
+        "process-dispatch",
+        "resume-dispatch",
+        "process-persistence",
+        "resume-persistence",
+    ],
+)
+@pytest.mark.parametrize("winner", ["boundary", "recovery"])
+def test_spawned_processes_serialize_dispatch_persistence_and_recovery(
+    db_path: Path, scenario: str, winner: str
+) -> None:
+    outcomes, reservation_id, execution_id = _run_spawn_race(db_path, scenario, winner)
+    boundary_outcome, boundary_events = outcomes["boundary"]
+    recovery_outcome, _ = outcomes["recovery"]
+    persistence = scenario.endswith("persistence")
+    if winner == "boundary":
+        assert boundary_outcome == "ok"
+        if persistence:
+            assert recovery_outcome.startswith("rejected:")
+        else:
+            assert recovery_outcome == "ok"
+    else:
+        assert recovery_outcome == "ok"
+        assert boundary_outcome.startswith("rejected:")
+
+    effect = {
+        "provider-dispatch": "provider-constructed",
+        "process-dispatch": "create-process",
+        "resume-dispatch": "resume-thread",
+        "process-persistence": "create-process",
+        "resume-persistence": "resume-thread",
+    }[scenario]
+    expected_effects = 0 if winner == "recovery" and not persistence else 1
+    assert boundary_events.count(effect) == expected_effects
+
+    verify = _connect(db_path)
+    state = verify.execute(
+        "SELECT reservation_state FROM launch_reservations "
+        "WHERE launch_reservation_id = ?",
+        (reservation_id,),
+    ).fetchone()[0]
+    if winner == "recovery" or not persistence:
+        assert state == "MANUAL_REVIEW"
+        assert verify.execute("SELECT count(*) FROM manual_recoveries").fetchone() == (
+            1,
+        )
+    else:
+        assert state == "PROCESS_CREATED"
+        assert verify.execute("SELECT count(*) FROM manual_recoveries").fetchone() == (
+            0,
+        )
+    if scenario == "process-persistence":
+        assert verify.execute("SELECT count(*) FROM launch_executions").fetchone() == (
+            1 if winner == "boundary" else 0,
+        )
+    if scenario == "resume-persistence":
+        assert execution_id is not None
+        expected = (
+            ("RESUME_RECORDED", 1)
+            if winner == "boundary"
+            else ("RESUME_INTENT_COMMITTED", 0)
+        )
+        assert (
+            verify.execute(
+                "SELECT phase, post_resume_json IS NOT NULL FROM launch_executions "
+                "WHERE launch_execution_id = ?",
+                (execution_id,),
+            ).fetchone()
+            == expected
+        )
+    assert verify.execute("PRAGMA foreign_key_check").fetchall() == []
+    verify.close()
+
+
+def test_spawned_process_crash_releases_lifecycle_arbiter_without_retry(
+    db_path: Path,
+) -> None:
+    setup = _connect(db_path)
+    session_id = create_session(setup)
+    attempt_id = allocate_attempt(setup, session_id)
+    claim_id = commit_claim(setup, attempt_id)
+    permit = reserve_launch(setup, claim_id)
+    reservation_id = str(permit)
+    setup.close()
+
+    context = multiprocessing.get_context("spawn")
+    acquired = context.Event()
+    crashed = context.Process(
+        target=_spawn_crash_while_holding_arbiter,
+        args=(reservation_id, acquired),
+    )
+    crashed.start()
+    assert acquired.wait(20)
+    crashed.join(20)
+    assert crashed.exitcode == 23
+
+    result_queue = context.Queue()
+    go = context.Event()
+    started = context.Event()
+    recovery = context.Process(
+        target=_spawn_recovery_worker,
+        args=(
+            str(db_path),
+            session_id,
+            reservation_id,
+            "CLASSIFY_LAUNCH_RESERVATION",
+            False,
+            result_queue,
+            go,
+            context.Event(),
+            context.Event(),
+            started,
+        ),
+    )
+    recovery.start()
+    go.set()
+    assert started.wait(20)
+    recovery.join(20)
+    assert recovery.exitcode == 0
+    assert result_queue.get(timeout=10)[:2] == ("recovery", "ok")
+    verify = _connect(db_path)
+    assert verify.execute(
+        "SELECT reservation_state FROM launch_reservations "
+        "WHERE launch_reservation_id = ?",
+        (reservation_id,),
+    ).fetchone() == ("MANUAL_REVIEW",)
+    assert verify.execute("SELECT count(*) FROM manual_recoveries").fetchone() == (1,)
+    verify.close()
+
+
+def test_spawned_process_rejects_reconstructed_process_local_capabilities(
+    db_path: Path,
+) -> None:
+    setup = _connect(db_path)
+    session_id = create_session(setup)
+    attempt_id = allocate_attempt(setup, session_id)
+    claim_id = commit_claim(setup, attempt_id)
+    permit = reserve_launch(setup, claim_id)
+    reservation_id = str(permit)
+    setup.close()
+    context = multiprocessing.get_context("spawn")
+    result_queue = context.Queue()
+    child = context.Process(
+        target=_spawn_reconstructed_capability_worker,
+        args=(str(db_path), reservation_id, result_queue),
+    )
+    child.start()
+    child.join(20)
+    assert child.exitcode == 0
+    outcomes = result_queue.get(timeout=10)
+    assert len(outcomes) == 2
+    assert all("not issued" in outcome for outcome in outcomes)
+    verify = _connect(db_path)
+    assert verify.execute(
+        "SELECT reservation_state, process_intent_json "
+        "FROM launch_reservations WHERE launch_reservation_id = ?",
+        (reservation_id,),
+    ).fetchone() == ("COMMITTED", None)
+    verify.close()
+
+
+def test_lifecycle_arbiter_identity_and_global_lock_order_are_explicit() -> None:
+    reservation_id = "reservation/raw/value"
+    first = InterprocessLifecycleArbiter(reservation_id)
+    second = InterprocessLifecycleArbiter(reservation_id)
+    expected_material = (
+        b'{"authority_epoch_id":"12345678-1234-5678-9abc-def012345678",'
+        b'"label":"lifecycle-arbiter/v1",'
+        b'"launch_reservation_id":"reservation/raw/value",'
+        b'"machine_authority_id":"87654321-4321-8765-cba9-876543210987"}'
+    )
+    assert first.identity == second.identity
+    assert first.identity == hashlib.sha256(expected_material).hexdigest()
+    assert len(first.identity) == 64
+    assert first.identity == first.identity.lower()
+    assert set(first.identity) <= set("0123456789abcdef")
+    assert reservation_id not in first.path.name
+
+    module_source = Path(__file__).read_text(encoding="utf-8")
+    assert "threading." + "RLock" not in module_source
+    assert "_RESERVATION_LIFECYCLE_" + "LOCKS" not in module_source
+    wrappers = (
+        (commit_process_intent, "_commit_process_intent_locked"),
+        (record_execution, "_record_execution_locked"),
+        (record_process_creation_failure, "_record_process_creation_failure_locked"),
+        (commit_resume_intent, "_commit_resume_intent_locked"),
+        (record_post_resume_evidence, "_record_post_resume_evidence_locked"),
+        (record_terminal, "_record_terminal_locked"),
+        (record_recovery, "_record_recovery_locked"),
+        (FakeSideEffects.construct_provider, "_construct_provider_locked"),
+        (FakeSideEffects.create_process, "_create_process_locked"),
+        (FakeSideEffects.resume_thread, "_resume_thread_locked"),
+    )
+    for wrapper, locked_name in wrappers:
+        source = inspect.getsource(wrapper)
+        arbiter_index = source.index("InterprocessLifecycleArbiter")
+        assert ".execute(" not in source[:arbiter_index]
+        assert arbiter_index < source.index(locked_name)
+    for worker in (_spawn_boundary_worker, _spawn_recovery_worker):
+        source = inspect.getsource(worker)
+        assert source.index("with InterprocessLifecycleArbiter") < source.rindex(
+            "_connect(Path(db_path))"
+        )
+    for hook in (
+        FakeSideEffects._construct_provider_locked,
+        FakeSideEffects._create_process_locked,
+        FakeSideEffects._resume_thread_locked,
+    ):
+        assert "assert not self.observer.in_transaction" in inspect.getsource(hook)
 
 
 @pytest.mark.parametrize(
@@ -3169,7 +3743,7 @@ def _seed_lifecycle(path: Path) -> dict[str, str]:
     claim_id = commit_claim(connection, attempt_id)
     reservation_id = reserve_launch(connection, claim_id)
     execution_id = _record_successful_process(connection, reservation_id)
-    _resume_and_persist(connection, execution_id)
+    _resume_and_persist(connection, execution_id, reservation_id)
     terminal_id = record_terminal(connection, reservation_id)
     connection.close()
     return {
@@ -3448,7 +4022,7 @@ def test_valid_lifecycle_from_metadata_to_selection(db_path: Path) -> None:
     claim_id = commit_claim(connection, attempt_id)
     reservation_id = reserve_launch(connection, claim_id)
     execution_id = _record_successful_process(connection, reservation_id)
-    _resume_and_persist(connection, execution_id)
+    _resume_and_persist(connection, execution_id, reservation_id)
     terminal_id = record_terminal(connection, reservation_id)
     selection_id = select_terminal(connection, session_id, terminal_id)
     expected_request = _snapshot_capture_request(request).canonical_json()
@@ -3761,7 +4335,7 @@ def test_terminal_state_disposition_matrix(
     reservation_id = reserve_launch(connection, claim_id)
     if preparation == "resumed":
         execution_id = _record_successful_process(connection, reservation_id)
-        _resume_and_persist(connection, execution_id)
+        _resume_and_persist(connection, execution_id, reservation_id)
     elif preparation == "process_failure":
         _record_definitive_process_failure(connection, reservation_id)
     else:
@@ -3808,7 +4382,7 @@ def test_recovery_action_matrix_allows_documented_actions(db_path: Path) -> None
     claim_id = commit_claim(connection, claim_attempt)
     claim_reservation = reserve_launch(connection, claim_id)
     claim_execution = _record_successful_process(connection, claim_reservation)
-    _resume_and_persist(connection, claim_execution)
+    _resume_and_persist(connection, claim_execution, claim_reservation)
     claim_recovery = record_recovery(
         connection,
         claim_session,
@@ -3847,7 +4421,7 @@ def test_recovery_action_matrix_allows_documented_actions(db_path: Path) -> None
     select_claim = commit_claim(connection, select_attempt)
     select_reservation = reserve_launch(connection, select_claim)
     select_execution = _record_successful_process(connection, select_reservation)
-    _resume_and_persist(connection, select_execution)
+    _resume_and_persist(connection, select_execution, select_reservation)
     select_terminal = record_terminal(connection, select_reservation)
     select_recovery = record_recovery(
         connection,
@@ -3939,14 +4513,14 @@ def test_selection_and_recovery_lineage_is_session_scoped(db_path: Path) -> None
     first_claim = commit_claim(connection, first_attempt)
     first_reservation = reserve_launch(connection, first_claim)
     first_execution = _record_successful_process(connection, first_reservation)
-    _resume_and_persist(connection, first_execution)
+    _resume_and_persist(connection, first_execution, first_reservation)
     first_terminal = record_terminal(connection, first_reservation)
     second_session = create_session(connection, _request("2026-01-02"))
     second_attempt = allocate_attempt(connection, second_session)
     second_claim = commit_claim(connection, second_attempt)
     second_reservation = reserve_launch(connection, second_claim)
     second_execution = _record_successful_process(connection, second_reservation)
-    _resume_and_persist(connection, second_execution)
+    _resume_and_persist(connection, second_execution, second_reservation)
     second_terminal = record_terminal(connection, second_reservation)
     with pytest.raises(sqlite3.IntegrityError):
         select_terminal(connection, second_session, first_terminal)
@@ -4088,7 +4662,7 @@ def test_recovery_ordinal_trigger_is_atomic_and_session_local(db_path: Path) -> 
     claim_id = commit_claim(connection, target_attempt)
     reservation_id = reserve_launch(connection, claim_id)
     execution_id = _record_successful_process(connection, reservation_id)
-    _resume_and_persist(connection, execution_id)
+    _resume_and_persist(connection, execution_id, reservation_id)
     first_recovery = record_recovery(
         connection,
         session_id,
@@ -4226,7 +4800,7 @@ def test_claim_and_launch_boundaries_commit_before_fake_side_effects(
     process_receipt = hooks.create_process(process_intent)
     assert type(process_receipt) is FakeProcessCreationReceipt
     execution_id = record_execution(connection, reservation_id, process_receipt)
-    resume_intent = commit_resume_intent(connection, execution_id)
+    resume_intent = commit_resume_intent(connection, execution_id, reservation_id)
     resume_receipt = hooks.resume_thread(resume_intent)
     record_post_resume_evidence(connection, execution_id, resume_receipt)
     hooks.observe_post_resume_evidence(execution_id)
@@ -4270,7 +4844,7 @@ def test_valid_capability_matrix_lifecycle_has_exactly_one_of_each(
     process_result = hooks.create_process(process_intent)
     assert type(process_result) is FakeProcessCreationReceipt
     execution_id = record_execution(connection, reservation_id, process_result)
-    resume_intent = commit_resume_intent(connection, execution_id)
+    resume_intent = commit_resume_intent(connection, execution_id, reservation_id)
     resume_result = hooks.resume_thread(resume_intent)
     record_post_resume_evidence(connection, execution_id, resume_result)
     terminal_id = record_terminal(connection, reservation_id)
@@ -4367,12 +4941,12 @@ def test_claim_admission_blocks_non_retry_safe_prior_outcomes(
     elif blocked_case == "resume_crash":
         assert first_reservation is not None
         execution_id = _record_successful_process(connection, first_reservation)
-        intent = commit_resume_intent(connection, execution_id)
+        intent = commit_resume_intent(connection, execution_id, first_reservation)
         FakeSideEffects(connection).resume_thread(intent)
     elif blocked_case in ("resume_recorded", "post_resume_ambiguous"):
         assert first_reservation is not None
         execution_id = _record_successful_process(connection, first_reservation)
-        _resume_and_persist(connection, execution_id)
+        _resume_and_persist(connection, execution_id, first_reservation)
         if blocked_case == "post_resume_ambiguous":
             connection.execute(
                 "UPDATE launch_executions SET phase = 'POST_RESUME_AMBIGUOUS' "
@@ -4383,7 +4957,7 @@ def test_claim_admission_blocks_non_retry_safe_prior_outcomes(
     elif blocked_case == "ambiguous_terminal":
         assert first_reservation is not None
         execution_id = _record_successful_process(connection, first_reservation)
-        _resume_and_persist(connection, execution_id)
+        _resume_and_persist(connection, execution_id, first_reservation)
         record_terminal(connection, first_reservation, "AMBIGUOUS", "MAY_HAVE_OCCURRED")
     elif blocked_case == "closed_terminal":
         assert first_reservation is not None
@@ -4408,17 +4982,17 @@ def test_claim_admission_blocks_non_retry_safe_prior_outcomes(
     elif blocked_case == "failed_confirmed":
         assert first_reservation is not None
         execution_id = _record_successful_process(connection, first_reservation)
-        _resume_and_persist(connection, execution_id)
+        _resume_and_persist(connection, execution_id, first_reservation)
         record_terminal(connection, first_reservation, "FAILED", "CONFIRMED")
     elif blocked_case == "successful_terminal":
         assert first_reservation is not None
         execution_id = _record_successful_process(connection, first_reservation)
-        _resume_and_persist(connection, execution_id)
+        _resume_and_persist(connection, execution_id, first_reservation)
         record_terminal(connection, first_reservation)
     elif blocked_case == "successful_selection":
         assert first_reservation is not None
         execution_id = _record_successful_process(connection, first_reservation)
-        _resume_and_persist(connection, execution_id)
+        _resume_and_persist(connection, execution_id, first_reservation)
         terminal_id = record_terminal(connection, first_reservation)
         select_terminal(connection, session_id, terminal_id)
     else:
@@ -4535,7 +5109,7 @@ def test_reservation_outcome_timestamp_is_preserved_and_write_once(
     reservation_id = reserve_launch(connection, claim_id)
     if outcome_kind == "process":
         execution_id = _record_successful_process(connection, reservation_id)
-        _resume_and_persist(connection, execution_id)
+        _resume_and_persist(connection, execution_id, reservation_id)
         expected_timestamp = PROCESS_CREATED_TIMESTAMP
         record_terminal(connection, reservation_id, "AMBIGUOUS", "MAY_HAVE_OCCURRED")
     elif outcome_kind == "failure":
@@ -4609,7 +5183,7 @@ def test_resume_outcome_unknown_recovery_is_conservative_and_closable(
     first_claim = commit_claim(connection, first_attempt)
     reservation_id = reserve_launch(connection, first_claim)
     execution_id = _record_successful_process(connection, reservation_id)
-    intent = commit_resume_intent(connection, execution_id)
+    intent = commit_resume_intent(connection, execution_id, reservation_id)
     FakeSideEffects(connection).resume_thread(intent)
 
     recovery_id = record_recovery(
@@ -4698,7 +5272,7 @@ def test_resume_outcome_unknown_recovery_grants_no_new_claim(db_path: Path) -> N
     reservation_id = reserve_launch(connection, first_claim)
     second_attempt = allocate_attempt(connection, session_id)
     execution_id = _record_successful_process(connection, reservation_id)
-    intent = commit_resume_intent(connection, execution_id)
+    intent = commit_resume_intent(connection, execution_id, reservation_id)
     FakeSideEffects(connection).resume_thread(intent)
     record_recovery(
         connection,
@@ -4737,7 +5311,7 @@ def test_resume_outcome_unknown_requires_exact_unresolved_pre_resume_execution(
     reservation_id = reserve_launch(connection, claim_id)
     if failure_point == "after_resume":
         execution_id = _record_successful_process(connection, reservation_id)
-        _resume_and_persist(connection, execution_id)
+        _resume_and_persist(connection, execution_id, reservation_id)
     with pytest.raises(sqlite3.IntegrityError):
         record_recovery(
             connection,
@@ -4802,7 +5376,7 @@ def test_session_close_facts_are_write_once_and_only_close_with_state(
     selected_claim = commit_claim(connection, selected_attempt)
     selected_reservation = reserve_launch(connection, selected_claim)
     selected_execution = _record_successful_process(connection, selected_reservation)
-    _resume_and_persist(connection, selected_execution)
+    _resume_and_persist(connection, selected_execution, selected_reservation)
     selected_terminal = record_terminal(connection, selected_reservation)
     select_terminal(connection, selected_session, selected_terminal)
     connection.execute(
@@ -5324,7 +5898,7 @@ def test_process_dispatch_and_recovery_share_lifecycle_arbiter(
     reservation_id = reserve_launch(setup, claim_id)
     intent = _construct_provider_and_commit_process_intent(setup, reservation_id)
     setup.close()
-    lifecycle_lock = _reservation_lifecycle_lock(reservation_id)
+    lifecycle_lock = InterprocessLifecycleArbiter(reservation_id)
     winner_has_lock = threading.Event()
     events: list[str] = []
     event_lock = threading.Lock()
@@ -5337,12 +5911,13 @@ def test_process_dispatch_and_recovery_share_lifecycle_arbiter(
             if first:
                 with lifecycle_lock:
                     winner_has_lock.set()
-                    record_recovery(
+                    _record_recovery_locked(
                         connection,
                         session_id,
                         "LAUNCH_RESERVATION",
                         reservation_id,
                         "CLASSIFY_PROCESS_OUTCOME_UNKNOWN",
+                        None,
                     )
             else:
                 winner_has_lock.wait()
@@ -5367,7 +5942,7 @@ def test_process_dispatch_and_recovery_share_lifecycle_arbiter(
             if first:
                 with lifecycle_lock:
                     winner_has_lock.set()
-                    result = hooks.create_process(intent)
+                    result = hooks._create_process_locked(intent, fail=False)
             else:
                 winner_has_lock.wait()
                 result = hooks.create_process(intent)
@@ -5431,7 +6006,7 @@ def test_process_result_persistence_and_recovery_are_serialized(
     intent = _construct_provider_and_commit_process_intent(setup, reservation_id)
     result = FakeSideEffects(setup).create_process(intent, fail=failure_result)
     setup.close()
-    lifecycle_lock = _reservation_lifecycle_lock(reservation_id)
+    lifecycle_lock = InterprocessLifecycleArbiter(reservation_id)
     winner_has_lock = threading.Event()
     outcomes: list[str] = []
     outcomes_lock = threading.Lock()
@@ -5442,12 +6017,13 @@ def test_process_result_persistence_and_recovery_are_serialized(
             if first:
                 with lifecycle_lock:
                     winner_has_lock.set()
-                    record_recovery(
+                    _record_recovery_locked(
                         connection,
                         session_id,
                         "LAUNCH_RESERVATION",
                         reservation_id,
                         "CLASSIFY_PROCESS_OUTCOME_UNKNOWN",
+                        None,
                     )
             else:
                 winner_has_lock.wait()
@@ -5480,7 +6056,14 @@ def test_process_result_persistence_and_recovery_are_serialized(
             if first:
                 with lifecycle_lock:
                     winner_has_lock.set()
-                    persist()
+                    if failure_result:
+                        assert type(result) is FakeProcessCreationFailure
+                        _record_process_creation_failure_locked(
+                            connection, reservation_id, result
+                        )
+                    else:
+                        assert type(result) is FakeProcessCreationReceipt
+                        _record_execution_locked(connection, reservation_id, result)
             else:
                 winner_has_lock.wait()
                 persist()
@@ -5579,7 +6162,7 @@ def test_authority_capability_revocation_matrix(
         process_result = hooks.create_process(process_intent)
         assert type(process_result) is FakeProcessCreationReceipt
         execution_id = record_execution(connection, reservation_id, process_result)
-        resume_intent = commit_resume_intent(connection, execution_id)
+        resume_intent = commit_resume_intent(connection, execution_id, reservation_id)
         resume_result = hooks.resume_thread(resume_intent)
         record_post_resume_evidence(connection, execution_id, resume_result)
         terminal_id = record_terminal(connection, reservation_id)
@@ -5647,7 +6230,7 @@ def test_authority_capability_revocation_matrix(
         )
     else:
         execution_id = _record_successful_process(connection, reservation_id)
-        resume_intent = commit_resume_intent(connection, execution_id)
+        resume_intent = commit_resume_intent(connection, execution_id, reservation_id)
         if capability == "resume-intent":
             authority = resume_intent
         else:
@@ -5934,17 +6517,17 @@ def test_pre_resume_recovery_revokes_intent_before_terminal_and_close(
         "CLASSIFY_PRE_RESUME_READY",
     )
     with pytest.raises(ValueError, match="revoked|unavailable"):
-        commit_resume_intent(connection, execution_id)
+        commit_resume_intent(connection, execution_id, reservation_id)
     with _ISSUED_RESUME_PERMITS_LOCK:
         assert _ISSUED_RESUME_PERMITS == permits_before
     assert events == []
 
     record_terminal(connection, reservation_id, "CLOSED", "MAY_HAVE_OCCURRED")
     with pytest.raises(ValueError, match="revoked|unavailable"):
-        commit_resume_intent(connection, execution_id)
+        commit_resume_intent(connection, execution_id, reservation_id)
     record_recovery(connection, session_id, "SESSION", session_id, "CLOSE_SESSION")
     with pytest.raises(ValueError, match="revoked|unavailable"):
-        commit_resume_intent(connection, execution_id)
+        commit_resume_intent(connection, execution_id, reservation_id)
     assert connection.execute(
         "SELECT phase FROM launch_executions WHERE launch_execution_id = ?",
         (execution_id,),
@@ -5962,7 +6545,7 @@ def test_resume_permit_is_revoked_by_unknown_outcome_recovery(db_path: Path) -> 
     claim_id = commit_claim(connection, attempt_id)
     reservation_id = reserve_launch(connection, claim_id)
     execution_id = _record_successful_process(connection, reservation_id)
-    intent = commit_resume_intent(connection, execution_id)
+    intent = commit_resume_intent(connection, execution_id, reservation_id)
     record_recovery(
         connection,
         session_id,
@@ -6009,7 +6592,7 @@ def test_delayed_resume_receipt_is_revoked_by_recovery(db_path: Path) -> None:
     claim_id = commit_claim(connection, attempt_id)
     reservation_id = reserve_launch(connection, claim_id)
     execution_id = _record_successful_process(connection, reservation_id)
-    intent = commit_resume_intent(connection, execution_id)
+    intent = commit_resume_intent(connection, execution_id, reservation_id)
     receipt = FakeSideEffects(connection).resume_thread(intent)
     record_recovery(
         connection,
@@ -6079,7 +6662,7 @@ def test_direct_sql_resume_phase_advance_fails_after_manual_review(
                 ),
             )
     else:
-        intent = commit_resume_intent(connection, execution_id)
+        intent = commit_resume_intent(connection, execution_id, reservation_id)
         record_recovery(
             connection,
             session_id,
@@ -6137,7 +6720,7 @@ def test_recovery_race_with_resume_intent_has_one_valid_winner(db_path: Path) ->
         barrier.wait()
         intent: FakeResumeIntent | None = None
         try:
-            intent = commit_resume_intent(connection, execution_id)
+            intent = commit_resume_intent(connection, execution_id, reservation_id)
             success = True
         except (ValueError, sqlite3.IntegrityError):
             success = False
@@ -6208,9 +6791,9 @@ def test_recovery_race_with_resume_dispatch_is_serialized(
     claim_id = commit_claim(setup, attempt_id)
     reservation_id = reserve_launch(setup, claim_id)
     execution_id = _record_successful_process(setup, reservation_id)
-    intent = commit_resume_intent(setup, execution_id)
+    intent = commit_resume_intent(setup, execution_id, reservation_id)
     setup.close()
-    lifecycle_lock = _reservation_lifecycle_lock(reservation_id)
+    lifecycle_lock = InterprocessLifecycleArbiter(reservation_id)
     winner_has_lock = threading.Event()
     events: list[str] = []
     event_lock = threading.Lock()
@@ -6223,12 +6806,13 @@ def test_recovery_race_with_resume_dispatch_is_serialized(
             if first:
                 with lifecycle_lock:
                     winner_has_lock.set()
-                    record_recovery(
+                    _record_recovery_locked(
                         connection,
                         session_id,
                         "LAUNCH_RESERVATION",
                         reservation_id,
                         "CLASSIFY_RESUME_OUTCOME_UNKNOWN",
+                        None,
                     )
             else:
                 winner_has_lock.wait()
@@ -6253,7 +6837,7 @@ def test_recovery_race_with_resume_dispatch_is_serialized(
             if first:
                 with lifecycle_lock:
                     winner_has_lock.set()
-                    hooks.resume_thread(intent)
+                    hooks._resume_thread_locked(intent, fail=False)
             else:
                 winner_has_lock.wait()
                 hooks.resume_thread(intent)
@@ -6299,10 +6883,10 @@ def test_recovery_race_with_receipt_persistence_is_serialized(
     claim_id = commit_claim(setup, attempt_id)
     reservation_id = reserve_launch(setup, claim_id)
     execution_id = _record_successful_process(setup, reservation_id)
-    intent = commit_resume_intent(setup, execution_id)
+    intent = commit_resume_intent(setup, execution_id, reservation_id)
     receipt = FakeSideEffects(setup).resume_thread(intent)
     setup.close()
-    lifecycle_lock = _reservation_lifecycle_lock(reservation_id)
+    lifecycle_lock = InterprocessLifecycleArbiter(reservation_id)
     winner_has_lock = threading.Event()
     outcomes: list[str] = []
     outcomes_lock = threading.Lock()
@@ -6313,12 +6897,13 @@ def test_recovery_race_with_receipt_persistence_is_serialized(
             if first:
                 with lifecycle_lock:
                     winner_has_lock.set()
-                    record_recovery(
+                    _record_recovery_locked(
                         connection,
                         session_id,
                         "LAUNCH_RESERVATION",
                         reservation_id,
                         "CLASSIFY_RESUME_OUTCOME_UNKNOWN",
+                        None,
                     )
             else:
                 winner_has_lock.wait()
@@ -6342,7 +6927,9 @@ def test_recovery_race_with_receipt_persistence_is_serialized(
             if first:
                 with lifecycle_lock:
                     winner_has_lock.set()
-                    record_post_resume_evidence(connection, execution_id, receipt)
+                    _record_post_resume_evidence_locked(
+                        connection, execution_id, receipt
+                    )
             else:
                 winner_has_lock.wait()
                 record_post_resume_evidence(connection, execution_id, receipt)
@@ -6432,7 +7019,9 @@ def test_resume_boundary_requires_pre_resume_and_receipt(db_path: Path) -> None:
     execution_id = _execution_id(reservation_id, application_release, authority_policy)
 
     with pytest.raises(ValueError, match="unknown execution"):
-        hooks.resume_thread(commit_resume_intent(connection, execution_id))
+        hooks.resume_thread(
+            commit_resume_intent(connection, execution_id, reservation_id)
+        )
 
     execution_id = _record_successful_process(connection, reservation_id)
     with pytest.raises(TypeError, match="fake resume receipt"):
@@ -6466,7 +7055,7 @@ def test_resume_intent_race_grants_exactly_one_hook_authority(db_path: Path) -> 
         hooks = FakeSideEffects(connection, events, event_lock)
         barrier.wait()
         try:
-            intent = commit_resume_intent(connection, execution_id)
+            intent = commit_resume_intent(connection, execution_id, reservation_id)
             hooks.resume_thread(intent)
             outcome = "winner"
         except ValueError:
@@ -6491,7 +7080,7 @@ def test_resume_intent_race_grants_exactly_one_hook_authority(db_path: Path) -> 
         (execution_id,),
     ).fetchone() == ("RESUME_INTENT_COMMITTED", 1, 1, RESUME_INTENT_TIMESTAMP)
     with pytest.raises(ValueError, match="PRE_RESUME_READY"):
-        commit_resume_intent(verify, execution_id)
+        commit_resume_intent(verify, execution_id, reservation_id)
     verify.close()
 
 
@@ -6506,7 +7095,7 @@ def test_crash_around_resume_leaves_same_unretryable_intent_state(
     claim_id = commit_claim(connection, attempt_id)
     reservation_id = reserve_launch(connection, claim_id)
     execution_id = _record_successful_process(connection, reservation_id)
-    intent = commit_resume_intent(connection, execution_id)
+    intent = commit_resume_intent(connection, execution_id, reservation_id)
     if invoke_resume_thread:
         hooks.resume_thread(intent)
     connection.close()
@@ -6534,7 +7123,7 @@ def test_crash_around_resume_leaves_same_unretryable_intent_state(
     with pytest.raises(sqlite3.IntegrityError):
         record_terminal(recovered, reservation_id)
     with pytest.raises(ValueError, match="PRE_RESUME_READY"):
-        commit_resume_intent(recovered, execution_id)
+        commit_resume_intent(recovered, execution_id, reservation_id)
     with pytest.raises(ValueError, match="already consumed|not issued"):
         FakeSideEffects(recovered).resume_thread(intent)
     with pytest.raises(TypeError, match="opaque fake resume intent"):
@@ -6569,7 +7158,7 @@ def test_resume_hook_failure_returns_no_receipt_and_consumes_permit(
     claim_id = commit_claim(connection, attempt_id)
     reservation_id = reserve_launch(connection, claim_id)
     execution_id = _record_successful_process(connection, reservation_id)
-    intent = commit_resume_intent(connection, execution_id)
+    intent = commit_resume_intent(connection, execution_id, reservation_id)
     hooks = FakeSideEffects(connection)
     with _ISSUED_RESUME_RESULTS_LOCK:
         results_before = dict(_ISSUED_RESUME_RESULTS)
@@ -6596,12 +7185,13 @@ def test_resume_receipt_requires_adapter_provenance_and_one_shot_permit(
     claim_id = commit_claim(connection, attempt_id)
     reservation_id = reserve_launch(connection, claim_id)
     execution_id = _record_successful_process(connection, reservation_id)
-    intent = commit_resume_intent(connection, execution_id)
+    intent = commit_resume_intent(connection, execution_id, reservation_id)
     receipt = FakeSideEffects(connection).resume_thread(intent)
 
     with pytest.raises(TypeError, match="only come from the adapter"):
         FakeResumeReceipt(
             execution_id=receipt.execution_id,
+            reservation_id=receipt.reservation_id,
             resume_intent_digest=receipt.resume_intent_digest,
             result_json=receipt.result_json,
             result_digest=receipt.result_digest,
@@ -6610,6 +7200,7 @@ def test_resume_receipt_requires_adapter_provenance_and_one_shot_permit(
         )
     reconstructed = FakeResumeReceipt(
         execution_id=receipt.execution_id,
+        reservation_id=receipt.reservation_id,
         resume_intent_digest=receipt.resume_intent_digest,
         result_json=receipt.result_json,
         result_digest=receipt.result_digest,
@@ -6641,7 +7232,7 @@ def test_resume_receipt_survives_transient_database_rollback(db_path: Path) -> N
     claim_id = commit_claim(connection, attempt_id)
     reservation_id = reserve_launch(connection, claim_id)
     execution_id = _record_successful_process(connection, reservation_id)
-    intent = commit_resume_intent(connection, execution_id)
+    intent = commit_resume_intent(connection, execution_id, reservation_id)
     receipt = FakeSideEffects(connection).resume_thread(intent)
     connection.execute(
         """
@@ -6698,7 +7289,7 @@ def test_post_resume_evidence_requires_exact_canonical_success_receipt(
     claim_id = commit_claim(connection, attempt_id)
     reservation_id = reserve_launch(connection, claim_id)
     execution_id = _record_successful_process(connection, reservation_id)
-    intent = commit_resume_intent(connection, execution_id)
+    intent = commit_resume_intent(connection, execution_id, reservation_id)
     valid = FakeSideEffects(connection).resume_thread(intent)
     envelope: dict[str, object] = json.loads(valid.result_json)
     receipt_execution = execution_id
@@ -6770,9 +7361,13 @@ def test_fake_resume_receipt_cannot_be_reused_for_another_execution(
         for reservation in reservations
     ]
     hooks = FakeSideEffects(connection)
-    intents = [commit_resume_intent(connection, execution) for execution in executions]
+    intents = [
+        commit_resume_intent(connection, execution, reservation)
+        for execution, reservation in zip(executions, reservations, strict=True)
+    ]
     reused_intent = FakeResumeIntent(
         execution_id=executions[1],
+        reservation_id=str(reservations[1]),
         intent_json=intents[0].intent_json,
         intent_digest=intents[0].intent_digest,
         _issuer=_RESUME_INTENT_ISSUER,
@@ -6856,9 +7451,10 @@ def test_launch_execution_evidence_is_append_only(db_path: Path) -> None:
             (post_resume, _digest(b"wrong-post-digest"), execution_id),
         )
 
-    resume_intent = commit_resume_intent(connection, execution_id)
+    resume_intent = commit_resume_intent(connection, execution_id, reservation_id)
     reconstructed_intent = FakeResumeIntent(
         execution_id=execution_id,
+        reservation_id=str(reservation_id),
         intent_json=resume_intent.intent_json,
         intent_digest=resume_intent.intent_digest,
         _issuer=_RESUME_INTENT_ISSUER,
@@ -7014,7 +7610,7 @@ def test_invalid_lifecycle_transitions_are_rejected(
         claim_id = commit_claim(connection, attempt_id)
         reservation_id = reserve_launch(connection, claim_id)
         execution_id = _record_successful_process(connection, reservation_id)
-        _resume_and_persist(connection, execution_id)
+        _resume_and_persist(connection, execution_id, reservation_id)
         terminal_id = record_terminal(connection, reservation_id)
         mutation = (
             "UPDATE terminals SET terminal_state = 'FAILED' WHERE terminal_id = ?",
@@ -7024,7 +7620,7 @@ def test_invalid_lifecycle_transitions_are_rejected(
         claim_id = commit_claim(connection, attempt_id)
         reservation_id = reserve_launch(connection, claim_id)
         execution_id = _record_successful_process(connection, reservation_id)
-        _resume_and_persist(connection, execution_id)
+        _resume_and_persist(connection, execution_id, reservation_id)
         terminal_id = record_terminal(connection, reservation_id)
         selection_id = select_terminal(connection, session_id, terminal_id)
         mutation = (
@@ -7057,7 +7653,7 @@ def test_recovery_race_produces_consecutive_ordinals(db_path: Path) -> None:
     claim_id = commit_claim(setup, target_attempt)
     reservation_id = reserve_launch(setup, claim_id)
     execution_id = _record_successful_process(setup, reservation_id)
-    _resume_and_persist(setup, execution_id)
+    _resume_and_persist(setup, execution_id, reservation_id)
     setup.close()
     barrier = threading.Barrier(2)
     results: list[str] = []

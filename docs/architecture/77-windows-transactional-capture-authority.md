@@ -30,6 +30,71 @@ The bootstrap and its exact database/output paths are administrator-provisioned
 facts. A caller, environment variable, child argument, current directory,
 request, or database row cannot select an alternate authority root.
 
+### Inter-process lifecycle arbitration contract
+
+Every launch-reservation boundary that can dispatch an external effect, persist
+its result, or classify the same uncertainty uses one deterministic OS-backed
+inter-process lifecycle arbiter. A Python `threading.RLock`, a process-local
+lock dictionary, and SQLite writer serialization are not lifecycle authority:
+they cannot exclude another approved process between the final lineage check
+and a Windows call.
+
+The arbiter key is SHA-256 over the exact canonical UTF-8 JSON object below,
+using sorted keys and no insignificant whitespace:
+
+```json
+{"authority_epoch_id":"<epoch UUID>","label":"lifecycle-arbiter/v1","launch_reservation_id":"<reservation UUID>","machine_authority_id":"<machine UUID>"}
+```
+
+The lowercase 64-character digest, never a raw identifier, is the bounded
+object-name suffix. Milestone A production uses the fixed local Windows object
+namespace `Local\\AITradingBot-Lifecycle-v1-<digest>` and a named mutex created
+or opened only after validating the administrator-provisioned security
+descriptor. Its owner and DACL grant synchronization rights only to the
+approved administrator and Trading SIDs and deny untrusted creation or
+replacement. Neither a caller nor database content selects another namespace,
+prefix, security descriptor, lock path, timeout, lease, or heartbeat.
+
+The executable harness uses a same-key advisory file lock below the fixed
+test-adapter temporary subdirectory
+`ai-trading-bot-lifecycle-arbiters-v1/<digest>.lock`. That adapter validates
+inter-process exclusion and process-death release semantics only. It is not the
+production named-mutex implementation, ACL provisioning, or security boundary.
+
+The global acquisition order is mandatory:
+
+1. derive the reservation identity from already validated immutable input;
+2. acquire the OS lifecycle arbiter while no SQLite transaction is active;
+3. open or use the SQLite connection and re-resolve the complete durable active
+   lineage;
+4. for durable changes, execute and commit one `BEGIN IMMEDIATE` transaction;
+5. for provider construction, `CreateProcessW`, or `ResumeThread`, perform the
+   external call with no SQLite transaction open while retaining the arbiter;
+6. release the arbiter only after typed result production or durable commit.
+
+Code must never wait for the arbiter while holding `BEGIN IMMEDIATE`, and must
+never hold an SQLite write transaction across an external call. This order is
+the single lock hierarchy; there is no nested lifecycle arbiter.
+
+Private issuers, one-shot objects, and their registries are process-local
+provenance checks only. They are never serialized, pickled, transferred,
+reconstructed, or reissued in another process and are not substitutes for the
+OS arbiter. Process death destroys every unpersisted capability. A restarted
+process must reconcile durable SQLite state and choose the documented recovery;
+it must not recreate a permit from public fields.
+
+Normal owner exit and abrupt process termination release the OS object. In
+production, `WAIT_ABANDONED` is conservative evidence that the prior owner died,
+not evidence that a provider or Windows API call did or did not occur. The new
+owner retains the mutex, rechecks durable state, emits no automatic retry, and
+maps `COMMITTED` to `CLASSIFY_LAUNCH_RESERVATION`,
+`PROCESS_INTENT_COMMITTED` to `CLASSIFY_PROCESS_OUTCOME_UNKNOWN`, and an
+unreceipted `RESUME_INTENT_COMMITTED` execution to
+`CLASSIFY_RESUME_OUTCOME_UNKNOWN`. Definitive persisted results continue by
+their recorded state. The test file-lock adapter proves release and
+reconciliation after process death but cannot expose Windows
+`WAIT_ABANDONED` or validate the production DACL.
+
 ## 1. Security boundary retained by this revision
 
 The approved security invariants are unchanged:
@@ -308,8 +373,8 @@ private issuer, and a registered one-shot permit. The permanent claim alone,
 an existing reservation, restart state, copied or reconstructed objects, and
 wrong issuers or permits cannot recreate this authority.
 
-Under the per-reservation lifecycle arbiter, provider construction accepts only
-that exact registered permit and rechecks the normalized reservation -> claim
+Under the OS-backed inter-process lifecycle arbiter, provider construction
+accepts only that exact registered permit and rechecks the normalized reservation -> claim
 -> attempt -> session lineage: reservation `COMMITTED` with no process intent,
 claim `COMMITTED`, attempt `LAUNCH_RESERVED`, session `OPEN`, no execution,
 terminal, or selection, and exact request/provider/operation/budget/policy
@@ -342,8 +407,8 @@ constructed-provider capability before process-intent commit leaves
 capability reconstruction are never retried.
 
 Only the winning transaction receives an opaque in-memory `FakeProcessIntent`.
-Under the per-reservation lifecycle arbiter, the external adapter accepts only
-the exact registered object, private issuer, and permit; resolves the normalized
+Under the OS-backed inter-process lifecycle arbiter, the external adapter
+accepts only the exact registered object, private issuer, and permit; resolves the normalized
 reservation -> claim -> attempt -> session lineage; requires
 `PROCESS_INTENT_COMMITTED`, `COMMITTED`, `LAUNCH_RESERVED`, and `OPEN` with no
 terminal or selection; verifies the durable canonical bytes/digest; and consumes
@@ -426,7 +491,7 @@ for all outstanding or delayed resume authority.
 
 The fake external boundary accepts only that exact registered
 `FakeResumeIntent`, then under the
-per-reservation lifecycle arbiter immediately re-resolves and rechecks the
+OS-backed inter-process lifecycle arbiter immediately re-resolves and rechecks the
 complete normalized active lineage, committed canonical intent, and all
 pre-resume evidence. It consumes the permit only after those checks and returns
 a privately issued, registered one-shot receipt only after the modeled call
@@ -543,6 +608,12 @@ same session, and one exact closed action-matrix entry:
 | `CLOSE_SESSION` | `SESSION` | `OPEN` -> `CLOSED` | close only when all attempts are terminal and none is ambiguous |
 | `ACKNOWLEDGE_RESTORE` | `SESSION` | `OPEN` -> `RESTORE_ACKNOWLEDGED` | record restore acknowledgement only |
 
+`CLOSE_SESSION` does not race a live external boundary: its prerequisite that
+every attempt is terminal means each reservation has already crossed the
+terminal writer's OS arbiter and revoked its process-local capabilities. The
+close transaction rechecks that durable prerequisite and cannot weaken it,
+reopen a lineage, or authorize another provider, process, or resume call.
+
 No generic recovery state ladder exists. Recovery cannot manufacture
 `CLAIM_COMMITTED`, `LAUNCH_RESERVED`, `TERMINAL_RECORDED`, or
 `SUCCESS_SELECTED` by arbitrary state update, cannot reopen or delete evidence,
@@ -583,8 +654,8 @@ action; appends the immutable recovery row; advances the trigger-owned
 recovery counter; and moves only the reservation to `MANUAL_REVIEW`. The
 execution and its evidence remain unchanged. This action never infers
 `NOT_STARTED` and grants no launch, claim, resume, or provider-call authority.
-Classification and the resume hook share one per-reservation lifecycle arbiter:
-if classification wins, a delayed hook cannot consume its permit or emit the
+Classification and the resume hook share one OS-backed inter-process lifecycle
+arbiter: if classification wins, a delayed hook cannot consume its permit or emit the
 external call; if the hook wins, classification may conservatively record the
 still-unpersisted outcome after the hook returns. Receipt persistence uses the
 same arbitration, so either the receipt commits while the lineage is active or
@@ -608,18 +679,20 @@ parent lineage for both `PRE_RESUME_READY -> RESUME_INTENT_COMMITTED` and
 selection for the session. Thus direct SQL cannot bypass a recovery, terminal,
 selection, or closure barrier. SQLite can enforce these persisted predicates;
 it cannot prove that a real Windows call is not already in flight. Production
-adapters must therefore use the reviewed per-lineage lifecycle arbiter or an
-equivalent quiescence protocol that makes the final hook recheck and manual
-classification mutually exclusive.
+adapters must therefore use the reviewed deterministic Windows named mutex.
+An in-process substitute or SQLite transaction alone cannot make the final
+hook recheck and manual classification mutually exclusive across processes.
 
 ### 3.1 Final capability matrix
 
-Canonical bytes and SHA-256 digests establish content integrity only. In the
-test harness, private typed issuers plus registries that bind each one-shot
-permit to the exact issued object model provenance. A copied, reconstructed,
-wrong-issuer, or wrong-permit object has no authority even when its public bytes
-are exact. Persisted parent state can independently revoke an otherwise valid
-object.
+Canonical bytes and SHA-256 digests establish content integrity only. The
+matrix deliberately separates durable SQLite state, process-local typed-object
+provenance, OS-backed inter-process arbitration, and the external effect or
+result. Private typed issuers plus registries bind each one-shot permit to the
+exact issued object only in its issuing process. A copied, reconstructed,
+cross-process, wrong-issuer, or wrong-permit object has no authority even when
+its public bytes are exact. Persisted parent state and the OS arbiter remain
+independently necessary.
 
 | Boundary | Required persisted parent | Capability/evidence | Issuer/provenance | Consumption point | Lifecycle arbiter | Database transaction | Revoking facts | Crash result / recovery | Direct-SQL enforcement |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -632,7 +705,7 @@ object.
 | Resume-intent issuance | `PRE_RESUME_READY`, `PROCESS_CREATED`, `OPEN`, no terminal/selection | Transaction-issued `FakeResumeIntent` | Private intent issuer; exact object/permit registry | Permit remains live until resume dispatch | Required against reservation classification | Yes, `BEGIN IMMEDIATE` | `MANUAL_REVIEW`, terminal, selection, `CLOSED` | Before commit use pre-resume recovery; after commit classify unknown | Execution phase/evidence trigger with normalized parent join |
 | `ResumeThread` dispatch | `RESUME_INTENT_COMMITTED` with exact active lineage | Exact `FakeResumeIntent` | Private issuer and exact registered one-shot permit | Immediately before `ResumeThread` | Required; held through receipt production | No transaction across call | `MANUAL_REVIEW`, terminal, selection, `CLOSED` | Missing persisted receipt is unknown; classify unknown | SQL cannot perform or prove the API call |
 | Resume-success persistence | Same active resume lineage and current intent | Exact `FakeResumeReceipt` | Private resume-result issuer and exact registered result permit | After receipt/cleanup commit | Required | Yes, `BEGIN IMMEDIATE` | `MANUAL_REVIEW`, terminal, selection, `CLOSED` | Rollback while active keeps receipt retryable; otherwise classify unknown | Execution phase/evidence trigger; provenance remains service-only |
-| Terminal recording | State-specific reservation matrix | Canonical terminal evidence and optional verified snapshot | Reviewed transaction service and terminal policy | Unique terminal insert | No external-dispatch arbiter | Yes, `BEGIN IMMEDIATE` | Existing terminal, selection, `CLOSED`; `MANUAL_REVIEW` permits only conservative close | Rollback leaves no terminal; retry only under unchanged state | Terminal matrix, uniqueness, and normalized lineage triggers |
+| Terminal recording | State-specific reservation matrix | Canonical terminal evidence and optional verified snapshot | Reviewed transaction service and terminal policy | Unique terminal insert | Required for that reservation; terminal is an immediate revocation boundary | Yes, `BEGIN IMMEDIATE` | Existing terminal, selection, `CLOSED`; `MANUAL_REVIEW` permits only conservative close | Rollback leaves no terminal; retry only under unchanged state | Terminal matrix, uniqueness, and normalized lineage triggers |
 | Selection | Confirmed successful terminal in owning `OPEN` session | Terminal identity and normal or recovery-authorized selection request | Reviewed transaction service and selection policy | Unique session selection insert | No external-dispatch arbiter | Yes, `BEGIN IMMEDIATE` | Existing selection, `SUCCESS_SELECTED`, `CLOSED` | Rollback leaves no selection; retry under unchanged success | Selection ownership/state trigger and uniqueness |
 | Recovery classification | `OPEN` session and exact action-matrix predecessor | Typed target, operator evidence, policy, current recovery ordinal | Reviewed recovery service; immutable operator evidence | Recovery row and ordinal consumed atomically | Required for reservation actions that arbitrate external work | Yes, `BEGIN IMMEDIATE` | `SUCCESS_SELECTED`, `CLOSED`, changed predecessor, prior classification | Rollback consumes no ordinal; commit is irreversible and authorizes no replacement operation | Recovery target/action trigger; service pairs row, counter, and state transition |
 
@@ -879,9 +952,9 @@ separate `BEGIN IMMEDIATE` process-intent transaction commits. The reservation,
 provider construction, and process-intent commits all precede process creation.
 Only the process-intent winner receives the one-shot permit accepted by the
 reviewed adapter. Process dispatch and manual
-classification are mutually exclusive under the per-reservation lifecycle
-arbiter: recovery-first emits no call, while dispatch-first emits exactly one
-call and produces exactly one privately issued result before releasing the
+classification are mutually exclusive under the OS-backed inter-process
+lifecycle arbiter: recovery-first emits no call, while dispatch-first emits
+exactly one call and produces exactly one privately issued result before releasing the
 arbiter. The exact registered successful result then authorizes the
 `PRE_RESUME_READY` execution row containing process, Job Object, and
 resume-authorization evidence. Result persistence uses the same arbiter and

@@ -40,6 +40,64 @@ duplicates, cooperating approved processes, foreign-key integrity, and
 transaction ordering. They do not claim to authenticate executables or defend
 against malicious direct SQL by code already controlling the trusted token.
 
+### Inter-process arbiter acceptance gates
+
+The focused harness must use `multiprocessing.get_context("spawn")`, not fork
+inheritance or threads, for lifecycle-arbitration acceptance. Every child opens
+its own SQLite connection and independently derives and opens its arbiter from
+the reservation identity. No SQLite connection, lock handle, permit registry,
+typed capability, or external result is passed between children.
+
+The deterministic arbiter identity is the lowercase SHA-256 digest of canonical
+sorted-key UTF-8 JSON containing exactly `authority_epoch_id`,
+`machine_authority_id`, `launch_reservation_id`, and literal label
+`lifecycle-arbiter/v1`. Tests require a bounded digest-only file name and prove
+that raw identities are absent. Source assertions reject `threading.RLock` and
+any process-local reservation-lock dictionary as lifecycle arbitration.
+
+For each pair below, tests force both acquisition orders rather than accepting
+a scheduler-dependent race:
+
+- provider construction versus `CLASSIFY_LAUNCH_RESERVATION`;
+- `CreateProcessW` dispatch versus `CLASSIFY_PROCESS_OUTCOME_UNKNOWN`;
+- `ResumeThread` dispatch versus `CLASSIFY_RESUME_OUTCOME_UNKNOWN`;
+- process-result persistence versus process-outcome classification; and
+- resume-result persistence versus resume-outcome classification.
+
+Recovery-first must commit one `MANUAL_REVIEW` audit trail and reject the
+delayed boundary. It emits no provider, process, or resume event when that
+effect has not already happened. Dispatch-first emits exactly one external
+event and may then be conservatively classified while its result is
+unpersisted. Persistence-first commits exactly one durable result and makes the
+narrow recovery ineligible; recovery-first rejects delayed persistence without
+changing the frozen lineage. Every child exits cleanly, every final database
+passes `PRAGMA foreign_key_check`, and no alternate permit or retry appears.
+
+One spawned child must terminate abruptly while owning the test file-lock
+adapter. A new spawned recovery worker must then acquire the same deterministic
+arbiter, reconcile durable state, append exactly one conservative recovery, and
+emit no retry. This proves process-death release, not Windows named-mutex
+`WAIT_ABANDONED` signaling or ACL correctness. Production acceptance separately
+requires the fixed `Local\\AITradingBot-Lifecycle-v1-<digest>` named mutex,
+administrator-provisioned owner/DACL validation, and conservative handling of
+`WAIT_ABANDONED` as owner-death evidence rather than API-outcome evidence.
+
+Another spawned child reconstructs provider and process-public fields under
+its own process-local issuers and registries. Both attempts must fail as not
+issued and leave durable state unchanged. Permits and results are therefore
+explicitly non-pickleable authority: they are never transferred, reconstructed,
+or reissued after process death.
+
+Lock-order assertions require: no active SQLite transaction before arbiter
+acquisition; complete lineage recheck only while the arbiter is held;
+`BEGIN IMMEDIATE` and commit while retained for durable boundaries; no active
+SQLite transaction at provider construction, `CreateProcessW`, or
+`ResumeThread`; and arbiter release only after commit or typed-result
+production. A terminal write uses the same reservation arbiter. Session close
+is permitted only after its terminal/manual-review prerequisites have already
+revoked every external capability; it cannot bypass that terminal arbitration
+or authorize another effect.
+
 ## 2. Enforcement acceptance split
 
 The validation review must classify each assertion before accepting it.
@@ -511,11 +569,13 @@ ancestor identifiers.
 
 ### Final capability audit matrix
 
-The executable audit distinguishes integrity from provenance: canonical bytes
-and digests prove content, while a private typed issuer and a registry entry
-binding the permit to the exact object prove test-adapter issuance. Copies,
-reconstructions, wrong issuers, wrong permits, reuse, cross-lineage use, and
-objects delayed past a persisted revocation all fail.
+The executable audit distinguishes four independent concerns: durable SQLite
+authority, process-local provenance, OS-backed inter-process arbitration, and
+external effects/results. Canonical bytes and digests prove content, while a
+private typed issuer and registry entry bind a permit to the exact object only
+inside its issuing process. Copies, reconstructions, cross-process transfer,
+wrong issuers, wrong permits, reuse, cross-lineage use, and objects delayed
+past persisted revocation all fail.
 
 | Boundary | Required persisted parent | Capability/evidence | Issuer/provenance | Consumption point | Lifecycle arbiter | Database transaction | Revoking facts | Crash result / recovery | Direct-SQL gate tested |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -528,7 +588,7 @@ objects delayed past a persisted revocation all fail.
 | Resume-intent issuance | `PRE_RESUME_READY`, `PROCESS_CREATED`, `OPEN`, no terminal/selection | `FakeResumeIntent` | Private issuer and exact object/permit registry | At resume dispatch | Required against classification | `BEGIN IMMEDIATE` | `MANUAL_REVIEW`, terminal, selection, `CLOSED` | Pre-commit uses pre-resume recovery; post-commit uses unknown-resume recovery | Normalized phase/evidence trigger |
 | `ResumeThread` dispatch | `RESUME_INTENT_COMMITTED` and exact active lineage | Exact resume intent | Private issuer and exact registered permit | Immediately before modeled call | Required through receipt production | No transaction across hook | `MANUAL_REVIEW`, terminal, selection, `CLOSED` | Missing persisted receipt remains unknown | SQL cannot prove dispatch |
 | Resume-success persistence | Same active resume lineage and current intent | `FakeResumeReceipt` | Private resume-result issuer and exact registered result permit | After successful commit | Required | `BEGIN IMMEDIATE` | `MANUAL_REVIEW`, terminal, selection, `CLOSED` | Transient rollback preserves exact receipt while active; otherwise unknown-resume recovery | Normalized phase/evidence trigger; provenance is service-only |
-| Terminal recording | Exact state/disposition/snapshot matrix | Canonical terminal evidence | Reviewed service and terminal policy | Unique terminal insert | No | `BEGIN IMMEDIATE` | Existing terminal, selection, `CLOSED`; manual review only permits conservative close | Rollback leaves no terminal | Terminal matrix and uniqueness triggers |
+| Terminal recording | Exact state/disposition/snapshot matrix | Canonical terminal evidence | Reviewed service and terminal policy | Unique terminal insert | Required for the reservation revocation boundary | `BEGIN IMMEDIATE` | Existing terminal, selection, `CLOSED`; manual review only permits conservative close | Rollback leaves no terminal | Terminal matrix and uniqueness triggers |
 | Selection | Confirmed successful terminal and owning `OPEN` session | Terminal identity and selection request | Reviewed service and selection policy | Unique session selection | No | `BEGIN IMMEDIATE` | Existing selection, `SUCCESS_SELECTED`, `CLOSED` | Rollback leaves no selection | Selection ownership/state trigger |
 | Recovery classification | `OPEN` session and exact action predecessor | Target, operator evidence, policy, current ordinal | Reviewed recovery service | Recovery row, ordinal, and state commit together | Required for reservation actions | `BEGIN IMMEDIATE` | Changed predecessor, prior classification, `SUCCESS_SELECTED`, `CLOSED` | Rollback consumes no ordinal; commit grants no replacement capability | Recovery action/target trigger plus paired service transaction |
 
@@ -634,15 +694,16 @@ or another claim. `CLASSIFY_PROCESS_OUTCOME_UNKNOWN` preserves the intent,
 records `MANUAL_REVIEW`, and allows only `CLOSED`/`MAY_HAVE_OCCURRED` plus the
 authorized session-close path.
 
-Two-connection process-dispatch/recovery tests force both arbiter orderings.
-Recovery-first commits `MANUAL_REVIEW`, leaves the earlier process permit
+Spawned-process process-dispatch/recovery tests force both OS-arbiter
+orderings using independent connections and independently opened arbiters.
+Recovery-first commits `MANUAL_REVIEW`, leaves the process-local permit
 unusable, and emits no `CreateProcessW` event. Dispatch-first consumes exactly
 one intent, emits exactly one call, and produces exactly one typed result;
 recovery may then conservatively classify the still-unpersisted result. A
-second matrix races both successful and definitive-failure result persistence
-against recovery. Persistence-first commits one result and makes the narrow
-recovery ineligible; recovery-first freezes the lineage and rejects delayed
-persistence without consuming or overwriting its typed result.
+second spawned matrix races result persistence against recovery.
+Persistence-first commits one result and makes the narrow recovery ineligible;
+recovery-first freezes the lineage and rejects delayed persistence without
+overwriting durable evidence.
 
 Two independent connections race `commit_resume_intent` for one execution:
 exactly one gets a permit and reaches the hook, the loser fails before the
@@ -655,9 +716,10 @@ cleanup. Neither permits intent reacquisition, another hook attempt, a new
 claim, or a `NOT_STARTED` classification. The separate pre-intent recovery
 test proves `PRE_RESUME_READY` remains conservatively closable.
 
-Additional two-connection races pair recovery with each resume boundary. An
+Additional spawned-process races pair recovery with each resume boundary. An
 intent/recovery race has exactly one valid winner. Hook/recovery tests force
-both orderings under one per-reservation lifecycle arbiter: recovery-first
+both orderings under one OS-backed inter-process lifecycle arbiter:
+recovery-first
 leaves the permit unconsumed and emits no modeled call, while hook-first emits
 exactly one call and permits only conservative unknown-outcome classification
 before receipt persistence. Receipt/recovery tests likewise force both
@@ -665,8 +727,9 @@ orderings: recovery-first preserves `RESUME_INTENT_COMMITTED` with no receipt
 or cleanup, while receipt-first reaches `RESUME_RECORDED` and makes the narrow
 recovery fail. Every outcome preserves one audit trail, no alternate permit,
 and no authority from a classified, terminal, selected, or closed lineage.
-These tests validate the reviewed in-process arbitration contract; SQLite
-alone cannot establish whether a real external call is already in flight.
+These tests validate the test adapter's inter-process exclusion and crash
+release semantics; SQLite alone cannot establish whether a real external call
+is already in flight, and the adapter does not validate production mutex ACLs.
 
 Receipt gates require exact `FakeResumeReceipt` type and the canonical object
 `execution_id`, lowercase intent-digest hex, literal `RESUMED`, and exact

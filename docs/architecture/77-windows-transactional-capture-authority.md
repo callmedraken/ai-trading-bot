@@ -363,10 +363,13 @@ rejects a direct insert that changes either copied fact or lacks a digest-valid
 from the exact successful adapter receipt.
 
 `commit_resume_intent(connection, execution_id) -> FakeResumeIntent` owns the
-one-shot resume fence. In one `BEGIN IMMEDIATE` transaction it requires exactly
-`PRE_RESUME_READY`, verifies the process-creation, Job Object, and
-resume-authorization JSON/digest pairs, appends this exact canonical evidence,
-and commits the phase change:
+one-shot resume fence. In one `BEGIN IMMEDIATE` transaction it resolves the
+normalized execution -> reservation -> claim -> attempt -> session lineage,
+requires the session to be `OPEN`, the reservation to be `PROCESS_CREATED`, no
+terminal or session selection, and exactly `PRE_RESUME_READY`, and verifies the
+process-creation, Job Object, and resume-authorization JSON/digest pairs. Its
+guarded update repeats that entire active-lineage predicate before appending
+this exact canonical evidence and committing the phase change:
 
 ```json
 {"execution_id":"<exact execution_id>","resume_operation":"ResumeThread","schema":1}
@@ -378,10 +381,16 @@ standalone field write, direct phase jump, clearing, replacement, reassignment,
 or use for another execution fails closed. The permit is consumable once and
 is not reconstructible from the database after restart. This durable intent is
 the authority fence; it does not prove that Windows executed `ResumeThread`.
+The permit is necessary but never sufficient authority: every later use must
+still prove the same active lineage. `MANUAL_REVIEW`, any terminal-recorded
+lineage, `SUCCESS_SELECTED`, and `CLOSED` are irreversible revocation barriers
+for all outstanding or delayed resume authority.
 
-The fake external boundary accepts only that `FakeResumeIntent`, rechecks the
-committed canonical intent and all pre-resume evidence, consumes the permit,
-and returns a receipt only after the modeled call succeeds. A modeled failure
+The fake external boundary accepts only that `FakeResumeIntent`, then under the
+per-reservation lifecycle arbiter immediately re-resolves and rechecks the
+complete normalized active lineage, committed canonical intent, and all
+pre-resume evidence. It consumes the permit only after those checks and returns
+a receipt only after the modeled call succeeds. A modeled failure
 returns no successful receipt and leaves the database at
 `RESUME_INTENT_COMMITTED`. The successful receipt body is exactly canonical
 UTF-8 JSON:
@@ -390,7 +399,12 @@ UTF-8 JSON:
 {"execution_id":"<exact execution_id>","resume_intent_digest":"<lowercase 64-character SHA-256 hex>","resume_result":"RESUMED","schema":1}
 ```
 
-`record_post_resume_evidence` requires exact `FakeResumeReceipt` type, the
+`record_post_resume_evidence` runs under the same lifecycle arbiter and in one
+`BEGIN IMMEDIATE` transaction. It re-resolves the full normalized active
+lineage both before and in its guarded update, so a structurally successful but
+delayed receipt cannot advance a reservation classified by recovery or a
+lineage already terminal, selected, or closed. It requires exact
+`FakeResumeReceipt` type, the
 same execution and committed intent digest, exact field set and field types,
 integer schema `1`, literal `RESUMED`, exact canonical bytes, and the exact
 SHA-256 digest. `FAILED`, `ERROR`, `UNKNOWN`, missing/extra fields, wrong or
@@ -496,7 +510,8 @@ state update in the same `BEGIN IMMEDIATE` transaction.
 `CLASSIFY_PRE_RESUME_READY` preserves the conservative operator path before
 resume-intent allocation. It requires one digest-valid `PRE_RESUME_READY`
 execution with no resume intent, post-resume, or cleanup evidence, records
-`MANUAL_REVIEW`, and grants no resume or other external authority.
+`MANUAL_REVIEW`, and irrevocably revokes every outstanding resume permit. It
+grants no resume or other external authority.
 
 `CLASSIFY_PROCESS_OUTCOME_UNKNOWN` is the sole recovery from
 `PROCESS_INTENT_COMMITTED`. It requires digest-valid committed process-intent
@@ -523,6 +538,13 @@ action; appends the immutable recovery row; advances the trigger-owned
 recovery counter; and moves only the reservation to `MANUAL_REVIEW`. The
 execution and its evidence remain unchanged. This action never infers
 `NOT_STARTED` and grants no launch, claim, resume, or provider-call authority.
+Classification and the resume hook share one per-reservation lifecycle arbiter:
+if classification wins, a delayed hook cannot consume its permit or emit the
+external call; if the hook wins, classification may conservatively record the
+still-unpersisted outcome after the hook returns. Receipt persistence uses the
+same arbitration, so either the receipt commits while the lineage is active or
+classification wins and the delayed receipt is rejected without changing the
+frozen execution. There is no alternate lineage or permit after classification.
 The only subsequent terminal classification is the existing
 `CLOSED`/`MAY_HAVE_OCCURRED` entry, after which the normal authorized session
 close may run. Recovery remains prohibited after `SUCCESS_SELECTED` or
@@ -533,6 +555,17 @@ close may run. Recovery remains prohibited after `SUCCESS_SELECTED` or
 The fixture deliberately enforces only facts that SQLite can evaluate at the
 row boundary. The reviewed transaction service and transaction tests enforce
 the multi-statement semantic contract.
+
+The execution phase trigger independently requires the same normalized active
+parent lineage for both `PRE_RESUME_READY -> RESUME_INTENT_COMMITTED` and
+`RESUME_INTENT_COMMITTED -> RESUME_RECORDED`: reservation
+`PROCESS_CREATED`, session `OPEN`, no terminal for the reservation, and no
+selection for the session. Thus direct SQL cannot bypass a recovery, terminal,
+selection, or closure barrier. SQLite can enforce these persisted predicates;
+it cannot prove that a real Windows call is not already in flight. Production
+adapters must therefore use the reviewed per-lineage lifecycle arbiter or an
+equivalent quiescence protocol that makes the final hook recheck and manual
+classification mutually exclusive.
 
 The signed bootstrap and immutable metadata own the permitted public Alpaca
 descriptor and select authority/claim policy versions. The reviewed service
@@ -776,13 +809,15 @@ Object, and resume-authorization evidence. A separate `BEGIN IMMEDIATE`
 transaction then appends the canonical resume intent and
 commits `RESUME_INTENT_COMMITTED`; only that winner receives the one-shot
 permit accepted by the reviewed adapter. The adapter observes that committed
-state, performs the modeled external call once, and returns the exact canonical
+state and rechecks the normalized active lineage immediately before the call,
+performs the modeled external call once, and returns the exact canonical
 success receipt bound to the execution and intent digest. Only then may the
-transaction service persist the receipt as post-resume evidence, persist
-cleanup evidence, verify both digests, and advance the execution to
-`RESUME_RECORDED`. SQLite enforces the durable one-reservation and one-intent
-fences, exact persisted bytes, and phase rules; it cannot prove that an
-external Windows API call occurred.
+transaction service, after another full active-lineage recheck, persist the
+receipt as post-resume evidence, persist cleanup evidence, verify both digests,
+and advance the execution to `RESUME_RECORDED`. SQLite enforces the durable
+one-reservation and one-intent fences, exact persisted bytes, active-parent
+phase guards, and persisted barriers; it cannot prove that an external Windows
+API call occurred or arbitrate a call already outside SQLite.
 
 A crash after a claim or reservation commit leaves that fence consumed. A
 crash after process-intent commit but before `CreateProcessW` and a crash after
@@ -810,7 +845,13 @@ exactly once, and changes the reservation from `PROCESS_CREATED` to
 the execution unchanged. It may then be recorded as
 `CLOSED`/`MAY_HAVE_OCCURRED` and the session may be closed under the normal
 close policy. It cannot produce `NOT_STARTED` or authorize another side
-effect.
+effect. Classification is an irreversible revocation barrier: a previously
+issued permit, a delayed hook invocation, and a delayed successful receipt are
+all insufficient after it commits. The hook and recovery transaction must be
+serialized per reservation; receipt persistence participates in the same
+arbitration. The process-result boundary applies the analogous rule: a delayed
+successful process receipt cannot create an execution after
+`CLASSIFY_PROCESS_OUTCOME_UNKNOWN`.
 
 The whole-boundary audit treats every arrow from claim commit through
 selection as an authority handoff: claim commit -> provider construction ->

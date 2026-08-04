@@ -485,6 +485,27 @@ claim or provider call. It permits only a subsequent
 `CLOSED`/`MAY_HAVE_OCCURRED` terminal and authorized session close. Recovery
 after `SUCCESS_SELECTED` or `CLOSED` remains rejected.
 
+Recovery classification is also tested as an irreversible authority barrier.
+The active resume lineage is exactly an `OPEN` session, a `PROCESS_CREATED`
+reservation, no terminal and no session selection, the expected execution
+phase, and digest-valid phase evidence resolved through the normalized parent
+chain. `commit_resume_intent`, the fake `ResumeThread` hook, and delayed receipt
+persistence must each recheck that full predicate; possession of a previously
+issued permit or structurally successful receipt is not sufficient. Tests
+classify at `PRE_RESUME_READY` and `RESUME_INTENT_COMMITTED`, then prove no
+intent, hook event, receipt persistence, terminal success, selection, new
+claim, or provider call can arise from that classified lineage. They repeat
+the delayed-permit and delayed-receipt rejection after conservative terminal
+recording and session closure. A delayed successful process receipt is likewise
+rejected after `CLASSIFY_PROCESS_OUTCOME_UNKNOWN`, with no execution row.
+
+Direct SQL attempts both guarded resume phase advances after `MANUAL_REVIEW`.
+The executable trigger must reject them because its normalized parent query
+requires `PROCESS_CREATED`, `OPEN`, no terminal, and no selection. The DDL
+smoke gate executes both exact transitions on a valid active lineage and then
+proves the same statements fail after recovery without relying on copied
+ancestor identifiers.
+
 ## 9. Transaction boundary gates
 
 `FakeSideEffects` observes the database through an independent connection.
@@ -500,6 +521,8 @@ The test proves the following event order:
 | Ambiguous terminal -> retry | A second claim cannot be inserted and the claim count remains one |
 | Any prior session claim -> new claim | The trigger admits only the exact retry-safe process-creation-failure lineage |
 | Unknown resume recovery -> closure | Recovery row, ordinal increment, `MANUAL_REVIEW`, `CLOSED`/`MAY_HAVE_OCCURRED` terminal, and authorized session close preserve the frozen execution |
+| Recovery classification -> outstanding resume permit | Per-reservation arbitration makes exactly one side first; a recovery winner emits no hook event, while a hook winner may be conservatively classified before receipt persistence |
+| Recovery classification -> delayed resume receipt | Exactly one of classification or receipt persistence commits first; classification rejects the delayed receipt, while a committed receipt makes the narrow recovery ineligible |
 
 The fake hooks do not read secrets, construct a provider, create a Windows
 process, call a network, or invoke a real Windows API. The fake resume adapter
@@ -563,6 +586,19 @@ persistence expose the same `RESUME_INTENT_COMMITTED` row with no receipt or
 cleanup. Neither permits intent reacquisition, another hook attempt, a new
 claim, or a `NOT_STARTED` classification. The separate pre-intent recovery
 test proves `PRE_RESUME_READY` remains conservatively closable.
+
+Additional two-connection races pair recovery with each resume boundary. An
+intent/recovery race has exactly one valid winner. Hook/recovery tests force
+both orderings under one per-reservation lifecycle arbiter: recovery-first
+leaves the permit unconsumed and emits no modeled call, while hook-first emits
+exactly one call and permits only conservative unknown-outcome classification
+before receipt persistence. Receipt/recovery tests likewise force both
+orderings: recovery-first preserves `RESUME_INTENT_COMMITTED` with no receipt
+or cleanup, while receipt-first reaches `RESUME_RECORDED` and makes the narrow
+recovery fail. Every outcome preserves one audit trail, no alternate permit,
+and no authority from a classified, terminal, selected, or closed lineage.
+These tests validate the reviewed in-process arbitration contract; SQLite
+alone cannot establish whether a real external call is already in flight.
 
 Receipt gates require exact `FakeResumeReceipt` type and the canonical object
 `execution_id`, lowercase intent-digest hex, literal `RESUMED`, and exact

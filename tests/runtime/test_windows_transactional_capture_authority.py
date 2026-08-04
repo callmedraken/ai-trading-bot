@@ -63,6 +63,13 @@ _PROCESS_RESULT_ISSUER = object()
 _ISSUED_RESUME_PERMITS_LOCK = threading.Lock()
 _ISSUED_PROCESS_PERMITS_LOCK = threading.Lock()
 _ISSUED_PROCESS_RESULTS_LOCK = threading.Lock()
+_RESUME_LIFECYCLE_LOCKS_GUARD = threading.Lock()
+_RESUME_LIFECYCLE_LOCKS: dict[str, threading.RLock] = {}
+
+
+def _resume_lifecycle_lock(reservation_id: str) -> threading.RLock:
+    with _RESUME_LIFECYCLE_LOCKS_GUARD:
+        return _RESUME_LIFECYCLE_LOCKS.setdefault(reservation_id, threading.RLock())
 
 
 @dataclass(eq=False)
@@ -1429,6 +1436,20 @@ def record_execution(
 def commit_resume_intent(
     connection: sqlite3.Connection, execution_id: str
 ) -> FakeResumeIntent:
+    parent = connection.execute(
+        "SELECT launch_reservation_id FROM launch_executions "
+        "WHERE launch_execution_id = ?",
+        (execution_id,),
+    ).fetchone()
+    if parent is None:
+        raise ValueError("cannot authorize resume for an unknown execution")
+    with _resume_lifecycle_lock(parent[0]):
+        return _commit_resume_intent_locked(connection, execution_id)
+
+
+def _commit_resume_intent_locked(
+    connection: sqlite3.Connection, execution_id: str
+) -> FakeResumeIntent:
     intent_json = _json(
         {
             "execution_id": execution_id,
@@ -1441,17 +1462,34 @@ def commit_resume_intent(
     try:
         row = connection.execute(
             """
-            SELECT phase, process_creation_json, process_creation_digest,
-                   job_object_json, job_object_digest, resume_authorization_json,
-                   resume_authorization_digest
-            FROM launch_executions WHERE launch_execution_id = ?
+            SELECT e.phase, e.process_creation_json, e.process_creation_digest,
+                   e.job_object_json, e.job_object_digest,
+                   e.resume_authorization_json, e.resume_authorization_digest,
+                   r.reservation_state, s.state
+            FROM launch_executions e
+            JOIN launch_reservations r
+              ON r.launch_reservation_id = e.launch_reservation_id
+            JOIN provider_call_claims c ON c.claim_id = r.claim_id
+            JOIN attempts a ON a.attempt_id = c.attempt_id
+            JOIN sessions s ON s.session_id = a.session_id
+            WHERE e.launch_execution_id = ?
+              AND NOT EXISTS (
+                  SELECT 1 FROM terminals t
+                  WHERE t.launch_reservation_id = r.launch_reservation_id
+              )
+              AND NOT EXISTS (
+                  SELECT 1 FROM session_selections ss
+                  WHERE ss.session_id = s.session_id
+              )
             """,
             (execution_id,),
         ).fetchone()
         if row is None:
-            raise ValueError("cannot authorize resume for an unknown execution")
+            raise ValueError("resume intent active lineage is unavailable")
         if row[0] != "PRE_RESUME_READY":
             raise ValueError("resume intent requires PRE_RESUME_READY")
+        if row[7] != "PROCESS_CREATED" or row[8] != "OPEN":
+            raise ValueError("resume intent active parent lineage is revoked")
         for evidence_json, evidence_digest in (
             (row[1], row[2]),
             (row[3], row[4]),
@@ -1464,7 +1502,30 @@ def commit_resume_intent(
             UPDATE launch_executions
             SET phase = 'RESUME_INTENT_COMMITTED', resume_intent_json = ?,
                 resume_intent_digest = ?, resume_intent_committed_at_utc = ?
-            WHERE launch_execution_id = ? AND phase = 'PRE_RESUME_READY'
+            WHERE launch_execution_id = ?
+              AND phase = 'PRE_RESUME_READY'
+              AND sha256(process_creation_json) IS process_creation_digest
+              AND sha256(job_object_json) IS job_object_digest
+              AND sha256(resume_authorization_json) IS resume_authorization_digest
+              AND EXISTS (
+                  SELECT 1
+                  FROM launch_reservations r
+                  JOIN provider_call_claims c ON c.claim_id = r.claim_id
+                  JOIN attempts a ON a.attempt_id = c.attempt_id
+                  JOIN sessions s ON s.session_id = a.session_id
+                  WHERE r.launch_reservation_id =
+                        launch_executions.launch_reservation_id
+                    AND r.reservation_state = 'PROCESS_CREATED'
+                    AND s.state = 'OPEN'
+                    AND NOT EXISTS (
+                        SELECT 1 FROM terminals t
+                        WHERE t.launch_reservation_id = r.launch_reservation_id
+                    )
+                    AND NOT EXISTS (
+                        SELECT 1 FROM session_selections ss
+                        WHERE ss.session_id = s.session_id
+                    )
+              )
             """,
             (intent_json, intent_digest, RESUME_INTENT_TIMESTAMP, execution_id),
         )
@@ -1547,6 +1608,22 @@ def record_post_resume_evidence(
     execution_id: str,
     resume_receipt: FakeResumeReceipt,
 ) -> None:
+    parent = connection.execute(
+        "SELECT launch_reservation_id FROM launch_executions "
+        "WHERE launch_execution_id = ?",
+        (execution_id,),
+    ).fetchone()
+    if parent is None:
+        raise ValueError("unknown launch execution")
+    with _resume_lifecycle_lock(parent[0]):
+        _record_post_resume_evidence_locked(connection, execution_id, resume_receipt)
+
+
+def _record_post_resume_evidence_locked(
+    connection: sqlite3.Connection,
+    execution_id: str,
+    resume_receipt: FakeResumeReceipt,
+) -> None:
     if type(resume_receipt) is not FakeResumeReceipt:
         raise TypeError("post-resume evidence requires a fake resume receipt")
     if resume_receipt.execution_id != execution_id:
@@ -1557,14 +1634,35 @@ def record_post_resume_evidence(
     _begin(connection)
     try:
         row = connection.execute(
-            "SELECT phase, resume_intent_digest FROM launch_executions "
-            "WHERE launch_execution_id = ?",
+            """
+            SELECT e.phase, e.resume_intent_digest, e.resume_intent_json,
+                   r.reservation_state, s.state
+            FROM launch_executions e
+            JOIN launch_reservations r
+              ON r.launch_reservation_id = e.launch_reservation_id
+            JOIN provider_call_claims c ON c.claim_id = r.claim_id
+            JOIN attempts a ON a.attempt_id = c.attempt_id
+            JOIN sessions s ON s.session_id = a.session_id
+            WHERE e.launch_execution_id = ?
+              AND NOT EXISTS (
+                  SELECT 1 FROM terminals t
+                  WHERE t.launch_reservation_id = r.launch_reservation_id
+              )
+              AND NOT EXISTS (
+                  SELECT 1 FROM session_selections ss
+                  WHERE ss.session_id = s.session_id
+              )
+            """,
             (execution_id,),
         ).fetchone()
         if row is None:
-            raise ValueError("unknown launch execution")
+            raise ValueError("post-resume active lineage is unavailable")
         if row[0] != "RESUME_INTENT_COMMITTED":
             raise ValueError("post-resume evidence requires committed resume intent")
+        if row[3] != "PROCESS_CREATED" or row[4] != "OPEN":
+            raise ValueError("post-resume active parent lineage is revoked")
+        if row[2] is None or _digest(row[2]) != row[1]:
+            raise ValueError("post-resume committed intent evidence is invalid")
         if resume_receipt.resume_intent_digest != row[1]:
             raise ValueError("fake resume receipt binds another resume intent")
         expected_result = _json(
@@ -1579,12 +1677,33 @@ def record_post_resume_evidence(
             raise ValueError("fake resume receipt is not the exact canonical success")
         if resume_receipt.result_digest != _digest(expected_result):
             raise ValueError("fake resume receipt digest is invalid")
-        connection.execute(
+        cursor = connection.execute(
             """
             UPDATE launch_executions
             SET phase = 'RESUME_RECORDED', post_resume_json = ?,
                 post_resume_digest = ?, cleanup_json = ?, cleanup_digest = ?
             WHERE launch_execution_id = ?
+              AND phase = 'RESUME_INTENT_COMMITTED'
+              AND resume_intent_digest IS ?
+              AND EXISTS (
+                  SELECT 1
+                  FROM launch_reservations r
+                  JOIN provider_call_claims c ON c.claim_id = r.claim_id
+                  JOIN attempts a ON a.attempt_id = c.attempt_id
+                  JOIN sessions s ON s.session_id = a.session_id
+                  WHERE r.launch_reservation_id =
+                        launch_executions.launch_reservation_id
+                    AND r.reservation_state = 'PROCESS_CREATED'
+                    AND s.state = 'OPEN'
+                    AND NOT EXISTS (
+                        SELECT 1 FROM terminals t
+                        WHERE t.launch_reservation_id = r.launch_reservation_id
+                    )
+                    AND NOT EXISTS (
+                        SELECT 1 FROM session_selections ss
+                        WHERE ss.session_id = s.session_id
+                    )
+              )
             """,
             (
                 expected_result,
@@ -1592,8 +1711,11 @@ def record_post_resume_evidence(
                 cleanup,
                 cleanup_digest,
                 execution_id,
+                row[1],
             ),
         )
+        if cursor.rowcount != 1:
+            raise ValueError("post-resume active lineage changed before persistence")
         _finish(connection, True)
     except BaseException:
         _finish(connection, False)
@@ -1830,6 +1952,34 @@ def record_recovery(
     action: str,
     ordinal: int | None = None,
 ) -> str:
+    if target_kind == "LAUNCH_RESERVATION" and action.startswith("CLASSIFY_"):
+        with _resume_lifecycle_lock(target_id):
+            return _record_recovery_locked(
+                connection,
+                session_id,
+                target_kind,
+                target_id,
+                action,
+                ordinal,
+            )
+    return _record_recovery_locked(
+        connection,
+        session_id,
+        target_kind,
+        target_id,
+        action,
+        ordinal,
+    )
+
+
+def _record_recovery_locked(
+    connection: sqlite3.Connection,
+    session_id: str,
+    target_kind: str,
+    target_id: str,
+    action: str,
+    ordinal: int | None,
+) -> str:
     _begin(connection)
     try:
         expected_kind, _, resulting = _RECOVERY_ACTIONS[action]
@@ -2028,21 +2178,51 @@ class FakeSideEffects:
     ) -> FakeResumeReceipt:
         if type(resume_intent) is not FakeResumeIntent:
             raise TypeError("ResumeThread requires an opaque fake resume intent")
+        parent = self.observer.execute(
+            "SELECT launch_reservation_id FROM launch_executions "
+            "WHERE launch_execution_id = ?",
+            (resume_intent.execution_id,),
+        ).fetchone()
+        if parent is None:
+            raise ValueError("cannot resume an unknown execution")
+        with _resume_lifecycle_lock(parent[0]):
+            return self._resume_thread_locked(resume_intent, fail=fail)
+
+    def _resume_thread_locked(
+        self, resume_intent: FakeResumeIntent, *, fail: bool
+    ) -> FakeResumeReceipt:
         execution_id = resume_intent.execution_id
         row = self.observer.execute(
             """
-            SELECT phase, process_creation_json, process_creation_digest,
-                   job_object_json, job_object_digest, resume_authorization_json,
-                   resume_authorization_digest, resume_intent_json,
-                   resume_intent_digest
-            FROM launch_executions WHERE launch_execution_id = ?
+            SELECT e.phase, e.process_creation_json, e.process_creation_digest,
+                   e.job_object_json, e.job_object_digest,
+                   e.resume_authorization_json, e.resume_authorization_digest,
+                   e.resume_intent_json, e.resume_intent_digest,
+                   r.reservation_state, s.state
+            FROM launch_executions e
+            JOIN launch_reservations r
+              ON r.launch_reservation_id = e.launch_reservation_id
+            JOIN provider_call_claims c ON c.claim_id = r.claim_id
+            JOIN attempts a ON a.attempt_id = c.attempt_id
+            JOIN sessions s ON s.session_id = a.session_id
+            WHERE e.launch_execution_id = ?
+              AND NOT EXISTS (
+                  SELECT 1 FROM terminals t
+                  WHERE t.launch_reservation_id = r.launch_reservation_id
+              )
+              AND NOT EXISTS (
+                  SELECT 1 FROM session_selections ss
+                  WHERE ss.session_id = s.session_id
+              )
             """,
             (execution_id,),
         ).fetchone()
         if row is None:
-            raise ValueError("cannot resume an unknown execution")
+            raise ValueError("ResumeThread active lineage is unavailable")
         if row[0] != "RESUME_INTENT_COMMITTED":
             raise ValueError("ResumeThread requires RESUME_INTENT_COMMITTED")
+        if row[9] != "PROCESS_CREATED" or row[10] != "OPEN":
+            raise ValueError("ResumeThread active parent lineage is revoked")
         for evidence_json, evidence_digest in (
             (row[1], row[2]),
             (row[3], row[4]),
@@ -4503,6 +4683,509 @@ def test_process_intent_evidence_is_paired_digest_valid_and_append_only(
         connection.rollback()
     with pytest.raises(ValueError, match="COMMITTED"):
         commit_process_intent(connection, reservation_id)
+    connection.close()
+
+
+def test_pre_resume_recovery_revokes_intent_before_terminal_and_close(
+    db_path: Path,
+) -> None:
+    connection = _connect(db_path)
+    events: list[str] = []
+    hooks = FakeSideEffects(connection, events)
+    session_id = create_session(connection)
+    attempt_id = allocate_attempt(connection, session_id)
+    claim_id = commit_claim(connection, attempt_id)
+    reservation_id = reserve_launch(connection, claim_id)
+    execution_id = _record_successful_process(connection, reservation_id)
+    with _ISSUED_RESUME_PERMITS_LOCK:
+        permits_before = set(_ISSUED_RESUME_PERMITS)
+
+    record_recovery(
+        connection,
+        session_id,
+        "LAUNCH_RESERVATION",
+        reservation_id,
+        "CLASSIFY_PRE_RESUME_READY",
+    )
+    with pytest.raises(ValueError, match="revoked|unavailable"):
+        commit_resume_intent(connection, execution_id)
+    with _ISSUED_RESUME_PERMITS_LOCK:
+        assert _ISSUED_RESUME_PERMITS == permits_before
+    assert events == []
+
+    record_terminal(connection, reservation_id, "CLOSED", "MAY_HAVE_OCCURRED")
+    with pytest.raises(ValueError, match="revoked|unavailable"):
+        commit_resume_intent(connection, execution_id)
+    record_recovery(connection, session_id, "SESSION", session_id, "CLOSE_SESSION")
+    with pytest.raises(ValueError, match="revoked|unavailable"):
+        commit_resume_intent(connection, execution_id)
+    assert connection.execute(
+        "SELECT phase FROM launch_executions WHERE launch_execution_id = ?",
+        (execution_id,),
+    ).fetchone() == ("PRE_RESUME_READY",)
+    assert hooks.events == []
+    connection.close()
+
+
+def test_resume_permit_is_revoked_by_unknown_outcome_recovery(db_path: Path) -> None:
+    connection = _connect(db_path)
+    events: list[str] = []
+    hooks = FakeSideEffects(connection, events)
+    session_id = create_session(connection)
+    attempt_id = allocate_attempt(connection, session_id)
+    claim_id = commit_claim(connection, attempt_id)
+    reservation_id = reserve_launch(connection, claim_id)
+    execution_id = _record_successful_process(connection, reservation_id)
+    intent = commit_resume_intent(connection, execution_id)
+    record_recovery(
+        connection,
+        session_id,
+        "LAUNCH_RESERVATION",
+        reservation_id,
+        "CLASSIFY_RESUME_OUTCOME_UNKNOWN",
+    )
+
+    with pytest.raises(ValueError, match="revoked"):
+        hooks.resume_thread(intent)
+    assert not intent._permit.consumed
+    assert events == []
+    assert connection.execute(
+        "SELECT reservation_state FROM launch_reservations "
+        "WHERE launch_reservation_id = ?",
+        (reservation_id,),
+    ).fetchone() == ("MANUAL_REVIEW",)
+    assert connection.execute(
+        "SELECT phase, post_resume_json, cleanup_json FROM launch_executions "
+        "WHERE launch_execution_id = ?",
+        (execution_id,),
+    ).fetchone() == ("RESUME_INTENT_COMMITTED", None, None)
+
+    with pytest.raises(sqlite3.IntegrityError):
+        record_terminal(connection, reservation_id)
+    record_terminal(connection, reservation_id, "CLOSED", "MAY_HAVE_OCCURRED")
+    with pytest.raises(ValueError, match="revoked|unavailable"):
+        hooks.resume_thread(intent)
+    record_recovery(connection, session_id, "SESSION", session_id, "CLOSE_SESSION")
+    with pytest.raises(ValueError, match="revoked|unavailable"):
+        hooks.resume_thread(intent)
+    assert connection.execute("SELECT count(*) FROM session_selections").fetchone() == (
+        0,
+    )
+    with _ISSUED_RESUME_PERMITS_LOCK:
+        _ISSUED_RESUME_PERMITS.discard(intent._permit)
+    connection.close()
+
+
+def test_delayed_resume_receipt_is_revoked_by_recovery(db_path: Path) -> None:
+    connection = _connect(db_path)
+    session_id = create_session(connection)
+    attempt_id = allocate_attempt(connection, session_id)
+    claim_id = commit_claim(connection, attempt_id)
+    reservation_id = reserve_launch(connection, claim_id)
+    execution_id = _record_successful_process(connection, reservation_id)
+    intent = commit_resume_intent(connection, execution_id)
+    receipt = FakeSideEffects(connection).resume_thread(intent)
+    record_recovery(
+        connection,
+        session_id,
+        "LAUNCH_RESERVATION",
+        reservation_id,
+        "CLASSIFY_RESUME_OUTCOME_UNKNOWN",
+    )
+
+    with pytest.raises(ValueError, match="revoked"):
+        record_post_resume_evidence(connection, execution_id, receipt)
+    assert json.loads(receipt.result_json)["resume_result"] == "RESUMED"
+    assert connection.execute(
+        "SELECT phase, post_resume_json, post_resume_digest, cleanup_json, "
+        "cleanup_digest FROM launch_executions WHERE launch_execution_id = ?",
+        (execution_id,),
+    ).fetchone() == ("RESUME_INTENT_COMMITTED", None, None, None, None)
+    assert connection.execute(
+        "SELECT reservation_state FROM launch_reservations "
+        "WHERE launch_reservation_id = ?",
+        (reservation_id,),
+    ).fetchone() == ("MANUAL_REVIEW",)
+    record_terminal(connection, reservation_id, "CLOSED", "MAY_HAVE_OCCURRED")
+    with pytest.raises(ValueError, match="revoked|unavailable"):
+        record_post_resume_evidence(connection, execution_id, receipt)
+    record_recovery(connection, session_id, "SESSION", session_id, "CLOSE_SESSION")
+    with pytest.raises(ValueError, match="revoked|unavailable"):
+        record_post_resume_evidence(connection, execution_id, receipt)
+    connection.close()
+
+
+@pytest.mark.parametrize("phase", ["PRE_RESUME_READY", "RESUME_INTENT_COMMITTED"])
+def test_direct_sql_resume_phase_advance_fails_after_manual_review(
+    db_path: Path, phase: str
+) -> None:
+    connection = _connect(db_path)
+    session_id = create_session(connection)
+    attempt_id = allocate_attempt(connection, session_id)
+    claim_id = commit_claim(connection, attempt_id)
+    reservation_id = reserve_launch(connection, claim_id)
+    execution_id = _record_successful_process(connection, reservation_id)
+    intent_json = _json(
+        {
+            "execution_id": execution_id,
+            "resume_operation": "ResumeThread",
+            "schema": 1,
+        }
+    )
+    if phase == "PRE_RESUME_READY":
+        record_recovery(
+            connection,
+            session_id,
+            "LAUNCH_RESERVATION",
+            reservation_id,
+            "CLASSIFY_PRE_RESUME_READY",
+        )
+        with pytest.raises(sqlite3.IntegrityError):
+            connection.execute(
+                "UPDATE launch_executions SET phase = 'RESUME_INTENT_COMMITTED', "
+                "resume_intent_json = ?, resume_intent_digest = ?, "
+                "resume_intent_committed_at_utc = ? WHERE launch_execution_id = ?",
+                (
+                    intent_json,
+                    _digest(intent_json),
+                    RESUME_INTENT_TIMESTAMP,
+                    execution_id,
+                ),
+            )
+    else:
+        intent = commit_resume_intent(connection, execution_id)
+        record_recovery(
+            connection,
+            session_id,
+            "LAUNCH_RESERVATION",
+            reservation_id,
+            "CLASSIFY_RESUME_OUTCOME_UNKNOWN",
+        )
+        post_json = _json(
+            {
+                "execution_id": execution_id,
+                "resume_intent_digest": intent.intent_digest.hex(),
+                "resume_result": "RESUMED",
+                "schema": 1,
+            }
+        )
+        cleanup, cleanup_digest = _evidence(f"cleanup:{execution_id}")
+        with pytest.raises(sqlite3.IntegrityError):
+            connection.execute(
+                "UPDATE launch_executions SET phase = 'RESUME_RECORDED', "
+                "post_resume_json = ?, post_resume_digest = ?, cleanup_json = ?, "
+                "cleanup_digest = ? WHERE launch_execution_id = ?",
+                (
+                    post_json,
+                    _digest(post_json),
+                    cleanup,
+                    cleanup_digest,
+                    execution_id,
+                ),
+            )
+        with _ISSUED_RESUME_PERMITS_LOCK:
+            _ISSUED_RESUME_PERMITS.discard(intent._permit)
+    connection.rollback()
+    assert connection.execute(
+        "SELECT reservation_state FROM launch_reservations "
+        "WHERE launch_reservation_id = ?",
+        (reservation_id,),
+    ).fetchone() == ("MANUAL_REVIEW",)
+    connection.close()
+
+
+def test_recovery_race_with_resume_intent_has_one_valid_winner(db_path: Path) -> None:
+    setup = _connect(db_path)
+    session_id = create_session(setup)
+    attempt_id = allocate_attempt(setup, session_id)
+    claim_id = commit_claim(setup, attempt_id)
+    reservation_id = reserve_launch(setup, claim_id)
+    execution_id = _record_successful_process(setup, reservation_id)
+    setup.close()
+    barrier = threading.Barrier(2)
+    outcomes: list[tuple[str, bool, FakeResumeIntent | None]] = []
+    outcome_lock = threading.Lock()
+
+    def intent_worker() -> None:
+        connection = _connect(db_path)
+        barrier.wait()
+        intent: FakeResumeIntent | None = None
+        try:
+            intent = commit_resume_intent(connection, execution_id)
+            success = True
+        except (ValueError, sqlite3.IntegrityError):
+            success = False
+        with outcome_lock:
+            outcomes.append(("intent", success, intent))
+        connection.close()
+
+    def recovery_worker() -> None:
+        connection = _connect(db_path)
+        barrier.wait()
+        try:
+            record_recovery(
+                connection,
+                session_id,
+                "LAUNCH_RESERVATION",
+                reservation_id,
+                "CLASSIFY_PRE_RESUME_READY",
+            )
+            success = True
+        except (ValueError, sqlite3.IntegrityError):
+            success = False
+        with outcome_lock:
+            outcomes.append(("recovery", success, None))
+        connection.close()
+
+    threads = [
+        threading.Thread(target=intent_worker),
+        threading.Thread(target=recovery_worker),
+    ]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    assert sum(success for _, success, _ in outcomes) == 1
+    verify = _connect(db_path)
+    intent_outcome = next(item for item in outcomes if item[0] == "intent")
+    if intent_outcome[1]:
+        assert verify.execute(
+            "SELECT reservation_state FROM launch_reservations "
+            "WHERE launch_reservation_id = ?",
+            (reservation_id,),
+        ).fetchone() == ("PROCESS_CREATED",)
+        assert verify.execute("SELECT count(*) FROM manual_recoveries").fetchone() == (
+            0,
+        )
+        assert intent_outcome[2] is not None
+        with _ISSUED_RESUME_PERMITS_LOCK:
+            _ISSUED_RESUME_PERMITS.discard(intent_outcome[2]._permit)
+    else:
+        assert verify.execute(
+            "SELECT reservation_state FROM launch_reservations "
+            "WHERE launch_reservation_id = ?",
+            (reservation_id,),
+        ).fetchone() == ("MANUAL_REVIEW",)
+        assert verify.execute("SELECT count(*) FROM manual_recoveries").fetchone() == (
+            1,
+        )
+    verify.close()
+
+
+@pytest.mark.parametrize("winner", ["recovery", "hook"])
+def test_recovery_race_with_resume_dispatch_is_serialized(
+    db_path: Path, winner: str
+) -> None:
+    setup = _connect(db_path)
+    session_id = create_session(setup)
+    attempt_id = allocate_attempt(setup, session_id)
+    claim_id = commit_claim(setup, attempt_id)
+    reservation_id = reserve_launch(setup, claim_id)
+    execution_id = _record_successful_process(setup, reservation_id)
+    intent = commit_resume_intent(setup, execution_id)
+    setup.close()
+    lifecycle_lock = _resume_lifecycle_lock(reservation_id)
+    winner_has_lock = threading.Event()
+    events: list[str] = []
+    event_lock = threading.Lock()
+    outcomes: list[str] = []
+    outcomes_lock = threading.Lock()
+
+    def run_recovery(first: bool) -> None:
+        connection = _connect(db_path)
+        try:
+            if first:
+                with lifecycle_lock:
+                    winner_has_lock.set()
+                    record_recovery(
+                        connection,
+                        session_id,
+                        "LAUNCH_RESERVATION",
+                        reservation_id,
+                        "CLASSIFY_RESUME_OUTCOME_UNKNOWN",
+                    )
+            else:
+                winner_has_lock.wait()
+                record_recovery(
+                    connection,
+                    session_id,
+                    "LAUNCH_RESERVATION",
+                    reservation_id,
+                    "CLASSIFY_RESUME_OUTCOME_UNKNOWN",
+                )
+            outcome = "recovery"
+        except (ValueError, sqlite3.IntegrityError):
+            outcome = "recovery-rejected"
+        with outcomes_lock:
+            outcomes.append(outcome)
+        connection.close()
+
+    def run_hook(first: bool) -> None:
+        connection = _connect(db_path)
+        hooks = FakeSideEffects(connection, events, event_lock)
+        try:
+            if first:
+                with lifecycle_lock:
+                    winner_has_lock.set()
+                    hooks.resume_thread(intent)
+            else:
+                winner_has_lock.wait()
+                hooks.resume_thread(intent)
+            outcome = "hook"
+        except ValueError:
+            outcome = "hook-rejected"
+        with outcomes_lock:
+            outcomes.append(outcome)
+        connection.close()
+
+    threads = [
+        threading.Thread(target=run_recovery, args=(winner == "recovery",)),
+        threading.Thread(target=run_hook, args=(winner == "hook",)),
+    ]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    if winner == "recovery":
+        assert sorted(outcomes) == ["hook-rejected", "recovery"]
+        assert events == []
+        with _ISSUED_RESUME_PERMITS_LOCK:
+            _ISSUED_RESUME_PERMITS.discard(intent._permit)
+    else:
+        assert sorted(outcomes) == ["hook", "recovery"]
+        assert events == ["resume-intent-committed", "resume-thread"]
+    verify = _connect(db_path)
+    assert verify.execute(
+        "SELECT reservation_state FROM launch_reservations "
+        "WHERE launch_reservation_id = ?",
+        (reservation_id,),
+    ).fetchone() == ("MANUAL_REVIEW",)
+    verify.close()
+
+
+@pytest.mark.parametrize("winner", ["recovery", "receipt"])
+def test_recovery_race_with_receipt_persistence_is_serialized(
+    db_path: Path, winner: str
+) -> None:
+    setup = _connect(db_path)
+    session_id = create_session(setup)
+    attempt_id = allocate_attempt(setup, session_id)
+    claim_id = commit_claim(setup, attempt_id)
+    reservation_id = reserve_launch(setup, claim_id)
+    execution_id = _record_successful_process(setup, reservation_id)
+    intent = commit_resume_intent(setup, execution_id)
+    receipt = FakeSideEffects(setup).resume_thread(intent)
+    setup.close()
+    lifecycle_lock = _resume_lifecycle_lock(reservation_id)
+    winner_has_lock = threading.Event()
+    outcomes: list[str] = []
+    outcomes_lock = threading.Lock()
+
+    def run_recovery(first: bool) -> None:
+        connection = _connect(db_path)
+        try:
+            if first:
+                with lifecycle_lock:
+                    winner_has_lock.set()
+                    record_recovery(
+                        connection,
+                        session_id,
+                        "LAUNCH_RESERVATION",
+                        reservation_id,
+                        "CLASSIFY_RESUME_OUTCOME_UNKNOWN",
+                    )
+            else:
+                winner_has_lock.wait()
+                record_recovery(
+                    connection,
+                    session_id,
+                    "LAUNCH_RESERVATION",
+                    reservation_id,
+                    "CLASSIFY_RESUME_OUTCOME_UNKNOWN",
+                )
+            outcome = "recovery"
+        except (ValueError, sqlite3.IntegrityError):
+            outcome = "recovery-rejected"
+        with outcomes_lock:
+            outcomes.append(outcome)
+        connection.close()
+
+    def run_receipt(first: bool) -> None:
+        connection = _connect(db_path)
+        try:
+            if first:
+                with lifecycle_lock:
+                    winner_has_lock.set()
+                    record_post_resume_evidence(connection, execution_id, receipt)
+            else:
+                winner_has_lock.wait()
+                record_post_resume_evidence(connection, execution_id, receipt)
+            outcome = "receipt"
+        except (ValueError, sqlite3.IntegrityError):
+            outcome = "receipt-rejected"
+        with outcomes_lock:
+            outcomes.append(outcome)
+        connection.close()
+
+    threads = [
+        threading.Thread(target=run_recovery, args=(winner == "recovery",)),
+        threading.Thread(target=run_receipt, args=(winner == "receipt",)),
+    ]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    verify = _connect(db_path)
+    if winner == "recovery":
+        assert sorted(outcomes) == ["receipt-rejected", "recovery"]
+        assert verify.execute(
+            "SELECT reservation_state FROM launch_reservations "
+            "WHERE launch_reservation_id = ?",
+            (reservation_id,),
+        ).fetchone() == ("MANUAL_REVIEW",)
+        assert verify.execute(
+            "SELECT phase, post_resume_json, cleanup_json FROM launch_executions "
+            "WHERE launch_execution_id = ?",
+            (execution_id,),
+        ).fetchone() == ("RESUME_INTENT_COMMITTED", None, None)
+    else:
+        assert sorted(outcomes) == ["receipt", "recovery-rejected"]
+        assert verify.execute(
+            "SELECT reservation_state FROM launch_reservations "
+            "WHERE launch_reservation_id = ?",
+            (reservation_id,),
+        ).fetchone() == ("PROCESS_CREATED",)
+        assert verify.execute(
+            "SELECT phase, post_resume_json IS NOT NULL, cleanup_json IS NOT NULL "
+            "FROM launch_executions WHERE launch_execution_id = ?",
+            (execution_id,),
+        ).fetchone() == ("RESUME_RECORDED", 1, 1)
+    verify.close()
+
+
+def test_process_receipt_cannot_persist_after_process_recovery(db_path: Path) -> None:
+    connection = _connect(db_path)
+    session_id = create_session(connection)
+    attempt_id = allocate_attempt(connection, session_id)
+    claim_id = commit_claim(connection, attempt_id)
+    reservation_id = reserve_launch(connection, claim_id)
+    process_intent = commit_process_intent(connection, reservation_id)
+    process_receipt = FakeSideEffects(connection).create_process(process_intent)
+    assert type(process_receipt) is FakeProcessCreationReceipt
+    record_recovery(
+        connection,
+        session_id,
+        "LAUNCH_RESERVATION",
+        reservation_id,
+        "CLASSIFY_PROCESS_OUTCOME_UNKNOWN",
+    )
+    with pytest.raises(ValueError, match="PROCESS_INTENT_COMMITTED"):
+        record_execution(connection, reservation_id, process_receipt)
+    assert connection.execute("SELECT count(*) FROM launch_executions").fetchone() == (
+        0,
+    )
+    with _ISSUED_PROCESS_RESULTS_LOCK:
+        _ISSUED_PROCESS_RESULTS.discard(process_receipt._permit)
     connection.close()
 
 

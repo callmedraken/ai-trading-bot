@@ -678,7 +678,25 @@ WHEN NOT (
         AND sha256(NEW.resume_intent_json) IS NEW.resume_intent_digest
         AND CAST(NEW.resume_intent_json AS TEXT) =
             '{"execution_id":"' || NEW.launch_execution_id ||
-            '","resume_operation":"ResumeThread","schema":1}')
+            '","resume_operation":"ResumeThread","schema":1}'
+        AND EXISTS (
+            SELECT 1
+            FROM launch_reservations r
+            JOIN provider_call_claims c ON c.claim_id = r.claim_id
+            JOIN attempts a ON a.attempt_id = c.attempt_id
+            JOIN sessions s ON s.session_id = a.session_id
+            WHERE r.launch_reservation_id = NEW.launch_reservation_id
+              AND r.reservation_state = 'PROCESS_CREATED'
+              AND s.state = 'OPEN'
+              AND NOT EXISTS (
+                  SELECT 1 FROM terminals t
+                  WHERE t.launch_reservation_id = r.launch_reservation_id
+              )
+              AND NOT EXISTS (
+                  SELECT 1 FROM session_selections ss
+                  WHERE ss.session_id = s.session_id
+              )
+        ))
     OR (OLD.phase = 'RESUME_INTENT_COMMITTED'
         AND NEW.phase = 'RESUME_RECORDED'
         AND NEW.post_resume_json IS NOT NULL
@@ -690,7 +708,25 @@ WHEN NOT (
             '","resume_result":"RESUMED","schema":1}'
         AND NEW.cleanup_json IS NOT NULL
         AND NEW.cleanup_digest IS NOT NULL
-        AND sha256(NEW.cleanup_json) IS NEW.cleanup_digest)
+        AND sha256(NEW.cleanup_json) IS NEW.cleanup_digest
+        AND EXISTS (
+            SELECT 1
+            FROM launch_reservations r
+            JOIN provider_call_claims c ON c.claim_id = r.claim_id
+            JOIN attempts a ON a.attempt_id = c.attempt_id
+            JOIN sessions s ON s.session_id = a.session_id
+            WHERE r.launch_reservation_id = NEW.launch_reservation_id
+              AND r.reservation_state = 'PROCESS_CREATED'
+              AND s.state = 'OPEN'
+              AND NOT EXISTS (
+                  SELECT 1 FROM terminals t
+                  WHERE t.launch_reservation_id = r.launch_reservation_id
+              )
+              AND NOT EXISTS (
+                  SELECT 1 FROM session_selections ss
+                  WHERE ss.session_id = s.session_id
+              )
+        ))
     OR (OLD.phase = 'RESUME_RECORDED' AND NEW.phase IN ('POST_RESUME_AMBIGUOUS', 'TERMINAL_RECORDED'))
     OR (OLD.phase = 'POST_RESUME_AMBIGUOUS' AND NEW.phase IN ('TERMINAL_RECORDED', 'CLOSED'))
     OR (OLD.phase = 'TERMINAL_RECORDED' AND NEW.phase = 'CLOSED')

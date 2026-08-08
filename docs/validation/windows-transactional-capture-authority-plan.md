@@ -654,14 +654,29 @@ state-column update alone must never manufacture operational progress.
 
 | Table | State/phase and predecessor | Durable fact before projection | Required immediate-parent lineage | Direct-SQL admission/projection gate | Recovery, selection, and close acceptance |
 | --- | --- | --- | --- | --- | --- |
-| `sessions` | insert -> `OPEN`; `OPEN -> SUCCESS_SELECTED`; `OPEN|SUCCESS_SELECTED -> CLOSED` | canonical row with zero counters/no close facts; selection; close recovery or existing selection plus immutable close facts | metadata -> session; selection -> terminal -> reservation -> claim -> attempt -> session; close rechecks every attempt lineage | reject every noncanonical insert, selection-free success, recovery-free open close, and any mutable close facts | `CLOSE_SESSION` may close an empty session, but any terminal-looking attempt must have its exact terminal/selection lineage |
+| `sessions` | insert -> `OPEN`; `OPEN -> SUCCESS_SELECTED`; `OPEN|SUCCESS_SELECTED -> CLOSED` | canonical row with zero counters/no close facts; selection; close recovery or existing selection plus immutable close facts | metadata -> session; selection -> terminal -> reservation -> claim -> attempt -> session; the exact close transition rechecks every current attempt lineage | reject every noncanonical insert, selection-free success, recovery-free or stale-recovery open close, and any mutable close facts | `CLOSE_SESSION` may close an empty session, but any current attempt must be terminal with exact terminal/selection lineage and none may be ambiguous |
 | `attempts` | insert -> `ALLOCATED`; then `CLAIM_COMMITTED`, `LAUNCH_RESERVED`, optional `LAUNCH_MAY_HAVE_OCCURRED`, `TERMINAL_RECORDED`, `SUCCESS_SELECTED`, optional `CLOSED` | attempt evidence; claim; reservation; attempt-ambiguity recovery; terminal; selection; terminal/selection plus closed session | each fact resolves to the exact attempt and owning session | reject every projection without its listed fact and reject child insert under the wrong predecessor | ambiguity grants no retry; selected and closed states are absorbing |
 | `provider_call_claims` | attempt `ALLOCATED` -> immutable `COMMITTED` claim | claim row precedes attempt claim projection | claim -> exact attempt -> open session with complete prior-claim admission matrix | insert trigger enforces copied request/provider/operation/budget/policy and predecessor; row is immutable | claim-ambiguity recovery is evidence-only and leaves `COMMITTED` |
-| `launch_reservations` | claim/attempt -> `COMMITTED`; then `PROCESS_INTENT_COMMITTED`, `PROCESS_CREATED` or `PROCESS_CREATION_FAILED`, `MANUAL_REVIEW`, `TERMINAL_RECORDED` | reservation; process intent; execution or exact failure evidence; matching recovery; terminal | reservation -> claim -> attempt -> open session; execution/terminal reference exact reservation | reject reservation under non-`CLAIM_COMMITTED` attempt, created-without-execution, failed-without-failure, manual-review-without-recovery, and terminal-without-terminal | each manual-review predecessor requires its exact action row; no alternate recovery path |
-| `launch_executions` | reservation process intent -> `PRE_RESUME_READY`; then `RESUME_INTENT_COMMITTED`, `RESUME_RECORDED`, optional `POST_RESUME_AMBIGUOUS`, `TERMINAL_RECORDED`, optional `CLOSED` | execution; resume intent; post-resume plus cleanup; attempt-ambiguity recovery; terminal; terminal plus closed session | execution -> reservation -> claim -> attempt -> open session | reject insert under wrong reservation state and every phase projection missing its paired evidence, recovery, terminal, or close | external call occurrence remains outside SQLite and conservatively recoverable |
+| `launch_reservations` | claim/attempt -> `COMMITTED`; then `PROCESS_INTENT_COMMITTED`, `PROCESS_CREATED` or `PROCESS_CREATION_FAILED`, `MANUAL_REVIEW`, `TERMINAL_RECORDED` | reservation; process intent; execution or exact failure evidence; matching recovery; terminal | reservation -> claim -> attempt -> open session; execution/terminal reference exact reservation | process intent requires the current launch-reserved parent projection; reject created-without-execution, failed-without-failure, manual-review without a fresh matching recovery predicate, and terminal-without-terminal | each manual-review predecessor requires its exact action row plus current phase/evidence and no newer terminal/selection fact; no alternate recovery path |
+| `launch_executions` | reservation process intent -> `PRE_RESUME_READY`; then `RESUME_INTENT_COMMITTED`, `RESUME_RECORDED`, optional `POST_RESUME_AMBIGUOUS`, `TERMINAL_RECORDED`, optional `CLOSED` | execution; resume intent; post-resume plus cleanup; attempt-ambiguity recovery; terminal; terminal plus closed session | execution -> reservation -> claim -> attempt -> open session | reject insert under wrong reservation state and every phase projection missing its paired evidence, fresh active-lineage predicate, recovery, terminal, or close | ambiguity projection rechecks no terminal/selection; external call occurrence remains outside SQLite and conservatively recoverable |
 | `terminals` | eligible reservation/execution predecessor -> immutable terminal | terminal row precedes execution/reservation/attempt terminal projections | terminal -> reservation -> claim -> attempt -> open session; state-specific execution/failure/manual-review evidence | reject impossible predecessor, wrong request lineage, and every invalid state/disposition/snapshot/evidence combination | ambiguous/manual-review terminals cannot authorize selection |
 | `session_selections` | successful terminal and terminal-recorded attempt in `OPEN` session -> immutable selection | selection row precedes attempt/session success projections | selection -> successful terminal -> reservation -> claim -> exact attempt/session | reject wrong session, non-success, non-terminal-recorded attempt, duplicate selection, and success projection without selection | normal and `SELECT_COMMITTED_SUCCESS` recovery use the same insert path and timestamp |
 | `manual_recoveries` | exact action-matrix predecessor in `OPEN` session | recovery row at current ordinal, then trigger-owned counter increment, then optional state projection | target kind/id resolves through immediate parents to the same session | reject wrong predecessor/target/action, duplicate ordinal, standalone counter update, and recovery-owned state without recovery | evidence-only actions do not themselves mutate aggregate state; any optional ambiguity projection must cite that row; classification and close are atomic and irreversible |
+
+Every state-producing recovery row is necessary but not sufficient for its
+projection. The freshness matrix is executable acceptance criteria:
+
+| Recovery action | Eligibility after row insertion | Required projection-time recheck |
+| --- | --- | --- |
+| `RECORD_ATTEMPT_AMBIGUITY` | mutable | committed claim, launch-reserved attempt, `PROCESS_CREATED` reservation, resumed execution, open session, no terminal/selection |
+| `RECORD_CLAIM_AMBIGUITY` | immutable evidence-only record | none; no state or capability projection exists |
+| `CLASSIFY_LAUNCH_RESERVATION` | mutable | exact active lineage and no process intent/execution/terminal/selection |
+| `CLASSIFY_PROCESS_OUTCOME_UNKNOWN` | mutable | exact digest-valid process intent, active lineage, and no failure/execution/terminal/selection |
+| `CLASSIFY_PRE_RESUME_READY` | mutable | one still-pre-resume execution and no resume, post-resume, cleanup, terminal, or selection fact |
+| `CLASSIFY_RESUME_OUTCOME_UNKNOWN` | mutable | one still-intent-only execution and no receipt, cleanup, terminal, or selection fact |
+| `SELECT_COMMITTED_SUCCESS` | mutable | normal selection ownership, success, terminal-recorded attempt, open-session, and uniqueness guards |
+| `CLOSE_SESSION` | mutable | complete current normalized close predicate at `OPEN -> CLOSED`, including every attempt added after the row |
+| `ACKNOWLEDGE_RESTORE` | immutable evidence-only record | none; no state or capability projection exists |
 
 Focused direct-SQL acceptance must exercise both directions and preserve a full
 before/after database snapshot on every rejection:
@@ -682,7 +697,16 @@ before/after database snapshot on every rejection:
 - after deliberately seeding a terminal-looking attempt while omitting its
   normalized child facts, `CLOSE_SESSION` rejects both fabricated
   `TERMINAL_RECORDED` and fabricated `SUCCESS_SELECTED`, leaving no recovery,
-  ordinal consumption, close facts, or session-state change.
+  ordinal consumption, close facts, or session-state change;
+- after inserting a valid `CLOSE_SESSION` row but before projecting closure,
+  adding a new allocated attempt makes the exact session transition fail;
+- after inserting each mutable reservation-classification row, a newly inserted
+  execution, resume intent, or resume receipt makes the stale projection fail;
+- after inserting attempt-ambiguity recovery, a newly inserted terminal makes
+  both the attempt and execution ambiguity projections fail; and
+- a canonical process-intent update against a reservation whose attempt has not
+  reached `LAUNCH_RESERVED` fails even though the intent bytes and digest are
+  otherwise exact.
 
 The positive ordering remains claim insert -> attempt claim projection;
 reservation insert -> attempt reservation projection; process-intent commit ->

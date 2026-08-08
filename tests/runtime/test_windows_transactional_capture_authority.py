@@ -2868,6 +2868,63 @@ _RECOVERY_ACTIONS: dict[str, tuple[str, str, str]] = {
 }
 
 
+def _insert_recovery_fact_for_test(
+    connection: sqlite3.Connection,
+    session_id: str,
+    target_kind: str,
+    target_id: str,
+    action: str,
+) -> str:
+    expected_kind, _, resulting = _RECOVERY_ACTIONS[action]
+    if target_kind != expected_kind:
+        raise ValueError("recovery action target kind is invalid")
+    ordinal_row = connection.execute(
+        "SELECT next_recovery_ordinal FROM sessions WHERE session_id = ?",
+        (session_id,),
+    ).fetchone()
+    if ordinal_row is None:
+        raise ValueError("unknown recovery session")
+    recovery_ordinal = ordinal_row[0]
+    predecessor = _target_state(connection, target_kind, target_id)
+    recovery_id = _recovery_id(
+        session_id,
+        target_kind,
+        target_id,
+        action,
+        predecessor,
+        resulting,
+        recovery_ordinal,
+        RECOVERY_POLICY,
+    )
+    evidence, evidence_digest = _evidence(f"recovery:{recovery_id}")
+    connection.execute(
+        """
+        INSERT INTO manual_recoveries (
+            recovery_id, session_id, recovery_ordinal, target_kind,
+            target_id, action, predecessor_state, resulting_state,
+            recovery_schema, recovery_policy_version,
+            operator_evidence_json, operator_evidence_digest,
+            created_at_utc
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)
+        """,
+        (
+            recovery_id,
+            session_id,
+            recovery_ordinal,
+            target_kind,
+            target_id,
+            action,
+            predecessor,
+            resulting,
+            RECOVERY_POLICY,
+            evidence,
+            evidence_digest,
+            MANUAL_REVIEW_TIMESTAMP,
+        ),
+    )
+    return recovery_id
+
+
 def record_recovery(
     connection: sqlite3.Connection,
     session_id: str,
@@ -9295,6 +9352,209 @@ def test_close_session_rejects_fabricated_terminal_looking_attempt_lineage(
         "SELECT state, next_recovery_ordinal FROM sessions WHERE session_id = ?",
         (session_id,),
     ).fetchone() == ("OPEN", 0)
+    connection.close()
+
+
+@pytest.mark.parametrize(
+    "stale_case",
+    [
+        "close-new-attempt",
+        "process-unknown-new-execution",
+        "pre-resume-new-intent",
+        "resume-unknown-new-receipt",
+    ],
+)
+def test_recovery_projection_rechecks_mutable_current_eligibility(
+    db_path: Path, stale_case: str
+) -> None:
+    connection = _connect(db_path)
+    session_id = create_session(connection)
+
+    if stale_case == "close-new-attempt":
+        target_id = session_id
+        _insert_recovery_fact_for_test(
+            connection,
+            session_id,
+            "SESSION",
+            target_id,
+            "CLOSE_SESSION",
+        )
+        attempt_id = allocate_attempt(connection, session_id)
+        update_sql = (
+            "UPDATE sessions SET state = 'CLOSED', closed_at_utc = ?, "
+            "close_reason = ? WHERE session_id = ?"
+        )
+        update_params: tuple[object, ...] = (
+            CLOSE_TIMESTAMP,
+            "stale-close-recovery",
+            session_id,
+        )
+    else:
+        attempt_id = allocate_attempt(connection, session_id)
+        claim_id = commit_claim(connection, attempt_id)
+        reservation_id = reserve_launch(connection, claim_id)
+        target_id = str(reservation_id)
+        if stale_case == "process-unknown-new-execution":
+            process_intent = _construct_provider_and_commit_process_intent(
+                connection, reservation_id
+            )
+            _insert_recovery_fact_for_test(
+                connection,
+                session_id,
+                "LAUNCH_RESERVATION",
+                target_id,
+                "CLASSIFY_PROCESS_OUTCOME_UNKNOWN",
+            )
+            _insert_execution_row_for_test(connection, target_id)
+            with _ISSUED_PROCESS_PERMITS_LOCK:
+                _ISSUED_PROCESS_PERMITS.pop(process_intent._permit, None)
+            update_sql = (
+                "UPDATE launch_reservations SET reservation_state = "
+                "'MANUAL_REVIEW', outcome_recorded_at_utc = ? "
+                "WHERE launch_reservation_id = ?"
+            )
+            update_params = (MANUAL_REVIEW_TIMESTAMP, target_id)
+        else:
+            execution_id = _record_successful_process(connection, reservation_id)
+            if stale_case == "pre-resume-new-intent":
+                _insert_recovery_fact_for_test(
+                    connection,
+                    session_id,
+                    "LAUNCH_RESERVATION",
+                    target_id,
+                    "CLASSIFY_PRE_RESUME_READY",
+                )
+                resume_intent = commit_resume_intent(
+                    connection, execution_id, reservation_id
+                )
+                with _ISSUED_RESUME_PERMITS_LOCK:
+                    _ISSUED_RESUME_PERMITS.pop(resume_intent._permit, None)
+            else:
+                assert stale_case == "resume-unknown-new-receipt"
+                resume_intent = commit_resume_intent(
+                    connection, execution_id, reservation_id
+                )
+                _insert_recovery_fact_for_test(
+                    connection,
+                    session_id,
+                    "LAUNCH_RESERVATION",
+                    target_id,
+                    "CLASSIFY_RESUME_OUTCOME_UNKNOWN",
+                )
+                resume_receipt = FakeSideEffects(connection).resume_thread(
+                    resume_intent
+                )
+                record_post_resume_evidence(connection, execution_id, resume_receipt)
+            update_sql = (
+                "UPDATE launch_reservations SET reservation_state = "
+                "'MANUAL_REVIEW' WHERE launch_reservation_id = ?"
+            )
+            update_params = (target_id,)
+
+    before = _database_rows(connection)
+    with pytest.raises(sqlite3.IntegrityError, match="projection fact"):
+        connection.execute(update_sql, update_params)
+    assert _database_rows(connection) == before
+    assert connection.execute(
+        "SELECT state, next_recovery_ordinal FROM sessions WHERE session_id = ?",
+        (session_id,),
+    ).fetchone() == ("OPEN", 1)
+    assert connection.execute(
+        "SELECT state FROM attempts WHERE attempt_id = ?",
+        (attempt_id,),
+    ).fetchone()[0] in {
+        "ALLOCATED",
+        "LAUNCH_RESERVED",
+    }
+    connection.close()
+
+
+@pytest.mark.parametrize("projection", ["attempt", "execution"])
+def test_ambiguity_recovery_projection_rechecks_current_terminal_absence(
+    db_path: Path, projection: str
+) -> None:
+    connection = _connect(db_path)
+    session_id = create_session(connection)
+    attempt_id = allocate_attempt(connection, session_id)
+    claim_id = commit_claim(connection, attempt_id)
+    reservation_id = reserve_launch(connection, claim_id)
+    execution_id = _record_successful_process(connection, reservation_id)
+    _resume_and_persist(connection, execution_id, reservation_id)
+    _insert_recovery_fact_for_test(
+        connection,
+        session_id,
+        "ATTEMPT",
+        attempt_id,
+        "RECORD_ATTEMPT_AMBIGUITY",
+    )
+    request_digest = connection.execute(
+        "SELECT request_digest FROM attempts WHERE attempt_id = ?",
+        (attempt_id,),
+    ).fetchone()[0]
+    _insert_terminal_row_for_test(
+        connection,
+        reservation_id,
+        request_digest,
+        "AMBIGUOUS",
+        "MAY_HAVE_OCCURRED",
+    )
+
+    mutation = (
+        (
+            "UPDATE attempts SET state = 'LAUNCH_MAY_HAVE_OCCURRED' "
+            "WHERE attempt_id = ?",
+            (attempt_id,),
+        )
+        if projection == "attempt"
+        else (
+            "UPDATE launch_executions SET phase = 'POST_RESUME_AMBIGUOUS' "
+            "WHERE launch_execution_id = ?",
+            (execution_id,),
+        )
+    )
+    before = _database_rows(connection)
+    with pytest.raises(sqlite3.IntegrityError, match="projection fact"):
+        connection.execute(*mutation)
+    assert _database_rows(connection) == before
+    connection.close()
+
+
+def test_process_intent_projection_requires_current_active_parent_lineage(
+    db_path: Path,
+) -> None:
+    connection = _connect(db_path)
+    session_id = create_session(connection)
+    attempt_id = allocate_attempt(connection, session_id)
+    claim_id = commit_claim(connection, attempt_id)
+    request_digest = connection.execute(
+        "SELECT request_digest FROM attempts WHERE attempt_id = ?",
+        (attempt_id,),
+    ).fetchone()[0]
+    reservation_id = _insert_reservation_row_for_test(
+        connection, claim_id, request_digest
+    )
+    intent_json = _process_intent_json(
+        reservation_id, request_digest, POLICY, CLAIM_POLICY
+    )
+
+    before = _database_rows(connection)
+    with pytest.raises(sqlite3.IntegrityError, match="projection fact"):
+        connection.execute(
+            "UPDATE launch_reservations SET reservation_state = "
+            "'PROCESS_INTENT_COMMITTED', process_intent_json = ?, "
+            "process_intent_digest = ?, process_intent_committed_at_utc = ? "
+            "WHERE launch_reservation_id = ?",
+            (
+                intent_json,
+                _digest(intent_json),
+                PROCESS_INTENT_TIMESTAMP,
+                reservation_id,
+            ),
+        )
+    assert _database_rows(connection) == before
+    assert connection.execute(
+        "SELECT state FROM attempts WHERE attempt_id = ?", (attempt_id,)
+    ).fetchone() == ("CLAIM_COMMITTED",)
     connection.close()
 
 

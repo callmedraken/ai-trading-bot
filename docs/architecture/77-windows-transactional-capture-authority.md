@@ -229,13 +229,17 @@ path.
 - canonical request bytes and digest; and
 - creation plus controlled close facts.
 
-Only forward session transitions are permitted. `SUCCESS_SELECTED` and
+The insert contract is exact: a session begins `OPEN`, both ordinal counters
+are zero, and both close facts are null. No direct insert may begin selected,
+closed, at another state, with a consumed ordinal, or with pre-populated close
+facts. Only forward session transitions are permitted. `SUCCESS_SELECTED` and
 `CLOSED` are absorbing with respect to selection/recovery eligibility;
 `CLOSED` also requires both `closed_at_utc` and `close_reason`. Those facts
 must both be null before closure, may be populated exactly once while moving
-either `OPEN` or `SUCCESS_SELECTED` to `CLOSED`, and cannot thereafter be
-replaced, cleared, partially changed, or changed by a same-state `CLOSED`
-update. Session identity and request evidence are immutable.
+`OPEN` to `CLOSED` under `CLOSE_SESSION` or moving a selection-backed
+`SUCCESS_SELECTED` session to `CLOSED`, and cannot thereafter be replaced,
+cleared, partially changed, or changed by a same-state `CLOSED` update. Session
+identity and request evidence are immutable.
 
 Caller-owned request dictionaries and lists are untrusted mutable inputs. The
 transaction service first requires an exact dictionary, copies its top-level
@@ -293,9 +297,10 @@ selection, or recovery side effect. Invalid alternate representations cannot
 enter storage or exploit an identity collision with a valid request. Existing valid request
 bytes and UUID5 vectors remain unchanged.
 
-The session insert trigger independently requires both copied policy fields to
-match the referenced metadata row. This protects direct SQL while the service
-gate additionally decides whether this release supports the signed versions.
+The session insert trigger independently enforces that canonical initial state,
+validates the request digest, and requires both copied policy fields to match
+the referenced metadata row. This protects direct SQL while the service gate
+additionally decides whether this release supports the signed versions.
 
 ### 2.4 attempts
 
@@ -758,7 +763,57 @@ typed issuers and process-local one-shot permits; exclusion, which is provided
 by the OS-backed inter-process arbiter; and external effects, which SQLite
 cannot prove occurred at a provider or Windows API boundary.
 
-### 3.2 Final capability matrix
+### 3.2 Durable fact / aggregate projection invariant
+
+Aggregate state and phase columns are indexes over, and verified projections
+of, normalized durable facts. A state value alone is never evidence that the
+represented operation occurred. Where SQLite can evaluate both sides, child
+admission requires the exact immediate-parent predecessor and every aggregate
+advance requires the corresponding child fact or paired immutable evidence.
+No direct SQL writer may manufacture operational progress merely by changing a
+state or phase column.
+
+Process intent, process-creation failure, resume intent, and resume result are
+paired with their aggregate transition in one guarded row update. For separate
+rows, the transaction inserts the durable child first and advances the
+aggregate second. External API occurrence remains outside SQLite and continues
+to require committed intents, exact typed results, OS-backed inter-process
+arbitration, and conservative recovery.
+
+| Table / state or phase | Predecessor | Durable fact first | Projection second | Immediate-parent lineage and SQL guard | Recovery, selection, or closure semantics |
+| --- | --- | --- | --- | --- | --- |
+| `sessions.OPEN` | none | canonical session row with both counters zero and no close facts | row begins `OPEN` | metadata policy and request-digest insert trigger | only state eligible for attempts, selection, or recovery |
+| `sessions.SUCCESS_SELECTED` | `OPEN` | owning `session_selection` for a successful terminal | session becomes `SUCCESS_SELECTED` | selection -> terminal -> reservation -> claim -> attempt -> same session; session state trigger requires the selection | absorbing for selection and recovery |
+| `sessions.CLOSED` | `OPEN` or `SUCCESS_SELECTED` | `CLOSE_SESSION` recovery for `OPEN`, or the existing selection for `SUCCESS_SELECTED`; immutable close facts | session becomes `CLOSED` | close recovery rechecks every attempt's normalized terminal/selection lineage; state and close-fact triggers require the authorizing fact | no launch, selection, or recovery authority remains |
+| `attempts.ALLOCATED` | open session/current ordinal | immutable attempt and allocation evidence | row begins `ALLOCATED` | attempt -> session -> metadata insert trigger; session counter advances after insert | no claim fact yet |
+| `attempts.CLAIM_COMMITTED` | `ALLOCATED` | exact immutable `provider_call_claim` | attempt becomes `CLAIM_COMMITTED` | claim's attempt, request, provider, operation, budget, and policy must match | claim remains permanent |
+| `attempts.LAUNCH_RESERVED` | `CLAIM_COMMITTED` | exact reservation through that claim | attempt becomes `LAUNCH_RESERVED` | reservation -> claim -> exact attempt in an open session | one reservation fence only |
+| `attempts.LAUNCH_MAY_HAVE_OCCURRED` | `LAUNCH_RESERVED` | matching `RECORD_ATTEMPT_AMBIGUITY` recovery | optional ambiguity projection | recovery targets that attempt in the same session | recovery records uncertainty; it grants no retry |
+| `attempts.TERMINAL_RECORDED` | `LAUNCH_RESERVED` or `LAUNCH_MAY_HAVE_OCCURRED` | terminal through the exact claim/reservation | attempt becomes `TERMINAL_RECORDED` | terminal -> reservation -> claim -> exact attempt | terminal is immutable |
+| `attempts.SUCCESS_SELECTED` | `TERMINAL_RECORDED` | owning selection for that attempt's successful terminal | attempt becomes `SUCCESS_SELECTED` | selection and terminal must resolve to the same attempt and session | absorbing until optional close projection |
+| `attempts.CLOSED` | terminal or selected attempt | durable terminal/selection plus closed owning session | attempt optionally becomes `CLOSED` | normalized terminal lineage and session `CLOSED` are required | no operational authority |
+| `provider_call_claims.COMMITTED` | attempt `ALLOCATED` | immutable claim row | attempt may become `CLAIM_COMMITTED` | normalized attempt/session admission policy and exact copied request/policy facts | evidence-only claim ambiguity does not mutate the permanent claim |
+| `launch_reservations.COMMITTED` | claim `COMMITTED`, attempt `CLAIM_COMMITTED` | immutable reservation row | attempt may become `LAUNCH_RESERVED` | reservation -> exact claim -> attempt -> open session insert guard | provider-construction handoff only |
+| reservation `PROCESS_INTENT_COMMITTED` / `PROCESS_CREATION_FAILED` | `COMMITTED` / `PROCESS_INTENT_COMMITTED` | canonical process intent / exact `NOT_CREATED` failure pair | paired reservation transition in the same guarded update | append-only evidence and digest guards; failure forbids an execution | intent does not prove the external call; failure is definitive no-process evidence |
+| reservation `PROCESS_CREATED` | `PROCESS_INTENT_COMMITTED` | exact execution row with creation, Job Object, and resume-authorization evidence | reservation becomes `PROCESS_CREATED` | execution -> exact reservation; reservation projection requires that execution | typed external result remains required by the service |
+| reservation `MANUAL_REVIEW` | documented recoverable reservation predecessor | matching immutable recovery row | reservation becomes `MANUAL_REVIEW` | recovery action, predecessor, target, and same-session lineage are exact | recovery-owned and irreversible |
+| reservation `TERMINAL_RECORDED` | eligible created, failed, or manual-review state | exact immutable terminal | reservation becomes `TERMINAL_RECORDED` | terminal references that reservation | terminal revokes delayed authority |
+| execution `PRE_RESUME_READY` | reservation `PROCESS_INTENT_COMMITTED` | immutable execution row | reservation may become `PROCESS_CREATED` | normalized reservation -> claim -> attempt -> open session insert guard | no resume intent yet |
+| execution `RESUME_INTENT_COMMITTED` / `RESUME_RECORDED` | `PRE_RESUME_READY` / `RESUME_INTENT_COMMITTED` | canonical resume intent / exact post-resume and cleanup pairs | paired phase transition in the same guarded update | active normalized lineage, no terminal or selection | persisted intent/result does not let SQLite prove the Windows call |
+| execution `POST_RESUME_AMBIGUOUS` | `RESUME_RECORDED` | matching attempt-ambiguity recovery | optional ambiguity phase projection | recovery resolves through reservation/claim to the exact attempt/session | conservative, no retry authority |
+| execution `TERMINAL_RECORDED` / `CLOSED` | resumed or ambiguous / terminal | exact terminal / terminal plus closed session | execution phase advances | terminal -> exact reservation; closure also resolves to session `CLOSED` | absorbing projections |
+| `terminals` | exact eligible reservation/execution predecessor | immutable terminal row satisfying the state/disposition/snapshot matrix | execution, reservation, and attempt become `TERMINAL_RECORDED` | terminal insert resolves reservation -> claim -> attempt -> open session | ambiguity and manual-review close remain conservative |
+| `session_selections` | successful terminal, terminal-recorded attempt, open session | immutable owning selection row | attempt and session become `SUCCESS_SELECTED` | complete terminal -> reservation -> claim -> attempt -> session ownership guard | normal and recovery-driven selection use the same fact |
+| `manual_recoveries` | exact action-matrix predecessor in an open session | immutable recovery row at the current ordinal | counter increments, then any recovery-owned projection advances | typed target resolves through immediate parents to the same session | evidence-only actions do not themselves mutate aggregate state; any optional ambiguity projection must cite that row; classification and close actions are irreversible |
+
+`CLOSE_SESSION` therefore cannot trust a terminal-looking attempt state. Every
+`TERMINAL_RECORDED`, `SUCCESS_SELECTED`, or `CLOSED` attempt admitted by the
+close matrix must resolve through its exact claim and reservation to the
+required terminal, and a selected attempt must additionally resolve to the
+owning session selection. Missing or contradictory lineage aborts the recovery
+insert, counter increment, close facts, and session transition atomically.
+
+### 3.3 Final capability matrix
 
 Canonical bytes and SHA-256 digests establish content integrity only. The
 matrix deliberately separates durable SQLite state, process-local typed-object

@@ -242,10 +242,11 @@ The executable DDL smoke test must also confirm that:
 
 - `provider_call_claims_before_insert` can traverse only the normalized
   immediate-parent chain and is the authoritative claim-admission gate;
-- session inserts match both signed metadata policies; attempts match their
-  session claim policy and metadata provider/operation; claims match attempt
-  policy; reservations match claim policy and owning-session authority policy;
-  and executions match reservation authority policy/release;
+- session inserts begin exactly `OPEN` with both counters zero, null close
+  facts, and both signed metadata policies; attempts match their session claim
+  policy and metadata provider/operation; claims match attempt policy;
+  reservations match claim policy and owning-session authority policy; and
+  executions match reservation authority policy/release;
 - reservation inserts accept only `COMMITTED` with all failure/outcome fields
   null;
 - the first reservation outcome timestamp and both session close facts are
@@ -641,6 +642,56 @@ requires `PROCESS_CREATED`, `OPEN`, no terminal, and no selection. The DDL
 smoke gate executes both exact transitions on a valid active lineage and then
 proves the same statements fail after recovery without relying on copied
 ancestor identifiers.
+
+### Durable fact / aggregate projection acceptance matrix
+
+The executable review treats every aggregate state as a projection of
+normalized durable facts, never as evidence by itself. Child admission must
+require the documented immediate-parent predecessor; after the child exists,
+the parent projection guard must require that exact fact. Paired evidence on a
+single row is appended in the same guarded update as its state/phase. A direct
+state-column update alone must never manufacture operational progress.
+
+| Table | State/phase and predecessor | Durable fact before projection | Required immediate-parent lineage | Direct-SQL admission/projection gate | Recovery, selection, and close acceptance |
+| --- | --- | --- | --- | --- | --- |
+| `sessions` | insert -> `OPEN`; `OPEN -> SUCCESS_SELECTED`; `OPEN|SUCCESS_SELECTED -> CLOSED` | canonical row with zero counters/no close facts; selection; close recovery or existing selection plus immutable close facts | metadata -> session; selection -> terminal -> reservation -> claim -> attempt -> session; close rechecks every attempt lineage | reject every noncanonical insert, selection-free success, recovery-free open close, and any mutable close facts | `CLOSE_SESSION` may close an empty session, but any terminal-looking attempt must have its exact terminal/selection lineage |
+| `attempts` | insert -> `ALLOCATED`; then `CLAIM_COMMITTED`, `LAUNCH_RESERVED`, optional `LAUNCH_MAY_HAVE_OCCURRED`, `TERMINAL_RECORDED`, `SUCCESS_SELECTED`, optional `CLOSED` | attempt evidence; claim; reservation; attempt-ambiguity recovery; terminal; selection; terminal/selection plus closed session | each fact resolves to the exact attempt and owning session | reject every projection without its listed fact and reject child insert under the wrong predecessor | ambiguity grants no retry; selected and closed states are absorbing |
+| `provider_call_claims` | attempt `ALLOCATED` -> immutable `COMMITTED` claim | claim row precedes attempt claim projection | claim -> exact attempt -> open session with complete prior-claim admission matrix | insert trigger enforces copied request/provider/operation/budget/policy and predecessor; row is immutable | claim-ambiguity recovery is evidence-only and leaves `COMMITTED` |
+| `launch_reservations` | claim/attempt -> `COMMITTED`; then `PROCESS_INTENT_COMMITTED`, `PROCESS_CREATED` or `PROCESS_CREATION_FAILED`, `MANUAL_REVIEW`, `TERMINAL_RECORDED` | reservation; process intent; execution or exact failure evidence; matching recovery; terminal | reservation -> claim -> attempt -> open session; execution/terminal reference exact reservation | reject reservation under non-`CLAIM_COMMITTED` attempt, created-without-execution, failed-without-failure, manual-review-without-recovery, and terminal-without-terminal | each manual-review predecessor requires its exact action row; no alternate recovery path |
+| `launch_executions` | reservation process intent -> `PRE_RESUME_READY`; then `RESUME_INTENT_COMMITTED`, `RESUME_RECORDED`, optional `POST_RESUME_AMBIGUOUS`, `TERMINAL_RECORDED`, optional `CLOSED` | execution; resume intent; post-resume plus cleanup; attempt-ambiguity recovery; terminal; terminal plus closed session | execution -> reservation -> claim -> attempt -> open session | reject insert under wrong reservation state and every phase projection missing its paired evidence, recovery, terminal, or close | external call occurrence remains outside SQLite and conservatively recoverable |
+| `terminals` | eligible reservation/execution predecessor -> immutable terminal | terminal row precedes execution/reservation/attempt terminal projections | terminal -> reservation -> claim -> attempt -> open session; state-specific execution/failure/manual-review evidence | reject impossible predecessor, wrong request lineage, and every invalid state/disposition/snapshot/evidence combination | ambiguous/manual-review terminals cannot authorize selection |
+| `session_selections` | successful terminal and terminal-recorded attempt in `OPEN` session -> immutable selection | selection row precedes attempt/session success projections | selection -> successful terminal -> reservation -> claim -> exact attempt/session | reject wrong session, non-success, non-terminal-recorded attempt, duplicate selection, and success projection without selection | normal and `SELECT_COMMITTED_SUCCESS` recovery use the same insert path and timestamp |
+| `manual_recoveries` | exact action-matrix predecessor in `OPEN` session | recovery row at current ordinal, then trigger-owned counter increment, then optional state projection | target kind/id resolves through immediate parents to the same session | reject wrong predecessor/target/action, duplicate ordinal, standalone counter update, and recovery-owned state without recovery | evidence-only actions do not themselves mutate aggregate state; any optional ambiguity projection must cite that row; classification and close are atomic and irreversible |
+
+Focused direct-SQL acceptance must exercise both directions and preserve a full
+before/after database snapshot on every rejection:
+
+- session insert rejects `SUCCESS_SELECTED`, `CLOSED`, unknown state, nonzero
+  attempt or recovery counter, and either pre-populated close fact;
+- attempt claim/reservation/ambiguity/terminal/selection/close projections
+  reject the missing claim, reservation, recovery, terminal, selection, or
+  closed-session fact respectively;
+- reservation `PROCESS_CREATED`, `PROCESS_CREATION_FAILED`, `MANUAL_REVIEW`,
+  and `TERMINAL_RECORDED` reject missing execution, failure evidence, recovery,
+  and terminal respectively;
+- execution ambiguity, terminal, and close projections reject missing
+  recovery, terminal, and closed-session lineage;
+- session success and close reject missing selection or close recovery;
+- reservation, execution, terminal, selection, and recovery inserts reject an
+  impossible parent predecessor; and
+- after deliberately seeding a terminal-looking attempt while omitting its
+  normalized child facts, `CLOSE_SESSION` rejects both fabricated
+  `TERMINAL_RECORDED` and fabricated `SUCCESS_SELECTED`, leaving no recovery,
+  ordinal consumption, close facts, or session-state change.
+
+The positive ordering remains claim insert -> attempt claim projection;
+reservation insert -> attempt reservation projection; process-intent commit ->
+typed external result -> execution insert -> reservation process-created
+projection; terminal insert -> execution/reservation/attempt terminal
+projections; selection insert -> attempt/session success projections; and
+recovery insert -> counter increment -> recovery-owned projection. Executable
+DDL, `foreign_key_check`, `integrity_check`, the valid lifecycle, and all UUID5
+golden vectors must continue to pass unchanged.
 
 ### Final capability audit matrix
 

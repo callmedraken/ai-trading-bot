@@ -556,6 +556,37 @@ then proves no process permit, hook, claim, or retry can be authorized. The
 reservation-only `COMMITTED` recovery remains distinct and valid before any
 process intent exists.
 
+### Canonical identity-input gates
+
+Persisted schema/version values used by deterministic identities must equal the
+version encoded in the canonical UUID5 tuple. This release therefore admits
+exactly the following values at direct-SQL insertion time:
+
+| Identity-bearing table | Persisted column | Supported value | Rejected smoke values |
+| --- | --- | --- | --- |
+| `sessions` | `session_schema` | exact integer `1` | `0`, `2`, `99` |
+| `attempts` | `attempt_schema` | exact integer `1` | `0`, `2`, `99` |
+| `provider_call_claims` | `claim_schema` | exact integer `1` | `0`, `2`, `99` |
+| `launch_reservations` | `launch_reservation_schema` | exact integer `1` | `0`, `2`, `99` |
+| `launch_executions` | `launch_schema` | exact integer `1` | `0`, `2`, `99` |
+| `terminals` | `terminal_schema` | exact integer `1` | `0`, `2`, `99` |
+| `session_selections` | `selection_schema` | exact integer `1` | `0`, `2`, `99` |
+| `manual_recoveries` | `recovery_schema` | exact integer `1` | `0`, `2`, `99` |
+
+The executable DDL matrix performs all 24 unsupported direct inserts and
+requires each to fail atomically. `authority_metadata.bootstrap_schema` and
+`schema_migrations.schema_version` have different bootstrap/migration
+semantics and are intentionally not tightened by this identity-version gate.
+Canonical JSON bytes and every existing UUID5 golden vector must remain
+unchanged.
+
+The remaining identity-relevant scalar audit requires `request_limit` to be an
+exact positive built-in integer matching universe length, provider-call budget
+to be exact integer `1`, and caller-supplied attempt/recovery ordinal overrides
+to satisfy the gates below. Textual identity inputs continue to come from the
+validated immutable request snapshot or exact persisted parent values. The
+audit must not broaden normalization or coerce alternate scalar types.
+
 ## 7. Attempt ordinal and crash gates
 
 The attempt primitive is tested under immediate SQLite row-trigger semantics:
@@ -570,6 +601,13 @@ The attempt primitive is tested under immediate SQLite row-trigger semantics:
 - the application helper performs one insert and no independent counter
   update; and
 - two separate sessions each begin at ordinal zero.
+
+Any caller-supplied ordinal override must have exact Python type `int`, must be
+non-negative, and must equal the current counter. `False`, `True`, integral
+floats, strings, `int` subclasses, and negative integers fail before UUID5
+construction, evidence construction, transaction entry, or insertion. Exact
+built-in integer zero and the current positive ordinal remain accepted. Every
+rejection preserves all rows and both session counters.
 
 The counter proof depends only on immutable attempts and contiguous committed
 per-session ordinals. It does not use an application-maintained trigger flag,
@@ -591,14 +629,21 @@ Recovery is tested with the same single-insert pattern:
 - each independent session begins recovery at ordinal zero; and
 - recovery after a successful selection or closed session fails.
 
+The same exact built-in non-negative-integer contract applies to a
+caller-supplied recovery ordinal before lifecycle-arbiter acquisition, UUID5
+construction, evidence construction, or transaction entry. Rejection creates
+no recovery row, consumes no ordinal, and changes no target state.
+
 Session close-fact tests require `closed_at_utc` and `close_reason` to remain
 jointly null before closure, become jointly non-null only on
 `OPEN -> CLOSED` or `SUCCESS_SELECTED -> CLOSED`, and remain unchanged
 forever. Partial population, pre-closure population, replacement, clearing,
 and same-state `CLOSED` mutation all fail.
 
-The trigger verifies open-session eligibility, target existence, same-session
-lineage, current ordinal, and an exact action-matrix entry. The test transaction
+The insert trigger verifies an open session with no existing selection, target
+existence, same-session lineage, current ordinal, and the complete currently
+actionable predicate for the exact action-matrix entry. An immutable historical
+fact with the same nominal predecessor is insufficient. The test transaction
 service additionally performs any matrix-authorized state update in the same
 `BEGIN IMMEDIATE` transaction. It never manufactures `CLAIM_COMMITTED`,
 `LAUNCH_RESERVED`, `TERMINAL_RECORDED`, or `SUCCESS_SELECTED` through a generic
@@ -663,20 +708,23 @@ state-column update alone must never manufacture operational progress.
 | `session_selections` | successful terminal and terminal-recorded attempt in `OPEN` session -> immutable selection | selection row precedes attempt/session success projections | selection -> successful terminal -> reservation -> claim -> exact attempt/session | reject wrong session, non-success, non-terminal-recorded attempt, duplicate selection, and success projection without selection | normal and `SELECT_COMMITTED_SUCCESS` recovery use the same insert path and timestamp |
 | `manual_recoveries` | exact action-matrix predecessor in `OPEN` session | recovery row at current ordinal, then trigger-owned counter increment, then optional state projection | target kind/id resolves through immediate parents to the same session | reject wrong predecessor/target/action, duplicate ordinal, standalone counter update, and recovery-owned state without recovery | evidence-only actions do not themselves mutate aggregate state; any optional ambiguity projection must cite that row; classification and close are atomic and irreversible |
 
-Every state-producing recovery row is necessary but not sufficient for its
-projection. The freshness matrix is executable acceptance criteria:
+Recovery insertion actionability and later projection freshness are separate
+gates. Every action must satisfy its complete current predicate when the
+immutable row is inserted; every state-producing row is then necessary but not
+sufficient for a later projection. The matrix is executable acceptance
+criteria:
 
-| Recovery action | Eligibility after row insertion | Required projection-time recheck |
+| Recovery action | Required current predicate at INSERT | Required later projection recheck |
 | --- | --- | --- |
-| `RECORD_ATTEMPT_AMBIGUITY` | mutable | committed claim, launch-reserved attempt, `PROCESS_CREATED` reservation, resumed execution, open session, no terminal/selection |
-| `RECORD_CLAIM_AMBIGUITY` | immutable evidence-only record | none; no state or capability projection exists |
-| `CLASSIFY_LAUNCH_RESERVATION` | mutable | exact active lineage and no process intent/execution/terminal/selection |
-| `CLASSIFY_PROCESS_OUTCOME_UNKNOWN` | mutable | exact digest-valid process intent, active lineage, and no failure/execution/terminal/selection |
-| `CLASSIFY_PRE_RESUME_READY` | mutable | one still-pre-resume execution and no resume, post-resume, cleanup, terminal, or selection fact |
-| `CLASSIFY_RESUME_OUTCOME_UNKNOWN` | mutable | one still-intent-only execution and no receipt, cleanup, terminal, or selection fact |
-| `SELECT_COMMITTED_SUCCESS` | mutable | normal selection ownership, success, terminal-recorded attempt, open-session, and uniqueness guards |
-| `CLOSE_SESSION` | mutable | complete current normalized close predicate at `OPEN -> CLOSED`, including every attempt added after the row |
-| `ACKNOWLEDGE_RESTORE` | immutable evidence-only record | none; no state or capability projection exists |
+| `RECORD_ATTEMPT_AMBIGUITY` | exact active attempt/claim/reservation/execution lineage; committed claim; launch-reserved attempt; `PROCESS_CREATED` reservation; resumed, digest-valid execution; open session; no terminal/selection | the same current predicate before optional attempt/execution ambiguity projection |
+| `RECORD_CLAIM_AMBIGUITY` | the same exact active lineage, evidence, open-session, and no-terminal/no-selection predicate | none; no state or capability projection exists |
+| `CLASSIFY_LAUNCH_RESERVATION` | exact active lineage; `COMMITTED` reservation; no process intent, failure, execution, terminal, or selection | the same current predicate before `MANUAL_REVIEW` projection |
+| `CLASSIFY_PROCESS_OUTCOME_UNKNOWN` | exact active lineage and digest-valid process intent; no failure, execution, terminal, or selection | the same current predicate before `MANUAL_REVIEW` projection |
+| `CLASSIFY_PRE_RESUME_READY` | exact active lineage with one digest-valid `PRE_RESUME_READY` execution and no resume intent, receipt, cleanup, terminal, or selection | the same current predicate before `MANUAL_REVIEW` projection |
+| `CLASSIFY_RESUME_OUTCOME_UNKNOWN` | exact active lineage with one digest-valid intent-only execution and no receipt, cleanup, terminal, or selection | the same current predicate before `MANUAL_REVIEW` projection |
+| `SELECT_COMMITTED_SUCCESS` | exact successful terminal ownership, terminal-recorded lineage, open session, and no existing selection | normal selection ownership, success, terminal-recorded lineage, open session, and uniqueness guards |
+| `CLOSE_SESSION` | complete current normalized close predicate in an open session with no existing selection, including every current attempt | the same complete predicate at `OPEN -> CLOSED`, including every attempt added after insertion |
+| `ACKNOWLEDGE_RESTORE` | exact owning open session with no existing selection | none; no state or capability projection exists |
 
 Focused direct-SQL acceptance must exercise both directions and preserve a full
 before/after database snapshot on every rejection:
@@ -704,6 +752,11 @@ before/after database snapshot on every rejection:
   execution, resume intent, or resume receipt makes the stale projection fail;
 - after inserting attempt-ambiguity recovery, a newly inserted terminal makes
   both the attempt and execution ambiguity projections fail; and
+- inserting attempt- or claim-ambiguity recovery after a terminal exists fails
+  at recovery-row admission and consumes no ordinal;
+- a valid raw selection deliberately inserted without aggregate projection
+  blocks `SELECT_COMMITTED_SUCCESS`, `CLOSE_SESSION`, and
+  `ACKNOWLEDGE_RESTORE` recovery insertion and consumes no ordinal; and
 - a canonical process-intent update against a reservation whose attempt has not
   reached `LAUNCH_RESERVED` fails even though the intent bytes and digest are
   otherwise exact.
@@ -949,6 +1002,7 @@ Run from the repository root:
 
 ```text
 .venv\Scripts\python.exe -m pytest -q tests/runtime/test_windows_transactional_capture_authority.py
+.venv\Scripts\python.exe -m pytest -q tests/runtime/test_windows_transactional_capture_authority.py -k "identity_bearing_rows or ordinal_overrides or recovery_insert_requires_action or recovery_action_matrix or recovery_projection"
 .venv\Scripts\python.exe -m pytest -q tests/runtime/test_windows_transactional_capture_authority.py -k "complete_ddl or process_intent or process_hook or process_success_receipt or process_failure_result or crash_around_process or process_unknown_recovery"
 .venv\Scripts\python.exe -m pytest -q tests/market_data/test_alpaca_daily_snapshot.py tests/cli/test_daily_snapshot_config.py
 .venv\Scripts\python.exe -m pytest -q

@@ -34,7 +34,7 @@ CREATE TABLE schema_migrations (
 CREATE TABLE sessions (
     session_id TEXT PRIMARY KEY,
     authority_epoch_id TEXT NOT NULL REFERENCES authority_metadata(authority_epoch_id),
-    session_schema INTEGER NOT NULL CHECK (session_schema > 0),
+    session_schema INTEGER NOT NULL CHECK (session_schema = 1),
     authority_policy_version TEXT NOT NULL,
     claim_policy_version TEXT NOT NULL,
     target_session_date TEXT NOT NULL,
@@ -61,7 +61,7 @@ CREATE TABLE attempts (
     provider_call_budget INTEGER NOT NULL CHECK (provider_call_budget = 1),
     request_json BLOB NOT NULL,
     request_digest BLOB NOT NULL CHECK (length(request_digest) = 32),
-    attempt_schema INTEGER NOT NULL CHECK (attempt_schema > 0),
+    attempt_schema INTEGER NOT NULL CHECK (attempt_schema = 1),
     attempt_policy_version TEXT NOT NULL,
     allocation_evidence_json BLOB NOT NULL,
     allocation_evidence_digest BLOB NOT NULL CHECK (length(allocation_evidence_digest) = 32),
@@ -79,7 +79,7 @@ CREATE TABLE attempts (
 CREATE TABLE provider_call_claims (
     claim_id TEXT PRIMARY KEY,
     attempt_id TEXT NOT NULL UNIQUE REFERENCES attempts(attempt_id),
-    claim_schema INTEGER NOT NULL CHECK (claim_schema > 0),
+    claim_schema INTEGER NOT NULL CHECK (claim_schema = 1),
     claim_policy_version TEXT NOT NULL,
     provider_id TEXT NOT NULL,
     permitted_provider_operation TEXT NOT NULL,
@@ -95,7 +95,7 @@ CREATE TABLE provider_call_claims (
 CREATE TABLE launch_reservations (
     launch_reservation_id TEXT PRIMARY KEY,
     claim_id TEXT NOT NULL UNIQUE REFERENCES provider_call_claims(claim_id),
-    launch_reservation_schema INTEGER NOT NULL CHECK (launch_reservation_schema > 0),
+    launch_reservation_schema INTEGER NOT NULL CHECK (launch_reservation_schema = 1),
     application_release_version TEXT NOT NULL,
     authority_policy_version TEXT NOT NULL,
     claim_policy_version TEXT NOT NULL,
@@ -130,7 +130,7 @@ CREATE TABLE launch_reservations (
 CREATE TABLE launch_executions (
     launch_execution_id TEXT PRIMARY KEY,
     launch_reservation_id TEXT NOT NULL UNIQUE REFERENCES launch_reservations(launch_reservation_id),
-    launch_schema INTEGER NOT NULL CHECK (launch_schema > 0),
+    launch_schema INTEGER NOT NULL CHECK (launch_schema = 1),
     application_release_version TEXT NOT NULL,
     authority_policy_version TEXT NOT NULL,
     phase TEXT NOT NULL CHECK (phase IN (
@@ -163,7 +163,7 @@ CREATE TABLE launch_executions (
 CREATE TABLE terminals (
     terminal_id TEXT PRIMARY KEY,
     launch_reservation_id TEXT NOT NULL UNIQUE REFERENCES launch_reservations(launch_reservation_id),
-    terminal_schema INTEGER NOT NULL CHECK (terminal_schema > 0),
+    terminal_schema INTEGER NOT NULL CHECK (terminal_schema = 1),
     terminal_policy_version TEXT NOT NULL,
     terminal_state TEXT NOT NULL CHECK (terminal_state IN ('SUCCEEDED', 'FAILED', 'AMBIGUOUS', 'CLOSED')),
     provider_call_disposition TEXT NOT NULL CHECK (
@@ -183,7 +183,7 @@ CREATE TABLE session_selections (
     selection_id TEXT NOT NULL UNIQUE,
     session_id TEXT PRIMARY KEY REFERENCES sessions(session_id),
     terminal_id TEXT NOT NULL UNIQUE REFERENCES terminals(terminal_id),
-    selection_schema INTEGER NOT NULL CHECK (selection_schema > 0),
+    selection_schema INTEGER NOT NULL CHECK (selection_schema = 1),
     selection_policy_version TEXT NOT NULL,
     snapshot_digest BLOB NOT NULL CHECK (length(snapshot_digest) = 32),
     selection_evidence_json BLOB NOT NULL,
@@ -212,7 +212,7 @@ CREATE TABLE manual_recoveries (
     )),
     predecessor_state TEXT NOT NULL,
     resulting_state TEXT NOT NULL,
-    recovery_schema INTEGER NOT NULL CHECK (recovery_schema > 0),
+    recovery_schema INTEGER NOT NULL CHECK (recovery_schema = 1),
     recovery_policy_version TEXT NOT NULL,
     operator_evidence_json BLOB NOT NULL,
     operator_evidence_digest BLOB NOT NULL CHECK (length(operator_evidence_digest) = 32),
@@ -1444,6 +1444,10 @@ BEGIN
         SELECT 1 FROM sessions
         WHERE session_id = NEW.session_id AND state = 'OPEN'
     ) THEN RAISE(ABORT, 'recovery session is not eligible') END;
+    SELECT CASE WHEN EXISTS (
+        SELECT 1 FROM session_selections
+        WHERE session_id = NEW.session_id
+    ) THEN RAISE(ABORT, 'recovery action matrix entry is invalid') END;
     SELECT CASE WHEN NEW.recovery_ordinal <> (
         SELECT next_recovery_ordinal FROM sessions WHERE session_id = NEW.session_id
     ) THEN RAISE(ABORT, 'recovery ordinal is not the session counter') END;
@@ -1497,19 +1501,29 @@ BEGIN
          AND NEW.predecessor_state = 'LAUNCH_RESERVED'
          AND NEW.resulting_state = 'AMBIGUITY_RECORDED'
          AND EXISTS (
-             SELECT 1 FROM attempts a
-             WHERE a.attempt_id = NEW.target_id
-               AND a.state = 'LAUNCH_RESERVED'
-         )
-         AND EXISTS (
              SELECT 1
-             FROM provider_call_claims c
+             FROM attempts a
+             JOIN provider_call_claims c ON c.attempt_id = a.attempt_id
              JOIN launch_reservations r ON r.claim_id = c.claim_id
              JOIN launch_executions e ON e.launch_reservation_id = r.launch_reservation_id
-             WHERE c.attempt_id = NEW.target_id
+             JOIN sessions s ON s.session_id = a.session_id
+             WHERE a.attempt_id = NEW.target_id
+               AND a.session_id = NEW.session_id
+               AND a.state = 'LAUNCH_RESERVED'
+               AND c.state = 'COMMITTED'
+               AND r.reservation_state = 'PROCESS_CREATED'
                AND e.phase = 'RESUME_RECORDED'
                AND e.post_resume_json IS NOT NULL
+               AND e.post_resume_digest IS NOT NULL
+               AND sha256(e.post_resume_json) IS e.post_resume_digest
                AND e.cleanup_json IS NOT NULL
+               AND e.cleanup_digest IS NOT NULL
+               AND sha256(e.cleanup_json) IS e.cleanup_digest
+               AND s.state = 'OPEN'
+               AND NOT EXISTS (
+                   SELECT 1 FROM terminals t
+                   WHERE t.launch_reservation_id = r.launch_reservation_id
+               )
          ))
         OR (NEW.action = 'RECORD_CLAIM_AMBIGUITY'
             AND NEW.target_kind = 'CLAIM'
@@ -1517,30 +1531,70 @@ BEGIN
             AND NEW.resulting_state = 'AMBIGUITY_RECORDED'
             AND EXISTS (
                 SELECT 1
-                FROM launch_reservations r
+                FROM provider_call_claims c
+                JOIN attempts a ON a.attempt_id = c.attempt_id
+                JOIN launch_reservations r ON r.claim_id = c.claim_id
                 JOIN launch_executions e ON e.launch_reservation_id = r.launch_reservation_id
-                WHERE r.claim_id = NEW.target_id
+                JOIN sessions s ON s.session_id = a.session_id
+                WHERE c.claim_id = NEW.target_id
+                  AND a.session_id = NEW.session_id
+                  AND c.state = 'COMMITTED'
+                  AND a.state = 'LAUNCH_RESERVED'
+                  AND r.reservation_state = 'PROCESS_CREATED'
                   AND e.phase = 'RESUME_RECORDED'
                   AND e.post_resume_json IS NOT NULL
+                  AND e.post_resume_digest IS NOT NULL
+                  AND sha256(e.post_resume_json) IS e.post_resume_digest
                   AND e.cleanup_json IS NOT NULL
+                  AND e.cleanup_digest IS NOT NULL
+                  AND sha256(e.cleanup_json) IS e.cleanup_digest
+                  AND s.state = 'OPEN'
+                  AND NOT EXISTS (
+                      SELECT 1 FROM terminals t
+                      WHERE t.launch_reservation_id = r.launch_reservation_id
+                  )
             ))
         OR (NEW.action = 'CLASSIFY_LAUNCH_RESERVATION'
             AND NEW.target_kind = 'LAUNCH_RESERVATION'
             AND NEW.predecessor_state = 'COMMITTED'
             AND NEW.resulting_state = 'MANUAL_REVIEW'
             AND EXISTS (
-                SELECT 1 FROM launch_reservations
-                WHERE launch_reservation_id = NEW.target_id
-                  AND reservation_state = 'COMMITTED'
+                SELECT 1
+                FROM launch_reservations r
+                JOIN provider_call_claims c ON c.claim_id = r.claim_id
+                JOIN attempts a ON a.attempt_id = c.attempt_id
+                JOIN sessions s ON s.session_id = a.session_id
+                WHERE r.launch_reservation_id = NEW.target_id
+                  AND a.session_id = NEW.session_id
+                  AND r.reservation_state = 'COMMITTED'
+                  AND c.state = 'COMMITTED'
+                  AND a.state = 'LAUNCH_RESERVED'
+                  AND s.state = 'OPEN'
+                  AND NOT EXISTS (
+                      SELECT 1 FROM launch_executions e
+                      WHERE e.launch_reservation_id = r.launch_reservation_id
+                  )
+                  AND NOT EXISTS (
+                      SELECT 1 FROM terminals t
+                      WHERE t.launch_reservation_id = r.launch_reservation_id
+                  )
             ))
         OR (NEW.action = 'CLASSIFY_PROCESS_OUTCOME_UNKNOWN'
             AND NEW.target_kind = 'LAUNCH_RESERVATION'
             AND NEW.predecessor_state = 'PROCESS_INTENT_COMMITTED'
             AND NEW.resulting_state = 'MANUAL_REVIEW'
             AND EXISTS (
-                SELECT 1 FROM launch_reservations r
+                SELECT 1
+                FROM launch_reservations r
+                JOIN provider_call_claims c ON c.claim_id = r.claim_id
+                JOIN attempts a ON a.attempt_id = c.attempt_id
+                JOIN sessions s ON s.session_id = a.session_id
                 WHERE r.launch_reservation_id = NEW.target_id
+                  AND a.session_id = NEW.session_id
                   AND r.reservation_state = 'PROCESS_INTENT_COMMITTED'
+                  AND c.state = 'COMMITTED'
+                  AND a.state = 'LAUNCH_RESERVED'
+                  AND s.state = 'OPEN'
                   AND r.process_intent_json IS NOT NULL
                   AND r.process_intent_digest IS NOT NULL
                   AND r.process_intent_committed_at_utc IS NOT NULL
@@ -1557,9 +1611,21 @@ BEGIN
             AND NEW.predecessor_state = 'PROCESS_CREATED'
             AND NEW.resulting_state = 'MANUAL_REVIEW'
             AND EXISTS (
-                SELECT 1 FROM launch_reservations
-                WHERE launch_reservation_id = NEW.target_id
-                  AND reservation_state = 'PROCESS_CREATED'
+                SELECT 1
+                FROM launch_reservations r
+                JOIN provider_call_claims c ON c.claim_id = r.claim_id
+                JOIN attempts a ON a.attempt_id = c.attempt_id
+                JOIN sessions s ON s.session_id = a.session_id
+                WHERE r.launch_reservation_id = NEW.target_id
+                  AND a.session_id = NEW.session_id
+                  AND r.reservation_state = 'PROCESS_CREATED'
+                  AND c.state = 'COMMITTED'
+                  AND a.state = 'LAUNCH_RESERVED'
+                  AND s.state = 'OPEN'
+                  AND NOT EXISTS (
+                      SELECT 1 FROM terminals t
+                      WHERE t.launch_reservation_id = r.launch_reservation_id
+                  )
             )
             AND (SELECT count(*) FROM launch_executions e
                  WHERE e.launch_reservation_id = NEW.target_id) = 1
@@ -1585,8 +1651,19 @@ BEGIN
             AND EXISTS (
                 SELECT 1
                 FROM launch_reservations r
+                JOIN provider_call_claims c ON c.claim_id = r.claim_id
+                JOIN attempts a ON a.attempt_id = c.attempt_id
+                JOIN sessions s ON s.session_id = a.session_id
                 WHERE r.launch_reservation_id = NEW.target_id
+                  AND a.session_id = NEW.session_id
                   AND r.reservation_state = 'PROCESS_CREATED'
+                  AND c.state = 'COMMITTED'
+                  AND a.state = 'LAUNCH_RESERVED'
+                  AND s.state = 'OPEN'
+                  AND NOT EXISTS (
+                      SELECT 1 FROM terminals t
+                      WHERE t.launch_reservation_id = r.launch_reservation_id
+                  )
             )
             AND (SELECT count(*) FROM launch_executions e
                  WHERE e.launch_reservation_id = NEW.target_id) = 1
@@ -1618,11 +1695,22 @@ BEGIN
             AND NEW.predecessor_state = 'SUCCEEDED'
             AND NEW.resulting_state = 'SUCCESS_SELECTED'
             AND EXISTS (
-                SELECT 1 FROM terminals
-                WHERE terminal_id = NEW.target_id
-                  AND terminal_state = 'SUCCEEDED'
-                  AND provider_call_disposition = 'CONFIRMED'
-                  AND snapshot_digest IS NOT NULL
+                SELECT 1
+                FROM terminals t
+                JOIN launch_reservations r
+                  ON r.launch_reservation_id = t.launch_reservation_id
+                JOIN provider_call_claims c ON c.claim_id = r.claim_id
+                JOIN attempts a ON a.attempt_id = c.attempt_id
+                JOIN sessions s ON s.session_id = a.session_id
+                WHERE t.terminal_id = NEW.target_id
+                  AND a.session_id = NEW.session_id
+                  AND t.terminal_state = 'SUCCEEDED'
+                  AND t.provider_call_disposition = 'CONFIRMED'
+                  AND t.snapshot_digest IS NOT NULL
+                  AND r.reservation_state = 'TERMINAL_RECORDED'
+                  AND c.state = 'COMMITTED'
+                  AND a.state = 'TERMINAL_RECORDED'
+                  AND s.state = 'OPEN'
             ))
         OR (NEW.action = 'CLOSE_SESSION'
             AND NEW.target_kind = 'SESSION'

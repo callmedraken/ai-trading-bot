@@ -584,6 +584,7 @@ def _insert_attempt_row_for_test(
     request_bytes: bytes,
     request_digest: bytes,
     *,
+    attempt_schema: int = 1,
     attempt_policy_version: str | None = None,
     provider_id: str | None = None,
     permitted_provider_operation: str | None = None,
@@ -621,7 +622,7 @@ def _insert_attempt_row_for_test(
             attempt_policy_version, allocation_evidence_json,
             allocation_evidence_digest, attempt_evidence_json,
             attempt_evidence_digest, state, created_at_utc
-        ) VALUES (?, ?, ?, ?, ?, 1, ?, ?, 1, ?, ?, ?, ?, ?, 'ALLOCATED', ?)
+        ) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, 'ALLOCATED', ?)
         """,
         (
             attempt_id,
@@ -631,6 +632,7 @@ def _insert_attempt_row_for_test(
             operation,
             request_bytes,
             request_digest,
+            attempt_schema,
             policy,
             allocation,
             allocation_digest,
@@ -648,6 +650,7 @@ def _insert_claim_row_for_test(
     request_bytes: bytes,
     request_digest: bytes,
     *,
+    claim_schema: int = 1,
     claim_policy_version: str | None = None,
 ) -> str:
     parent = connection.execute(
@@ -671,11 +674,12 @@ def _insert_claim_row_for_test(
             provider_id, permitted_provider_operation, provider_call_budget,
             request_json, request_digest, claim_evidence_json,
             claim_evidence_digest, state, committed_at_utc
-        ) VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, 'COMMITTED', ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'COMMITTED', ?)
         """,
         (
             claim_id,
             attempt_id,
+            claim_schema,
             policy,
             provider_id,
             operation,
@@ -698,6 +702,7 @@ def _insert_reservation_row_for_test(
     failure_mode: bool = False,
     outcome_timestamp: str | None = None,
     *,
+    launch_reservation_schema: int = 1,
     authority_policy_version: str | None = None,
     claim_policy_version: str | None = None,
 ) -> str:
@@ -736,11 +741,12 @@ def _insert_reservation_row_for_test(
             reservation_evidence_digest, reservation_state,
             process_creation_failure_json, process_creation_failure_digest,
             committed_at_utc, outcome_recorded_at_utc
-        ) VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             reservation_id,
             claim_id,
+            launch_reservation_schema,
             RELEASE,
             authority_policy,
             claim_policy,
@@ -765,6 +771,7 @@ def _insert_terminal_row_for_test(
     disposition: str,
     snapshot_mode: str = "auto",
     *,
+    terminal_schema: int = 1,
     evidence_json: bytes | None = None,
     evidence_digest: bytes | None = None,
     diagnostics_json: bytes | None = None,
@@ -802,11 +809,12 @@ def _insert_terminal_row_for_test(
             provider_call_disposition, request_digest, evidence_json,
             evidence_digest, snapshot_digest, sanitized_diagnostics_json,
             sanitized_diagnostics_digest, recorded_at_utc
-        ) VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             terminal_id,
             reservation_id,
+            terminal_schema,
             TERMINAL_POLICY,
             state,
             disposition,
@@ -826,6 +834,7 @@ def _insert_execution_row_for_test(
     connection: sqlite3.Connection,
     reservation_id: str,
     *,
+    launch_schema: int = 1,
     authority_policy_version: str | None = None,
 ) -> str:
     reservation_id = str(reservation_id)
@@ -861,12 +870,13 @@ def _insert_execution_row_for_test(
             resume_intent_digest, resume_intent_committed_at_utc,
             post_resume_json, post_resume_digest, cleanup_json,
             cleanup_digest, created_at_utc
-        ) VALUES (?, ?, 1, ?, ?, 'PRE_RESUME_READY', ?, ?, ?, ?, ?, ?,
+        ) VALUES (?, ?, ?, ?, ?, 'PRE_RESUME_READY', ?, ?, ?, ?, ?, ?,
                   NULL, NULL, NULL, NULL, NULL, NULL, NULL, ?)
         """,
         (
             execution_id,
             reservation_id,
+            launch_schema,
             application_release_version,
             authority_policy,
             process,
@@ -1038,6 +1048,12 @@ def _session_id(
     )
 
 
+def _canonical_ordinal(value: object, field_name: str) -> int:
+    if type(value) is not int or value < 0:
+        raise ValueError(f"{field_name} must be an exact non-negative int")
+    return value
+
+
 def _attempt_id(
     session_id: str,
     ordinal: int,
@@ -1045,6 +1061,7 @@ def _attempt_id(
     permitted_provider_operation: str,
     attempt_policy_version: str,
 ) -> str:
+    ordinal = _canonical_ordinal(ordinal, "attempt ordinal")
     return _identity(
         "attempt_id/v2",
         session_id,
@@ -1130,6 +1147,7 @@ def _recovery_id(
     ordinal: int,
     recovery_policy_version: str,
 ) -> str:
+    ordinal = _canonical_ordinal(ordinal, "recovery ordinal")
     return _identity(
         "recovery_id/v2",
         session_id,
@@ -1311,6 +1329,9 @@ def create_session(
 def allocate_attempt(
     connection: sqlite3.Connection, session_id: str, ordinal: int | None = None
 ) -> str:
+    requested_ordinal = (
+        None if ordinal is None else _canonical_ordinal(ordinal, "attempt ordinal")
+    )
     _begin(connection)
     try:
         row = connection.execute(
@@ -1344,7 +1365,10 @@ def allocate_attempt(
             or claim_policy_version != metadata_claim_policy
         ):
             raise ValueError("session policy lineage does not match metadata")
-        allocated_ordinal = current_ordinal if ordinal is None else ordinal
+        current_ordinal = _canonical_ordinal(current_ordinal, "attempt ordinal")
+        allocated_ordinal = (
+            current_ordinal if requested_ordinal is None else requested_ordinal
+        )
         attempt_id = _attempt_id(
             session_id,
             allocated_ordinal,
@@ -2783,6 +2807,44 @@ def _insert_selection_in_transaction(
     return selection_id
 
 
+def _insert_selection_row_for_test(
+    connection: sqlite3.Connection,
+    session_id: str,
+    terminal_id: str,
+    *,
+    selection_schema: int = 1,
+) -> str:
+    snapshot = connection.execute(
+        "SELECT snapshot_digest FROM terminals WHERE terminal_id = ?", (terminal_id,)
+    ).fetchone()
+    if snapshot is None or snapshot[0] is None:
+        raise ValueError("terminal has no snapshot")
+    selection_id = _selection_id(session_id, terminal_id, SELECTION_POLICY)
+    evidence, evidence_digest = _evidence(f"raw-selection:{terminal_id}")
+    connection.execute(
+        """
+        INSERT INTO session_selections (
+            selection_id, session_id, terminal_id, selection_schema,
+            selection_policy_version, snapshot_digest,
+            selection_evidence_json, selection_evidence_digest,
+            selected_at_utc
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            selection_id,
+            session_id,
+            terminal_id,
+            selection_schema,
+            SELECTION_POLICY,
+            snapshot[0],
+            evidence,
+            evidence_digest,
+            SELECTION_TIMESTAMP,
+        ),
+    )
+    return selection_id
+
+
 def select_terminal(
     connection: sqlite3.Connection, session_id: str, terminal_id: str
 ) -> str:
@@ -2874,6 +2936,8 @@ def _insert_recovery_fact_for_test(
     target_kind: str,
     target_id: str,
     action: str,
+    *,
+    recovery_schema: int = 1,
 ) -> str:
     expected_kind, _, resulting = _RECOVERY_ACTIONS[action]
     if target_kind != expected_kind:
@@ -2905,7 +2969,7 @@ def _insert_recovery_fact_for_test(
             recovery_schema, recovery_policy_version,
             operator_evidence_json, operator_evidence_digest,
             created_at_utc
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             recovery_id,
@@ -2916,6 +2980,7 @@ def _insert_recovery_fact_for_test(
             action,
             predecessor,
             resulting,
+            recovery_schema,
             RECOVERY_POLICY,
             evidence,
             evidence_digest,
@@ -2933,6 +2998,9 @@ def record_recovery(
     action: str,
     ordinal: int | None = None,
 ) -> str:
+    requested_ordinal = (
+        None if ordinal is None else _canonical_ordinal(ordinal, "recovery ordinal")
+    )
     target_id = str(target_id)
     if target_kind == "LAUNCH_RESERVATION" and action.startswith("CLASSIFY_"):
         with InterprocessLifecycleArbiter(target_id):
@@ -2942,7 +3010,7 @@ def record_recovery(
                 target_kind,
                 target_id,
                 action,
-                ordinal,
+                requested_ordinal,
             )
     return _record_recovery_locked(
         connection,
@@ -2950,7 +3018,7 @@ def record_recovery(
         target_kind,
         target_id,
         action,
-        ordinal,
+        requested_ordinal,
     )
 
 
@@ -2974,8 +3042,13 @@ def _record_recovery_locked(
         ).fetchone()
         if row is None:
             raise ValueError("unknown recovery session")
-        current_ordinal = row[0]
-        recovery_ordinal = current_ordinal if ordinal is None else ordinal
+        current_ordinal = _canonical_ordinal(row[0], "recovery ordinal")
+        requested_ordinal = (
+            None if ordinal is None else _canonical_ordinal(ordinal, "recovery ordinal")
+        )
+        recovery_ordinal = (
+            current_ordinal if requested_ordinal is None else requested_ordinal
+        )
         predecessor = _target_state(connection, target_kind, target_id)
         recovery_id = _recovery_id(
             session_id,
@@ -4424,6 +4497,167 @@ def test_complete_ddl_and_immediate_parent_chain(db_path: Path) -> None:
         "launch_reservations_before_insert",
         "launch_executions_parent_policy_before_insert",
     }
+    connection.close()
+
+
+@pytest.mark.parametrize(
+    "table",
+    [
+        "sessions",
+        "attempts",
+        "provider_call_claims",
+        "launch_reservations",
+        "launch_executions",
+        "terminals",
+        "session_selections",
+        "manual_recoveries",
+    ],
+)
+@pytest.mark.parametrize("unsupported_schema", [0, 2, 99])
+def test_identity_bearing_rows_reject_unsupported_schema_at_insert(
+    db_path: Path, table: str, unsupported_schema: int
+) -> None:
+    connection = _connect(db_path)
+    session_id: str | None = None
+    process_intent: FakeProcessIntent | None = None
+
+    if table == "sessions":
+        request = _snapshot_capture_request(_request()).canonical_json()
+
+        def insert_invalid() -> None:
+            connection.execute(
+                """
+                INSERT INTO sessions (
+                    session_id, authority_epoch_id, session_schema,
+                    authority_policy_version, claim_policy_version,
+                    target_session_date, state, next_attempt_ordinal,
+                    next_recovery_ordinal, request_json, request_digest,
+                    created_at_utc, closed_at_utc, close_reason
+                ) VALUES (?, ?, ?, ?, ?, ?, 'OPEN', 0, 0, ?, ?, ?, NULL, NULL)
+                """,
+                (
+                    f"unsupported-session-schema-{unsupported_schema}",
+                    EPOCH,
+                    unsupported_schema,
+                    POLICY,
+                    CLAIM_POLICY,
+                    "2026-01-01",
+                    request,
+                    _digest(request),
+                    TIMESTAMP,
+                ),
+            )
+
+    else:
+        session_id = create_session(connection)
+        if table == "attempts":
+            request, request_digest = connection.execute(
+                "SELECT request_json, request_digest FROM sessions "
+                "WHERE session_id = ?",
+                (session_id,),
+            ).fetchone()
+
+            def insert_invalid() -> None:
+                _insert_attempt_row_for_test(
+                    connection,
+                    session_id,
+                    0,
+                    request,
+                    request_digest,
+                    attempt_schema=unsupported_schema,
+                )
+
+        else:
+            attempt_id = allocate_attempt(connection, session_id)
+            request, request_digest = connection.execute(
+                "SELECT request_json, request_digest FROM attempts "
+                "WHERE attempt_id = ?",
+                (attempt_id,),
+            ).fetchone()
+            if table == "provider_call_claims":
+
+                def insert_invalid() -> None:
+                    _insert_claim_row_for_test(
+                        connection,
+                        attempt_id,
+                        request,
+                        request_digest,
+                        claim_schema=unsupported_schema,
+                    )
+
+            else:
+                claim_id = commit_claim(connection, attempt_id)
+                if table == "launch_reservations":
+
+                    def insert_invalid() -> None:
+                        _insert_reservation_row_for_test(
+                            connection,
+                            claim_id,
+                            request_digest,
+                            launch_reservation_schema=unsupported_schema,
+                        )
+
+                else:
+                    reservation_id = reserve_launch(connection, claim_id)
+                    if table == "launch_executions":
+                        process_intent = _construct_provider_and_commit_process_intent(
+                            connection, reservation_id
+                        )
+
+                        def insert_invalid() -> None:
+                            _insert_execution_row_for_test(
+                                connection,
+                                reservation_id,
+                                launch_schema=unsupported_schema,
+                            )
+
+                    elif table == "manual_recoveries":
+
+                        def insert_invalid() -> None:
+                            _insert_recovery_fact_for_test(
+                                connection,
+                                session_id,
+                                "SESSION",
+                                session_id,
+                                "ACKNOWLEDGE_RESTORE",
+                                recovery_schema=unsupported_schema,
+                            )
+
+                    else:
+                        execution_id = _record_successful_process(
+                            connection, reservation_id
+                        )
+                        _resume_and_persist(connection, execution_id, reservation_id)
+                        if table == "terminals":
+
+                            def insert_invalid() -> None:
+                                _insert_terminal_row_for_test(
+                                    connection,
+                                    reservation_id,
+                                    request_digest,
+                                    "SUCCEEDED",
+                                    "CONFIRMED",
+                                    terminal_schema=unsupported_schema,
+                                )
+
+                        else:
+                            terminal_id = record_terminal(connection, reservation_id)
+
+                            def insert_invalid() -> None:
+                                _insert_selection_row_for_test(
+                                    connection,
+                                    session_id,
+                                    terminal_id,
+                                    selection_schema=unsupported_schema,
+                                )
+
+    before = _database_rows(connection)
+    with pytest.raises(sqlite3.IntegrityError):
+        insert_invalid()
+    assert _database_rows(connection) == before
+    if process_intent is not None:
+        with _ISSUED_PROCESS_PERMITS_LOCK:
+            _ISSUED_PROCESS_PERMITS.pop(process_intent._permit, None)
     connection.close()
 
 
@@ -9352,6 +9586,202 @@ def test_close_session_rejects_fabricated_terminal_looking_attempt_lineage(
         "SELECT state, next_recovery_ordinal FROM sessions WHERE session_id = ?",
         (session_id,),
     ).fetchone() == ("OPEN", 0)
+    connection.close()
+
+
+class _OrdinalInt(int):
+    pass
+
+
+@pytest.mark.parametrize("operation", ["attempt", "recovery"])
+@pytest.mark.parametrize(
+    "invalid_ordinal",
+    [False, True, 0.0, 1.0, "0", _OrdinalInt(0), -1],
+    ids=["false", "true", "float-zero", "float-one", "string", "subclass", "negative"],
+)
+def test_caller_ordinal_overrides_require_exact_non_negative_int(
+    db_path: Path, operation: str, invalid_ordinal: object
+) -> None:
+    connection = _connect(db_path)
+    session_id = create_session(connection)
+    before = _database_rows(connection)
+    with pytest.raises(ValueError, match="exact non-negative int"):
+        if operation == "attempt":
+            allocate_attempt(connection, session_id, ordinal=invalid_ordinal)  # type: ignore[arg-type]
+        else:
+            record_recovery(
+                connection,
+                session_id,
+                "SESSION",
+                session_id,
+                "ACKNOWLEDGE_RESTORE",
+                ordinal=invalid_ordinal,  # type: ignore[arg-type]
+            )
+    assert _database_rows(connection) == before
+    assert connection.execute(
+        "SELECT next_attempt_ordinal, next_recovery_ordinal "
+        "FROM sessions WHERE session_id = ?",
+        (session_id,),
+    ).fetchone() == (0, 0)
+    connection.close()
+
+
+def test_exact_integer_ordinal_overrides_accept_zero_and_current_positive_value(
+    db_path: Path,
+) -> None:
+    connection = _connect(db_path)
+    attempt_zero = allocate_attempt(connection, create_session(connection), ordinal=0)
+    attempt_session = connection.execute(
+        "SELECT session_id FROM attempts WHERE attempt_id = ?", (attempt_zero,)
+    ).fetchone()[0]
+    attempt_one = allocate_attempt(connection, attempt_session, ordinal=1)
+    assert connection.execute(
+        "SELECT ordinal FROM attempts WHERE attempt_id IN (?, ?) ORDER BY ordinal",
+        (attempt_zero, attempt_one),
+    ).fetchall() == [(0,), (1,)]
+
+    recovery_session = create_session(connection, _request("2026-01-02"))
+    first_recovery = record_recovery(
+        connection,
+        recovery_session,
+        "SESSION",
+        recovery_session,
+        "ACKNOWLEDGE_RESTORE",
+        ordinal=0,
+    )
+    second_recovery = record_recovery(
+        connection,
+        recovery_session,
+        "SESSION",
+        recovery_session,
+        "CLOSE_SESSION",
+        ordinal=1,
+    )
+    assert connection.execute(
+        "SELECT recovery_ordinal FROM manual_recoveries "
+        "WHERE recovery_id IN (?, ?) ORDER BY recovery_ordinal",
+        (first_recovery, second_recovery),
+    ).fetchall() == [(0,), (1,)]
+    connection.close()
+
+
+@pytest.mark.parametrize(
+    "stale_action",
+    [
+        "RECORD_ATTEMPT_AMBIGUITY",
+        "RECORD_CLAIM_AMBIGUITY",
+        "CLASSIFY_LAUNCH_RESERVATION",
+        "CLASSIFY_PROCESS_OUTCOME_UNKNOWN",
+        "CLASSIFY_PRE_RESUME_READY",
+        "CLASSIFY_RESUME_OUTCOME_UNKNOWN",
+        "SELECT_COMMITTED_SUCCESS",
+        "CLOSE_SESSION",
+        "ACKNOWLEDGE_RESTORE",
+    ],
+)
+def test_recovery_insert_requires_action_to_be_currently_actionable(
+    db_path: Path, stale_action: str
+) -> None:
+    connection = _connect(db_path)
+    session_id = create_session(connection)
+    process_intent: FakeProcessIntent | None = None
+
+    if stale_action in {"CLOSE_SESSION", "ACKNOWLEDGE_RESTORE"}:
+        attempt_id = allocate_attempt(connection, session_id)
+        claim_id = commit_claim(connection, attempt_id)
+        reservation_id = reserve_launch(connection, claim_id)
+        execution_id = _record_successful_process(connection, reservation_id)
+        _resume_and_persist(connection, execution_id, reservation_id)
+        terminal_id = record_terminal(connection, reservation_id)
+        _insert_selection_row_for_test(connection, session_id, terminal_id)
+        target_kind, target_id = "SESSION", session_id
+    else:
+        attempt_id = allocate_attempt(connection, session_id)
+        claim_id = commit_claim(connection, attempt_id)
+        reservation_id = reserve_launch(connection, claim_id)
+        target_kind = "LAUNCH_RESERVATION"
+        target_id = str(reservation_id)
+
+        if stale_action == "CLASSIFY_LAUNCH_RESERVATION":
+            process_intent = _construct_provider_and_commit_process_intent(
+                connection, reservation_id
+            )
+        elif stale_action == "CLASSIFY_PROCESS_OUTCOME_UNKNOWN":
+            process_intent = _construct_provider_and_commit_process_intent(
+                connection, reservation_id
+            )
+            _insert_execution_row_for_test(connection, reservation_id)
+        else:
+            execution_id = _record_successful_process(connection, reservation_id)
+            if stale_action == "CLASSIFY_PRE_RESUME_READY":
+                resume_intent = commit_resume_intent(
+                    connection, execution_id, reservation_id
+                )
+                with _ISSUED_RESUME_PERMITS_LOCK:
+                    _ISSUED_RESUME_PERMITS.pop(resume_intent._permit, None)
+            elif stale_action == "CLASSIFY_RESUME_OUTCOME_UNKNOWN":
+                resume_intent = commit_resume_intent(
+                    connection, execution_id, reservation_id
+                )
+                receipt = FakeSideEffects(connection).resume_thread(resume_intent)
+                record_post_resume_evidence(connection, execution_id, receipt)
+            else:
+                assert stale_action in {
+                    "RECORD_ATTEMPT_AMBIGUITY",
+                    "RECORD_CLAIM_AMBIGUITY",
+                    "SELECT_COMMITTED_SUCCESS",
+                }
+                _resume_and_persist(connection, execution_id, reservation_id)
+                terminal_id = _insert_terminal_row_for_test(
+                    connection,
+                    reservation_id,
+                    connection.execute(
+                        "SELECT request_digest FROM attempts WHERE attempt_id = ?",
+                        (attempt_id,),
+                    ).fetchone()[0],
+                    "AMBIGUOUS"
+                    if stale_action != "SELECT_COMMITTED_SUCCESS"
+                    else "SUCCEEDED",
+                    "MAY_HAVE_OCCURRED"
+                    if stale_action != "SELECT_COMMITTED_SUCCESS"
+                    else "CONFIRMED",
+                )
+                if stale_action == "RECORD_ATTEMPT_AMBIGUITY":
+                    target_kind, target_id = "ATTEMPT", attempt_id
+                elif stale_action == "RECORD_CLAIM_AMBIGUITY":
+                    target_kind, target_id = "CLAIM", claim_id
+                else:
+                    connection.execute(
+                        "UPDATE launch_executions SET phase = 'TERMINAL_RECORDED' "
+                        "WHERE launch_execution_id = ?",
+                        (execution_id,),
+                    )
+                    connection.execute(
+                        "UPDATE launch_reservations SET reservation_state = "
+                        "'TERMINAL_RECORDED' WHERE launch_reservation_id = ?",
+                        (str(reservation_id),),
+                    )
+                    connection.execute(
+                        "UPDATE attempts SET state = 'TERMINAL_RECORDED' "
+                        "WHERE attempt_id = ?",
+                        (attempt_id,),
+                    )
+                    _insert_selection_row_for_test(connection, session_id, terminal_id)
+                    target_kind, target_id = "TERMINAL", terminal_id
+
+    before = _database_rows(connection)
+    with pytest.raises(sqlite3.IntegrityError, match="recovery action matrix"):
+        _insert_recovery_fact_for_test(
+            connection, session_id, target_kind, target_id, stale_action
+        )
+    assert _database_rows(connection) == before
+    assert connection.execute(
+        "SELECT next_recovery_ordinal FROM sessions WHERE session_id = ?",
+        (session_id,),
+    ).fetchone() == (0,)
+    if process_intent is not None:
+        with _ISSUED_PROCESS_PERMITS_LOCK:
+            _ISSUED_PROCESS_PERMITS.pop(process_intent._permit, None)
     connection.close()
 
 

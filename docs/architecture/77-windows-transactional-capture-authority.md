@@ -623,9 +623,13 @@ The row also stores action, predecessor/resulting state, recovery policy/schema,
 operator evidence, and creation timestamp. `UNIQUE(session_id,
 recovery_ordinal)` fences each per-session ordinal.
 
-The `BEFORE INSERT` trigger requires an open session, the current recovery
-counter, a target that resolves through the immediate-parent chain to that
-same session, and one exact closed action-matrix entry:
+The `BEFORE INSERT` trigger requires an open session with no existing
+selection, the current recovery counter, a target that resolves through the
+immediate-parent chain to that same session, and one exact currently
+actionable closed action-matrix entry. Immutable recovery evidence may only be
+admitted while the represented recovery action is currently actionable; an
+immutable historical fact is never sufficient merely because the target's
+aggregate predecessor has not yet changed.
 
 | Action | Target | Predecessor -> result | Effect |
 | --- | --- | --- | --- |
@@ -639,22 +643,23 @@ same session, and one exact closed action-matrix entry:
 | `CLOSE_SESSION` | `SESSION` | `OPEN` -> `CLOSED` | close only when all attempts are terminal and none is ambiguous |
 | `ACKNOWLEDGE_RESTORE` | `SESSION` | `OPEN` -> `RESTORE_ACKNOWLEDGED` | record restore acknowledgement only |
 
+INSERT-time actionability and later projection freshness are separate checks.
 For every action that owns a later aggregate projection, the immutable recovery
 row is necessary but is not a reusable authorization token. The projection
 trigger independently re-evaluates the mutable normalized predicate at the
 exact state or phase update:
 
-| Recovery action | Later projection | Freshness classification and use-time predicate |
+| Recovery action | Required current predicate at INSERT | Later projection freshness |
 | --- | --- | --- |
-| `RECORD_ATTEMPT_AMBIGUITY` | optional attempt `LAUNCH_MAY_HAVE_OCCURRED` and execution `POST_RESUME_AMBIGUOUS` | mutable: exact committed claim, launch-reserved attempt, `PROCESS_CREATED` reservation, resumed execution, open session, and no terminal or selection are rechecked |
-| `RECORD_CLAIM_AMBIGUITY` | none | evidence-only; no aggregate or external authority can be derived from the row |
-| `CLASSIFY_LAUNCH_RESERVATION` | reservation `MANUAL_REVIEW` | mutable: active committed claim/launch-reserved attempt/open session and absence of execution, terminal, and selection are rechecked |
-| `CLASSIFY_PROCESS_OUTCOME_UNKNOWN` | reservation `MANUAL_REVIEW` | mutable: exact active lineage, digest-valid intent, no failure evidence, execution, terminal, or selection are rechecked |
-| `CLASSIFY_PRE_RESUME_READY` | reservation `MANUAL_REVIEW` | mutable: exact active lineage and the one still-`PRE_RESUME_READY` execution with no resume/post-resume/cleanup evidence are rechecked |
-| `CLASSIFY_RESUME_OUTCOME_UNKNOWN` | reservation `MANUAL_REVIEW` | mutable: exact active lineage and the one still-`RESUME_INTENT_COMMITTED` execution with no post-resume/cleanup evidence are rechecked |
-| `SELECT_COMMITTED_SUCCESS` | selection plus attempt/session success | mutable: the normal selection insert and projection guards recheck the owning successful terminal, terminal-recorded attempt, open session, and no prior selection |
-| `CLOSE_SESSION` | session `CLOSED` | mutable: every current attempt and its exact claim/reservation/terminal/selection lineage, plus absence of ambiguity, are rechecked at `OPEN -> CLOSED` |
-| `ACKNOWLEDGE_RESTORE` | none | evidence-only; it changes no aggregate state and grants no capability |
+| `RECORD_ATTEMPT_AMBIGUITY` | exact committed claim, launch-reserved attempt, `PROCESS_CREATED` reservation, one `RESUME_RECORDED` execution with digest-valid post-resume and cleanup evidence, open session, no terminal/selection | optional attempt and execution ambiguity projections repeat the same active lineage and revocation checks |
+| `RECORD_CLAIM_AMBIGUITY` | the targeted committed claim resolves through the same currently actionable attempt/reservation/execution lineage, with no terminal/selection | evidence-only; no aggregate or external authority can be derived from the row |
+| `CLASSIFY_LAUNCH_RESERVATION` | active committed claim, launch-reserved attempt, `COMMITTED` reservation, open session, and no execution, terminal, or selection | reservation `MANUAL_REVIEW` repeats the active-lineage predicate |
+| `CLASSIFY_PROCESS_OUTCOME_UNKNOWN` | exact active lineage, digest-valid intent, and no failure evidence, execution, terminal, or selection | reservation `MANUAL_REVIEW` repeats those predicates |
+| `CLASSIFY_PRE_RESUME_READY` | exact active lineage and one still-`PRE_RESUME_READY` execution with no resume/post-resume/cleanup evidence or terminal/selection | reservation `MANUAL_REVIEW` repeats the exact phase/evidence predicate |
+| `CLASSIFY_RESUME_OUTCOME_UNKNOWN` | exact active lineage and one still-`RESUME_INTENT_COMMITTED` execution with no post-resume/cleanup evidence or terminal/selection | reservation `MANUAL_REVIEW` repeats the exact phase/evidence predicate |
+| `SELECT_COMMITTED_SUCCESS` | owning confirmed-success terminal, terminal-recorded reservation and attempt, open session, and no prior selection | normal selection and aggregate projection guards recheck ownership and success facts |
+| `CLOSE_SESSION` | every current attempt has exact non-ambiguous terminal/selection lineage and the open session has no selection | `OPEN -> CLOSED` repeats the complete current normalized close predicate |
+| `ACKNOWLEDGE_RESTORE` | open session with no selection and no prior identical acknowledgement | evidence-only; it changes no aggregate state and grants no capability |
 
 `CLOSE_SESSION` does not race a live external boundary: its prerequisite that
 every attempt is terminal means each reservation has already crossed the
@@ -929,6 +934,12 @@ run inside the inserting statement, so an abort rolls back both the attempt
 row and the trigger-owned increment. Separate sessions independently begin at
 ordinal zero.
 
+Any caller-supplied attempt ordinal override is validated before UUID5 or
+evidence derivation and before the transaction begins. Its exact Python type
+must be `int` (not `bool`, float, string, coercible numeric, or an `int`
+subclass) and its value must be non-negative. The counter read from SQLite is
+validated through the same canonical domain before use.
+
 ### 4.2 Recovery allocation
 
 Recovery uses the same single-insert primitive:
@@ -961,6 +972,12 @@ transition all durable. A duplicate ordinal fails closed and never silently
 selects an alternate ordinal. Separate sessions independently begin at
 recovery ordinal zero.
 
+Caller-supplied recovery ordinal overrides use the same exact non-negative
+Python `int` contract before arbiter selection, UUID5 material, evidence text,
+or transaction work. Rejection leaves the row set and both counters unchanged;
+SQLite remains authoritative for whether a valid canonical ordinal equals the
+currently allocated counter.
+
 ## 5. Deterministic identities
 
 The repository-owned namespace is:
@@ -983,6 +1000,16 @@ contents are `LF(item_count)` followed by each item frame in the order captured
 by the immutable validated request snapshot. No identity uses a clock, UUID4,
 Python hash, object identity, locale,
 filesystem path, secret, row order, or serialized artifact bytes.
+
+Persisted schema/version values used by deterministic identities must equal the
+version encoded in the canonical UUID5 tuple. This release supports exactly
+schema `1` for `sessions`, `attempts`, `provider_call_claims`,
+`launch_reservations`, `launch_executions`, `terminals`,
+`session_selections`, and `manual_recoveries`; each column has an authoritative
+`CHECK(schema = 1)`. Values 0, 2, and all other alternatives fail at direct SQL
+insertion. `authority_metadata.bootstrap_schema` and
+`schema_migrations.schema_version` retain their distinct bootstrap and
+migration versioning semantics and are not part of this row-schema gate.
 
 The root `session_id/v2` tuple is:
 

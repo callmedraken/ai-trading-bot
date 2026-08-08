@@ -83,6 +83,15 @@ OS arbiter. Process death destroys every unpersisted capability. A restarted
 process must reconcile durable SQLite state and choose the documented recovery;
 it must not recreate a permit from public fields.
 
+Each registry stores an immutable private issuance record containing the exact
+issued object, its one-shot token and issuer, and its original reservation and,
+where applicable, execution identity. Caller-visible object attributes are
+validated copies, not authority for choosing an arbiter, database lineage, or
+event attribution. Every capability boundary resolves and validates the exact
+registry record before arbiter selection, uses only registry-side identities,
+and rechecks the record before consumption. This remains fail-closed even if a
+caller bypasses frozen-field assignment with reflective mutation.
+
 Normal owner exit and abrupt process termination release the OS object. In
 production, `WAIT_ABANDONED` is conservative evidence that the prior owner died,
 not evidence that a provider or Windows API call did or did not occur. The new
@@ -367,14 +376,17 @@ bindings and requires every inserted reservation to start exactly in
 all null.
 
 The unique reservation is also the durable claim-to-provider handoff fence.
-Only the transaction that inserts it receives an exact typed
-`FakeProviderConstructionPermit` containing the reservation identity, a
-private issuer, and a registered one-shot permit. The permanent claim alone,
-an existing reservation, restart state, copied or reconstructed objects, and
-wrong issuers or permits cannot recreate this authority.
+Only the transaction that inserts it receives an exact frozen, slots-backed
+`FakeProviderConstructionPermit`; it is not a string subtype and has one
+reservation field, a private issuer, and a registered one-shot permit. The
+registry independently freezes the exact issued object and original
+reservation binding. The permanent claim alone, an existing reservation,
+restart state, copied or reconstructed objects, mutated visible fields, and
+wrong issuers or permits cannot recreate or redirect this authority.
 
 Under the OS-backed inter-process lifecycle arbiter, provider construction
-accepts only that exact registered permit and rechecks the normalized reservation -> claim
+first resolves the original reservation from that exact registry entry; only
+then does it select the arbiter and query the normalized reservation -> claim
 -> attempt -> session lineage: reservation `COMMITTED` with no process intent,
 claim `COMMITTED`, attempt `LAUNCH_RESERVED`, session `OPEN`, no execution,
 terminal, or selection, and exact request/provider/operation/budget/policy
@@ -738,15 +750,17 @@ Canonical bytes and SHA-256 digests establish content integrity only. The
 matrix deliberately separates durable SQLite state, process-local typed-object
 provenance, OS-backed inter-process arbitration, and the external effect or
 result. Private typed issuers plus registries bind each one-shot permit to the
-exact issued object only in its issuing process. A copied, reconstructed,
-cross-process, wrong-issuer, or wrong-permit object has no authority even when
-its public bytes are exact. Persisted parent state and the OS arbiter remain
-independently necessary.
+exact issued object and immutable original lineage only in its issuing process.
+Registry-side lineage, never caller-visible attributes, selects the arbiter,
+database facts, and event identity. A copied, reconstructed, reflectively
+mutated, cross-process, wrong-issuer, or wrong-permit object has no authority
+even when its public bytes are exact. Persisted parent state and the OS arbiter
+remain independently necessary.
 
 | Boundary | Required persisted parent | Capability/evidence | Issuer/provenance | Consumption point | Lifecycle arbiter | Database transaction | Revoking facts | Crash result / recovery | Direct-SQL enforcement |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Reservation/provider-permit issuance | `COMMITTED` claim in an `OPEN` session | Unique reservation insert produces `FakeProviderConstructionPermit` | Private reservation-transaction issuer and exact object/permit registry | Permit remains live until provider construction | Persisted writers serialize through `BEGIN IMMEDIATE` | Yes, `BEGIN IMMEDIATE` | `MANUAL_REVIEW`, process intent, terminal, selection, `CLOSED` | Before commit: no reservation/permit; after commit with lost permit: `CLASSIFY_LAUNCH_RESERVATION` | Unique `claim_id`, reservation lineage trigger; SQL cannot issue the permit |
-| Provider construction | `COMMITTED` reservation, exact normalized active lineage, no process intent/execution/terminal/selection | Exact `FakeProviderConstructionPermit` produces `FakeConstructedProvider` | Both objects use private issuers and exact one-shot registries | Reservation permit immediately before construction; constructed provider after process-intent commit | Required; held through constructed-provider production | No transaction across construction | `MANUAL_REVIEW`, process intent, terminal, selection, `CLOSED` | Failure or loss leaves `COMMITTED`; never reconstruct/repeat, use `CLASSIFY_LAUNCH_RESERVATION` | SQLite proves reservation ownership, not provider-object construction |
+| Reservation/provider-permit issuance | `COMMITTED` claim in an `OPEN` session | Unique reservation insert produces frozen `FakeProviderConstructionPermit` | Immutable registry record owns exact object and original reservation ID | Permit remains live until provider construction | Persisted writers serialize through `BEGIN IMMEDIATE` | Yes, `BEGIN IMMEDIATE` | `MANUAL_REVIEW`, process intent, terminal, selection, `CLOSED` | Before commit: no reservation/permit; after commit with lost permit: `CLASSIFY_LAUNCH_RESERVATION` | Unique `claim_id`, reservation lineage trigger; SQL cannot issue the permit |
+| Provider construction | `COMMITTED` reservation, exact normalized active lineage, no process intent/execution/terminal/selection | Exact `FakeProviderConstructionPermit` produces `FakeConstructedProvider` | Registry-bound reservation selects arbiter, SQL lineage, event, and result; visible fields are checked only | Reservation permit immediately before construction; constructed provider after process-intent commit | Required; held through constructed-provider production | No transaction across construction | `MANUAL_REVIEW`, process intent, terminal, selection, `CLOSED` | Failure or loss leaves `COMMITTED`; never reconstruct/repeat, use `CLASSIFY_LAUNCH_RESERVATION` | SQLite proves reservation ownership, not provider-object construction |
 | Process-intent issuance | `COMMITTED` reservation and exact normalized claim/session lineage | Exact `FakeConstructedProvider` produces transaction-issued `FakeProcessIntent` | Private issuers and exact object/permit registries | Constructed provider after commit; process permit at dispatch | Required against reservation classification | Yes, `BEGIN IMMEDIATE` | `MANUAL_REVIEW`, terminal, selection, `CLOSED` | Rollback while active preserves exact provider capability; after commit no process-permit reconstruction, use `CLASSIFY_PROCESS_OUTCOME_UNKNOWN` | Process-intent append/state triggers; provider provenance remains service-only |
 | Process dispatch | `PROCESS_INTENT_COMMITTED`, committed claim, launch-reserved attempt, `OPEN`, no terminal/selection | Exact `FakeProcessIntent` | Private issuer and exact registered one-shot permit | Immediately before `CreateProcessW` | Required; held through typed result production | No transaction across call | `MANUAL_REVIEW`, terminal, selection, `CLOSED` | No result is indistinguishable from unpersisted result; classify unknown | SQL cannot perform or prove the API call |
 | Process-success persistence | Same active process lineage; no execution | Exact `FakeProcessCreationReceipt` | Private result issuer and exact registered result permit | After execution/reservation commit | Required | Yes, `BEGIN IMMEDIATE` | `MANUAL_REVIEW`, terminal, selection, `CLOSED` | Rollback while active keeps receipt retryable; otherwise classify unknown | Execution parent trigger and reservation state trigger; provenance remains service-only |

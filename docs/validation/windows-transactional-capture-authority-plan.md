@@ -625,15 +625,29 @@ ancestor identifiers.
 The executable audit distinguishes four independent concerns: durable SQLite
 authority, process-local provenance, OS-backed inter-process arbitration, and
 external effects/results. Canonical bytes and digests prove content, while a
-private typed issuer and registry entry bind a permit to the exact object only
-inside its issuing process. Copies, reconstructions, cross-process transfer,
-wrong issuers, wrong permits, reuse, cross-lineage use, and objects delayed
-past persisted revocation all fail.
+private typed issuer and immutable registry issuance record bind the exact
+object to its original reservation and, where applicable, execution identity
+inside its issuing process. Registry-side identities select the arbiter,
+database lineage, and event attribution; caller-visible fields are validated
+but never trusted for those choices. Copies, reconstructions, reflective
+mutation, cross-process transfer, wrong issuers, wrong permits, reuse,
+cross-lineage use, and objects delayed past persisted revocation all fail.
+
+The executable provenance audit covers `FakeProviderConstructionPermit`,
+`FakeConstructedProvider`, `FakeProcessIntent`, both process-result types,
+`FakeResumeIntent`, and `FakeResumeReceipt`. For each object it forcibly mutates
+a visible lineage field with `object.__setattr__`, requires a registry-binding
+failure before arbiter construction, and proves no event, database mutation, or
+permit consumption. Restoring the field must leave the exact original object
+usable at its documented boundary. Provider-permit tests additionally prove
+ordinary assignment to the reservation, issuer, and permit fails; mutation from
+reservation A to B performs no query or event for B; both durable reservations
+remain unchanged; and B's genuine permit remains usable exactly once.
 
 | Boundary | Required persisted parent | Capability/evidence | Issuer/provenance | Consumption point | Lifecycle arbiter | Database transaction | Revoking facts | Crash result / recovery | Direct-SQL gate tested |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Reservation/provider-permit issuance | `COMMITTED` claim in an `OPEN` session | Unique reservation insert produces `FakeProviderConstructionPermit` | Private reservation-transaction issuer and exact registry binding | At provider construction | SQLite serializes reservation writers | `BEGIN IMMEDIATE` | `MANUAL_REVIEW`, process intent, terminal, selection, `CLOSED` | Lost post-commit permit uses `CLASSIFY_LAUNCH_RESERVATION` | Unique claim reservation and normalized insert trigger; SQL cannot issue the permit |
-| Provider construction | `COMMITTED` reservation and exact active normalized lineage; no process intent/execution/terminal/selection | Exact reservation-issued permit produces `FakeConstructedProvider` | Private issuers and exact one-shot registries | Reservation permit immediately before construction; provider result after process-intent commit | Required through constructed-provider production | No transaction across hook | `MANUAL_REVIEW`, process intent, terminal, selection, `CLOSED` | Failure/loss remains `COMMITTED`; no reconstruction or repeat, classify reservation | SQLite proves reservation ownership, not provider construction |
+| Reservation/provider-permit issuance | `COMMITTED` claim in an `OPEN` session | Unique reservation insert produces frozen `FakeProviderConstructionPermit` | Immutable registry record owns exact object and original reservation ID | At provider construction | SQLite serializes reservation writers | `BEGIN IMMEDIATE` | `MANUAL_REVIEW`, process intent, terminal, selection, `CLOSED` | Lost post-commit permit uses `CLASSIFY_LAUNCH_RESERVATION` | Unique claim reservation and normalized insert trigger; SQL cannot issue the permit |
+| Provider construction | `COMMITTED` reservation and exact active normalized lineage; no process intent/execution/terminal/selection | Exact reservation-issued permit produces `FakeConstructedProvider` | Registry-bound ID selects arbiter, SQL lineage, event, and result; visible fields are checked only | Reservation permit immediately before construction; provider result after process-intent commit | Required through constructed-provider production | No transaction across hook | `MANUAL_REVIEW`, process intent, terminal, selection, `CLOSED` | Failure/loss remains `COMMITTED`; no reconstruction or repeat, classify reservation | SQLite proves reservation ownership, not provider construction |
 | Process-intent issuance | `COMMITTED` reservation and normalized active lineage | Exact `FakeConstructedProvider` produces `FakeProcessIntent` | Private issuers and exact object/permit registries | Provider capability after commit; process permit at dispatch | Required against reservation recovery | `BEGIN IMMEDIATE` | `MANUAL_REVIEW`, terminal, selection, `CLOSED` | Transient rollback preserves exact provider capability; committed process intent uses unknown-process recovery | Intent append/state triggers; provider provenance is service-only |
 | Process dispatch | `PROCESS_INTENT_COMMITTED`, committed claim, launch-reserved attempt, `OPEN`, no terminal/selection | Exact process intent | Private issuer and exact registered permit | Immediately before modeled `CreateProcessW` | Required through result production | No transaction across hook | `MANUAL_REVIEW`, terminal, selection, `CLOSED` | Missing persisted result is conservatively unknown | SQL cannot prove dispatch |
 | Process-success persistence | Same active process lineage, no execution | `FakeProcessCreationReceipt` | Private adapter issuer and exact registered result permit | After successful commit | Required | `BEGIN IMMEDIATE` | `MANUAL_REVIEW`, terminal, selection, `CLOSED` | Transient rollback preserves retry while active; otherwise unknown-process recovery | Execution parent and reservation state triggers; provenance is service-only |

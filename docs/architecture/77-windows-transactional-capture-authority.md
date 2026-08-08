@@ -47,19 +47,33 @@ using sorted keys and no insignificant whitespace:
 ```
 
 The lowercase 64-character digest, never a raw identifier, is the bounded
-object-name suffix. Milestone A production uses the fixed local Windows object
-namespace `Local\\AITradingBot-Lifecycle-v1-<digest>` and a named mutex created
-or opened only after validating the administrator-provisioned security
-descriptor. Its owner and DACL grant synchronization rights only to the
-approved administrator and Trading SIDs and deny untrusted creation or
-replacement. Neither a caller nor database content selects another namespace,
-prefix, security descriptor, lock path, timeout, lease, or heartbeat.
+object-name suffix. Lifecycle authority is machine-scoped, not scoped to an
+interactive Windows session. Milestone A production uses the fixed global
+Windows object namespace
+`Global\\AITradingBot-Lifecycle-v1-<digest>`. Every Trading worker,
+scheduler/helper, recovery process, and approved administrator tool opens that
+same named mutex regardless of its Windows session. `Local\\` is prohibited
+for lifecycle arbitration. The fixed `Global\\AITradingBot-Lifecycle-v1-`
+prefix and digest-derived suffix are not caller selectable.
+
+Creation and opening use the administrator-reviewed security descriptor. Its
+owner and DACL admit only the approved administrator and Trading principals
+required by this architecture and deny untrusted creation, replacement, or
+synchronization. An existing object with an unexpected type, ownership, DACL,
+name, or other security property causes fail-closed startup; there is no
+fallback to `Local\\` or a differently named mutex. Neither a caller nor
+database content selects another namespace, prefix, security descriptor, lock
+path, timeout, lease, or heartbeat. Lock stealing, timeout takeover, and
+session-local fallback are prohibited.
 
 The executable harness uses a same-key advisory file lock below the fixed
 test-adapter temporary subdirectory
 `ai-trading-bot-lifecycle-arbiters-v1/<digest>.lock`. That adapter validates
 inter-process exclusion and process-death release semantics only. It is not the
 production named-mutex implementation, ACL provisioning, or security boundary.
+This PR does not implement the production Windows mutex, namespace validation,
+privilege or ACL provisioning, DACL enforcement, or real Windows acceptance;
+those remain Milestone A work.
 
 The global acquisition order is mandatory:
 

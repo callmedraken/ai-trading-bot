@@ -78,9 +78,31 @@ adapter. A new spawned recovery worker must then acquire the same deterministic
 arbiter, reconcile durable state, append exactly one conservative recovery, and
 emit no retry. This proves process-death release, not Windows named-mutex
 `WAIT_ABANDONED` signaling or ACL correctness. Production acceptance separately
-requires the fixed `Local\\AITradingBot-Lifecycle-v1-<digest>` named mutex,
-administrator-provisioned owner/DACL validation, and conservative handling of
-`WAIT_ABANDONED` as owner-death evidence rather than API-outcome evidence.
+requires the fixed `Global\\AITradingBot-Lifecycle-v1-<digest>` named mutex,
+administrator-reviewed security-descriptor and owner/DACL validation, and
+conservative handling of `WAIT_ABANDONED` as owner-death evidence rather than
+API-outcome evidence. `Local\\` lifecycle arbitration is rejected.
+
+Milestone A production acceptance must run cooperating approved processes in
+different Windows sessions against one reservation and prove that every Trading
+worker, scheduler/helper, recovery process, and approved administrator tool
+derives and opens the exact same `Global\\` mutex and cannot enter its critical
+section concurrently. This demonstrates one machine-wide lifecycle authority,
+not one authority per interactive session. The fixed prefix and digest suffix
+are not caller selectable. Creation/opening must use the administrator-reviewed
+security descriptor whose owner and DACL admit only the approved administrator
+and Trading principals required by the architecture. An existing object with
+an unexpected type, owner, DACL, name, or other security property must fail
+startup closed, without trying `Local\\` or any alternate name. Acceptance must
+also reject lease, heartbeat, timeout-takeover, lock-stealing, and session-local
+fallback behavior.
+
+The portable file-lock tests are semantic inter-process arbitration tests only.
+They do not validate the Windows `Global\\` namespace, cross-Windows-session
+object visibility, named-mutex type or name validation, privileges, owner, DACL,
+or other ACL behavior. This PR does not implement those production concerns;
+namespace validation, mutex creation/opening, privilege and ACL provisioning,
+and real Windows acceptance remain Milestone A work.
 
 Another spawned child reconstructs provider and process-public fields under
 its own process-local issuers and registries. Both attempts must fail as not

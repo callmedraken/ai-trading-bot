@@ -381,12 +381,13 @@ proves equality and later closure for both authorized paths and atomic
 rejection immediately before the matching recovery or selection.
 
 Timestamp tests must also prove that normal and recovery-driven selection use
-the same valid deterministic selection timestamp, that terminal recording is
-not earlier than selection, that selection is not later than subsequent
-closure, and that reservation outcome timestamps remain write-once after the
-first accepted value. Timestamp values remain audit-only and absent from UUID5
-material; canonical JSON and every existing identity golden vector must remain
-byte-for-byte unchanged.
+the same valid deterministic selection timestamp, that
+`selection.selected_at_utc >= terminal.recorded_at_utc` for its exact referenced
+terminal, and that `selection.selected_at_utc <= session.closed_at_utc` for any
+subsequent closure. They must also prove reservation outcome timestamps remain
+write-once after the first accepted value. Timestamp values remain audit-only
+and absent from UUID5 material; canonical JSON and every existing identity
+golden vector must remain byte-for-byte unchanged.
 
 ## 4. Deterministic identity gates
 

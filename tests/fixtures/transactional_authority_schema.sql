@@ -19,7 +19,24 @@ CREATE TABLE authority_metadata (
         AND substr(created_at_utc, 12, 2) BETWEEN '00' AND '23'
         AND substr(created_at_utc, 15, 2) BETWEEN '00' AND '59'
         AND substr(created_at_utc, 18, 2) BETWEEN '00' AND '59'
-        AND strftime('%Y-%m-%dT%H:%M:%SZ', created_at_utc) IS created_at_utc
+        AND CAST(substr(created_at_utc, 6, 2) AS INTEGER) BETWEEN 1 AND 12
+        AND CAST(substr(created_at_utc, 9, 2) AS INTEGER) >= 1
+        AND CAST(substr(created_at_utc, 9, 2) AS INTEGER) <=
+            CASE
+                WHEN CAST(substr(created_at_utc, 6, 2) AS INTEGER)
+                    IN (1, 3, 5, 7, 8, 10, 12) THEN 31
+                WHEN CAST(substr(created_at_utc, 6, 2) AS INTEGER)
+                    IN (4, 6, 9, 11) THEN 30
+                WHEN CAST(substr(created_at_utc, 6, 2) AS INTEGER) = 2 THEN
+                    CASE
+                        WHEN CAST(substr(created_at_utc, 1, 4) AS INTEGER) % 400 = 0
+                          OR (CAST(substr(created_at_utc, 1, 4) AS INTEGER) % 4 = 0
+                              AND CAST(substr(created_at_utc, 1, 4) AS INTEGER) % 100 <> 0)
+                        THEN 29
+                        ELSE 28
+                    END
+                ELSE 0
+            END
     ),
     bootstrap_digest BLOB NOT NULL CHECK (length(bootstrap_digest) = 32),
     database_identity_digest BLOB NOT NULL CHECK (length(database_identity_digest) = 32),
@@ -44,7 +61,24 @@ CREATE TABLE schema_migrations (
         AND substr(applied_at_utc, 12, 2) BETWEEN '00' AND '23'
         AND substr(applied_at_utc, 15, 2) BETWEEN '00' AND '59'
         AND substr(applied_at_utc, 18, 2) BETWEEN '00' AND '59'
-        AND strftime('%Y-%m-%dT%H:%M:%SZ', applied_at_utc) IS applied_at_utc
+        AND CAST(substr(applied_at_utc, 6, 2) AS INTEGER) BETWEEN 1 AND 12
+        AND CAST(substr(applied_at_utc, 9, 2) AS INTEGER) >= 1
+        AND CAST(substr(applied_at_utc, 9, 2) AS INTEGER) <=
+            CASE
+                WHEN CAST(substr(applied_at_utc, 6, 2) AS INTEGER)
+                    IN (1, 3, 5, 7, 8, 10, 12) THEN 31
+                WHEN CAST(substr(applied_at_utc, 6, 2) AS INTEGER)
+                    IN (4, 6, 9, 11) THEN 30
+                WHEN CAST(substr(applied_at_utc, 6, 2) AS INTEGER) = 2 THEN
+                    CASE
+                        WHEN CAST(substr(applied_at_utc, 1, 4) AS INTEGER) % 400 = 0
+                          OR (CAST(substr(applied_at_utc, 1, 4) AS INTEGER) % 4 = 0
+                              AND CAST(substr(applied_at_utc, 1, 4) AS INTEGER) % 100 <> 0)
+                        THEN 29
+                        ELSE 28
+                    END
+                ELSE 0
+            END
     ),
     UNIQUE (authority_epoch_id, schema_version)
 );
@@ -69,7 +103,24 @@ CREATE TABLE sessions (
         AND substr(created_at_utc, 12, 2) BETWEEN '00' AND '23'
         AND substr(created_at_utc, 15, 2) BETWEEN '00' AND '59'
         AND substr(created_at_utc, 18, 2) BETWEEN '00' AND '59'
-        AND strftime('%Y-%m-%dT%H:%M:%SZ', created_at_utc) IS created_at_utc
+        AND CAST(substr(created_at_utc, 6, 2) AS INTEGER) BETWEEN 1 AND 12
+        AND CAST(substr(created_at_utc, 9, 2) AS INTEGER) >= 1
+        AND CAST(substr(created_at_utc, 9, 2) AS INTEGER) <=
+            CASE
+                WHEN CAST(substr(created_at_utc, 6, 2) AS INTEGER)
+                    IN (1, 3, 5, 7, 8, 10, 12) THEN 31
+                WHEN CAST(substr(created_at_utc, 6, 2) AS INTEGER)
+                    IN (4, 6, 9, 11) THEN 30
+                WHEN CAST(substr(created_at_utc, 6, 2) AS INTEGER) = 2 THEN
+                    CASE
+                        WHEN CAST(substr(created_at_utc, 1, 4) AS INTEGER) % 400 = 0
+                          OR (CAST(substr(created_at_utc, 1, 4) AS INTEGER) % 4 = 0
+                              AND CAST(substr(created_at_utc, 1, 4) AS INTEGER) % 100 <> 0)
+                        THEN 29
+                        ELSE 28
+                    END
+                ELSE 0
+            END
     ),
     closed_at_utc TEXT CHECK (
         closed_at_utc IS NULL OR (
@@ -80,7 +131,24 @@ CREATE TABLE sessions (
             AND substr(closed_at_utc, 12, 2) BETWEEN '00' AND '23'
             AND substr(closed_at_utc, 15, 2) BETWEEN '00' AND '59'
             AND substr(closed_at_utc, 18, 2) BETWEEN '00' AND '59'
-            AND strftime('%Y-%m-%dT%H:%M:%SZ', closed_at_utc) IS closed_at_utc
+            AND CAST(substr(closed_at_utc, 6, 2) AS INTEGER) BETWEEN 1 AND 12
+            AND CAST(substr(closed_at_utc, 9, 2) AS INTEGER) >= 1
+            AND CAST(substr(closed_at_utc, 9, 2) AS INTEGER) <=
+                CASE
+                    WHEN CAST(substr(closed_at_utc, 6, 2) AS INTEGER)
+                        IN (1, 3, 5, 7, 8, 10, 12) THEN 31
+                    WHEN CAST(substr(closed_at_utc, 6, 2) AS INTEGER)
+                        IN (4, 6, 9, 11) THEN 30
+                    WHEN CAST(substr(closed_at_utc, 6, 2) AS INTEGER) = 2 THEN
+                        CASE
+                            WHEN CAST(substr(closed_at_utc, 1, 4) AS INTEGER) % 400 = 0
+                              OR (CAST(substr(closed_at_utc, 1, 4) AS INTEGER) % 4 = 0
+                                  AND CAST(substr(closed_at_utc, 1, 4) AS INTEGER) % 100 <> 0)
+                            THEN 29
+                            ELSE 28
+                        END
+                    ELSE 0
+                END
         )
     ),
     close_reason TEXT,
@@ -118,7 +186,24 @@ CREATE TABLE attempts (
         AND substr(created_at_utc, 12, 2) BETWEEN '00' AND '23'
         AND substr(created_at_utc, 15, 2) BETWEEN '00' AND '59'
         AND substr(created_at_utc, 18, 2) BETWEEN '00' AND '59'
-        AND strftime('%Y-%m-%dT%H:%M:%SZ', created_at_utc) IS created_at_utc
+        AND CAST(substr(created_at_utc, 6, 2) AS INTEGER) BETWEEN 1 AND 12
+        AND CAST(substr(created_at_utc, 9, 2) AS INTEGER) >= 1
+        AND CAST(substr(created_at_utc, 9, 2) AS INTEGER) <=
+            CASE
+                WHEN CAST(substr(created_at_utc, 6, 2) AS INTEGER)
+                    IN (1, 3, 5, 7, 8, 10, 12) THEN 31
+                WHEN CAST(substr(created_at_utc, 6, 2) AS INTEGER)
+                    IN (4, 6, 9, 11) THEN 30
+                WHEN CAST(substr(created_at_utc, 6, 2) AS INTEGER) = 2 THEN
+                    CASE
+                        WHEN CAST(substr(created_at_utc, 1, 4) AS INTEGER) % 400 = 0
+                          OR (CAST(substr(created_at_utc, 1, 4) AS INTEGER) % 4 = 0
+                              AND CAST(substr(created_at_utc, 1, 4) AS INTEGER) % 100 <> 0)
+                        THEN 29
+                        ELSE 28
+                    END
+                ELSE 0
+            END
     ),
     UNIQUE (session_id, ordinal)
 );
@@ -144,7 +229,24 @@ CREATE TABLE provider_call_claims (
         AND substr(committed_at_utc, 12, 2) BETWEEN '00' AND '23'
         AND substr(committed_at_utc, 15, 2) BETWEEN '00' AND '59'
         AND substr(committed_at_utc, 18, 2) BETWEEN '00' AND '59'
-        AND strftime('%Y-%m-%dT%H:%M:%SZ', committed_at_utc) IS committed_at_utc
+        AND CAST(substr(committed_at_utc, 6, 2) AS INTEGER) BETWEEN 1 AND 12
+        AND CAST(substr(committed_at_utc, 9, 2) AS INTEGER) >= 1
+        AND CAST(substr(committed_at_utc, 9, 2) AS INTEGER) <=
+            CASE
+                WHEN CAST(substr(committed_at_utc, 6, 2) AS INTEGER)
+                    IN (1, 3, 5, 7, 8, 10, 12) THEN 31
+                WHEN CAST(substr(committed_at_utc, 6, 2) AS INTEGER)
+                    IN (4, 6, 9, 11) THEN 30
+                WHEN CAST(substr(committed_at_utc, 6, 2) AS INTEGER) = 2 THEN
+                    CASE
+                        WHEN CAST(substr(committed_at_utc, 1, 4) AS INTEGER) % 400 = 0
+                          OR (CAST(substr(committed_at_utc, 1, 4) AS INTEGER) % 4 = 0
+                              AND CAST(substr(committed_at_utc, 1, 4) AS INTEGER) % 100 <> 0)
+                        THEN 29
+                        ELSE 28
+                    END
+                ELSE 0
+            END
     )
 );
 
@@ -169,7 +271,24 @@ CREATE TABLE launch_reservations (
             AND substr(process_intent_committed_at_utc, 12, 2) BETWEEN '00' AND '23'
             AND substr(process_intent_committed_at_utc, 15, 2) BETWEEN '00' AND '59'
             AND substr(process_intent_committed_at_utc, 18, 2) BETWEEN '00' AND '59'
-            AND strftime('%Y-%m-%dT%H:%M:%SZ', process_intent_committed_at_utc) IS process_intent_committed_at_utc
+            AND CAST(substr(process_intent_committed_at_utc, 6, 2) AS INTEGER) BETWEEN 1 AND 12
+            AND CAST(substr(process_intent_committed_at_utc, 9, 2) AS INTEGER) >= 1
+            AND CAST(substr(process_intent_committed_at_utc, 9, 2) AS INTEGER) <=
+                CASE
+                    WHEN CAST(substr(process_intent_committed_at_utc, 6, 2) AS INTEGER)
+                        IN (1, 3, 5, 7, 8, 10, 12) THEN 31
+                    WHEN CAST(substr(process_intent_committed_at_utc, 6, 2) AS INTEGER)
+                        IN (4, 6, 9, 11) THEN 30
+                    WHEN CAST(substr(process_intent_committed_at_utc, 6, 2) AS INTEGER) = 2 THEN
+                        CASE
+                            WHEN CAST(substr(process_intent_committed_at_utc, 1, 4) AS INTEGER) % 400 = 0
+                              OR (CAST(substr(process_intent_committed_at_utc, 1, 4) AS INTEGER) % 4 = 0
+                                  AND CAST(substr(process_intent_committed_at_utc, 1, 4) AS INTEGER) % 100 <> 0)
+                            THEN 29
+                            ELSE 28
+                        END
+                    ELSE 0
+                END
         )
     ),
     reservation_state TEXT NOT NULL CHECK (reservation_state IN (
@@ -186,7 +305,24 @@ CREATE TABLE launch_reservations (
         AND substr(committed_at_utc, 12, 2) BETWEEN '00' AND '23'
         AND substr(committed_at_utc, 15, 2) BETWEEN '00' AND '59'
         AND substr(committed_at_utc, 18, 2) BETWEEN '00' AND '59'
-        AND strftime('%Y-%m-%dT%H:%M:%SZ', committed_at_utc) IS committed_at_utc
+        AND CAST(substr(committed_at_utc, 6, 2) AS INTEGER) BETWEEN 1 AND 12
+        AND CAST(substr(committed_at_utc, 9, 2) AS INTEGER) >= 1
+        AND CAST(substr(committed_at_utc, 9, 2) AS INTEGER) <=
+            CASE
+                WHEN CAST(substr(committed_at_utc, 6, 2) AS INTEGER)
+                    IN (1, 3, 5, 7, 8, 10, 12) THEN 31
+                WHEN CAST(substr(committed_at_utc, 6, 2) AS INTEGER)
+                    IN (4, 6, 9, 11) THEN 30
+                WHEN CAST(substr(committed_at_utc, 6, 2) AS INTEGER) = 2 THEN
+                    CASE
+                        WHEN CAST(substr(committed_at_utc, 1, 4) AS INTEGER) % 400 = 0
+                          OR (CAST(substr(committed_at_utc, 1, 4) AS INTEGER) % 4 = 0
+                              AND CAST(substr(committed_at_utc, 1, 4) AS INTEGER) % 100 <> 0)
+                        THEN 29
+                        ELSE 28
+                    END
+                ELSE 0
+            END
     ),
     outcome_recorded_at_utc TEXT CHECK (
         outcome_recorded_at_utc IS NULL OR (
@@ -197,7 +333,24 @@ CREATE TABLE launch_reservations (
             AND substr(outcome_recorded_at_utc, 12, 2) BETWEEN '00' AND '23'
             AND substr(outcome_recorded_at_utc, 15, 2) BETWEEN '00' AND '59'
             AND substr(outcome_recorded_at_utc, 18, 2) BETWEEN '00' AND '59'
-            AND strftime('%Y-%m-%dT%H:%M:%SZ', outcome_recorded_at_utc) IS outcome_recorded_at_utc
+            AND CAST(substr(outcome_recorded_at_utc, 6, 2) AS INTEGER) BETWEEN 1 AND 12
+            AND CAST(substr(outcome_recorded_at_utc, 9, 2) AS INTEGER) >= 1
+            AND CAST(substr(outcome_recorded_at_utc, 9, 2) AS INTEGER) <=
+                CASE
+                    WHEN CAST(substr(outcome_recorded_at_utc, 6, 2) AS INTEGER)
+                        IN (1, 3, 5, 7, 8, 10, 12) THEN 31
+                    WHEN CAST(substr(outcome_recorded_at_utc, 6, 2) AS INTEGER)
+                        IN (4, 6, 9, 11) THEN 30
+                    WHEN CAST(substr(outcome_recorded_at_utc, 6, 2) AS INTEGER) = 2 THEN
+                        CASE
+                            WHEN CAST(substr(outcome_recorded_at_utc, 1, 4) AS INTEGER) % 400 = 0
+                              OR (CAST(substr(outcome_recorded_at_utc, 1, 4) AS INTEGER) % 4 = 0
+                                  AND CAST(substr(outcome_recorded_at_utc, 1, 4) AS INTEGER) % 100 <> 0)
+                            THEN 29
+                            ELSE 28
+                        END
+                    ELSE 0
+                END
         )
     ),
     CHECK (
@@ -241,7 +394,24 @@ CREATE TABLE launch_executions (
             AND substr(resume_intent_committed_at_utc, 12, 2) BETWEEN '00' AND '23'
             AND substr(resume_intent_committed_at_utc, 15, 2) BETWEEN '00' AND '59'
             AND substr(resume_intent_committed_at_utc, 18, 2) BETWEEN '00' AND '59'
-            AND strftime('%Y-%m-%dT%H:%M:%SZ', resume_intent_committed_at_utc) IS resume_intent_committed_at_utc
+            AND CAST(substr(resume_intent_committed_at_utc, 6, 2) AS INTEGER) BETWEEN 1 AND 12
+            AND CAST(substr(resume_intent_committed_at_utc, 9, 2) AS INTEGER) >= 1
+            AND CAST(substr(resume_intent_committed_at_utc, 9, 2) AS INTEGER) <=
+                CASE
+                    WHEN CAST(substr(resume_intent_committed_at_utc, 6, 2) AS INTEGER)
+                        IN (1, 3, 5, 7, 8, 10, 12) THEN 31
+                    WHEN CAST(substr(resume_intent_committed_at_utc, 6, 2) AS INTEGER)
+                        IN (4, 6, 9, 11) THEN 30
+                    WHEN CAST(substr(resume_intent_committed_at_utc, 6, 2) AS INTEGER) = 2 THEN
+                        CASE
+                            WHEN CAST(substr(resume_intent_committed_at_utc, 1, 4) AS INTEGER) % 400 = 0
+                              OR (CAST(substr(resume_intent_committed_at_utc, 1, 4) AS INTEGER) % 4 = 0
+                                  AND CAST(substr(resume_intent_committed_at_utc, 1, 4) AS INTEGER) % 100 <> 0)
+                            THEN 29
+                            ELSE 28
+                        END
+                    ELSE 0
+                END
         )
     ),
     post_resume_json BLOB,
@@ -256,7 +426,24 @@ CREATE TABLE launch_executions (
         AND substr(created_at_utc, 12, 2) BETWEEN '00' AND '23'
         AND substr(created_at_utc, 15, 2) BETWEEN '00' AND '59'
         AND substr(created_at_utc, 18, 2) BETWEEN '00' AND '59'
-        AND strftime('%Y-%m-%dT%H:%M:%SZ', created_at_utc) IS created_at_utc
+        AND CAST(substr(created_at_utc, 6, 2) AS INTEGER) BETWEEN 1 AND 12
+        AND CAST(substr(created_at_utc, 9, 2) AS INTEGER) >= 1
+        AND CAST(substr(created_at_utc, 9, 2) AS INTEGER) <=
+            CASE
+                WHEN CAST(substr(created_at_utc, 6, 2) AS INTEGER)
+                    IN (1, 3, 5, 7, 8, 10, 12) THEN 31
+                WHEN CAST(substr(created_at_utc, 6, 2) AS INTEGER)
+                    IN (4, 6, 9, 11) THEN 30
+                WHEN CAST(substr(created_at_utc, 6, 2) AS INTEGER) = 2 THEN
+                    CASE
+                        WHEN CAST(substr(created_at_utc, 1, 4) AS INTEGER) % 400 = 0
+                          OR (CAST(substr(created_at_utc, 1, 4) AS INTEGER) % 4 = 0
+                              AND CAST(substr(created_at_utc, 1, 4) AS INTEGER) % 100 <> 0)
+                        THEN 29
+                        ELSE 28
+                    END
+                ELSE 0
+            END
     ),
     CHECK (resume_intent_digest IS NULL OR length(resume_intent_digest) = 32),
     CHECK (post_resume_digest IS NULL OR length(post_resume_digest) = 32),
@@ -290,7 +477,24 @@ CREATE TABLE terminals (
         AND substr(recorded_at_utc, 12, 2) BETWEEN '00' AND '23'
         AND substr(recorded_at_utc, 15, 2) BETWEEN '00' AND '59'
         AND substr(recorded_at_utc, 18, 2) BETWEEN '00' AND '59'
-        AND strftime('%Y-%m-%dT%H:%M:%SZ', recorded_at_utc) IS recorded_at_utc
+        AND CAST(substr(recorded_at_utc, 6, 2) AS INTEGER) BETWEEN 1 AND 12
+        AND CAST(substr(recorded_at_utc, 9, 2) AS INTEGER) >= 1
+        AND CAST(substr(recorded_at_utc, 9, 2) AS INTEGER) <=
+            CASE
+                WHEN CAST(substr(recorded_at_utc, 6, 2) AS INTEGER)
+                    IN (1, 3, 5, 7, 8, 10, 12) THEN 31
+                WHEN CAST(substr(recorded_at_utc, 6, 2) AS INTEGER)
+                    IN (4, 6, 9, 11) THEN 30
+                WHEN CAST(substr(recorded_at_utc, 6, 2) AS INTEGER) = 2 THEN
+                    CASE
+                        WHEN CAST(substr(recorded_at_utc, 1, 4) AS INTEGER) % 400 = 0
+                          OR (CAST(substr(recorded_at_utc, 1, 4) AS INTEGER) % 4 = 0
+                              AND CAST(substr(recorded_at_utc, 1, 4) AS INTEGER) % 100 <> 0)
+                        THEN 29
+                        ELSE 28
+                    END
+                ELSE 0
+            END
     ),
     CHECK (snapshot_digest IS NULL OR length(snapshot_digest) = 32)
 );
@@ -312,7 +516,24 @@ CREATE TABLE session_selections (
         AND substr(selected_at_utc, 12, 2) BETWEEN '00' AND '23'
         AND substr(selected_at_utc, 15, 2) BETWEEN '00' AND '59'
         AND substr(selected_at_utc, 18, 2) BETWEEN '00' AND '59'
-        AND strftime('%Y-%m-%dT%H:%M:%SZ', selected_at_utc) IS selected_at_utc
+        AND CAST(substr(selected_at_utc, 6, 2) AS INTEGER) BETWEEN 1 AND 12
+        AND CAST(substr(selected_at_utc, 9, 2) AS INTEGER) >= 1
+        AND CAST(substr(selected_at_utc, 9, 2) AS INTEGER) <=
+            CASE
+                WHEN CAST(substr(selected_at_utc, 6, 2) AS INTEGER)
+                    IN (1, 3, 5, 7, 8, 10, 12) THEN 31
+                WHEN CAST(substr(selected_at_utc, 6, 2) AS INTEGER)
+                    IN (4, 6, 9, 11) THEN 30
+                WHEN CAST(substr(selected_at_utc, 6, 2) AS INTEGER) = 2 THEN
+                    CASE
+                        WHEN CAST(substr(selected_at_utc, 1, 4) AS INTEGER) % 400 = 0
+                          OR (CAST(substr(selected_at_utc, 1, 4) AS INTEGER) % 4 = 0
+                              AND CAST(substr(selected_at_utc, 1, 4) AS INTEGER) % 100 <> 0)
+                        THEN 29
+                        ELSE 28
+                    END
+                ELSE 0
+            END
     )
 );
 
@@ -349,7 +570,24 @@ CREATE TABLE manual_recoveries (
         AND substr(created_at_utc, 12, 2) BETWEEN '00' AND '23'
         AND substr(created_at_utc, 15, 2) BETWEEN '00' AND '59'
         AND substr(created_at_utc, 18, 2) BETWEEN '00' AND '59'
-        AND strftime('%Y-%m-%dT%H:%M:%SZ', created_at_utc) IS created_at_utc
+        AND CAST(substr(created_at_utc, 6, 2) AS INTEGER) BETWEEN 1 AND 12
+        AND CAST(substr(created_at_utc, 9, 2) AS INTEGER) >= 1
+        AND CAST(substr(created_at_utc, 9, 2) AS INTEGER) <=
+            CASE
+                WHEN CAST(substr(created_at_utc, 6, 2) AS INTEGER)
+                    IN (1, 3, 5, 7, 8, 10, 12) THEN 31
+                WHEN CAST(substr(created_at_utc, 6, 2) AS INTEGER)
+                    IN (4, 6, 9, 11) THEN 30
+                WHEN CAST(substr(created_at_utc, 6, 2) AS INTEGER) = 2 THEN
+                    CASE
+                        WHEN CAST(substr(created_at_utc, 1, 4) AS INTEGER) % 400 = 0
+                          OR (CAST(substr(created_at_utc, 1, 4) AS INTEGER) % 4 = 0
+                              AND CAST(substr(created_at_utc, 1, 4) AS INTEGER) % 100 <> 0)
+                        THEN 29
+                        ELSE 28
+                    END
+                ELSE 0
+            END
     ),
     UNIQUE (session_id, recovery_ordinal)
 );
@@ -481,10 +719,26 @@ BEGIN
             NEW.request_json,
             '$.request_window_start_date'
         ), 1, 4) NOT BETWEEN '0001' AND '9999'
-        OR strftime(
-            '%Y-%m-%d',
-            json_extract(NEW.request_json, '$.request_window_start_date')
-        ) IS NOT json_extract(NEW.request_json, '$.request_window_start_date')
+        OR NOT (
+            CAST(substr(json_extract(NEW.request_json, '$.request_window_start_date'), 6, 2) AS INTEGER) BETWEEN 1 AND 12
+            AND CAST(substr(json_extract(NEW.request_json, '$.request_window_start_date'), 9, 2) AS INTEGER) >= 1
+            AND CAST(substr(json_extract(NEW.request_json, '$.request_window_start_date'), 9, 2) AS INTEGER) <=
+                CASE
+                    WHEN CAST(substr(json_extract(NEW.request_json, '$.request_window_start_date'), 6, 2) AS INTEGER)
+                        IN (1, 3, 5, 7, 8, 10, 12) THEN 31
+                    WHEN CAST(substr(json_extract(NEW.request_json, '$.request_window_start_date'), 6, 2) AS INTEGER)
+                        IN (4, 6, 9, 11) THEN 30
+                    WHEN CAST(substr(json_extract(NEW.request_json, '$.request_window_start_date'), 6, 2) AS INTEGER) = 2 THEN
+                        CASE
+                            WHEN CAST(substr(json_extract(NEW.request_json, '$.request_window_start_date'), 1, 4) AS INTEGER) % 400 = 0
+                              OR (CAST(substr(json_extract(NEW.request_json, '$.request_window_start_date'), 1, 4) AS INTEGER) % 4 = 0
+                                  AND CAST(substr(json_extract(NEW.request_json, '$.request_window_start_date'), 1, 4) AS INTEGER) % 100 <> 0)
+                            THEN 29
+                            ELSE 28
+                        END
+                    ELSE 0
+                END
+        )
         OR length(json_extract(NEW.request_json, '$.request_window_end_date')) <> 10
         OR json_extract(NEW.request_json, '$.request_window_end_date')
             NOT GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'
@@ -492,10 +746,26 @@ BEGIN
             NEW.request_json,
             '$.request_window_end_date'
         ), 1, 4) NOT BETWEEN '0001' AND '9999'
-        OR strftime(
-            '%Y-%m-%d',
-            json_extract(NEW.request_json, '$.request_window_end_date')
-        ) IS NOT json_extract(NEW.request_json, '$.request_window_end_date')
+        OR NOT (
+            CAST(substr(json_extract(NEW.request_json, '$.request_window_end_date'), 6, 2) AS INTEGER) BETWEEN 1 AND 12
+            AND CAST(substr(json_extract(NEW.request_json, '$.request_window_end_date'), 9, 2) AS INTEGER) >= 1
+            AND CAST(substr(json_extract(NEW.request_json, '$.request_window_end_date'), 9, 2) AS INTEGER) <=
+                CASE
+                    WHEN CAST(substr(json_extract(NEW.request_json, '$.request_window_end_date'), 6, 2) AS INTEGER)
+                        IN (1, 3, 5, 7, 8, 10, 12) THEN 31
+                    WHEN CAST(substr(json_extract(NEW.request_json, '$.request_window_end_date'), 6, 2) AS INTEGER)
+                        IN (4, 6, 9, 11) THEN 30
+                    WHEN CAST(substr(json_extract(NEW.request_json, '$.request_window_end_date'), 6, 2) AS INTEGER) = 2 THEN
+                        CASE
+                            WHEN CAST(substr(json_extract(NEW.request_json, '$.request_window_end_date'), 1, 4) AS INTEGER) % 400 = 0
+                              OR (CAST(substr(json_extract(NEW.request_json, '$.request_window_end_date'), 1, 4) AS INTEGER) % 4 = 0
+                                  AND CAST(substr(json_extract(NEW.request_json, '$.request_window_end_date'), 1, 4) AS INTEGER) % 100 <> 0)
+                            THEN 29
+                            ELSE 28
+                        END
+                    ELSE 0
+                END
+        )
         OR length(json_extract(NEW.request_json, '$.target_session_date')) <> 10
         OR json_extract(NEW.request_json, '$.target_session_date')
             NOT GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'
@@ -503,10 +773,26 @@ BEGIN
             NEW.request_json,
             '$.target_session_date'
         ), 1, 4) NOT BETWEEN '0001' AND '9999'
-        OR strftime(
-            '%Y-%m-%d',
-            json_extract(NEW.request_json, '$.target_session_date')
-        ) IS NOT json_extract(NEW.request_json, '$.target_session_date')
+        OR NOT (
+            CAST(substr(json_extract(NEW.request_json, '$.target_session_date'), 6, 2) AS INTEGER) BETWEEN 1 AND 12
+            AND CAST(substr(json_extract(NEW.request_json, '$.target_session_date'), 9, 2) AS INTEGER) >= 1
+            AND CAST(substr(json_extract(NEW.request_json, '$.target_session_date'), 9, 2) AS INTEGER) <=
+                CASE
+                    WHEN CAST(substr(json_extract(NEW.request_json, '$.target_session_date'), 6, 2) AS INTEGER)
+                        IN (1, 3, 5, 7, 8, 10, 12) THEN 31
+                    WHEN CAST(substr(json_extract(NEW.request_json, '$.target_session_date'), 6, 2) AS INTEGER)
+                        IN (4, 6, 9, 11) THEN 30
+                    WHEN CAST(substr(json_extract(NEW.request_json, '$.target_session_date'), 6, 2) AS INTEGER) = 2 THEN
+                        CASE
+                            WHEN CAST(substr(json_extract(NEW.request_json, '$.target_session_date'), 1, 4) AS INTEGER) % 400 = 0
+                              OR (CAST(substr(json_extract(NEW.request_json, '$.target_session_date'), 1, 4) AS INTEGER) % 4 = 0
+                                  AND CAST(substr(json_extract(NEW.request_json, '$.target_session_date'), 1, 4) AS INTEGER) % 100 <> 0)
+                            THEN 29
+                            ELSE 28
+                        END
+                    ELSE 0
+                END
+        )
         OR json_extract(NEW.request_json, '$.request_window_start_date')
             > json_extract(NEW.request_json, '$.request_window_end_date')
         OR json_extract(NEW.request_json, '$.request_window_end_date')

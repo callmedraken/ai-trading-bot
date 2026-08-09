@@ -350,7 +350,9 @@ enforces the canonical initial state and copied policies. This protects the
 persisted boundary from cooperating direct SQL while the service gate remains
 responsible for snapshotting mutable caller input, invoking public `Symbol`,
 deciding which signed versions the release supports, and deriving UUID5
-identities.
+identities. Each request date-only field uses the same explicit integer
+Gregorian month/day/leap-year arithmetic as timestamp v1, without relying on
+SQLite date/time parser normalization.
 
 The session row is the sole canonical request owner. Attempts and claims copy
 its exact bytes and digest through immediate-parent checks; reservations and
@@ -815,15 +817,21 @@ The executable schema applies this contract to all 14 timestamp columns,
 including every non-null value written to nullable close, process-intent,
 outcome, and resume-intent fields. Each column has a deterministic SQLite
 `CHECK` combining exact length, a case-sensitive fixed-shape `GLOB`, explicit
-year/hour/minute/second ranges, and a canonical
-`strftime('%Y-%m-%dT%H:%M:%SZ', value) IS value` round trip. `IS` deliberately
-makes a failed native parse reject instead of allowing SQL `NULL` to satisfy a
-`CHECK`. Native SQLite validation faithfully accepts both boundary years.
+year/hour/minute/second ranges, and explicit proleptic-Gregorian arithmetic.
+After the digit shape and year range are established, the check casts the
+year, month, and day substrings to integers, requires month `1..12` and day at
+least one, and caps the day with the exact 31-day, 30-day, and February rule.
+February has 29 days precisely when the year is divisible by 400 or is
+divisible by 4 but not by 100. No SQLite date/time parser function participates
+in the authority decision, so calendar admission is independent of parser
+normalization differences between SQLite versions and faithfully covers years
+`0001..9999`.
 
-After representation has been proven, causal timestamp comparisons use
-lexical ordering, which is chronological for this fixed-width UTC form. Every
-required edge is nondecreasing (`child >= predecessor`); equality is legal
-because v1 has one-second precision. The enforced edge matrix is:
+Only after canonical representation and explicit Gregorian validity have been
+proven do causal timestamp comparisons use lexical ordering, which is
+chronological for this fixed-width UTC form. Every required edge is
+nondecreasing (`child >= predecessor`); equality is legal because v1 has
+one-second precision. The enforced edge matrix is:
 
 | Child fact | Exact durable predecessor |
 | --- | --- |

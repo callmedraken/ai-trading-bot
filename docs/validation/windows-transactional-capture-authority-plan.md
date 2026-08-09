@@ -340,17 +340,21 @@ exactly 20 ASCII characters in `YYYY-MM-DDTHH:MM:SSZ`, year `0001..9999`, a
 valid proleptic-Gregorian date, uppercase `T`/`Z`, hour `00..23`, minute and
 second `00..59`, and no fractions, offsets, spaces, leap seconds, or
 `24:00:00`. Nullable columns must apply the same expression whenever non-null.
-The structural DDL assertion inventories every timestamp column and the
-behavioral matrix exercises the actual expression through direct SQL.
+The structural DDL assertion inventories every timestamp column and requires
+the same explicit integer month/day/leap-year arithmetic in each copy. It also
+proves that no SQLite date/time parser function participates in calendar
+admission. The behavioral matrix exercises the actual expression through
+direct SQL, including ordinary leap years, non-leap centuries, and years
+divisible by 400, so acceptance is independent of SQLite parser normalization.
 
 Direct SQL must reject, atomically, missing zero padding, a space separator,
 lowercase `t` or `z`, missing `Z`, numeric offsets, one- and three-digit
 fractions, hour 24, minute or second 60, non-leap `2026-02-29`, February 30,
 month 00 or 13, day 00, year 0000, arbitrary text, and leading or trailing
 whitespace. It must accept `0001-01-01T00:00:00Z`, a valid leap day, the normal
-fixed lifecycle values, and `9999-12-31T23:59:59Z`. A failed native parse must
-evaluate false at the `CHECK`; SQL `NULL` must not accidentally admit an
-invalid non-null value.
+fixed lifecycle values, and `9999-12-31T23:59:59Z`. Explicit Gregorian
+arithmetic, not parser round-tripping, must reject every invalid month/day
+combination; SQL `NULL` must not accidentally admit an invalid non-null value.
 
 For every causal edge below, table-driven direct-SQL tests require a value one
 second earlier to fail, equality to succeed, and a later value to succeed.
@@ -513,6 +517,10 @@ the established sorted-key compact serialization with JSON1 and compares it to
 the stored UTF-8 JSON BLOB, so whitespace, key reordering, duplicate keys,
 alternate numeric forms, and other semantic-but-noncanonical encodings fail.
 It does not recompute `session_id`; UUID5 remains service-owned and unchanged.
+Each of the three date-only fields uses the same explicit integer Gregorian
+month/day/leap-year predicate as the date portion of timestamp v1. Boundary
+tests include non-leap centuries and 400-year leap centuries and do not defer
+calendar authority to SQLite date/time parser normalization.
 
 Before that construction, the session helper must begin `BEGIN IMMEDIATE`,
 read the singleton metadata row, first require exact release-supported

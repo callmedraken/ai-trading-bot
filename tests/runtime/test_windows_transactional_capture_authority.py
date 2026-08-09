@@ -11406,6 +11406,185 @@ _AUTHORITY_TIMESTAMP_COLUMNS = {
     "manual_recoveries": ("created_at_utc",),
 }
 
+_INVALID_GREGORIAN_DATES = (
+    "0000-01-01",
+    "2026-00-01",
+    "2026-13-01",
+    "2026-01-00",
+    "2026-02-29",
+    "2026-02-30",
+    "2024-02-30",
+    "2026-04-31",
+    "2026-06-31",
+    "2026-09-31",
+    "2026-11-31",
+    "1900-02-29",
+    "2100-02-29",
+    "2200-02-29",
+    "2300-02-29",
+)
+_VALID_GREGORIAN_REQUEST_WINDOWS = {
+    "0001-01-01": ("0001-01-01", "0001-01-01", "0001-01-02"),
+    "2024-02-29": ("2024-02-29", "2024-02-29", "2024-03-01"),
+    "2000-02-29": ("2000-02-29", "2000-02-29", "2000-03-01"),
+    "2400-02-29": ("2400-02-29", "2400-02-29", "2400-03-01"),
+    "2026-01-31": ("2026-01-31", "2026-01-31", "2026-02-01"),
+    "2026-04-30": ("2026-04-30", "2026-04-30", "2026-05-01"),
+    "9999-12-31": ("9999-12-30", "9999-12-30", "9999-12-31"),
+}
+_SQLITE_DATE_TIME_PARSER_FUNCTIONS = (
+    "strftime(",
+    "date(",
+    "datetime(",
+    "julianday(",
+    "unixepoch(",
+)
+
+
+def _gregorian_sql_predicate(value_sql: str) -> str:
+    return " ".join(
+        f"""
+        CAST(substr({value_sql}, 6, 2) AS INTEGER) BETWEEN 1 AND 12
+        AND CAST(substr({value_sql}, 9, 2) AS INTEGER) >= 1
+        AND CAST(substr({value_sql}, 9, 2) AS INTEGER) <=
+            CASE
+                WHEN CAST(substr({value_sql}, 6, 2) AS INTEGER)
+                    IN (1, 3, 5, 7, 8, 10, 12) THEN 31
+                WHEN CAST(substr({value_sql}, 6, 2) AS INTEGER)
+                    IN (4, 6, 9, 11) THEN 30
+                WHEN CAST(substr({value_sql}, 6, 2) AS INTEGER) = 2 THEN
+                    CASE
+                        WHEN CAST(substr({value_sql}, 1, 4) AS INTEGER) % 400 = 0
+                          OR (CAST(substr({value_sql}, 1, 4) AS INTEGER) % 4 = 0
+                              AND CAST(substr({value_sql}, 1, 4) AS INTEGER) % 100 <> 0)
+                        THEN 29
+                        ELSE 28
+                    END
+                ELSE 0
+            END
+        """.split()
+    )
+
+
+@pytest.mark.parametrize(
+    ("calendar_date", "accepted"),
+    [
+        *((calendar_date, False) for calendar_date in _INVALID_GREGORIAN_DATES),
+        *((calendar_date, True) for calendar_date in _VALID_GREGORIAN_REQUEST_WINDOWS),
+    ],
+)
+def test_gregorian_calendar_matrix_for_timestamp_v1_is_parser_independent(
+    tmp_path: Path,
+    calendar_date: str,
+    accepted: bool,
+) -> None:
+    connection = _connect(tmp_path / "gregorian-timestamp.sqlite3")
+    _install_schema(connection)
+    timestamp = f"{calendar_date}T12:34:56Z"
+    before = _database_rows(connection)
+    if accepted:
+        _insert_metadata(connection, created_at_utc=timestamp)
+        assert connection.execute(
+            "SELECT created_at_utc FROM authority_metadata"
+        ).fetchone() == (timestamp,)
+    else:
+        with pytest.raises(sqlite3.IntegrityError):
+            _insert_metadata(connection, created_at_utc=timestamp)
+        assert _database_rows(connection) == before
+    connection.close()
+
+
+@pytest.mark.parametrize(
+    "field_name",
+    (
+        "request_window_start_date",
+        "request_window_end_date",
+        "target_session_date",
+    ),
+)
+@pytest.mark.parametrize("calendar_date", _INVALID_GREGORIAN_DATES)
+def test_gregorian_calendar_matrix_rejects_each_request_date_atomically(
+    db_path: Path,
+    field_name: str,
+    calendar_date: str,
+) -> None:
+    connection = _connect(db_path)
+    request = _request()
+    request[field_name] = calendar_date
+    request_bytes = _json(request)
+    target_session_date = request["target_session_date"]
+    before = _database_rows(connection)
+
+    with pytest.raises(sqlite3.IntegrityError, match="date window is invalid"):
+        _insert_session_row_for_test(
+            connection,
+            f"invalid-{field_name}-{calendar_date}",
+            request_bytes,
+            target_session_date=target_session_date,
+        )
+
+    assert _database_rows(connection) == before
+    _assert_no_capture_authority_side_effects(connection)
+    connection.close()
+
+
+@pytest.mark.parametrize(
+    ("calendar_date", "request_window"),
+    _VALID_GREGORIAN_REQUEST_WINDOWS.items(),
+)
+def test_gregorian_calendar_matrix_accepts_canonical_request_dates(
+    db_path: Path,
+    calendar_date: str,
+    request_window: tuple[str, str, str],
+) -> None:
+    connection = _connect(db_path)
+    window_start, window_end, target_session_date = request_window
+    assert calendar_date in request_window
+    request = _request(target_session_date)
+    request["request_window_start_date"] = window_start
+    request["request_window_end_date"] = window_end
+    request_bytes = _json(request)
+
+    _insert_session_row_for_test(
+        connection,
+        f"valid-gregorian-request-{calendar_date}",
+        request_bytes,
+        target_session_date=target_session_date,
+    )
+
+    assert connection.execute(
+        "SELECT target_session_date, request_json FROM sessions"
+    ).fetchone() == (target_session_date, request_bytes)
+    connection.close()
+
+
+def test_invalid_gregorian_nullable_timestamp_update_is_atomic(db_path: Path) -> None:
+    connection = _connect(db_path)
+    session_id = create_session(connection)
+    _insert_recovery_fact_for_test(
+        connection,
+        session_id,
+        "SESSION",
+        session_id,
+        "CLOSE_SESSION",
+    )
+    before = _database_rows(connection)
+
+    with pytest.raises(sqlite3.IntegrityError):
+        connection.execute(
+            """
+            UPDATE sessions
+            SET state = 'CLOSED',
+                closed_at_utc = '2026-02-30T00:06:00Z',
+                close_reason = 'invalid-calendar-date'
+            WHERE session_id = ?
+            """,
+            (session_id,),
+        )
+
+    assert _database_rows(connection) == before
+    connection.close()
+
 
 @pytest.mark.parametrize(
     "invalid_timestamp",
@@ -11470,19 +11649,39 @@ def test_every_authority_timestamp_column_uses_timestamp_v1_sql_check(
     db_path: Path,
 ) -> None:
     connection = _connect(db_path)
+    schema_source = SCHEMA_PATH.read_text(encoding="utf-8").lower()
+    for parser_function in _SQLITE_DATE_TIME_PARSER_FUNCTIONS:
+        assert parser_function not in schema_source
+
     checked_columns = 0
     for table, columns in _AUTHORITY_TIMESTAMP_COLUMNS.items():
         table_sql = connection.execute(
             "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?",
             (table,),
         ).fetchone()[0]
-        assert table_sql.count("strftime('%Y-%m-%dT%H:%M:%SZ'") == len(columns)
+        compact_table_sql = " ".join(table_sql.split())
         for column in columns:
-            assert f"length({column}) = 20" in table_sql
-            assert f"typeof({column}) = 'text'" in table_sql
-            assert f"strftime('%Y-%m-%dT%H:%M:%SZ', {column}) IS {column}" in table_sql
+            assert f"length({column}) = 20" in compact_table_sql
+            assert f"typeof({column}) = 'text'" in compact_table_sql
+            assert _gregorian_sql_predicate(column) in compact_table_sql
             checked_columns += 1
     assert checked_columns == 14
+
+    session_trigger_sql = connection.execute(
+        "SELECT sql FROM sqlite_master WHERE type = 'trigger' AND name = ?",
+        ("sessions_before_insert",),
+    ).fetchone()[0]
+    compact_session_trigger_sql = " ".join(session_trigger_sql.split())
+    request_date_fields = (
+        "request_window_start_date",
+        "request_window_end_date",
+        "target_session_date",
+    )
+    for field_name in request_date_fields:
+        request_value_sql = f"json_extract(NEW.request_json, '$.{field_name}')"
+        assert (
+            _gregorian_sql_predicate(request_value_sql) in compact_session_trigger_sql
+        )
     connection.close()
 
 

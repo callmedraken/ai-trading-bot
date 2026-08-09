@@ -338,10 +338,25 @@ selection, or recovery side effect. Invalid alternate representations cannot
 enter storage or exploit an identity collision with a valid request. Existing valid request
 bytes and UUID5 vectors remain unchanged.
 
-The session insert trigger independently enforces that canonical initial state,
-validates the request digest, and requires both copied policy fields to match
-the referenced metadata row. This protects direct SQL while the service gate
-additionally decides whether this release supports the signed versions.
+The `sessions_before_insert` trigger independently admits only one exact
+canonical UTF-8 JSON BLOB representation of `capture_request/v2`. Native JSON1
+checks require the exact ten-field object, exact JSON types and fixed values,
+canonical bounded duplicate-free Symbol text, canonical date-only values and
+ordering, the request limit/universe relationship, and exact canonical bytes
+before validating the digest. The trigger also binds the embedded target date
+to `sessions.target_session_date`, binds the embedded provider and operation to
+the exact public descriptor values in the referenced metadata row, and
+enforces the canonical initial state and copied policies. This protects the
+persisted boundary from cooperating direct SQL while the service gate remains
+responsible for snapshotting mutable caller input, invoking public `Symbol`,
+deciding which signed versions the release supports, and deriving UUID5
+identities.
+
+The session row is the sole canonical request owner. Attempts and claims copy
+its exact bytes and digest through immediate-parent checks; reservations and
+terminals retain that digest lineage. Descendants neither reconstruct nor
+independently reinterpret the request. UUID5 generation remains service-owned
+and unchanged.
 
 ### 2.4 attempts
 
@@ -1003,18 +1018,22 @@ remain independently necessary.
 
 The signed bootstrap and immutable metadata own the permitted public Alpaca
 descriptor and select authority/claim policy versions. The reviewed service
-first rejects metadata policies this release does not implement, then performs
-descriptor and canonical-request semantic reconciliation before session
-insertion. SQLite preserves the immutable canonical bytes/digest and checks
-each copied child policy against its persisted immediate-parent lineage. It
-does not parse request JSON, validate `Symbol` semantics, authenticate callers,
-or validate external provider behavior.
+first rejects metadata policies this release does not implement, snapshots and
+validates caller-owned input, then performs descriptor and canonical-request
+semantic reconciliation before deriving the service-owned UUID5 identity.
+Independently, `sessions_before_insert` uses native JSON1 to admit only the
+exact canonical persisted `capture_request/v2`, enforce its existing field,
+type, fixed-value, Symbol-text, bound, date, and digest contract, and bind its
+target/provider/operation semantics to the session and metadata columns.
+Immediate descendants can only copy the session-owned bytes/digest through
+their persisted parent lineage. SQLite does not authenticate callers, derive
+UUID5 identities, invoke external provider behavior, or prove Windows effects.
 
 | SQLite schema, constraints, and triggers | Reviewed transaction service/tests |
 | --- | --- |
 | Immediate-parent foreign keys and `foreign_key_check` integrity | Workflow ordering across multiple statements and tables |
 | Normalized metadata/session/attempt/claim/reservation/execution policy-binding checks | Release-support validation before session canonicalization or identity derivation |
-| Append-only immutable evidence, canonical resume-intent/receipt bytes, and prohibited deletes | Exact capture-request shape/type/date validation, canonical construction, digest reconciliation, and policy reconciliation |
+| Canonical session-request admission, redundant target/descriptor binding, append-only immutable evidence, canonical resume-intent/receipt bytes, and prohibited deletes | Caller-input snapshot, public `Symbol` validation, canonical construction, UUID5 derivation, and release-policy reconciliation |
 | One-to-one claim, reservation, execution, terminal, selection, and ordinal fences | Multi-statement parent-state update sequencing |
 | Unique per-session ordinals and trigger-owned exact increments | Commit-before-side-effect boundaries |
 | Session-wide claim admission and normalized retry-safe lineage joins | Complete transaction atomicity and crash classification |
@@ -1384,7 +1403,8 @@ The focused executable evidence is
 - deterministic identity vectors;
 - exact public Alpaca descriptor sourcing, metadata/request reconciliation,
   drift rejection before persistence, and regenerated descendant vectors;
-- exact session-to-immediate-parent request propagation and mismatch rejection;
+- native JSON1 canonical session-request admission, exact target/metadata
+  binding, and session-to-immediate-parent propagation/mismatch rejection;
 - the complete terminal state/disposition matrix and append-only paired launch
   evidence rules;
 - the authoritative session-wide claim-admission matrix through both helper

@@ -410,6 +410,135 @@ BEGIN
         AND NEW.closed_at_utc IS NULL
         AND NEW.close_reason IS NULL
     ) THEN RAISE(ABORT, 'new sessions must start in the canonical open state') END;
+    SELECT CASE WHEN typeof(NEW.request_json) <> 'blob'
+        OR json_valid(NEW.request_json) <> 1
+        THEN RAISE(ABORT, 'session request must be valid JSON BLOB bytes') END;
+    SELECT CASE WHEN json_type(NEW.request_json) IS NOT 'object'
+        THEN RAISE(ABORT, 'session request root must be an object') END;
+    SELECT CASE WHEN (SELECT count(*) FROM json_each(NEW.request_json)) <> 10
+        OR EXISTS (
+            SELECT 1 FROM json_each(NEW.request_json)
+            WHERE key NOT IN (
+                'bar_interval',
+                'child_operation_version',
+                'ordered_universe',
+                'output_policy_version',
+                'permitted_provider_operation',
+                'provider_id',
+                'request_limit',
+                'request_window_end_date',
+                'request_window_start_date',
+                'target_session_date'
+            )
+        )
+        OR json_type(NEW.request_json, '$.bar_interval') IS NOT 'text'
+        OR json_type(NEW.request_json, '$.child_operation_version') IS NOT 'text'
+        OR json_type(NEW.request_json, '$.ordered_universe') IS NOT 'array'
+        OR json_type(NEW.request_json, '$.output_policy_version') IS NOT 'text'
+        OR json_type(NEW.request_json, '$.permitted_provider_operation') IS NOT 'text'
+        OR json_type(NEW.request_json, '$.provider_id') IS NOT 'text'
+        OR json_type(NEW.request_json, '$.request_limit') IS NOT 'integer'
+        OR json_type(NEW.request_json, '$.request_window_end_date') IS NOT 'text'
+        OR json_type(NEW.request_json, '$.request_window_start_date') IS NOT 'text'
+        OR json_type(NEW.request_json, '$.target_session_date') IS NOT 'text'
+        THEN RAISE(ABORT, 'session request fields or types are invalid') END;
+    SELECT CASE WHEN json_extract(NEW.request_json, '$.bar_interval') IS NOT '1d'
+        OR json_extract(NEW.request_json, '$.child_operation_version') IS NOT 'child/v1'
+        OR json_extract(NEW.request_json, '$.output_policy_version') IS NOT 'output/v1'
+        OR json_extract(NEW.request_json, '$.provider_id') IS NOT 'alpaca-market-data'
+        OR json_extract(
+            NEW.request_json,
+            '$.permitted_provider_operation'
+        ) IS NOT 'historical-stock-bars-v2-raw-usd-no-asof'
+        THEN RAISE(ABORT, 'session request fixed semantics are invalid') END;
+    SELECT CASE WHEN json_extract(NEW.request_json, '$.target_session_date')
+            IS NOT NEW.target_session_date
+        THEN RAISE(ABORT, 'session target date differs from request') END;
+    SELECT CASE WHEN json_extract(NEW.request_json, '$.request_limit') NOT BETWEEN 1 AND 100
+        OR json_array_length(NEW.request_json, '$.ordered_universe') NOT BETWEEN 1 AND 100
+        OR json_extract(NEW.request_json, '$.request_limit')
+            <> json_array_length(NEW.request_json, '$.ordered_universe')
+        OR EXISTS (
+            SELECT 1 FROM json_each(NEW.request_json, '$.ordered_universe')
+            WHERE type <> 'text'
+               OR length(value) NOT BETWEEN 1 AND 10
+               OR value GLOB '*[^A-Z0-9.-]*'
+        )
+        OR EXISTS (
+            SELECT 1
+            FROM json_each(NEW.request_json, '$.ordered_universe')
+            GROUP BY value
+            HAVING count(*) <> 1
+        )
+        THEN RAISE(ABORT, 'session request universe is invalid') END;
+    SELECT CASE WHEN length(json_extract(
+            NEW.request_json,
+            '$.request_window_start_date'
+        )) <> 10
+        OR json_extract(NEW.request_json, '$.request_window_start_date')
+            NOT GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'
+        OR substr(json_extract(
+            NEW.request_json,
+            '$.request_window_start_date'
+        ), 1, 4) NOT BETWEEN '0001' AND '9999'
+        OR strftime(
+            '%Y-%m-%d',
+            json_extract(NEW.request_json, '$.request_window_start_date')
+        ) IS NOT json_extract(NEW.request_json, '$.request_window_start_date')
+        OR length(json_extract(NEW.request_json, '$.request_window_end_date')) <> 10
+        OR json_extract(NEW.request_json, '$.request_window_end_date')
+            NOT GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'
+        OR substr(json_extract(
+            NEW.request_json,
+            '$.request_window_end_date'
+        ), 1, 4) NOT BETWEEN '0001' AND '9999'
+        OR strftime(
+            '%Y-%m-%d',
+            json_extract(NEW.request_json, '$.request_window_end_date')
+        ) IS NOT json_extract(NEW.request_json, '$.request_window_end_date')
+        OR length(json_extract(NEW.request_json, '$.target_session_date')) <> 10
+        OR json_extract(NEW.request_json, '$.target_session_date')
+            NOT GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'
+        OR substr(json_extract(
+            NEW.request_json,
+            '$.target_session_date'
+        ), 1, 4) NOT BETWEEN '0001' AND '9999'
+        OR strftime(
+            '%Y-%m-%d',
+            json_extract(NEW.request_json, '$.target_session_date')
+        ) IS NOT json_extract(NEW.request_json, '$.target_session_date')
+        OR json_extract(NEW.request_json, '$.request_window_start_date')
+            > json_extract(NEW.request_json, '$.request_window_end_date')
+        OR json_extract(NEW.request_json, '$.request_window_end_date')
+            >= json_extract(NEW.request_json, '$.target_session_date')
+        THEN RAISE(ABORT, 'session request date window is invalid') END;
+    SELECT CASE WHEN CAST(NEW.request_json AS TEXT) IS NOT (
+        '{"bar_interval":'
+        || json_quote(json_extract(NEW.request_json, '$.bar_interval'))
+        || ',"child_operation_version":'
+        || json_quote(json_extract(NEW.request_json, '$.child_operation_version'))
+        || ',"ordered_universe":'
+        || (SELECT json_group_array(value)
+            FROM json_each(NEW.request_json, '$.ordered_universe'))
+        || ',"output_policy_version":'
+        || json_quote(json_extract(NEW.request_json, '$.output_policy_version'))
+        || ',"permitted_provider_operation":'
+        || json_quote(json_extract(
+            NEW.request_json,
+            '$.permitted_provider_operation'
+        ))
+        || ',"provider_id":'
+        || json_quote(json_extract(NEW.request_json, '$.provider_id'))
+        || ',"request_limit":'
+        || json_extract(NEW.request_json, '$.request_limit')
+        || ',"request_window_end_date":'
+        || json_quote(json_extract(NEW.request_json, '$.request_window_end_date'))
+        || ',"request_window_start_date":'
+        || json_quote(json_extract(NEW.request_json, '$.request_window_start_date'))
+        || ',"target_session_date":'
+        || json_quote(json_extract(NEW.request_json, '$.target_session_date'))
+        || '}'
+    ) THEN RAISE(ABORT, 'session request bytes are not canonical') END;
     SELECT CASE WHEN sha256(NEW.request_json) IS NOT NEW.request_digest
         THEN RAISE(ABORT, 'session request digest is invalid') END;
     SELECT CASE WHEN NOT EXISTS (
@@ -417,8 +546,16 @@ BEGIN
         WHERE m.authority_epoch_id = NEW.authority_epoch_id
           AND m.authority_policy_version IS NEW.authority_policy_version
           AND m.claim_policy_version IS NEW.claim_policy_version
+          AND m.provider_id = 'alpaca-market-data'
+          AND m.permitted_provider_operation =
+              'historical-stock-bars-v2-raw-usd-no-asof'
+          AND json_extract(NEW.request_json, '$.provider_id') IS m.provider_id
+          AND json_extract(
+              NEW.request_json,
+              '$.permitted_provider_operation'
+          ) IS m.permitted_provider_operation
           AND NEW.created_at_utc >= m.created_at_utc
-    ) THEN RAISE(ABORT, 'session policy binding differs from metadata') END;
+    ) THEN RAISE(ABORT, 'session binding differs from metadata') END;
 END;
 
 CREATE TRIGGER sessions_immutable_fields

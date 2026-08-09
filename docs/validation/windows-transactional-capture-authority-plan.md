@@ -200,16 +200,19 @@ descriptor and select authority/claim policy versions. This release supports
 exactly `authority-policy/v1` and `claim-policy/v1`; the reviewed transaction
 helper rejects any other signed value before request canonicalization, session
 identity construction, or insertion, then reconciles metadata and request
-semantics. SQLite preserves accepted canonical request bytes/digest and checks
-copied descendant policy fields, but does not parse request JSON, validate
-`Symbol` semantics, decide which future policies a release implements, or
-authenticate external Alpaca behavior.
+semantics. Independently, SQLite uses native JSON1 at
+`sessions_before_insert` to admit only the exact canonical persisted
+`capture_request/v2`, bind its target/provider/operation semantics to session
+and metadata columns, preserve its bytes/digest, and check copied descendant
+request and policy fields. The reviewed service still owns mutable-input
+snapshotting, use of public `Symbol`, release-policy support decisions, and
+UUID5 derivation; SQLite does not authenticate external Alpaca behavior.
 
 | SQLite fixture proves | Reviewed transaction harness proves |
 | --- | --- |
 | Immediate-parent foreign keys and `PRAGMA foreign_key_check` | Multi-statement workflow ordering |
 | Normalized copied-policy checks from metadata through execution | Exact release-supported metadata policy validation before session creation |
-| Append-only evidence, canonical resume-intent/receipt bytes, immutable rows, and prohibited deletes | Exact request snapshot, shape/type/date/Symbol validation, canonical request/digest, and policy reconciliation |
+| Canonical session-request admission and redundant target/descriptor binding; append-only evidence, canonical resume-intent/receipt bytes, immutable rows, and prohibited deletes | Exact caller-input snapshot, public `Symbol` validation, canonical request construction, UUID5 derivation, and release-policy reconciliation |
 | Unique one-to-one claim/reservation/execution/terminal/selection fences | UUID5 identity construction and comparison |
 | Per-session uniqueness and trigger-owned ordinal increments | Commit-before-side-effect boundaries |
 | Session-wide claim admission through normalized lineage joins | Complete atomicity of state plus evidence updates |
@@ -495,6 +498,22 @@ snapshot. The valid-lifecycle test uses a non-default date, ordered universe,
 and consistent limit, then compares the exact bytes/digest in every stored
 request-bearing row.
 
+The session row is the sole canonical request owner, and
+`sessions_before_insert` is its independent direct-SQL admission gate. Native
+JSON1 must require a valid JSON object with exactly the ten named fields and no
+missing, unknown, or duplicate key; exact string/array/integer JSON types; the
+fixed bar, child, output, public-provider, and public-operation values; an
+integer limit and duplicate-free canonical Symbol array each bounded by the
+repository's `MAX_DAILY_SNAPSHOT_SYMBOLS = 100`; exact canonical date-only
+values ordered `window_start <= window_end < target_session`; and an exact
+SHA-256 digest. The embedded target date must equal
+`sessions.target_session_date`, while embedded provider and operation must
+equal the referenced metadata and public descriptor. The trigger reconstructs
+the established sorted-key compact serialization with JSON1 and compares it to
+the stored UTF-8 JSON BLOB, so whitespace, key reordering, duplicate keys,
+alternate numeric forms, and other semantic-but-noncanonical encodings fail.
+It does not recompute `session_id`; UUID5 remains service-owned and unchanged.
+
 Before that construction, the session helper must begin `BEGIN IMMEDIATE`,
 read the singleton metadata row, first require exact release-supported
 `authority-policy/v1` and `claim-policy/v1`, verify its provider and operation
@@ -515,24 +534,32 @@ padded, over-ten-character, unsupported-punctuation, and
 normalization-equivalent entries without trimming or uppercasing. Canonical
 period and hyphen symbols remain accepted.
 
-Table-driven negative tests remove each required field in turn and cover an
-unknown field; request-limit string, boolean, zero, and universe mismatch;
-tuple, empty, oversized, duplicate, blank/whitespace/lowercase/padded/overlong/
-unsupported-punctuation/normalization-equivalent, and non-string-member
-universes; malformed/noncanonical dates and invalid ordering; wrong scalar
-types; every fixed-value drift; metadata drift; and legacy labels. Every
-rejection must leave no session, counter, attempt, claim, reservation,
-execution, terminal, selection, recovery, or fake side-effect event. A
-collision test proves that an alternate tuple representation which would feed
-the same pure list framing cannot persist under the valid session ID. Mutation
-tests change the original list, replace request fields, and alter target/date
-facts after snapshot creation; the frozen snapshot, canonical bytes, digest,
-identity, target date, and persisted row must remain mutually consistent. Tests
-also prove that the snapshot has no mutable caller-owned fields, cannot be
-assigned to, and serializes `ordered_universe` back to the established JSON
-list representation. The positive complete lifecycle must persist the public
-descriptor values in metadata, attempt, claim, canonical request bytes, and
-all dependent identity material.
+One consolidated direct-SQL canonical-request matrix covers target-column
+mismatch; missing, unknown, duplicate, malformed, reordered, whitespace-added,
+wrong-root, and wrong-typed JSON; boolean, string, real, zero, over-bound, and
+universe-mismatched limits; empty, oversized, non-string, duplicate,
+lowercase, padded, blank, overlong, and unsupported-punctuation universes;
+malformed/noncanonical dates and all invalid date orderings; every fixed-value,
+request/metadata provider-operation, and digest mismatch. Every rejection must
+leave the complete database byte-for-row equivalent to its predecessor,
+including unchanged metadata, no session or counter, and no descendant. Each
+case is followed by insertion of the corresponding valid canonical request so
+the matrix distinguishes authoritative rejection from an accidentally
+impossible fixture state.
+
+The service-side table-driven matrix additionally removes each required field
+in turn and covers tuple and normalization-equivalent input, legacy labels,
+metadata drift, and caller mutation. A collision test proves that an alternate
+tuple representation which would feed the same pure list framing cannot
+persist under the valid session ID. Mutation tests change the original list,
+replace request fields, and alter target/date facts after snapshot creation;
+the frozen snapshot, canonical bytes, digest, identity, target date, and
+persisted row must remain mutually consistent. Tests also prove that the
+snapshot has no mutable caller-owned fields, cannot be assigned to, and
+serializes `ordered_universe` back to the established JSON list representation.
+The positive complete lifecycle must persist the public descriptor values in
+metadata, attempt, claim, canonical request bytes, and all dependent identity
+material.
 Existing canonical JSON bytes and UUID5 golden vectors must remain unchanged.
 
 Policy-lineage tests insert unsupported authority and claim metadata policies

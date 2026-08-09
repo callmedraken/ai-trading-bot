@@ -594,6 +594,40 @@ def _evidence(label: str) -> tuple[bytes, bytes]:
     return value, _digest(value)
 
 
+def _insert_session_row_for_test(
+    connection: sqlite3.Connection,
+    session_id: str,
+    request_bytes: bytes | str,
+    *,
+    target_session_date: str = "2026-01-01",
+    request_digest: bytes | None = None,
+) -> None:
+    digest_material = (
+        request_bytes.encode("utf-8") if type(request_bytes) is str else request_bytes
+    )
+    connection.execute(
+        """
+        INSERT INTO sessions (
+            session_id, authority_epoch_id, session_schema,
+            authority_policy_version, claim_policy_version,
+            target_session_date, state, next_attempt_ordinal,
+            next_recovery_ordinal, request_json, request_digest,
+            created_at_utc, closed_at_utc, close_reason
+        ) VALUES (?, ?, 1, ?, ?, ?, 'OPEN', 0, 0, ?, ?, ?, NULL, NULL)
+        """,
+        (
+            session_id,
+            EPOCH,
+            POLICY,
+            CLAIM_POLICY,
+            target_session_date,
+            request_bytes,
+            _digest(digest_material) if request_digest is None else request_digest,
+            TIMESTAMP,
+        ),
+    )
+
+
 def _insert_attempt_row_for_test(
     connection: sqlite3.Connection,
     session_id: str,
@@ -5684,6 +5718,253 @@ def test_direct_session_insert_requires_canonical_initial_projection(
     connection.close()
 
 
+DIRECT_SQL_SESSION_REQUEST_CASES = (
+    "target-column-request-mismatch",
+    "missing-field",
+    "unknown-field",
+    "duplicate-json-key",
+    "reordered-keys",
+    "added-whitespace",
+    "text-storage",
+    "malformed-json",
+    "wrong-root-type",
+    "wrong-scalar-type",
+    "request-limit-true",
+    "request-limit-false",
+    "request-limit-string",
+    "request-limit-real",
+    "request-limit-zero",
+    "request-limit-over-bound",
+    "request-limit-size-mismatch",
+    "empty-universe",
+    "oversized-universe",
+    "non-string-universe-member",
+    "duplicate-symbol",
+    "lowercase-symbol",
+    "padded-symbol",
+    "blank-symbol",
+    "overlong-symbol",
+    "unsupported-symbol-punctuation",
+    "malformed-date",
+    "noncanonical-date",
+    "start-after-end",
+    "end-equals-target",
+    "end-after-target",
+    "wrong-bar-interval",
+    "wrong-child-operation-version",
+    "wrong-output-policy-version",
+    "wrong-provider",
+    "wrong-operation",
+    "request-digest-mismatch",
+)
+
+
+def _direct_sql_session_request_candidate(
+    case_id: str,
+) -> tuple[bytes | str, str, bytes | None]:
+    request = _request()
+    target_session_date = request["target_session_date"]
+    request_digest: bytes | None = None
+
+    if case_id == "target-column-request-mismatch":
+        target_session_date = "2026-01-02"
+    elif case_id == "missing-field":
+        del request["bar_interval"]
+    elif case_id == "unknown-field":
+        request["unknown"] = "value"
+    elif case_id == "wrong-root-type":
+        return _json([]), target_session_date, request_digest
+    elif case_id == "wrong-scalar-type":
+        request["bar_interval"] = ["1d"]
+    elif case_id == "request-limit-true":
+        request["request_limit"] = True
+    elif case_id == "request-limit-false":
+        request["request_limit"] = False
+    elif case_id == "request-limit-string":
+        request["request_limit"] = "2"
+    elif case_id == "request-limit-real":
+        request["request_limit"] = 2.0
+    elif case_id == "request-limit-zero":
+        request["request_limit"] = 0
+    elif case_id == "request-limit-over-bound":
+        request["request_limit"] = MAX_DAILY_SNAPSHOT_SYMBOLS + 1
+    elif case_id == "request-limit-size-mismatch":
+        request["request_limit"] = 1
+    elif case_id == "empty-universe":
+        request["ordered_universe"] = []
+        request["request_limit"] = 0
+    elif case_id == "oversized-universe":
+        request["ordered_universe"] = [
+            f"S{index}" for index in range(MAX_DAILY_SNAPSHOT_SYMBOLS + 1)
+        ]
+        request["request_limit"] = MAX_DAILY_SNAPSHOT_SYMBOLS + 1
+    elif case_id == "non-string-universe-member":
+        request["ordered_universe"] = ["QQQ", 7]
+    elif case_id == "duplicate-symbol":
+        request["ordered_universe"] = ["QQQ", "QQQ"]
+    elif case_id == "lowercase-symbol":
+        request["ordered_universe"] = ["QQQ", "spy"]
+    elif case_id == "padded-symbol":
+        request["ordered_universe"] = ["QQQ", " SPY"]
+    elif case_id == "blank-symbol":
+        request["ordered_universe"] = ["QQQ", ""]
+    elif case_id == "overlong-symbol":
+        request["ordered_universe"] = ["QQQ", "ABCDEFGHIJK"]
+    elif case_id == "unsupported-symbol-punctuation":
+        request["ordered_universe"] = ["QQQ", "BRK/B"]
+    elif case_id == "malformed-date":
+        request["request_window_start_date"] = "2025-13-01"
+    elif case_id == "noncanonical-date":
+        request["request_window_start_date"] = "2025-12-1"
+    elif case_id == "start-after-end":
+        request["request_window_start_date"] = "2025-12-31"
+        request["request_window_end_date"] = "2025-12-01"
+    elif case_id == "end-equals-target":
+        request["request_window_end_date"] = target_session_date
+    elif case_id == "end-after-target":
+        request["request_window_end_date"] = "2026-01-02"
+    elif case_id == "wrong-bar-interval":
+        request["bar_interval"] = "1h"
+    elif case_id == "wrong-child-operation-version":
+        request["child_operation_version"] = "child/v2"
+    elif case_id == "wrong-output-policy-version":
+        request["output_policy_version"] = "output/v2"
+    elif case_id == "wrong-provider":
+        request["provider_id"] = "other-provider"
+    elif case_id == "wrong-operation":
+        request["permitted_provider_operation"] = "other-operation"
+
+    request_bytes = _json(request)
+    if case_id == "duplicate-json-key":
+        request_bytes = request_bytes.replace(
+            b'{"bar_interval":"1d"',
+            b'{"bar_interval":"1d","bar_interval":"1d"',
+            1,
+        )
+    elif case_id == "reordered-keys":
+        request_bytes = json.dumps(
+            dict(reversed(tuple(request.items()))),
+            ensure_ascii=False,
+            sort_keys=False,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    elif case_id == "added-whitespace":
+        request_bytes += b" "
+    elif case_id == "text-storage":
+        return request_bytes.decode("utf-8"), target_session_date, request_digest
+    elif case_id == "malformed-json":
+        request_bytes = b'{"bar_interval":'
+    elif case_id == "request-digest-mismatch":
+        request_digest = _digest(b"wrong-session-request")
+    return request_bytes, target_session_date, request_digest
+
+
+@pytest.mark.parametrize("case_id", DIRECT_SQL_SESSION_REQUEST_CASES)
+def test_direct_sql_session_request_admission_is_canonical_and_atomic(
+    db_path: Path,
+    case_id: str,
+) -> None:
+    connection = _connect(db_path)
+    request_bytes, target_session_date, request_digest = (
+        _direct_sql_session_request_candidate(case_id)
+    )
+    before = _database_rows(connection)
+
+    with pytest.raises(sqlite3.IntegrityError):
+        _insert_session_row_for_test(
+            connection,
+            f"invalid-request-{case_id}",
+            request_bytes,
+            target_session_date=target_session_date,
+            request_digest=request_digest,
+        )
+
+    assert _database_rows(connection) == before
+    _assert_no_capture_authority_side_effects(connection)
+
+    valid_request = _snapshot_capture_request(_request()).canonical_json()
+    _insert_session_row_for_test(
+        connection,
+        f"valid-request-after-{case_id}",
+        valid_request,
+    )
+    assert connection.execute(
+        """
+        SELECT target_session_date, next_attempt_ordinal, next_recovery_ordinal,
+               request_json, request_digest
+        FROM sessions
+        """
+    ).fetchone() == (
+        "2026-01-01",
+        0,
+        0,
+        valid_request,
+        _digest(valid_request),
+    )
+    connection.close()
+
+
+@pytest.mark.parametrize(
+    ("metadata_provider_id", "metadata_operation"),
+    [
+        ("other-provider", OPERATION),
+        (PROVIDER, "other-operation"),
+    ],
+    ids=("metadata-provider", "metadata-operation"),
+)
+def test_direct_sql_session_request_requires_exact_public_metadata_descriptor(
+    tmp_path: Path,
+    metadata_provider_id: str,
+    metadata_operation: str,
+) -> None:
+    path = tmp_path / "direct-metadata-binding.sqlite3"
+    connection = _connect(path)
+    _install_schema(connection)
+    _insert_metadata(
+        connection,
+        provider_id=metadata_provider_id,
+        permitted_provider_operation=metadata_operation,
+    )
+    _insert_migration(connection)
+    request_bytes = _snapshot_capture_request(_request()).canonical_json()
+    before = _database_rows(connection)
+
+    with pytest.raises(sqlite3.IntegrityError, match="binding differs from metadata"):
+        _insert_session_row_for_test(
+            connection,
+            f"invalid-metadata-{metadata_provider_id}-{metadata_operation}",
+            request_bytes,
+        )
+
+    assert _database_rows(connection) == before
+    _assert_no_capture_authority_side_effects(connection)
+    connection.close()
+
+
+def test_session_request_admission_uses_native_json1_and_repository_bound(
+    db_path: Path,
+) -> None:
+    connection = _connect(db_path)
+    trigger_sql = connection.execute(
+        "SELECT sql FROM sqlite_master WHERE type = 'trigger' AND name = ?",
+        ("sessions_before_insert",),
+    ).fetchone()
+    assert trigger_sql is not None
+    compact_sql = " ".join(trigger_sql[0].split())
+    for json1_function in (
+        "json_valid(",
+        "json_type(",
+        "json_each(",
+        "json_array_length(",
+        "json_group_array(",
+        "json_extract(",
+        "json_quote(",
+    ):
+        assert json1_function in compact_sql
+    assert MAX_DAILY_SNAPSHOT_SYMBOLS == 100
+    connection.close()
+
+
 def test_complete_evidence_pair_inventory_has_authoritative_digest_guards(
     db_path: Path,
 ) -> None:
@@ -5862,7 +6143,12 @@ def test_every_owned_insert_pair_rejects_direct_sql_mismatch_atomically(
         values[columns.index(digest_column)] = _digest(b"wrong-owned-pair-digest")
     placeholders = ", ".join("?" for _ in columns)
     before = _database_rows(base)
-    with pytest.raises(sqlite3.IntegrityError, match="digest is invalid"):
+    expected_error = (
+        "request bytes are not canonical"
+        if table == "sessions" and invalid_part == "bytes"
+        else "digest is invalid"
+    )
+    with pytest.raises(sqlite3.IntegrityError, match=expected_error):
         base.execute(
             f"INSERT INTO {table} ({', '.join(columns)}) VALUES ({placeholders})",
             values,

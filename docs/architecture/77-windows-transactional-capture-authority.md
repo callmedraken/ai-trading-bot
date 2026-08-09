@@ -91,18 +91,32 @@ never hold an SQLite write transaction across an external call. This order is
 the single lock hierarchy; there is no nested lifecycle arbiter.
 
 Any authority operation that acquires the OS-backed lifecycle arbiter MUST
-reject a supplied SQLite connection whose `in_transaction` flag is already
-true before attempting arbiter construction or acquisition. The transaction
-service, not its caller, owns the SQLite transaction nested beneath the
-arbiter. A caller cannot wrap process-intent, process-result, resume-intent,
-resume-result, terminal, or reservation-classification recovery work in an
-outer SQLite transaction. A `SAVEPOINT` does not make reversed acquisition
-legal. Rejection is immediate and does not query authority state, consume a
-capability, emit an external event, mutate a row, or silently commit, roll back,
-or otherwise alter caller-owned work; the caller must explicitly end its
-transaction before retrying the unchanged lifecycle boundary. Provider
-construction, `CreateProcessW`, and `ResumeThread` remain external boundaries
-that execute while the arbiter is held and no SQLite transaction is active.
+reject an active transaction on every SQLite connection that the operation
+will use for authority or lineage observation, whether the connection is a
+method argument or stored on an adapter. The rejection occurs before
+capability or registry lineage resolution that selects the arbiter, arbiter
+construction or acquisition, SQLite queries, capability consumption, event
+emission, or an external effect. The transaction service, not its caller, owns
+the SQLite transaction nested beneath the arbiter. A caller cannot wrap
+process-intent, process-result, resume-intent, resume-result, terminal, or
+reservation-classification recovery work in an outer SQLite transaction. A
+`SAVEPOINT` does not make reversed acquisition legal. Rejection is immediate
+and does not query authority state, consume a capability, emit an external
+event, mutate a row, or silently commit, roll back, or otherwise alter
+caller-owned work; the caller must explicitly end its transaction before
+retrying the unchanged lifecycle boundary.
+
+The production external-boundary contract does not require provider
+construction, `CreateProcessW`, or `ResumeThread` APIs to receive a
+caller-owned SQLite connection. Each boundary nevertheless enters the arbiter
+with no pre-existing SQLite transaction, performs its final lineage observation
+beneath the arbiter, and leaves no SQLite transaction open across the external
+effect. The executable `FakeSideEffects` adapter holds a persistent exact
+`sqlite3.Connection` as `self.observer`; therefore each of its three public
+external methods explicitly rejects `self.observer.in_transaction` before
+registry resolution or arbiter construction. After the caller explicitly
+rolls back, an unchanged valid capability remains usable exactly once only
+while its durable lineage is still active.
 
 Private issuers, one-shot objects, and their registries are process-local
 provenance checks only. They are never serialized, pickled, transferred,
@@ -417,10 +431,11 @@ reservation binding. The permanent claim alone, an existing reservation,
 restart state, copied or reconstructed objects, mutated visible fields, and
 wrong issuers or permits cannot recreate or redirect this authority.
 
-Under the OS-backed inter-process lifecycle arbiter, provider construction
-first resolves the original reservation from that exact registry entry; only
-then does it select the arbiter and query the normalized reservation -> claim
--> attempt -> session lineage: reservation `COMMITTED` with no process intent,
+Provider construction first rejects an active transaction on the executable
+fake's stored observer, then resolves the original reservation from the exact
+registry entry. Under the OS-backed inter-process lifecycle arbiter it queries
+the normalized reservation -> claim -> attempt -> session lineage: reservation
+`COMMITTED` with no process intent,
 claim `COMMITTED`, attempt `LAUNCH_RESERVED`, session `OPEN`, no execution,
 terminal, or selection, and exact request/provider/operation/budget/policy
 evidence. It consumes the permit immediately before the modeled construction

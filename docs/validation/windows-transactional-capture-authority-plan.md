@@ -124,10 +124,11 @@ The API-entry lock-order matrix is explicit:
 
 | Category | Boundaries | Required executable assertion |
 | --- | --- | --- |
-| Caller SQLite connection plus arbiter | process-intent issuance; process success/failure persistence; resume-intent issuance; resume-result persistence; terminal recording; all four reservation-classification recoveries | exact `sqlite3.Connection`; reject `in_transaction` before arbiter construction, query, capability consumption, evidence/state mutation, or event emission |
-| External-only arbiter boundary | provider construction, `CreateProcessW`, `ResumeThread` | no caller transaction guard is invented; final lineage read and external effect occur under the arbiter with no SQLite transaction active |
-| Spawned/recovery worker | independent process boundary and recovery workers | acquire the arbiter before opening the worker-owned SQLite connection and before `BEGIN IMMEDIATE` |
-| Direct arbiter exercise | deterministic identity, exclusion, and process-death tests | no SQLite connection or transaction is involved |
+| A. Supplied SQLite connection | process-intent issuance; process success/failure persistence; resume-intent issuance; resume-result persistence; terminal recording; all four reservation-classification recoveries; direct threaded harness acquisitions that use a local connection | require an exact `sqlite3.Connection` and reject `in_transaction` before arbiter construction, query, capability consumption, evidence/state mutation, or event emission |
+| B. Stored SQLite observer connection | executable `FakeSideEffects.construct_provider`, `create_process`, and `resume_thread` external boundaries | call `_require_no_active_transaction(self.observer)` before registry lineage resolution or arbiter construction; zero SQL, event, consumption, or effect on rejection |
+| C. Worker-owned SQLite connection | independent spawned boundary and recovery workers | acquire the arbiter before opening the worker-owned SQLite connection and before `BEGIN IMMEDIATE`; the boundary worker closes its setup connection before racing |
+| D. Pure arbiter exercise | deterministic identity, exclusion, and process-death tests | no SQLite connection or transaction is involved |
+| E. External boundary with no SQLite connection at entry | production adapter shape only; no such executable fake boundary is currently present | do not invent a caller-owned connection parameter; enter the arbiter transaction-free, perform final lineage observation beneath it, and hold no SQLite transaction across the effect |
 
 The caller-transaction rejection matrix starts `BEGIN IMMEDIATE` before each
 caller-connection boundary and uses an arbiter-construction probe plus SQLite
@@ -140,13 +141,32 @@ outside the permitted hierarchy. After rollback, the original constructed
 provider, process result, and resume result remain usable exactly once while
 their durable lineage remains active.
 
-A spawned deadlock regression places process A in `BEGIN IMMEDIATE` while
-process B holds the same reservation arbiter and begins classification. Process
-A must reject without attempting the arbiter, retain and then explicitly roll
-back its transaction, and leave its constructed-provider capability
-unconsumed. Process B must then commit recovery normally. Named spawn queues and
-events plus bounded joins establish ordering; success must not depend on a
-SQLite busy timeout or a sleep.
+The stored-observer matrix repeats `BEGIN IMMEDIATE` and `SAVEPOINT` for all
+three `FakeSideEffects` public external methods. Each case proves immediate
+active-transaction rejection, zero arbiter construction/acquisition, zero
+observer SQL after entry, zero new external events, no durable mutation, an
+unconsumed capability, and an observer transaction left active for the caller
+to end. After explicit rollback, the exact original capability succeeds once;
+a second use fails without a second effect.
+
+Two spawned deadlock regressions place process A in `BEGIN IMMEDIATE` while
+process B holds the same reservation arbiter and begins classification. The
+supplied-connection case enters process-intent issuance; the stored-observer
+case enters `FakeSideEffects.construct_provider` with a valid provider permit.
+Process A must reject without attempting the arbiter, retain and then
+explicitly roll back its transaction, and leave its capability unconsumed.
+Process B must then commit recovery normally, and the stored-observer case must
+emit no provider-construction event. Named spawn queues and events plus bounded
+joins establish ordering; success must not depend on a SQLite busy timeout or
+a sleep.
+
+The final source audit enumerates every executable
+`InterprocessLifecycleArbiter` construction and assigns it to exactly one of
+categories A-E. It requires guards before every supplied or stored connection
+acquisition, proves category-C connection opening occurs after acquisition,
+and records that category E has no executable harness instance. In particular,
+the audit classifies all three `FakeSideEffects` methods as category B rather
+than external-only/no-SQLite boundaries.
 
 ## 2. Enforcement acceptance split
 
@@ -850,8 +870,11 @@ rollback and succeeds exactly once after the transient failure is removed.
 
 ## 9. Transaction boundary gates
 
-`FakeSideEffects` observes the database through an independent connection.
-The test proves the following event order:
+`FakeSideEffects` observes the database through a persistent independent
+connection. Each public external hook rejects an active transaction on that
+stored observer before registry lookup or arbiter construction, then performs
+its final read-only lineage observation beneath the arbiter with no transaction
+open across the modeled effect. The test proves the following event order:
 
 | Commit/effect boundary | Required evidence |
 | --- | --- |
@@ -1030,7 +1053,7 @@ Run from the repository root:
 
 ```text
 .venv\Scripts\python.exe -m pytest -q tests/runtime/test_windows_transactional_capture_authority.py
-.venv\Scripts\python.exe -m pytest -q tests/runtime/test_windows_transactional_capture_authority.py -k "arbiter_sqlite_boundaries or lifecycle_transaction_guard or spawned_outer_transaction or lifecycle_arbiter_identity"
+.venv\Scripts\python.exe -m pytest -q tests/runtime/test_windows_transactional_capture_authority.py -k "arbiter_sqlite_boundaries or stored_observer_boundaries or lifecycle_transaction_guard or spawned_outer_transaction or spawned_stored_observer or lifecycle_arbiter_identity"
 .venv\Scripts\python.exe -m pytest -q tests/runtime/test_windows_transactional_capture_authority.py -k "identity_bearing_rows or ordinal_overrides or recovery_insert_requires_action or recovery_action_matrix or recovery_projection"
 .venv\Scripts\python.exe -m pytest -q tests/runtime/test_windows_transactional_capture_authority.py -k "complete_ddl or process_intent or process_hook or process_success_receipt or process_failure_result or crash_around_process or process_unknown_recovery"
 .venv\Scripts\python.exe -m pytest -q tests/market_data/test_alpaca_daily_snapshot.py tests/cli/test_daily_snapshot_config.py

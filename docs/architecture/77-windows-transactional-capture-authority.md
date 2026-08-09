@@ -90,6 +90,20 @@ Code must never wait for the arbiter while holding `BEGIN IMMEDIATE`, and must
 never hold an SQLite write transaction across an external call. This order is
 the single lock hierarchy; there is no nested lifecycle arbiter.
 
+Any authority operation that acquires the OS-backed lifecycle arbiter MUST
+reject a supplied SQLite connection whose `in_transaction` flag is already
+true before attempting arbiter construction or acquisition. The transaction
+service, not its caller, owns the SQLite transaction nested beneath the
+arbiter. A caller cannot wrap process-intent, process-result, resume-intent,
+resume-result, terminal, or reservation-classification recovery work in an
+outer SQLite transaction. A `SAVEPOINT` does not make reversed acquisition
+legal. Rejection is immediate and does not query authority state, consume a
+capability, emit an external event, mutate a row, or silently commit, roll back,
+or otherwise alter caller-owned work; the caller must explicitly end its
+transaction before retrying the unchanged lifecycle boundary. Provider
+construction, `CreateProcessW`, and `ResumeThread` remain external boundaries
+that execute while the arbiter is held and no SQLite transaction is active.
+
 Private issuers, one-shot objects, and their registries are process-local
 provenance checks only. They are never serialized, pickled, transferred,
 reconstructed, or reissued in another process and are not substitutes for the

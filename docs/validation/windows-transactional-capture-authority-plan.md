@@ -120,6 +120,34 @@ is permitted only after its terminal/manual-review prerequisites have already
 revoked every external capability; it cannot bypass that terminal arbitration
 or authorize another effect.
 
+The API-entry lock-order matrix is explicit:
+
+| Category | Boundaries | Required executable assertion |
+| --- | --- | --- |
+| Caller SQLite connection plus arbiter | process-intent issuance; process success/failure persistence; resume-intent issuance; resume-result persistence; terminal recording; all four reservation-classification recoveries | exact `sqlite3.Connection`; reject `in_transaction` before arbiter construction, query, capability consumption, evidence/state mutation, or event emission |
+| External-only arbiter boundary | provider construction, `CreateProcessW`, `ResumeThread` | no caller transaction guard is invented; final lineage read and external effect occur under the arbiter with no SQLite transaction active |
+| Spawned/recovery worker | independent process boundary and recovery workers | acquire the arbiter before opening the worker-owned SQLite connection and before `BEGIN IMMEDIATE` |
+| Direct arbiter exercise | deterministic identity, exclusion, and process-death tests | no SQLite connection or transaction is involved |
+
+The caller-transaction rejection matrix starts `BEGIN IMMEDIATE` before each
+caller-connection boundary and uses an arbiter-construction probe plus SQLite
+trace callback. Every case must raise the deterministic active-transaction
+error with zero arbiter attempts and zero SQL statements, preserve
+`connection.in_transaction`, all rows, every event list, and every one-shot
+capability, and permit the caller to roll back explicitly. The service never
+commits, rolls back, nests, or replaces caller work; a `SAVEPOINT` is equally
+outside the permitted hierarchy. After rollback, the original constructed
+provider, process result, and resume result remain usable exactly once while
+their durable lineage remains active.
+
+A spawned deadlock regression places process A in `BEGIN IMMEDIATE` while
+process B holds the same reservation arbiter and begins classification. Process
+A must reject without attempting the arbiter, retain and then explicitly roll
+back its transaction, and leave its constructed-provider capability
+unconsumed. Process B must then commit recovery normally. Named spawn queues and
+events plus bounded joins establish ordering; success must not depend on a
+SQLite busy timeout or a sleep.
+
 ## 2. Enforcement acceptance split
 
 The validation review must classify each assertion before accepting it.
@@ -1002,6 +1030,7 @@ Run from the repository root:
 
 ```text
 .venv\Scripts\python.exe -m pytest -q tests/runtime/test_windows_transactional_capture_authority.py
+.venv\Scripts\python.exe -m pytest -q tests/runtime/test_windows_transactional_capture_authority.py -k "arbiter_sqlite_boundaries or lifecycle_transaction_guard or spawned_outer_transaction or lifecycle_arbiter_identity"
 .venv\Scripts\python.exe -m pytest -q tests/runtime/test_windows_transactional_capture_authority.py -k "identity_bearing_rows or ordinal_overrides or recovery_insert_requires_action or recovery_action_matrix or recovery_projection"
 .venv\Scripts\python.exe -m pytest -q tests/runtime/test_windows_transactional_capture_authority.py -k "complete_ddl or process_intent or process_hook or process_success_receipt or process_failure_result or crash_around_process or process_unknown_recovery"
 .venv\Scripts\python.exe -m pytest -q tests/market_data/test_alpaca_daily_snapshot.py tests/cli/test_daily_snapshot_config.py

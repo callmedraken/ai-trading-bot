@@ -12,7 +12,7 @@ import sys
 import tempfile
 import threading
 import uuid
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import FrozenInstanceError, dataclass, field, replace
 from datetime import date
@@ -1240,6 +1240,13 @@ def _insert_migration(connection: sqlite3.Connection) -> str:
     return migration_id
 
 
+def _require_no_active_transaction(connection: sqlite3.Connection) -> None:
+    if type(connection) is not sqlite3.Connection:
+        raise TypeError("lifecycle boundary requires an exact sqlite3.Connection")
+    if connection.in_transaction:
+        raise ValueError("lifecycle boundary requires no active SQLite transaction")
+
+
 def _begin(connection: sqlite3.Connection) -> None:
     connection.execute("BEGIN IMMEDIATE")
 
@@ -1694,6 +1701,7 @@ def commit_process_intent(
     reservation_id: str,
     provider: FakeConstructedProvider | None = None,
 ) -> FakeProcessIntent:
+    _require_no_active_transaction(connection)
     if type(provider) is not FakeConstructedProvider:
         raise TypeError("process intent requires an opaque constructed provider")
     registered_reservation_id = _registered_constructed_provider_reservation_id(
@@ -2144,6 +2152,7 @@ def record_execution(
     reservation_id: str,
     receipt: FakeProcessCreationReceipt,
 ) -> str:
+    _require_no_active_transaction(connection)
     if type(receipt) is not FakeProcessCreationReceipt:
         raise TypeError("record_execution requires a fake process creation receipt")
     registered_reservation_id = _registered_process_result_reservation_id(receipt)
@@ -2299,6 +2308,7 @@ def commit_resume_intent(
     execution_id: str,
     reservation_id: str,
 ) -> FakeResumeIntent:
+    _require_no_active_transaction(connection)
     reservation_id = str(reservation_id)
     with InterprocessLifecycleArbiter(reservation_id):
         return _commit_resume_intent_locked(connection, execution_id, reservation_id)
@@ -2424,6 +2434,7 @@ def record_process_creation_failure(
     reservation_id: str,
     failure: FakeProcessCreationFailure,
 ) -> None:
+    _require_no_active_transaction(connection)
     if type(failure) is not FakeProcessCreationFailure:
         raise TypeError(
             "record_process_creation_failure requires a fake process creation failure"
@@ -2534,6 +2545,7 @@ def record_post_resume_evidence(
     execution_id: str,
     resume_receipt: FakeResumeReceipt,
 ) -> None:
+    _require_no_active_transaction(connection)
     if type(resume_receipt) is not FakeResumeReceipt:
         raise TypeError("post-resume evidence requires a fake resume receipt")
     registered_execution_id, registered_reservation_id = (
@@ -2664,6 +2676,7 @@ def record_terminal(
     state: str = "SUCCEEDED",
     disposition: str = "CONFIRMED",
 ) -> str:
+    _require_no_active_transaction(connection)
     reservation_id = str(reservation_id)
     with InterprocessLifecycleArbiter(reservation_id):
         return _record_terminal_locked(connection, reservation_id, state, disposition)
@@ -3003,6 +3016,7 @@ def record_recovery(
     )
     target_id = str(target_id)
     if target_kind == "LAUNCH_RESERVATION" and action.startswith("CLASSIFY_"):
+        _require_no_active_transaction(connection)
         with InterprocessLifecycleArbiter(target_id):
             return _record_recovery_locked(
                 connection,
@@ -3712,6 +3726,79 @@ def _spawn_reconstructed_capability_worker(
         connection.close()
 
 
+def _spawn_outer_transaction_boundary_worker(
+    db_path: str,
+    setup_queue: Any,
+    result_queue: Any,
+    recovery_acquired: Any,
+    transaction_started: Any,
+) -> None:
+    connection = _connect(Path(db_path))
+    hooks = FakeSideEffects(connection)
+    try:
+        session_id = create_session(connection)
+        attempt_id = allocate_attempt(connection, session_id)
+        claim_id = commit_claim(connection, attempt_id)
+        reservation = reserve_launch(connection, claim_id)
+        provider = hooks.construct_provider(reservation)
+        setup_queue.put((session_id, str(reservation)))
+        if not recovery_acquired.wait(20):
+            raise TimeoutError("recovery worker did not acquire the arbiter")
+        before = _database_rows(connection)
+        events_before = list(hooks.events)
+        connection.execute("BEGIN IMMEDIATE")
+        transaction_started.set()
+        try:
+            commit_process_intent(connection, str(reservation), provider)
+        except ValueError as exc:
+            rejection = str(exc)
+        else:
+            raise AssertionError("active transaction reached lifecycle arbiter")
+        assert connection.in_transaction
+        assert not provider._permit.consumed
+        assert hooks.events == events_before
+        assert _database_rows(connection) == before
+        connection.rollback()
+        result_queue.put(("boundary", rejection))
+    except BaseException as exc:
+        if connection.in_transaction:
+            connection.rollback()
+        result_queue.put(("boundary-error", repr(exc)))
+    finally:
+        connection.close()
+
+
+def _spawn_recovery_after_outer_transaction_worker(
+    db_path: str,
+    session_id: str,
+    reservation_id: str,
+    result_queue: Any,
+    recovery_acquired: Any,
+    transaction_started: Any,
+) -> None:
+    connection: sqlite3.Connection | None = None
+    try:
+        with InterprocessLifecycleArbiter(reservation_id):
+            recovery_acquired.set()
+            if not transaction_started.wait(20):
+                raise TimeoutError("boundary worker did not begin its transaction")
+            connection = _connect(Path(db_path))
+            recovery_id = _record_recovery_locked(
+                connection,
+                session_id,
+                "LAUNCH_RESERVATION",
+                reservation_id,
+                "CLASSIFY_LAUNCH_RESERVATION",
+                None,
+            )
+        result_queue.put(("recovery", recovery_id))
+    except BaseException as exc:
+        result_queue.put(("recovery-error", repr(exc)))
+    finally:
+        if connection is not None:
+            connection.close()
+
+
 @pytest.fixture
 def db_path(tmp_path: Path) -> Path:
     path = tmp_path / "authority.sqlite3"
@@ -3964,6 +4051,286 @@ def test_spawned_process_rejects_reconstructed_process_local_capabilities(
     verify.close()
 
 
+def test_spawned_outer_transaction_rejects_before_arbiter_and_releases_writer(
+    db_path: Path,
+) -> None:
+    context = multiprocessing.get_context("spawn")
+    setup_queue = context.Queue()
+    result_queue = context.Queue()
+    recovery_acquired = context.Event()
+    transaction_started = context.Event()
+    boundary = context.Process(
+        target=_spawn_outer_transaction_boundary_worker,
+        args=(
+            str(db_path),
+            setup_queue,
+            result_queue,
+            recovery_acquired,
+            transaction_started,
+        ),
+    )
+    boundary.start()
+    session_id, reservation_id = setup_queue.get(timeout=30)
+    recovery = context.Process(
+        target=_spawn_recovery_after_outer_transaction_worker,
+        args=(
+            str(db_path),
+            session_id,
+            reservation_id,
+            result_queue,
+            recovery_acquired,
+            transaction_started,
+        ),
+    )
+    recovery.start()
+    boundary.join(20)
+    recovery.join(20)
+    assert boundary.exitcode == 0
+    assert recovery.exitcode == 0
+    outcomes = dict([result_queue.get(timeout=10), result_queue.get(timeout=10)])
+    assert set(outcomes) == {"boundary", "recovery"}
+    assert outcomes["boundary"] == (
+        "lifecycle boundary requires no active SQLite transaction"
+    )
+    assert uuid.UUID(outcomes["recovery"]).version == 5
+    verify = _connect(db_path)
+    assert verify.execute(
+        "SELECT reservation_state, process_intent_json "
+        "FROM launch_reservations WHERE launch_reservation_id = ?",
+        (reservation_id,),
+    ).fetchone() == ("MANUAL_REVIEW", None)
+    assert verify.execute("SELECT count(*) FROM manual_recoveries").fetchone() == (1,)
+    assert verify.execute("PRAGMA foreign_key_check").fetchall() == []
+    assert verify.execute("PRAGMA integrity_check").fetchone() == ("ok",)
+    verify.close()
+
+
+def _prepare_active_transaction_boundary(
+    connection: sqlite3.Connection,
+    boundary: str,
+) -> tuple[Callable[[], object], object | None, list[str]]:
+    events: list[str] = []
+    hooks = FakeSideEffects(connection, events)
+    session_id = create_session(connection)
+    attempt_id = allocate_attempt(connection, session_id)
+    claim_id = commit_claim(connection, attempt_id)
+    reservation = reserve_launch(connection, claim_id)
+    reservation_id = str(reservation)
+
+    if boundary == "recover-launch-reservation":
+        return (
+            lambda: record_recovery(
+                connection,
+                session_id,
+                "LAUNCH_RESERVATION",
+                reservation_id,
+                "CLASSIFY_LAUNCH_RESERVATION",
+            ),
+            None,
+            events,
+        )
+
+    provider = hooks.construct_provider(reservation)
+    if boundary == "commit-process-intent":
+        return (
+            lambda: commit_process_intent(connection, reservation_id, provider),
+            provider,
+            events,
+        )
+
+    process_intent = commit_process_intent(connection, reservation_id, provider)
+    if boundary == "recover-process-outcome":
+        return (
+            lambda: record_recovery(
+                connection,
+                session_id,
+                "LAUNCH_RESERVATION",
+                reservation_id,
+                "CLASSIFY_PROCESS_OUTCOME_UNKNOWN",
+            ),
+            None,
+            events,
+        )
+
+    process_result = hooks.create_process(
+        process_intent, fail=boundary == "record-process-creation-failure"
+    )
+    if boundary == "record-process-creation-failure":
+        assert type(process_result) is FakeProcessCreationFailure
+        return (
+            lambda: record_process_creation_failure(
+                connection, reservation_id, process_result
+            ),
+            process_result,
+            events,
+        )
+    assert type(process_result) is FakeProcessCreationReceipt
+    if boundary == "record-execution":
+        return (
+            lambda: record_execution(connection, reservation_id, process_result),
+            process_result,
+            events,
+        )
+
+    execution_id = record_execution(connection, reservation_id, process_result)
+    if boundary == "recover-pre-resume":
+        return (
+            lambda: record_recovery(
+                connection,
+                session_id,
+                "LAUNCH_RESERVATION",
+                reservation_id,
+                "CLASSIFY_PRE_RESUME_READY",
+            ),
+            None,
+            events,
+        )
+    if boundary == "commit-resume-intent":
+        return (
+            lambda: commit_resume_intent(connection, execution_id, reservation_id),
+            None,
+            events,
+        )
+
+    resume_intent = commit_resume_intent(connection, execution_id, reservation_id)
+    if boundary == "recover-resume-outcome":
+        return (
+            lambda: record_recovery(
+                connection,
+                session_id,
+                "LAUNCH_RESERVATION",
+                reservation_id,
+                "CLASSIFY_RESUME_OUTCOME_UNKNOWN",
+            ),
+            None,
+            events,
+        )
+
+    resume_receipt = hooks.resume_thread(resume_intent)
+    if boundary == "record-post-resume-evidence":
+        return (
+            lambda: record_post_resume_evidence(
+                connection, execution_id, resume_receipt
+            ),
+            resume_receipt,
+            events,
+        )
+
+    assert boundary == "record-terminal"
+    record_post_resume_evidence(connection, execution_id, resume_receipt)
+    return (
+        lambda: record_terminal(connection, reservation_id),
+        None,
+        events,
+    )
+
+
+@pytest.mark.parametrize(
+    "boundary",
+    [
+        "commit-process-intent",
+        "record-execution",
+        "record-process-creation-failure",
+        "commit-resume-intent",
+        "record-post-resume-evidence",
+        "record-terminal",
+        "recover-launch-reservation",
+        "recover-process-outcome",
+        "recover-pre-resume",
+        "recover-resume-outcome",
+    ],
+)
+def test_arbiter_sqlite_boundaries_reject_active_caller_transaction_before_lock(
+    db_path: Path, monkeypatch: pytest.MonkeyPatch, boundary: str
+) -> None:
+    connection = _connect(db_path)
+    invoke, capability, events = _prepare_active_transaction_boundary(
+        connection, boundary
+    )
+    before = _database_rows(connection)
+    events_before = list(events)
+    arbiter_attempts: list[str] = []
+
+    class ArbiterProbe:
+        def __init__(self, reservation_id: str) -> None:
+            arbiter_attempts.append(str(reservation_id))
+
+        def __enter__(self) -> ArbiterProbe:
+            raise AssertionError("active transaction reached arbiter acquisition")
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+    connection.execute("BEGIN IMMEDIATE")
+    traces: list[str] = []
+    connection.set_trace_callback(traces.append)
+    with monkeypatch.context() as context:
+        context.setattr(
+            sys.modules[__name__], "InterprocessLifecycleArbiter", ArbiterProbe
+        )
+        with pytest.raises(
+            ValueError,
+            match="lifecycle boundary requires no active SQLite transaction",
+        ):
+            invoke()
+    connection.set_trace_callback(None)
+    assert traces == []
+    assert arbiter_attempts == []
+    assert connection.in_transaction
+    assert events == events_before
+    assert _database_rows(connection) == before
+    if capability is not None:
+        assert not capability._permit.consumed  # type: ignore[union-attr]
+    connection.rollback()
+    assert not connection.in_transaction
+
+    result = invoke()
+    assert result is not None or boundary in {
+        "record-process-creation-failure",
+        "record-post-resume-evidence",
+    }
+    if capability is not None:
+        assert capability._permit.consumed  # type: ignore[union-attr]
+    assert _database_rows(connection) != before
+    connection.close()
+
+
+def test_reservation_recovery_validates_ordinal_before_transaction_guard(
+    db_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    connection = _connect(db_path)
+    session_id = create_session(connection)
+    attempt_id = allocate_attempt(connection, session_id)
+    claim_id = commit_claim(connection, attempt_id)
+    reservation_id = str(reserve_launch(connection, claim_id))
+    before = _database_rows(connection)
+    arbiter_attempts: list[str] = []
+
+    class ArbiterProbe:
+        def __init__(self, selected_reservation_id: str) -> None:
+            arbiter_attempts.append(selected_reservation_id)
+
+    connection.execute("BEGIN IMMEDIATE")
+    with monkeypatch.context() as context:
+        context.setattr(
+            sys.modules[__name__], "InterprocessLifecycleArbiter", ArbiterProbe
+        )
+        with pytest.raises(ValueError, match="exact non-negative int"):
+            record_recovery(
+                connection,
+                session_id,
+                "LAUNCH_RESERVATION",
+                reservation_id,
+                "CLASSIFY_LAUNCH_RESERVATION",
+                ordinal=False,
+            )
+    assert arbiter_attempts == []
+    assert connection.in_transaction
+    assert _database_rows(connection) == before
+    connection.rollback()
+    connection.close()
+
+
 def test_lifecycle_arbiter_identity_and_global_lock_order_are_explicit() -> None:
     reservation_id = "reservation/raw/value"
     first = InterprocessLifecycleArbiter(reservation_id)
@@ -3984,7 +4351,7 @@ def test_lifecycle_arbiter_identity_and_global_lock_order_are_explicit() -> None
     module_source = Path(__file__).read_text(encoding="utf-8")
     assert "threading." + "RLock" not in module_source
     assert "_RESERVATION_LIFECYCLE_" + "LOCKS" not in module_source
-    wrappers = (
+    sqlite_wrappers = (
         (commit_process_intent, "_commit_process_intent_locked"),
         (record_execution, "_record_execution_locked"),
         (record_process_creation_failure, "_record_process_creation_failure_locked"),
@@ -3992,16 +4359,31 @@ def test_lifecycle_arbiter_identity_and_global_lock_order_are_explicit() -> None
         (record_post_resume_evidence, "_record_post_resume_evidence_locked"),
         (record_terminal, "_record_terminal_locked"),
         (record_recovery, "_record_recovery_locked"),
+    )
+    for wrapper, locked_name in sqlite_wrappers:
+        source = inspect.getsource(wrapper)
+        guard_index = source.index("_require_no_active_transaction")
+        arbiter_index = source.index("InterprocessLifecycleArbiter")
+        assert ".execute(" not in source[:arbiter_index]
+        assert "_begin(" not in source[:arbiter_index]
+        assert guard_index < arbiter_index < source.index(locked_name)
+
+    external_wrappers = (
         (FakeSideEffects.construct_provider, "_construct_provider_locked"),
         (FakeSideEffects.create_process, "_create_process_locked"),
         (FakeSideEffects.resume_thread, "_resume_thread_locked"),
     )
-    for wrapper, locked_name in wrappers:
+    for wrapper, locked_name in external_wrappers:
         source = inspect.getsource(wrapper)
         arbiter_index = source.index("InterprocessLifecycleArbiter")
+        assert "_require_no_active_transaction" not in source
         assert ".execute(" not in source[:arbiter_index]
         assert arbiter_index < source.index(locked_name)
-    for worker in (_spawn_boundary_worker, _spawn_recovery_worker):
+    for worker in (
+        _spawn_boundary_worker,
+        _spawn_recovery_worker,
+        _spawn_recovery_after_outer_transaction_worker,
+    ):
         source = inspect.getsource(worker)
         assert source.index("with InterprocessLifecycleArbiter") < source.rindex(
             "_connect(Path(db_path))"
@@ -4012,6 +4394,30 @@ def test_lifecycle_arbiter_identity_and_global_lock_order_are_explicit() -> None
         FakeSideEffects._resume_thread_locked,
     ):
         assert "assert not self.observer.in_transaction" in inspect.getsource(hook)
+
+
+def test_lifecycle_transaction_guard_requires_exact_sqlite_connection() -> None:
+    class ConnectionSubclass(sqlite3.Connection):
+        pass
+
+    exact_connection = sqlite3.connect(":memory:", isolation_level=None)
+    exact_connection.execute("SAVEPOINT caller_work")
+    try:
+        with pytest.raises(ValueError, match="no active SQLite transaction"):
+            _require_no_active_transaction(exact_connection)
+        assert exact_connection.in_transaction
+        exact_connection.execute("ROLLBACK TO caller_work")
+        exact_connection.execute("RELEASE caller_work")
+        assert not exact_connection.in_transaction
+    finally:
+        exact_connection.close()
+
+    connection = sqlite3.connect(":memory:", factory=ConnectionSubclass)
+    try:
+        with pytest.raises(TypeError, match="exact sqlite3.Connection"):
+            _require_no_active_transaction(connection)
+    finally:
+        connection.close()
 
 
 @pytest.mark.parametrize(

@@ -66,14 +66,27 @@ database content selects another namespace, prefix, security descriptor, lock
 path, timeout, lease, or heartbeat. Lock stealing, timeout takeover, and
 session-local fallback are prohibited.
 
-The executable harness uses a same-key advisory file lock below the fixed
-test-adapter temporary subdirectory
-`ai-trading-bot-lifecycle-arbiters-v1/<digest>.lock`. That adapter validates
-inter-process exclusion and process-death release semantics only. It is not the
-production named-mutex implementation, ACL provisioning, or security boundary.
-This PR does not implement the production Windows mutex, namespace validation,
-privilege or ACL provisioning, DACL enforcement, or real Windows acceptance;
-those remain Milestone A work.
+The executable harness uses a same-key advisory file lock below one fixed,
+process-independent adapter root resolved from the harness module's checked-out
+repository location:
+`<repository-root>/.pytest_cache/ai-trading-bot-lifecycle-arbiters-v1/<digest>.lock`.
+The module resolves and validates that absolute root once. `TEMP`, `TMP`,
+`TMPDIR`, current directory, caller input, PID, thread identity, and
+per-process random state cannot select or split the adapter namespace; only the
+digest suffix varies by reservation authority identity. Cooperating processes
+from the same checkout therefore contend on the same path, while different
+reservation identities select different lock files. Lock files are not deleted
+as test cleanup while another process may own them.
+
+That repository-anchored directory is ignored test infrastructure only. It is
+not a production ACL/security boundary and is not included in the lifecycle
+identity digest. The adapter validates inter-process exclusion and
+process-death release semantics only. Milestone A production continues to use
+the secured machine-wide
+`Global\\AITradingBot-Lifecycle-v1-<digest>` named mutex with the unchanged
+canonical digest material. This PR does not implement the production Windows
+mutex, namespace validation, privilege or ACL provisioning, DACL enforcement,
+or real Windows acceptance; those remain Milestone A work.
 
 The global acquisition order is mandatory:
 

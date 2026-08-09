@@ -55,6 +55,27 @@ sorted-key UTF-8 JSON containing exactly `authority_epoch_id`,
 that raw identities are absent. Source assertions reject `threading.RLock` and
 any process-local reservation-lock dictionary as lifecycle arbitration.
 
+The portable adapter root is resolved once from the executable harness module
+to the absolute ignored path
+`<repository-root>/.pytest_cache/ai-trading-bot-lifecycle-arbiters-v1`.
+Behavioral and compact source assertions require that this is the sole adapter
+root rule and reject `tempfile.gettempdir()`, environment-derived roots,
+current-directory roots, PID/thread components, random components, and
+per-boundary caller overrides. The filesystem root is not part of the digest.
+The previously classified 20 arbiter call sites retain their categories; any
+new root-regression worker construction is classified separately.
+
+Two independently spawned processes receive different `TEMP`, `TMP`, and
+`TMPDIR` values before interpreter startup and again before arbiter
+construction, then change to different current directories. For the same
+machine, epoch, and reservation they must report the exact same absolute root,
+lock path, and unchanged digest suffix. The first process holds the lock until
+an explicit event releases it; the second must remain blocked, then acquire
+only after release. A shared modeled-effect gate must record exactly one effect.
+Different reservation identities must still select different lock paths. No
+sleep, temporary-directory fallback, cwd fallback, or timeout takeover is
+accepted as synchronization or authority.
+
 For each pair below, tests force both acquisition orders rather than accepting
 a scheduler-dependent race:
 
@@ -74,11 +95,13 @@ changing the frozen lineage. Every child exits cleanly, every final database
 passes `PRAGMA foreign_key_check`, and no alternate permit or retry appears.
 
 One spawned child must terminate abruptly while owning the test file-lock
-adapter. A new spawned recovery worker must then acquire the same deterministic
-arbiter, reconcile durable state, append exactly one conservative recovery, and
-emit no retry. This proves process-death release, not Windows named-mutex
-`WAIT_ABANDONED` signaling or ACL correctness. Production acceptance separately
-requires the fixed `Global\\AITradingBot-Lifecycle-v1-<digest>` named mutex,
+adapter under one temporary-directory environment. A new spawned recovery
+worker with different `TEMP`, `TMP`, and `TMPDIR` values must then acquire the
+same repository-anchored arbiter, reconcile durable state, append exactly one
+conservative recovery, and emit no retry. This proves process-death release,
+not Windows named-mutex `WAIT_ABANDONED` signaling or ACL correctness.
+Production acceptance separately requires the fixed
+`Global\\AITradingBot-Lifecycle-v1-<digest>` named mutex,
 administrator-reviewed security-descriptor and owner/DACL validation, and
 conservative handling of `WAIT_ABANDONED` as owner-death evidence rather than
 API-outcome evidence. `Local\\` lifecycle arbitration is rejected.
@@ -1053,7 +1076,7 @@ Run from the repository root:
 
 ```text
 .venv\Scripts\python.exe -m pytest -q tests/runtime/test_windows_transactional_capture_authority.py
-.venv\Scripts\python.exe -m pytest -q tests/runtime/test_windows_transactional_capture_authority.py -k "arbiter_sqlite_boundaries or stored_observer_boundaries or lifecycle_transaction_guard or spawned_outer_transaction or spawned_stored_observer or lifecycle_arbiter_identity"
+.venv\Scripts\python.exe -m pytest -q tests/runtime/test_windows_transactional_capture_authority.py -k "arbiter_namespace or crash_releases_lifecycle_arbiter or lifecycle_arbiter_identity or arbiter_sqlite_boundaries or stored_observer_boundaries or lifecycle_transaction_guard or spawned_outer_transaction or spawned_stored_observer"
 .venv\Scripts\python.exe -m pytest -q tests/runtime/test_windows_transactional_capture_authority.py -k "identity_bearing_rows or ordinal_overrides or recovery_insert_requires_action or recovery_action_matrix or recovery_projection"
 .venv\Scripts\python.exe -m pytest -q tests/runtime/test_windows_transactional_capture_authority.py -k "complete_ddl or process_intent or process_hook or process_success_receipt or process_failure_result or crash_around_process or process_unknown_recovery"
 .venv\Scripts\python.exe -m pytest -q tests/market_data/test_alpaca_daily_snapshot.py tests/cli/test_daily_snapshot_config.py

@@ -10,7 +10,6 @@ import multiprocessing
 import os
 import sqlite3
 import sys
-import tempfile
 import threading
 import uuid
 from collections.abc import Callable, Iterator
@@ -28,8 +27,29 @@ from trading_bot.market_data import (
     MAX_DAILY_SNAPSHOT_SYMBOLS,
 )
 
+_HARNESS_MODULE_PATH = Path(__file__).resolve(strict=True)
+_HARNESS_REPOSITORY_ROOT = _HARNESS_MODULE_PATH.parents[2]
+_EXPECTED_HARNESS_PATH = (
+    _HARNESS_REPOSITORY_ROOT
+    / "tests"
+    / "runtime"
+    / "test_windows_transactional_capture_authority.py"
+)
+if (
+    _HARNESS_MODULE_PATH != _EXPECTED_HARNESS_PATH
+    or not (_HARNESS_REPOSITORY_ROOT / "AGENTS.md").is_file()
+):
+    raise RuntimeError("transactional-authority repository root is ambiguous")
+_LIFECYCLE_ARBITER_ROOT = (
+    _HARNESS_REPOSITORY_ROOT / ".pytest_cache" / "ai-trading-bot-lifecycle-arbiters-v1"
+).resolve()
+if not _LIFECYCLE_ARBITER_ROOT.is_absolute():
+    raise RuntimeError("lifecycle-arbiter adapter root must be absolute")
 SCHEMA_PATH = (
-    Path(__file__).parents[1] / "fixtures" / "transactional_authority_schema.sql"
+    _HARNESS_REPOSITORY_ROOT
+    / "tests"
+    / "fixtures"
+    / "transactional_authority_schema.sql"
 )
 NAMESPACE = uuid.UUID("7c2d5a44-3b2e-5f8f-9a1c-6d4e7b8f9012")
 EPOCH = "12345678-1234-5678-9abc-def012345678"
@@ -199,11 +219,7 @@ class InterprocessLifecycleArbiter:
             sort_keys=True,
         ).encode("utf-8")
         self.identity = hashlib.sha256(material).hexdigest()
-        self.path = (
-            Path(tempfile.gettempdir())
-            / "ai-trading-bot-lifecycle-arbiters-v1"
-            / f"{self.identity}.lock"
-        )
+        self.path = _LIFECYCLE_ARBITER_ROOT / f"{self.identity}.lock"
         self._stream: Any | None = None
         self._overlapped: Any | None = None
 
@@ -3694,6 +3710,60 @@ def _spawn_recovery_worker(
             connection.close()
 
 
+@contextmanager
+def _spawn_temp_environment(temp_root: Path) -> Iterator[None]:
+    names = ("TEMP", "TMP", "TMPDIR")
+    previous = {name: os.environ.get(name) for name in names}
+    try:
+        for name in names:
+            os.environ[name] = str(temp_root)
+        yield
+    finally:
+        for name, value in previous.items():
+            if value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = value
+
+
+def _spawn_cross_environment_arbiter_worker(
+    reservation_id: str,
+    temp_root: str,
+    working_directory: str,
+    label: str,
+    attempting: Any,
+    acquired: Any,
+    release: Any,
+    hold_until_released: bool,
+    effect_count: Any,
+    result_queue: Any,
+) -> None:
+    for name in ("TEMP", "TMP", "TMPDIR"):
+        os.environ[name] = temp_root
+    os.chdir(working_directory)
+    arbiter = InterprocessLifecycleArbiter(reservation_id)
+    result_queue.put(
+        (
+            "path",
+            label,
+            str(arbiter.path.parent),
+            str(arbiter.path),
+            arbiter.identity,
+        )
+    )
+    attempting.set()
+    with arbiter:
+        eligible_for_effect = effect_count.value == 0
+        acquired.set()
+        if hold_until_released and not release.wait(20):
+            raise TimeoutError("cross-environment arbiter owner was not released")
+        emitted = False
+        if eligible_for_effect:
+            effect_count.value += 1
+            emitted = True
+    result_queue.put(("result", label, emitted, effect_count.value))
+
+
 def _spawn_crash_while_holding_arbiter(reservation_id: str, acquired: Any) -> None:
     with InterprocessLifecycleArbiter(reservation_id):
         acquired.set()
@@ -4021,8 +4091,102 @@ def test_spawned_processes_serialize_dispatch_persistence_and_recovery(
     verify.close()
 
 
+def test_spawned_arbiter_namespace_is_temp_and_cwd_independent(
+    tmp_path: Path,
+) -> None:
+    reservation_id = "cross-environment/reservation"
+    first_temp = tmp_path / "first-temp"
+    second_temp = tmp_path / "second-temp"
+    first_cwd = tmp_path / "first-cwd"
+    second_cwd = tmp_path / "second-cwd"
+    for directory in (first_temp, second_temp, first_cwd, second_cwd):
+        directory.mkdir()
+
+    context = multiprocessing.get_context("spawn")
+    result_queue = context.Queue()
+    release = context.Event()
+    first_attempting = context.Event()
+    first_acquired = context.Event()
+    second_attempting = context.Event()
+    second_acquired = context.Event()
+    effect_count = context.Value("i", 0, lock=False)
+    first = context.Process(
+        target=_spawn_cross_environment_arbiter_worker,
+        args=(
+            reservation_id,
+            str(first_temp),
+            str(first_cwd),
+            "first",
+            first_attempting,
+            first_acquired,
+            release,
+            True,
+            effect_count,
+            result_queue,
+        ),
+    )
+    second = context.Process(
+        target=_spawn_cross_environment_arbiter_worker,
+        args=(
+            reservation_id,
+            str(second_temp),
+            str(second_cwd),
+            "second",
+            second_attempting,
+            second_acquired,
+            release,
+            False,
+            effect_count,
+            result_queue,
+        ),
+    )
+    with _spawn_temp_environment(first_temp):
+        first.start()
+    assert first_attempting.wait(20)
+    assert first_acquired.wait(20)
+    with _spawn_temp_environment(second_temp):
+        second.start()
+    assert second_attempting.wait(20)
+    second_blocked_until_release = not second_acquired.wait(1)
+    release.set()
+    first.join(20)
+    second.join(20)
+    assert first.exitcode == 0
+    assert second.exitcode == 0
+    assert second_blocked_until_release
+    assert second_acquired.is_set()
+
+    messages = [result_queue.get(timeout=10) for _ in range(4)]
+    path_messages = [message for message in messages if message[0] == "path"]
+    result_messages = [message for message in messages if message[0] == "result"]
+    paths = {
+        message[1]: (message[2], message[3], message[4]) for message in path_messages
+    }
+    results = {message[1]: (message[2], message[3]) for message in result_messages}
+    assert set(paths) == {"first", "second"}
+    assert set(results) == {"first", "second"}
+    assert paths["first"] == paths["second"]
+    root, path, identity = paths["first"]
+    assert Path(root) == _LIFECYCLE_ARBITER_ROOT
+    assert Path(path) == _LIFECYCLE_ARBITER_ROOT / f"{identity}.lock"
+    expected_material = json.dumps(
+        {
+            "authority_epoch_id": EPOCH,
+            "label": "lifecycle-arbiter/v1",
+            "launch_reservation_id": reservation_id,
+            "machine_authority_id": MACHINE,
+        },
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("utf-8")
+    assert identity == hashlib.sha256(expected_material).hexdigest()
+    assert sum(emitted for emitted, _ in results.values()) == 1
+    assert effect_count.value == 1
+
+
 def test_spawned_process_crash_releases_lifecycle_arbiter_without_retry(
-    db_path: Path,
+    db_path: Path, tmp_path: Path
 ) -> None:
     setup = _connect(db_path)
     session_id = create_session(setup)
@@ -4031,6 +4195,10 @@ def test_spawned_process_crash_releases_lifecycle_arbiter_without_retry(
     permit = reserve_launch(setup, claim_id)
     reservation_id = str(permit)
     setup.close()
+    crashed_temp = tmp_path / "crashed-owner-temp"
+    recovery_temp = tmp_path / "recovery-temp"
+    crashed_temp.mkdir()
+    recovery_temp.mkdir()
 
     context = multiprocessing.get_context("spawn")
     acquired = context.Event()
@@ -4038,7 +4206,8 @@ def test_spawned_process_crash_releases_lifecycle_arbiter_without_retry(
         target=_spawn_crash_while_holding_arbiter,
         args=(reservation_id, acquired),
     )
-    crashed.start()
+    with _spawn_temp_environment(crashed_temp):
+        crashed.start()
     assert acquired.wait(20)
     crashed.join(20)
     assert crashed.exitcode == 23
@@ -4063,7 +4232,8 @@ def test_spawned_process_crash_releases_lifecycle_arbiter_without_retry(
             started,
         ),
     )
-    recovery.start()
+    with _spawn_temp_environment(recovery_temp):
+        recovery.start()
     go.set()
     assert started.wait(20)
     recovery.join(20)
@@ -4569,6 +4739,7 @@ def test_lifecycle_arbiter_identity_and_global_lock_order_are_explicit() -> None
     reservation_id = "reservation/raw/value"
     first = InterprocessLifecycleArbiter(reservation_id)
     second = InterprocessLifecycleArbiter(reservation_id)
+    different = InterprocessLifecycleArbiter("different-reservation")
     expected_material = (
         b'{"authority_epoch_id":"12345678-1234-5678-9abc-def012345678",'
         b'"label":"lifecycle-arbiter/v1",'
@@ -4581,10 +4752,40 @@ def test_lifecycle_arbiter_identity_and_global_lock_order_are_explicit() -> None
     assert first.identity == first.identity.lower()
     assert set(first.identity) <= set("0123456789abcdef")
     assert reservation_id not in first.path.name
+    assert first.path.parent == _LIFECYCLE_ARBITER_ROOT
+    assert first.path == second.path
+    assert first.path != different.path
+    assert first.path.is_absolute()
+    assert (
+        _LIFECYCLE_ARBITER_ROOT
+        == (
+            Path(__file__).resolve().parents[2]
+            / ".pytest_cache"
+            / "ai-trading-bot-lifecycle-arbiters-v1"
+        ).resolve()
+    )
 
     module_source = Path(__file__).read_text(encoding="utf-8")
     assert "threading." + "RLock" not in module_source
     assert "_RESERVATION_LIFECYCLE_" + "LOCKS" not in module_source
+    root_definition_source = module_source[
+        : module_source.index("class " + "InterprocessLifecycleArbiter")
+    ]
+    assert root_definition_source.count("_LIFECYCLE_ARBITER_" + "ROOT =") == 1
+    for forbidden_root_source in (
+        "tempfile." + "gettempdir",
+        "os." + "environ",
+        "os." + "getenv",
+        "Path." + "cwd",
+        "os." + "getcwd",
+        "os." + "getpid",
+        "threading." + "get_ident",
+        "uuid." + "uuid4",
+    ):
+        assert forbidden_root_source not in root_definition_source
+    arbiter_source = inspect.getsource(InterprocessLifecycleArbiter)
+    assert "self.path = _LIFECYCLE_ARBITER_ROOT" in arbiter_source
+    assert "resolve(" not in arbiter_source
 
     arbiter_construction_owners: list[str] = []
 
@@ -4640,8 +4841,9 @@ def test_lifecycle_arbiter_identity_and_global_lock_order_are_explicit() -> None
             "_spawn_crash_while_holding_arbiter",
             "test_lifecycle_arbiter_identity_and_global_lock_order_are_explicit",
             "test_lifecycle_arbiter_identity_and_global_lock_order_are_explicit",
+            "test_lifecycle_arbiter_identity_and_global_lock_order_are_explicit",
         ),
-        "E-external-boundary-no-sqlite": (),
+        "E-external-boundary-no-sqlite": ("_spawn_cross_environment_arbiter_worker",),
     }
     assert sorted(arbiter_construction_owners) == sorted(
         owner for owners in classifications.values() for owner in owners

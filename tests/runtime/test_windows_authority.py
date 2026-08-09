@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import ctypes
 import hashlib
 import json
 import os
+from ctypes import wintypes
 
 import pytest
 
@@ -17,27 +19,36 @@ from trading_bot.runtime.windows_authority import (
     BootstrapSignatureError,
     BootstrapSyntaxError,
     BootstrapTrustAnchorError,
+    LifecycleMutexSecurityError,
     PinnedBootstrapKey,
     PinnedBootstrapKeyRegistry,
     UnsupportedBootstrapError,
     UnsupportedWindowsPlatformError,
     WindowsAuthorityBootstrap,
     WindowsAuthorityError,
+    WindowsNativeError,
     parse_bootstrap_bytes,
     require_fixed_authority_path,
     verify_bootstrap_signature,
 )
 from trading_bot.runtime.windows_authority_mutex import (
+    ADMINISTRATORS_SID,
     LIFECYCLE_MUTEX_LABEL,
     LIFECYCLE_MUTEX_PREFIX,
+    SYSTEM_SID,
+    GlobalLifecycleMutex,
     canonical_lifecycle_mutex_material,
     lifecycle_mutex_digest,
     lifecycle_mutex_name,
+    reviewed_lifecycle_mutex_security_policy,
+    select_lifecycle_mutex_owner_sid,
 )
 from trading_bot.runtime.windows_authority_security import (
     DELETE,
     FILE_READ_DATA,
     READ_CONTROL,
+    SE_FILE_OBJECT,
+    SE_KERNEL_OBJECT,
     WRITE_DAC,
     WRITE_OWNER,
     AuthorityObjectKind,
@@ -45,6 +56,7 @@ from trading_bot.runtime.windows_authority_security import (
     AuthoritySecurityError,
     SecurityAce,
     SecurityInspection,
+    SecurityObjectType,
     SecurityPolicy,
     authority_parent_security_policy,
     authority_security_policy,
@@ -276,6 +288,239 @@ def test_security_policy_is_sid_based_and_does_not_grant_dangerous_rights() -> N
     assert mutex.aces[-1].access_mask & READ_CONTROL
     with pytest.raises(AuthorityPrincipalError):
         authority_security_policy("database", "Trading")
+
+
+def test_security_inspection_passes_explicit_object_type_to_get_security_info(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import trading_bot.runtime.windows_authority_security as security
+
+    requested_types: list[int] = []
+
+    class FakeFunction:
+        argtypes: object
+        restype: object
+
+        def __call__(self, handle: int, object_type: int, *args: object) -> int:
+            assert handle == 123
+            requested_types.append(object_type)
+            return 5
+
+    class FakeAdvapi32:
+        GetSecurityInfo = FakeFunction()
+
+    monkeypatch.setattr(security, "wintypes", wintypes)
+    monkeypatch.setattr(security.os, "name", "nt")
+    monkeypatch.setattr(security, "_advapi32", lambda: FakeAdvapi32())
+    for object_type in (SecurityObjectType.FILE, SecurityObjectType.KERNEL):
+        with pytest.raises(WindowsNativeError):
+            security.inspect_handle_security(123, object_type)
+    assert requested_types == [SE_FILE_OBJECT, SE_KERNEL_OBJECT]
+
+
+def test_authority_file_and_mutex_inspection_select_their_native_object_types(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import trading_bot.runtime.windows_authority_security as security
+
+    observed: list[SecurityObjectType] = []
+    policy = authority_security_policy("bootstrap", "S-1-5-21-100-200-300-400")
+
+    def fake_security(
+        handle: int,
+        object_type: SecurityObjectType,
+    ) -> tuple[str, bool, tuple[SecurityAce, ...]]:
+        observed.append(object_type)
+        return policy.owner_sid, True, policy.aces
+
+    monkeypatch.setattr(security, "require_windows_platform", lambda: None)
+    monkeypatch.setattr(security, "_security", fake_security)
+    monkeypatch.setattr(
+        security,
+        "_final_path",
+        lambda handle: str(PRODUCTION_AUTHORITY_PATHS.bootstrap),
+    )
+    monkeypatch.setattr(security, "_attributes", lambda handle: (0, 0))
+    monkeypatch.setattr(security, "_volume", lambda path: ("F:\\", "NTFS"))
+    security.inspect_open_authority_object(
+        123,
+        PRODUCTION_AUTHORITY_PATHS.bootstrap,
+        AuthorityObjectKind.FILE,
+    )
+    security.inspect_handle_security(123, SecurityObjectType.KERNEL)
+    assert observed == [SecurityObjectType.FILE, SecurityObjectType.KERNEL]
+
+
+@pytest.mark.parametrize(
+    "current_sid, elevated, administrator, expected",
+    [
+        (
+            "S-1-5-21-100-200-300-400",
+            False,
+            False,
+            "S-1-5-21-100-200-300-400",
+        ),
+        ("S-1-5-18", False, False, SYSTEM_SID),
+        ("S-1-5-21-100-200-300-401", True, True, ADMINISTRATORS_SID),
+    ],
+)
+def test_lifecycle_mutex_owner_selection_uses_approved_token_facts(
+    current_sid: str,
+    elevated: bool,
+    administrator: bool,
+    expected: str,
+) -> None:
+    assert (
+        select_lifecycle_mutex_owner_sid(
+            "S-1-5-21-100-200-300-400",
+            current_sid,
+            token_is_elevated=elevated,
+            token_is_administrator=administrator,
+        )
+        == expected
+    )
+
+
+def test_lifecycle_mutex_owner_selection_rejects_unapproved_token() -> None:
+    with pytest.raises(LifecycleMutexSecurityError):
+        select_lifecycle_mutex_owner_sid(
+            "S-1-5-21-100-200-300-400",
+            "S-1-5-21-100-200-300-401",
+            token_is_elevated=False,
+            token_is_administrator=False,
+        )
+
+
+def test_lifecycle_mutex_policy_allows_only_reviewed_owner_sids() -> None:
+    trading = "S-1-5-21-100-200-300-400"
+    base = authority_security_policy("lifecycle-mutex", trading)
+    for owner in (ADMINISTRATORS_SID, SYSTEM_SID, trading):
+        policy = reviewed_lifecycle_mutex_security_policy(trading, owner_sid=owner)
+        assert policy.owner_sid == owner
+        assert policy.aces == base.aces
+    with pytest.raises(LifecycleMutexSecurityError):
+        reviewed_lifecycle_mutex_security_policy(
+            trading, owner_sid="S-1-5-21-100-200-300-401"
+        )
+    assert (
+        authority_security_policy("database", trading).owner_sid == ADMINISTRATORS_SID
+    )
+
+
+@pytest.mark.parametrize(
+    "owner_sid, aces, protected, accepted",
+    [
+        (ADMINISTRATORS_SID, "exact", True, True),
+        (SYSTEM_SID, "exact", True, True),
+        ("S-1-5-21-100-200-300-400", "exact", True, True),
+        ("S-1-5-21-100-200-300-401", "exact", True, False),
+        (ADMINISTRATORS_SID, "expanded", True, False),
+        (ADMINISTRATORS_SID, "exact", False, False),
+    ],
+)
+def test_existing_lifecycle_mutex_requires_approved_owner_and_exact_dacl(
+    monkeypatch: pytest.MonkeyPatch,
+    owner_sid: str,
+    aces: str,
+    protected: bool,
+    accepted: bool,
+) -> None:
+    import trading_bot.runtime.windows_authority_mutex as mutex
+
+    trading = "S-1-5-21-100-200-300-400"
+    policy = authority_security_policy("lifecycle-mutex", trading)
+    actual_aces = (
+        policy.aces
+        if aces == "exact"
+        else policy.aces + (SecurityAce("S-1-5-32-545", FILE_READ_DATA),)
+    )
+    monkeypatch.setattr(
+        mutex,
+        "inspect_handle_security",
+        lambda handle, object_type: (owner_sid, protected, actual_aces),
+    )
+    if accepted:
+        assert mutex._validate_mutex_policy(123, trading).owner_sid == owner_sid
+    else:
+        with pytest.raises(LifecycleMutexSecurityError):
+            mutex._validate_mutex_policy(123, trading)
+
+
+def test_trading_can_create_a_new_mutex_with_exact_rights_and_kernel_validation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import trading_bot.runtime.windows_authority_mutex as mutex
+
+    trading = "S-1-5-21-100-200-300-400"
+    calls: list[tuple[str, tuple[object, ...]]] = []
+    policy = reviewed_lifecycle_mutex_security_policy(trading, owner_sid=trading)
+
+    class FakeFunction:
+        argtypes: object
+        restype: object
+
+        def __init__(self, name: str, result: object) -> None:
+            self.name = name
+            self.result = result
+
+        def __call__(self, *args: object) -> object:
+            calls.append((self.name, args))
+            return self.result
+
+    class FakeKernel32:
+        CreateMutexExW = FakeFunction("CreateMutexExW", ctypes.c_void_p(123))
+        WaitForSingleObject = FakeFunction("WaitForSingleObject", mutex.WAIT_OBJECT_0)
+        ReleaseMutex = FakeFunction("ReleaseMutex", True)
+        CloseHandle = FakeFunction("CloseHandle", True)
+
+    class FakeAttributes:
+        attributes = ctypes.c_int()
+
+        def __enter__(self) -> FakeAttributes:
+            return self
+
+        def __exit__(self, exc_type: object, exc: object, traceback: object) -> None:
+            return None
+
+    monkeypatch.setattr(mutex, "require_windows_platform", lambda: None)
+    monkeypatch.setattr(
+        mutex,
+        "resolve_current_lifecycle_mutex_owner_sid",
+        lambda sid: sid,
+    )
+    monkeypatch.setattr(
+        mutex, "build_security_attributes", lambda value: FakeAttributes()
+    )
+    monkeypatch.setattr(
+        mutex,
+        "inspect_handle_security",
+        lambda handle, object_type: (
+            calls.append(("inspect", (handle, object_type)))
+            or (trading, True, policy.aces)
+        ),
+    )
+    monkeypatch.setattr(
+        mutex.ctypes,
+        "WinDLL",
+        lambda name, use_last_error: FakeKernel32(),
+        raising=False,
+    )
+
+    scope = GlobalLifecycleMutex("machine", "epoch", "reservation", trading_sid=trading)
+    acquisition = scope.acquire()
+    assert acquisition.state.value == "OWNED"
+    create_calls = [args for name, args in calls if name == "CreateMutexExW"]
+    assert len(create_calls) == 1
+    assert create_calls[0][1] == scope.name
+    assert create_calls[0][2] == 0
+    assert (
+        create_calls[0][3]
+        == mutex.MUTEX_MODIFY_STATE | mutex.READ_CONTROL | mutex.SYNCHRONIZE
+    )
+    assert (123, SecurityObjectType.KERNEL) in [
+        args for name, args in calls if name == "inspect"
+    ]
+    scope.release()
 
 
 def _directory_inspection(

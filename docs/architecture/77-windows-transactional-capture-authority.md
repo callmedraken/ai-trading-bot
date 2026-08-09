@@ -56,9 +56,12 @@ same named mutex regardless of its Windows session. `Local\\` is prohibited
 for lifecycle arbitration. The fixed `Global\\AITradingBot-Lifecycle-v1-`
 prefix and digest-derived suffix are not caller selectable.
 
-Creation and opening use the administrator-reviewed security descriptor. Its
-owner and DACL admit only the approved administrator and Trading principals
-required by this architecture and deny untrusted creation, replacement, or
+Creation and opening use the administrator-reviewed security descriptor. For
+the lifecycle mutex only, the approved owner is exactly
+BUILTIN\\Administrators, LOCAL SYSTEM, or the exact signed/verified Trading
+SID; filesystem authority objects remain owned by BUILTIN\\Administrators.
+The DACL admits only the approved administrator and Trading principals
+required by this architecture and denies untrusted creation, replacement, or
 synchronization. An existing object with an unexpected type, ownership, DACL,
 name, or other security property causes fail-closed startup; there is no
 fallback to `Local\\` or a differently named mutex. Neither a caller nor

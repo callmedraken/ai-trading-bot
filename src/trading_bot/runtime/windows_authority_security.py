@@ -7,7 +7,7 @@ import ntpath
 import os
 import re
 from dataclasses import dataclass
-from enum import StrEnum
+from enum import IntEnum, StrEnum
 from pathlib import PureWindowsPath
 from typing import Any, Self
 
@@ -71,6 +71,7 @@ ERROR_ACCESS_DENIED = 5
 INVALID_HANDLE_VALUE = -1
 
 SE_FILE_OBJECT = 1
+SE_KERNEL_OBJECT = 6
 OWNER_SECURITY_INFORMATION = 0x00000001
 DACL_SECURITY_INFORMATION = 0x00000004
 PROTECTED_DACL_SECURITY_INFORMATION = 0x80000000
@@ -80,6 +81,13 @@ ACCESS_ALLOWED_ACE_TYPE = 0
 ACCESS_DENIED_ACE_TYPE = 1
 NO_INHERITANCE = 0
 _SID_PATTERN = re.compile(r"^S-(?:0|[1-9][0-9]*)(?:-(?:0|[1-9][0-9]*))+$")
+
+
+class SecurityObjectType(IntEnum):
+    """Native object type passed to the Win32 security-information APIs."""
+
+    FILE = SE_FILE_OBJECT
+    KERNEL = SE_KERNEL_OBJECT
 
 
 class AuthorityObjectKind(StrEnum):
@@ -479,6 +487,64 @@ def _sid_to_string(sid: ctypes.c_void_p) -> str:
         _local_free(ctypes.cast(text, ctypes.c_void_p))
 
 
+def resolve_current_token_sid() -> str:
+    """Return the exact user SID of the current Windows access token."""
+
+    require_windows_platform()
+    advapi32 = _advapi32()
+    token = wintypes.HANDLE()
+    open_token = advapi32.OpenProcessToken
+    open_token.argtypes = [
+        wintypes.HANDLE,
+        wintypes.DWORD,
+        ctypes.POINTER(wintypes.HANDLE),
+    ]
+    open_token.restype = wintypes.BOOL
+    get_current_process = _kernel32().GetCurrentProcess
+    get_current_process.argtypes = []
+    get_current_process.restype = wintypes.HANDLE
+    if not open_token(get_current_process(), 0x0008, ctypes.byref(token)):
+        raise _last_error("OpenProcessToken")
+    try:
+        get_token_information = advapi32.GetTokenInformation
+        get_token_information.argtypes = [
+            wintypes.HANDLE,
+            wintypes.DWORD,
+            ctypes.c_void_p,
+            wintypes.DWORD,
+            ctypes.POINTER(wintypes.DWORD),
+        ]
+        get_token_information.restype = wintypes.BOOL
+
+        required = wintypes.DWORD()
+        get_token_information(token, 1, None, 0, ctypes.byref(required))
+        if ctypes.get_last_error() != ERROR_INSUFFICIENT_BUFFER or not required.value:
+            raise _last_error("GetTokenInformation(TokenUser size)")
+
+        buffer = ctypes.create_string_buffer(required.value)
+        if not get_token_information(
+            token,
+            1,
+            buffer,
+            required.value,
+            ctypes.byref(required),
+        ):
+            raise _last_error("GetTokenInformation(TokenUser)")
+
+        class SidAndAttributes(ctypes.Structure):
+            _fields_ = [("sid", ctypes.c_void_p), ("attributes", wintypes.DWORD)]
+
+        class TokenUser(ctypes.Structure):
+            _fields_ = [("user", SidAndAttributes)]
+
+        user = ctypes.cast(buffer, ctypes.POINTER(TokenUser)).contents
+        if not user.user.sid:
+            raise AuthorityPrincipalError("current Windows token has no user SID")
+        return _sid_to_string(user.user.sid)
+    finally:
+        _close_handle(token)
+
+
 def resolve_local_trading_sid() -> str:
     """Resolve the local ``Trading`` account through LookupAccountNameW."""
 
@@ -681,7 +747,12 @@ def _attributes(handle: int) -> tuple[int, int]:
     return info.attributes, info.reparse_tag
 
 
-def _security(handle: int) -> tuple[str, bool, tuple[SecurityAce, ...]]:
+def _security(
+    handle: int,
+    object_type: SecurityObjectType,
+) -> tuple[str, bool, tuple[SecurityAce, ...]]:
+    if type(object_type) is not SecurityObjectType:
+        raise AuthoritySecurityError("native security object type must be explicit")
     advapi32 = _advapi32()
     descriptor = ctypes.c_void_p()
     get_security = advapi32.GetSecurityInfo
@@ -700,7 +771,7 @@ def _security(handle: int) -> tuple[str, bool, tuple[SecurityAce, ...]]:
     dacl = ctypes.c_void_p()
     status = get_security(
         handle,
-        SE_FILE_OBJECT,
+        int(object_type),
         OWNER_SECURITY_INFORMATION | DACL_SECURITY_INFORMATION,
         ctypes.byref(owner),
         None,
@@ -835,7 +906,7 @@ def inspect_open_authority_object(
     volume_root, filesystem = _volume(final)
     if ntpath.normcase(volume_root) != "f:\\" or filesystem.upper() != "NTFS":
         raise AuthorityObjectError("authority is not on the approved local NTFS volume")
-    owner, protected, aces = _security(handle)
+    owner, protected, aces = _security(handle, SecurityObjectType.FILE)
     return SecurityInspection(
         expected_path=expected,
         final_path=final,
@@ -930,11 +1001,14 @@ def require_security_policy(
         )
 
 
-def inspect_handle_security(handle: int) -> tuple[str, bool, tuple[SecurityAce, ...]]:
+def inspect_handle_security(
+    handle: int,
+    object_type: SecurityObjectType,
+) -> tuple[str, bool, tuple[SecurityAce, ...]]:
     """Inspect only the owner/DACL of a native security object handle."""
 
     require_windows_platform()
-    return _security(handle)
+    return _security(handle, object_type)
 
 
 class SecurityAttributesBundle:

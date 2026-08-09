@@ -37,7 +37,7 @@ from trading_bot.runtime.windows_authority_security import (
     validate_fixed_parent_chain,
 )
 from trading_bot.runtime.windows_authority_sqlite import (
-    validate_persistent_sqlite_contract,
+    validate_installed_sqlite_prerequisites,
 )
 
 
@@ -206,7 +206,7 @@ def _validate_database_if_present(
             "pre-created authority database could not open"
         ) from error
     try:
-        validate_persistent_sqlite_contract(
+        validate_installed_sqlite_prerequisites(
             connection,
             database_path=PRODUCTION_AUTHORITY_PATHS.database,
             journal_path=PRODUCTION_AUTHORITY_PATHS.journal,

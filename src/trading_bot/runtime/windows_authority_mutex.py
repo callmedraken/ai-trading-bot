@@ -21,10 +21,14 @@ from trading_bot.runtime.windows_authority_security import (
     MUTEX_MODIFY_STATE,
     READ_CONTROL,
     SYNCHRONIZE,
+    SecurityObjectType,
     SecurityPolicy,
     authority_security_policy,
     build_security_attributes,
     inspect_handle_security,
+    is_current_token_administrator,
+    is_current_token_elevated,
+    resolve_current_token_sid,
     resolve_local_trading_sid,
 )
 
@@ -35,6 +39,8 @@ WAIT_ABANDONED_0 = 0x80
 WAIT_FAILED = 0xFFFFFFFF
 INFINITE = 0xFFFFFFFF
 ERROR_ALREADY_EXISTS = 183
+ADMINISTRATORS_SID = "S-1-5-32-544"
+SYSTEM_SID = "S-1-5-18"
 
 
 def canonical_lifecycle_mutex_material(
@@ -92,18 +98,60 @@ derive_lifecycle_mutex_digest = lifecycle_mutex_digest
 build_lifecycle_mutex_name = lifecycle_mutex_name
 
 
-def reviewed_lifecycle_mutex_security_policy(trading_sid: str) -> SecurityPolicy:
-    """Return the one reviewed owner/DACL policy used by every mutex scope."""
+def reviewed_lifecycle_mutex_security_policy(
+    trading_sid: str,
+    *,
+    owner_sid: str,
+) -> SecurityPolicy:
+    """Return the exact mutex policy for one approved creator-compatible owner."""
 
-    return authority_security_policy("lifecycle-mutex", trading_sid)
+    if owner_sid not in {ADMINISTRATORS_SID, SYSTEM_SID, trading_sid}:
+        raise LifecycleMutexSecurityError("lifecycle mutex owner is not approved")
+    base = authority_security_policy("lifecycle-mutex", trading_sid)
+    return SecurityPolicy(owner_sid, base.aces)
+
+
+def select_lifecycle_mutex_owner_sid(
+    trading_sid: str,
+    current_token_sid: str,
+    *,
+    token_is_elevated: bool,
+    token_is_administrator: bool,
+) -> str:
+    """Select an owner the current approved token can assign, from exact SID facts."""
+
+    if current_token_sid == trading_sid:
+        return trading_sid
+    if current_token_sid == SYSTEM_SID:
+        return SYSTEM_SID
+    if token_is_elevated and token_is_administrator:
+        return ADMINISTRATORS_SID
+    raise LifecycleMutexSecurityError(
+        "current token cannot create an approved lifecycle mutex owner"
+    )
+
+
+def resolve_current_lifecycle_mutex_owner_sid(trading_sid: str) -> str:
+    """Resolve the approved owner compatible with the current Windows token."""
+
+    current_sid = resolve_current_token_sid()
+    if current_sid in {trading_sid, SYSTEM_SID}:
+        return current_sid
+    return select_lifecycle_mutex_owner_sid(
+        trading_sid,
+        current_sid,
+        token_is_elevated=is_current_token_elevated(),
+        token_is_administrator=is_current_token_administrator(),
+    )
 
 
 def validate_lifecycle_mutex_security_descriptor(trading_sid: str) -> None:
     """Preflight construction of the reviewed binary mutex descriptor."""
 
     require_windows_platform()
+    owner_sid = resolve_current_lifecycle_mutex_owner_sid(trading_sid)
     with build_security_attributes(
-        reviewed_lifecycle_mutex_security_policy(trading_sid)
+        reviewed_lifecycle_mutex_security_policy(trading_sid, owner_sid=owner_sid)
     ):
         pass
 
@@ -130,13 +178,17 @@ def _validate_mutex_policy(
     handle: int,
     trading_sid: str,
 ) -> SecurityPolicy:
-    policy = authority_security_policy("lifecycle-mutex", trading_sid)
-    owner, protected, aces = inspect_handle_security(handle)
-    if owner != policy.owner_sid or not protected or aces != policy.aces:
+    base = authority_security_policy("lifecycle-mutex", trading_sid)
+    owner, protected, aces = inspect_handle_security(handle, SecurityObjectType.KERNEL)
+    if owner not in {ADMINISTRATORS_SID, SYSTEM_SID, trading_sid}:
+        raise LifecycleMutexSecurityError(
+            "existing lifecycle mutex owner is unexpected"
+        )
+    if not protected or aces != base.aces:
         raise LifecycleMutexSecurityError(
             "existing lifecycle mutex security is unexpected"
         )
-    return policy
+    return SecurityPolicy(owner, base.aces)
 
 
 class GlobalLifecycleMutex:
@@ -173,32 +225,25 @@ class GlobalLifecycleMutex:
         if self._handle is not None:
             raise LifecycleMutexError("lifecycle mutex scope is already active")
         trading_sid = self._trading_sid or resolve_local_trading_sid()
-        policy = reviewed_lifecycle_mutex_security_policy(trading_sid)
+        owner_sid = resolve_current_lifecycle_mutex_owner_sid(trading_sid)
+        policy = reviewed_lifecycle_mutex_security_policy(
+            trading_sid, owner_sid=owner_sid
+        )
         kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
-        create = kernel32.CreateMutexW
-        create.argtypes = [ctypes.c_void_p, wintypes.BOOL, ctypes.c_wchar_p]
+        create = kernel32.CreateMutexExW
+        create.argtypes = [
+            ctypes.c_void_p,
+            ctypes.c_wchar_p,
+            wintypes.DWORD,
+            wintypes.DWORD,
+        ]
         create.restype = ctypes.c_void_p
         with build_security_attributes(policy) as attributes:
-            handle = create(ctypes.byref(attributes.attributes), False, self.name)
-        created_error = ctypes.get_last_error()
-        if handle and created_error == ERROR_ALREADY_EXISTS:
-            close = kernel32.CloseHandle
-            close.argtypes = [ctypes.c_void_p]
-            close.restype = wintypes.BOOL
-            close(handle)
-            handle = None
-        if not handle:
-            open_mutex = kernel32.OpenMutexW
-            open_mutex.argtypes = [
-                ctypes.c_ulong,
-                wintypes.BOOL,
-                ctypes.c_wchar_p,
-            ]
-            open_mutex.restype = ctypes.c_void_p
-            handle = open_mutex(
-                MUTEX_MODIFY_STATE | READ_CONTROL | SYNCHRONIZE,
-                False,
+            handle = create(
+                ctypes.byref(attributes.attributes),
                 self.name,
+                0,
+                MUTEX_MODIFY_STATE | READ_CONTROL | SYNCHRONIZE,
             )
         if not handle:
             raise LifecycleMutexSecurityError(

@@ -49,8 +49,11 @@ and locking operations, can create expected capture output, and cannot access
 backup, create at the authority root, delete/rename/replace DB or journal,
 change owner/DACL, or replace trust material. Tests use a disposable
 administrator-provisioned database with `foreign_keys=ON`, `journal_mode=PERSIST`,
-and `synchronous=FULL`; they do not attach, vacuum, migrate, or promote the
-test-only SQL fixture.
+and `synchronous=FULL`; the production connection setup helper must request
+and verify those values on every opened authority connection. The read-only
+installed validator checks only the fixed database/journal prerequisites and
+must not silently configure connection-local PRAGMAs. Tests do not attach,
+vacuum, migrate, or promote the test-only SQL fixture.
 
 The path matrix creates junction/symbolic-link/mount substitutions only when
 administrator privileges are available. Each must be rejected from the final
@@ -67,6 +70,13 @@ with a hostile existing object/DACL and verify fail-closed startup. Verify no
 `Local\` name is attempted. Terminate the owner while holding the mutex and
 record `ABANDONED_OWNER`; the recovery process must reconcile durable state and
 must not retry the external effect automatically.
+
+The lifecycle mutex owner must be one of BUILTIN\\Administrators, LOCAL
+SYSTEM, or the exact Trading SID. A Trading-created mutex is accepted with
+Trading as its owner; an unapproved owner or any expanded DACL remains a
+fail-closed result. This owner exception is limited to the kernel mutex and
+does not change the administrator ownership requirement for filesystem
+authority objects.
 
 If distinct-session automation is unavailable inside pytest, run the manual
 procedure above and retain only command lines, account/session labels, mutex

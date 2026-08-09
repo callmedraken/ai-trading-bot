@@ -41,10 +41,14 @@ F:\AITradingBot\Authority\
 Staging paths may supply a bootstrap and detached signature to `provision`,
 but their final destinations remain the fixed paths above. Database and
 persistent-journal initialization is deliberately deferred; pre-created files
-are validated when present. If both exist, the read-only SQLite validator
-requires one local main database, foreign keys enabled, `journal_mode=PERSIST`,
-`synchronous=FULL`, and the pre-created journal; it never performs ATTACH,
-VACUUM, DDL, or automatic migration.
+are validated when present. The read-only installed validator proves only that
+the fixed database is openable, has one local main database, and has the
+pre-created persistent journal. It does not claim connection-local PRAGMA
+state or change it. Every production SQLite connection must instead use the
+runtime setup helper before authority work; that helper explicitly requests
+and reads back `foreign_keys=ON`, `journal_mode=PERSIST`, and
+`synchronous=FULL`, and fails closed on any mismatch. Neither layer performs
+ATTACH, VACUUM, DDL, or automatic migration.
 
 The pre-existing `F:\AITradingBot` parent component is also opened and checked;
 it must be a local NTFS directory with the exact administrator/SYSTEM-only
@@ -122,11 +126,23 @@ Global\AITradingBot-Lifecycle-v1-<64-lowercase-hex-digest>
 ```
 
 The prefix is fixed; `Local\`, leases, heartbeats, timeout takeover, and lock
-stealing do not exist. Creation/opening supplies an explicit binary security
-descriptor for administrators, SYSTEM, and the approved Trading SID. An
-existing object is checked for the reviewed owner and exact DACL before wait;
-Trading receives only mutex modify, synchronization, and read-control rights
-so it can verify that descriptor without gaining mutation rights.
+stealing do not exist. Lifecycle mutex ownership is separate from filesystem
+authority ownership. The approved owner set is exactly
+`BUILTIN\Administrators`, `LOCAL SYSTEM`, or the exact signed/verified
+`Trading` SID. Creation selects only the owner compatible with the current
+token's SID and approved elevation facts; it never stamps the administrator
+owner from a standard Trading process. An existing object is checked for an
+approved actual owner and exact DACL before wait; Trading receives only mutex
+modify, synchronization, and read-control rights so it can verify that
+descriptor without gaining mutation rights.
+
+Windows ownership carries implicit DACL-control authority. Consequently, when
+the trusted Trading token creates and owns a lifecycle mutex, the mutex DACL
+is not a security boundary against malicious code already executing as that
+same token. This is consistent with architecture 77's trusted-Trading-token
+assumption. The mutex boundary protects against precreation or substitution
+by unapproved principals; this ownership exception does not apply to
+filesystem authority objects, which remain administrator-owned.
 No alternate object name is attempted.
 
 Successful `WAIT_OBJECT_0` ownership is returned as `OWNED`. `WAIT_ABANDONED`
@@ -140,7 +156,8 @@ actually owns.
 
 `validate` requires an already elevated administrator token, reads only the
 fixed trust material, resolves the actual Trading SID, verifies the signature,
-and inspects fixed objects. It does not mutate the tree.
+inspects fixed objects, and checks installed SQLite file prerequisites. It does
+not configure connection-local PRAGMAs or mutate the tree.
 
 `provision` requires the same token and performs, in order:
 

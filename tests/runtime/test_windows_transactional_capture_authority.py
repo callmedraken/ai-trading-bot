@@ -605,6 +605,7 @@ def _insert_attempt_row_for_test(
     attempt_policy_version: str | None = None,
     provider_id: str | None = None,
     permitted_provider_operation: str | None = None,
+    created_at_utc: str = TIMESTAMP,
 ) -> str:
     parent = connection.execute(
         """
@@ -655,7 +656,7 @@ def _insert_attempt_row_for_test(
             allocation_digest,
             attempt,
             attempt_digest,
-            TIMESTAMP,
+            created_at_utc,
         ),
     )
     return attempt_id
@@ -669,6 +670,7 @@ def _insert_claim_row_for_test(
     *,
     claim_schema: int = 1,
     claim_policy_version: str | None = None,
+    committed_at_utc: str = TIMESTAMP,
 ) -> str:
     parent = connection.execute(
         """
@@ -705,7 +707,7 @@ def _insert_claim_row_for_test(
             request_digest,
             evidence,
             evidence_digest,
-            TIMESTAMP,
+            committed_at_utc,
         ),
     )
     return claim_id
@@ -722,6 +724,7 @@ def _insert_reservation_row_for_test(
     launch_reservation_schema: int = 1,
     authority_policy_version: str | None = None,
     claim_policy_version: str | None = None,
+    committed_at_utc: str = TIMESTAMP,
 ) -> str:
     parent = connection.execute(
         """
@@ -773,7 +776,7 @@ def _insert_reservation_row_for_test(
             reservation_state,
             failure,
             failure_digest,
-            TIMESTAMP,
+            committed_at_utc,
             outcome_timestamp,
         ),
     )
@@ -793,6 +796,7 @@ def _insert_terminal_row_for_test(
     evidence_digest: bytes | None = None,
     diagnostics_json: bytes | None = None,
     diagnostics_digest: bytes | None = None,
+    recorded_at_utc: str = TERMINAL_TIMESTAMP,
 ) -> str:
     reservation_id = str(reservation_id)
     terminal_id = _terminal_id(reservation_id, TERMINAL_POLICY)
@@ -841,7 +845,7 @@ def _insert_terminal_row_for_test(
             snapshot,
             diagnostics,
             diagnostics_hash,
-            TERMINAL_TIMESTAMP,
+            recorded_at_utc,
         ),
     )
     return terminal_id
@@ -853,6 +857,7 @@ def _insert_execution_row_for_test(
     *,
     launch_schema: int = 1,
     authority_policy_version: str | None = None,
+    created_at_utc: str = PROCESS_CREATED_TIMESTAMP,
 ) -> str:
     reservation_id = str(reservation_id)
     parent = connection.execute(
@@ -902,7 +907,7 @@ def _insert_execution_row_for_test(
             job_digest,
             resume,
             resume_digest,
-            TIMESTAMP,
+            created_at_utc,
         ),
     )
     return execution_id
@@ -1206,6 +1211,7 @@ def _insert_metadata(
     permitted_provider_operation: str = OPERATION,
     authority_policy_version: str = POLICY,
     claim_policy_version: str = CLAIM_POLICY,
+    created_at_utc: str = TIMESTAMP,
 ) -> None:
     metadata = _json({"authority_epoch_id": EPOCH, "machine_authority_id": MACHINE})
     connection.execute(
@@ -1225,7 +1231,7 @@ def _insert_metadata(
             permitted_provider_operation,
             authority_policy_version,
             claim_policy_version,
-            TIMESTAMP,
+            created_at_utc,
             _digest(b"bootstrap"),
             _digest(b"database"),
             metadata,
@@ -1234,7 +1240,9 @@ def _insert_metadata(
     )
 
 
-def _insert_migration(connection: sqlite3.Connection) -> str:
+def _insert_migration(
+    connection: sqlite3.Connection, *, applied_at_utc: str = TIMESTAMP
+) -> str:
     migration_id = _identity("migration_id/v1", EPOCH, "3", "migration-policy/v1")
     evidence, evidence_digest = _evidence("migration")
     connection.execute(
@@ -1251,7 +1259,7 @@ def _insert_migration(connection: sqlite3.Connection) -> str:
             evidence_digest,
             _digest(b"release"),
             evidence,
-            TIMESTAMP,
+            applied_at_utc,
         ),
     )
     return migration_id
@@ -1273,7 +1281,10 @@ def _finish(connection: sqlite3.Connection, commit: bool) -> None:
 
 
 def create_session(
-    connection: sqlite3.Connection, request: dict[str, Any] | None = None
+    connection: sqlite3.Connection,
+    request: dict[str, Any] | None = None,
+    *,
+    created_at_utc: str = TIMESTAMP,
 ) -> str:
     snapshot = _snapshot_capture_request(_request() if request is None else request)
     _begin(connection)
@@ -1340,7 +1351,7 @@ def create_session(
                 snapshot.target_session_date,
                 request_bytes,
                 _digest(request_bytes),
-                TIMESTAMP,
+                created_at_utc,
             ),
         )
         _finish(connection, True)
@@ -1351,7 +1362,11 @@ def create_session(
 
 
 def allocate_attempt(
-    connection: sqlite3.Connection, session_id: str, ordinal: int | None = None
+    connection: sqlite3.Connection,
+    session_id: str,
+    ordinal: int | None = None,
+    *,
+    created_at_utc: str = TIMESTAMP,
 ) -> str:
     requested_ordinal = (
         None if ordinal is None else _canonical_ordinal(ordinal, "attempt ordinal")
@@ -1428,7 +1443,7 @@ def allocate_attempt(
                 allocation_digest,
                 attempt_evidence,
                 attempt_digest,
-                TIMESTAMP,
+                created_at_utc,
             ),
         )
         _finish(connection, True)
@@ -1438,7 +1453,12 @@ def allocate_attempt(
     return attempt_id
 
 
-def commit_claim(connection: sqlite3.Connection, attempt_id: str) -> str:
+def commit_claim(
+    connection: sqlite3.Connection,
+    attempt_id: str,
+    *,
+    committed_at_utc: str = TIMESTAMP,
+) -> str:
     evidence, evidence_digest = _evidence(f"claim:{attempt_id}")
     _begin(connection)
     try:
@@ -1489,7 +1509,7 @@ def commit_claim(connection: sqlite3.Connection, attempt_id: str) -> str:
                 request_digest,
                 evidence,
                 evidence_digest,
-                TIMESTAMP,
+                committed_at_utc,
             ),
         )
         connection.execute(
@@ -1504,7 +1524,10 @@ def commit_claim(connection: sqlite3.Connection, attempt_id: str) -> str:
 
 
 def reserve_launch(
-    connection: sqlite3.Connection, claim_id: str
+    connection: sqlite3.Connection,
+    claim_id: str,
+    *,
+    committed_at_utc: str = TIMESTAMP,
 ) -> FakeProviderConstructionPermit:
     evidence, evidence_digest = _evidence(f"reservation:{claim_id}")
     _begin(connection)
@@ -1551,7 +1574,7 @@ def reserve_launch(
                 request_digest,
                 evidence,
                 evidence_digest,
-                TIMESTAMP,
+                committed_at_utc,
             ),
         )
         connection.execute(
@@ -2843,6 +2866,7 @@ def _insert_selection_row_for_test(
     terminal_id: str,
     *,
     selection_schema: int = 1,
+    selected_at_utc: str = SELECTION_TIMESTAMP,
 ) -> str:
     snapshot = connection.execute(
         "SELECT snapshot_digest FROM terminals WHERE terminal_id = ?", (terminal_id,)
@@ -2869,7 +2893,7 @@ def _insert_selection_row_for_test(
             snapshot[0],
             evidence,
             evidence_digest,
-            SELECTION_TIMESTAMP,
+            selected_at_utc,
         ),
     )
     return selection_id
@@ -2968,6 +2992,7 @@ def _insert_recovery_fact_for_test(
     action: str,
     *,
     recovery_schema: int = 1,
+    created_at_utc: str = MANUAL_REVIEW_TIMESTAMP,
 ) -> str:
     expected_kind, _, resulting = _RECOVERY_ACTIONS[action]
     if target_kind != expected_kind:
@@ -3014,7 +3039,7 @@ def _insert_recovery_fact_for_test(
             RECOVERY_POLICY,
             evidence,
             evidence_digest,
-            MANUAL_REVIEW_TIMESTAMP,
+            created_at_utc,
         ),
     )
     return recovery_id
@@ -7817,7 +7842,7 @@ def test_session_close_facts_are_write_once_and_only_close_with_state(
             "close_reason = ? WHERE session_id = ?",
             ("partial-close", session_id),
         )
-    with pytest.raises(sqlite3.IntegrityError, match="projection fact"):
+    with pytest.raises(sqlite3.IntegrityError, match="session (close facts|state)"):
         connection.execute(
             "UPDATE sessions SET state = 'CLOSED', closed_at_utc = ?, "
             "close_reason = ? WHERE session_id = ?",
@@ -11075,4 +11100,812 @@ def test_recovery_race_produces_consecutive_ordinals(db_path: Path) -> None:
             "SELECT recovery_ordinal FROM manual_recoveries ORDER BY recovery_ordinal"
         )
     ] == [0, 1]
+    connection.close()
+
+
+_AUTHORITY_TIMESTAMP_COLUMNS = {
+    "authority_metadata": ("created_at_utc",),
+    "schema_migrations": ("applied_at_utc",),
+    "sessions": ("created_at_utc", "closed_at_utc"),
+    "attempts": ("created_at_utc",),
+    "provider_call_claims": ("committed_at_utc",),
+    "launch_reservations": (
+        "process_intent_committed_at_utc",
+        "committed_at_utc",
+        "outcome_recorded_at_utc",
+    ),
+    "launch_executions": ("resume_intent_committed_at_utc", "created_at_utc"),
+    "terminals": ("recorded_at_utc",),
+    "session_selections": ("selected_at_utc",),
+    "manual_recoveries": ("created_at_utc",),
+}
+
+
+@pytest.mark.parametrize(
+    "invalid_timestamp",
+    [
+        "2026-1-01T00:00:00Z",
+        "2026-01-1T00:00:00Z",
+        "2026-01-01 00:00:00Z",
+        "2026-01-01t00:00:00Z",
+        "2026-01-01T00:00:00z",
+        "2026-01-01T00:00:00",
+        "2026-01-01T00:00:00+00:00",
+        "2026-01-01T00:00:00.0Z",
+        "2026-01-01T00:00:00.000Z",
+        "2026-01-01T24:00:00Z",
+        "2026-01-01T23:60:00Z",
+        "2026-01-01T23:59:60Z",
+        "2026-02-29T00:00:00Z",
+        "2026-02-30T00:00:00Z",
+        "2026-00-01T00:00:00Z",
+        "2026-13-01T00:00:00Z",
+        "2026-01-00T00:00:00Z",
+        "0000-01-01T00:00:00Z",
+        "arbitrary text",
+        " 2026-01-01T00:00:00Z",
+        "2026-01-01T00:00:00Z ",
+    ],
+)
+def test_canonical_authority_timestamp_v1_rejects_malformed_direct_sql(
+    tmp_path: Path, invalid_timestamp: str
+) -> None:
+    connection = _connect(tmp_path / "invalid-timestamp.sqlite3")
+    _install_schema(connection)
+    before = _database_rows(connection)
+    with pytest.raises(sqlite3.IntegrityError):
+        _insert_metadata(connection, created_at_utc=invalid_timestamp)
+    assert _database_rows(connection) == before
+    connection.close()
+
+
+@pytest.mark.parametrize(
+    "valid_timestamp",
+    [
+        "0001-01-01T00:00:00Z",
+        "2024-02-29T23:59:59Z",
+        TIMESTAMP,
+        "9999-12-31T23:59:59Z",
+    ],
+)
+def test_canonical_authority_timestamp_v1_accepts_supported_boundaries(
+    tmp_path: Path, valid_timestamp: str
+) -> None:
+    connection = _connect(tmp_path / "valid-timestamp.sqlite3")
+    _install_schema(connection)
+    _insert_metadata(connection, created_at_utc=valid_timestamp)
+    assert connection.execute(
+        "SELECT created_at_utc FROM authority_metadata"
+    ).fetchone() == (valid_timestamp,)
+    connection.close()
+
+
+def test_every_authority_timestamp_column_uses_timestamp_v1_sql_check(
+    db_path: Path,
+) -> None:
+    connection = _connect(db_path)
+    checked_columns = 0
+    for table, columns in _AUTHORITY_TIMESTAMP_COLUMNS.items():
+        table_sql = connection.execute(
+            "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?",
+            (table,),
+        ).fetchone()[0]
+        assert table_sql.count("strftime('%Y-%m-%dT%H:%M:%SZ'") == len(columns)
+        for column in columns:
+            assert f"length({column}) = 20" in table_sql
+            assert f"typeof({column}) = 'text'" in table_sql
+            assert f"strftime('%Y-%m-%dT%H:%M:%SZ', {column}) IS {column}" in table_sql
+            checked_columns += 1
+    assert checked_columns == 14
+    connection.close()
+
+
+@pytest.mark.parametrize(
+    ("relation", "child_timestamp", "accepted"),
+    [
+        ("earlier", "2025-12-31T23:59:59Z", False),
+        ("equal", TIMESTAMP, True),
+        ("later", "2026-01-01T00:00:01Z", True),
+    ],
+)
+def test_migration_timestamp_is_non_decreasing_from_metadata(
+    tmp_path: Path, relation: str, child_timestamp: str, accepted: bool
+) -> None:
+    connection = _connect(tmp_path / f"migration-{relation}.sqlite3")
+    _install_schema(connection)
+    _insert_metadata(connection)
+    before = _database_rows(connection)
+    if accepted:
+        _insert_migration(connection, applied_at_utc=child_timestamp)
+        assert connection.execute(
+            "SELECT applied_at_utc FROM schema_migrations"
+        ).fetchone() == (child_timestamp,)
+    else:
+        with pytest.raises(sqlite3.IntegrityError):
+            _insert_migration(connection, applied_at_utc=child_timestamp)
+        assert _database_rows(connection) == before
+    connection.close()
+
+
+@pytest.mark.parametrize("edge", ["session", "attempt", "claim", "reservation"])
+@pytest.mark.parametrize(
+    ("child_timestamp", "accepted"),
+    [
+        ("2025-12-31T23:59:59Z", False),
+        (TIMESTAMP, True),
+        ("2026-01-01T00:00:01Z", True),
+    ],
+)
+def test_creation_chain_timestamps_are_non_decreasing_at_direct_sql_boundaries(
+    db_path: Path, edge: str, child_timestamp: str, accepted: bool
+) -> None:
+    connection = _connect(db_path)
+    session_id: str | None = None
+    attempt_id: str | None = None
+    claim_id: str | None = None
+    if edge != "session":
+        session_id = create_session(connection)
+    if edge in {"claim", "reservation"}:
+        assert session_id is not None
+        attempt_id = allocate_attempt(connection, session_id)
+    if edge == "reservation":
+        assert attempt_id is not None
+        claim_id = commit_claim(connection, attempt_id)
+    before = _database_rows(connection)
+
+    def insert_child() -> object:
+        if edge == "session":
+            return create_session(connection, created_at_utc=child_timestamp)
+        if edge == "attempt":
+            assert session_id is not None
+            return allocate_attempt(
+                connection, session_id, created_at_utc=child_timestamp
+            )
+        if edge == "claim":
+            assert attempt_id is not None
+            return commit_claim(
+                connection, attempt_id, committed_at_utc=child_timestamp
+            )
+        assert claim_id is not None
+        return reserve_launch(connection, claim_id, committed_at_utc=child_timestamp)
+
+    if accepted:
+        inserted = insert_child()
+        if type(inserted) is FakeProviderConstructionPermit:
+            with _ISSUED_PROVIDER_CONSTRUCTION_PERMITS_LOCK:
+                _ISSUED_PROVIDER_CONSTRUCTION_PERMITS.pop(inserted._permit, None)
+    else:
+        with pytest.raises(sqlite3.IntegrityError):
+            insert_child()
+        assert _database_rows(connection) == before
+    connection.close()
+
+
+@pytest.mark.parametrize(
+    ("selected_at_utc", "accepted"),
+    [
+        ("2026-01-01T00:03:59Z", False),
+        (TERMINAL_TIMESTAMP, True),
+        ("2026-01-01T00:04:01Z", True),
+    ],
+)
+def test_selection_timestamp_is_non_decreasing_from_exact_terminal(
+    db_path: Path, selected_at_utc: str, accepted: bool
+) -> None:
+    lifecycle = _seed_lifecycle(db_path)
+    connection = _connect(db_path)
+    before = _database_rows(connection)
+    if accepted:
+        selection_id = _insert_selection_row_for_test(
+            connection,
+            lifecycle["session_id"],
+            lifecycle["terminal_id"],
+            selected_at_utc=selected_at_utc,
+        )
+        assert connection.execute(
+            "SELECT selected_at_utc FROM session_selections WHERE selection_id = ?",
+            (selection_id,),
+        ).fetchone() == (selected_at_utc,)
+    else:
+        with pytest.raises(sqlite3.IntegrityError, match="selection terminal"):
+            _insert_selection_row_for_test(
+                connection,
+                lifecycle["session_id"],
+                lifecycle["terminal_id"],
+                selected_at_utc=selected_at_utc,
+            )
+        assert _database_rows(connection) == before
+    connection.close()
+
+
+def test_selection_chronology_cannot_be_satisfied_by_wrong_session_terminal(
+    db_path: Path,
+) -> None:
+    first = _seed_lifecycle(db_path)
+    connection = _connect(db_path)
+    second_session = create_session(connection, _request("2026-01-02"))
+    second_attempt = allocate_attempt(connection, second_session)
+    second_claim = commit_claim(connection, second_attempt)
+    second_reservation = reserve_launch(connection, second_claim)
+    second_execution = _record_successful_process(connection, second_reservation)
+    _resume_and_persist(connection, second_execution, second_reservation)
+    second_terminal = record_terminal(connection, second_reservation)
+    before = _database_rows(connection)
+    with pytest.raises(sqlite3.IntegrityError, match="selection terminal"):
+        _insert_selection_row_for_test(
+            connection,
+            first["session_id"],
+            second_terminal,
+            selected_at_utc="9999-12-31T23:59:59Z",
+        )
+    assert _database_rows(connection) == before
+    connection.close()
+
+
+@pytest.mark.parametrize(
+    ("state", "disposition", "preparation", "predecessor", "earlier"),
+    [
+        (
+            "SUCCEEDED",
+            "CONFIRMED",
+            "resumed",
+            RESUME_INTENT_TIMESTAMP,
+            "2026-01-01T00:01:29Z",
+        ),
+        (
+            "FAILED",
+            "CONFIRMED",
+            "resumed",
+            RESUME_INTENT_TIMESTAMP,
+            "2026-01-01T00:01:29Z",
+        ),
+        (
+            "AMBIGUOUS",
+            "MAY_HAVE_OCCURRED",
+            "resumed",
+            RESUME_INTENT_TIMESTAMP,
+            "2026-01-01T00:01:29Z",
+        ),
+        (
+            "FAILED",
+            "NOT_STARTED",
+            "process_failure",
+            PROCESS_FAILURE_TIMESTAMP,
+            "2026-01-01T00:01:59Z",
+        ),
+        (
+            "CLOSED",
+            "MAY_HAVE_OCCURRED",
+            "manual_review",
+            MANUAL_REVIEW_TIMESTAMP,
+            "2026-01-01T00:02:59Z",
+        ),
+    ],
+)
+@pytest.mark.parametrize("relation", ["earlier", "equal", "later"])
+def test_terminal_chronology_uses_state_specific_durable_predecessor(
+    db_path: Path,
+    state: str,
+    disposition: str,
+    preparation: str,
+    predecessor: str,
+    earlier: str,
+    relation: str,
+) -> None:
+    connection = _connect(db_path)
+    session_id = create_session(connection)
+    attempt_id = allocate_attempt(connection, session_id)
+    claim_id = commit_claim(connection, attempt_id)
+    reservation_id = reserve_launch(connection, claim_id)
+    if preparation == "resumed":
+        execution_id = _record_successful_process(connection, reservation_id)
+        _resume_and_persist(connection, execution_id, reservation_id)
+    elif preparation == "process_failure":
+        _record_definitive_process_failure(connection, reservation_id)
+    else:
+        assert preparation == "manual_review"
+        record_recovery(
+            connection,
+            session_id,
+            "LAUNCH_RESERVATION",
+            reservation_id,
+            "CLASSIFY_LAUNCH_RESERVATION",
+        )
+    recorded_at_utc = {
+        "earlier": earlier,
+        "equal": predecessor,
+        "later": TERMINAL_TIMESTAMP,
+    }[relation]
+    request_digest = connection.execute(
+        "SELECT request_digest FROM launch_reservations "
+        "WHERE launch_reservation_id = ?",
+        (str(reservation_id),),
+    ).fetchone()[0]
+    before = _database_rows(connection)
+    if relation == "earlier":
+        with pytest.raises(sqlite3.IntegrityError, match="terminal timestamp"):
+            _insert_terminal_row_for_test(
+                connection,
+                reservation_id,
+                request_digest,
+                state,
+                disposition,
+                recorded_at_utc=recorded_at_utc,
+            )
+        assert _database_rows(connection) == before
+        assert connection.execute(
+            "SELECT state FROM attempts WHERE attempt_id = ?", (attempt_id,)
+        ).fetchone()[0] in {"LAUNCH_RESERVED", "TERMINAL_RECORDED"}
+    else:
+        terminal_id = _insert_terminal_row_for_test(
+            connection,
+            reservation_id,
+            request_digest,
+            state,
+            disposition,
+            recorded_at_utc=recorded_at_utc,
+        )
+        assert connection.execute(
+            "SELECT recorded_at_utc FROM terminals WHERE terminal_id = ?",
+            (terminal_id,),
+        ).fetchone() == (recorded_at_utc,)
+    assert connection.execute(
+        "SELECT state FROM sessions WHERE session_id = ?", (session_id,)
+    ).fetchone() == ("OPEN",)
+    connection.close()
+
+
+@pytest.mark.parametrize("close_path", ["recovery", "selection"])
+@pytest.mark.parametrize("relation", ["earlier", "equal", "later"])
+def test_session_close_timestamp_uses_exact_close_predecessor(
+    db_path: Path, close_path: str, relation: str
+) -> None:
+    connection = _connect(db_path)
+    if close_path == "recovery":
+        session_id = create_session(connection)
+        _insert_recovery_fact_for_test(
+            connection,
+            session_id,
+            "SESSION",
+            session_id,
+            "CLOSE_SESSION",
+            created_at_utc=MANUAL_REVIEW_TIMESTAMP,
+        )
+        predecessor = MANUAL_REVIEW_TIMESTAMP
+        earlier = "2026-01-01T00:02:59Z"
+        later = TERMINAL_TIMESTAMP
+    else:
+        lifecycle = _seed_lifecycle(db_path)
+        session_id = lifecycle["session_id"]
+        select_terminal(connection, session_id, lifecycle["terminal_id"])
+        predecessor = SELECTION_TIMESTAMP
+        earlier = "2026-01-01T00:04:59Z"
+        later = CLOSE_TIMESTAMP
+    closed_at_utc = {"earlier": earlier, "equal": predecessor, "later": later}[relation]
+    before = _database_rows(connection)
+    update = (
+        "UPDATE sessions SET state = 'CLOSED', closed_at_utc = ?, close_reason = ? "
+        "WHERE session_id = ?",
+        (closed_at_utc, f"{close_path}-{relation}", session_id),
+    )
+    if relation == "earlier":
+        with pytest.raises(sqlite3.IntegrityError, match="session close facts"):
+            connection.execute(*update)
+        assert _database_rows(connection) == before
+    else:
+        connection.execute(*update)
+        assert connection.execute(
+            "SELECT state, closed_at_utc FROM sessions WHERE session_id = ?",
+            (session_id,),
+        ).fetchone() == ("CLOSED", closed_at_utc)
+    connection.close()
+
+
+@pytest.mark.parametrize(
+    ("process_intent_at_utc", "accepted"),
+    [
+        ("2025-12-31T23:59:59Z", False),
+        (TIMESTAMP, True),
+        ("2026-01-01T00:00:01Z", True),
+    ],
+)
+def test_process_intent_timestamp_is_non_decreasing_from_reservation(
+    db_path: Path, process_intent_at_utc: str, accepted: bool
+) -> None:
+    connection = _connect(db_path)
+    session_id = create_session(connection)
+    attempt_id = allocate_attempt(connection, session_id)
+    claim_id = commit_claim(connection, attempt_id)
+    permit = reserve_launch(connection, claim_id)
+    reservation_id = str(permit)
+    request_digest, authority_policy, claim_policy = connection.execute(
+        "SELECT request_digest, authority_policy_version, claim_policy_version "
+        "FROM launch_reservations WHERE launch_reservation_id = ?",
+        (reservation_id,),
+    ).fetchone()
+    intent_json = _process_intent_json(
+        reservation_id, request_digest, authority_policy, claim_policy
+    )
+    mutation = (
+        "UPDATE launch_reservations SET reservation_state = "
+        "'PROCESS_INTENT_COMMITTED', process_intent_json = ?, "
+        "process_intent_digest = ?, process_intent_committed_at_utc = ? "
+        "WHERE launch_reservation_id = ?",
+        (intent_json, _digest(intent_json), process_intent_at_utc, reservation_id),
+    )
+    before = _database_rows(connection)
+    if accepted:
+        connection.execute(*mutation)
+        assert connection.execute(
+            "SELECT process_intent_committed_at_utc FROM launch_reservations "
+            "WHERE launch_reservation_id = ?",
+            (reservation_id,),
+        ).fetchone() == (process_intent_at_utc,)
+    else:
+        with pytest.raises(sqlite3.IntegrityError, match="process intent"):
+            connection.execute(*mutation)
+        assert _database_rows(connection) == before
+    with _ISSUED_PROVIDER_CONSTRUCTION_PERMITS_LOCK:
+        _ISSUED_PROVIDER_CONSTRUCTION_PERMITS.pop(permit._permit, None)
+    connection.close()
+
+
+@pytest.mark.parametrize(
+    ("execution_created_at_utc", "accepted"),
+    [
+        ("2026-01-01T00:00:29Z", False),
+        (PROCESS_INTENT_TIMESTAMP, True),
+        ("2026-01-01T00:00:31Z", True),
+    ],
+)
+def test_execution_timestamp_is_non_decreasing_from_process_intent(
+    db_path: Path, execution_created_at_utc: str, accepted: bool
+) -> None:
+    connection = _connect(db_path)
+    session_id = create_session(connection)
+    attempt_id = allocate_attempt(connection, session_id)
+    claim_id = commit_claim(connection, attempt_id)
+    reservation_id = reserve_launch(connection, claim_id)
+    process_intent = _construct_provider_and_commit_process_intent(
+        connection, reservation_id
+    )
+    before = _database_rows(connection)
+    _begin(connection)
+    if accepted:
+        execution_id = _insert_execution_row_for_test(
+            connection,
+            reservation_id,
+            created_at_utc=execution_created_at_utc,
+        )
+        assert connection.execute(
+            "SELECT created_at_utc FROM launch_executions "
+            "WHERE launch_execution_id = ?",
+            (execution_id,),
+        ).fetchone() == (execution_created_at_utc,)
+    else:
+        with pytest.raises(sqlite3.IntegrityError, match="execution policy"):
+            _insert_execution_row_for_test(
+                connection,
+                reservation_id,
+                created_at_utc=execution_created_at_utc,
+            )
+        assert _database_rows(connection) == before
+    connection.rollback()
+    with _ISSUED_PROCESS_PERMITS_LOCK:
+        _ISSUED_PROCESS_PERMITS.pop(process_intent._permit, None)
+    connection.close()
+
+
+@pytest.mark.parametrize(
+    ("resume_intent_at_utc", "accepted"),
+    [
+        ("2026-01-01T00:00:59Z", False),
+        (PROCESS_CREATED_TIMESTAMP, True),
+        ("2026-01-01T00:01:01Z", True),
+    ],
+)
+def test_resume_intent_timestamp_is_non_decreasing_from_execution(
+    db_path: Path, resume_intent_at_utc: str, accepted: bool
+) -> None:
+    connection = _connect(db_path)
+    session_id = create_session(connection)
+    attempt_id = allocate_attempt(connection, session_id)
+    claim_id = commit_claim(connection, attempt_id)
+    reservation_id = reserve_launch(connection, claim_id)
+    execution_id = _record_successful_process(connection, reservation_id)
+    intent_json = _json(
+        {
+            "execution_id": execution_id,
+            "resume_operation": "ResumeThread",
+            "schema": 1,
+        }
+    )
+    mutation = (
+        "UPDATE launch_executions SET phase = 'RESUME_INTENT_COMMITTED', "
+        "resume_intent_json = ?, resume_intent_digest = ?, "
+        "resume_intent_committed_at_utc = ? WHERE launch_execution_id = ?",
+        (intent_json, _digest(intent_json), resume_intent_at_utc, execution_id),
+    )
+    before = _database_rows(connection)
+    if accepted:
+        connection.execute(*mutation)
+        assert connection.execute(
+            "SELECT resume_intent_committed_at_utc FROM launch_executions "
+            "WHERE launch_execution_id = ?",
+            (execution_id,),
+        ).fetchone() == (resume_intent_at_utc,)
+    else:
+        with pytest.raises(sqlite3.IntegrityError, match="resume intent"):
+            connection.execute(*mutation)
+        assert _database_rows(connection) == before
+    connection.close()
+
+
+@pytest.mark.parametrize("outcome_kind", ["process-created", "creation-failed"])
+@pytest.mark.parametrize("relation", ["earlier", "equal", "later"])
+def test_process_outcome_timestamp_uses_exact_durable_predecessor(
+    db_path: Path, outcome_kind: str, relation: str
+) -> None:
+    connection = _connect(db_path)
+    session_id = create_session(connection)
+    attempt_id = allocate_attempt(connection, session_id)
+    claim_id = commit_claim(connection, attempt_id)
+    reservation_id = reserve_launch(connection, claim_id)
+    process_intent = _construct_provider_and_commit_process_intent(
+        connection, reservation_id
+    )
+    before = _database_rows(connection)
+    _begin(connection)
+    if outcome_kind == "process-created":
+        _insert_execution_row_for_test(
+            connection,
+            reservation_id,
+            created_at_utc=PROCESS_CREATED_TIMESTAMP,
+        )
+        outcome_at_utc = {
+            "earlier": "2026-01-01T00:00:59Z",
+            "equal": PROCESS_CREATED_TIMESTAMP,
+            "later": "2026-01-01T00:01:01Z",
+        }[relation]
+        mutation = (
+            "UPDATE launch_reservations SET reservation_state = 'PROCESS_CREATED', "
+            "outcome_recorded_at_utc = ? WHERE launch_reservation_id = ?",
+            (outcome_at_utc, str(reservation_id)),
+        )
+    else:
+        failure_json = _process_failure_json(
+            str(reservation_id), process_intent.intent_digest
+        )
+        outcome_at_utc = {
+            "earlier": "2026-01-01T00:00:29Z",
+            "equal": PROCESS_INTENT_TIMESTAMP,
+            "later": "2026-01-01T00:00:31Z",
+        }[relation]
+        mutation = (
+            "UPDATE launch_reservations SET reservation_state = "
+            "'PROCESS_CREATION_FAILED', process_creation_failure_json = ?, "
+            "process_creation_failure_digest = ?, outcome_recorded_at_utc = ? "
+            "WHERE launch_reservation_id = ?",
+            (
+                failure_json,
+                _digest(failure_json),
+                outcome_at_utc,
+                str(reservation_id),
+            ),
+        )
+    if relation == "earlier":
+        with pytest.raises(sqlite3.IntegrityError):
+            connection.execute(*mutation)
+        connection.rollback()
+        assert _database_rows(connection) == before
+    else:
+        connection.execute(*mutation)
+        assert connection.execute(
+            "SELECT outcome_recorded_at_utc FROM launch_reservations "
+            "WHERE launch_reservation_id = ?",
+            (str(reservation_id),),
+        ).fetchone() == (outcome_at_utc,)
+        connection.rollback()
+    with _ISSUED_PROCESS_PERMITS_LOCK:
+        _ISSUED_PROCESS_PERMITS.pop(process_intent._permit, None)
+    connection.close()
+
+
+def _prepare_recovery_chronology_case(
+    connection: sqlite3.Connection, action: str
+) -> tuple[str, str, str, str, str]:
+    session_id = create_session(connection)
+    if action in {"CLOSE_SESSION", "ACKNOWLEDGE_RESTORE"}:
+        return session_id, "SESSION", session_id, TIMESTAMP, "2025-12-31T23:59:59Z"
+
+    attempt_id = allocate_attempt(connection, session_id)
+    claim_id = commit_claim(connection, attempt_id)
+    reservation_id = reserve_launch(connection, claim_id)
+    if action == "CLASSIFY_LAUNCH_RESERVATION":
+        return (
+            session_id,
+            "LAUNCH_RESERVATION",
+            str(reservation_id),
+            TIMESTAMP,
+            "2025-12-31T23:59:59Z",
+        )
+    if action == "CLASSIFY_PROCESS_OUTCOME_UNKNOWN":
+        process_intent = _construct_provider_and_commit_process_intent(
+            connection, reservation_id
+        )
+        with _ISSUED_PROCESS_PERMITS_LOCK:
+            _ISSUED_PROCESS_PERMITS.pop(process_intent._permit, None)
+        return (
+            session_id,
+            "LAUNCH_RESERVATION",
+            str(reservation_id),
+            PROCESS_INTENT_TIMESTAMP,
+            "2026-01-01T00:00:29Z",
+        )
+
+    execution_id = _record_successful_process(connection, reservation_id)
+    if action == "CLASSIFY_PRE_RESUME_READY":
+        return (
+            session_id,
+            "LAUNCH_RESERVATION",
+            str(reservation_id),
+            PROCESS_CREATED_TIMESTAMP,
+            "2026-01-01T00:00:59Z",
+        )
+    if action == "CLASSIFY_RESUME_OUTCOME_UNKNOWN":
+        resume_intent = commit_resume_intent(connection, execution_id, reservation_id)
+        with _ISSUED_RESUME_PERMITS_LOCK:
+            _ISSUED_RESUME_PERMITS.pop(resume_intent._permit, None)
+        return (
+            session_id,
+            "LAUNCH_RESERVATION",
+            str(reservation_id),
+            RESUME_INTENT_TIMESTAMP,
+            "2026-01-01T00:01:29Z",
+        )
+
+    _resume_and_persist(connection, execution_id, reservation_id)
+    if action == "RECORD_ATTEMPT_AMBIGUITY":
+        return (
+            session_id,
+            "ATTEMPT",
+            attempt_id,
+            RESUME_INTENT_TIMESTAMP,
+            "2026-01-01T00:01:29Z",
+        )
+    if action == "RECORD_CLAIM_AMBIGUITY":
+        return (
+            session_id,
+            "CLAIM",
+            claim_id,
+            RESUME_INTENT_TIMESTAMP,
+            "2026-01-01T00:01:29Z",
+        )
+    assert action == "SELECT_COMMITTED_SUCCESS"
+    terminal_id = record_terminal(connection, reservation_id)
+    return (
+        session_id,
+        "TERMINAL",
+        terminal_id,
+        TERMINAL_TIMESTAMP,
+        "2026-01-01T00:03:59Z",
+    )
+
+
+@pytest.mark.parametrize("action", list(_RECOVERY_ACTIONS))
+@pytest.mark.parametrize("relation", ["earlier", "equal", "later"])
+def test_recovery_timestamp_uses_action_specific_durable_predecessor(
+    db_path: Path, action: str, relation: str
+) -> None:
+    connection = _connect(db_path)
+    session_id, target_kind, target_id, predecessor, earlier = (
+        _prepare_recovery_chronology_case(connection, action)
+    )
+    recovery_created_at_utc = {
+        "earlier": earlier,
+        "equal": predecessor,
+        "later": SELECTION_TIMESTAMP
+        if action == "SELECT_COMMITTED_SUCCESS"
+        else MANUAL_REVIEW_TIMESTAMP,
+    }[relation]
+    before = _database_rows(connection)
+    _begin(connection)
+    if relation == "earlier":
+        with pytest.raises(sqlite3.IntegrityError, match="recovery timestamp"):
+            _insert_recovery_fact_for_test(
+                connection,
+                session_id,
+                target_kind,
+                target_id,
+                action,
+                created_at_utc=recovery_created_at_utc,
+            )
+        connection.rollback()
+        assert _database_rows(connection) == before
+    else:
+        recovery_id = _insert_recovery_fact_for_test(
+            connection,
+            session_id,
+            target_kind,
+            target_id,
+            action,
+            created_at_utc=recovery_created_at_utc,
+        )
+        assert connection.execute(
+            "SELECT created_at_utc FROM manual_recoveries WHERE recovery_id = ?",
+            (recovery_id,),
+        ).fetchone() == (recovery_created_at_utc,)
+        connection.rollback()
+    connection.close()
+
+
+@pytest.mark.parametrize("action", list(_RECOVERY_ACTIONS))
+def test_recovery_chronology_cannot_use_wrong_session_lineage(
+    db_path: Path, action: str
+) -> None:
+    connection = _connect(db_path)
+    _, target_kind, target_id, _, _ = _prepare_recovery_chronology_case(
+        connection, action
+    )
+    wrong_session = create_session(connection, _request("2026-01-10"))
+    before = _database_rows(connection)
+    _begin(connection)
+    with pytest.raises(sqlite3.IntegrityError):
+        _insert_recovery_fact_for_test(
+            connection,
+            wrong_session,
+            target_kind,
+            target_id,
+            action,
+            created_at_utc="9999-12-31T23:59:59Z",
+        )
+    connection.rollback()
+    assert _database_rows(connection) == before
+    connection.close()
+
+
+@pytest.mark.parametrize(
+    "action", ["CLASSIFY_LAUNCH_RESERVATION", "CLASSIFY_PROCESS_OUTCOME_UNKNOWN"]
+)
+@pytest.mark.parametrize("relation", ["earlier", "equal", "later"])
+def test_manual_review_outcome_timestamp_does_not_predate_classification_recovery(
+    db_path: Path, action: str, relation: str
+) -> None:
+    connection = _connect(db_path)
+    session_id, target_kind, target_id, _, _ = _prepare_recovery_chronology_case(
+        connection, action
+    )
+    before = _database_rows(connection)
+    _begin(connection)
+    _insert_recovery_fact_for_test(
+        connection,
+        session_id,
+        target_kind,
+        target_id,
+        action,
+        created_at_utc=MANUAL_REVIEW_TIMESTAMP,
+    )
+    outcome_at_utc = {
+        "earlier": "2026-01-01T00:02:59Z",
+        "equal": MANUAL_REVIEW_TIMESTAMP,
+        "later": TERMINAL_TIMESTAMP,
+    }[relation]
+    mutation = (
+        "UPDATE launch_reservations SET reservation_state = 'MANUAL_REVIEW', "
+        "outcome_recorded_at_utc = ? WHERE launch_reservation_id = ?",
+        (outcome_at_utc, target_id),
+    )
+    if relation == "earlier":
+        with pytest.raises(sqlite3.IntegrityError, match="outcome timestamp"):
+            connection.execute(*mutation)
+        connection.rollback()
+        assert _database_rows(connection) == before
+    else:
+        connection.execute(*mutation)
+        assert connection.execute(
+            "SELECT outcome_recorded_at_utc FROM launch_reservations "
+            "WHERE launch_reservation_id = ?",
+            (target_id,),
+        ).fetchone() == (outcome_at_utc,)
+        connection.rollback()
     connection.close()

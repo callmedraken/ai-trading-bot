@@ -329,6 +329,65 @@ The executable DDL smoke test must also confirm that:
   distinct recovery phase/policy/digest checks are present without copied
   ancestor columns.
 
+### Canonical timestamp-v1 and causal-edge gates
+
+The executable DDL is the authoritative timestamp boundary. All 14 persisted
+timestamp columns must contain the same native SQLite `CHECK` semantics:
+exactly 20 ASCII characters in `YYYY-MM-DDTHH:MM:SSZ`, year `0001..9999`, a
+valid proleptic-Gregorian date, uppercase `T`/`Z`, hour `00..23`, minute and
+second `00..59`, and no fractions, offsets, spaces, leap seconds, or
+`24:00:00`. Nullable columns must apply the same expression whenever non-null.
+The structural DDL assertion inventories every timestamp column and the
+behavioral matrix exercises the actual expression through direct SQL.
+
+Direct SQL must reject, atomically, missing zero padding, a space separator,
+lowercase `t` or `z`, missing `Z`, numeric offsets, one- and three-digit
+fractions, hour 24, minute or second 60, non-leap `2026-02-29`, February 30,
+month 00 or 13, day 00, year 0000, arbitrary text, and leading or trailing
+whitespace. It must accept `0001-01-01T00:00:00Z`, a valid leap day, the normal
+fixed lifecycle values, and `9999-12-31T23:59:59Z`. A failed native parse must
+evaluate false at the `CHECK`; SQL `NULL` must not accidentally admit an
+invalid non-null value.
+
+For every causal edge below, table-driven direct-SQL tests require a value one
+second earlier to fail, equality to succeed, and a later value to succeed.
+Each rejection compares the complete database before and after, verifies the
+immutable predecessor is unchanged, and proves a newer wrong-lineage row
+cannot satisfy an exact-parent predicate:
+
+| Child timestamp | Required predecessor and acceptance gate |
+| --- | --- |
+| migration/session creation | singleton metadata creation; migration ordering is required by the metadata-first provisioning model |
+| attempt creation | exact owning session creation |
+| claim commit | exact attempt creation |
+| reservation commit | exact claim commit |
+| process-intent commit | exact reservation commit |
+| execution creation | exact process-intent commit |
+| first process outcome | execution creation for `PROCESS_CREATED`; process-intent commit for definitive creation failure; matching classification recovery plus reservation/intent predecessor for first `MANUAL_REVIEW` |
+| resume-intent commit | exact execution creation |
+| terminal recording | process-failure outcome for `FAILED/NOT_STARTED`; resume intent for confirmed or ordinary ambiguity results; matching recovery as an additional predecessor for recovery-classified ambiguity or closure |
+| selection | exact referenced confirmed-success terminal, including earlier/equal/later and wrong-session-terminal cases |
+| recovery | action-specific predecessor for all nine closed-matrix actions |
+| session close | exact `CLOSE_SESSION` recovery for `OPEN`, or exact session selection for `SUCCESS_SELECTED` |
+
+The recovery chronology matrix covers
+`RECORD_ATTEMPT_AMBIGUITY`, `RECORD_CLAIM_AMBIGUITY`,
+`CLASSIFY_LAUNCH_RESERVATION`, `CLASSIFY_PROCESS_OUTCOME_UNKNOWN`,
+`CLASSIFY_PRE_RESUME_READY`, `CLASSIFY_RESUME_OUTCOME_UNKNOWN`,
+`SELECT_COMMITTED_SUCCESS`, `CLOSE_SESSION`, and `ACKNOWLEDGE_RESTORE`.
+Each case is repeated with a target from another session to prove that time
+alone cannot substitute for normalized lineage. The close matrix separately
+proves equality and later closure for both authorized paths and atomic
+rejection immediately before the matching recovery or selection.
+
+Timestamp tests must also prove that normal and recovery-driven selection use
+the same valid deterministic selection timestamp, that terminal recording is
+not earlier than selection, that selection is not later than subsequent
+closure, and that reservation outcome timestamps remain write-once after the
+first accepted value. Timestamp values remain audit-only and absent from UUID5
+material; canonical JSON and every existing identity golden vector must remain
+byte-for-byte unchanged.
+
 ## 4. Deterministic identity gates
 
 The test harness uses the fixed namespace
@@ -1076,6 +1135,7 @@ Run from the repository root:
 
 ```text
 .venv\Scripts\python.exe -m pytest -q tests/runtime/test_windows_transactional_capture_authority.py
+.venv\Scripts\python.exe -m pytest -q tests/runtime/test_windows_transactional_capture_authority.py -k "canonical_authority_timestamp or every_authority_timestamp or creation_chain_timestamps or process_intent_timestamp or execution_timestamp or process_outcome_timestamp or resume_intent_timestamp or terminal_chronology or selection_timestamp or recovery_timestamp or session_close_timestamp"
 .venv\Scripts\python.exe -m pytest -q tests/runtime/test_windows_transactional_capture_authority.py -k "arbiter_namespace or crash_releases_lifecycle_arbiter or lifecycle_arbiter_identity or arbiter_sqlite_boundaries or stored_observer_boundaries or lifecycle_transaction_guard or spawned_outer_transaction or spawned_stored_observer"
 .venv\Scripts\python.exe -m pytest -q tests/runtime/test_windows_transactional_capture_authority.py -k "identity_bearing_rows or ordinal_overrides or recovery_insert_requires_action or recovery_action_matrix or recovery_projection"
 .venv\Scripts\python.exe -m pytest -q tests/runtime/test_windows_transactional_capture_authority.py -k "complete_ddl or process_intent or process_hook or process_success_receipt or process_failure_result or crash_around_process or process_unknown_recovery"

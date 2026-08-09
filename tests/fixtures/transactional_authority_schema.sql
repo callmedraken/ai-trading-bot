@@ -11,7 +11,16 @@ CREATE TABLE authority_metadata (
     permitted_provider_operation TEXT NOT NULL,
     authority_policy_version TEXT NOT NULL,
     claim_policy_version TEXT NOT NULL,
-    created_at_utc TEXT NOT NULL,
+    created_at_utc TEXT NOT NULL CHECK (
+        typeof(created_at_utc) = 'text'
+        AND length(created_at_utc) = 20
+        AND created_at_utc GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]Z'
+        AND substr(created_at_utc, 1, 4) BETWEEN '0001' AND '9999'
+        AND substr(created_at_utc, 12, 2) BETWEEN '00' AND '23'
+        AND substr(created_at_utc, 15, 2) BETWEEN '00' AND '59'
+        AND substr(created_at_utc, 18, 2) BETWEEN '00' AND '59'
+        AND strftime('%Y-%m-%dT%H:%M:%SZ', created_at_utc) IS created_at_utc
+    ),
     bootstrap_digest BLOB NOT NULL CHECK (length(bootstrap_digest) = 32),
     database_identity_digest BLOB NOT NULL CHECK (length(database_identity_digest) = 32),
     metadata_json BLOB NOT NULL,
@@ -27,7 +36,16 @@ CREATE TABLE schema_migrations (
     migration_digest BLOB NOT NULL CHECK (length(migration_digest) = 32),
     application_release_digest BLOB NOT NULL CHECK (length(application_release_digest) = 32),
     migration_json BLOB NOT NULL,
-    applied_at_utc TEXT NOT NULL,
+    applied_at_utc TEXT NOT NULL CHECK (
+        typeof(applied_at_utc) = 'text'
+        AND length(applied_at_utc) = 20
+        AND applied_at_utc GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]Z'
+        AND substr(applied_at_utc, 1, 4) BETWEEN '0001' AND '9999'
+        AND substr(applied_at_utc, 12, 2) BETWEEN '00' AND '23'
+        AND substr(applied_at_utc, 15, 2) BETWEEN '00' AND '59'
+        AND substr(applied_at_utc, 18, 2) BETWEEN '00' AND '59'
+        AND strftime('%Y-%m-%dT%H:%M:%SZ', applied_at_utc) IS applied_at_utc
+    ),
     UNIQUE (authority_epoch_id, schema_version)
 );
 
@@ -43,8 +61,28 @@ CREATE TABLE sessions (
     next_recovery_ordinal INTEGER NOT NULL CHECK (next_recovery_ordinal >= 0),
     request_json BLOB NOT NULL,
     request_digest BLOB NOT NULL CHECK (length(request_digest) = 32),
-    created_at_utc TEXT NOT NULL,
-    closed_at_utc TEXT,
+    created_at_utc TEXT NOT NULL CHECK (
+        typeof(created_at_utc) = 'text'
+        AND length(created_at_utc) = 20
+        AND created_at_utc GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]Z'
+        AND substr(created_at_utc, 1, 4) BETWEEN '0001' AND '9999'
+        AND substr(created_at_utc, 12, 2) BETWEEN '00' AND '23'
+        AND substr(created_at_utc, 15, 2) BETWEEN '00' AND '59'
+        AND substr(created_at_utc, 18, 2) BETWEEN '00' AND '59'
+        AND strftime('%Y-%m-%dT%H:%M:%SZ', created_at_utc) IS created_at_utc
+    ),
+    closed_at_utc TEXT CHECK (
+        closed_at_utc IS NULL OR (
+            typeof(closed_at_utc) = 'text'
+            AND length(closed_at_utc) = 20
+            AND closed_at_utc GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]Z'
+            AND substr(closed_at_utc, 1, 4) BETWEEN '0001' AND '9999'
+            AND substr(closed_at_utc, 12, 2) BETWEEN '00' AND '23'
+            AND substr(closed_at_utc, 15, 2) BETWEEN '00' AND '59'
+            AND substr(closed_at_utc, 18, 2) BETWEEN '00' AND '59'
+            AND strftime('%Y-%m-%dT%H:%M:%SZ', closed_at_utc) IS closed_at_utc
+        )
+    ),
     close_reason TEXT,
     CHECK (
         (state = 'CLOSED' AND closed_at_utc IS NOT NULL AND close_reason IS NOT NULL)
@@ -72,7 +110,16 @@ CREATE TABLE attempts (
         'LAUNCH_MAY_HAVE_OCCURRED', 'TERMINAL_RECORDED',
         'SUCCESS_SELECTED', 'CLOSED'
     )),
-    created_at_utc TEXT NOT NULL,
+    created_at_utc TEXT NOT NULL CHECK (
+        typeof(created_at_utc) = 'text'
+        AND length(created_at_utc) = 20
+        AND created_at_utc GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]Z'
+        AND substr(created_at_utc, 1, 4) BETWEEN '0001' AND '9999'
+        AND substr(created_at_utc, 12, 2) BETWEEN '00' AND '23'
+        AND substr(created_at_utc, 15, 2) BETWEEN '00' AND '59'
+        AND substr(created_at_utc, 18, 2) BETWEEN '00' AND '59'
+        AND strftime('%Y-%m-%dT%H:%M:%SZ', created_at_utc) IS created_at_utc
+    ),
     UNIQUE (session_id, ordinal)
 );
 
@@ -89,7 +136,16 @@ CREATE TABLE provider_call_claims (
     claim_evidence_json BLOB NOT NULL,
     claim_evidence_digest BLOB NOT NULL CHECK (length(claim_evidence_digest) = 32),
     state TEXT NOT NULL CHECK (state = 'COMMITTED'),
-    committed_at_utc TEXT NOT NULL
+    committed_at_utc TEXT NOT NULL CHECK (
+        typeof(committed_at_utc) = 'text'
+        AND length(committed_at_utc) = 20
+        AND committed_at_utc GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]Z'
+        AND substr(committed_at_utc, 1, 4) BETWEEN '0001' AND '9999'
+        AND substr(committed_at_utc, 12, 2) BETWEEN '00' AND '23'
+        AND substr(committed_at_utc, 15, 2) BETWEEN '00' AND '59'
+        AND substr(committed_at_utc, 18, 2) BETWEEN '00' AND '59'
+        AND strftime('%Y-%m-%dT%H:%M:%SZ', committed_at_utc) IS committed_at_utc
+    )
 );
 
 CREATE TABLE launch_reservations (
@@ -104,15 +160,46 @@ CREATE TABLE launch_reservations (
     reservation_evidence_digest BLOB NOT NULL CHECK (length(reservation_evidence_digest) = 32),
     process_intent_json BLOB,
     process_intent_digest BLOB,
-    process_intent_committed_at_utc TEXT,
+    process_intent_committed_at_utc TEXT CHECK (
+        process_intent_committed_at_utc IS NULL OR (
+            typeof(process_intent_committed_at_utc) = 'text'
+            AND length(process_intent_committed_at_utc) = 20
+            AND process_intent_committed_at_utc GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]Z'
+            AND substr(process_intent_committed_at_utc, 1, 4) BETWEEN '0001' AND '9999'
+            AND substr(process_intent_committed_at_utc, 12, 2) BETWEEN '00' AND '23'
+            AND substr(process_intent_committed_at_utc, 15, 2) BETWEEN '00' AND '59'
+            AND substr(process_intent_committed_at_utc, 18, 2) BETWEEN '00' AND '59'
+            AND strftime('%Y-%m-%dT%H:%M:%SZ', process_intent_committed_at_utc) IS process_intent_committed_at_utc
+        )
+    ),
     reservation_state TEXT NOT NULL CHECK (reservation_state IN (
         'COMMITTED', 'PROCESS_INTENT_COMMITTED', 'PROCESS_CREATED',
         'PROCESS_CREATION_FAILED', 'MANUAL_REVIEW', 'TERMINAL_RECORDED'
     )),
     process_creation_failure_json BLOB,
     process_creation_failure_digest BLOB,
-    committed_at_utc TEXT NOT NULL,
-    outcome_recorded_at_utc TEXT,
+    committed_at_utc TEXT NOT NULL CHECK (
+        typeof(committed_at_utc) = 'text'
+        AND length(committed_at_utc) = 20
+        AND committed_at_utc GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]Z'
+        AND substr(committed_at_utc, 1, 4) BETWEEN '0001' AND '9999'
+        AND substr(committed_at_utc, 12, 2) BETWEEN '00' AND '23'
+        AND substr(committed_at_utc, 15, 2) BETWEEN '00' AND '59'
+        AND substr(committed_at_utc, 18, 2) BETWEEN '00' AND '59'
+        AND strftime('%Y-%m-%dT%H:%M:%SZ', committed_at_utc) IS committed_at_utc
+    ),
+    outcome_recorded_at_utc TEXT CHECK (
+        outcome_recorded_at_utc IS NULL OR (
+            typeof(outcome_recorded_at_utc) = 'text'
+            AND length(outcome_recorded_at_utc) = 20
+            AND outcome_recorded_at_utc GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]Z'
+            AND substr(outcome_recorded_at_utc, 1, 4) BETWEEN '0001' AND '9999'
+            AND substr(outcome_recorded_at_utc, 12, 2) BETWEEN '00' AND '23'
+            AND substr(outcome_recorded_at_utc, 15, 2) BETWEEN '00' AND '59'
+            AND substr(outcome_recorded_at_utc, 18, 2) BETWEEN '00' AND '59'
+            AND strftime('%Y-%m-%dT%H:%M:%SZ', outcome_recorded_at_utc) IS outcome_recorded_at_utc
+        )
+    ),
     CHECK (
         (process_intent_json IS NULL)
         = (process_intent_digest IS NULL)
@@ -145,12 +232,32 @@ CREATE TABLE launch_executions (
     resume_authorization_digest BLOB NOT NULL CHECK (length(resume_authorization_digest) = 32),
     resume_intent_json BLOB,
     resume_intent_digest BLOB,
-    resume_intent_committed_at_utc TEXT,
+    resume_intent_committed_at_utc TEXT CHECK (
+        resume_intent_committed_at_utc IS NULL OR (
+            typeof(resume_intent_committed_at_utc) = 'text'
+            AND length(resume_intent_committed_at_utc) = 20
+            AND resume_intent_committed_at_utc GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]Z'
+            AND substr(resume_intent_committed_at_utc, 1, 4) BETWEEN '0001' AND '9999'
+            AND substr(resume_intent_committed_at_utc, 12, 2) BETWEEN '00' AND '23'
+            AND substr(resume_intent_committed_at_utc, 15, 2) BETWEEN '00' AND '59'
+            AND substr(resume_intent_committed_at_utc, 18, 2) BETWEEN '00' AND '59'
+            AND strftime('%Y-%m-%dT%H:%M:%SZ', resume_intent_committed_at_utc) IS resume_intent_committed_at_utc
+        )
+    ),
     post_resume_json BLOB,
     post_resume_digest BLOB,
     cleanup_json BLOB,
     cleanup_digest BLOB,
-    created_at_utc TEXT NOT NULL,
+    created_at_utc TEXT NOT NULL CHECK (
+        typeof(created_at_utc) = 'text'
+        AND length(created_at_utc) = 20
+        AND created_at_utc GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]Z'
+        AND substr(created_at_utc, 1, 4) BETWEEN '0001' AND '9999'
+        AND substr(created_at_utc, 12, 2) BETWEEN '00' AND '23'
+        AND substr(created_at_utc, 15, 2) BETWEEN '00' AND '59'
+        AND substr(created_at_utc, 18, 2) BETWEEN '00' AND '59'
+        AND strftime('%Y-%m-%dT%H:%M:%SZ', created_at_utc) IS created_at_utc
+    ),
     CHECK (resume_intent_digest IS NULL OR length(resume_intent_digest) = 32),
     CHECK (post_resume_digest IS NULL OR length(post_resume_digest) = 32),
     CHECK (cleanup_digest IS NULL OR length(cleanup_digest) = 32),
@@ -175,7 +282,16 @@ CREATE TABLE terminals (
     snapshot_digest BLOB,
     sanitized_diagnostics_json BLOB NOT NULL,
     sanitized_diagnostics_digest BLOB NOT NULL CHECK (length(sanitized_diagnostics_digest) = 32),
-    recorded_at_utc TEXT NOT NULL,
+    recorded_at_utc TEXT NOT NULL CHECK (
+        typeof(recorded_at_utc) = 'text'
+        AND length(recorded_at_utc) = 20
+        AND recorded_at_utc GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]Z'
+        AND substr(recorded_at_utc, 1, 4) BETWEEN '0001' AND '9999'
+        AND substr(recorded_at_utc, 12, 2) BETWEEN '00' AND '23'
+        AND substr(recorded_at_utc, 15, 2) BETWEEN '00' AND '59'
+        AND substr(recorded_at_utc, 18, 2) BETWEEN '00' AND '59'
+        AND strftime('%Y-%m-%dT%H:%M:%SZ', recorded_at_utc) IS recorded_at_utc
+    ),
     CHECK (snapshot_digest IS NULL OR length(snapshot_digest) = 32)
 );
 
@@ -188,7 +304,16 @@ CREATE TABLE session_selections (
     snapshot_digest BLOB NOT NULL CHECK (length(snapshot_digest) = 32),
     selection_evidence_json BLOB NOT NULL,
     selection_evidence_digest BLOB NOT NULL CHECK (length(selection_evidence_digest) = 32),
-    selected_at_utc TEXT NOT NULL
+    selected_at_utc TEXT NOT NULL CHECK (
+        typeof(selected_at_utc) = 'text'
+        AND length(selected_at_utc) = 20
+        AND selected_at_utc GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]Z'
+        AND substr(selected_at_utc, 1, 4) BETWEEN '0001' AND '9999'
+        AND substr(selected_at_utc, 12, 2) BETWEEN '00' AND '23'
+        AND substr(selected_at_utc, 15, 2) BETWEEN '00' AND '59'
+        AND substr(selected_at_utc, 18, 2) BETWEEN '00' AND '59'
+        AND strftime('%Y-%m-%dT%H:%M:%SZ', selected_at_utc) IS selected_at_utc
+    )
 );
 
 CREATE TABLE manual_recoveries (
@@ -216,7 +341,16 @@ CREATE TABLE manual_recoveries (
     recovery_policy_version TEXT NOT NULL,
     operator_evidence_json BLOB NOT NULL,
     operator_evidence_digest BLOB NOT NULL CHECK (length(operator_evidence_digest) = 32),
-    created_at_utc TEXT NOT NULL,
+    created_at_utc TEXT NOT NULL CHECK (
+        typeof(created_at_utc) = 'text'
+        AND length(created_at_utc) = 20
+        AND created_at_utc GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]Z'
+        AND substr(created_at_utc, 1, 4) BETWEEN '0001' AND '9999'
+        AND substr(created_at_utc, 12, 2) BETWEEN '00' AND '23'
+        AND substr(created_at_utc, 15, 2) BETWEEN '00' AND '59'
+        AND substr(created_at_utc, 18, 2) BETWEEN '00' AND '59'
+        AND strftime('%Y-%m-%dT%H:%M:%SZ', created_at_utc) IS created_at_utc
+    ),
     UNIQUE (session_id, recovery_ordinal)
 );
 
@@ -252,6 +386,11 @@ FOR EACH ROW
 BEGIN
     SELECT CASE WHEN sha256(NEW.migration_json) IS NOT NEW.migration_digest
         THEN RAISE(ABORT, 'migration evidence digest is invalid') END;
+    SELECT CASE WHEN NOT EXISTS (
+        SELECT 1 FROM authority_metadata m
+        WHERE m.authority_epoch_id = NEW.authority_epoch_id
+          AND NEW.applied_at_utc >= m.created_at_utc
+    ) THEN RAISE(ABORT, 'migration timestamp predates authority metadata') END;
 END;
 
 CREATE TRIGGER schema_migrations_no_delete
@@ -278,6 +417,7 @@ BEGIN
         WHERE m.authority_epoch_id = NEW.authority_epoch_id
           AND m.authority_policy_version IS NEW.authority_policy_version
           AND m.claim_policy_version IS NEW.claim_policy_version
+          AND NEW.created_at_utc >= m.created_at_utc
     ) THEN RAISE(ABORT, 'session policy binding differs from metadata') END;
 END;
 
@@ -404,7 +544,24 @@ WHEN NOT (
         AND OLD.close_reason IS NULL
         AND NEW.state = 'CLOSED'
         AND NEW.closed_at_utc IS NOT NULL
-        AND NEW.close_reason IS NOT NULL)
+        AND NEW.close_reason IS NOT NULL
+        AND (
+            (OLD.state = 'OPEN'
+             AND EXISTS (
+                 SELECT 1 FROM manual_recoveries mr
+                 WHERE mr.session_id = OLD.session_id
+                   AND mr.target_kind = 'SESSION'
+                   AND mr.target_id = OLD.session_id
+                   AND mr.action = 'CLOSE_SESSION'
+                   AND NEW.closed_at_utc >= mr.created_at_utc
+             ))
+            OR (OLD.state = 'SUCCESS_SELECTED'
+                AND EXISTS (
+                    SELECT 1 FROM session_selections ss
+                    WHERE ss.session_id = OLD.session_id
+                      AND NEW.closed_at_utc >= ss.selected_at_utc
+                ))
+        ))
 )
 BEGIN
     SELECT RAISE(ABORT, 'session close facts are write-once');
@@ -477,6 +634,7 @@ BEGIN
           AND s.claim_policy_version IS NEW.attempt_policy_version
           AND m.provider_id IS NEW.provider_id
           AND m.permitted_provider_operation IS NEW.permitted_provider_operation
+          AND NEW.created_at_utc >= s.created_at_utc
     ) THEN RAISE(ABORT, 'attempt parent binding differs from session or metadata') END;
     SELECT CASE WHEN NEW.state <> 'ALLOCATED'
         THEN RAISE(ABORT, 'new attempts must start allocated') END;
@@ -666,6 +824,7 @@ BEGIN
           AND a.attempt_policy_version IS NEW.claim_policy_version
           AND a.request_json IS NEW.request_json
           AND a.request_digest IS NEW.request_digest
+          AND NEW.committed_at_utc >= a.created_at_utc
           AND NOT EXISTS (
               SELECT 1 FROM session_selections ss
               WHERE ss.session_id = s.session_id
@@ -767,6 +926,7 @@ BEGIN
           AND c.request_digest IS NEW.request_digest
           AND c.claim_policy_version IS NEW.claim_policy_version
           AND s.authority_policy_version IS NEW.authority_policy_version
+          AND NEW.committed_at_utc >= c.committed_at_utc
     ) THEN RAISE(ABORT, 'reservation parent binding differs from claim lineage') END;
 END;
 
@@ -783,6 +943,7 @@ BEGIN
         AND NEW.process_intent_json IS NOT NULL
         AND NEW.process_intent_digest IS NOT NULL
         AND NEW.process_intent_committed_at_utc IS NOT NULL
+        AND NEW.process_intent_committed_at_utc >= OLD.committed_at_utc
         AND sha256(NEW.process_intent_json) IS NEW.process_intent_digest
         AND CAST(NEW.process_intent_json AS TEXT) =
             '{"authority_policy_version":"' || OLD.authority_policy_version ||
@@ -838,6 +999,39 @@ WHEN NOT (
         AND OLD.reservation_state IN ('COMMITTED', 'PROCESS_INTENT_COMMITTED')
         AND NEW.reservation_state IN (
             'PROCESS_CREATED', 'PROCESS_CREATION_FAILED', 'MANUAL_REVIEW'
+        )
+        AND (
+            (OLD.reservation_state = 'COMMITTED'
+             AND NEW.reservation_state = 'MANUAL_REVIEW'
+             AND NEW.outcome_recorded_at_utc >= OLD.committed_at_utc
+             AND EXISTS (
+                 SELECT 1 FROM manual_recoveries mr
+                 WHERE mr.target_kind = 'LAUNCH_RESERVATION'
+                   AND mr.target_id = OLD.launch_reservation_id
+                   AND mr.action = 'CLASSIFY_LAUNCH_RESERVATION'
+                   AND NEW.outcome_recorded_at_utc >= mr.created_at_utc
+             ))
+            OR (OLD.reservation_state = 'PROCESS_INTENT_COMMITTED'
+                AND NEW.reservation_state = 'PROCESS_CREATED'
+                AND NEW.outcome_recorded_at_utc >= OLD.process_intent_committed_at_utc
+                AND EXISTS (
+                    SELECT 1 FROM launch_executions e
+                    WHERE e.launch_reservation_id = OLD.launch_reservation_id
+                      AND NEW.outcome_recorded_at_utc >= e.created_at_utc
+                ))
+            OR (OLD.reservation_state = 'PROCESS_INTENT_COMMITTED'
+                AND NEW.reservation_state = 'PROCESS_CREATION_FAILED'
+                AND NEW.outcome_recorded_at_utc >= OLD.process_intent_committed_at_utc)
+            OR (OLD.reservation_state = 'PROCESS_INTENT_COMMITTED'
+                AND NEW.reservation_state = 'MANUAL_REVIEW'
+                AND NEW.outcome_recorded_at_utc >= OLD.process_intent_committed_at_utc
+                AND EXISTS (
+                    SELECT 1 FROM manual_recoveries mr
+                    WHERE mr.target_kind = 'LAUNCH_RESERVATION'
+                      AND mr.target_id = OLD.launch_reservation_id
+                      AND mr.action = 'CLASSIFY_PROCESS_OUTCOME_UNKNOWN'
+                      AND NEW.outcome_recorded_at_utc >= mr.created_at_utc
+                ))
         ))
     OR (OLD.outcome_recorded_at_utc IS NOT NULL
         AND NEW.outcome_recorded_at_utc IS OLD.outcome_recorded_at_utc)
@@ -1220,7 +1414,9 @@ BEGIN
           AND r.reservation_state = 'PROCESS_INTENT_COMMITTED'
           AND r.process_intent_json IS NOT NULL
           AND r.process_intent_digest IS NOT NULL
+          AND r.process_intent_committed_at_utc IS NOT NULL
           AND sha256(r.process_intent_json) IS r.process_intent_digest
+          AND NEW.created_at_utc >= r.process_intent_committed_at_utc
           AND c.state = 'COMMITTED'
           AND a.state = 'LAUNCH_RESERVED'
           AND s.state = 'OPEN'
@@ -1254,6 +1450,7 @@ BEGIN
         AND NEW.resume_intent_json IS NOT NULL
         AND NEW.resume_intent_digest IS NOT NULL
         AND NEW.resume_intent_committed_at_utc IS NOT NULL
+        AND NEW.resume_intent_committed_at_utc >= OLD.created_at_utc
         AND sha256(NEW.resume_intent_json) IS NEW.resume_intent_digest
         AND CAST(NEW.resume_intent_json AS TEXT) =
             '{"execution_id":"' || NEW.launch_execution_id ||
@@ -1330,6 +1527,62 @@ BEGIN
               WHERE ss.session_id = s.session_id
           )
     ) THEN RAISE(ABORT, 'terminal request binding differs from reservation') END;
+
+    SELECT CASE WHEN NEW.terminal_state = 'FAILED'
+        AND NEW.provider_call_disposition = 'NOT_STARTED'
+        AND NOT EXISTS (
+            SELECT 1 FROM launch_reservations r
+            WHERE r.launch_reservation_id = NEW.launch_reservation_id
+              AND r.outcome_recorded_at_utc IS NOT NULL
+              AND NEW.recorded_at_utc >= r.outcome_recorded_at_utc
+        )
+        THEN RAISE(ABORT, 'terminal timestamp predates process failure') END;
+    SELECT CASE WHEN (
+        NEW.terminal_state IN ('SUCCEEDED', 'AMBIGUOUS')
+        OR (NEW.terminal_state = 'FAILED'
+            AND NEW.provider_call_disposition = 'CONFIRMED')
+    ) AND NOT EXISTS (
+        SELECT 1 FROM launch_executions e
+        WHERE e.launch_reservation_id = NEW.launch_reservation_id
+          AND e.resume_intent_committed_at_utc IS NOT NULL
+          AND NEW.recorded_at_utc >= e.resume_intent_committed_at_utc
+    ) THEN RAISE(ABORT, 'terminal timestamp predates resumed execution') END;
+    SELECT CASE WHEN NEW.terminal_state = 'AMBIGUOUS' AND EXISTS (
+        SELECT 1
+        FROM launch_reservations r
+        JOIN provider_call_claims c ON c.claim_id = r.claim_id
+        JOIN attempts a ON a.attempt_id = c.attempt_id
+        WHERE r.launch_reservation_id = NEW.launch_reservation_id
+          AND a.state = 'LAUNCH_MAY_HAVE_OCCURRED'
+    ) AND NOT EXISTS (
+        SELECT 1
+        FROM launch_reservations r
+        JOIN provider_call_claims c ON c.claim_id = r.claim_id
+        JOIN attempts a ON a.attempt_id = c.attempt_id
+        JOIN manual_recoveries mr ON mr.session_id = a.session_id
+        WHERE r.launch_reservation_id = NEW.launch_reservation_id
+          AND (
+              (mr.target_kind = 'ATTEMPT' AND mr.target_id = a.attempt_id)
+              OR (mr.target_kind = 'CLAIM' AND mr.target_id = c.claim_id)
+          )
+          AND mr.action IN (
+              'RECORD_ATTEMPT_AMBIGUITY', 'RECORD_CLAIM_AMBIGUITY'
+          )
+          AND NEW.recorded_at_utc >= mr.created_at_utc
+    ) THEN RAISE(ABORT, 'terminal timestamp predates ambiguity recovery') END;
+    SELECT CASE WHEN NEW.terminal_state = 'CLOSED' AND NOT EXISTS (
+        SELECT 1
+        FROM manual_recoveries mr
+        WHERE mr.target_kind = 'LAUNCH_RESERVATION'
+          AND mr.target_id = NEW.launch_reservation_id
+          AND mr.action IN (
+              'CLASSIFY_LAUNCH_RESERVATION',
+              'CLASSIFY_PROCESS_OUTCOME_UNKNOWN',
+              'CLASSIFY_PRE_RESUME_READY',
+              'CLASSIFY_RESUME_OUTCOME_UNKNOWN'
+          )
+          AND NEW.recorded_at_utc >= mr.created_at_utc
+    ) THEN RAISE(ABORT, 'terminal timestamp predates reservation recovery') END;
 
     SELECT CASE WHEN NEW.terminal_state = 'SUCCEEDED' AND NOT EXISTS (
         SELECT 1
@@ -1421,6 +1674,7 @@ BEGIN
           AND t.terminal_state = 'SUCCEEDED'
           AND t.provider_call_disposition = 'CONFIRMED'
           AND t.snapshot_digest IS NEW.snapshot_digest
+          AND NEW.selected_at_utc >= t.recorded_at_utc
     ) THEN RAISE(ABORT, 'selection terminal does not belong to the session') END;
 END;
 
@@ -1494,6 +1748,112 @@ BEGIN
         NEW.recovery_schema = 1
         AND NEW.recovery_policy_version = 'recovery-policy/v1'
     ) THEN RAISE(ABORT, 'recovery schema or policy is invalid') END;
+
+    SELECT CASE WHEN NOT (
+        (NEW.action = 'RECORD_ATTEMPT_AMBIGUITY'
+         AND EXISTS (
+             SELECT 1
+             FROM attempts a
+             JOIN provider_call_claims c ON c.attempt_id = a.attempt_id
+             JOIN launch_reservations r ON r.claim_id = c.claim_id
+             JOIN launch_executions e
+               ON e.launch_reservation_id = r.launch_reservation_id
+             WHERE a.attempt_id = NEW.target_id
+               AND a.session_id = NEW.session_id
+               AND e.resume_intent_committed_at_utc IS NOT NULL
+               AND NEW.created_at_utc >= e.resume_intent_committed_at_utc
+         ))
+        OR (NEW.action = 'RECORD_CLAIM_AMBIGUITY'
+            AND EXISTS (
+                SELECT 1
+                FROM provider_call_claims c
+                JOIN attempts a ON a.attempt_id = c.attempt_id
+                JOIN launch_reservations r ON r.claim_id = c.claim_id
+                JOIN launch_executions e
+                  ON e.launch_reservation_id = r.launch_reservation_id
+                WHERE c.claim_id = NEW.target_id
+                  AND a.session_id = NEW.session_id
+                  AND e.resume_intent_committed_at_utc IS NOT NULL
+                  AND NEW.created_at_utc >= e.resume_intent_committed_at_utc
+            ))
+        OR (NEW.action = 'CLASSIFY_LAUNCH_RESERVATION'
+            AND EXISTS (
+                SELECT 1 FROM launch_reservations r
+                JOIN provider_call_claims c ON c.claim_id = r.claim_id
+                JOIN attempts a ON a.attempt_id = c.attempt_id
+                WHERE r.launch_reservation_id = NEW.target_id
+                  AND a.session_id = NEW.session_id
+                  AND NEW.created_at_utc >= r.committed_at_utc
+            ))
+        OR (NEW.action = 'CLASSIFY_PROCESS_OUTCOME_UNKNOWN'
+            AND EXISTS (
+                SELECT 1 FROM launch_reservations r
+                JOIN provider_call_claims c ON c.claim_id = r.claim_id
+                JOIN attempts a ON a.attempt_id = c.attempt_id
+                WHERE r.launch_reservation_id = NEW.target_id
+                  AND a.session_id = NEW.session_id
+                  AND r.process_intent_committed_at_utc IS NOT NULL
+                  AND NEW.created_at_utc >= r.process_intent_committed_at_utc
+            ))
+        OR (NEW.action = 'CLASSIFY_PRE_RESUME_READY'
+            AND EXISTS (
+                SELECT 1 FROM launch_reservations r
+                JOIN provider_call_claims c ON c.claim_id = r.claim_id
+                JOIN attempts a ON a.attempt_id = c.attempt_id
+                JOIN launch_executions e
+                  ON e.launch_reservation_id = r.launch_reservation_id
+                WHERE r.launch_reservation_id = NEW.target_id
+                  AND a.session_id = NEW.session_id
+                  AND NEW.created_at_utc >= e.created_at_utc
+            ))
+        OR (NEW.action = 'CLASSIFY_RESUME_OUTCOME_UNKNOWN'
+            AND EXISTS (
+                SELECT 1 FROM launch_reservations r
+                JOIN provider_call_claims c ON c.claim_id = r.claim_id
+                JOIN attempts a ON a.attempt_id = c.attempt_id
+                JOIN launch_executions e
+                  ON e.launch_reservation_id = r.launch_reservation_id
+                WHERE r.launch_reservation_id = NEW.target_id
+                  AND a.session_id = NEW.session_id
+                  AND e.resume_intent_committed_at_utc IS NOT NULL
+                  AND NEW.created_at_utc >= e.resume_intent_committed_at_utc
+            ))
+        OR (NEW.action = 'SELECT_COMMITTED_SUCCESS'
+            AND EXISTS (
+                SELECT 1 FROM terminals t
+                JOIN launch_reservations r
+                  ON r.launch_reservation_id = t.launch_reservation_id
+                JOIN provider_call_claims c ON c.claim_id = r.claim_id
+                JOIN attempts a ON a.attempt_id = c.attempt_id
+                WHERE t.terminal_id = NEW.target_id
+                  AND a.session_id = NEW.session_id
+                  AND NEW.created_at_utc >= t.recorded_at_utc
+            ))
+        OR (NEW.action = 'CLOSE_SESSION'
+            AND EXISTS (
+                SELECT 1 FROM sessions s
+                WHERE s.session_id = NEW.target_id
+                  AND s.session_id = NEW.session_id
+                  AND NEW.created_at_utc >= s.created_at_utc
+            )
+            AND NOT EXISTS (
+                SELECT 1
+                FROM terminals t
+                JOIN launch_reservations r
+                  ON r.launch_reservation_id = t.launch_reservation_id
+                JOIN provider_call_claims c ON c.claim_id = r.claim_id
+                JOIN attempts a ON a.attempt_id = c.attempt_id
+                WHERE a.session_id = NEW.session_id
+                  AND t.recorded_at_utc > NEW.created_at_utc
+            ))
+        OR (NEW.action = 'ACKNOWLEDGE_RESTORE'
+            AND EXISTS (
+                SELECT 1 FROM sessions s
+                WHERE s.session_id = NEW.target_id
+                  AND s.session_id = NEW.session_id
+                  AND NEW.created_at_utc >= s.created_at_utc
+            ))
+    ) THEN RAISE(ABORT, 'recovery timestamp predates its durable predecessor') END;
 
     SELECT CASE WHEN NOT (
         (NEW.action = 'RECORD_ATTEMPT_AMBIGUITY'

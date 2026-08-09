@@ -652,7 +652,9 @@ One immediate foreign key points to the owning session and one to the selected
 terminal. A `BEFORE INSERT` trigger verifies the terminal path
 `terminal -> launch_reservation -> claim -> attempt` resolves to the same
 `session_id`, that the terminal is a confirmed success, and that the selected
-snapshot digest matches. The application transaction then commits the
+snapshot digest matches. `selected_at_utc` must be greater than or equal to the
+`recorded_at_utc` of that exact referenced terminal; a newer terminal in
+another lineage is irrelevant. The application transaction then commits the
 selection and the session/attempt success transitions together.
 
 ### 2.10 manual_recoveries
@@ -783,7 +785,86 @@ adapters must therefore use the reviewed deterministic Windows named mutex.
 An in-process substitute or SQLite transaction alone cannot make the final
 hook recheck and manual classification mutually exclusive across processes.
 
-### 3.1 Persisted evidence-pair inventory
+### 3.1 Canonical timestamp v1 and causal chronology
+
+Every non-null authority timestamp is canonical timestamp v1: exactly 20 ASCII
+characters in `YYYY-MM-DDTHH:MM:SSZ`. The year is four digits from `0001`
+through `9999`; the date is valid in the proleptic Gregorian calendar; `T` and
+`Z` are literal uppercase characters; and hour, minute, and second are limited
+to `00..23`, `00..59`, and `00..59`. UTC is the only representation. Spaces,
+lowercase separators, omitted padding, numeric offsets, fractional seconds,
+leap seconds, `24:00:00`, and year zero are invalid. A future fractional form
+requires a separately reviewed fixed-width schema and policy revision.
+
+The executable schema applies this contract to all 14 timestamp columns,
+including every non-null value written to nullable close, process-intent,
+outcome, and resume-intent fields. Each column has a deterministic SQLite
+`CHECK` combining exact length, a case-sensitive fixed-shape `GLOB`, explicit
+year/hour/minute/second ranges, and a canonical
+`strftime('%Y-%m-%dT%H:%M:%SZ', value) IS value` round trip. `IS` deliberately
+makes a failed native parse reject instead of allowing SQL `NULL` to satisfy a
+`CHECK`. Native SQLite validation faithfully accepts both boundary years.
+
+After representation has been proven, causal timestamp comparisons use
+lexical ordering, which is chronological for this fixed-width UTC form. Every
+required edge is nondecreasing (`child >= predecessor`); equality is legal
+because v1 has one-second precision. The enforced edge matrix is:
+
+| Child fact | Exact durable predecessor |
+| --- | --- |
+| migration application and session creation | singleton metadata creation |
+| attempt creation | owning session creation |
+| claim commit | exact attempt creation |
+| reservation commit | exact claim commit |
+| process-intent commit | exact reservation commit |
+| execution creation | exact reservation process-intent commit |
+| `PROCESS_CREATED` first outcome | exact execution creation; the execution already requires the process intent |
+| `PROCESS_CREATION_FAILED` first outcome | exact reservation process-intent commit |
+| first `MANUAL_REVIEW` outcome from `COMMITTED` or `PROCESS_INTENT_COMMITTED` | exact matching classification recovery, plus the reservation commit or process-intent commit respectively |
+| resume-intent commit | exact execution creation |
+| `FAILED/NOT_STARTED` terminal | persisted process-creation-failure outcome |
+| confirmed success/failure or ordinary post-resume ambiguity terminal | exact execution resume-intent commit |
+| ambiguity terminal after attempt/claim ambiguity classification | the matching ambiguity recovery, in addition to the resumed execution predecessor |
+| `CLOSED/MAY_HAVE_OCCURRED` terminal | exact matching reservation-classification recovery |
+| selection | the exact successful terminal named by `terminal_id` |
+| recovery | the action-specific predecessor in the following table |
+| `OPEN -> CLOSED` close facts | matching `CLOSE_SESSION` recovery and every terminal already required by that close action |
+| `SUCCESS_SELECTED -> CLOSED` close facts | the owning session selection |
+
+Migration application is ordered after metadata creation because provisioning
+first inserts the immutable epoch metadata and then appends the migration fact;
+it is not an independent administratively prepared timestamp. No edge is added
+between independent attempts or other sibling branches.
+
+Recovery timestamps use the latest necessarily causal persisted predecessor:
+
+| Recovery action | Timestamp predecessor |
+| --- | --- |
+| `RECORD_ATTEMPT_AMBIGUITY` | exact execution resume-intent commit |
+| `RECORD_CLAIM_AMBIGUITY` | exact execution resume-intent commit |
+| `CLASSIFY_LAUNCH_RESERVATION` | target reservation commit |
+| `CLASSIFY_PROCESS_OUTCOME_UNKNOWN` | target reservation process-intent commit |
+| `CLASSIFY_PRE_RESUME_READY` | target execution creation |
+| `CLASSIFY_RESUME_OUTCOME_UNKNOWN` | target execution resume-intent commit |
+| `SELECT_COMMITTED_SUCCESS` | target successful terminal recording |
+| `CLOSE_SESSION` | owning session creation and every existing terminal required by the close predicate |
+| `ACKNOWLEDGE_RESTORE` | owning session creation |
+
+Every comparison is joined through the exact target and owning session; a
+newer fact in another lineage cannot satisfy it. Format and chronology failures
+abort the statement, and the surrounding `BEGIN IMMEDIATE` transaction keeps
+the child fact, counter or state projection atomic. Immutable predecessor
+timestamps cannot be reassigned to manufacture chronology.
+
+Timestamp v1 is an audit representation and chronology contract only. A
+timestamp never grants or revokes a capability, decides whether an external
+API occurred, replaces current-state predicates or the OS inter-process
+arbiter, establishes retry eligibility or freshness, or supplies trusted
+exchange time. It is absent from every UUID5 identity tuple. Unattended
+scheduling therefore remains `NO-GO`; valid chronology does not make local
+wall-clock input trusted authority.
+
+### 3.2 Persisted evidence-pair inventory
 
 Every persisted column whose name ends in `_json` has one declared SHA-256
 digest and an authoritative SQLite validation boundary. Digest length alone is
@@ -832,7 +913,7 @@ typed issuers and process-local one-shot permits; exclusion, which is provided
 by the OS-backed inter-process arbiter; and external effects, which SQLite
 cannot prove occurred at a provider or Windows API boundary.
 
-### 3.2 Durable fact / aggregate projection invariant
+### 3.3 Durable fact / aggregate projection invariant
 
 Aggregate state and phase columns are indexes over, and verified projections
 of, normalized durable facts. A state value alone is never evidence that the
@@ -892,7 +973,7 @@ the normal transaction. An allocated but unclaimed attempt is an inert audit
 row, not external authority; selection or closure makes its future claim
 admission impossible.
 
-### 3.3 Final capability matrix
+### 3.4 Final capability matrix
 
 Canonical bytes and SHA-256 digests establish content integrity only. The
 matrix deliberately separates durable SQLite state, process-local typed-object

@@ -132,7 +132,9 @@ def _inspect_tree(trading_sid: str) -> tuple[tuple[str, ...], bool, bool]:
         (PRODUCTION_AUTHORITY_PATHS.backup, "backup"),
     )
     for path, role in required:
-        inspection = inspect_fixed_authority_object(str(path), _kind_for(path))
+        inspection = inspect_fixed_authority_object(
+            str(path), _kind_for(path), trading_sid=trading_sid
+        )
         require_security_policy(
             inspection, authority_security_policy(role, trading_sid)
         )
@@ -145,7 +147,7 @@ def _inspect_tree(trading_sid: str) -> tuple[tuple[str, ...], bool, bool]:
     ):
         if os.path.lexists(str(path)):
             inspection = inspect_fixed_authority_object(
-                str(path), AuthorityObjectKind.FILE
+                str(path), AuthorityObjectKind.FILE, trading_sid=trading_sid
             )
             require_security_policy(
                 inspection, authority_security_policy(role, trading_sid)
@@ -179,7 +181,9 @@ def _validate_existing_objects(
     for path, present in existing.items():
         if not present:
             continue
-        inspection = inspect_fixed_authority_object(str(path), _kind_for(path))
+        inspection = inspect_fixed_authority_object(
+            str(path), _kind_for(path), trading_sid=trading_sid
+        )
         require_security_policy(
             inspection, authority_security_policy(roles[path], trading_sid)
         )

@@ -852,6 +852,8 @@ def inspect_open_authority_object(
 def inspect_fixed_authority_object(
     path: str | PureWindowsPath,
     kind: AuthorityObjectKind,
+    *,
+    trading_sid: str | None = None,
 ) -> SecurityInspection:
     """Open and inspect one exact fixed object, closing its handle deterministically."""
 
@@ -865,13 +867,17 @@ def inspect_fixed_authority_object(
     )
     if fixed is None:
         raise AuthorityPathError("path is outside the fixed authority deployment")
-    validate_fixed_parent_chain(fixed)
+    validate_fixed_parent_chain(fixed, trading_sid=trading_sid)
     with open_authority_object(fixed, kind) as handle:
         return inspect_open_authority_object(handle, fixed, kind)
 
 
-def validate_fixed_parent_chain(path: str | PureWindowsPath) -> None:
-    """Open every fixed parent component and reject reparse substitutions."""
+def validate_fixed_parent_chain(
+    path: str | PureWindowsPath,
+    *,
+    trading_sid: str | None = None,
+) -> None:
+    """Open fixed parents and apply the policy for each directory role."""
 
     fixed = next(
         (
@@ -888,16 +894,28 @@ def validate_fixed_parent_chain(path: str | PureWindowsPath) -> None:
     for part in parts[1:-1]:
         current /= part
         with open_authority_object(current, AuthorityObjectKind.DIRECTORY) as handle:
-            _validate_directory_component(handle, current)
+            if current == PRODUCTION_AUTHORITY_PATHS.root:
+                if trading_sid is None:
+                    raise AuthorityPrincipalError(
+                        "Trading SID is required to validate the authority root"
+                    )
+                policy = authority_security_policy("root", trading_sid)
+            else:
+                policy = authority_parent_security_policy()
+            _validate_directory_component(handle, current, policy)
 
 
-def _validate_directory_component(handle: int, expected_path: PureWindowsPath) -> None:
+def _validate_directory_component(
+    handle: int,
+    expected_path: PureWindowsPath,
+    policy: SecurityPolicy,
+) -> None:
     """Validate a parent component before opening the next fixed component."""
 
     inspection = inspect_open_authority_object(
         handle, expected_path, AuthorityObjectKind.DIRECTORY
     )
-    require_security_policy(inspection, authority_parent_security_policy())
+    require_security_policy(inspection, policy)
 
 
 def require_security_policy(

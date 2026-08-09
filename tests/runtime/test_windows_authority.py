@@ -36,10 +36,16 @@ from trading_bot.runtime.windows_authority_mutex import (
 )
 from trading_bot.runtime.windows_authority_security import (
     DELETE,
+    FILE_READ_DATA,
     READ_CONTROL,
     WRITE_DAC,
     WRITE_OWNER,
+    AuthorityObjectKind,
     AuthorityPrincipalError,
+    AuthoritySecurityError,
+    SecurityAce,
+    SecurityInspection,
+    SecurityPolicy,
     authority_parent_security_policy,
     authority_security_policy,
     sqlite_trading_file_rights,
@@ -270,6 +276,231 @@ def test_security_policy_is_sid_based_and_does_not_grant_dangerous_rights() -> N
     assert mutex.aces[-1].access_mask & READ_CONTROL
     with pytest.raises(AuthorityPrincipalError):
         authority_security_policy("database", "Trading")
+
+
+def _directory_inspection(
+    path: object,
+    policy: SecurityPolicy,
+    *,
+    owner_sid: str | None = None,
+    dacl_protected: bool | None = None,
+    aces: tuple[SecurityAce, ...] | None = None,
+) -> SecurityInspection:
+    return SecurityInspection(
+        expected_path=str(path),
+        final_path=str(path),
+        kind=AuthorityObjectKind.DIRECTORY,
+        owner_sid=owner_sid if owner_sid is not None else policy.owner_sid,
+        dacl_protected=(
+            dacl_protected if dacl_protected is not None else policy.dacl_protected
+        ),
+        aces=aces if aces is not None else policy.aces,
+        is_reparse_point=False,
+        volume_root="F:\\",
+        filesystem="NTFS",
+    )
+
+
+def test_fixed_parent_chain_uses_role_aware_policies(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import trading_bot.runtime.windows_authority_security as security
+
+    trading_sid = "S-1-5-21-100-200-300-400"
+    parent = PRODUCTION_AUTHORITY_PATHS.root.parent
+    root_policy = authority_security_policy("root", trading_sid)
+    parent_policy = authority_parent_security_policy()
+    inspections = {
+        str(parent): _directory_inspection(parent, parent_policy),
+        str(PRODUCTION_AUTHORITY_PATHS.root): _directory_inspection(
+            PRODUCTION_AUTHORITY_PATHS.root, root_policy
+        ),
+    }
+    opened: list[str] = []
+
+    class FakeHandle:
+        def __enter__(self) -> int:
+            return 1
+
+        def __exit__(
+            self,
+            exc_type: object,
+            exc: object,
+            traceback: object,
+        ) -> None:
+            return None
+
+    def fake_open(path: object, kind: AuthorityObjectKind) -> FakeHandle:
+        assert kind is AuthorityObjectKind.DIRECTORY
+        opened.append(str(path))
+        return FakeHandle()
+
+    def fake_inspect(
+        handle: int,
+        expected_path: object,
+        expected_kind: AuthorityObjectKind,
+    ) -> SecurityInspection:
+        assert handle == 1
+        assert expected_kind is AuthorityObjectKind.DIRECTORY
+        return inspections[str(expected_path)]
+
+    monkeypatch.setattr(security, "open_authority_object", fake_open)
+    monkeypatch.setattr(security, "inspect_open_authority_object", fake_inspect)
+    for path in (
+        PRODUCTION_AUTHORITY_PATHS.bootstrap,
+        PRODUCTION_AUTHORITY_PATHS.database,
+        PRODUCTION_AUTHORITY_PATHS.journal,
+        PRODUCTION_AUTHORITY_PATHS.capture_output,
+        PRODUCTION_AUTHORITY_PATHS.backup,
+    ):
+        opened.clear()
+        security.validate_fixed_parent_chain(path, trading_sid=trading_sid)
+        assert opened == [str(parent), str(PRODUCTION_AUTHORITY_PATHS.root)]
+
+
+def test_outer_parent_preflight_does_not_require_trading_sid(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import trading_bot.runtime.windows_authority_security as security
+
+    parent = PRODUCTION_AUTHORITY_PATHS.root.parent
+    inspection = _directory_inspection(parent, authority_parent_security_policy())
+
+    class FakeHandle:
+        def __enter__(self) -> int:
+            return 1
+
+        def __exit__(
+            self,
+            exc_type: object,
+            exc: object,
+            traceback: object,
+        ) -> None:
+            return None
+
+    monkeypatch.setattr(
+        security,
+        "open_authority_object",
+        lambda path, kind: FakeHandle(),
+    )
+    monkeypatch.setattr(
+        security,
+        "inspect_open_authority_object",
+        lambda handle, expected_path, expected_kind: inspection,
+    )
+    security.validate_fixed_parent_chain(PRODUCTION_AUTHORITY_PATHS.root)
+
+
+@pytest.mark.parametrize(
+    "component, mutation",
+    [
+        ("outer", "trading"),
+        ("root", "missing_trading"),
+        ("root", "wrong_trading"),
+        ("root", "extra_ace"),
+        ("outer", "wrong_owner"),
+        ("outer", "unprotected"),
+        ("root", "wrong_owner"),
+        ("root", "unprotected"),
+    ],
+)
+def test_fixed_parent_chain_rejects_role_policy_drift(
+    monkeypatch: pytest.MonkeyPatch,
+    component: str,
+    mutation: str,
+) -> None:
+    import trading_bot.runtime.windows_authority_security as security
+
+    trading_sid = "S-1-5-21-100-200-300-400"
+    parent = PRODUCTION_AUTHORITY_PATHS.root.parent
+    parent_policy = authority_parent_security_policy()
+    root_policy = authority_security_policy("root", trading_sid)
+    outer_inspection = _directory_inspection(parent, parent_policy)
+    root_inspection = _directory_inspection(
+        PRODUCTION_AUTHORITY_PATHS.root, root_policy
+    )
+    if component == "outer":
+        if mutation == "trading":
+            outer_inspection = _directory_inspection(
+                parent,
+                parent_policy,
+                aces=root_policy.aces,
+            )
+        elif mutation == "wrong_owner":
+            outer_inspection = _directory_inspection(
+                parent,
+                parent_policy,
+                owner_sid="S-1-5-18",
+            )
+        else:
+            outer_inspection = _directory_inspection(
+                parent,
+                parent_policy,
+                dacl_protected=False,
+            )
+    else:
+        if mutation == "missing_trading":
+            root_inspection = _directory_inspection(
+                PRODUCTION_AUTHORITY_PATHS.root,
+                root_policy,
+                aces=parent_policy.aces,
+            )
+        elif mutation == "wrong_trading":
+            root_inspection = _directory_inspection(
+                PRODUCTION_AUTHORITY_PATHS.root,
+                root_policy,
+                aces=authority_security_policy("root", "S-1-5-21-100-200-300-401").aces,
+            )
+        elif mutation == "extra_ace":
+            root_inspection = _directory_inspection(
+                PRODUCTION_AUTHORITY_PATHS.root,
+                root_policy,
+                aces=root_policy.aces + (SecurityAce("S-1-5-32-545", FILE_READ_DATA),),
+            )
+        elif mutation == "wrong_owner":
+            root_inspection = _directory_inspection(
+                PRODUCTION_AUTHORITY_PATHS.root,
+                root_policy,
+                owner_sid="S-1-5-18",
+            )
+        else:
+            root_inspection = _directory_inspection(
+                PRODUCTION_AUTHORITY_PATHS.root,
+                root_policy,
+                dacl_protected=False,
+            )
+    inspections = {
+        str(parent): outer_inspection,
+        str(PRODUCTION_AUTHORITY_PATHS.root): root_inspection,
+    }
+
+    class FakeHandle:
+        def __enter__(self) -> int:
+            return 1
+
+        def __exit__(
+            self,
+            exc_type: object,
+            exc: object,
+            traceback: object,
+        ) -> None:
+            return None
+
+    monkeypatch.setattr(
+        security,
+        "open_authority_object",
+        lambda path, kind: FakeHandle(),
+    )
+    monkeypatch.setattr(
+        security,
+        "inspect_open_authority_object",
+        lambda handle, expected_path, expected_kind: inspections[str(expected_path)],
+    )
+    with pytest.raises(AuthoritySecurityError):
+        security.validate_fixed_parent_chain(
+            PRODUCTION_AUTHORITY_PATHS.bootstrap,
+            trading_sid=trading_sid,
+        )
 
 
 def test_native_operation_has_a_typed_non_windows_guard(

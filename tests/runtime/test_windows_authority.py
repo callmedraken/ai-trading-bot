@@ -14,6 +14,7 @@ from trading_bot.market_data import ALPACA_DAILY_SNAPSHOT_DESCRIPTOR
 from trading_bot.runtime.windows_authority import (
     PRODUCTION_AUTHORITY_PATHS,
     PRODUCTION_PINNED_BOOTSTRAP_KEYS,
+    AuthorityObjectError,
     AuthorityPathError,
     BootstrapSchemaError,
     BootstrapSignatureError,
@@ -118,6 +119,82 @@ def test_fixed_path_rejects_unc_device_and_drive_relative_inputs() -> None:
     ):
         with pytest.raises(AuthorityPathError):
             require_fixed_authority_path(supplied, expected)
+
+
+@pytest.mark.parametrize(
+    "supplied, expected",
+    [
+        (
+            r"\\?\F:\AITradingBot\Authority",
+            r"F:\AITradingBot\Authority",
+        ),
+        (
+            r"\\?\F:\AITradingBot\Authority\authority.sqlite3",
+            r"F:\AITradingBot\Authority\authority.sqlite3",
+        ),
+    ],
+)
+def test_normalize_final_authority_path_accepts_local_dos_paths(
+    supplied: str, expected: str
+) -> None:
+    import trading_bot.runtime.windows_authority_security as security
+
+    assert security._normalize_final_authority_path(supplied) == expected
+
+
+@pytest.mark.parametrize(
+    "supplied",
+    [
+        r"\\?\UNC\server\share\Authority",
+        r"\\server\share\Authority",
+        r"\\.\F:\AITradingBot\Authority",
+        r"\\?\GLOBALROOT\Device\HarddiskVolume1\Authority",
+        r"\\?\Volume{12345678-1234-1234-1234-123456789abc}\Authority",
+        r"\\?\F:relative\Authority",
+        r"\\?\not-a-drive\Authority",
+        "\\\\?\\",
+    ],
+)
+def test_normalize_final_authority_path_rejects_unapproved_namespaces(
+    supplied: str,
+) -> None:
+    import trading_bot.runtime.windows_authority_security as security
+
+    with pytest.raises(AuthorityObjectError):
+        security._normalize_final_authority_path(supplied)
+
+
+def test_final_path_normalizes_local_dos_prefix_from_native_result(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import trading_bot.runtime.windows_authority_security as security
+
+    native_value = r"\\?\F:\AITradingBot\Authority\authority.sqlite3"
+
+    class FakeGetFinalPathNameByHandleW:
+        argtypes: object
+        restype: object
+
+        def __call__(
+            self,
+            handle: int,
+            buffer: ctypes.Array[ctypes.c_wchar],
+            size: int,
+            flags: int,
+        ) -> int:
+            assert handle == 123
+            assert size == len(buffer)
+            assert flags == 0
+            buffer.value = native_value
+            return len(native_value)
+
+    class FakeKernel32:
+        GetFinalPathNameByHandleW = FakeGetFinalPathNameByHandleW()
+
+    monkeypatch.setattr(security, "wintypes", wintypes)
+    monkeypatch.setattr(security, "_kernel32", lambda: FakeKernel32())
+
+    assert security._final_path(123) == r"F:\AITradingBot\Authority\authority.sqlite3"
 
 
 def test_bootstrap_canonicalization_is_exact() -> None:

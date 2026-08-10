@@ -81,6 +81,7 @@ ACCESS_ALLOWED_ACE_TYPE = 0
 ACCESS_DENIED_ACE_TYPE = 1
 NO_INHERITANCE = 0
 _SID_PATTERN = re.compile(r"^S-(?:0|[1-9][0-9]*)(?:-(?:0|[1-9][0-9]*))+$")
+_LOCAL_DOS_PATH_PATTERN = re.compile(r"^[A-Za-z]:\\")
 
 
 class SecurityObjectType(IntEnum):
@@ -715,6 +716,32 @@ def _require_trading_not_in_privileged_groups(
         netapi32.NetApiBufferFree(groups)
 
 
+def _normalize_final_authority_path(value: str) -> str:
+    """Normalize the only approved Win32 final-path namespace."""
+
+    if type(value) is not str or not value:
+        raise AuthorityObjectError("authority final path is invalid")
+
+    if value.startswith("\\\\?\\"):
+        local_path = value[4:]
+        namespace = local_path.casefold()
+        if namespace.startswith("unc\\"):
+            raise AuthorityObjectError("authority object resolved to a UNC path")
+        if namespace.startswith("globalroot\\"):
+            raise AuthorityObjectError("authority object resolved to GLOBALROOT")
+        if namespace.startswith("volume{"):
+            raise AuthorityObjectError("authority object resolved to a volume path")
+        if _LOCAL_DOS_PATH_PATTERN.match(local_path) is None:
+            raise AuthorityObjectError("authority final path is not a local DOS path")
+        return local_path
+
+    if value.startswith("\\\\.\\"):
+        raise AuthorityObjectError("authority object resolved to a device path")
+    if value.startswith("\\\\"):
+        raise AuthorityObjectError("authority object resolved to a UNC path")
+    raise AuthorityObjectError("authority final path has an unsupported namespace")
+
+
 def _final_path(handle: int) -> str:
     kernel32 = _kernel32()
     get_final = kernel32.GetFinalPathNameByHandleW
@@ -729,12 +756,7 @@ def _final_path(handle: int) -> str:
     length = get_final(handle, buffer, len(buffer), 0)
     if length == 0 or length >= len(buffer):
         raise _last_error("GetFinalPathNameByHandleW")
-    value = buffer.value
-    if value.startswith("\\\\?\\UNC\\") or value.startswith("\\\\"):
-        raise AuthorityObjectError("authority object resolved to a UNC path")
-    if value.startswith("\\\\?\\"):
-        value = value[4:]
-    return value
+    return _normalize_final_authority_path(buffer.value)
 
 
 def _attributes(handle: int) -> tuple[int, int]:

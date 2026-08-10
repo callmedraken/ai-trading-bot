@@ -138,6 +138,151 @@ def test_native_object_open_is_fixed_path_only(
         )
 
 
+def _mock_installed_material_reader(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    failure: str | None = None,
+) -> tuple[list[tuple[str, object]], dict[int, str]]:
+    import trading_bot.runtime.windows_authority_provisioning as provisioning
+
+    calls: list[tuple[str, object]] = []
+    paths_by_handle: dict[int, str] = {}
+
+    class FakeHandle:
+        def __init__(self, value: int) -> None:
+            self.value = value
+
+        def __enter__(self) -> int:
+            return self.value
+
+        def __exit__(
+            self,
+            exc_type: object,
+            exc: object,
+            traceback: object,
+        ) -> None:
+            return None
+
+    def fake_parent(path: object, *, trading_sid: str) -> None:
+        calls.append(("parent", str(path)))
+        if failure == "parent":
+            raise AuthoritySecurityError("hostile parent")
+
+    def fake_open(path: object, kind: AuthorityObjectKind) -> FakeHandle:
+        value = len(paths_by_handle) + 1
+        paths_by_handle[value] = str(path)
+        calls.append(("open", str(path)))
+        return FakeHandle(value)
+
+    def fake_inspect(
+        handle: int,
+        expected_path: object,
+        expected_kind: AuthorityObjectKind,
+    ) -> object:
+        calls.append(("inspect", handle))
+        if (
+            failure == "bootstrap_object"
+            and expected_path == PRODUCTION_AUTHORITY_PATHS.bootstrap
+        ):
+            raise AuthorityObjectError("hostile bootstrap final object")
+        if (
+            failure == "signature_object"
+            and expected_path == PRODUCTION_AUTHORITY_PATHS.signature
+        ):
+            raise AuthorityObjectError("hostile signature final object")
+        return str(expected_path)
+
+    def fake_require(inspection: object, policy: SecurityPolicy) -> None:
+        calls.append(("policy", policy))
+        current_path = str(inspection)
+        if failure == "bootstrap_policy" and current_path == str(
+            PRODUCTION_AUTHORITY_PATHS.bootstrap
+        ):
+            raise AuthoritySecurityError("hostile bootstrap security")
+        if failure == "signature_policy" and current_path == str(
+            PRODUCTION_AUTHORITY_PATHS.signature
+        ):
+            raise AuthoritySecurityError("hostile signature security")
+
+    def fake_read(handle: int) -> bytes:
+        calls.append(("read", handle))
+        return (
+            b"verified-bootstrap"
+            if paths_by_handle[handle] == str(PRODUCTION_AUTHORITY_PATHS.bootstrap)
+            else b"verified-signature"
+        )
+
+    def forbidden_path_read(path: object) -> bytes:
+        raise AssertionError(f"pathname read must not occur: {path}")
+
+    monkeypatch.setattr(provisioning, "validate_fixed_parent_chain", fake_parent)
+    monkeypatch.setattr(provisioning, "open_authority_object", fake_open)
+    monkeypatch.setattr(provisioning, "inspect_open_authority_object", fake_inspect)
+    monkeypatch.setattr(provisioning, "require_security_policy", fake_require)
+    monkeypatch.setattr(provisioning, "read_open_authority_file", fake_read)
+    monkeypatch.setattr(provisioning.Path, "read_bytes", forbidden_path_read)
+    return calls, paths_by_handle
+
+
+def test_installed_trust_material_reads_from_the_same_validated_handles(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import trading_bot.runtime.windows_authority_provisioning as provisioning
+
+    calls, paths_by_handle = _mock_installed_material_reader(monkeypatch)
+    assert provisioning._read_installed_material("S-1-5-21-100-200-300-400") == (
+        b"verified-bootstrap",
+        b"verified-signature",
+    )
+    assert calls[0] == ("parent", str(PRODUCTION_AUTHORITY_PATHS.bootstrap))
+    assert [kind for kind, _ in calls].count("open") == 2
+    assert [kind for kind, _ in calls].count("read") == 2
+    assert all(
+        paths_by_handle[handle]
+        in {
+            str(PRODUCTION_AUTHORITY_PATHS.bootstrap),
+            str(PRODUCTION_AUTHORITY_PATHS.signature),
+        }
+        for kind, handle in calls
+        if kind in {"inspect", "read"}
+    )
+    for handle, path in paths_by_handle.items():
+        assert ("inspect", handle) in calls
+        assert ("read", handle) in calls
+        assert path in {
+            str(PRODUCTION_AUTHORITY_PATHS.bootstrap),
+            str(PRODUCTION_AUTHORITY_PATHS.signature),
+        }
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [
+        "parent",
+        "bootstrap_object",
+        "signature_object",
+        "bootstrap_policy",
+        "signature_policy",
+    ],
+)
+def test_installed_trust_material_rejects_hostile_state_before_reading_bytes(
+    monkeypatch: pytest.MonkeyPatch,
+    failure: str,
+) -> None:
+    import trading_bot.runtime.windows_authority_provisioning as provisioning
+
+    calls, paths_by_handle = _mock_installed_material_reader(
+        monkeypatch, failure=failure
+    )
+    with pytest.raises(WindowsAuthorityError):
+        provisioning._read_installed_material("S-1-5-21-100-200-300-400")
+    reads = [paths_by_handle[handle] for kind, handle in calls if kind == "read"]
+    if failure in {"parent", "bootstrap_object", "bootstrap_policy"}:
+        assert reads == []
+    else:
+        assert reads == [str(PRODUCTION_AUTHORITY_PATHS.bootstrap)]
+
+
 @pytest.mark.parametrize(
     "supplied, expected",
     [

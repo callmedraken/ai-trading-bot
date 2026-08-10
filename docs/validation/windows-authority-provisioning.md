@@ -29,7 +29,7 @@ Portable tests must not be read as proof of native Windows acceptance:
 | --- | --- | --- |
 | Canonical bootstrap, fixed paths, policy masks, SQLite state rules | 1. Pure deterministic contract | Automated unit tests |
 | Win32 argument selection, object kinds, failure cleanup, typed rejection | 2. Mocked Win32 behavior | Automated unit tests |
-| Actual local DOS final paths, reparse behavior, NTFS volume, ACLs, SQLite Win32 locking | 3. Real Windows-native integration | Safe disposable integration coverage where available; otherwise acceptance prerequisite |
+| Actual local DOS final paths, reparse behavior, NTFS volume, ACLs, SQLite Win32 locking, same-handle trust reads | 3. Real Windows-native integration | Safe disposable integration coverage where available; otherwise acceptance prerequisite |
 | Administrator provisioning and dedicated `Trading` allow/deny behavior | 4. Administrator acceptance | Explicit opt-in fixed-root acceptance suite |
 | Cross-session `Global\\` mutex contention and abandoned-owner recovery | 5. Manual/cross-session acceptance | Separate manual gate; not simulated by portable tests |
 
@@ -81,6 +81,16 @@ The path matrix creates junction/symbolic-link/mount substitutions only when
 administrator privileges are available. Each must be rejected from the final
 opened handle; a test that cannot construct the substitution is reported as a
 prerequisite skip, not converted into a weaker assertion.
+
+The database lifecycle evidence is intentionally separate from the operation
+state: `NOT_PRESENT` is an absent pair, `PRECREATED_UNINITIALIZED` is a
+structurally valid empty storage container, and `IDENTITY_BOUND` is one exact
+metadata singleton reconciled to the verified signed bootstrap. A populated
+database without authority metadata, zero or multiple metadata rows, malformed
+metadata, or any identity mismatch is rejected as `INVALID_MISMATCHED`.
+`PRECREATED_UNINITIALIZED` is not executable authority. The validator checks
+the opaque metadata BLOB digest but does not claim a canonical semantic
+`metadata_json` format that Architecture 77 does not define.
 
 ## Cross-session mutex procedure
 

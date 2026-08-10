@@ -54,6 +54,25 @@ authority work; that helper explicitly requests and reads back
 `synchronous=FULL`, and fails closed on any mismatch. Neither layer performs
 ATTACH, VACUUM, DDL, or automatic migration.
 
+Installed database state is explicit. `NOT_PRESENT` means neither the database
+nor persistent journal exists. `PRECREATED_UNINITIALIZED` means the paired
+files are structurally valid but the database contains no user/application
+schema objects; SQLite-internal objects alone do not make it executable
+authority. `IDENTITY_BOUND` means one exact `authority_metadata` singleton is
+present and its immutable signed facts, bootstrap digest, database identity
+digest, metadata digest, and field types match the already verified bootstrap.
+Any incomplete pair, corrupt or truncated database, populated database without
+`authority_metadata`, incompatible metadata shape, missing singleton, or
+mismatch is `INVALID_MISMATCHED` and fails closed rather than producing
+evidence. `PRECREATED_UNINITIALIZED` is storage substrate only and is never
+reported as an executable or identity-bound authority database.
+
+The typed `metadata_json` value is checked as an opaque BLOB together with its
+exact SHA-256 `metadata_digest`. Architecture 77 does not define a separate
+canonical semantic encoding for that JSON beyond this immutable byte/digest
+contract, so this release does not invent one or claim metadata-schema
+completeness.
+
 The pre-existing `F:\AITradingBot` parent component is also opened and checked;
 it must be a local NTFS directory with the exact administrator/SYSTEM-only
 protected DACL. Provisioning does not create or repair that parent component.
@@ -85,6 +104,15 @@ Before the bootstrap is accepted, the administrator workflow resolves the
 local `Trading` account through `LookupAccountNameW` and compares its SID to
 the signed SID. Display-name comparisons and localized command output are not
 security decisions.
+
+When `authority_metadata` exists, installed validation and provisioning require
+its exact immutable identity facts to match the verified signed bootstrap:
+authority epoch, machine authority, bootstrap schema and generation, signing
+key, approved SID, provider/operation, policy versions, SHA-256 bootstrap
+digest, and database identity digest. The database-local bootstrap digest must
+be the SHA-256 of the exact canonical verified bootstrap bytes. A foreign,
+old, malformed, multiply populated, or otherwise mismatched initialized
+database fails before validation evidence or trust-material mutation.
 
 ## Security principal and DACL intent
 
@@ -162,10 +190,12 @@ actually owns.
 
 ## Provisioning state machine
 
-`validate` requires an already elevated administrator token, reads only the
-fixed trust material, resolves the actual Trading SID, verifies the signature,
-inspects fixed objects, and checks installed SQLite file prerequisites. It does
-not configure connection-local PRAGMAs or mutate the tree.
+`validate` requires an already elevated administrator token, resolves the actual
+Trading SID, validates the fixed parent chain, opens and inspects the fixed
+bootstrap/signature handles, reads the bytes from those same verified handles,
+verifies the signature, inspects the remaining fixed objects, and checks the
+installed SQLite file/state prerequisites against that verified bootstrap. It
+does not configure connection-local PRAGMAs or mutate the tree.
 
 `provision` requires the same token and performs, in order:
 
@@ -174,12 +204,15 @@ not configure connection-local PRAGMAs or mutate the tree.
    local Trading SID before final-tree mutation;
 3. validate the fixed parent/object state and any pre-created database/journal
    with the read-only SQLite format/schema/integrity checks before mutation;
-4. create only the fixed root, `capture-output`, and `backup` directories with
+4. if the pre-created database is `IDENTITY_BOUND`, reconcile its immutable
+   metadata with the verified staging bootstrap; reject populated unrelated or
+   incomplete state;
+5. create only the fixed root, `capture-output`, and `backup` directories with
    the reviewed owner/DACL descriptor;
-5. install trust material only when absent, under that descriptor, or require
+6. install trust material only when absent, under that descriptor, or require
    exact byte identity when already present;
-6. validate the resulting fixed objects; and
-7. validate the installed state and report sanitized evidence.
+7. validate the resulting fixed objects; and
+8. validate the installed SQLite state/binding and report sanitized evidence.
 
 Unexpected existing types, bytes, owner, DACL, or reparse state fail closed;
 the command does not repair hostile state. It never creates a production SQL

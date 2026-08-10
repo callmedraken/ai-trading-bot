@@ -39,7 +39,7 @@ def _evidence_json(evidence: ProvisioningEvidence) -> str:
             "inspected_objects": list(evidence.inspected_objects),
             "journal_present": evidence.journal_present,
             "signing_key_id": evidence.signing_key_id,
-            "sqlite_contract": evidence.sqlite_contract,
+            "database_state": evidence.database_state,
             "state": evidence.state.value,
             "trading_sid": evidence.trading_sid,
         },

@@ -36,6 +36,7 @@ from trading_bot.runtime.windows_authority_security import (
     validate_fixed_parent_chain,
 )
 from trading_bot.runtime.windows_authority_sqlite import (
+    SqliteDatabaseState,
     open_read_only_sqlite_connection,
     validate_installed_sqlite_prerequisites,
 )
@@ -59,7 +60,7 @@ class ProvisioningEvidence:
     database_present: bool
     journal_present: bool
     database_initialization: str = "DEFERRED"
-    sqlite_contract: str = "NOT_PRESENT"
+    database_state: str = SqliteDatabaseState.NOT_PRESENT.value
 
 
 def _kind_for(path: PureWindowsPath) -> AuthorityObjectKind:
@@ -111,15 +112,44 @@ def validate_bootstrap_installation(
     )
 
 
-def _read_installed_material() -> tuple[bytes, bytes]:
+def _read_verified_installed_file(
+    path: PureWindowsPath,
+    role: str,
+    trading_sid: str,
+) -> bytes:
+    policy = authority_security_policy(role, trading_sid)
     try:
-        bootstrap = Path(str(PRODUCTION_AUTHORITY_PATHS.bootstrap)).read_bytes()
-        signature = Path(str(PRODUCTION_AUTHORITY_PATHS.signature)).read_bytes()
+        with open_authority_object(path, AuthorityObjectKind.FILE) as handle:
+            inspection = inspect_open_authority_object(
+                handle, path, AuthorityObjectKind.FILE
+            )
+            require_security_policy(inspection, policy)
+            return read_open_authority_file(handle)
+    except WindowsAuthorityError:
+        raise
     except OSError as error:
         raise WindowsAuthorityError(
             "fixed bootstrap trust material could not be read"
         ) from error
-    return bootstrap, signature
+
+
+def _read_installed_material(trading_sid: str) -> tuple[bytes, bytes]:
+    validate_fixed_parent_chain(
+        PRODUCTION_AUTHORITY_PATHS.bootstrap,
+        trading_sid=trading_sid,
+    )
+    return (
+        _read_verified_installed_file(
+            PRODUCTION_AUTHORITY_PATHS.bootstrap,
+            "bootstrap",
+            trading_sid,
+        ),
+        _read_verified_installed_file(
+            PRODUCTION_AUTHORITY_PATHS.signature,
+            "signature",
+            trading_sid,
+        ),
+    )
 
 
 def _inspect_tree(trading_sid: str) -> tuple[tuple[str, ...], bool, bool]:
@@ -192,23 +222,26 @@ def _validate_existing_objects(
 def _validate_database_if_present(
     database_present: bool,
     journal_present: bool,
-) -> str:
+    *,
+    verification: BootstrapVerification | None = None,
+) -> SqliteDatabaseState:
     if not database_present and not journal_present:
-        return "NOT_PRESENT"
+        return SqliteDatabaseState.NOT_PRESENT
     if database_present != journal_present:
         raise WindowsAuthorityError(
             "pre-created authority database and persistent journal must be paired"
         )
     connection = open_read_only_sqlite_connection(PRODUCTION_AUTHORITY_PATHS.database)
     try:
-        validate_installed_sqlite_prerequisites(
+        evidence = validate_installed_sqlite_prerequisites(
             connection,
             database_path=PRODUCTION_AUTHORITY_PATHS.database,
             journal_path=PRODUCTION_AUTHORITY_PATHS.journal,
+            verification=verification,
         )
     finally:
         connection.close()
-    return "VALIDATED"
+    return evidence.database_state
 
 
 def validate_installed_authority(
@@ -219,7 +252,7 @@ def validate_installed_authority(
 
     require_administrator_token()
     trading_sid = require_trading_standard_account()
-    bootstrap_bytes, signature_bytes = _read_installed_material()
+    bootstrap_bytes, signature_bytes = _read_installed_material(trading_sid)
     verification = _verify_material(
         bootstrap_bytes,
         signature_bytes,
@@ -228,7 +261,11 @@ def validate_installed_authority(
     )
     validate_lifecycle_mutex_security_descriptor(trading_sid)
     inspected, database_present, journal_present = _inspect_tree(trading_sid)
-    sqlite_contract = _validate_database_if_present(database_present, journal_present)
+    database_state = _validate_database_if_present(
+        database_present,
+        journal_present,
+        verification=verification,
+    )
     return ProvisioningEvidence(
         ProvisioningState.VALIDATED,
         str(PRODUCTION_AUTHORITY_PATHS.root),
@@ -238,7 +275,7 @@ def validate_installed_authority(
         inspected,
         database_present,
         journal_present,
-        sqlite_contract=sqlite_contract,
+        database_state=database_state.value,
     )
 
 
@@ -297,6 +334,7 @@ def provision_authority(
     _validate_database_if_present(
         existing[PRODUCTION_AUTHORITY_PATHS.database],
         existing[PRODUCTION_AUTHORITY_PATHS.journal],
+        verification=verification,
     )
     try:
         for path, role in (
@@ -330,7 +368,11 @@ def provision_authority(
     # New objects receive the reviewed descriptor atomically at creation;
     # existing objects were validated above and are never repaired.
     inspected, database_present, journal_present = _inspect_tree(trading_sid)
-    sqlite_contract = _validate_database_if_present(database_present, journal_present)
+    database_state = _validate_database_if_present(
+        database_present,
+        journal_present,
+        verification=verification,
+    )
     return ProvisioningEvidence(
         ProvisioningState.PROVISIONED,
         str(PRODUCTION_AUTHORITY_PATHS.root),
@@ -340,5 +382,5 @@ def provision_authority(
         inspected,
         database_present,
         journal_present,
-        sqlite_contract=sqlite_contract,
+        database_state=database_state.value,
     )

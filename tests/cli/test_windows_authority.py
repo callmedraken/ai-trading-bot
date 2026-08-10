@@ -47,7 +47,7 @@ def test_cli_emits_only_sanitized_evidence(monkeypatch, capsys) -> None:  # type
     output = json.loads(capsys.readouterr().out)
     assert output["authority_root"] == r"F:\AITradingBot\Authority"
     assert output["bootstrap_digest"] == "a" * 64
-    assert output["sqlite_contract"] == "NOT_PRESENT"
+    assert output["database_state"] == "NOT_PRESENT"
     assert set(output) == {
         "authority_root",
         "bootstrap_digest",
@@ -56,7 +56,7 @@ def test_cli_emits_only_sanitized_evidence(monkeypatch, capsys) -> None:  # type
         "inspected_objects",
         "journal_present",
         "signing_key_id",
-        "sqlite_contract",
+        "database_state",
         "state",
         "trading_sid",
     }

@@ -12,20 +12,32 @@ import ctypes
 import json
 import os
 import sqlite3
+import sys
 import uuid
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from enum import StrEnum
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
+from types import SimpleNamespace
 from typing import NoReturn
 
 import pytest
 
+from trading_bot.market_data import ALPACA_DAILY_SNAPSHOT_DESCRIPTOR
 from trading_bot.runtime.windows_authority import (
     PRODUCTION_AUTHORITY_PATHS,
     PRODUCTION_PINNED_BOOTSTRAP_KEYS,
+    AuthorityPrincipalError,
     BootstrapError,
+    BootstrapSchemaError,
+    BootstrapSignatureError,
+    BootstrapTrustAnchorError,
+    PinnedBootstrapKey,
+    PinnedBootstrapKeyRegistry,
+    UnsupportedBootstrapError,
+    WindowsAuthorityBootstrap,
     WindowsAuthorityError,
+    WindowsNativeError,
     parse_bootstrap_bytes,
     verify_bootstrap_signature,
 )
@@ -37,6 +49,7 @@ from trading_bot.runtime.windows_authority_security import (
     DELETE,
     ERROR_ACCESS_DENIED,
     ERROR_FILE_NOT_FOUND,
+    ERROR_PATH_NOT_FOUND,
     FILE_FLAG_BACKUP_SEMANTICS,
     FILE_FLAG_OPEN_REPARSE_POINT,
     FILE_SHARE_DELETE,
@@ -234,6 +247,28 @@ def _read_verified_fixed_file(
         return read_open_authority_file(handle)
 
 
+def _validate_fixed_object_for_capability(
+    path: str | PureWindowsPath,
+    role: str,
+    kind: AuthorityObjectKind,
+    trading_sid: str,
+) -> None:
+    """Validate a production object before an acceptance capability probe uses it."""
+
+    try:
+        validate_fixed_parent_chain(path, trading_sid=trading_sid)
+        policy = authority_security_policy(role, trading_sid)
+        with open_authority_object(path, kind) as handle:
+            inspection = inspect_open_authority_object(handle, path, kind)
+            require_security_policy(inspection, policy)
+    except WindowsNativeError as error:
+        if error.error_code in {ERROR_FILE_NOT_FOUND, ERROR_PATH_NOT_FOUND}:
+            raise AcceptanceBlockedError(
+                f"required production {role} object is absent"
+            ) from error
+        raise
+
+
 def _bootstrap_variant(bootstrap: object, **changes: object) -> bytes:
     values = dict(bootstrap.to_dict())  # type: ignore[union-attr]
     values.update(changes)
@@ -248,10 +283,19 @@ def _bootstrap_variant(bootstrap: object, **changes: object) -> bytes:
 def _require_bootstrap_rejection(
     scenario: str,
     operation: Callable[[], object],
+    *,
+    expected_exception: type[BaseException]
+    | tuple[type[BaseException], ...]
+    | None = None,
 ) -> str:
     try:
         operation()
-    except (BootstrapError, WindowsAuthorityError, ValueError):
+    except (BootstrapError, WindowsAuthorityError, ValueError) as error:
+        if expected_exception is not None and not isinstance(error, expected_exception):
+            raise AssertionError(
+                f"acceptance negative scenario {scenario} reached "
+                f"{type(error).__name__}; expected {expected_exception}"
+            ) from error
         return scenario
     raise AssertionError(
         f"acceptance negative scenario unexpectedly passed: {scenario}"
@@ -272,6 +316,7 @@ def _administrator_negative_matrix(
                 bytes([signature[0] ^ 1]) + signature[1:],
                 trading_sid=trading_sid,
             ),
+            expected_exception=BootstrapSignatureError,
         )
     )
     scenarios.append(
@@ -282,6 +327,7 @@ def _administrator_negative_matrix(
                 signature,
                 trading_sid=trading_sid,
             ),
+            expected_exception=BootstrapTrustAnchorError,
         )
     )
     wrong_sid_base, wrong_sid_number = trading_sid.rsplit("-", 1)
@@ -289,55 +335,48 @@ def _administrator_negative_matrix(
         _require_bootstrap_rejection(
             "wrong-trading-sid",
             lambda: validate_bootstrap_installation(
-                _bootstrap_variant(
-                    bootstrap,
-                    approved_account_sid=(
-                        f"{wrong_sid_base}-{int(wrong_sid_number) + 1}"
-                    ),
-                ),
+                bootstrap.canonical_bytes(),  # type: ignore[union-attr]
                 signature,
-                trading_sid=trading_sid,
+                trading_sid=f"{wrong_sid_base}-{int(wrong_sid_number) + 1}",
             ),
+            expected_exception=AuthorityPrincipalError,
         )
     )
     scenarios.append(
         _require_bootstrap_rejection(
             "wrong-fixed-path",
-            lambda: validate_bootstrap_installation(
+            lambda: parse_bootstrap_bytes(
                 _bootstrap_variant(
                     bootstrap,
                     database_path=str(PRODUCTION_AUTHORITY_PATHS.database) + ".wrong",
                 ),
-                signature,
-                trading_sid=trading_sid,
             ),
+            expected_exception=BootstrapSchemaError,
         )
     )
     scenarios.append(
         _require_bootstrap_rejection(
             "wrong-provider-operation",
-            lambda: validate_bootstrap_installation(
+            lambda: parse_bootstrap_bytes(
                 _bootstrap_variant(
                     bootstrap,
                     provider_id="unapproved-provider",
                     permitted_provider_operation="unapproved-operation",
                 ),
-                signature,
-                trading_sid=trading_sid,
             ),
+            expected_exception=BootstrapSchemaError,
         )
     )
     scenarios.append(
         _require_bootstrap_rejection(
             "unsupported-policy",
-            lambda: validate_bootstrap_installation(
+            lambda: parse_bootstrap_bytes(
                 _bootstrap_variant(
                     bootstrap,
                     authority_policy_version="authority-policy/v999",
                 ),
-                signature,
-                trading_sid=trading_sid,
             ),
+            expected_exception=UnsupportedBootstrapError,
         )
     )
     return tuple(scenarios)
@@ -698,13 +737,32 @@ def _create_root_probe() -> bool:
 
 def _run_trading_allow_deny_phase() -> AcceptanceEvidence:
     verification, trading_sid = _require_trading_context()
-    database = Path(str(PRODUCTION_AUTHORITY_PATHS.database))
-    journal = Path(str(PRODUCTION_AUTHORITY_PATHS.journal))
-    if not database.is_file() or not journal.is_file():
-        raise AcceptanceBlockedError(
-            "Trading acceptance requires the disposable administrator-"
-            "provisioned DB/journal pair"
-        )
+    database = PRODUCTION_AUTHORITY_PATHS.database
+    journal = PRODUCTION_AUTHORITY_PATHS.journal
+    _validate_fixed_object_for_capability(
+        PRODUCTION_AUTHORITY_PATHS.root,
+        "root",
+        AuthorityObjectKind.DIRECTORY,
+        trading_sid,
+    )
+    _validate_fixed_object_for_capability(
+        PRODUCTION_AUTHORITY_PATHS.capture_output,
+        "capture-output",
+        AuthorityObjectKind.DIRECTORY,
+        trading_sid,
+    )
+    _validate_fixed_object_for_capability(
+        database,
+        "database",
+        AuthorityObjectKind.FILE,
+        trading_sid,
+    )
+    _validate_fixed_object_for_capability(
+        journal,
+        "journal",
+        AuthorityObjectKind.FILE,
+        trading_sid,
+    )
     connection = sqlite3.connect(str(database), timeout=0.0)
     try:
         connection.execute("SELECT name FROM sqlite_schema").fetchall()
@@ -1102,6 +1160,117 @@ def test_administrator_phase_rejects_non_admin_token() -> None:
             token_is_elevated=False,
             token_is_administrator=False,
         )
+
+
+def test_wrong_trading_sid_reaches_signed_sid_binding(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The negative matrix keeps signed bytes intact through signature verification."""
+
+    import trading_bot.runtime.windows_authority as authority
+
+    bootstrap = WindowsAuthorityBootstrap(
+        bootstrap_schema=1,
+        bootstrap_generation=1,
+        machine_authority_id="87654321-4321-8765-cba9-876543210987",
+        authority_epoch_id="12345678-1234-5678-9abc-def012345678",
+        signing_key_id="test/v1",
+        approved_account_sid="S-1-5-21-100-200-300-400",
+        database_path=str(PRODUCTION_AUTHORITY_PATHS.database),
+        output_root=str(PRODUCTION_AUTHORITY_PATHS.capture_output),
+        provider_id=ALPACA_DAILY_SNAPSHOT_DESCRIPTOR.provider_id,
+        permitted_provider_operation=ALPACA_DAILY_SNAPSHOT_DESCRIPTOR.operation,
+        authority_policy_version="authority-policy/v1",
+        claim_policy_version="claim-policy/v1",
+        database_identity_digest="0" * 64,
+    )
+    public_key = b"\x04" + b"\x01" * 32 + b"\x02" * 32
+    registry = PinnedBootstrapKeyRegistry((PinnedBootstrapKey("test/v1", public_key),))
+    signature = b"s" * 64
+    verified_inputs: list[tuple[bytes, bytes, bytes]] = []
+    monkeypatch.setattr(authority, "_require_windows", lambda: None)
+    monkeypatch.setattr(
+        authority,
+        "_cng_verify_p256_sha256",
+        lambda key, data, signed: verified_inputs.append((key, data, signed)),
+    )
+
+    with pytest.raises(AuthorityPrincipalError):
+        validate_bootstrap_installation(
+            bootstrap.canonical_bytes(),
+            signature,
+            trading_sid="S-1-5-21-100-200-300-401",
+            key_registry=registry,
+        )
+
+    assert verified_inputs == [
+        (public_key, bootstrap.canonical_bytes(), signature),
+    ]
+
+
+def test_trading_phase_validates_fixed_objects_before_capability_use(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    events: list[str] = []
+    module = sys.modules[__name__]
+
+    class FakeConnection:
+        def execute(self, statement: str) -> FakeConnection:
+            assert statement == "SELECT name FROM sqlite_schema"
+            events.append("sqlite-open")
+            return self
+
+        def fetchall(self) -> list[object]:
+            return []
+
+        def close(self) -> None:
+            events.append("sqlite-close")
+
+    monkeypatch.setattr(
+        module,
+        "_require_trading_context",
+        lambda: (
+            SimpleNamespace(bootstrap_digest="digest"),
+            "S-1-5-21-100-200-300-400",
+        ),
+    )
+
+    def record_validation(
+        path: str | PureWindowsPath,
+        role: str,
+        kind: AuthorityObjectKind,
+        trading_sid: str,
+    ) -> None:
+        del path, kind, trading_sid
+        events.append(role)
+
+    monkeypatch.setattr(
+        module, "_validate_fixed_object_for_capability", record_validation
+    )
+    monkeypatch.setattr(
+        sqlite3,
+        "connect",
+        lambda _path, timeout: events.append("sqlite-connect") or FakeConnection(),
+    )
+    monkeypatch.setattr(
+        module,
+        "_create_capture_artifact",
+        lambda _path: events.append("capture-artifact"),
+    )
+    monkeypatch.setattr(
+        module, "_expect_access_denied", lambda _scenario, _operation: None
+    )
+
+    _run_trading_allow_deny_phase()
+
+    assert events[:5] == [
+        "root",
+        "capture-output",
+        "database",
+        "journal",
+        "sqlite-connect",
+    ]
+    assert events[5:] == ["sqlite-open", "sqlite-close", "capture-artifact"]
 
 
 def test_phase_evidence_identifies_exact_phase() -> None:

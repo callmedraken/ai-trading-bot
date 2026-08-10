@@ -118,6 +118,11 @@ the database is readable through Python SQLite, the persistent journal is
 present for normal VFS access, and a uniquely named capture-output artifact can
 be created and cleaned up.
 
+Before those operations, the harness revalidates the fixed root,
+`capture-output`, database, and journal through no-follow handles, exact final
+paths, and their role-specific security policies. Path-based existence checks
+are not used to establish trust for a production object.
+
 It proves the negative boundary with non-mutating access probes and uniquely
 named harmless probes: backup access, arbitrary authority-root creation,
 bootstrap/signature replacement capability, database/journal delete and

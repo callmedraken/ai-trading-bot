@@ -16,10 +16,11 @@ Run the portable unit layer from the repository root:
 ```
 
 These tests do not open the production root, use credentials, call Alpaca,
-create a mutex, or mutate Windows security state. They cover deterministic
-canonicalization, fixed-path invariance under `TEMP`/`TMP`/`TMPDIR` and cwd
-changes, unsupported bootstrap shapes, the empty production trust-anchor
-registry, P1363 envelope length, mutex digest/name, and exact policy masks.
+create a production mutex, or mutate Windows security state. They cover
+deterministic canonicalization, fixed-path invariance under `TEMP`/`TMP`/`TMPDIR`
+and cwd changes, unsupported bootstrap shapes, the empty production trust-anchor
+registry, P1363 envelope length, mutex digest/name, exact policy masks, and
+mocked acceptance dispatch/evidence semantics.
 
 ## Evidence classification matrix
 
@@ -30,97 +31,178 @@ Portable tests must not be read as proof of native Windows acceptance:
 | Canonical bootstrap, fixed paths, policy masks, SQLite state rules | 1. Pure deterministic contract | Automated unit tests |
 | Win32 argument selection, object kinds, failure cleanup, typed rejection | 2. Mocked Win32 behavior | Automated unit tests |
 | Actual local DOS final paths, reparse behavior, NTFS volume, ACLs, SQLite Win32 locking, same-handle trust reads | 3. Real Windows-native integration | Safe disposable integration coverage where available; otherwise acceptance prerequisite |
-| Administrator provisioning and dedicated `Trading` allow/deny behavior | 4. Administrator acceptance | Explicit opt-in fixed-root acceptance suite |
-| Cross-session `Global\\` mutex contention and abandoned-owner recovery | 5. Manual/cross-session acceptance | Separate manual gate; not simulated by portable tests |
+| Administrator fixed-root facts | 4A. Administrator acceptance | Explicit `administrator` phase below |
+| Dedicated Trading allow/deny facts | 4B. Trading acceptance | Explicit `trading` phase under the real Trading account |
+| Python SQLite Windows VFS and locking | 4C. SQLite VFS acceptance | Explicit `sqlite-vfs` phase under Trading against a disposable pair |
+| Reparse and substitution rejection | 4D. Destructive maintenance acceptance | Separate `reparse` phase and operator procedure |
+| Cross-session `Global\\` mutex contention and abandoned-owner recovery | 5. Manual/cross-session acceptance | Separate `cross-session-mutex` gate; never simulated by ordinary pytest |
 
-Classes 1 and 2 establish the portable contract and mock sequencing only.
-They do not establish the class 3, 4, or 5 claims that require Windows,
+Classes 1 and 2 establish portable contract and mock sequencing only. They do
+not establish the class 3, 4, or 5 claims that require Windows,
 administrator-provisioned artifacts, distinct sessions, or dedicated-account
 permissions.
 
-## Opt-in administrator acceptance
+## Phase model and opt-in commands
 
-The destructive acceptance suite is not run by ordinary pytest. Run it only
-after the machine has an approved maintenance window and a disposable
-administrator-provisioned authority tree:
+The old one-test administrator run was only a smoke/preflight check. It could
+prove that one administrator process reached `validate_installed_authority()`;
+it could not prove Trading permissions, SQLite Win32 VFS behavior, reparse
+substitution rejection, or cross-session mutex behavior. It must not be called
+Milestone A production acceptance.
+
+The acceptance harness requires both the existing global opt-in and one exact
+phase selection:
 
 ```powershell
 $env:AI_TRADING_BOT_RUN_WINDOWS_AUTHORITY_ACCEPTANCE = "1"
+$env:AI_TRADING_BOT_WINDOWS_AUTHORITY_ACCEPTANCE_PHASE = "administrator"
 .venv\Scripts\python.exe -m pytest tests/acceptance/test_windows_authority_provisioning_acceptance.py -q
-Remove-Item Env:AI_TRADING_BOT_RUN_WINDOWS_AUTHORITY_ACCEPTANCE
 ```
 
-Without the opt-in variable, the test is a clear skip. With it, missing
-Windows, missing fixed root, absent trust material, or absent pre-created
-database/journal is a failure/blocked prerequisite, never a simulated pass.
-The suite must record sanitized evidence only.
+The reviewed phase values are:
 
-Administrator perspective must prove: elevated token; owner and protected
-DACL; no unexpected ACE; no reparse point; exact final local `F:` path; NTFS
-volume; exact fixed bootstrap/signature bytes; wrong key ID/bad signature/wrong
-SID/path/provider/policy rejection; and idempotence without automatic repair.
+| Phase value | Evidence identifier | Execution boundary |
+| --- | --- | --- |
+| `administrator` | `ADMINISTRATOR_FIXED_ROOT` | Elevated administrator session |
+| `trading` | `TRADING_ALLOW_DENY` | Dedicated standard `Trading` account/session |
+| `sqlite-vfs` | `SQLITE_WINDOWS_VFS` | Dedicated standard `Trading` account/session and disposable DB pair |
+| `reparse` | `REPARSE_AND_SUBSTITUTION` | Elevated disposable maintenance session |
+| `cross-session-mutex` | `CROSS_SESSION_GLOBAL_MUTEX` | Two independently launched Windows sessions |
 
-Dedicated `Trading` perspective must prove the account is not an administrator,
-can read bootstrap/signature, can perform the reviewed DB/journal read/write
-and locking operations (including the specific `FILE_WRITE_EA` bit required by
-Windows `FILE_GENERIC_WRITE` when the standard SQLite Win32 VFS opens those
-handles with `GENERIC_WRITE`), can create expected capture output, and cannot access
-backup, create at the authority root, delete/rename/replace DB or journal,
-change owner/DACL, or replace trust material. Tests use a disposable
-administrator-provisioned database with `foreign_keys=ON`, `journal_mode=PERSIST`,
-and `synchronous=FULL`; the production connection setup helper must request
-and verify those values on every opened authority connection. The read-only
-installed validator opens the fixed database with an explicit `mode=ro` URI,
-performs a real `sqlite_schema` read and read-only `PRAGMA integrity_check`,
-and checks the fixed database/journal prerequisites without silently configuring
-connection-local PRAGMAs. It must reject arbitrary, truncated, or structurally
-corrupt database bytes. Tests do not attach, vacuum, migrate, or promote the
-test-only SQL fixture.
+Ordinary pytest without the global opt-in skips all five native phase tests.
+Opt-in without a phase fails with a clear configuration error. An unknown
+phase fails closed. Selecting one phase skips the other phase tests; a PASS
+therefore identifies only that phase and never represents complete Milestone A
+acceptance.
 
-The path matrix creates junction/symbolic-link/mount substitutions only when
-administrator privileges are available. Each must be rejected from the final
-opened handle; a test that cannot construct the substitution is reported as a
-prerequisite skip, not converted into a weaker assertion.
+After each run, clear the selection:
 
-The database lifecycle evidence is intentionally separate from the operation
-state: `NOT_PRESENT` is an absent pair, `PRECREATED_UNINITIALIZED` is a
-structurally valid empty storage container, and `IDENTITY_BOUND` is one exact
-metadata singleton reconciled to the verified signed bootstrap. A populated
-database without authority metadata, zero or multiple metadata rows, malformed
-metadata, or any identity mismatch is rejected as `INVALID_MISMATCHED`.
-`PRECREATED_UNINITIALIZED` is not executable authority. The validator checks
-the opaque metadata BLOB digest but does not claim a canonical semantic
-`metadata_json` format that Architecture 77 does not define.
+```powershell
+Remove-Item Env:AI_TRADING_BOT_WINDOWS_AUTHORITY_ACCEPTANCE_PHASE
+Remove-Item Env:AI_TRADING_BOT_RUN_WINDOWS_AUTHORITY_ACCEPTANCE
+Remove-Item Env:AI_TRADING_BOT_WINDOWS_AUTHORITY_ACCEPTANCE_MAINTENANCE -ErrorAction SilentlyContinue
+```
 
-## Cross-session mutex procedure
+## Phase A: `ADMINISTRATOR_FIXED_ROOT`
 
-Launch two independently spawned approved workers under distinct Windows
-sessions/accounts with the same machine, epoch, and reservation. Each must
-derive the same `Global\AITradingBot-Lifecycle-v1-<digest>` name and the second
-must remain outside the critical section until the first releases it. Repeat
-with a hostile existing object/DACL and verify fail-closed startup. Verify no
-`Local\` name is attempted. Terminate the owner while holding the mutex and
-record `ABANDONED_OWNER`; the recovery process must reconcile durable state and
-must not retry the external effect automatically.
+Run from an already elevated administrator PowerShell. The phase does not
+self-elevate, request a password, or alter the fixed tree. It proves, through
+the existing same-handle validator and a repeated read-only validation:
 
-The lifecycle mutex owner must be one of BUILTIN\\Administrators, LOCAL
-SYSTEM, or the exact Trading SID. A Trading-created mutex is accepted with
-Trading as its owner; an unapproved owner or any expanded DACL remains a
-fail-closed result. This owner exception is limited to the kernel mutex and
-does not change the administrator ownership requirement for filesystem
-authority objects.
+- elevated administrator token;
+- exact `F:\AITradingBot\Authority` root and complete fixed object set;
+- administrator owner, protected DACL, no unexpected ACE, no reparse, local
+  `F:` NTFS final paths;
+- bootstrap and detached signature bytes read from the handles whose final path
+  and security policy were inspected;
+- valid installed signature/bootstrap acceptance and correct database lifecycle
+  evidence;
+- repeated validation returns identical evidence without mutation.
 
-If distinct-session automation is unavailable inside pytest, run the manual
-procedure above and retain only command lines, account/session labels, mutex
-state, digest/name, and pass/fail classification. Do not retain credentials,
-tokens, environment dumps, raw security descriptors, provider bodies, or
-arbitrary exception text.
+The phase also performs disposable in-memory negative material checks for bad
+signature, unsupported signing-key ID, wrong Trading SID, wrong fixed path,
+wrong provider/operation, and unsupported policy. It never overwrites or
+renames installed trust files. Missing fixed artifacts, an absent production
+trust anchor, or an invalid installed state is a failure/blocker, never PASS.
 
-## Evidence and limitations
+## Phase B: `TRADING_ALLOW_DENY`
 
-The command emits sanitized JSON containing only state, fixed root, bootstrap
-digest, signing-key ID, Trading SID, inspected object roles, and DB/journal
-presence. Production validation currently fails closed because no approved
-production P-256 public key/key-ID record exists in the repository. This is a
-Milestone A acceptance blocker, not a test pass. Database initialization and
-unattended scheduling remain later milestones.
+Log on to the dedicated standard `Trading` account and launch the command from
+that account. Do not provide a password to pytest, place one in an environment
+variable, or automate account logon. The phase first compares the current token
+SID to the verified signed Trading SID and rejects administrator or elevated
+tokens.
+
+It then proves the positive boundary: bootstrap and signature are readable,
+the database is readable through Python SQLite, the persistent journal is
+present for normal VFS access, and a uniquely named capture-output artifact can
+be created and cleaned up.
+
+It proves the negative boundary with non-mutating access probes and uniquely
+named harmless probes: backup access, arbitrary authority-root creation,
+bootstrap/signature replacement capability, database/journal delete and
+rename/replace capability, `WRITE_DAC`, and `WRITE_OWNER` are all denied. A
+probe is recorded as denied only for the expected Windows access-denied result;
+an unrelated setup or operating-system error is blocked/failing evidence.
+
+## Phase C: `SQLITE_WINDOWS_VFS`
+
+Run under the standard `Trading` account only after an administrator has
+prepared the fixed-path database and persistent journal as a disposable
+acceptance pair. Set the maintenance gate before running because this phase
+requests connection-local durability settings and exercises write locking:
+
+```powershell
+$env:AI_TRADING_BOT_RUN_WINDOWS_AUTHORITY_ACCEPTANCE = "1"
+$env:AI_TRADING_BOT_WINDOWS_AUTHORITY_ACCEPTANCE_PHASE = "sqlite-vfs"
+$env:AI_TRADING_BOT_WINDOWS_AUTHORITY_ACCEPTANCE_MAINTENANCE = "1"
+.venv\Scripts\python.exe -m pytest tests/acceptance/test_windows_authority_provisioning_acceptance.py -q
+```
+
+The phase proves ordinary Python `sqlite3` read/write opening, the reviewed
+`configure_and_validate_authority_sqlite_connection()` helper, `foreign_keys`
+`ON`, `journal_mode` `PERSIST`, `synchronous` `FULL`, successful `BEGIN
+IMMEDIATE`, real second-connection contention, rollback/release/reacquisition,
+reopening, and persistent-journal presence. It creates no schema, performs no
+migration, attaches no database, vacuums nothing, and leaves no semantic
+acceptance data.
+
+## Phase D: `REPARSE_AND_SUBSTITUTION`
+
+This phase is an explicit maintenance gate, not a normal pytest mutation. The
+harness reports `BLOCKED` until an operator has a disposable authority tree and
+maintenance window; it never turns an ordinary non-reparse tree into PASS.
+
+For the manual procedure, under an elevated maintenance account and only on a
+disposable tree, construct one substitution at a time where the host permits
+it: symbolic link, junction, mount/reparse substitution, wrong final path, and
+UNC/device substitution. Open the affected fixed target with the reviewed
+`FILE_FLAG_OPEN_REPARSE_POINT`/final-handle validator and retain only the
+scenario name plus `PASS` or `BLOCKED`. Remove only substitutions created by
+that maintenance procedure and restore the disposable tree. If a Windows
+privilege or filesystem prerequisite prevents construction, record `BLOCKED`
+with the prerequisite; do not weaken the assertion or call it PASS.
+
+## Phase E: `CROSS_SESSION_GLOBAL_MUTEX`
+
+This phase remains a separate manual gate. The pytest harness always reports it
+as blocked because one process or one interactive session cannot establish
+cross-session evidence. Launch two approved processes in distinct Windows
+sessions with the same machine authority, epoch, and reservation. Retain only
+the sanitized mutex digest/name and phase result. Verify the exact same
+`Global\\AITradingBot-Lifecycle-v1-<digest>` name, second-process contention,
+release and reacquisition, hostile descriptor rejection, no `Local\\` fallback,
+and `ABANDONED_OWNER` after terminating the owner. Recovery must reconcile
+durable state and must not retry an external effect automatically.
+
+## Sanitized evidence and production checklist
+
+Each green phase emits one record with only:
+
+- `phase_id` and `status`;
+- the fixed command, account classification, and safe scenario names;
+- bootstrap digest, database lifecycle state, and Trading SID where applicable.
+
+Evidence must never retain passwords, tokens, private keys, environment dumps,
+raw security descriptors, credentials, provider data, or arbitrary exception
+text. A phase record is partial evidence. Production acceptance is a
+collection/checklist containing separate PASS records for every required phase,
+including the separately obtained cross-session record; it is not a pytest
+exit code and no individual result is named complete Milestone A acceptance.
+
+## Current limitations and NO-GO gates
+
+Production remains NO-GO until all of the following are separately satisfied:
+
+- an approved production P-256 public trust anchor/key-ID record is installed;
+- the fixed parent, root, bootstrap/signature, database, and journal are
+  administrator provisioned and accepted;
+- the Trading allow/deny phase runs under the real standard account;
+- the SQLite Windows VFS/locking phase succeeds against its disposable pair;
+- reparse/substitution evidence is obtained in a disposable maintenance window;
+- cross-session `Global\\` mutex evidence is obtained from distinct sessions.
+
+Database initialization, migrations, unattended scheduling, Credential Manager,
+provider transport, child process orchestration, live trading, and real-money
+orders remain outside this milestone. Architecture 77 and its fixture remain
+unchanged.

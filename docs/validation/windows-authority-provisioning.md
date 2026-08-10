@@ -53,8 +53,10 @@ change owner/DACL, or replace trust material. Tests use a disposable
 administrator-provisioned database with `foreign_keys=ON`, `journal_mode=PERSIST`,
 and `synchronous=FULL`; the production connection setup helper must request
 and verify those values on every opened authority connection. The read-only
-installed validator checks only the fixed database/journal prerequisites and
-must not silently configure connection-local PRAGMAs. Tests do not attach,
+installed validator opens the fixed database with an explicit `mode=ro` URI,
+performs a real `sqlite_schema` read, and checks the fixed database/journal
+prerequisites without silently configuring connection-local PRAGMAs. It must
+reject arbitrary, truncated, or corrupt database bytes. Tests do not attach,
 vacuum, migrate, or promote the test-only SQL fixture.
 
 The path matrix creates junction/symbolic-link/mount substitutions only when

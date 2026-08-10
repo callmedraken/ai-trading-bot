@@ -41,12 +41,15 @@ F:\AITradingBot\Authority\
 Staging paths may supply a bootstrap and detached signature to `provision`,
 but their final destinations remain the fixed paths above. Database and
 persistent-journal initialization is deliberately deferred; pre-created files
-are validated when present. The read-only installed validator proves only that
-the fixed database is openable, has one local main database, and has the
-pre-created persistent journal. It does not claim connection-local PRAGMA
-state or change it. Every production SQLite connection must instead use the
-runtime setup helper before authority work; that helper explicitly requests
-and reads back `foreign_keys=ON`, `journal_mode=PERSIST`, and
+are validated when present. The installed validator opens the existing fixed
+database through a `file:///F:/AITradingBot/Authority/authority.sqlite3?mode=ro`
+URI, performs a real `sqlite_schema` read, and requires one local main database
+plus the pre-created persistent journal. Non-SQLite, truncated, or corrupt
+database bytes fail closed; no write-capable fallback or `immutable=1` bypass
+is used. It does not claim connection-local PRAGMA state or change it. Every
+production SQLite connection must instead use the runtime setup helper before
+authority work; that helper explicitly requests and reads back
+`foreign_keys=ON`, `journal_mode=PERSIST`, and
 `synchronous=FULL`, and fails closed on any mismatch. Neither layer performs
 ATTACH, VACUUM, DDL, or automatic migration.
 

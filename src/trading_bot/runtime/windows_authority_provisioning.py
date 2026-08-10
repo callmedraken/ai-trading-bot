@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-import sqlite3
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path, PureWindowsPath
@@ -37,6 +36,7 @@ from trading_bot.runtime.windows_authority_security import (
     validate_fixed_parent_chain,
 )
 from trading_bot.runtime.windows_authority_sqlite import (
+    open_read_only_sqlite_connection,
     validate_installed_sqlite_prerequisites,
 )
 
@@ -199,12 +199,7 @@ def _validate_database_if_present(
         raise WindowsAuthorityError(
             "pre-created authority database and persistent journal must be paired"
         )
-    try:
-        connection = sqlite3.connect(str(PRODUCTION_AUTHORITY_PATHS.database))
-    except sqlite3.Error as error:
-        raise WindowsAuthorityError(
-            "pre-created authority database could not open"
-        ) from error
+    connection = open_read_only_sqlite_connection(PRODUCTION_AUTHORITY_PATHS.database)
     try:
         validate_installed_sqlite_prerequisites(
             connection,

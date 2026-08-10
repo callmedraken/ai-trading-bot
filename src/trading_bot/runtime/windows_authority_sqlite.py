@@ -6,6 +6,7 @@ import os
 import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
+from urllib.parse import quote
 
 from trading_bot.runtime.windows_authority import WindowsAuthorityError
 
@@ -71,6 +72,37 @@ def _require_database_file(database_path: str) -> None:
         raise SqliteDurabilityError("SQLite authority database is not pre-created")
 
 
+def _read_only_sqlite_uri(database_path: str | Path) -> str:
+    path = str(database_path)
+    if len(path) >= 3 and path[1] == ":" and path[2] in {"\\", "/"}:
+        normalized = path.replace("\\", "/")
+        encoded = quote(normalized, safe="/:")
+        return f"file:///{encoded}?mode=ro"
+    return f"file:{quote(path, safe='/')}?mode=ro"
+
+
+def open_read_only_sqlite_connection(database_path: str | Path) -> sqlite3.Connection:
+    """Open one existing database read-only without an implicit create fallback."""
+
+    try:
+        return sqlite3.connect(_read_only_sqlite_uri(database_path), uri=True)
+    except sqlite3.Error as error:
+        raise SqliteDurabilityError(
+            "SQLite read-only database could not be opened"
+        ) from error
+
+
+def _read_schema(connection: sqlite3.Connection) -> None:
+    try:
+        connection.execute(
+            "SELECT type, name, tbl_name, rootpage, sql FROM sqlite_schema LIMIT 1"
+        ).fetchone()
+    except (sqlite3.Error, TypeError, ValueError, IndexError) as error:
+        raise SqliteDurabilityError(
+            "SQLite database schema could not be read"
+        ) from error
+
+
 def validate_installed_sqlite_prerequisites(
     connection: sqlite3.Connection,
     *,
@@ -79,10 +111,10 @@ def validate_installed_sqlite_prerequisites(
 ) -> InstalledSqliteEvidence:
     """Validate installed SQLite files without configuring the connection.
 
-    This read-only layer proves that the fixed database is openable, that only
-    its main database is attached, and that the administrator-precreated
-    persistent journal exists.  Runtime PRAGMAs are connection-local and are
-    intentionally not read or changed here.
+    This read-only layer proves that the fixed database format/schema is
+    readable, that only its main database is attached, and that the
+    administrator-precreated persistent journal exists. Runtime PRAGMAs are
+    connection-local and are intentionally not read or changed here.
     """
 
     _require_exact_connection(connection)
@@ -90,6 +122,7 @@ def validate_installed_sqlite_prerequisites(
     expected_journal = str(journal_path)
     _require_database_file(expected_database)
     databases = _main_database(connection, expected_database)
+    _read_schema(connection)
     _require_persistent_journal(expected_journal)
     return InstalledSqliteEvidence(
         database_path=expected_database,

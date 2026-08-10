@@ -128,9 +128,38 @@ an unrelated setup or operating-system error is blocked/failing evidence.
 ## Phase C: `SQLITE_WINDOWS_VFS`
 
 Run under the standard `Trading` account only after an administrator has
-prepared the fixed-path database and persistent journal as a disposable
-acceptance pair. Set the maintenance gate before running because this phase
-requests connection-local durability settings and exercises write locking:
+prepared a separate acceptance-only disposable database/journal pair and its
+fixed probe table. This pair must not be the production
+`F:\AITradingBot\Authority\authority.sqlite3`/journal pair, and it is never
+passed to `validate_installed_authority()`. The reviewed setup location is:
+
+```text
+F:\AITradingBot\AuthorityAcceptance\SQLiteVfs\authority-vfs.sqlite3
+F:\AITradingBot\AuthorityAcceptance\SQLiteVfs\authority-vfs.sqlite3-journal
+table: windows_authority_acceptance_probe
+```
+
+An administrator must create the disposable directory, database, persistent
+journal, and exactly that harmless probe table before the Trading run. The
+table is an acceptance harness prerequisite, not production schema
+initialization; the Trading test never issues `CREATE TABLE`, migration, or
+other DDL. The administrator-prepared table has exactly this shape and no
+rows:
+
+```sql
+CREATE TABLE windows_authority_acceptance_probe (
+    probe_id INTEGER PRIMARY KEY,
+    marker TEXT NOT NULL
+);
+```
+
+The administrator must leave the persistent journal file present and
+zero-length before the run, grant the standard Trading account the reviewed
+SQLite read/write/locking rights for this pair, and keep the pair outside the
+fixed production authority tree. Missing files, the table, or required ACLs
+are `BLOCKED` and cannot produce a PASS. Set the maintenance gate before
+running because this phase requests connection-local durability settings and
+exercises write locking:
 
 ```powershell
 $env:AI_TRADING_BOT_RUN_WINDOWS_AUTHORITY_ACCEPTANCE = "1"
@@ -141,11 +170,15 @@ $env:AI_TRADING_BOT_WINDOWS_AUTHORITY_ACCEPTANCE_MAINTENANCE = "1"
 
 The phase proves ordinary Python `sqlite3` read/write opening, the reviewed
 `configure_and_validate_authority_sqlite_connection()` helper, `foreign_keys`
-`ON`, `journal_mode` `PERSIST`, `synchronous` `FULL`, successful `BEGIN
-IMMEDIATE`, real second-connection contention, rollback/release/reacquisition,
-reopening, and persistent-journal presence. It creates no schema, performs no
-migration, attaches no database, vacuums nothing, and leaves no semantic
-acceptance data.
+`ON`, `journal_mode` `PERSIST`, `synchronous` `FULL`, and a real harmless
+`INSERT` into the pre-created probe table. The inserted marker must be visible
+inside the transaction, the journal must be written, a second connection must
+observe real `BEGIN IMMEDIATE` contention, and rollback must make the marker
+absent. The test then reacquires the lock, repeats the write/rollback,
+reopens the database, and proves both the marker and the probe table state
+remain uncommitted. The phase creates no schema, performs no migration,
+attaches no database, vacuums nothing, never calls the installed authority
+validator, and leaves no semantic acceptance data.
 
 ## Phase D: `REPARSE_AND_SUBSTITUTION`
 

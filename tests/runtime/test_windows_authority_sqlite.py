@@ -15,9 +15,6 @@ from trading_bot.runtime.windows_authority import (
     WindowsAuthorityBootstrap,
     WindowsAuthorityError,
 )
-from trading_bot.runtime.windows_authority_provisioning import (
-    _validate_database_if_present,
-)
 from trading_bot.runtime.windows_authority_sqlite import (
     InstalledSqliteEvidence,
     SqliteDatabaseState,
@@ -52,6 +49,9 @@ def _verification() -> BootstrapVerification:
     )
 
 
+# This Architecture-77-shaped table is a rejection-only test fixture. It is
+# deliberately not imported by production validation and is not a schema
+# manifest for Milestone A.
 _METADATA_SCHEMA = """
 CREATE TABLE authority_metadata (
     authority_epoch_id TEXT PRIMARY KEY,
@@ -74,54 +74,41 @@ CREATE TABLE authority_metadata (
 """
 
 
-def _metadata_values(
-    verification: BootstrapVerification,
-    **overrides: object,
-) -> dict[str, object]:
-    bootstrap = verification.bootstrap
-    metadata_json = b'{"authority_epoch_id":"metadata"}'
-    values: dict[str, object] = {
-        "authority_epoch_id": bootstrap.authority_epoch_id,
-        "machine_authority_id": bootstrap.machine_authority_id,
-        "bootstrap_schema": bootstrap.bootstrap_schema,
-        "bootstrap_generation": bootstrap.bootstrap_generation,
-        "signing_key_id": bootstrap.signing_key_id,
-        "approved_account_sid": bootstrap.approved_account_sid,
-        "provider_id": bootstrap.provider_id,
-        "permitted_provider_operation": bootstrap.permitted_provider_operation,
-        "authority_policy_version": bootstrap.authority_policy_version,
-        "claim_policy_version": bootstrap.claim_policy_version,
-        "created_at_utc": "2026-01-01T00:00:00Z",
-        "bootstrap_digest": bytes.fromhex(verification.bootstrap_digest),
-        "database_identity_digest": bytes.fromhex(bootstrap.database_identity_digest),
-        "metadata_json": metadata_json,
-        "metadata_digest": hashlib.sha256(metadata_json).digest(),
-        "singleton_key": 1,
-    }
-    values.update(overrides)
-    return values
-
-
 def _metadata_database(
-    tmp_path: Path,
-    *,
-    verification: BootstrapVerification,
-    rows: tuple[dict[str, object], ...] = (),
+    tmp_path: Path, verification: BootstrapVerification
 ) -> tuple[Path, Path]:
     database = tmp_path / "authority.sqlite3"
     journal = tmp_path / "authority.sqlite3-journal"
+    bootstrap = verification.bootstrap
+    metadata_json = b'{"opaque":"test-only"}'
     connection = sqlite3.connect(database)
     try:
         connection.executescript(_METADATA_SCHEMA)
-        columns = tuple(_metadata_values(verification))
-        statement = ", ".join(f"{column}" for column in columns)
-        placeholders = ", ".join("?" for _ in columns)
-        for overrides in rows:
-            values = _metadata_values(verification, **overrides)
-            connection.execute(
-                f"INSERT INTO authority_metadata ({statement}) VALUES ({placeholders})",
-                tuple(values[column] for column in columns),
+        connection.execute(
+            """
+            INSERT INTO authority_metadata VALUES (
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
             )
+            """,
+            (
+                bootstrap.authority_epoch_id,
+                bootstrap.machine_authority_id,
+                bootstrap.bootstrap_schema,
+                bootstrap.bootstrap_generation,
+                bootstrap.signing_key_id,
+                bootstrap.approved_account_sid,
+                bootstrap.provider_id,
+                bootstrap.permitted_provider_operation,
+                bootstrap.authority_policy_version,
+                bootstrap.claim_policy_version,
+                "2026-01-01T00:00:00Z",
+                bytes.fromhex(verification.bootstrap_digest),
+                bytes.fromhex(bootstrap.database_identity_digest),
+                metadata_json,
+                hashlib.sha256(metadata_json).digest(),
+                1,
+            ),
+        )
         connection.commit()
     finally:
         connection.close()
@@ -222,137 +209,44 @@ def test_installed_validation_rejects_populated_non_authority_database(
         connection.close()
 
 
-def test_installed_validation_accepts_exact_identity_bound_metadata(
+def test_installed_validation_rejects_matching_metadata_only_database(
     tmp_path: Path,
 ) -> None:
-    verification = _verification()
-    database, journal = _metadata_database(
-        tmp_path, verification=verification, rows=({},)
-    )
+    database, journal = _metadata_database(tmp_path, _verification())
     before_bytes = database.read_bytes()
     connection = open_read_only_sqlite_connection(database)
     try:
-        evidence = validate_installed_sqlite_prerequisites(
-            connection,
-            database_path=database,
-            journal_path=journal,
-            verification=verification,
-        )
-        assert evidence.database_state is SqliteDatabaseState.IDENTITY_BOUND
+        with pytest.raises(SqliteDurabilityError, match="unsupported"):
+            validate_installed_sqlite_prerequisites(
+                connection, database_path=database, journal_path=journal
+            )
     finally:
         connection.close()
     assert database.read_bytes() == before_bytes
 
 
-@pytest.mark.parametrize(
-    ("field", "value"),
-    [
-        ("authority_epoch_id", "00000000-0000-4000-8000-000000000001"),
-        ("machine_authority_id", "00000000-0000-4000-8000-000000000002"),
-        ("bootstrap_schema", 2),
-        ("bootstrap_generation", 2),
-        ("signing_key_id", "other-key/v1"),
-        ("approved_account_sid", "S-1-5-21-100-200-300-401"),
-        ("provider_id", "other-provider"),
-        ("permitted_provider_operation", "other-operation"),
-        ("authority_policy_version", "authority-policy/other"),
-        ("claim_policy_version", "claim-policy/other"),
-        ("singleton_key", 2),
-        ("bootstrap_digest", b"b" * 32),
-        ("database_identity_digest", b"b" * 32),
-    ],
-)
-def test_identity_bound_metadata_must_match_verified_bootstrap(
+def test_installed_validation_rejects_architecture_77_fixture(
     tmp_path: Path,
-    field: str,
-    value: object,
 ) -> None:
-    verification = _verification()
-    database, journal = _metadata_database(
-        tmp_path,
-        verification=verification,
-        rows=({field: value},),
+    database = tmp_path / "authority.sqlite3"
+    journal = tmp_path / "authority.sqlite3-journal"
+    fixture = (
+        Path(__file__).resolve().parents[1]
+        / "fixtures"
+        / "transactional_authority_schema.sql"
     )
-    connection = open_read_only_sqlite_connection(database)
+    connection = sqlite3.connect(database)
     try:
-        with pytest.raises(SqliteDurabilityError):
-            validate_installed_sqlite_prerequisites(
-                connection,
-                database_path=database,
-                journal_path=journal,
-                verification=verification,
-            )
+        connection.executescript(fixture.read_text(encoding="utf-8"))
+        connection.commit()
     finally:
         connection.close()
-
-
-def test_identity_bound_metadata_rejects_zero_rows(
-    tmp_path: Path,
-) -> None:
-    verification = _verification()
-    database, journal = _metadata_database(
-        tmp_path,
-        verification=verification,
-        rows=(),
-    )
+    journal.touch()
     connection = open_read_only_sqlite_connection(database)
     try:
-        with pytest.raises(SqliteDurabilityError):
+        with pytest.raises(SqliteDurabilityError, match="unsupported"):
             validate_installed_sqlite_prerequisites(
-                connection,
-                database_path=database,
-                journal_path=journal,
-                verification=verification,
-            )
-    finally:
-        connection.close()
-
-
-def test_identity_bound_metadata_rejects_multiple_rows(
-    tmp_path: Path,
-) -> None:
-    verification = _verification()
-    database, journal = _metadata_database(
-        tmp_path,
-        verification=verification,
-        rows=(
-            {},
-            {
-                "authority_epoch_id": "00000000-0000-4000-8000-000000000001",
-                "machine_authority_id": "00000000-0000-4000-8000-000000000002",
-            },
-        ),
-    )
-    connection = open_read_only_sqlite_connection(database)
-    try:
-        with pytest.raises(SqliteDurabilityError):
-            validate_installed_sqlite_prerequisites(
-                connection,
-                database_path=database,
-                journal_path=journal,
-                verification=verification,
-            )
-    finally:
-        connection.close()
-
-
-def test_identity_bound_metadata_digest_is_required(
-    tmp_path: Path,
-) -> None:
-    verification = _verification()
-    database, journal = _metadata_database(
-        tmp_path,
-        verification=verification,
-        rows=({"metadata_digest": b"c" * 32},),
-    )
-    connection = open_read_only_sqlite_connection(database)
-    try:
-        with pytest.raises(SqliteDurabilityError):
-            validate_installed_sqlite_prerequisites(
-                connection,
-                database_path=database,
-                journal_path=journal,
-                verification=verification,
+                connection, database_path=database, journal_path=journal
             )
     finally:
         connection.close()
@@ -429,15 +323,13 @@ def test_installed_validation_uses_fixed_read_only_sqlite_uri(
     monkeypatch.setattr(
         provisioning,
         "validate_installed_sqlite_prerequisites",
-        lambda connection, *, database_path, journal_path, verification: (
-            InstalledSqliteEvidence(
-                database_path=str(database_path),
-                journal_path=str(journal_path),
-                database_openable=True,
-                database_state=SqliteDatabaseState.PRECREATED_UNINITIALIZED,
-                attached_database_count=1,
-                persistent_journal_present=True,
-            )
+        lambda connection, *, database_path, journal_path: InstalledSqliteEvidence(
+            database_path=str(database_path),
+            journal_path=str(journal_path),
+            database_openable=True,
+            database_state=SqliteDatabaseState.PRECREATED_UNINITIALIZED,
+            attached_database_count=1,
+            persistent_journal_present=True,
         ),
     )
 
@@ -570,8 +462,10 @@ def test_installed_validation_rejects_missing_persistent_journal(
 
 
 def test_installed_database_journal_pairing_remains_fail_closed() -> None:
-    assert _validate_database_if_present(False, False) == "NOT_PRESENT"
+    import trading_bot.runtime.windows_authority_provisioning as provisioning
+
+    assert provisioning._validate_database_if_present(False, False) == "NOT_PRESENT"
     with pytest.raises(WindowsAuthorityError):
-        _validate_database_if_present(True, False)
+        provisioning._validate_database_if_present(True, False)
     with pytest.raises(WindowsAuthorityError):
-        _validate_database_if_present(False, True)
+        provisioning._validate_database_if_present(False, True)

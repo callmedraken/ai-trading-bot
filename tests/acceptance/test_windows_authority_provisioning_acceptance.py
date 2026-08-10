@@ -63,6 +63,14 @@ from trading_bot.runtime.windows_authority_sqlite import (
 ACCEPTANCE_OPT_IN_ENV = "AI_TRADING_BOT_RUN_WINDOWS_AUTHORITY_ACCEPTANCE"
 ACCEPTANCE_PHASE_ENV = "AI_TRADING_BOT_WINDOWS_AUTHORITY_ACCEPTANCE_PHASE"
 ACCEPTANCE_MAINTENANCE_ENV = "AI_TRADING_BOT_WINDOWS_AUTHORITY_ACCEPTANCE_MAINTENANCE"
+ACCEPTANCE_SQLITE_VFS_ROOT = Path(r"F:\AITradingBot\AuthorityAcceptance\SQLiteVfs")
+ACCEPTANCE_SQLITE_VFS_DATABASE = ACCEPTANCE_SQLITE_VFS_ROOT / "authority-vfs.sqlite3"
+ACCEPTANCE_SQLITE_VFS_JOURNAL = (
+    ACCEPTANCE_SQLITE_VFS_ROOT / "authority-vfs.sqlite3-journal"
+)
+ACCEPTANCE_SQLITE_VFS_TABLE = "windows_authority_acceptance_probe"
+ACCEPTANCE_SQLITE_VFS_PROBE_ID = 1
+ACCEPTANCE_SQLITE_VFS_MARKER = "milestone-a-rollback-probe"
 
 
 class AcceptancePhase(StrEnum):
@@ -634,19 +642,22 @@ def _run_trading_allow_deny_phase() -> AcceptanceEvidence:
 
 def _run_sqlite_windows_vfs_phase() -> AcceptanceEvidence:
     verification, trading_sid = _require_trading_context()
-    database = Path(str(PRODUCTION_AUTHORITY_PATHS.database))
-    journal = Path(str(PRODUCTION_AUTHORITY_PATHS.journal))
+    database = ACCEPTANCE_SQLITE_VFS_DATABASE
+    journal = ACCEPTANCE_SQLITE_VFS_JOURNAL
     if os.environ.get(ACCEPTANCE_MAINTENANCE_ENV) != "1":
         raise AcceptanceBlockedError(
             f"{ACCEPTANCE_MAINTENANCE_ENV}=1 is required for disposable "
             "SQLite write/lock acceptance"
         )
     if not database.is_file() or not journal.is_file():
-        raise AcceptanceBlockedError("disposable acceptance DB/journal pair is absent")
-    first = sqlite3.connect(str(database), timeout=0.25)
+        raise AcceptanceBlockedError(
+            "administrator-prepared disposable SQLite VFS DB/journal pair is absent"
+        )
+    first: sqlite3.Connection | None = None
     second: sqlite3.Connection | None = None
     reopened: sqlite3.Connection | None = None
     try:
+        first = sqlite3.connect(str(database), timeout=0.25)
         durability = configure_and_validate_authority_sqlite_connection(
             first,
             database_path=database,
@@ -660,7 +671,53 @@ def _run_sqlite_windows_vfs_phase() -> AcceptanceEvidence:
             raise AssertionError(
                 "SQLite durability evidence did not match the contract"
             )
+        schema = tuple(
+            tuple(row)
+            for row in first.execute(
+                f"PRAGMA table_info({ACCEPTANCE_SQLITE_VFS_TABLE})"
+            ).fetchall()
+        )
+        if schema != (
+            (0, "probe_id", "INTEGER", 0, None, 1),
+            (1, "marker", "TEXT", 1, None, 0),
+        ):
+            raise AcceptanceBlockedError(
+                "administrator-prepared disposable probe table is absent or has "
+                "an unapproved schema"
+            )
+        if (
+            first.execute(
+                f"SELECT COUNT(*) FROM {ACCEPTANCE_SQLITE_VFS_TABLE}"
+            ).fetchone()[0]
+            != 0
+        ):
+            raise AcceptanceBlockedError(
+                "administrator-prepared disposable probe table is not empty"
+            )
+        journal_before = journal.stat().st_size
+        if journal_before != 0:
+            raise AcceptanceBlockedError(
+                "administrator-prepared disposable journal is not empty before "
+                "the rollback probe"
+            )
         first.execute("BEGIN IMMEDIATE")
+        first.execute(
+            f"INSERT INTO {ACCEPTANCE_SQLITE_VFS_TABLE} (probe_id, marker) "
+            "VALUES (?, ?)",
+            (ACCEPTANCE_SQLITE_VFS_PROBE_ID, ACCEPTANCE_SQLITE_VFS_MARKER),
+        )
+        if first.execute(
+            f"SELECT marker FROM {ACCEPTANCE_SQLITE_VFS_TABLE} WHERE probe_id = ?",
+            (ACCEPTANCE_SQLITE_VFS_PROBE_ID,),
+        ).fetchone() != (ACCEPTANCE_SQLITE_VFS_MARKER,):
+            raise AssertionError(
+                "SQLite rollback marker was not visible in-transaction"
+            )
+        journal_during = journal.stat().st_size
+        if journal_during <= journal_before:
+            raise AssertionError(
+                "SQLite transaction did not write the persistent journal"
+            )
         second = sqlite3.connect(str(database), timeout=0.0)
         second.execute("PRAGMA busy_timeout = 0")
         with pytest.raises(sqlite3.OperationalError) as locked:
@@ -670,14 +727,61 @@ def _run_sqlite_windows_vfs_phase() -> AcceptanceEvidence:
                 "second SQLite connection did not observe real locking"
             )
         first.rollback()
+        if (
+            first.execute(
+                f"SELECT COUNT(*) FROM {ACCEPTANCE_SQLITE_VFS_TABLE} "
+                "WHERE probe_id = ?",
+                (ACCEPTANCE_SQLITE_VFS_PROBE_ID,),
+            ).fetchone()[0]
+            != 0
+        ):
+            raise AssertionError("SQLite rollback left a committed probe marker")
         second.execute("BEGIN IMMEDIATE")
+        second.execute(
+            f"INSERT INTO {ACCEPTANCE_SQLITE_VFS_TABLE} (probe_id, marker) "
+            "VALUES (?, ?)",
+            (ACCEPTANCE_SQLITE_VFS_PROBE_ID, ACCEPTANCE_SQLITE_VFS_MARKER),
+        )
+        if second.execute(
+            f"SELECT marker FROM {ACCEPTANCE_SQLITE_VFS_TABLE} WHERE probe_id = ?",
+            (ACCEPTANCE_SQLITE_VFS_PROBE_ID,),
+        ).fetchone() != (ACCEPTANCE_SQLITE_VFS_MARKER,):
+            raise AssertionError(
+                "SQLite reacquired write was not visible in-transaction"
+            )
         second.rollback()
+        if (
+            second.execute(
+                f"SELECT COUNT(*) FROM {ACCEPTANCE_SQLITE_VFS_TABLE} "
+                "WHERE probe_id = ?",
+                (ACCEPTANCE_SQLITE_VFS_PROBE_ID,),
+            ).fetchone()[0]
+            != 0
+        ):
+            raise AssertionError("SQLite reacquired rollback left a committed marker")
         reopened = sqlite3.connect(str(database), timeout=0.25)
         reopened.execute("SELECT name FROM sqlite_schema").fetchall()
+        if (
+            reopened.execute(
+                f"SELECT COUNT(*) FROM {ACCEPTANCE_SQLITE_VFS_TABLE} "
+                "WHERE probe_id = ?",
+                (ACCEPTANCE_SQLITE_VFS_PROBE_ID,),
+            ).fetchone()[0]
+            != 0
+        ):
+            raise AssertionError("SQLite reopen observed a committed probe marker")
         if not journal.is_file():
             raise AssertionError(
                 "persistent SQLite journal disappeared during acceptance"
             )
+    except sqlite3.Error as error:
+        raise AcceptanceBlockedError(
+            "disposable SQLite VFS probe could not complete under the Trading account"
+        ) from error
+    except OSError as error:
+        raise AcceptanceBlockedError(
+            "disposable SQLite VFS probe files could not be inspected"
+        ) from error
     finally:
         if reopened is not None:
             reopened.close()
@@ -685,9 +789,10 @@ def _run_sqlite_windows_vfs_phase() -> AcceptanceEvidence:
             if second.in_transaction:
                 second.rollback()
             second.close()
-        if first.in_transaction:
+        if first is not None and first.in_transaction:
             first.rollback()
-        first.close()
+        if first is not None:
+            first.close()
     return AcceptanceEvidence(
         phase=AcceptancePhase.SQLITE_WINDOWS_VFS,
         status=AcceptanceEvidenceStatus.PASS,
@@ -698,10 +803,13 @@ def _run_sqlite_windows_vfs_phase() -> AcceptanceEvidence:
             "foreign-keys-on",
             "journal-mode-persist",
             "synchronous-full",
-            "begin-immediate-succeeds",
+            "administrator-precreated-probe-table",
+            "real-main-database-insert-visible-in-transaction",
+            "persistent-journal-written-during-transaction",
             "second-connection-observes-real-locking",
-            "rollback-release-and-reacquire-succeed",
-            "reopen-succeeds",
+            "rollback-removes-probe-marker",
+            "reacquire-write-and-rollback-succeed",
+            "reopen-proves-no-committed-probe-marker",
             "persistent-journal-remains-present",
         ),
         bootstrap_digest=verification.bootstrap_digest,

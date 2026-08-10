@@ -222,8 +222,6 @@ def _validate_existing_objects(
 def _validate_database_if_present(
     database_present: bool,
     journal_present: bool,
-    *,
-    verification: BootstrapVerification | None = None,
 ) -> SqliteDatabaseState:
     if not database_present and not journal_present:
         return SqliteDatabaseState.NOT_PRESENT
@@ -237,7 +235,6 @@ def _validate_database_if_present(
             connection,
             database_path=PRODUCTION_AUTHORITY_PATHS.database,
             journal_path=PRODUCTION_AUTHORITY_PATHS.journal,
-            verification=verification,
         )
     finally:
         connection.close()
@@ -264,7 +261,6 @@ def validate_installed_authority(
     database_state = _validate_database_if_present(
         database_present,
         journal_present,
-        verification=verification,
     )
     return ProvisioningEvidence(
         ProvisioningState.VALIDATED,
@@ -334,7 +330,6 @@ def provision_authority(
     _validate_database_if_present(
         existing[PRODUCTION_AUTHORITY_PATHS.database],
         existing[PRODUCTION_AUTHORITY_PATHS.journal],
-        verification=verification,
     )
     try:
         for path, role in (
@@ -371,7 +366,6 @@ def provision_authority(
     database_state = _validate_database_if_present(
         database_present,
         journal_present,
-        verification=verification,
     )
     return ProvisioningEvidence(
         ProvisioningState.PROVISIONED,

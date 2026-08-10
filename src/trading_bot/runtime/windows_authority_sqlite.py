@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import os
 import sqlite3
 from dataclasses import dataclass
@@ -10,10 +9,7 @@ from enum import StrEnum
 from pathlib import Path
 from urllib.parse import quote
 
-from trading_bot.runtime.windows_authority import (
-    BootstrapVerification,
-    WindowsAuthorityError,
-)
+from trading_bot.runtime.windows_authority import WindowsAuthorityError
 
 
 class SqliteDurabilityError(WindowsAuthorityError):
@@ -25,28 +21,8 @@ class SqliteDatabaseState(StrEnum):
 
     NOT_PRESENT = "NOT_PRESENT"
     PRECREATED_UNINITIALIZED = "PRECREATED_UNINITIALIZED"
-    IDENTITY_BOUND = "IDENTITY_BOUND"
+    INITIALIZED_UNSUPPORTED = "INITIALIZED_UNSUPPORTED"
     INVALID_MISMATCHED = "INVALID_MISMATCHED"
-
-
-_AUTHORITY_METADATA_COLUMNS = (
-    ("authority_epoch_id", "TEXT"),
-    ("machine_authority_id", "TEXT"),
-    ("bootstrap_schema", "INTEGER"),
-    ("bootstrap_generation", "INTEGER"),
-    ("signing_key_id", "TEXT"),
-    ("approved_account_sid", "TEXT"),
-    ("provider_id", "TEXT"),
-    ("permitted_provider_operation", "TEXT"),
-    ("authority_policy_version", "TEXT"),
-    ("claim_policy_version", "TEXT"),
-    ("created_at_utc", "TEXT"),
-    ("bootstrap_digest", "BLOB"),
-    ("database_identity_digest", "BLOB"),
-    ("metadata_json", "BLOB"),
-    ("metadata_digest", "BLOB"),
-    ("singleton_key", "INTEGER"),
-)
 
 
 @dataclass(frozen=True, slots=True)
@@ -173,188 +149,14 @@ def _schema_objects(
     )
 
 
-def _require_metadata_schema(
-    connection: sqlite3.Connection,
-    schema_objects: tuple[tuple[object, ...], ...],
-) -> None:
-    metadata_objects = [row for row in schema_objects if row[1] == "authority_metadata"]
-    if len(metadata_objects) != 1 or metadata_objects[0][0] != "table":
-        raise SqliteDurabilityError(
-            "populated SQLite database does not contain one authority_metadata table"
-        )
-    try:
-        columns = tuple(
-            tuple(row)
-            for row in connection.execute(
-                "PRAGMA table_info(authority_metadata)"
-            ).fetchall()
-        )
-    except (sqlite3.Error, TypeError, ValueError, IndexError) as error:
-        raise SqliteDurabilityError(
-            "authority_metadata schema could not be read"
-        ) from error
-    actual_columns = tuple((row[1], row[2]) for row in columns)
-    if actual_columns != _AUTHORITY_METADATA_COLUMNS:
-        raise SqliteDurabilityError("authority_metadata schema is incompatible")
-
-
-def _require_exact_text(value: object, field: str) -> str:
-    if type(value) is not str:
-        raise SqliteDurabilityError(f"authority_metadata {field} is not text")
-    return value
-
-
-def _require_exact_integer(value: object, field: str) -> int:
-    if type(value) is not int:
-        raise SqliteDurabilityError(f"authority_metadata {field} is not an integer")
-    return value
-
-
-def _require_digest_blob(value: object, field: str) -> bytes:
-    if type(value) is not bytes or len(value) != hashlib.sha256().digest_size:
-        raise SqliteDurabilityError(
-            f"authority_metadata {field} is not a 32-byte digest"
-        )
-    return value
-
-
-def _validate_identity_bound_metadata(
-    connection: sqlite3.Connection,
-    schema_objects: tuple[tuple[object, ...], ...],
-    verification: BootstrapVerification | None,
-) -> SqliteDatabaseState:
-    _require_metadata_schema(connection, schema_objects)
-    if verification is None:
-        raise SqliteDurabilityError(
-            "identity-bound database requires a verified bootstrap"
-        )
-    try:
-        rows = tuple(
-            tuple(row)
-            for row in connection.execute(
-                """
-                SELECT authority_epoch_id, machine_authority_id,
-                       bootstrap_schema, bootstrap_generation, signing_key_id,
-                       approved_account_sid, provider_id,
-                       permitted_provider_operation, authority_policy_version,
-                       claim_policy_version, created_at_utc, bootstrap_digest,
-                       database_identity_digest, metadata_json, metadata_digest,
-                       singleton_key
-                FROM authority_metadata
-                """
-            ).fetchall()
-        )
-    except (sqlite3.Error, TypeError, ValueError, IndexError) as error:
-        raise SqliteDurabilityError(
-            "authority_metadata rows could not be read"
-        ) from error
-    if len(rows) != 1:
-        raise SqliteDurabilityError(
-            "authority_metadata must contain exactly one active singleton row"
-        )
-    row = rows[0]
-    (
-        authority_epoch_id,
-        machine_authority_id,
-        bootstrap_schema,
-        bootstrap_generation,
-        signing_key_id,
-        approved_account_sid,
-        provider_id,
-        permitted_provider_operation,
-        authority_policy_version,
-        claim_policy_version,
-        created_at_utc,
-        bootstrap_digest,
-        database_identity_digest,
-        metadata_json,
-        metadata_digest,
-        singleton_key,
-    ) = row
-    bootstrap = verification.bootstrap
-    expected_text = {
-        "authority_epoch_id": bootstrap.authority_epoch_id,
-        "machine_authority_id": bootstrap.machine_authority_id,
-        "signing_key_id": bootstrap.signing_key_id,
-        "approved_account_sid": bootstrap.approved_account_sid,
-        "provider_id": bootstrap.provider_id,
-        "permitted_provider_operation": bootstrap.permitted_provider_operation,
-        "authority_policy_version": bootstrap.authority_policy_version,
-        "claim_policy_version": bootstrap.claim_policy_version,
-    }
-    actual_text = {
-        "authority_epoch_id": _require_exact_text(
-            authority_epoch_id, "authority_epoch_id"
-        ),
-        "machine_authority_id": _require_exact_text(
-            machine_authority_id, "machine_authority_id"
-        ),
-        "signing_key_id": _require_exact_text(signing_key_id, "signing_key_id"),
-        "approved_account_sid": _require_exact_text(
-            approved_account_sid, "approved_account_sid"
-        ),
-        "provider_id": _require_exact_text(provider_id, "provider_id"),
-        "permitted_provider_operation": _require_exact_text(
-            permitted_provider_operation, "permitted_provider_operation"
-        ),
-        "authority_policy_version": _require_exact_text(
-            authority_policy_version, "authority_policy_version"
-        ),
-        "claim_policy_version": _require_exact_text(
-            claim_policy_version, "claim_policy_version"
-        ),
-    }
-    if actual_text != expected_text:
-        raise SqliteDurabilityError(
-            "authority_metadata does not match the verified bootstrap"
-        )
-    if (
-        _require_exact_integer(bootstrap_schema, "bootstrap_schema")
-        != bootstrap.bootstrap_schema
-    ):
-        raise SqliteDurabilityError("authority_metadata bootstrap schema mismatches")
-    if (
-        _require_exact_integer(bootstrap_generation, "bootstrap_generation")
-        != bootstrap.bootstrap_generation
-    ):
-        raise SqliteDurabilityError(
-            "authority_metadata bootstrap generation mismatches"
-        )
-    if _require_exact_integer(singleton_key, "singleton_key") != 1:
-        raise SqliteDurabilityError("authority_metadata singleton key is not one")
-    _require_exact_text(created_at_utc, "created_at_utc")
-    if type(metadata_json) is not bytes:
-        raise SqliteDurabilityError("authority_metadata metadata_json is not a BLOB")
-    if (
-        _require_digest_blob(metadata_digest, "metadata_digest")
-        != hashlib.sha256(metadata_json).digest()
-    ):
-        raise SqliteDurabilityError("authority_metadata metadata digest mismatches")
-    expected_bootstrap_digest = bytes.fromhex(verification.bootstrap_digest)
-    if (
-        _require_digest_blob(bootstrap_digest, "bootstrap_digest")
-        != expected_bootstrap_digest
-    ):
-        raise SqliteDurabilityError("authority_metadata bootstrap digest mismatches")
-    expected_database_digest = bytes.fromhex(bootstrap.database_identity_digest)
-    if (
-        _require_digest_blob(database_identity_digest, "database_identity_digest")
-        != expected_database_digest
-    ):
-        raise SqliteDurabilityError(
-            "authority_metadata database identity digest mismatches"
-        )
-    return SqliteDatabaseState.IDENTITY_BOUND
-
-
-def _determine_database_state(
-    connection: sqlite3.Connection,
-    verification: BootstrapVerification | None,
-) -> SqliteDatabaseState:
+def _determine_database_state(connection: sqlite3.Connection) -> SqliteDatabaseState:
     schema_objects = _schema_objects(connection)
     if not schema_objects:
         return SqliteDatabaseState.PRECREATED_UNINITIALIZED
-    return _validate_identity_bound_metadata(connection, schema_objects, verification)
+    raise SqliteDurabilityError(
+        f"{SqliteDatabaseState.INITIALIZED_UNSUPPORTED.value}: initialized "
+        "SQLite authority database is unsupported in Milestone A"
+    )
 
 
 def validate_installed_sqlite_prerequisites(
@@ -362,7 +164,6 @@ def validate_installed_sqlite_prerequisites(
     *,
     database_path: str | Path,
     journal_path: str | Path,
-    verification: BootstrapVerification | None = None,
 ) -> InstalledSqliteEvidence:
     """Validate installed SQLite files without configuring the connection.
 
@@ -379,7 +180,7 @@ def validate_installed_sqlite_prerequisites(
     _read_schema(connection)
     _require_integrity(connection)
     _require_persistent_journal(expected_journal)
-    database_state = _determine_database_state(connection, verification)
+    database_state = _determine_database_state(connection)
     return InstalledSqliteEvidence(
         database_path=expected_database,
         journal_path=expected_journal,

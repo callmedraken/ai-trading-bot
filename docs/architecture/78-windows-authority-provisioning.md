@@ -58,20 +58,19 @@ Installed database state is explicit. `NOT_PRESENT` means neither the database
 nor persistent journal exists. `PRECREATED_UNINITIALIZED` means the paired
 files are structurally valid but the database contains no user/application
 schema objects; SQLite-internal objects alone do not make it executable
-authority. `IDENTITY_BOUND` means one exact `authority_metadata` singleton is
-present and its immutable signed facts, bootstrap digest, database identity
-digest, metadata digest, and field types match the already verified bootstrap.
-Any incomplete pair, corrupt or truncated database, populated database without
-`authority_metadata`, incompatible metadata shape, missing singleton, or
-mismatch is `INVALID_MISMATCHED` and fails closed rather than producing
-evidence. `PRECREATED_UNINITIALIZED` is storage substrate only and is never
-reported as an executable or identity-bound authority database.
+authority. These are the only database states accepted by Milestone A. Any
+incomplete pair, corrupt or truncated database, arbitrary table, metadata-only
+database, or complete Architecture-77 fixture is classified as
+`INITIALIZED_UNSUPPORTED` and fails closed rather than producing evidence.
+Milestone A never reports an initialized database as executable or
+identity-bound authority.
 
-The typed `metadata_json` value is checked as an opaque BLOB together with its
-exact SHA-256 `metadata_digest`. Architecture 77 does not define a separate
-canonical semantic encoding for that JSON beyond this immutable byte/digest
-contract, so this release does not invent one or claim metadata-schema
-completeness.
+The future schema contract may check `metadata_json` only as opaque bytes
+together with its exact SHA-256 `metadata_digest`. Architecture 77 does not
+define a separate canonical semantic encoding for that JSON beyond this
+immutable byte/digest contract, so this release does not invent one or claim
+metadata-schema completeness. Milestone A does not reach this initialized-
+schema check because it rejects every initialized database.
 
 The pre-existing `F:\AITradingBot` parent component is also opened and checked;
 it must be a local NTFS directory with the exact administrator/SYSTEM-only
@@ -105,14 +104,16 @@ local `Trading` account through `LookupAccountNameW` and compares its SID to
 the signed SID. Display-name comparisons and localized command output are not
 security decisions.
 
-When `authority_metadata` exists, installed validation and provisioning require
-its exact immutable identity facts to match the verified signed bootstrap:
-authority epoch, machine authority, bootstrap schema and generation, signing
-key, approved SID, provider/operation, policy versions, SHA-256 bootstrap
-digest, and database identity digest. The database-local bootstrap digest must
-be the SHA-256 of the exact canonical verified bootstrap bytes. A foreign,
-old, malformed, multiply populated, or otherwise mismatched initialized
-database fails before validation evidence or trust-material mutation.
+Architecture 77 defines the future executable relational authority model,
+including `authority_metadata`; it is not an approved Milestone-A production
+schema artifact or version contract. Milestone A therefore does not interpret
+or bind any initialized schema, even when an `authority_metadata` row appears
+to match the verified bootstrap. A future schema milestone must first approve
+the exact schema artifact and version/migration contract, constraints and
+triggers, immutable metadata rules, and canonical semantic encoding for
+metadata before it may reconcile database facts to the signed bootstrap. The
+existing `metadata_json` limitation remains: Architecture 77 defines no
+canonical semantic encoding, so this milestone does not invent one.
 
 ## Security principal and DACL intent
 
@@ -194,8 +195,8 @@ actually owns.
 Trading SID, validates the fixed parent chain, opens and inspects the fixed
 bootstrap/signature handles, reads the bytes from those same verified handles,
 verifies the signature, inspects the remaining fixed objects, and checks the
-installed SQLite file/state prerequisites against that verified bootstrap. It
-does not configure connection-local PRAGMAs or mutate the tree.
+installed SQLite file/state prerequisites. It does not configure
+connection-local PRAGMAs or mutate the tree.
 
 `provision` requires the same token and performs, in order:
 
@@ -204,15 +205,17 @@ does not configure connection-local PRAGMAs or mutate the tree.
    local Trading SID before final-tree mutation;
 3. validate the fixed parent/object state and any pre-created database/journal
    with the read-only SQLite format/schema/integrity checks before mutation;
-4. if the pre-created database is `IDENTITY_BOUND`, reconcile its immutable
-   metadata with the verified staging bootstrap; reject populated unrelated or
-   incomplete state;
+4. accept only the `PRECREATED_UNINITIALIZED` storage state; reject every
+   initialized/application schema as `INITIALIZED_UNSUPPORTED` before any
+   trust-material mutation. No database identity binding or production schema
+   initialization exists in Milestone A;
 5. create only the fixed root, `capture-output`, and `backup` directories with
    the reviewed owner/DACL descriptor;
 6. install trust material only when absent, under that descriptor, or require
    exact byte identity when already present;
 7. validate the resulting fixed objects; and
-8. validate the installed SQLite state/binding and report sanitized evidence.
+8. validate the installed SQLite storage state and report sanitized evidence;
+   no initialized database identity is reported.
 
 Unexpected existing types, bytes, owner, DACL, or reparse state fail closed;
 the command does not repair hostile state. It never creates a production SQL
@@ -226,8 +229,11 @@ registry behavior, mutex identity/name, policy masks, and typed failures.
 Windows acceptance must be explicitly opted in and must operate against the
 administrator-provisioned fixed root. It must exercise both administrator and
 Trading perspectives, including SID/DACL/reparse/final-path checks, SQLite
-PERSIST/FULL prerequisites, destructive-denial cases, and cross-session
-`Global\` mutex behavior.
+PERSIST/FULL prerequisites, a separate administrator-prepared disposable
+SQLite probe with real DML/rollback/locking, destructive-denial cases, and
+cross-session `Global\` mutex behavior. The disposable probe is acceptance
+evidence only; it is never the fixed production database and is never passed
+to installed authority validation.
 
 Production remains NO-GO until the approved P-256 public trust anchor is
 provided and the administrator-provisioned database/journal artifact boundary

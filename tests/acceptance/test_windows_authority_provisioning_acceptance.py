@@ -36,6 +36,7 @@ from trading_bot.runtime.windows_authority_provisioning import (
 from trading_bot.runtime.windows_authority_security import (
     DELETE,
     ERROR_ACCESS_DENIED,
+    ERROR_FILE_NOT_FOUND,
     FILE_FLAG_BACKUP_SEMANTICS,
     FILE_FLAG_OPEN_REPARSE_POINT,
     FILE_SHARE_DELETE,
@@ -461,6 +462,21 @@ def _expect_access_denied(scenario: str, operation: Callable[[], object]) -> Non
     pytest.fail(f"Trading allow/deny policy allowed {scenario}")
 
 
+_POINTER_INVALID_HANDLE_VALUE = ctypes.c_void_p(-1).value
+
+
+def _native_handle_value(handle: object) -> int:
+    """Normalize acceptance-probe handles without importing runtime internals."""
+
+    value = getattr(handle, "value", handle)
+    if value is None:
+        return 0
+    normalized = int(value)
+    if normalized in (INVALID_HANDLE_VALUE, _POINTER_INVALID_HANDLE_VALUE):
+        return INVALID_HANDLE_VALUE
+    return normalized
+
+
 def _native_access_probe(
     path: object, desired_access: int, kind: AuthorityObjectKind
 ) -> bool:
@@ -492,7 +508,7 @@ def _native_access_probe(
         flags,
         None,
     )
-    value = int(getattr(handle, "value", handle) or 0)
+    value = _native_handle_value(handle)
     if value in (0, INVALID_HANDLE_VALUE):
         error_code = ctypes.get_last_error()
         if error_code == ERROR_ACCESS_DENIED:
@@ -504,6 +520,144 @@ def _native_access_probe(
     if not close(value):
         raise AcceptanceBlockedError("native access probe handle could not close")
     return True
+
+
+def _install_native_access_probe_kernel(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    handle: object,
+    error_code: int,
+    close_result: bool = True,
+) -> list[object]:
+    closed: list[object] = []
+
+    class FakeCreateFile:
+        argtypes: object
+        restype: object
+
+        def __call__(self, *args: object) -> object:
+            return handle
+
+    class FakeCloseHandle:
+        argtypes: object
+        restype: object
+
+        def __call__(self, value: object) -> bool:
+            closed.append(value)
+            return close_result
+
+    class FakeKernel32:
+        CreateFileW = FakeCreateFile()
+        CloseHandle = FakeCloseHandle()
+
+    monkeypatch.setattr(os, "name", "nt")
+    monkeypatch.setattr(
+        ctypes,
+        "WinDLL",
+        lambda name, use_last_error: FakeKernel32(),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        ctypes,
+        "get_last_error",
+        lambda: error_code,
+        raising=False,
+    )
+    return closed
+
+
+def test_native_access_probe_normalizes_pointer_width_invalid_handles() -> None:
+    pointer_bits = ctypes.sizeof(ctypes.c_void_p) * 8
+    pointer_invalid = ctypes.c_void_p(-1).value
+    assert pointer_invalid == (1 << pointer_bits) - 1
+    assert _native_handle_value(None) == 0
+    assert _native_handle_value(ctypes.c_void_p()) == 0
+    assert _native_handle_value(0) == 0
+    assert _native_handle_value(123) == 123
+    assert _native_handle_value(-1) == INVALID_HANDLE_VALUE
+    assert _native_handle_value(ctypes.c_void_p(-1)) == INVALID_HANDLE_VALUE
+    assert _native_handle_value(pointer_invalid) == INVALID_HANDLE_VALUE
+
+
+@pytest.mark.parametrize("desired_access", [DELETE, WRITE_DAC, WRITE_OWNER])
+def test_native_trading_denial_probe_counts_access_denied(
+    monkeypatch: pytest.MonkeyPatch,
+    desired_access: int,
+) -> None:
+    pointer_invalid = ctypes.c_void_p(-1).value
+    closed = _install_native_access_probe_kernel(
+        monkeypatch,
+        handle=pointer_invalid,
+        error_code=ERROR_ACCESS_DENIED,
+    )
+
+    assert (
+        _native_access_probe(
+            PRODUCTION_AUTHORITY_PATHS.bootstrap,
+            desired_access,
+            AuthorityObjectKind.FILE,
+        )
+        is False
+    )
+    assert closed == []
+
+
+def test_native_access_probe_blocks_unrelated_invalid_handle_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pointer_invalid = ctypes.c_void_p(-1).value
+    closed = _install_native_access_probe_kernel(
+        monkeypatch,
+        handle=pointer_invalid,
+        error_code=ERROR_FILE_NOT_FOUND,
+    )
+
+    with pytest.raises(AcceptanceBlockedError):
+        _native_access_probe(
+            PRODUCTION_AUTHORITY_PATHS.bootstrap,
+            DELETE,
+            AuthorityObjectKind.FILE,
+        )
+    assert closed == []
+
+
+def test_native_access_probe_closes_valid_handle_once(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    closed = _install_native_access_probe_kernel(
+        monkeypatch,
+        handle=ctypes.c_void_p(123),
+        error_code=0,
+    )
+
+    assert (
+        _native_access_probe(
+            PRODUCTION_AUTHORITY_PATHS.bootstrap,
+            DELETE,
+            AuthorityObjectKind.FILE,
+        )
+        is True
+    )
+    assert closed == [123]
+
+
+def test_native_access_probe_blocks_valid_handle_close_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    closed = _install_native_access_probe_kernel(
+        monkeypatch,
+        handle=ctypes.c_void_p(123),
+        error_code=0,
+        close_result=False,
+    )
+
+    with pytest.raises(AcceptanceBlockedError):
+        _native_access_probe(
+            PRODUCTION_AUTHORITY_PATHS.bootstrap,
+            DELETE,
+            AuthorityObjectKind.FILE,
+        )
+    assert closed == [123]
 
 
 def _create_capture_artifact(capture_root: Path) -> None:

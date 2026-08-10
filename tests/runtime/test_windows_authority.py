@@ -139,6 +139,260 @@ def test_native_object_open_is_fixed_path_only(
         )
 
 
+def test_handle_value_normalizes_null_valid_and_pointer_width_invalid() -> None:
+    import trading_bot.runtime.windows_authority_security as security
+
+    pointer_bits = ctypes.sizeof(ctypes.c_void_p) * 8
+    pointer_invalid = ctypes.c_void_p(-1).value
+    assert pointer_invalid == (1 << pointer_bits) - 1
+    assert security._handle_value(None) == 0
+    assert security._handle_value(ctypes.c_void_p()) == 0
+    assert security._handle_value(0) == 0
+    assert security._handle_value(123) == 123
+    assert security._handle_value(-1) == security.INVALID_HANDLE_VALUE
+    assert security._handle_value(ctypes.c_void_p(-1)) == security.INVALID_HANDLE_VALUE
+    assert security._handle_value(pointer_invalid) == security.INVALID_HANDLE_VALUE
+
+
+def test_windows_handle_closes_valid_handles_once_and_skips_invalid_sentinels(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import trading_bot.runtime.windows_authority_security as security
+
+    closed: list[object] = []
+    monkeypatch.setattr(security.os, "name", "nt")
+    monkeypatch.setattr(security, "_close_handle", closed.append)
+    pointer_invalid = ctypes.c_void_p(-1).value
+
+    for raw in (-1, pointer_invalid, ctypes.c_void_p(-1)):
+        handle = security.WindowsHandle(raw)
+        handle.close()
+        handle.close()
+
+    valid = security.WindowsHandle(ctypes.c_void_p(123))
+    valid.close()
+    valid.close()
+    assert closed == [123]
+
+
+@pytest.mark.parametrize(
+    "error_code",
+    [2, 3],
+)
+def test_open_authority_object_rejects_pointer_invalid_handle_immediately(
+    monkeypatch: pytest.MonkeyPatch,
+    error_code: int,
+) -> None:
+    import trading_bot.runtime.windows_authority_security as security
+
+    calls: list[str] = []
+    pointer_invalid = ctypes.c_void_p(-1).value
+
+    class FakeCreateFile:
+        argtypes: object
+        restype: object
+
+        def __call__(self, *args: object) -> int:
+            calls.append("CreateFileW")
+            return pointer_invalid
+
+    class FakeKernel32:
+        CreateFileW = FakeCreateFile()
+
+    monkeypatch.setattr(security, "wintypes", wintypes)
+    monkeypatch.setattr(security, "require_windows_platform", lambda: None)
+    monkeypatch.setattr(security, "_kernel32", lambda: FakeKernel32())
+    monkeypatch.setattr(
+        security.ctypes,
+        "get_last_error",
+        lambda: error_code,
+        raising=False,
+    )
+
+    with pytest.raises(WindowsNativeError) as caught:
+        security.open_authority_object(
+            PRODUCTION_AUTHORITY_PATHS.root,
+            AuthorityObjectKind.DIRECTORY,
+        )
+
+    assert caught.value.error_code == error_code
+    assert calls == ["CreateFileW"]
+
+
+def test_validate_existing_root_treats_pointer_invalid_not_found_as_absent(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import trading_bot.runtime.windows_authority_provisioning as provisioning
+    import trading_bot.runtime.windows_authority_security as security
+
+    pointer_invalid = ctypes.c_void_p(-1).value
+
+    class FakeCreateFile:
+        argtypes: object
+        restype: object
+
+        def __call__(self, *args: object) -> int:
+            return pointer_invalid
+
+    class FakeKernel32:
+        CreateFileW = FakeCreateFile()
+
+    monkeypatch.setattr(security, "wintypes", wintypes)
+    monkeypatch.setattr(security, "require_windows_platform", lambda: None)
+    monkeypatch.setattr(security, "_kernel32", lambda: FakeKernel32())
+    monkeypatch.setattr(security.ctypes, "get_last_error", lambda: 3, raising=False)
+    monkeypatch.setattr(
+        provisioning, "open_authority_object", security.open_authority_object
+    )
+    monkeypatch.setattr(
+        provisioning,
+        "validate_fixed_parent_chain",
+        lambda path, *, trading_sid: None,
+    )
+    monkeypatch.setattr(
+        provisioning.os.path,
+        "lexists",
+        lambda path: pytest.fail(f"child probe was attempted: {path}"),
+    )
+
+    assert (
+        provisioning._validate_existing_authority_root("S-1-5-21-100-200-300-400")
+        is False
+    )
+
+
+def test_validate_existing_root_keeps_non_not_found_failure_fail_closed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import trading_bot.runtime.windows_authority_provisioning as provisioning
+
+    monkeypatch.setattr(
+        provisioning,
+        "validate_fixed_parent_chain",
+        lambda path, *, trading_sid: None,
+    )
+    monkeypatch.setattr(
+        provisioning,
+        "open_authority_object",
+        lambda path, kind: (_ for _ in ()).throw(
+            WindowsNativeError("CreateFileW(authority object)", 5)
+        ),
+    )
+    monkeypatch.setattr(
+        provisioning.os.path,
+        "lexists",
+        lambda path: pytest.fail(f"child probe was attempted: {path}"),
+    )
+
+    with pytest.raises(WindowsNativeError) as caught:
+        provisioning._validate_existing_authority_root("S-1-5-21-100-200-300-400")
+    assert caught.value.error_code == 5
+
+
+def test_create_authority_file_rejects_pointer_invalid_without_writes_or_close(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import trading_bot.runtime.windows_authority_security as security
+
+    calls: list[str] = []
+    pointer_invalid = ctypes.c_void_p(-1).value
+
+    class FakeCreateFile:
+        argtypes: object
+        restype: object
+
+        def __call__(self, *args: object) -> int:
+            calls.append("CreateFileW")
+            return pointer_invalid
+
+    class FakeWriteFile:
+        argtypes: object
+        restype: object
+
+        def __call__(self, *args: object) -> bool:
+            calls.append("WriteFile")
+            return True
+
+    class FakeFlushFileBuffers:
+        argtypes: object
+        restype: object
+
+        def __call__(self, *args: object) -> bool:
+            calls.append("FlushFileBuffers")
+            return True
+
+    class FakeKernel32:
+        CreateFileW = FakeCreateFile()
+        WriteFile = FakeWriteFile()
+        FlushFileBuffers = FakeFlushFileBuffers()
+
+    class FakeAttributes:
+        attributes = ctypes.c_int()
+
+        def __enter__(self) -> FakeAttributes:
+            return self
+
+        def __exit__(self, exc_type: object, exc: object, traceback: object) -> None:
+            return None
+
+    closed: list[object] = []
+    monkeypatch.setattr(security, "wintypes", wintypes)
+    monkeypatch.setattr(security, "require_windows_platform", lambda: None)
+    monkeypatch.setattr(security, "_kernel32", lambda: FakeKernel32())
+    monkeypatch.setattr(
+        security, "build_security_attributes", lambda policy: FakeAttributes()
+    )
+    monkeypatch.setattr(security, "_close_handle", closed.append)
+    monkeypatch.setattr(
+        security.ctypes,
+        "get_last_error",
+        lambda: security.ERROR_PATH_NOT_FOUND,
+        raising=False,
+    )
+
+    with pytest.raises(WindowsNativeError) as caught:
+        security.create_authority_file(
+            PRODUCTION_AUTHORITY_PATHS.bootstrap,
+            b"authority bytes",
+            authority_security_policy("bootstrap", "S-1-5-21-100-200-300-400"),
+        )
+
+    assert caught.value.error_code == security.ERROR_PATH_NOT_FOUND
+    assert calls == ["CreateFileW"]
+    assert closed == []
+
+
+def test_open_authority_object_preserves_valid_handle_behavior(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import trading_bot.runtime.windows_authority_security as security
+
+    class FakeCreateFile:
+        argtypes: object
+        restype: object
+
+        def __call__(self, *args: object) -> ctypes.c_void_p:
+            return ctypes.c_void_p(123)
+
+    class FakeKernel32:
+        CreateFileW = FakeCreateFile()
+
+    closed: list[object] = []
+    monkeypatch.setattr(security, "wintypes", wintypes)
+    monkeypatch.setattr(security, "require_windows_platform", lambda: None)
+    monkeypatch.setattr(security, "_kernel32", lambda: FakeKernel32())
+    monkeypatch.setattr(security.os, "name", "nt")
+    monkeypatch.setattr(security, "_close_handle", closed.append)
+
+    handle = security.open_authority_object(
+        PRODUCTION_AUTHORITY_PATHS.root,
+        AuthorityObjectKind.DIRECTORY,
+    )
+    assert handle.value == 123
+    handle.close()
+    assert closed == [123]
+
+
 def _mock_installed_material_reader(
     monkeypatch: pytest.MonkeyPatch,
     *,

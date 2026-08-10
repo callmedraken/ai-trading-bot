@@ -250,11 +250,26 @@ def authority_parent_security_policy() -> SecurityPolicy:
     return SecurityPolicy("S-1-5-32-544", (admins, system))
 
 
+_POINTER_INVALID_HANDLE_VALUE = ctypes.c_void_p(-1).value
+
+
+def _handle_value(handle: object) -> int:
+    """Normalize ctypes and Python handles to the canonical integer form."""
+
+    value = getattr(handle, "value", handle)
+    if value is None:
+        return 0
+    normalized = int(value)
+    if normalized in (INVALID_HANDLE_VALUE, _POINTER_INVALID_HANDLE_VALUE):
+        return INVALID_HANDLE_VALUE
+    return normalized
+
+
 class WindowsHandle:
     """Small deterministic CloseHandle wrapper."""
 
-    def __init__(self, value: int, *, close: bool = True) -> None:
-        self.value = value
+    def __init__(self, value: object, *, close: bool = True) -> None:
+        self.value = _handle_value(value)
         self._close = close
 
     def __enter__(self) -> int:
@@ -264,10 +279,15 @@ class WindowsHandle:
         self.close()
 
     def close(self) -> None:
-        if self._close and self.value not in (0, INVALID_HANDLE_VALUE):
-            if os.name == "nt":
-                _close_handle(self.value)
+        if not self._close:
+            return
+        handle = _handle_value(self.value)
+        if handle in (0, INVALID_HANDLE_VALUE):
             self.value = 0
+            return
+        if os.name == "nt":
+            _close_handle(handle)
+        self.value = 0
 
 
 def _last_error(operation: str) -> WindowsNativeError:
@@ -301,13 +321,6 @@ def _local_free(pointer: object) -> None:
     free.argtypes = [ctypes.c_void_p]
     free.restype = ctypes.c_void_p
     free(pointer)
-
-
-def _handle_value(handle: object) -> int:
-    value = getattr(handle, "value", handle)
-    if value is None:
-        return 0
-    return int(value)
 
 
 def _require_fixed_open_path(path: str | PureWindowsPath) -> None:

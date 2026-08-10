@@ -103,6 +103,20 @@ def _read_schema(connection: sqlite3.Connection) -> None:
         ) from error
 
 
+def _require_integrity(connection: sqlite3.Connection) -> None:
+    try:
+        result = tuple(
+            tuple(row)
+            for row in connection.execute("PRAGMA integrity_check").fetchall()
+        )
+    except (sqlite3.Error, TypeError, ValueError, IndexError) as error:
+        raise SqliteDurabilityError(
+            "SQLite integrity check could not be read"
+        ) from error
+    if result != (("ok",),):
+        raise SqliteDurabilityError("SQLite integrity check did not succeed")
+
+
 def validate_installed_sqlite_prerequisites(
     connection: sqlite3.Connection,
     *,
@@ -123,6 +137,7 @@ def validate_installed_sqlite_prerequisites(
     _require_database_file(expected_database)
     databases = _main_database(connection, expected_database)
     _read_schema(connection)
+    _require_integrity(connection)
     _require_persistent_journal(expected_journal)
     return InstalledSqliteEvidence(
         database_path=expected_database,

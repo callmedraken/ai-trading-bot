@@ -80,6 +80,91 @@ def test_installed_validation_rejects_non_sqlite_and_truncated_database(
         connection.close()
 
 
+def _create_populated_database(tmp_path: Path) -> tuple[Path, Path]:
+    database = tmp_path / "authority.sqlite3"
+    journal = tmp_path / "authority.sqlite3-journal"
+    connection = sqlite3.connect(database)
+    try:
+        connection.execute("CREATE TABLE disposable_data(value TEXT NOT NULL)")
+        connection.executemany(
+            "INSERT INTO disposable_data(value) VALUES (?)",
+            ((f"value-{index}",) for index in range(256)),
+        )
+        connection.commit()
+    finally:
+        connection.close()
+    journal.touch()
+    return database, journal
+
+
+def test_installed_validation_accepts_valid_populated_database(
+    tmp_path: Path,
+) -> None:
+    database, journal = _create_populated_database(tmp_path)
+    connection = open_read_only_sqlite_connection(database)
+    try:
+        evidence = validate_installed_sqlite_prerequisites(
+            connection, database_path=database, journal_path=journal
+        )
+        assert evidence.database_openable is True
+        assert connection.execute(
+            "SELECT count(*) FROM disposable_data"
+        ).fetchone() == (256,)
+    finally:
+        connection.close()
+
+
+def _corrupt_later_btree_page(database: Path) -> None:
+    connection = sqlite3.connect(database)
+    try:
+        connection.execute("PRAGMA page_size = 1024")
+        connection.execute("CREATE TABLE disposable_data(value TEXT NOT NULL)")
+        connection.executemany(
+            "INSERT INTO disposable_data(value) VALUES (?)",
+            ((f"value-{index}",) for index in range(4096)),
+        )
+        connection.execute(
+            "CREATE INDEX disposable_data_value_idx ON disposable_data(value)"
+        )
+        connection.commit()
+        page_size = int(connection.execute("PRAGMA page_size").fetchone()[0])
+        page_count = int(connection.execute("PRAGMA page_count").fetchone()[0])
+    finally:
+        connection.close()
+
+    contents = bytearray(database.read_bytes())
+    page_offset = next(
+        (
+            (page - 1) * page_size
+            for page in range(2, page_count + 1)
+            if contents[(page - 1) * page_size] in {0x02, 0x05, 0x0A, 0x0D}
+        ),
+        None,
+    )
+    assert page_offset is not None
+    contents[page_offset] = 0
+    database.write_bytes(contents)
+
+
+def test_integrity_validation_rejects_corruption_in_a_later_database_page(
+    tmp_path: Path,
+) -> None:
+    database = tmp_path / "authority.sqlite3"
+    journal = tmp_path / "authority.sqlite3-journal"
+    _corrupt_later_btree_page(database)
+    journal.touch()
+    before_bytes = database.read_bytes()
+    connection = open_read_only_sqlite_connection(database)
+    try:
+        with pytest.raises(SqliteDurabilityError):
+            validate_installed_sqlite_prerequisites(
+                connection, database_path=database, journal_path=journal
+            )
+    finally:
+        connection.close()
+    assert database.read_bytes() == before_bytes
+
+
 def test_installed_validation_uses_fixed_read_only_sqlite_uri(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

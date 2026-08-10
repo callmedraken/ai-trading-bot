@@ -6,6 +6,8 @@ import ctypes
 import hashlib
 import json
 import os
+import threading
+import uuid
 from ctypes import wintypes
 
 import pytest
@@ -53,6 +55,7 @@ from trading_bot.runtime.windows_authority_security import (
     FILE_WRITE_ATTRIBUTES,
     FILE_WRITE_DATA,
     FILE_WRITE_EA,
+    MUTEX_ALL_ACCESS,
     READ_CONTROL,
     SE_FILE_OBJECT,
     SE_KERNEL_OBJECT,
@@ -68,6 +71,7 @@ from trading_bot.runtime.windows_authority_security import (
     SecurityPolicy,
     authority_parent_security_policy,
     authority_security_policy,
+    resolve_current_token_sid,
     sqlite_trading_file_rights,
 )
 
@@ -119,6 +123,19 @@ def test_fixed_path_rejects_unc_device_and_drive_relative_inputs() -> None:
     ):
         with pytest.raises(AuthorityPathError):
             require_fixed_authority_path(supplied, expected)
+
+
+def test_native_object_open_is_fixed_path_only(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import trading_bot.runtime.windows_authority_security as security
+
+    monkeypatch.setattr(security, "require_windows_platform", lambda: None)
+    with pytest.raises(AuthorityPathError):
+        security.open_authority_object(
+            r"F:\AITradingBot\Authority\other.sqlite3",
+            AuthorityObjectKind.FILE,
+        )
 
 
 @pytest.mark.parametrize(
@@ -628,6 +645,145 @@ def test_trading_can_create_a_new_mutex_with_exact_rights_and_kernel_validation(
         args for name, args in calls if name == "inspect"
     ]
     scope.release()
+
+
+@pytest.mark.skipif(
+    os.name != "nt" or os.environ.get("AI_TRADING_BOT_RUN_WINDOWS_NATIVE_TESTS") != "1",
+    reason="opt-in disposable native Windows mutex integration test",
+)
+def test_native_global_lifecycle_mutex_create_release_and_reacquire() -> None:
+    """Exercise a temporary Global mutex without touching production authority state."""
+
+    trading_sid = resolve_current_token_sid()
+    reservation = f"native-contract-test-{os.getpid()}-{uuid.uuid4().hex}"
+    first = GlobalLifecycleMutex(
+        "native-contract-test-machine",
+        "native-contract-test-epoch",
+        reservation,
+        trading_sid=trading_sid,
+    )
+    first_acquisition = first.acquire()
+    contender_started = threading.Event()
+    contender_acquired = threading.Event()
+    contender_errors: list[BaseException] = []
+
+    def contend() -> None:
+        contender = GlobalLifecycleMutex(
+            "native-contract-test-machine",
+            "native-contract-test-epoch",
+            reservation,
+            trading_sid=trading_sid,
+        )
+        contender_started.set()
+        try:
+            contender.acquire()
+            contender_acquired.set()
+        except BaseException as error:
+            contender_errors.append(error)
+        finally:
+            contender.release()
+
+    thread = threading.Thread(target=contend)
+    thread.start()
+    try:
+        assert first_acquisition.was_abandoned is False
+        assert contender_started.wait(5) is True
+        assert contender_acquired.wait(0.1) is False
+    finally:
+        first.release()
+    thread.join(5)
+    assert thread.is_alive() is False
+    assert contender_errors == []
+    assert contender_acquired.is_set() is True
+
+    second = GlobalLifecycleMutex(
+        "native-contract-test-machine",
+        "native-contract-test-epoch",
+        reservation,
+        trading_sid=trading_sid,
+    )
+    second_acquisition = second.acquire()
+    try:
+        assert second_acquisition.was_abandoned is False
+    finally:
+        second.release()
+
+    abandoned_holder: list[GlobalLifecycleMutex] = []
+    abandoned_errors: list[BaseException] = []
+
+    def abandon() -> None:
+        holder = GlobalLifecycleMutex(
+            "native-contract-test-machine",
+            "native-contract-test-epoch",
+            reservation,
+            trading_sid=trading_sid,
+        )
+        try:
+            holder.acquire()
+            abandoned_holder.append(holder)
+        except BaseException as error:
+            abandoned_errors.append(error)
+
+    abandoned_thread = threading.Thread(target=abandon)
+    abandoned_thread.start()
+    abandoned_thread.join(5)
+    assert abandoned_thread.is_alive() is False
+    assert abandoned_errors == []
+    assert len(abandoned_holder) == 1
+
+    recovery = GlobalLifecycleMutex(
+        "native-contract-test-machine",
+        "native-contract-test-epoch",
+        reservation,
+        trading_sid=trading_sid,
+    )
+    recovery_acquisition = recovery.acquire()
+    try:
+        assert recovery_acquisition.was_abandoned is True
+    finally:
+        recovery.release()
+        abandoned_holder[0].close()
+
+
+@pytest.mark.skipif(
+    os.name != "nt" or os.environ.get("AI_TRADING_BOT_RUN_WINDOWS_NATIVE_TESTS") != "1",
+    reason="opt-in disposable native Windows mutex security test",
+)
+def test_native_global_lifecycle_mutex_rejects_unreviewed_security() -> None:
+    """Reject a disposable pre-existing Global mutex with the wrong security."""
+
+    import trading_bot.runtime.windows_authority_mutex as mutex
+
+    trading_sid = resolve_current_token_sid()
+    reservation = f"native-hostile-test-{os.getpid()}-{uuid.uuid4().hex}"
+    name = mutex.lifecycle_mutex_name(
+        "native-hostile-test-machine", "native-hostile-test-epoch", reservation
+    )
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    create = kernel32.CreateMutexExW
+    create.argtypes = [
+        ctypes.c_void_p,
+        ctypes.c_wchar_p,
+        wintypes.DWORD,
+        wintypes.DWORD,
+    ]
+    create.restype = ctypes.c_void_p
+    handle = create(None, name, 0, MUTEX_ALL_ACCESS)
+    assert handle
+    native_handle = int(getattr(handle, "value", handle))
+    close = kernel32.CloseHandle
+    close.argtypes = [ctypes.c_void_p]
+    close.restype = wintypes.BOOL
+    try:
+        with pytest.raises(LifecycleMutexSecurityError):
+            GlobalLifecycleMutex(
+                "native-hostile-test-machine",
+                "native-hostile-test-epoch",
+                reservation,
+                trading_sid=trading_sid,
+            ).acquire()
+    finally:
+        assert close(native_handle)
 
 
 def _directory_inspection(

@@ -310,6 +310,12 @@ def _handle_value(handle: object) -> int:
     return int(value)
 
 
+def _require_fixed_open_path(path: str | PureWindowsPath) -> None:
+    if str(path) == str(PRODUCTION_AUTHORITY_PATHS.root.parent):
+        return
+    require_fixed_authority_tree_path(path)
+
+
 def open_authority_object(
     path: str | PureWindowsPath,
     kind: AuthorityObjectKind,
@@ -318,6 +324,9 @@ def open_authority_object(
 ) -> WindowsHandle:
     """Open an authority object without following reparse points."""
 
+    _require_fixed_open_path(path)
+    if type(kind) is not AuthorityObjectKind:
+        raise AuthorityObjectError("authority object kind must be explicit")
     require_windows_platform()
     expected = str(path)
     if not expected.startswith("F:\\") or expected.startswith("\\\\"):
@@ -552,10 +561,24 @@ def resolve_current_token_sid() -> str:
 def resolve_local_trading_sid() -> str:
     """Resolve the local ``Trading`` account through LookupAccountNameW."""
 
-    return _lookup_account_sid("Trading")
+    kernel32 = _kernel32()
+    get_computer_name = kernel32.GetComputerNameW
+    get_computer_name.argtypes = [ctypes.c_wchar_p, ctypes.POINTER(wintypes.DWORD)]
+    get_computer_name.restype = wintypes.BOOL
+    computer_name = ctypes.create_unicode_buffer(256)
+    name_size = wintypes.DWORD(len(computer_name))
+    if not get_computer_name(computer_name, ctypes.byref(name_size)):
+        raise _last_error("GetComputerNameW")
+    if not computer_name.value:
+        raise AuthorityPrincipalError("local computer name is unavailable")
+    return _lookup_account_sid("Trading", system_name=computer_name.value)
 
 
-def _lookup_account_sid(account_name: str) -> str:
+def _lookup_account_sid(
+    account_name: str,
+    *,
+    system_name: str | None = None,
+) -> str:
     """Resolve one account/group name and return only its SID."""
 
     require_windows_platform()
@@ -575,7 +598,7 @@ def _lookup_account_sid(account_name: str) -> str:
     domain_size = wintypes.DWORD(0)
     sid_type = wintypes.DWORD(0)
     lookup(
-        None,
+        system_name,
         account_name,
         None,
         ctypes.byref(sid_size),
@@ -588,7 +611,7 @@ def _lookup_account_sid(account_name: str) -> str:
     sid = ctypes.create_string_buffer(sid_size.value)
     domain = ctypes.create_unicode_buffer(domain_size.value)
     if not lookup(
-        None,
+        system_name,
         account_name,
         sid,
         ctypes.byref(sid_size),

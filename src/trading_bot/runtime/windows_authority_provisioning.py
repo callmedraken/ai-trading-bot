@@ -293,6 +293,11 @@ def provision_authority(
     existing = _existing_fixed_objects()
     validate_fixed_parent_chain(PRODUCTION_AUTHORITY_PATHS.root)
     _validate_existing_objects(trading_sid, existing)
+    # Reject a corrupt pre-created database before any trust material mutation.
+    _validate_database_if_present(
+        existing[PRODUCTION_AUTHORITY_PATHS.database],
+        existing[PRODUCTION_AUTHORITY_PATHS.journal],
+    )
     try:
         for path, role in (
             (PRODUCTION_AUTHORITY_PATHS.root, "root"),

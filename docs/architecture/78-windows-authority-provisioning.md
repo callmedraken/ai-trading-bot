@@ -43,10 +43,11 @@ but their final destinations remain the fixed paths above. Database and
 persistent-journal initialization is deliberately deferred; pre-created files
 are validated when present. The installed validator opens the existing fixed
 database through a `file:///F:/AITradingBot/Authority/authority.sqlite3?mode=ro`
-URI, performs a real `sqlite_schema` read, and requires one local main database
-plus the pre-created persistent journal. Non-SQLite, truncated, or corrupt
-database bytes fail closed; no write-capable fallback or `immutable=1` bypass
-is used. It does not claim connection-local PRAGMA state or change it. Every
+URI, performs a real `sqlite_schema` read and read-only `PRAGMA integrity_check`,
+and requires one local main database plus the pre-created persistent journal.
+Non-SQLite, truncated, or structurally corrupt database bytes fail closed; no
+write-capable fallback or `immutable=1` bypass is used. It does not claim
+connection-local PRAGMA state or change it. Every
 production SQLite connection must instead use the runtime setup helper before
 authority work; that helper explicitly requests and reads back
 `foreign_keys=ON`, `journal_mode=PERSIST`, and
@@ -171,12 +172,14 @@ not configure connection-local PRAGMAs or mutate the tree.
 1. read staging material and parse it;
 2. verify canonical bytes, key pin, signature, fixed paths/policies, and the
    local Trading SID before final-tree mutation;
-3. create only the fixed root, `capture-output`, and `backup` directories with
+3. validate the fixed parent/object state and any pre-created database/journal
+   with the read-only SQLite format/schema/integrity checks before mutation;
+4. create only the fixed root, `capture-output`, and `backup` directories with
    the reviewed owner/DACL descriptor;
-4. install trust material only when absent, under that descriptor, or require
+5. install trust material only when absent, under that descriptor, or require
    exact byte identity when already present;
-5. validate the resulting fixed objects; and
-6. validate the installed state and report sanitized evidence.
+6. validate the resulting fixed objects; and
+7. validate the installed state and report sanitized evidence.
 
 Unexpected existing types, bytes, owner, DACL, or reparse state fail closed;
 the command does not repair hostile state. It never creates a production SQL

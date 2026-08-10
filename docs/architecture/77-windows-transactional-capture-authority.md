@@ -177,7 +177,10 @@ The approved security invariants are unchanged:
   aliases, and UNC substitution.
 - The administrator owns the bootstrap, signature, database replacement,
   persistent journal provisioning, and backup tree. Trading receives only the
-  reviewed database/journal and capture-output rights.
+  reviewed database/journal and capture-output rights. The concrete
+  database/journal mask includes `FILE_WRITE_EA` because the standard Windows
+  SQLite VFS requests `GENERIC_WRITE`; this bit does not grant DELETE,
+  WRITE_DAC, WRITE_OWNER, or parent-directory replacement authority.
 - The trusted `Trading` token is an explicit assumption. SQLite constraints
   serialize accidental duplicate or cooperating approved processes; they do
   not authenticate an executable or protect against malicious direct SQL from

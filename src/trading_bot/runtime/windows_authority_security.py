@@ -169,8 +169,10 @@ def sqlite_trading_file_rights() -> int:
     """Return the reviewed concrete SQLite rights.
 
     SQLite needs read/write bytes, append/extend support for its persistent
-    journal, file attributes, synchronization, and byte-range locking.  It
-    does not receive DELETE, WRITE_DAC, WRITE_OWNER, or write-EA rights.
+    journal, file attributes, synchronization, byte-range locking, and the
+    ``FILE_WRITE_EA`` right requested by the standard Windows SQLite VFS as
+    part of ``GENERIC_WRITE``.  It does not receive DELETE, WRITE_DAC, or
+    WRITE_OWNER rights; ``FILE_WRITE_EA`` alone does not grant those rights.
     """
 
     return (
@@ -178,6 +180,7 @@ def sqlite_trading_file_rights() -> int:
         | FILE_WRITE_DATA
         | FILE_APPEND_DATA
         | FILE_READ_EA
+        | FILE_WRITE_EA
         | FILE_READ_ATTRIBUTES
         | FILE_WRITE_ATTRIBUTES
         | READ_CONTROL

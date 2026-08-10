@@ -45,10 +45,17 @@ from trading_bot.runtime.windows_authority_mutex import (
 )
 from trading_bot.runtime.windows_authority_security import (
     DELETE,
+    FILE_APPEND_DATA,
+    FILE_READ_ATTRIBUTES,
     FILE_READ_DATA,
+    FILE_READ_EA,
+    FILE_WRITE_ATTRIBUTES,
+    FILE_WRITE_DATA,
+    FILE_WRITE_EA,
     READ_CONTROL,
     SE_FILE_OBJECT,
     SE_KERNEL_OBJECT,
+    SYNCHRONIZE,
     WRITE_DAC,
     WRITE_OWNER,
     AuthorityObjectKind,
@@ -277,11 +284,34 @@ def test_security_policy_is_sid_based_and_does_not_grant_dangerous_rights() -> N
     ]
     trading_ace = database.aces[-1]
     assert trading_ace.access_mask == sqlite_trading_file_rights()
+    generic_read_write = (
+        FILE_READ_DATA
+        | FILE_READ_EA
+        | FILE_READ_ATTRIBUTES
+        | FILE_WRITE_DATA
+        | FILE_APPEND_DATA
+        | FILE_WRITE_EA
+        | FILE_WRITE_ATTRIBUTES
+        | READ_CONTROL
+        | SYNCHRONIZE
+    )
+    assert trading_ace.access_mask & generic_read_write == generic_read_write
     assert not trading_ace.access_mask & DELETE
     assert not trading_ace.access_mask & WRITE_DAC
     assert not trading_ace.access_mask & WRITE_OWNER
-    backup = authority_security_policy("backup", trading)
-    assert trading not in {ace.principal_sid for ace in backup.aces}
+    for role in ("root", "bootstrap", "signature", "backup"):
+        policy = authority_security_policy(role, trading)
+        assert all(
+            not ace.access_mask & FILE_WRITE_EA
+            for ace in policy.aces
+            if ace.principal_sid == trading
+        )
+    for role in ("database", "journal"):
+        policy = authority_security_policy(role, trading)
+        assert policy.aces[-1].access_mask == sqlite_trading_file_rights()
+    assert trading not in {
+        ace.principal_sid for ace in authority_security_policy("backup", trading).aces
+    }
     parent = authority_parent_security_policy()
     assert trading not in {ace.principal_sid for ace in parent.aces}
     mutex = authority_security_policy("lifecycle-mutex", trading)

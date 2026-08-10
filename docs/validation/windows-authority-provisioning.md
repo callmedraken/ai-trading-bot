@@ -45,7 +45,9 @@ SID/path/provider/policy rejection; and idempotence without automatic repair.
 
 Dedicated `Trading` perspective must prove the account is not an administrator,
 can read bootstrap/signature, can perform the reviewed DB/journal read/write
-and locking operations, can create expected capture output, and cannot access
+and locking operations (including the specific `FILE_WRITE_EA` bit required by
+Windows `FILE_GENERIC_WRITE` when the standard SQLite Win32 VFS opens those
+handles with `GENERIC_WRITE`), can create expected capture output, and cannot access
 backup, create at the authority root, delete/rename/replace DB or journal,
 change owner/DACL, or replace trust material. Tests use a disposable
 administrator-provisioned database with `foreign_keys=ON`, `journal_mode=PERSIST`,

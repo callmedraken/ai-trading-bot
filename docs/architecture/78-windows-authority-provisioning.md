@@ -96,10 +96,14 @@ ACE is exact and SID-based:
   below that directory; no authority-root create/delete/rename rights; and
 - `backup`: no Trading ACE.
 
-The SQLite rights intentionally do not include `DELETE`, `WRITE_DAC`,
-`WRITE_OWNER`, or write-EA rights. The implementation does not broaden rights
-when an acceptance test fails. Every security decision compares owner SID,
-protected-DACL state, ACE type/flags/principal/mask, and unexpected ACEs.
+The SQLite rights include the specific `FILE_WRITE_EA` bit required by the
+standard Windows SQLite VFS: its read/write database and journal open requests
+use `GENERIC_WRITE`, whose `FILE_GENERIC_WRITE` mapping includes that bit.
+This concrete grant does not include `DELETE`, `WRITE_DAC`, or `WRITE_OWNER`,
+and does not grant authority-root replacement or parent-directory rights. The
+implementation does not broaden rights when an acceptance test fails. Every
+security decision compares owner SID, protected-DACL state,
+ACE type/flags/principal/mask, and unexpected ACEs.
 
 ## Final-handle and reparse validation
 

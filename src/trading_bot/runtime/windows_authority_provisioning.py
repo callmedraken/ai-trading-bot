@@ -14,6 +14,7 @@ from trading_bot.runtime.windows_authority import (
     BootstrapVerification,
     PinnedBootstrapKeyRegistry,
     WindowsAuthorityError,
+    WindowsNativeError,
     parse_bootstrap_bytes,
     verify_bootstrap_signature,
 )
@@ -21,6 +22,8 @@ from trading_bot.runtime.windows_authority_mutex import (
     validate_lifecycle_mutex_security_descriptor,
 )
 from trading_bot.runtime.windows_authority_security import (
+    ERROR_FILE_NOT_FOUND,
+    ERROR_PATH_NOT_FOUND,
     AuthorityObjectKind,
     SecurityPolicy,
     authority_security_policy,
@@ -186,11 +189,37 @@ def _inspect_tree(trading_sid: str) -> tuple[tuple[str, ...], bool, bool]:
     return tuple(inspected), database_present, journal_present
 
 
-def _existing_fixed_objects() -> dict[PureWindowsPath, bool]:
-    return {
-        path: os.path.lexists(str(path))
-        for path in PRODUCTION_AUTHORITY_PATHS.protected_objects
+def _validate_existing_authority_root(trading_sid: str) -> bool:
+    """Validate the parent and existing root before probing any child path."""
+
+    root = PRODUCTION_AUTHORITY_PATHS.root
+    validate_fixed_parent_chain(root, trading_sid=trading_sid)
+    try:
+        root_handle = open_authority_object(root, AuthorityObjectKind.DIRECTORY)
+    except WindowsNativeError as error:
+        if error.error_code in {ERROR_FILE_NOT_FOUND, ERROR_PATH_NOT_FOUND}:
+            return False
+        raise
+    with root_handle as handle:
+        inspection = inspect_open_authority_object(
+            handle, root, AuthorityObjectKind.DIRECTORY
+        )
+        require_security_policy(
+            inspection, authority_security_policy("root", trading_sid)
+        )
+    return True
+
+
+def _existing_fixed_objects(trading_sid: str) -> dict[PureWindowsPath, bool]:
+    """Discover children only after the fixed parent and root are trusted."""
+
+    root_present = _validate_existing_authority_root(trading_sid)
+    existing: dict[PureWindowsPath, bool] = {
+        PRODUCTION_AUTHORITY_PATHS.root: root_present
     }
+    for path in PRODUCTION_AUTHORITY_PATHS.protected_objects[1:]:
+        existing[path] = root_present and os.path.lexists(str(path))
+    return existing
 
 
 def _validate_existing_objects(
@@ -200,7 +229,6 @@ def _validate_existing_objects(
     """Reject any pre-existing object that is not already exactly reviewed."""
 
     roles = {
-        PRODUCTION_AUTHORITY_PATHS.root: "root",
         PRODUCTION_AUTHORITY_PATHS.bootstrap: "bootstrap",
         PRODUCTION_AUTHORITY_PATHS.signature: "signature",
         PRODUCTION_AUTHORITY_PATHS.capture_output: "capture-output",
@@ -209,7 +237,7 @@ def _validate_existing_objects(
         PRODUCTION_AUTHORITY_PATHS.journal: "journal",
     }
     for path, present in existing.items():
-        if not present:
+        if path == PRODUCTION_AUTHORITY_PATHS.root or not present:
             continue
         inspection = inspect_fixed_authority_object(
             str(path), _kind_for(path), trading_sid=trading_sid
@@ -323,8 +351,7 @@ def provision_authority(
         key_registry=key_registry,
     )
     validate_lifecycle_mutex_security_descriptor(trading_sid)
-    existing = _existing_fixed_objects()
-    validate_fixed_parent_chain(PRODUCTION_AUTHORITY_PATHS.root)
+    existing = _existing_fixed_objects(trading_sid)
     _validate_existing_objects(trading_sid, existing)
     # Reject a corrupt pre-created database before any trust material mutation.
     _validate_database_if_present(

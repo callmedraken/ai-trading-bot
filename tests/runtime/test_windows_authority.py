@@ -9,6 +9,7 @@ import os
 import threading
 import uuid
 from ctypes import wintypes
+from pathlib import Path
 
 import pytest
 
@@ -952,6 +953,372 @@ def _directory_inspection(
         volume_root="F:\\",
         filesystem="NTFS",
     )
+
+
+def test_provisioning_discovers_children_only_after_root_validation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import trading_bot.runtime.windows_authority_provisioning as provisioning
+
+    trading_sid = "S-1-5-21-100-200-300-400"
+    parent = PRODUCTION_AUTHORITY_PATHS.root.parent
+    root = PRODUCTION_AUTHORITY_PATHS.root
+    calls: list[tuple[str, str]] = []
+    parent_policy = authority_parent_security_policy()
+    root_policy = authority_security_policy("root", trading_sid)
+
+    def fake_parent(path: object, *, trading_sid: str) -> None:
+        calls.append(("parent-chain", str(path)))
+
+    class FakeHandle:
+        def __enter__(self) -> int:
+            return 1
+
+        def __exit__(
+            self,
+            exc_type: object,
+            exc: object,
+            traceback: object,
+        ) -> None:
+            return None
+
+    def fake_open(path: object, kind: AuthorityObjectKind) -> FakeHandle:
+        assert kind is AuthorityObjectKind.DIRECTORY
+        calls.append(("root-open", str(path)))
+        return FakeHandle()
+
+    def fake_inspect(
+        handle: int,
+        expected_path: object,
+        expected_kind: AuthorityObjectKind,
+    ) -> SecurityInspection:
+        assert handle == 1
+        assert expected_kind is AuthorityObjectKind.DIRECTORY
+        calls.append(("root-inspect", str(expected_path)))
+        return _directory_inspection(
+            expected_path,
+            parent_policy if expected_path == parent else root_policy,
+        )
+
+    def fake_require(inspection: SecurityInspection, policy: SecurityPolicy) -> None:
+        calls.append(("root-policy", inspection.expected_path))
+
+    def fake_lexists(path: str) -> bool:
+        calls.append(("child-probe", path))
+        return False
+
+    monkeypatch.setattr(provisioning, "validate_fixed_parent_chain", fake_parent)
+    monkeypatch.setattr(provisioning, "open_authority_object", fake_open)
+    monkeypatch.setattr(provisioning, "inspect_open_authority_object", fake_inspect)
+    monkeypatch.setattr(provisioning, "require_security_policy", fake_require)
+    monkeypatch.setattr(provisioning.os.path, "lexists", fake_lexists)
+
+    existing = provisioning._existing_fixed_objects(trading_sid)
+
+    first_child_probe = next(
+        index for index, call in enumerate(calls) if call[0] == "child-probe"
+    )
+    assert [call[0] for call in calls[:first_child_probe]] == [
+        "parent-chain",
+        "root-open",
+        "root-inspect",
+        "root-policy",
+    ]
+    assert existing[root] is True
+    assert all(not present for path, present in existing.items() if path != root)
+
+
+def test_hostile_parent_fails_before_any_child_probe_or_mutation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import trading_bot.runtime.windows_authority_provisioning as provisioning
+
+    calls: list[str] = []
+
+    def fake_parent(path: object, *, trading_sid: str) -> None:
+        calls.append("parent-chain")
+        raise AuthoritySecurityError("hostile parent")
+
+    monkeypatch.setattr(provisioning, "validate_fixed_parent_chain", fake_parent)
+    monkeypatch.setattr(
+        provisioning.os.path,
+        "lexists",
+        lambda path: calls.append(f"child-probe:{path}"),
+    )
+    monkeypatch.setattr(
+        provisioning,
+        "create_authority_directory",
+        lambda path, policy: calls.append(f"mkdir:{path}"),
+    )
+    monkeypatch.setattr(
+        provisioning,
+        "create_authority_file",
+        lambda path, data, policy: calls.append(f"file:{path}"),
+    )
+
+    with pytest.raises(AuthoritySecurityError):
+        provisioning._existing_fixed_objects("S-1-5-21-100-200-300-400")
+
+    assert calls == ["parent-chain"]
+
+
+def test_hostile_existing_root_fails_before_child_probe(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import trading_bot.runtime.windows_authority_provisioning as provisioning
+
+    root = PRODUCTION_AUTHORITY_PATHS.root
+    calls: list[tuple[str, str]] = []
+
+    class FakeHandle:
+        def __enter__(self) -> int:
+            return 1
+
+        def __exit__(
+            self,
+            exc_type: object,
+            exc: object,
+            traceback: object,
+        ) -> None:
+            return None
+
+    monkeypatch.setattr(
+        provisioning,
+        "validate_fixed_parent_chain",
+        lambda path, *, trading_sid: calls.append(("parent-chain", str(path))),
+    )
+    monkeypatch.setattr(
+        provisioning,
+        "open_authority_object",
+        lambda path, kind: (calls.append(("root-open", str(path))), FakeHandle())[1],
+    )
+
+    def hostile_inspect(handle: int, expected_path: object, expected_kind: object):
+        calls.append(("root-inspect", str(expected_path)))
+        raise AuthorityObjectError("reparse root")
+
+    monkeypatch.setattr(provisioning, "inspect_open_authority_object", hostile_inspect)
+    monkeypatch.setattr(
+        provisioning.os.path,
+        "lexists",
+        lambda path: calls.append(("child-probe", str(path))),
+    )
+
+    with pytest.raises(AuthorityObjectError):
+        provisioning._existing_fixed_objects("S-1-5-21-100-200-300-400")
+
+    assert calls == [
+        ("parent-chain", str(root)),
+        ("root-open", str(root)),
+        ("root-inspect", str(root)),
+    ]
+
+
+def test_wrong_existing_root_policy_fails_before_child_probe(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import trading_bot.runtime.windows_authority_provisioning as provisioning
+
+    root = PRODUCTION_AUTHORITY_PATHS.root
+    calls: list[str] = []
+
+    class FakeHandle:
+        def __enter__(self) -> int:
+            return 1
+
+        def __exit__(
+            self,
+            exc_type: object,
+            exc: object,
+            traceback: object,
+        ) -> None:
+            return None
+
+    monkeypatch.setattr(
+        provisioning,
+        "validate_fixed_parent_chain",
+        lambda path, *, trading_sid: calls.append("parent-chain"),
+    )
+    monkeypatch.setattr(
+        provisioning,
+        "open_authority_object",
+        lambda path, kind: (calls.append("root-open"), FakeHandle())[1],
+    )
+    monkeypatch.setattr(
+        provisioning,
+        "inspect_open_authority_object",
+        lambda handle, expected_path, expected_kind: (
+            calls.append("root-inspect")
+            or _directory_inspection(
+                root, authority_security_policy("root", "S-1-5-21-100-200-300-400")
+            )
+        ),
+    )
+
+    def reject_root(inspection: SecurityInspection, policy: SecurityPolicy) -> None:
+        calls.append("root-policy")
+        raise AuthoritySecurityError("wrong root policy")
+
+    monkeypatch.setattr(provisioning, "require_security_policy", reject_root)
+    monkeypatch.setattr(
+        provisioning.os.path,
+        "lexists",
+        lambda path: calls.append(f"child-probe:{path}"),
+    )
+
+    with pytest.raises(AuthoritySecurityError):
+        provisioning._existing_fixed_objects("S-1-5-21-100-200-300-400")
+
+    assert calls == ["parent-chain", "root-open", "root-inspect", "root-policy"]
+
+
+def test_absent_valid_root_does_not_probe_children(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import trading_bot.runtime.windows_authority_provisioning as provisioning
+
+    root = PRODUCTION_AUTHORITY_PATHS.root
+    calls: list[str] = []
+    monkeypatch.setattr(
+        provisioning,
+        "validate_fixed_parent_chain",
+        lambda path, *, trading_sid: calls.append("parent-chain"),
+    )
+
+    def root_absent(path: object, kind: AuthorityObjectKind) -> object:
+        calls.append("root-open")
+        raise WindowsNativeError("CreateFileW(authority object)", 3)
+
+    monkeypatch.setattr(provisioning, "open_authority_object", root_absent)
+    monkeypatch.setattr(
+        provisioning.os.path,
+        "lexists",
+        lambda path: calls.append(f"child-probe:{path}"),
+    )
+
+    existing = provisioning._existing_fixed_objects("S-1-5-21-100-200-300-400")
+
+    assert calls == ["parent-chain", "root-open"]
+    assert existing[root] is False
+    assert all(not present for path, present in existing.items())
+
+
+def test_existing_child_validation_remains_no_follow_and_policy_checked(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import trading_bot.runtime.windows_authority_provisioning as provisioning
+
+    trading_sid = "S-1-5-21-100-200-300-400"
+    child = PRODUCTION_AUTHORITY_PATHS.bootstrap
+    calls: list[str] = []
+    inspection = SecurityInspection(
+        expected_path=str(child),
+        final_path=str(child),
+        kind=AuthorityObjectKind.FILE,
+        owner_sid="S-1-5-32-544",
+        dacl_protected=True,
+        aces=authority_security_policy("bootstrap", trading_sid).aces,
+        is_reparse_point=False,
+        volume_root="F:\\",
+        filesystem="NTFS",
+    )
+    monkeypatch.setattr(
+        provisioning,
+        "inspect_fixed_authority_object",
+        lambda path, kind, *, trading_sid: (
+            calls.append(f"inspect:{path}") or inspection
+        ),
+    )
+    monkeypatch.setattr(
+        provisioning,
+        "require_security_policy",
+        lambda found, policy: calls.append(f"policy:{found.expected_path}"),
+    )
+
+    provisioning._validate_existing_objects(
+        trading_sid,
+        {PRODUCTION_AUTHORITY_PATHS.root: True, child: True},
+    )
+
+    assert calls == [f"inspect:{child}", f"policy:{child}"]
+
+
+def test_precreated_database_is_checked_after_filesystem_trust_before_mutation(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    import trading_bot.runtime.windows_authority_provisioning as provisioning
+
+    staging_bootstrap = tmp_path / "staging.bootstrap.json"
+    staging_signature = tmp_path / "staging.bootstrap.sig"
+    staging_bootstrap.write_bytes(b"bootstrap")
+    staging_signature.write_bytes(b"signature")
+    events: list[str] = []
+    existing = {
+        path: path is PRODUCTION_AUTHORITY_PATHS.root
+        for path in PRODUCTION_AUTHORITY_PATHS.protected_objects
+    }
+
+    monkeypatch.setattr(
+        provisioning,
+        "require_administrator_token",
+        lambda: events.append("administrator"),
+    )
+    monkeypatch.setattr(
+        provisioning,
+        "parse_bootstrap_bytes",
+        lambda data: events.append("parse"),
+    )
+    monkeypatch.setattr(
+        provisioning,
+        "require_trading_standard_account",
+        lambda: events.append("trading") or "S-1-5-21-100-200-300-400",
+    )
+    monkeypatch.setattr(
+        provisioning,
+        "_verify_material",
+        lambda *args, **kwargs: events.append("verify") or object(),
+    )
+    monkeypatch.setattr(
+        provisioning,
+        "validate_lifecycle_mutex_security_descriptor",
+        lambda trading_sid: events.append("mutex"),
+    )
+    monkeypatch.setattr(
+        provisioning,
+        "_existing_fixed_objects",
+        lambda trading_sid: events.append("discover") or existing,
+    )
+    monkeypatch.setattr(
+        provisioning,
+        "_validate_existing_objects",
+        lambda trading_sid, found: events.append("filesystem"),
+    )
+
+    def reject_database(database_present: bool, journal_present: bool) -> None:
+        events.append("database")
+        raise WindowsAuthorityError("precreated database rejected")
+
+    monkeypatch.setattr(provisioning, "_validate_database_if_present", reject_database)
+    monkeypatch.setattr(
+        provisioning,
+        "create_authority_directory",
+        lambda path, policy: events.append(f"mutate-directory:{path}"),
+    )
+    monkeypatch.setattr(
+        provisioning,
+        "create_authority_file",
+        lambda path, data, policy: events.append(f"mutate-file:{path}"),
+    )
+
+    with pytest.raises(WindowsAuthorityError, match="precreated database"):
+        provisioning.provision_authority(
+            bootstrap_source=staging_bootstrap,
+            signature_source=staging_signature,
+        )
+
+    assert events.index("filesystem") < events.index("database")
+    assert not any(event.startswith("mutate-") for event in events)
 
 
 def test_fixed_parent_chain_uses_role_aware_policies(

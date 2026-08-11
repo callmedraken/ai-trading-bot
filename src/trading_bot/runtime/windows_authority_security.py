@@ -63,6 +63,7 @@ FILE_SHARE_DELETE = 4
 FILE_ATTRIBUTE_REPARSE_POINT = 0x400
 FILE_ATTRIBUTE_DIRECTORY = 0x10
 FILE_RENAME_INFO_CLASS = 3
+FILE_BEGIN = 0
 LG_INCLUDE_INDIRECT = 1
 MAX_PREFERRED_LENGTH = 0xFFFFFFFF
 ERROR_INSUFFICIENT_BUFFER = 122
@@ -532,10 +533,21 @@ def publish_unpublished_authority_file(
 
 
 def read_open_authority_file(handle: int) -> bytes:
-    """Read one already-opened fixed file without reopening its path."""
+    """Read one already-opened fixed file from byte offset zero."""
 
     require_windows_platform()
-    get_size = _kernel32().GetFileSizeEx
+    kernel32 = _kernel32()
+    set_file_pointer = kernel32.SetFilePointerEx
+    set_file_pointer.argtypes = [
+        wintypes.HANDLE,
+        ctypes.c_longlong,
+        ctypes.POINTER(ctypes.c_longlong),
+        wintypes.DWORD,
+    ]
+    set_file_pointer.restype = wintypes.BOOL
+    if not set_file_pointer(handle, ctypes.c_longlong(0), None, FILE_BEGIN):
+        raise _last_error("SetFilePointerEx(authority file)")
+    get_size = kernel32.GetFileSizeEx
     get_size.argtypes = [wintypes.HANDLE, ctypes.POINTER(ctypes.c_longlong)]
     get_size.restype = wintypes.BOOL
     size = ctypes.c_longlong()
@@ -544,7 +556,7 @@ def read_open_authority_file(handle: int) -> bytes:
     if size.value > 16 * 1024 * 1024:
         raise AuthorityObjectError("authority file is unexpectedly large")
     data = ctypes.create_string_buffer(size.value)
-    read_file = _kernel32().ReadFile
+    read_file = kernel32.ReadFile
     read_file.argtypes = [
         wintypes.HANDLE,
         ctypes.c_void_p,

@@ -53,6 +53,7 @@ from trading_bot.runtime.windows_authority_security import (
     DELETE,
     FILE_APPEND_DATA,
     FILE_ATTRIBUTE_NORMAL,
+    FILE_BEGIN,
     FILE_FLAG_OPEN_REPARSE_POINT,
     FILE_READ_ATTRIBUTES,
     FILE_READ_DATA,
@@ -667,6 +668,313 @@ def test_publish_unpublished_file_uses_handle_rename_without_replacement(
         str(PRODUCTION_AUTHORITY_PATHS.bootstrap).encode("utf-16-le")
     )
     assert "MoveFileEx" not in str(fake_set.args)
+
+
+def test_read_open_authority_file_seeks_same_handle_to_zero_before_read(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import trading_bot.runtime.windows_authority_security as security
+
+    calls: list[tuple[str, object]] = []
+
+    class FakeSetFilePointerEx:
+        argtypes: object
+        restype: object
+
+        def __call__(self, *args: object) -> bool:
+            calls.append(("SetFilePointerEx", args))
+            assert args[0] == 55
+            assert args[1].value == 0
+            assert args[2] is None
+            assert args[3] == FILE_BEGIN
+            return True
+
+    class FakeGetFileSizeEx:
+        argtypes: object
+        restype: object
+
+        def __call__(self, *args: object) -> bool:
+            calls.append(("GetFileSizeEx", args))
+            ctypes.cast(args[1], ctypes.POINTER(ctypes.c_longlong)).contents.value = 3
+            return True
+
+    class FakeReadFile:
+        argtypes: object
+        restype: object
+
+        def __call__(self, *args: object) -> bool:
+            calls.append(("ReadFile", args))
+            assert args[0] == 55
+            ctypes.memmove(args[1], b"abc", 3)
+            ctypes.cast(args[3], ctypes.POINTER(wintypes.DWORD)).contents.value = 3
+            return True
+
+    class FakeKernel32:
+        SetFilePointerEx = FakeSetFilePointerEx()
+        GetFileSizeEx = FakeGetFileSizeEx()
+        ReadFile = FakeReadFile()
+
+    monkeypatch.setattr(security, "wintypes", wintypes)
+    monkeypatch.setattr(security, "require_windows_platform", lambda: None)
+    monkeypatch.setattr(security, "_kernel32", lambda: FakeKernel32())
+
+    assert security.read_open_authority_file(55) == b"abc"
+    assert [name for name, _args in calls] == [
+        "SetFilePointerEx",
+        "GetFileSizeEx",
+        "ReadFile",
+    ]
+
+
+def test_set_file_pointer_failure_blocks_publication_and_preserves_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import trading_bot.runtime.windows_authority_provisioning as provisioning
+    import trading_bot.runtime.windows_authority_security as security
+
+    sid = "S-1-5-21-100-200-300-400"
+    temporary = PRODUCTION_AUTHORITY_PATHS.bootstrap_temporary
+    policy = authority_security_policy("bootstrap", sid)
+    events: list[str] = []
+    native_calls: list[str] = []
+
+    class FakeSetFilePointerEx:
+        argtypes: object
+        restype: object
+
+        def __call__(self, *args: object) -> bool:
+            native_calls.append("SetFilePointerEx")
+            return False
+
+    class FakeGetFileSizeEx:
+        argtypes: object
+        restype: object
+
+        def __call__(self, *args: object) -> bool:
+            native_calls.append("GetFileSizeEx")
+            return True
+
+    class FakeReadFile:
+        argtypes: object
+        restype: object
+
+        def __call__(self, *args: object) -> bool:
+            native_calls.append("ReadFile")
+            return True
+
+    class FakeSetFileInformationByHandle:
+        argtypes: object
+        restype: object
+
+        def __call__(self, *args: object) -> bool:
+            native_calls.append("SetFileInformationByHandle")
+            return True
+
+    class FakeKernel32:
+        SetFilePointerEx = FakeSetFilePointerEx()
+        GetFileSizeEx = FakeGetFileSizeEx()
+        ReadFile = FakeReadFile()
+        SetFileInformationByHandle = FakeSetFileInformationByHandle()
+
+    class FakeHandle:
+        value = 77
+
+        def __enter__(self) -> int:
+            events.append("enter")
+            return self.value
+
+        def __exit__(
+            self,
+            exc_type: object,
+            exc: object,
+            traceback: object,
+        ) -> None:
+            events.append("close")
+
+    inspection = SecurityInspection(
+        expected_path=str(temporary),
+        final_path=str(temporary),
+        kind=AuthorityObjectKind.FILE,
+        owner_sid=policy.owner_sid,
+        dacl_protected=True,
+        aces=policy.aces,
+        is_reparse_point=False,
+        volume_root="F:\\",
+        filesystem="NTFS",
+    )
+    monkeypatch.setattr(security, "wintypes", wintypes)
+    monkeypatch.setattr(security, "require_windows_platform", lambda: None)
+    monkeypatch.setattr(security, "_kernel32", lambda: FakeKernel32())
+    monkeypatch.setattr(security.ctypes, "get_last_error", lambda: 4321, raising=False)
+    monkeypatch.setattr(
+        provisioning,
+        "create_unpublished_authority_file",
+        lambda path, data, requested: events.append("create") or FakeHandle(),
+    )
+    monkeypatch.setattr(
+        provisioning,
+        "inspect_open_authority_provisioning_temp_file",
+        lambda handle, path: inspection,
+    )
+    monkeypatch.setattr(
+        provisioning, "require_security_policy", lambda found, requested: None
+    )
+    monkeypatch.setattr(
+        provisioning, "read_open_authority_file", security.read_open_authority_file
+    )
+    monkeypatch.setattr(
+        provisioning,
+        "publish_unpublished_authority_file",
+        security.publish_unpublished_authority_file,
+    )
+
+    with pytest.raises(WindowsNativeError) as caught:
+        provisioning._install_exact_file(
+            PRODUCTION_AUTHORITY_PATHS.bootstrap,
+            b"abc",
+            policy,
+            False,
+        )
+
+    assert caught.value.error_code == 4321
+    assert events == ["create", "enter", "close"]
+    assert native_calls == ["SetFilePointerEx"]
+
+
+def test_successful_seek_runs_after_flush_before_read_and_publish(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import trading_bot.runtime.windows_authority_provisioning as provisioning
+    import trading_bot.runtime.windows_authority_security as security
+
+    sid = "S-1-5-21-100-200-300-400"
+    temporary = PRODUCTION_AUTHORITY_PATHS.bootstrap_temporary
+    policy = authority_security_policy("bootstrap", sid)
+    timeline: list[str] = []
+
+    class FakeSetFilePointerEx:
+        argtypes: object
+        restype: object
+
+        def __call__(self, *args: object) -> bool:
+            timeline.append("seek")
+            assert args[0] == 77
+            assert args[1].value == 0
+            assert args[3] == FILE_BEGIN
+            return True
+
+    class FakeGetFileSizeEx:
+        argtypes: object
+        restype: object
+
+        def __call__(self, *args: object) -> bool:
+            timeline.append("size")
+            ctypes.cast(args[1], ctypes.POINTER(ctypes.c_longlong)).contents.value = 3
+            return True
+
+    class FakeReadFile:
+        argtypes: object
+        restype: object
+
+        def __call__(self, *args: object) -> bool:
+            timeline.append("read")
+            ctypes.memmove(args[1], b"abc", 3)
+            ctypes.cast(args[3], ctypes.POINTER(wintypes.DWORD)).contents.value = 3
+            return True
+
+    class FakeSetFileInformationByHandle:
+        argtypes: object
+        restype: object
+
+        def __call__(self, *args: object) -> bool:
+            timeline.append("publish")
+            return True
+
+    class FakeKernel32:
+        SetFilePointerEx = FakeSetFilePointerEx()
+        GetFileSizeEx = FakeGetFileSizeEx()
+        ReadFile = FakeReadFile()
+        SetFileInformationByHandle = FakeSetFileInformationByHandle()
+
+    class FakeHandle:
+        value = 77
+
+        def __enter__(self) -> int:
+            return self.value
+
+        def __exit__(
+            self,
+            exc_type: object,
+            exc: object,
+            traceback: object,
+        ) -> None:
+            timeline.append("close")
+
+    inspection = SecurityInspection(
+        expected_path=str(temporary),
+        final_path=str(temporary),
+        kind=AuthorityObjectKind.FILE,
+        owner_sid=policy.owner_sid,
+        dacl_protected=True,
+        aces=policy.aces,
+        is_reparse_point=False,
+        volume_root="F:\\",
+        filesystem="NTFS",
+    )
+    monkeypatch.setattr(security, "wintypes", wintypes)
+    monkeypatch.setattr(security, "require_windows_platform", lambda: None)
+    monkeypatch.setattr(security, "_kernel32", lambda: FakeKernel32())
+    monkeypatch.setattr(
+        provisioning,
+        "create_unpublished_authority_file",
+        lambda path, data, requested: (
+            timeline.extend(["create", "write", "flush"]) or FakeHandle()
+        ),
+    )
+    monkeypatch.setattr(
+        provisioning,
+        "inspect_open_authority_provisioning_temp_file",
+        lambda handle, path: timeline.append("inspect") or inspection,
+    )
+    monkeypatch.setattr(
+        provisioning,
+        "require_security_policy",
+        lambda found, requested: timeline.append("policy"),
+    )
+    monkeypatch.setattr(
+        provisioning, "read_open_authority_file", security.read_open_authority_file
+    )
+    monkeypatch.setattr(
+        provisioning,
+        "publish_unpublished_authority_file",
+        security.publish_unpublished_authority_file,
+    )
+    monkeypatch.setattr(
+        provisioning,
+        "_validate_exact_file",
+        lambda path, data, requested: timeline.append("final-validate"),
+    )
+
+    provisioning._install_exact_file(
+        PRODUCTION_AUTHORITY_PATHS.bootstrap,
+        b"abc",
+        policy,
+        False,
+    )
+
+    assert timeline == [
+        "create",
+        "write",
+        "flush",
+        "inspect",
+        "policy",
+        "seek",
+        "size",
+        "read",
+        "publish",
+        "close",
+        "final-validate",
+    ]
 
 
 @pytest.mark.parametrize("error_code", [2, 3, 5])

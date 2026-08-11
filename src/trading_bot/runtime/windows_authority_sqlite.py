@@ -10,6 +10,11 @@ from pathlib import Path
 from urllib.parse import quote
 
 from trading_bot.runtime.windows_authority import WindowsAuthorityError
+from trading_bot.runtime.windows_authority_schema import (
+    SchemaValidationError,
+    configure_trusted_schema_off,
+    validate_schema_state,
+)
 
 
 class SqliteDurabilityError(WindowsAuthorityError):
@@ -21,6 +26,7 @@ class SqliteDatabaseState(StrEnum):
 
     NOT_PRESENT = "NOT_PRESENT"
     PRECREATED_UNINITIALIZED = "PRECREATED_UNINITIALIZED"
+    INITIALIZED_SUPPORTED = "INITIALIZED_SUPPORTED"
     INITIALIZED_UNSUPPORTED = "INITIALIZED_UNSUPPORTED"
     INVALID_MISMATCHED = "INVALID_MISMATCHED"
 
@@ -35,6 +41,7 @@ class InstalledSqliteEvidence:
     database_state: SqliteDatabaseState
     attached_database_count: int
     persistent_journal_present: bool
+    trusted_schema: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -48,6 +55,7 @@ class SqliteDurabilityEvidence:
     synchronous: int
     attached_database_count: int
     persistent_journal_present: bool
+    trusted_schema: bool = False
 
 
 def _require_exact_connection(connection: sqlite3.Connection) -> None:
@@ -153,10 +161,11 @@ def _determine_database_state(connection: sqlite3.Connection) -> SqliteDatabaseS
     schema_objects = _schema_objects(connection)
     if not schema_objects:
         return SqliteDatabaseState.PRECREATED_UNINITIALIZED
-    raise SqliteDurabilityError(
-        f"{SqliteDatabaseState.INITIALIZED_UNSUPPORTED.value}: initialized "
-        "SQLite authority database is unsupported in Milestone A"
-    )
+    try:
+        state = validate_schema_state(connection)
+    except SchemaValidationError:
+        state = SqliteDatabaseState.INITIALIZED_UNSUPPORTED.value
+    return SqliteDatabaseState(state)
 
 
 def validate_installed_sqlite_prerequisites(
@@ -176,11 +185,23 @@ def validate_installed_sqlite_prerequisites(
     expected_database = str(database_path)
     expected_journal = str(journal_path)
     _require_database_file(expected_database)
+    try:
+        configure_trusted_schema_off(connection)
+    except SchemaValidationError as error:
+        raise SqliteDurabilityError(str(error)) from error
     databases = _main_database(connection, expected_database)
     _read_schema(connection)
     _require_integrity(connection)
     _require_persistent_journal(expected_journal)
     database_state = _determine_database_state(connection)
+    if database_state in {
+        SqliteDatabaseState.INITIALIZED_UNSUPPORTED,
+        SqliteDatabaseState.INVALID_MISMATCHED,
+    }:
+        raise SqliteDurabilityError(
+            f"{database_state.value}: initialized SQLite authority schema is "
+            "unsupported or mismatched"
+        )
     return InstalledSqliteEvidence(
         database_path=expected_database,
         journal_path=expected_journal,
@@ -188,6 +209,7 @@ def validate_installed_sqlite_prerequisites(
         database_state=database_state,
         attached_database_count=len(databases),
         persistent_journal_present=True,
+        trusted_schema=True,
     )
 
 
@@ -212,6 +234,10 @@ def configure_and_validate_authority_sqlite_connection(
     expected_database = str(database_path)
     expected_journal = str(journal_path)
     _require_database_file(expected_database)
+    try:
+        configure_trusted_schema_off(connection)
+    except SchemaValidationError as error:
+        raise SqliteDurabilityError(str(error)) from error
     _main_database(connection, expected_database)
     _require_persistent_journal(expected_journal)
     try:
@@ -243,4 +269,5 @@ def configure_and_validate_authority_sqlite_connection(
         synchronous=synchronous,
         attached_database_count=len(databases),
         persistent_journal_present=True,
+        trusted_schema=True,
     )

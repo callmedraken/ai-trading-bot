@@ -8,6 +8,10 @@ import sys
 from pathlib import Path
 
 from trading_bot.runtime.windows_authority import WindowsAuthorityError
+from trading_bot.runtime.windows_authority_initialization import (
+    InitializationEvidence,
+    initialize_installed_authority_database,
+)
 from trading_bot.runtime.windows_authority_provisioning import (
     ProvisioningEvidence,
     provision_authority,
@@ -26,10 +30,30 @@ def build_parser() -> argparse.ArgumentParser:
     provision = commands.add_parser("provision", help="install staged trust material")
     provision.add_argument("--bootstrap-source", required=True, type=Path)
     provision.add_argument("--signature-source", required=True, type=Path)
+    commands.add_parser(
+        "initialize-database",
+        help="initialize the fixed pre-created database as administrator",
+    )
     return parser
 
 
 def _evidence_json(evidence: ProvisioningEvidence) -> str:
+    if isinstance(evidence, InitializationEvidence):
+        return json.dumps(
+            {
+                "database_path": evidence.database_path,
+                "metadata_digest": evidence.metadata_digest,
+                "migration_id": evidence.migration_id,
+                "release_manifest_digest": evidence.release_manifest_digest,
+                "schema_digest": evidence.schema_digest,
+                "schema_id": evidence.schema_id,
+                "schema_version": evidence.schema_version,
+                "sqlite_build_manifest_digest": evidence.sqlite_build_manifest_digest,
+                "state": evidence.state.value,
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+        )
     return json.dumps(
         {
             "authority_root": evidence.authority_root,
@@ -55,11 +79,13 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.command == "validate":
             evidence = validate_installed_authority()
-        else:
+        elif args.command == "provision":
             evidence = provision_authority(
                 bootstrap_source=args.bootstrap_source,
                 signature_source=args.signature_source,
             )
+        else:
+            evidence = initialize_installed_authority_database()
     except WindowsAuthorityError as error:
         # Deliberately emit only the typed failure class, not native text,
         # paths outside the fixed deployment, or arbitrary exception details.

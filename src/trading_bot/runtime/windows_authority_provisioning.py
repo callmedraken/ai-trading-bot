@@ -22,6 +22,13 @@ from trading_bot.runtime.windows_authority import (
 from trading_bot.runtime.windows_authority_mutex import (
     validate_lifecycle_mutex_security_descriptor,
 )
+from trading_bot.runtime.windows_authority_schema import (
+    ReleaseManifestEvidence,
+    SqliteAuthorityBuildEvidence,
+    load_approved_release_manifest,
+    load_approved_sqlite_authority_build,
+    validate_production_authority_database,
+)
 from trading_bot.runtime.windows_authority_security import (
     ERROR_FILE_NOT_FOUND,
     ERROR_PATH_NOT_FOUND,
@@ -156,6 +163,12 @@ def _read_installed_material(trading_sid: str) -> tuple[bytes, bytes]:
             trading_sid,
         ),
     )
+
+
+def read_installed_authority_material(trading_sid: str) -> tuple[bytes, bytes]:
+    """Read the already security-validated fixed bootstrap pair."""
+
+    return _read_installed_material(trading_sid)
 
 
 def _inspect_tree(trading_sid: str) -> tuple[tuple[str, ...], bool, bool]:
@@ -310,6 +323,8 @@ def _validate_exact_file(
 def validate_installed_authority(
     *,
     key_registry: PinnedBootstrapKeyRegistry = PRODUCTION_PINNED_BOOTSTRAP_KEYS,
+    release_manifest: ReleaseManifestEvidence | None = None,
+    sqlite_build: SqliteAuthorityBuildEvidence | None = None,
 ) -> ProvisioningEvidence:
     """Validate the fixed install and existing DB/journal without mutating it."""
 
@@ -328,6 +343,21 @@ def validate_installed_authority(
         database_present,
         journal_present,
     )
+    if database_state is SqliteDatabaseState.INITIALIZED_SUPPORTED:
+        connection = open_read_only_sqlite_connection(
+            PRODUCTION_AUTHORITY_PATHS.database
+        )
+        try:
+            validate_production_authority_database(
+                connection,
+                database_path=PRODUCTION_AUTHORITY_PATHS.database,
+                bootstrap=verification.bootstrap,
+                bootstrap_digest=verification.bootstrap_digest,
+                release_manifest=release_manifest or load_approved_release_manifest(),
+                sqlite_build=sqlite_build or load_approved_sqlite_authority_build(),
+            )
+        finally:
+            connection.close()
     return ProvisioningEvidence(
         ProvisioningState.VALIDATED,
         str(PRODUCTION_AUTHORITY_PATHS.root),
@@ -411,10 +441,25 @@ def provision_authority(
     existing = _existing_fixed_objects(trading_sid)
     _validate_existing_objects(trading_sid, existing)
     # Reject a corrupt pre-created database before any trust material mutation.
-    _validate_database_if_present(
+    database_state = _validate_database_if_present(
         existing[PRODUCTION_AUTHORITY_PATHS.database],
         existing[PRODUCTION_AUTHORITY_PATHS.journal],
     )
+    if database_state is SqliteDatabaseState.INITIALIZED_SUPPORTED:
+        connection = open_read_only_sqlite_connection(
+            PRODUCTION_AUTHORITY_PATHS.database
+        )
+        try:
+            validate_production_authority_database(
+                connection,
+                database_path=PRODUCTION_AUTHORITY_PATHS.database,
+                bootstrap=verification.bootstrap,
+                bootstrap_digest=verification.bootstrap_digest,
+                release_manifest=load_approved_release_manifest(),
+                sqlite_build=load_approved_sqlite_authority_build(),
+            )
+        finally:
+            connection.close()
     try:
         if existing[PRODUCTION_AUTHORITY_PATHS.root]:
             _require_reserved_temporary_objects_absent()

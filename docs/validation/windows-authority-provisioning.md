@@ -105,6 +105,17 @@ wrong provider/operation, and unsupported policy. It never overwrites or
 renames installed trust files. Missing fixed artifacts, an absent production
 trust anchor, or an invalid installed state is a failure/blocker, never PASS.
 
+The administrator run also checks the reserved same-directory trust-material
+temporary names
+`F:\AITradingBot\Authority\.authority.bootstrap.json.installing` and
+`F:\AITradingBot\Authority\.authority.bootstrap.sig.installing` before any
+trust-file publication. A present or unexpectedly inaccessible name is a
+stale/recovery condition and blocks provisioning; the provisioner never deletes
+or reuses it automatically. Under an approved maintenance procedure, an
+administrator must inspect the object with the same no-follow/final-path and
+security rules, remove only the known stale temporary, and rerun the original
+staging validation. A temporary is not production acceptance evidence.
+
 ## Phase B: `TRADING_ALLOW_DENY`
 
 Log on to the dedicated standard `Trading` account and launch the command from
@@ -227,6 +238,17 @@ text. A phase record is partial evidence. Production acceptance is a
 collection/checklist containing separate PASS records for every required phase,
 including the separately obtained cross-session record; it is not a pytest
 exit code and no individual result is named complete Milestone A acceptance.
+
+Trust-file publication is crash-consistent per file, not a two-file
+transaction. The publisher writes and flushes a reserved temporary while
+holding its handle, validates that same object, then uses a no-replace
+handle-based rename into the absent fixed destination and reopens the final
+path. A process failure or power loss can therefore leave a stale temporary,
+one published final and one absent final, or neither final; it cannot
+intentionally expose a final trust file while it is being written. Stale
+temporary state requires explicit administrator recovery. The contract makes
+no directory-entry persistence claim across abrupt power loss, and no native
+power-loss test is inferred from ordinary pytest.
 
 ## Current limitations and NO-GO gates
 

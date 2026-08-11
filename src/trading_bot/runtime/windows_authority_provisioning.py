@@ -11,6 +11,7 @@ from trading_bot.runtime.windows_authority import (
     PRODUCTION_AUTHORITY_PATHS,
     PRODUCTION_PINNED_BOOTSTRAP_KEYS,
     AuthorityPrincipalError,
+    AuthorityRecoveryRequiredError,
     BootstrapVerification,
     PinnedBootstrapKeyRegistry,
     WindowsAuthorityError,
@@ -28,10 +29,12 @@ from trading_bot.runtime.windows_authority_security import (
     SecurityPolicy,
     authority_security_policy,
     create_authority_directory,
-    create_authority_file,
+    create_unpublished_authority_file,
     inspect_fixed_authority_object,
     inspect_open_authority_object,
+    inspect_open_authority_provisioning_temp_file,
     open_authority_object,
+    publish_unpublished_authority_file,
     read_open_authority_file,
     require_administrator_token,
     require_security_policy,
@@ -269,6 +272,41 @@ def _validate_database_if_present(
     return evidence.database_state
 
 
+def _require_reserved_temporary_objects_absent() -> None:
+    """Fail closed when either reserved install name needs manual recovery."""
+
+    for path in PRODUCTION_AUTHORITY_PATHS.provisioning_temporary_objects:
+        try:
+            handle = open_authority_object(path, AuthorityObjectKind.FILE)
+        except WindowsNativeError as error:
+            if error.error_code in {ERROR_FILE_NOT_FOUND, ERROR_PATH_NOT_FOUND}:
+                continue
+            raise AuthorityRecoveryRequiredError(
+                "reserved authority trust-material temporary requires manual recovery"
+            ) from error
+        else:
+            handle.close()
+            raise AuthorityRecoveryRequiredError(
+                "reserved authority trust-material temporary requires manual recovery"
+            )
+
+
+def _validate_exact_file(
+    path: PureWindowsPath,
+    data: bytes,
+    policy: SecurityPolicy,
+) -> None:
+    with open_authority_object(path, AuthorityObjectKind.FILE) as handle:
+        inspection = inspect_open_authority_object(
+            handle, path, AuthorityObjectKind.FILE
+        )
+        require_security_policy(inspection, policy)
+        if read_open_authority_file(handle) != data:
+            raise WindowsAuthorityError(
+                "existing trust material does not exactly match staging"
+            )
+
+
 def validate_installed_authority(
     *,
     key_registry: PinnedBootstrapKeyRegistry = PRODUCTION_PINNED_BOOTSTRAP_KEYS,
@@ -310,15 +348,34 @@ def _install_exact_file(
     existing: bool,
 ) -> None:
     if existing:
-        with open_authority_object(destination, AuthorityObjectKind.FILE) as handle:
-            inspect_open_authority_object(handle, destination, AuthorityObjectKind.FILE)
+        _validate_exact_file(destination, data, policy)
+        return
+    temporary_by_destination = {
+        PRODUCTION_AUTHORITY_PATHS.bootstrap: (
+            PRODUCTION_AUTHORITY_PATHS.bootstrap_temporary
+        ),
+        PRODUCTION_AUTHORITY_PATHS.signature: (
+            PRODUCTION_AUTHORITY_PATHS.signature_temporary
+        ),
+    }
+    try:
+        temporary = temporary_by_destination[destination]
+    except KeyError as error:
+        raise WindowsAuthorityError(
+            "only fixed bootstrap and signature files can be published"
+        ) from error
+    try:
+        with create_unpublished_authority_file(temporary, data, policy) as handle:
+            inspection = inspect_open_authority_provisioning_temp_file(
+                handle, temporary
+            )
+            require_security_policy(inspection, policy)
             if read_open_authority_file(handle) != data:
                 raise WindowsAuthorityError(
-                    "existing trust material does not exactly match staging"
+                    "unpublished trust material does not exactly match staging"
                 )
-        return
-    try:
-        create_authority_file(destination, data, policy)
+            publish_unpublished_authority_file(handle, destination)
+        _validate_exact_file(destination, data, policy)
     except WindowsAuthorityError:
         raise
     except OSError as error:
@@ -359,6 +416,8 @@ def provision_authority(
         existing[PRODUCTION_AUTHORITY_PATHS.journal],
     )
     try:
+        if existing[PRODUCTION_AUTHORITY_PATHS.root]:
+            _require_reserved_temporary_objects_absent()
         for path, role in (
             (PRODUCTION_AUTHORITY_PATHS.root, "root"),
             (PRODUCTION_AUTHORITY_PATHS.capture_output, "capture-output"),
@@ -368,6 +427,9 @@ def provision_authority(
                 create_authority_directory(
                     path, authority_security_policy(role, trading_sid)
                 )
+            if path == PRODUCTION_AUTHORITY_PATHS.root and not existing[path]:
+                _validate_existing_authority_root(trading_sid)
+                _require_reserved_temporary_objects_absent()
         _install_exact_file(
             PRODUCTION_AUTHORITY_PATHS.bootstrap,
             bootstrap_bytes,
@@ -387,8 +449,8 @@ def provision_authority(
             "fixed authority objects could not be established"
         ) from error
 
-    # New objects receive the reviewed descriptor atomically at creation;
-    # existing objects were validated above and are never repaired.
+    # Existing objects were validated above and are never repaired. Absent
+    # trust files were published only after complete temporary-file validation.
     inspected, database_present, journal_present = _inspect_tree(trading_sid)
     database_state = _validate_database_if_present(
         database_present,

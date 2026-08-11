@@ -32,6 +32,8 @@ current directory, registry, database, bootstrap, or CLI input:
 F:\AITradingBot\Authority\
   authority.bootstrap.json
   authority.bootstrap.sig
+  .authority.bootstrap.json.installing   # reserved provisioning temporary
+  .authority.bootstrap.sig.installing    # reserved provisioning temporary
   authority.sqlite3
   authority.sqlite3-journal
   capture-output\
@@ -75,6 +77,14 @@ schema check because it rejects every initialized database.
 The pre-existing `F:\AITradingBot` parent component is also opened and checked;
 it must be a local NTFS directory with the exact administrator/SYSTEM-only
 protected DACL. Provisioning does not create or repair that parent component.
+
+The two `.installing` names are deterministic, code-owned, same-directory
+temporary names used only while publishing the two trust files. They are not
+installed authority objects and are not caller-selectable. Provisioning first
+validates the parent and root, then requires both reserved names to be absent.
+Any present or unexpectedly inaccessible temporary object is stale or hostile
+state and fails closed with an administrator recovery requirement. The
+provisioner never deletes, reuses, promotes, or repairs it automatically.
 
 ## Bootstrap verification
 
@@ -210,17 +220,35 @@ connection-local PRAGMAs or mutate the tree.
    trust-material mutation. No database identity binding or production schema
    initialization exists in Milestone A;
 5. create only the fixed root, `capture-output`, and `backup` directories with
-   the reviewed owner/DACL descriptor;
-6. install trust material only when absent, under that descriptor, or require
-   exact byte identity when already present;
-7. validate the resulting fixed objects; and
-8. validate the installed SQLite storage state and report sanitized evidence;
+   the reviewed owner/DACL descriptor, and revalidate the root before touching
+   reserved temporary names;
+6. install each absent trust file by creating its reserved same-directory
+   temporary with `CREATE_NEW` and `FILE_FLAG_OPEN_REPARSE_POINT`, retaining
+   that handle through complete writes, `FlushFileBuffers`, no-follow
+   final-path/type/volume/security inspection, and exact-byte verification;
+7. publish the still-open temporary through handle-based `FileRenameInfo` with
+   `ReplaceIfExists = FALSE` into the absent fixed destination, close it, and
+   reopen the final path for full validation. Existing final files are accepted
+   only when their inspected policy and bytes exactly match; they are never
+   replaced or repaired;
+8. validate the resulting fixed objects; and
+9. validate the installed SQLite storage state and report sanitized evidence;
    no initialized database identity is reported.
 
 Unexpected existing types, bytes, owner, DACL, or reparse state fail closed;
-the command does not repair hostile state. It never creates a production SQL
-schema, reads credentials, calls a provider, launches a child, schedules work,
-or places an order.
+the command does not repair hostile state. A write, flush, inspection, or
+no-replace publish failure leaves any temporary name for explicit administrator
+recovery; it is not silently cleaned up. Publication is atomic for each file,
+not a transaction across bootstrap and signature: a crash may leave one final
+file published and the other absent, which is recoverable on a clean retry only
+after no stale temporary remains. A mismatched final file is never an
+automatic-repair path. Flushing the file handle prevents intentional exposure
+of a partially written published file and orders file data before publication;
+this contract does not claim that the directory entry survives every abrupt
+power loss because the Win32 user-mode contract provides no additional
+directory-durability operation here. It never creates a production SQL schema,
+reads credentials, calls a provider, launches a child, schedules work, or
+places an order.
 
 ## Acceptance boundary and remaining NO-GO items
 

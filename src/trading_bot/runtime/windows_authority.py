@@ -49,6 +49,10 @@ class WindowsNativeError(WindowsAuthorityError):
         super().__init__(f"Windows operation failed: {operation}{suffix}")
 
 
+class AuthorityRecoveryRequiredError(WindowsAuthorityError):
+    """Raised when administrator manual recovery is required before retry."""
+
+
 class BootstrapError(WindowsAuthorityError, ValueError):
     """Base class for malformed or unsupported signed bootstrap material."""
 
@@ -143,6 +147,18 @@ class FixedAuthorityPaths:
         return self.root / "backup"
 
     @property
+    def bootstrap_temporary(self) -> PureWindowsPath:
+        return self.root / ".authority.bootstrap.json.installing"
+
+    @property
+    def signature_temporary(self) -> PureWindowsPath:
+        return self.root / ".authority.bootstrap.sig.installing"
+
+    @property
+    def provisioning_temporary_objects(self) -> tuple[PureWindowsPath, ...]:
+        return (self.bootstrap_temporary, self.signature_temporary)
+
+    @property
     def protected_objects(self) -> tuple[PureWindowsPath, ...]:
         return (
             self.root,
@@ -194,6 +210,17 @@ def require_fixed_authority_tree_path(
         if str(path) == str(expected):
             return expected
     raise AuthorityPathError("path is outside the fixed authority deployment")
+
+
+def require_fixed_authority_provisioning_temp_path(
+    path: str | PureWindowsPath,
+) -> PureWindowsPath:
+    """Require one of the two code-owned provisioning temporary paths."""
+
+    for expected in PRODUCTION_AUTHORITY_PATHS.provisioning_temporary_objects:
+        if str(path) == str(expected):
+            return expected
+    raise AuthorityPathError("path is outside the fixed provisioning temporary set")
 
 
 # ---------------------------------------------------------------------------

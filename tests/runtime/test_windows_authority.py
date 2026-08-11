@@ -19,6 +19,7 @@ from trading_bot.runtime.windows_authority import (
     PRODUCTION_PINNED_BOOTSTRAP_KEYS,
     AuthorityObjectError,
     AuthorityPathError,
+    AuthorityRecoveryRequiredError,
     BootstrapSchemaError,
     BootstrapSignatureError,
     BootstrapSyntaxError,
@@ -48,14 +49,19 @@ from trading_bot.runtime.windows_authority_mutex import (
     select_lifecycle_mutex_owner_sid,
 )
 from trading_bot.runtime.windows_authority_security import (
+    CREATE_NEW,
     DELETE,
     FILE_APPEND_DATA,
+    FILE_ATTRIBUTE_NORMAL,
+    FILE_FLAG_OPEN_REPARSE_POINT,
     FILE_READ_ATTRIBUTES,
     FILE_READ_DATA,
     FILE_READ_EA,
+    FILE_RENAME_INFO_CLASS,
     FILE_WRITE_ATTRIBUTES,
     FILE_WRITE_DATA,
     FILE_WRITE_EA,
+    GENERIC_WRITE,
     MUTEX_ALL_ACCESS,
     READ_CONTROL,
     SE_FILE_OBJECT,
@@ -72,6 +78,7 @@ from trading_bot.runtime.windows_authority_security import (
     SecurityPolicy,
     authority_parent_security_policy,
     authority_security_policy,
+    require_fixed_authority_provisioning_temp_path,
     resolve_current_token_sid,
     sqlite_trading_file_rights,
 )
@@ -289,7 +296,7 @@ def test_validate_existing_root_keeps_non_not_found_failure_fail_closed(
     assert caught.value.error_code == 5
 
 
-def test_create_authority_file_rejects_pointer_invalid_without_writes_or_close(
+def test_create_unpublished_file_rejects_pointer_invalid_without_writes_or_close(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     import trading_bot.runtime.windows_authority_security as security
@@ -351,8 +358,8 @@ def test_create_authority_file_rejects_pointer_invalid_without_writes_or_close(
     )
 
     with pytest.raises(WindowsNativeError) as caught:
-        security.create_authority_file(
-            PRODUCTION_AUTHORITY_PATHS.bootstrap,
+        security.create_unpublished_authority_file(
+            PRODUCTION_AUTHORITY_PATHS.bootstrap_temporary,
             b"authority bytes",
             authority_security_policy("bootstrap", "S-1-5-21-100-200-300-400"),
         )
@@ -391,6 +398,570 @@ def test_open_authority_object_preserves_valid_handle_behavior(
     assert handle.value == 123
     handle.close()
     assert closed == [123]
+
+
+def test_provisioning_temporary_paths_are_reserved_and_not_installed() -> None:
+    import trading_bot.runtime.windows_authority as authority
+
+    assert authority.PRODUCTION_AUTHORITY_PATHS.provisioning_temporary_objects == (
+        authority.PRODUCTION_AUTHORITY_PATHS.bootstrap_temporary,
+        authority.PRODUCTION_AUTHORITY_PATHS.signature_temporary,
+    )
+    for (
+        temporary
+    ) in authority.PRODUCTION_AUTHORITY_PATHS.provisioning_temporary_objects:
+        assert temporary not in authority.PRODUCTION_AUTHORITY_PATHS.protected_objects
+        assert require_fixed_authority_provisioning_temp_path(temporary) == temporary
+        with pytest.raises(AuthorityPathError):
+            authority.require_fixed_authority_tree_path(temporary)
+    with pytest.raises(AuthorityPathError):
+        require_fixed_authority_provisioning_temp_path(
+            authority.PRODUCTION_AUTHORITY_PATHS.root / "attacker.installing"
+        )
+
+
+def test_create_unpublished_file_writes_flushes_and_retains_handle(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import trading_bot.runtime.windows_authority_security as security
+
+    temporary = PRODUCTION_AUTHORITY_PATHS.bootstrap_temporary
+    policy = authority_security_policy("bootstrap", "S-1-5-21-100-200-300-400")
+    calls: list[tuple[str, object]] = []
+    closed: list[object] = []
+
+    class FakeCreateFile:
+        argtypes: object
+        restype: object
+
+        def __call__(self, *args: object) -> int:
+            calls.append(("CreateFileW", args))
+            return 77
+
+    class FakeWriteFile:
+        argtypes: object
+        restype: object
+
+        def __call__(self, *args: object) -> bool:
+            calls.append(("WriteFile", args))
+            ctypes.cast(args[3], ctypes.POINTER(wintypes.DWORD)).contents.value = args[
+                2
+            ]
+            return True
+
+    class FakeFlushFileBuffers:
+        argtypes: object
+        restype: object
+
+        def __call__(self, *args: object) -> bool:
+            calls.append(("FlushFileBuffers", args))
+            return True
+
+    class FakeKernel32:
+        CreateFileW = FakeCreateFile()
+        WriteFile = FakeWriteFile()
+        FlushFileBuffers = FakeFlushFileBuffers()
+
+    class FakeAttributes:
+        attributes = ctypes.c_int()
+
+        def __enter__(self) -> FakeAttributes:
+            return self
+
+        def __exit__(
+            self,
+            exc_type: object,
+            exc: object,
+            traceback: object,
+        ) -> None:
+            return None
+
+    monkeypatch.setattr(security, "wintypes", wintypes)
+    monkeypatch.setattr(security, "require_windows_platform", lambda: None)
+    monkeypatch.setattr(security, "_kernel32", lambda: FakeKernel32())
+    monkeypatch.setattr(
+        security, "build_security_attributes", lambda requested: FakeAttributes()
+    )
+    monkeypatch.setattr(security.os, "name", "nt")
+    monkeypatch.setattr(security, "_close_handle", closed.append)
+
+    handle = security.create_unpublished_authority_file(temporary, b"abc", policy)
+
+    create_args = next(args for name, args in calls if name == "CreateFileW")
+    assert create_args[0] == str(temporary)
+    assert create_args[1] & GENERIC_WRITE
+    assert create_args[1] & DELETE
+    assert create_args[1] & FILE_READ_DATA
+    assert create_args[1] & READ_CONTROL
+    assert create_args[1] & FILE_READ_ATTRIBUTES
+    assert create_args[4] == CREATE_NEW
+    assert create_args[5] & FILE_ATTRIBUTE_NORMAL
+    assert create_args[5] & FILE_FLAG_OPEN_REPARSE_POINT
+    assert [name for name, _args in calls] == [
+        "CreateFileW",
+        "WriteFile",
+        "FlushFileBuffers",
+    ]
+    assert handle.value == 77
+    assert closed == []
+    handle.close()
+    assert closed == [77]
+
+
+@pytest.mark.parametrize("failure", ["write", "zero", "flush"])
+def test_create_unpublished_file_leaves_temporary_on_write_path_failure(
+    monkeypatch: pytest.MonkeyPatch,
+    failure: str,
+) -> None:
+    import trading_bot.runtime.windows_authority_security as security
+
+    calls: list[str] = []
+    closed: list[object] = []
+
+    class FakeCreateFile:
+        argtypes: object
+        restype: object
+
+        def __call__(self, *args: object) -> int:
+            calls.append("CreateFileW")
+            return 88
+
+    class FakeWriteFile:
+        argtypes: object
+        restype: object
+
+        def __call__(self, *args: object) -> bool:
+            calls.append("WriteFile")
+            if failure == "write":
+                return False
+            ctypes.cast(args[3], ctypes.POINTER(wintypes.DWORD)).contents.value = (
+                0 if failure == "zero" else args[2]
+            )
+            return True
+
+    class FakeFlushFileBuffers:
+        argtypes: object
+        restype: object
+
+        def __call__(self, *args: object) -> bool:
+            calls.append("FlushFileBuffers")
+            return failure != "flush"
+
+    class FakeKernel32:
+        CreateFileW = FakeCreateFile()
+        WriteFile = FakeWriteFile()
+        FlushFileBuffers = FakeFlushFileBuffers()
+
+    class FakeAttributes:
+        attributes = ctypes.c_int()
+
+        def __enter__(self) -> FakeAttributes:
+            return self
+
+        def __exit__(
+            self,
+            exc_type: object,
+            exc: object,
+            traceback: object,
+        ) -> None:
+            return None
+
+    monkeypatch.setattr(security, "wintypes", wintypes)
+    monkeypatch.setattr(security, "require_windows_platform", lambda: None)
+    monkeypatch.setattr(security, "_kernel32", lambda: FakeKernel32())
+    monkeypatch.setattr(
+        security, "build_security_attributes", lambda requested: FakeAttributes()
+    )
+    monkeypatch.setattr(security.os, "name", "nt")
+    monkeypatch.setattr(security, "_close_handle", closed.append)
+    monkeypatch.setattr(
+        security.ctypes,
+        "get_last_error",
+        lambda: 1234,
+        raising=False,
+    )
+
+    with pytest.raises(WindowsNativeError):
+        security.create_unpublished_authority_file(
+            PRODUCTION_AUTHORITY_PATHS.bootstrap_temporary,
+            b"abc",
+            authority_security_policy("bootstrap", "S-1-5-21-100-200-300-400"),
+        )
+
+    assert calls[0] == "CreateFileW"
+    assert closed == [88]
+    assert "SetFileInformationByHandle" not in calls
+
+
+def test_file_rename_info_is_pointer_width_safe_and_no_replace() -> None:
+    import trading_bot.runtime.windows_authority_security as security
+
+    destination = PRODUCTION_AUTHORITY_PATHS.bootstrap
+    buffer = security._build_file_rename_info(destination)
+    info = security._FileRenameInfo.from_buffer(buffer)
+    encoded = str(destination).encode("utf-16-le")
+    offset = security._FileRenameInfo.file_name.offset
+
+    assert info.replace_if_exists == 0
+    assert info.root_directory is None
+    assert info.file_name_length == len(encoded)
+    assert ctypes.string_at(ctypes.addressof(buffer) + offset, len(encoded)) == encoded
+    assert ctypes.sizeof(buffer) >= offset + len(encoded)
+    with pytest.raises(AuthorityPathError):
+        security._build_file_rename_info(PRODUCTION_AUTHORITY_PATHS.bootstrap_temporary)
+
+
+@pytest.mark.parametrize("should_fail", [False, True])
+def test_publish_unpublished_file_uses_handle_rename_without_replacement(
+    monkeypatch: pytest.MonkeyPatch,
+    should_fail: bool,
+) -> None:
+    import trading_bot.runtime.windows_authority_security as security
+
+    class FakeSetFileInformationByHandle:
+        argtypes: object
+        restype: object
+
+        def __init__(self) -> None:
+            self.args: tuple[object, ...] | None = None
+
+        def __call__(self, *args: object) -> bool:
+            self.args = args
+            return not should_fail
+
+    fake_set = FakeSetFileInformationByHandle()
+
+    class FakeKernel32:
+        SetFileInformationByHandle = fake_set
+
+    monkeypatch.setattr(security, "wintypes", wintypes)
+    monkeypatch.setattr(security, "require_windows_platform", lambda: None)
+    monkeypatch.setattr(security, "_kernel32", lambda: FakeKernel32())
+    monkeypatch.setattr(
+        security.ctypes,
+        "get_last_error",
+        lambda: 9876,
+        raising=False,
+    )
+    handle = security.WindowsHandle(91, close=False)
+
+    if should_fail:
+        with pytest.raises(WindowsNativeError) as caught:
+            security.publish_unpublished_authority_file(
+                handle, PRODUCTION_AUTHORITY_PATHS.bootstrap
+            )
+        assert caught.value.error_code == 9876
+    else:
+        security.publish_unpublished_authority_file(
+            handle, PRODUCTION_AUTHORITY_PATHS.bootstrap
+        )
+
+    assert fake_set.args is not None
+    assert fake_set.args[0] == 91
+    assert fake_set.args[1] == FILE_RENAME_INFO_CLASS
+    raw = ctypes.string_at(fake_set.args[2], fake_set.args[3])
+    info = security._FileRenameInfo.from_buffer_copy(raw)
+    assert info.replace_if_exists == 0
+    assert info.root_directory is None
+    assert info.file_name_length == len(
+        str(PRODUCTION_AUTHORITY_PATHS.bootstrap).encode("utf-16-le")
+    )
+    assert "MoveFileEx" not in str(fake_set.args)
+
+
+@pytest.mark.parametrize("error_code", [2, 3, 5])
+def test_reserved_temporary_presence_or_unknown_failure_requires_recovery(
+    monkeypatch: pytest.MonkeyPatch,
+    error_code: int,
+) -> None:
+    import trading_bot.runtime.windows_authority_provisioning as provisioning
+
+    opened: list[object] = []
+
+    def fake_open(path: object, kind: AuthorityObjectKind) -> object:
+        opened.append(path)
+        if error_code == 5:
+            raise WindowsNativeError("CreateFileW(authority object)", error_code)
+
+        class FakeHandle:
+            def __init__(self) -> None:
+                self.closed = False
+
+            def close(self) -> None:
+                self.closed = True
+
+        return FakeHandle()
+
+    monkeypatch.setattr(provisioning, "open_authority_object", fake_open)
+
+    with pytest.raises(AuthorityRecoveryRequiredError):
+        provisioning._require_reserved_temporary_objects_absent()
+
+    assert opened == [PRODUCTION_AUTHORITY_PATHS.bootstrap_temporary]
+
+
+def test_reserved_temporary_absence_requires_both_exact_not_found_results(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import trading_bot.runtime.windows_authority_provisioning as provisioning
+
+    opened: list[object] = []
+
+    def fake_open(path: object, kind: AuthorityObjectKind) -> object:
+        opened.append(path)
+        raise WindowsNativeError("CreateFileW(authority object)", 3)
+
+    monkeypatch.setattr(provisioning, "open_authority_object", fake_open)
+    provisioning._require_reserved_temporary_objects_absent()
+    assert opened == list(PRODUCTION_AUTHORITY_PATHS.provisioning_temporary_objects)
+
+
+def test_install_absent_file_validates_temp_before_publish_and_reopens_final(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import trading_bot.runtime.windows_authority_provisioning as provisioning
+
+    sid = "S-1-5-21-100-200-300-400"
+    destination = PRODUCTION_AUTHORITY_PATHS.bootstrap
+    temporary = PRODUCTION_AUTHORITY_PATHS.bootstrap_temporary
+    policy = authority_security_policy("bootstrap", sid)
+    events: list[str] = []
+
+    class FakeHandle:
+        value = 77
+
+        def __enter__(self) -> FakeHandle:
+            events.append("open")
+            return self
+
+        def __exit__(
+            self,
+            exc_type: object,
+            exc: object,
+            traceback: object,
+        ) -> None:
+            events.append("close")
+
+    inspection = SecurityInspection(
+        expected_path=str(temporary),
+        final_path=str(temporary),
+        kind=AuthorityObjectKind.FILE,
+        owner_sid=policy.owner_sid,
+        dacl_protected=True,
+        aces=policy.aces,
+        is_reparse_point=False,
+        volume_root="F:\\",
+        filesystem="NTFS",
+    )
+
+    monkeypatch.setattr(
+        provisioning,
+        "create_unpublished_authority_file",
+        lambda path, data, requested: events.append("create") or FakeHandle(),
+    )
+    monkeypatch.setattr(
+        provisioning,
+        "inspect_open_authority_provisioning_temp_file",
+        lambda handle, path: events.append("temp-inspect") or inspection,
+    )
+    monkeypatch.setattr(
+        provisioning,
+        "require_security_policy",
+        lambda found, requested: events.append("policy"),
+    )
+    monkeypatch.setattr(
+        provisioning,
+        "read_open_authority_file",
+        lambda handle: events.append("temp-read") or b"abc",
+    )
+    monkeypatch.setattr(
+        provisioning,
+        "publish_unpublished_authority_file",
+        lambda handle, path: events.append("publish"),
+    )
+    monkeypatch.setattr(
+        provisioning,
+        "_validate_exact_file",
+        lambda path, data, requested: events.append("final-validate"),
+    )
+
+    provisioning._install_exact_file(destination, b"abc", policy, False)
+
+    assert events == [
+        "create",
+        "open",
+        "temp-inspect",
+        "policy",
+        "temp-read",
+        "publish",
+        "close",
+        "final-validate",
+    ]
+
+
+def test_provisioning_checks_temporary_names_before_trust_mutation(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    import types
+
+    import trading_bot.runtime.windows_authority_provisioning as provisioning
+
+    staging_bootstrap = tmp_path / "staging.bootstrap.json"
+    staging_signature = tmp_path / "staging.bootstrap.sig"
+    staging_bootstrap.write_bytes(b"bootstrap")
+    staging_signature.write_bytes(b"signature")
+    existing = {
+        path: path is PRODUCTION_AUTHORITY_PATHS.root
+        for path in PRODUCTION_AUTHORITY_PATHS.protected_objects
+    }
+    events: list[str] = []
+
+    monkeypatch.setattr(
+        provisioning, "require_administrator_token", lambda: events.append("admin")
+    )
+    monkeypatch.setattr(provisioning, "parse_bootstrap_bytes", lambda data: None)
+    monkeypatch.setattr(
+        provisioning,
+        "require_trading_standard_account",
+        lambda: "S-1-5-21-100-200-300-400",
+    )
+    monkeypatch.setattr(
+        provisioning,
+        "_verify_material",
+        lambda *args, **kwargs: types.SimpleNamespace(
+            bootstrap_digest="digest", signing_key_id="key"
+        ),
+    )
+    monkeypatch.setattr(
+        provisioning,
+        "validate_lifecycle_mutex_security_descriptor",
+        lambda sid: events.append("mutex"),
+    )
+    monkeypatch.setattr(
+        provisioning,
+        "_existing_fixed_objects",
+        lambda sid: events.append("discover") or existing,
+    )
+    monkeypatch.setattr(
+        provisioning,
+        "_validate_existing_objects",
+        lambda sid, found: events.append("existing"),
+    )
+    monkeypatch.setattr(
+        provisioning,
+        "_validate_database_if_present",
+        lambda database, journal: (
+            events.append("database") or provisioning.SqliteDatabaseState.NOT_PRESENT
+        ),
+    )
+    monkeypatch.setattr(
+        provisioning,
+        "_require_reserved_temporary_objects_absent",
+        lambda: events.append("temporary-absent"),
+    )
+    monkeypatch.setattr(
+        provisioning,
+        "create_authority_directory",
+        lambda path, policy: events.append(f"mkdir:{path}"),
+    )
+    monkeypatch.setattr(
+        provisioning,
+        "_install_exact_file",
+        lambda path, data, policy, present: events.append(f"install:{path}"),
+    )
+    monkeypatch.setattr(
+        provisioning,
+        "_inspect_tree",
+        lambda sid: events.append("inspect") or (("root",), False, False),
+    )
+
+    provisioning.provision_authority(
+        bootstrap_source=staging_bootstrap,
+        signature_source=staging_signature,
+    )
+
+    database_index = events.index("database")
+    temporary_index = events.index("temporary-absent")
+    first_mutation = min(
+        index
+        for index, event in enumerate(events)
+        if event.startswith("mkdir:") or event.startswith("install:")
+    )
+    assert database_index < temporary_index < first_mutation
+
+
+def test_existing_mismatched_file_is_not_repaired_or_published(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import trading_bot.runtime.windows_authority_provisioning as provisioning
+
+    sid = "S-1-5-21-100-200-300-400"
+    policy = authority_security_policy("bootstrap", sid)
+    events: list[str] = []
+
+    class FakeHandle:
+        def __enter__(self) -> int:
+            return 41
+
+        def __exit__(
+            self,
+            exc_type: object,
+            exc: object,
+            traceback: object,
+        ) -> None:
+            events.append("close")
+
+    inspection = SecurityInspection(
+        expected_path=str(PRODUCTION_AUTHORITY_PATHS.bootstrap),
+        final_path=str(PRODUCTION_AUTHORITY_PATHS.bootstrap),
+        kind=AuthorityObjectKind.FILE,
+        owner_sid=policy.owner_sid,
+        dacl_protected=True,
+        aces=policy.aces,
+        is_reparse_point=False,
+        volume_root="F:\\",
+        filesystem="NTFS",
+    )
+    monkeypatch.setattr(
+        provisioning,
+        "open_authority_object",
+        lambda path, kind: events.append("open") or FakeHandle(),
+    )
+    monkeypatch.setattr(
+        provisioning,
+        "inspect_open_authority_object",
+        lambda handle, path, kind: events.append("inspect") or inspection,
+    )
+    monkeypatch.setattr(
+        provisioning,
+        "require_security_policy",
+        lambda found, requested: events.append("policy"),
+    )
+    monkeypatch.setattr(
+        provisioning,
+        "read_open_authority_file",
+        lambda handle: events.append("read") or b"different",
+    )
+    monkeypatch.setattr(
+        provisioning,
+        "create_unpublished_authority_file",
+        lambda *args: pytest.fail("mismatched final must not create a temporary"),
+    )
+    monkeypatch.setattr(
+        provisioning,
+        "publish_unpublished_authority_file",
+        lambda *args: pytest.fail("mismatched final must not publish"),
+    )
+
+    with pytest.raises(WindowsAuthorityError, match="exactly match"):
+        provisioning._install_exact_file(
+            PRODUCTION_AUTHORITY_PATHS.bootstrap,
+            b"expected",
+            policy,
+            True,
+        )
+    assert events == ["open", "inspect", "policy", "read", "close"]
 
 
 def _mock_installed_material_reader(
@@ -1306,7 +1877,7 @@ def test_hostile_parent_fails_before_any_child_probe_or_mutation(
     )
     monkeypatch.setattr(
         provisioning,
-        "create_authority_file",
+        "create_unpublished_authority_file",
         lambda path, data, policy: calls.append(f"file:{path}"),
     )
 
@@ -1561,7 +2132,7 @@ def test_precreated_database_is_checked_after_filesystem_trust_before_mutation(
     )
     monkeypatch.setattr(
         provisioning,
-        "create_authority_file",
+        "create_unpublished_authority_file",
         lambda path, data, policy: events.append(f"mutate-file:{path}"),
     )
 

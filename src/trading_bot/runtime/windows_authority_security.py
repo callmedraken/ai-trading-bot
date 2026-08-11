@@ -18,6 +18,7 @@ from trading_bot.runtime.windows_authority import (
     AuthorityPrincipalError,
     AuthoritySecurityError,
     WindowsNativeError,
+    require_fixed_authority_provisioning_temp_path,
     require_fixed_authority_tree_path,
     require_windows_platform,
 )
@@ -61,6 +62,7 @@ FILE_SHARE_WRITE = 2
 FILE_SHARE_DELETE = 4
 FILE_ATTRIBUTE_REPARSE_POINT = 0x400
 FILE_ATTRIBUTE_DIRECTORY = 0x10
+FILE_RENAME_INFO_CLASS = 3
 LG_INCLUDE_INDIRECT = 1
 MAX_PREFERRED_LENGTH = 0xFFFFFFFF
 ERROR_INSUFFICIENT_BUFFER = 122
@@ -326,7 +328,10 @@ def _local_free(pointer: object) -> None:
 def _require_fixed_open_path(path: str | PureWindowsPath) -> None:
     if str(path) == str(PRODUCTION_AUTHORITY_PATHS.root.parent):
         return
-    require_fixed_authority_tree_path(path)
+    try:
+        require_fixed_authority_tree_path(path)
+    except AuthorityPathError:
+        require_fixed_authority_provisioning_temp_path(path)
 
 
 def open_authority_object(
@@ -391,14 +396,44 @@ def create_authority_directory(
             raise _last_error("CreateDirectoryW(authority object)")
 
 
-def create_authority_file(
+class _FileRenameInfo(ctypes.Structure):
+    """Pointer-width-safe prefix for the legacy FileRenameInfo class."""
+
+    _fields_ = [
+        ("replace_if_exists", ctypes.c_ubyte),
+        ("root_directory", ctypes.c_void_p),
+        ("file_name_length", ctypes.c_uint32),
+        ("file_name", ctypes.c_ubyte * 1),
+    ]
+
+
+def _build_file_rename_info(destination: PureWindowsPath) -> ctypes.Array:
+    """Build a variable-length UTF-16 FILE_RENAME_INFO buffer."""
+
+    require_fixed_authority_tree_path(destination)
+    file_name = str(destination).encode("utf-16-le")
+    file_name_offset = _FileRenameInfo.file_name.offset
+    buffer = ctypes.create_string_buffer(file_name_offset + len(file_name))
+    info = _FileRenameInfo.from_buffer(buffer)
+    info.replace_if_exists = 0
+    info.root_directory = None
+    info.file_name_length = len(file_name)
+    ctypes.memmove(
+        ctypes.addressof(buffer) + file_name_offset,
+        file_name,
+        len(file_name),
+    )
+    return buffer
+
+
+def create_unpublished_authority_file(
     path: str | PureWindowsPath,
     data: bytes,
     policy: SecurityPolicy,
-) -> None:
-    """Create and write one fixed file under its reviewed descriptor."""
+) -> WindowsHandle:
+    """Create, flush, and retain one unpublished trust file handle."""
 
-    require_fixed_authority_tree_path(path)
+    require_fixed_authority_provisioning_temp_path(path)
     if type(data) is not bytes:
         raise AuthorityObjectError("authority file contents must be bytes")
     require_windows_platform()
@@ -429,7 +464,11 @@ def create_authority_file(
     with build_security_attributes(policy) as attributes:
         raw_handle = create(
             str(path),
-            GENERIC_WRITE,
+            GENERIC_WRITE
+            | DELETE
+            | FILE_READ_DATA
+            | READ_CONTROL
+            | FILE_READ_ATTRIBUTES,
             FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
             ctypes.byref(attributes.attributes),
             CREATE_NEW,
@@ -438,7 +477,7 @@ def create_authority_file(
         )
         handle = _handle_value(raw_handle)
         if handle in (0, INVALID_HANDLE_VALUE):
-            raise _last_error("CreateFileW(authority file)")
+            raise _last_error("CreateFileW(unpublished authority file)")
         try:
             buffer = ctypes.create_string_buffer(data)
             offset = 0
@@ -451,14 +490,45 @@ def create_authority_file(
                     ctypes.byref(written),
                     None,
                 ):
-                    raise _last_error("WriteFile(authority file)")
+                    raise _last_error("WriteFile(unpublished authority file)")
                 if written.value == 0:
-                    raise WindowsNativeError("WriteFile(authority file)")
+                    raise WindowsNativeError("WriteFile(unpublished authority file)")
                 offset += written.value
             if not flush(handle):
-                raise _last_error("FlushFileBuffers(authority file)")
-        finally:
+                raise _last_error("FlushFileBuffers(unpublished authority file)")
+        except BaseException:
             _close_handle(handle)
+            raise
+    return WindowsHandle(handle)
+
+
+def publish_unpublished_authority_file(
+    handle: WindowsHandle,
+    destination: str | PureWindowsPath,
+) -> None:
+    """Atomically rename an unpublished file without replacing its destination."""
+
+    destination_path = require_fixed_authority_tree_path(destination)
+    require_windows_platform()
+    handle_value = _handle_value(handle)
+    if handle_value in (0, INVALID_HANDLE_VALUE):
+        raise AuthorityObjectError("unpublished authority handle is invalid")
+    rename_info = _build_file_rename_info(destination_path)
+    set_file_information = _kernel32().SetFileInformationByHandle
+    set_file_information.argtypes = [
+        wintypes.HANDLE,
+        ctypes.c_int,
+        ctypes.c_void_p,
+        wintypes.DWORD,
+    ]
+    set_file_information.restype = wintypes.BOOL
+    if not set_file_information(
+        handle_value,
+        FILE_RENAME_INFO_CLASS,
+        ctypes.byref(rename_info),
+        ctypes.sizeof(rename_info),
+    ):
+        raise _last_error("SetFileInformationByHandle(FileRenameInfo)")
 
 
 def read_open_authority_file(handle: int) -> bytes:
@@ -978,6 +1048,20 @@ def inspect_open_authority_object(
         is_reparse_point=reparse,
         volume_root=volume_root,
         filesystem=filesystem,
+    )
+
+
+def inspect_open_authority_provisioning_temp_file(
+    handle: int,
+    expected_path: str | PureWindowsPath,
+) -> SecurityInspection:
+    """Inspect one reserved unpublished trust-material file."""
+
+    temporary = require_fixed_authority_provisioning_temp_path(expected_path)
+    return inspect_open_authority_object(
+        handle,
+        temporary,
+        AuthorityObjectKind.FILE,
     )
 
 

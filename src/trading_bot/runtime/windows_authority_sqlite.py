@@ -41,7 +41,7 @@ class InstalledSqliteEvidence:
     database_state: SqliteDatabaseState
     attached_database_count: int
     persistent_journal_present: bool
-    trusted_schema: bool = False
+    trusted_schema_off: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,7 +55,7 @@ class SqliteDurabilityEvidence:
     synchronous: int
     attached_database_count: int
     persistent_journal_present: bool
-    trusted_schema: bool = False
+    trusted_schema_off: bool
 
 
 def _require_exact_connection(connection: sqlite3.Connection) -> None:
@@ -84,6 +84,15 @@ def _main_database(
 def _require_persistent_journal(journal_path: str) -> None:
     if not Path(journal_path).is_file():
         raise SqliteDurabilityError("SQLite persistent journal is not pre-created")
+
+
+def _require_trusted_schema_off(connection: sqlite3.Connection) -> None:
+    try:
+        value = connection.execute("PRAGMA trusted_schema").fetchone()
+    except (sqlite3.Error, TypeError, ValueError, IndexError) as error:
+        raise SqliteDurabilityError("SQLite trusted_schema readback failed") from error
+    if value is None or type(value[0]) is not int or value[0] != 0:
+        raise SqliteDurabilityError("SQLite trusted_schema is not OFF")
 
 
 def _require_database_file(database_path: str) -> None:
@@ -174,11 +183,12 @@ def validate_installed_sqlite_prerequisites(
     database_path: str | Path,
     journal_path: str | Path,
 ) -> InstalledSqliteEvidence:
-    """Validate installed SQLite files without configuring the connection.
+    """Validate installed SQLite files without mutating the database.
 
     This read-only layer proves the fixed database format, schema, integrity,
-    attachment, journal, and explicit lifecycle state. Runtime PRAGMAs are
-    connection-local and are intentionally not read or changed here.
+    attachment, journal, and explicit lifecycle state. It configures and
+    proves the connection-local trusted-schema fence while leaving other
+    runtime durability PRAGMAs unchanged.
     """
 
     _require_exact_connection(connection)
@@ -189,6 +199,7 @@ def validate_installed_sqlite_prerequisites(
         configure_trusted_schema_off(connection)
     except SchemaValidationError as error:
         raise SqliteDurabilityError(str(error)) from error
+    _require_trusted_schema_off(connection)
     databases = _main_database(connection, expected_database)
     _read_schema(connection)
     _require_integrity(connection)
@@ -209,7 +220,7 @@ def validate_installed_sqlite_prerequisites(
         database_state=database_state,
         attached_database_count=len(databases),
         persistent_journal_present=True,
-        trusted_schema=True,
+        trusted_schema_off=True,
     )
 
 
@@ -238,6 +249,7 @@ def configure_and_validate_authority_sqlite_connection(
         configure_trusted_schema_off(connection)
     except SchemaValidationError as error:
         raise SqliteDurabilityError(str(error)) from error
+    _require_trusted_schema_off(connection)
     _main_database(connection, expected_database)
     _require_persistent_journal(expected_journal)
     try:
@@ -269,5 +281,5 @@ def configure_and_validate_authority_sqlite_connection(
         synchronous=synchronous,
         attached_database_count=len(databases),
         persistent_journal_present=True,
-        trusted_schema=True,
+        trusted_schema_off=True,
     )

@@ -15,6 +15,7 @@ from trading_bot.runtime.windows_authority import (
     WindowsAuthorityBootstrap,
     WindowsAuthorityError,
 )
+from trading_bot.runtime.windows_authority_schema import SchemaValidationError
 from trading_bot.runtime.windows_authority_sqlite import (
     InstalledSqliteEvidence,
     SqliteDatabaseState,
@@ -144,12 +145,81 @@ def test_installed_validation_is_read_only_and_does_not_claim_runtime_pragmas(
             connection.execute("PRAGMA synchronous").fetchone()[0],
         )
         assert before == after
+        assert connection.execute("PRAGMA trusted_schema").fetchone()[0] == 0
         assert evidence.database_openable is True
         assert evidence.database_state is SqliteDatabaseState.PRECREATED_UNINITIALIZED
         assert evidence.attached_database_count == 1
         assert evidence.persistent_journal_present is True
+        assert evidence.trusted_schema_off is True
         assert connection.execute("SELECT name FROM sqlite_schema").fetchall() == []
         assert database.read_bytes() == before_bytes
+    finally:
+        connection.close()
+
+
+def test_installed_read_only_validation_proves_trusted_schema_off(
+    tmp_path: Path,
+) -> None:
+    connection, database, journal = _fresh_database(tmp_path)
+    connection.close()
+    read_only = open_read_only_sqlite_connection(database)
+    try:
+        read_only.execute("PRAGMA trusted_schema = ON")
+        assert read_only.execute("PRAGMA trusted_schema").fetchone()[0] == 1
+        evidence = validate_installed_sqlite_prerequisites(
+            read_only, database_path=database, journal_path=journal
+        )
+        assert read_only.execute("PRAGMA trusted_schema").fetchone()[0] == 0
+        assert evidence.trusted_schema_off is True
+    finally:
+        read_only.close()
+
+
+@pytest.mark.parametrize("validation_kind", ["installed", "runtime"])
+def test_sqlite_evidence_fails_closed_when_trusted_schema_setup_fails(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    validation_kind: str,
+) -> None:
+    import trading_bot.runtime.windows_authority_sqlite as sqlite_runtime
+
+    def fail_setup(connection: sqlite3.Connection) -> None:
+        raise SchemaValidationError("trusted-schema setup failed")
+
+    monkeypatch.setattr(sqlite_runtime, "configure_trusted_schema_off", fail_setup)
+    connection, database, journal = _fresh_database(tmp_path)
+    try:
+        validator = (
+            validate_installed_sqlite_prerequisites
+            if validation_kind == "installed"
+            else configure_and_validate_authority_sqlite_connection
+        )
+        with pytest.raises(SqliteDurabilityError, match="trusted-schema setup failed"):
+            validator(connection, database_path=database, journal_path=journal)
+    finally:
+        connection.close()
+
+
+@pytest.mark.parametrize("validation_kind", ["installed", "runtime"])
+def test_sqlite_evidence_rejects_trusted_schema_remaining_on(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    validation_kind: str,
+) -> None:
+    import trading_bot.runtime.windows_authority_sqlite as sqlite_runtime
+
+    monkeypatch.setattr(sqlite_runtime, "configure_trusted_schema_off", lambda _: None)
+    connection, database, journal = _fresh_database(tmp_path)
+    try:
+        connection.execute("PRAGMA trusted_schema = ON")
+        assert connection.execute("PRAGMA trusted_schema").fetchone()[0] == 1
+        validator = (
+            validate_installed_sqlite_prerequisites
+            if validation_kind == "installed"
+            else configure_and_validate_authority_sqlite_connection
+        )
+        with pytest.raises(SqliteDurabilityError, match="trusted_schema is not OFF"):
+            validator(connection, database_path=database, journal_path=journal)
     finally:
         connection.close()
 
@@ -329,6 +399,7 @@ def test_installed_validation_uses_fixed_read_only_sqlite_uri(
             database_state=SqliteDatabaseState.PRECREATED_UNINITIALIZED,
             attached_database_count=1,
             persistent_journal_present=True,
+            trusted_schema_off=True,
         ),
     )
 
@@ -390,9 +461,11 @@ def test_runtime_connection_setup_configures_every_required_pragma(
         assert connection.execute("PRAGMA foreign_keys").fetchone()[0] == 1
         assert connection.execute("PRAGMA journal_mode").fetchone()[0] == "persist"
         assert connection.execute("PRAGMA synchronous").fetchone()[0] == 2
+        assert connection.execute("PRAGMA trusted_schema").fetchone()[0] == 0
         assert evidence.foreign_keys is True
         assert evidence.journal_mode == "persist"
         assert evidence.synchronous == 2
+        assert evidence.trusted_schema_off is True
         assert (
             connection.execute(
                 "SELECT name FROM sqlite_master WHERE type = 'table'"

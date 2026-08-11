@@ -5,6 +5,12 @@ the transactional runtime in [architecture 77](77-windows-transactional-capture-
 can be considered for production. It does not change the executable fixture,
 its UUID5 contracts, or the transactional state machine.
 
+[Architecture 79](79-windows-production-transactional-authority-schema.md)
+defines the next boundary: the exact production schema, immutable metadata,
+bootstrap reconciliation, and explicit administrator-only database
+initialization that turns a verified pre-created pair into
+`INITIALIZED_SUPPORTED` authority.
+
 ## Module boundaries
 
 The production boundary is split across:
@@ -67,12 +73,11 @@ database, or complete Architecture-77 fixture is classified as
 Milestone A never reports an initialized database as executable or
 identity-bound authority.
 
-The future schema contract may check `metadata_json` only as opaque bytes
-together with its exact SHA-256 `metadata_digest`. Architecture 77 does not
-define a separate canonical semantic encoding for that JSON beyond this
-immutable byte/digest contract, so this release does not invent one or claim
-metadata-schema completeness. Milestone A does not reach this initialized-
-schema check because it rejects every initialized database.
+The production schema and canonical metadata contract are now defined by
+[Architecture 79](79-windows-production-transactional-authority-schema.md).
+Until that milestone is implemented and accepted, Architecture 78 continues
+to treat initialized databases as unsupported and does not interpret
+`metadata_json` semantically.
 
 The pre-existing `F:\AITradingBot` parent component is also opened and checked;
 it must be a local NTFS directory with the exact administrator/SYSTEM-only
@@ -215,10 +220,12 @@ connection-local PRAGMAs or mutate the tree.
    local Trading SID before final-tree mutation;
 3. validate the fixed parent/object state and any pre-created database/journal
    with the read-only SQLite format/schema/integrity checks before mutation;
-4. accept only the `PRECREATED_UNINITIALIZED` storage state; reject every
-   initialized/application schema as `INITIALIZED_UNSUPPORTED` before any
-   trust-material mutation. No database identity binding or production schema
-   initialization exists in Milestone A;
+4. preserve the deferred database boundary: accept a paired
+   `PRECREATED_UNINITIALIZED` database without initializing it, and after
+   Architecture 79 is implemented accept an exact `INITIALIZED_SUPPORTED`
+   database only as an idempotent already-installed state. Reject every other
+   initialized/application schema before any trust-material mutation. The
+   separate Architecture-79 `initialize-database` action owns schema creation;
 5. create only the fixed root, `capture-output`, and `backup` directories with
    the reviewed owner/DACL descriptor, and revalidate the root before touching
    reserved temporary names;

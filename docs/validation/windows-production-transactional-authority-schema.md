@@ -9,9 +9,9 @@ tests.
 The production artifact is the packaged
 `trading_bot/runtime/schema/windows_transactional_authority_v1.sql`.  Its
 exact UTF-8 bytes, SHA-256 identity, and rootpage-free materialized
-`schema-manifest/v1` are checked.  The test fixture
-`tests/fixtures/transactional_authority_schema.sql` remains unchanged and is
-not the production resource.
+`schema-manifest/v1` are checked.  The Architecture-77 behavioral harness
+loads the same packaged resource through the public package boundary; there is
+no second full SQL fixture.
 
 The initializer contract requires an elevated administrator, the fixed
 Architecture-78 tree and signed bootstrap, the real Trading SID, a paired

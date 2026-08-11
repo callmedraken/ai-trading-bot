@@ -3,7 +3,8 @@
 This procedure validates the production Windows substrate described by
 [architecture 78](../architecture/78-windows-authority-provisioning.md). It
 is intentionally separate from the executable transactional-authority fixture
-and does not modify `tests/fixtures/transactional_authority_schema.sql`.
+and does not maintain a second authority SQL schema; the production artifact
+is owned by the runtime package.
 
 ## Safe automated layers
 

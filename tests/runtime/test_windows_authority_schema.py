@@ -27,6 +27,7 @@ from trading_bot.runtime.windows_authority_schema import (
     RELEASE_MANIFEST_ID,
     SQLITE_BUILD_MANIFEST_ID,
     AuthorityMetadataV1,
+    InitializationBlockedError,
     MetadataValidationError,
     SchemaMigrationV1,
     SqliteAuthorityBuildEvidence,
@@ -104,13 +105,29 @@ def _precreated_pair(tmp_path: Path) -> tuple[Path, Path]:
 
 
 def test_packaged_artifact_has_stable_identity_and_no_sql_udf() -> None:
+    assert len(PRODUCTION_SCHEMA_ARTIFACT_BYTES) == 118_896
     assert not PRODUCTION_SCHEMA_ARTIFACT_BYTES.startswith(b"\xef\xbb\xbf")
+    assert b"\r" not in PRODUCTION_SCHEMA_ARTIFACT_BYTES
     assert hashlib.sha256(PRODUCTION_SCHEMA_ARTIFACT_BYTES).hexdigest() == (
         PRODUCTION_SCHEMA_ARTIFACT_SHA256
     )
     assert b"sha256(" not in PRODUCTION_SCHEMA_ARTIFACT_BYTES.lower()
     assert PRODUCTION_SCHEMA_ID.endswith("/v1")
     assert PRODUCTION_SCHEMA_MANIFEST_BYTES
+
+
+def test_release_manifest_binds_the_pinned_artifact_digest() -> None:
+    payload = {
+        "application_version": "0.1.0",
+        "initializer_contract_version": INITIALIZER_CONTRACT_VERSION,
+        "manifest_id": RELEASE_MANIFEST_ID,
+        "production_schema_digest": "0" * 64,
+        "production_schema_id": PRODUCTION_SCHEMA_ID,
+    }
+    with pytest.raises(InitializationBlockedError, match="digest does not match"):
+        parse_release_manifest_bytes(
+            json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+        )
 
 
 def test_artifact_materializes_exact_manifest_with_trusted_schema_off() -> None:

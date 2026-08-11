@@ -24,6 +24,7 @@ from trading_bot.runtime.windows_authority_provisioning import (
     validate_installed_authority,
 )
 from trading_bot.runtime.windows_authority_schema import (
+    AuthorityMetadataV1,
     AuthoritySchemaError,
     ProductionAuthorityEvidence,
     ReleaseManifestEvidence,
@@ -92,7 +93,7 @@ def _insert_metadata_and_migration(
     metadata: object,
     migration: SchemaMigrationV1,
 ) -> None:
-    if type(metadata).__name__ != "AuthorityMetadataV1":
+    if type(metadata) is not AuthorityMetadataV1:
         raise AuthorityInitializationError("initializer metadata type is invalid")
     # The exact typed model is intentionally converted to its public mapping;
     # no SQLite row is assembled from arbitrary caller-provided field names.

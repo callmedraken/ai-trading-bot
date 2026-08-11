@@ -97,26 +97,25 @@ artifact digest and requires a new reviewed schema identity.
 
 ### 1.2 Fixture relationship and divergence control
 
-`tests/fixtures/transactional_authority_schema.sql` remains unchanged by this
-design milestone. It is current Architecture-77 test material, not a
-production artifact and not an installed-database acceptance source.
+The implementation correction makes
+`src/trading_bot/runtime/schema/windows_transactional_authority_v1.sql` the
+only checked-in full authority SQL source. The Architecture-77 executable
+harness loads those exact bytes through the public package/resource boundary,
+materializes them with `trusted_schema=OFF`, and runs its behavioral suite
+against that database. The former
+`tests/fixtures/transactional_authority_schema.sql` copy is removed; no
+compatibility loader contains independent schema bytes.
 
-During the implementation milestone, the Architecture-77 harness will load
-the packaged production artifact instead of maintaining a second SQL source.
-The fixture file will then be removed or replaced by a small test-resource
-loader; it will not remain an independently edited schema. The conformance
-tests will execute the artifact in an empty in-memory database, compare the
-materialized schema manifest to the approved golden vector, and run the
-Architecture-77 behavioral tests against that materialization.
+The conformance tests compare the materialized schema manifest to the approved
+golden vector and include a regression that the harness bytes equal the
+packaged resource. The only intentional behavioral-harness differences are
+the production v1 metadata/migration contract and the relocation of digest
+checks from SQL triggers to Python mutation/read-only validation boundaries.
 
-This design intentionally does not change the existing Architecture-77
-migration vector today. The current harness inserts `schema_version=3` as a
-historical test fact. Production v1 inserts `schema_version=1`; the migration
-golden vector must therefore be regenerated in the implementation milestone.
-The session/attempt/claim/reservation/execution/terminal identity contracts
-remain unchanged unless the promoted artifact audit finds a separate defect.
-CI must fail if a checked-in fixture or generated resource is not derived from
-the canonical package artifact.
+Production v1 inserts `schema_version=1`; the migration golden vector was
+regenerated for that version. The session/attempt/claim/reservation/execution/
+terminal identity contracts and canonical bytes remain unchanged. CI must fail
+if a second full SQL schema or an unapproved artifact digest is introduced.
 
 ### 1.3 Digest responsibility and complete fixture audit
 
@@ -846,9 +845,9 @@ scheduling acceptance requirement.
   reads back `trusted_schema=OFF`; writable connections additionally read back
   all three durability settings and prove one main database. No custom SQL
   hash function is registered or required.
-- **Artifact/fixture divergence:** the package artifact becomes the only SQL
-  source; the fixture is unchanged now only because this milestone is design
-  only, and CI conformance prevents a future second implementation.
+- **Artifact/fixture divergence:** the package artifact is the only full SQL
+  source; the former fixture copy is absent, and the executable harness has a
+  byte-equality regression against the public package resource.
 
 No security-relevant schema choice is intentionally left ambiguous. The
 approved native SQLite/VFS/trusted-schema build, production trust anchor, and

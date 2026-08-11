@@ -1,9 +1,9 @@
 """Production v1 schema, canonical authority evidence, and validation.
 
-This module is deliberately independent of the Architecture-77 transactional
-fixture.  The fixture remains a regression contract for the existing capture
-service; this module owns the packaged production artifact and its exact
-read-only validation boundary.
+This module owns the packaged production artifact and its exact read-only
+validation boundary.  Architecture-77's executable harness consumes the same
+artifact through the public resource boundary rather than maintaining a second
+SQL schema.
 """
 
 from __future__ import annotations
@@ -87,6 +87,19 @@ def _artifact_bytes() -> bytes:
 
 PRODUCTION_SCHEMA_ARTIFACT_BYTES = _artifact_bytes()
 PRODUCTION_SCHEMA_ARTIFACT_SHA256 = _ARTIFACT_SHA256
+
+
+def require_evidence_digest(
+    evidence: bytes, digest: bytes, *, field: str = "evidence digest"
+) -> None:
+    """Require an exact byte string and its exact raw SHA-256 digest."""
+
+    if type(evidence) is not bytes:
+        raise SchemaValidationError(f"{field} evidence must be exact bytes")
+    if type(digest) is not bytes or len(digest) != 32:
+        raise SchemaValidationError(f"{field} must be an exact 32-byte digest")
+    if hashlib.sha256(evidence).digest() != digest:
+        raise SchemaValidationError(f"{field} does not match evidence bytes")
 
 
 def configure_trusted_schema_off(connection: sqlite3.Connection) -> None:

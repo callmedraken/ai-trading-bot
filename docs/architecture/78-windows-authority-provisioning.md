@@ -2,8 +2,9 @@
 
 Architecture 78 implements the fixed Windows trust substrate required before
 the transactional runtime in [architecture 77](77-windows-transactional-capture-authority.md)
-can be considered for production. It does not change the executable fixture,
-its UUID5 contracts, or the transactional state machine.
+can be considered for production. It does not change the Architecture-77
+UUID5 contracts or transactional state machine; Architecture 79 owns the
+packaged production schema and its executable behavioral harness.
 
 [Architecture 79](79-windows-production-transactional-authority-schema.md)
 defines the next boundary: the exact production schema, immutable metadata,

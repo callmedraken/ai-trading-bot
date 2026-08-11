@@ -1,10 +1,10 @@
 # Windows transactional capture authority validation plan
 
-This plan validates the normalized test-only authority described in
+This plan validates the normalized authority behavior described in
 `docs/architecture/77-windows-transactional-capture-authority.md`. The
-executable fixture is
-`tests/fixtures/transactional_authority_schema.sql`; the focused harness is
-`tests/runtime/test_windows_transactional_capture_authority.py`.
+focused harness is
+`tests/runtime/test_windows_transactional_capture_authority.py` and loads the
+packaged production SQL resource through the public package boundary.
 
 This milestone does not implement production capture, credentials, provider
 transport, Windows provisioning, scheduling, brokerage access, or real-money
@@ -15,7 +15,8 @@ trading. All external effects are fake hooks or database observations.
 Every schema/transaction test must:
 
 - use a temporary local SQLite database with `PRAGMA foreign_keys=ON`;
-- execute the complete fixture before inserting authority facts;
+- execute the complete packaged production resource before inserting authority
+  facts;
 - use `BEGIN IMMEDIATE` for write workflows;
 - use fixed semantic timestamps and explicit canonical bytes in deterministic
   test data; timestamps are facts and never UUID5 inputs;
@@ -25,7 +26,7 @@ Every schema/transaction test must:
 - never use credentials, real provider calls, brokerage APIs, or real-money
   orders.
 
-The fixture and tests must not discover a schema by scanning a directory or
+The resource and tests must not discover a schema by scanning a directory or
 accept a legacy JSON claim as authority. Paths are test transport inputs only;
 they are not deterministic identity inputs.
 

@@ -225,19 +225,18 @@ def test_installed_validation_rejects_matching_metadata_only_database(
     assert database.read_bytes() == before_bytes
 
 
-def test_installed_validation_rejects_architecture_77_fixture(
+def test_installed_validation_rejects_unapproved_legacy_schema(
     tmp_path: Path,
 ) -> None:
     database = tmp_path / "authority.sqlite3"
     journal = tmp_path / "authority.sqlite3-journal"
-    fixture = (
-        Path(__file__).resolve().parents[1]
-        / "fixtures"
-        / "transactional_authority_schema.sql"
-    )
     connection = sqlite3.connect(database)
     try:
-        connection.executescript(fixture.read_text(encoding="utf-8"))
+        # A minimal legacy marker is sufficient for the rejection contract;
+        # this test must not maintain a second authority SQL schema.
+        connection.execute(
+            "CREATE TABLE legacy_authority_marker (marker TEXT NOT NULL)"
+        )
         connection.commit()
     finally:
         connection.close()

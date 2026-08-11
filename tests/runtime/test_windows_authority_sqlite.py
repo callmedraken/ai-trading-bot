@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import hashlib
+import os
 import sqlite3
 from pathlib import Path
+from urllib.parse import parse_qs, urlsplit
 
 import pytest
 
@@ -21,7 +23,9 @@ from trading_bot.runtime.windows_authority_sqlite import (
     SqliteDatabaseState,
     SqliteDurabilityError,
     configure_and_validate_authority_sqlite_connection,
+    open_disposable_read_only_sqlite_connection,
     open_read_only_sqlite_connection,
+    open_writable_authority_sqlite_connection,
     validate_installed_sqlite_prerequisites,
 )
 
@@ -48,6 +52,22 @@ def _verification() -> BootstrapVerification:
         signing_key_id=bootstrap.signing_key_id,
         signature_length=64,
     )
+
+
+def _available_vfs_name() -> str:
+    candidates = ("win32", "unix") if os.name == "nt" else ("unix", "win32")
+    for vfs in candidates:
+        try:
+            connection = sqlite3.connect(
+                f"file:authority-sqlite-vfs-probe?mode=memory&vfs={vfs}",
+                uri=True,
+            )
+        except sqlite3.OperationalError:
+            continue
+        else:
+            connection.close()
+            return vfs
+    raise AssertionError("no supported platform SQLite VFS was available")
 
 
 # This Architecture-77-shaped table is a rejection-only test fixture. It is
@@ -162,7 +182,7 @@ def test_installed_read_only_validation_proves_trusted_schema_off(
 ) -> None:
     connection, database, journal = _fresh_database(tmp_path)
     connection.close()
-    read_only = open_read_only_sqlite_connection(database)
+    read_only = open_disposable_read_only_sqlite_connection(database)
     try:
         read_only.execute("PRAGMA trusted_schema = ON")
         assert read_only.execute("PRAGMA trusted_schema").fetchone()[0] == 1
@@ -269,7 +289,7 @@ def test_installed_validation_rejects_populated_non_authority_database(
     tmp_path: Path,
 ) -> None:
     database, journal = _create_populated_database(tmp_path)
-    connection = open_read_only_sqlite_connection(database)
+    connection = open_disposable_read_only_sqlite_connection(database)
     try:
         with pytest.raises(SqliteDurabilityError):
             validate_installed_sqlite_prerequisites(
@@ -284,7 +304,7 @@ def test_installed_validation_rejects_matching_metadata_only_database(
 ) -> None:
     database, journal = _metadata_database(tmp_path, _verification())
     before_bytes = database.read_bytes()
-    connection = open_read_only_sqlite_connection(database)
+    connection = open_disposable_read_only_sqlite_connection(database)
     try:
         with pytest.raises(SqliteDurabilityError, match="unsupported"):
             validate_installed_sqlite_prerequisites(
@@ -311,7 +331,7 @@ def test_installed_validation_rejects_unapproved_legacy_schema(
     finally:
         connection.close()
     journal.touch()
-    connection = open_read_only_sqlite_connection(database)
+    connection = open_disposable_read_only_sqlite_connection(database)
     try:
         with pytest.raises(SqliteDurabilityError, match="unsupported"):
             validate_installed_sqlite_prerequisites(
@@ -361,7 +381,7 @@ def test_integrity_validation_rejects_corruption_in_a_later_database_page(
     _corrupt_later_btree_page(database)
     journal.touch()
     before_bytes = database.read_bytes()
-    connection = open_read_only_sqlite_connection(database)
+    connection = open_disposable_read_only_sqlite_connection(database)
     try:
         with pytest.raises(SqliteDurabilityError):
             validate_installed_sqlite_prerequisites(
@@ -378,6 +398,7 @@ def test_installed_validation_uses_fixed_read_only_sqlite_uri(
     import trading_bot.runtime.windows_authority_provisioning as provisioning
     import trading_bot.runtime.windows_authority_sqlite as sqlite_runtime
 
+    vfs = _available_vfs_name()
     calls: list[tuple[object, dict[str, object]]] = []
 
     class FakeConnection:
@@ -389,6 +410,7 @@ def test_installed_validation_uses_fixed_read_only_sqlite_uri(
         return FakeConnection()
 
     monkeypatch.setattr(sqlite_runtime.sqlite3, "connect", fake_connect)
+    monkeypatch.setattr(sqlite_runtime, "_require_database_file", lambda _: None)
     monkeypatch.setattr(
         provisioning,
         "validate_installed_sqlite_prerequisites",
@@ -404,12 +426,12 @@ def test_installed_validation_uses_fixed_read_only_sqlite_uri(
     )
 
     assert (
-        provisioning._validate_database_if_present(True, True)
+        provisioning._validate_database_if_present(True, True, vfs=vfs)
         is SqliteDatabaseState.PRECREATED_UNINITIALIZED
     )
     assert calls == [
         (
-            "file:///F:/AITradingBot/Authority/authority.sqlite3?mode=ro",
+            f"file:///F:/AITradingBot/Authority/authority.sqlite3?mode=ro&vfs={vfs}",
             {"uri": True},
         )
     ]
@@ -439,7 +461,7 @@ def test_read_only_sqlite_connection_rejects_writes_and_preserves_bytes(
     connection.close()
     before_bytes = database.read_bytes()
 
-    read_only = open_read_only_sqlite_connection(database)
+    read_only = open_disposable_read_only_sqlite_connection(database)
     try:
         assert read_only.execute("SELECT name FROM sqlite_schema").fetchall() == []
         with pytest.raises(sqlite3.OperationalError):
@@ -448,6 +470,81 @@ def test_read_only_sqlite_connection_rejects_writes_and_preserves_bytes(
         read_only.close()
 
     assert database.read_bytes() == before_bytes
+
+
+def test_production_read_only_opener_binds_a_real_platform_vfs(
+    tmp_path: Path,
+) -> None:
+    database = tmp_path / "authority.sqlite3"
+    sqlite3.connect(database).close()
+    vfs = _available_vfs_name()
+
+    connection = open_read_only_sqlite_connection(database, vfs=vfs)
+    try:
+        assert connection.execute("SELECT 1").fetchone() == (1,)
+    finally:
+        connection.close()
+
+
+def test_unknown_vfs_fails_without_a_default_vfs_retry(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    import trading_bot.runtime.windows_authority_sqlite as sqlite_runtime
+
+    database = tmp_path / "authority.sqlite3"
+    sqlite3.connect(database).close()
+    calls: list[tuple[object, dict[str, object]]] = []
+
+    def fail_connect(database_uri: object, **kwargs: object) -> None:
+        calls.append((database_uri, kwargs))
+        raise sqlite3.OperationalError("unknown VFS")
+
+    monkeypatch.setattr(sqlite_runtime.sqlite3, "connect", fail_connect)
+    with pytest.raises(SqliteDurabilityError):
+        open_read_only_sqlite_connection(database, vfs="missing-vfs")
+
+    assert len(calls) == 1
+    parsed = urlsplit(str(calls[0][0]))
+    assert parse_qs(parsed.query) == {"mode": ["ro"], "vfs": ["missing-vfs"]}
+    assert calls[0][1] == {"uri": True}
+
+
+def test_writable_opener_uses_rw_vfs_uri_and_never_creates(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    import trading_bot.runtime.windows_authority_sqlite as sqlite_runtime
+
+    database = tmp_path / "authority.sqlite3"
+    sqlite3.connect(database).close()
+    calls: list[tuple[object, dict[str, object]]] = []
+
+    class FakeConnection:
+        def close(self) -> None:
+            return None
+
+    def fake_connect(database_uri: object, **kwargs: object) -> FakeConnection:
+        calls.append((database_uri, kwargs))
+        return FakeConnection()
+
+    monkeypatch.setattr(sqlite_runtime.sqlite3, "connect", fake_connect)
+    connection = open_writable_authority_sqlite_connection(
+        database, vfs="unix/approved"
+    )
+    connection.close()
+
+    parsed = urlsplit(str(calls[0][0]))
+    assert parse_qs(parsed.query) == {
+        "mode": ["rw"],
+        "vfs": ["unix/approved"],
+    }
+    assert calls[0][1] == {"uri": True}
+
+    with pytest.raises(SqliteDurabilityError):
+        open_writable_authority_sqlite_connection(
+            tmp_path / "missing.sqlite3", vfs="unix"
+        )
 
 
 def test_runtime_connection_setup_configures_every_required_pragma(

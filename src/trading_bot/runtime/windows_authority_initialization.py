@@ -37,13 +37,14 @@ from trading_bot.runtime.windows_authority_schema import (
     load_approved_release_manifest,
     load_approved_sqlite_authority_build,
     validate_production_authority_database,
+    validate_production_authority_database_in_transaction,
     validate_schema_state,
 )
 from trading_bot.runtime.windows_authority_security import require_administrator_token
 from trading_bot.runtime.windows_authority_sqlite import (
     SqliteDatabaseState,
     configure_and_validate_authority_sqlite_connection,
-    open_read_only_sqlite_connection,
+    open_writable_authority_sqlite_connection,
 )
 
 
@@ -159,11 +160,11 @@ def _initialize_database_transaction(
     release_manifest: ReleaseManifestEvidence,
     sqlite_build: SqliteAuthorityBuildEvidence,
     now_utc: str,
-    connection_factory: Callable[..., sqlite3.Connection] = sqlite3.connect,
+    connection_factory: Callable[..., sqlite3.Connection] | None = None,
 ) -> InitializationEvidence:
     """Initialize one already-precreated pair; all evidence is ready before BEGIN."""
 
-    if not callable(connection_factory):
+    if connection_factory is not None and not callable(connection_factory):
         raise AuthorityInitializationError("SQLite connection factory is invalid")
     database = str(database_path)
     journal = str(journal_path)
@@ -177,7 +178,12 @@ def _initialize_database_transaction(
     )
     connection: sqlite3.Connection | None = None
     try:
-        connection = connection_factory(database)
+        if connection_factory is None:
+            connection = open_writable_authority_sqlite_connection(
+                database, vfs=sqlite_build.vfs
+            )
+        else:
+            connection = connection_factory(database)
         if type(connection) is not sqlite3.Connection:
             raise AuthorityInitializationError("SQLite connection type is not exact")
         if connection.in_transaction:
@@ -216,14 +222,13 @@ def _initialize_database_transaction(
                 _insert_metadata_and_migration(
                     connection, metadata=metadata, migration=migration
                 )
-                validate_production_authority_database(
+                validate_production_authority_database_in_transaction(
                     connection,
                     database_path=database,
                     bootstrap=bootstrap,
                     bootstrap_digest=bootstrap_digest,
                     release_manifest=release_manifest,
                     sqlite_build=sqlite_build,
-                    allow_active_transaction=True,
                 )
                 connection.commit()
             except BaseException:
@@ -245,10 +250,8 @@ def _initialize_database_transaction(
     finally:
         if connection is not None:
             connection.close()
-    reopened = open_read_only_sqlite_connection(database)
     try:
         evidence = validate_production_authority_database(
-            reopened,
             database_path=database,
             bootstrap=bootstrap,
             bootstrap_digest=bootstrap_digest,
@@ -265,8 +268,6 @@ def _initialize_database_transaction(
         raise AuthorityInitializationError(
             "post-commit read-only validation failed"
         ) from error
-    finally:
-        reopened.close()
     return _production_evidence(evidence, SqliteDatabaseState.INITIALIZED_SUPPORTED)
 
 
@@ -295,50 +296,35 @@ def initialize_authority_database_for_test(
     )
 
 
-def initialize_installed_authority_database(
-    *,
-    key_registry=PRODUCTION_PINNED_BOOTSTRAP_KEYS,
-    release_manifest: ReleaseManifestEvidence | None = None,
-    sqlite_build: SqliteAuthorityBuildEvidence | None = None,
-    now_utc: str | None = None,
-) -> InitializationEvidence:
+def initialize_installed_authority_database() -> InitializationEvidence:
     """Run the fixed-path, elevated administrator initialization action."""
 
     if os.name != "nt":
         raise UnsupportedWindowsPlatformError("database initialization is Windows-only")
     require_administrator_token()
-    selected_release = release_manifest or load_approved_release_manifest()
-    selected_build = sqlite_build or load_approved_sqlite_authority_build()
-    preflight: ProvisioningEvidence = validate_installed_authority(
-        key_registry=key_registry,
-        release_manifest=selected_release,
-        sqlite_build=selected_build,
-    )
+    selected_release = load_approved_release_manifest()
+    selected_build = load_approved_sqlite_authority_build()
+    preflight: ProvisioningEvidence = validate_installed_authority()
     sid = preflight.trading_sid
     bootstrap_bytes, signature_bytes = read_installed_authority_material(sid)
     bootstrap = parse_bootstrap_bytes(bootstrap_bytes)
     verification = verify_bootstrap_signature(
-        bootstrap_bytes, signature_bytes, key_registry=key_registry
+        bootstrap_bytes,
+        signature_bytes,
+        key_registry=PRODUCTION_PINNED_BOOTSTRAP_KEYS,
     )
     if verification.bootstrap != bootstrap:
         raise AuthorityInitializationError(
             "verified bootstrap facts changed during initialization"
         )
     if preflight.database_state == SqliteDatabaseState.INITIALIZED_SUPPORTED.value:
-        connection = open_read_only_sqlite_connection(
-            PRODUCTION_AUTHORITY_PATHS.database
+        evidence = validate_production_authority_database(
+            database_path=PRODUCTION_AUTHORITY_PATHS.database,
+            bootstrap=bootstrap,
+            bootstrap_digest=verification.bootstrap_digest,
+            release_manifest=selected_release,
+            sqlite_build=selected_build,
         )
-        try:
-            evidence = validate_production_authority_database(
-                connection,
-                database_path=PRODUCTION_AUTHORITY_PATHS.database,
-                bootstrap=bootstrap,
-                bootstrap_digest=verification.bootstrap_digest,
-                release_manifest=selected_release,
-                sqlite_build=selected_build,
-            )
-        finally:
-            connection.close()
         return _production_evidence(evidence, SqliteDatabaseState.INITIALIZED_SUPPORTED)
     if preflight.database_state != SqliteDatabaseState.PRECREATED_UNINITIALIZED.value:
         raise AuthorityInitializationError("database is not PRECREATED_UNINITIALIZED")
@@ -349,5 +335,5 @@ def initialize_installed_authority_database(
         bootstrap_digest=verification.bootstrap_digest,
         release_manifest=selected_release,
         sqlite_build=selected_build,
-        now_utc=now_utc or _timestamp_now_utc(),
+        now_utc=_timestamp_now_utc(),
     )

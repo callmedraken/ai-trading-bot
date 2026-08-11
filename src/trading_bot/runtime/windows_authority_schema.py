@@ -62,6 +62,7 @@ _ARTIFACT_SHA256 = "aa61df2f5db0090f8373222d1f5e492a58f4c10273afacfab45e382bacd4
 _HEX_DIGEST = re.compile(r"^[0-9a-f]{64}$")
 _SID = re.compile(r"^S-(?:0|[1-9][0-9]*)(?:-(?:0|[1-9][0-9]*))+$")
 _KEY_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$")
+_VFS_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$")
 _UTC_TIMESTAMP = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$")
 
 
@@ -731,6 +732,8 @@ class SqliteAuthorityBuildEvidence:
             raise InitializationBlockedError(
                 "SQLite trusted-schema evidence is not true"
             )
+        if type(self.vfs) is not str or _VFS_NAME.fullmatch(self.vfs) is None:
+            raise InitializationBlockedError("SQLite VFS name is invalid")
         values = _strict_json_object(self.manifest_bytes, InitializationBlockedError)
         if values != self.to_dict() or _canonical_bytes(values) != self.manifest_bytes:
             raise InitializationBlockedError("SQLite build evidence is inconsistent")
@@ -771,9 +774,11 @@ def parse_sqlite_authority_build_manifest(data: bytes) -> SqliteAuthorityBuildEv
     options = tuple(values["compile_options"])
     if options != tuple(sorted(set(options))):
         raise InitializationBlockedError("SQLite compile options are not canonical")
-    for field in ("sqlite_version", "sqlite_source_id", "vfs"):
+    for field in ("sqlite_version", "sqlite_source_id"):
         if type(values[field]) is not str or not values[field]:
             raise InitializationBlockedError(f"SQLite build field {field} is invalid")
+    if type(values["vfs"]) is not str or _VFS_NAME.fullmatch(values["vfs"]) is None:
+        raise InitializationBlockedError("SQLite build field vfs is invalid")
     if (
         type(values["trusted_schema_off"]) is not bool
         or not values["trusted_schema_off"]
@@ -1005,7 +1010,7 @@ class ProductionAuthorityEvidence:
     sqlite_build_manifest_digest: str
 
 
-def validate_production_authority_database(
+def _validate_production_authority_database_connection(
     connection: sqlite3.Connection,
     *,
     database_path: str | Path,
@@ -1086,6 +1091,77 @@ def validate_production_authority_database(
         migration_id=migration.migration_id,
         release_manifest_digest=release_manifest.digest.hex(),
         sqlite_build_manifest_digest=sqlite_build.digest.hex(),
+    )
+
+
+def validate_production_authority_database(
+    *,
+    database_path: str | Path,
+    bootstrap: WindowsAuthorityBootstrap,
+    bootstrap_digest: str,
+    release_manifest: ReleaseManifestEvidence,
+    sqlite_build: SqliteAuthorityBuildEvidence,
+) -> ProductionAuthorityEvidence:
+    """Open and validate a production database through its approved VFS."""
+
+    from trading_bot.runtime.windows_authority_sqlite import (
+        open_read_only_sqlite_connection,
+    )
+
+    connection = open_read_only_sqlite_connection(database_path, vfs=sqlite_build.vfs)
+    try:
+        return _validate_production_authority_database_connection(
+            connection,
+            database_path=database_path,
+            bootstrap=bootstrap,
+            bootstrap_digest=bootstrap_digest,
+            release_manifest=release_manifest,
+            sqlite_build=sqlite_build,
+        )
+    finally:
+        connection.close()
+
+
+def validate_production_authority_database_for_test(
+    connection: sqlite3.Connection,
+    *,
+    database_path: str | Path,
+    bootstrap: WindowsAuthorityBootstrap,
+    bootstrap_digest: str,
+    release_manifest: ReleaseManifestEvidence,
+    sqlite_build: SqliteAuthorityBuildEvidence,
+) -> ProductionAuthorityEvidence:
+    """Validate a caller-owned disposable connection in an explicit test boundary."""
+
+    return _validate_production_authority_database_connection(
+        connection,
+        database_path=database_path,
+        bootstrap=bootstrap,
+        bootstrap_digest=bootstrap_digest,
+        release_manifest=release_manifest,
+        sqlite_build=sqlite_build,
+    )
+
+
+def validate_production_authority_database_in_transaction(
+    connection: sqlite3.Connection,
+    *,
+    database_path: str | Path,
+    bootstrap: WindowsAuthorityBootstrap,
+    bootstrap_digest: str,
+    release_manifest: ReleaseManifestEvidence,
+    sqlite_build: SqliteAuthorityBuildEvidence,
+) -> ProductionAuthorityEvidence:
+    """Validate the initializer-owned connection while its DDL transaction is open."""
+
+    return _validate_production_authority_database_connection(
+        connection,
+        database_path=database_path,
+        bootstrap=bootstrap,
+        bootstrap_digest=bootstrap_digest,
+        release_manifest=release_manifest,
+        sqlite_build=sqlite_build,
+        allow_active_transaction=True,
     )
 
 

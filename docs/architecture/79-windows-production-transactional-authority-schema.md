@@ -561,8 +561,10 @@ Before opening a writable SQLite connection, the command must require:
 2. the fixed parent/root/database/journal final-path and security checks;
 3. the real local Trading SID and exact equality with the signed bootstrap;
 4. valid pinned-key/signature/bootstrap/policy verification;
-5. a complete pre-created database/journal pair; and
-6. the exact `PRECREATED_UNINITIALIZED` state.
+5. a complete pre-created database/journal pair;
+6. the approved release manifest and SQLite build manifest, including the
+   exact VFS name to bind at open; and
+7. the exact `PRECREATED_UNINITIALIZED` state.
 
 The Trading account cannot initialize the schema. Normal `validate` never
 initializes. An already `INITIALIZED_SUPPORTED` exact database is accepted as
@@ -572,6 +574,11 @@ initialized database is never modified into compliance.
 The initializer must use the fixed code-owned path after final-handle
 validation. It cannot accept a database path, schema path, output path,
 identity, epoch, SID, or policy from CLI arguments or environment variables.
+Production initialization, installed validation, and provisioning also cannot
+accept caller-supplied key registries, release manifests, SQLite build
+manifests, or timestamps. Those values come only from the production-pinned
+registry, approved resources, and the internal UTC clock. Disposable tests
+use separately named injection boundaries.
 
 ## 8. Transactional initialization sequence
 
@@ -582,9 +589,10 @@ The sequence is:
 1. Complete Architecture-78 filesystem/bootstrap/SID validation and retain
    the verified bootstrap facts. Resolve and validate the fixed database and
    journal handles before opening SQLite.
-2. Open the exact fixed database with no URI fallback. Immediately require
-   one `main` database at the exact fixed path, no attachments, and the
-   pre-created persistent journal.
+2. Open the exact fixed database with `mode=rw&vfs=<approved-vfs>` and
+   `uri=True`; there is no URI fallback or create fallback. Immediately
+   require one `main` database at the exact fixed path, no attachments, and
+   the pre-created persistent journal.
 3. Establish `trusted_schema=OFF` using the public Python 3.12+ standard
    library configuration path where available, then read back
    `PRAGMA trusted_schema` and require `0`. If the setting cannot be
@@ -629,9 +637,10 @@ The sequence is:
     become one durable SQLite commit. No external side effect is performed
     while the transaction is open.
 12. Close the connection, revalidate the fixed final path and journal, reopen
-    the database read-only, and run the complete installed validator. Report
-    success only if it returns `INITIALIZED_SUPPORTED` for the same signed
-    bootstrap and exact production schema.
+    the database with `mode=ro&vfs=<approved-vfs>` and `uri=True`, and run the
+    complete installed validator. Report success only if it returns
+    `INITIALIZED_SUPPORTED` for the same signed bootstrap and exact production
+    schema.
 
 SQLite ordinary CREATE TABLE, CREATE INDEX, and CREATE TRIGGER DDL
 participates in the surrounding transaction. A rollback therefore removes

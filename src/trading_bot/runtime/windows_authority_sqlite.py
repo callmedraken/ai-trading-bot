@@ -7,7 +7,7 @@ import sqlite3
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
-from urllib.parse import quote
+from urllib.parse import quote, urlencode
 
 from trading_bot.runtime.windows_authority import WindowsAuthorityError
 from trading_bot.runtime.windows_authority_schema import (
@@ -100,7 +100,32 @@ def _require_database_file(database_path: str) -> None:
         raise SqliteDurabilityError("SQLite authority database is not pre-created")
 
 
-def _read_only_sqlite_uri(database_path: str | Path) -> str:
+def _require_vfs_name(vfs: str) -> str:
+    if (
+        type(vfs) is not str
+        or not vfs
+        or any(ord(character) < 0x20 or ord(character) == 0x7F for character in vfs)
+    ):
+        raise SqliteDurabilityError("SQLite VFS name is invalid")
+    return vfs
+
+
+def _sqlite_uri(database_path: str | Path, *, mode: str, vfs: str) -> str:
+    if mode not in {"ro", "rw"}:
+        raise SqliteDurabilityError("SQLite URI mode is invalid")
+    _require_vfs_name(vfs)
+    path = str(database_path)
+    if len(path) >= 3 and path[1] == ":" and path[2] in {"\\", "/"}:
+        normalized = path.replace("\\", "/")
+        encoded = quote(normalized, safe="/:")
+        prefix = f"file:///{encoded}"
+    else:
+        prefix = f"file:{quote(path, safe='/')}"
+    query = urlencode((("mode", mode), ("vfs", vfs)))
+    return f"{prefix}?{query}"
+
+
+def _disposable_read_only_sqlite_uri(database_path: str | Path) -> str:
     path = str(database_path)
     if len(path) >= 3 and path[1] == ":" and path[2] in {"\\", "/"}:
         normalized = path.replace("\\", "/")
@@ -109,15 +134,41 @@ def _read_only_sqlite_uri(database_path: str | Path) -> str:
     return f"file:{quote(path, safe='/')}?mode=ro"
 
 
-def open_read_only_sqlite_connection(database_path: str | Path) -> sqlite3.Connection:
-    """Open one existing database read-only without an implicit create fallback."""
+def open_read_only_sqlite_connection(
+    database_path: str | Path, *, vfs: str
+) -> sqlite3.Connection:
+    """Open one fixed database read-only through the explicitly approved VFS."""
 
+    _require_database_file(str(database_path))
     try:
-        return sqlite3.connect(_read_only_sqlite_uri(database_path), uri=True)
+        return sqlite3.connect(_sqlite_uri(database_path, mode="ro", vfs=vfs), uri=True)
     except sqlite3.Error as error:
         raise SqliteDurabilityError(
             "SQLite read-only database could not be opened"
         ) from error
+
+
+def open_writable_authority_sqlite_connection(
+    database_path: str | Path, *, vfs: str
+) -> sqlite3.Connection:
+    """Open one existing fixed database read-write through the approved VFS."""
+
+    _require_database_file(str(database_path))
+    try:
+        return sqlite3.connect(_sqlite_uri(database_path, mode="rw", vfs=vfs), uri=True)
+    except sqlite3.Error as error:
+        raise SqliteDurabilityError(
+            "SQLite writable database could not be opened"
+        ) from error
+
+
+def open_disposable_read_only_sqlite_connection(
+    database_path: str | Path,
+) -> sqlite3.Connection:
+    """Open a disposable read-only database without production VFS evidence."""
+
+    _require_database_file(str(database_path))
+    return sqlite3.connect(_disposable_read_only_sqlite_uri(database_path), uri=True)
 
 
 def _read_schema(connection: sqlite3.Connection) -> None:

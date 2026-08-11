@@ -266,6 +266,8 @@ def _validate_existing_objects(
 def _validate_database_if_present(
     database_present: bool,
     journal_present: bool,
+    *,
+    vfs: str | None = None,
 ) -> SqliteDatabaseState:
     if not database_present and not journal_present:
         return SqliteDatabaseState.NOT_PRESENT
@@ -273,7 +275,14 @@ def _validate_database_if_present(
         raise WindowsAuthorityError(
             "pre-created authority database and persistent journal must be paired"
         )
-    connection = open_read_only_sqlite_connection(PRODUCTION_AUTHORITY_PATHS.database)
+    if vfs is None:
+        raise WindowsAuthorityError(
+            "approved SQLite VFS evidence is required before opening "
+            "the authority database"
+        )
+    connection = open_read_only_sqlite_connection(
+        PRODUCTION_AUTHORITY_PATHS.database, vfs=vfs
+    )
     try:
         evidence = validate_installed_sqlite_prerequisites(
             connection,
@@ -320,13 +329,13 @@ def _validate_exact_file(
             )
 
 
-def validate_installed_authority(
+def _validate_installed_authority(
     *,
-    key_registry: PinnedBootstrapKeyRegistry = PRODUCTION_PINNED_BOOTSTRAP_KEYS,
+    key_registry: PinnedBootstrapKeyRegistry,
     release_manifest: ReleaseManifestEvidence | None = None,
     sqlite_build: SqliteAuthorityBuildEvidence | None = None,
 ) -> ProvisioningEvidence:
-    """Validate the fixed install and existing DB/journal without mutating it."""
+    """Validate the fixed install with explicitly selected trust inputs."""
 
     require_administrator_token()
     trading_sid = require_trading_standard_account()
@@ -339,25 +348,32 @@ def validate_installed_authority(
     )
     validate_lifecycle_mutex_security_descriptor(trading_sid)
     inspected, database_present, journal_present = _inspect_tree(trading_sid)
-    database_state = _validate_database_if_present(
-        database_present,
-        journal_present,
-    )
-    if database_state is SqliteDatabaseState.INITIALIZED_SUPPORTED:
-        connection = open_read_only_sqlite_connection(
-            PRODUCTION_AUTHORITY_PATHS.database
+    selected_build = sqlite_build
+    if database_present or journal_present:
+        selected_build = selected_build or load_approved_sqlite_authority_build()
+        database_state = _validate_database_if_present(
+            database_present,
+            journal_present,
+            vfs=selected_build.vfs,
         )
-        try:
-            validate_production_authority_database(
-                connection,
-                database_path=PRODUCTION_AUTHORITY_PATHS.database,
-                bootstrap=verification.bootstrap,
-                bootstrap_digest=verification.bootstrap_digest,
-                release_manifest=release_manifest or load_approved_release_manifest(),
-                sqlite_build=sqlite_build or load_approved_sqlite_authority_build(),
+    else:
+        database_state = _validate_database_if_present(
+            database_present,
+            journal_present,
+        )
+    if database_state is SqliteDatabaseState.INITIALIZED_SUPPORTED:
+        selected_release = release_manifest or load_approved_release_manifest()
+        if selected_build is None:
+            raise WindowsAuthorityError(
+                "approved SQLite VFS evidence is required for initialized authority"
             )
-        finally:
-            connection.close()
+        validate_production_authority_database(
+            database_path=PRODUCTION_AUTHORITY_PATHS.database,
+            bootstrap=verification.bootstrap,
+            bootstrap_digest=verification.bootstrap_digest,
+            release_manifest=selected_release,
+            sqlite_build=selected_build,
+        )
     return ProvisioningEvidence(
         ProvisioningState.VALIDATED,
         str(PRODUCTION_AUTHORITY_PATHS.root),
@@ -368,6 +384,29 @@ def validate_installed_authority(
         database_present,
         journal_present,
         database_state=database_state.value,
+    )
+
+
+def validate_installed_authority() -> ProvisioningEvidence:
+    """Validate the fixed install using only production-pinned trust evidence."""
+
+    return _validate_installed_authority(
+        key_registry=PRODUCTION_PINNED_BOOTSTRAP_KEYS,
+    )
+
+
+def validate_installed_authority_for_test(
+    *,
+    key_registry: PinnedBootstrapKeyRegistry,
+    release_manifest: ReleaseManifestEvidence | None = None,
+    sqlite_build: SqliteAuthorityBuildEvidence | None = None,
+) -> ProvisioningEvidence:
+    """Explicit test-only boundary for disposable trust-evidence injection."""
+
+    return _validate_installed_authority(
+        key_registry=key_registry,
+        release_manifest=release_manifest,
+        sqlite_build=sqlite_build,
     )
 
 
@@ -412,13 +451,15 @@ def _install_exact_file(
         raise WindowsAuthorityError("trust material could not be installed") from error
 
 
-def provision_authority(
+def _provision_authority(
     *,
     bootstrap_source: Path,
     signature_source: Path,
-    key_registry: PinnedBootstrapKeyRegistry = PRODUCTION_PINNED_BOOTSTRAP_KEYS,
+    key_registry: PinnedBootstrapKeyRegistry,
+    release_manifest: ReleaseManifestEvidence | None = None,
+    sqlite_build: SqliteAuthorityBuildEvidence | None = None,
 ) -> ProvisioningEvidence:
-    """Provision only the fixed authority tree after all trust checks pass."""
+    """Provision the fixed authority tree with explicitly selected trust inputs."""
 
     require_administrator_token()
     try:
@@ -441,25 +482,35 @@ def provision_authority(
     existing = _existing_fixed_objects(trading_sid)
     _validate_existing_objects(trading_sid, existing)
     # Reject a corrupt pre-created database before any trust material mutation.
-    database_state = _validate_database_if_present(
-        existing[PRODUCTION_AUTHORITY_PATHS.database],
-        existing[PRODUCTION_AUTHORITY_PATHS.journal],
-    )
-    if database_state is SqliteDatabaseState.INITIALIZED_SUPPORTED:
-        connection = open_read_only_sqlite_connection(
-            PRODUCTION_AUTHORITY_PATHS.database
+    selected_build = sqlite_build
+    if (
+        existing[PRODUCTION_AUTHORITY_PATHS.database]
+        or existing[PRODUCTION_AUTHORITY_PATHS.journal]
+    ):
+        selected_build = selected_build or load_approved_sqlite_authority_build()
+        database_state = _validate_database_if_present(
+            existing[PRODUCTION_AUTHORITY_PATHS.database],
+            existing[PRODUCTION_AUTHORITY_PATHS.journal],
+            vfs=selected_build.vfs,
         )
-        try:
-            validate_production_authority_database(
-                connection,
-                database_path=PRODUCTION_AUTHORITY_PATHS.database,
-                bootstrap=verification.bootstrap,
-                bootstrap_digest=verification.bootstrap_digest,
-                release_manifest=load_approved_release_manifest(),
-                sqlite_build=load_approved_sqlite_authority_build(),
+    else:
+        database_state = _validate_database_if_present(
+            existing[PRODUCTION_AUTHORITY_PATHS.database],
+            existing[PRODUCTION_AUTHORITY_PATHS.journal],
+        )
+    if database_state is SqliteDatabaseState.INITIALIZED_SUPPORTED:
+        selected_release = release_manifest or load_approved_release_manifest()
+        if selected_build is None:
+            raise WindowsAuthorityError(
+                "approved SQLite VFS evidence is required for initialized authority"
             )
-        finally:
-            connection.close()
+        validate_production_authority_database(
+            database_path=PRODUCTION_AUTHORITY_PATHS.database,
+            bootstrap=verification.bootstrap,
+            bootstrap_digest=verification.bootstrap_digest,
+            release_manifest=selected_release,
+            sqlite_build=selected_build,
+        )
     try:
         if existing[PRODUCTION_AUTHORITY_PATHS.root]:
             _require_reserved_temporary_objects_absent()
@@ -497,10 +548,18 @@ def provision_authority(
     # Existing objects were validated above and are never repaired. Absent
     # trust files were published only after complete temporary-file validation.
     inspected, database_present, journal_present = _inspect_tree(trading_sid)
-    database_state = _validate_database_if_present(
-        database_present,
-        journal_present,
-    )
+    if database_present or journal_present:
+        selected_build = selected_build or load_approved_sqlite_authority_build()
+        database_state = _validate_database_if_present(
+            database_present,
+            journal_present,
+            vfs=selected_build.vfs,
+        )
+    else:
+        database_state = _validate_database_if_present(
+            database_present,
+            journal_present,
+        )
     return ProvisioningEvidence(
         ProvisioningState.PROVISIONED,
         str(PRODUCTION_AUTHORITY_PATHS.root),
@@ -511,4 +570,37 @@ def provision_authority(
         database_present,
         journal_present,
         database_state=database_state.value,
+    )
+
+
+def provision_authority(
+    *,
+    bootstrap_source: Path,
+    signature_source: Path,
+) -> ProvisioningEvidence:
+    """Provision the fixed authority tree with production-pinned trust evidence."""
+
+    return _provision_authority(
+        bootstrap_source=bootstrap_source,
+        signature_source=signature_source,
+        key_registry=PRODUCTION_PINNED_BOOTSTRAP_KEYS,
+    )
+
+
+def provision_authority_for_test(
+    *,
+    bootstrap_source: Path,
+    signature_source: Path,
+    key_registry: PinnedBootstrapKeyRegistry,
+    release_manifest: ReleaseManifestEvidence | None = None,
+    sqlite_build: SqliteAuthorityBuildEvidence | None = None,
+) -> ProvisioningEvidence:
+    """Explicit test-only boundary for disposable trust-evidence injection."""
+
+    return _provision_authority(
+        bootstrap_source=bootstrap_source,
+        signature_source=signature_source,
+        key_registry=key_registry,
+        release_manifest=release_manifest,
+        sqlite_build=sqlite_build,
     )

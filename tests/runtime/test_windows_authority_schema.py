@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import sqlite3
 from pathlib import Path
 
@@ -39,7 +40,10 @@ from trading_bot.runtime.windows_authority_schema import (
     parse_authority_metadata_bytes,
     parse_release_manifest_bytes,
     parse_sqlite_authority_build_manifest,
-    validate_production_authority_database,
+    validate_production_authority_database_for_test,
+)
+from trading_bot.runtime.windows_authority_sqlite import (
+    open_read_only_sqlite_connection,
 )
 
 
@@ -74,6 +78,21 @@ def _release_manifest() -> object:
     )
 
 
+def _available_vfs_name() -> str:
+    candidates = ("win32", "unix") if os.name == "nt" else ("unix", "win32")
+    for vfs in candidates:
+        try:
+            connection = sqlite3.connect(
+                f"file:authority-vfs-probe?mode=memory&vfs={vfs}", uri=True
+            )
+        except sqlite3.OperationalError:
+            continue
+        else:
+            connection.close()
+            return vfs
+    raise AssertionError("no supported platform SQLite VFS was available")
+
+
 def _sqlite_build() -> SqliteAuthorityBuildEvidence:
     connection = sqlite3.connect(":memory:")
     try:
@@ -89,7 +108,7 @@ def _sqlite_build() -> SqliteAuthorityBuildEvidence:
         "sqlite_source_id": source_id,
         "sqlite_version": sqlite3.sqlite_version,
         "trusted_schema_off": True,
-        "vfs": "test-vfs",
+        "vfs": _available_vfs_name(),
     }
     return parse_sqlite_authority_build_manifest(
         json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
@@ -231,9 +250,9 @@ def test_disposable_initializer_commits_and_read_only_validation_succeeds(
         )
     finally:
         connection.close()
-    read_only = sqlite3.connect(f"file:{database.as_posix()}?mode=ro", uri=True)
+    read_only = open_read_only_sqlite_connection(database, vfs=build.vfs)
     try:
-        validated = validate_production_authority_database(
+        validated = validate_production_authority_database_for_test(
             read_only,
             database_path=database,
             bootstrap=bootstrap,

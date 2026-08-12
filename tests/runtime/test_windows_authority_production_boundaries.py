@@ -67,6 +67,24 @@ def _approved_identity() -> tuple[SimpleNamespace, SimpleNamespace]:
     )
 
 
+def _test_capability() -> object:
+    from tests.runtime.test_windows_authority_capability import (
+        _bootstrap,
+        _production_evidence,
+    )
+
+    from trading_bot.runtime.windows_authority_validation import (
+        acquire_validated_production_authority_for_test,
+    )
+
+    bootstrap = _bootstrap()
+    return acquire_validated_production_authority_for_test(
+        bootstrap=bootstrap,
+        bootstrap_digest=bootstrap.digest,
+        production_evidence=_production_evidence(),
+    )
+
+
 def test_production_entrypoints_do_not_accept_caller_trust_evidence() -> None:
     assert (
         tuple(
@@ -133,8 +151,16 @@ def test_complete_installed_boundary_retains_sqlite_evidence(
 def test_complete_installed_database_validation_uses_one_vfs_connection(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    from tests.runtime.test_windows_authority_capability import (
+        _bootstrap,
+        _production_evidence,
+    )
+
+    import trading_bot.runtime.windows_authority_validation as validation
+
     close_calls = 0
-    production = SimpleNamespace()
+    production = _production_evidence()
+    bootstrap = _bootstrap()
 
     def close() -> None:
         nonlocal close_calls
@@ -147,18 +173,16 @@ def test_complete_installed_database_validation_uses_one_vfs_connection(
         open_calls.append((path, vfs))
         return fake_connection
 
+    monkeypatch.setattr(validation, "open_read_only_sqlite_connection", open_connection)
     monkeypatch.setattr(
-        provisioning, "open_read_only_sqlite_connection", open_connection
-    )
-    monkeypatch.setattr(
-        provisioning,
+        validation,
         "validate_installed_sqlite_prerequisites",
         lambda actual_connection, **_: SimpleNamespace(
             database_state=initialization.SqliteDatabaseState.INITIALIZED_SUPPORTED
         ),
     )
     monkeypatch.setattr(
-        provisioning,
+        validation,
         "validate_production_authority_database_connection",
         lambda actual_connection, **_: (
             production
@@ -167,17 +191,21 @@ def test_complete_installed_database_validation_uses_one_vfs_connection(
         ),
     )
 
-    state, evidence = provisioning._validate_installed_database_complete(
+    complete = validation.validate_installed_database_complete(
         True,
         True,
-        bootstrap=object(),  # type: ignore[arg-type]
-        bootstrap_digest="bootstrap-1",
+        bootstrap=bootstrap,
+        bootstrap_digest=bootstrap.digest,
         release_manifest=object(),  # type: ignore[arg-type]
         sqlite_build=SimpleNamespace(vfs="approved"),  # type: ignore[arg-type]
     )
 
-    assert state is initialization.SqliteDatabaseState.INITIALIZED_SUPPORTED
-    assert evidence is production
+    assert (
+        complete.database_state
+        is initialization.SqliteDatabaseState.INITIALIZED_SUPPORTED
+    )
+    assert complete.production_evidence is production
+    assert complete.validated_production_authority is not None
     assert len(open_calls) == 1
     assert close_calls == 1
 
@@ -256,9 +284,13 @@ def test_provisioning_revalidates_raced_supported_database(
     )
     monkeypatch.setattr(provisioning, "_inspect_tree", lambda sid: ((), True, True))
 
-    def complete_validation(*args: object, **kwargs: object) -> tuple[object, object]:
+    def complete_validation(*args: object, **kwargs: object) -> SimpleNamespace:
         complete_calls.append(kwargs)
-        return provisioning.SqliteDatabaseState.INITIALIZED_SUPPORTED, object()
+        return SimpleNamespace(
+            database_state=provisioning.SqliteDatabaseState.INITIALIZED_SUPPORTED,
+            production_evidence=object(),
+            validated_production_authority=object(),
+        )
 
     monkeypatch.setattr(
         provisioning, "_validate_installed_database_complete", complete_validation
@@ -358,7 +390,6 @@ def test_provisioning_raced_supported_database_mismatch_fails_closed(
 def test_post_commit_complete_validation_is_consumed_once(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    release, build = _approved_identity()
     expected = _installed_validation()
     actual = _installed_validation()
     calls = 0
@@ -371,16 +402,16 @@ def test_post_commit_complete_validation_is_consumed_once(
     monkeypatch.setattr(
         initialization, "validate_installed_authority_complete", complete_validation
     )
+    capability = _test_capability()
+    monkeypatch.setattr(
+        initialization, "require_validated_production_authority", lambda _: capability
+    )
     evidence = initialization._post_commit_installed_production_evidence(
-        expected_validation=expected,
-        bootstrap=expected.bootstrap_verification.bootstrap,
-        bootstrap_digest="bootstrap-1",
-        release_manifest=release,  # type: ignore[arg-type]
-        sqlite_build=build,  # type: ignore[arg-type]
+        expected_validation=expected
     )
 
     assert calls == 1
-    assert evidence is actual.production_evidence
+    assert evidence is capability
 
 
 def test_new_initializer_success_consumes_post_commit_complete_evidence(
@@ -400,10 +431,10 @@ def test_new_initializer_success_consumes_post_commit_complete_evidence(
     def fake_transaction(**kwargs: object) -> object:
         validator = kwargs["post_commit_validator"]
         assert callable(validator)
-        evidence = validator()
-        assert evidence is post_commit.production_evidence
+        authority = validator()
+        assert authority is capability
         return initialization._production_evidence(
-            evidence,
+            authority,  # type: ignore[arg-type]
             initialization.SqliteDatabaseState.INITIALIZED_SUPPORTED,  # type: ignore[arg-type]
         )
 
@@ -417,6 +448,10 @@ def test_new_initializer_success_consumes_post_commit_complete_evidence(
     )
     monkeypatch.setattr(
         initialization, "validate_installed_authority_complete", complete_validation
+    )
+    capability = _test_capability()
+    monkeypatch.setattr(
+        initialization, "require_validated_production_authority", lambda _: capability
     )
     monkeypatch.setattr(
         initialization, "_initialize_database_transaction", fake_transaction
@@ -456,6 +491,10 @@ def test_idempotent_initializer_returns_the_complete_boundary_evidence(
     monkeypatch.setattr(
         initialization, "validate_installed_authority_complete", complete_validation
     )
+    capability = _test_capability()
+    monkeypatch.setattr(
+        initialization, "require_validated_production_authority", lambda _: capability
+    )
     monkeypatch.setattr(
         initialization,
         "validate_production_authority_database_for_test",
@@ -485,7 +524,6 @@ def test_post_commit_complete_validation_rejects_changed_authority_facts(
     monkeypatch: pytest.MonkeyPatch,
     change: dict[str, object],
 ) -> None:
-    release, build = _approved_identity()
     expected = _installed_validation()
     actual = _installed_validation(**change)  # type: ignore[arg-type]
     monkeypatch.setattr(
@@ -494,11 +532,7 @@ def test_post_commit_complete_validation_rejects_changed_authority_facts(
 
     with pytest.raises(initialization.AuthorityInitializationError):
         initialization._post_commit_installed_production_evidence(
-            expected_validation=expected,
-            bootstrap=expected.bootstrap_verification.bootstrap,
-            bootstrap_digest="bootstrap-1",
-            release_manifest=release,  # type: ignore[arg-type]
-            sqlite_build=build,  # type: ignore[arg-type]
+            expected_validation=expected
         )
 
 
@@ -520,15 +554,9 @@ def test_post_commit_windows_revalidation_failure_cannot_fallback_to_sqlite(
         "validate_production_authority_database_for_test",
         lambda *args, **kwargs: pytest.fail("SQLite-only fallback was used"),
     )
-    release, build = _approved_identity()
-
     with pytest.raises(initialization.AuthorityInitializationError):
         initialization._post_commit_installed_production_evidence(
-            expected_validation=expected,
-            bootstrap=expected.bootstrap_verification.bootstrap,
-            bootstrap_digest="bootstrap-1",
-            release_manifest=release,  # type: ignore[arg-type]
-            sqlite_build=build,  # type: ignore[arg-type]
+            expected_validation=expected
         )
 
 

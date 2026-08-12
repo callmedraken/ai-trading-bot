@@ -235,6 +235,9 @@ def test_provisioning_revalidates_raced_supported_database(
         "validate_lifecycle_mutex_security_descriptor",
         lambda sid: None,
     )
+    monkeypatch.setattr(
+        provisioning, "_require_reserved_temporary_objects_absent", lambda: None
+    )
     monkeypatch.setattr(provisioning, "_existing_fixed_objects", lambda sid: existing)
     monkeypatch.setattr(
         provisioning, "_validate_existing_objects", lambda sid, found: None
@@ -308,6 +311,9 @@ def test_provisioning_raced_supported_database_mismatch_fails_closed(
         provisioning,
         "validate_lifecycle_mutex_security_descriptor",
         lambda sid: None,
+    )
+    monkeypatch.setattr(
+        provisioning, "_require_reserved_temporary_objects_absent", lambda: None
     )
     monkeypatch.setattr(provisioning, "_existing_fixed_objects", lambda sid: existing)
     monkeypatch.setattr(

@@ -64,7 +64,8 @@ class _CapabilityIssuer:
     """Private process-local provenance marker for capability issuance."""
 
 
-_CAPABILITY_ISSUER = _CapabilityIssuer()
+_PRODUCTION_CAPABILITY_ISSUER = _CapabilityIssuer()
+_TEST_CAPABILITY_ISSUER = _CapabilityIssuer()
 _CAPABILITY_FIELDS = (
     "authority_epoch_id",
     "machine_authority_id",
@@ -97,16 +98,24 @@ class ValidatedProductionAuthority:
     future Architecture-77 one-shot capabilities.
     """
 
-    __slots__ = _CAPABILITY_FIELDS
+    __slots__ = (*_CAPABILITY_FIELDS, "_provenance")
 
     def __init__(self, *args: object, **kwargs: object) -> None:
         issuer = kwargs.pop("_issuer", None)
-        if issuer is not _CAPABILITY_ISSUER or args:
+        if (
+            issuer
+            not in (
+                _PRODUCTION_CAPABILITY_ISSUER,
+                _TEST_CAPABILITY_ISSUER,
+            )
+            or args
+        ):
             raise TypeError(
                 "ValidatedProductionAuthority is issued by the validation module"
             )
         if set(kwargs) != set(_CAPABILITY_FIELDS):
             raise TypeError("validated authority fields are not exact")
+        object.__setattr__(self, "_provenance", issuer)
         for field in _CAPABILITY_FIELDS:
             object.__setattr__(self, field, kwargs[field])
 
@@ -130,13 +139,18 @@ class ValidatedProductionAuthority:
     def __eq__(self, other: object) -> bool:
         if type(other) is not type(self):
             return NotImplemented
-        return all(
+        return self._provenance is other._provenance and all(
             getattr(self, field) == getattr(other, field)
             for field in _CAPABILITY_FIELDS
         )
 
     def __hash__(self) -> int:
-        return hash(tuple(getattr(self, field) for field in _CAPABILITY_FIELDS))
+        return hash(
+            (
+                self._provenance,
+                tuple(getattr(self, field) for field in _CAPABILITY_FIELDS),
+            )
+        )
 
     def __reduce__(self) -> object:
         raise TypeError("ValidatedProductionAuthority cannot be serialized")
@@ -168,11 +182,10 @@ class ProvisioningEvidence:
 
 @dataclass(frozen=True, slots=True)
 class InstalledDatabaseValidation:
-    """Centralized complete validation of the fixed database pair."""
+    """Administrative validation facts for the fixed database pair."""
 
     database_state: SqliteDatabaseState
     production_evidence: ProductionAuthorityEvidence | None
-    validated_production_authority: ValidatedProductionAuthority | None
 
     def __iter__(self) -> Iterator[object]:
         """Retain the prior private helper's two-value unpacking shape."""
@@ -352,8 +365,15 @@ def _validate_exact_identity(
     trading_sid: str,
     production: ProductionAuthorityEvidence,
     require_fixed_database_path: bool,
+    issuer: _CapabilityIssuer,
 ) -> ValidatedProductionAuthority:
     """Issue a capability only from exact, already-reviewed facts."""
+
+    if issuer not in (
+        _PRODUCTION_CAPABILITY_ISSUER,
+        _TEST_CAPABILITY_ISSUER,
+    ):
+        raise WindowsAuthorityError("validated authority issuer is invalid")
 
     if type(bootstrap) is not WindowsAuthorityBootstrap:
         raise WindowsAuthorityError("validated authority bootstrap type is invalid")
@@ -390,7 +410,7 @@ def _validate_exact_identity(
     if type(production.migration_id) is not str or not production.migration_id:
         raise WindowsAuthorityError("validated authority migration identity is invalid")
     return ValidatedProductionAuthority(
-        _issuer=_CAPABILITY_ISSUER,
+        _issuer=issuer,
         authority_epoch_id=bootstrap.authority_epoch_id,
         machine_authority_id=bootstrap.machine_authority_id,
         bootstrap_schema=bootstrap.bootstrap_schema,
@@ -431,6 +451,7 @@ def issue_validated_production_authority_for_test(
         ),
         production=production_evidence,
         require_fixed_database_path=False,
+        issuer=_TEST_CAPABILITY_ISSUER,
     )
 
 
@@ -443,10 +464,10 @@ def validate_installed_database_complete(
     release_manifest: ReleaseManifestEvidence | None,
     sqlite_build: SqliteAuthorityBuildEvidence | None,
 ) -> InstalledDatabaseValidation:
-    """Run the complete fixed-path SQLite validation and issue its capability."""
+    """Run complete fixed-path SQLite validation and return administrative facts."""
 
     if not database_present and not journal_present:
-        return InstalledDatabaseValidation(SqliteDatabaseState.NOT_PRESENT, None, None)
+        return InstalledDatabaseValidation(SqliteDatabaseState.NOT_PRESENT, None)
     if database_present != journal_present:
         raise WindowsAuthorityError(
             "pre-created authority database and persistent journal must be paired"
@@ -463,7 +484,7 @@ def validate_installed_database_complete(
         )
         state = installed.database_state
         if state is not SqliteDatabaseState.INITIALIZED_SUPPORTED:
-            return InstalledDatabaseValidation(state, None, None)
+            return InstalledDatabaseValidation(state, None)
         selected_release = release_manifest or load_approved_release_manifest()
         production = validate_production_authority_database_connection(
             connection,
@@ -473,14 +494,7 @@ def validate_installed_database_complete(
             release_manifest=selected_release,
             sqlite_build=selected_build,
         )
-        capability = _validate_exact_identity(
-            bootstrap=bootstrap,
-            bootstrap_digest=bootstrap_digest,
-            trading_sid=bootstrap.approved_account_sid,
-            production=production,
-            require_fixed_database_path=True,
-        )
-        return InstalledDatabaseValidation(state, production, capability)
+        return InstalledDatabaseValidation(state, production)
     finally:
         connection.close()
 
@@ -490,6 +504,7 @@ def _validate_installed_authority(
     key_registry: PinnedBootstrapKeyRegistry,
     release_manifest: ReleaseManifestEvidence | None = None,
     sqlite_build: SqliteAuthorityBuildEvidence | None = None,
+    capability_issuer: _CapabilityIssuer,
 ) -> InstalledAuthorityValidation:
     """Validate the fixed install with production or explicitly test trust."""
 
@@ -512,6 +527,16 @@ def _validate_installed_authority(
         release_manifest=release_manifest,
         sqlite_build=sqlite_build,
     )
+    capability = None
+    if database.production_evidence is not None:
+        capability = _validate_exact_identity(
+            bootstrap=verification.bootstrap,
+            bootstrap_digest=verification.bootstrap_digest,
+            trading_sid=trading_sid,
+            production=database.production_evidence,
+            require_fixed_database_path=True,
+            issuer=capability_issuer,
+        )
     return InstalledAuthorityValidation(
         provisioning=ProvisioningEvidence(
             ProvisioningState.VALIDATED,
@@ -526,7 +551,7 @@ def _validate_installed_authority(
         ),
         bootstrap_verification=verification,
         production_evidence=database.production_evidence,
-        validated_production_authority=database.validated_production_authority,
+        validated_production_authority=capability,
     )
 
 
@@ -535,6 +560,7 @@ def validate_installed_authority_complete() -> InstalledAuthorityValidation:
 
     return _validate_installed_authority(
         key_registry=PRODUCTION_PINNED_BOOTSTRAP_KEYS,
+        capability_issuer=_PRODUCTION_CAPABILITY_ISSUER,
     )
 
 
@@ -556,6 +582,7 @@ def validate_installed_authority_complete_for_test(
         key_registry=key_registry,
         release_manifest=release_manifest,
         sqlite_build=sqlite_build,
+        capability_issuer=_TEST_CAPABILITY_ISSUER,
     )
 
 
@@ -603,6 +630,10 @@ def require_validated_production_authority(
     if type(capability) is not ValidatedProductionAuthority:
         raise WindowsAuthorityError(
             "complete installed validation did not issue executable authority"
+        )
+    if capability._provenance is not _PRODUCTION_CAPABILITY_ISSUER:
+        raise WindowsAuthorityError(
+            "validated production authority has non-production provenance"
         )
     if capability.database_path != str(PRODUCTION_AUTHORITY_PATHS.database):
         raise WindowsAuthorityError(

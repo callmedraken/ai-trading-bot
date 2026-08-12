@@ -465,7 +465,6 @@ def _provision_authority(
         if (
             complete.database_state is not SqliteDatabaseState.INITIALIZED_SUPPORTED
             or complete.production_evidence is None
-            or complete.validated_production_authority is None
         ):
             raise WindowsAuthorityError(
                 "initialized authority was not completely reconciled"
@@ -521,7 +520,6 @@ def _provision_authority(
         production_evidence = complete.production_evidence
         if database_state is SqliteDatabaseState.INITIALIZED_SUPPORTED and (
             production_evidence is None
-            or complete.validated_production_authority is None
         ):
             raise WindowsAuthorityError(
                 "initialized authority was not completely reconciled"

@@ -205,7 +205,7 @@ def test_complete_installed_database_validation_uses_one_vfs_connection(
         is initialization.SqliteDatabaseState.INITIALIZED_SUPPORTED
     )
     assert complete.production_evidence is production
-    assert complete.validated_production_authority is not None
+    assert not hasattr(complete, "validated_production_authority")
     assert len(open_calls) == 1
     assert close_calls == 1
 
@@ -289,7 +289,6 @@ def test_provisioning_revalidates_raced_supported_database(
         return SimpleNamespace(
             database_state=provisioning.SqliteDatabaseState.INITIALIZED_SUPPORTED,
             production_evidence=object(),
-            validated_production_authority=object(),
         )
 
     monkeypatch.setattr(

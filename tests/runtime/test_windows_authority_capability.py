@@ -113,6 +113,24 @@ def _validation(
     )
 
 
+def _production_validation() -> InstalledAuthorityValidation:
+    """Build a production-provenance fixture through the private issuer seam."""
+
+    import trading_bot.runtime.windows_authority_validation as validation
+
+    bootstrap = _bootstrap()
+    evidence = _production_evidence()
+    capability = validation._validate_exact_identity(
+        bootstrap=bootstrap,
+        bootstrap_digest=bootstrap.digest,
+        trading_sid=bootstrap.approved_account_sid,
+        production=evidence,
+        require_fixed_database_path=True,
+        issuer=validation._PRODUCTION_CAPABILITY_ISSUER,
+    )
+    return _validation(evidence=evidence, capability=capability)
+
+
 @pytest.mark.parametrize(
     "state",
     [
@@ -167,7 +185,7 @@ def test_exact_supported_validation_issues_one_immutable_capability(
 ) -> None:
     import trading_bot.runtime.windows_authority_validation as validation
 
-    reviewed = _validation()
+    reviewed = _production_validation()
     monkeypatch.setattr(
         validation, "validate_installed_authority_complete", lambda: reviewed
     )
@@ -193,6 +211,49 @@ def test_exact_supported_validation_issues_one_immutable_capability(
         capability.authority_epoch_id = "substituted"  # type: ignore[misc]
     with pytest.raises(TypeError):
         pickle.dumps(capability)
+
+
+def test_test_capability_has_test_provenance_and_cannot_cross_production_boundary() -> (
+    None
+):
+    import trading_bot.runtime.windows_authority_validation as validation
+
+    test_capability = _validation().validated_production_authority
+    production_capability = _production_validation().validated_production_authority
+    assert test_capability is not None
+    assert production_capability is not None
+    assert test_capability._provenance is validation._TEST_CAPABILITY_ISSUER
+    assert production_capability._provenance is validation._PRODUCTION_CAPABILITY_ISSUER
+    assert test_capability != production_capability
+    assert hash(test_capability) != hash(production_capability)
+    with pytest.raises(WindowsAuthorityError):
+        require_validated_production_authority(_validation())
+
+
+def test_parameterless_and_test_complete_validators_select_distinct_issuers(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import trading_bot.runtime.windows_authority_validation as validation
+
+    calls: list[object] = []
+
+    def fake_validate(**kwargs: object) -> object:
+        calls.append(kwargs["capability_issuer"])
+        return object()
+
+    monkeypatch.setattr(validation, "_validate_installed_authority", fake_validate)
+
+    assert validation.validate_installed_authority_complete() is not None
+    assert (
+        validation.validate_installed_authority_complete_for_test(
+            key_registry=object(),  # type: ignore[arg-type]
+        )
+        is not None
+    )
+    assert calls == [
+        validation._PRODUCTION_CAPABILITY_ISSUER,
+        validation._TEST_CAPABILITY_ISSUER,
+    ]
 
 
 def test_production_issuer_has_no_raw_authority_inputs() -> None:

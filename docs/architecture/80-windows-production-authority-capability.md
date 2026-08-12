@@ -57,7 +57,9 @@ executable authority by themselves.
 
 The administrator layer produces `ProvisioningEvidence`,
 `BootstrapVerification`, `ProductionAuthorityEvidence`, and the immutable
-`InstalledAuthorityValidation` result. The latter may carry an optional
+`InstalledAuthorityValidation` result. The low-level database validator
+returns only administrative state and database evidence; it never mints a
+capability. The complete installed-authority validator may carry an optional
 `ValidatedProductionAuthority`, but only the capability carries executable
 authority meaning.
 
@@ -101,12 +103,14 @@ identity.
 
 ## Provenance and consumption
 
-The capability constructor is issuer-token gated by a private process-local
-marker owned by the validation module. Public fields are not a supported
-reconstruction mechanism, and the object rejects mutation, serialization, and
-pickling. This is supported-API provenance fencing, not a claim that Python
-can defend against malicious reflective code that already controls the
-trusted process.
+The capability constructor is issuer-token gated by separate private
+process-local production and test markers owned by the validation module. The
+marker is stored in a private non-serialized slot, and public fields are not a
+supported reconstruction mechanism. Production consumers require the exact
+production marker, so a test capability with identical public fields remains
+unacceptable. The object rejects mutation, serialization, and pickling. This
+is supported-API provenance fencing, not a claim that Python can defend
+against malicious reflective code that already controls the trusted process.
 
 C1 does not impose one-shot consumption because it performs no external
 effect. Future provider, `CreateProcessW`, and `ResumeThread` permits remain

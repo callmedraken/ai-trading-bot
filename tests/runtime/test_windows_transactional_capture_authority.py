@@ -3186,6 +3186,124 @@ _RECOVERY_ACTIONS: dict[str, tuple[str, str, str]] = {
 }
 
 
+_RECOVERY_TARGET_EVIDENCE_PAIRS: dict[str, tuple[str, ...]] = {
+    "RECORD_ATTEMPT_AMBIGUITY": (
+        "launch_executions.post_resume",
+        "launch_executions.cleanup",
+    ),
+    "RECORD_CLAIM_AMBIGUITY": (
+        "launch_executions.post_resume",
+        "launch_executions.cleanup",
+    ),
+    "CLASSIFY_LAUNCH_RESERVATION": (),
+    "CLASSIFY_PROCESS_OUTCOME_UNKNOWN": ("launch_reservations.process_intent",),
+    "CLASSIFY_PRE_RESUME_READY": (
+        "launch_executions.process_creation",
+        "launch_executions.job_object",
+        "launch_executions.resume_authorization",
+    ),
+    "CLASSIFY_RESUME_OUTCOME_UNKNOWN": (
+        "launch_executions.process_creation",
+        "launch_executions.job_object",
+        "launch_executions.resume_authorization",
+        "launch_executions.resume_intent",
+    ),
+    "SELECT_COMMITTED_SUCCESS": (),
+    "CLOSE_SESSION": (),
+    "ACKNOWLEDGE_RESTORE": (),
+}
+
+
+def _validate_recovery_target_evidence(
+    connection: sqlite3.Connection,
+    session_id: str,
+    target_kind: str,
+    target_id: str,
+    action: str,
+) -> None:
+    """Validate only the stored cryptographic pairs required by one recovery."""
+
+    required_pairs = _RECOVERY_TARGET_EVIDENCE_PAIRS[action]
+    if not required_pairs:
+        return
+
+    if action in {"RECORD_ATTEMPT_AMBIGUITY", "RECORD_CLAIM_AMBIGUITY"}:
+        target_column = "a.attempt_id" if target_kind == "ATTEMPT" else "c.claim_id"
+        row = connection.execute(
+            f"""
+            SELECT e.post_resume_json, e.post_resume_digest,
+                   e.cleanup_json, e.cleanup_digest, e.phase
+            FROM launch_executions e
+            JOIN launch_reservations r
+              ON r.launch_reservation_id = e.launch_reservation_id
+            JOIN provider_call_claims c ON c.claim_id = r.claim_id
+            JOIN attempts a ON a.attempt_id = c.attempt_id
+            WHERE {target_column} = ? AND a.session_id = ?
+            """,
+            (target_id, session_id),
+        ).fetchone()
+        if row is None or row[4] != "RESUME_RECORDED":
+            return
+        pair_values = {
+            "launch_executions.post_resume": (row[0], row[1]) if row else None,
+            "launch_executions.cleanup": (row[2], row[3]) if row else None,
+        }
+    elif action == "CLASSIFY_PROCESS_OUTCOME_UNKNOWN":
+        row = connection.execute(
+            """
+            SELECT r.process_intent_json, r.process_intent_digest,
+                   r.reservation_state
+            FROM launch_reservations r
+            JOIN provider_call_claims c ON c.claim_id = r.claim_id
+            JOIN attempts a ON a.attempt_id = c.attempt_id
+            WHERE r.launch_reservation_id = ? AND a.session_id = ?
+            """,
+            (target_id, session_id),
+        ).fetchone()
+        if row is None or row[2] != "PROCESS_INTENT_COMMITTED":
+            return
+        pair_values = {
+            "launch_reservations.process_intent": ((row[0], row[1]) if row else None),
+        }
+    else:
+        row = connection.execute(
+            """
+            SELECT e.process_creation_json, e.process_creation_digest,
+                   e.job_object_json, e.job_object_digest,
+                   e.resume_authorization_json, e.resume_authorization_digest,
+                   e.resume_intent_json, e.resume_intent_digest, e.phase
+            FROM launch_executions e
+            JOIN launch_reservations r
+              ON r.launch_reservation_id = e.launch_reservation_id
+            JOIN provider_call_claims c ON c.claim_id = r.claim_id
+            JOIN attempts a ON a.attempt_id = c.attempt_id
+            WHERE r.launch_reservation_id = ? AND a.session_id = ?
+            """,
+            (target_id, session_id),
+        ).fetchone()
+        expected_phase = (
+            "PRE_RESUME_READY"
+            if action == "CLASSIFY_PRE_RESUME_READY"
+            else "RESUME_INTENT_COMMITTED"
+        )
+        if row is None or row[8] != expected_phase:
+            return
+        pair_values = {
+            "launch_executions.process_creation": ((row[0], row[1]) if row else None),
+            "launch_executions.job_object": (row[2], row[3]) if row else None,
+            "launch_executions.resume_authorization": (
+                (row[4], row[5]) if row else None
+            ),
+            "launch_executions.resume_intent": ((row[6], row[7]) if row else None),
+        }
+
+    for pair in required_pairs:
+        values = pair_values[pair]
+        if values is None:
+            raise ValueError(f"recovery target evidence is unavailable: {pair}")
+        _require_evidence_pair(values[0], values[1], field=f"{pair} digest")
+
+
 def _insert_recovery_fact_for_test(
     connection: sqlite3.Connection,
     session_id: str,
@@ -3309,6 +3427,13 @@ def _record_recovery_locked(
             current_ordinal if requested_ordinal is None else requested_ordinal
         )
         predecessor = _target_state(connection, target_kind, target_id)
+        _validate_recovery_target_evidence(
+            connection,
+            session_id,
+            target_kind,
+            target_id,
+            action,
+        )
         recovery_id = _recovery_id(
             session_id,
             target_kind,
@@ -12526,4 +12651,151 @@ def test_manual_review_outcome_timestamp_does_not_predate_classification_recover
             (target_id,),
         ).fetchone() == (outcome_at_utc,)
         connection.rollback()
+    connection.close()
+
+
+def _recovery_target_reservation_id(
+    connection: sqlite3.Connection,
+    session_id: str,
+    target_kind: str,
+    target_id: str,
+) -> str:
+    if target_kind == "LAUNCH_RESERVATION":
+        return target_id
+    if target_kind == "ATTEMPT":
+        row = connection.execute(
+            """
+            SELECT r.launch_reservation_id
+            FROM launch_reservations r
+            JOIN provider_call_claims c ON c.claim_id = r.claim_id
+            JOIN attempts a ON a.attempt_id = c.attempt_id
+            WHERE a.attempt_id = ? AND a.session_id = ?
+            """,
+            (target_id, session_id),
+        ).fetchone()
+    else:
+        assert target_kind == "CLAIM"
+        row = connection.execute(
+            """
+            SELECT r.launch_reservation_id
+            FROM launch_reservations r
+            JOIN provider_call_claims c ON c.claim_id = r.claim_id
+            JOIN attempts a ON a.attempt_id = c.attempt_id
+            WHERE c.claim_id = ? AND a.session_id = ?
+            """,
+            (target_id, session_id),
+        ).fetchone()
+    assert row is not None
+    return row[0]
+
+
+def _corrupt_recovery_target_evidence(
+    connection: sqlite3.Connection,
+    session_id: str,
+    target_kind: str,
+    target_id: str,
+    pair: str,
+) -> None:
+    reservation_id = _recovery_target_reservation_id(
+        connection, session_id, target_kind, target_id
+    )
+    wrong_digest = _digest(b"corrupted recovery target evidence")
+    if pair == "launch_reservations.process_intent":
+        connection.execute(
+            "DROP TRIGGER launch_reservations_process_intent_append_only"
+        )
+        connection.execute(
+            "UPDATE launch_reservations SET process_intent_digest = ? "
+            "WHERE launch_reservation_id = ?",
+            (wrong_digest, reservation_id),
+        )
+    else:
+        column = pair.rsplit(".", 1)[1]
+        trigger = {
+            "post_resume": "launch_executions_post_resume_append_only",
+            "cleanup": "launch_executions_cleanup_append_only",
+            "process_creation": "launch_executions_immutable_fields",
+            "job_object": "launch_executions_immutable_fields",
+            "resume_authorization": "launch_executions_immutable_fields",
+            "resume_intent": "launch_executions_resume_intent_append_only",
+        }[column]
+        connection.execute(f"DROP TRIGGER {trigger}")
+        connection.execute(
+            f"UPDATE launch_executions SET {column}_digest = ? "
+            "WHERE launch_reservation_id = ?",
+            (wrong_digest, reservation_id),
+        )
+    connection.commit()
+
+
+_RECOVERY_TARGET_EVIDENCE_CORRUPTION_CASES = tuple(
+    (action, pair)
+    for action, pairs in _RECOVERY_TARGET_EVIDENCE_PAIRS.items()
+    for pair in pairs
+)
+
+
+def test_recovery_target_evidence_mapping_has_exact_twelve_dependencies() -> None:
+    assert _RECOVERY_TARGET_EVIDENCE_PAIRS == {
+        "RECORD_ATTEMPT_AMBIGUITY": (
+            "launch_executions.post_resume",
+            "launch_executions.cleanup",
+        ),
+        "RECORD_CLAIM_AMBIGUITY": (
+            "launch_executions.post_resume",
+            "launch_executions.cleanup",
+        ),
+        "CLASSIFY_LAUNCH_RESERVATION": (),
+        "CLASSIFY_PROCESS_OUTCOME_UNKNOWN": ("launch_reservations.process_intent",),
+        "CLASSIFY_PRE_RESUME_READY": (
+            "launch_executions.process_creation",
+            "launch_executions.job_object",
+            "launch_executions.resume_authorization",
+        ),
+        "CLASSIFY_RESUME_OUTCOME_UNKNOWN": (
+            "launch_executions.process_creation",
+            "launch_executions.job_object",
+            "launch_executions.resume_authorization",
+            "launch_executions.resume_intent",
+        ),
+        "SELECT_COMMITTED_SUCCESS": (),
+        "CLOSE_SESSION": (),
+        "ACKNOWLEDGE_RESTORE": (),
+    }
+    assert len(_RECOVERY_TARGET_EVIDENCE_CORRUPTION_CASES) == 12
+    assert "_validate_recovery_target_evidence" in inspect.getsource(
+        _record_recovery_locked
+    )
+    assert "_require_evidence_pair" in inspect.getsource(_record_recovery_locked)
+
+
+@pytest.mark.parametrize(
+    ("action", "pair"),
+    _RECOVERY_TARGET_EVIDENCE_CORRUPTION_CASES,
+    ids=lambda value: str(value),
+)
+def test_corrupt_recovery_target_evidence_blocks_without_mutation(
+    db_path: Path, action: str, pair: str
+) -> None:
+    connection = _connect(db_path)
+    session_id, target_kind, target_id, _, _ = _prepare_recovery_chronology_case(
+        connection, action
+    )
+    _corrupt_recovery_target_evidence(
+        connection, session_id, target_kind, target_id, pair
+    )
+    before = _database_rows(connection)
+    target_state = _target_state(connection, target_kind, target_id)
+
+    with pytest.raises(SchemaValidationError, match="does not match evidence bytes"):
+        record_recovery(connection, session_id, target_kind, target_id, action)
+
+    assert not connection.in_transaction
+    assert _database_rows(connection) == before
+    assert _target_state(connection, target_kind, target_id) == target_state
+    assert connection.execute("SELECT count(*) FROM manual_recoveries").fetchone() == (
+        0,
+    )
+    connection.execute("BEGIN IMMEDIATE")
+    connection.rollback()
     connection.close()

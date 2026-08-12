@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import sqlite3
 from pathlib import Path
+from types import SimpleNamespace
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
@@ -17,7 +19,20 @@ from trading_bot.runtime.windows_authority import (
     WindowsAuthorityBootstrap,
     WindowsAuthorityError,
 )
-from trading_bot.runtime.windows_authority_schema import SchemaValidationError
+from trading_bot.runtime.windows_authority_initialization import (
+    initialize_authority_database_for_test,
+)
+from trading_bot.runtime.windows_authority_schema import (
+    INITIALIZER_CONTRACT_VERSION,
+    PRODUCTION_SCHEMA_ARTIFACT_SHA256,
+    PRODUCTION_SCHEMA_ID,
+    RELEASE_MANIFEST_ID,
+    SQLITE_BUILD_MANIFEST_ID,
+    SchemaValidationError,
+    SqliteAuthorityBuildEvidence,
+    parse_release_manifest_bytes,
+    parse_sqlite_authority_build_manifest,
+)
 from trading_bot.runtime.windows_authority_sqlite import (
     InstalledSqliteEvidence,
     SqliteDatabaseState,
@@ -51,6 +66,41 @@ def _verification() -> BootstrapVerification:
         bootstrap_digest=hashlib.sha256(bootstrap.canonical_bytes()).hexdigest(),
         signing_key_id=bootstrap.signing_key_id,
         signature_length=64,
+    )
+
+
+def _release_manifest() -> object:
+    payload = {
+        "application_version": "0.1.0",
+        "initializer_contract_version": INITIALIZER_CONTRACT_VERSION,
+        "manifest_id": RELEASE_MANIFEST_ID,
+        "production_schema_digest": PRODUCTION_SCHEMA_ARTIFACT_SHA256,
+        "production_schema_id": PRODUCTION_SCHEMA_ID,
+    }
+    return parse_release_manifest_bytes(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+    )
+
+
+def _sqlite_build() -> SqliteAuthorityBuildEvidence:
+    connection = sqlite3.connect(":memory:")
+    try:
+        source_id = connection.execute("SELECT sqlite_source_id()").fetchone()[0]
+        compile_options = sorted(
+            row[0] for row in connection.execute("PRAGMA compile_options")
+        )
+    finally:
+        connection.close()
+    payload = {
+        "compile_options": compile_options,
+        "manifest_id": SQLITE_BUILD_MANIFEST_ID,
+        "sqlite_source_id": source_id,
+        "sqlite_version": sqlite3.sqlite_version,
+        "trusted_schema_off": True,
+        "vfs": _available_vfs_name(),
+    }
+    return parse_sqlite_authority_build_manifest(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
     )
 
 
@@ -145,6 +195,50 @@ def _fresh_database(tmp_path: Path) -> tuple[sqlite3.Connection, Path, Path]:
     return connection, database, journal
 
 
+def _database_with_sqlite_stat_object(tmp_path: Path) -> tuple[Path, Path]:
+    database = tmp_path / "authority.sqlite3"
+    journal = tmp_path / "authority.sqlite3-journal"
+    connection = sqlite3.connect(database)
+    try:
+        connection.execute("CREATE TABLE analyzed_data(value TEXT NOT NULL)")
+        connection.execute("CREATE INDEX analyzed_data_value ON analyzed_data(value)")
+        connection.execute("INSERT INTO analyzed_data(value) VALUES ('value')")
+        connection.execute("ANALYZE")
+        connection.execute("DROP TABLE analyzed_data")
+        connection.commit()
+        names = {
+            row[0]
+            for row in connection.execute(
+                "SELECT name FROM sqlite_schema WHERE name LIKE 'sqlite_stat%'"
+            )
+        }
+        assert names
+    finally:
+        connection.close()
+    journal.touch()
+    return database, journal
+
+
+def _database_with_sqlite_sequence(tmp_path: Path) -> tuple[Path, Path]:
+    database = tmp_path / "authority.sqlite3"
+    journal = tmp_path / "authority.sqlite3-journal"
+    connection = sqlite3.connect(database)
+    try:
+        connection.execute(
+            "CREATE TABLE disposable_autoincrement("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT, value TEXT)"
+        )
+        connection.execute("DROP TABLE disposable_autoincrement")
+        connection.commit()
+        assert connection.execute(
+            "SELECT 1 FROM sqlite_schema WHERE name = 'sqlite_sequence'"
+        ).fetchone() == (1,)
+    finally:
+        connection.close()
+    journal.touch()
+    return database, journal
+
+
 def test_installed_validation_is_read_only_and_does_not_claim_runtime_pragmas(
     tmp_path: Path,
 ) -> None:
@@ -173,6 +267,109 @@ def test_installed_validation_is_read_only_and_does_not_claim_runtime_pragmas(
         assert evidence.trusted_schema_off is True
         assert connection.execute("SELECT name FROM sqlite_schema").fetchall() == []
         assert database.read_bytes() == before_bytes
+    finally:
+        connection.close()
+
+
+def test_empty_database_is_precreated_uninitialized(tmp_path: Path) -> None:
+    connection, database, journal = _fresh_database(tmp_path)
+    try:
+        evidence = validate_installed_sqlite_prerequisites(
+            connection, database_path=database, journal_path=journal
+        )
+        assert evidence.database_state is SqliteDatabaseState.PRECREATED_UNINITIALIZED
+    finally:
+        connection.close()
+
+
+def test_installed_validation_rejects_sqlite_stat_objects_as_unsupported(
+    tmp_path: Path,
+) -> None:
+    database, journal = _database_with_sqlite_stat_object(tmp_path)
+    before_bytes = database.read_bytes()
+    connection = open_disposable_read_only_sqlite_connection(database)
+    try:
+        with pytest.raises(SqliteDurabilityError, match="unsupported"):
+            validate_installed_sqlite_prerequisites(
+                connection, database_path=database, journal_path=journal
+            )
+    finally:
+        connection.close()
+    assert database.read_bytes() == before_bytes
+
+
+def test_installed_validation_rejects_sqlite_sequence_as_unsupported(
+    tmp_path: Path,
+) -> None:
+    database, journal = _database_with_sqlite_sequence(tmp_path)
+    before_bytes = database.read_bytes()
+    connection = open_disposable_read_only_sqlite_connection(database)
+    try:
+        with pytest.raises(SqliteDurabilityError, match="unsupported"):
+            validate_installed_sqlite_prerequisites(
+                connection, database_path=database, journal_path=journal
+            )
+    finally:
+        connection.close()
+    assert database.read_bytes() == before_bytes
+
+
+def test_installed_validation_classifies_supported_schema_with_autoindexes(
+    tmp_path: Path,
+) -> None:
+    database = tmp_path / "authority.sqlite3"
+    journal = tmp_path / "authority.sqlite3-journal"
+    sqlite3.connect(database).close()
+    journal.touch()
+    verification = _verification()
+    release = _release_manifest()
+    build = _sqlite_build()
+    initialize_authority_database_for_test(
+        database_path=database,
+        journal_path=journal,
+        bootstrap=verification.bootstrap,
+        bootstrap_digest=verification.bootstrap_digest,
+        release_manifest=release,  # type: ignore[arg-type]
+        sqlite_build=build,
+        now_utc="2026-01-01T00:00:00Z",
+    )
+    connection = open_disposable_read_only_sqlite_connection(database)
+    try:
+        autoindexes = connection.execute(
+            "SELECT name FROM sqlite_schema "
+            "WHERE type = 'index' AND name LIKE 'sqlite_autoindex_%'"
+        ).fetchall()
+        assert autoindexes
+        evidence = validate_installed_sqlite_prerequisites(
+            connection, database_path=database, journal_path=journal
+        )
+        assert evidence.database_state is SqliteDatabaseState.INITIALIZED_SUPPORTED
+    finally:
+        connection.close()
+
+
+def test_provisioning_rejects_reserved_sqlite_structure_without_mutation(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    import trading_bot.runtime.windows_authority_provisioning as provisioning
+
+    database, journal = _database_with_sqlite_sequence(tmp_path)
+    monkeypatch.setattr(
+        provisioning,
+        "PRODUCTION_AUTHORITY_PATHS",
+        SimpleNamespace(database=database, journal=journal),
+    )
+    before_bytes = database.read_bytes()
+    with pytest.raises(SqliteDurabilityError, match="unsupported"):
+        provisioning._validate_database_if_present(
+            True, True, vfs=_available_vfs_name()
+        )
+    assert database.read_bytes() == before_bytes
+    connection = sqlite3.connect(database)
+    try:
+        assert connection.execute(
+            "SELECT 1 FROM sqlite_schema WHERE name = 'sqlite_sequence'"
+        ).fetchone() == (1,)
     finally:
         connection.close()
 

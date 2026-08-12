@@ -213,7 +213,12 @@ def _schema_objects(
     return tuple(
         row
         for row in rows
-        if not (type(row[1]) is str and row[1].startswith("sqlite_"))
+        if not (
+            row[0] == "index"
+            and type(row[1]) is str
+            and row[1].startswith("sqlite_autoindex_")
+            and row[4] is None
+        )
     )
 
 

@@ -182,6 +182,173 @@ def test_complete_installed_database_validation_uses_one_vfs_connection(
     assert close_calls == 1
 
 
+def _provisioning_race_setup() -> tuple[
+    SimpleNamespace,
+    SimpleNamespace,
+    SimpleNamespace,
+    dict[object, bool],
+]:
+    bootstrap = SimpleNamespace(
+        machine_authority_id="machine-1",
+        authority_epoch_id="epoch-1",
+        bootstrap_generation=1,
+        database_identity_digest="database-1",
+        approved_account_sid="S-1-5-21-1",
+    )
+    verification = SimpleNamespace(
+        bootstrap=bootstrap,
+        bootstrap_digest="bootstrap-1",
+        signing_key_id="key-1",
+    )
+    release, approved_build = _approved_identity()
+    build = SimpleNamespace(digest=approved_build.digest, vfs="approved")
+    existing = {path: True for path in PRODUCTION_AUTHORITY_PATHS.protected_objects}
+    existing[PRODUCTION_AUTHORITY_PATHS.bootstrap] = False
+    existing[PRODUCTION_AUTHORITY_PATHS.signature] = False
+    return verification, release, build, existing
+
+
+def test_provisioning_revalidates_raced_supported_database(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    verification, release, build, existing = _provisioning_race_setup()
+    staging_bootstrap = tmp_path / "staging.bootstrap.json"
+    staging_signature = tmp_path / "staging.bootstrap.sig"
+    staging_bootstrap.write_bytes(b"bootstrap")
+    staging_signature.write_bytes(b"signature")
+    complete_calls: list[dict[str, object]] = []
+    installed_files: list[object] = []
+
+    monkeypatch.setattr(provisioning, "require_administrator_token", lambda: None)
+    monkeypatch.setattr(provisioning, "parse_bootstrap_bytes", lambda data: None)
+    monkeypatch.setattr(
+        provisioning,
+        "require_trading_standard_account",
+        lambda: "S-1-5-21-1",
+    )
+    monkeypatch.setattr(
+        provisioning, "_verify_material", lambda *args, **kwargs: verification
+    )
+    monkeypatch.setattr(
+        provisioning,
+        "validate_lifecycle_mutex_security_descriptor",
+        lambda sid: None,
+    )
+    monkeypatch.setattr(provisioning, "_existing_fixed_objects", lambda sid: existing)
+    monkeypatch.setattr(
+        provisioning, "_validate_existing_objects", lambda sid, found: None
+    )
+    monkeypatch.setattr(
+        provisioning,
+        "_validate_database_if_present",
+        lambda database, journal, **kwargs: (
+            provisioning.SqliteDatabaseState.PRECREATED_UNINITIALIZED
+        ),
+    )
+    monkeypatch.setattr(
+        provisioning,
+        "_install_exact_file",
+        lambda path, data, policy, present: installed_files.append(path),
+    )
+    monkeypatch.setattr(provisioning, "_inspect_tree", lambda sid: ((), True, True))
+
+    def complete_validation(*args: object, **kwargs: object) -> tuple[object, object]:
+        complete_calls.append(kwargs)
+        return provisioning.SqliteDatabaseState.INITIALIZED_SUPPORTED, object()
+
+    monkeypatch.setattr(
+        provisioning, "_validate_installed_database_complete", complete_validation
+    )
+
+    result = provisioning._provision_authority(
+        bootstrap_source=staging_bootstrap,
+        signature_source=staging_signature,
+        key_registry=object(),  # type: ignore[arg-type]
+        release_manifest=release,  # type: ignore[arg-type]
+        sqlite_build=build,  # type: ignore[arg-type]
+    )
+
+    assert result.database_state == "INITIALIZED_SUPPORTED"
+    assert installed_files == [
+        PRODUCTION_AUTHORITY_PATHS.bootstrap,
+        PRODUCTION_AUTHORITY_PATHS.signature,
+    ]
+    assert len(complete_calls) == 1
+    assert complete_calls[0]["bootstrap"] is verification.bootstrap
+    assert complete_calls[0]["bootstrap_digest"] == verification.bootstrap_digest
+    assert complete_calls[0]["release_manifest"] is release
+    assert complete_calls[0]["sqlite_build"] is build
+
+
+@pytest.mark.parametrize("mismatch", ["bootstrap", "release", "build"])
+def test_provisioning_raced_supported_database_mismatch_fails_closed(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    mismatch: str,
+) -> None:
+    verification, release, build, existing = _provisioning_race_setup()
+    staging_bootstrap = tmp_path / "staging.bootstrap.json"
+    staging_signature = tmp_path / "staging.bootstrap.sig"
+    staging_bootstrap.write_bytes(b"bootstrap")
+    staging_signature.write_bytes(b"signature")
+    database_repairs: list[object] = []
+
+    monkeypatch.setattr(provisioning, "require_administrator_token", lambda: None)
+    monkeypatch.setattr(provisioning, "parse_bootstrap_bytes", lambda data: None)
+    monkeypatch.setattr(
+        provisioning,
+        "require_trading_standard_account",
+        lambda: "S-1-5-21-1",
+    )
+    monkeypatch.setattr(
+        provisioning, "_verify_material", lambda *args, **kwargs: verification
+    )
+    monkeypatch.setattr(
+        provisioning,
+        "validate_lifecycle_mutex_security_descriptor",
+        lambda sid: None,
+    )
+    monkeypatch.setattr(provisioning, "_existing_fixed_objects", lambda sid: existing)
+    monkeypatch.setattr(
+        provisioning, "_validate_existing_objects", lambda sid, found: None
+    )
+    monkeypatch.setattr(
+        provisioning,
+        "_validate_database_if_present",
+        lambda database, journal, **kwargs: (
+            provisioning.SqliteDatabaseState.PRECREATED_UNINITIALIZED
+        ),
+    )
+    monkeypatch.setattr(
+        provisioning,
+        "_install_exact_file",
+        lambda path, data, policy, present: None,
+    )
+    monkeypatch.setattr(provisioning, "_inspect_tree", lambda sid: ((), True, True))
+
+    def reject_mismatch(*args: object, **kwargs: object) -> tuple[object, object]:
+        database_repairs.append("attempted")
+        raise provisioning.WindowsAuthorityError(f"{mismatch} mismatch")
+
+    monkeypatch.setattr(
+        provisioning, "_validate_installed_database_complete", reject_mismatch
+    )
+
+    with pytest.raises(
+        provisioning.WindowsAuthorityError, match=f"{mismatch} mismatch"
+    ):
+        provisioning._provision_authority(
+            bootstrap_source=staging_bootstrap,
+            signature_source=staging_signature,
+            key_registry=object(),  # type: ignore[arg-type]
+            release_manifest=release,  # type: ignore[arg-type]
+            sqlite_build=build,  # type: ignore[arg-type]
+        )
+
+    assert database_repairs == ["attempted"]
+
+
 def test_post_commit_complete_validation_is_consumed_once(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

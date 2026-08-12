@@ -613,11 +613,21 @@ def _provision_authority(
     inspected, database_present, journal_present = _inspect_tree(trading_sid)
     if database_present or journal_present:
         selected_build = selected_build or load_approved_sqlite_authority_build()
-        database_state = _validate_database_if_present(
+        database_state, production_evidence = _validate_installed_database_complete(
             database_present,
             journal_present,
-            vfs=selected_build.vfs,
+            bootstrap=verification.bootstrap,
+            bootstrap_digest=verification.bootstrap_digest,
+            release_manifest=release_manifest,
+            sqlite_build=selected_build,
         )
+        if (
+            database_state is SqliteDatabaseState.INITIALIZED_SUPPORTED
+            and production_evidence is None
+        ):
+            raise WindowsAuthorityError(
+                "initialized authority was not completely reconciled"
+            )
     else:
         database_state = _validate_database_if_present(
             database_present,

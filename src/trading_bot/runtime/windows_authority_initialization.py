@@ -210,27 +210,39 @@ def _initialize_database_transaction(
         if not already_supported:
             connection.execute("BEGIN EXCLUSIVE")
             try:
-                execute_schema_artifact(connection)
-                validate_production_schema_state = validate_schema_state(connection)
-                if (
-                    validate_production_schema_state
-                    != SqliteDatabaseState.INITIALIZED_UNSUPPORTED.value
-                ):
-                    raise AuthorityInitializationError(
-                        "schema did not remain transactional during initialization"
+                locked_state = SqliteDatabaseState(validate_schema_state(connection))
+                if locked_state is SqliteDatabaseState.INITIALIZED_SUPPORTED:
+                    # A competing initializer won the exclusive transaction.  Do
+                    # not run DDL or commit an application transaction here; the
+                    # post-close validator below performs the complete read-only
+                    # verification on this connection's approved VFS.
+                    connection.rollback()
+                else:
+                    if locked_state is not SqliteDatabaseState.PRECREATED_UNINITIALIZED:
+                        raise AuthorityInitializationError(
+                            "database changed before exclusive initialization"
+                        )
+                    execute_schema_artifact(connection)
+                    validate_production_schema_state = validate_schema_state(connection)
+                    if (
+                        validate_production_schema_state
+                        != SqliteDatabaseState.INITIALIZED_UNSUPPORTED.value
+                    ):
+                        raise AuthorityInitializationError(
+                            "schema did not remain transactional during initialization"
+                        )
+                    _insert_metadata_and_migration(
+                        connection, metadata=metadata, migration=migration
                     )
-                _insert_metadata_and_migration(
-                    connection, metadata=metadata, migration=migration
-                )
-                validate_production_authority_database_in_transaction(
-                    connection,
-                    database_path=database,
-                    bootstrap=bootstrap,
-                    bootstrap_digest=bootstrap_digest,
-                    release_manifest=release_manifest,
-                    sqlite_build=sqlite_build,
-                )
-                connection.commit()
+                    validate_production_authority_database_in_transaction(
+                        connection,
+                        database_path=database,
+                        bootstrap=bootstrap,
+                        bootstrap_digest=bootstrap_digest,
+                        release_manifest=release_manifest,
+                        sqlite_build=sqlite_build,
+                    )
+                    connection.commit()
             except BaseException:
                 if connection.in_transaction:
                     connection.rollback()

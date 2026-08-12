@@ -151,6 +151,15 @@ or mismatched stored digest therefore blocks a reviewed authority operation
 before its dependent mutation, even though SQLite v1 no longer calls a custom
 hash function from a trigger.
 
+The production read-only validator owns an explicit code-level inventory of
+the 21 persisted evidence-byte/digest pairs listed by this audit. It reads
+every row of every pair, requires exact `bytes`, exact raw 32-byte digests, and
+`SHA-256(evidence).digest() == digest`; nullable append-only pairs accept only
+the exact `(NULL, NULL)` state. The specialized metadata and migration
+semantic validators run first, and this complete inventory sweep runs before
+`ProductionAuthorityEvidence` is returned. The sweep is read-only and does
+not discover pairs from table metadata or invoke SQL functions.
+
 This is an intentional trust-boundary correction. Architecture 77 already
 assumes the dedicated Trading token is trusted; SQLite constraints do not
 protect against arbitrary malicious SQL from code that fully controls that
@@ -231,8 +240,10 @@ is opened, installed validation performs, in order:
 6. compare the exact materialized schema manifest and artifact digest;
 7. read exactly one immutable metadata row and exactly one v1 migration row;
 8. validate canonical metadata/migration bytes and their SHA-256 digests;
-9. reconcile every bootstrap-bound fact; and
-10. return sanitized immutable evidence only after all checks pass.
+9. sweep the complete 21-pair persisted evidence inventory, including every
+   non-null and nullable Architecture-77 evidence pair;
+10. reconcile every bootstrap-bound fact; and
+11. return sanitized immutable evidence only after all checks pass.
 
 The validator does not set `journal_mode`, `synchronous`, or
 `foreign_keys`; it establishes and reads back `trusted_schema=OFF` where the
@@ -603,19 +614,26 @@ The sequence is:
    trusted-schema setting, and persistent journal after the PRAGMAs. These
    connection setup writes occur before the schema transaction and are
    connection-local security/durability setup, not schema initialization.
-5. Read the schema and integrity in the current connection. If it is not
-   exactly empty of application objects, classify it before DDL; do not run
-   repair DDL. Internal SQLite objects alone are the only allowed pre-created
-   content.
+5. Read the schema and integrity in the current connection. This
+   `PRECREATED_UNINITIALIZED` classification is a fail-fast precheck only; if
+   it is not exactly empty of application objects, do not run repair DDL.
+   Internal SQLite objects alone are the only allowed pre-created content.
 6. Capture and validate `created_at_utc`, `applied_at_utc`, and the approved
    release-manifest digest before beginning the transaction. No clock, file,
    provider, credential, or external process call is made while the SQLite
    transaction is open.
 7. Execute `BEGIN EXCLUSIVE`. The initializer uses EXCLUSIVE for this
    one-time schema boundary so no concurrent reader can observe a partially
-   materialized schema and no competing initializer can pass the preflight.
-   Normal Architecture-77 runtime writes continue to use `BEGIN IMMEDIATE`.
-8. Execute every statement from the canonical artifact in order while this
+   materialized schema. Immediately reclassify the database while the
+   exclusive transaction is held. Only `PRECREATED_UNINITIALIZED` may proceed
+   to DDL. If the authoritative under-lock state is already
+   `INITIALIZED_SUPPORTED`, roll back the empty exclusive transaction, close
+   the connection, and complete the full installed read-only validator. Any
+   unsupported, partial, mismatched, or otherwise unexpected state fails
+   closed without repair. Normal Architecture-77 runtime writes continue to
+   use `BEGIN IMMEDIATE`.
+8. If and only if the under-lock classification is
+   `PRECREATED_UNINITIALIZED`, execute every statement from the canonical artifact in order while this
    transaction remains active. The implementation must not use Python
    `executescript`, because its implicit pre-script commit would break the
    all-or-nothing contract. It must use a reviewed complete-statement runner
@@ -656,7 +674,8 @@ still require the production acceptance described below.
 
 | Interruption point | Required next-state interpretation |
 | --- | --- |
-| Before `BEGIN EXCLUSIVE` | No accepted schema change. A retry re-runs all trust and storage checks. |
+| Before `BEGIN EXCLUSIVE` | No accepted schema change. A retry re-runs all trust and storage checks and treats the classification as provisional. |
+| After `BEGIN EXCLUSIVE` but before DDL | The under-lock classification is authoritative: an exact supported state is an empty-transaction idempotent retry; any unsupported or partial state fails closed without repair. |
 | During DDL | SQLite transaction rollback is expected to return the pair to `PRECREATED_UNINITIALIZED`; if reopen shows partial objects, corruption, or uncertainty, fail closed for manual investigation. |
 | After some DDL and before commit | Same rollback expectation; never execute repair DDL over a partial state. |
 | After metadata insertion and before commit | Metadata and schema_migrations are uncommitted and must roll back with the DDL; a partial durable row is not repaired. |

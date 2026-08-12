@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import sqlite3
+import threading
 from pathlib import Path
 
 import pytest
@@ -21,6 +22,7 @@ from trading_bot.runtime.windows_authority_schema import (
     INITIALIZATION_POLICY_VERSION,
     INITIALIZER_CONTRACT_VERSION,
     MIGRATION_POLICY_VERSION,
+    PERSISTED_EVIDENCE_PAIR_INVENTORY,
     PRODUCTION_SCHEMA_ARTIFACT_BYTES,
     PRODUCTION_SCHEMA_ARTIFACT_SHA256,
     PRODUCTION_SCHEMA_ID,
@@ -28,9 +30,12 @@ from trading_bot.runtime.windows_authority_schema import (
     RELEASE_MANIFEST_ID,
     SQLITE_BUILD_MANIFEST_ID,
     AuthorityMetadataV1,
+    AuthoritySchemaError,
     InitializationBlockedError,
     MetadataValidationError,
+    PersistedEvidencePair,
     SchemaMigrationV1,
+    SchemaValidationError,
     SqliteAuthorityBuildEvidence,
     authority_metadata_from_bootstrap,
     canonical_schema_manifest,
@@ -40,6 +45,7 @@ from trading_bot.runtime.windows_authority_schema import (
     parse_authority_metadata_bytes,
     parse_release_manifest_bytes,
     parse_sqlite_authority_build_manifest,
+    validate_persisted_evidence_digests,
     validate_production_authority_database_for_test,
 )
 from trading_bot.runtime.windows_authority_sqlite import (
@@ -121,6 +127,484 @@ def _precreated_pair(tmp_path: Path) -> tuple[Path, Path]:
     sqlite3.connect(database).close()
     journal.touch()
     return database, journal
+
+
+def _harness_helpers() -> object:
+    """Import lifecycle-only test helpers without making them production API."""
+
+    from tests.runtime import test_windows_transactional_capture_authority as harness
+
+    return harness
+
+
+def _initialized_authority(
+    tmp_path: Path,
+) -> tuple[Path, Path, WindowsAuthorityBootstrap, object, SqliteAuthorityBuildEvidence]:
+    database, journal = _precreated_pair(tmp_path)
+    bootstrap = _bootstrap()
+    release = _release_manifest()
+    build = _sqlite_build()
+    initialize_authority_database_for_test(
+        database_path=database,
+        journal_path=journal,
+        bootstrap=bootstrap,
+        bootstrap_digest=bootstrap.digest,
+        release_manifest=release,  # type: ignore[arg-type]
+        sqlite_build=build,
+        now_utc="2026-01-01T00:00:00Z",
+    )
+    return database, journal, bootstrap, release, build
+
+
+def _populated_authority(
+    tmp_path: Path,
+) -> tuple[Path, Path, WindowsAuthorityBootstrap, object, SqliteAuthorityBuildEvidence]:
+    database, journal, bootstrap, release, build = _initialized_authority(tmp_path)
+    harness = _harness_helpers()
+    ids = harness._seed_lifecycle(database)
+    connection = harness._connect(database)
+    try:
+        harness._insert_recovery_fact_for_test(
+            connection,
+            ids["session_id"],
+            "TERMINAL",
+            ids["terminal_id"],
+            "SELECT_COMMITTED_SUCCESS",
+            created_at_utc=harness.SELECTION_TIMESTAMP,
+        )
+    finally:
+        connection.close()
+    connection = harness._connect(database)
+    try:
+        harness.select_terminal(connection, ids["session_id"], ids["terminal_id"])
+    finally:
+        connection.close()
+    journal.touch()
+    return database, journal, bootstrap, release, build
+
+
+def _failure_authority(
+    tmp_path: Path,
+) -> tuple[Path, Path, WindowsAuthorityBootstrap, object, SqliteAuthorityBuildEvidence]:
+    database, journal, bootstrap, release, build = _initialized_authority(tmp_path)
+    harness = _harness_helpers()
+    connection = harness._connect(database)
+    try:
+        session_id = harness.create_session(connection)
+        attempt_id = harness.allocate_attempt(connection, session_id)
+        claim_id = harness.commit_claim(connection, attempt_id)
+        reservation = harness.reserve_launch(connection, claim_id)
+        harness._record_definitive_process_failure(connection, reservation)
+    finally:
+        connection.close()
+    journal.touch()
+    return database, journal, bootstrap, release, build
+
+
+def _validate_populated(
+    database: Path,
+    bootstrap: WindowsAuthorityBootstrap,
+    release: object,
+    build: SqliteAuthorityBuildEvidence,
+) -> None:
+    connection = open_read_only_sqlite_connection(database, vfs=build.vfs)
+    try:
+        validate_production_authority_database_for_test(
+            connection,
+            database_path=database,
+            bootstrap=bootstrap,
+            bootstrap_digest=bootstrap.digest,
+            release_manifest=release,  # type: ignore[arg-type]
+            sqlite_build=build,
+        )
+    finally:
+        connection.close()
+
+
+def _corrupt_evidence_pair(
+    database: Path,
+    table: str,
+    evidence_column: str,
+    digest_column: str,
+    *,
+    field: str = "evidence",
+) -> None:
+    """Use direct test SQL, then restore the exact trigger rows."""
+
+    connection = sqlite3.connect(database)
+    trigger_rows = connection.execute(
+        "SELECT type, name, tbl_name, rootpage, sql "
+        "FROM sqlite_schema WHERE type = 'trigger' AND tbl_name = ?",
+        (table,),
+    ).fetchall()
+    connection.execute("PRAGMA writable_schema = ON")
+    connection.executemany(
+        "DELETE FROM sqlite_schema WHERE type = 'trigger' AND name = ?",
+        [(row[1],) for row in trigger_rows],
+    )
+    connection.commit()
+    connection.close()
+    try:
+        connection = sqlite3.connect(database)
+        row = connection.execute(
+            f'SELECT rowid, "{evidence_column}" FROM "{table}" LIMIT 1'
+        ).fetchone()
+        if row is None:
+            raise AssertionError(f"{table} has no row for evidence corruption")
+        if field == "evidence":
+            connection.execute(
+                f'UPDATE "{table}" SET "{evidence_column}" = ? WHERE rowid = ?',
+                (row[1] + b"corruption", row[0]),
+            )
+        elif field == "digest":
+            connection.execute(
+                f'UPDATE "{table}" SET "{digest_column}" = ? WHERE rowid = ?',
+                (b"0" * 32, row[0]),
+            )
+        elif field == "null-evidence":
+            connection.execute(
+                f'UPDATE "{table}" SET "{evidence_column}" = NULL WHERE rowid = ?',
+                (row[0],),
+            )
+        elif field == "null-digest":
+            connection.execute(
+                f'UPDATE "{table}" SET "{digest_column}" = NULL WHERE rowid = ?',
+                (row[0],),
+            )
+        else:
+            raise AssertionError(f"unknown corruption field: {field}")
+        connection.commit()
+        connection.close()
+        Path(f"{database}-journal").touch()
+    finally:
+        connection = sqlite3.connect(database)
+        connection.execute("PRAGMA writable_schema = ON")
+        connection.executemany(
+            "INSERT INTO sqlite_schema(type, name, tbl_name, rootpage, sql) "
+            "VALUES (?, ?, ?, ?, ?)",
+            trigger_rows,
+        )
+        connection.commit()
+        connection.close()
+        Path(f"{database}-journal").touch()
+
+
+def test_production_inventory_is_explicit_and_complete() -> None:
+    pairs = {
+        (pair.table, pair.evidence_column, pair.digest_column)
+        for pair in PERSISTED_EVIDENCE_PAIR_INVENTORY
+    }
+    assert len(PERSISTED_EVIDENCE_PAIR_INVENTORY) == 21
+    assert len(pairs) == 21
+    assert {table for table, _, _ in pairs} == {
+        "authority_metadata",
+        "schema_migrations",
+        "sessions",
+        "attempts",
+        "provider_call_claims",
+        "launch_reservations",
+        "launch_executions",
+        "terminals",
+        "session_selections",
+        "manual_recoveries",
+    }
+
+
+def test_production_validator_accepts_complete_populated_evidence(
+    tmp_path: Path,
+) -> None:
+    # This fixture exercises non-null evidence in every lifecycle category and
+    # exact (NULL, NULL) states in the optional append-only columns.
+    database, _, bootstrap, release, build = _populated_authority(tmp_path)
+    _validate_populated(database, bootstrap, release, build)
+
+
+_SUCCESS_POPULATED_PERSISTED_PAIRS = tuple(
+    pair
+    for pair in PERSISTED_EVIDENCE_PAIR_INVENTORY
+    if not (
+        pair.table == "launch_reservations"
+        and pair.evidence_column == "process_creation_failure_json"
+    )
+)
+
+
+@pytest.mark.parametrize(
+    "pair",
+    _SUCCESS_POPULATED_PERSISTED_PAIRS,
+    ids=lambda pair: f"{pair.table}.{pair.evidence_column}",
+)
+def test_production_validator_rejects_corruption_in_every_nonnull_pair(
+    tmp_path: Path, pair: PersistedEvidencePair
+) -> None:
+    database, _, bootstrap, release, build = _populated_authority(tmp_path)
+    _corrupt_evidence_pair(
+        database,
+        pair.table,
+        pair.evidence_column,
+        pair.digest_column,
+    )
+    connection = open_read_only_sqlite_connection(database, vfs=build.vfs)
+    try:
+        with pytest.raises(AuthoritySchemaError):
+            validate_production_authority_database_for_test(
+                connection,
+                database_path=database,
+                bootstrap=bootstrap,
+                bootstrap_digest=bootstrap.digest,
+                release_manifest=release,  # type: ignore[arg-type]
+                sqlite_build=build,
+            )
+    finally:
+        connection.close()
+
+
+def test_production_validator_rejects_changed_session_digest(
+    tmp_path: Path,
+) -> None:
+    database, _, bootstrap, release, build = _populated_authority(tmp_path)
+    _corrupt_evidence_pair(
+        database, "sessions", "request_json", "request_digest", field="digest"
+    )
+    connection = open_read_only_sqlite_connection(database, vfs=build.vfs)
+    try:
+        with pytest.raises(AuthoritySchemaError):
+            validate_production_authority_database_for_test(
+                connection,
+                database_path=database,
+                bootstrap=bootstrap,
+                bootstrap_digest=bootstrap.digest,
+                release_manifest=release,  # type: ignore[arg-type]
+                sqlite_build=build,
+            )
+    finally:
+        connection.close()
+
+
+def test_production_validator_rejects_optional_failure_pair_corruption(
+    tmp_path: Path,
+) -> None:
+    database, _, bootstrap, release, build = _failure_authority(tmp_path)
+    _corrupt_evidence_pair(
+        database,
+        "launch_reservations",
+        "process_creation_failure_json",
+        "process_creation_failure_digest",
+    )
+    connection = open_read_only_sqlite_connection(database, vfs=build.vfs)
+    try:
+        with pytest.raises(AuthoritySchemaError):
+            validate_production_authority_database_for_test(
+                connection,
+                database_path=database,
+                bootstrap=bootstrap,
+                bootstrap_digest=bootstrap.digest,
+                release_manifest=release,  # type: ignore[arg-type]
+                sqlite_build=build,
+            )
+    finally:
+        connection.close()
+
+
+@pytest.mark.parametrize("field", ("null-evidence", "null-digest"))
+def test_production_validator_rejects_one_sided_nullable_pair(
+    monkeypatch: pytest.MonkeyPatch, field: str
+) -> None:
+    import trading_bot.runtime.windows_authority_schema as schema
+
+    monkeypatch.setattr(
+        schema,
+        "PERSISTED_EVIDENCE_PAIR_INVENTORY",
+        (
+            schema.PersistedEvidencePair(
+                "nullable_test",
+                "evidence_bytes",
+                "evidence_digest",
+                True,
+                "test",
+            ),
+        ),
+    )
+    connection = sqlite3.connect(":memory:")
+    try:
+        connection.execute(
+            "CREATE TABLE nullable_test(evidence_bytes BLOB, evidence_digest BLOB)"
+        )
+        connection.execute(
+            "INSERT INTO nullable_test VALUES (?, ?)",
+            (b"bytes", hashlib.sha256(b"bytes").digest()),
+        )
+        column = "evidence_bytes" if field == "null-evidence" else "evidence_digest"
+        connection.execute(f"UPDATE nullable_test SET {column} = NULL")
+        with pytest.raises(SchemaValidationError, match="one-sided NULL"):
+            validate_persisted_evidence_digests(connection)
+    finally:
+        connection.close()
+
+
+def test_persisted_sweep_rejects_malformed_digest_length(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import trading_bot.runtime.windows_authority_schema as schema
+
+    monkeypatch.setattr(
+        schema,
+        "PERSISTED_EVIDENCE_PAIR_INVENTORY",
+        (
+            schema.PersistedEvidencePair(
+                "evidence_test", "evidence_bytes", "evidence_digest", False, "test"
+            ),
+        ),
+    )
+    connection = sqlite3.connect(":memory:")
+    try:
+        connection.execute(
+            "CREATE TABLE evidence_test(evidence_bytes BLOB, evidence_digest BLOB)"
+        )
+        connection.execute(
+            "INSERT INTO evidence_test VALUES (?, ?)", (b"bytes", b"short")
+        )
+        with pytest.raises(SchemaValidationError, match="32-byte digest"):
+            validate_persisted_evidence_digests(connection)
+    finally:
+        connection.close()
+
+
+def test_concurrent_initializers_recheck_state_under_exclusive_lock(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    import trading_bot.runtime.windows_authority_initialization as initialization
+
+    database, journal = _precreated_pair(tmp_path)
+    bootstrap = _bootstrap()
+    release = _release_manifest()
+    build = _sqlite_build()
+    precheck_barrier = threading.Barrier(2, timeout=15)
+    call_lock = threading.Lock()
+    call_count = 0
+    original = initialization.validate_schema_state
+
+    def synchronized_precheck(connection: sqlite3.Connection) -> str:
+        nonlocal call_count
+        with call_lock:
+            call_count += 1
+            ordinal = call_count
+        if ordinal <= 2:
+            precheck_barrier.wait()
+        return original(connection)
+
+    monkeypatch.setattr(initialization, "validate_schema_state", synchronized_precheck)
+    results: list[object] = []
+    errors: list[BaseException] = []
+    result_lock = threading.Lock()
+
+    def worker() -> None:
+        try:
+            result = initialize_authority_database_for_test(
+                database_path=database,
+                journal_path=journal,
+                bootstrap=bootstrap,
+                bootstrap_digest=bootstrap.digest,
+                release_manifest=release,  # type: ignore[arg-type]
+                sqlite_build=build,
+                now_utc="2026-08-11T12:00:00Z",
+                connection_factory=lambda path: sqlite3.connect(
+                    path, timeout=15.0, isolation_level=None
+                ),
+            )
+            with result_lock:
+                results.append(result)
+        except BaseException as error:
+            with result_lock:
+                errors.append(error)
+
+    threads = [threading.Thread(target=worker) for _ in range(2)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(30)
+    assert all(not thread.is_alive() for thread in threads)
+    assert errors == []
+    assert len(results) == 2
+    assert results[0] == results[1]
+    connection = sqlite3.connect(database)
+    try:
+        assert connection.execute(
+            "SELECT count(*) FROM authority_metadata"
+        ).fetchone() == (1,)
+        assert connection.execute(
+            "SELECT count(*) FROM schema_migrations"
+        ).fetchone() == (1,)
+    finally:
+        connection.close()
+
+
+def test_initializer_rejects_database_changed_before_under_lock_recheck(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    import trading_bot.runtime.windows_authority_initialization as initialization
+
+    database, journal = _precreated_pair(tmp_path)
+    bootstrap = _bootstrap()
+    release = _release_manifest()
+    build = _sqlite_build()
+    precheck_ready = threading.Event()
+    competitor_done = threading.Event()
+    first_call = True
+    original = initialization.validate_schema_state
+
+    def delayed_precheck(connection: sqlite3.Connection) -> str:
+        nonlocal first_call
+        if first_call:
+            first_call = False
+            state = original(connection)
+            precheck_ready.set()
+            if not competitor_done.wait(15):
+                raise TimeoutError("competitor did not change database")
+            return state
+        return original(connection)
+
+    monkeypatch.setattr(initialization, "validate_schema_state", delayed_precheck)
+    errors: list[BaseException] = []
+
+    def worker() -> None:
+        try:
+            initialize_authority_database_for_test(
+                database_path=database,
+                journal_path=journal,
+                bootstrap=bootstrap,
+                bootstrap_digest=bootstrap.digest,
+                release_manifest=release,  # type: ignore[arg-type]
+                sqlite_build=build,
+                now_utc="2026-08-11T12:00:00Z",
+                connection_factory=lambda path: sqlite3.connect(
+                    path, timeout=15.0, isolation_level=None
+                ),
+            )
+        except BaseException as error:
+            errors.append(error)
+
+    thread = threading.Thread(target=worker)
+    thread.start()
+    assert precheck_ready.wait(15)
+    competitor = sqlite3.connect(database, timeout=15.0)
+    try:
+        competitor.execute("CREATE TABLE competing_object(value TEXT NOT NULL)")
+        competitor.commit()
+    finally:
+        competitor.close()
+        competitor_done.set()
+    thread.join(30)
+    assert not thread.is_alive()
+    assert len(errors) == 1
+    assert isinstance(errors[0], AuthorityInitializationError)
+    connection = sqlite3.connect(database)
+    try:
+        assert connection.execute(
+            "SELECT name FROM sqlite_schema WHERE type = 'table' ORDER BY name"
+        ).fetchall() == [("competing_object",)]
+    finally:
+        connection.close()
 
 
 def test_packaged_artifact_has_stable_identity_and_no_sql_udf() -> None:

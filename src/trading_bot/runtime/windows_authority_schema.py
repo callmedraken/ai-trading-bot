@@ -1010,6 +1010,212 @@ class ProductionAuthorityEvidence:
     sqlite_build_manifest_digest: str
 
 
+@dataclass(frozen=True, slots=True)
+class PersistedEvidencePair:
+    """One code-owned Architecture-77 evidence-bytes/digest invariant."""
+
+    table: str
+    evidence_column: str
+    digest_column: str
+    nullable: bool
+    invariant: str
+
+
+# This is deliberately explicit rather than inferred from database metadata or
+# ``*_digest`` naming.  The first two pairs are also checked by their
+# specialized metadata/migration validators; keeping them here makes the
+# complete 21-pair production inventory auditable in one place.
+PERSISTED_EVIDENCE_PAIR_INVENTORY: tuple[PersistedEvidencePair, ...] = (
+    PersistedEvidencePair(
+        "authority_metadata",
+        "metadata_json",
+        "metadata_digest",
+        False,
+        "canonical authority metadata bytes bind the singleton metadata row",
+    ),
+    PersistedEvidencePair(
+        "schema_migrations",
+        "migration_json",
+        "migration_digest",
+        False,
+        "canonical migration bytes bind immutable migration history",
+    ),
+    PersistedEvidencePair(
+        "sessions",
+        "request_json",
+        "request_digest",
+        False,
+        "session capture request bytes bind the session request identity",
+    ),
+    PersistedEvidencePair(
+        "attempts",
+        "request_json",
+        "request_digest",
+        False,
+        "attempt request bytes copy and bind the session request identity",
+    ),
+    PersistedEvidencePair(
+        "attempts",
+        "allocation_evidence_json",
+        "allocation_evidence_digest",
+        False,
+        "attempt allocation evidence is immutable and cryptographically exact",
+    ),
+    PersistedEvidencePair(
+        "attempts",
+        "attempt_evidence_json",
+        "attempt_evidence_digest",
+        False,
+        "attempt evidence is immutable and cryptographically exact",
+    ),
+    PersistedEvidencePair(
+        "provider_call_claims",
+        "request_json",
+        "request_digest",
+        False,
+        "claim request bytes copy and bind the attempt request identity",
+    ),
+    PersistedEvidencePair(
+        "provider_call_claims",
+        "claim_evidence_json",
+        "claim_evidence_digest",
+        False,
+        "provider claim evidence is immutable and cryptographically exact",
+    ),
+    PersistedEvidencePair(
+        "launch_reservations",
+        "reservation_evidence_json",
+        "reservation_evidence_digest",
+        False,
+        "launch reservation evidence is immutable and cryptographically exact",
+    ),
+    PersistedEvidencePair(
+        "launch_reservations",
+        "process_intent_json",
+        "process_intent_digest",
+        True,
+        "append-only process intent evidence is absent or an exact pair",
+    ),
+    PersistedEvidencePair(
+        "launch_reservations",
+        "process_creation_failure_json",
+        "process_creation_failure_digest",
+        True,
+        "append-only process failure evidence is absent or an exact pair",
+    ),
+    PersistedEvidencePair(
+        "launch_executions",
+        "process_creation_json",
+        "process_creation_digest",
+        False,
+        "process creation evidence is immutable and cryptographically exact",
+    ),
+    PersistedEvidencePair(
+        "launch_executions",
+        "job_object_json",
+        "job_object_digest",
+        False,
+        "job object evidence is immutable and cryptographically exact",
+    ),
+    PersistedEvidencePair(
+        "launch_executions",
+        "resume_authorization_json",
+        "resume_authorization_digest",
+        False,
+        "resume authorization evidence is immutable and cryptographically exact",
+    ),
+    PersistedEvidencePair(
+        "launch_executions",
+        "resume_intent_json",
+        "resume_intent_digest",
+        True,
+        "append-only resume intent evidence is absent or an exact pair",
+    ),
+    PersistedEvidencePair(
+        "launch_executions",
+        "post_resume_json",
+        "post_resume_digest",
+        True,
+        "append-only post-resume evidence is absent or an exact pair",
+    ),
+    PersistedEvidencePair(
+        "launch_executions",
+        "cleanup_json",
+        "cleanup_digest",
+        True,
+        "append-only cleanup evidence is absent or an exact pair",
+    ),
+    PersistedEvidencePair(
+        "terminals",
+        "evidence_json",
+        "evidence_digest",
+        False,
+        "terminal evidence is immutable and cryptographically exact",
+    ),
+    PersistedEvidencePair(
+        "terminals",
+        "sanitized_diagnostics_json",
+        "sanitized_diagnostics_digest",
+        False,
+        "sanitized terminal diagnostics are immutable and cryptographically exact",
+    ),
+    PersistedEvidencePair(
+        "session_selections",
+        "selection_evidence_json",
+        "selection_evidence_digest",
+        False,
+        "selection evidence is immutable and cryptographically exact",
+    ),
+    PersistedEvidencePair(
+        "manual_recoveries",
+        "operator_evidence_json",
+        "operator_evidence_digest",
+        False,
+        "manual recovery operator evidence is immutable and cryptographically exact",
+    ),
+)
+
+
+def validate_persisted_evidence_digests(connection: sqlite3.Connection) -> None:
+    """Validate every persisted Architecture-77 evidence pair without writes."""
+
+    for pair in PERSISTED_EVIDENCE_PAIR_INVENTORY:
+        statement = (
+            f"SELECT {_quote_pragma_identifier(pair.evidence_column)}, "
+            f"{_quote_pragma_identifier(pair.digest_column)} "
+            f"FROM {_quote_pragma_identifier(pair.table)}"
+        )
+        try:
+            rows = connection.execute(statement)
+            for row in rows:
+                if len(row) != 2:
+                    raise SchemaValidationError(
+                        f"{pair.table}.{pair.evidence_column} pair shape is invalid"
+                    )
+                evidence, digest = row
+                if evidence is None and digest is None:
+                    if pair.nullable:
+                        continue
+                    raise SchemaValidationError(
+                        f"{pair.table}.{pair.evidence_column} pair is NULL"
+                    )
+                if evidence is None or digest is None:
+                    raise SchemaValidationError(
+                        f"{pair.table}.{pair.evidence_column} pair has one-sided NULL"
+                    )
+                require_evidence_digest(
+                    evidence,
+                    digest,
+                    field=(f"{pair.table}.{pair.evidence_column}/{pair.digest_column}"),
+                )
+        except SchemaValidationError:
+            raise
+        except (sqlite3.Error, TypeError, ValueError, IndexError) as error:
+            raise SchemaValidationError(
+                f"{pair.table}.{pair.evidence_column} pair could not be read"
+            ) from error
+
+
 def _validate_production_authority_database_connection(
     connection: sqlite3.Connection,
     *,
@@ -1082,6 +1288,7 @@ def _validate_production_authority_database_connection(
         authority_epoch_id=metadata.authority_epoch_id,
         release_manifest=release_manifest,
     )
+    validate_persisted_evidence_digests(connection)
     return ProductionAuthorityEvidence(
         database_path=str(database_path),
         schema_id=metadata.production_schema_id,

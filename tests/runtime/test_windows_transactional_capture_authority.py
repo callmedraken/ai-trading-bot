@@ -188,6 +188,255 @@ EVIDENCE_PAIR_INVENTORY = {
         "operator_evidence_digest",
     ): ("owned-insert", "manual_recoveries_before_insert"),
 }
+
+
+@dataclass(frozen=True)
+class _DependentDigestAudit:
+    historical_trigger: str
+    semantic_call_site: str
+    historical_predicate: str
+    evidence_pair: str
+    service_owner: str
+    checker: str
+
+
+_DEPENDENT_DIGEST_AUDIT = (
+    _DependentDigestAudit(
+        "provider_call_claims_before_insert",
+        "claim.retry_safe_prior.process_creation_failure",
+        "sha256(safe_reservation.process_creation_failure_json) IS "
+        "safe_reservation.process_creation_failure_digest",
+        "launch_reservations.process_creation_failure",
+        "commit_claim",
+        "_validate_claim_admission_evidence",
+    ),
+    _DependentDigestAudit(
+        "provider_call_claims_before_insert",
+        "claim.retry_safe_prior.process_intent",
+        "sha256(safe_reservation.process_intent_json) IS "
+        "safe_reservation.process_intent_digest",
+        "launch_reservations.process_intent",
+        "commit_claim",
+        "_validate_claim_admission_evidence",
+    ),
+    _DependentDigestAudit(
+        "launch_reservations_failure_evidence_guard",
+        "process_failure.failure_guard.parent_process_intent",
+        "sha256(OLD.process_intent_json) IS OLD.process_intent_digest",
+        "launch_reservations.process_intent",
+        "record_process_creation_failure",
+        "_record_process_creation_failure_locked",
+    ),
+    _DependentDigestAudit(
+        "launch_reservations_state_guard",
+        "process_intent_commit.new_process_intent",
+        "sha256(NEW.process_intent_json) IS NEW.process_intent_digest",
+        "launch_reservations.process_intent",
+        "commit_process_intent",
+        "_commit_process_intent_locked",
+    ),
+    _DependentDigestAudit(
+        "launch_reservations_state_guard",
+        "execution.transition.parent_process_intent",
+        "sha256(OLD.process_intent_json) IS OLD.process_intent_digest",
+        "launch_reservations.process_intent",
+        "record_execution",
+        "_record_execution_locked",
+    ),
+    _DependentDigestAudit(
+        "launch_reservations_state_guard",
+        "execution.transition.process_creation",
+        "sha256(e.process_creation_json) IS e.process_creation_digest",
+        "launch_executions.process_creation",
+        "record_execution",
+        "_record_execution_locked",
+    ),
+    _DependentDigestAudit(
+        "launch_reservations_state_guard",
+        "execution.transition.job_object",
+        "sha256(e.job_object_json) IS e.job_object_digest",
+        "launch_executions.job_object",
+        "record_execution",
+        "_record_execution_locked",
+    ),
+    _DependentDigestAudit(
+        "launch_reservations_state_guard",
+        "execution.transition.resume_authorization",
+        "sha256(e.resume_authorization_json) IS e.resume_authorization_digest",
+        "launch_executions.resume_authorization",
+        "record_execution",
+        "_record_execution_locked",
+    ),
+    _DependentDigestAudit(
+        "launch_reservations_state_guard",
+        "process_failure.state_guard.parent_process_intent",
+        "sha256(OLD.process_intent_json) IS OLD.process_intent_digest",
+        "launch_reservations.process_intent",
+        "record_process_creation_failure",
+        "_record_process_creation_failure_locked",
+    ),
+    _DependentDigestAudit(
+        "launch_reservations_state_guard",
+        "process_failure.new_failure_evidence",
+        "sha256(NEW.process_creation_failure_json) IS "
+        "NEW.process_creation_failure_digest",
+        "launch_reservations.process_creation_failure",
+        "record_process_creation_failure",
+        "_record_process_creation_failure_locked",
+    ),
+    _DependentDigestAudit(
+        "launch_reservations_state_guard",
+        "recovery.process_outcome_unknown.state_guard.process_intent",
+        "sha256(OLD.process_intent_json) IS OLD.process_intent_digest",
+        "launch_reservations.process_intent",
+        "record_recovery",
+        "_validate_recovery_target_evidence",
+    ),
+    _DependentDigestAudit(
+        "launch_reservations_state_guard",
+        "recovery.resume_outcome_unknown.state_guard.resume_intent",
+        "sha256(e.resume_intent_json) IS e.resume_intent_digest",
+        "launch_executions.resume_intent",
+        "record_recovery",
+        "_validate_recovery_target_evidence",
+    ),
+    _DependentDigestAudit(
+        "launch_executions_parent_policy_before_insert",
+        "execution.insert.parent_process_intent",
+        "sha256(r.process_intent_json) IS r.process_intent_digest",
+        "launch_reservations.process_intent",
+        "record_execution",
+        "_record_execution_locked",
+    ),
+    _DependentDigestAudit(
+        "launch_executions_phase_guard",
+        "resume_intent.commit.new_resume_intent",
+        "sha256(NEW.resume_intent_json) IS NEW.resume_intent_digest",
+        "launch_executions.resume_intent",
+        "commit_resume_intent",
+        "_commit_resume_intent_locked",
+    ),
+    _DependentDigestAudit(
+        "launch_executions_phase_guard",
+        "post_resume.record.post_resume",
+        "sha256(NEW.post_resume_json) IS NEW.post_resume_digest",
+        "launch_executions.post_resume",
+        "record_post_resume_evidence",
+        "_record_post_resume_evidence_locked",
+    ),
+    _DependentDigestAudit(
+        "launch_executions_phase_guard",
+        "post_resume.record.cleanup",
+        "sha256(NEW.cleanup_json) IS NEW.cleanup_digest",
+        "launch_executions.cleanup",
+        "record_post_resume_evidence",
+        "_record_post_resume_evidence_locked",
+    ),
+    _DependentDigestAudit(
+        "terminals_before_insert",
+        "terminal.failed_not_started.parent_process_intent",
+        "sha256(r.process_intent_json) IS r.process_intent_digest",
+        "launch_reservations.process_intent",
+        "record_terminal",
+        "_record_terminal_locked",
+    ),
+    _DependentDigestAudit(
+        "manual_recoveries_before_insert",
+        "recovery.attempt_ambiguity.post_resume",
+        "sha256(e.post_resume_json) IS e.post_resume_digest",
+        "launch_executions.post_resume",
+        "record_recovery",
+        "_validate_recovery_target_evidence",
+    ),
+    _DependentDigestAudit(
+        "manual_recoveries_before_insert",
+        "recovery.attempt_ambiguity.cleanup",
+        "sha256(e.cleanup_json) IS e.cleanup_digest",
+        "launch_executions.cleanup",
+        "record_recovery",
+        "_validate_recovery_target_evidence",
+    ),
+    _DependentDigestAudit(
+        "manual_recoveries_before_insert",
+        "recovery.claim_ambiguity.post_resume",
+        "sha256(e.post_resume_json) IS e.post_resume_digest",
+        "launch_executions.post_resume",
+        "record_recovery",
+        "_validate_recovery_target_evidence",
+    ),
+    _DependentDigestAudit(
+        "manual_recoveries_before_insert",
+        "recovery.claim_ambiguity.cleanup",
+        "sha256(e.cleanup_json) IS e.cleanup_digest",
+        "launch_executions.cleanup",
+        "record_recovery",
+        "_validate_recovery_target_evidence",
+    ),
+    _DependentDigestAudit(
+        "manual_recoveries_before_insert",
+        "recovery.process_outcome_unknown.manual_recovery.process_intent",
+        "sha256(r.process_intent_json) IS r.process_intent_digest",
+        "launch_reservations.process_intent",
+        "record_recovery",
+        "_validate_recovery_target_evidence",
+    ),
+    _DependentDigestAudit(
+        "manual_recoveries_before_insert",
+        "recovery.pre_resume_ready.process_creation",
+        "sha256(e.process_creation_json) IS e.process_creation_digest",
+        "launch_executions.process_creation",
+        "record_recovery",
+        "_validate_recovery_target_evidence",
+    ),
+    _DependentDigestAudit(
+        "manual_recoveries_before_insert",
+        "recovery.pre_resume_ready.job_object",
+        "sha256(e.job_object_json) IS e.job_object_digest",
+        "launch_executions.job_object",
+        "record_recovery",
+        "_validate_recovery_target_evidence",
+    ),
+    _DependentDigestAudit(
+        "manual_recoveries_before_insert",
+        "recovery.pre_resume_ready.resume_authorization",
+        "sha256(e.resume_authorization_json) IS e.resume_authorization_digest",
+        "launch_executions.resume_authorization",
+        "record_recovery",
+        "_validate_recovery_target_evidence",
+    ),
+    _DependentDigestAudit(
+        "manual_recoveries_before_insert",
+        "recovery.resume_outcome_unknown.process_creation",
+        "sha256(e.process_creation_json) IS e.process_creation_digest",
+        "launch_executions.process_creation",
+        "record_recovery",
+        "_validate_recovery_target_evidence",
+    ),
+    _DependentDigestAudit(
+        "manual_recoveries_before_insert",
+        "recovery.resume_outcome_unknown.job_object",
+        "sha256(e.job_object_json) IS e.job_object_digest",
+        "launch_executions.job_object",
+        "record_recovery",
+        "_validate_recovery_target_evidence",
+    ),
+    _DependentDigestAudit(
+        "manual_recoveries_before_insert",
+        "recovery.resume_outcome_unknown.resume_authorization",
+        "sha256(e.resume_authorization_json) IS e.resume_authorization_digest",
+        "launch_executions.resume_authorization",
+        "record_recovery",
+        "_validate_recovery_target_evidence",
+    ),
+    _DependentDigestAudit(
+        "manual_recoveries_before_insert",
+        "recovery.resume_outcome_unknown.manual_recovery.resume_intent",
+        "sha256(e.resume_intent_json) IS e.resume_intent_digest",
+        "launch_executions.resume_intent",
+        "record_recovery",
+        "_validate_recovery_target_evidence",
+    ),
+)
 _RESUME_INTENT_ISSUER = object()
 _PROCESS_INTENT_ISSUER = object()
 _PROCESS_RESULT_ISSUER = object()
@@ -1638,6 +1887,60 @@ def allocate_attempt(
     return attempt_id
 
 
+def _validate_claim_admission_evidence(
+    connection: sqlite3.Connection, session_id: str
+) -> None:
+    """Validate retry-safe prior outcomes before admitting a new claim."""
+
+    rows = connection.execute(
+        """
+        SELECT safe_reservation.process_creation_failure_json,
+               safe_reservation.process_creation_failure_digest,
+               safe_reservation.process_intent_json,
+               safe_reservation.process_intent_digest
+        FROM provider_call_claims prior_claim
+        JOIN attempts prior_attempt
+          ON prior_attempt.attempt_id = prior_claim.attempt_id
+        JOIN launch_reservations safe_reservation
+          ON safe_reservation.claim_id = prior_claim.claim_id
+        JOIN terminals safe_terminal
+          ON safe_terminal.launch_reservation_id =
+             safe_reservation.launch_reservation_id
+        WHERE prior_attempt.session_id = ?
+          AND prior_attempt.state = 'TERMINAL_RECORDED'
+          AND safe_reservation.reservation_state = 'TERMINAL_RECORDED'
+          AND safe_reservation.process_creation_failure_json IS NOT NULL
+          AND safe_reservation.process_creation_failure_digest IS NOT NULL
+          AND safe_terminal.terminal_state = 'FAILED'
+          AND safe_terminal.provider_call_disposition = 'NOT_STARTED'
+          AND safe_terminal.snapshot_digest IS NULL
+          AND NOT EXISTS (
+              SELECT 1
+              FROM launch_executions prior_execution
+              WHERE prior_execution.launch_reservation_id =
+                    safe_reservation.launch_reservation_id
+          )
+        """,
+        (session_id,),
+    ).fetchall()
+    for (
+        process_failure,
+        process_failure_digest,
+        process_intent,
+        process_intent_digest,
+    ) in rows:
+        _require_evidence_pair(
+            process_failure,
+            process_failure_digest,
+            field="retry-safe process failure digest",
+        )
+        _require_evidence_pair(
+            process_intent,
+            process_intent_digest,
+            field="retry-safe process intent digest",
+        )
+
+
 def commit_claim(
     connection: sqlite3.Connection,
     attempt_id: str,
@@ -1659,7 +1962,7 @@ def commit_claim(
         if attempt is None:
             raise ValueError("unknown attempt")
         (
-            _,
+            session_id,
             request_bytes,
             request_digest,
             provider_id,
@@ -1670,6 +1973,7 @@ def commit_claim(
         _require_evidence_pair(
             request_bytes, request_digest, field="claim request digest"
         )
+        _validate_claim_admission_evidence(connection, session_id)
         _require_evidence_pair(evidence, evidence_digest, field="claim evidence digest")
         claim_id = _claim_id(
             attempt_id,
@@ -2939,13 +3243,24 @@ def _record_terminal_locked(
         reservation = connection.execute(
             """
             SELECT claim_id, request_digest, reservation_state,
-                   process_creation_failure_json, process_creation_failure_digest
+                   process_creation_failure_json, process_creation_failure_digest,
+                   process_intent_json, process_intent_digest
             FROM launch_reservations WHERE launch_reservation_id = ?
             """,
             (str(reservation_id),),
         ).fetchone()
         if reservation is None:
             raise ValueError("unknown reservation")
+        if (
+            state == "FAILED"
+            and disposition == "NOT_STARTED"
+            and reservation[2] == "PROCESS_CREATION_FAILED"
+        ):
+            _require_evidence_pair(
+                reservation[5],
+                reservation[6],
+                field="terminal parent process intent digest",
+            )
         connection.execute(
             """
             INSERT INTO terminals (
@@ -3139,6 +3454,41 @@ def _target_state(
     if row is None:
         raise ValueError("unknown recovery target")
     return row[0]
+
+
+def test_dependent_digest_audit_accounts_for_all_29_call_sites() -> None:
+    assert len(_DEPENDENT_DIGEST_AUDIT) == 29
+    assert len({entry.semantic_call_site for entry in _DEPENDENT_DIGEST_AUDIT}) == 29
+    counts: dict[str, int] = {}
+    for entry in _DEPENDENT_DIGEST_AUDIT:
+        counts[entry.historical_trigger] = counts.get(entry.historical_trigger, 0) + 1
+        assert entry.historical_predicate.startswith("sha256(")
+        assert entry.evidence_pair
+        assert entry.service_owner
+        assert entry.checker
+    assert counts == {
+        "provider_call_claims_before_insert": 2,
+        "launch_reservations_failure_evidence_guard": 1,
+        "launch_reservations_state_guard": 9,
+        "launch_executions_parent_policy_before_insert": 1,
+        "launch_executions_phase_guard": 3,
+        "terminals_before_insert": 1,
+        "manual_recoveries_before_insert": 12,
+    }
+    assert (
+        sum(
+            entry.historical_trigger == "manual_recoveries_before_insert"
+            for entry in _DEPENDENT_DIGEST_AUDIT
+        )
+        == 12
+    )
+    assert (
+        sum(
+            entry.historical_trigger == "terminals_before_insert"
+            for entry in _DEPENDENT_DIGEST_AUDIT
+        )
+        == 1
+    )
 
 
 _RECOVERY_ACTIONS: dict[str, tuple[str, str, str]] = {
@@ -3908,6 +4258,29 @@ def _record_definitive_process_failure(
     result = FakeSideEffects(connection).create_process(intent, fail=True)
     assert type(result) is FakeProcessCreationFailure
     record_process_creation_failure(connection, reservation_id, result)
+
+
+def _corrupt_retry_safe_prior_evidence(
+    connection: sqlite3.Connection, reservation_id: str, pair: str
+) -> bytes:
+    trigger, column = {
+        "process_creation_failure": (
+            "launch_reservations_failure_evidence_guard",
+            "process_creation_failure_digest",
+        ),
+        "process_intent": (
+            "launch_reservations_process_intent_append_only",
+            "process_intent_digest",
+        ),
+    }[pair]
+    wrong_digest = _digest(f"corrupt-{pair}".encode("ascii"))
+    connection.execute(f"DROP TRIGGER {trigger}")
+    connection.execute(
+        f"UPDATE launch_reservations SET {column} = ? WHERE launch_reservation_id = ?",
+        (wrong_digest, str(reservation_id)),
+    )
+    connection.commit()
+    return wrong_digest
 
 
 def _construct_provider_and_commit_process_intent(
@@ -7140,6 +7513,44 @@ def test_process_creation_failure_can_record_terminal_without_execution(
     connection.close()
 
 
+def test_failed_not_started_terminal_revalidates_parent_process_intent(
+    db_path: Path,
+) -> None:
+    connection = _connect(db_path)
+    session_id = create_session(connection)
+    attempt_id = allocate_attempt(connection, session_id)
+    claim_id = commit_claim(connection, attempt_id)
+    reservation_id = reserve_launch(connection, claim_id)
+    _record_definitive_process_failure(connection, reservation_id)
+    wrong_digest = _corrupt_retry_safe_prior_evidence(
+        connection, reservation_id, "process_intent"
+    )
+    before = _database_rows(connection)
+
+    with pytest.raises(
+        SchemaValidationError, match="terminal parent process intent digest"
+    ):
+        record_terminal(connection, reservation_id, "FAILED", "NOT_STARTED")
+
+    assert not connection.in_transaction
+    assert _database_rows(connection) == before
+    assert connection.execute("SELECT count(*) FROM terminals").fetchone() == (0,)
+    assert connection.execute(
+        "SELECT reservation_state FROM launch_reservations "
+        "WHERE launch_reservation_id = ?",
+        (str(reservation_id),),
+    ).fetchone() == ("PROCESS_CREATION_FAILED",)
+    assert connection.execute(
+        "SELECT state FROM attempts WHERE attempt_id = ?", (attempt_id,)
+    ).fetchone() == ("LAUNCH_RESERVED",)
+    assert connection.execute(
+        "SELECT process_intent_digest FROM launch_reservations "
+        "WHERE launch_reservation_id = ?",
+        (str(reservation_id),),
+    ).fetchone() == (wrong_digest,)
+    connection.close()
+
+
 def _prepare_terminal_insert_path(
     connection: sqlite3.Connection, state: str
 ) -> tuple[str, str, str, str]:
@@ -8090,6 +8501,47 @@ def test_claim_admission_allows_only_retry_safe_failed_not_started(
     assert connection.execute(
         "SELECT count(*) FROM provider_call_claims"
     ).fetchone() == (2,)
+    connection.close()
+
+
+@pytest.mark.parametrize("pair", ["process_creation_failure", "process_intent"])
+def test_claim_admission_revalidates_retry_safe_parent_digest(
+    db_path: Path, pair: str
+) -> None:
+    connection = _connect(db_path)
+    session_id = create_session(connection)
+    first_attempt = allocate_attempt(connection, session_id)
+    first_claim = commit_claim(connection, first_attempt)
+    first_reservation = reserve_launch(connection, first_claim)
+    _record_definitive_process_failure(connection, first_reservation)
+    record_terminal(connection, first_reservation, "FAILED", "NOT_STARTED")
+    wrong_digest = _corrupt_retry_safe_prior_evidence(
+        connection, first_reservation, pair
+    )
+
+    second_attempt = allocate_attempt(connection, session_id)
+    expected_field = {
+        "process_creation_failure": "retry-safe process failure digest",
+        "process_intent": "retry-safe process intent digest",
+    }[pair]
+    with pytest.raises(
+        SchemaValidationError,
+        match=expected_field,
+    ):
+        commit_claim(connection, second_attempt)
+
+    assert not connection.in_transaction
+    assert connection.execute(
+        "SELECT count(*) FROM provider_call_claims"
+    ).fetchone() == (1,)
+    assert connection.execute(
+        "SELECT state FROM attempts WHERE attempt_id = ?", (second_attempt,)
+    ).fetchone() == ("ALLOCATED",)
+    assert connection.execute(
+        f"SELECT {pair}_digest FROM launch_reservations "
+        "WHERE launch_reservation_id = ?",
+        (str(first_reservation),),
+    ).fetchone() == (wrong_digest,)
     connection.close()
 
 

@@ -111,9 +111,28 @@ def _require_same_installed_authority(
         )
 
 
+def _require_selected_approval_continuity(
+    authority: ValidatedProductionAuthority,
+    *,
+    selected_release: ReleaseManifestEvidence,
+    selected_build: SqliteAuthorityBuildEvidence,
+) -> None:
+    """Require capability identities to match this invocation's approvals."""
+
+    if (
+        authority.release_manifest_digest != selected_release.digest.hex()
+        or authority.sqlite_build_manifest_digest != selected_build.digest.hex()
+    ):
+        raise AuthorityInitializationError(
+            "validated authority does not match selected release or SQLite build"
+        )
+
+
 def _post_commit_installed_production_evidence(
     *,
     expected_validation: InstalledAuthorityValidation,
+    selected_release: ReleaseManifestEvidence,
+    selected_build: SqliteAuthorityBuildEvidence,
 ) -> ValidatedProductionAuthority:
     """Re-establish Windows trust, then consume its issued capability."""
 
@@ -125,7 +144,13 @@ def _post_commit_installed_production_evidence(
         ) from error
     _require_same_installed_authority(expected_validation, actual_validation)
     try:
-        return require_validated_production_authority(actual_validation)
+        authority = require_validated_production_authority(actual_validation)
+        _require_selected_approval_continuity(
+            authority,
+            selected_release=selected_release,
+            selected_build=selected_build,
+        )
+        return authority
     except WindowsAuthorityError as error:
         raise AuthorityInitializationError(
             "post-commit validation did not issue executable authority"
@@ -387,6 +412,11 @@ def initialize_installed_authority_database() -> InitializationEvidence:
     bootstrap_digest = preflight.bootstrap_verification.bootstrap_digest
     if provisioning.database_state == SqliteDatabaseState.INITIALIZED_SUPPORTED.value:
         authority = require_validated_production_authority(preflight)
+        _require_selected_approval_continuity(
+            authority,
+            selected_release=selected_release,
+            selected_build=selected_build,
+        )
         return _production_evidence(
             authority, SqliteDatabaseState.INITIALIZED_SUPPORTED
         )
@@ -405,5 +435,7 @@ def initialize_installed_authority_database() -> InitializationEvidence:
         now_utc=_timestamp_now_utc(),
         post_commit_validator=lambda: _post_commit_installed_production_evidence(
             expected_validation=preflight,
+            selected_release=selected_release,
+            selected_build=selected_build,
         ),
     )

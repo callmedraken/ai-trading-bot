@@ -60,14 +60,18 @@ def _installed_validation(
     )
 
 
-def _approved_identity() -> tuple[SimpleNamespace, SimpleNamespace]:
+def _approved_identity(
+    *, release_digest: str = "11" * 32, sqlite_digest: str = "22" * 32
+) -> tuple[SimpleNamespace, SimpleNamespace]:
     return (
-        SimpleNamespace(digest=bytes.fromhex("72656c65617365")),
-        SimpleNamespace(digest=bytes.fromhex("6275696c64")),
+        SimpleNamespace(digest=bytes.fromhex(release_digest)),
+        SimpleNamespace(digest=bytes.fromhex(sqlite_digest)),
     )
 
 
-def _test_capability() -> object:
+def _test_capability(
+    *, release_digest: str = "11" * 32, sqlite_digest: str = "22" * 32
+) -> object:
     from tests.runtime.test_windows_authority_capability import (
         _bootstrap,
         _production_evidence,
@@ -81,7 +85,10 @@ def _test_capability() -> object:
     return acquire_validated_production_authority_for_test(
         bootstrap=bootstrap,
         bootstrap_digest=bootstrap.digest,
-        production_evidence=_production_evidence(),
+        production_evidence=_production_evidence(
+            release_digest=release_digest,
+            sqlite_digest=sqlite_digest,
+        ),
     )
 
 
@@ -137,7 +144,9 @@ def test_complete_installed_boundary_retains_sqlite_evidence(
 ) -> None:
     validation = _installed_validation()
     monkeypatch.setattr(
-        provisioning, "_validate_installed_authority", lambda **_: validation
+        provisioning.authority_validation,
+        "validate_installed_authority_complete",
+        lambda: validation,
     )
 
     complete = provisioning.validate_installed_authority_complete()
@@ -405,8 +414,11 @@ def test_post_commit_complete_validation_is_consumed_once(
     monkeypatch.setattr(
         initialization, "require_validated_production_authority", lambda _: capability
     )
+    release, build = _approved_identity()
     evidence = initialization._post_commit_installed_production_evidence(
-        expected_validation=expected
+        expected_validation=expected,
+        selected_release=release,
+        selected_build=build,
     )
 
     assert calls == 1
@@ -467,6 +479,59 @@ def test_new_initializer_success_consumes_post_commit_complete_evidence(
     assert result.state is initialization.SqliteDatabaseState.INITIALIZED_SUPPORTED
 
 
+@pytest.mark.parametrize("mismatch", ["release", "sqlite"])
+def test_new_initializer_rejects_post_commit_approval_mismatch(
+    monkeypatch: pytest.MonkeyPatch,
+    mismatch: str,
+) -> None:
+    selected_release, selected_build = _approved_identity()
+    returned_release, returned_build = _approved_identity(
+        release_digest="33" * 32 if mismatch == "release" else "11" * 32,
+        sqlite_digest="44" * 32 if mismatch == "sqlite" else "22" * 32,
+    )
+    preflight = _installed_validation(state="PRECREATED_UNINITIALIZED")
+    post_commit = _installed_validation()
+    validations = iter((preflight, post_commit))
+    success_effects: list[str] = []
+
+    monkeypatch.setattr(initialization.os, "name", "nt")
+    monkeypatch.setattr(initialization, "require_administrator_token", lambda: None)
+    monkeypatch.setattr(
+        initialization, "load_approved_release_manifest", lambda: selected_release
+    )
+    monkeypatch.setattr(
+        initialization, "load_approved_sqlite_authority_build", lambda: selected_build
+    )
+    monkeypatch.setattr(
+        initialization,
+        "validate_installed_authority_complete",
+        lambda: next(validations),
+    )
+    monkeypatch.setattr(
+        initialization,
+        "require_validated_production_authority",
+        lambda _: _test_capability(
+            release_digest=returned_release.digest.hex(),
+            sqlite_digest=returned_build.digest.hex(),
+        ),
+    )
+
+    def fake_transaction(**kwargs: object) -> object:
+        validator = kwargs["post_commit_validator"]
+        assert callable(validator)
+        validator()
+        success_effects.append("post-commit success")
+        pytest.fail("mismatched post-commit approval was accepted")
+
+    monkeypatch.setattr(
+        initialization, "_initialize_database_transaction", fake_transaction
+    )
+
+    with pytest.raises(initialization.AuthorityInitializationError):
+        initialization.initialize_installed_authority_database()
+    assert success_effects == []
+
+
 def test_idempotent_initializer_returns_the_complete_boundary_evidence(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -506,6 +571,53 @@ def test_idempotent_initializer_returns_the_complete_boundary_evidence(
     assert result.state is initialization.SqliteDatabaseState.INITIALIZED_SUPPORTED
 
 
+@pytest.mark.parametrize("mismatch", ["release", "sqlite"])
+def test_idempotent_initializer_rejects_approval_mismatch(
+    monkeypatch: pytest.MonkeyPatch,
+    mismatch: str,
+) -> None:
+    selected_release, selected_build = _approved_identity()
+    returned_release, returned_build = _approved_identity(
+        release_digest="33" * 32 if mismatch == "release" else "11" * 32,
+        sqlite_digest="44" * 32 if mismatch == "sqlite" else "22" * 32,
+    )
+    validation = _installed_validation()
+    transaction_calls = 0
+
+    monkeypatch.setattr(initialization.os, "name", "nt")
+    monkeypatch.setattr(initialization, "require_administrator_token", lambda: None)
+    monkeypatch.setattr(
+        initialization, "load_approved_release_manifest", lambda: selected_release
+    )
+    monkeypatch.setattr(
+        initialization, "load_approved_sqlite_authority_build", lambda: selected_build
+    )
+    monkeypatch.setattr(
+        initialization, "validate_installed_authority_complete", lambda: validation
+    )
+    monkeypatch.setattr(
+        initialization,
+        "require_validated_production_authority",
+        lambda _: _test_capability(
+            release_digest=returned_release.digest.hex(),
+            sqlite_digest=returned_build.digest.hex(),
+        ),
+    )
+
+    def unexpected_transaction(**kwargs: object) -> object:
+        nonlocal transaction_calls
+        transaction_calls += 1
+        pytest.fail("idempotent approval mismatch reached database mutation")
+
+    monkeypatch.setattr(
+        initialization, "_initialize_database_transaction", unexpected_transaction
+    )
+
+    with pytest.raises(initialization.AuthorityInitializationError):
+        initialization.initialize_installed_authority_database()
+    assert transaction_calls == 0
+
+
 @pytest.mark.parametrize(
     "change",
     [
@@ -525,13 +637,16 @@ def test_post_commit_complete_validation_rejects_changed_authority_facts(
 ) -> None:
     expected = _installed_validation()
     actual = _installed_validation(**change)  # type: ignore[arg-type]
+    release, build = _approved_identity()
     monkeypatch.setattr(
         initialization, "validate_installed_authority_complete", lambda: actual
     )
 
     with pytest.raises(initialization.AuthorityInitializationError):
         initialization._post_commit_installed_production_evidence(
-            expected_validation=expected
+            expected_validation=expected,
+            selected_release=release,
+            selected_build=build,
         )
 
 
@@ -541,6 +656,7 @@ def test_post_commit_windows_revalidation_failure_cannot_fallback_to_sqlite(
     failure: str,
 ) -> None:
     expected = _installed_validation()
+    release, build = _approved_identity()
     monkeypatch.setattr(
         initialization,
         "validate_installed_authority_complete",
@@ -555,7 +671,9 @@ def test_post_commit_windows_revalidation_failure_cannot_fallback_to_sqlite(
     )
     with pytest.raises(initialization.AuthorityInitializationError):
         initialization._post_commit_installed_production_evidence(
-            expected_validation=expected
+            expected_validation=expected,
+            selected_release=release,
+            selected_build=build,
         )
 
 

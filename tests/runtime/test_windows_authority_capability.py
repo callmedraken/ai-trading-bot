@@ -22,6 +22,7 @@ from trading_bot.runtime.windows_authority_schema import (
 from trading_bot.runtime.windows_authority_sqlite import SqliteDatabaseState
 from trading_bot.runtime.windows_authority_validation import (
     InstalledAuthorityValidation,
+    InstalledDatabaseValidation,
     ProvisioningEvidence,
     ProvisioningState,
     ValidatedProductionAuthority,
@@ -113,22 +114,68 @@ def _validation(
     )
 
 
-def _production_validation() -> InstalledAuthorityValidation:
-    """Build a production-provenance fixture through the private issuer seam."""
+def _production_validation(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    evidence: ProductionAuthorityEvidence | None = None,
+) -> InstalledAuthorityValidation:
+    """Build production provenance through the public complete validator."""
 
+    import trading_bot.runtime.windows_authority_security as security
     import trading_bot.runtime.windows_authority_validation as validation
 
     bootstrap = _bootstrap()
-    evidence = _production_evidence()
-    capability = validation._validate_exact_identity(
+    evidence = evidence or _production_evidence()
+    verification = BootstrapVerification(
         bootstrap=bootstrap,
         bootstrap_digest=bootstrap.digest,
-        trading_sid=bootstrap.approved_account_sid,
-        production=evidence,
-        require_fixed_database_path=True,
-        issuer=validation._PRODUCTION_CAPABILITY_ISSUER,
+        signing_key_id=bootstrap.signing_key_id,
+        signature_length=64,
     )
-    return _validation(evidence=evidence, capability=capability)
+
+    class AuthorityFileHandle:
+        def __enter__(self) -> AuthorityFileHandle:
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+    monkeypatch.setattr(validation, "require_administrator_token", lambda: None)
+    monkeypatch.setattr(
+        validation,
+        "require_trading_standard_account",
+        lambda: bootstrap.approved_account_sid,
+    )
+    monkeypatch.setattr(validation, "validate_fixed_parent_chain", lambda *a, **k: None)
+    monkeypatch.setattr(
+        security, "open_authority_object", lambda *args, **kwargs: AuthorityFileHandle()
+    )
+    monkeypatch.setattr(
+        validation, "inspect_open_authority_object", lambda *args, **kwargs: object()
+    )
+    monkeypatch.setattr(validation, "require_security_policy", lambda *a, **k: None)
+    monkeypatch.setattr(validation, "read_open_authority_file", lambda handle: b"")
+    monkeypatch.setattr(
+        validation, "verify_bootstrap_signature", lambda *args, **kwargs: verification
+    )
+    monkeypatch.setattr(
+        validation,
+        "validate_lifecycle_mutex_security_descriptor",
+        lambda sid: None,
+    )
+    monkeypatch.setattr(
+        validation, "inspect_fixed_authority_object", lambda *args, **kwargs: object()
+    )
+    monkeypatch.setattr(validation.os.path, "lexists", lambda path: True)
+    monkeypatch.setattr(
+        validation,
+        "validate_installed_database_complete",
+        lambda *args, **kwargs: InstalledDatabaseValidation(
+            SqliteDatabaseState.INITIALIZED_SUPPORTED,
+            evidence,
+        ),
+    )
+    return validation.validate_installed_authority_complete()
 
 
 @pytest.mark.parametrize(
@@ -185,7 +232,7 @@ def test_exact_supported_validation_issues_one_immutable_capability(
 ) -> None:
     import trading_bot.runtime.windows_authority_validation as validation
 
-    reviewed = _production_validation()
+    reviewed = _production_validation(monkeypatch)
     monkeypatch.setattr(
         validation, "validate_installed_authority_complete", lambda: reviewed
     )
@@ -213,47 +260,56 @@ def test_exact_supported_validation_issues_one_immutable_capability(
         pickle.dumps(capability)
 
 
-def test_test_capability_has_test_provenance_and_cannot_cross_production_boundary() -> (
-    None
-):
-    import trading_bot.runtime.windows_authority_validation as validation
-
-    test_capability = _validation().validated_production_authority
-    production_capability = _production_validation().validated_production_authority
-    assert test_capability is not None
-    assert production_capability is not None
-    assert test_capability._provenance is validation._TEST_CAPABILITY_ISSUER
-    assert production_capability._provenance is validation._PRODUCTION_CAPABILITY_ISSUER
-    assert test_capability != production_capability
-    assert hash(test_capability) != hash(production_capability)
-    with pytest.raises(WindowsAuthorityError):
-        require_validated_production_authority(_validation())
-
-
-def test_parameterless_and_test_complete_validators_select_distinct_issuers(
+def test_test_capability_has_test_provenance_and_cannot_cross_production_boundary(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    import trading_bot.runtime.windows_authority_validation as validation
-
-    calls: list[object] = []
-
-    def fake_validate(**kwargs: object) -> object:
-        calls.append(kwargs["capability_issuer"])
-        return object()
-
-    monkeypatch.setattr(validation, "_validate_installed_authority", fake_validate)
-
-    assert validation.validate_installed_authority_complete() is not None
-    assert (
-        validation.validate_installed_authority_complete_for_test(
-            key_registry=object(),  # type: ignore[arg-type]
-        )
-        is not None
+    production_reviewed = _production_validation(monkeypatch)
+    test_capability = _validation().validated_production_authority
+    production_capability = production_reviewed.validated_production_authority
+    assert test_capability is not None
+    assert production_capability is not None
+    public_fields = (
+        "authority_epoch_id",
+        "machine_authority_id",
+        "bootstrap_schema",
+        "bootstrap_generation",
+        "signing_key_id",
+        "approved_account_sid",
+        "provider_id",
+        "permitted_provider_operation",
+        "authority_policy_version",
+        "claim_policy_version",
+        "bootstrap_digest",
+        "database_identity_digest",
+        "database_path",
+        "schema_id",
+        "schema_version",
+        "schema_digest",
+        "metadata_digest",
+        "migration_id",
+        "release_manifest_digest",
+        "sqlite_build_manifest_digest",
     )
-    assert calls == [
-        validation._PRODUCTION_CAPABILITY_ISSUER,
-        validation._TEST_CAPABILITY_ISSUER,
-    ]
+    assert tuple(getattr(test_capability, field) for field in public_fields) == tuple(
+        getattr(production_capability, field) for field in public_fields
+    )
+    assert test_capability != production_capability
+    with pytest.raises(WindowsAuthorityError):
+        require_validated_production_authority(
+            replace(
+                production_reviewed,
+                validated_production_authority=test_capability,
+            )
+        )
+
+
+def test_parameterless_complete_validator_issues_accepted_production_capability(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    reviewed = _production_validation(monkeypatch)
+    capability = reviewed.validated_production_authority
+    assert capability is not None
+    assert require_validated_production_authority(reviewed) is capability
 
 
 def test_production_issuer_has_no_raw_authority_inputs() -> None:
@@ -282,9 +338,10 @@ def test_validation_result_cannot_be_consumed_as_executable_without_capability()
 
 @pytest.mark.parametrize("mismatch", ["bootstrap", "release", "sqlite"])
 def test_capability_cannot_outlive_bootstrap_or_database_identity(
+    monkeypatch: pytest.MonkeyPatch,
     mismatch: str,
 ) -> None:
-    reviewed = _validation()
+    reviewed = _production_validation(monkeypatch)
     if mismatch == "bootstrap":
         bootstrap = reviewed.bootstrap_verification.bootstrap
         substituted = replace(bootstrap, database_identity_digest="cd" * 32)

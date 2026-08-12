@@ -1329,6 +1329,27 @@ def validate_production_authority_database(
         connection.close()
 
 
+def validate_production_authority_database_connection(
+    connection: sqlite3.Connection,
+    *,
+    database_path: str | Path,
+    bootstrap: WindowsAuthorityBootstrap,
+    bootstrap_digest: str,
+    release_manifest: ReleaseManifestEvidence,
+    sqlite_build: SqliteAuthorityBuildEvidence,
+) -> ProductionAuthorityEvidence:
+    """Validate one already-open production connection without reopening it."""
+
+    return _validate_production_authority_database_connection(
+        connection,
+        database_path=database_path,
+        bootstrap=bootstrap,
+        bootstrap_digest=bootstrap_digest,
+        release_manifest=release_manifest,
+        sqlite_build=sqlite_build,
+    )
+
+
 def validate_production_authority_database_for_test(
     connection: sqlite3.Connection,
     *,

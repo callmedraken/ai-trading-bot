@@ -2,13 +2,17 @@
 
 ## Scope and decision
 
-This milestone defines the production database contract that follows
-[architecture 78](78-windows-authority-provisioning.md) and makes the
-transactional authority in [architecture 77](77-windows-transactional-capture-authority.md)
-recognizable as an executable production authority. It is a design milestone
-only. It does not implement a database initializer, change the Architecture-77
-fixture, add a broker, read credentials, call a provider, launch a child,
-schedule work, or enable live trading.
+Milestone B now defines and implements the production database contract that
+follows [architecture 78](78-windows-authority-provisioning.md) and makes the
+transactional authority in
+[architecture 77](77-windows-transactional-capture-authority.md)
+recognizable as an executable production authority. It implements production
+schema v1, immutable metadata and migration evidence, administrator-only
+database initialization, and initialized read-only validation.
+
+It still does not implement approved production trust, release, or SQLite
+build material; native Windows acceptance; credentials; provider execution;
+child execution; live orders; or unattended scheduling.
 
 The fixed security boundary remains unchanged:
 

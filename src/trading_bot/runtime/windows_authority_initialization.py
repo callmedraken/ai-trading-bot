@@ -11,19 +11,18 @@ from pathlib import Path
 
 from trading_bot.runtime.windows_authority import (
     PRODUCTION_AUTHORITY_PATHS,
-    PRODUCTION_PINNED_BOOTSTRAP_KEYS,
     UnsupportedWindowsPlatformError,
     WindowsAuthorityBootstrap,
     WindowsAuthorityError,
-    parse_bootstrap_bytes,
-    verify_bootstrap_signature,
 )
 from trading_bot.runtime.windows_authority_provisioning import (
-    ProvisioningEvidence,
-    read_installed_authority_material,
-    validate_installed_authority,
+    InstalledAuthorityValidation,
+    validate_installed_authority_complete,
 )
 from trading_bot.runtime.windows_authority_schema import (
+    PRODUCTION_SCHEMA_ARTIFACT_SHA256,
+    PRODUCTION_SCHEMA_ID,
+    PRODUCTION_SCHEMA_VERSION,
     AuthorityMetadataV1,
     AuthoritySchemaError,
     ProductionAuthorityEvidence,
@@ -36,7 +35,7 @@ from trading_bot.runtime.windows_authority_schema import (
     execute_schema_artifact,
     load_approved_release_manifest,
     load_approved_sqlite_authority_build,
-    validate_production_authority_database,
+    validate_production_authority_database_for_test,
     validate_production_authority_database_in_transaction,
     validate_schema_state,
 )
@@ -44,6 +43,7 @@ from trading_bot.runtime.windows_authority_security import require_administrator
 from trading_bot.runtime.windows_authority_sqlite import (
     SqliteDatabaseState,
     configure_and_validate_authority_sqlite_connection,
+    open_disposable_read_only_sqlite_connection,
     open_writable_authority_sqlite_connection,
 )
 
@@ -85,6 +85,102 @@ def _production_evidence(
         migration_id=evidence.migration_id,
         release_manifest_digest=evidence.release_manifest_digest,
         sqlite_build_manifest_digest=evidence.sqlite_build_manifest_digest,
+    )
+
+
+def _require_supported_production_evidence(
+    validation: InstalledAuthorityValidation,
+    *,
+    bootstrap: WindowsAuthorityBootstrap,
+    bootstrap_digest: str,
+    release_manifest: ReleaseManifestEvidence,
+    sqlite_build: SqliteAuthorityBuildEvidence,
+) -> ProductionAuthorityEvidence:
+    """Require the complete installed proof before executable success."""
+
+    if (
+        validation.provisioning.database_state
+        != SqliteDatabaseState.INITIALIZED_SUPPORTED.value
+    ):
+        raise AuthorityInitializationError(
+            "complete installed validation did not prove INITIALIZED_SUPPORTED"
+        )
+    verification = validation.bootstrap_verification
+    if (
+        verification.bootstrap != bootstrap
+        or verification.bootstrap_digest != bootstrap_digest
+        or validation.provisioning.bootstrap_digest != bootstrap_digest
+        or validation.provisioning.trading_sid != bootstrap.approved_account_sid
+    ):
+        raise AuthorityInitializationError(
+            "installed authority bootstrap or Trading binding changed"
+        )
+    evidence = validation.production_evidence
+    if evidence is None:
+        raise AuthorityInitializationError(
+            "complete installed validation returned no production evidence"
+        )
+    if (
+        evidence.database_path != str(PRODUCTION_AUTHORITY_PATHS.database)
+        or evidence.schema_id != PRODUCTION_SCHEMA_ID
+        or evidence.schema_version != PRODUCTION_SCHEMA_VERSION
+        or evidence.schema_digest != PRODUCTION_SCHEMA_ARTIFACT_SHA256
+        or evidence.release_manifest_digest != release_manifest.digest.hex()
+        or evidence.sqlite_build_manifest_digest != sqlite_build.digest.hex()
+    ):
+        raise AuthorityInitializationError(
+            "installed production evidence does not match approved identity"
+        )
+    return evidence
+
+
+def _require_same_installed_authority(
+    expected: InstalledAuthorityValidation,
+    actual: InstalledAuthorityValidation,
+) -> None:
+    """Reject changes in signed or resolved authority facts after commit."""
+
+    expected_bootstrap = expected.bootstrap_verification.bootstrap
+    actual_bootstrap = actual.bootstrap_verification.bootstrap
+    if (
+        actual_bootstrap.machine_authority_id != expected_bootstrap.machine_authority_id
+        or actual_bootstrap.authority_epoch_id != expected_bootstrap.authority_epoch_id
+        or actual_bootstrap.bootstrap_generation
+        != expected_bootstrap.bootstrap_generation
+        or actual_bootstrap.database_identity_digest
+        != expected_bootstrap.database_identity_digest
+        or actual.bootstrap_verification.bootstrap_digest
+        != expected.bootstrap_verification.bootstrap_digest
+        or actual.provisioning.trading_sid != expected.provisioning.trading_sid
+    ):
+        raise AuthorityInitializationError(
+            "installed Windows authority facts changed after database commit"
+        )
+
+
+def _post_commit_installed_production_evidence(
+    *,
+    expected_validation: InstalledAuthorityValidation,
+    bootstrap: WindowsAuthorityBootstrap,
+    bootstrap_digest: str,
+    release_manifest: ReleaseManifestEvidence,
+    sqlite_build: SqliteAuthorityBuildEvidence,
+) -> ProductionAuthorityEvidence:
+    """Re-establish Windows trust, then consume its SQLite proof once."""
+
+    try:
+        actual_validation = validate_installed_authority_complete()
+    except WindowsAuthorityError as error:
+        raise AuthorityInitializationError(
+            "post-commit installed Windows validation failed"
+        ) from error
+    _require_same_installed_authority(expected_validation, actual_validation)
+    return _require_supported_production_evidence(
+        actual_validation,
+        bootstrap=bootstrap,
+        bootstrap_digest=bootstrap_digest,
+        release_manifest=release_manifest,
+        sqlite_build=sqlite_build,
     )
 
 
@@ -161,6 +257,7 @@ def _initialize_database_transaction(
     sqlite_build: SqliteAuthorityBuildEvidence,
     now_utc: str,
     connection_factory: Callable[..., sqlite3.Connection] | None = None,
+    post_commit_validator: Callable[[], ProductionAuthorityEvidence],
 ) -> InitializationEvidence:
     """Initialize one already-precreated pair; all evidence is ready before BEGIN."""
 
@@ -263,15 +360,15 @@ def _initialize_database_transaction(
         if connection is not None:
             connection.close()
     try:
-        evidence = validate_production_authority_database(
-            database_path=database,
-            bootstrap=bootstrap,
-            bootstrap_digest=bootstrap_digest,
-            release_manifest=release_manifest,
-            sqlite_build=sqlite_build,
-        )
+        evidence = post_commit_validator()
+        if type(evidence) is not ProductionAuthorityEvidence:
+            raise AuthorityInitializationError(
+                "post-commit validator returned invalid production evidence"
+            )
     except (
+        AuthorityInitializationError,
         AuthoritySchemaError,
+        WindowsAuthorityError,
         sqlite3.Error,
         OSError,
         ValueError,
@@ -296,6 +393,20 @@ def initialize_authority_database_for_test(
 ) -> InitializationEvidence:
     """Explicit test-injection boundary for disposable database acceptance tests."""
 
+    def validate_disposable_after_commit() -> ProductionAuthorityEvidence:
+        connection = open_disposable_read_only_sqlite_connection(database_path)
+        try:
+            return validate_production_authority_database_for_test(
+                connection,
+                database_path=database_path,
+                bootstrap=bootstrap,
+                bootstrap_digest=bootstrap_digest,
+                release_manifest=release_manifest,
+                sqlite_build=sqlite_build,
+            )
+        finally:
+            connection.close()
+
     return _initialize_database_transaction(
         database_path=database_path,
         journal_path=journal_path,
@@ -305,6 +416,7 @@ def initialize_authority_database_for_test(
         sqlite_build=sqlite_build,
         now_utc=now_utc,
         connection_factory=connection_factory,
+        post_commit_validator=validate_disposable_after_commit,
     )
 
 
@@ -316,36 +428,37 @@ def initialize_installed_authority_database() -> InitializationEvidence:
     require_administrator_token()
     selected_release = load_approved_release_manifest()
     selected_build = load_approved_sqlite_authority_build()
-    preflight: ProvisioningEvidence = validate_installed_authority()
-    sid = preflight.trading_sid
-    bootstrap_bytes, signature_bytes = read_installed_authority_material(sid)
-    bootstrap = parse_bootstrap_bytes(bootstrap_bytes)
-    verification = verify_bootstrap_signature(
-        bootstrap_bytes,
-        signature_bytes,
-        key_registry=PRODUCTION_PINNED_BOOTSTRAP_KEYS,
-    )
-    if verification.bootstrap != bootstrap:
-        raise AuthorityInitializationError(
-            "verified bootstrap facts changed during initialization"
-        )
-    if preflight.database_state == SqliteDatabaseState.INITIALIZED_SUPPORTED.value:
-        evidence = validate_production_authority_database(
-            database_path=PRODUCTION_AUTHORITY_PATHS.database,
+    preflight = validate_installed_authority_complete()
+    provisioning = preflight.provisioning
+    bootstrap = preflight.bootstrap_verification.bootstrap
+    bootstrap_digest = preflight.bootstrap_verification.bootstrap_digest
+    if provisioning.database_state == SqliteDatabaseState.INITIALIZED_SUPPORTED.value:
+        evidence = _require_supported_production_evidence(
+            preflight,
             bootstrap=bootstrap,
-            bootstrap_digest=verification.bootstrap_digest,
+            bootstrap_digest=bootstrap_digest,
             release_manifest=selected_release,
             sqlite_build=selected_build,
         )
         return _production_evidence(evidence, SqliteDatabaseState.INITIALIZED_SUPPORTED)
-    if preflight.database_state != SqliteDatabaseState.PRECREATED_UNINITIALIZED.value:
+    if (
+        provisioning.database_state
+        != SqliteDatabaseState.PRECREATED_UNINITIALIZED.value
+    ):
         raise AuthorityInitializationError("database is not PRECREATED_UNINITIALIZED")
     return _initialize_database_transaction(
         database_path=PRODUCTION_AUTHORITY_PATHS.database,
         journal_path=PRODUCTION_AUTHORITY_PATHS.journal,
         bootstrap=bootstrap,
-        bootstrap_digest=verification.bootstrap_digest,
+        bootstrap_digest=bootstrap_digest,
         release_manifest=selected_release,
         sqlite_build=selected_build,
         now_utc=_timestamp_now_utc(),
+        post_commit_validator=lambda: _post_commit_installed_production_evidence(
+            expected_validation=preflight,
+            bootstrap=bootstrap,
+            bootstrap_digest=bootstrap_digest,
+            release_manifest=selected_release,
+            sqlite_build=selected_build,
+        ),
     )

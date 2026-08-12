@@ -6,14 +6,19 @@ from types import SimpleNamespace
 
 import pytest
 
+from trading_bot.market_data import ALPACA_DAILY_SNAPSHOT_DESCRIPTOR
 from trading_bot.runtime import windows_authority_initialization as initialization
 from trading_bot.runtime import windows_authority_provisioning as provisioning
-from trading_bot.runtime.windows_authority import PRODUCTION_AUTHORITY_PATHS
+from trading_bot.runtime.windows_authority import (
+    PRODUCTION_AUTHORITY_PATHS,
+    WindowsAuthorityBootstrap,
+)
 from trading_bot.runtime.windows_authority_schema import (
     PRODUCTION_SCHEMA_ARTIFACT_SHA256,
     PRODUCTION_SCHEMA_ID,
     PRODUCTION_SCHEMA_VERSION,
     InitializationBlockedError,
+    ProductionAuthorityEvidence,
     validate_production_authority_database_for_test,
 )
 
@@ -69,14 +74,44 @@ def _approved_identity(
     )
 
 
+def _bootstrap() -> WindowsAuthorityBootstrap:
+    return WindowsAuthorityBootstrap(
+        bootstrap_schema=1,
+        bootstrap_generation=7,
+        machine_authority_id="11111111-1111-4111-8111-111111111111",
+        authority_epoch_id="22222222-2222-4222-8222-222222222222",
+        signing_key_id="test-key",
+        approved_account_sid="S-1-5-21-1",
+        database_path=str(PRODUCTION_AUTHORITY_PATHS.database),
+        output_root=str(PRODUCTION_AUTHORITY_PATHS.capture_output),
+        provider_id=ALPACA_DAILY_SNAPSHOT_DESCRIPTOR.provider_id,
+        permitted_provider_operation=ALPACA_DAILY_SNAPSHOT_DESCRIPTOR.operation,
+        authority_policy_version="authority-policy/v1",
+        claim_policy_version="claim-policy/v1",
+        database_identity_digest="ab" * 32,
+    )
+
+
+def _production_evidence(
+    *,
+    release_digest: str = "11" * 32,
+    sqlite_digest: str = "22" * 32,
+) -> ProductionAuthorityEvidence:
+    return ProductionAuthorityEvidence(
+        database_path=str(PRODUCTION_AUTHORITY_PATHS.database),
+        schema_id=PRODUCTION_SCHEMA_ID,
+        schema_version=PRODUCTION_SCHEMA_VERSION,
+        schema_digest=PRODUCTION_SCHEMA_ARTIFACT_SHA256,
+        metadata_digest="33" * 32,
+        migration_id="migration-v1",
+        release_manifest_digest=release_digest,
+        sqlite_build_manifest_digest=sqlite_digest,
+    )
+
+
 def _test_capability(
     *, release_digest: str = "11" * 32, sqlite_digest: str = "22" * 32
 ) -> object:
-    from tests.runtime.test_windows_authority_capability import (
-        _bootstrap,
-        _production_evidence,
-    )
-
     from trading_bot.runtime.windows_authority_validation import (
         acquire_validated_production_authority_for_test,
     )
@@ -160,11 +195,6 @@ def test_complete_installed_boundary_retains_sqlite_evidence(
 def test_complete_installed_database_validation_uses_one_vfs_connection(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from tests.runtime.test_windows_authority_capability import (
-        _bootstrap,
-        _production_evidence,
-    )
-
     import trading_bot.runtime.windows_authority_validation as validation
 
     close_calls = 0

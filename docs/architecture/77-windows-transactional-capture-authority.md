@@ -208,11 +208,14 @@ backup/restore, and scheduler/account rights.
 
 ## 2. Executable normalized relational model
 
-The test-only source of truth is
-`tests/fixtures/transactional_authority_schema.sql`. It executes with
-`PRAGMA foreign_keys=ON` and contains all tables, indexes supplied by SQLite
-for primary/unique keys, and triggers. There are no composite lineage foreign
-keys. The authority chain is:
+The canonical executable source is the packaged
+`trading_bot/runtime/schema/windows_transactional_authority_v1.sql`, loaded by
+the behavioral harness through the public package/resource boundary. It
+executes with `PRAGMA foreign_keys=ON` and `trusted_schema=OFF`, and contains
+all tables, indexes supplied by SQLite for primary/unique keys, and triggers.
+The historical fixture copy used while Architecture 77 was drafted is not
+maintained. There are no composite lineage foreign keys. The authority chain
+is:
 
 ```text
 authority_metadata

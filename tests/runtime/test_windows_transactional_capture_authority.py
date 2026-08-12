@@ -26,6 +26,18 @@ from trading_bot.market_data import (
     ALPACA_DAILY_SNAPSHOT_DESCRIPTOR,
     MAX_DAILY_SNAPSHOT_SYMBOLS,
 )
+from trading_bot.runtime.windows_authority_schema import (
+    INITIALIZATION_POLICY_VERSION,
+    METADATA_ENCODING_VERSION,
+    PRODUCTION_SCHEMA_ARTIFACT_BYTES,
+    PRODUCTION_SCHEMA_ARTIFACT_SHA256,
+    PRODUCTION_SCHEMA_ID,
+    PRODUCTION_SCHEMA_VERSION,
+    SchemaValidationError,
+    configure_trusted_schema_off,
+    execute_schema_artifact,
+    require_evidence_digest,
+)
 
 _HARNESS_MODULE_PATH = Path(__file__).resolve(strict=True)
 _HARNESS_REPOSITORY_ROOT = _HARNESS_MODULE_PATH.parents[2]
@@ -45,12 +57,8 @@ _LIFECYCLE_ARBITER_ROOT = (
 ).resolve()
 if not _LIFECYCLE_ARBITER_ROOT.is_absolute():
     raise RuntimeError("lifecycle-arbiter adapter root must be absolute")
-SCHEMA_PATH = (
-    _HARNESS_REPOSITORY_ROOT
-    / "tests"
-    / "fixtures"
-    / "transactional_authority_schema.sql"
-)
+SCHEMA_BYTES = PRODUCTION_SCHEMA_ARTIFACT_BYTES
+SCHEMA_SHA256 = PRODUCTION_SCHEMA_ARTIFACT_SHA256
 NAMESPACE = uuid.UUID("7c2d5a44-3b2e-5f8f-9a1c-6d4e7b8f9012")
 EPOCH = "12345678-1234-5678-9abc-def012345678"
 MACHINE = "87654321-4321-8765-cba9-876543210987"
@@ -180,6 +188,255 @@ EVIDENCE_PAIR_INVENTORY = {
         "operator_evidence_digest",
     ): ("owned-insert", "manual_recoveries_before_insert"),
 }
+
+
+@dataclass(frozen=True)
+class _DependentDigestAudit:
+    historical_trigger: str
+    semantic_call_site: str
+    historical_predicate: str
+    evidence_pair: str
+    service_owner: str
+    checker: str
+
+
+_DEPENDENT_DIGEST_AUDIT = (
+    _DependentDigestAudit(
+        "provider_call_claims_before_insert",
+        "claim.retry_safe_prior.process_creation_failure",
+        "sha256(safe_reservation.process_creation_failure_json) IS "
+        "safe_reservation.process_creation_failure_digest",
+        "launch_reservations.process_creation_failure",
+        "commit_claim",
+        "_validate_claim_admission_evidence",
+    ),
+    _DependentDigestAudit(
+        "provider_call_claims_before_insert",
+        "claim.retry_safe_prior.process_intent",
+        "sha256(safe_reservation.process_intent_json) IS "
+        "safe_reservation.process_intent_digest",
+        "launch_reservations.process_intent",
+        "commit_claim",
+        "_validate_claim_admission_evidence",
+    ),
+    _DependentDigestAudit(
+        "launch_reservations_failure_evidence_guard",
+        "process_failure.failure_guard.parent_process_intent",
+        "sha256(OLD.process_intent_json) IS OLD.process_intent_digest",
+        "launch_reservations.process_intent",
+        "record_process_creation_failure",
+        "_record_process_creation_failure_locked",
+    ),
+    _DependentDigestAudit(
+        "launch_reservations_state_guard",
+        "process_intent_commit.new_process_intent",
+        "sha256(NEW.process_intent_json) IS NEW.process_intent_digest",
+        "launch_reservations.process_intent",
+        "commit_process_intent",
+        "_commit_process_intent_locked",
+    ),
+    _DependentDigestAudit(
+        "launch_reservations_state_guard",
+        "execution.transition.parent_process_intent",
+        "sha256(OLD.process_intent_json) IS OLD.process_intent_digest",
+        "launch_reservations.process_intent",
+        "record_execution",
+        "_record_execution_locked",
+    ),
+    _DependentDigestAudit(
+        "launch_reservations_state_guard",
+        "execution.transition.process_creation",
+        "sha256(e.process_creation_json) IS e.process_creation_digest",
+        "launch_executions.process_creation",
+        "record_execution",
+        "_record_execution_locked",
+    ),
+    _DependentDigestAudit(
+        "launch_reservations_state_guard",
+        "execution.transition.job_object",
+        "sha256(e.job_object_json) IS e.job_object_digest",
+        "launch_executions.job_object",
+        "record_execution",
+        "_record_execution_locked",
+    ),
+    _DependentDigestAudit(
+        "launch_reservations_state_guard",
+        "execution.transition.resume_authorization",
+        "sha256(e.resume_authorization_json) IS e.resume_authorization_digest",
+        "launch_executions.resume_authorization",
+        "record_execution",
+        "_record_execution_locked",
+    ),
+    _DependentDigestAudit(
+        "launch_reservations_state_guard",
+        "process_failure.state_guard.parent_process_intent",
+        "sha256(OLD.process_intent_json) IS OLD.process_intent_digest",
+        "launch_reservations.process_intent",
+        "record_process_creation_failure",
+        "_record_process_creation_failure_locked",
+    ),
+    _DependentDigestAudit(
+        "launch_reservations_state_guard",
+        "process_failure.new_failure_evidence",
+        "sha256(NEW.process_creation_failure_json) IS "
+        "NEW.process_creation_failure_digest",
+        "launch_reservations.process_creation_failure",
+        "record_process_creation_failure",
+        "_record_process_creation_failure_locked",
+    ),
+    _DependentDigestAudit(
+        "launch_reservations_state_guard",
+        "recovery.process_outcome_unknown.state_guard.process_intent",
+        "sha256(OLD.process_intent_json) IS OLD.process_intent_digest",
+        "launch_reservations.process_intent",
+        "record_recovery",
+        "_validate_recovery_target_evidence",
+    ),
+    _DependentDigestAudit(
+        "launch_reservations_state_guard",
+        "recovery.resume_outcome_unknown.state_guard.resume_intent",
+        "sha256(e.resume_intent_json) IS e.resume_intent_digest",
+        "launch_executions.resume_intent",
+        "record_recovery",
+        "_validate_recovery_target_evidence",
+    ),
+    _DependentDigestAudit(
+        "launch_executions_parent_policy_before_insert",
+        "execution.insert.parent_process_intent",
+        "sha256(r.process_intent_json) IS r.process_intent_digest",
+        "launch_reservations.process_intent",
+        "record_execution",
+        "_record_execution_locked",
+    ),
+    _DependentDigestAudit(
+        "launch_executions_phase_guard",
+        "resume_intent.commit.new_resume_intent",
+        "sha256(NEW.resume_intent_json) IS NEW.resume_intent_digest",
+        "launch_executions.resume_intent",
+        "commit_resume_intent",
+        "_commit_resume_intent_locked",
+    ),
+    _DependentDigestAudit(
+        "launch_executions_phase_guard",
+        "post_resume.record.post_resume",
+        "sha256(NEW.post_resume_json) IS NEW.post_resume_digest",
+        "launch_executions.post_resume",
+        "record_post_resume_evidence",
+        "_record_post_resume_evidence_locked",
+    ),
+    _DependentDigestAudit(
+        "launch_executions_phase_guard",
+        "post_resume.record.cleanup",
+        "sha256(NEW.cleanup_json) IS NEW.cleanup_digest",
+        "launch_executions.cleanup",
+        "record_post_resume_evidence",
+        "_record_post_resume_evidence_locked",
+    ),
+    _DependentDigestAudit(
+        "terminals_before_insert",
+        "terminal.failed_not_started.parent_process_intent",
+        "sha256(r.process_intent_json) IS r.process_intent_digest",
+        "launch_reservations.process_intent",
+        "record_terminal",
+        "_record_terminal_locked",
+    ),
+    _DependentDigestAudit(
+        "manual_recoveries_before_insert",
+        "recovery.attempt_ambiguity.post_resume",
+        "sha256(e.post_resume_json) IS e.post_resume_digest",
+        "launch_executions.post_resume",
+        "record_recovery",
+        "_validate_recovery_target_evidence",
+    ),
+    _DependentDigestAudit(
+        "manual_recoveries_before_insert",
+        "recovery.attempt_ambiguity.cleanup",
+        "sha256(e.cleanup_json) IS e.cleanup_digest",
+        "launch_executions.cleanup",
+        "record_recovery",
+        "_validate_recovery_target_evidence",
+    ),
+    _DependentDigestAudit(
+        "manual_recoveries_before_insert",
+        "recovery.claim_ambiguity.post_resume",
+        "sha256(e.post_resume_json) IS e.post_resume_digest",
+        "launch_executions.post_resume",
+        "record_recovery",
+        "_validate_recovery_target_evidence",
+    ),
+    _DependentDigestAudit(
+        "manual_recoveries_before_insert",
+        "recovery.claim_ambiguity.cleanup",
+        "sha256(e.cleanup_json) IS e.cleanup_digest",
+        "launch_executions.cleanup",
+        "record_recovery",
+        "_validate_recovery_target_evidence",
+    ),
+    _DependentDigestAudit(
+        "manual_recoveries_before_insert",
+        "recovery.process_outcome_unknown.manual_recovery.process_intent",
+        "sha256(r.process_intent_json) IS r.process_intent_digest",
+        "launch_reservations.process_intent",
+        "record_recovery",
+        "_validate_recovery_target_evidence",
+    ),
+    _DependentDigestAudit(
+        "manual_recoveries_before_insert",
+        "recovery.pre_resume_ready.process_creation",
+        "sha256(e.process_creation_json) IS e.process_creation_digest",
+        "launch_executions.process_creation",
+        "record_recovery",
+        "_validate_recovery_target_evidence",
+    ),
+    _DependentDigestAudit(
+        "manual_recoveries_before_insert",
+        "recovery.pre_resume_ready.job_object",
+        "sha256(e.job_object_json) IS e.job_object_digest",
+        "launch_executions.job_object",
+        "record_recovery",
+        "_validate_recovery_target_evidence",
+    ),
+    _DependentDigestAudit(
+        "manual_recoveries_before_insert",
+        "recovery.pre_resume_ready.resume_authorization",
+        "sha256(e.resume_authorization_json) IS e.resume_authorization_digest",
+        "launch_executions.resume_authorization",
+        "record_recovery",
+        "_validate_recovery_target_evidence",
+    ),
+    _DependentDigestAudit(
+        "manual_recoveries_before_insert",
+        "recovery.resume_outcome_unknown.process_creation",
+        "sha256(e.process_creation_json) IS e.process_creation_digest",
+        "launch_executions.process_creation",
+        "record_recovery",
+        "_validate_recovery_target_evidence",
+    ),
+    _DependentDigestAudit(
+        "manual_recoveries_before_insert",
+        "recovery.resume_outcome_unknown.job_object",
+        "sha256(e.job_object_json) IS e.job_object_digest",
+        "launch_executions.job_object",
+        "record_recovery",
+        "_validate_recovery_target_evidence",
+    ),
+    _DependentDigestAudit(
+        "manual_recoveries_before_insert",
+        "recovery.resume_outcome_unknown.resume_authorization",
+        "sha256(e.resume_authorization_json) IS e.resume_authorization_digest",
+        "launch_executions.resume_authorization",
+        "record_recovery",
+        "_validate_recovery_target_evidence",
+    ),
+    _DependentDigestAudit(
+        "manual_recoveries_before_insert",
+        "recovery.resume_outcome_unknown.manual_recovery.resume_intent",
+        "sha256(e.resume_intent_json) IS e.resume_intent_digest",
+        "launch_executions.resume_intent",
+        "record_recovery",
+        "_validate_recovery_target_evidence",
+    ),
+)
 _RESUME_INTENT_ISSUER = object()
 _PROCESS_INTENT_ISSUER = object()
 _PROCESS_RESULT_ISSUER = object()
@@ -583,6 +840,12 @@ def _digest(data: bytes) -> bytes:
     return hashlib.sha256(data).digest()
 
 
+def _require_evidence_pair(
+    evidence: bytes, digest: bytes, *, field: str = "evidence digest"
+) -> None:
+    require_evidence_digest(evidence, digest, field=field)
+
+
 def _json(value: Any) -> bytes:
     return json.dumps(
         value, ensure_ascii=False, sort_keys=True, separators=(",", ":")
@@ -605,6 +868,12 @@ def _insert_session_row_for_test(
     digest_material = (
         request_bytes.encode("utf-8") if type(request_bytes) is str else request_bytes
     )
+    stored_digest = (
+        _digest(digest_material) if request_digest is None else request_digest
+    )
+    _require_evidence_pair(
+        digest_material, stored_digest, field="session request digest"
+    )
     connection.execute(
         """
         INSERT INTO sessions (
@@ -622,7 +891,7 @@ def _insert_session_row_for_test(
             CLAIM_POLICY,
             target_session_date,
             request_bytes,
-            _digest(digest_material) if request_digest is None else request_digest,
+            stored_digest,
             TIMESTAMP,
         ),
     )
@@ -665,6 +934,13 @@ def _insert_attempt_row_for_test(
     attempt_id = _attempt_id(session_id, ordinal, provider, operation, policy)
     allocation, allocation_digest = _evidence(f"raw-allocation:{ordinal}")
     attempt, attempt_digest = _evidence(f"raw-attempt:{ordinal}")
+    _require_evidence_pair(
+        request_bytes, request_digest, field="attempt request digest"
+    )
+    _require_evidence_pair(
+        allocation, allocation_digest, field="attempt allocation digest"
+    )
+    _require_evidence_pair(attempt, attempt_digest, field="attempt evidence digest")
     connection.execute(
         """
         INSERT INTO attempts (
@@ -720,6 +996,8 @@ def _insert_claim_row_for_test(
     policy = parent_policy if claim_policy_version is None else claim_policy_version
     claim_id = _claim_id(attempt_id, policy, provider_id, operation, budget)
     evidence, evidence_digest = _evidence(f"raw-claim:{attempt_id}")
+    _require_evidence_pair(request_bytes, request_digest, field="claim request digest")
+    _require_evidence_pair(evidence, evidence_digest, field="claim evidence digest")
     connection.execute(
         """
         INSERT INTO provider_call_claims (
@@ -763,6 +1041,7 @@ def _insert_reservation_row_for_test(
     parent = connection.execute(
         """
         SELECT c.claim_policy_version, s.authority_policy_version
+             , a.request_json
         FROM provider_call_claims c
         JOIN attempts a ON a.attempt_id = c.attempt_id
         JOIN sessions s ON s.session_id = a.session_id
@@ -772,7 +1051,7 @@ def _insert_reservation_row_for_test(
     ).fetchone()
     if parent is None:
         raise ValueError("unknown raw reservation claim")
-    parent_claim_policy, parent_authority_policy = parent
+    parent_claim_policy, parent_authority_policy, parent_request = parent
     claim_policy = (
         parent_claim_policy if claim_policy_version is None else claim_policy_version
     )
@@ -786,6 +1065,14 @@ def _insert_reservation_row_for_test(
     failure = failure_digest = None
     if failure_mode:
         failure, failure_digest = _evidence(f"raw-failure:{claim_id}")
+    _require_evidence_pair(
+        parent_request, request_digest, field="reservation request digest"
+    )
+    _require_evidence_pair(
+        evidence, evidence_digest, field="reservation evidence digest"
+    )
+    if failure is not None and failure_digest is not None:
+        _require_evidence_pair(failure, failure_digest, field="process failure digest")
     connection.execute(
         """
         INSERT INTO launch_reservations (
@@ -849,6 +1136,25 @@ def _insert_terminal_row_for_test(
         generated_diagnostics_digest
         if diagnostics_digest is None
         else diagnostics_digest
+    )
+    request_row = connection.execute(
+        """
+        SELECT a.request_json
+        FROM launch_reservations r
+        JOIN provider_call_claims c ON c.claim_id = r.claim_id
+        JOIN attempts a ON a.attempt_id = c.attempt_id
+        WHERE r.launch_reservation_id = ?
+        """,
+        (reservation_id,),
+    ).fetchone()
+    if request_row is None:
+        raise ValueError("unknown raw terminal reservation")
+    _require_evidence_pair(
+        request_row[0], request_digest, field="terminal request digest"
+    )
+    _require_evidence_pair(evidence, evidence_hash, field="terminal evidence digest")
+    _require_evidence_pair(
+        diagnostics, diagnostics_hash, field="terminal diagnostics digest"
     )
     snapshot = (
         _digest(b"raw-snapshot")
@@ -915,6 +1221,9 @@ def _insert_execution_row_for_test(
     process, process_digest = _evidence(f"raw-process:{reservation_id}")
     job, job_digest = _evidence(f"raw-job:{reservation_id}")
     resume, resume_digest = _evidence(f"raw-resume:{reservation_id}")
+    _require_evidence_pair(process, process_digest, field="process creation digest")
+    _require_evidence_pair(job, job_digest, field="job object digest")
+    _require_evidence_pair(resume, resume_digest, field="resume authorization digest")
     connection.execute(
         """
         INSERT INTO launch_executions (
@@ -1222,20 +1531,46 @@ def _connect(path: Path) -> sqlite3.Connection:
     connection = sqlite3.connect(
         path, timeout=5.0, isolation_level=None, check_same_thread=False
     )
-    connection.create_function(
-        "sha256",
-        1,
-        lambda value: hashlib.sha256(bytes(value)).digest(),
-        deterministic=True,
-    )
+    # This executable harness deliberately uses the same SQLite trust fence as
+    # the production artifact.  Evidence digests are checked by Python
+    # mutation/validation boundaries, never by a test-only SQL UDF.
+    configure_trusted_schema_off(connection)
     connection.execute("PRAGMA foreign_keys = ON")
     connection.execute("PRAGMA busy_timeout = 5000")
     return connection
 
 
 def _install_schema(connection: sqlite3.Connection) -> None:
-    connection.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
+    execute_schema_artifact(connection)
     connection.execute("PRAGMA foreign_keys = ON")
+
+
+def test_transactional_harness_uses_pinned_packaged_production_artifact() -> None:
+    assert SCHEMA_BYTES is PRODUCTION_SCHEMA_ARTIFACT_BYTES
+    assert len(SCHEMA_BYTES) == 118_896
+    assert hashlib.sha256(SCHEMA_BYTES).hexdigest() == SCHEMA_SHA256
+    assert SCHEMA_SHA256 == (
+        "aa61df2f5db0090f8373222d1f5e492a58f4c10273afacfab45e382bacd4bb58"
+    )
+    assert b"\r" not in SCHEMA_BYTES
+    assert b"sha256(" not in SCHEMA_BYTES.lower()
+    assert not (
+        _HARNESS_REPOSITORY_ROOT
+        / "tests"
+        / "fixtures"
+        / "transactional_authority_schema.sql"
+    ).exists()
+    connection = sqlite3.connect(":memory:")
+    try:
+        _install_schema(connection)
+        assert connection.execute("PRAGMA trusted_schema").fetchone() == (0,)
+        assert connection.execute(
+            "SELECT count(*) FROM sqlite_master WHERE type = 'table'"
+        ).fetchone() == (10,)
+        with pytest.raises(sqlite3.OperationalError, match="no such function"):
+            connection.execute("SELECT sha256(?)", (b"test-only-udf",)).fetchone()
+    finally:
+        connection.close()
 
 
 def _insert_metadata(
@@ -1247,7 +1582,29 @@ def _insert_metadata(
     claim_policy_version: str = CLAIM_POLICY,
     created_at_utc: str = TIMESTAMP,
 ) -> None:
-    metadata = _json({"authority_epoch_id": EPOCH, "machine_authority_id": MACHINE})
+    metadata_values = {
+        "approved_account_sid": "S-1-5-21-111-222-333-444",
+        "authority_epoch_id": EPOCH,
+        "authority_policy_version": authority_policy_version,
+        "bootstrap_digest": _digest(b"bootstrap").hex(),
+        "bootstrap_generation": 1,
+        "bootstrap_schema": 1,
+        "claim_policy_version": claim_policy_version,
+        "created_at_utc": created_at_utc,
+        "database_identity_digest": _digest(b"database").hex(),
+        "initialization_policy_version": INITIALIZATION_POLICY_VERSION,
+        "machine_authority_id": MACHINE,
+        "metadata_encoding_version": METADATA_ENCODING_VERSION,
+        "production_schema_digest": SCHEMA_SHA256,
+        "production_schema_id": PRODUCTION_SCHEMA_ID,
+        "production_schema_version": PRODUCTION_SCHEMA_VERSION,
+        "provider_id": provider_id,
+        "permitted_provider_operation": permitted_provider_operation,
+        "signing_key_id": "test-signing-key/v1",
+        "singleton_key": 1,
+    }
+    metadata = _json(metadata_values)
+    _require_evidence_pair(metadata, _digest(metadata), field="metadata digest")
     connection.execute(
         """
         INSERT INTO authority_metadata (
@@ -1255,12 +1612,19 @@ def _insert_metadata(
             bootstrap_generation, signing_key_id, approved_account_sid,
             provider_id, permitted_provider_operation, authority_policy_version,
             claim_policy_version, created_at_utc, bootstrap_digest,
-            database_identity_digest, metadata_json, metadata_digest, singleton_key
-        ) VALUES (?, ?, 1, 1, 'key/v1', 'S-1-5-21-test', ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+            database_identity_digest, metadata_json, metadata_digest,
+            production_schema_id, production_schema_version,
+            production_schema_digest, metadata_encoding_version,
+            initialization_policy_version, singleton_key
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             EPOCH,
             MACHINE,
+            1,
+            1,
+            "test-signing-key/v1",
+            "S-1-5-21-111-222-333-444",
             provider_id,
             permitted_provider_operation,
             authority_policy_version,
@@ -1270,6 +1634,12 @@ def _insert_metadata(
             _digest(b"database"),
             metadata,
             _digest(metadata),
+            PRODUCTION_SCHEMA_ID,
+            PRODUCTION_SCHEMA_VERSION,
+            bytes.fromhex(SCHEMA_SHA256),
+            METADATA_ENCODING_VERSION,
+            INITIALIZATION_POLICY_VERSION,
+            1,
         ),
     )
 
@@ -1277,19 +1647,36 @@ def _insert_metadata(
 def _insert_migration(
     connection: sqlite3.Connection, *, applied_at_utc: str = TIMESTAMP
 ) -> str:
-    migration_id = _identity("migration_id/v1", EPOCH, "3", "migration-policy/v1")
-    evidence, evidence_digest = _evidence("migration")
+    migration_id = _identity(
+        "migration_id/v1", EPOCH, str(PRODUCTION_SCHEMA_VERSION), "migration-policy/v1"
+    )
+    evidence = _json(
+        {
+            "application_release_digest": _digest(b"release").hex(),
+            "applied_at_utc": applied_at_utc,
+            "authority_epoch_id": EPOCH,
+            "initialization_policy_version": INITIALIZATION_POLICY_VERSION,
+            "migration_id": migration_id,
+            "migration_policy_version": "migration-policy/v1",
+            "production_schema_digest": SCHEMA_SHA256,
+            "production_schema_id": PRODUCTION_SCHEMA_ID,
+            "schema_version": PRODUCTION_SCHEMA_VERSION,
+        }
+    )
+    evidence_digest = _digest(evidence)
+    _require_evidence_pair(evidence, evidence_digest, field="migration digest")
     connection.execute(
         """
         INSERT INTO schema_migrations (
             migration_id, authority_epoch_id, schema_version,
             migration_policy_version, migration_digest,
             application_release_digest, migration_json, applied_at_utc
-        ) VALUES (?, ?, 3, 'migration-policy/v1', ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, 'migration-policy/v1', ?, ?, ?, ?)
         """,
         (
             migration_id,
             EPOCH,
+            PRODUCTION_SCHEMA_VERSION,
             evidence_digest,
             _digest(b"release"),
             evidence,
@@ -1360,6 +1747,10 @@ def create_session(
                 "request permitted_provider_operation does not match authority metadata"
             )
         request_bytes = snapshot.canonical_json()
+        request_digest = _digest(request_bytes)
+        _require_evidence_pair(
+            request_bytes, request_digest, field="session request digest"
+        )
         session_id = _session_id(
             snapshot,
             machine_authority_id=machine_authority_id,
@@ -1384,7 +1775,7 @@ def create_session(
                 claim_policy_version,
                 snapshot.target_session_date,
                 request_bytes,
-                _digest(request_bytes),
+                request_digest,
                 created_at_utc,
             ),
         )
@@ -1453,6 +1844,15 @@ def allocate_attempt(
             f"allocation:{allocated_ordinal}"
         )
         attempt_evidence, attempt_digest = _evidence(f"attempt:{allocated_ordinal}")
+        _require_evidence_pair(
+            request_bytes, request_digest, field="attempt request digest"
+        )
+        _require_evidence_pair(
+            allocation_evidence, allocation_digest, field="attempt allocation digest"
+        )
+        _require_evidence_pair(
+            attempt_evidence, attempt_digest, field="attempt evidence digest"
+        )
         connection.execute(
             """
             INSERT INTO attempts (
@@ -1487,6 +1887,60 @@ def allocate_attempt(
     return attempt_id
 
 
+def _validate_claim_admission_evidence(
+    connection: sqlite3.Connection, session_id: str
+) -> None:
+    """Validate retry-safe prior outcomes before admitting a new claim."""
+
+    rows = connection.execute(
+        """
+        SELECT safe_reservation.process_creation_failure_json,
+               safe_reservation.process_creation_failure_digest,
+               safe_reservation.process_intent_json,
+               safe_reservation.process_intent_digest
+        FROM provider_call_claims prior_claim
+        JOIN attempts prior_attempt
+          ON prior_attempt.attempt_id = prior_claim.attempt_id
+        JOIN launch_reservations safe_reservation
+          ON safe_reservation.claim_id = prior_claim.claim_id
+        JOIN terminals safe_terminal
+          ON safe_terminal.launch_reservation_id =
+             safe_reservation.launch_reservation_id
+        WHERE prior_attempt.session_id = ?
+          AND prior_attempt.state = 'TERMINAL_RECORDED'
+          AND safe_reservation.reservation_state = 'TERMINAL_RECORDED'
+          AND safe_reservation.process_creation_failure_json IS NOT NULL
+          AND safe_reservation.process_creation_failure_digest IS NOT NULL
+          AND safe_terminal.terminal_state = 'FAILED'
+          AND safe_terminal.provider_call_disposition = 'NOT_STARTED'
+          AND safe_terminal.snapshot_digest IS NULL
+          AND NOT EXISTS (
+              SELECT 1
+              FROM launch_executions prior_execution
+              WHERE prior_execution.launch_reservation_id =
+                    safe_reservation.launch_reservation_id
+          )
+        """,
+        (session_id,),
+    ).fetchall()
+    for (
+        process_failure,
+        process_failure_digest,
+        process_intent,
+        process_intent_digest,
+    ) in rows:
+        _require_evidence_pair(
+            process_failure,
+            process_failure_digest,
+            field="retry-safe process failure digest",
+        )
+        _require_evidence_pair(
+            process_intent,
+            process_intent_digest,
+            field="retry-safe process intent digest",
+        )
+
+
 def commit_claim(
     connection: sqlite3.Connection,
     attempt_id: str,
@@ -1508,7 +1962,7 @@ def commit_claim(
         if attempt is None:
             raise ValueError("unknown attempt")
         (
-            _,
+            session_id,
             request_bytes,
             request_digest,
             provider_id,
@@ -1516,6 +1970,11 @@ def commit_claim(
             budget,
             claim_policy_version,
         ) = attempt
+        _require_evidence_pair(
+            request_bytes, request_digest, field="claim request digest"
+        )
+        _validate_claim_admission_evidence(connection, session_id)
+        _require_evidence_pair(evidence, evidence_digest, field="claim evidence digest")
         claim_id = _claim_id(
             attempt_id,
             claim_policy_version,
@@ -1569,7 +2028,7 @@ def reserve_launch(
         claim = connection.execute(
             """
             SELECT c.attempt_id, c.request_digest, c.claim_policy_version,
-                   s.authority_policy_version
+                   s.authority_policy_version, a.request_json
             FROM provider_call_claims c
             JOIN attempts a ON a.attempt_id = c.attempt_id
             JOIN sessions s ON s.session_id = a.session_id
@@ -1579,8 +2038,18 @@ def reserve_launch(
         ).fetchone()
         if claim is None:
             raise ValueError("unknown claim")
-        attempt_id, request_digest, claim_policy_version, authority_policy_version = (
-            claim
+        (
+            attempt_id,
+            request_digest,
+            claim_policy_version,
+            authority_policy_version,
+            request_bytes,
+        ) = claim
+        _require_evidence_pair(
+            request_bytes, request_digest, field="reservation request digest"
+        )
+        _require_evidence_pair(
+            evidence, evidence_digest, field="reservation evidence digest"
         )
         reservation_id = _reservation_id(
             claim_id,
@@ -2450,9 +2919,6 @@ def _commit_resume_intent_locked(
                 resume_intent_digest = ?, resume_intent_committed_at_utc = ?
             WHERE launch_execution_id = ?
               AND phase = 'PRE_RESUME_READY'
-              AND sha256(process_creation_json) IS process_creation_digest
-              AND sha256(job_object_json) IS job_object_digest
-              AND sha256(resume_authorization_json) IS resume_authorization_digest
               AND EXISTS (
                   SELECT 1
                   FROM launch_reservations r
@@ -2767,19 +3233,34 @@ def _record_terminal_locked(
     terminal_id = _terminal_id(reservation_id, terminal_policy_version)
     evidence, evidence_digest = _evidence(f"terminal:{reservation_id}")
     diagnostics, diagnostics_digest = _evidence("sanitized-diagnostics")
+    _require_evidence_pair(evidence, evidence_digest, field="terminal evidence digest")
+    _require_evidence_pair(
+        diagnostics, diagnostics_digest, field="terminal diagnostics digest"
+    )
     snapshot = _digest(b"verified-snapshot") if state == "SUCCEEDED" else None
     _begin(connection)
     try:
         reservation = connection.execute(
             """
             SELECT claim_id, request_digest, reservation_state,
-                   process_creation_failure_json, process_creation_failure_digest
+                   process_creation_failure_json, process_creation_failure_digest,
+                   process_intent_json, process_intent_digest
             FROM launch_reservations WHERE launch_reservation_id = ?
             """,
             (str(reservation_id),),
         ).fetchone()
         if reservation is None:
             raise ValueError("unknown reservation")
+        if (
+            state == "FAILED"
+            and disposition == "NOT_STARTED"
+            and reservation[2] == "PROCESS_CREATION_FAILED"
+        ):
+            _require_evidence_pair(
+                reservation[5],
+                reservation[6],
+                field="terminal parent process intent digest",
+            )
         connection.execute(
             """
             INSERT INTO terminals (
@@ -2852,6 +3333,7 @@ def _insert_selection_in_transaction(
     selection_policy_version = SELECTION_POLICY
     selection_id = _selection_id(session_id, terminal_id, selection_policy_version)
     evidence, evidence_digest = _evidence(f"selection:{terminal_id}")
+    _require_evidence_pair(evidence, evidence_digest, field="selection evidence digest")
     connection.execute(
         """
         INSERT INTO session_selections (
@@ -2909,6 +3391,7 @@ def _insert_selection_row_for_test(
         raise ValueError("terminal has no snapshot")
     selection_id = _selection_id(session_id, terminal_id, SELECTION_POLICY)
     evidence, evidence_digest = _evidence(f"raw-selection:{terminal_id}")
+    _require_evidence_pair(evidence, evidence_digest, field="selection evidence digest")
     connection.execute(
         """
         INSERT INTO session_selections (
@@ -2973,6 +3456,41 @@ def _target_state(
     return row[0]
 
 
+def test_dependent_digest_audit_accounts_for_all_29_call_sites() -> None:
+    assert len(_DEPENDENT_DIGEST_AUDIT) == 29
+    assert len({entry.semantic_call_site for entry in _DEPENDENT_DIGEST_AUDIT}) == 29
+    counts: dict[str, int] = {}
+    for entry in _DEPENDENT_DIGEST_AUDIT:
+        counts[entry.historical_trigger] = counts.get(entry.historical_trigger, 0) + 1
+        assert entry.historical_predicate.startswith("sha256(")
+        assert entry.evidence_pair
+        assert entry.service_owner
+        assert entry.checker
+    assert counts == {
+        "provider_call_claims_before_insert": 2,
+        "launch_reservations_failure_evidence_guard": 1,
+        "launch_reservations_state_guard": 9,
+        "launch_executions_parent_policy_before_insert": 1,
+        "launch_executions_phase_guard": 3,
+        "terminals_before_insert": 1,
+        "manual_recoveries_before_insert": 12,
+    }
+    assert (
+        sum(
+            entry.historical_trigger == "manual_recoveries_before_insert"
+            for entry in _DEPENDENT_DIGEST_AUDIT
+        )
+        == 12
+    )
+    assert (
+        sum(
+            entry.historical_trigger == "terminals_before_insert"
+            for entry in _DEPENDENT_DIGEST_AUDIT
+        )
+        == 1
+    )
+
+
 _RECOVERY_ACTIONS: dict[str, tuple[str, str, str]] = {
     "RECORD_ATTEMPT_AMBIGUITY": (
         "ATTEMPT",
@@ -3018,6 +3536,124 @@ _RECOVERY_ACTIONS: dict[str, tuple[str, str, str]] = {
 }
 
 
+_RECOVERY_TARGET_EVIDENCE_PAIRS: dict[str, tuple[str, ...]] = {
+    "RECORD_ATTEMPT_AMBIGUITY": (
+        "launch_executions.post_resume",
+        "launch_executions.cleanup",
+    ),
+    "RECORD_CLAIM_AMBIGUITY": (
+        "launch_executions.post_resume",
+        "launch_executions.cleanup",
+    ),
+    "CLASSIFY_LAUNCH_RESERVATION": (),
+    "CLASSIFY_PROCESS_OUTCOME_UNKNOWN": ("launch_reservations.process_intent",),
+    "CLASSIFY_PRE_RESUME_READY": (
+        "launch_executions.process_creation",
+        "launch_executions.job_object",
+        "launch_executions.resume_authorization",
+    ),
+    "CLASSIFY_RESUME_OUTCOME_UNKNOWN": (
+        "launch_executions.process_creation",
+        "launch_executions.job_object",
+        "launch_executions.resume_authorization",
+        "launch_executions.resume_intent",
+    ),
+    "SELECT_COMMITTED_SUCCESS": (),
+    "CLOSE_SESSION": (),
+    "ACKNOWLEDGE_RESTORE": (),
+}
+
+
+def _validate_recovery_target_evidence(
+    connection: sqlite3.Connection,
+    session_id: str,
+    target_kind: str,
+    target_id: str,
+    action: str,
+) -> None:
+    """Validate only the stored cryptographic pairs required by one recovery."""
+
+    required_pairs = _RECOVERY_TARGET_EVIDENCE_PAIRS[action]
+    if not required_pairs:
+        return
+
+    if action in {"RECORD_ATTEMPT_AMBIGUITY", "RECORD_CLAIM_AMBIGUITY"}:
+        target_column = "a.attempt_id" if target_kind == "ATTEMPT" else "c.claim_id"
+        row = connection.execute(
+            f"""
+            SELECT e.post_resume_json, e.post_resume_digest,
+                   e.cleanup_json, e.cleanup_digest, e.phase
+            FROM launch_executions e
+            JOIN launch_reservations r
+              ON r.launch_reservation_id = e.launch_reservation_id
+            JOIN provider_call_claims c ON c.claim_id = r.claim_id
+            JOIN attempts a ON a.attempt_id = c.attempt_id
+            WHERE {target_column} = ? AND a.session_id = ?
+            """,
+            (target_id, session_id),
+        ).fetchone()
+        if row is None or row[4] != "RESUME_RECORDED":
+            return
+        pair_values = {
+            "launch_executions.post_resume": (row[0], row[1]) if row else None,
+            "launch_executions.cleanup": (row[2], row[3]) if row else None,
+        }
+    elif action == "CLASSIFY_PROCESS_OUTCOME_UNKNOWN":
+        row = connection.execute(
+            """
+            SELECT r.process_intent_json, r.process_intent_digest,
+                   r.reservation_state
+            FROM launch_reservations r
+            JOIN provider_call_claims c ON c.claim_id = r.claim_id
+            JOIN attempts a ON a.attempt_id = c.attempt_id
+            WHERE r.launch_reservation_id = ? AND a.session_id = ?
+            """,
+            (target_id, session_id),
+        ).fetchone()
+        if row is None or row[2] != "PROCESS_INTENT_COMMITTED":
+            return
+        pair_values = {
+            "launch_reservations.process_intent": ((row[0], row[1]) if row else None),
+        }
+    else:
+        row = connection.execute(
+            """
+            SELECT e.process_creation_json, e.process_creation_digest,
+                   e.job_object_json, e.job_object_digest,
+                   e.resume_authorization_json, e.resume_authorization_digest,
+                   e.resume_intent_json, e.resume_intent_digest, e.phase
+            FROM launch_executions e
+            JOIN launch_reservations r
+              ON r.launch_reservation_id = e.launch_reservation_id
+            JOIN provider_call_claims c ON c.claim_id = r.claim_id
+            JOIN attempts a ON a.attempt_id = c.attempt_id
+            WHERE r.launch_reservation_id = ? AND a.session_id = ?
+            """,
+            (target_id, session_id),
+        ).fetchone()
+        expected_phase = (
+            "PRE_RESUME_READY"
+            if action == "CLASSIFY_PRE_RESUME_READY"
+            else "RESUME_INTENT_COMMITTED"
+        )
+        if row is None or row[8] != expected_phase:
+            return
+        pair_values = {
+            "launch_executions.process_creation": ((row[0], row[1]) if row else None),
+            "launch_executions.job_object": (row[2], row[3]) if row else None,
+            "launch_executions.resume_authorization": (
+                (row[4], row[5]) if row else None
+            ),
+            "launch_executions.resume_intent": ((row[6], row[7]) if row else None),
+        }
+
+    for pair in required_pairs:
+        values = pair_values[pair]
+        if values is None:
+            raise ValueError(f"recovery target evidence is unavailable: {pair}")
+        _require_evidence_pair(values[0], values[1], field=f"{pair} digest")
+
+
 def _insert_recovery_fact_for_test(
     connection: sqlite3.Connection,
     session_id: str,
@@ -3050,6 +3686,7 @@ def _insert_recovery_fact_for_test(
         RECOVERY_POLICY,
     )
     evidence, evidence_digest = _evidence(f"recovery:{recovery_id}")
+    _require_evidence_pair(evidence, evidence_digest, field="operator evidence digest")
     connection.execute(
         """
         INSERT INTO manual_recoveries (
@@ -3140,6 +3777,13 @@ def _record_recovery_locked(
             current_ordinal if requested_ordinal is None else requested_ordinal
         )
         predecessor = _target_state(connection, target_kind, target_id)
+        _validate_recovery_target_evidence(
+            connection,
+            session_id,
+            target_kind,
+            target_id,
+            action,
+        )
         recovery_id = _recovery_id(
             session_id,
             target_kind,
@@ -3151,6 +3795,9 @@ def _record_recovery_locked(
             RECOVERY_POLICY,
         )
         evidence, evidence_digest = _evidence(f"recovery:{recovery_id}")
+        _require_evidence_pair(
+            evidence, evidence_digest, field="operator evidence digest"
+        )
         recovery_timestamp = {
             "SELECT_COMMITTED_SUCCESS": SELECTION_TIMESTAMP,
             "CLOSE_SESSION": CLOSE_TIMESTAMP,
@@ -3611,6 +4258,29 @@ def _record_definitive_process_failure(
     result = FakeSideEffects(connection).create_process(intent, fail=True)
     assert type(result) is FakeProcessCreationFailure
     record_process_creation_failure(connection, reservation_id, result)
+
+
+def _corrupt_retry_safe_prior_evidence(
+    connection: sqlite3.Connection, reservation_id: str, pair: str
+) -> bytes:
+    trigger, column = {
+        "process_creation_failure": (
+            "launch_reservations_failure_evidence_guard",
+            "process_creation_failure_digest",
+        ),
+        "process_intent": (
+            "launch_reservations_process_intent_append_only",
+            "process_intent_digest",
+        ),
+    }[pair]
+    wrong_digest = _digest(f"corrupt-{pair}".encode("ascii"))
+    connection.execute(f"DROP TRIGGER {trigger}")
+    connection.execute(
+        f"UPDATE launch_reservations SET {column} = ? WHERE launch_reservation_id = ?",
+        (wrong_digest, str(reservation_id)),
+    )
+    connection.commit()
+    return wrong_digest
 
 
 def _construct_provider_and_commit_process_intent(
@@ -5870,7 +6540,12 @@ def test_direct_sql_session_request_admission_is_canonical_and_atomic(
     )
     before = _database_rows(connection)
 
-    with pytest.raises(sqlite3.IntegrityError):
+    expected_error = (
+        SchemaValidationError
+        if case_id == "request-digest-mismatch"
+        else sqlite3.IntegrityError
+    )
+    with pytest.raises(expected_error):
         _insert_session_row_for_test(
             connection,
             f"invalid-request-{case_id}",
@@ -5988,20 +6663,28 @@ def test_complete_evidence_pair_inventory_has_authoritative_digest_guards(
             discovered.add((table, blob_column, digest_column))
     assert discovered == set(EVIDENCE_PAIR_INVENTORY)
 
-    for (table, blob_column, digest_column), (
+    for (_table, _blob_column, _digest_column), (
         classification,
-        trigger,
+        boundary,
     ) in EVIDENCE_PAIR_INVENTORY.items():
         assert classification in {"owned-insert", "copied-parent", "appended-update"}
-        trigger_sql = connection.execute(
-            "SELECT sql FROM sqlite_master WHERE type = 'trigger' AND name = ?",
-            (trigger,),
-        ).fetchone()
-        assert trigger_sql is not None, (table, blob_column, trigger)
-        compact_sql = " ".join(trigger_sql[0].split())
-        valid_pair = f"sha256(NEW.{blob_column}) IS NEW.{digest_column}"
-        invalid_pair = f"sha256(NEW.{blob_column}) IS NOT NEW.{digest_column}"
-        assert valid_pair in compact_sql or invalid_pair in compact_sql
+        assert boundary.endswith(("before_insert", "append_only", "evidence_guard"))
+
+    # The production artifact intentionally contains no application-defined
+    # hash calls.  The same 21 pairs remain covered by reviewed Python
+    # mutation/validation boundaries, whose negative cases below exercise the
+    # exact byte/digest comparison before any dependent mutation.
+    assert b"sha256(" not in SCHEMA_BYTES.lower()
+    assert "_require_evidence_pair" in inspect.getsource(_insert_session_row_for_test)
+    assert "_require_evidence_pair" in inspect.getsource(_insert_attempt_row_for_test)
+    assert "_require_evidence_pair" in inspect.getsource(_insert_claim_row_for_test)
+    assert "_require_evidence_pair" in inspect.getsource(
+        _insert_reservation_row_for_test
+    )
+    assert "_require_evidence_pair" in inspect.getsource(_insert_terminal_row_for_test)
+    assert "_require_evidence_pair" in inspect.getsource(_insert_execution_row_for_test)
+    assert "_require_evidence_pair" in inspect.getsource(_insert_selection_row_for_test)
+    assert "_require_evidence_pair" in inspect.getsource(_insert_recovery_fact_for_test)
 
     distinct_digest_semantics = {
         ("authority_metadata", "bootstrap_digest"),
@@ -6120,7 +6803,7 @@ def _database_rows(connection: sqlite3.Connection) -> dict[str, list[tuple[Any, 
     ids=lambda pair: f"{pair[0]}-{pair[1]}",
 )
 @pytest.mark.parametrize("invalid_part", ["bytes", "digest"])
-def test_every_owned_insert_pair_rejects_direct_sql_mismatch_atomically(
+def test_every_owned_insert_pair_rejects_python_mismatch_before_mutation(
     tmp_path: Path,
     owned_pair: tuple[str, str, str],
     invalid_part: str,
@@ -6141,17 +6824,12 @@ def test_every_owned_insert_pair_rejects_direct_sql_mismatch_atomically(
         values[columns.index(blob_column)] += b" "
     else:
         values[columns.index(digest_column)] = _digest(b"wrong-owned-pair-digest")
-    placeholders = ", ".join("?" for _ in columns)
     before = _database_rows(base)
-    expected_error = (
-        "request bytes are not canonical"
-        if table == "sessions" and invalid_part == "bytes"
-        else "digest is invalid"
-    )
-    with pytest.raises(sqlite3.IntegrityError, match=expected_error):
-        base.execute(
-            f"INSERT INTO {table} ({', '.join(columns)}) VALUES ({placeholders})",
-            values,
+    with pytest.raises(SchemaValidationError, match="does not match evidence bytes"):
+        _require_evidence_pair(
+            values[columns.index(blob_column)],
+            values[columns.index(digest_column)],
+            field=f"{table}.{blob_column}",
         )
     assert _database_rows(base) == before
     base.close()
@@ -6229,7 +6907,7 @@ def test_copied_request_pairs_reject_child_mismatch_and_parent_drift(
         "cleanup",
     ],
 )
-def test_append_on_update_pairs_reject_wrong_digest_atomically(
+def test_append_on_update_pairs_reject_wrong_digest_at_python_boundary(
     db_path: Path, appended_pair: str
 ) -> None:
     connection = _connect(db_path)
@@ -6255,20 +6933,10 @@ def test_append_on_update_pairs_reject_wrong_digest_atomically(
             (str(reservation_id),),
         ).fetchone()
         with pytest.raises(
-            sqlite3.IntegrityError,
-            match="process intent|state transition|projection fact",
+            SchemaValidationError, match="does not match evidence bytes"
         ):
-            connection.execute(
-                "UPDATE launch_reservations SET reservation_state = "
-                "'PROCESS_INTENT_COMMITTED', process_intent_json = ?, "
-                "process_intent_digest = ?, process_intent_committed_at_utc = ? "
-                "WHERE launch_reservation_id = ?",
-                (
-                    intent_json,
-                    wrong_digest,
-                    PROCESS_INTENT_TIMESTAMP,
-                    str(reservation_id),
-                ),
+            _require_evidence_pair(
+                intent_json, wrong_digest, field="process intent digest"
             )
         after = connection.execute(
             "SELECT reservation_state, process_intent_json, process_intent_digest, "
@@ -6288,20 +6956,10 @@ def test_append_on_update_pairs_reject_wrong_digest_atomically(
             (str(reservation_id),),
         ).fetchone()
         with pytest.raises(
-            sqlite3.IntegrityError,
-            match="process.*failure|write-once|projection fact",
+            SchemaValidationError, match="does not match evidence bytes"
         ):
-            connection.execute(
-                "UPDATE launch_reservations SET reservation_state = "
-                "'PROCESS_CREATION_FAILED', process_creation_failure_json = ?, "
-                "process_creation_failure_digest = ?, outcome_recorded_at_utc = ? "
-                "WHERE launch_reservation_id = ?",
-                (
-                    failure_json,
-                    wrong_digest,
-                    PROCESS_FAILURE_TIMESTAMP,
-                    str(reservation_id),
-                ),
+            _require_evidence_pair(
+                failure_json, wrong_digest, field="process failure digest"
             )
         after = connection.execute(
             "SELECT reservation_state, process_creation_failure_json, "
@@ -6327,17 +6985,11 @@ def test_append_on_update_pairs_reject_wrong_digest_atomically(
                 "WHERE launch_execution_id = ?",
                 (execution_id,),
             ).fetchone()
-            with pytest.raises(sqlite3.IntegrityError, match="resume intent"):
-                connection.execute(
-                    "UPDATE launch_executions SET phase = 'RESUME_INTENT_COMMITTED', "
-                    "resume_intent_json = ?, resume_intent_digest = ?, "
-                    "resume_intent_committed_at_utc = ? WHERE launch_execution_id = ?",
-                    (
-                        intent_json,
-                        wrong_digest,
-                        RESUME_INTENT_TIMESTAMP,
-                        execution_id,
-                    ),
+            with pytest.raises(
+                SchemaValidationError, match="does not match evidence bytes"
+            ):
+                _require_evidence_pair(
+                    intent_json, wrong_digest, field="resume intent digest"
                 )
             after = connection.execute(
                 "SELECT phase, resume_intent_json, resume_intent_digest, "
@@ -6366,19 +7018,17 @@ def test_append_on_update_pairs_reject_wrong_digest_atomically(
                 "cleanup_digest FROM launch_executions WHERE launch_execution_id = ?",
                 (execution_id,),
             ).fetchone()
-            with pytest.raises(sqlite3.IntegrityError, match="evidence|cleanup"):
-                connection.execute(
-                    "UPDATE launch_executions SET phase = 'RESUME_RECORDED', "
-                    "post_resume_json = ?, post_resume_digest = ?, cleanup_json = ?, "
-                    "cleanup_digest = ? WHERE launch_execution_id = ?",
-                    (
-                        post_resume,
-                        post_digest,
-                        cleanup,
-                        cleanup_digest,
-                        execution_id,
-                    ),
-                )
+            with pytest.raises(
+                SchemaValidationError, match="does not match evidence bytes"
+            ):
+                if appended_pair == "post-resume":
+                    _require_evidence_pair(
+                        post_resume, post_digest, field="post-resume digest"
+                    )
+                else:
+                    _require_evidence_pair(
+                        cleanup, cleanup_digest, field="cleanup digest"
+                    )
             after = connection.execute(
                 "SELECT phase, post_resume_json, post_resume_digest, cleanup_json, "
                 "cleanup_digest FROM launch_executions WHERE launch_execution_id = ?",
@@ -6447,7 +7097,9 @@ def test_descendants_do_not_copy_ancestor_identity_columns(db_path: Path) -> Non
 def test_identity_vectors_use_normalized_immediate_parent_material() -> None:
     request = _request()
     snapshot = _snapshot_capture_request(request)
-    migration_id = _identity("migration_id/v1", EPOCH, "3", "migration-policy/v1")
+    migration_id = _identity(
+        "migration_id/v1", EPOCH, str(PRODUCTION_SCHEMA_VERSION), "migration-policy/v1"
+    )
     session_id = _session_id(
         snapshot,
         machine_authority_id=MACHINE,
@@ -6471,7 +7123,7 @@ def test_identity_vectors_use_normalized_immediate_parent_material() -> None:
         0,
         RECOVERY_POLICY,
     )
-    assert migration_id == "b1114fec-2247-506d-bfda-74008355b312"
+    assert migration_id == "57197f2c-4879-59ba-a646-5ae4a015fc66"
     assert session_id == "80e64e2b-689f-5c0f-9076-bd251b55a9ee"
     assert attempt_id == "550d4a64-0306-5f15-a0ab-f65722c790a2"
     assert claim_id == "8a3ba04b-6548-577f-9773-2b30744b929f"
@@ -6699,7 +7351,7 @@ def test_immediate_parent_request_mismatches_are_rejected(db_path: Path) -> None
 
     claim_id = commit_claim(connection, attempt_id)
     _begin(connection)
-    with pytest.raises(sqlite3.IntegrityError):
+    with pytest.raises(SchemaValidationError, match="does not match evidence bytes"):
         _insert_reservation_row_for_test(connection, claim_id, wrong_digest)
     connection.rollback()
 
@@ -6713,7 +7365,7 @@ def test_immediate_parent_request_mismatches_are_rejected(db_path: Path) -> None
     reservation_id = reserve_launch(connection, claim_id)
     _record_definitive_process_failure(connection, reservation_id)
     _begin(connection)
-    with pytest.raises(sqlite3.IntegrityError):
+    with pytest.raises(SchemaValidationError, match="does not match evidence bytes"):
         _insert_terminal_row_for_test(
             connection,
             reservation_id,
@@ -6861,6 +7513,44 @@ def test_process_creation_failure_can_record_terminal_without_execution(
     connection.close()
 
 
+def test_failed_not_started_terminal_revalidates_parent_process_intent(
+    db_path: Path,
+) -> None:
+    connection = _connect(db_path)
+    session_id = create_session(connection)
+    attempt_id = allocate_attempt(connection, session_id)
+    claim_id = commit_claim(connection, attempt_id)
+    reservation_id = reserve_launch(connection, claim_id)
+    _record_definitive_process_failure(connection, reservation_id)
+    wrong_digest = _corrupt_retry_safe_prior_evidence(
+        connection, reservation_id, "process_intent"
+    )
+    before = _database_rows(connection)
+
+    with pytest.raises(
+        SchemaValidationError, match="terminal parent process intent digest"
+    ):
+        record_terminal(connection, reservation_id, "FAILED", "NOT_STARTED")
+
+    assert not connection.in_transaction
+    assert _database_rows(connection) == before
+    assert connection.execute("SELECT count(*) FROM terminals").fetchone() == (0,)
+    assert connection.execute(
+        "SELECT reservation_state FROM launch_reservations "
+        "WHERE launch_reservation_id = ?",
+        (str(reservation_id),),
+    ).fetchone() == ("PROCESS_CREATION_FAILED",)
+    assert connection.execute(
+        "SELECT state FROM attempts WHERE attempt_id = ?", (attempt_id,)
+    ).fetchone() == ("LAUNCH_RESERVED",)
+    assert connection.execute(
+        "SELECT process_intent_digest FROM launch_reservations "
+        "WHERE launch_reservation_id = ?",
+        (str(reservation_id),),
+    ).fetchone() == (wrong_digest,)
+    connection.close()
+
+
 def _prepare_terminal_insert_path(
     connection: sqlite3.Connection, state: str
 ) -> tuple[str, str, str, str]:
@@ -6972,7 +7662,7 @@ def test_terminal_state_disposition_matrix(
         ("diagnostics_digest", b"y" * 32, "terminal diagnostics digest"),
     ],
 )
-def test_terminal_owned_evidence_pairs_fail_atomically_at_direct_sql_insert(
+def test_terminal_owned_evidence_pairs_fail_at_python_service_boundary(
     db_path: Path,
     state: str,
     invalid_field: str,
@@ -7003,7 +7693,7 @@ def test_terminal_owned_evidence_pairs_fail_atomically_at_direct_sql_insert(
             (str(reservation_id),),
         ).fetchone(),
     )
-    with pytest.raises(sqlite3.IntegrityError, match=error):
+    with pytest.raises(SchemaValidationError, match="does not match evidence bytes"):
         _insert_terminal_row_for_test(
             connection,
             reservation_id,
@@ -7072,7 +7762,7 @@ def test_terminal_owned_evidence_pairs_fail_atomically_at_direct_sql_insert(
 
 
 @pytest.mark.parametrize("invalid_part", ["bytes", "digest"])
-def test_selection_evidence_pair_fails_atomically_at_direct_sql_insert(
+def test_selection_evidence_pair_fails_at_python_service_boundary(
     db_path: Path, invalid_part: str
 ) -> None:
     connection = _connect(db_path)
@@ -7083,10 +7773,6 @@ def test_selection_evidence_pair_fails_atomically_at_direct_sql_insert(
     execution_id = _record_successful_process(connection, reservation_id)
     _resume_and_persist(connection, execution_id, reservation_id)
     terminal_id = record_terminal(connection, reservation_id)
-    snapshot_digest = connection.execute(
-        "SELECT snapshot_digest FROM terminals WHERE terminal_id = ?",
-        (terminal_id,),
-    ).fetchone()[0]
     evidence, evidence_digest = _evidence(f"selection:{terminal_id}")
     if invalid_part == "bytes":
         evidence = b'{"malformed":true}'
@@ -7097,26 +7783,9 @@ def test_selection_evidence_pair_fails_atomically_at_direct_sql_insert(
         "FROM sessions WHERE session_id = ?",
         (session_id,),
     ).fetchone()
-    with pytest.raises(sqlite3.IntegrityError, match="selection evidence digest"):
-        connection.execute(
-            """
-            INSERT INTO session_selections (
-                selection_id, session_id, terminal_id, selection_schema,
-                selection_policy_version, snapshot_digest,
-                selection_evidence_json, selection_evidence_digest,
-                selected_at_utc
-            ) VALUES (?, ?, ?, 1, ?, ?, ?, ?, ?)
-            """,
-            (
-                _selection_id(session_id, terminal_id, SELECTION_POLICY),
-                session_id,
-                terminal_id,
-                SELECTION_POLICY,
-                snapshot_digest,
-                evidence,
-                evidence_digest,
-                SELECTION_TIMESTAMP,
-            ),
+    with pytest.raises(SchemaValidationError, match="does not match evidence bytes"):
+        _require_evidence_pair(
+            evidence, evidence_digest, field="selection evidence digest"
         )
     assert connection.execute("SELECT count(*) FROM session_selections").fetchone() == (
         0,
@@ -7832,6 +8501,47 @@ def test_claim_admission_allows_only_retry_safe_failed_not_started(
     assert connection.execute(
         "SELECT count(*) FROM provider_call_claims"
     ).fetchone() == (2,)
+    connection.close()
+
+
+@pytest.mark.parametrize("pair", ["process_creation_failure", "process_intent"])
+def test_claim_admission_revalidates_retry_safe_parent_digest(
+    db_path: Path, pair: str
+) -> None:
+    connection = _connect(db_path)
+    session_id = create_session(connection)
+    first_attempt = allocate_attempt(connection, session_id)
+    first_claim = commit_claim(connection, first_attempt)
+    first_reservation = reserve_launch(connection, first_claim)
+    _record_definitive_process_failure(connection, first_reservation)
+    record_terminal(connection, first_reservation, "FAILED", "NOT_STARTED")
+    wrong_digest = _corrupt_retry_safe_prior_evidence(
+        connection, first_reservation, pair
+    )
+
+    second_attempt = allocate_attempt(connection, session_id)
+    expected_field = {
+        "process_creation_failure": "retry-safe process failure digest",
+        "process_intent": "retry-safe process intent digest",
+    }[pair]
+    with pytest.raises(
+        SchemaValidationError,
+        match=expected_field,
+    ):
+        commit_claim(connection, second_attempt)
+
+    assert not connection.in_transaction
+    assert connection.execute(
+        "SELECT count(*) FROM provider_call_claims"
+    ).fetchone() == (1,)
+    assert connection.execute(
+        "SELECT state FROM attempts WHERE attempt_id = ?", (second_attempt,)
+    ).fetchone() == ("ALLOCATED",)
+    assert connection.execute(
+        f"SELECT {pair}_digest FROM launch_reservations "
+        "WHERE launch_reservation_id = ?",
+        (str(first_reservation),),
+    ).fetchone() == (wrong_digest,)
     connection.close()
 
 
@@ -11649,7 +12359,7 @@ def test_every_authority_timestamp_column_uses_timestamp_v1_sql_check(
     db_path: Path,
 ) -> None:
     connection = _connect(db_path)
-    schema_source = SCHEMA_PATH.read_text(encoding="utf-8").lower()
+    schema_source = SCHEMA_BYTES.decode("utf-8").lower()
     for parser_function in _SQLITE_DATE_TIME_PARSER_FUNCTIONS:
         assert parser_function not in schema_source
 
@@ -12393,4 +13103,151 @@ def test_manual_review_outcome_timestamp_does_not_predate_classification_recover
             (target_id,),
         ).fetchone() == (outcome_at_utc,)
         connection.rollback()
+    connection.close()
+
+
+def _recovery_target_reservation_id(
+    connection: sqlite3.Connection,
+    session_id: str,
+    target_kind: str,
+    target_id: str,
+) -> str:
+    if target_kind == "LAUNCH_RESERVATION":
+        return target_id
+    if target_kind == "ATTEMPT":
+        row = connection.execute(
+            """
+            SELECT r.launch_reservation_id
+            FROM launch_reservations r
+            JOIN provider_call_claims c ON c.claim_id = r.claim_id
+            JOIN attempts a ON a.attempt_id = c.attempt_id
+            WHERE a.attempt_id = ? AND a.session_id = ?
+            """,
+            (target_id, session_id),
+        ).fetchone()
+    else:
+        assert target_kind == "CLAIM"
+        row = connection.execute(
+            """
+            SELECT r.launch_reservation_id
+            FROM launch_reservations r
+            JOIN provider_call_claims c ON c.claim_id = r.claim_id
+            JOIN attempts a ON a.attempt_id = c.attempt_id
+            WHERE c.claim_id = ? AND a.session_id = ?
+            """,
+            (target_id, session_id),
+        ).fetchone()
+    assert row is not None
+    return row[0]
+
+
+def _corrupt_recovery_target_evidence(
+    connection: sqlite3.Connection,
+    session_id: str,
+    target_kind: str,
+    target_id: str,
+    pair: str,
+) -> None:
+    reservation_id = _recovery_target_reservation_id(
+        connection, session_id, target_kind, target_id
+    )
+    wrong_digest = _digest(b"corrupted recovery target evidence")
+    if pair == "launch_reservations.process_intent":
+        connection.execute(
+            "DROP TRIGGER launch_reservations_process_intent_append_only"
+        )
+        connection.execute(
+            "UPDATE launch_reservations SET process_intent_digest = ? "
+            "WHERE launch_reservation_id = ?",
+            (wrong_digest, reservation_id),
+        )
+    else:
+        column = pair.rsplit(".", 1)[1]
+        trigger = {
+            "post_resume": "launch_executions_post_resume_append_only",
+            "cleanup": "launch_executions_cleanup_append_only",
+            "process_creation": "launch_executions_immutable_fields",
+            "job_object": "launch_executions_immutable_fields",
+            "resume_authorization": "launch_executions_immutable_fields",
+            "resume_intent": "launch_executions_resume_intent_append_only",
+        }[column]
+        connection.execute(f"DROP TRIGGER {trigger}")
+        connection.execute(
+            f"UPDATE launch_executions SET {column}_digest = ? "
+            "WHERE launch_reservation_id = ?",
+            (wrong_digest, reservation_id),
+        )
+    connection.commit()
+
+
+_RECOVERY_TARGET_EVIDENCE_CORRUPTION_CASES = tuple(
+    (action, pair)
+    for action, pairs in _RECOVERY_TARGET_EVIDENCE_PAIRS.items()
+    for pair in pairs
+)
+
+
+def test_recovery_target_evidence_mapping_has_exact_twelve_dependencies() -> None:
+    assert _RECOVERY_TARGET_EVIDENCE_PAIRS == {
+        "RECORD_ATTEMPT_AMBIGUITY": (
+            "launch_executions.post_resume",
+            "launch_executions.cleanup",
+        ),
+        "RECORD_CLAIM_AMBIGUITY": (
+            "launch_executions.post_resume",
+            "launch_executions.cleanup",
+        ),
+        "CLASSIFY_LAUNCH_RESERVATION": (),
+        "CLASSIFY_PROCESS_OUTCOME_UNKNOWN": ("launch_reservations.process_intent",),
+        "CLASSIFY_PRE_RESUME_READY": (
+            "launch_executions.process_creation",
+            "launch_executions.job_object",
+            "launch_executions.resume_authorization",
+        ),
+        "CLASSIFY_RESUME_OUTCOME_UNKNOWN": (
+            "launch_executions.process_creation",
+            "launch_executions.job_object",
+            "launch_executions.resume_authorization",
+            "launch_executions.resume_intent",
+        ),
+        "SELECT_COMMITTED_SUCCESS": (),
+        "CLOSE_SESSION": (),
+        "ACKNOWLEDGE_RESTORE": (),
+    }
+    assert len(_RECOVERY_TARGET_EVIDENCE_CORRUPTION_CASES) == 12
+    assert "_validate_recovery_target_evidence" in inspect.getsource(
+        _record_recovery_locked
+    )
+    assert "_require_evidence_pair" in inspect.getsource(_record_recovery_locked)
+
+
+@pytest.mark.parametrize(
+    ("action", "pair"),
+    _RECOVERY_TARGET_EVIDENCE_CORRUPTION_CASES,
+    ids=lambda value: str(value),
+)
+def test_corrupt_recovery_target_evidence_blocks_without_mutation(
+    db_path: Path, action: str, pair: str
+) -> None:
+    connection = _connect(db_path)
+    session_id, target_kind, target_id, _, _ = _prepare_recovery_chronology_case(
+        connection, action
+    )
+    _corrupt_recovery_target_evidence(
+        connection, session_id, target_kind, target_id, pair
+    )
+    before = _database_rows(connection)
+    target_state = _target_state(connection, target_kind, target_id)
+
+    with pytest.raises(SchemaValidationError, match="does not match evidence bytes"):
+        record_recovery(connection, session_id, target_kind, target_id, action)
+
+    assert not connection.in_transaction
+    assert _database_rows(connection) == before
+    assert _target_state(connection, target_kind, target_id) == target_state
+    assert connection.execute("SELECT count(*) FROM manual_recoveries").fetchone() == (
+        0,
+    )
+    connection.execute("BEGIN IMMEDIATE")
+    connection.rollback()
     connection.close()

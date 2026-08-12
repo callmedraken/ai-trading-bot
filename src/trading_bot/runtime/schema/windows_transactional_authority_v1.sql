@@ -3,7 +3,7 @@ PRAGMA foreign_keys = ON;
 CREATE TABLE authority_metadata (
     authority_epoch_id TEXT PRIMARY KEY,
     machine_authority_id TEXT NOT NULL UNIQUE,
-    bootstrap_schema INTEGER NOT NULL CHECK (bootstrap_schema > 0),
+    bootstrap_schema INTEGER NOT NULL CHECK (bootstrap_schema = 1),
     bootstrap_generation INTEGER NOT NULL CHECK (bootstrap_generation > 0),
     signing_key_id TEXT NOT NULL,
     approved_account_sid TEXT NOT NULL,
@@ -42,14 +42,19 @@ CREATE TABLE authority_metadata (
     database_identity_digest BLOB NOT NULL CHECK (length(database_identity_digest) = 32),
     metadata_json BLOB NOT NULL,
     metadata_digest BLOB NOT NULL CHECK (length(metadata_digest) = 32),
+    production_schema_id TEXT NOT NULL CHECK (production_schema_id = 'windows-transactional-authority-schema/v1'),
+    production_schema_version INTEGER NOT NULL CHECK (production_schema_version = 1),
+    production_schema_digest BLOB NOT NULL CHECK (length(production_schema_digest) = 32),
+    metadata_encoding_version TEXT NOT NULL CHECK (metadata_encoding_version = 'authority-metadata/v1'),
+    initialization_policy_version TEXT NOT NULL CHECK (initialization_policy_version = 'authority-initialization/v1'),
     singleton_key INTEGER NOT NULL UNIQUE CHECK (singleton_key = 1)
 );
 
 CREATE TABLE schema_migrations (
     migration_id TEXT PRIMARY KEY,
     authority_epoch_id TEXT NOT NULL REFERENCES authority_metadata(authority_epoch_id),
-    schema_version INTEGER NOT NULL CHECK (schema_version > 0),
-    migration_policy_version TEXT NOT NULL,
+    schema_version INTEGER NOT NULL CHECK (schema_version = 1),
+    migration_policy_version TEXT NOT NULL CHECK (migration_policy_version = 'migration-policy/v1'),
     migration_digest BLOB NOT NULL CHECK (length(migration_digest) = 32),
     application_release_digest BLOB NOT NULL CHECK (length(application_release_digest) = 32),
     migration_json BLOB NOT NULL,
@@ -592,14 +597,6 @@ CREATE TABLE manual_recoveries (
     UNIQUE (session_id, recovery_ordinal)
 );
 
-CREATE TRIGGER authority_metadata_before_insert
-BEFORE INSERT ON authority_metadata
-FOR EACH ROW
-BEGIN
-    SELECT CASE WHEN sha256(NEW.metadata_json) IS NOT NEW.metadata_digest
-        THEN RAISE(ABORT, 'authority metadata evidence digest is invalid') END;
-END;
-
 CREATE TRIGGER authority_metadata_no_update
 BEFORE UPDATE ON authority_metadata
 BEGIN
@@ -622,8 +619,6 @@ CREATE TRIGGER schema_migrations_before_insert
 BEFORE INSERT ON schema_migrations
 FOR EACH ROW
 BEGIN
-    SELECT CASE WHEN sha256(NEW.migration_json) IS NOT NEW.migration_digest
-        THEN RAISE(ABORT, 'migration evidence digest is invalid') END;
     SELECT CASE WHEN NOT EXISTS (
         SELECT 1 FROM authority_metadata m
         WHERE m.authority_epoch_id = NEW.authority_epoch_id
@@ -825,8 +820,6 @@ BEGIN
         || json_quote(json_extract(NEW.request_json, '$.target_session_date'))
         || '}'
     ) THEN RAISE(ABORT, 'session request bytes are not canonical') END;
-    SELECT CASE WHEN sha256(NEW.request_json) IS NOT NEW.request_digest
-        THEN RAISE(ABORT, 'session request digest is invalid') END;
     SELECT CASE WHEN NOT EXISTS (
         SELECT 1 FROM authority_metadata m
         WHERE m.authority_epoch_id = NEW.authority_epoch_id
@@ -1031,14 +1024,6 @@ CREATE TRIGGER attempts_before_insert
 BEFORE INSERT ON attempts
 FOR EACH ROW
 BEGIN
-    SELECT CASE WHEN sha256(NEW.request_json) IS NOT NEW.request_digest
-        THEN RAISE(ABORT, 'attempt request digest is invalid') END;
-    SELECT CASE WHEN sha256(NEW.allocation_evidence_json)
-        IS NOT NEW.allocation_evidence_digest
-        THEN RAISE(ABORT, 'attempt allocation evidence digest is invalid') END;
-    SELECT CASE WHEN sha256(NEW.attempt_evidence_json)
-        IS NOT NEW.attempt_evidence_digest
-        THEN RAISE(ABORT, 'attempt evidence digest is invalid') END;
     SELECT CASE WHEN NOT EXISTS (
         SELECT 1 FROM sessions
         WHERE session_id = NEW.session_id AND state = 'OPEN'
@@ -1229,10 +1214,6 @@ CREATE TRIGGER provider_call_claims_before_insert
 BEFORE INSERT ON provider_call_claims
 FOR EACH ROW
 BEGIN
-    SELECT CASE WHEN sha256(NEW.request_json) IS NOT NEW.request_digest
-        THEN RAISE(ABORT, 'claim request digest is invalid') END;
-    SELECT CASE WHEN sha256(NEW.claim_evidence_json) IS NOT NEW.claim_evidence_digest
-        THEN RAISE(ABORT, 'claim evidence digest is invalid') END;
     SELECT CASE WHEN NOT EXISTS (
         SELECT 1
         FROM attempts a
@@ -1280,12 +1261,8 @@ BEGIN
                       AND safe_reservation.reservation_state = 'TERMINAL_RECORDED'
                       AND safe_reservation.process_creation_failure_json IS NOT NULL
                       AND safe_reservation.process_creation_failure_digest IS NOT NULL
-                      AND sha256(safe_reservation.process_creation_failure_json)
-                          IS safe_reservation.process_creation_failure_digest
                       AND safe_reservation.process_intent_json IS NOT NULL
                       AND safe_reservation.process_intent_digest IS NOT NULL
-                      AND sha256(safe_reservation.process_intent_json)
-                          IS safe_reservation.process_intent_digest
                       AND safe_terminal.terminal_state = 'FAILED'
                       AND safe_terminal.provider_call_disposition = 'NOT_STARTED'
                       AND safe_terminal.snapshot_digest IS NULL
@@ -1325,9 +1302,6 @@ CREATE TRIGGER launch_reservations_before_insert
 BEFORE INSERT ON launch_reservations
 FOR EACH ROW
 BEGIN
-    SELECT CASE WHEN sha256(NEW.reservation_evidence_json)
-        IS NOT NEW.reservation_evidence_digest
-        THEN RAISE(ABORT, 'reservation evidence digest is invalid') END;
     SELECT CASE WHEN NOT (
         NEW.reservation_state = 'COMMITTED'
         AND NEW.process_intent_json IS NULL
@@ -1367,7 +1341,6 @@ BEGIN
         AND NEW.process_intent_digest IS NOT NULL
         AND NEW.process_intent_committed_at_utc IS NOT NULL
         AND NEW.process_intent_committed_at_utc >= OLD.committed_at_utc
-        AND sha256(NEW.process_intent_json) IS NEW.process_intent_digest
         AND CAST(NEW.process_intent_json AS TEXT) =
             '{"authority_policy_version":"' || OLD.authority_policy_version ||
             '","claim_policy_version":"' || OLD.claim_policy_version ||
@@ -1391,12 +1364,10 @@ BEGIN
         AND OLD.process_creation_failure_digest IS NULL
         AND NEW.process_creation_failure_json IS NOT NULL
         AND NEW.process_creation_failure_digest IS NOT NULL
-        AND sha256(NEW.process_creation_failure_json) IS NEW.process_creation_failure_digest
         AND OLD.reservation_state = 'PROCESS_INTENT_COMMITTED'
         AND NEW.reservation_state = 'PROCESS_CREATION_FAILED'
         AND OLD.process_intent_json IS NOT NULL
         AND OLD.process_intent_digest IS NOT NULL
-        AND sha256(OLD.process_intent_json) IS OLD.process_intent_digest
         AND CAST(NEW.process_creation_failure_json AS TEXT) =
             '{"creation_result":"NOT_CREATED","process_intent_digest":"' ||
             lower(hex(OLD.process_intent_digest)) ||
@@ -1472,7 +1443,6 @@ WHEN NOT (
         AND NEW.process_intent_json IS NOT NULL
         AND NEW.process_intent_digest IS NOT NULL
         AND NEW.process_intent_committed_at_utc IS NOT NULL
-        AND sha256(NEW.process_intent_json) IS NEW.process_intent_digest
         AND EXISTS (
             SELECT 1
             FROM provider_call_claims c
@@ -1537,26 +1507,18 @@ WHEN NOT (
         AND OLD.process_intent_json IS NOT NULL
         AND OLD.process_intent_digest IS NOT NULL
         AND OLD.process_intent_committed_at_utc IS NOT NULL
-        AND sha256(OLD.process_intent_json) IS OLD.process_intent_digest
         AND EXISTS (
             SELECT 1 FROM launch_executions e
             WHERE e.launch_reservation_id = OLD.launch_reservation_id
               AND e.phase = 'PRE_RESUME_READY'
-              AND sha256(e.process_creation_json) IS e.process_creation_digest
-              AND sha256(e.job_object_json) IS e.job_object_digest
-              AND sha256(e.resume_authorization_json)
-                  IS e.resume_authorization_digest
         ))
     OR (OLD.reservation_state = 'PROCESS_INTENT_COMMITTED'
         AND NEW.reservation_state = 'PROCESS_CREATION_FAILED'
         AND OLD.process_intent_json IS NOT NULL
         AND OLD.process_intent_digest IS NOT NULL
         AND OLD.process_intent_committed_at_utc IS NOT NULL
-        AND sha256(OLD.process_intent_json) IS OLD.process_intent_digest
         AND NEW.process_creation_failure_json IS NOT NULL
         AND NEW.process_creation_failure_digest IS NOT NULL
-        AND sha256(NEW.process_creation_failure_json)
-            IS NEW.process_creation_failure_digest
         AND NOT EXISTS (
             SELECT 1 FROM launch_executions e
             WHERE e.launch_reservation_id = OLD.launch_reservation_id
@@ -1566,7 +1528,6 @@ WHEN NOT (
         AND OLD.process_intent_json IS NOT NULL
         AND OLD.process_intent_digest IS NOT NULL
         AND OLD.process_intent_committed_at_utc IS NOT NULL
-        AND sha256(OLD.process_intent_json) IS OLD.process_intent_digest
         AND EXISTS (
             SELECT 1
             FROM manual_recoveries mr
@@ -1629,7 +1590,6 @@ WHEN NOT (
                       AND e.phase = 'RESUME_INTENT_COMMITTED'
                       AND e.resume_intent_json IS NOT NULL
                       AND e.resume_intent_digest IS NOT NULL
-                      AND sha256(e.resume_intent_json) IS e.resume_intent_digest
                       AND e.resume_intent_committed_at_utc IS NOT NULL
                       AND e.post_resume_json IS NULL
                       AND e.post_resume_digest IS NULL
@@ -1690,7 +1650,6 @@ WHEN NOT (
         AND NEW.phase = 'RESUME_INTENT_COMMITTED'
         AND NEW.resume_intent_json IS NOT NULL
         AND NEW.resume_intent_digest IS NOT NULL
-        AND sha256(NEW.resume_intent_json) IS NEW.resume_intent_digest
         AND CAST(NEW.resume_intent_json AS TEXT) =
             '{"execution_id":"' || NEW.launch_execution_id ||
             '","resume_operation":"ResumeThread","schema":1}'
@@ -1716,14 +1675,12 @@ WHEN NOT (
         AND NEW.phase = 'RESUME_RECORDED'
         AND NEW.post_resume_json IS NOT NULL
         AND NEW.post_resume_digest IS NOT NULL
-        AND sha256(NEW.post_resume_json) IS NEW.post_resume_digest
         AND CAST(NEW.post_resume_json AS TEXT) =
             '{"execution_id":"' || NEW.launch_execution_id ||
             '","resume_intent_digest":"' || lower(hex(NEW.resume_intent_digest)) ||
             '","resume_result":"RESUMED","schema":1}'
         AND NEW.cleanup_json IS NOT NULL
         AND NEW.cleanup_digest IS NOT NULL
-        AND sha256(NEW.cleanup_json) IS NEW.cleanup_digest
         AND EXISTS (
             SELECT 1
             FROM launch_reservations r
@@ -1801,14 +1758,6 @@ CREATE TRIGGER launch_executions_before_insert
 BEFORE INSERT ON launch_executions
 FOR EACH ROW
 BEGIN
-    SELECT CASE WHEN sha256(NEW.process_creation_json)
-        IS NOT NEW.process_creation_digest
-        THEN RAISE(ABORT, 'process creation evidence digest is invalid') END;
-    SELECT CASE WHEN sha256(NEW.job_object_json) IS NOT NEW.job_object_digest
-        THEN RAISE(ABORT, 'job object evidence digest is invalid') END;
-    SELECT CASE WHEN sha256(NEW.resume_authorization_json)
-        IS NOT NEW.resume_authorization_digest
-        THEN RAISE(ABORT, 'resume authorization evidence digest is invalid') END;
     SELECT CASE WHEN NOT (
         NEW.phase = 'PRE_RESUME_READY'
         AND NEW.resume_intent_json IS NULL
@@ -1838,7 +1787,6 @@ BEGIN
           AND r.process_intent_json IS NOT NULL
           AND r.process_intent_digest IS NOT NULL
           AND r.process_intent_committed_at_utc IS NOT NULL
-          AND sha256(r.process_intent_json) IS r.process_intent_digest
           AND NEW.created_at_utc >= r.process_intent_committed_at_utc
           AND c.state = 'COMMITTED'
           AND a.state = 'LAUNCH_RESERVED'
@@ -1874,7 +1822,6 @@ BEGIN
         AND NEW.resume_intent_digest IS NOT NULL
         AND NEW.resume_intent_committed_at_utc IS NOT NULL
         AND NEW.resume_intent_committed_at_utc >= OLD.created_at_utc
-        AND sha256(NEW.resume_intent_json) IS NEW.resume_intent_digest
         AND CAST(NEW.resume_intent_json AS TEXT) =
             '{"execution_id":"' || NEW.launch_execution_id ||
             '","resume_operation":"ResumeThread","schema":1}'
@@ -1893,7 +1840,6 @@ BEGIN
         AND OLD.post_resume_digest IS NULL
         AND NEW.post_resume_json IS NOT NULL
         AND NEW.post_resume_digest IS NOT NULL
-        AND sha256(NEW.post_resume_json) IS NEW.post_resume_digest
         AND CAST(NEW.post_resume_json AS TEXT) =
             '{"execution_id":"' || NEW.launch_execution_id ||
             '","resume_intent_digest":"' || lower(hex(NEW.resume_intent_digest)) ||
@@ -1913,7 +1859,6 @@ BEGIN
         AND OLD.cleanup_digest IS NULL
         AND NEW.cleanup_json IS NOT NULL
         AND NEW.cleanup_digest IS NOT NULL
-        AND sha256(NEW.cleanup_json) IS NEW.cleanup_digest
         AND OLD.phase = 'RESUME_INTENT_COMMITTED'
         AND NEW.phase = 'RESUME_RECORDED'
     ) THEN RAISE(ABORT, 'cleanup evidence is append-only') END;
@@ -1929,11 +1874,6 @@ CREATE TRIGGER terminals_before_insert
 BEFORE INSERT ON terminals
 FOR EACH ROW
 BEGIN
-    SELECT CASE WHEN sha256(NEW.evidence_json) IS NOT NEW.evidence_digest
-        THEN RAISE(ABORT, 'terminal evidence digest is invalid') END;
-    SELECT CASE WHEN sha256(NEW.sanitized_diagnostics_json)
-        IS NOT NEW.sanitized_diagnostics_digest
-        THEN RAISE(ABORT, 'terminal diagnostics digest is invalid') END;
     SELECT CASE WHEN NOT EXISTS (
         SELECT 1
         FROM launch_reservations r
@@ -2042,7 +1982,6 @@ BEGIN
                AND r.reservation_state = 'PROCESS_CREATION_FAILED'
                AND r.process_intent_json IS NOT NULL
                AND r.process_intent_digest IS NOT NULL
-               AND sha256(r.process_intent_json) IS r.process_intent_digest
                AND r.process_creation_failure_json IS NOT NULL
                AND r.process_creation_failure_digest IS NOT NULL
          ))
@@ -2077,9 +2016,6 @@ CREATE TRIGGER session_selections_before_insert
 BEFORE INSERT ON session_selections
 FOR EACH ROW
 BEGIN
-    SELECT CASE WHEN sha256(NEW.selection_evidence_json)
-        IS NOT NEW.selection_evidence_digest
-        THEN RAISE(ABORT, 'selection evidence digest is invalid') END;
     SELECT CASE WHEN NOT EXISTS (
         SELECT 1 FROM sessions
         WHERE session_id = NEW.session_id AND state = 'OPEN'
@@ -2165,8 +2101,6 @@ BEGIN
         JOIN attempts a ON a.attempt_id = c.attempt_id
         WHERE t.terminal_id = NEW.target_id AND a.session_id = NEW.session_id
     ) THEN RAISE(ABORT, 'recovery terminal target binding is invalid') END;
-    SELECT CASE WHEN sha256(NEW.operator_evidence_json) IS NOT NEW.operator_evidence_digest
-        THEN RAISE(ABORT, 'recovery operator evidence digest is invalid') END;
     SELECT CASE WHEN NOT (
         NEW.recovery_schema = 1
         AND NEW.recovery_policy_version = 'recovery-policy/v1'
@@ -2298,10 +2232,8 @@ BEGIN
                AND e.phase = 'RESUME_RECORDED'
                AND e.post_resume_json IS NOT NULL
                AND e.post_resume_digest IS NOT NULL
-               AND sha256(e.post_resume_json) IS e.post_resume_digest
                AND e.cleanup_json IS NOT NULL
                AND e.cleanup_digest IS NOT NULL
-               AND sha256(e.cleanup_json) IS e.cleanup_digest
                AND s.state = 'OPEN'
                AND NOT EXISTS (
                    SELECT 1 FROM terminals t
@@ -2327,10 +2259,8 @@ BEGIN
                   AND e.phase = 'RESUME_RECORDED'
                   AND e.post_resume_json IS NOT NULL
                   AND e.post_resume_digest IS NOT NULL
-                  AND sha256(e.post_resume_json) IS e.post_resume_digest
                   AND e.cleanup_json IS NOT NULL
                   AND e.cleanup_digest IS NOT NULL
-                  AND sha256(e.cleanup_json) IS e.cleanup_digest
                   AND s.state = 'OPEN'
                   AND NOT EXISTS (
                       SELECT 1 FROM terminals t
@@ -2381,7 +2311,6 @@ BEGIN
                   AND r.process_intent_json IS NOT NULL
                   AND r.process_intent_digest IS NOT NULL
                   AND r.process_intent_committed_at_utc IS NOT NULL
-                  AND sha256(r.process_intent_json) IS r.process_intent_digest
                   AND r.process_creation_failure_json IS NULL
                   AND r.process_creation_failure_digest IS NULL
             )
@@ -2416,9 +2345,6 @@ BEGIN
                 SELECT 1 FROM launch_executions e
                 WHERE e.launch_reservation_id = NEW.target_id
                   AND e.phase = 'PRE_RESUME_READY'
-                  AND sha256(e.process_creation_json) IS e.process_creation_digest
-                  AND sha256(e.job_object_json) IS e.job_object_digest
-                  AND sha256(e.resume_authorization_json) IS e.resume_authorization_digest
                   AND e.resume_intent_json IS NULL
                   AND e.resume_intent_digest IS NULL
                   AND e.resume_intent_committed_at_utc IS NULL
@@ -2457,16 +2383,12 @@ BEGIN
                   AND e.phase = 'RESUME_INTENT_COMMITTED'
                   AND e.process_creation_json IS NOT NULL
                   AND e.process_creation_digest IS NOT NULL
-                  AND sha256(e.process_creation_json) IS e.process_creation_digest
                   AND e.job_object_json IS NOT NULL
                   AND e.job_object_digest IS NOT NULL
-                  AND sha256(e.job_object_json) IS e.job_object_digest
                   AND e.resume_authorization_json IS NOT NULL
                   AND e.resume_authorization_digest IS NOT NULL
-                  AND sha256(e.resume_authorization_json) IS e.resume_authorization_digest
                   AND e.resume_intent_json IS NOT NULL
                   AND e.resume_intent_digest IS NOT NULL
-                  AND sha256(e.resume_intent_json) IS e.resume_intent_digest
                   AND e.resume_intent_committed_at_utc IS NOT NULL
                   AND e.post_resume_json IS NULL
                   AND e.post_resume_digest IS NULL

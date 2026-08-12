@@ -7,9 +7,14 @@ import sqlite3
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
-from urllib.parse import quote
+from urllib.parse import quote, urlencode
 
 from trading_bot.runtime.windows_authority import WindowsAuthorityError
+from trading_bot.runtime.windows_authority_schema import (
+    SchemaValidationError,
+    configure_trusted_schema_off,
+    validate_schema_state,
+)
 
 
 class SqliteDurabilityError(WindowsAuthorityError):
@@ -21,6 +26,7 @@ class SqliteDatabaseState(StrEnum):
 
     NOT_PRESENT = "NOT_PRESENT"
     PRECREATED_UNINITIALIZED = "PRECREATED_UNINITIALIZED"
+    INITIALIZED_SUPPORTED = "INITIALIZED_SUPPORTED"
     INITIALIZED_UNSUPPORTED = "INITIALIZED_UNSUPPORTED"
     INVALID_MISMATCHED = "INVALID_MISMATCHED"
 
@@ -35,6 +41,7 @@ class InstalledSqliteEvidence:
     database_state: SqliteDatabaseState
     attached_database_count: int
     persistent_journal_present: bool
+    trusted_schema_off: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -48,6 +55,7 @@ class SqliteDurabilityEvidence:
     synchronous: int
     attached_database_count: int
     persistent_journal_present: bool
+    trusted_schema_off: bool
 
 
 def _require_exact_connection(connection: sqlite3.Connection) -> None:
@@ -78,12 +86,46 @@ def _require_persistent_journal(journal_path: str) -> None:
         raise SqliteDurabilityError("SQLite persistent journal is not pre-created")
 
 
+def _require_trusted_schema_off(connection: sqlite3.Connection) -> None:
+    try:
+        value = connection.execute("PRAGMA trusted_schema").fetchone()
+    except (sqlite3.Error, TypeError, ValueError, IndexError) as error:
+        raise SqliteDurabilityError("SQLite trusted_schema readback failed") from error
+    if value is None or type(value[0]) is not int or value[0] != 0:
+        raise SqliteDurabilityError("SQLite trusted_schema is not OFF")
+
+
 def _require_database_file(database_path: str) -> None:
     if not Path(database_path).is_file():
         raise SqliteDurabilityError("SQLite authority database is not pre-created")
 
 
-def _read_only_sqlite_uri(database_path: str | Path) -> str:
+def _require_vfs_name(vfs: str) -> str:
+    if (
+        type(vfs) is not str
+        or not vfs
+        or any(ord(character) < 0x20 or ord(character) == 0x7F for character in vfs)
+    ):
+        raise SqliteDurabilityError("SQLite VFS name is invalid")
+    return vfs
+
+
+def _sqlite_uri(database_path: str | Path, *, mode: str, vfs: str) -> str:
+    if mode not in {"ro", "rw"}:
+        raise SqliteDurabilityError("SQLite URI mode is invalid")
+    _require_vfs_name(vfs)
+    path = str(database_path)
+    if len(path) >= 3 and path[1] == ":" and path[2] in {"\\", "/"}:
+        normalized = path.replace("\\", "/")
+        encoded = quote(normalized, safe="/:")
+        prefix = f"file:///{encoded}"
+    else:
+        prefix = f"file:{quote(path, safe='/')}"
+    query = urlencode((("mode", mode), ("vfs", vfs)))
+    return f"{prefix}?{query}"
+
+
+def _disposable_read_only_sqlite_uri(database_path: str | Path) -> str:
     path = str(database_path)
     if len(path) >= 3 and path[1] == ":" and path[2] in {"\\", "/"}:
         normalized = path.replace("\\", "/")
@@ -92,15 +134,41 @@ def _read_only_sqlite_uri(database_path: str | Path) -> str:
     return f"file:{quote(path, safe='/')}?mode=ro"
 
 
-def open_read_only_sqlite_connection(database_path: str | Path) -> sqlite3.Connection:
-    """Open one existing database read-only without an implicit create fallback."""
+def open_read_only_sqlite_connection(
+    database_path: str | Path, *, vfs: str
+) -> sqlite3.Connection:
+    """Open one fixed database read-only through the explicitly approved VFS."""
 
+    _require_database_file(str(database_path))
     try:
-        return sqlite3.connect(_read_only_sqlite_uri(database_path), uri=True)
+        return sqlite3.connect(_sqlite_uri(database_path, mode="ro", vfs=vfs), uri=True)
     except sqlite3.Error as error:
         raise SqliteDurabilityError(
             "SQLite read-only database could not be opened"
         ) from error
+
+
+def open_writable_authority_sqlite_connection(
+    database_path: str | Path, *, vfs: str
+) -> sqlite3.Connection:
+    """Open one existing fixed database read-write through the approved VFS."""
+
+    _require_database_file(str(database_path))
+    try:
+        return sqlite3.connect(_sqlite_uri(database_path, mode="rw", vfs=vfs), uri=True)
+    except sqlite3.Error as error:
+        raise SqliteDurabilityError(
+            "SQLite writable database could not be opened"
+        ) from error
+
+
+def open_disposable_read_only_sqlite_connection(
+    database_path: str | Path,
+) -> sqlite3.Connection:
+    """Open a disposable read-only database without production VFS evidence."""
+
+    _require_database_file(str(database_path))
+    return sqlite3.connect(_disposable_read_only_sqlite_uri(database_path), uri=True)
 
 
 def _read_schema(connection: sqlite3.Connection) -> None:
@@ -145,7 +213,12 @@ def _schema_objects(
     return tuple(
         row
         for row in rows
-        if not (type(row[1]) is str and row[1].startswith("sqlite_"))
+        if not (
+            row[0] == "index"
+            and type(row[1]) is str
+            and row[1].startswith("sqlite_autoindex_")
+            and row[4] is None
+        )
     )
 
 
@@ -153,10 +226,11 @@ def _determine_database_state(connection: sqlite3.Connection) -> SqliteDatabaseS
     schema_objects = _schema_objects(connection)
     if not schema_objects:
         return SqliteDatabaseState.PRECREATED_UNINITIALIZED
-    raise SqliteDurabilityError(
-        f"{SqliteDatabaseState.INITIALIZED_UNSUPPORTED.value}: initialized "
-        "SQLite authority database is unsupported in Milestone A"
-    )
+    try:
+        state = validate_schema_state(connection)
+    except SchemaValidationError:
+        state = SqliteDatabaseState.INITIALIZED_UNSUPPORTED.value
+    return SqliteDatabaseState(state)
 
 
 def validate_installed_sqlite_prerequisites(
@@ -165,22 +239,36 @@ def validate_installed_sqlite_prerequisites(
     database_path: str | Path,
     journal_path: str | Path,
 ) -> InstalledSqliteEvidence:
-    """Validate installed SQLite files without configuring the connection.
+    """Validate installed SQLite files without mutating the database.
 
     This read-only layer proves the fixed database format, schema, integrity,
-    attachment, journal, and explicit lifecycle state. Runtime PRAGMAs are
-    connection-local and are intentionally not read or changed here.
+    attachment, journal, and explicit lifecycle state. It configures and
+    proves the connection-local trusted-schema fence while leaving other
+    runtime durability PRAGMAs unchanged.
     """
 
     _require_exact_connection(connection)
     expected_database = str(database_path)
     expected_journal = str(journal_path)
     _require_database_file(expected_database)
+    try:
+        configure_trusted_schema_off(connection)
+    except SchemaValidationError as error:
+        raise SqliteDurabilityError(str(error)) from error
+    _require_trusted_schema_off(connection)
     databases = _main_database(connection, expected_database)
     _read_schema(connection)
     _require_integrity(connection)
     _require_persistent_journal(expected_journal)
     database_state = _determine_database_state(connection)
+    if database_state in {
+        SqliteDatabaseState.INITIALIZED_UNSUPPORTED,
+        SqliteDatabaseState.INVALID_MISMATCHED,
+    }:
+        raise SqliteDurabilityError(
+            f"{database_state.value}: initialized SQLite authority schema is "
+            "unsupported or mismatched"
+        )
     return InstalledSqliteEvidence(
         database_path=expected_database,
         journal_path=expected_journal,
@@ -188,6 +276,7 @@ def validate_installed_sqlite_prerequisites(
         database_state=database_state,
         attached_database_count=len(databases),
         persistent_journal_present=True,
+        trusted_schema_off=True,
     )
 
 
@@ -212,6 +301,11 @@ def configure_and_validate_authority_sqlite_connection(
     expected_database = str(database_path)
     expected_journal = str(journal_path)
     _require_database_file(expected_database)
+    try:
+        configure_trusted_schema_off(connection)
+    except SchemaValidationError as error:
+        raise SqliteDurabilityError(str(error)) from error
+    _require_trusted_schema_off(connection)
     _main_database(connection, expected_database)
     _require_persistent_journal(expected_journal)
     try:
@@ -243,4 +337,5 @@ def configure_and_validate_authority_sqlite_connection(
         synchronous=synchronous,
         attached_database_count=len(databases),
         persistent_journal_present=True,
+        trusted_schema_off=True,
     )

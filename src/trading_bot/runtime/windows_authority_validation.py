@@ -1,9 +1,8 @@
-"""Complete installed validation and the executable-authority capability.
+"""Administrator evidence and Trading-runtime authority boundaries.
 
-This module is the only supported production interpretation of a fixed
-Windows authority that is both ``INITIALIZED_SUPPORTED`` and executable.
-Administrator provisioning remains responsible for mutation; this module
-owns the read-only validation chain and capability issuance.
+Administrator provisioning remains responsible for mutation and complete
+installed conformance. The dedicated Trading runtime owns the separate
+read-only executable-authority acquisition path.
 """
 
 from __future__ import annotations
@@ -46,11 +45,14 @@ from trading_bot.runtime.windows_authority_security import (
     authority_security_policy,
     inspect_fixed_authority_object,
     inspect_open_authority_object,
+    is_current_token_administrator,
+    is_current_token_elevated,
     open_authority_object,
     read_open_authority_file,
     require_administrator_token,
     require_security_policy,
     require_trading_standard_account,
+    resolve_current_token_sid,
     validate_fixed_parent_chain,
 )
 from trading_bot.runtime.windows_authority_sqlite import (
@@ -120,6 +122,9 @@ class ValidatedProductionAuthority:
             object.__setattr__(self, field, kwargs[field])
 
     def __setattr__(self, name: str, value: object) -> None:
+        raise AttributeError("ValidatedProductionAuthority is immutable")
+
+    def __delattr__(self, name: str) -> None:
         raise AttributeError("ValidatedProductionAuthority is immutable")
 
     def __repr__(self) -> str:
@@ -196,12 +201,11 @@ class InstalledDatabaseValidation:
 
 @dataclass(frozen=True, slots=True)
 class InstalledAuthorityValidation:
-    """Administrative validation facts plus the optional executable capability."""
+    """Administrative installation-conformance evidence only."""
 
     provisioning: ProvisioningEvidence
     bootstrap_verification: BootstrapVerification
     production_evidence: ProductionAuthorityEvidence | None
-    validated_production_authority: ValidatedProductionAuthority | None = None
 
 
 def _kind_for(path: PureWindowsPath) -> AuthorityObjectKind:
@@ -335,6 +339,56 @@ def _inspect_tree(trading_sid: str) -> tuple[tuple[str, ...], bool, bool]:
             )
             inspected.append(role)
     return tuple(inspected), database_present, journal_present
+
+
+def _inspect_runtime_tree(
+    trading_sid: str,
+) -> tuple[tuple[str, ...], bool, bool, bytes, bytes]:
+    """Inspect only objects granted to the dedicated Trading principal."""
+
+    inspected: list[str] = []
+    bootstrap_bytes = b""
+    signature_bytes = b""
+    required = (
+        (PRODUCTION_AUTHORITY_PATHS.root, "root"),
+        (PRODUCTION_AUTHORITY_PATHS.bootstrap, "bootstrap"),
+        (PRODUCTION_AUTHORITY_PATHS.signature, "signature"),
+        (PRODUCTION_AUTHORITY_PATHS.capture_output, "capture-output"),
+    )
+    for path, role in required:
+        with open_authority_object(path, _kind_for(path)) as handle:
+            inspection = inspect_open_authority_object(handle, path, _kind_for(path))
+            require_security_policy(
+                inspection, authority_security_policy(role, trading_sid)
+            )
+            if role == "bootstrap":
+                bootstrap_bytes = read_open_authority_file(handle)
+            elif role == "signature":
+                signature_bytes = read_open_authority_file(handle)
+        inspected.append(role)
+
+    database_present = os.path.lexists(str(PRODUCTION_AUTHORITY_PATHS.database))
+    journal_present = os.path.lexists(str(PRODUCTION_AUTHORITY_PATHS.journal))
+    for path, role in (
+        (PRODUCTION_AUTHORITY_PATHS.database, "database"),
+        (PRODUCTION_AUTHORITY_PATHS.journal, "journal"),
+    ):
+        if os.path.lexists(str(path)):
+            with open_authority_object(path, AuthorityObjectKind.FILE) as handle:
+                inspection = inspect_open_authority_object(
+                    handle, path, AuthorityObjectKind.FILE
+                )
+                require_security_policy(
+                    inspection, authority_security_policy(role, trading_sid)
+                )
+            inspected.append(role)
+    return (
+        tuple(inspected),
+        database_present,
+        journal_present,
+        bootstrap_bytes,
+        signature_bytes,
+    )
 
 
 def _validate_existing_authority_root(trading_sid: str) -> bool:
@@ -504,9 +558,8 @@ def _validate_installed_authority(
     key_registry: PinnedBootstrapKeyRegistry,
     release_manifest: ReleaseManifestEvidence | None = None,
     sqlite_build: SqliteAuthorityBuildEvidence | None = None,
-    capability_issuer: _CapabilityIssuer,
 ) -> InstalledAuthorityValidation:
-    """Validate the fixed install with production or explicitly test trust."""
+    """Validate complete installed conformance as administrator evidence."""
 
     require_administrator_token()
     trading_sid = require_trading_standard_account()
@@ -527,16 +580,6 @@ def _validate_installed_authority(
         release_manifest=release_manifest,
         sqlite_build=sqlite_build,
     )
-    capability = None
-    if database.production_evidence is not None:
-        capability = _validate_exact_identity(
-            bootstrap=verification.bootstrap,
-            bootstrap_digest=verification.bootstrap_digest,
-            trading_sid=trading_sid,
-            production=database.production_evidence,
-            require_fixed_database_path=True,
-            issuer=capability_issuer,
-        )
     return InstalledAuthorityValidation(
         provisioning=ProvisioningEvidence(
             ProvisioningState.VALIDATED,
@@ -551,7 +594,6 @@ def _validate_installed_authority(
         ),
         bootstrap_verification=verification,
         production_evidence=database.production_evidence,
-        validated_production_authority=capability,
     )
 
 
@@ -560,7 +602,6 @@ def validate_installed_authority_complete() -> InstalledAuthorityValidation:
 
     return _validate_installed_authority(
         key_registry=PRODUCTION_PINNED_BOOTSTRAP_KEYS,
-        capability_issuer=_PRODUCTION_CAPABILITY_ISSUER,
     )
 
 
@@ -582,7 +623,6 @@ def validate_installed_authority_complete_for_test(
         key_registry=key_registry,
         release_manifest=release_manifest,
         sqlite_build=sqlite_build,
-        capability_issuer=_TEST_CAPABILITY_ISSUER,
     )
 
 
@@ -601,17 +641,10 @@ def validate_installed_authority_for_test(
     ).provisioning
 
 
-def acquire_validated_production_authority() -> ValidatedProductionAuthority:
-    """Acquire the fixed, production-pinned executable-authority capability."""
-
-    validation = validate_installed_authority_complete()
-    return require_validated_production_authority(validation)
-
-
-def require_validated_production_authority(
+def require_initialized_supported_authority_evidence(
     validation: InstalledAuthorityValidation,
-) -> ValidatedProductionAuthority:
-    """Return the capability already issued by complete installed validation."""
+) -> ProductionAuthorityEvidence:
+    """Return reconciled administrator evidence without issuing authority."""
 
     if type(validation) is not InstalledAuthorityValidation:
         raise WindowsAuthorityError("installed validation result type is invalid")
@@ -626,63 +659,168 @@ def require_validated_production_authority(
         is not WindowsAuthorityBootstrap
     ):
         raise WindowsAuthorityError("installed validation evidence types are invalid")
-    capability = validation.validated_production_authority
-    if type(capability) is not ValidatedProductionAuthority:
-        raise WindowsAuthorityError(
-            "complete installed validation did not issue executable authority"
-        )
-    if capability._provenance is not _PRODUCTION_CAPABILITY_ISSUER:
-        raise WindowsAuthorityError(
-            "validated production authority has non-production provenance"
-        )
-    if capability.database_path != str(PRODUCTION_AUTHORITY_PATHS.database):
-        raise WindowsAuthorityError(
-            "validated production authority is not fixed-path bound"
-        )
     verification = validation.bootstrap_verification
     bootstrap = verification.bootstrap
     if (
         validation.provisioning.bootstrap_digest != verification.bootstrap_digest
         or validation.provisioning.trading_sid != bootstrap.approved_account_sid
-        or capability.authority_epoch_id != bootstrap.authority_epoch_id
-        or capability.machine_authority_id != bootstrap.machine_authority_id
-        or capability.bootstrap_schema != bootstrap.bootstrap_schema
-        or capability.bootstrap_generation != bootstrap.bootstrap_generation
-        or capability.signing_key_id != bootstrap.signing_key_id
-        or capability.approved_account_sid != bootstrap.approved_account_sid
-        or capability.provider_id != bootstrap.provider_id
-        or capability.permitted_provider_operation
-        != bootstrap.permitted_provider_operation
-        or capability.authority_policy_version != bootstrap.authority_policy_version
-        or capability.claim_policy_version != bootstrap.claim_policy_version
-        or capability.bootstrap_digest != verification.bootstrap_digest
-        or capability.database_identity_digest != bootstrap.database_identity_digest
+        or bootstrap.database_path != str(PRODUCTION_AUTHORITY_PATHS.database)
     ):
         raise WindowsAuthorityError(
-            "validated production authority does not match bootstrap evidence"
+            "administrator evidence does not match bootstrap facts"
         )
     production = validation.production_evidence
     if type(production) is not ProductionAuthorityEvidence:
         raise WindowsAuthorityError(
-            "validated production authority has no complete database evidence"
+            "initialized authority has no complete database evidence"
         )
-    if any(
-        getattr(capability, field) != getattr(production, field)
-        for field in (
-            "database_path",
-            "schema_id",
-            "schema_version",
-            "schema_digest",
-            "metadata_digest",
-            "migration_id",
-            "release_manifest_digest",
-            "sqlite_build_manifest_digest",
-        )
+    _validate_production_evidence_shape(production, require_fixed_database_path=True)
+    return production
+
+
+def _validate_production_evidence_shape(
+    production: ProductionAuthorityEvidence,
+    *,
+    require_fixed_database_path: bool,
+) -> None:
+    if type(production) is not ProductionAuthorityEvidence:
+        raise WindowsAuthorityError("validated authority evidence type is invalid")
+    if require_fixed_database_path and (
+        production.database_path != str(PRODUCTION_AUTHORITY_PATHS.database)
     ):
-        raise WindowsAuthorityError(
-            "validated production authority does not match database evidence"
+        raise WindowsAuthorityError("validated authority database path is not fixed")
+    if type(production.database_path) is not str or not production.database_path:
+        raise WindowsAuthorityError("validated authority database path is invalid")
+    if (
+        production.schema_id != PRODUCTION_SCHEMA_ID
+        or production.schema_version != PRODUCTION_SCHEMA_VERSION
+        or production.schema_digest != PRODUCTION_SCHEMA_ARTIFACT_SHA256
+    ):
+        raise WindowsAuthorityError("validated authority schema identity is invalid")
+    for field in (
+        "metadata_digest",
+        "release_manifest_digest",
+        "sqlite_build_manifest_digest",
+    ):
+        value = getattr(production, field)
+        if (
+            type(value) is not str
+            or len(value) != 64
+            or any(character not in "0123456789abcdef" for character in value)
+        ):
+            raise WindowsAuthorityError(f"validated authority {field} is invalid")
+    if type(production.migration_id) is not str or not production.migration_id:
+        raise WindowsAuthorityError("validated authority migration identity is invalid")
+
+
+def _require_current_trading_token() -> str:
+    """Prove the current process is the exact non-elevated Trading principal."""
+
+    current_sid = resolve_current_token_sid()
+    trading_sid = require_trading_standard_account()
+    if current_sid != trading_sid:
+        raise AuthorityPrincipalError(
+            "current process token is not the reviewed Trading principal"
         )
-    return capability
+    if is_current_token_elevated() or is_current_token_administrator():
+        raise AuthorityPrincipalError(
+            "Trading runtime authority requires a non-elevated standard token"
+        )
+    return current_sid
+
+
+def acquire_validated_production_authority() -> ValidatedProductionAuthority:
+    """Acquire executable authority inside the exact Trading process."""
+
+    trading_sid = _require_current_trading_token()
+    (
+        _inspected,
+        database_present,
+        journal_present,
+        bootstrap_bytes,
+        signature_bytes,
+    ) = _inspect_runtime_tree(trading_sid)
+    verification = _verify_material(
+        bootstrap_bytes,
+        signature_bytes,
+        trading_sid=trading_sid,
+        key_registry=PRODUCTION_PINNED_BOOTSTRAP_KEYS,
+    )
+    validate_lifecycle_mutex_security_descriptor(trading_sid)
+    database = validate_installed_database_complete(
+        database_present,
+        journal_present,
+        bootstrap=verification.bootstrap,
+        bootstrap_digest=verification.bootstrap_digest,
+        release_manifest=None,
+        sqlite_build=None,
+    )
+    if database.database_state is not SqliteDatabaseState.INITIALIZED_SUPPORTED:
+        raise WindowsAuthorityError(
+            "runtime authority requires INITIALIZED_SUPPORTED authority state"
+        )
+    production = database.production_evidence
+    if type(production) is not ProductionAuthorityEvidence:
+        raise WindowsAuthorityError(
+            "runtime authority has no complete database evidence"
+        )
+    capability = _validate_exact_identity(
+        bootstrap=verification.bootstrap,
+        bootstrap_digest=verification.bootstrap_digest,
+        trading_sid=trading_sid,
+        production=production,
+        require_fixed_database_path=True,
+        issuer=_PRODUCTION_CAPABILITY_ISSUER,
+    )
+    return require_validated_production_authority(capability)
+
+
+def require_validated_production_authority(
+    authority: ValidatedProductionAuthority,
+) -> ValidatedProductionAuthority:
+    """Validate the process-local production capability consumption boundary."""
+
+    if type(authority) is not ValidatedProductionAuthority:
+        raise WindowsAuthorityError("validated production authority type is invalid")
+    if authority._provenance is not _PRODUCTION_CAPABILITY_ISSUER:
+        raise WindowsAuthorityError(
+            "validated production authority has non-production provenance"
+        )
+    if authority.database_path != str(PRODUCTION_AUTHORITY_PATHS.database):
+        raise WindowsAuthorityError(
+            "validated production authority is not fixed-path bound"
+        )
+    if (
+        type(authority.schema_id) is not str
+        or type(authority.schema_version) is not int
+        or authority.schema_id != PRODUCTION_SCHEMA_ID
+        or authority.schema_version != PRODUCTION_SCHEMA_VERSION
+        or authority.schema_digest != PRODUCTION_SCHEMA_ARTIFACT_SHA256
+    ):
+        raise WindowsAuthorityError("validated production authority schema is invalid")
+    for field in (
+        "bootstrap_digest",
+        "database_identity_digest",
+        "metadata_digest",
+        "release_manifest_digest",
+        "sqlite_build_manifest_digest",
+    ):
+        value = getattr(authority, field)
+        if (
+            type(value) is not str
+            or len(value) != 64
+            or any(character not in "0123456789abcdef" for character in value)
+        ):
+            raise WindowsAuthorityError(
+                f"validated production authority {field} is invalid"
+            )
+    for field in _CAPABILITY_FIELDS:
+        value = getattr(authority, field)
+        if type(value) not in (str, int) or (type(value) is str and not value):
+            raise WindowsAuthorityError(
+                f"validated production authority field {field} is invalid"
+            )
+    return authority
 
 
 def acquire_validated_production_authority_for_test(

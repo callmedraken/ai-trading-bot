@@ -18,6 +18,7 @@ from trading_bot.runtime.windows_authority import (
 from trading_bot.runtime.windows_authority_schema import (
     AuthorityMetadataV1,
     AuthoritySchemaError,
+    ProductionAuthorityEvidence,
     ReleaseManifestEvidence,
     SchemaMigrationV1,
     SchemaValidationError,
@@ -40,9 +41,7 @@ from trading_bot.runtime.windows_authority_sqlite import (
 )
 from trading_bot.runtime.windows_authority_validation import (
     InstalledAuthorityValidation,
-    ValidatedProductionAuthority,
-    acquire_validated_production_authority_for_test,
-    require_validated_production_authority,
+    require_initialized_supported_authority_evidence,
     validate_installed_authority_complete,
 )
 
@@ -71,7 +70,7 @@ def _timestamp_now_utc() -> str:
 
 
 def _production_evidence(
-    authority: ValidatedProductionAuthority,
+    authority: ProductionAuthorityEvidence,
     state: SqliteDatabaseState,
 ) -> InitializationEvidence:
     return InitializationEvidence(
@@ -112,7 +111,7 @@ def _require_same_installed_authority(
 
 
 def _require_selected_approval_continuity(
-    authority: ValidatedProductionAuthority,
+    authority: ProductionAuthorityEvidence,
     *,
     selected_release: ReleaseManifestEvidence,
     selected_build: SqliteAuthorityBuildEvidence,
@@ -133,8 +132,8 @@ def _post_commit_installed_production_evidence(
     expected_validation: InstalledAuthorityValidation,
     selected_release: ReleaseManifestEvidence,
     selected_build: SqliteAuthorityBuildEvidence,
-) -> ValidatedProductionAuthority:
-    """Re-establish Windows trust, then consume its issued capability."""
+) -> ProductionAuthorityEvidence:
+    """Re-establish Windows trust and reconcile administrator evidence."""
 
     try:
         actual_validation = validate_installed_authority_complete()
@@ -144,7 +143,7 @@ def _post_commit_installed_production_evidence(
         ) from error
     _require_same_installed_authority(expected_validation, actual_validation)
     try:
-        authority = require_validated_production_authority(actual_validation)
+        authority = require_initialized_supported_authority_evidence(actual_validation)
         _require_selected_approval_continuity(
             authority,
             selected_release=selected_release,
@@ -153,7 +152,7 @@ def _post_commit_installed_production_evidence(
         return authority
     except WindowsAuthorityError as error:
         raise AuthorityInitializationError(
-            "post-commit validation did not issue executable authority"
+            "post-commit administrator evidence was not reconciled"
         ) from error
 
 
@@ -230,7 +229,7 @@ def _initialize_database_transaction(
     sqlite_build: SqliteAuthorityBuildEvidence,
     now_utc: str,
     connection_factory: Callable[..., sqlite3.Connection] | None = None,
-    post_commit_validator: Callable[[], ValidatedProductionAuthority],
+    post_commit_validator: Callable[[], ProductionAuthorityEvidence],
 ) -> InitializationEvidence:
     """Initialize one already-precreated pair; all evidence is ready before BEGIN."""
 
@@ -334,9 +333,9 @@ def _initialize_database_transaction(
             connection.close()
     try:
         evidence = post_commit_validator()
-        if type(evidence) is not ValidatedProductionAuthority:
+        if type(evidence) is not ProductionAuthorityEvidence:
             raise AuthorityInitializationError(
-                "post-commit validator returned invalid production capability"
+                "post-commit validator returned invalid production evidence"
             )
     except (
         AuthorityInitializationError,
@@ -366,7 +365,7 @@ def initialize_authority_database_for_test(
 ) -> InitializationEvidence:
     """Explicit test-injection boundary for disposable database acceptance tests."""
 
-    def validate_disposable_after_commit() -> ValidatedProductionAuthority:
+    def validate_disposable_after_commit() -> ProductionAuthorityEvidence:
         connection = open_disposable_read_only_sqlite_connection(database_path)
         try:
             evidence = validate_production_authority_database_for_test(
@@ -377,11 +376,7 @@ def initialize_authority_database_for_test(
                 release_manifest=release_manifest,
                 sqlite_build=sqlite_build,
             )
-            return acquire_validated_production_authority_for_test(
-                bootstrap=bootstrap,
-                bootstrap_digest=bootstrap_digest,
-                production_evidence=evidence,
-            )
+            return evidence
         finally:
             connection.close()
 
@@ -411,7 +406,7 @@ def initialize_installed_authority_database() -> InitializationEvidence:
     bootstrap = preflight.bootstrap_verification.bootstrap
     bootstrap_digest = preflight.bootstrap_verification.bootstrap_digest
     if provisioning.database_state == SqliteDatabaseState.INITIALIZED_SUPPORTED.value:
-        authority = require_validated_production_authority(preflight)
+        authority = require_initialized_supported_authority_evidence(preflight)
         _require_selected_approval_continuity(
             authority,
             selected_release=selected_release,

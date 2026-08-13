@@ -11,6 +11,7 @@ from trading_bot.runtime import windows_authority_initialization as initializati
 from trading_bot.runtime import windows_authority_provisioning as provisioning
 from trading_bot.runtime.windows_authority import (
     PRODUCTION_AUTHORITY_PATHS,
+    BootstrapVerification,
     WindowsAuthorityBootstrap,
 )
 from trading_bot.runtime.windows_authority_schema import (
@@ -20,6 +21,11 @@ from trading_bot.runtime.windows_authority_schema import (
     InitializationBlockedError,
     ProductionAuthorityEvidence,
     validate_production_authority_database_for_test,
+)
+from trading_bot.runtime.windows_authority_validation import (
+    InstalledAuthorityValidation,
+    ProvisioningEvidence,
+    ProvisioningState,
 )
 
 
@@ -33,33 +39,63 @@ def _installed_validation(
     bootstrap_digest: str = "bootstrap-1",
     trading_sid: str = "S-1-5-21-1",
     database_path: str | None = None,
-) -> SimpleNamespace:
-    bootstrap = SimpleNamespace(
-        machine_authority_id=machine_authority_id,
-        authority_epoch_id=authority_epoch_id,
+) -> InstalledAuthorityValidation:
+    bootstrap = WindowsAuthorityBootstrap(
+        bootstrap_schema=1,
         bootstrap_generation=bootstrap_generation,
-        database_identity_digest=database_identity_digest,
+        machine_authority_id=(
+            "11111111-1111-4111-8111-111111111111"
+            if machine_authority_id == "machine-1"
+            else "33333333-3333-4333-8333-333333333333"
+        ),
+        authority_epoch_id=(
+            "22222222-2222-4222-8222-222222222222"
+            if authority_epoch_id == "epoch-1"
+            else "44444444-4444-4444-8444-444444444444"
+        ),
+        signing_key_id="test-key",
         approved_account_sid=trading_sid,
+        database_path=str(PRODUCTION_AUTHORITY_PATHS.database),
+        output_root=str(PRODUCTION_AUTHORITY_PATHS.capture_output),
+        provider_id=ALPACA_DAILY_SNAPSHOT_DESCRIPTOR.provider_id,
+        permitted_provider_operation=ALPACA_DAILY_SNAPSHOT_DESCRIPTOR.operation,
+        authority_policy_version="authority-policy/v1",
+        claim_policy_version="claim-policy/v1",
+        database_identity_digest=(
+            "ab" * 32 if database_identity_digest == "database-1" else "cd" * 32
+        ),
     )
-    production = SimpleNamespace(
+    production = ProductionAuthorityEvidence(
         database_path=database_path or str(PRODUCTION_AUTHORITY_PATHS.database),
         schema_id=PRODUCTION_SCHEMA_ID,
         schema_version=PRODUCTION_SCHEMA_VERSION,
         schema_digest=PRODUCTION_SCHEMA_ARTIFACT_SHA256,
-        metadata_digest="metadata-1",
+        metadata_digest="33" * 32,
         migration_id="migration-1",
-        release_manifest_digest=bytes.fromhex("72656c65617365").hex(),
-        sqlite_build_manifest_digest=bytes.fromhex("6275696c64").hex(),
+        release_manifest_digest="11" * 32,
+        sqlite_build_manifest_digest="22" * 32,
     )
-    return SimpleNamespace(
-        provisioning=SimpleNamespace(
-            database_state=state,
-            bootstrap_digest=bootstrap_digest,
+    return InstalledAuthorityValidation(
+        provisioning=ProvisioningEvidence(
+            state=ProvisioningState.VALIDATED,
+            authority_root=str(PRODUCTION_AUTHORITY_PATHS.root),
+            bootstrap_digest=(
+                bootstrap.digest
+                if bootstrap_digest == "bootstrap-1"
+                else bootstrap_digest
+            ),
+            signing_key_id=bootstrap.signing_key_id,
             trading_sid=trading_sid,
+            inspected_objects=("root", "bootstrap", "signature"),
+            database_present=state != "NOT_PRESENT",
+            journal_present=state != "NOT_PRESENT",
+            database_state=state,
         ),
-        bootstrap_verification=SimpleNamespace(
+        bootstrap_verification=BootstrapVerification(
             bootstrap=bootstrap,
-            bootstrap_digest=bootstrap_digest,
+            bootstrap_digest=bootstrap.digest,
+            signing_key_id=bootstrap.signing_key_id,
+            signature_length=64,
         ),
         production_evidence=production if state == "INITIALIZED_SUPPORTED" else None,
     )
@@ -106,24 +142,6 @@ def _production_evidence(
         migration_id="migration-v1",
         release_manifest_digest=release_digest,
         sqlite_build_manifest_digest=sqlite_digest,
-    )
-
-
-def _test_capability(
-    *, release_digest: str = "11" * 32, sqlite_digest: str = "22" * 32
-) -> object:
-    from trading_bot.runtime.windows_authority_validation import (
-        acquire_validated_production_authority_for_test,
-    )
-
-    bootstrap = _bootstrap()
-    return acquire_validated_production_authority_for_test(
-        bootstrap=bootstrap,
-        bootstrap_digest=bootstrap.digest,
-        production_evidence=_production_evidence(
-            release_digest=release_digest,
-            sqlite_digest=sqlite_digest,
-        ),
     )
 
 
@@ -432,17 +450,13 @@ def test_post_commit_complete_validation_is_consumed_once(
     actual = _installed_validation()
     calls = 0
 
-    def complete_validation() -> SimpleNamespace:
+    def complete_validation() -> InstalledAuthorityValidation:
         nonlocal calls
         calls += 1
         return actual
 
     monkeypatch.setattr(
         initialization, "validate_installed_authority_complete", complete_validation
-    )
-    capability = _test_capability()
-    monkeypatch.setattr(
-        initialization, "require_validated_production_authority", lambda _: capability
     )
     release, build = _approved_identity()
     evidence = initialization._post_commit_installed_production_evidence(
@@ -452,7 +466,7 @@ def test_post_commit_complete_validation_is_consumed_once(
     )
 
     assert calls == 1
-    assert evidence is capability
+    assert evidence is actual.production_evidence
 
 
 def test_new_initializer_success_consumes_post_commit_complete_evidence(
@@ -464,7 +478,7 @@ def test_new_initializer_success_consumes_post_commit_complete_evidence(
     validations = iter((preflight, post_commit))
     calls = 0
 
-    def complete_validation() -> SimpleNamespace:
+    def complete_validation() -> InstalledAuthorityValidation:
         nonlocal calls
         calls += 1
         return next(validations)
@@ -473,7 +487,7 @@ def test_new_initializer_success_consumes_post_commit_complete_evidence(
         validator = kwargs["post_commit_validator"]
         assert callable(validator)
         authority = validator()
-        assert authority is capability
+        assert authority is post_commit.production_evidence
         return initialization._production_evidence(
             authority,  # type: ignore[arg-type]
             initialization.SqliteDatabaseState.INITIALIZED_SUPPORTED,  # type: ignore[arg-type]
@@ -489,10 +503,6 @@ def test_new_initializer_success_consumes_post_commit_complete_evidence(
     )
     monkeypatch.setattr(
         initialization, "validate_installed_authority_complete", complete_validation
-    )
-    capability = _test_capability()
-    monkeypatch.setattr(
-        initialization, "require_validated_production_authority", lambda _: capability
     )
     monkeypatch.setattr(
         initialization, "_initialize_database_transaction", fake_transaction
@@ -539,8 +549,8 @@ def test_new_initializer_rejects_post_commit_approval_mismatch(
     )
     monkeypatch.setattr(
         initialization,
-        "require_validated_production_authority",
-        lambda _: _test_capability(
+        "require_initialized_supported_authority_evidence",
+        lambda _: _production_evidence(
             release_digest=returned_release.digest.hex(),
             sqlite_digest=returned_build.digest.hex(),
         ),
@@ -585,10 +595,6 @@ def test_idempotent_initializer_returns_the_complete_boundary_evidence(
     monkeypatch.setattr(
         initialization, "validate_installed_authority_complete", complete_validation
     )
-    capability = _test_capability()
-    monkeypatch.setattr(
-        initialization, "require_validated_production_authority", lambda _: capability
-    )
     monkeypatch.setattr(
         initialization,
         "validate_production_authority_database_for_test",
@@ -627,8 +633,8 @@ def test_idempotent_initializer_rejects_approval_mismatch(
     )
     monkeypatch.setattr(
         initialization,
-        "require_validated_production_authority",
-        lambda _: _test_capability(
+        "require_initialized_supported_authority_evidence",
+        lambda _: _production_evidence(
             release_digest=returned_release.digest.hex(),
             sqlite_digest=returned_build.digest.hex(),
         ),

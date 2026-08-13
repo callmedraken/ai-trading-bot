@@ -3,14 +3,12 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
-from enum import StrEnum
 from pathlib import Path, PureWindowsPath
 
+from trading_bot.runtime import windows_authority_validation as authority_validation
 from trading_bot.runtime.windows_authority import (
     PRODUCTION_AUTHORITY_PATHS,
     PRODUCTION_PINNED_BOOTSTRAP_KEYS,
-    AuthorityPrincipalError,
     AuthorityRecoveryRequiredError,
     BootstrapVerification,
     PinnedBootstrapKeyRegistry,
@@ -18,19 +16,15 @@ from trading_bot.runtime.windows_authority import (
     WindowsAuthorityError,
     WindowsNativeError,
     parse_bootstrap_bytes,
-    verify_bootstrap_signature,
 )
 from trading_bot.runtime.windows_authority_mutex import (
     validate_lifecycle_mutex_security_descriptor,
 )
 from trading_bot.runtime.windows_authority_schema import (
-    ProductionAuthorityEvidence,
     ReleaseManifestEvidence,
     SqliteAuthorityBuildEvidence,
     load_approved_release_manifest,
     load_approved_sqlite_authority_build,
-    validate_production_authority_database,
-    validate_production_authority_database_connection,
 )
 from trading_bot.runtime.windows_authority_security import (
     ERROR_FILE_NOT_FOUND,
@@ -56,36 +50,13 @@ from trading_bot.runtime.windows_authority_sqlite import (
     open_read_only_sqlite_connection,
     validate_installed_sqlite_prerequisites,
 )
-
-
-class ProvisioningState(StrEnum):
-    VALIDATED = "VALIDATED"
-    PROVISIONED = "PROVISIONED"
-
-
-@dataclass(frozen=True, slots=True)
-class ProvisioningEvidence:
-    """Secret-free, stable evidence emitted by the administrator command."""
-
-    state: ProvisioningState
-    authority_root: str
-    bootstrap_digest: str
-    signing_key_id: str
-    trading_sid: str
-    inspected_objects: tuple[str, ...]
-    database_present: bool
-    journal_present: bool
-    database_initialization: str = "DEFERRED"
-    database_state: str = SqliteDatabaseState.NOT_PRESENT.value
-
-
-@dataclass(frozen=True, slots=True)
-class InstalledAuthorityValidation:
-    """Complete installed Windows-to-SQLite validation evidence."""
-
-    provisioning: ProvisioningEvidence
-    bootstrap_verification: BootstrapVerification
-    production_evidence: ProductionAuthorityEvidence | None
+from trading_bot.runtime.windows_authority_validation import (
+    InstalledAuthorityValidation,
+    ProvisioningEvidence,
+    ProvisioningState,
+    validate_bootstrap_installation,
+    validate_installed_database_complete,
+)
 
 
 def _kind_for(path: PureWindowsPath) -> AuthorityObjectKind:
@@ -108,28 +79,7 @@ def _verify_material(
     trading_sid: str,
     key_registry: PinnedBootstrapKeyRegistry,
 ) -> BootstrapVerification:
-    verification = verify_bootstrap_signature(
-        bootstrap_bytes,
-        signature_bytes,
-        key_registry=key_registry,
-    )
-    if verification.bootstrap.approved_account_sid != trading_sid:
-        raise AuthorityPrincipalError(
-            "resolved Trading SID does not match signed bootstrap"
-        )
-    return verification
-
-
-def validate_bootstrap_installation(
-    bootstrap_bytes: bytes,
-    signature_bytes: bytes,
-    *,
-    trading_sid: str,
-    key_registry: PinnedBootstrapKeyRegistry = PRODUCTION_PINNED_BOOTSTRAP_KEYS,
-) -> BootstrapVerification:
-    """Validate signed material and the actual resolved SID before filesystem work."""
-
-    return _verify_material(
+    return validate_bootstrap_installation(
         bootstrap_bytes,
         signature_bytes,
         trading_sid=trading_sid,
@@ -137,50 +87,33 @@ def validate_bootstrap_installation(
     )
 
 
-def _read_verified_installed_file(
-    path: PureWindowsPath,
-    role: str,
-    trading_sid: str,
-) -> bytes:
-    policy = authority_security_policy(role, trading_sid)
-    try:
+def _read_installed_material(trading_sid: str) -> tuple[bytes, bytes]:
+    """Retain the low-level administrator helper for existing diagnostics/tests."""
+
+    validate_fixed_parent_chain(
+        PRODUCTION_AUTHORITY_PATHS.bootstrap,
+        trading_sid=trading_sid,
+    )
+
+    def read_verified(path: PureWindowsPath, role: str) -> bytes:
+        policy = authority_security_policy(role, trading_sid)
         with open_authority_object(path, AuthorityObjectKind.FILE) as handle:
             inspection = inspect_open_authority_object(
                 handle, path, AuthorityObjectKind.FILE
             )
             require_security_policy(inspection, policy)
             return read_open_authority_file(handle)
-    except WindowsAuthorityError:
-        raise
-    except OSError as error:
-        raise WindowsAuthorityError(
-            "fixed bootstrap trust material could not be read"
-        ) from error
 
-
-def _read_installed_material(trading_sid: str) -> tuple[bytes, bytes]:
-    validate_fixed_parent_chain(
-        PRODUCTION_AUTHORITY_PATHS.bootstrap,
-        trading_sid=trading_sid,
-    )
     return (
-        _read_verified_installed_file(
-            PRODUCTION_AUTHORITY_PATHS.bootstrap,
-            "bootstrap",
-            trading_sid,
-        ),
-        _read_verified_installed_file(
-            PRODUCTION_AUTHORITY_PATHS.signature,
-            "signature",
-            trading_sid,
-        ),
+        read_verified(PRODUCTION_AUTHORITY_PATHS.bootstrap, "bootstrap"),
+        read_verified(PRODUCTION_AUTHORITY_PATHS.signature, "signature"),
     )
 
 
 def read_installed_authority_material(trading_sid: str) -> tuple[bytes, bytes]:
-    """Read the already security-validated fixed bootstrap pair."""
+    """Read installed material through the dedicated validation module."""
 
-    return _read_installed_material(trading_sid)
+    return authority_validation.read_installed_authority_material(trading_sid)
 
 
 def _inspect_tree(trading_sid: str) -> tuple[tuple[str, ...], bool, bool]:
@@ -314,40 +247,17 @@ def _validate_installed_database_complete(
     bootstrap_digest: str,
     release_manifest: ReleaseManifestEvidence | None,
     sqlite_build: SqliteAuthorityBuildEvidence | None,
-) -> tuple[SqliteDatabaseState, ProductionAuthorityEvidence | None]:
-    """Validate installed SQLite facts and production evidence on one connection."""
+) -> authority_validation.InstalledDatabaseValidation:
+    """Compatibility wrapper over the centralized complete validator."""
 
-    if not database_present and not journal_present:
-        return SqliteDatabaseState.NOT_PRESENT, None
-    if database_present != journal_present:
-        raise WindowsAuthorityError(
-            "pre-created authority database and persistent journal must be paired"
-        )
-    selected_build = sqlite_build or load_approved_sqlite_authority_build()
-    connection = open_read_only_sqlite_connection(
-        PRODUCTION_AUTHORITY_PATHS.database, vfs=selected_build.vfs
+    return validate_installed_database_complete(
+        database_present,
+        journal_present,
+        bootstrap=bootstrap,
+        bootstrap_digest=bootstrap_digest,
+        release_manifest=release_manifest,
+        sqlite_build=sqlite_build,
     )
-    try:
-        installed = validate_installed_sqlite_prerequisites(
-            connection,
-            database_path=PRODUCTION_AUTHORITY_PATHS.database,
-            journal_path=PRODUCTION_AUTHORITY_PATHS.journal,
-        )
-        state = installed.database_state
-        if state is not SqliteDatabaseState.INITIALIZED_SUPPORTED:
-            return state, None
-        selected_release = release_manifest or load_approved_release_manifest()
-        production = validate_production_authority_database_connection(
-            connection,
-            database_path=PRODUCTION_AUTHORITY_PATHS.database,
-            bootstrap=bootstrap,
-            bootstrap_digest=bootstrap_digest,
-            release_manifest=selected_release,
-            sqlite_build=selected_build,
-        )
-        return state, production
-    finally:
-        connection.close()
 
 
 def _require_reserved_temporary_objects_absent() -> None:
@@ -391,46 +301,23 @@ def _validate_installed_authority(
     release_manifest: ReleaseManifestEvidence | None = None,
     sqlite_build: SqliteAuthorityBuildEvidence | None = None,
 ) -> InstalledAuthorityValidation:
-    """Validate the fixed install with explicitly selected trust inputs."""
+    """Compatibility wrapper over the centralized installed validator."""
 
-    require_administrator_token()
-    trading_sid = require_trading_standard_account()
-    bootstrap_bytes, signature_bytes = _read_installed_material(trading_sid)
-    verification = _verify_material(
-        bootstrap_bytes,
-        signature_bytes,
-        trading_sid=trading_sid,
+    if (
+        key_registry is PRODUCTION_PINNED_BOOTSTRAP_KEYS
+        and release_manifest is None
+        and sqlite_build is None
+    ):
+        return authority_validation.validate_installed_authority_complete()
+    return authority_validation.validate_installed_authority_complete_for_test(
         key_registry=key_registry,
-    )
-    validate_lifecycle_mutex_security_descriptor(trading_sid)
-    inspected, database_present, journal_present = _inspect_tree(trading_sid)
-    database_state, production_evidence = _validate_installed_database_complete(
-        database_present,
-        journal_present,
-        bootstrap=verification.bootstrap,
-        bootstrap_digest=verification.bootstrap_digest,
         release_manifest=release_manifest,
         sqlite_build=sqlite_build,
-    )
-    return InstalledAuthorityValidation(
-        provisioning=ProvisioningEvidence(
-            ProvisioningState.VALIDATED,
-            str(PRODUCTION_AUTHORITY_PATHS.root),
-            verification.bootstrap_digest,
-            verification.signing_key_id,
-            trading_sid,
-            inspected,
-            database_present,
-            journal_present,
-            database_state=database_state.value,
-        ),
-        bootstrap_verification=verification,
-        production_evidence=production_evidence,
     )
 
 
 def validate_installed_authority_complete() -> InstalledAuthorityValidation:
-    """Prove installed authority from Windows trust through SQLite contents."""
+    """Prove installed authority through the centralized validation boundary."""
 
     return _validate_installed_authority(
         key_registry=PRODUCTION_PINNED_BOOTSTRAP_KEYS,
@@ -451,7 +338,7 @@ def validate_installed_authority_complete_for_test(
 ) -> InstalledAuthorityValidation:
     """Explicit test boundary for complete installed validation injection."""
 
-    return _validate_installed_authority(
+    return authority_validation.validate_installed_authority_complete_for_test(
         key_registry=key_registry,
         release_manifest=release_manifest,
         sqlite_build=sqlite_build,
@@ -466,7 +353,7 @@ def validate_installed_authority_for_test(
 ) -> ProvisioningEvidence:
     """Explicit test-only boundary for disposable trust-evidence injection."""
 
-    return validate_installed_authority_complete_for_test(
+    return authority_validation.validate_installed_authority_complete_for_test(
         key_registry=key_registry,
         release_manifest=release_manifest,
         sqlite_build=sqlite_build,
@@ -567,13 +454,21 @@ def _provision_authority(
             raise WindowsAuthorityError(
                 "approved SQLite VFS evidence is required for initialized authority"
             )
-        validate_production_authority_database(
-            database_path=PRODUCTION_AUTHORITY_PATHS.database,
+        complete = _validate_installed_database_complete(
+            True,
+            True,
             bootstrap=verification.bootstrap,
             bootstrap_digest=verification.bootstrap_digest,
             release_manifest=selected_release,
             sqlite_build=selected_build,
         )
+        if (
+            complete.database_state is not SqliteDatabaseState.INITIALIZED_SUPPORTED
+            or complete.production_evidence is None
+        ):
+            raise WindowsAuthorityError(
+                "initialized authority was not completely reconciled"
+            )
     try:
         if existing[PRODUCTION_AUTHORITY_PATHS.root]:
             _require_reserved_temporary_objects_absent()
@@ -613,7 +508,7 @@ def _provision_authority(
     inspected, database_present, journal_present = _inspect_tree(trading_sid)
     if database_present or journal_present:
         selected_build = selected_build or load_approved_sqlite_authority_build()
-        database_state, production_evidence = _validate_installed_database_complete(
+        complete = _validate_installed_database_complete(
             database_present,
             journal_present,
             bootstrap=verification.bootstrap,
@@ -621,9 +516,10 @@ def _provision_authority(
             release_manifest=release_manifest,
             sqlite_build=selected_build,
         )
-        if (
-            database_state is SqliteDatabaseState.INITIALIZED_SUPPORTED
-            and production_evidence is None
+        database_state = complete.database_state
+        production_evidence = complete.production_evidence
+        if database_state is SqliteDatabaseState.INITIALIZED_SUPPORTED and (
+            production_evidence is None
         ):
             raise WindowsAuthorityError(
                 "initialized authority was not completely reconciled"

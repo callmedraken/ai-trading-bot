@@ -15,14 +15,7 @@ from trading_bot.runtime.windows_authority import (
     WindowsAuthorityBootstrap,
     WindowsAuthorityError,
 )
-from trading_bot.runtime.windows_authority_provisioning import (
-    InstalledAuthorityValidation,
-    validate_installed_authority_complete,
-)
 from trading_bot.runtime.windows_authority_schema import (
-    PRODUCTION_SCHEMA_ARTIFACT_SHA256,
-    PRODUCTION_SCHEMA_ID,
-    PRODUCTION_SCHEMA_VERSION,
     AuthorityMetadataV1,
     AuthoritySchemaError,
     ProductionAuthorityEvidence,
@@ -45,6 +38,11 @@ from trading_bot.runtime.windows_authority_sqlite import (
     configure_and_validate_authority_sqlite_connection,
     open_disposable_read_only_sqlite_connection,
     open_writable_authority_sqlite_connection,
+)
+from trading_bot.runtime.windows_authority_validation import (
+    InstalledAuthorityValidation,
+    require_initialized_supported_authority_evidence,
+    validate_installed_authority_complete,
 )
 
 
@@ -72,66 +70,20 @@ def _timestamp_now_utc() -> str:
 
 
 def _production_evidence(
-    evidence: ProductionAuthorityEvidence,
+    authority: ProductionAuthorityEvidence,
     state: SqliteDatabaseState,
 ) -> InitializationEvidence:
     return InitializationEvidence(
         state=state,
-        database_path=evidence.database_path,
-        schema_id=evidence.schema_id,
-        schema_version=evidence.schema_version,
-        schema_digest=evidence.schema_digest,
-        metadata_digest=evidence.metadata_digest,
-        migration_id=evidence.migration_id,
-        release_manifest_digest=evidence.release_manifest_digest,
-        sqlite_build_manifest_digest=evidence.sqlite_build_manifest_digest,
+        database_path=authority.database_path,
+        schema_id=authority.schema_id,
+        schema_version=authority.schema_version,
+        schema_digest=authority.schema_digest,
+        metadata_digest=authority.metadata_digest,
+        migration_id=authority.migration_id,
+        release_manifest_digest=authority.release_manifest_digest,
+        sqlite_build_manifest_digest=authority.sqlite_build_manifest_digest,
     )
-
-
-def _require_supported_production_evidence(
-    validation: InstalledAuthorityValidation,
-    *,
-    bootstrap: WindowsAuthorityBootstrap,
-    bootstrap_digest: str,
-    release_manifest: ReleaseManifestEvidence,
-    sqlite_build: SqliteAuthorityBuildEvidence,
-) -> ProductionAuthorityEvidence:
-    """Require the complete installed proof before executable success."""
-
-    if (
-        validation.provisioning.database_state
-        != SqliteDatabaseState.INITIALIZED_SUPPORTED.value
-    ):
-        raise AuthorityInitializationError(
-            "complete installed validation did not prove INITIALIZED_SUPPORTED"
-        )
-    verification = validation.bootstrap_verification
-    if (
-        verification.bootstrap != bootstrap
-        or verification.bootstrap_digest != bootstrap_digest
-        or validation.provisioning.bootstrap_digest != bootstrap_digest
-        or validation.provisioning.trading_sid != bootstrap.approved_account_sid
-    ):
-        raise AuthorityInitializationError(
-            "installed authority bootstrap or Trading binding changed"
-        )
-    evidence = validation.production_evidence
-    if evidence is None:
-        raise AuthorityInitializationError(
-            "complete installed validation returned no production evidence"
-        )
-    if (
-        evidence.database_path != str(PRODUCTION_AUTHORITY_PATHS.database)
-        or evidence.schema_id != PRODUCTION_SCHEMA_ID
-        or evidence.schema_version != PRODUCTION_SCHEMA_VERSION
-        or evidence.schema_digest != PRODUCTION_SCHEMA_ARTIFACT_SHA256
-        or evidence.release_manifest_digest != release_manifest.digest.hex()
-        or evidence.sqlite_build_manifest_digest != sqlite_build.digest.hex()
-    ):
-        raise AuthorityInitializationError(
-            "installed production evidence does not match approved identity"
-        )
-    return evidence
 
 
 def _require_same_installed_authority(
@@ -158,15 +110,30 @@ def _require_same_installed_authority(
         )
 
 
+def _require_selected_approval_continuity(
+    authority: ProductionAuthorityEvidence,
+    *,
+    selected_release: ReleaseManifestEvidence,
+    selected_build: SqliteAuthorityBuildEvidence,
+) -> None:
+    """Require capability identities to match this invocation's approvals."""
+
+    if (
+        authority.release_manifest_digest != selected_release.digest.hex()
+        or authority.sqlite_build_manifest_digest != selected_build.digest.hex()
+    ):
+        raise AuthorityInitializationError(
+            "validated authority does not match selected release or SQLite build"
+        )
+
+
 def _post_commit_installed_production_evidence(
     *,
     expected_validation: InstalledAuthorityValidation,
-    bootstrap: WindowsAuthorityBootstrap,
-    bootstrap_digest: str,
-    release_manifest: ReleaseManifestEvidence,
-    sqlite_build: SqliteAuthorityBuildEvidence,
+    selected_release: ReleaseManifestEvidence,
+    selected_build: SqliteAuthorityBuildEvidence,
 ) -> ProductionAuthorityEvidence:
-    """Re-establish Windows trust, then consume its SQLite proof once."""
+    """Re-establish Windows trust and reconcile administrator evidence."""
 
     try:
         actual_validation = validate_installed_authority_complete()
@@ -175,13 +142,18 @@ def _post_commit_installed_production_evidence(
             "post-commit installed Windows validation failed"
         ) from error
     _require_same_installed_authority(expected_validation, actual_validation)
-    return _require_supported_production_evidence(
-        actual_validation,
-        bootstrap=bootstrap,
-        bootstrap_digest=bootstrap_digest,
-        release_manifest=release_manifest,
-        sqlite_build=sqlite_build,
-    )
+    try:
+        authority = require_initialized_supported_authority_evidence(actual_validation)
+        _require_selected_approval_continuity(
+            authority,
+            selected_release=selected_release,
+            selected_build=selected_build,
+        )
+        return authority
+    except WindowsAuthorityError as error:
+        raise AuthorityInitializationError(
+            "post-commit administrator evidence was not reconciled"
+        ) from error
 
 
 def _insert_metadata_and_migration(
@@ -396,7 +368,7 @@ def initialize_authority_database_for_test(
     def validate_disposable_after_commit() -> ProductionAuthorityEvidence:
         connection = open_disposable_read_only_sqlite_connection(database_path)
         try:
-            return validate_production_authority_database_for_test(
+            evidence = validate_production_authority_database_for_test(
                 connection,
                 database_path=database_path,
                 bootstrap=bootstrap,
@@ -404,6 +376,7 @@ def initialize_authority_database_for_test(
                 release_manifest=release_manifest,
                 sqlite_build=sqlite_build,
             )
+            return evidence
         finally:
             connection.close()
 
@@ -433,14 +406,15 @@ def initialize_installed_authority_database() -> InitializationEvidence:
     bootstrap = preflight.bootstrap_verification.bootstrap
     bootstrap_digest = preflight.bootstrap_verification.bootstrap_digest
     if provisioning.database_state == SqliteDatabaseState.INITIALIZED_SUPPORTED.value:
-        evidence = _require_supported_production_evidence(
-            preflight,
-            bootstrap=bootstrap,
-            bootstrap_digest=bootstrap_digest,
-            release_manifest=selected_release,
-            sqlite_build=selected_build,
+        authority = require_initialized_supported_authority_evidence(preflight)
+        _require_selected_approval_continuity(
+            authority,
+            selected_release=selected_release,
+            selected_build=selected_build,
         )
-        return _production_evidence(evidence, SqliteDatabaseState.INITIALIZED_SUPPORTED)
+        return _production_evidence(
+            authority, SqliteDatabaseState.INITIALIZED_SUPPORTED
+        )
     if (
         provisioning.database_state
         != SqliteDatabaseState.PRECREATED_UNINITIALIZED.value
@@ -456,9 +430,7 @@ def initialize_installed_authority_database() -> InitializationEvidence:
         now_utc=_timestamp_now_utc(),
         post_commit_validator=lambda: _post_commit_installed_production_evidence(
             expected_validation=preflight,
-            bootstrap=bootstrap,
-            bootstrap_digest=bootstrap_digest,
-            release_manifest=selected_release,
-            sqlite_build=selected_build,
+            selected_release=selected_release,
+            selected_build=selected_build,
         ),
     )

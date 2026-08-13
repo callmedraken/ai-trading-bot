@@ -866,9 +866,11 @@ scheduling acceptance requirement.
 - **Migration ambiguity:** v1 has one historical initialization row and no
   migration engine. Future schema changes require a new reviewed artifact and
   milestone.
-- **Administrator versus Trading:** initialization requires elevated admin;
-  Trading only consumes a fully validated authority. The signed SID is still
-  verified before either path reaches SQLite.
+- **Administrator versus Trading:** complete installation conformance and
+  initialization require elevated admin. The dedicated Trading process
+  performs the reviewed runtime-visible executable-authority proof, including
+  signed-SID verification, before receiving process-local authority. The
+  signed SID is verified before either path reaches SQLite.
 - **Path ordering:** fixed final-handle and bootstrap trust precede SQLite
   open; the SQLite URI cannot select an alternate path.
 - **Validation mutation:** installed validation is `mode=ro` and never writes

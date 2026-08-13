@@ -1,0 +1,277 @@
+from __future__ import annotations
+
+import pickle
+import sqlite3
+from inspect import signature
+
+import pytest
+
+from trading_bot.market_data import ALPACA_DAILY_SNAPSHOT_DESCRIPTOR
+from trading_bot.runtime.windows_authority import (
+    PRODUCTION_AUTHORITY_PATHS,
+    BootstrapVerification,
+    WindowsAuthorityBootstrap,
+    WindowsAuthorityError,
+)
+from trading_bot.runtime.windows_authority_schema import (
+    PRODUCTION_SCHEMA_ARTIFACT_SHA256,
+    PRODUCTION_SCHEMA_ID,
+    PRODUCTION_SCHEMA_VERSION,
+    ProductionAuthorityEvidence,
+)
+from trading_bot.runtime.windows_authority_sqlite import SqliteDatabaseState
+from trading_bot.runtime.windows_authority_validation import (
+    InstalledAuthorityValidation,
+    InstalledDatabaseValidation,
+    ProvisioningEvidence,
+    ProvisioningState,
+    ValidatedProductionAuthority,
+    acquire_validated_production_authority,
+    acquire_validated_production_authority_for_test,
+)
+from trading_bot.runtime.windows_transactional_authority import (
+    ConstructedProvider,
+    ExternalAuthorityBoundaryUnavailable,
+    GlobalLifecycleMutex,
+    ProviderConstructionPermit,
+    WindowsTransactionalAuthority,
+    _production_lifecycle_arbiter_factory,
+    commit_process_intent,
+    issue_constructed_provider_for_test,
+    snapshot_capture_request_for_test,
+)
+
+
+def _bootstrap() -> WindowsAuthorityBootstrap:
+    return WindowsAuthorityBootstrap(
+        bootstrap_schema=1,
+        bootstrap_generation=7,
+        machine_authority_id="11111111-1111-4111-8111-111111111111",
+        authority_epoch_id="22222222-2222-4222-8222-222222222222",
+        signing_key_id="test-key",
+        approved_account_sid="S-1-5-21-1",
+        database_path=str(PRODUCTION_AUTHORITY_PATHS.database),
+        output_root=str(PRODUCTION_AUTHORITY_PATHS.capture_output),
+        provider_id=ALPACA_DAILY_SNAPSHOT_DESCRIPTOR.provider_id,
+        permitted_provider_operation=ALPACA_DAILY_SNAPSHOT_DESCRIPTOR.operation,
+        authority_policy_version="authority-policy/v1",
+        claim_policy_version="claim-policy/v1",
+        database_identity_digest="ab" * 32,
+    )
+
+
+def _production_evidence() -> ProductionAuthorityEvidence:
+    return ProductionAuthorityEvidence(
+        database_path=str(PRODUCTION_AUTHORITY_PATHS.database),
+        schema_id=PRODUCTION_SCHEMA_ID,
+        schema_version=PRODUCTION_SCHEMA_VERSION,
+        schema_digest=PRODUCTION_SCHEMA_ARTIFACT_SHA256,
+        metadata_digest="33" * 32,
+        migration_id="migration-v1",
+        release_manifest_digest="11" * 32,
+        sqlite_build_manifest_digest="22" * 32,
+    )
+
+
+def _validation() -> InstalledAuthorityValidation:
+    bootstrap = _bootstrap()
+    return InstalledAuthorityValidation(
+        provisioning=ProvisioningEvidence(
+            state=ProvisioningState.VALIDATED,
+            authority_root=str(PRODUCTION_AUTHORITY_PATHS.root),
+            bootstrap_digest=bootstrap.digest,
+            signing_key_id=bootstrap.signing_key_id,
+            trading_sid=bootstrap.approved_account_sid,
+            inspected_objects=("root", "bootstrap", "signature"),
+            database_present=True,
+            journal_present=True,
+            database_state=SqliteDatabaseState.INITIALIZED_SUPPORTED.value,
+        ),
+        bootstrap_verification=BootstrapVerification(
+            bootstrap=bootstrap,
+            bootstrap_digest=bootstrap.digest,
+            signing_key_id=bootstrap.signing_key_id,
+            signature_length=64,
+        ),
+        production_evidence=_production_evidence(),
+    )
+
+
+def _production_validation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> ValidatedProductionAuthority:
+    import trading_bot.runtime.windows_authority_validation as validation
+
+    bootstrap = _bootstrap()
+    evidence = _production_evidence()
+    verification = BootstrapVerification(
+        bootstrap=bootstrap,
+        bootstrap_digest=bootstrap.digest,
+        signing_key_id=bootstrap.signing_key_id,
+        signature_length=64,
+    )
+    monkeypatch.setattr(
+        validation, "_require_current_trading_token", lambda: "S-1-5-21-1"
+    )
+    monkeypatch.setattr(
+        validation,
+        "_inspect_runtime_tree",
+        lambda sid: (("root", "bootstrap", "signature"), True, True, b"", b""),
+    )
+    monkeypatch.setattr(
+        validation, "_verify_material", lambda *args, **kwargs: verification
+    )
+    monkeypatch.setattr(
+        validation,
+        "validate_lifecycle_mutex_security_descriptor",
+        lambda sid: None,
+    )
+    monkeypatch.setattr(
+        validation,
+        "validate_installed_database_complete",
+        lambda *args, **kwargs: InstalledDatabaseValidation(
+            SqliteDatabaseState.INITIALIZED_SUPPORTED, evidence
+        ),
+    )
+    return acquire_validated_production_authority()
+
+
+def _test_authority() -> ValidatedProductionAuthority:
+    bootstrap = _bootstrap()
+    return acquire_validated_production_authority_for_test(
+        bootstrap=bootstrap,
+        bootstrap_digest=bootstrap.digest,
+        production_evidence=_production_evidence(),
+    )
+
+
+def test_production_constructor_requires_genuine_capability() -> None:
+    with pytest.raises(WindowsAuthorityError):
+        WindowsTransactionalAuthority(_test_authority())
+
+    with pytest.raises(WindowsAuthorityError):
+        WindowsTransactionalAuthority(_validation())  # type: ignore[arg-type]
+
+
+def test_genuine_capability_is_required_and_binds_the_database(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    authority = _production_validation(monkeypatch)
+    service = WindowsTransactionalAuthority(authority)
+    assert service.authority is authority
+    assert service.database_path == authority.database_path
+    service.close()
+
+
+def test_production_constructor_has_no_caller_path_or_connection_seam() -> None:
+    parameters = signature(WindowsTransactionalAuthority).parameters
+    assert tuple(parameters) == ("authority",)
+    assert "database_path" not in parameters
+    assert "connection" not in parameters
+    assert "vfs" not in parameters
+
+
+def test_public_capability_fields_cannot_reconstruct_authority() -> None:
+    authority = _test_authority()
+    fields = {
+        field: getattr(authority, field)
+        for field in authority.__slots__
+        if field != "_provenance"
+    }
+    with pytest.raises(TypeError):
+        ValidatedProductionAuthority(**fields)
+
+
+def test_c2_external_effect_boundary_fails_closed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service = WindowsTransactionalAuthority(_production_validation(monkeypatch))
+    with pytest.raises(ExternalAuthorityBoundaryUnavailable):
+        service.construct_provider(object())  # type: ignore[arg-type]
+    with pytest.raises(ExternalAuthorityBoundaryUnavailable):
+        service.create_process(object())  # type: ignore[arg-type]
+    with pytest.raises(ExternalAuthorityBoundaryUnavailable):
+        service.resume_thread(object())  # type: ignore[arg-type]
+
+
+def test_test_factory_is_explicit_and_rejects_active_transaction_before_arbiter() -> (
+    None
+):
+    connection = sqlite3.connect(":memory:", isolation_level=None)
+    arbiter_calls: list[str] = []
+
+    def arbiter(reservation_id: str):
+        arbiter_calls.append(reservation_id)
+        return GlobalLifecycleMutex("machine", "epoch", reservation_id)
+
+    service = WindowsTransactionalAuthority.for_test(
+        connection=connection,
+        lifecycle_arbiter_factory=arbiter,
+    )
+    connection.execute("BEGIN IMMEDIATE")
+    try:
+        with pytest.raises(ValueError, match="no active SQLite transaction"):
+            service.invoke_for_test(commit_process_intent, "reservation", object())
+        assert arbiter_calls == []
+    finally:
+        connection.rollback()
+        connection.close()
+
+
+def test_production_lifecycle_factory_uses_reviewed_global_mutex(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    authority = _production_validation(monkeypatch)
+    calls: list[tuple[object, ...]] = []
+
+    class Probe:
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            calls.append((*args, kwargs))
+
+    monkeypatch.setattr(
+        "trading_bot.runtime.windows_transactional_authority.GlobalLifecycleMutex",
+        Probe,
+    )
+    factory = _production_lifecycle_arbiter_factory(authority)
+    assert isinstance(factory("reservation"), Probe)
+    assert calls == [
+        (
+            authority.machine_authority_id,
+            authority.authority_epoch_id,
+            "reservation",
+            {"trading_sid": authority.approved_account_sid},
+        )
+    ]
+
+
+def test_transactional_capabilities_are_process_local_and_non_serializable() -> None:
+    capability = issue_constructed_provider_for_test("reservation")
+    assert isinstance(capability, ConstructedProvider)
+    assert not isinstance(capability, ProviderConstructionPermit)
+    with pytest.raises(TypeError, match="cannot be pickled"):
+        pickle.dumps(capability)
+
+
+def test_capture_request_vector_remains_exact() -> None:
+    request = {
+        "bar_interval": "1d",
+        "child_operation_version": "child/v1",
+        "ordered_universe": ["AAPL", "MSFT"],
+        "output_policy_version": "output/v1",
+        "permitted_provider_operation": "historical-stock-bars-v2-raw-usd-no-asof",
+        "provider_id": "alpaca-market-data",
+        "request_limit": 2,
+        "request_window_end_date": "2025-12-31",
+        "request_window_start_date": "2025-01-01",
+        "target_session_date": "2026-01-01",
+    }
+    snapshot = snapshot_capture_request_for_test(request)
+    assert snapshot.ordered_universe == ("AAPL", "MSFT")
+    assert snapshot.canonical_json() == (
+        b'{"bar_interval":"1d","child_operation_version":"child/v1",'
+        b'"ordered_universe":["AAPL","MSFT"],"output_policy_version":'
+        b'"output/v1","permitted_provider_operation":"historical-stock-bars-v2-raw-usd-no-asof",'
+        b'"provider_id":"alpaca-market-data","request_limit":2,'
+        b'"request_window_end_date":"2025-12-31","request_window_start_date":"2025-01-01",'
+        b'"target_session_date":"2026-01-01"}'
+    )

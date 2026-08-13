@@ -35,6 +35,10 @@ reconstructed from public fields.
 disposable seam for injected SQLite connections, test lifecycle arbiters, and
 fake adapters. It is not a production entry path.
 
+`invoke_for_test` is bound to that test-only construction provenance. A
+production-created service rejects it before opening its fixed authority
+database or invoking the callback.
+
 ## Fixed database binding
 
 Production opens only the database path already bound into the validated C1
@@ -103,6 +107,11 @@ registries retain the reviewed provenance checks; visible fields do not select
 lineage or arbiter identity. Registry records are checked before consumption,
 and one-shot permits are consumed at most once. The objects reject pickling
 and serialization.
+
+Test-issued provider/process/resume capabilities and receipts use distinct
+test provenance. Production service consumers reject that provenance before
+arbiter acquisition or durable mutation; the explicit `for_test` service
+context remains the only harness path that accepts it.
 
 Process death destroys unpersisted capabilities. A restarted process does not
 reconstruct a permit from SQLite or public fields; it re-resolves durable

@@ -97,6 +97,7 @@ class _ServiceContext:
     lifecycle_arbiter_factory: Callable[[str], AbstractContextManager[object]]
     timestamp_provider: Callable[[str], str]
     capture_request_provider: Callable[[object], ValidatedCaptureRequest]
+    test_only: bool
     external_adapter: TransactionalAuthorityAdapter | None = None
 
 
@@ -123,6 +124,29 @@ def _require_service_context() -> _ServiceContext:
             "transactional authority operation requires a bound service"
         )
     return context
+
+
+def _service_issuer(production_issuer: object, test_issuer: object) -> object:
+    return test_issuer if _require_service_context().test_only else production_issuer
+
+
+def _require_service_provenance(
+    capability: object,
+    *,
+    production_issuer: object,
+    test_issuer: object,
+    label: str,
+    test_only: bool | None = None,
+) -> None:
+    if test_only is None:
+        test_only = _require_service_context().test_only
+    expected_issuer = test_issuer if test_only else production_issuer
+    if getattr(capability, "_issuer", None) is not expected_issuer:
+        if test_only:
+            raise TypeError(f"{label} has invalid test service provenance issuer")
+        raise ExternalAuthorityBoundaryUnavailable(
+            f"{label} has invalid production service provenance"
+        )
 
 
 def _production_timestamp(fallback: str) -> str:
@@ -155,6 +179,12 @@ _PROCESS_RESULT_ISSUER = object()
 _RESUME_RESULT_ISSUER = object()
 _PROVIDER_CONSTRUCTION_ISSUER = object()
 _CONSTRUCTED_PROVIDER_ISSUER = object()
+_TEST_RESUME_INTENT_ISSUER = object()
+_TEST_PROCESS_INTENT_ISSUER = object()
+_TEST_PROCESS_RESULT_ISSUER = object()
+_TEST_RESUME_RESULT_ISSUER = object()
+_TEST_PROVIDER_CONSTRUCTION_ISSUER = object()
+_TEST_CONSTRUCTED_PROVIDER_ISSUER = object()
 _ISSUED_RESUME_PERMITS_LOCK = threading.Lock()
 _ISSUED_PROCESS_PERMITS_LOCK = threading.Lock()
 _ISSUED_PROCESS_RESULTS_LOCK = threading.Lock()
@@ -218,7 +248,10 @@ class ProviderConstructionPermit(_ProcessLocalCapability):
     _permit: _ProviderConstructionOneShot = field(repr=False, compare=False)
 
     def __post_init__(self) -> None:
-        if self._issuer is not _PROVIDER_CONSTRUCTION_ISSUER:
+        if self._issuer not in (
+            _PROVIDER_CONSTRUCTION_ISSUER,
+            _TEST_PROVIDER_CONSTRUCTION_ISSUER,
+        ):
             raise TypeError(
                 "fake provider construction permits require reservation commit"
             )
@@ -236,7 +269,10 @@ class ConstructedProvider(_ProcessLocalCapability):
     _permit: _ConstructedProviderOneShot = field(repr=False, compare=False)
 
     def __post_init__(self) -> None:
-        if self._issuer is not _CONSTRUCTED_PROVIDER_ISSUER:
+        if self._issuer not in (
+            _CONSTRUCTED_PROVIDER_ISSUER,
+            _TEST_CONSTRUCTED_PROVIDER_ISSUER,
+        ):
             raise TypeError("fake constructed providers can only come from the adapter")
 
 
@@ -251,7 +287,10 @@ class ProcessIntent(_ProcessLocalCapability):
     _permit: _ProcessPermit = field(repr=False, compare=False)
 
     def __post_init__(self) -> None:
-        if self._issuer is not _PROCESS_INTENT_ISSUER:
+        if self._issuer not in (
+            _PROCESS_INTENT_ISSUER,
+            _TEST_PROCESS_INTENT_ISSUER,
+        ):
             raise TypeError("fake process intents can only be issued after commit")
 
 
@@ -271,7 +310,10 @@ class ProcessCreationReceipt(_ProcessLocalCapability):
     _permit: _ProcessResultPermit = field(repr=False, compare=False)
 
     def __post_init__(self) -> None:
-        if self._issuer is not _PROCESS_RESULT_ISSUER:
+        if self._issuer not in (
+            _PROCESS_RESULT_ISSUER,
+            _TEST_PROCESS_RESULT_ISSUER,
+        ):
             raise TypeError("fake process receipts can only come from the adapter")
 
 
@@ -287,7 +329,10 @@ class ProcessCreationFailure(_ProcessLocalCapability):
     _permit: _ProcessResultPermit = field(repr=False, compare=False)
 
     def __post_init__(self) -> None:
-        if self._issuer is not _PROCESS_RESULT_ISSUER:
+        if self._issuer not in (
+            _PROCESS_RESULT_ISSUER,
+            _TEST_PROCESS_RESULT_ISSUER,
+        ):
             raise TypeError("fake process failures can only come from the adapter")
 
 
@@ -303,7 +348,10 @@ class ResumeIntent(_ProcessLocalCapability):
     _permit: _ResumePermit = field(repr=False, compare=False)
 
     def __post_init__(self) -> None:
-        if self._issuer is not _RESUME_INTENT_ISSUER:
+        if self._issuer not in (
+            _RESUME_INTENT_ISSUER,
+            _TEST_RESUME_INTENT_ISSUER,
+        ):
             raise TypeError("fake resume intents can only be issued after commit")
 
 
@@ -320,7 +368,10 @@ class ResumeReceipt(_ProcessLocalCapability):
     _permit: _ResumeResultPermit = field(repr=False, compare=False)
 
     def __post_init__(self) -> None:
-        if self._issuer is not _RESUME_RESULT_ISSUER:
+        if self._issuer not in (
+            _RESUME_RESULT_ISSUER,
+            _TEST_RESUME_RESULT_ISSUER,
+        ):
             raise TypeError("fake resume receipts can only come from the adapter")
 
 
@@ -1102,16 +1153,20 @@ def reserve_launch(
         _finish(connection, False)
         raise
     one_shot = _ProviderConstructionOneShot()
+    issuer = _service_issuer(
+        _PROVIDER_CONSTRUCTION_ISSUER,
+        _TEST_PROVIDER_CONSTRUCTION_ISSUER,
+    )
     capability = ProviderConstructionPermit(
         reservation_id,
-        _issuer=_PROVIDER_CONSTRUCTION_ISSUER,
+        _issuer=issuer,
         _permit=one_shot,
     )
     with _ISSUED_PROVIDER_CONSTRUCTION_PERMITS_LOCK:
         _ISSUED_PROVIDER_CONSTRUCTION_PERMITS[one_shot] = _ProviderConstructionIssuance(
             capability=capability,
             reservation_id=reservation_id,
-            issuer=_PROVIDER_CONSTRUCTION_ISSUER,
+            issuer=issuer,
             permit=one_shot,
         )
     return capability
@@ -1141,7 +1196,10 @@ def _registered_provider_reservation_id(
 ) -> str:
     if type(capability) is not ProviderConstructionPermit:
         raise TypeError("provider construction requires a reservation-issued permit")
-    if capability._issuer is not _PROVIDER_CONSTRUCTION_ISSUER:
+    if capability._issuer not in (
+        _PROVIDER_CONSTRUCTION_ISSUER,
+        _TEST_PROVIDER_CONSTRUCTION_ISSUER,
+    ):
         raise TypeError("provider construction permit issuer is invalid")
     permit = capability._permit
     if type(permit) is not _ProviderConstructionOneShot:
@@ -1199,7 +1257,10 @@ def _registered_constructed_provider_reservation_id(
 ) -> str:
     if type(provider) is not ConstructedProvider:
         raise TypeError("process intent requires an opaque constructed provider")
-    if provider._issuer is not _CONSTRUCTED_PROVIDER_ISSUER:
+    if provider._issuer not in (
+        _CONSTRUCTED_PROVIDER_ISSUER,
+        _TEST_CONSTRUCTED_PROVIDER_ISSUER,
+    ):
         raise TypeError("constructed provider issuer is invalid")
     permit = provider._permit
     if type(permit) is not _ConstructedProviderOneShot:
@@ -1261,6 +1322,12 @@ def commit_process_intent(
     _require_no_active_transaction(connection)
     if type(provider) is not ConstructedProvider:
         raise TypeError("process intent requires an opaque constructed provider")
+    _require_service_provenance(
+        provider,
+        production_issuer=_CONSTRUCTED_PROVIDER_ISSUER,
+        test_issuer=_TEST_CONSTRUCTED_PROVIDER_ISSUER,
+        label="constructed provider",
+    )
     registered_reservation_id = _registered_constructed_provider_reservation_id(
         provider
     )
@@ -1398,11 +1465,12 @@ def _commit_process_intent_locked(
         raise
     _consume_constructed_provider(provider, reservation_id)
     permit = _ProcessPermit()
+    issuer = _service_issuer(_PROCESS_INTENT_ISSUER, _TEST_PROCESS_INTENT_ISSUER)
     intent = ProcessIntent(
         reservation_id=reservation_id,
         intent_json=intent_json,
         intent_digest=intent_digest,
-        _issuer=_PROCESS_INTENT_ISSUER,
+        _issuer=issuer,
         _permit=permit,
     )
     with _ISSUED_PROCESS_PERMITS_LOCK:
@@ -1411,7 +1479,7 @@ def _commit_process_intent_locked(
             reservation_id=reservation_id,
             intent_json=intent_json,
             intent_digest=intent_digest,
-            issuer=_PROCESS_INTENT_ISSUER,
+            issuer=issuer,
             permit=permit,
         )
     return intent
@@ -1448,7 +1516,7 @@ def _process_failure_json(reservation_id: str, process_intent_digest: bytes) -> 
 def _registered_process_intent_reservation_id(intent: ProcessIntent) -> str:
     if type(intent) is not ProcessIntent:
         raise TypeError("CreateProcessW requires an opaque fake process intent")
-    if intent._issuer is not _PROCESS_INTENT_ISSUER:
+    if intent._issuer not in (_PROCESS_INTENT_ISSUER, _TEST_PROCESS_INTENT_ISSUER):
         raise TypeError("CreateProcessW process intent issuer is invalid")
     permit = intent._permit
     if type(permit) is not _ProcessPermit:
@@ -1527,7 +1595,9 @@ def _process_result_visible_evidence(
 def _registered_process_result_reservation_id(
     result: ProcessCreationReceipt | ProcessCreationFailure,
 ) -> str:
-    if result._issuer is not _PROCESS_RESULT_ISSUER:
+    if type(result) not in {ProcessCreationReceipt, ProcessCreationFailure}:
+        raise TypeError("process result type is invalid")
+    if result._issuer not in (_PROCESS_RESULT_ISSUER, _TEST_PROCESS_RESULT_ISSUER):
         raise TypeError("process result issuer is invalid")
     permit = result._permit
     if type(permit) is not _ProcessResultPermit:
@@ -1588,7 +1658,7 @@ def _consume_process_result(
 def _registered_resume_intent_binding(intent: ResumeIntent) -> tuple[str, str]:
     if type(intent) is not ResumeIntent:
         raise TypeError("ResumeThread requires an opaque fake resume intent")
-    if intent._issuer is not _RESUME_INTENT_ISSUER:
+    if intent._issuer not in (_RESUME_INTENT_ISSUER, _TEST_RESUME_INTENT_ISSUER):
         raise TypeError("ResumeThread intent issuer is invalid")
     permit = intent._permit
     if type(permit) is not _ResumePermit:
@@ -1651,7 +1721,7 @@ def _consume_resume_intent(
 def _registered_resume_result_binding(result: ResumeReceipt) -> tuple[str, str]:
     if type(result) is not ResumeReceipt:
         raise TypeError("post-resume evidence requires a fake resume receipt")
-    if result._issuer is not _RESUME_RESULT_ISSUER:
+    if result._issuer not in (_RESUME_RESULT_ISSUER, _TEST_RESUME_RESULT_ISSUER):
         raise TypeError("resume result issuer is invalid")
     permit = result._permit
     if type(permit) is not _ResumeResultPermit:
@@ -1718,6 +1788,12 @@ def record_execution(
     _require_no_active_transaction(connection)
     if type(receipt) is not ProcessCreationReceipt:
         raise TypeError("record_execution requires a fake process creation receipt")
+    _require_service_provenance(
+        receipt,
+        production_issuer=_PROCESS_RESULT_ISSUER,
+        test_issuer=_TEST_PROCESS_RESULT_ISSUER,
+        label="process creation receipt",
+    )
     registered_reservation_id = _registered_process_result_reservation_id(receipt)
     if registered_reservation_id != str(reservation_id):
         raise ValueError("process creation receipt belongs to another reservation")
@@ -1974,12 +2050,13 @@ def _commit_resume_intent_locked(
         _finish(connection, False)
         raise
     permit = _ResumePermit()
+    issuer = _service_issuer(_RESUME_INTENT_ISSUER, _TEST_RESUME_INTENT_ISSUER)
     intent = ResumeIntent(
         execution_id=execution_id,
         reservation_id=reservation_id,
         intent_json=intent_json,
         intent_digest=intent_digest,
-        _issuer=_RESUME_INTENT_ISSUER,
+        _issuer=issuer,
         _permit=permit,
     )
     with _ISSUED_RESUME_PERMITS_LOCK:
@@ -1989,7 +2066,7 @@ def _commit_resume_intent_locked(
             reservation_id=reservation_id,
             intent_json=intent_json,
             intent_digest=intent_digest,
-            issuer=_RESUME_INTENT_ISSUER,
+            issuer=issuer,
             permit=permit,
         )
     return intent
@@ -2006,6 +2083,12 @@ def record_process_creation_failure(
         raise TypeError(
             "record_process_creation_failure requires a fake process creation failure"
         )
+    _require_service_provenance(
+        failure,
+        production_issuer=_PROCESS_RESULT_ISSUER,
+        test_issuer=_TEST_PROCESS_RESULT_ISSUER,
+        label="process creation failure",
+    )
     registered_reservation_id = _registered_process_result_reservation_id(failure)
     if registered_reservation_id != str(reservation_id):
         raise ValueError("process creation failure belongs to another reservation")
@@ -2116,6 +2199,12 @@ def record_post_resume_evidence(
     _require_no_active_transaction(connection)
     if type(resume_receipt) is not ResumeReceipt:
         raise TypeError("post-resume evidence requires a fake resume receipt")
+    _require_service_provenance(
+        resume_receipt,
+        production_issuer=_RESUME_RESULT_ISSUER,
+        test_issuer=_TEST_RESUME_RESULT_ISSUER,
+        label="resume receipt",
+    )
     registered_execution_id, registered_reservation_id = (
         _registered_resume_result_binding(resume_receipt)
     )
@@ -2800,6 +2889,7 @@ class WindowsTransactionalAuthority:
             ),
             timestamp_provider=_production_timestamp,
             capture_request_provider=_snapshot_capture_request,
+            test_only=False,
         )
 
     @classmethod
@@ -2829,6 +2919,7 @@ class WindowsTransactionalAuthority:
                 if capture_request_factory is None
                 else capture_request_factory
             ),
+            test_only=True,
             external_adapter=external_adapter,
         )
         return instance
@@ -2874,6 +2965,10 @@ class WindowsTransactionalAuthority:
     ) -> Any:
         """Invoke one extracted operation against the disposable test seam."""
 
+        if not self._context.test_only:
+            raise ExternalAuthorityBoundaryUnavailable(
+                "invoke_for_test is available only on for_test services"
+            )
         return self._invoke(operation, *args, **kwargs)
 
     def _invoke(self, operation: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
@@ -2914,11 +3009,25 @@ class WindowsTransactionalAuthority:
     def commit_process_intent(
         self, reservation_id: str, provider: ConstructedProvider
     ) -> ProcessIntent:
+        _require_service_provenance(
+            provider,
+            production_issuer=_CONSTRUCTED_PROVIDER_ISSUER,
+            test_issuer=_TEST_CONSTRUCTED_PROVIDER_ISSUER,
+            label="constructed provider",
+            test_only=self._context.test_only,
+        )
         return self._invoke(commit_process_intent, reservation_id, provider)
 
     def record_execution(
         self, reservation_id: str, receipt: ProcessCreationReceipt
     ) -> str:
+        _require_service_provenance(
+            receipt,
+            production_issuer=_PROCESS_RESULT_ISSUER,
+            test_issuer=_TEST_PROCESS_RESULT_ISSUER,
+            label="process creation receipt",
+            test_only=self._context.test_only,
+        )
         return self._invoke(record_execution, reservation_id, receipt)
 
     def commit_resume_intent(
@@ -2929,11 +3038,25 @@ class WindowsTransactionalAuthority:
     def record_process_creation_failure(
         self, reservation_id: str, failure: ProcessCreationFailure
     ) -> None:
+        _require_service_provenance(
+            failure,
+            production_issuer=_PROCESS_RESULT_ISSUER,
+            test_issuer=_TEST_PROCESS_RESULT_ISSUER,
+            label="process creation failure",
+            test_only=self._context.test_only,
+        )
         return self._invoke(record_process_creation_failure, reservation_id, failure)
 
     def record_post_resume_evidence(
         self, execution_id: str, receipt: ResumeReceipt
     ) -> None:
+        _require_service_provenance(
+            receipt,
+            production_issuer=_RESUME_RESULT_ISSUER,
+            test_issuer=_TEST_RESUME_RESULT_ISSUER,
+            label="resume receipt",
+            test_only=self._context.test_only,
+        )
         return self._invoke(record_post_resume_evidence, execution_id, receipt)
 
     def record_terminal(
@@ -2967,6 +3090,17 @@ class WindowsTransactionalAuthority:
             raise ExternalAuthorityBoundaryUnavailable(
                 "C2 production has no provider construction adapter"
             )
+        if type(capability) is not ProviderConstructionPermit:
+            raise TypeError(
+                "provider construction requires a reservation-issued permit"
+            )
+        _require_service_provenance(
+            capability,
+            production_issuer=_PROVIDER_CONSTRUCTION_ISSUER,
+            test_issuer=_TEST_PROVIDER_CONSTRUCTION_ISSUER,
+            label="provider construction permit",
+            test_only=self._context.test_only,
+        )
         return adapter.construct_provider(capability, fail=fail)
 
     def create_process(
@@ -2977,6 +3111,15 @@ class WindowsTransactionalAuthority:
             raise ExternalAuthorityBoundaryUnavailable(
                 "C2 production has no process creation adapter"
             )
+        if type(process_intent) is not ProcessIntent:
+            raise TypeError("CreateProcessW requires an opaque fake process intent")
+        _require_service_provenance(
+            process_intent,
+            production_issuer=_PROCESS_INTENT_ISSUER,
+            test_issuer=_TEST_PROCESS_INTENT_ISSUER,
+            label="process intent",
+            test_only=self._context.test_only,
+        )
         return adapter.create_process(process_intent, fail=fail)
 
     def resume_thread(
@@ -2987,6 +3130,15 @@ class WindowsTransactionalAuthority:
             raise ExternalAuthorityBoundaryUnavailable(
                 "C2 production has no resume adapter"
             )
+        if type(resume_intent) is not ResumeIntent:
+            raise TypeError("ResumeThread requires an opaque fake resume intent")
+        _require_service_provenance(
+            resume_intent,
+            production_issuer=_RESUME_INTENT_ISSUER,
+            test_issuer=_TEST_RESUME_INTENT_ISSUER,
+            label="resume intent",
+            test_only=self._context.test_only,
+        )
         return adapter.resume_thread(resume_intent, fail=fail)
 
 
@@ -3184,14 +3336,14 @@ def issue_constructed_provider_for_test(reservation_id: str) -> ConstructedProvi
     permit = _ConstructedProviderOneShot()
     provider = ConstructedProvider(
         reservation_id,
-        _issuer=_CONSTRUCTED_PROVIDER_ISSUER,
+        _issuer=_TEST_CONSTRUCTED_PROVIDER_ISSUER,
         _permit=permit,
     )
     with _ISSUED_CONSTRUCTED_PROVIDERS_LOCK:
         _ISSUED_CONSTRUCTED_PROVIDERS[permit] = _ConstructedProviderIssuance(
             provider=provider,
             reservation_id=reservation_id,
-            issuer=_CONSTRUCTED_PROVIDER_ISSUER,
+            issuer=_TEST_CONSTRUCTED_PROVIDER_ISSUER,
             permit=permit,
         )
     return provider
@@ -3217,7 +3369,7 @@ def issue_process_creation_receipt_for_test(
         job_digest=job_digest,
         resume_authorization_json=resume_authorization_json,
         resume_authorization_digest=resume_authorization_digest,
-        _issuer=_PROCESS_RESULT_ISSUER,
+        _issuer=_TEST_PROCESS_RESULT_ISSUER,
         _permit=permit,
     )
     evidence, digests = _process_result_visible_evidence(result)
@@ -3228,7 +3380,7 @@ def issue_process_creation_receipt_for_test(
             process_intent_digest=process_intent_digest,
             evidence=evidence,
             digests=digests,
-            issuer=_PROCESS_RESULT_ISSUER,
+            issuer=_TEST_PROCESS_RESULT_ISSUER,
             permit=permit,
         )
     return result
@@ -3246,7 +3398,7 @@ def issue_process_creation_failure_for_test(
         process_intent_digest=process_intent_digest,
         result_json=result_json,
         result_digest=result_digest,
-        _issuer=_PROCESS_RESULT_ISSUER,
+        _issuer=_TEST_PROCESS_RESULT_ISSUER,
         _permit=permit,
     )
     evidence, digests = _process_result_visible_evidence(result)
@@ -3257,7 +3409,7 @@ def issue_process_creation_failure_for_test(
             process_intent_digest=process_intent_digest,
             evidence=evidence,
             digests=digests,
-            issuer=_PROCESS_RESULT_ISSUER,
+            issuer=_TEST_PROCESS_RESULT_ISSUER,
             permit=permit,
         )
     return result
@@ -3277,7 +3429,7 @@ def issue_resume_receipt_for_test(
         resume_intent_digest=resume_intent_digest,
         result_json=result_json,
         result_digest=result_digest,
-        _issuer=_RESUME_RESULT_ISSUER,
+        _issuer=_TEST_RESUME_RESULT_ISSUER,
         _permit=permit,
     )
     with _ISSUED_RESUME_RESULTS_LOCK:
@@ -3288,7 +3440,7 @@ def issue_resume_receipt_for_test(
             resume_intent_digest=resume_intent_digest,
             result_json=result_json,
             result_digest=result_digest,
-            issuer=_RESUME_RESULT_ISSUER,
+            issuer=_TEST_RESUME_RESULT_ISSUER,
             permit=permit,
         )
     return result

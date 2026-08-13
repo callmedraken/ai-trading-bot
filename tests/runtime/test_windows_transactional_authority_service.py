@@ -38,7 +38,12 @@ from trading_bot.runtime.windows_transactional_authority import (
     WindowsTransactionalAuthority,
     commit_process_intent,
     consume_constructed_provider_for_test,
+    consume_process_result_for_test,
+    consume_resume_result_for_test,
     issue_constructed_provider_for_test,
+    issue_process_creation_failure_for_test,
+    issue_process_creation_receipt_for_test,
+    issue_resume_receipt_for_test,
     snapshot_capture_request_for_test,
 )
 
@@ -243,6 +248,80 @@ def test_test_factory_is_explicit_and_rejects_active_transaction_before_arbiter(
         connection.close()
 
 
+def test_production_instance_rejects_invoke_for_test_before_opening_database(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service = WindowsTransactionalAuthority(_production_validation(monkeypatch))
+    open_calls: list[tuple[object, ...]] = []
+    callback_calls: list[str] = []
+    monkeypatch.setattr(
+        "trading_bot.runtime.windows_transactional_authority.open_writable_authority_sqlite_connection",
+        lambda *args, **kwargs: open_calls.append((args, kwargs)),
+    )
+
+    def arbitrary_callback(connection: sqlite3.Connection) -> None:
+        del connection
+        callback_calls.append("called")
+
+    with pytest.raises(
+        ExternalAuthorityBoundaryUnavailable,
+        match="only on for_test services",
+    ):
+        service.invoke_for_test(arbitrary_callback)
+    assert open_calls == []
+    assert callback_calls == []
+
+
+def test_production_rejects_test_external_effect_provenance_before_database_mutation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service = WindowsTransactionalAuthority(_production_validation(monkeypatch))
+    open_calls: list[tuple[object, ...]] = []
+    monkeypatch.setattr(
+        "trading_bot.runtime.windows_transactional_authority.open_writable_authority_sqlite_connection",
+        lambda *args, **kwargs: open_calls.append((args, kwargs)),
+    )
+    provider = issue_constructed_provider_for_test("reservation")
+    process_receipt = issue_process_creation_receipt_for_test(
+        "reservation",
+        b"intent",
+        b"process",
+        b"process-digest",
+        b"job",
+        b"job-digest",
+        b"resume",
+        b"resume-digest",
+    )
+    process_failure = issue_process_creation_failure_for_test(
+        "reservation",
+        b"intent",
+        b"failure",
+        b"failure-digest",
+    )
+    resume_receipt = issue_resume_receipt_for_test(
+        "execution",
+        "reservation",
+        b"resume-intent",
+        b"resumed",
+        b"resumed-digest",
+    )
+    try:
+        with pytest.raises(ExternalAuthorityBoundaryUnavailable, match="provenance"):
+            service.commit_process_intent("reservation", provider)
+        with pytest.raises(ExternalAuthorityBoundaryUnavailable, match="provenance"):
+            service.record_execution("reservation", process_receipt)
+        with pytest.raises(ExternalAuthorityBoundaryUnavailable, match="provenance"):
+            service.record_process_creation_failure("reservation", process_failure)
+        with pytest.raises(ExternalAuthorityBoundaryUnavailable, match="provenance"):
+            service.record_post_resume_evidence("execution", resume_receipt)
+        assert open_calls == []
+    finally:
+        consume_constructed_provider_for_test(provider, "reservation")
+        consume_process_result_for_test(process_receipt, "reservation")
+        consume_process_result_for_test(process_failure, "reservation")
+        consume_resume_result_for_test(resume_receipt, "execution", "reservation")
+
+
 def test_production_lifecycle_factory_uses_reviewed_global_mutex(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -287,8 +366,17 @@ def test_production_lifecycle_factory_uses_reviewed_global_mutex(
     service = WindowsTransactionalAuthority(authority)
     provider = issue_constructed_provider_for_test("durable-reservation")
     try:
-        with pytest.raises(ValueError, match="unknown reservation"):
+        with pytest.raises(ExternalAuthorityBoundaryUnavailable, match="provenance"):
             service.commit_process_intent("durable-reservation", provider)
+        consume_constructed_provider_for_test(provider, "durable-reservation")
+
+        with pytest.raises(ValueError, match="unknown recovery session"):
+            service.record_recovery(
+                "unknown-session",
+                "LAUNCH_RESERVATION",
+                "durable-reservation",
+                "CLASSIFY_LAUNCH_RESERVATION",
+            )
         assert calls == [
             (
                 authority.machine_authority_id,
@@ -298,7 +386,10 @@ def test_production_lifecycle_factory_uses_reviewed_global_mutex(
             )
         ]
     finally:
-        consume_constructed_provider_for_test(provider, "durable-reservation")
+        try:
+            consume_constructed_provider_for_test(provider, "durable-reservation")
+        except ValueError:
+            pass
         service.close()
         connection.close()
 

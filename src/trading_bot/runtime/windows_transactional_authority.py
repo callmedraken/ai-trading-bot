@@ -96,6 +96,7 @@ class _ServiceContext:
     authority: ValidatedProductionAuthority | None
     lifecycle_arbiter_factory: Callable[[str], AbstractContextManager[object]]
     timestamp_provider: Callable[[str], str]
+    capture_request_provider: Callable[[object], ValidatedCaptureRequest]
     external_adapter: TransactionalAuthorityAdapter | None = None
 
 
@@ -716,7 +717,7 @@ def create_session(
     _require_service_context()
     if request is None:
         raise ValueError("capture request is required at the production boundary")
-    snapshot = _snapshot_capture_request(request)
+    snapshot = _require_service_context().capture_request_provider(request)
     _begin(connection)
     try:
         metadata = connection.execute(
@@ -2798,6 +2799,7 @@ class WindowsTransactionalAuthority:
                 self._authority
             ),
             timestamp_provider=_production_timestamp,
+            capture_request_provider=_snapshot_capture_request,
         )
 
     @classmethod
@@ -2807,6 +2809,8 @@ class WindowsTransactionalAuthority:
         connection: sqlite3.Connection,
         authority: ValidatedProductionAuthority | None = None,
         lifecycle_arbiter_factory: Callable[[str], AbstractContextManager[object]],
+        capture_request_factory: Callable[[object], ValidatedCaptureRequest]
+        | None = None,
         external_adapter: TransactionalAuthorityAdapter | None = None,
     ) -> Self:
         """Create a disposable service with explicitly injected test seams."""
@@ -2820,6 +2824,11 @@ class WindowsTransactionalAuthority:
             authority=authority,
             lifecycle_arbiter_factory=lifecycle_arbiter_factory,
             timestamp_provider=lambda fallback: fallback,
+            capture_request_provider=(
+                _snapshot_capture_request
+                if capture_request_factory is None
+                else capture_request_factory
+            ),
             external_adapter=external_adapter,
         )
         return instance

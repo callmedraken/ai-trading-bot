@@ -13,11 +13,13 @@ from trading_bot.runtime.windows_authority import (
     WindowsAuthorityBootstrap,
     WindowsAuthorityError,
 )
+from trading_bot.runtime.windows_authority_mutex import GlobalLifecycleMutex
 from trading_bot.runtime.windows_authority_schema import (
     PRODUCTION_SCHEMA_ARTIFACT_SHA256,
     PRODUCTION_SCHEMA_ID,
     PRODUCTION_SCHEMA_VERSION,
     ProductionAuthorityEvidence,
+    execute_schema_artifact,
 )
 from trading_bot.runtime.windows_authority_sqlite import SqliteDatabaseState
 from trading_bot.runtime.windows_authority_validation import (
@@ -32,11 +34,10 @@ from trading_bot.runtime.windows_authority_validation import (
 from trading_bot.runtime.windows_transactional_authority import (
     ConstructedProvider,
     ExternalAuthorityBoundaryUnavailable,
-    GlobalLifecycleMutex,
     ProviderConstructionPermit,
     WindowsTransactionalAuthority,
-    _production_lifecycle_arbiter_factory,
     commit_process_intent,
+    consume_constructed_provider_for_test,
     issue_constructed_provider_for_test,
     snapshot_capture_request_for_test,
 )
@@ -110,22 +111,46 @@ def _production_validation(
         signing_key_id=bootstrap.signing_key_id,
         signature_length=64,
     )
+    monkeypatch.setattr(validation, "resolve_current_token_sid", lambda: "S-1-5-21-1")
     monkeypatch.setattr(
-        validation, "_require_current_trading_token", lambda: "S-1-5-21-1"
+        validation, "require_trading_standard_account", lambda: "S-1-5-21-1"
     )
-    monkeypatch.setattr(
-        validation,
-        "_inspect_runtime_tree",
-        lambda sid: (("root", "bootstrap", "signature"), True, True, b"", b""),
-    )
-    monkeypatch.setattr(
-        validation, "_verify_material", lambda *args, **kwargs: verification
-    )
+    monkeypatch.setattr(validation, "is_current_token_elevated", lambda: False)
+    monkeypatch.setattr(validation, "is_current_token_administrator", lambda: False)
     monkeypatch.setattr(
         validation,
         "validate_lifecycle_mutex_security_descriptor",
         lambda sid: None,
     )
+    monkeypatch.setattr(
+        validation, "verify_bootstrap_signature", lambda *args, **kwargs: verification
+    )
+
+    class Handle:
+        def __init__(self, path: str) -> None:
+            self.path = path
+
+        def __enter__(self) -> Handle:
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+    monkeypatch.setattr(
+        validation,
+        "open_authority_object",
+        lambda path, kind: Handle(str(path)),
+    )
+    monkeypatch.setattr(
+        validation,
+        "inspect_open_authority_object",
+        lambda handle, path, kind: object(),
+    )
+    monkeypatch.setattr(validation, "require_security_policy", lambda *args: None)
+    monkeypatch.setattr(
+        validation, "read_open_authority_file", lambda handle: b"material"
+    )
+    monkeypatch.setattr(validation.os.path, "lexists", lambda path: True)
     monkeypatch.setattr(
         validation,
         "validate_installed_database_complete",
@@ -223,25 +248,59 @@ def test_production_lifecycle_factory_uses_reviewed_global_mutex(
 ) -> None:
     authority = _production_validation(monkeypatch)
     calls: list[tuple[object, ...]] = []
+    connection = sqlite3.connect(":memory:", isolation_level=None)
 
     class Probe:
         def __init__(self, *args: object, **kwargs: object) -> None:
             calls.append((*args, kwargs))
 
+        def __enter__(self) -> Probe:
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
     monkeypatch.setattr(
         "trading_bot.runtime.windows_transactional_authority.GlobalLifecycleMutex",
         Probe,
     )
-    factory = _production_lifecycle_arbiter_factory(authority)
-    assert isinstance(factory("reservation"), Probe)
-    assert calls == [
-        (
-            authority.machine_authority_id,
-            authority.authority_epoch_id,
-            "reservation",
-            {"trading_sid": authority.approved_account_sid},
-        )
-    ]
+    monkeypatch.setattr(
+        "trading_bot.runtime.windows_authority_schema.load_approved_sqlite_authority_build",
+        lambda: type(
+            "ApprovedBuild",
+            (),
+            {
+                "vfs": "test-vfs",
+                "digest": bytes.fromhex(authority.sqlite_build_manifest_digest),
+            },
+        )(),
+    )
+    monkeypatch.setattr(
+        "trading_bot.runtime.windows_transactional_authority.open_writable_authority_sqlite_connection",
+        lambda path, *, vfs: connection,
+    )
+    monkeypatch.setattr(
+        "trading_bot.runtime.windows_transactional_authority.configure_and_validate_authority_sqlite_connection",
+        lambda *args, **kwargs: object(),
+    )
+    execute_schema_artifact(connection)
+    service = WindowsTransactionalAuthority(authority)
+    provider = issue_constructed_provider_for_test("durable-reservation")
+    try:
+        with pytest.raises(ValueError, match="unknown reservation"):
+            service.commit_process_intent("durable-reservation", provider)
+        assert calls == [
+            (
+                authority.machine_authority_id,
+                authority.authority_epoch_id,
+                "durable-reservation",
+                {"trading_sid": authority.approved_account_sid},
+            )
+        ]
+    finally:
+        consume_constructed_provider_for_test(provider, "durable-reservation")
+        service.close()
+        connection.close()
 
 
 def test_transactional_capabilities_are_process_local_and_non_serializable() -> None:

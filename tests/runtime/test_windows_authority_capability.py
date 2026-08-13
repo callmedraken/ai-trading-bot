@@ -109,9 +109,33 @@ def _production_validation(
     evidence: ProductionAuthorityEvidence | None = None,
     signed_sid: str = "S-1-5-21-1",
     verification_error: WindowsAuthorityError | None = None,
+    database_state: SqliteDatabaseState = SqliteDatabaseState.INITIALIZED_SUPPORTED,
 ) -> ValidatedProductionAuthority:
     """Build production provenance through the public runtime issuer."""
 
+    _configure_public_runtime_issuer(
+        monkeypatch,
+        evidence=evidence,
+        signed_sid=signed_sid,
+        verification_error=verification_error,
+        database_state=database_state,
+    )
+    import trading_bot.runtime.windows_authority_validation as validation
+
+    return validation.acquire_validated_production_authority()
+
+
+def _configure_public_runtime_issuer(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    evidence: ProductionAuthorityEvidence | None = None,
+    signed_sid: str = "S-1-5-21-1",
+    verification_error: WindowsAuthorityError | None = None,
+    database_state: SqliteDatabaseState = SqliteDatabaseState.INITIALIZED_SUPPORTED,
+    opened: list[str] | None = None,
+    inspected: list[str] | None = None,
+    read_from: list[str] | None = None,
+) -> None:
     import trading_bot.runtime.windows_authority_validation as validation
 
     bootstrap = _bootstrap(approved_account_sid=signed_sid)
@@ -142,34 +166,63 @@ def _production_validation(
     )
     if verification_error is None:
         monkeypatch.setattr(
-            validation, "_verify_material", lambda *args, **kwargs: verification
+            validation,
+            "verify_bootstrap_signature",
+            lambda *args, **kwargs: verification,
         )
     else:
         monkeypatch.setattr(
             validation,
-            "_verify_material",
+            "verify_bootstrap_signature",
             lambda *args, **kwargs: (_ for _ in ()).throw(verification_error),
         )
+
+    class Handle:
+        def __init__(self, path: str) -> None:
+            self.path = path
+
+        def __enter__(self) -> Handle:
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
     monkeypatch.setattr(
         validation,
-        "_inspect_runtime_tree",
-        lambda sid: (
-            ("root", "bootstrap", "signature", "capture-output", "database", "journal"),
-            True,
-            True,
-            b"",
-            b"",
+        "open_authority_object",
+        lambda path, kind: (
+            (opened.append(str(path)) if opened is not None else None)
+            or Handle(str(path))
         ),
     )
+    monkeypatch.setattr(
+        validation,
+        "inspect_open_authority_object",
+        lambda handle, path, kind: (
+            (inspected.append(str(path)) if inspected is not None else None) or object()
+        ),
+    )
+    monkeypatch.setattr(validation, "require_security_policy", lambda *args: None)
+    monkeypatch.setattr(
+        validation,
+        "read_open_authority_file",
+        lambda handle: (
+            (read_from.append(handle.path) if read_from is not None else None)
+            or b"material"
+        ),
+    )
+    monkeypatch.setattr(validation.os.path, "lexists", lambda path: True)
+
     monkeypatch.setattr(
         validation,
         "validate_installed_database_complete",
         lambda *args, **kwargs: InstalledDatabaseValidation(
-            SqliteDatabaseState.INITIALIZED_SUPPORTED,
-            evidence,
+            database_state,
+            evidence
+            if database_state is SqliteDatabaseState.INITIALIZED_SUPPORTED
+            else None,
         ),
     )
-    return validation.acquire_validated_production_authority()
 
 
 def test_complete_installed_validation_still_requires_administrator(
@@ -205,33 +258,9 @@ def test_installed_validation_is_administrator_evidence_only() -> None:
 def test_production_acquisition_rejects_non_supported_states(
     monkeypatch: pytest.MonkeyPatch, state: str
 ) -> None:
-    import trading_bot.runtime.windows_authority_validation as validation
-
-    monkeypatch.setattr(
-        validation,
-        "_require_current_trading_token",
-        lambda: "S-1-5-21-1",
-    )
-    bootstrap = _bootstrap()
-    verification = BootstrapVerification(
-        bootstrap=bootstrap,
-        bootstrap_digest=bootstrap.digest,
-        signing_key_id=bootstrap.signing_key_id,
-        signature_length=64,
-    )
-    monkeypatch.setattr(validation, "_verify_material", lambda *a, **k: verification)
-    monkeypatch.setattr(
-        validation, "validate_lifecycle_mutex_security_descriptor", lambda sid: None
-    )
-    monkeypatch.setattr(
-        validation,
-        "_inspect_runtime_tree",
-        lambda sid: ((), False, False, b"", b""),
-    )
-    monkeypatch.setattr(
-        validation,
-        "validate_installed_database_complete",
-        lambda *a, **k: InstalledDatabaseValidation(SqliteDatabaseState(state), None),
+    _configure_public_runtime_issuer(
+        monkeypatch,
+        database_state=SqliteDatabaseState(state),
     )
 
     with pytest.raises(WindowsAuthorityError):
@@ -308,46 +337,40 @@ def test_runtime_object_validation_uses_opened_handles_and_excludes_parent_backu
     import trading_bot.runtime.windows_authority_validation as validation
 
     opened: list[str] = []
-
-    class Handle:
-        def __enter__(self) -> Handle:
-            return self
-
-        def __exit__(self, *args: object) -> None:
-            return None
+    inspected: list[str] = []
+    read_from: list[str] = []
+    _configure_public_runtime_issuer(
+        monkeypatch,
+        opened=opened,
+        inspected=inspected,
+        read_from=read_from,
+    )
 
     monkeypatch.setattr(
         validation,
-        "open_authority_object",
-        lambda path, kind: opened.append(str(path)) or Handle(),
+        "validate_fixed_parent_chain",
+        lambda *args, **kwargs: pytest.fail("parent chain was inspected"),
     )
-    monkeypatch.setattr(
-        validation, "inspect_open_authority_object", lambda *args: object()
-    )
-    monkeypatch.setattr(validation, "require_security_policy", lambda *args: None)
-    monkeypatch.setattr(
-        validation, "read_open_authority_file", lambda handle: b"material"
-    )
-    monkeypatch.setattr(validation.os.path, "lexists", lambda path: True)
+    capability = acquire_validated_production_authority()
 
-    inspected, database_present, journal_present, bootstrap, signature = (
-        validation._inspect_runtime_tree("S-1-5-21-1")
+    expected_paths = (
+        str(PRODUCTION_AUTHORITY_PATHS.root),
+        str(PRODUCTION_AUTHORITY_PATHS.bootstrap),
+        str(PRODUCTION_AUTHORITY_PATHS.signature),
+        str(PRODUCTION_AUTHORITY_PATHS.capture_output),
+        str(PRODUCTION_AUTHORITY_PATHS.database),
+        str(PRODUCTION_AUTHORITY_PATHS.journal),
     )
-
-    assert inspected == (
-        "root",
-        "bootstrap",
-        "signature",
-        "capture-output",
-        "database",
-        "journal",
+    assert tuple(opened) == expected_paths
+    assert tuple(inspected) == expected_paths
+    assert tuple(read_from) == (
+        str(PRODUCTION_AUTHORITY_PATHS.bootstrap),
+        str(PRODUCTION_AUTHORITY_PATHS.signature),
     )
-    assert database_present is True
-    assert journal_present is True
-    assert bootstrap == b"material"
-    assert signature == b"material"
-    assert all("backup" not in path.casefold() for path in opened)
-    assert all(path != r"F:\AITradingBot" for path in opened)
+    assert all("backup" not in path.casefold() for path in opened + inspected)
+    assert all(path != r"F:\AITradingBot" for path in opened + inspected)
+    assert type(capability) is ValidatedProductionAuthority
+    assert require_validated_production_authority(capability) is capability
 
 
 def test_signed_bootstrap_sid_mismatch_fails_closed(

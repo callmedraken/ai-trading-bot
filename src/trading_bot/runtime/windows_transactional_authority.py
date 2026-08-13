@@ -11,6 +11,7 @@ from __future__ import annotations
 import contextvars
 import hashlib
 import json
+import os
 import sqlite3
 import threading
 import uuid
@@ -18,6 +19,7 @@ from collections.abc import Callable
 from contextlib import AbstractContextManager
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
+from pathlib import Path
 from typing import Any, Protocol, Self
 
 from trading_bot.domain import Symbol
@@ -25,9 +27,13 @@ from trading_bot.market_data import (
     ALPACA_DAILY_SNAPSHOT_DESCRIPTOR,
     MAX_DAILY_SNAPSHOT_SYMBOLS,
 )
-from trading_bot.runtime.windows_authority import WindowsAuthorityError
+from trading_bot.runtime.windows_authority import (
+    PRODUCTION_AUTHORITY_PATHS,
+    WindowsAuthorityError,
+)
 from trading_bot.runtime.windows_authority_mutex import GlobalLifecycleMutex
 from trading_bot.runtime.windows_authority_schema import (
+    configure_trusted_schema_off,
     require_evidence_digest,
 )
 from trading_bot.runtime.windows_authority_sqlite import (
@@ -99,6 +105,167 @@ class _ServiceContext:
     capture_request_provider: Callable[[object], ValidatedCaptureRequest]
     test_only: bool
     external_adapter: TransactionalAuthorityAdapter | None = None
+    test_database: DisposableAuthorityDatabaseForTest | None = None
+
+
+_DISPOSABLE_DATABASE_CONSTRUCTOR = object()
+
+
+@dataclass(frozen=True, slots=True)
+class _DisposableDatabaseIdentity:
+    database_list: tuple[tuple[int, str, str], ...]
+
+
+def _production_authority_root() -> Path:
+    return Path(PRODUCTION_AUTHORITY_PATHS.root).resolve(strict=False)
+
+
+def _production_authority_database() -> Path:
+    return Path(PRODUCTION_AUTHORITY_PATHS.database).resolve(strict=False)
+
+
+def _path_is_under(path: Path, root: Path) -> bool:
+    return path == root or root in path.parents
+
+
+def _reject_production_database_path(database: str | os.PathLike[str]) -> None:
+    try:
+        database_value = os.fspath(database)
+    except TypeError as error:
+        raise TypeError("disposable database path must be path-like") from error
+    if database_value == ":memory:":
+        return
+    candidate = Path(database_value).resolve(strict=False)
+    if _path_is_under(candidate, _production_authority_root()):
+        raise ExternalAuthorityBoundaryUnavailable(
+            "disposable test database path is inside the production authority tree"
+        )
+    if candidate == _production_authority_database():
+        raise ExternalAuthorityBoundaryUnavailable(
+            "disposable test database path is the production authority database"
+        )
+
+
+def _inspect_disposable_database_identity(
+    connection: sqlite3.Connection,
+) -> _DisposableDatabaseIdentity:
+    if type(connection) is not sqlite3.Connection:
+        raise TypeError("disposable database requires exact sqlite3.Connection")
+    rows = connection.execute("PRAGMA database_list").fetchall()
+    identity = _DisposableDatabaseIdentity(
+        tuple(
+            (int(sequence), str(name), "" if filename is None else str(filename))
+            for sequence, name, filename in rows
+        )
+    )
+    if len(identity.database_list) != 1 or identity.database_list[0][1] != "main":
+        raise ExternalAuthorityBoundaryUnavailable(
+            "disposable test database must have exactly one main database"
+        )
+    filename = identity.database_list[0][2]
+    if filename:
+        if filename.startswith("file:"):
+            raise ExternalAuthorityBoundaryUnavailable(
+                "disposable test database URI identity is ambiguous"
+            )
+        actual_path = Path(filename).resolve(strict=False)
+        if _path_is_under(actual_path, _production_authority_root()):
+            raise ExternalAuthorityBoundaryUnavailable(
+                "disposable test database identity is inside the production "
+                "authority tree"
+            )
+        if actual_path == _production_authority_database():
+            raise ExternalAuthorityBoundaryUnavailable(
+                "disposable test database identity is the production authority database"
+            )
+    return identity
+
+
+class DisposableAuthorityDatabaseForTest:
+    """Opaque database opened and identity-checked by the disposable test seam."""
+
+    __slots__ = ("_connection", "_identity", "__weakref__")
+
+    def __new__(
+        cls,
+        constructor: object,
+        connection: sqlite3.Connection,
+        identity: _DisposableDatabaseIdentity,
+    ) -> Self:
+        if constructor is not _DISPOSABLE_DATABASE_CONSTRUCTOR:
+            raise TypeError("disposable test databases must use the reviewed opener")
+        instance = super().__new__(cls)
+        instance._connection = connection
+        instance._identity = identity
+        return instance
+
+    def __init__(
+        self,
+        constructor: object,
+        connection: sqlite3.Connection,
+        identity: _DisposableDatabaseIdentity,
+    ) -> None:
+        del constructor, connection, identity
+
+    @property
+    def connection(self) -> sqlite3.Connection:
+        return self._connection
+
+    @property
+    def database_identity(self) -> tuple[tuple[int, str, str], ...]:
+        return self._identity.database_list
+
+    def validate_identity(self) -> None:
+        if _inspect_disposable_database_identity(self._connection) != self._identity:
+            raise ExternalAuthorityBoundaryUnavailable(
+                "disposable test database identity changed after opening"
+            )
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._connection, name)
+
+    def __enter__(self) -> Self:
+        self._connection.__enter__()
+        return self
+
+    def __exit__(self, *args: object) -> None:
+        self._connection.__exit__(*args)
+
+    def __reduce__(self) -> object:
+        raise TypeError("disposable test databases cannot be serialized")
+
+
+def open_disposable_authority_database_for_test(
+    database: str | os.PathLike[str],
+) -> DisposableAuthorityDatabaseForTest:
+    """Open and identity-check a disposable database for the explicit test seam."""
+
+    _reject_production_database_path(database)
+    try:
+        database_value = os.fspath(database)
+    except TypeError as error:
+        raise TypeError("disposable database path must be path-like") from error
+    connection: sqlite3.Connection | None = None
+    try:
+        connection = sqlite3.connect(
+            database_value,
+            timeout=5.0,
+            isolation_level=None,
+            check_same_thread=False,
+        )
+        configure_trusted_schema_off(connection)
+        connection.execute("PRAGMA foreign_keys = ON")
+        connection.execute("PRAGMA busy_timeout = 5000")
+        identity = _inspect_disposable_database_identity(connection)
+        return DisposableAuthorityDatabaseForTest(
+            _DISPOSABLE_DATABASE_CONSTRUCTOR,
+            connection,
+            identity,
+        )
+    except BaseException:
+        if connection is not None:
+            connection.close()
+        raise
 
 
 _CURRENT_SERVICE_CONTEXT: contextvars.ContextVar[_ServiceContext | None] = (
@@ -749,6 +916,14 @@ def _require_no_active_transaction(connection: sqlite3.Connection) -> None:
         raise TypeError("lifecycle boundary requires an exact sqlite3.Connection")
     if connection.in_transaction:
         raise ValueError("lifecycle boundary requires no active SQLite transaction")
+    context = _require_service_context()
+    if context.test_only:
+        test_database = context.test_database
+        if test_database is None:
+            raise ExternalAuthorityBoundaryUnavailable(
+                "test service has no reviewed disposable database"
+            )
+        test_database.validate_identity()
 
 
 def _begin(connection: sqlite3.Connection) -> None:
@@ -2882,6 +3057,7 @@ class WindowsTransactionalAuthority:
     def __init__(self, authority: ValidatedProductionAuthority) -> None:
         self._authority = require_validated_production_authority(authority)
         self._connection: sqlite3.Connection | None = None
+        self._test_database: DisposableAuthorityDatabaseForTest | None = None
         self._context = _ServiceContext(
             authority=self._authority,
             lifecycle_arbiter_factory=_production_lifecycle_arbiter_factory(
@@ -2896,8 +3072,7 @@ class WindowsTransactionalAuthority:
     def for_test(
         cls,
         *,
-        connection: sqlite3.Connection,
-        authority: ValidatedProductionAuthority | None = None,
+        database: DisposableAuthorityDatabaseForTest,
         lifecycle_arbiter_factory: Callable[[str], AbstractContextManager[object]],
         capture_request_factory: Callable[[object], ValidatedCaptureRequest]
         | None = None,
@@ -2905,13 +3080,17 @@ class WindowsTransactionalAuthority:
     ) -> Self:
         """Create a disposable service with explicitly injected test seams."""
 
-        if type(connection) is not sqlite3.Connection:
-            raise TypeError("test authority service requires sqlite3.Connection")
+        if type(database) is not DisposableAuthorityDatabaseForTest:
+            raise TypeError(
+                "test authority service requires a reviewed disposable database"
+            )
+        database.validate_identity()
         instance = cls.__new__(cls)
-        instance._authority = authority
-        instance._connection = connection
+        instance._authority = None
+        instance._connection = database.connection
+        instance._test_database = database
         instance._context = _ServiceContext(
-            authority=authority,
+            authority=None,
             lifecycle_arbiter_factory=lifecycle_arbiter_factory,
             timestamp_provider=lambda fallback: fallback,
             capture_request_provider=(
@@ -2921,6 +3100,7 @@ class WindowsTransactionalAuthority:
             ),
             test_only=True,
             external_adapter=external_adapter,
+            test_database=database,
         )
         return instance
 
@@ -2957,6 +3137,7 @@ class WindowsTransactionalAuthority:
     def close(self) -> None:
         connection = self._connection
         self._connection = None
+        self._test_database = None
         if connection is not None:
             connection.close()
 
@@ -2972,6 +3153,17 @@ class WindowsTransactionalAuthority:
         return self._invoke(operation, *args, **kwargs)
 
     def _invoke(self, operation: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
+        if self._context.test_only:
+            test_database = self._test_database
+            if test_database is None:
+                raise ExternalAuthorityBoundaryUnavailable(
+                    "test service has no reviewed disposable database"
+                )
+            if self._connection is not None and self._connection.in_transaction:
+                raise ValueError(
+                    "lifecycle boundary requires no active SQLite transaction"
+                )
+            test_database.validate_identity()
         self._open_production_connection()
         return _run_in_service_context(
             self, operation, self._connection, *args, **kwargs
@@ -3078,6 +3270,8 @@ class WindowsTransactionalAuthority:
         action: str,
         ordinal: int | None = None,
     ) -> str:
+        if ordinal is not None:
+            _canonical_ordinal(ordinal, "recovery ordinal")
         return self._invoke(
             record_recovery, session_id, target_kind, target_id, action, ordinal
         )

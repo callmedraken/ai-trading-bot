@@ -33,6 +33,7 @@ from trading_bot.runtime.windows_authority_validation import (
 )
 from trading_bot.runtime.windows_transactional_authority import (
     ConstructedProvider,
+    DisposableAuthorityDatabaseForTest,
     ExternalAuthorityBoundaryUnavailable,
     ProviderConstructionPermit,
     WindowsTransactionalAuthority,
@@ -44,6 +45,7 @@ from trading_bot.runtime.windows_transactional_authority import (
     issue_process_creation_failure_for_test,
     issue_process_creation_receipt_for_test,
     issue_resume_receipt_for_test,
+    open_disposable_authority_database_for_test,
     snapshot_capture_request_for_test,
 )
 
@@ -227,7 +229,8 @@ def test_c2_external_effect_boundary_fails_closed(
 def test_test_factory_is_explicit_and_rejects_active_transaction_before_arbiter() -> (
     None
 ):
-    connection = sqlite3.connect(":memory:", isolation_level=None)
+    database = open_disposable_authority_database_for_test(":memory:")
+    connection = database.connection
     arbiter_calls: list[str] = []
 
     def arbiter(reservation_id: str):
@@ -235,7 +238,7 @@ def test_test_factory_is_explicit_and_rejects_active_transaction_before_arbiter(
         return GlobalLifecycleMutex("machine", "epoch", reservation_id)
 
     service = WindowsTransactionalAuthority.for_test(
-        connection=connection,
+        database=database,
         lifecycle_arbiter_factory=arbiter,
     )
     connection.execute("BEGIN IMMEDIATE")
@@ -246,6 +249,175 @@ def test_test_factory_is_explicit_and_rejects_active_transaction_before_arbiter(
     finally:
         connection.rollback()
         connection.close()
+
+
+def test_test_factory_rejects_raw_connection_before_callbacks() -> None:
+    connection = sqlite3.connect(":memory:", isolation_level=None)
+    arbiter_calls: list[str] = []
+    callback_calls: list[str] = []
+
+    def arbiter(reservation_id: str):
+        arbiter_calls.append(reservation_id)
+        return GlobalLifecycleMutex("machine", "epoch", reservation_id)
+
+    def capture_request(request: object):
+        callback_calls.append("called")
+        return snapshot_capture_request_for_test(request)
+
+    try:
+        with pytest.raises(TypeError, match="reviewed disposable database"):
+            WindowsTransactionalAuthority.for_test(  # type: ignore[arg-type]
+                database=connection,
+                lifecycle_arbiter_factory=arbiter,
+                capture_request_factory=capture_request,
+            )
+        assert arbiter_calls == []
+        assert callback_calls == []
+    finally:
+        connection.close()
+
+
+@pytest.mark.parametrize(
+    "database_path",
+    [
+        str(PRODUCTION_AUTHORITY_PATHS.database),
+        str(PRODUCTION_AUTHORITY_PATHS.root / "shadow.sqlite3"),
+    ],
+)
+def test_disposable_opener_rejects_production_tree_before_sqlite_open(
+    monkeypatch: pytest.MonkeyPatch,
+    database_path: str,
+) -> None:
+    open_calls: list[tuple[object, ...]] = []
+
+    def unexpected_open(*args: object, **kwargs: object) -> None:
+        open_calls.append((args, kwargs))
+        raise AssertionError("production path was opened")
+
+    monkeypatch.setattr(
+        "trading_bot.runtime.windows_transactional_authority.sqlite3.connect",
+        unexpected_open,
+    )
+    with pytest.raises(
+        ExternalAuthorityBoundaryUnavailable,
+        match="production authority tree",
+    ):
+        open_disposable_authority_database_for_test(database_path)
+    assert open_calls == []
+
+
+def test_anonymous_disposable_database_supports_the_test_service() -> None:
+    database = open_disposable_authority_database_for_test(":memory:")
+    service = WindowsTransactionalAuthority.for_test(
+        database=database,
+        lifecycle_arbiter_factory=lambda reservation_id: GlobalLifecycleMutex(
+            "machine", "epoch", reservation_id
+        ),
+    )
+    try:
+        assert database.database_identity == ((0, "main", ""),)
+        assert (
+            service.invoke_for_test(
+                lambda connection: connection.execute("SELECT 1").fetchone()[0]
+            )
+            == 1
+        )
+    finally:
+        service.close()
+
+
+def test_file_backed_test_database_requires_reviewed_opener_and_sqlite_identity(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    database = open_disposable_authority_database_for_test("authority.sqlite3")
+    service = WindowsTransactionalAuthority.for_test(
+        database=database,
+        lifecycle_arbiter_factory=lambda reservation_id: GlobalLifecycleMutex(
+            "machine", "epoch", reservation_id
+        ),
+    )
+    try:
+        sqlite_identity = tuple(
+            tuple(row) for row in database.connection.execute("PRAGMA database_list")
+        )
+        assert database.database_identity == sqlite_identity
+        assert database.database_identity[0][2] == str(
+            (tmp_path / "authority.sqlite3").resolve()
+        )
+        assert database.database_identity[0][2] != "authority.sqlite3"
+        assert (
+            service.invoke_for_test(
+                lambda connection: connection.execute("SELECT 1").fetchone()[0]
+            )
+            == 1
+        )
+    finally:
+        service.close()
+
+    raw_connection = sqlite3.connect(
+        tmp_path / "authority.sqlite3", isolation_level=None
+    )
+    try:
+        with pytest.raises(TypeError, match="reviewed disposable database"):
+            WindowsTransactionalAuthority.for_test(  # type: ignore[arg-type]
+                database=raw_connection,
+                lifecycle_arbiter_factory=lambda reservation_id: GlobalLifecycleMutex(
+                    "machine", "epoch", reservation_id
+                ),
+            )
+    finally:
+        raw_connection.close()
+
+
+def test_attached_disposable_database_is_rejected_before_callback_or_mutation() -> None:
+    database = open_disposable_authority_database_for_test(":memory:")
+    connection = database.connection
+    connection.execute("CREATE TABLE marker (value TEXT NOT NULL)")
+    service = WindowsTransactionalAuthority.for_test(
+        database=database,
+        lifecycle_arbiter_factory=lambda reservation_id: GlobalLifecycleMutex(
+            "machine", "epoch", reservation_id
+        ),
+    )
+    callback_calls: list[str] = []
+
+    def would_mutate(connection: sqlite3.Connection) -> None:
+        callback_calls.append("called")
+        connection.execute("INSERT INTO marker(value) VALUES ('unexpected')")
+
+    try:
+        connection.execute("ATTACH DATABASE ':memory:' AS attached")
+        with pytest.raises(
+            ExternalAuthorityBoundaryUnavailable,
+            match="exactly one main database",
+        ):
+            service.invoke_for_test(would_mutate)
+        assert callback_calls == []
+        assert connection.execute("SELECT COUNT(*) FROM marker").fetchone() == (0,)
+    finally:
+        service.close()
+
+
+def test_disposable_database_wrapper_cannot_be_reconstructed_or_serialized() -> None:
+    database = open_disposable_authority_database_for_test(":memory:")
+    try:
+        with pytest.raises(TypeError, match="reviewed opener"):
+            DisposableAuthorityDatabaseForTest(  # type: ignore[call-arg]
+                object(), database.connection, database.database_identity
+            )
+        with pytest.raises(TypeError, match="cannot be serialized"):
+            pickle.dumps(database)
+    finally:
+        database.connection.close()
+
+
+def test_test_factory_has_no_production_authority_or_raw_connection_argument() -> None:
+    parameters = signature(WindowsTransactionalAuthority.for_test).parameters
+    assert "authority" not in parameters
+    assert "connection" not in parameters
+    assert "database" in parameters
 
 
 def test_production_instance_rejects_invoke_for_test_before_opening_database(
@@ -327,7 +499,8 @@ def test_production_lifecycle_factory_uses_reviewed_global_mutex(
 ) -> None:
     authority = _production_validation(monkeypatch)
     calls: list[tuple[object, ...]] = []
-    connection = sqlite3.connect(":memory:", isolation_level=None)
+    database = open_disposable_authority_database_for_test(":memory:")
+    connection = database.connection
 
     class Probe:
         def __init__(self, *args: object, **kwargs: object) -> None:

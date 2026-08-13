@@ -12,6 +12,7 @@ import sqlite3
 import sys
 import threading
 import uuid
+import weakref
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import FrozenInstanceError, dataclass, replace
@@ -32,12 +33,16 @@ from trading_bot.runtime.windows_authority_schema import (
     PRODUCTION_SCHEMA_ID,
     PRODUCTION_SCHEMA_VERSION,
     SchemaValidationError,
-    configure_trusted_schema_off,
     execute_schema_artifact,
     require_evidence_digest,
 )
 from trading_bot.runtime.windows_transactional_authority import (
     ConstructedProvider as FakeConstructedProvider,
+)
+from trading_bot.runtime.windows_transactional_authority import (
+    DisposableAuthorityDatabaseForTest,
+    ValidatedCaptureRequest,
+    WindowsTransactionalAuthority,
 )
 from trading_bot.runtime.windows_transactional_authority import (
     ProcessCreationFailure as FakeProcessCreationFailure,
@@ -56,10 +61,6 @@ from trading_bot.runtime.windows_transactional_authority import (
 )
 from trading_bot.runtime.windows_transactional_authority import (
     ResumeReceipt as FakeResumeReceipt,
-)
-from trading_bot.runtime.windows_transactional_authority import (
-    ValidatedCaptureRequest,
-    WindowsTransactionalAuthority,
 )
 from trading_bot.runtime.windows_transactional_authority import (
     allocate_attempt as _production_allocate_attempt,
@@ -107,6 +108,9 @@ from trading_bot.runtime.windows_transactional_authority import (
     issue_resume_receipt_for_test as _issue_resume_receipt,
 )
 from trading_bot.runtime.windows_transactional_authority import (
+    open_disposable_authority_database_for_test as _open_disposable_database,
+)
+from trading_bot.runtime.windows_transactional_authority import (
     process_failure_json_for_test as _process_failure_json,
 )
 from trading_bot.runtime.windows_transactional_authority import (
@@ -132,9 +136,6 @@ from trading_bot.runtime.windows_transactional_authority import (
 )
 from trading_bot.runtime.windows_transactional_authority import (
     record_process_creation_failure_locked_for_test as _record_process_creation_failure_locked,  # noqa: E501
-)
-from trading_bot.runtime.windows_transactional_authority import (
-    record_recovery as _production_record_recovery,
 )
 from trading_bot.runtime.windows_transactional_authority import (
     record_recovery_locked_for_test as _record_recovery_locked,
@@ -1373,22 +1374,24 @@ def _recovery_id(
     )
 
 
-def _connect(path: Path) -> sqlite3.Connection:
-    connection = sqlite3.connect(
-        path, timeout=5.0, isolation_level=None, check_same_thread=False
-    )
-    # This executable harness deliberately uses the same SQLite trust fence as
-    # the production artifact.  Evidence digests are checked by Python
-    # mutation/validation boundaries, never by a test-only SQL UDF.
-    configure_trusted_schema_off(connection)
-    connection.execute("PRAGMA foreign_keys = ON")
-    connection.execute("PRAGMA busy_timeout = 5000")
+def _raw_connection_for_test(
+    connection: sqlite3.Connection | DisposableAuthorityDatabaseForTest,
+) -> sqlite3.Connection:
+    if type(connection) is DisposableAuthorityDatabaseForTest:
+        return connection.connection
     return connection
 
 
-def _install_schema(connection: sqlite3.Connection) -> None:
-    execute_schema_artifact(connection)
-    connection.execute("PRAGMA foreign_keys = ON")
+def _connect(path: Path) -> DisposableAuthorityDatabaseForTest:
+    return _open_disposable_database(path)
+
+
+def _install_schema(
+    connection: sqlite3.Connection | DisposableAuthorityDatabaseForTest,
+) -> None:
+    raw_connection = _raw_connection_for_test(connection)
+    execute_schema_artifact(raw_connection)
+    raw_connection.execute("PRAGMA foreign_keys = ON")
 
 
 def test_transactional_harness_uses_pinned_packaged_production_artifact() -> None:
@@ -1532,10 +1535,13 @@ def _insert_migration(
     return migration_id
 
 
-def _require_no_active_transaction(connection: sqlite3.Connection) -> None:
-    if type(connection) is not sqlite3.Connection:
+def _require_no_active_transaction(
+    connection: sqlite3.Connection | DisposableAuthorityDatabaseForTest,
+) -> None:
+    raw_connection = _raw_connection_for_test(connection)
+    if type(raw_connection) is not sqlite3.Connection:
         raise TypeError("lifecycle boundary requires an exact sqlite3.Connection")
-    if connection.in_transaction:
+    if raw_connection.in_transaction:
         raise ValueError("lifecycle boundary requires no active SQLite transaction")
 
 
@@ -1547,16 +1553,34 @@ def _finish(connection: sqlite3.Connection, commit: bool) -> None:
     (connection.commit if commit else connection.rollback)()
 
 
+_TEST_SERVICES: weakref.WeakKeyDictionary[
+    DisposableAuthorityDatabaseForTest,
+    dict[
+        Callable[[object], ValidatedCaptureRequest] | None,
+        WindowsTransactionalAuthority,
+    ],
+] = weakref.WeakKeyDictionary()
+
+
+def _current_lifecycle_arbiter(reservation_id: str):
+    return InterprocessLifecycleArbiter(reservation_id)
+
+
 def _test_service(
-    connection: sqlite3.Connection,
+    connection: DisposableAuthorityDatabaseForTest,
     *,
     capture_request_factory: Callable[[object], ValidatedCaptureRequest] | None = None,
 ) -> WindowsTransactionalAuthority:
-    return WindowsTransactionalAuthority.for_test(
-        connection=connection,
-        lifecycle_arbiter_factory=InterprocessLifecycleArbiter,
-        capture_request_factory=capture_request_factory,
-    )
+    services = _TEST_SERVICES.setdefault(connection, {})
+    service = services.get(capture_request_factory)
+    if service is None:
+        service = WindowsTransactionalAuthority.for_test(
+            database=connection,
+            lifecycle_arbiter_factory=_current_lifecycle_arbiter,
+            capture_request_factory=capture_request_factory,
+        )
+        services[capture_request_factory] = service
+    return service
 
 
 def create_session(
@@ -1703,8 +1727,7 @@ def record_recovery(
     action: str,
     ordinal: int | None = None,
 ) -> str:
-    return _test_service(connection).invoke_for_test(
-        _production_record_recovery,
+    return _test_service(connection).record_recovery(
         session_id,
         target_kind,
         target_id,
@@ -3166,6 +3189,7 @@ def _prepare_active_transaction_boundary(
 ) -> tuple[Callable[[], object], object | None, list[str]]:
     events: list[str] = []
     hooks = FakeSideEffects(connection, events)
+    service = _test_service(connection)
     session_id = create_session(connection)
     attempt_id = allocate_attempt(connection, session_id)
     claim_id = commit_claim(connection, attempt_id)
@@ -3174,8 +3198,7 @@ def _prepare_active_transaction_boundary(
 
     if boundary == "recover-launch-reservation":
         return (
-            lambda: record_recovery(
-                connection,
+            lambda: service.record_recovery(
                 session_id,
                 "LAUNCH_RESERVATION",
                 reservation_id,
@@ -3188,7 +3211,7 @@ def _prepare_active_transaction_boundary(
     provider = hooks.construct_provider(reservation)
     if boundary == "commit-process-intent":
         return (
-            lambda: commit_process_intent(connection, reservation_id, provider),
+            lambda: service.commit_process_intent(reservation_id, provider),
             provider,
             events,
         )
@@ -3196,8 +3219,7 @@ def _prepare_active_transaction_boundary(
     process_intent = commit_process_intent(connection, reservation_id, provider)
     if boundary == "recover-process-outcome":
         return (
-            lambda: record_recovery(
-                connection,
+            lambda: service.record_recovery(
                 session_id,
                 "LAUNCH_RESERVATION",
                 reservation_id,
@@ -3213,8 +3235,8 @@ def _prepare_active_transaction_boundary(
     if boundary == "record-process-creation-failure":
         assert type(process_result) is FakeProcessCreationFailure
         return (
-            lambda: record_process_creation_failure(
-                connection, reservation_id, process_result
+            lambda: service.record_process_creation_failure(
+                reservation_id, process_result
             ),
             process_result,
             events,
@@ -3222,7 +3244,7 @@ def _prepare_active_transaction_boundary(
     assert type(process_result) is FakeProcessCreationReceipt
     if boundary == "record-execution":
         return (
-            lambda: record_execution(connection, reservation_id, process_result),
+            lambda: service.record_execution(reservation_id, process_result),
             process_result,
             events,
         )
@@ -3230,8 +3252,7 @@ def _prepare_active_transaction_boundary(
     execution_id = record_execution(connection, reservation_id, process_result)
     if boundary == "recover-pre-resume":
         return (
-            lambda: record_recovery(
-                connection,
+            lambda: service.record_recovery(
                 session_id,
                 "LAUNCH_RESERVATION",
                 reservation_id,
@@ -3242,7 +3263,7 @@ def _prepare_active_transaction_boundary(
         )
     if boundary == "commit-resume-intent":
         return (
-            lambda: commit_resume_intent(connection, execution_id, reservation_id),
+            lambda: service.commit_resume_intent(execution_id, reservation_id),
             None,
             events,
         )
@@ -3250,8 +3271,7 @@ def _prepare_active_transaction_boundary(
     resume_intent = commit_resume_intent(connection, execution_id, reservation_id)
     if boundary == "recover-resume-outcome":
         return (
-            lambda: record_recovery(
-                connection,
+            lambda: service.record_recovery(
                 session_id,
                 "LAUNCH_RESERVATION",
                 reservation_id,
@@ -3264,9 +3284,7 @@ def _prepare_active_transaction_boundary(
     resume_receipt = hooks.resume_thread(resume_intent)
     if boundary == "record-post-resume-evidence":
         return (
-            lambda: record_post_resume_evidence(
-                connection, execution_id, resume_receipt
-            ),
+            lambda: service.record_post_resume_evidence(execution_id, resume_receipt),
             resume_receipt,
             events,
         )
@@ -3274,7 +3292,7 @@ def _prepare_active_transaction_boundary(
     assert boundary == "record-terminal"
     record_post_resume_evidence(connection, execution_id, resume_receipt)
     return (
-        lambda: record_terminal(connection, reservation_id),
+        lambda: service.record_terminal(reservation_id),
         None,
         events,
     )
@@ -3470,6 +3488,7 @@ def test_reservation_recovery_validates_ordinal_before_transaction_guard(
     attempt_id = allocate_attempt(connection, session_id)
     claim_id = commit_claim(connection, attempt_id)
     reservation_id = str(reserve_launch(connection, claim_id))
+    service = _test_service(connection)
     before = _database_rows(connection)
     arbiter_attempts: list[str] = []
 
@@ -3483,8 +3502,7 @@ def test_reservation_recovery_validates_ordinal_before_transaction_guard(
             sys.modules[__name__], "InterprocessLifecycleArbiter", ArbiterProbe
         )
         with pytest.raises(ValueError, match="exact non-negative int"):
-            record_recovery(
-                connection,
+            service.record_recovery(
                 session_id,
                 "LAUNCH_RESERVATION",
                 reservation_id,
@@ -4704,7 +4722,7 @@ def test_every_owned_insert_pair_rejects_python_mismatch_before_mutation(
     context = _prepare_owned_insert_parent(base, table)
 
     candidate = _connect(tmp_path / "owned-pair-candidate.sqlite3")
-    base.backup(candidate)
+    base.connection.backup(candidate.connection)
     _create_owned_insert_candidate(candidate, table, context)
     columns = [row[1] for row in candidate.execute(f"PRAGMA table_info({table})")]
     values = list(candidate.execute(f"SELECT * FROM {table}").fetchone())

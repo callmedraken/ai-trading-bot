@@ -32,8 +32,16 @@ connection is not a production substitute. Production authority cannot be
 reconstructed from public fields.
 
 `WindowsTransactionalAuthority.for_test(...)` is the explicitly named
-disposable seam for injected SQLite connections, test lifecycle arbiters, and
-fake adapters. It is not a production entry path.
+disposable seam for a `DisposableAuthorityDatabaseForTest` produced by the
+reviewed test-only opener, test lifecycle arbiters, and fake adapters. It does
+not accept an arbitrary SQLite connection or a production-authority argument.
+The opener records the identity returned by SQLite's `PRAGMA database_list` and
+rejects the fixed production database, every database under the fixed
+production authority tree, and attached or otherwise ambiguous databases
+before the test service can use them. The database binding is private test
+provenance; public paths, connections, and wrapper fields cannot reconstruct
+it. Consequently test arbiters, adapters, and test-issued capabilities or
+receipts cannot operate production storage.
 
 `invoke_for_test` is bound to that test-only construction provenance. A
 production-created service rejects it before opening its fixed authority

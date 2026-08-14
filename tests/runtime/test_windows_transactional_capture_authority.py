@@ -12,7 +12,6 @@ import sqlite3
 import sys
 import threading
 import uuid
-import weakref
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import FrozenInstanceError, dataclass, replace
@@ -33,6 +32,7 @@ from trading_bot.runtime.windows_authority_schema import (
     PRODUCTION_SCHEMA_ID,
     PRODUCTION_SCHEMA_VERSION,
     SchemaValidationError,
+    configure_trusted_schema_off,
     execute_schema_artifact,
     require_evidence_digest,
 )
@@ -108,7 +108,7 @@ from trading_bot.runtime.windows_transactional_authority import (
     issue_resume_receipt_for_test as _issue_resume_receipt,
 )
 from trading_bot.runtime.windows_transactional_authority import (
-    open_disposable_authority_database_for_test as _open_disposable_database,
+    open_disposable_authority_database_for_test as _open_disposable_database_for_test,
 )
 from trading_bot.runtime.windows_transactional_authority import (
     process_failure_json_for_test as _process_failure_json,
@@ -136,6 +136,9 @@ from trading_bot.runtime.windows_transactional_authority import (
 )
 from trading_bot.runtime.windows_transactional_authority import (
     record_process_creation_failure_locked_for_test as _record_process_creation_failure_locked,  # noqa: E501
+)
+from trading_bot.runtime.windows_transactional_authority import (
+    record_recovery as _production_record_recovery,
 )
 from trading_bot.runtime.windows_transactional_authority import (
     record_recovery_locked_for_test as _record_recovery_locked,
@@ -1382,8 +1385,23 @@ def _raw_connection_for_test(
     return connection
 
 
-def _connect(path: Path) -> DisposableAuthorityDatabaseForTest:
-    return _open_disposable_database(path)
+def _connect(path: Path) -> sqlite3.Connection:
+    """Open a harness-owned file database for cross-process Architecture-77 tests."""
+
+    connection = sqlite3.connect(
+        path,
+        timeout=5.0,
+        isolation_level=None,
+        check_same_thread=False,
+    )
+    try:
+        configure_trusted_schema_off(connection)
+        connection.execute("PRAGMA foreign_keys = ON")
+        connection.execute("PRAGMA busy_timeout = 5000")
+        return connection
+    except BaseException:
+        connection.close()
+        raise
 
 
 def _install_schema(
@@ -1553,34 +1571,113 @@ def _finish(connection: sqlite3.Connection, commit: bool) -> None:
     (connection.commit if commit else connection.rollback)()
 
 
-_TEST_SERVICES: weakref.WeakKeyDictionary[
-    DisposableAuthorityDatabaseForTest,
-    dict[
-        Callable[[object], ValidatedCaptureRequest] | None,
-        WindowsTransactionalAuthority,
-    ],
-] = weakref.WeakKeyDictionary()
-
-
 def _current_lifecycle_arbiter(reservation_id: str):
     return InterprocessLifecycleArbiter(reservation_id)
 
 
+class _HarnessService:
+    """Bind public state-machine calls to a harness-owned file connection."""
+
+    def __init__(
+        self,
+        connection: sqlite3.Connection,
+        capture_request_factory: Callable[[object], ValidatedCaptureRequest] | None,
+    ) -> None:
+        self._connection = connection
+        self._capture_request_factory = capture_request_factory
+
+    def invoke_for_test(
+        self, operation: Callable[..., Any], *args: Any, **kwargs: Any
+    ) -> Any:
+        if type(self._connection) is not sqlite3.Connection:
+            raise TypeError("lifecycle boundary requires an exact sqlite3.Connection")
+        if self._connection.in_transaction:
+            raise ValueError("lifecycle boundary requires no active SQLite transaction")
+
+        database = _open_disposable_database_for_test()
+        service = WindowsTransactionalAuthority.for_test(
+            database=database,
+            lifecycle_arbiter_factory=_current_lifecycle_arbiter,
+            capture_request_factory=self._capture_request_factory,
+        )
+        try:
+            return service.invoke_for_test(
+                lambda _memory_connection: operation(self._connection, *args, **kwargs)
+            )
+        finally:
+            service.close()
+
+    def commit_process_intent(
+        self, reservation_id: str, provider: FakeConstructedProvider | None = None
+    ) -> FakeProcessIntent:
+        return self.invoke_for_test(
+            _production_commit_process_intent, reservation_id, provider
+        )
+
+    def record_execution(
+        self, reservation_id: str, receipt: FakeProcessCreationReceipt
+    ) -> str:
+        return self.invoke_for_test(
+            _production_record_execution, reservation_id, receipt
+        )
+
+    def commit_resume_intent(
+        self, execution_id: str, reservation_id: str
+    ) -> FakeResumeIntent:
+        return self.invoke_for_test(
+            _production_commit_resume_intent, execution_id, reservation_id
+        )
+
+    def record_process_creation_failure(
+        self, reservation_id: str, failure: FakeProcessCreationFailure
+    ) -> None:
+        return self.invoke_for_test(
+            _production_record_process_creation_failure, reservation_id, failure
+        )
+
+    def record_post_resume_evidence(
+        self, execution_id: str, resume_receipt: FakeResumeReceipt
+    ) -> None:
+        return self.invoke_for_test(
+            _production_record_post_resume_evidence, execution_id, resume_receipt
+        )
+
+    def record_terminal(
+        self,
+        reservation_id: str,
+        state: str = "SUCCEEDED",
+        disposition: str = "CONFIRMED",
+    ) -> str:
+        return self.invoke_for_test(
+            _production_record_terminal, reservation_id, state, disposition
+        )
+
+    def record_recovery(
+        self,
+        session_id: str,
+        target_kind: str,
+        target_id: str,
+        action: str,
+        ordinal: int | None = None,
+    ) -> str:
+        if ordinal is not None:
+            _canonical_ordinal(ordinal, "recovery ordinal")
+        return self.invoke_for_test(
+            _production_record_recovery,
+            session_id,
+            target_kind,
+            target_id,
+            action,
+            ordinal,
+        )
+
+
 def _test_service(
-    connection: DisposableAuthorityDatabaseForTest,
+    connection: sqlite3.Connection,
     *,
     capture_request_factory: Callable[[object], ValidatedCaptureRequest] | None = None,
-) -> WindowsTransactionalAuthority:
-    services = _TEST_SERVICES.setdefault(connection, {})
-    service = services.get(capture_request_factory)
-    if service is None:
-        service = WindowsTransactionalAuthority.for_test(
-            database=connection,
-            lifecycle_arbiter_factory=_current_lifecycle_arbiter,
-            capture_request_factory=capture_request_factory,
-        )
-        services[capture_request_factory] = service
-    return service
+) -> _HarnessService:
+    return _HarnessService(connection, capture_request_factory)
 
 
 def create_session(

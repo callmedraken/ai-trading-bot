@@ -34,14 +34,18 @@ reconstructed from public fields.
 `WindowsTransactionalAuthority.for_test(...)` is the explicitly named
 disposable seam for a `DisposableAuthorityDatabaseForTest` produced by the
 reviewed test-only opener, test lifecycle arbiters, and fake adapters. It does
-not accept an arbitrary SQLite connection or a production-authority argument.
-The opener records the identity returned by SQLite's `PRAGMA database_list` and
-rejects the fixed production database, every database under the fixed
-production authority tree, and attached or otherwise ambiguous databases
-before the test service can use them. The database binding is private test
-provenance; public paths, connections, and wrapper fields cannot reconstruct
-it. Consequently test arbiters, adapters, and test-issued capabilities or
-receipts cannot operate production storage.
+not accept an arbitrary SQLite connection, a database path, or a
+production-authority argument. The opener always opens `:memory:`, then proves
+from SQLite's `PRAGMA database_list` that the connection has exactly one
+`main` database with an empty filename. File-backed databases, URI databases,
+and attached databases are rejected before the test service can use them.
+File-backed Architecture-77 databases remain harness-owned infrastructure and
+are exercised through public state-machine functions plus harness adapters;
+they are not `WindowsTransactionalAuthority.for_test(...)` bindings. The
+anonymous database binding is private test provenance; public paths,
+connections, and wrapper fields cannot reconstruct it. Consequently test
+arbiters, adapters, and test-issued capabilities or receipts cannot operate
+production storage.
 
 `invoke_for_test` is bound to that test-only construction provenance. A
 production-created service rejects it before opening its fixed authority
@@ -155,8 +159,9 @@ successful no-op.
 
 Behavioral tests retain disposable SQLite setup, the file-lock lifecycle
 adapter, fake external observations, direct-SQL negative vectors, and
-test-only capability factories. The harness now invokes the extracted
-transactional service through its explicit `for_test` seam.
+test-only capability factories. In-memory service vectors use the explicit
+`for_test` seam; file-backed cross-process vectors use harness-owned SQLite
+adapters around the public state-machine functions.
 
 ## C2 exclusions and next milestone
 

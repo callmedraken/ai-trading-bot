@@ -11,7 +11,6 @@ from __future__ import annotations
 import contextvars
 import hashlib
 import json
-import os
 import sqlite3
 import threading
 import uuid
@@ -19,7 +18,6 @@ from collections.abc import Callable
 from contextlib import AbstractContextManager
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
-from pathlib import Path
 from typing import Any, Protocol, Self
 
 from trading_bot.domain import Symbol
@@ -28,7 +26,6 @@ from trading_bot.market_data import (
     MAX_DAILY_SNAPSHOT_SYMBOLS,
 )
 from trading_bot.runtime.windows_authority import (
-    PRODUCTION_AUTHORITY_PATHS,
     WindowsAuthorityError,
 )
 from trading_bot.runtime.windows_authority_mutex import GlobalLifecycleMutex
@@ -116,36 +113,6 @@ class _DisposableDatabaseIdentity:
     database_list: tuple[tuple[int, str, str], ...]
 
 
-def _production_authority_root() -> Path:
-    return Path(PRODUCTION_AUTHORITY_PATHS.root).resolve(strict=False)
-
-
-def _production_authority_database() -> Path:
-    return Path(PRODUCTION_AUTHORITY_PATHS.database).resolve(strict=False)
-
-
-def _path_is_under(path: Path, root: Path) -> bool:
-    return path == root or root in path.parents
-
-
-def _reject_production_database_path(database: str | os.PathLike[str]) -> None:
-    try:
-        database_value = os.fspath(database)
-    except TypeError as error:
-        raise TypeError("disposable database path must be path-like") from error
-    if database_value == ":memory:":
-        return
-    candidate = Path(database_value).resolve(strict=False)
-    if _path_is_under(candidate, _production_authority_root()):
-        raise ExternalAuthorityBoundaryUnavailable(
-            "disposable test database path is inside the production authority tree"
-        )
-    if candidate == _production_authority_database():
-        raise ExternalAuthorityBoundaryUnavailable(
-            "disposable test database path is the production authority database"
-        )
-
-
 def _inspect_disposable_database_identity(
     connection: sqlite3.Connection,
 ) -> _DisposableDatabaseIdentity:
@@ -164,20 +131,9 @@ def _inspect_disposable_database_identity(
         )
     filename = identity.database_list[0][2]
     if filename:
-        if filename.startswith("file:"):
-            raise ExternalAuthorityBoundaryUnavailable(
-                "disposable test database URI identity is ambiguous"
-            )
-        actual_path = Path(filename).resolve(strict=False)
-        if _path_is_under(actual_path, _production_authority_root()):
-            raise ExternalAuthorityBoundaryUnavailable(
-                "disposable test database identity is inside the production "
-                "authority tree"
-            )
-        if actual_path == _production_authority_database():
-            raise ExternalAuthorityBoundaryUnavailable(
-                "disposable test database identity is the production authority database"
-            )
+        raise ExternalAuthorityBoundaryUnavailable(
+            "disposable test database must be anonymous in-memory SQLite"
+        )
     return identity
 
 
@@ -236,19 +192,18 @@ class DisposableAuthorityDatabaseForTest:
 
 
 def open_disposable_authority_database_for_test(
-    database: str | os.PathLike[str],
+    database: object = ":memory:",
 ) -> DisposableAuthorityDatabaseForTest:
-    """Open and identity-check a disposable database for the explicit test seam."""
+    """Open and identity-check an anonymous database for the explicit test seam."""
 
-    _reject_production_database_path(database)
-    try:
-        database_value = os.fspath(database)
-    except TypeError as error:
-        raise TypeError("disposable database path must be path-like") from error
+    if database != ":memory:":
+        raise ExternalAuthorityBoundaryUnavailable(
+            "disposable test database requires anonymous in-memory SQLite"
+        )
     connection: sqlite3.Connection | None = None
     try:
         connection = sqlite3.connect(
-            database_value,
+            ":memory:",
             timeout=5.0,
             isolation_level=None,
             check_same_thread=False,

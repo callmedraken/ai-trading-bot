@@ -300,7 +300,7 @@ def test_disposable_opener_rejects_production_tree_before_sqlite_open(
     )
     with pytest.raises(
         ExternalAuthorityBoundaryUnavailable,
-        match="production authority tree",
+        match="anonymous in-memory SQLite",
     ):
         open_disposable_authority_database_for_test(database_path)
     assert open_calls == []
@@ -326,49 +326,28 @@ def test_anonymous_disposable_database_supports_the_test_service() -> None:
         service.close()
 
 
-def test_file_backed_test_database_requires_reviewed_opener_and_sqlite_identity(
+def test_file_backed_test_database_is_rejected_before_sqlite_open(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path,
 ) -> None:
-    monkeypatch.chdir(tmp_path)
-    database = open_disposable_authority_database_for_test("authority.sqlite3")
-    service = WindowsTransactionalAuthority.for_test(
-        database=database,
-        lifecycle_arbiter_factory=lambda reservation_id: GlobalLifecycleMutex(
-            "machine", "epoch", reservation_id
-        ),
-    )
-    try:
-        sqlite_identity = tuple(
-            tuple(row) for row in database.connection.execute("PRAGMA database_list")
-        )
-        assert database.database_identity == sqlite_identity
-        assert database.database_identity[0][2] == str(
-            (tmp_path / "authority.sqlite3").resolve()
-        )
-        assert database.database_identity[0][2] != "authority.sqlite3"
-        assert (
-            service.invoke_for_test(
-                lambda connection: connection.execute("SELECT 1").fetchone()[0]
-            )
-            == 1
-        )
-    finally:
-        service.close()
+    file_path = tmp_path / "authority.sqlite3"
+    open_calls: list[tuple[object, ...]] = []
 
-    raw_connection = sqlite3.connect(
-        tmp_path / "authority.sqlite3", isolation_level=None
+    def unexpected_open(*args: object, **kwargs: object) -> None:
+        open_calls.append((args, kwargs))
+        raise AssertionError("file-backed disposable database was opened")
+
+    monkeypatch.setattr(
+        "trading_bot.runtime.windows_transactional_authority.sqlite3.connect",
+        unexpected_open,
     )
-    try:
-        with pytest.raises(TypeError, match="reviewed disposable database"):
-            WindowsTransactionalAuthority.for_test(  # type: ignore[arg-type]
-                database=raw_connection,
-                lifecycle_arbiter_factory=lambda reservation_id: GlobalLifecycleMutex(
-                    "machine", "epoch", reservation_id
-                ),
-            )
-    finally:
-        raw_connection.close()
+    with pytest.raises(
+        ExternalAuthorityBoundaryUnavailable,
+        match="anonymous in-memory SQLite",
+    ):
+        open_disposable_authority_database_for_test(file_path)
+    assert open_calls == []
+    assert not file_path.exists()
 
 
 def test_attached_disposable_database_is_rejected_before_callback_or_mutation() -> None:

@@ -46,18 +46,24 @@ Architecture-77 file-backed multiprocessing tests use a separate
 `Architecture77HarnessAuthority` under `tests/`. That factory creates and
 owns a fresh temporary root and database, supplies a plain spawn descriptor to
 children, checks ordinary database/schema identity and cleanup boundaries, and
-binds the file connection directly to the private shared transactional core.
-It is test correctness/isolation infrastructure, not production executable
-authority and not a hostile same-user filesystem security boundary. It never
-passes its path, connection, descriptor, or capabilities to a production
-facade. Direct SQL/schema fixtures remain test-owned raw SQLite infrastructure.
+binds the file connection directly to the supported shared
+`TransactionalAuthorityCore` implementation API. The core accepts the exact
+reviewed connection supplied by its binding, but it is not executable
+production authority. The harness is test correctness/isolation infrastructure,
+not production executable authority and not a hostile same-user filesystem
+security boundary. It never passes its path, connection, descriptor, or
+capabilities to a production facade. Direct SQL/schema fixtures remain
+test-owned raw SQLite infrastructure.
 
-The anonymous service and file-backed harness execute the same private
-transactional core as production. Production storage remains selected only by
-the genuine `ValidatedProductionAuthority` and its fixed approved VFS/storage
-binding. Consequently test arbiters, adapters, test-issued capabilities or
-receipts, harness paths, and harness descriptors cannot operate production
-storage through a production API.
+The anonymous service, file-backed harness, and production facade execute the
+same `TransactionalAuthorityCore` state-machine implementation. Production
+storage remains selected only by the genuine `ValidatedProductionAuthority`
+and its fixed approved VFS/storage binding. Consequently test arbiters,
+adapters, test-issued capabilities or receipts, harness paths, and harness
+descriptors cannot operate production storage through a production API. The
+core is intentionally supported as an implementation interface, but is not a
+proof of production authority and is not broadly re-exported by package
+convenience modules.
 
 ## Fixed database binding
 
@@ -132,7 +138,13 @@ results are immutable process-local objects. Private issuer tokens and
 registries retain the reviewed provenance checks; visible fields do not select
 lineage or arbiter identity. Registry records are checked before consumption,
 and one-shot permits are consumed at most once. The objects reject pickling
-and serialization.
+and serialization. Each anonymous `for_test` service receives a fresh opaque
+process-local service token. A file-backed Architecture-77 harness uses one
+such token for its logical temporary-database scope within a process, so its
+separate SQLite observer connections remain one reviewed harness service;
+separate harness databases and spawned processes receive distinct tokens. The
+token is never derived from deterministic IDs, persisted, serialized, or
+caller-selected.
 
 Test-issued provider/process/resume capabilities and receipts use distinct
 test provenance. Production service consumers reject that provenance before
@@ -177,7 +189,8 @@ test-only capability factories. In-memory service vectors use the explicit
 `for_test` seam. File-backed cross-process vectors use
 `Architecture77HarnessAuthority` and its explicit `TestLifecycleLease`; they
 do not route a file connection through the anonymous-memory service or an
-arbitrary callback. The harness and production therefore exercise one
+arbitrary callback. The harness imports the supported core API and owns its
+connection directly. The harness and production therefore exercise one
 state-machine implementation while retaining separate storage boundaries.
 
 ## C2 exclusions and next milestone

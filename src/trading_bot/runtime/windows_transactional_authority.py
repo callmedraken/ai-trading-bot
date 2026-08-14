@@ -103,6 +103,7 @@ class _ServiceContext:
     test_only: bool
     external_adapter: TransactionalAuthorityAdapter | None = None
     test_database: DisposableAuthorityDatabaseForTest | None = None
+    test_service_token: object | None = None
 
 
 _DISPOSABLE_DATABASE_CONSTRUCTOR = object()
@@ -248,6 +249,13 @@ def _service_issuer(production_issuer: object, test_issuer: object) -> object:
     return test_issuer if _require_service_context().test_only else production_issuer
 
 
+def _active_test_service_token() -> object | None:
+    context = _CURRENT_SERVICE_CONTEXT.get()
+    if context is None or not context.test_only:
+        return None
+    return context.test_service_token
+
+
 def _require_service_provenance(
     capability: object,
     *,
@@ -255,9 +263,12 @@ def _require_service_provenance(
     test_issuer: object,
     label: str,
     test_only: bool | None = None,
+    service_token: object | None = None,
 ) -> None:
     if test_only is None:
-        test_only = _require_service_context().test_only
+        context = _require_service_context()
+        test_only = context.test_only
+        service_token = context.test_service_token
     expected_issuer = test_issuer if test_only else production_issuer
     if getattr(capability, "_issuer", None) is not expected_issuer:
         if test_only:
@@ -265,6 +276,8 @@ def _require_service_provenance(
         raise ExternalAuthorityBoundaryUnavailable(
             f"{label} has invalid production service provenance"
         )
+    if test_only and getattr(capability, "_service_token", None) is not service_token:
+        raise TypeError(f"{label} has invalid test service provenance service")
 
 
 def _production_timestamp(fallback: str) -> str:
@@ -364,6 +377,7 @@ class ProviderConstructionPermit(_ProcessLocalCapability):
     reservation_id: str
     _issuer: object = field(repr=False, compare=False)
     _permit: _ProviderConstructionOneShot = field(repr=False, compare=False)
+    _service_token: object | None = field(repr=False, compare=False, default=None)
 
     def __post_init__(self) -> None:
         if self._issuer not in (
@@ -385,6 +399,7 @@ class ConstructedProvider(_ProcessLocalCapability):
     reservation_id: str
     _issuer: object = field(repr=False, compare=False)
     _permit: _ConstructedProviderOneShot = field(repr=False, compare=False)
+    _service_token: object | None = field(repr=False, compare=False, default=None)
 
     def __post_init__(self) -> None:
         if self._issuer not in (
@@ -403,6 +418,7 @@ class ProcessIntent(_ProcessLocalCapability):
     intent_digest: bytes
     _issuer: object = field(repr=False, compare=False)
     _permit: _ProcessPermit = field(repr=False, compare=False)
+    _service_token: object | None = field(repr=False, compare=False, default=None)
 
     def __post_init__(self) -> None:
         if self._issuer not in (
@@ -426,6 +442,7 @@ class ProcessCreationReceipt(_ProcessLocalCapability):
     resume_authorization_digest: bytes
     _issuer: object = field(repr=False, compare=False)
     _permit: _ProcessResultPermit = field(repr=False, compare=False)
+    _service_token: object | None = field(repr=False, compare=False, default=None)
 
     def __post_init__(self) -> None:
         if self._issuer not in (
@@ -445,6 +462,7 @@ class ProcessCreationFailure(_ProcessLocalCapability):
     result_digest: bytes
     _issuer: object = field(repr=False, compare=False)
     _permit: _ProcessResultPermit = field(repr=False, compare=False)
+    _service_token: object | None = field(repr=False, compare=False, default=None)
 
     def __post_init__(self) -> None:
         if self._issuer not in (
@@ -464,6 +482,7 @@ class ResumeIntent(_ProcessLocalCapability):
     intent_digest: bytes
     _issuer: object = field(repr=False, compare=False)
     _permit: _ResumePermit = field(repr=False, compare=False)
+    _service_token: object | None = field(repr=False, compare=False, default=None)
 
     def __post_init__(self) -> None:
         if self._issuer not in (
@@ -484,6 +503,7 @@ class ResumeReceipt(_ProcessLocalCapability):
     result_digest: bytes
     _issuer: object = field(repr=False, compare=False)
     _permit: _ResumeResultPermit = field(repr=False, compare=False)
+    _service_token: object | None = field(repr=False, compare=False, default=None)
 
     def __post_init__(self) -> None:
         if self._issuer not in (
@@ -504,6 +524,7 @@ class _ProviderConstructionIssuance:
     reservation_id: str
     issuer: object
     permit: _ProviderConstructionOneShot
+    service_token: object | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -512,6 +533,7 @@ class _ConstructedProviderIssuance:
     reservation_id: str
     issuer: object
     permit: _ConstructedProviderOneShot
+    service_token: object | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -522,6 +544,7 @@ class _ProcessIntentIssuance:
     intent_digest: bytes
     issuer: object
     permit: _ProcessPermit
+    service_token: object | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -533,6 +556,7 @@ class _ProcessResultIssuance:
     digests: tuple[bytes, ...]
     issuer: object
     permit: _ProcessResultPermit
+    service_token: object | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -544,6 +568,7 @@ class _ResumeIntentIssuance:
     intent_digest: bytes
     issuer: object
     permit: _ResumePermit
+    service_token: object | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -556,6 +581,7 @@ class _ResumeResultIssuance:
     result_digest: bytes
     issuer: object
     permit: _ResumeResultPermit
+    service_token: object | None
 
 
 _ISSUED_PROVIDER_CONSTRUCTION_PERMITS: dict[
@@ -1284,6 +1310,7 @@ def _core_reserve_launch(
         reservation_id,
         _issuer=issuer,
         _permit=one_shot,
+        _service_token=_active_test_service_token(),
     )
     with _ISSUED_PROVIDER_CONSTRUCTION_PERMITS_LOCK:
         _ISSUED_PROVIDER_CONSTRUCTION_PERMITS[one_shot] = _ProviderConstructionIssuance(
@@ -1291,6 +1318,7 @@ def _core_reserve_launch(
             reservation_id=reservation_id,
             issuer=issuer,
             permit=one_shot,
+            service_token=capability._service_token,
         )
     return capability
 
@@ -1338,6 +1366,7 @@ def _registered_provider_reservation_id(
                 issuance.capability is not capability
                 or issuance.permit is not permit
                 or issuance.issuer is not capability._issuer
+                or issuance.service_token is not capability._service_token
                 or issuance.reservation_id != capability.reservation_id
             ):
                 raise ValueError(
@@ -1364,6 +1393,7 @@ def _consume_provider_construction_permit(
                 issuance.capability is not capability
                 or issuance.permit is not permit
                 or issuance.issuer is not capability._issuer
+                or issuance.service_token is not capability._service_token
                 or issuance.reservation_id != capability.reservation_id
                 or issuance.reservation_id != reservation_id
             ):
@@ -1399,6 +1429,7 @@ def _registered_constructed_provider_reservation_id(
                 issuance.provider is not provider
                 or issuance.permit is not permit
                 or issuance.issuer is not provider._issuer
+                or issuance.service_token is not provider._service_token
                 or issuance.reservation_id != provider.reservation_id
             ):
                 raise ValueError(
@@ -1425,6 +1456,7 @@ def _consume_constructed_provider(
                 issuance.provider is not provider
                 or issuance.permit is not permit
                 or issuance.issuer is not provider._issuer
+                or issuance.service_token is not provider._service_token
                 or issuance.reservation_id != provider.reservation_id
                 or issuance.reservation_id != reservation_id
             ):
@@ -1595,6 +1627,7 @@ def _commit_process_intent_locked(
         intent_digest=intent_digest,
         _issuer=issuer,
         _permit=permit,
+        _service_token=_active_test_service_token(),
     )
     with _ISSUED_PROCESS_PERMITS_LOCK:
         _ISSUED_PROCESS_PERMITS[permit] = _ProcessIntentIssuance(
@@ -1604,6 +1637,7 @@ def _commit_process_intent_locked(
             intent_digest=intent_digest,
             issuer=issuer,
             permit=permit,
+            service_token=intent._service_token,
         )
     return intent
 
@@ -1655,6 +1689,7 @@ def _registered_process_intent_reservation_id(intent: ProcessIntent) -> str:
                 issuance.intent is not intent
                 or issuance.permit is not permit
                 or issuance.issuer is not intent._issuer
+                or issuance.service_token is not intent._service_token
                 or issuance.reservation_id != intent.reservation_id
                 or issuance.intent_json != intent.intent_json
                 or issuance.intent_digest != intent.intent_digest
@@ -1681,6 +1716,7 @@ def _consume_process_intent(intent: ProcessIntent, reservation_id: str) -> None:
                 issuance.intent is not intent
                 or issuance.permit is not permit
                 or issuance.issuer is not intent._issuer
+                or issuance.service_token is not intent._service_token
                 or issuance.reservation_id != intent.reservation_id
                 or issuance.reservation_id != reservation_id
                 or issuance.intent_json != intent.intent_json
@@ -1735,6 +1771,7 @@ def _registered_process_result_reservation_id(
                 issuance.result is not result
                 or issuance.permit is not permit
                 or issuance.issuer is not result._issuer
+                or issuance.service_token is not result._service_token
                 or issuance.reservation_id != result.reservation_id
                 or issuance.process_intent_digest != result.process_intent_digest
                 or issuance.evidence != evidence
@@ -1764,6 +1801,7 @@ def _consume_process_result(
                 issuance.result is not result
                 or issuance.permit is not permit
                 or issuance.issuer is not result._issuer
+                or issuance.service_token is not result._service_token
                 or issuance.reservation_id != result.reservation_id
                 or issuance.reservation_id != reservation_id
                 or issuance.process_intent_digest != result.process_intent_digest
@@ -1797,6 +1835,7 @@ def _registered_resume_intent_binding(intent: ResumeIntent) -> tuple[str, str]:
                 issuance.intent is not intent
                 or issuance.permit is not permit
                 or issuance.issuer is not intent._issuer
+                or issuance.service_token is not intent._service_token
                 or issuance.execution_id != intent.execution_id
                 or issuance.reservation_id != intent.reservation_id
                 or issuance.intent_json != intent.intent_json
@@ -1826,6 +1865,7 @@ def _consume_resume_intent(
                 issuance.intent is not intent
                 or issuance.permit is not permit
                 or issuance.issuer is not intent._issuer
+                or issuance.service_token is not intent._service_token
                 or issuance.execution_id != intent.execution_id
                 or issuance.execution_id != execution_id
                 or issuance.reservation_id != intent.reservation_id
@@ -1858,6 +1898,7 @@ def _registered_resume_result_binding(result: ResumeReceipt) -> tuple[str, str]:
                 issuance.result is not result
                 or issuance.permit is not permit
                 or issuance.issuer is not result._issuer
+                or issuance.service_token is not result._service_token
                 or issuance.execution_id != result.execution_id
                 or issuance.reservation_id != result.reservation_id
                 or issuance.resume_intent_digest != result.resume_intent_digest
@@ -1886,6 +1927,7 @@ def _consume_resume_result(
                 issuance.result is not result
                 or issuance.permit is not permit
                 or issuance.issuer is not result._issuer
+                or issuance.service_token is not result._service_token
                 or issuance.execution_id != result.execution_id
                 or issuance.execution_id != execution_id
                 or issuance.reservation_id != result.reservation_id
@@ -2181,6 +2223,7 @@ def _commit_resume_intent_locked(
         intent_digest=intent_digest,
         _issuer=issuer,
         _permit=permit,
+        _service_token=_active_test_service_token(),
     )
     with _ISSUED_RESUME_PERMITS_LOCK:
         _ISSUED_RESUME_PERMITS[permit] = _ResumeIntentIssuance(
@@ -2191,6 +2234,7 @@ def _commit_resume_intent_locked(
             intent_digest=intent_digest,
             issuer=issuer,
             permit=permit,
+            service_token=intent._service_token,
         )
     return intent
 
@@ -2981,8 +3025,33 @@ def snapshot_capture_request_for_test(request: object) -> ValidatedCaptureReques
     return _snapshot_capture_request(request)
 
 
-class _TransactionalAuthorityCore:
-    """Shared Architecture-77 transactional state-machine implementation."""
+_HARNESS_SERVICE_TOKENS: dict[str, object] = {}
+_HARNESS_SERVICE_TOKENS_LOCK = threading.Lock()
+
+
+def _harness_service_token(connection: sqlite3.Connection) -> object:
+    """Return the process-local token for one logical file-backed harness."""
+
+    database_list = connection.execute("PRAGMA database_list").fetchall()
+    if len(database_list) != 1 or database_list[0][1] != "main":
+        raise ExternalAuthorityBoundaryUnavailable(
+            "Architecture-77 harness requires one main database"
+        )
+    database_path = str(database_list[0][2])
+    if not database_path:
+        return object()
+    with _HARNESS_SERVICE_TOKENS_LOCK:
+        return _HARNESS_SERVICE_TOKENS.setdefault(database_path, object())
+
+
+class TransactionalAuthorityCore:
+    """Supported shared transactional state-machine implementation.
+
+    This implementation API accepts the exact SQLite connection supplied by a
+    reviewed binding.  It is not an executable production-authority boundary;
+    production storage remains selected and validated by
+    ``WindowsTransactionalAuthority``.
+    """
 
     def __init__(
         self,
@@ -3021,8 +3090,16 @@ class _TransactionalAuthorityCore:
                 ),
                 test_only=True,
                 external_adapter=external_adapter,
+                test_service_token=_harness_service_token(connection),
             ),
         )
+
+    @contextmanager
+    def bind_external_effects(self) -> Iterator[None]:
+        """Bind the reviewed service provenance while an adapter runs."""
+
+        with self._bound_context():
+            yield
 
     @contextmanager
     def _bound_context(self) -> Iterator[None]:
@@ -3031,6 +3108,53 @@ class _TransactionalAuthorityCore:
             yield
         finally:
             _CURRENT_SERVICE_CONTEXT.reset(token)
+
+    def require_test_capability(self, capability: object) -> None:
+        with self._bound_context():
+            if type(capability) is ProviderConstructionPermit:
+                _require_service_provenance(
+                    capability,
+                    production_issuer=_PROVIDER_CONSTRUCTION_ISSUER,
+                    test_issuer=_TEST_PROVIDER_CONSTRUCTION_ISSUER,
+                    label="provider construction permit",
+                )
+            elif type(capability) is ConstructedProvider:
+                _require_service_provenance(
+                    capability,
+                    production_issuer=_CONSTRUCTED_PROVIDER_ISSUER,
+                    test_issuer=_TEST_CONSTRUCTED_PROVIDER_ISSUER,
+                    label="constructed provider",
+                )
+            elif type(capability) is ProcessIntent:
+                _require_service_provenance(
+                    capability,
+                    production_issuer=_PROCESS_INTENT_ISSUER,
+                    test_issuer=_TEST_PROCESS_INTENT_ISSUER,
+                    label="process intent",
+                )
+            elif type(capability) in {ProcessCreationReceipt, ProcessCreationFailure}:
+                _require_service_provenance(
+                    capability,
+                    production_issuer=_PROCESS_RESULT_ISSUER,
+                    test_issuer=_TEST_PROCESS_RESULT_ISSUER,
+                    label="process creation result",
+                )
+            elif type(capability) is ResumeIntent:
+                _require_service_provenance(
+                    capability,
+                    production_issuer=_RESUME_INTENT_ISSUER,
+                    test_issuer=_TEST_RESUME_INTENT_ISSUER,
+                    label="resume intent",
+                )
+            elif type(capability) is ResumeReceipt:
+                _require_service_provenance(
+                    capability,
+                    production_issuer=_RESUME_RESULT_ISSUER,
+                    test_issuer=_TEST_RESUME_RESULT_ISSUER,
+                    label="resume receipt",
+                )
+            else:
+                raise TypeError("unsupported transactional capability")
 
     def create_session(
         self, request: dict[str, Any], *, created_at_utc: str = TIMESTAMP
@@ -3195,6 +3319,16 @@ class _TransactionalAuthorityCore:
         self, reservation_id: str, provider: ConstructedProvider
     ) -> ProcessIntent:
         with self._bound_context():
+            if type(provider) is not ConstructedProvider:
+                raise TypeError(
+                    "commit_process_intent requires an opaque constructed provider"
+                )
+            _require_service_provenance(
+                provider,
+                production_issuer=_CONSTRUCTED_PROVIDER_ISSUER,
+                test_issuer=_TEST_CONSTRUCTED_PROVIDER_ISSUER,
+                label="constructed provider",
+            )
             return _commit_process_intent_locked(
                 self._connection, reservation_id, provider
             )
@@ -3203,6 +3337,16 @@ class _TransactionalAuthorityCore:
         self, reservation_id: str, receipt: ProcessCreationReceipt
     ) -> str:
         with self._bound_context():
+            if type(receipt) is not ProcessCreationReceipt:
+                raise TypeError(
+                    "record_execution requires a fake process creation receipt"
+                )
+            _require_service_provenance(
+                receipt,
+                production_issuer=_PROCESS_RESULT_ISSUER,
+                test_issuer=_TEST_PROCESS_RESULT_ISSUER,
+                label="process creation receipt",
+            )
             return _record_execution_locked(self._connection, reservation_id, receipt)
 
     def commit_resume_intent_while_held(
@@ -3217,6 +3361,12 @@ class _TransactionalAuthorityCore:
         self, reservation_id: str, failure: ProcessCreationFailure
     ) -> None:
         with self._bound_context():
+            _require_service_provenance(
+                failure,
+                production_issuer=_PROCESS_RESULT_ISSUER,
+                test_issuer=_TEST_PROCESS_RESULT_ISSUER,
+                label="process creation failure",
+            )
             return _record_process_creation_failure_locked(
                 self._connection, reservation_id, failure
             )
@@ -3225,6 +3375,14 @@ class _TransactionalAuthorityCore:
         self, execution_id: str, receipt: ResumeReceipt
     ) -> None:
         with self._bound_context():
+            if type(receipt) is not ResumeReceipt:
+                raise TypeError("post-resume evidence requires a fake resume receipt")
+            _require_service_provenance(
+                receipt,
+                production_issuer=_RESUME_RESULT_ISSUER,
+                test_issuer=_TEST_RESUME_RESULT_ISSUER,
+                label="resume receipt",
+            )
             return _record_post_resume_evidence_locked(
                 self._connection, execution_id, receipt
             )
@@ -3292,7 +3450,7 @@ class WindowsTransactionalAuthority:
     def __init__(self, authority: ValidatedProductionAuthority) -> None:
         self._authority = require_validated_production_authority(authority)
         self._connection: sqlite3.Connection | None = None
-        self._core: _TransactionalAuthorityCore | None = None
+        self._core: TransactionalAuthorityCore | None = None
         self._test_database: DisposableAuthorityDatabaseForTest | None = None
         self._context = _ServiceContext(
             authority=self._authority,
@@ -3338,6 +3496,7 @@ class WindowsTransactionalAuthority:
             test_only=True,
             external_adapter=external_adapter,
             test_database=database,
+            test_service_token=object(),
         )
         return instance
 
@@ -3360,11 +3519,15 @@ class WindowsTransactionalAuthority:
         connection = open_writable_authority_sqlite_connection(
             self._authority.database_path, vfs=build.vfs
         )
-        configure_and_validate_authority_sqlite_connection(
-            connection,
-            database_path=self._authority.database_path,
-            journal_path=f"{self._authority.database_path}-journal",
-        )
+        try:
+            configure_and_validate_authority_sqlite_connection(
+                connection,
+                database_path=self._authority.database_path,
+                journal_path=f"{self._authority.database_path}-journal",
+            )
+        except BaseException:
+            connection.close()
+            raise
         self._connection = connection
         return connection
 
@@ -3379,7 +3542,7 @@ class WindowsTransactionalAuthority:
         if connection is not None:
             connection.close()
 
-    def _core_for_operation(self) -> _TransactionalAuthorityCore:
+    def _core_for_operation(self) -> TransactionalAuthorityCore:
         if self._context.test_only:
             test_database = self._test_database
             if test_database is None:
@@ -3397,7 +3560,7 @@ class WindowsTransactionalAuthority:
                 "transactional authority has no database connection"
             )
         if self._core is None:
-            self._core = _TransactionalAuthorityCore(
+            self._core = TransactionalAuthorityCore(
                 self._connection,
                 self._context,
             )
@@ -3434,6 +3597,7 @@ class WindowsTransactionalAuthority:
             test_issuer=_TEST_CONSTRUCTED_PROVIDER_ISSUER,
             label="constructed provider",
             test_only=self._context.test_only,
+            service_token=self._context.test_service_token,
         )
         return self._core_for_operation().commit_process_intent(
             reservation_id, provider
@@ -3448,6 +3612,7 @@ class WindowsTransactionalAuthority:
             test_issuer=_TEST_PROCESS_RESULT_ISSUER,
             label="process creation receipt",
             test_only=self._context.test_only,
+            service_token=self._context.test_service_token,
         )
         return self._core_for_operation().record_execution(reservation_id, receipt)
 
@@ -3467,6 +3632,7 @@ class WindowsTransactionalAuthority:
             test_issuer=_TEST_PROCESS_RESULT_ISSUER,
             label="process creation failure",
             test_only=self._context.test_only,
+            service_token=self._context.test_service_token,
         )
         return self._core_for_operation().record_process_creation_failure(
             reservation_id, failure
@@ -3481,6 +3647,7 @@ class WindowsTransactionalAuthority:
             test_issuer=_TEST_RESUME_RESULT_ISSUER,
             label="resume receipt",
             test_only=self._context.test_only,
+            service_token=self._context.test_service_token,
         )
         return self._core_for_operation().record_post_resume_evidence(
             execution_id, receipt
@@ -3531,8 +3698,11 @@ class WindowsTransactionalAuthority:
             test_issuer=_TEST_PROVIDER_CONSTRUCTION_ISSUER,
             label="provider construction permit",
             test_only=self._context.test_only,
+            service_token=self._context.test_service_token,
         )
-        return adapter.construct_provider(capability, fail=fail)
+        core = self._core_for_operation()
+        with core.bind_external_effects():
+            return adapter.construct_provider(capability, fail=fail)
 
     def create_process(
         self, process_intent: ProcessIntent, *, fail: bool = False
@@ -3550,8 +3720,11 @@ class WindowsTransactionalAuthority:
             test_issuer=_TEST_PROCESS_INTENT_ISSUER,
             label="process intent",
             test_only=self._context.test_only,
+            service_token=self._context.test_service_token,
         )
-        return adapter.create_process(process_intent, fail=fail)
+        core = self._core_for_operation()
+        with core.bind_external_effects():
+            return adapter.create_process(process_intent, fail=fail)
 
     def resume_thread(
         self, resume_intent: ResumeIntent, *, fail: bool = False
@@ -3569,8 +3742,11 @@ class WindowsTransactionalAuthority:
             test_issuer=_TEST_RESUME_INTENT_ISSUER,
             label="resume intent",
             test_only=self._context.test_only,
+            service_token=self._context.test_service_token,
         )
-        return adapter.resume_thread(resume_intent, fail=fail)
+        core = self._core_for_operation()
+        with core.bind_external_effects():
+            return adapter.resume_thread(resume_intent, fail=fail)
 
 
 def _approved_sqlite_build_for_authority(
@@ -3693,6 +3869,7 @@ def issue_constructed_provider_for_test(reservation_id: str) -> ConstructedProvi
         reservation_id,
         _issuer=_TEST_CONSTRUCTED_PROVIDER_ISSUER,
         _permit=permit,
+        _service_token=_active_test_service_token(),
     )
     with _ISSUED_CONSTRUCTED_PROVIDERS_LOCK:
         _ISSUED_CONSTRUCTED_PROVIDERS[permit] = _ConstructedProviderIssuance(
@@ -3700,6 +3877,7 @@ def issue_constructed_provider_for_test(reservation_id: str) -> ConstructedProvi
             reservation_id=reservation_id,
             issuer=_TEST_CONSTRUCTED_PROVIDER_ISSUER,
             permit=permit,
+            service_token=provider._service_token,
         )
     return provider
 
@@ -3726,6 +3904,7 @@ def issue_process_creation_receipt_for_test(
         resume_authorization_digest=resume_authorization_digest,
         _issuer=_TEST_PROCESS_RESULT_ISSUER,
         _permit=permit,
+        _service_token=_active_test_service_token(),
     )
     evidence, digests = _process_result_visible_evidence(result)
     with _ISSUED_PROCESS_RESULTS_LOCK:
@@ -3737,6 +3916,7 @@ def issue_process_creation_receipt_for_test(
             digests=digests,
             issuer=_TEST_PROCESS_RESULT_ISSUER,
             permit=permit,
+            service_token=result._service_token,
         )
     return result
 
@@ -3755,6 +3935,7 @@ def issue_process_creation_failure_for_test(
         result_digest=result_digest,
         _issuer=_TEST_PROCESS_RESULT_ISSUER,
         _permit=permit,
+        _service_token=_active_test_service_token(),
     )
     evidence, digests = _process_result_visible_evidence(result)
     with _ISSUED_PROCESS_RESULTS_LOCK:
@@ -3766,6 +3947,7 @@ def issue_process_creation_failure_for_test(
             digests=digests,
             issuer=_TEST_PROCESS_RESULT_ISSUER,
             permit=permit,
+            service_token=result._service_token,
         )
     return result
 
@@ -3786,6 +3968,7 @@ def issue_resume_receipt_for_test(
         result_digest=result_digest,
         _issuer=_TEST_RESUME_RESULT_ISSUER,
         _permit=permit,
+        _service_token=_active_test_service_token(),
     )
     with _ISSUED_RESUME_RESULTS_LOCK:
         _ISSUED_RESUME_RESULTS[permit] = _ResumeResultIssuance(
@@ -3797,5 +3980,6 @@ def issue_resume_receipt_for_test(
             result_digest=result_digest,
             issuer=_TEST_RESUME_RESULT_ISSUER,
             permit=permit,
+            service_token=result._service_token,
         )
     return result

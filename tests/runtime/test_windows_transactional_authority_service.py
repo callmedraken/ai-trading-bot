@@ -418,6 +418,44 @@ def test_production_instance_has_no_arbitrary_test_dispatcher(
     assert not hasattr(service, "invoke_for_test")
 
 
+def test_production_connection_validation_failure_closes_local_connection(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import trading_bot.runtime.windows_transactional_authority as production
+
+    authority = _production_validation(monkeypatch)
+    connection = sqlite3.connect(":memory:")
+    failure = RuntimeError("authority connection validation failed")
+    monkeypatch.setattr(
+        production,
+        "_approved_sqlite_build_for_authority",
+        lambda _: type("ApprovedBuild", (), {"vfs": "test-vfs"})(),
+    )
+    monkeypatch.setattr(
+        production,
+        "open_writable_authority_sqlite_connection",
+        lambda *args, **kwargs: connection,
+    )
+
+    def fail_validation(*args: object, **kwargs: object) -> None:
+        raise failure
+
+    monkeypatch.setattr(
+        production,
+        "configure_and_validate_authority_sqlite_connection",
+        fail_validation,
+    )
+    service = WindowsTransactionalAuthority(authority)
+
+    with pytest.raises(RuntimeError, match="authority connection validation failed"):
+        service._open_production_connection()
+
+    assert service._connection is None
+    with pytest.raises(sqlite3.ProgrammingError):
+        connection.execute("SELECT 1")
+    service.close()
+
+
 def test_production_rejects_test_external_effect_provenance_before_database_mutation(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

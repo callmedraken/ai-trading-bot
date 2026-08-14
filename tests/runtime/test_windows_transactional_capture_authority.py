@@ -15,7 +15,7 @@ import tempfile
 import threading
 import uuid
 from collections.abc import Callable, Iterator
-from contextlib import contextmanager
+from contextlib import AbstractContextManager, contextmanager
 from dataclasses import FrozenInstanceError, dataclass, replace
 from pathlib import Path
 from typing import Any
@@ -44,8 +44,8 @@ from trading_bot.runtime.windows_transactional_authority import (
 )
 from trading_bot.runtime.windows_transactional_authority import (
     DisposableAuthorityDatabaseForTest,
+    TransactionalAuthorityCore,
     ValidatedCaptureRequest,
-    _TransactionalAuthorityCore,
 )
 from trading_bot.runtime.windows_transactional_authority import (
     ProcessCreationFailure as FakeProcessCreationFailure,
@@ -1534,7 +1534,7 @@ class Architecture77HarnessDescriptor:
 
 
 class Architecture77HarnessAuthority:
-    """Bind the shared private core to a harness-owned file connection."""
+    """Bind the shared transactional core to a harness-owned file connection."""
 
     def __init__(
         self,
@@ -1548,13 +1548,14 @@ class Architecture77HarnessAuthority:
             raise TypeError(
                 "Architecture-77 harness requires an exact sqlite3.Connection"
             )
+        self._connection = connection
         self._root = None if root is None else root.resolve(strict=True)
         self._database_path = (
             None
             if self._root is None
             else (self._root / "authority.sqlite3").resolve(strict=False)
         )
-        self._core = _TransactionalAuthorityCore.for_harness(
+        self._core = TransactionalAuthorityCore.for_harness(
             connection,
             lifecycle_arbiter_factory=_current_lifecycle_arbiter,
             capture_request_factory=capture_request_factory,
@@ -1599,14 +1600,14 @@ class Architecture77HarnessAuthority:
             raise AssertionError(
                 "harness database selected the production authority path"
             )
-        rows = self._core._connection.execute("PRAGMA database_list").fetchall()
+        rows = self._connection.execute("PRAGMA database_list").fetchall()
         if len(rows) != 1 or rows[0][1] != "main":
             raise AssertionError("harness database must have exactly one main database")
         if Path(str(rows[0][2])).resolve() != self.database_path:
             raise AssertionError(
                 "harness database identity does not match its factory path"
             )
-        schema = self._core._connection.execute(
+        schema = self._connection.execute(
             "SELECT production_schema_id, production_schema_version, "
             "production_schema_digest FROM authority_metadata WHERE singleton_key = 1"
         ).fetchone()
@@ -1620,9 +1621,15 @@ class Architecture77HarnessAuthority:
             )
 
     def close(self) -> None:
-        self._core._connection.close()
+        self._connection.close()
         if self._root is not None:
             shutil.rmtree(self._root, ignore_errors=True)
+
+    def bind_external_effects(self) -> AbstractContextManager[None]:
+        return self._core.bind_external_effects()
+
+    def require_test_capability(self, capability: object) -> None:
+        self._core.require_test_capability(capability)
 
     def lifecycle_lease(self, reservation_id: str) -> TestLifecycleLease:
         return TestLifecycleLease(self, reservation_id)
@@ -1783,12 +1790,24 @@ class TestLifecycleLease:
         )
 
 
+_HARNESS_SERVICES_BY_CONNECTION: dict[
+    sqlite3.Connection, Architecture77HarnessAuthority
+] = {}
+
+
 def _test_service(
     connection: sqlite3.Connection,
     *,
     capture_request_factory: Callable[[object], ValidatedCaptureRequest] | None = None,
 ) -> Architecture77HarnessAuthority:
-    return Architecture77HarnessAuthority(connection, capture_request_factory)
+    if capture_request_factory is None:
+        cached = _HARNESS_SERVICES_BY_CONNECTION.get(connection)
+        if cached is not None:
+            return cached
+    service = Architecture77HarnessAuthority(connection, capture_request_factory)
+    if capture_request_factory is None:
+        _HARNESS_SERVICES_BY_CONNECTION[connection] = service
+    return service
 
 
 def create_session(
@@ -2155,10 +2174,13 @@ class FakeSideEffects:
         observer: sqlite3.Connection,
         events: list[str] | None = None,
         event_lock: threading.Lock | None = None,
+        *,
+        service: Architecture77HarnessAuthority | None = None,
     ) -> None:
         self.observer = observer
         self.events = [] if events is None else events
         self._event_lock = threading.Lock() if event_lock is None else event_lock
+        self._service = _test_service(observer) if service is None else service
 
     def _emit(self, event: str) -> None:
         with self._event_lock:
@@ -2170,6 +2192,11 @@ class FakeSideEffects:
         *,
         fail: bool = False,
     ) -> FakeConstructedProvider:
+        if type(capability) is not FakeProviderConstructionPermit:
+            raise TypeError(
+                "provider construction requires the reservation-issued permit"
+            )
+        self._service.require_test_capability(capability)
         _require_no_active_transaction(self.observer)
         reservation_id = _registered_provider_reservation_id(capability)
         with InterprocessLifecycleArbiter(reservation_id):
@@ -2265,11 +2292,15 @@ class FakeSideEffects:
         if fail:
             self._emit("provider-construction-failed")
             raise RuntimeError("modeled provider construction failure")
-        return _issue_constructed_provider(reservation_id)
+        with self._service.bind_external_effects():
+            return _issue_constructed_provider(reservation_id)
 
     def create_process(
         self, process_intent: FakeProcessIntent, *, fail: bool = False
     ) -> FakeProcessCreationReceipt | FakeProcessCreationFailure:
+        if type(process_intent) is not FakeProcessIntent:
+            raise TypeError("create process requires an opaque fake process intent")
+        self._service.require_test_capability(process_intent)
         _require_no_active_transaction(self.observer)
         reservation_id = _registered_process_intent_reservation_id(process_intent)
         with InterprocessLifecycleArbiter(reservation_id):
@@ -2328,30 +2359,35 @@ class FakeSideEffects:
             result_json = _process_failure_json(
                 reservation_id, process_intent.intent_digest
             )
-            return _issue_process_creation_failure(
-                reservation_id,
-                process_intent.intent_digest,
-                result_json,
-                _digest(result_json),
-            )
+            with self._service.bind_external_effects():
+                return _issue_process_creation_failure(
+                    reservation_id,
+                    process_intent.intent_digest,
+                    result_json,
+                    _digest(result_json),
+                )
         self._emit("process-created")
         process_json, job_json, resume_json = _process_success_evidence(
             reservation_id, process_intent.intent_digest
         )
-        return _issue_process_creation_receipt(
-            reservation_id,
-            process_intent.intent_digest,
-            process_json,
-            _digest(process_json),
-            job_json,
-            _digest(job_json),
-            resume_json,
-            _digest(resume_json),
-        )
+        with self._service.bind_external_effects():
+            return _issue_process_creation_receipt(
+                reservation_id,
+                process_intent.intent_digest,
+                process_json,
+                _digest(process_json),
+                job_json,
+                _digest(job_json),
+                resume_json,
+                _digest(resume_json),
+            )
 
     def resume_thread(
         self, resume_intent: FakeResumeIntent, *, fail: bool = False
     ) -> FakeResumeReceipt:
+        if type(resume_intent) is not FakeResumeIntent:
+            raise TypeError("resume thread requires an opaque fake resume intent")
+        self._service.require_test_capability(resume_intent)
         _require_no_active_transaction(self.observer)
         execution_id, reservation_id = _registered_resume_intent_binding(resume_intent)
         with InterprocessLifecycleArbiter(reservation_id):
@@ -2434,13 +2470,14 @@ class FakeSideEffects:
                 "schema": 1,
             }
         )
-        return _issue_resume_receipt(
-            execution_id,
-            reservation_id,
-            resume_intent.intent_digest,
-            result_json,
-            _digest(result_json),
-        )
+        with self._service.bind_external_effects():
+            return _issue_resume_receipt(
+                execution_id,
+                reservation_id,
+                resume_intent.intent_digest,
+                result_json,
+                _digest(result_json),
+            )
 
     def observe_post_resume_evidence(self, execution_id: str) -> None:
         assert (
@@ -3592,7 +3629,7 @@ def test_stored_observer_boundaries_reject_active_transaction_before_lock(
     connection = _connect(db_path)
     observer = _connect(db_path)
     events: list[str] = []
-    hooks = FakeSideEffects(observer, events)
+    hooks = FakeSideEffects(observer, events, service=_test_service(connection))
     invoke, capability, effect = _prepare_stored_observer_boundary(
         connection, hooks, boundary
     )
@@ -6295,7 +6332,7 @@ def test_claim_and_launch_boundaries_commit_before_fake_side_effects(
 ) -> None:
     connection = _connect(db_path)
     observer = _connect(db_path)
-    hooks = FakeSideEffects(observer)
+    hooks = FakeSideEffects(observer, service=_test_service(connection))
     session_id = create_session(connection)
     attempt_id = allocate_attempt(connection, session_id)
     claim_id = commit_claim(connection, attempt_id)
@@ -7025,6 +7062,91 @@ def test_process_intent_race_grants_exactly_one_process_call(db_path: Path) -> N
     ).fetchone() == ("PROCESS_CREATED", 1, 1, PROCESS_INTENT_TIMESTAMP)
     assert verify.execute("SELECT count(*) FROM launch_executions").fetchone() == (1,)
     verify.close()
+
+
+def test_test_capabilities_are_bound_to_issuing_harness_service(
+    tmp_path: Path,
+) -> None:
+    db_path_a = tmp_path / "service-a.sqlite3"
+    db_path_b = tmp_path / "service-b.sqlite3"
+    connection_a = _connect(db_path_a)
+    connection_b = _connect(db_path_b)
+    _install_schema(connection_a)
+    _insert_metadata(connection_a)
+    _insert_migration(connection_a)
+    _install_schema(connection_b)
+    _insert_metadata(connection_b)
+    _insert_migration(connection_b)
+    service_a = _test_service(connection_a)
+    service_b = _test_service(connection_b)
+    hooks_a = FakeSideEffects(connection_a)
+    hooks_b = FakeSideEffects(connection_b)
+
+    try:
+        session_id = service_a.create_session(_request())
+        attempt_id = service_a.allocate_attempt(session_id)
+        claim_id = service_a.commit_claim(attempt_id)
+        permit = service_a.reserve_launch(claim_id)
+        reservation_id = permit.reservation_id
+        session_b = service_b.create_session(_request())
+        attempt_b = service_b.allocate_attempt(session_b)
+        claim_b = service_b.commit_claim(attempt_b)
+        permit_b = service_b.reserve_launch(claim_b)
+        assert (session_id, attempt_id, claim_id, permit.reservation_id) == (
+            session_b,
+            attempt_b,
+            claim_b,
+            permit_b.reservation_id,
+        )
+        before_b = _database_rows(connection_b)
+
+        before = _database_rows(connection_a)
+        with pytest.raises(TypeError, match="invalid test service provenance service"):
+            hooks_b.construct_provider(permit)
+        assert _database_rows(connection_a) == before
+        assert _database_rows(connection_b) == before_b
+
+        provider = hooks_a.construct_provider(permit)
+        before = _database_rows(connection_a)
+        with pytest.raises(TypeError, match="invalid test service provenance service"):
+            service_b.commit_process_intent(reservation_id, provider)
+        assert _database_rows(connection_a) == before
+        assert _database_rows(connection_b) == before_b
+
+        process_intent = service_a.commit_process_intent(reservation_id, provider)
+        before = _database_rows(connection_a)
+        with pytest.raises(TypeError, match="invalid test service provenance service"):
+            hooks_b.create_process(process_intent)
+        assert _database_rows(connection_a) == before
+        assert _database_rows(connection_b) == before_b
+
+        process_result = hooks_a.create_process(process_intent)
+        assert type(process_result) is FakeProcessCreationReceipt
+        before = _database_rows(connection_a)
+        with pytest.raises(TypeError, match="invalid test service provenance service"):
+            service_b.record_execution(reservation_id, process_result)
+        assert _database_rows(connection_a) == before
+        assert _database_rows(connection_b) == before_b
+
+        execution_id = service_a.record_execution(reservation_id, process_result)
+        resume_intent = service_a.commit_resume_intent(execution_id, reservation_id)
+        before = _database_rows(connection_a)
+        with pytest.raises(TypeError, match="invalid test service provenance service"):
+            hooks_b.resume_thread(resume_intent)
+        assert _database_rows(connection_a) == before
+        assert _database_rows(connection_b) == before_b
+
+        resume_result = hooks_a.resume_thread(resume_intent)
+        before = _database_rows(connection_a)
+        with pytest.raises(TypeError, match="invalid test service provenance service"):
+            service_b.record_post_resume_evidence(execution_id, resume_result)
+        assert _database_rows(connection_a) == before
+        assert _database_rows(connection_b) == before_b
+
+        service_a.record_post_resume_evidence(execution_id, resume_result)
+    finally:
+        connection_a.close()
+        connection_b.close()
 
 
 def test_reservation_race_issues_one_provider_permit_and_construction(
@@ -11176,7 +11298,7 @@ def test_recovery_target_evidence_mapping_has_exact_twelve_dependencies() -> Non
     assert len(_RECOVERY_TARGET_EVIDENCE_CORRUPTION_CASES) == 12
 
 
-def test_harness_imports_only_the_reviewed_private_core() -> None:
+def test_harness_imports_only_the_supported_transactional_core() -> None:
     tree = ast.parse(_HARNESS_MODULE_PATH.read_text(encoding="utf-8"))
     private_imports = [
         alias.name
@@ -11186,7 +11308,16 @@ def test_harness_imports_only_the_reviewed_private_core() -> None:
         for alias in node.names
         if alias.name.startswith("_")
     ]
-    assert private_imports == ["_TransactionalAuthorityCore"]
+    supported_imports = [
+        alias.name
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ImportFrom)
+        and node.module == "trading_bot.runtime.windows_transactional_authority"
+        for alias in node.names
+        if alias.name == "TransactionalAuthorityCore"
+    ]
+    assert private_imports == []
+    assert supported_imports == ["TransactionalAuthorityCore"]
 
 
 @pytest.mark.parametrize(

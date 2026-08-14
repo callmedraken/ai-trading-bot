@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import pickle
 import sqlite3
 from inspect import signature
@@ -561,6 +562,10 @@ def test_production_lifecycle_factory_uses_reviewed_global_mutex(
                 "LAUNCH_RESERVATION",
                 "durable-reservation",
                 "CLASSIFY_LAUNCH_RESERVATION",
+                operator_evidence_json=b'{"operator":"test"}',
+                operator_evidence_digest=hashlib.sha256(
+                    b'{"operator":"test"}'
+                ).digest(),
             )
         assert calls == [
             (

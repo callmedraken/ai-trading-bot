@@ -30,6 +30,7 @@ from trading_bot.runtime.windows_authority import (
 )
 from trading_bot.runtime.windows_authority_mutex import GlobalLifecycleMutex
 from trading_bot.runtime.windows_authority_schema import (
+    SchemaValidationError,
     configure_trusted_schema_off,
     require_evidence_digest,
 )
@@ -619,6 +620,18 @@ def _require_evidence_pair(
     evidence: bytes, digest: bytes, *, field: str = "evidence digest"
 ) -> None:
     require_evidence_digest(evidence, digest, field=field)
+
+
+def _require_terminal_snapshot_digest(
+    state: str, snapshot_digest: bytes | None
+) -> None:
+    if state == "SUCCEEDED":
+        if type(snapshot_digest) is not bytes or len(snapshot_digest) != 32:
+            raise SchemaValidationError(
+                "successful terminal requires an exact 32-byte snapshot digest"
+            )
+    elif snapshot_digest is not None:
+        raise SchemaValidationError("non-success terminal snapshot digest must be NULL")
 
 
 def _json(value: Any) -> bytes:
@@ -2499,12 +2512,21 @@ def _core_record_terminal(
     reservation_id: str,
     state: str = "SUCCEEDED",
     disposition: str = "CONFIRMED",
+    *,
+    snapshot_digest: bytes | None,
 ) -> str:
     _require_service_context()
     _require_no_active_transaction(connection)
+    _require_terminal_snapshot_digest(state, snapshot_digest)
     reservation_id = str(reservation_id)
     with _lifecycle_arbiter(reservation_id):
-        return _record_terminal_locked(connection, reservation_id, state, disposition)
+        return _record_terminal_locked(
+            connection,
+            reservation_id,
+            state,
+            disposition,
+            snapshot_digest=snapshot_digest,
+        )
 
 
 def _record_terminal_locked(
@@ -2512,7 +2534,10 @@ def _record_terminal_locked(
     reservation_id: str,
     state: str,
     disposition: str,
+    *,
+    snapshot_digest: bytes | None,
 ) -> str:
+    _require_terminal_snapshot_digest(state, snapshot_digest)
     reservation_id = str(reservation_id)
     terminal_policy_version = TERMINAL_POLICY
     terminal_id = _terminal_id(reservation_id, terminal_policy_version)
@@ -2522,7 +2547,6 @@ def _record_terminal_locked(
     _require_evidence_pair(
         diagnostics, diagnostics_digest, field="terminal diagnostics digest"
     )
-    snapshot = _digest(b"verified-snapshot") if state == "SUCCEEDED" else None
     _begin(connection)
     try:
         reservation = connection.execute(
@@ -2565,7 +2589,7 @@ def _record_terminal_locked(
                 reservation[1],
                 evidence,
                 evidence_digest,
-                snapshot,
+                snapshot_digest,
                 diagnostics,
                 diagnostics_digest,
                 _timestamp(TERMINAL_TIMESTAMP),
@@ -2872,8 +2896,16 @@ def _core_record_recovery(
     target_id: str,
     action: str,
     ordinal: int | None = None,
+    *,
+    operator_evidence_json: bytes,
+    operator_evidence_digest: bytes,
 ) -> str:
     _require_service_context()
+    _require_evidence_pair(
+        operator_evidence_json,
+        operator_evidence_digest,
+        field="operator evidence digest",
+    )
     requested_ordinal = (
         None if ordinal is None else _canonical_ordinal(ordinal, "recovery ordinal")
     )
@@ -2888,6 +2920,8 @@ def _core_record_recovery(
                 target_id,
                 action,
                 requested_ordinal,
+                operator_evidence_json=operator_evidence_json,
+                operator_evidence_digest=operator_evidence_digest,
             )
     return _record_recovery_locked(
         connection,
@@ -2896,6 +2930,8 @@ def _core_record_recovery(
         target_id,
         action,
         requested_ordinal,
+        operator_evidence_json=operator_evidence_json,
+        operator_evidence_digest=operator_evidence_digest,
     )
 
 
@@ -2906,8 +2942,16 @@ def _record_recovery_locked(
     target_id: str,
     action: str,
     ordinal: int | None,
+    *,
+    operator_evidence_json: bytes,
+    operator_evidence_digest: bytes,
 ) -> str:
     target_id = str(target_id)
+    _require_evidence_pair(
+        operator_evidence_json,
+        operator_evidence_digest,
+        field="operator evidence digest",
+    )
     _begin(connection)
     try:
         expected_kind, _, resulting = _RECOVERY_ACTIONS[action]
@@ -2944,10 +2988,6 @@ def _record_recovery_locked(
             recovery_ordinal,
             RECOVERY_POLICY,
         )
-        evidence, evidence_digest = _evidence(f"recovery:{recovery_id}")
-        _require_evidence_pair(
-            evidence, evidence_digest, field="operator evidence digest"
-        )
         recovery_timestamp = {
             "SELECT_COMMITTED_SUCCESS": _timestamp(SELECTION_TIMESTAMP),
             "CLOSE_SESSION": _timestamp(CLOSE_TIMESTAMP),
@@ -2972,8 +3012,8 @@ def _record_recovery_locked(
                 predecessor,
                 resulting,
                 RECOVERY_POLICY,
-                evidence,
-                evidence_digest,
+                operator_evidence_json,
+                operator_evidence_digest,
                 recovery_timestamp,
             ),
         )
@@ -3281,11 +3321,17 @@ class TransactionalAuthorityCore:
         reservation_id: str,
         state: str = "SUCCEEDED",
         disposition: str = "CONFIRMED",
+        *,
+        snapshot_digest: bytes | None,
     ) -> str:
         with self._bound_context():
             _require_no_active_transaction(self._connection)
             return _core_record_terminal(
-                self._connection, reservation_id, state, disposition
+                self._connection,
+                reservation_id,
+                state,
+                disposition,
+                snapshot_digest=snapshot_digest,
             )
 
     def select_terminal(self, session_id: str, terminal_id: str) -> str:
@@ -3300,6 +3346,9 @@ class TransactionalAuthorityCore:
         target_id: str,
         action: str,
         ordinal: int | None = None,
+        *,
+        operator_evidence_json: bytes,
+        operator_evidence_digest: bytes,
     ) -> str:
         with self._bound_context():
             if ordinal is not None:
@@ -3313,6 +3362,8 @@ class TransactionalAuthorityCore:
                 target_id,
                 action,
                 ordinal,
+                operator_evidence_json=operator_evidence_json,
+                operator_evidence_digest=operator_evidence_digest,
             )
 
     def commit_process_intent_while_held(
@@ -3392,10 +3443,16 @@ class TransactionalAuthorityCore:
         reservation_id: str,
         state: str = "SUCCEEDED",
         disposition: str = "CONFIRMED",
+        *,
+        snapshot_digest: bytes | None,
     ) -> str:
         with self._bound_context():
             return _record_terminal_locked(
-                self._connection, reservation_id, state, disposition
+                self._connection,
+                reservation_id,
+                state,
+                disposition,
+                snapshot_digest=snapshot_digest,
             )
 
     def record_recovery_while_held(
@@ -3405,6 +3462,9 @@ class TransactionalAuthorityCore:
         target_id: str,
         action: str,
         ordinal: int | None = None,
+        *,
+        operator_evidence_json: bytes,
+        operator_evidence_digest: bytes,
     ) -> str:
         with self._bound_context():
             return _record_recovery_locked(
@@ -3414,6 +3474,8 @@ class TransactionalAuthorityCore:
                 target_id,
                 action,
                 ordinal,
+                operator_evidence_json=operator_evidence_json,
+                operator_evidence_digest=operator_evidence_digest,
             )
 
     def insert_selection_in_transaction(self, session_id: str, terminal_id: str) -> str:
@@ -3658,9 +3720,14 @@ class WindowsTransactionalAuthority:
         reservation_id: str,
         state: str = "SUCCEEDED",
         disposition: str = "CONFIRMED",
+        *,
+        snapshot_digest: bytes | None,
     ) -> str:
         return self._core_for_operation().record_terminal(
-            reservation_id, state, disposition
+            reservation_id,
+            state,
+            disposition,
+            snapshot_digest=snapshot_digest,
         )
 
     def select_terminal(self, session_id: str, terminal_id: str) -> str:
@@ -3673,11 +3740,20 @@ class WindowsTransactionalAuthority:
         target_id: str,
         action: str,
         ordinal: int | None = None,
+        *,
+        operator_evidence_json: bytes,
+        operator_evidence_digest: bytes,
     ) -> str:
         if ordinal is not None:
             _canonical_ordinal(ordinal, "recovery ordinal")
         return self._core_for_operation().record_recovery(
-            session_id, target_kind, target_id, action, ordinal
+            session_id,
+            target_kind,
+            target_id,
+            action,
+            ordinal,
+            operator_evidence_json=operator_evidence_json,
+            operator_evidence_digest=operator_evidence_digest,
         )
 
     def construct_provider(

@@ -772,6 +772,12 @@ def _evidence(label: str) -> tuple[bytes, bytes]:
     return value, _digest(value)
 
 
+TEST_SNAPSHOT_DIGEST = _digest(b"verified-snapshot")
+TEST_OPERATOR_EVIDENCE_JSON, TEST_OPERATOR_EVIDENCE_DIGEST = _evidence(
+    "explicit-test-operator-evidence"
+)
+
+
 def _insert_session_row_for_test(
     connection: sqlite3.Connection,
     session_id: str,
@@ -1072,7 +1078,7 @@ def _insert_terminal_row_for_test(
         diagnostics, diagnostics_hash, field="terminal diagnostics digest"
     )
     snapshot = (
-        _digest(b"raw-snapshot")
+        TEST_SNAPSHOT_DIGEST
         if snapshot_mode == "present"
         or (snapshot_mode == "auto" and state == "SUCCEEDED")
         else None
@@ -1692,8 +1698,15 @@ class Architecture77HarnessAuthority:
         reservation_id: str,
         state: str = "SUCCEEDED",
         disposition: str = "CONFIRMED",
+        *,
+        snapshot_digest: bytes | None,
     ) -> str:
-        return self._core.record_terminal(reservation_id, state, disposition)
+        return self._core.record_terminal(
+            reservation_id,
+            state,
+            disposition,
+            snapshot_digest=snapshot_digest,
+        )
 
     def record_recovery(
         self,
@@ -1702,11 +1715,20 @@ class Architecture77HarnessAuthority:
         target_id: str,
         action: str,
         ordinal: int | None = None,
+        *,
+        operator_evidence_json: bytes,
+        operator_evidence_digest: bytes,
     ) -> str:
         if ordinal is not None:
             _canonical_ordinal(ordinal, "recovery ordinal")
         return self._core.record_recovery(
-            session_id, target_kind, target_id, action, ordinal
+            session_id,
+            target_kind,
+            target_id,
+            action,
+            ordinal,
+            operator_evidence_json=operator_evidence_json,
+            operator_evidence_digest=operator_evidence_digest,
         )
 
 
@@ -1772,9 +1794,14 @@ class TestLifecycleLease:
         reservation_id: str,
         state: str = "SUCCEEDED",
         disposition: str = "CONFIRMED",
+        *,
+        snapshot_digest: bytes | None,
     ) -> str:
         return self._authority._core.record_terminal_while_held(
-            reservation_id, state, disposition
+            reservation_id,
+            state,
+            disposition,
+            snapshot_digest=snapshot_digest,
         )
 
     def record_recovery(
@@ -1784,9 +1811,18 @@ class TestLifecycleLease:
         target_id: str,
         action: str,
         ordinal: int | None = None,
+        *,
+        operator_evidence_json: bytes,
+        operator_evidence_digest: bytes,
     ) -> str:
         return self._authority._core.record_recovery_while_held(
-            session_id, target_kind, target_id, action, ordinal
+            session_id,
+            target_kind,
+            target_id,
+            action,
+            ordinal,
+            operator_evidence_json=operator_evidence_json,
+            operator_evidence_digest=operator_evidence_digest,
         )
 
 
@@ -1904,8 +1940,15 @@ def record_terminal(
     reservation_id: str,
     state: str = "SUCCEEDED",
     disposition: str = "CONFIRMED",
+    *,
+    snapshot_digest: bytes | None,
 ) -> str:
-    return _test_service(connection).record_terminal(reservation_id, state, disposition)
+    return _test_service(connection).record_terminal(
+        reservation_id,
+        state,
+        disposition,
+        snapshot_digest=snapshot_digest,
+    )
 
 
 def select_terminal(
@@ -1921,6 +1964,9 @@ def record_recovery(
     target_id: str,
     action: str,
     ordinal: int | None = None,
+    *,
+    operator_evidence_json: bytes,
+    operator_evidence_digest: bytes,
 ) -> str:
     return _test_service(connection).record_recovery(
         session_id,
@@ -1928,6 +1974,8 @@ def record_recovery(
         target_id,
         action,
         ordinal,
+        operator_evidence_json=operator_evidence_json,
+        operator_evidence_digest=operator_evidence_digest,
     )
 
 
@@ -2111,6 +2159,8 @@ def _insert_recovery_fact_for_test(
     target_id: str,
     action: str,
     *,
+    operator_evidence_json: bytes,
+    operator_evidence_digest: bytes,
     recovery_schema: int = 1,
     created_at_utc: str = MANUAL_REVIEW_TIMESTAMP,
 ) -> str:
@@ -2135,8 +2185,11 @@ def _insert_recovery_fact_for_test(
         recovery_ordinal,
         RECOVERY_POLICY,
     )
-    evidence, evidence_digest = _evidence(f"recovery:{recovery_id}")
-    _require_evidence_pair(evidence, evidence_digest, field="operator evidence digest")
+    _require_evidence_pair(
+        operator_evidence_json,
+        operator_evidence_digest,
+        field="operator evidence digest",
+    )
     connection.execute(
         """
         INSERT INTO manual_recoveries (
@@ -2158,8 +2211,8 @@ def _insert_recovery_fact_for_test(
             resulting,
             recovery_schema,
             RECOVERY_POLICY,
-            evidence,
-            evidence_digest,
+            operator_evidence_json,
+            operator_evidence_digest,
             created_at_utc,
         ),
     )
@@ -2690,6 +2743,8 @@ def _spawn_recovery_worker(
                     reservation_id,
                     action,
                     None,
+                    operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+                    operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
                 )
             outcome = "ok"
         except (TypeError, ValueError, sqlite3.IntegrityError) as exc:
@@ -2914,6 +2969,8 @@ def _spawn_recovery_after_outer_transaction_worker(
                 reservation_id,
                 "CLASSIFY_LAUNCH_RESERVATION",
                 None,
+                operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+                operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
             )
         result_queue.put(("recovery", recovery_id))
     except BaseException as exc:
@@ -3408,6 +3465,8 @@ def _prepare_active_transaction_boundary(
                 "LAUNCH_RESERVATION",
                 reservation_id,
                 "CLASSIFY_LAUNCH_RESERVATION",
+                operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+                operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
             ),
             None,
             events,
@@ -3429,6 +3488,8 @@ def _prepare_active_transaction_boundary(
                 "LAUNCH_RESERVATION",
                 reservation_id,
                 "CLASSIFY_PROCESS_OUTCOME_UNKNOWN",
+                operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+                operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
             ),
             None,
             events,
@@ -3462,6 +3523,8 @@ def _prepare_active_transaction_boundary(
                 "LAUNCH_RESERVATION",
                 reservation_id,
                 "CLASSIFY_PRE_RESUME_READY",
+                operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+                operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
             ),
             None,
             events,
@@ -3481,6 +3544,8 @@ def _prepare_active_transaction_boundary(
                 "LAUNCH_RESERVATION",
                 reservation_id,
                 "CLASSIFY_RESUME_OUTCOME_UNKNOWN",
+                operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+                operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
             ),
             None,
             events,
@@ -3497,7 +3562,9 @@ def _prepare_active_transaction_boundary(
     assert boundary == "record-terminal"
     record_post_resume_evidence(connection, execution_id, resume_receipt)
     return (
-        lambda: service.record_terminal(reservation_id),
+        lambda: service.record_terminal(
+            reservation_id, snapshot_digest=TEST_SNAPSHOT_DIGEST
+        ),
         None,
         events,
     )
@@ -3713,6 +3780,8 @@ def test_reservation_recovery_validates_ordinal_before_transaction_guard(
                 reservation_id,
                 "CLASSIFY_LAUNCH_RESERVATION",
                 ordinal=False,
+                operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+                operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
             )
     assert arbiter_attempts == []
     assert connection.in_transaction
@@ -4185,7 +4254,9 @@ def _seed_lifecycle(path: Path) -> dict[str, str]:
     reservation_id = reserve_launch(connection, claim_id)
     execution_id = _record_successful_process(connection, reservation_id)
     _resume_and_persist(connection, execution_id, reservation_id)
-    terminal_id = record_terminal(connection, reservation_id)
+    terminal_id = record_terminal(
+        connection, reservation_id, snapshot_digest=TEST_SNAPSHOT_DIGEST
+    )
     connection.close()
     return {
         "session_id": session_id,
@@ -4400,6 +4471,8 @@ def test_identity_bearing_rows_reject_unsupported_schema_at_insert(
                                 session_id,
                                 "ACKNOWLEDGE_RESTORE",
                                 recovery_schema=unsupported_schema,
+                                operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+                                operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
                             )
 
                     else:
@@ -4420,7 +4493,11 @@ def test_identity_bearing_rows_reject_unsupported_schema_at_insert(
                                 )
 
                         else:
-                            terminal_id = record_terminal(connection, reservation_id)
+                            terminal_id = record_terminal(
+                                connection,
+                                reservation_id,
+                                snapshot_digest=TEST_SNAPSHOT_DIGEST,
+                            )
 
                             def insert_invalid() -> None:
                                 _insert_selection_row_for_test(
@@ -4851,7 +4928,9 @@ def _prepare_owned_insert_parent(
     if table == "terminals":
         return context
     assert table == "session_selections"
-    context["terminal_id"] = record_terminal(connection, context["reservation_id"])
+    context["terminal_id"] = record_terminal(
+        connection, context["reservation_id"], snapshot_digest=TEST_SNAPSHOT_DIGEST
+    )
     return context
 
 
@@ -4879,7 +4958,9 @@ def _create_owned_insert_candidate(
         assert type(receipt) is FakeProcessCreationReceipt
         record_execution(connection, reservation_id, receipt)
     elif table == "terminals":
-        record_terminal(connection, context["reservation_id"])
+        record_terminal(
+            connection, context["reservation_id"], snapshot_digest=TEST_SNAPSHOT_DIGEST
+        )
     elif table == "session_selections":
         select_terminal(connection, context["session_id"], context["terminal_id"])
     else:
@@ -4890,6 +4971,8 @@ def _create_owned_insert_candidate(
             "LAUNCH_RESERVATION",
             context["reservation_id"],
             "CLASSIFY_LAUNCH_RESERVATION",
+            operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+            operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
         )
 
 
@@ -5344,7 +5427,9 @@ def test_valid_lifecycle_from_metadata_to_selection(db_path: Path) -> None:
     reservation_id = reserve_launch(connection, claim_id)
     execution_id = _record_successful_process(connection, reservation_id)
     _resume_and_persist(connection, execution_id, reservation_id)
-    terminal_id = record_terminal(connection, reservation_id)
+    terminal_id = record_terminal(
+        connection, reservation_id, snapshot_digest=TEST_SNAPSHOT_DIGEST
+    )
     selection_id = select_terminal(connection, session_id, terminal_id)
     expected_request = _snapshot_capture_request(request).canonical_json()
     expected_digest = _digest(expected_request)
@@ -5613,7 +5698,9 @@ def test_process_creation_failure_can_record_terminal_without_execution(
     claim_id = commit_claim(connection, attempt_id)
     reservation_id = reserve_launch(connection, claim_id)
     _record_definitive_process_failure(connection, reservation_id)
-    terminal_id = record_terminal(connection, reservation_id, "FAILED", "NOT_STARTED")
+    terminal_id = record_terminal(
+        connection, reservation_id, "FAILED", "NOT_STARTED", snapshot_digest=None
+    )
     assert connection.execute("SELECT count(*) FROM launch_executions").fetchone() == (
         0,
     )
@@ -5642,7 +5729,9 @@ def test_failed_not_started_terminal_revalidates_parent_process_intent(
     with pytest.raises(
         SchemaValidationError, match="terminal parent process intent digest"
     ):
-        record_terminal(connection, reservation_id, "FAILED", "NOT_STARTED")
+        record_terminal(
+            connection, reservation_id, "FAILED", "NOT_STARTED", snapshot_digest=None
+        )
 
     assert not connection.in_transaction
     assert _database_rows(connection) == before
@@ -5685,6 +5774,8 @@ def _prepare_terminal_insert_path(
             "LAUNCH_RESERVATION",
             reservation_id,
             "CLASSIFY_LAUNCH_RESERVATION",
+            operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+            operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
         )
         disposition = "MAY_HAVE_OCCURRED"
     return session_id, attempt_id, reservation_id, disposition
@@ -5731,10 +5822,18 @@ def test_terminal_state_disposition_matrix(
             "LAUNCH_RESERVATION",
             reservation_id,
             "CLASSIFY_LAUNCH_RESERVATION",
+            operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+            operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
         )
 
     if valid:
-        terminal_id = record_terminal(connection, reservation_id, state, disposition)
+        terminal_id = record_terminal(
+            connection,
+            reservation_id,
+            state,
+            disposition,
+            snapshot_digest=TEST_SNAPSHOT_DIGEST if state == "SUCCEEDED" else None,
+        )
         assert connection.execute(
             "SELECT terminal_state, provider_call_disposition, snapshot_digest "
             "FROM terminals WHERE terminal_id = ?",
@@ -5757,6 +5856,80 @@ def test_terminal_state_disposition_matrix(
                 snapshot_mode,
             )
         connection.rollback()
+    connection.close()
+
+
+def test_terminal_persists_supplied_snapshot_and_selection_copies_it(
+    db_path: Path,
+) -> None:
+    connection = _connect(db_path)
+    snapshot_digests = (_digest(b"snapshot-one"), _digest(b"snapshot-two"))
+    terminal_ids: list[str] = []
+    for index, snapshot_digest in enumerate(snapshot_digests, start=1):
+        session_id = create_session(connection, _request(f"2026-01-0{index}"))
+        attempt_id = allocate_attempt(connection, session_id)
+        claim_id = commit_claim(connection, attempt_id)
+        reservation_id = reserve_launch(connection, claim_id)
+        execution_id = _record_successful_process(connection, reservation_id)
+        _resume_and_persist(connection, execution_id, reservation_id)
+        terminal_id = record_terminal(
+            connection,
+            reservation_id,
+            snapshot_digest=snapshot_digest,
+        )
+        terminal_ids.append(terminal_id)
+        assert connection.execute(
+            "SELECT snapshot_digest FROM terminals WHERE terminal_id = ?",
+            (terminal_id,),
+        ).fetchone() == (snapshot_digest,)
+        select_terminal(connection, session_id, terminal_id)
+        assert connection.execute(
+            "SELECT snapshot_digest FROM session_selections WHERE terminal_id = ?",
+            (terminal_id,),
+        ).fetchone() == (snapshot_digest,)
+
+    assert terminal_ids[0] != terminal_ids[1]
+    assert snapshot_digests[0] != snapshot_digests[1]
+    connection.close()
+
+
+@pytest.mark.parametrize("snapshot_digest", [None, b"invalid-snapshot-digest"])
+def test_successful_terminal_requires_supplied_snapshot_digest(
+    db_path: Path, snapshot_digest: bytes | None
+) -> None:
+    connection = _connect(db_path)
+    session_id, _, reservation_id, _ = _prepare_terminal_insert_path(
+        connection, "SUCCEEDED"
+    )
+    before = _database_rows(connection)
+    with pytest.raises(SchemaValidationError, match="snapshot digest"):
+        record_terminal(
+            connection,
+            reservation_id,
+            snapshot_digest=snapshot_digest,
+        )
+    assert _database_rows(connection) == before
+    assert connection.execute(
+        "SELECT next_recovery_ordinal FROM sessions WHERE session_id = ?",
+        (session_id,),
+    ).fetchone() == (0,)
+    connection.close()
+
+
+def test_failed_terminal_persists_no_snapshot_digest(db_path: Path) -> None:
+    connection = _connect(db_path)
+    _, _, reservation_id, _ = _prepare_terminal_insert_path(connection, "FAILED")
+    terminal_id = record_terminal(
+        connection,
+        reservation_id,
+        "FAILED",
+        "NOT_STARTED",
+        snapshot_digest=None,
+    )
+    assert connection.execute(
+        "SELECT snapshot_digest FROM terminals WHERE terminal_id = ?",
+        (terminal_id,),
+    ).fetchone() == (None,)
     connection.close()
 
 
@@ -5884,7 +6057,9 @@ def test_selection_evidence_pair_fails_at_python_service_boundary(
     reservation_id = reserve_launch(connection, claim_id)
     execution_id = _record_successful_process(connection, reservation_id)
     _resume_and_persist(connection, execution_id, reservation_id)
-    terminal_id = record_terminal(connection, reservation_id)
+    terminal_id = record_terminal(
+        connection, reservation_id, snapshot_digest=TEST_SNAPSHOT_DIGEST
+    )
     evidence, evidence_digest = _evidence(f"selection:{terminal_id}")
     if invalid_part == "bytes":
         evidence = b'{"malformed":true}'
@@ -5933,6 +6108,8 @@ def test_recovery_action_matrix_allows_documented_actions(db_path: Path) -> None
         "CLAIM",
         claim_id,
         "RECORD_CLAIM_AMBIGUITY",
+        operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+        operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
     )
     assert connection.execute(
         "SELECT state FROM provider_call_claims WHERE claim_id = ?", (claim_id,)
@@ -5952,6 +6129,8 @@ def test_recovery_action_matrix_allows_documented_actions(db_path: Path) -> None
         "LAUNCH_RESERVATION",
         review_reservation,
         "CLASSIFY_LAUNCH_RESERVATION",
+        operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+        operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
     )
     assert connection.execute(
         "SELECT reservation_state FROM launch_reservations "
@@ -5966,13 +6145,17 @@ def test_recovery_action_matrix_allows_documented_actions(db_path: Path) -> None
     select_reservation = reserve_launch(connection, select_claim)
     select_execution = _record_successful_process(connection, select_reservation)
     _resume_and_persist(connection, select_execution, select_reservation)
-    select_terminal = record_terminal(connection, select_reservation)
+    select_terminal = record_terminal(
+        connection, select_reservation, snapshot_digest=TEST_SNAPSHOT_DIGEST
+    )
     select_recovery = record_recovery(
         connection,
         select_session,
         "TERMINAL",
         select_terminal,
         "SELECT_COMMITTED_SUCCESS",
+        operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+        operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
     )
     assert connection.execute(
         "SELECT state FROM sessions WHERE session_id = ?", (select_session,)
@@ -6009,6 +6192,8 @@ def test_recovery_action_matrix_allows_documented_actions(db_path: Path) -> None
         "SESSION",
         close_session,
         "CLOSE_SESSION",
+        operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+        operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
     )
     assert connection.execute(
         "SELECT state FROM sessions WHERE session_id = ?", (close_session,)
@@ -6022,11 +6207,81 @@ def test_recovery_action_matrix_allows_documented_actions(db_path: Path) -> None
         "SESSION",
         restore_session,
         "ACKNOWLEDGE_RESTORE",
+        operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+        operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
     )
     assert connection.execute(
         "SELECT state FROM sessions WHERE session_id = ?", (restore_session,)
     ).fetchone() == ("OPEN",)
     assert restore_recovery
+    connection.close()
+
+
+def test_recovery_persists_explicit_operator_evidence_without_identity_binding(
+    tmp_path: Path,
+) -> None:
+    first_path = tmp_path / "recovery-evidence-first.sqlite3"
+    second_path = tmp_path / "recovery-evidence-second.sqlite3"
+    for path in (first_path, second_path):
+        connection = _connect(path)
+        _install_schema(connection)
+        _insert_metadata(connection)
+        connection.close()
+    _seed_lifecycle(first_path)
+    _seed_lifecycle(second_path)
+    first_evidence, first_digest = _evidence("operator-evidence-first")
+    second_evidence, second_digest = _evidence("operator-evidence-second")
+
+    recovery_ids: list[str] = []
+    for path, evidence, digest in (
+        (first_path, first_evidence, first_digest),
+        (second_path, second_evidence, second_digest),
+    ):
+        connection = _connect(path)
+        session_id = connection.execute("SELECT session_id FROM sessions").fetchone()[0]
+        recovery_id = record_recovery(
+            connection,
+            session_id,
+            "SESSION",
+            session_id,
+            "CLOSE_SESSION",
+            operator_evidence_json=evidence,
+            operator_evidence_digest=digest,
+        )
+        recovery_ids.append(recovery_id)
+        assert connection.execute(
+            "SELECT operator_evidence_json, operator_evidence_digest "
+            "FROM manual_recoveries WHERE recovery_id = ?",
+            (recovery_id,),
+        ).fetchone() == (evidence, digest)
+        connection.close()
+
+    assert recovery_ids[0] == recovery_ids[1]
+    assert first_evidence != second_evidence
+
+
+def test_bad_recovery_evidence_fails_before_ordinal_or_mutation(
+    db_path: Path,
+) -> None:
+    values = _seed_lifecycle(db_path)
+    connection = _connect(db_path)
+    before = _database_rows(connection)
+    bad_evidence = b'{"operator":"bad"}'
+    with pytest.raises(SchemaValidationError, match="does not match evidence bytes"):
+        record_recovery(
+            connection,
+            values["session_id"],
+            "SESSION",
+            values["session_id"],
+            "CLOSE_SESSION",
+            operator_evidence_json=bad_evidence,
+            operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
+        )
+    assert _database_rows(connection) == before
+    assert connection.execute(
+        "SELECT next_recovery_ordinal FROM sessions WHERE session_id = ?",
+        (values["session_id"],),
+    ).fetchone() == (0,)
     connection.close()
 
 
@@ -6040,7 +6295,9 @@ def test_one_to_one_parent_fences(db_path: Path) -> None:
     with pytest.raises((ValueError, sqlite3.IntegrityError)):
         _record_successful_process(connection, values["reservation_id"])
     with pytest.raises(sqlite3.IntegrityError):
-        record_terminal(connection, values["reservation_id"])
+        record_terminal(
+            connection, values["reservation_id"], snapshot_digest=TEST_SNAPSHOT_DIGEST
+        )
     select_terminal(connection, values["session_id"], values["terminal_id"])
     with pytest.raises(sqlite3.IntegrityError):
         select_terminal(connection, values["session_id"], values["terminal_id"])
@@ -6058,14 +6315,18 @@ def test_selection_and_recovery_lineage_is_session_scoped(db_path: Path) -> None
     first_reservation = reserve_launch(connection, first_claim)
     first_execution = _record_successful_process(connection, first_reservation)
     _resume_and_persist(connection, first_execution, first_reservation)
-    first_terminal = record_terminal(connection, first_reservation)
+    first_terminal = record_terminal(
+        connection, first_reservation, snapshot_digest=TEST_SNAPSHOT_DIGEST
+    )
     second_session = create_session(connection, _request("2026-01-02"))
     second_attempt = allocate_attempt(connection, second_session)
     second_claim = commit_claim(connection, second_attempt)
     second_reservation = reserve_launch(connection, second_claim)
     second_execution = _record_successful_process(connection, second_reservation)
     _resume_and_persist(connection, second_execution, second_reservation)
-    second_terminal = record_terminal(connection, second_reservation)
+    second_terminal = record_terminal(
+        connection, second_reservation, snapshot_digest=TEST_SNAPSHOT_DIGEST
+    )
     with pytest.raises(sqlite3.IntegrityError):
         select_terminal(connection, second_session, first_terminal)
     for target_kind, target_id, action in (
@@ -6082,6 +6343,8 @@ def test_selection_and_recovery_lineage_is_session_scoped(db_path: Path) -> None
                 target_kind,
                 target_id,
                 action,
+                operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+                operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
             )
     assert first_execution != second_execution
     connection.close()
@@ -6213,6 +6476,8 @@ def test_recovery_ordinal_trigger_is_atomic_and_session_local(db_path: Path) -> 
         "ATTEMPT",
         target_attempt,
         "RECORD_ATTEMPT_AMBIGUITY",
+        operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+        operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
     )
     assert first_recovery == _recovery_id(
         session_id,
@@ -6232,6 +6497,8 @@ def test_recovery_ordinal_trigger_is_atomic_and_session_local(db_path: Path) -> 
             session_id,
             "ACKNOWLEDGE_RESTORE",
             ordinal=0,
+            operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+            operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
         )
     with pytest.raises(sqlite3.IntegrityError):
         record_recovery(
@@ -6241,6 +6508,8 @@ def test_recovery_ordinal_trigger_is_atomic_and_session_local(db_path: Path) -> 
             session_id,
             "ACKNOWLEDGE_RESTORE",
             ordinal=2,
+            operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+            operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
         )
     with pytest.raises(sqlite3.IntegrityError):
         connection.execute(
@@ -6292,6 +6561,8 @@ def test_recovery_ordinal_trigger_is_atomic_and_session_local(db_path: Path) -> 
         "SESSION",
         session_id,
         "ACKNOWLEDGE_RESTORE",
+        operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+        operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
     )
     assert second_recovery != first_recovery
     assert connection.execute(
@@ -6304,6 +6575,8 @@ def test_recovery_ordinal_trigger_is_atomic_and_session_local(db_path: Path) -> 
         "SESSION",
         second_session,
         "ACKNOWLEDGE_RESTORE",
+        operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+        operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
     )
     assert second_recovery != first_recovery
     assert connection.execute(
@@ -6324,6 +6597,8 @@ def test_recovery_after_absorbing_session_state_fails(db_path: Path) -> None:
             "SESSION",
             values["session_id"],
             "CLOSE_SESSION",
+            operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+            operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
         )
     connection.close()
 
@@ -6349,7 +6624,11 @@ def test_claim_and_launch_boundaries_commit_before_fake_side_effects(
     record_post_resume_evidence(connection, execution_id, resume_receipt)
     hooks.observe_post_resume_evidence(execution_id)
     terminal_id = record_terminal(
-        connection, reservation_id, "AMBIGUOUS", "MAY_HAVE_OCCURRED"
+        connection,
+        reservation_id,
+        "AMBIGUOUS",
+        "MAY_HAVE_OCCURRED",
+        snapshot_digest=None,
     )
     assert terminal_id
     hooks.observe_terminal(reservation_id)
@@ -6391,7 +6670,9 @@ def test_valid_capability_matrix_lifecycle_has_exactly_one_of_each(
     resume_intent = commit_resume_intent(connection, execution_id, reservation_id)
     resume_result = hooks.resume_thread(resume_intent)
     record_post_resume_evidence(connection, execution_id, resume_result)
-    terminal_id = record_terminal(connection, reservation_id)
+    terminal_id = record_terminal(
+        connection, reservation_id, snapshot_digest=TEST_SNAPSHOT_DIGEST
+    )
     select_terminal(connection, session_id, terminal_id)
 
     assert events == [
@@ -6477,6 +6758,8 @@ def test_claim_admission_blocks_non_retry_safe_prior_outcomes(
             "LAUNCH_RESERVATION",
             first_reservation,
             "CLASSIFY_LAUNCH_RESERVATION",
+            operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+            operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
         )
     elif blocked_case == "pre_resume_ready":
         assert first_reservation is not None
@@ -6497,6 +6780,8 @@ def test_claim_admission_blocks_non_retry_safe_prior_outcomes(
                 "ATTEMPT",
                 first_attempt,
                 "RECORD_ATTEMPT_AMBIGUITY",
+                operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+                operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
             )
             connection.execute(
                 "UPDATE launch_executions SET phase = 'POST_RESUME_AMBIGUOUS' "
@@ -6508,7 +6793,13 @@ def test_claim_admission_blocks_non_retry_safe_prior_outcomes(
         assert first_reservation is not None
         execution_id = _record_successful_process(connection, first_reservation)
         _resume_and_persist(connection, execution_id, first_reservation)
-        record_terminal(connection, first_reservation, "AMBIGUOUS", "MAY_HAVE_OCCURRED")
+        record_terminal(
+            connection,
+            first_reservation,
+            "AMBIGUOUS",
+            "MAY_HAVE_OCCURRED",
+            snapshot_digest=None,
+        )
     elif blocked_case == "closed_terminal":
         assert first_reservation is not None
         record_recovery(
@@ -6517,23 +6808,37 @@ def test_claim_admission_blocks_non_retry_safe_prior_outcomes(
             "LAUNCH_RESERVATION",
             first_reservation,
             "CLASSIFY_LAUNCH_RESERVATION",
+            operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+            operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
         )
-        record_terminal(connection, first_reservation, "CLOSED", "MAY_HAVE_OCCURRED")
+        record_terminal(
+            connection,
+            first_reservation,
+            "CLOSED",
+            "MAY_HAVE_OCCURRED",
+            snapshot_digest=None,
+        )
     elif blocked_case == "failed_confirmed":
         assert first_reservation is not None
         execution_id = _record_successful_process(connection, first_reservation)
         _resume_and_persist(connection, execution_id, first_reservation)
-        record_terminal(connection, first_reservation, "FAILED", "CONFIRMED")
+        record_terminal(
+            connection, first_reservation, "FAILED", "CONFIRMED", snapshot_digest=None
+        )
     elif blocked_case == "successful_terminal":
         assert first_reservation is not None
         execution_id = _record_successful_process(connection, first_reservation)
         _resume_and_persist(connection, execution_id, first_reservation)
-        record_terminal(connection, first_reservation)
+        record_terminal(
+            connection, first_reservation, snapshot_digest=TEST_SNAPSHOT_DIGEST
+        )
     elif blocked_case == "successful_selection":
         assert first_reservation is not None
         execution_id = _record_successful_process(connection, first_reservation)
         _resume_and_persist(connection, execution_id, first_reservation)
-        terminal_id = record_terminal(connection, first_reservation)
+        terminal_id = record_terminal(
+            connection, first_reservation, snapshot_digest=TEST_SNAPSHOT_DIGEST
+        )
         select_terminal(connection, session_id, terminal_id)
     else:
         raise AssertionError(f"unhandled blocked case: {blocked_case}")
@@ -6563,7 +6868,15 @@ def test_closed_session_rejects_new_attempt_admission(db_path: Path) -> None:
         "SELECT request_json, request_digest FROM sessions WHERE session_id = ?",
         (session_id,),
     ).fetchone()
-    record_recovery(connection, session_id, "SESSION", session_id, "CLOSE_SESSION")
+    record_recovery(
+        connection,
+        session_id,
+        "SESSION",
+        session_id,
+        "CLOSE_SESSION",
+        operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+        operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
+    )
     before = _database_rows(connection)
     with pytest.raises(sqlite3.IntegrityError, match="session is not open"):
         _insert_attempt_row_for_test(
@@ -6587,7 +6900,9 @@ def test_claim_admission_allows_only_retry_safe_failed_not_started(
     first_claim = commit_claim(connection, first_attempt)
     first_reservation = reserve_launch(connection, first_claim)
     _record_definitive_process_failure(connection, first_reservation)
-    record_terminal(connection, first_reservation, "FAILED", "NOT_STARTED")
+    record_terminal(
+        connection, first_reservation, "FAILED", "NOT_STARTED", snapshot_digest=None
+    )
     assert connection.execute(
         "SELECT reservation_state, outcome_recorded_at_utc "
         "FROM launch_reservations WHERE launch_reservation_id = ?",
@@ -6626,7 +6941,9 @@ def test_claim_admission_revalidates_retry_safe_parent_digest(
     first_claim = commit_claim(connection, first_attempt)
     first_reservation = reserve_launch(connection, first_claim)
     _record_definitive_process_failure(connection, first_reservation)
-    record_terminal(connection, first_reservation, "FAILED", "NOT_STARTED")
+    record_terminal(
+        connection, first_reservation, "FAILED", "NOT_STARTED", snapshot_digest=None
+    )
     wrong_digest = _corrupt_retry_safe_prior_evidence(
         connection, first_reservation, pair
     )
@@ -6713,11 +7030,19 @@ def test_reservation_outcome_timestamp_is_preserved_and_write_once(
         execution_id = _record_successful_process(connection, reservation_id)
         _resume_and_persist(connection, execution_id, reservation_id)
         expected_timestamp = PROCESS_CREATED_TIMESTAMP
-        record_terminal(connection, reservation_id, "AMBIGUOUS", "MAY_HAVE_OCCURRED")
+        record_terminal(
+            connection,
+            reservation_id,
+            "AMBIGUOUS",
+            "MAY_HAVE_OCCURRED",
+            snapshot_digest=None,
+        )
     elif outcome_kind == "failure":
         _record_definitive_process_failure(connection, reservation_id)
         expected_timestamp = PROCESS_FAILURE_TIMESTAMP
-        record_terminal(connection, reservation_id, "FAILED", "NOT_STARTED")
+        record_terminal(
+            connection, reservation_id, "FAILED", "NOT_STARTED", snapshot_digest=None
+        )
     else:
         record_recovery(
             connection,
@@ -6725,9 +7050,17 @@ def test_reservation_outcome_timestamp_is_preserved_and_write_once(
             "LAUNCH_RESERVATION",
             reservation_id,
             "CLASSIFY_LAUNCH_RESERVATION",
+            operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+            operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
         )
         expected_timestamp = MANUAL_REVIEW_TIMESTAMP
-        record_terminal(connection, reservation_id, "CLOSED", "MAY_HAVE_OCCURRED")
+        record_terminal(
+            connection,
+            reservation_id,
+            "CLOSED",
+            "MAY_HAVE_OCCURRED",
+            snapshot_digest=None,
+        )
 
     assert connection.execute(
         "SELECT outcome_recorded_at_utc FROM launch_reservations "
@@ -6794,6 +7127,8 @@ def test_resume_outcome_unknown_recovery_is_conservative_and_closable(
         "LAUNCH_RESERVATION",
         reservation_id,
         "CLASSIFY_RESUME_OUTCOME_UNKNOWN",
+        operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+        operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
     )
     assert recovery_id
     assert connection.execute(
@@ -6813,14 +7148,30 @@ def test_resume_outcome_unknown_recovery_is_conservative_and_closable(
             "LAUNCH_RESERVATION",
             reservation_id,
             "CLASSIFY_RESUME_OUTCOME_UNKNOWN",
+            operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+            operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
         )
     with pytest.raises(sqlite3.IntegrityError):
-        record_terminal(connection, reservation_id, "SUCCEEDED", "CONFIRMED")
+        record_terminal(
+            connection,
+            reservation_id,
+            "SUCCEEDED",
+            "CONFIRMED",
+            snapshot_digest=TEST_SNAPSHOT_DIGEST,
+        )
     terminal_id = record_terminal(
-        connection, reservation_id, "CLOSED", "MAY_HAVE_OCCURRED"
+        connection, reservation_id, "CLOSED", "MAY_HAVE_OCCURRED", snapshot_digest=None
     )
     assert terminal_id
-    record_recovery(connection, session_id, "SESSION", session_id, "CLOSE_SESSION")
+    record_recovery(
+        connection,
+        session_id,
+        "SESSION",
+        session_id,
+        "CLOSE_SESSION",
+        operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+        operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
+    )
     assert connection.execute(
         "SELECT state, closed_at_utc, close_reason FROM sessions WHERE session_id = ?",
         (session_id,),
@@ -6844,6 +7195,8 @@ def test_pre_resume_ready_has_separate_conservative_recovery_path(
             "LAUNCH_RESERVATION",
             reservation_id,
             "CLASSIFY_RESUME_OUTCOME_UNKNOWN",
+            operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+            operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
         )
     recovery_id = record_recovery(
         connection,
@@ -6851,6 +7204,8 @@ def test_pre_resume_ready_has_separate_conservative_recovery_path(
         "LAUNCH_RESERVATION",
         reservation_id,
         "CLASSIFY_PRE_RESUME_READY",
+        operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+        operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
     )
     assert recovery_id
     assert connection.execute(
@@ -6882,6 +7237,8 @@ def test_resume_outcome_unknown_recovery_grants_no_new_claim(db_path: Path) -> N
         "LAUNCH_RESERVATION",
         reservation_id,
         "CLASSIFY_RESUME_OUTCOME_UNKNOWN",
+        operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+        operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
     )
 
     with pytest.raises(sqlite3.IntegrityError, match="claim admission policy rejected"):
@@ -6921,6 +7278,8 @@ def test_resume_outcome_unknown_requires_exact_unresolved_pre_resume_execution(
             "LAUNCH_RESERVATION",
             reservation_id,
             "CLASSIFY_RESUME_OUTCOME_UNKNOWN",
+            operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+            operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
         )
     assert connection.execute("SELECT count(*) FROM manual_recoveries").fetchone() == (
         0,
@@ -6956,7 +7315,15 @@ def test_session_close_facts_are_write_once_and_only_close_with_state(
             "close_reason = ? WHERE session_id = ?",
             (CLOSE_TIMESTAMP, "direct-close", session_id),
         )
-    record_recovery(connection, session_id, "SESSION", session_id, "CLOSE_SESSION")
+    record_recovery(
+        connection,
+        session_id,
+        "SESSION",
+        session_id,
+        "CLOSE_SESSION",
+        operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+        operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
+    )
     with pytest.raises(sqlite3.IntegrityError):
         connection.execute(
             "UPDATE sessions SET closed_at_utc = ? WHERE session_id = ?",
@@ -6980,7 +7347,9 @@ def test_session_close_facts_are_write_once_and_only_close_with_state(
     selected_reservation = reserve_launch(connection, selected_claim)
     selected_execution = _record_successful_process(connection, selected_reservation)
     _resume_and_persist(connection, selected_execution, selected_reservation)
-    selected_terminal = record_terminal(connection, selected_reservation)
+    selected_terminal = record_terminal(
+        connection, selected_reservation, snapshot_digest=TEST_SNAPSHOT_DIGEST
+    )
     select_terminal(connection, selected_session, selected_terminal)
     connection.execute(
         "UPDATE sessions SET state = 'CLOSED', closed_at_utc = ?, close_reason = ? "
@@ -7512,6 +7881,8 @@ def test_constructed_provider_retry_survives_rollback_until_recovery(
             "LAUNCH_RESERVATION",
             permit,
             "CLASSIFY_LAUNCH_RESERVATION",
+            operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+            operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
         )
         with pytest.raises(ValueError, match="COMMITTED|revoked|not issued"):
             commit_process_intent(connection, permit, provider)
@@ -7562,6 +7933,8 @@ def test_provider_construction_loss_allows_only_reservation_recovery(
         "LAUNCH_RESERVATION",
         permit,
         "CLASSIFY_LAUNCH_RESERVATION",
+        operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+        operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
     )
     connection.close()
 
@@ -7694,7 +8067,9 @@ def test_process_failure_result_is_exact_and_only_not_started_path(
         record_process_creation_failure(connection, other_reservation, failure)
 
     record_process_creation_failure(connection, reservation_id, failure)
-    terminal_id = record_terminal(connection, reservation_id, "FAILED", "NOT_STARTED")
+    terminal_id = record_terminal(
+        connection, reservation_id, "FAILED", "NOT_STARTED", snapshot_digest=None
+    )
     assert terminal_id
     assert connection.execute("SELECT count(*) FROM launch_executions").fetchone() == (
         0,
@@ -7807,6 +8182,8 @@ def test_process_dispatch_and_recovery_share_lifecycle_arbiter(
                         reservation_id,
                         "CLASSIFY_PROCESS_OUTCOME_UNKNOWN",
                         None,
+                        operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+                        operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
                     )
             else:
                 winner_has_lock.wait()
@@ -7816,6 +8193,8 @@ def test_process_dispatch_and_recovery_share_lifecycle_arbiter(
                     "LAUNCH_RESERVATION",
                     reservation_id,
                     "CLASSIFY_PROCESS_OUTCOME_UNKNOWN",
+                    operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+                    operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
                 )
             outcome: tuple[str, object | None] = ("recovery", None)
         except (ValueError, sqlite3.IntegrityError):
@@ -7911,6 +8290,8 @@ def test_process_result_persistence_and_recovery_are_serialized(
                         reservation_id,
                         "CLASSIFY_PROCESS_OUTCOME_UNKNOWN",
                         None,
+                        operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+                        operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
                     )
             else:
                 winner_has_lock.wait()
@@ -7920,6 +8301,8 @@ def test_process_result_persistence_and_recovery_are_serialized(
                     "LAUNCH_RESERVATION",
                     reservation_id,
                     "CLASSIFY_PROCESS_OUTCOME_UNKNOWN",
+                    operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+                    operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
                 )
             outcome = "recovery"
         except (ValueError, sqlite3.IntegrityError):
@@ -8050,7 +8433,9 @@ def test_authority_capability_revocation_matrix(
         resume_intent = commit_resume_intent(connection, execution_id, reservation_id)
         resume_result = hooks.resume_thread(resume_intent)
         record_post_resume_evidence(connection, execution_id, resume_result)
-        terminal_id = record_terminal(connection, reservation_id)
+        terminal_id = record_terminal(
+            connection, reservation_id, snapshot_digest=TEST_SNAPSHOT_DIGEST
+        )
         select_terminal(connection, session_id, terminal_id)
         if revoking_state == "CLOSED_AFTER_SELECTION":
             connection.execute(
@@ -8094,6 +8479,8 @@ def test_authority_capability_revocation_matrix(
                 "LAUNCH_RESERVATION",
                 reservation_id,
                 "CLASSIFY_LAUNCH_RESERVATION",
+                operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+                operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
             )
     elif capability.startswith("process"):
         process_intent = _construct_provider_and_commit_process_intent(
@@ -8112,6 +8499,8 @@ def test_authority_capability_revocation_matrix(
             "LAUNCH_RESERVATION",
             reservation_id,
             "CLASSIFY_PROCESS_OUTCOME_UNKNOWN",
+            operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+            operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
         )
     else:
         execution_id = _record_successful_process(connection, reservation_id)
@@ -8126,12 +8515,28 @@ def test_authority_capability_revocation_matrix(
             "LAUNCH_RESERVATION",
             reservation_id,
             "CLASSIFY_RESUME_OUTCOME_UNKNOWN",
+            operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+            operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
         )
 
     if revoking_state in {"TERMINAL_RECORDED", "CLOSED"}:
-        record_terminal(connection, reservation_id, "CLOSED", "MAY_HAVE_OCCURRED")
+        record_terminal(
+            connection,
+            reservation_id,
+            "CLOSED",
+            "MAY_HAVE_OCCURRED",
+            snapshot_digest=None,
+        )
     if revoking_state == "CLOSED":
-        record_recovery(connection, session_id, "SESSION", session_id, "CLOSE_SESSION")
+        record_recovery(
+            connection,
+            session_id,
+            "SESSION",
+            session_id,
+            "CLOSE_SESSION",
+            operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+            operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
+        )
 
     before = connection.execute(
         """
@@ -8249,6 +8654,8 @@ def test_crash_around_process_call_is_unretryable_and_conservative(
         "LAUNCH_RESERVATION",
         reservation_id,
         "CLASSIFY_PROCESS_OUTCOME_UNKNOWN",
+        operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+        operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
     )
     assert recovered.execute(
         "SELECT reservation_state, process_intent_json, process_intent_digest, "
@@ -8295,12 +8702,22 @@ def test_process_unknown_recovery_allows_only_conservative_close_path(
         "LAUNCH_RESERVATION",
         reservation_id,
         "CLASSIFY_PROCESS_OUTCOME_UNKNOWN",
+        operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+        operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
     )
     terminal_id = record_terminal(
-        connection, reservation_id, "CLOSED", "MAY_HAVE_OCCURRED"
+        connection, reservation_id, "CLOSED", "MAY_HAVE_OCCURRED", snapshot_digest=None
     )
     assert terminal_id
-    record_recovery(connection, session_id, "SESSION", session_id, "CLOSE_SESSION")
+    record_recovery(
+        connection,
+        session_id,
+        "SESSION",
+        session_id,
+        "CLOSE_SESSION",
+        operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+        operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
+    )
     assert connection.execute(
         "SELECT state FROM sessions WHERE session_id = ?", (session_id,)
     ).fetchone() == ("CLOSED",)
@@ -8374,15 +8791,27 @@ def test_pre_resume_recovery_revokes_intent_before_terminal_and_close(
         "LAUNCH_RESERVATION",
         reservation_id,
         "CLASSIFY_PRE_RESUME_READY",
+        operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+        operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
     )
     with pytest.raises(ValueError, match="revoked|unavailable"):
         commit_resume_intent(connection, execution_id, reservation_id)
     assert events == []
 
-    record_terminal(connection, reservation_id, "CLOSED", "MAY_HAVE_OCCURRED")
+    record_terminal(
+        connection, reservation_id, "CLOSED", "MAY_HAVE_OCCURRED", snapshot_digest=None
+    )
     with pytest.raises(ValueError, match="revoked|unavailable"):
         commit_resume_intent(connection, execution_id, reservation_id)
-    record_recovery(connection, session_id, "SESSION", session_id, "CLOSE_SESSION")
+    record_recovery(
+        connection,
+        session_id,
+        "SESSION",
+        session_id,
+        "CLOSE_SESSION",
+        operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+        operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
+    )
     with pytest.raises(ValueError, match="revoked|unavailable"):
         commit_resume_intent(connection, execution_id, reservation_id)
     assert connection.execute(
@@ -8409,6 +8838,8 @@ def test_resume_permit_is_revoked_by_unknown_outcome_recovery(db_path: Path) -> 
         "LAUNCH_RESERVATION",
         reservation_id,
         "CLASSIFY_RESUME_OUTCOME_UNKNOWN",
+        operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+        operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
     )
 
     with pytest.raises(ValueError, match="revoked"):
@@ -8427,11 +8858,23 @@ def test_resume_permit_is_revoked_by_unknown_outcome_recovery(db_path: Path) -> 
     ).fetchone() == ("RESUME_INTENT_COMMITTED", None, None)
 
     with pytest.raises(sqlite3.IntegrityError):
-        record_terminal(connection, reservation_id)
-    record_terminal(connection, reservation_id, "CLOSED", "MAY_HAVE_OCCURRED")
+        record_terminal(
+            connection, reservation_id, snapshot_digest=TEST_SNAPSHOT_DIGEST
+        )
+    record_terminal(
+        connection, reservation_id, "CLOSED", "MAY_HAVE_OCCURRED", snapshot_digest=None
+    )
     with pytest.raises(ValueError, match="revoked|unavailable"):
         hooks.resume_thread(intent)
-    record_recovery(connection, session_id, "SESSION", session_id, "CLOSE_SESSION")
+    record_recovery(
+        connection,
+        session_id,
+        "SESSION",
+        session_id,
+        "CLOSE_SESSION",
+        operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+        operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
+    )
     with pytest.raises(ValueError, match="revoked|unavailable"):
         hooks.resume_thread(intent)
     assert connection.execute("SELECT count(*) FROM session_selections").fetchone() == (
@@ -8456,6 +8899,8 @@ def test_delayed_resume_receipt_is_revoked_by_recovery(db_path: Path) -> None:
         "LAUNCH_RESERVATION",
         reservation_id,
         "CLASSIFY_RESUME_OUTCOME_UNKNOWN",
+        operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+        operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
     )
 
     with pytest.raises(ValueError, match="revoked"):
@@ -8471,10 +8916,20 @@ def test_delayed_resume_receipt_is_revoked_by_recovery(db_path: Path) -> None:
         "WHERE launch_reservation_id = ?",
         (str(reservation_id),),
     ).fetchone() == ("MANUAL_REVIEW",)
-    record_terminal(connection, reservation_id, "CLOSED", "MAY_HAVE_OCCURRED")
+    record_terminal(
+        connection, reservation_id, "CLOSED", "MAY_HAVE_OCCURRED", snapshot_digest=None
+    )
     with pytest.raises(ValueError, match="revoked|unavailable"):
         record_post_resume_evidence(connection, execution_id, receipt)
-    record_recovery(connection, session_id, "SESSION", session_id, "CLOSE_SESSION")
+    record_recovery(
+        connection,
+        session_id,
+        "SESSION",
+        session_id,
+        "CLOSE_SESSION",
+        operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+        operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
+    )
     with pytest.raises(ValueError, match="revoked|unavailable"):
         record_post_resume_evidence(connection, execution_id, receipt)
     connection.close()
@@ -8504,6 +8959,8 @@ def test_direct_sql_resume_phase_advance_fails_after_manual_review(
             "LAUNCH_RESERVATION",
             reservation_id,
             "CLASSIFY_PRE_RESUME_READY",
+            operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+            operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
         )
         with pytest.raises(sqlite3.IntegrityError):
             connection.execute(
@@ -8525,6 +8982,8 @@ def test_direct_sql_resume_phase_advance_fails_after_manual_review(
             "LAUNCH_RESERVATION",
             reservation_id,
             "CLASSIFY_RESUME_OUTCOME_UNKNOWN",
+            operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+            operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
         )
         post_json = _json(
             {
@@ -8593,6 +9052,8 @@ def test_recovery_race_with_resume_intent_has_one_valid_winner(db_path: Path) ->
                 "LAUNCH_RESERVATION",
                 reservation_id,
                 "CLASSIFY_PRE_RESUME_READY",
+                operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+                operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
             )
             success = True
         except (ValueError, sqlite3.IntegrityError):
@@ -8667,6 +9128,8 @@ def test_recovery_race_with_resume_dispatch_is_serialized(
                         reservation_id,
                         "CLASSIFY_RESUME_OUTCOME_UNKNOWN",
                         None,
+                        operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+                        operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
                     )
             else:
                 winner_has_lock.wait()
@@ -8676,6 +9139,8 @@ def test_recovery_race_with_resume_dispatch_is_serialized(
                     "LAUNCH_RESERVATION",
                     reservation_id,
                     "CLASSIFY_RESUME_OUTCOME_UNKNOWN",
+                    operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+                    operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
                 )
             outcome = "recovery"
         except (ValueError, sqlite3.IntegrityError):
@@ -8757,6 +9222,8 @@ def test_recovery_race_with_receipt_persistence_is_serialized(
                         reservation_id,
                         "CLASSIFY_RESUME_OUTCOME_UNKNOWN",
                         None,
+                        operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+                        operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
                     )
             else:
                 winner_has_lock.wait()
@@ -8766,6 +9233,8 @@ def test_recovery_race_with_receipt_persistence_is_serialized(
                     "LAUNCH_RESERVATION",
                     reservation_id,
                     "CLASSIFY_RESUME_OUTCOME_UNKNOWN",
+                    operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+                    operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
                 )
             outcome = "recovery"
         except (ValueError, sqlite3.IntegrityError):
@@ -8845,6 +9314,8 @@ def test_process_receipt_cannot_persist_after_process_recovery(db_path: Path) ->
         "LAUNCH_RESERVATION",
         reservation_id,
         "CLASSIFY_PROCESS_OUTCOME_UNKNOWN",
+        operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+        operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
     )
     with pytest.raises(ValueError, match="PROCESS_INTENT_COMMITTED"):
         record_execution(connection, reservation_id, process_receipt)
@@ -8878,7 +9349,9 @@ def test_resume_boundary_requires_pre_resume_and_receipt(db_path: Path) -> None:
     with pytest.raises(TypeError, match="fake resume receipt"):
         record_post_resume_evidence(connection, execution_id, None)  # type: ignore[arg-type]
     with pytest.raises(sqlite3.IntegrityError):
-        record_terminal(connection, reservation_id)
+        record_terminal(
+            connection, reservation_id, snapshot_digest=TEST_SNAPSHOT_DIGEST
+        )
     assert connection.execute(
         "SELECT phase FROM launch_executions WHERE launch_execution_id = ?",
         (execution_id,),
@@ -8971,7 +9444,7 @@ def test_crash_around_resume_leaves_same_unretryable_intent_state(
         (str(reservation_id),),
     ).fetchone() == ("PROCESS_CREATED",)
     with pytest.raises(sqlite3.IntegrityError):
-        record_terminal(recovered, reservation_id)
+        record_terminal(recovered, reservation_id, snapshot_digest=TEST_SNAPSHOT_DIGEST)
     with pytest.raises(ValueError, match="PRE_RESUME_READY"):
         commit_resume_intent(recovered, execution_id, reservation_id)
     with pytest.raises(ValueError, match="already consumed|not issued"):
@@ -8985,6 +9458,8 @@ def test_crash_around_resume_leaves_same_unretryable_intent_state(
             "ATTEMPT",
             attempt_id,
             "RECORD_ATTEMPT_AMBIGUITY",
+            operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+            operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
         )
 
     second_attempt = allocate_attempt(recovered, session_id)
@@ -9379,7 +9854,7 @@ def test_launch_execution_evidence_is_append_only(db_path: Path) -> None:
         with pytest.raises(sqlite3.IntegrityError):
             connection.execute(sql, params)
 
-    record_terminal(connection, reservation_id)
+    record_terminal(connection, reservation_id, snapshot_digest=TEST_SNAPSHOT_DIGEST)
     with pytest.raises(sqlite3.IntegrityError):
         connection.execute(
             "UPDATE launch_executions SET post_resume_json = ? "
@@ -9479,6 +9954,8 @@ def test_direct_sql_state_projection_requires_normalized_durable_facts(
         "ATTEMPT",
         attempt_id,
         "RECORD_ATTEMPT_AMBIGUITY",
+        operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+        operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
     )
     connection.execute(
         "UPDATE launch_executions SET phase = 'POST_RESUME_AMBIGUOUS' "
@@ -9489,7 +9966,13 @@ def test_direct_sql_state_projection_requires_normalized_durable_facts(
         "UPDATE attempts SET state = 'LAUNCH_MAY_HAVE_OCCURRED' WHERE attempt_id = ?",
         (attempt_id,),
     )
-    record_terminal(connection, reservation_id, "AMBIGUOUS", "MAY_HAVE_OCCURRED")
+    record_terminal(
+        connection,
+        reservation_id,
+        "AMBIGUOUS",
+        "MAY_HAVE_OCCURRED",
+        snapshot_digest=None,
+    )
 
     selected_session = create_session(connection, _request("2026-01-02"))
     selected_attempt = allocate_attempt(connection, selected_session)
@@ -9497,7 +9980,9 @@ def test_direct_sql_state_projection_requires_normalized_durable_facts(
     selected_reservation = reserve_launch(connection, selected_claim)
     selected_execution = _record_successful_process(connection, selected_reservation)
     _resume_and_persist(connection, selected_execution, selected_reservation)
-    selected_terminal = record_terminal(connection, selected_reservation)
+    selected_terminal = record_terminal(
+        connection, selected_reservation, snapshot_digest=TEST_SNAPSHOT_DIGEST
+    )
     assert_rejected(
         "UPDATE attempts SET state = 'SUCCESS_SELECTED' WHERE attempt_id = ?",
         (selected_attempt,),
@@ -9612,6 +10097,8 @@ def test_direct_sql_child_admission_requires_documented_predecessor(
             "SESSION",
             session_id,
             "CLOSE_SESSION",
+            operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+            operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
         )
     assert _database_rows(connection) == before
     connection.close()
@@ -9637,6 +10124,8 @@ def test_close_session_rejects_fabricated_terminal_looking_attempt_lineage(
             "SESSION",
             session_id,
             "CLOSE_SESSION",
+            operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+            operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
         )
     assert _database_rows(connection) == before
     assert connection.execute(
@@ -9673,6 +10162,8 @@ def test_caller_ordinal_overrides_require_exact_non_negative_int(
                 session_id,
                 "ACKNOWLEDGE_RESTORE",
                 ordinal=invalid_ordinal,  # type: ignore[arg-type]
+                operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+                operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
             )
     assert _database_rows(connection) == before
     assert connection.execute(
@@ -9705,6 +10196,8 @@ def test_exact_integer_ordinal_overrides_accept_zero_and_current_positive_value(
         recovery_session,
         "ACKNOWLEDGE_RESTORE",
         ordinal=0,
+        operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+        operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
     )
     second_recovery = record_recovery(
         connection,
@@ -9713,6 +10206,8 @@ def test_exact_integer_ordinal_overrides_accept_zero_and_current_positive_value(
         recovery_session,
         "CLOSE_SESSION",
         ordinal=1,
+        operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+        operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
     )
     assert connection.execute(
         "SELECT recovery_ordinal FROM manual_recoveries "
@@ -9749,7 +10244,9 @@ def test_recovery_insert_requires_action_to_be_currently_actionable(
         reservation_id = reserve_launch(connection, claim_id)
         execution_id = _record_successful_process(connection, reservation_id)
         _resume_and_persist(connection, execution_id, reservation_id)
-        terminal_id = record_terminal(connection, reservation_id)
+        terminal_id = record_terminal(
+            connection, reservation_id, snapshot_digest=TEST_SNAPSHOT_DIGEST
+        )
         _insert_selection_row_for_test(connection, session_id, terminal_id)
         target_kind, target_id = "SESSION", session_id
     else:
@@ -9828,7 +10325,13 @@ def test_recovery_insert_requires_action_to_be_currently_actionable(
     before = _database_rows(connection)
     with pytest.raises(sqlite3.IntegrityError, match="recovery action matrix"):
         _insert_recovery_fact_for_test(
-            connection, session_id, target_kind, target_id, stale_action
+            connection,
+            session_id,
+            target_kind,
+            target_id,
+            stale_action,
+            operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+            operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
         )
     assert _database_rows(connection) == before
     assert connection.execute(
@@ -9863,6 +10366,8 @@ def test_recovery_projection_rechecks_mutable_current_eligibility(
             "SESSION",
             target_id,
             "CLOSE_SESSION",
+            operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+            operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
         )
         attempt_id = allocate_attempt(connection, session_id)
         update_sql = (
@@ -9889,6 +10394,8 @@ def test_recovery_projection_rechecks_mutable_current_eligibility(
                 "LAUNCH_RESERVATION",
                 target_id,
                 "CLASSIFY_PROCESS_OUTCOME_UNKNOWN",
+                operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+                operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
             )
             _insert_execution_row_for_test(connection, target_id)
             _consume_capability_for_test(process_intent)
@@ -9907,6 +10414,8 @@ def test_recovery_projection_rechecks_mutable_current_eligibility(
                     "LAUNCH_RESERVATION",
                     target_id,
                     "CLASSIFY_PRE_RESUME_READY",
+                    operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+                    operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
                 )
                 resume_intent = commit_resume_intent(
                     connection, execution_id, reservation_id
@@ -9923,6 +10432,8 @@ def test_recovery_projection_rechecks_mutable_current_eligibility(
                     "LAUNCH_RESERVATION",
                     target_id,
                     "CLASSIFY_RESUME_OUTCOME_UNKNOWN",
+                    operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+                    operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
                 )
                 resume_receipt = FakeSideEffects(connection).resume_thread(
                     resume_intent
@@ -9969,6 +10480,8 @@ def test_ambiguity_recovery_projection_rechecks_current_terminal_absence(
         "ATTEMPT",
         attempt_id,
         "RECORD_ATTEMPT_AMBIGUITY",
+        operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+        operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
     )
     request_digest = connection.execute(
         "SELECT request_digest FROM attempts WHERE attempt_id = ?",
@@ -10093,7 +10606,9 @@ def test_invalid_lifecycle_transitions_are_rejected(
         reservation_id = reserve_launch(connection, claim_id)
         execution_id = _record_successful_process(connection, reservation_id)
         _resume_and_persist(connection, execution_id, reservation_id)
-        terminal_id = record_terminal(connection, reservation_id)
+        terminal_id = record_terminal(
+            connection, reservation_id, snapshot_digest=TEST_SNAPSHOT_DIGEST
+        )
         mutation = (
             "UPDATE terminals SET terminal_state = 'FAILED' WHERE terminal_id = ?",
             (terminal_id,),
@@ -10103,7 +10618,9 @@ def test_invalid_lifecycle_transitions_are_rejected(
         reservation_id = reserve_launch(connection, claim_id)
         execution_id = _record_successful_process(connection, reservation_id)
         _resume_and_persist(connection, execution_id, reservation_id)
-        terminal_id = record_terminal(connection, reservation_id)
+        terminal_id = record_terminal(
+            connection, reservation_id, snapshot_digest=TEST_SNAPSHOT_DIGEST
+        )
         selection_id = select_terminal(connection, session_id, terminal_id)
         mutation = (
             "UPDATE session_selections SET selection_policy_version = 'bad' "
@@ -10124,6 +10641,8 @@ def test_invalid_lifecycle_transitions_are_rejected(
                 "ATTEMPT",
                 attempt_id,
                 "RECORD_ATTEMPT_AMBIGUITY",
+                operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+                operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
             )
     connection.close()
 
@@ -10152,6 +10671,8 @@ def test_recovery_race_produces_consecutive_ordinals(db_path: Path) -> None:
                 target_kind,
                 target_id,
                 action,
+                operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+                operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
             )
             with lock:
                 results.append(recovery_id)
@@ -10365,6 +10886,8 @@ def test_invalid_gregorian_nullable_timestamp_update_is_atomic(db_path: Path) ->
         "SESSION",
         session_id,
         "CLOSE_SESSION",
+        operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+        operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
     )
     before = _database_rows(connection)
 
@@ -10611,7 +11134,9 @@ def test_selection_chronology_cannot_be_satisfied_by_wrong_session_terminal(
     second_reservation = reserve_launch(connection, second_claim)
     second_execution = _record_successful_process(connection, second_reservation)
     _resume_and_persist(connection, second_execution, second_reservation)
-    second_terminal = record_terminal(connection, second_reservation)
+    second_terminal = record_terminal(
+        connection, second_reservation, snapshot_digest=TEST_SNAPSHOT_DIGEST
+    )
     before = _database_rows(connection)
     with pytest.raises(sqlite3.IntegrityError, match="selection terminal"):
         _insert_selection_row_for_test(
@@ -10692,6 +11217,8 @@ def test_terminal_chronology_uses_state_specific_durable_predecessor(
             "LAUNCH_RESERVATION",
             reservation_id,
             "CLASSIFY_LAUNCH_RESERVATION",
+            operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+            operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
         )
     recorded_at_utc = {
         "earlier": earlier,
@@ -10752,6 +11279,8 @@ def test_session_close_timestamp_uses_exact_close_predecessor(
             session_id,
             "CLOSE_SESSION",
             created_at_utc=MANUAL_REVIEW_TIMESTAMP,
+            operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+            operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
         )
         predecessor = MANUAL_REVIEW_TIMESTAMP
         earlier = "2026-01-01T00:02:59Z"
@@ -11059,7 +11588,9 @@ def _prepare_recovery_chronology_case(
             "2026-01-01T00:01:29Z",
         )
     assert action == "SELECT_COMMITTED_SUCCESS"
-    terminal_id = record_terminal(connection, reservation_id)
+    terminal_id = record_terminal(
+        connection, reservation_id, snapshot_digest=TEST_SNAPSHOT_DIGEST
+    )
     return (
         session_id,
         "TERMINAL",
@@ -11096,6 +11627,8 @@ def test_recovery_timestamp_uses_action_specific_durable_predecessor(
                 target_id,
                 action,
                 created_at_utc=recovery_created_at_utc,
+                operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+                operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
             )
         connection.rollback()
         assert _database_rows(connection) == before
@@ -11107,6 +11640,8 @@ def test_recovery_timestamp_uses_action_specific_durable_predecessor(
             target_id,
             action,
             created_at_utc=recovery_created_at_utc,
+            operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+            operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
         )
         assert connection.execute(
             "SELECT created_at_utc FROM manual_recoveries WHERE recovery_id = ?",
@@ -11135,6 +11670,8 @@ def test_recovery_chronology_cannot_use_wrong_session_lineage(
             target_id,
             action,
             created_at_utc="9999-12-31T23:59:59Z",
+            operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+            operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
         )
     connection.rollback()
     assert _database_rows(connection) == before
@@ -11161,6 +11698,8 @@ def test_manual_review_outcome_timestamp_does_not_predate_classification_recover
         target_id,
         action,
         created_at_utc=MANUAL_REVIEW_TIMESTAMP,
+        operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+        operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
     )
     outcome_at_utc = {
         "earlier": "2026-01-01T00:02:59Z",
@@ -11340,7 +11879,15 @@ def test_corrupt_recovery_target_evidence_blocks_without_mutation(
     target_state = _target_state(connection, target_kind, target_id)
 
     with pytest.raises(SchemaValidationError, match="does not match evidence bytes"):
-        record_recovery(connection, session_id, target_kind, target_id, action)
+        record_recovery(
+            connection,
+            session_id,
+            target_kind,
+            target_id,
+            action,
+            operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+            operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
+        )
 
     assert not connection.in_transaction
     assert _database_rows(connection) == before

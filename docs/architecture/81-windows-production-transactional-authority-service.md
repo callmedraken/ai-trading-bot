@@ -166,10 +166,13 @@ restricts temporary-root cleanup to the creating lifecycle.
 
 Already-held lifecycle tests use the explicit test-owned `TestLifecycleLease`.
 One lease binds exactly one reservation, one harness lifecycle, one arbiter
-entry, and one process-local core witness. Named while-held operations require
-that witness and reject reservation, execution, recovery-target, re-entry,
-post-exit, and closed-lifecycle mismatches before durable mutation. The witness
-is invalidated on exit, is not serialized, and is not production authority.
+entry, and one process-local core witness. The supported core has no general
+witness factory: the reviewed harness binding is the issuer and acquires the
+exact reservation arbiter before returning a witness to `TestLifecycleLease`.
+Named while-held operations require that witness and reject reservation,
+execution, recovery-target, re-entry, post-exit, and closed-lifecycle
+mismatches before durable mutation. The witness is invalidated on exit, is not
+serialized, and is not production authority.
 
 Test-issued provider/process/resume capabilities and receipts use distinct
 test provenance. Production service consumers reject that provenance before

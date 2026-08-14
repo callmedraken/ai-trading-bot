@@ -3241,6 +3241,32 @@ class TransactionalAuthorityCoreBinding:
             self._service_token,
         )
 
+    def acquire_lifecycle_lease(
+        self,
+        core: TransactionalAuthorityCore,
+        reservation_id: str,
+    ) -> tuple[AbstractContextManager[object], object]:
+        """Acquire the reviewed arbiter before issuing a lease witness."""
+
+        self._require_active()
+        if (
+            type(core) is not TransactionalAuthorityCore
+            or core._harness_binding is not self
+        ):
+            raise TypeError(
+                "lifecycle lease witness requires its reviewed core binding"
+            )
+        arbiter = self._lifecycle_arbiter_factory(str(reservation_id))
+        try:
+            arbiter.__enter__()
+            witness = _TransactionalLeaseWitness(
+                core, self._service_token, str(reservation_id)
+            )
+        except BaseException:
+            arbiter.__exit__(None, None, None)
+            raise
+        return arbiter, witness
+
     def invalidate_for_harness_close(self, error: BaseException | None = None) -> None:
         self._active = False
         self._lifecycle_error = error
@@ -3334,18 +3360,6 @@ class TransactionalAuthorityCore:
         if self._harness_binding is not None:
             self._harness_binding._require_active()
 
-    def create_lifecycle_lease_witness(self, reservation_id: str) -> object:
-        """Create a process-local witness for the reviewed test lease adapter."""
-
-        self._require_binding_active()
-        if not self._context.test_only or self._context.test_service_token is None:
-            raise ExternalAuthorityBoundaryUnavailable(
-                "lifecycle lease witnesses are test-only"
-            )
-        return _TransactionalLeaseWitness(
-            self, self._context.test_service_token, str(reservation_id)
-        )
-
     def invalidate_lifecycle_lease_witness(self, witness: object) -> None:
         if type(witness) is not _TransactionalLeaseWitness or witness.core is not self:
             raise TypeError("lifecycle lease witness does not belong to this core")
@@ -3354,6 +3368,7 @@ class TransactionalAuthorityCore:
     def _require_lifecycle_lease_witness(
         self, witness: object, reservation_id: str | None = None
     ) -> _TransactionalLeaseWitness:
+        self._require_binding_active()
         if type(witness) is not _TransactionalLeaseWitness:
             raise TypeError(
                 "already-held operation requires a reviewed lifecycle lease"
@@ -3369,6 +3384,25 @@ class TransactionalAuthorityCore:
         ):
             raise ValueError("lifecycle lease witness is invalid or mismatched")
         return witness
+
+    def require_execution_binding_while_held(
+        self,
+        execution_id: str,
+        reservation_id: str,
+        *,
+        lease_witness: object,
+    ) -> None:
+        """Require durable execution lineage to match the held reservation."""
+
+        self._require_lifecycle_lease_witness(lease_witness, reservation_id)
+        with self._bound_context():
+            row = self._connection.execute(
+                "SELECT launch_reservation_id FROM launch_executions "
+                "WHERE launch_execution_id = ?",
+                (str(execution_id),),
+            ).fetchone()
+        if row is None or row[0] != str(reservation_id):
+            raise ValueError("execution does not belong to the held reservation")
 
     @contextmanager
     def bind_external_effects(self) -> Iterator[None]:
@@ -3685,7 +3719,7 @@ class TransactionalAuthorityCore:
         *,
         lease_witness: object,
     ) -> None:
-        self._require_lifecycle_lease_witness(lease_witness)
+        witness = self._require_lifecycle_lease_witness(lease_witness)
         with self._bound_context():
             if type(receipt) is not ResumeReceipt:
                 raise TypeError("post-resume evidence requires a fake resume receipt")
@@ -3695,6 +3729,13 @@ class TransactionalAuthorityCore:
                 test_issuer=_TEST_RESUME_RESULT_ISSUER,
                 label="resume receipt",
             )
+            registered_execution_id, registered_reservation_id = (
+                _registered_resume_result_binding(receipt)
+            )
+            if registered_execution_id != str(execution_id):
+                raise ValueError("fake resume receipt belongs to another execution")
+            if registered_reservation_id != witness.reservation_id:
+                raise ValueError("resume receipt belongs to the held reservation")
             return _record_post_resume_evidence_locked(
                 self._connection, execution_id, receipt
             )

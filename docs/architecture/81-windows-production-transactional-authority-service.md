@@ -32,24 +32,32 @@ connection is not a production substitute. Production authority cannot be
 reconstructed from public fields.
 
 `WindowsTransactionalAuthority.for_test(...)` is the explicitly named
-disposable seam for a `DisposableAuthorityDatabaseForTest` produced by the
-reviewed test-only opener, test lifecycle arbiters, and fake adapters. It does
-not accept an arbitrary SQLite connection, a database path, or a
-production-authority argument. The opener always opens `:memory:`, then proves
-from SQLite's `PRAGMA database_list` that the connection has exactly one
-`main` database with an empty filename. File-backed databases, URI databases,
-and attached databases are rejected before the test service can use them.
-File-backed Architecture-77 databases remain harness-owned infrastructure and
-are exercised through public state-machine functions plus harness adapters;
-they are not `WindowsTransactionalAuthority.for_test(...)` bindings. The
-anonymous database binding is private test provenance; public paths,
-connections, and wrapper fields cannot reconstruct it. Consequently test
-arbiters, adapters, and test-issued capabilities or receipts cannot operate
-production storage.
+anonymous-memory service seam for a `DisposableAuthorityDatabaseForTest`
+produced by the reviewed test-only opener, test lifecycle arbiters, and fake
+adapters. It does not accept an arbitrary SQLite connection, a database path,
+or a production-authority argument. The opener always opens `:memory:`, then
+proves from SQLite's `PRAGMA database_list` that the connection has exactly
+one `main` database with an empty filename. File-backed databases, URI
+databases, and attached databases are rejected before the test service can use
+them. This service exposes only the explicit named state-machine operations;
+`invoke_for_test` does not exist.
 
-`invoke_for_test` is bound to that test-only construction provenance. A
-production-created service rejects it before opening its fixed authority
-database or invoking the callback.
+Architecture-77 file-backed multiprocessing tests use a separate
+`Architecture77HarnessAuthority` under `tests/`. That factory creates and
+owns a fresh temporary root and database, supplies a plain spawn descriptor to
+children, checks ordinary database/schema identity and cleanup boundaries, and
+binds the file connection directly to the private shared transactional core.
+It is test correctness/isolation infrastructure, not production executable
+authority and not a hostile same-user filesystem security boundary. It never
+passes its path, connection, descriptor, or capabilities to a production
+facade. Direct SQL/schema fixtures remain test-owned raw SQLite infrastructure.
+
+The anonymous service and file-backed harness execute the same private
+transactional core as production. Production storage remains selected only by
+the genuine `ValidatedProductionAuthority` and its fixed approved VFS/storage
+binding. Consequently test arbiters, adapters, test-issued capabilities or
+receipts, harness paths, and harness descriptors cannot operate production
+storage through a production API.
 
 ## Fixed database binding
 
@@ -63,6 +71,12 @@ The reviewed SQLite connection contract remains `foreign_keys=ON`,
 `journal_mode=PERSIST`, `synchronous=FULL`, and `trusted_schema=OFF` where the
 Architecture-79 runtime contract applies. C2 adds no `ATTACH`, `VACUUM`, repair,
 automatic migration, alternate schema, or write-capable fallback.
+
+The production surface contains only explicit named service operations. It
+accepts no caller connection, caller filesystem path, harness descriptor, or
+arbitrary operation callback. Public raw-connection durable mutators and
+public raw-connection `*_locked_for_test` writers do not exist. Already-held
+arbiter tests use the harness-owned named `TestLifecycleLease` operations.
 
 ## Durable state-machine ownership
 
@@ -160,8 +174,11 @@ successful no-op.
 Behavioral tests retain disposable SQLite setup, the file-lock lifecycle
 adapter, fake external observations, direct-SQL negative vectors, and
 test-only capability factories. In-memory service vectors use the explicit
-`for_test` seam; file-backed cross-process vectors use harness-owned SQLite
-adapters around the public state-machine functions.
+`for_test` seam. File-backed cross-process vectors use
+`Architecture77HarnessAuthority` and its explicit `TestLifecycleLease`; they
+do not route a file connection through the anonymous-memory service or an
+arbitrary callback. The harness and production therefore exercise one
+state-machine implementation while retaining separate storage boundaries.
 
 ## C2 exclusions and next milestone
 

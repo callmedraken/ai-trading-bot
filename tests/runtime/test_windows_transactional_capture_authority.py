@@ -8,8 +8,10 @@ import inspect
 import json
 import multiprocessing
 import os
+import shutil
 import sqlite3
 import sys
+import tempfile
 import threading
 import uuid
 from collections.abc import Callable, Iterator
@@ -24,6 +26,7 @@ from trading_bot.market_data import (
     ALPACA_DAILY_SNAPSHOT_DESCRIPTOR,
     MAX_DAILY_SNAPSHOT_SYMBOLS,
 )
+from trading_bot.runtime.windows_authority import PRODUCTION_AUTHORITY_PATHS
 from trading_bot.runtime.windows_authority_schema import (
     INITIALIZATION_POLICY_VERSION,
     METADATA_ENCODING_VERSION,
@@ -42,7 +45,7 @@ from trading_bot.runtime.windows_transactional_authority import (
 from trading_bot.runtime.windows_transactional_authority import (
     DisposableAuthorityDatabaseForTest,
     ValidatedCaptureRequest,
-    WindowsTransactionalAuthority,
+    _TransactionalAuthorityCore,
 )
 from trading_bot.runtime.windows_transactional_authority import (
     ProcessCreationFailure as FakeProcessCreationFailure,
@@ -63,18 +66,6 @@ from trading_bot.runtime.windows_transactional_authority import (
     ResumeReceipt as FakeResumeReceipt,
 )
 from trading_bot.runtime.windows_transactional_authority import (
-    allocate_attempt as _production_allocate_attempt,
-)
-from trading_bot.runtime.windows_transactional_authority import (
-    commit_claim as _production_commit_claim,
-)
-from trading_bot.runtime.windows_transactional_authority import (
-    commit_process_intent as _production_commit_process_intent,
-)
-from trading_bot.runtime.windows_transactional_authority import (
-    commit_resume_intent as _production_commit_resume_intent,
-)
-from trading_bot.runtime.windows_transactional_authority import (
     consume_constructed_provider_for_test as _consume_constructed_provider,
 )
 from trading_bot.runtime.windows_transactional_authority import (
@@ -93,9 +84,6 @@ from trading_bot.runtime.windows_transactional_authority import (
     consume_resume_result_for_test as _consume_resume_result,
 )
 from trading_bot.runtime.windows_transactional_authority import (
-    create_session as _production_create_session,
-)
-from trading_bot.runtime.windows_transactional_authority import (
     issue_constructed_provider_for_test as _issue_constructed_provider,
 )
 from trading_bot.runtime.windows_transactional_authority import (
@@ -108,9 +96,6 @@ from trading_bot.runtime.windows_transactional_authority import (
     issue_resume_receipt_for_test as _issue_resume_receipt,
 )
 from trading_bot.runtime.windows_transactional_authority import (
-    open_disposable_authority_database_for_test as _open_disposable_database_for_test,
-)
-from trading_bot.runtime.windows_transactional_authority import (
     process_failure_json_for_test as _process_failure_json,
 )
 from trading_bot.runtime.windows_transactional_authority import (
@@ -118,33 +103,6 @@ from trading_bot.runtime.windows_transactional_authority import (
 )
 from trading_bot.runtime.windows_transactional_authority import (
     process_success_evidence_for_test as _process_success_evidence,
-)
-from trading_bot.runtime.windows_transactional_authority import (
-    record_execution as _production_record_execution,
-)
-from trading_bot.runtime.windows_transactional_authority import (
-    record_execution_locked_for_test as _record_execution_locked,
-)
-from trading_bot.runtime.windows_transactional_authority import (
-    record_post_resume_evidence as _production_record_post_resume_evidence,
-)
-from trading_bot.runtime.windows_transactional_authority import (
-    record_post_resume_evidence_locked_for_test as _record_post_resume_evidence_locked,
-)
-from trading_bot.runtime.windows_transactional_authority import (
-    record_process_creation_failure as _production_record_process_creation_failure,
-)
-from trading_bot.runtime.windows_transactional_authority import (
-    record_process_creation_failure_locked_for_test as _record_process_creation_failure_locked,  # noqa: E501
-)
-from trading_bot.runtime.windows_transactional_authority import (
-    record_recovery as _production_record_recovery,
-)
-from trading_bot.runtime.windows_transactional_authority import (
-    record_recovery_locked_for_test as _record_recovery_locked,
-)
-from trading_bot.runtime.windows_transactional_authority import (
-    record_terminal as _production_record_terminal,
 )
 from trading_bot.runtime.windows_transactional_authority import (
     registered_constructed_provider_reservation_id_for_test as _registered_constructed_provider_reservation_id,  # noqa: E501
@@ -163,12 +121,6 @@ from trading_bot.runtime.windows_transactional_authority import (
 )
 from trading_bot.runtime.windows_transactional_authority import (
     registered_resume_result_binding_for_test as _registered_resume_result_binding,
-)
-from trading_bot.runtime.windows_transactional_authority import (
-    reserve_launch as _production_reserve_launch,
-)
-from trading_bot.runtime.windows_transactional_authority import (
-    select_terminal as _production_select_terminal,
 )
 from trading_bot.runtime.windows_transactional_authority import (
     snapshot_capture_request_for_test as _snapshot_capture_request,
@@ -1381,7 +1333,7 @@ def _raw_connection_for_test(
     connection: sqlite3.Connection | DisposableAuthorityDatabaseForTest,
 ) -> sqlite3.Connection:
     if type(connection) is DisposableAuthorityDatabaseForTest:
-        return connection.connection
+        return connection._connection
     return connection
 
 
@@ -1575,72 +1527,158 @@ def _current_lifecycle_arbiter(reservation_id: str):
     return InterprocessLifecycleArbiter(reservation_id)
 
 
-class _HarnessService:
-    """Bind public state-machine calls to a harness-owned file connection."""
+@dataclass(frozen=True, slots=True)
+class Architecture77HarnessDescriptor:
+    root: str
+    database_path: str
+
+
+class Architecture77HarnessAuthority:
+    """Bind the shared private core to a harness-owned file connection."""
 
     def __init__(
         self,
         connection: sqlite3.Connection,
-        capture_request_factory: Callable[[object], ValidatedCaptureRequest] | None,
+        capture_request_factory: Callable[[object], ValidatedCaptureRequest]
+        | None = None,
+        *,
+        root: Path | None = None,
     ) -> None:
-        self._connection = connection
-        self._capture_request_factory = capture_request_factory
-
-    def invoke_for_test(
-        self, operation: Callable[..., Any], *args: Any, **kwargs: Any
-    ) -> Any:
-        if type(self._connection) is not sqlite3.Connection:
-            raise TypeError("lifecycle boundary requires an exact sqlite3.Connection")
-        if self._connection.in_transaction:
-            raise ValueError("lifecycle boundary requires no active SQLite transaction")
-
-        database = _open_disposable_database_for_test()
-        service = WindowsTransactionalAuthority.for_test(
-            database=database,
-            lifecycle_arbiter_factory=_current_lifecycle_arbiter,
-            capture_request_factory=self._capture_request_factory,
-        )
-        try:
-            return service.invoke_for_test(
-                lambda _memory_connection: operation(self._connection, *args, **kwargs)
+        if type(connection) is not sqlite3.Connection:
+            raise TypeError(
+                "Architecture-77 harness requires an exact sqlite3.Connection"
             )
-        finally:
-            service.close()
+        self._root = None if root is None else root.resolve(strict=True)
+        self._database_path = (
+            None
+            if self._root is None
+            else (self._root / "authority.sqlite3").resolve(strict=False)
+        )
+        self._core = _TransactionalAuthorityCore.for_harness(
+            connection,
+            lifecycle_arbiter_factory=_current_lifecycle_arbiter,
+            capture_request_factory=capture_request_factory,
+        )
+
+    @classmethod
+    def create(cls) -> Architecture77HarnessAuthority:
+        root = Path(tempfile.mkdtemp(prefix="ai-trading-bot-arch77-"))
+        path = root / "authority.sqlite3"
+        connection: sqlite3.Connection | None = None
+        try:
+            connection = _connect(path)
+            _install_schema(connection)
+            _insert_metadata(connection)
+            _insert_migration(connection)
+            instance = cls(connection, root=root)
+            instance._validate_storage()
+            return instance
+        except BaseException:
+            if connection is not None:
+                connection.close()
+            shutil.rmtree(root, ignore_errors=True)
+            raise
+
+    @property
+    def database_path(self) -> Path:
+        if self._database_path is None:
+            raise RuntimeError("harness storage was not created by the factory")
+        return self._database_path
+
+    @property
+    def descriptor(self) -> Architecture77HarnessDescriptor:
+        return Architecture77HarnessDescriptor(
+            root=str(self._root), database_path=str(self.database_path)
+        )
+
+    def _validate_storage(self) -> None:
+        root = self._root
+        if root is None or self.database_path.parent != root:
+            raise AssertionError("harness database escaped its private temporary root")
+        if self.database_path == Path(PRODUCTION_AUTHORITY_PATHS.database).resolve():
+            raise AssertionError(
+                "harness database selected the production authority path"
+            )
+        rows = self._core._connection.execute("PRAGMA database_list").fetchall()
+        if len(rows) != 1 or rows[0][1] != "main":
+            raise AssertionError("harness database must have exactly one main database")
+        if Path(str(rows[0][2])).resolve() != self.database_path:
+            raise AssertionError(
+                "harness database identity does not match its factory path"
+            )
+        schema = self._core._connection.execute(
+            "SELECT production_schema_id, production_schema_version, "
+            "production_schema_digest FROM authority_metadata WHERE singleton_key = 1"
+        ).fetchone()
+        if schema != (
+            PRODUCTION_SCHEMA_ID,
+            PRODUCTION_SCHEMA_VERSION,
+            bytes.fromhex(SCHEMA_SHA256),
+        ):
+            raise AssertionError(
+                "harness database schema identity is not the reviewed artifact"
+            )
+
+    def close(self) -> None:
+        self._core._connection.close()
+        if self._root is not None:
+            shutil.rmtree(self._root, ignore_errors=True)
+
+    def lifecycle_lease(self, reservation_id: str) -> TestLifecycleLease:
+        return TestLifecycleLease(self, reservation_id)
+
+    def create_session(
+        self, request: dict[str, Any], *, created_at_utc: str = TIMESTAMP
+    ) -> str:
+        return self._core.create_session(request, created_at_utc=created_at_utc)
+
+    def allocate_attempt(
+        self,
+        session_id: str,
+        ordinal: int | None = None,
+        *,
+        created_at_utc: str = TIMESTAMP,
+    ) -> str:
+        return self._core.allocate_attempt(
+            session_id, ordinal=ordinal, created_at_utc=created_at_utc
+        )
+
+    def commit_claim(
+        self, attempt_id: str, *, committed_at_utc: str = TIMESTAMP
+    ) -> str:
+        return self._core.commit_claim(attempt_id, committed_at_utc=committed_at_utc)
+
+    def reserve_launch(
+        self, claim_id: str, *, committed_at_utc: str = TIMESTAMP
+    ) -> FakeProviderConstructionPermit:
+        return self._core.reserve_launch(claim_id, committed_at_utc=committed_at_utc)
 
     def commit_process_intent(
         self, reservation_id: str, provider: FakeConstructedProvider | None = None
     ) -> FakeProcessIntent:
-        return self.invoke_for_test(
-            _production_commit_process_intent, reservation_id, provider
+        return self._core.commit_process_intent(  # type: ignore[arg-type]
+            reservation_id, provider
         )
 
     def record_execution(
         self, reservation_id: str, receipt: FakeProcessCreationReceipt
     ) -> str:
-        return self.invoke_for_test(
-            _production_record_execution, reservation_id, receipt
-        )
+        return self._core.record_execution(reservation_id, receipt)
 
     def commit_resume_intent(
         self, execution_id: str, reservation_id: str
     ) -> FakeResumeIntent:
-        return self.invoke_for_test(
-            _production_commit_resume_intent, execution_id, reservation_id
-        )
+        return self._core.commit_resume_intent(execution_id, reservation_id)
 
     def record_process_creation_failure(
         self, reservation_id: str, failure: FakeProcessCreationFailure
     ) -> None:
-        return self.invoke_for_test(
-            _production_record_process_creation_failure, reservation_id, failure
-        )
+        return self._core.record_process_creation_failure(reservation_id, failure)
 
     def record_post_resume_evidence(
         self, execution_id: str, resume_receipt: FakeResumeReceipt
     ) -> None:
-        return self.invoke_for_test(
-            _production_record_post_resume_evidence, execution_id, resume_receipt
-        )
+        return self._core.record_post_resume_evidence(execution_id, resume_receipt)
 
     def record_terminal(
         self,
@@ -1648,9 +1686,7 @@ class _HarnessService:
         state: str = "SUCCEEDED",
         disposition: str = "CONFIRMED",
     ) -> str:
-        return self.invoke_for_test(
-            _production_record_terminal, reservation_id, state, disposition
-        )
+        return self._core.record_terminal(reservation_id, state, disposition)
 
     def record_recovery(
         self,
@@ -1662,13 +1698,88 @@ class _HarnessService:
     ) -> str:
         if ordinal is not None:
             _canonical_ordinal(ordinal, "recovery ordinal")
-        return self.invoke_for_test(
-            _production_record_recovery,
-            session_id,
-            target_kind,
-            target_id,
-            action,
-            ordinal,
+        return self._core.record_recovery(
+            session_id, target_kind, target_id, action, ordinal
+        )
+
+
+class TestLifecycleLease:
+    """Explicit named-operation lease for already-held arbiter tests."""
+
+    __test__ = False
+
+    def __init__(
+        self, authority: Architecture77HarnessAuthority, reservation_id: str
+    ) -> None:
+        self._authority = authority
+        self._reservation_id = str(reservation_id)
+        self._arbiter: Any = None
+
+    def __enter__(self) -> TestLifecycleLease:
+        self._arbiter = _current_lifecycle_arbiter(self._reservation_id)
+        self._arbiter.__enter__()
+        return self
+
+    def __exit__(self, *args: object) -> None:
+        if self._arbiter is not None:
+            self._arbiter.__exit__(*args)
+            self._arbiter = None
+
+    def record_execution(
+        self, reservation_id: str, receipt: FakeProcessCreationReceipt
+    ) -> str:
+        return self._authority._core.record_execution_while_held(
+            reservation_id, receipt
+        )
+
+    def commit_process_intent(
+        self, reservation_id: str, provider: FakeConstructedProvider
+    ) -> FakeProcessIntent:
+        return self._authority._core.commit_process_intent_while_held(
+            reservation_id, provider
+        )
+
+    def commit_resume_intent(
+        self, execution_id: str, reservation_id: str
+    ) -> FakeResumeIntent:
+        return self._authority._core.commit_resume_intent_while_held(
+            execution_id, reservation_id
+        )
+
+    def record_process_creation_failure(
+        self, reservation_id: str, failure: FakeProcessCreationFailure
+    ) -> None:
+        return self._authority._core.record_process_creation_failure_while_held(
+            reservation_id, failure
+        )
+
+    def record_post_resume_evidence(
+        self, execution_id: str, receipt: FakeResumeReceipt
+    ) -> None:
+        return self._authority._core.record_post_resume_evidence_while_held(
+            execution_id, receipt
+        )
+
+    def record_terminal(
+        self,
+        reservation_id: str,
+        state: str = "SUCCEEDED",
+        disposition: str = "CONFIRMED",
+    ) -> str:
+        return self._authority._core.record_terminal_while_held(
+            reservation_id, state, disposition
+        )
+
+    def record_recovery(
+        self,
+        session_id: str,
+        target_kind: str,
+        target_id: str,
+        action: str,
+        ordinal: int | None = None,
+    ) -> str:
+        return self._authority._core.record_recovery_while_held(
+            session_id, target_kind, target_id, action, ordinal
         )
 
 
@@ -1676,8 +1787,8 @@ def _test_service(
     connection: sqlite3.Connection,
     *,
     capture_request_factory: Callable[[object], ValidatedCaptureRequest] | None = None,
-) -> _HarnessService:
-    return _HarnessService(connection, capture_request_factory)
+) -> Architecture77HarnessAuthority:
+    return Architecture77HarnessAuthority(connection, capture_request_factory)
 
 
 def create_session(
@@ -1686,10 +1797,8 @@ def create_session(
     *,
     created_at_utc: str = TIMESTAMP,
 ) -> str:
-    return _test_service(connection).invoke_for_test(
-        _production_create_session,
-        _request() if request is None else request,
-        created_at_utc=created_at_utc,
+    return _test_service(connection).create_session(
+        _request() if request is None else request, created_at_utc=created_at_utc
     )
 
 
@@ -1700,11 +1809,8 @@ def allocate_attempt(
     *,
     created_at_utc: str = TIMESTAMP,
 ) -> str:
-    return _test_service(connection).invoke_for_test(
-        _production_allocate_attempt,
-        session_id,
-        ordinal,
-        created_at_utc=created_at_utc,
+    return _test_service(connection).allocate_attempt(
+        session_id, ordinal, created_at_utc=created_at_utc
     )
 
 
@@ -1714,10 +1820,8 @@ def commit_claim(
     *,
     committed_at_utc: str = TIMESTAMP,
 ) -> str:
-    return _test_service(connection).invoke_for_test(
-        _production_commit_claim,
-        attempt_id,
-        committed_at_utc=committed_at_utc,
+    return _test_service(connection).commit_claim(
+        attempt_id, committed_at_utc=committed_at_utc
     )
 
 
@@ -1727,10 +1831,8 @@ def reserve_launch(
     *,
     committed_at_utc: str = TIMESTAMP,
 ) -> FakeProviderConstructionPermit:
-    return _test_service(connection).invoke_for_test(
-        _production_reserve_launch,
-        claim_id,
-        committed_at_utc=committed_at_utc,
+    return _test_service(connection).reserve_launch(
+        claim_id, committed_at_utc=committed_at_utc
     )
 
 
@@ -1739,11 +1841,7 @@ def commit_process_intent(
     reservation_id: str,
     provider: FakeConstructedProvider | None = None,
 ) -> FakeProcessIntent:
-    return _test_service(connection).invoke_for_test(
-        _production_commit_process_intent,
-        reservation_id,
-        provider,
-    )
+    return _test_service(connection).commit_process_intent(reservation_id, provider)
 
 
 def record_execution(
@@ -1751,11 +1849,7 @@ def record_execution(
     reservation_id: str,
     receipt: FakeProcessCreationReceipt,
 ) -> str:
-    return _test_service(connection).invoke_for_test(
-        _production_record_execution,
-        reservation_id,
-        receipt,
-    )
+    return _test_service(connection).record_execution(reservation_id, receipt)
 
 
 def commit_resume_intent(
@@ -1763,11 +1857,7 @@ def commit_resume_intent(
     execution_id: str,
     reservation_id: str,
 ) -> FakeResumeIntent:
-    return _test_service(connection).invoke_for_test(
-        _production_commit_resume_intent,
-        execution_id,
-        reservation_id,
-    )
+    return _test_service(connection).commit_resume_intent(execution_id, reservation_id)
 
 
 def record_process_creation_failure(
@@ -1775,10 +1865,8 @@ def record_process_creation_failure(
     reservation_id: str,
     failure: FakeProcessCreationFailure,
 ) -> None:
-    return _test_service(connection).invoke_for_test(
-        _production_record_process_creation_failure,
-        reservation_id,
-        failure,
+    return _test_service(connection).record_process_creation_failure(
+        reservation_id, failure
     )
 
 
@@ -1787,10 +1875,8 @@ def record_post_resume_evidence(
     execution_id: str,
     resume_receipt: FakeResumeReceipt,
 ) -> None:
-    return _test_service(connection).invoke_for_test(
-        _production_record_post_resume_evidence,
-        execution_id,
-        resume_receipt,
+    return _test_service(connection).record_post_resume_evidence(
+        execution_id, resume_receipt
     )
 
 
@@ -1800,20 +1886,13 @@ def record_terminal(
     state: str = "SUCCEEDED",
     disposition: str = "CONFIRMED",
 ) -> str:
-    return _test_service(connection).invoke_for_test(
-        _production_record_terminal,
-        reservation_id,
-        state,
-        disposition,
-    )
+    return _test_service(connection).record_terminal(reservation_id, state, disposition)
 
 
 def select_terminal(
     connection: sqlite3.Connection, session_id: str, terminal_id: str
 ) -> str:
-    return _test_service(connection).invoke_for_test(
-        _production_select_terminal, session_id, terminal_id
-    )
+    return _test_service(connection)._core.select_terminal(session_id, terminal_id)
 
 
 def record_recovery(
@@ -2503,38 +2582,34 @@ def _spawn_boundary_worker(
         if not go.wait(20):
             raise TimeoutError("boundary worker was not released to race")
 
-        def invoke_locked() -> None:
-            if scenario == "provider-dispatch":
-                assert type(capability) is FakeProviderConstructionPermit
-                hooks._construct_provider_locked(capability, fail=False)
-            elif scenario == "process-dispatch":
-                assert type(capability) is FakeProcessIntent
-                hooks._create_process_locked(capability, fail=False)
-            elif scenario == "process-persistence":
-                assert type(capability) is FakeProcessCreationReceipt
-                _record_execution_locked(connection, reservation_id, capability)
-            elif scenario == "resume-dispatch":
-                assert type(capability) is FakeResumeIntent
-                hooks._resume_thread_locked(capability, fail=False)
-            else:
-                assert scenario == "resume-persistence"
-                assert execution_id is not None
-                assert type(capability) is FakeResumeReceipt
-                _record_post_resume_evidence_locked(
-                    connection, execution_id, capability
-                )
-
         try:
             if not first:
                 started.set()
-            with InterprocessLifecycleArbiter(reservation_id):
+            connection = _connect(Path(db_path))
+            hooks.observer = connection
+            harness = _test_service(connection)
+            with harness.lifecycle_lease(reservation_id) as lease:
                 if first:
                     acquired.set()
                     if not release.wait(20):
                         raise TimeoutError("boundary winner was not released")
-                connection = _connect(Path(db_path))
-                hooks.observer = connection
-                invoke_locked()
+                if scenario == "provider-dispatch":
+                    assert type(capability) is FakeProviderConstructionPermit
+                    hooks._construct_provider_locked(capability, fail=False)
+                elif scenario == "process-dispatch":
+                    assert type(capability) is FakeProcessIntent
+                    hooks._create_process_locked(capability, fail=False)
+                elif scenario == "process-persistence":
+                    assert type(capability) is FakeProcessCreationReceipt
+                    lease.record_execution(reservation_id, capability)
+                elif scenario == "resume-dispatch":
+                    assert type(capability) is FakeResumeIntent
+                    hooks._resume_thread_locked(capability, fail=False)
+                else:
+                    assert scenario == "resume-persistence"
+                    assert execution_id is not None
+                    assert type(capability) is FakeResumeReceipt
+                    lease.record_post_resume_evidence(execution_id, capability)
             outcome = "ok"
         except (TypeError, ValueError, sqlite3.IntegrityError) as exc:
             outcome = f"rejected:{type(exc).__name__}"
@@ -2565,14 +2640,14 @@ def _spawn_recovery_worker(
         try:
             if not first:
                 started.set()
-            with InterprocessLifecycleArbiter(reservation_id):
+            connection = _connect(Path(db_path))
+            harness = _test_service(connection)
+            with harness.lifecycle_lease(reservation_id) as lease:
                 if first:
                     acquired.set()
                     if not release.wait(20):
                         raise TimeoutError("recovery winner was not released")
-                connection = _connect(Path(db_path))
-                _record_recovery_locked(
-                    connection,
+                lease.record_recovery(
                     session_id,
                     "LAUNCH_RESERVATION",
                     reservation_id,
@@ -2788,15 +2863,15 @@ def _spawn_recovery_after_outer_transaction_worker(
 ) -> None:
     connection: sqlite3.Connection | None = None
     try:
-        with InterprocessLifecycleArbiter(reservation_id):
+        connection = _connect(Path(db_path))
+        harness = _test_service(connection)
+        with harness.lifecycle_lease(reservation_id) as lease:
             recovery_acquired.set()
             if not transaction_started.wait(20):
                 raise TimeoutError("boundary worker did not begin its transaction")
             if not transaction_released.wait(20):
                 raise TimeoutError("boundary worker did not release its transaction")
-            connection = _connect(Path(db_path))
-            recovery_id = _record_recovery_locked(
-                connection,
+            recovery_id = lease.record_recovery(
                 session_id,
                 "LAUNCH_RESERVATION",
                 reservation_id,
@@ -2812,14 +2887,10 @@ def _spawn_recovery_after_outer_transaction_worker(
 
 
 @pytest.fixture
-def db_path(tmp_path: Path) -> Path:
-    path = tmp_path / "authority.sqlite3"
-    connection = _connect(path)
-    _install_schema(connection)
-    _insert_metadata(connection)
-    _insert_migration(connection)
-    connection.close()
-    return path
+def db_path(request: pytest.FixtureRequest) -> Path:
+    harness = Architecture77HarnessAuthority.create()
+    request.addfinalizer(harness.close)
+    return harness.database_path
 
 
 def _run_spawn_race(
@@ -3621,13 +3692,13 @@ def test_lifecycle_arbiter_identity_and_global_lock_order_are_explicit() -> None
     assert "Local\\AITradingBot" not in production_source
     assert "threading.RLock" not in production_source
     for operation in (
-        production.commit_process_intent,
-        production.record_execution,
-        production.record_process_creation_failure,
-        production.commit_resume_intent,
-        production.record_post_resume_evidence,
-        production.record_terminal,
-        production.record_recovery,
+        production._core_commit_process_intent,
+        production._core_record_execution,
+        production._core_record_process_creation_failure,
+        production._core_commit_resume_intent,
+        production._core_record_post_resume_evidence,
+        production._core_record_terminal,
+        production._core_record_recovery,
     ):
         source = inspect.getsource(operation)
         assert source.index("_require_no_active_transaction") < source.index(
@@ -3849,7 +3920,7 @@ def test_caller_mutation_after_snapshot_cannot_desynchronize_session(
         return snapshot
 
     service = _test_service(connection, capture_request_factory=snapshot_then_mutate)
-    session_id = service.invoke_for_test(_production_create_session, caller_request)
+    session_id = service.create_session(caller_request)
     snapshot = snapshots[0]
     expected_bytes = snapshot.canonical_json()
     expected_id = _session_id(
@@ -4819,7 +4890,7 @@ def test_every_owned_insert_pair_rejects_python_mismatch_before_mutation(
     context = _prepare_owned_insert_parent(base, table)
 
     candidate = _connect(tmp_path / "owned-pair-candidate.sqlite3")
-    base.connection.backup(candidate.connection)
+    base.backup(candidate)
     _create_owned_insert_candidate(candidate, table, context)
     columns = [row[1] for row in candidate.execute(f"PRAGMA table_info({table})")]
     values = list(candidate.execute(f"SELECT * FROM {table}").fetchone())
@@ -7605,10 +7676,9 @@ def test_process_dispatch_and_recovery_share_lifecycle_arbiter(
         try:
             if first:
                 _require_no_active_transaction(connection)
-                with lifecycle_lock:
+                with _test_service(connection).lifecycle_lease(reservation_id) as lease:
                     winner_has_lock.set()
-                    _record_recovery_locked(
-                        connection,
+                    lease.record_recovery(
                         session_id,
                         "LAUNCH_RESERVATION",
                         reservation_id,
@@ -7701,7 +7771,6 @@ def test_process_result_persistence_and_recovery_are_serialized(
     intent = _construct_provider_and_commit_process_intent(setup, reservation_id)
     result = FakeSideEffects(setup).create_process(intent, fail=failure_result)
     setup.close()
-    lifecycle_lock = InterprocessLifecycleArbiter(reservation_id)
     winner_has_lock = threading.Event()
     outcomes: list[str] = []
     outcomes_lock = threading.Lock()
@@ -7711,10 +7780,9 @@ def test_process_result_persistence_and_recovery_are_serialized(
         try:
             if first:
                 _require_no_active_transaction(connection)
-                with lifecycle_lock:
+                with _test_service(connection).lifecycle_lease(reservation_id) as lease:
                     winner_has_lock.set()
-                    _record_recovery_locked(
-                        connection,
+                    lease.record_recovery(
                         session_id,
                         "LAUNCH_RESERVATION",
                         reservation_id,
@@ -7751,16 +7819,14 @@ def test_process_result_persistence_and_recovery_are_serialized(
         try:
             if first:
                 _require_no_active_transaction(connection)
-                with lifecycle_lock:
+                with _test_service(connection).lifecycle_lease(reservation_id) as lease:
                     winner_has_lock.set()
                     if failure_result:
                         assert type(result) is FakeProcessCreationFailure
-                        _record_process_creation_failure_locked(
-                            connection, reservation_id, result
-                        )
+                        lease.record_process_creation_failure(reservation_id, result)
                     else:
                         assert type(result) is FakeProcessCreationReceipt
-                        _record_execution_locked(connection, reservation_id, result)
+                        lease.record_execution(reservation_id, result)
             else:
                 winner_has_lock.wait()
                 persist()
@@ -8470,10 +8536,9 @@ def test_recovery_race_with_resume_dispatch_is_serialized(
         try:
             if first:
                 _require_no_active_transaction(connection)
-                with lifecycle_lock:
+                with _test_service(connection).lifecycle_lease(reservation_id) as lease:
                     winner_has_lock.set()
-                    _record_recovery_locked(
-                        connection,
+                    lease.record_recovery(
                         session_id,
                         "LAUNCH_RESERVATION",
                         reservation_id,
@@ -8552,7 +8617,6 @@ def test_recovery_race_with_receipt_persistence_is_serialized(
     intent = commit_resume_intent(setup, execution_id, reservation_id)
     receipt = FakeSideEffects(setup).resume_thread(intent)
     setup.close()
-    lifecycle_lock = InterprocessLifecycleArbiter(reservation_id)
     winner_has_lock = threading.Event()
     outcomes: list[str] = []
     outcomes_lock = threading.Lock()
@@ -8562,10 +8626,9 @@ def test_recovery_race_with_receipt_persistence_is_serialized(
         try:
             if first:
                 _require_no_active_transaction(connection)
-                with lifecycle_lock:
+                with _test_service(connection).lifecycle_lease(reservation_id) as lease:
                     winner_has_lock.set()
-                    _record_recovery_locked(
-                        connection,
+                    lease.record_recovery(
                         session_id,
                         "LAUNCH_RESERVATION",
                         reservation_id,
@@ -8593,11 +8656,9 @@ def test_recovery_race_with_receipt_persistence_is_serialized(
         try:
             if first:
                 _require_no_active_transaction(connection)
-                with lifecycle_lock:
+                with _test_service(connection).lifecycle_lease(reservation_id) as lease:
                     winner_has_lock.set()
-                    _record_post_resume_evidence_locked(
-                        connection, execution_id, receipt
-                    )
+                    lease.record_post_resume_evidence(execution_id, receipt)
             else:
                 winner_has_lock.wait()
                 record_post_resume_evidence(connection, execution_id, receipt)
@@ -11115,7 +11176,7 @@ def test_recovery_target_evidence_mapping_has_exact_twelve_dependencies() -> Non
     assert len(_RECOVERY_TARGET_EVIDENCE_CORRUPTION_CASES) == 12
 
 
-def test_harness_has_no_private_transactional_authority_imports() -> None:
+def test_harness_imports_only_the_reviewed_private_core() -> None:
     tree = ast.parse(_HARNESS_MODULE_PATH.read_text(encoding="utf-8"))
     private_imports = [
         alias.name
@@ -11125,7 +11186,7 @@ def test_harness_has_no_private_transactional_authority_imports() -> None:
         for alias in node.names
         if alias.name.startswith("_")
     ]
-    assert private_imports == []
+    assert private_imports == ["_TransactionalAuthorityCore"]
 
 
 @pytest.mark.parametrize(

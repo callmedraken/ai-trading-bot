@@ -14,8 +14,8 @@ import json
 import sqlite3
 import threading
 import uuid
-from collections.abc import Callable
-from contextlib import AbstractContextManager
+from collections.abc import Callable, Iterator
+from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 from typing import Any, Protocol, Self
@@ -164,10 +164,6 @@ class DisposableAuthorityDatabaseForTest:
         del constructor, connection, identity
 
     @property
-    def connection(self) -> sqlite3.Connection:
-        return self._connection
-
-    @property
     def database_identity(self) -> tuple[tuple[int, str, str], ...]:
         return self._identity.database_list
 
@@ -177,15 +173,15 @@ class DisposableAuthorityDatabaseForTest:
                 "disposable test database identity changed after opening"
             )
 
-    def __getattr__(self, name: str) -> Any:
-        return getattr(self._connection, name)
+    def close(self) -> None:
+        self._connection.close()
 
     def __enter__(self) -> Self:
-        self._connection.__enter__()
         return self
 
     def __exit__(self, *args: object) -> None:
-        self._connection.__exit__(*args)
+        del args
+        self.close()
 
     def __reduce__(self) -> object:
         raise TypeError("disposable test databases cannot be serialized")
@@ -874,11 +870,8 @@ def _require_no_active_transaction(connection: sqlite3.Connection) -> None:
     context = _require_service_context()
     if context.test_only:
         test_database = context.test_database
-        if test_database is None:
-            raise ExternalAuthorityBoundaryUnavailable(
-                "test service has no reviewed disposable database"
-            )
-        test_database.validate_identity()
+        if test_database is not None:
+            test_database.validate_identity()
 
 
 def _begin(connection: sqlite3.Connection) -> None:
@@ -889,7 +882,7 @@ def _finish(connection: sqlite3.Connection, commit: bool) -> None:
     (connection.commit if commit else connection.rollback)()
 
 
-def create_session(
+def _core_create_session(
     connection: sqlite3.Connection,
     request: dict[str, Any] | None = None,
     *,
@@ -977,7 +970,7 @@ def create_session(
     return session_id
 
 
-def allocate_attempt(
+def _core_allocate_attempt(
     connection: sqlite3.Connection,
     session_id: str,
     ordinal: int | None = None,
@@ -1133,7 +1126,7 @@ def _validate_claim_admission_evidence(
         )
 
 
-def commit_claim(
+def _core_commit_claim(
     connection: sqlite3.Connection,
     attempt_id: str,
     *,
@@ -1209,7 +1202,7 @@ def commit_claim(
     return claim_id
 
 
-def reserve_launch(
+def _core_reserve_launch(
     connection: sqlite3.Connection,
     claim_id: str,
     *,
@@ -1443,7 +1436,7 @@ def _consume_constructed_provider(
         permit.consumed = True
 
 
-def commit_process_intent(
+def _core_commit_process_intent(
     connection: sqlite3.Connection,
     reservation_id: str,
     provider: ConstructedProvider | None = None,
@@ -1909,7 +1902,7 @@ def _consume_resume_result(
         permit.consumed = True
 
 
-def record_execution(
+def _core_record_execution(
     connection: sqlite3.Connection,
     reservation_id: str,
     receipt: ProcessCreationReceipt,
@@ -2072,7 +2065,7 @@ def _record_execution_locked(
     return execution_id
 
 
-def commit_resume_intent(
+def _core_commit_resume_intent(
     connection: sqlite3.Connection,
     execution_id: str,
     reservation_id: str,
@@ -2202,7 +2195,7 @@ def _commit_resume_intent_locked(
     return intent
 
 
-def record_process_creation_failure(
+def _core_record_process_creation_failure(
     connection: sqlite3.Connection,
     reservation_id: str,
     failure: ProcessCreationFailure,
@@ -2320,7 +2313,7 @@ def _record_process_creation_failure_locked(
     _consume_process_result(failure, reservation_id)
 
 
-def record_post_resume_evidence(
+def _core_record_post_resume_evidence(
     connection: sqlite3.Connection,
     execution_id: str,
     resume_receipt: ResumeReceipt,
@@ -2457,7 +2450,7 @@ def _record_post_resume_evidence_locked(
     _consume_resume_result(resume_receipt, execution_id, reservation_id)
 
 
-def record_terminal(
+def _core_record_terminal(
     connection: sqlite3.Connection,
     reservation_id: str,
     state: str = "SUCCEEDED",
@@ -2624,7 +2617,7 @@ def _insert_selection_in_transaction(
     return selection_id
 
 
-def select_terminal(
+def _core_select_terminal(
     connection: sqlite3.Connection, session_id: str, terminal_id: str
 ) -> str:
     _require_service_context()
@@ -2828,7 +2821,7 @@ def _validate_recovery_target_evidence(
         _require_evidence_pair(values[0], values[1], field=f"{pair} digest")
 
 
-def record_recovery(
+def _core_record_recovery(
     connection: sqlite3.Connection,
     session_id: str,
     target_kind: str,
@@ -2988,17 +2981,304 @@ def snapshot_capture_request_for_test(request: object) -> ValidatedCaptureReques
     return _snapshot_capture_request(request)
 
 
-def _run_in_service_context(
-    service: WindowsTransactionalAuthority,
-    operation: Callable[..., Any],
-    *args: Any,
-    **kwargs: Any,
-) -> Any:
-    token = _CURRENT_SERVICE_CONTEXT.set(service._context)
-    try:
-        return operation(*args, **kwargs)
-    finally:
-        _CURRENT_SERVICE_CONTEXT.reset(token)
+class _TransactionalAuthorityCore:
+    """Shared Architecture-77 transactional state-machine implementation."""
+
+    def __init__(
+        self,
+        connection: sqlite3.Connection,
+        context: _ServiceContext,
+    ) -> None:
+        if type(connection) is not sqlite3.Connection:
+            raise TypeError("transactional core requires an exact sqlite3.Connection")
+        self._connection = connection
+        self._context = context
+
+    @classmethod
+    def for_harness(
+        cls,
+        connection: sqlite3.Connection,
+        *,
+        lifecycle_arbiter_factory: Callable[[str], AbstractContextManager[object]],
+        capture_request_factory: Callable[[object], ValidatedCaptureRequest]
+        | None = None,
+        external_adapter: TransactionalAuthorityAdapter | None = None,
+    ) -> Self:
+        if type(connection) is not sqlite3.Connection:
+            raise TypeError(
+                "Architecture-77 harness requires an exact sqlite3.Connection"
+            )
+        return cls(
+            connection,
+            _ServiceContext(
+                authority=None,
+                lifecycle_arbiter_factory=lifecycle_arbiter_factory,
+                timestamp_provider=lambda fallback: fallback,
+                capture_request_provider=(
+                    _snapshot_capture_request
+                    if capture_request_factory is None
+                    else capture_request_factory
+                ),
+                test_only=True,
+                external_adapter=external_adapter,
+            ),
+        )
+
+    @contextmanager
+    def _bound_context(self) -> Iterator[None]:
+        token = _CURRENT_SERVICE_CONTEXT.set(self._context)
+        try:
+            yield
+        finally:
+            _CURRENT_SERVICE_CONTEXT.reset(token)
+
+    def create_session(
+        self, request: dict[str, Any], *, created_at_utc: str = TIMESTAMP
+    ) -> str:
+        with self._bound_context():
+            _require_no_active_transaction(self._connection)
+            return _core_create_session(
+                self._connection, request, created_at_utc=created_at_utc
+            )
+
+    def allocate_attempt(
+        self,
+        session_id: str,
+        *,
+        ordinal: int | None = None,
+        created_at_utc: str = TIMESTAMP,
+    ) -> str:
+        with self._bound_context():
+            _require_no_active_transaction(self._connection)
+            return _core_allocate_attempt(
+                self._connection,
+                session_id,
+                ordinal,
+                created_at_utc=created_at_utc,
+            )
+
+    def commit_claim(
+        self, attempt_id: str, *, committed_at_utc: str = TIMESTAMP
+    ) -> str:
+        with self._bound_context():
+            _require_no_active_transaction(self._connection)
+            return _core_commit_claim(
+                self._connection, attempt_id, committed_at_utc=committed_at_utc
+            )
+
+    def reserve_launch(
+        self, claim_id: str, *, committed_at_utc: str = TIMESTAMP
+    ) -> ProviderConstructionPermit:
+        with self._bound_context():
+            _require_no_active_transaction(self._connection)
+            return _core_reserve_launch(
+                self._connection, claim_id, committed_at_utc=committed_at_utc
+            )
+
+    def commit_process_intent(
+        self, reservation_id: str, provider: ConstructedProvider
+    ) -> ProcessIntent:
+        with self._bound_context():
+            if type(provider) is not ConstructedProvider:
+                raise TypeError(
+                    "commit_process_intent requires an opaque constructed provider"
+                )
+            _require_service_provenance(
+                provider,
+                production_issuer=_CONSTRUCTED_PROVIDER_ISSUER,
+                test_issuer=_TEST_CONSTRUCTED_PROVIDER_ISSUER,
+                label="constructed provider",
+            )
+            _require_no_active_transaction(self._connection)
+            return _core_commit_process_intent(
+                self._connection, reservation_id, provider
+            )
+
+    def record_execution(
+        self, reservation_id: str, receipt: ProcessCreationReceipt
+    ) -> str:
+        with self._bound_context():
+            if type(receipt) is not ProcessCreationReceipt:
+                raise TypeError(
+                    "record_execution requires a fake process creation receipt"
+                )
+            _require_service_provenance(
+                receipt,
+                production_issuer=_PROCESS_RESULT_ISSUER,
+                test_issuer=_TEST_PROCESS_RESULT_ISSUER,
+                label="process creation receipt",
+            )
+            _require_no_active_transaction(self._connection)
+            return _core_record_execution(self._connection, reservation_id, receipt)
+
+    def commit_resume_intent(
+        self, execution_id: str, reservation_id: str
+    ) -> ResumeIntent:
+        with self._bound_context():
+            _require_no_active_transaction(self._connection)
+            return _core_commit_resume_intent(
+                self._connection, execution_id, reservation_id
+            )
+
+    def record_process_creation_failure(
+        self, reservation_id: str, failure: ProcessCreationFailure
+    ) -> None:
+        with self._bound_context():
+            _require_service_provenance(
+                failure,
+                production_issuer=_PROCESS_RESULT_ISSUER,
+                test_issuer=_TEST_PROCESS_RESULT_ISSUER,
+                label="process creation failure",
+            )
+            _require_no_active_transaction(self._connection)
+            return _core_record_process_creation_failure(
+                self._connection, reservation_id, failure
+            )
+
+    def record_post_resume_evidence(
+        self, execution_id: str, receipt: ResumeReceipt
+    ) -> None:
+        with self._bound_context():
+            if type(receipt) is not ResumeReceipt:
+                raise TypeError("post-resume evidence requires a fake resume receipt")
+            _require_service_provenance(
+                receipt,
+                production_issuer=_RESUME_RESULT_ISSUER,
+                test_issuer=_TEST_RESUME_RESULT_ISSUER,
+                label="resume receipt",
+            )
+            _require_no_active_transaction(self._connection)
+            return _core_record_post_resume_evidence(
+                self._connection, execution_id, receipt
+            )
+
+    def record_terminal(
+        self,
+        reservation_id: str,
+        state: str = "SUCCEEDED",
+        disposition: str = "CONFIRMED",
+    ) -> str:
+        with self._bound_context():
+            _require_no_active_transaction(self._connection)
+            return _core_record_terminal(
+                self._connection, reservation_id, state, disposition
+            )
+
+    def select_terminal(self, session_id: str, terminal_id: str) -> str:
+        with self._bound_context():
+            _require_no_active_transaction(self._connection)
+            return _core_select_terminal(self._connection, session_id, terminal_id)
+
+    def record_recovery(
+        self,
+        session_id: str,
+        target_kind: str,
+        target_id: str,
+        action: str,
+        ordinal: int | None = None,
+    ) -> str:
+        with self._bound_context():
+            if ordinal is not None:
+                _canonical_ordinal(ordinal, "recovery ordinal")
+            if target_kind == "LAUNCH_RESERVATION" and action.startswith("CLASSIFY_"):
+                _require_no_active_transaction(self._connection)
+            return _core_record_recovery(
+                self._connection,
+                session_id,
+                target_kind,
+                target_id,
+                action,
+                ordinal,
+            )
+
+    def commit_process_intent_while_held(
+        self, reservation_id: str, provider: ConstructedProvider
+    ) -> ProcessIntent:
+        with self._bound_context():
+            return _commit_process_intent_locked(
+                self._connection, reservation_id, provider
+            )
+
+    def record_execution_while_held(
+        self, reservation_id: str, receipt: ProcessCreationReceipt
+    ) -> str:
+        with self._bound_context():
+            return _record_execution_locked(self._connection, reservation_id, receipt)
+
+    def commit_resume_intent_while_held(
+        self, execution_id: str, reservation_id: str
+    ) -> ResumeIntent:
+        with self._bound_context():
+            return _commit_resume_intent_locked(
+                self._connection, execution_id, reservation_id
+            )
+
+    def record_process_creation_failure_while_held(
+        self, reservation_id: str, failure: ProcessCreationFailure
+    ) -> None:
+        with self._bound_context():
+            return _record_process_creation_failure_locked(
+                self._connection, reservation_id, failure
+            )
+
+    def record_post_resume_evidence_while_held(
+        self, execution_id: str, receipt: ResumeReceipt
+    ) -> None:
+        with self._bound_context():
+            return _record_post_resume_evidence_locked(
+                self._connection, execution_id, receipt
+            )
+
+    def record_terminal_while_held(
+        self,
+        reservation_id: str,
+        state: str = "SUCCEEDED",
+        disposition: str = "CONFIRMED",
+    ) -> str:
+        with self._bound_context():
+            return _record_terminal_locked(
+                self._connection, reservation_id, state, disposition
+            )
+
+    def record_recovery_while_held(
+        self,
+        session_id: str,
+        target_kind: str,
+        target_id: str,
+        action: str,
+        ordinal: int | None = None,
+    ) -> str:
+        with self._bound_context():
+            return _record_recovery_locked(
+                self._connection,
+                session_id,
+                target_kind,
+                target_id,
+                action,
+                ordinal,
+            )
+
+    def insert_selection_in_transaction(self, session_id: str, terminal_id: str) -> str:
+        with self._bound_context():
+            return _insert_selection_in_transaction(
+                self._connection, session_id, terminal_id
+            )
+
+    def target_state(self, target_kind: str, target_id: str) -> str:
+        with self._bound_context():
+            return _target_state(self._connection, target_kind, target_id)
+
+    def validate_recovery_target_evidence(
+        self,
+        session_id: str,
+        target_kind: str,
+        target_id: str,
+        action: str,
+    ) -> None:
+        with self._bound_context():
+            return _validate_recovery_target_evidence(
+                self._connection, session_id, target_kind, target_id, action
+            )
 
 
 class WindowsTransactionalAuthority:
@@ -3012,6 +3292,7 @@ class WindowsTransactionalAuthority:
     def __init__(self, authority: ValidatedProductionAuthority) -> None:
         self._authority = require_validated_production_authority(authority)
         self._connection: sqlite3.Connection | None = None
+        self._core: _TransactionalAuthorityCore | None = None
         self._test_database: DisposableAuthorityDatabaseForTest | None = None
         self._context = _ServiceContext(
             authority=self._authority,
@@ -3042,7 +3323,8 @@ class WindowsTransactionalAuthority:
         database.validate_identity()
         instance = cls.__new__(cls)
         instance._authority = None
-        instance._connection = database.connection
+        instance._connection = database._connection
+        instance._core = None
         instance._test_database = database
         instance._context = _ServiceContext(
             authority=None,
@@ -3092,22 +3374,12 @@ class WindowsTransactionalAuthority:
     def close(self) -> None:
         connection = self._connection
         self._connection = None
+        self._core = None
         self._test_database = None
         if connection is not None:
             connection.close()
 
-    def invoke_for_test(
-        self, operation: Callable[..., Any], *args: Any, **kwargs: Any
-    ) -> Any:
-        """Invoke one extracted operation against the disposable test seam."""
-
-        if not self._context.test_only:
-            raise ExternalAuthorityBoundaryUnavailable(
-                "invoke_for_test is available only on for_test services"
-            )
-        return self._invoke(operation, *args, **kwargs)
-
-    def _invoke(self, operation: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
+    def _core_for_operation(self) -> _TransactionalAuthorityCore:
         if self._context.test_only:
             test_database = self._test_database
             if test_database is None:
@@ -3120,37 +3392,37 @@ class WindowsTransactionalAuthority:
                 )
             test_database.validate_identity()
         self._open_production_connection()
-        return _run_in_service_context(
-            self, operation, self._connection, *args, **kwargs
-        )
+        if self._connection is None:
+            raise ExternalAuthorityBoundaryUnavailable(
+                "transactional authority has no database connection"
+            )
+        if self._core is None:
+            self._core = _TransactionalAuthorityCore(
+                self._connection,
+                self._context,
+            )
+        return self._core
 
     def create_session(self, request: dict[str, Any]) -> str:
-        return self._invoke(
-            create_session,
-            request,
-            created_at_utc=self._service_timestamp(TIMESTAMP),
+        return self._core_for_operation().create_session(
+            request, created_at_utc=self._service_timestamp(TIMESTAMP)
         )
 
     def allocate_attempt(self, session_id: str, *, ordinal: int | None = None) -> str:
-        return self._invoke(
-            allocate_attempt,
+        return self._core_for_operation().allocate_attempt(
             session_id,
-            ordinal,
+            ordinal=ordinal,
             created_at_utc=self._service_timestamp(TIMESTAMP),
         )
 
     def commit_claim(self, attempt_id: str) -> str:
-        return self._invoke(
-            commit_claim,
-            attempt_id,
-            committed_at_utc=self._service_timestamp(TIMESTAMP),
+        return self._core_for_operation().commit_claim(
+            attempt_id, committed_at_utc=self._service_timestamp(TIMESTAMP)
         )
 
     def reserve_launch(self, claim_id: str) -> ProviderConstructionPermit:
-        return self._invoke(
-            reserve_launch,
-            claim_id,
-            committed_at_utc=self._service_timestamp(TIMESTAMP),
+        return self._core_for_operation().reserve_launch(
+            claim_id, committed_at_utc=self._service_timestamp(TIMESTAMP)
         )
 
     def commit_process_intent(
@@ -3163,7 +3435,9 @@ class WindowsTransactionalAuthority:
             label="constructed provider",
             test_only=self._context.test_only,
         )
-        return self._invoke(commit_process_intent, reservation_id, provider)
+        return self._core_for_operation().commit_process_intent(
+            reservation_id, provider
+        )
 
     def record_execution(
         self, reservation_id: str, receipt: ProcessCreationReceipt
@@ -3175,12 +3449,14 @@ class WindowsTransactionalAuthority:
             label="process creation receipt",
             test_only=self._context.test_only,
         )
-        return self._invoke(record_execution, reservation_id, receipt)
+        return self._core_for_operation().record_execution(reservation_id, receipt)
 
     def commit_resume_intent(
         self, execution_id: str, reservation_id: str
     ) -> ResumeIntent:
-        return self._invoke(commit_resume_intent, execution_id, reservation_id)
+        return self._core_for_operation().commit_resume_intent(
+            execution_id, reservation_id
+        )
 
     def record_process_creation_failure(
         self, reservation_id: str, failure: ProcessCreationFailure
@@ -3192,7 +3468,9 @@ class WindowsTransactionalAuthority:
             label="process creation failure",
             test_only=self._context.test_only,
         )
-        return self._invoke(record_process_creation_failure, reservation_id, failure)
+        return self._core_for_operation().record_process_creation_failure(
+            reservation_id, failure
+        )
 
     def record_post_resume_evidence(
         self, execution_id: str, receipt: ResumeReceipt
@@ -3204,7 +3482,9 @@ class WindowsTransactionalAuthority:
             label="resume receipt",
             test_only=self._context.test_only,
         )
-        return self._invoke(record_post_resume_evidence, execution_id, receipt)
+        return self._core_for_operation().record_post_resume_evidence(
+            execution_id, receipt
+        )
 
     def record_terminal(
         self,
@@ -3212,10 +3492,12 @@ class WindowsTransactionalAuthority:
         state: str = "SUCCEEDED",
         disposition: str = "CONFIRMED",
     ) -> str:
-        return self._invoke(record_terminal, reservation_id, state, disposition)
+        return self._core_for_operation().record_terminal(
+            reservation_id, state, disposition
+        )
 
     def select_terminal(self, session_id: str, terminal_id: str) -> str:
-        return self._invoke(select_terminal, session_id, terminal_id)
+        return self._core_for_operation().select_terminal(session_id, terminal_id)
 
     def record_recovery(
         self,
@@ -3227,8 +3509,8 @@ class WindowsTransactionalAuthority:
     ) -> str:
         if ordinal is not None:
             _canonical_ordinal(ordinal, "recovery ordinal")
-        return self._invoke(
-            record_recovery, session_id, target_kind, target_id, action, ordinal
+        return self._core_for_operation().record_recovery(
+            session_id, target_kind, target_id, action, ordinal
         )
 
     def construct_provider(
@@ -3308,82 +3590,6 @@ def _approved_sqlite_build_for_authority(
             "approved SQLite build does not match validated authority"
         )
     return build
-
-
-def record_execution_locked_for_test(
-    connection: sqlite3.Connection, reservation_id: str, receipt: ProcessCreationReceipt
-) -> str:
-    return _record_execution_locked(connection, reservation_id, receipt)
-
-
-def commit_process_intent_locked_for_test(
-    connection: sqlite3.Connection, reservation_id: str, provider: ConstructedProvider
-) -> ProcessIntent:
-    return _commit_process_intent_locked(connection, reservation_id, provider)
-
-
-def commit_resume_intent_locked_for_test(
-    connection: sqlite3.Connection, execution_id: str, reservation_id: str
-) -> ResumeIntent:
-    return _commit_resume_intent_locked(connection, execution_id, reservation_id)
-
-
-def record_process_creation_failure_locked_for_test(
-    connection: sqlite3.Connection, reservation_id: str, failure: ProcessCreationFailure
-) -> None:
-    return _record_process_creation_failure_locked(connection, reservation_id, failure)
-
-
-def record_post_resume_evidence_locked_for_test(
-    connection: sqlite3.Connection, execution_id: str, receipt: ResumeReceipt
-) -> None:
-    return _record_post_resume_evidence_locked(connection, execution_id, receipt)
-
-
-def record_terminal_locked_for_test(
-    connection: sqlite3.Connection,
-    reservation_id: str,
-    state: str = "SUCCEEDED",
-    disposition: str = "CONFIRMED",
-) -> str:
-    return _record_terminal_locked(connection, reservation_id, state, disposition)
-
-
-def record_recovery_locked_for_test(
-    connection: sqlite3.Connection,
-    session_id: str,
-    target_kind: str,
-    target_id: str,
-    action: str,
-    ordinal: int | None = None,
-) -> str:
-    return _record_recovery_locked(
-        connection, session_id, target_kind, target_id, action, ordinal
-    )
-
-
-def insert_selection_in_transaction_for_test(
-    connection: sqlite3.Connection, session_id: str, terminal_id: str
-) -> str:
-    return _insert_selection_in_transaction(connection, session_id, terminal_id)
-
-
-def target_state_for_test(
-    connection: sqlite3.Connection, target_kind: str, target_id: str
-) -> str:
-    return _target_state(connection, target_kind, target_id)
-
-
-def validate_recovery_target_evidence_for_test(
-    connection: sqlite3.Connection,
-    session_id: str,
-    target_kind: str,
-    target_id: str,
-    action: str,
-) -> None:
-    return _validate_recovery_target_evidence(
-        connection, session_id, target_kind, target_id, action
-    )
 
 
 def registered_provider_reservation_id_for_test(

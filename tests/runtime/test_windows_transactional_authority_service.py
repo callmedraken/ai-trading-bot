@@ -37,7 +37,6 @@ from trading_bot.runtime.windows_transactional_authority import (
     ExternalAuthorityBoundaryUnavailable,
     ProviderConstructionPermit,
     WindowsTransactionalAuthority,
-    commit_process_intent,
     consume_constructed_provider_for_test,
     consume_process_result_for_test,
     consume_resume_result_for_test,
@@ -230,7 +229,7 @@ def test_test_factory_is_explicit_and_rejects_active_transaction_before_arbiter(
     None
 ):
     database = open_disposable_authority_database_for_test(":memory:")
-    connection = database.connection
+    connection = database._connection
     arbiter_calls: list[str] = []
 
     def arbiter(reservation_id: str):
@@ -244,7 +243,7 @@ def test_test_factory_is_explicit_and_rejects_active_transaction_before_arbiter(
     connection.execute("BEGIN IMMEDIATE")
     try:
         with pytest.raises(ValueError, match="no active SQLite transaction"):
-            service.invoke_for_test(commit_process_intent, "reservation", object())
+            service.create_session({})
         assert arbiter_calls == []
     finally:
         connection.rollback()
@@ -316,12 +315,8 @@ def test_anonymous_disposable_database_supports_the_test_service() -> None:
     )
     try:
         assert database.database_identity == ((0, "main", ""),)
-        assert (
-            service.invoke_for_test(
-                lambda connection: connection.execute("SELECT 1").fetchone()[0]
-            )
-            == 1
-        )
+        assert hasattr(service, "create_session")
+        assert not hasattr(service, "invoke_for_test")
     finally:
         service.close()
 
@@ -352,7 +347,7 @@ def test_file_backed_test_database_is_rejected_before_sqlite_open(
 
 def test_attached_disposable_database_is_rejected_before_callback_or_mutation() -> None:
     database = open_disposable_authority_database_for_test(":memory:")
-    connection = database.connection
+    connection = database._connection
     connection.execute("CREATE TABLE marker (value TEXT NOT NULL)")
     service = WindowsTransactionalAuthority.for_test(
         database=database,
@@ -360,20 +355,13 @@ def test_attached_disposable_database_is_rejected_before_callback_or_mutation() 
             "machine", "epoch", reservation_id
         ),
     )
-    callback_calls: list[str] = []
-
-    def would_mutate(connection: sqlite3.Connection) -> None:
-        callback_calls.append("called")
-        connection.execute("INSERT INTO marker(value) VALUES ('unexpected')")
-
     try:
         connection.execute("ATTACH DATABASE ':memory:' AS attached")
         with pytest.raises(
             ExternalAuthorityBoundaryUnavailable,
             match="exactly one main database",
         ):
-            service.invoke_for_test(would_mutate)
-        assert callback_calls == []
+            service.create_session({})
         assert connection.execute("SELECT COUNT(*) FROM marker").fetchone() == (0,)
     finally:
         service.close()
@@ -384,12 +372,13 @@ def test_disposable_database_wrapper_cannot_be_reconstructed_or_serialized() -> 
     try:
         with pytest.raises(TypeError, match="reviewed opener"):
             DisposableAuthorityDatabaseForTest(  # type: ignore[call-arg]
-                object(), database.connection, database.database_identity
+                object(), database._connection, database.database_identity
             )
+        assert not hasattr(database, "connection")
         with pytest.raises(TypeError, match="cannot be serialized"):
             pickle.dumps(database)
     finally:
-        database.connection.close()
+        database.close()
 
 
 def test_test_factory_has_no_production_authority_or_raw_connection_argument() -> None:
@@ -399,28 +388,34 @@ def test_test_factory_has_no_production_authority_or_raw_connection_argument() -
     assert "database" in parameters
 
 
-def test_production_instance_rejects_invoke_for_test_before_opening_database(
+def test_production_module_has_no_raw_connection_mutator_surface() -> None:
+    import trading_bot.runtime.windows_transactional_authority as production
+
+    durable_names = (
+        "create_session",
+        "allocate_attempt",
+        "commit_claim",
+        "reserve_launch",
+        "commit_process_intent",
+        "record_execution",
+        "commit_resume_intent",
+        "record_process_creation_failure",
+        "record_post_resume_evidence",
+        "record_terminal",
+        "select_terminal",
+        "record_recovery",
+    )
+    assert all(not hasattr(production, name) for name in durable_names)
+    assert not any(name.endswith("_locked_for_test") for name in vars(production))
+    assert not hasattr(WindowsTransactionalAuthority, "invoke_for_test")
+    assert not hasattr(WindowsTransactionalAuthority, "_invoke")
+
+
+def test_production_instance_has_no_arbitrary_test_dispatcher(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     service = WindowsTransactionalAuthority(_production_validation(monkeypatch))
-    open_calls: list[tuple[object, ...]] = []
-    callback_calls: list[str] = []
-    monkeypatch.setattr(
-        "trading_bot.runtime.windows_transactional_authority.open_writable_authority_sqlite_connection",
-        lambda *args, **kwargs: open_calls.append((args, kwargs)),
-    )
-
-    def arbitrary_callback(connection: sqlite3.Connection) -> None:
-        del connection
-        callback_calls.append("called")
-
-    with pytest.raises(
-        ExternalAuthorityBoundaryUnavailable,
-        match="only on for_test services",
-    ):
-        service.invoke_for_test(arbitrary_callback)
-    assert open_calls == []
-    assert callback_calls == []
+    assert not hasattr(service, "invoke_for_test")
 
 
 def test_production_rejects_test_external_effect_provenance_before_database_mutation(
@@ -479,7 +474,7 @@ def test_production_lifecycle_factory_uses_reviewed_global_mutex(
     authority = _production_validation(monkeypatch)
     calls: list[tuple[object, ...]] = []
     database = open_disposable_authority_database_for_test(":memory:")
-    connection = database.connection
+    connection = database._connection
 
     class Probe:
         def __init__(self, *args: object, **kwargs: object) -> None:

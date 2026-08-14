@@ -161,24 +161,37 @@ def _populated_authority(
 ) -> tuple[Path, Path, WindowsAuthorityBootstrap, object, SqliteAuthorityBuildEvidence]:
     database, journal, bootstrap, release, build = _initialized_authority(tmp_path)
     harness = _harness_helpers()
-    ids = harness._seed_lifecycle(database)
-    connection = harness._connect(database)
-    try:
-        harness._insert_recovery_fact_for_test(
-            connection,
-            ids["session_id"],
-            "TERMINAL",
-            ids["terminal_id"],
-            "SELECT_COMMITTED_SUCCESS",
-            created_at_utc=harness.SELECTION_TIMESTAMP,
+    test_harness = harness.Architecture77HarnessAuthority.open_from_descriptor(
+        harness.Architecture77HarnessDescriptor(
+            root=str(tmp_path), database_path=str(database)
         )
-    finally:
-        connection.close()
-    connection = harness._connect(database)
+    )
     try:
-        harness.select_terminal(connection, ids["session_id"], ids["terminal_id"])
+        with harness._bind_harness(test_harness):
+            ids = harness._seed_lifecycle(database)
+            connection = harness._connect(database)
+            try:
+                harness._insert_recovery_fact_for_test(
+                    connection,
+                    ids["session_id"],
+                    "TERMINAL",
+                    ids["terminal_id"],
+                    "SELECT_COMMITTED_SUCCESS",
+                    operator_evidence_json=harness.TEST_OPERATOR_EVIDENCE_JSON,
+                    operator_evidence_digest=harness.TEST_OPERATOR_EVIDENCE_DIGEST,
+                    created_at_utc=harness.SELECTION_TIMESTAMP,
+                )
+            finally:
+                connection.close()
+            connection = harness._connect(database)
+            try:
+                harness.select_terminal(
+                    connection, ids["session_id"], ids["terminal_id"]
+                )
+            finally:
+                connection.close()
     finally:
-        connection.close()
+        test_harness.close()
     journal.touch()
     return database, journal, bootstrap, release, build
 
@@ -188,15 +201,24 @@ def _failure_authority(
 ) -> tuple[Path, Path, WindowsAuthorityBootstrap, object, SqliteAuthorityBuildEvidence]:
     database, journal, bootstrap, release, build = _initialized_authority(tmp_path)
     harness = _harness_helpers()
-    connection = harness._connect(database)
+    test_harness = harness.Architecture77HarnessAuthority.open_from_descriptor(
+        harness.Architecture77HarnessDescriptor(
+            root=str(tmp_path), database_path=str(database)
+        )
+    )
     try:
-        session_id = harness.create_session(connection)
-        attempt_id = harness.allocate_attempt(connection, session_id)
-        claim_id = harness.commit_claim(connection, attempt_id)
-        reservation = harness.reserve_launch(connection, claim_id)
-        harness._record_definitive_process_failure(connection, reservation)
+        with harness._bind_harness(test_harness):
+            connection = harness._connect(database)
+            try:
+                session_id = harness.create_session(connection)
+                attempt_id = harness.allocate_attempt(connection, session_id)
+                claim_id = harness.commit_claim(connection, attempt_id)
+                reservation = harness.reserve_launch(connection, claim_id)
+                harness._record_definitive_process_failure(connection, reservation)
+            finally:
+                connection.close()
     finally:
-        connection.close()
+        test_harness.close()
     journal.touch()
     return database, journal, bootstrap, release, build
 

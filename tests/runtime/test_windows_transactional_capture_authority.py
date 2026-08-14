@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import contextvars
 import hashlib
 import inspect
 import json
@@ -15,7 +16,7 @@ import tempfile
 import threading
 import uuid
 from collections.abc import Callable, Iterator
-from contextlib import AbstractContextManager, contextmanager
+from contextlib import contextmanager
 from dataclasses import FrozenInstanceError, dataclass, replace
 from pathlib import Path
 from typing import Any
@@ -1356,6 +1357,9 @@ def _connect(path: Path) -> sqlite3.Connection:
         configure_trusted_schema_off(connection)
         connection.execute("PRAGMA foreign_keys = ON")
         connection.execute("PRAGMA busy_timeout = 5000")
+        harness = _CURRENT_HARNESS.get()
+        if harness is not None and path.resolve(strict=False) == harness.database_path:
+            harness._register_connection(connection)
         return connection
     except BaseException:
         connection.close()
@@ -1539,8 +1543,18 @@ class Architecture77HarnessDescriptor:
     database_path: str
 
 
+class HarnessLifecycleError(RuntimeError):
+    """A reviewed Architecture-77 harness lifecycle has been closed or invalid."""
+
+
+_HARNESS_CONSTRUCTOR_TOKEN = object()
+_CURRENT_HARNESS: contextvars.ContextVar[Any] = contextvars.ContextVar(
+    "architecture77_harness", default=None
+)
+
+
 class Architecture77HarnessAuthority:
-    """Bind the shared transactional core to a harness-owned file connection."""
+    """Own one explicit file-backed Architecture-77 test lifecycle."""
 
     def __init__(
         self,
@@ -1548,23 +1562,40 @@ class Architecture77HarnessAuthority:
         capture_request_factory: Callable[[object], ValidatedCaptureRequest]
         | None = None,
         *,
-        root: Path | None = None,
+        root: Path,
+        _construction_token: object,
+        _service_token: object | None = None,
+        _owner: Architecture77HarnessAuthority | None = None,
+        _cleanup_root: bool = True,
     ) -> None:
+        if _construction_token is not _HARNESS_CONSTRUCTOR_TOKEN:
+            raise TypeError(
+                "Architecture-77 harness instances require an explicit factory"
+            )
         if type(connection) is not sqlite3.Connection:
             raise TypeError(
                 "Architecture-77 harness requires an exact sqlite3.Connection"
             )
+        resolved_root = root.resolve(strict=True)
+        if not resolved_root.is_dir():
+            raise HarnessLifecycleError("harness root is not a directory")
         self._connection = connection
-        self._root = None if root is None else root.resolve(strict=True)
-        self._database_path = (
-            None
-            if self._root is None
-            else (self._root / "authority.sqlite3").resolve(strict=False)
+        self._root = resolved_root
+        self._database_path = (resolved_root / "authority.sqlite3").resolve(
+            strict=False
         )
+        self._owner = self if _owner is None else _owner
+        self._service_token = object() if _service_token is None else _service_token
+        self._cleanup_root = _cleanup_root if _owner is None else False
+        self._closed = False
+        if _owner is None:
+            self._connections: dict[int, sqlite3.Connection] = {}
+        self._register_connection(connection)
         self._core = TransactionalAuthorityCore.for_harness(
             connection,
             lifecycle_arbiter_factory=_current_lifecycle_arbiter,
             capture_request_factory=capture_request_factory,
+            service_token=self._service_token,
         )
 
     @classmethod
@@ -1577,7 +1608,11 @@ class Architecture77HarnessAuthority:
             _install_schema(connection)
             _insert_metadata(connection)
             _insert_migration(connection)
-            instance = cls(connection, root=root)
+            instance = cls(
+                connection,
+                root=root,
+                _construction_token=_HARNESS_CONSTRUCTOR_TOKEN,
+            )
             instance._validate_storage()
             return instance
         except BaseException:
@@ -1586,63 +1621,181 @@ class Architecture77HarnessAuthority:
             shutil.rmtree(root, ignore_errors=True)
             raise
 
+    @classmethod
+    def open_from_descriptor(
+        cls, descriptor: Architecture77HarnessDescriptor
+    ) -> Architecture77HarnessAuthority:
+        """Open a fresh child-process lifecycle from the factory descriptor."""
+
+        if type(descriptor) is not Architecture77HarnessDescriptor:
+            raise HarnessLifecycleError("spawn requires an Architecture-77 descriptor")
+        database_path = Path(descriptor.database_path).resolve(strict=False)
+        if database_path == Path(PRODUCTION_AUTHORITY_PATHS.database).resolve():
+            raise HarnessLifecycleError(
+                "descriptor selected the production authority path"
+            )
+        try:
+            root = Path(descriptor.root).resolve(strict=True)
+        except (OSError, RuntimeError) as exc:
+            raise HarnessLifecycleError("descriptor root is unavailable") from exc
+        expected_path = (root / "authority.sqlite3").resolve(strict=False)
+        if database_path != expected_path:
+            raise HarnessLifecycleError("descriptor database escaped its harness root")
+        if not database_path.is_file():
+            raise HarnessLifecycleError("descriptor database is unavailable")
+        connection: sqlite3.Connection | None = None
+        try:
+            connection = _connect(database_path)
+            instance = cls(
+                connection,
+                root=root,
+                _construction_token=_HARNESS_CONSTRUCTOR_TOKEN,
+                _cleanup_root=False,
+            )
+            instance._validate_storage()
+            return instance
+        except BaseException:
+            if connection is not None:
+                connection.close()
+            raise
+
     @property
     def database_path(self) -> Path:
-        if self._database_path is None:
-            raise RuntimeError("harness storage was not created by the factory")
+        self._require_open()
         return self._database_path
 
     @property
     def descriptor(self) -> Architecture77HarnessDescriptor:
+        self._require_open()
         return Architecture77HarnessDescriptor(
             root=str(self._root), database_path=str(self.database_path)
         )
 
-    def _validate_storage(self) -> None:
-        root = self._root
-        if root is None or self.database_path.parent != root:
-            raise AssertionError("harness database escaped its private temporary root")
-        if self.database_path == Path(PRODUCTION_AUTHORITY_PATHS.database).resolve():
-            raise AssertionError(
-                "harness database selected the production authority path"
-            )
-        rows = self._connection.execute("PRAGMA database_list").fetchall()
-        if len(rows) != 1 or rows[0][1] != "main":
-            raise AssertionError("harness database must have exactly one main database")
-        if Path(str(rows[0][2])).resolve() != self.database_path:
-            raise AssertionError(
-                "harness database identity does not match its factory path"
-            )
-        schema = self._connection.execute(
-            "SELECT production_schema_id, production_schema_version, "
-            "production_schema_digest FROM authority_metadata WHERE singleton_key = 1"
-        ).fetchone()
+    def _require_open(self) -> None:
+        if self._owner._closed:
+            raise HarnessLifecycleError("Architecture-77 harness lifecycle is closed")
+        try:
+            self._connection.execute("SELECT 1")
+        except sqlite3.ProgrammingError as exc:
+            raise HarnessLifecycleError("harness connection is closed") from exc
+
+    def _register_connection(self, connection: sqlite3.Connection) -> None:
+        self._require_open()
+        if type(connection) is not sqlite3.Connection:
+            raise TypeError("harness binding requires an exact sqlite3.Connection")
+        try:
+            connection.execute("SELECT 1")
+        except sqlite3.ProgrammingError as exc:
+            raise HarnessLifecycleError("harness connection is closed") from exc
+        self._validate_connection(connection)
+        self._owner._connections[id(connection)] = connection
+
+    def _validate_connection(self, connection: sqlite3.Connection) -> None:
+        try:
+            rows = connection.execute("PRAGMA database_list").fetchall()
+            if len(rows) != 1 or rows[0][1] != "main":
+                raise HarnessLifecycleError(
+                    "harness database must have exactly one main database"
+                )
+            opened_path = str(rows[0][2])
+            if not opened_path or Path(opened_path).resolve() != self._database_path:
+                raise HarnessLifecycleError(
+                    "harness connection identity mismatches descriptor"
+                )
+            schema = connection.execute(
+                "SELECT production_schema_id, production_schema_version, "
+                "production_schema_digest FROM authority_metadata "
+                "WHERE singleton_key = 1"
+            ).fetchone()
+        except sqlite3.Error as exc:
+            raise HarnessLifecycleError(
+                "harness database schema is unavailable"
+            ) from exc
         if schema != (
             PRODUCTION_SCHEMA_ID,
             PRODUCTION_SCHEMA_VERSION,
             bytes.fromhex(SCHEMA_SHA256),
         ):
-            raise AssertionError(
-                "harness database schema identity is not the reviewed artifact"
+            raise HarnessLifecycleError(
+                "harness database schema identity is not reviewed"
             )
 
-    def close(self) -> None:
-        self._connection.close()
-        if self._root is not None:
-            shutil.rmtree(self._root, ignore_errors=True)
+    def bind_connection(
+        self,
+        connection: sqlite3.Connection,
+        capture_request_factory: Callable[[object], ValidatedCaptureRequest]
+        | None = None,
+    ) -> Architecture77HarnessAuthority:
+        self._register_connection(connection)
+        return type(self)(
+            connection,
+            capture_request_factory,
+            root=self._root,
+            _construction_token=_HARNESS_CONSTRUCTOR_TOKEN,
+            _service_token=self._service_token,
+            _owner=self._owner,
+            _cleanup_root=False,
+        )
 
-    def bind_external_effects(self) -> AbstractContextManager[None]:
-        return self._core.bind_external_effects()
+    def open_connection(self) -> sqlite3.Connection:
+        self._require_open()
+        return _connect(self.database_path)
+
+    def _validate_storage(self) -> None:
+        root = self._root
+        if self.database_path.parent != root:
+            raise AssertionError("harness database escaped its private temporary root")
+        if self.database_path == Path(PRODUCTION_AUTHORITY_PATHS.database).resolve():
+            raise AssertionError(
+                "harness database selected the production authority path"
+            )
+        self._validate_connection(self._connection)
+
+    def close(self) -> None:
+        owner = self._owner
+        if owner._closed:
+            return
+        owner._closed = True
+        for connection in tuple(owner._connections.values()):
+            try:
+                connection.execute("SELECT 1")
+            except sqlite3.ProgrammingError:
+                pass
+            else:
+                connection.close()
+        owner._connections.clear()
+        if owner._cleanup_root:
+            shutil.rmtree(owner._root, ignore_errors=True)
+
+    @contextmanager
+    def bind_external_effects(self) -> Iterator[None]:
+        self._require_open()
+        with self._core.bind_external_effects():
+            yield
+
+    def _lease_witness(self, reservation_id: str) -> object:
+        self._require_open()
+        return self._core.create_lifecycle_lease_witness(reservation_id)
+
+    def _invalidate_lease_witness(self, witness: object) -> None:
+        self._core.invalidate_lifecycle_lease_witness(witness)
+
+    def _core_for_use(self) -> TransactionalAuthorityCore:
+        self._require_open()
+        return self._core
 
     def require_test_capability(self, capability: object) -> None:
+        self._require_open()
         self._core.require_test_capability(capability)
 
     def lifecycle_lease(self, reservation_id: str) -> TestLifecycleLease:
+        self._require_open()
         return TestLifecycleLease(self, reservation_id)
 
     def create_session(
         self, request: dict[str, Any], *, created_at_utc: str = TIMESTAMP
     ) -> str:
+        self._require_open()
         return self._core.create_session(request, created_at_utc=created_at_utc)
 
     def allocate_attempt(
@@ -1652,6 +1805,7 @@ class Architecture77HarnessAuthority:
         *,
         created_at_utc: str = TIMESTAMP,
     ) -> str:
+        self._require_open()
         return self._core.allocate_attempt(
             session_id, ordinal=ordinal, created_at_utc=created_at_utc
         )
@@ -1659,16 +1813,19 @@ class Architecture77HarnessAuthority:
     def commit_claim(
         self, attempt_id: str, *, committed_at_utc: str = TIMESTAMP
     ) -> str:
+        self._require_open()
         return self._core.commit_claim(attempt_id, committed_at_utc=committed_at_utc)
 
     def reserve_launch(
         self, claim_id: str, *, committed_at_utc: str = TIMESTAMP
     ) -> FakeProviderConstructionPermit:
+        self._require_open()
         return self._core.reserve_launch(claim_id, committed_at_utc=committed_at_utc)
 
     def commit_process_intent(
         self, reservation_id: str, provider: FakeConstructedProvider | None = None
     ) -> FakeProcessIntent:
+        self._require_open()
         return self._core.commit_process_intent(  # type: ignore[arg-type]
             reservation_id, provider
         )
@@ -1676,21 +1833,25 @@ class Architecture77HarnessAuthority:
     def record_execution(
         self, reservation_id: str, receipt: FakeProcessCreationReceipt
     ) -> str:
+        self._require_open()
         return self._core.record_execution(reservation_id, receipt)
 
     def commit_resume_intent(
         self, execution_id: str, reservation_id: str
     ) -> FakeResumeIntent:
+        self._require_open()
         return self._core.commit_resume_intent(execution_id, reservation_id)
 
     def record_process_creation_failure(
         self, reservation_id: str, failure: FakeProcessCreationFailure
     ) -> None:
+        self._require_open()
         return self._core.record_process_creation_failure(reservation_id, failure)
 
     def record_post_resume_evidence(
         self, execution_id: str, resume_receipt: FakeResumeReceipt
     ) -> None:
+        self._require_open()
         return self._core.record_post_resume_evidence(execution_id, resume_receipt)
 
     def record_terminal(
@@ -1701,6 +1862,7 @@ class Architecture77HarnessAuthority:
         *,
         snapshot_digest: bytes | None,
     ) -> str:
+        self._require_open()
         return self._core.record_terminal(
             reservation_id,
             state,
@@ -1719,6 +1881,7 @@ class Architecture77HarnessAuthority:
         operator_evidence_json: bytes,
         operator_evidence_digest: bytes,
     ) -> str:
+        self._require_open()
         if ordinal is not None:
             _canonical_ordinal(ordinal, "recovery ordinal")
         return self._core.record_recovery(
@@ -1740,53 +1903,111 @@ class TestLifecycleLease:
     def __init__(
         self, authority: Architecture77HarnessAuthority, reservation_id: str
     ) -> None:
+        authority._require_open()
         self._authority = authority
         self._reservation_id = str(reservation_id)
         self._arbiter: Any = None
+        self._witness: object | None = None
+        self._entered = False
+        self._exited = False
+        self._execution_ids: set[str] = set()
+
+    def _require_active(self) -> object:
+        self._authority._require_open()
+        if not self._entered or self._exited or self._arbiter is None:
+            raise HarnessLifecycleError("lifecycle lease is not active")
+        if self._witness is None:
+            raise HarnessLifecycleError("lifecycle lease has no core witness")
+        return self._witness
+
+    def _require_reservation(self, reservation_id: str) -> object:
+        witness = self._require_active()
+        if str(reservation_id) != self._reservation_id:
+            raise ValueError(
+                "operation reservation does not match held lifecycle lease"
+            )
+        return witness
 
     def __enter__(self) -> TestLifecycleLease:
+        if self._entered or self._exited:
+            raise HarnessLifecycleError("lifecycle lease cannot be re-entered")
+        self._authority._require_open()
         self._arbiter = _current_lifecycle_arbiter(self._reservation_id)
-        self._arbiter.__enter__()
-        return self
+        try:
+            self._arbiter.__enter__()
+            self._witness = self._authority._lease_witness(self._reservation_id)
+            self._entered = True
+            return self
+        except BaseException:
+            try:
+                self._arbiter.__exit__(None, None, None)
+            finally:
+                self._arbiter = None
+            raise
 
     def __exit__(self, *args: object) -> None:
-        if self._arbiter is not None:
+        if self._arbiter is None:
+            return None
+        witness = self._witness
+        self._witness = None
+        self._exited = True
+        try:
+            if witness is not None:
+                self._authority._invalidate_lease_witness(witness)
+        finally:
             self._arbiter.__exit__(*args)
             self._arbiter = None
+
+    def bind_execution(self, execution_id: str) -> None:
+        self._require_active()
+        if not isinstance(execution_id, str) or not execution_id:
+            raise ValueError("lifecycle lease requires a canonical execution id")
+        self._execution_ids.add(execution_id)
 
     def record_execution(
         self, reservation_id: str, receipt: FakeProcessCreationReceipt
     ) -> str:
-        return self._authority._core.record_execution_while_held(
-            reservation_id, receipt
+        witness = self._require_reservation(reservation_id)
+        return self._authority._core_for_use().record_execution_while_held(
+            reservation_id, receipt, lease_witness=witness
         )
 
     def commit_process_intent(
         self, reservation_id: str, provider: FakeConstructedProvider
     ) -> FakeProcessIntent:
-        return self._authority._core.commit_process_intent_while_held(
-            reservation_id, provider
+        witness = self._require_reservation(reservation_id)
+        return self._authority._core_for_use().commit_process_intent_while_held(
+            reservation_id, provider, lease_witness=witness
         )
 
     def commit_resume_intent(
         self, execution_id: str, reservation_id: str
     ) -> FakeResumeIntent:
-        return self._authority._core.commit_resume_intent_while_held(
-            execution_id, reservation_id
+        witness = self._require_reservation(reservation_id)
+        result = self._authority._core_for_use().commit_resume_intent_while_held(
+            execution_id, reservation_id, lease_witness=witness
         )
+        self._execution_ids.add(execution_id)
+        return result
 
     def record_process_creation_failure(
         self, reservation_id: str, failure: FakeProcessCreationFailure
     ) -> None:
-        return self._authority._core.record_process_creation_failure_while_held(
-            reservation_id, failure
+        witness = self._require_reservation(reservation_id)
+        return (
+            self._authority._core_for_use().record_process_creation_failure_while_held(
+                reservation_id, failure, lease_witness=witness
+            )
         )
 
     def record_post_resume_evidence(
         self, execution_id: str, receipt: FakeResumeReceipt
     ) -> None:
-        return self._authority._core.record_post_resume_evidence_while_held(
-            execution_id, receipt
+        witness = self._require_active()
+        if execution_id not in self._execution_ids:
+            raise ValueError("execution is not bound to the held lifecycle lease")
+        return self._authority._core_for_use().record_post_resume_evidence_while_held(
+            execution_id, receipt, lease_witness=witness
         )
 
     def record_terminal(
@@ -1797,11 +2018,13 @@ class TestLifecycleLease:
         *,
         snapshot_digest: bytes | None,
     ) -> str:
-        return self._authority._core.record_terminal_while_held(
+        witness = self._require_reservation(reservation_id)
+        return self._authority._core_for_use().record_terminal_while_held(
             reservation_id,
             state,
             disposition,
             snapshot_digest=snapshot_digest,
+            lease_witness=witness,
         )
 
     def record_recovery(
@@ -1815,7 +2038,13 @@ class TestLifecycleLease:
         operator_evidence_json: bytes,
         operator_evidence_digest: bytes,
     ) -> str:
-        return self._authority._core.record_recovery_while_held(
+        witness = self._require_active()
+        if (
+            target_kind != "LAUNCH_RESERVATION"
+            or str(target_id) != self._reservation_id
+        ):
+            raise ValueError("recovery target is outside the held reservation")
+        return self._authority._core_for_use().record_recovery_while_held(
             session_id,
             target_kind,
             target_id,
@@ -1823,12 +2052,8 @@ class TestLifecycleLease:
             ordinal,
             operator_evidence_json=operator_evidence_json,
             operator_evidence_digest=operator_evidence_digest,
+            lease_witness=witness,
         )
-
-
-_HARNESS_SERVICES_BY_CONNECTION: dict[
-    sqlite3.Connection, Architecture77HarnessAuthority
-] = {}
 
 
 def _test_service(
@@ -1836,14 +2061,12 @@ def _test_service(
     *,
     capture_request_factory: Callable[[object], ValidatedCaptureRequest] | None = None,
 ) -> Architecture77HarnessAuthority:
-    if capture_request_factory is None:
-        cached = _HARNESS_SERVICES_BY_CONNECTION.get(connection)
-        if cached is not None:
-            return cached
-    service = Architecture77HarnessAuthority(connection, capture_request_factory)
-    if capture_request_factory is None:
-        _HARNESS_SERVICES_BY_CONNECTION[connection] = service
-    return service
+    harness = _CURRENT_HARNESS.get()
+    if harness is None:
+        raise HarnessLifecycleError(
+            "test service requires an explicitly bound Architecture-77 harness"
+        )
+    return harness.bind_connection(connection, capture_request_factory)
 
 
 def create_session(
@@ -2233,7 +2456,19 @@ class FakeSideEffects:
         self.observer = observer
         self.events = [] if events is None else events
         self._event_lock = threading.Lock() if event_lock is None else event_lock
-        self._service = _test_service(observer) if service is None else service
+        self._service = (
+            _test_service(observer)
+            if service is None and _CURRENT_HARNESS.get() is not None
+            else service
+        )
+
+    @property
+    def _bound_service(self) -> Architecture77HarnessAuthority:
+        if self._service is None:
+            raise HarnessLifecycleError(
+                "external-effect test adapter requires an explicit harness service"
+            )
+        return self._service
 
     def _emit(self, event: str) -> None:
         with self._event_lock:
@@ -2249,7 +2484,7 @@ class FakeSideEffects:
             raise TypeError(
                 "provider construction requires the reservation-issued permit"
             )
-        self._service.require_test_capability(capability)
+        self._bound_service.require_test_capability(capability)
         _require_no_active_transaction(self.observer)
         reservation_id = _registered_provider_reservation_id(capability)
         with InterprocessLifecycleArbiter(reservation_id):
@@ -2345,7 +2580,7 @@ class FakeSideEffects:
         if fail:
             self._emit("provider-construction-failed")
             raise RuntimeError("modeled provider construction failure")
-        with self._service.bind_external_effects():
+        with self._bound_service.bind_external_effects():
             return _issue_constructed_provider(reservation_id)
 
     def create_process(
@@ -2353,7 +2588,7 @@ class FakeSideEffects:
     ) -> FakeProcessCreationReceipt | FakeProcessCreationFailure:
         if type(process_intent) is not FakeProcessIntent:
             raise TypeError("create process requires an opaque fake process intent")
-        self._service.require_test_capability(process_intent)
+        self._bound_service.require_test_capability(process_intent)
         _require_no_active_transaction(self.observer)
         reservation_id = _registered_process_intent_reservation_id(process_intent)
         with InterprocessLifecycleArbiter(reservation_id):
@@ -2412,7 +2647,7 @@ class FakeSideEffects:
             result_json = _process_failure_json(
                 reservation_id, process_intent.intent_digest
             )
-            with self._service.bind_external_effects():
+            with self._bound_service.bind_external_effects():
                 return _issue_process_creation_failure(
                     reservation_id,
                     process_intent.intent_digest,
@@ -2423,7 +2658,7 @@ class FakeSideEffects:
         process_json, job_json, resume_json = _process_success_evidence(
             reservation_id, process_intent.intent_digest
         )
-        with self._service.bind_external_effects():
+        with self._bound_service.bind_external_effects():
             return _issue_process_creation_receipt(
                 reservation_id,
                 process_intent.intent_digest,
@@ -2440,7 +2675,7 @@ class FakeSideEffects:
     ) -> FakeResumeReceipt:
         if type(resume_intent) is not FakeResumeIntent:
             raise TypeError("resume thread requires an opaque fake resume intent")
-        self._service.require_test_capability(resume_intent)
+        self._bound_service.require_test_capability(resume_intent)
         _require_no_active_transaction(self.observer)
         execution_id, reservation_id = _registered_resume_intent_binding(resume_intent)
         with InterprocessLifecycleArbiter(reservation_id):
@@ -2523,7 +2758,7 @@ class FakeSideEffects:
                 "schema": 1,
             }
         )
-        with self._service.bind_external_effects():
+        with self._bound_service.bind_external_effects():
             return _issue_resume_receipt(
                 execution_id,
                 reservation_id,
@@ -2626,7 +2861,7 @@ def _resume_and_persist(
 
 
 def _spawn_boundary_worker(
-    db_path: str,
+    descriptor: Architecture77HarnessDescriptor,
     scenario: str,
     first: bool,
     setup_queue: Any,
@@ -2636,7 +2871,9 @@ def _spawn_boundary_worker(
     release: Any,
     started: Any,
 ) -> None:
-    connection = _connect(Path(db_path))
+    harness = Architecture77HarnessAuthority.open_from_descriptor(descriptor)
+    harness_context = _CURRENT_HARNESS.set(harness)
+    connection = harness._connection
     events: list[str] = []
     hooks = FakeSideEffects(connection, events)
     try:
@@ -2675,7 +2912,7 @@ def _spawn_boundary_worker(
         try:
             if not first:
                 started.set()
-            connection = _connect(Path(db_path))
+            connection = _connect(Path(descriptor.database_path))
             hooks.observer = connection
             harness = _test_service(connection)
             with harness.lifecycle_lease(reservation_id) as lease:
@@ -2699,6 +2936,7 @@ def _spawn_boundary_worker(
                     assert scenario == "resume-persistence"
                     assert execution_id is not None
                     assert type(capability) is FakeResumeReceipt
+                    lease.bind_execution(execution_id)
                     lease.record_post_resume_evidence(execution_id, capability)
             outcome = "ok"
         except (TypeError, ValueError, sqlite3.IntegrityError) as exc:
@@ -2709,10 +2947,12 @@ def _spawn_boundary_worker(
     finally:
         if connection is not None:
             connection.close()
+        _CURRENT_HARNESS.reset(harness_context)
+        harness.close()
 
 
 def _spawn_recovery_worker(
-    db_path: str,
+    descriptor: Architecture77HarnessDescriptor,
     session_id: str,
     reservation_id: str,
     action: str,
@@ -2723,6 +2963,8 @@ def _spawn_recovery_worker(
     release: Any,
     started: Any,
 ) -> None:
+    harness = Architecture77HarnessAuthority.open_from_descriptor(descriptor)
+    harness_context = _CURRENT_HARNESS.set(harness)
     connection: sqlite3.Connection | None = None
     try:
         if not go.wait(20):
@@ -2730,7 +2972,7 @@ def _spawn_recovery_worker(
         try:
             if not first:
                 started.set()
-            connection = _connect(Path(db_path))
+            connection = _connect(Path(descriptor.database_path))
             harness = _test_service(connection)
             with harness.lifecycle_lease(reservation_id) as lease:
                 if first:
@@ -2755,6 +2997,8 @@ def _spawn_recovery_worker(
     finally:
         if connection is not None:
             connection.close()
+        _CURRENT_HARNESS.reset(harness_context)
+        harness.close()
 
 
 @contextmanager
@@ -2818,9 +3062,11 @@ def _spawn_crash_while_holding_arbiter(reservation_id: str, acquired: Any) -> No
 
 
 def _spawn_reconstructed_capability_worker(
-    db_path: str, reservation_id: str, result_queue: Any
+    descriptor: Architecture77HarnessDescriptor, reservation_id: str, result_queue: Any
 ) -> None:
-    connection = _connect(Path(db_path))
+    harness = Architecture77HarnessAuthority.open_from_descriptor(descriptor)
+    harness_context = _CURRENT_HARNESS.set(harness)
+    connection = harness._connection
     hooks = FakeSideEffects(connection)
     outcomes: list[str] = []
     try:
@@ -2843,17 +3089,21 @@ def _spawn_reconstructed_capability_worker(
         result_queue.put(outcomes)
     finally:
         connection.close()
+        _CURRENT_HARNESS.reset(harness_context)
+        harness.close()
 
 
 def _spawn_outer_transaction_boundary_worker(
-    db_path: str,
+    descriptor: Architecture77HarnessDescriptor,
     setup_queue: Any,
     result_queue: Any,
     recovery_acquired: Any,
     transaction_started: Any,
     transaction_released: Any,
 ) -> None:
-    connection = _connect(Path(db_path))
+    harness = Architecture77HarnessAuthority.open_from_descriptor(descriptor)
+    harness_context = _CURRENT_HARNESS.set(harness)
+    connection = harness._connection
     hooks = FakeSideEffects(connection)
     try:
         session_id = create_session(connection)
@@ -2887,17 +3137,21 @@ def _spawn_outer_transaction_boundary_worker(
         result_queue.put(("boundary-error", repr(exc)))
     finally:
         connection.close()
+        _CURRENT_HARNESS.reset(harness_context)
+        harness.close()
 
 
 def _spawn_stored_observer_transaction_boundary_worker(
-    db_path: str,
+    descriptor: Architecture77HarnessDescriptor,
     setup_queue: Any,
     result_queue: Any,
     recovery_acquired: Any,
     transaction_started: Any,
     transaction_released: Any,
 ) -> None:
-    observer = _connect(Path(db_path))
+    harness = Architecture77HarnessAuthority.open_from_descriptor(descriptor)
+    harness_context = _CURRENT_HARNESS.set(harness)
+    observer = harness._connection
     events: list[str] = []
     hooks = FakeSideEffects(observer, events)
     try:
@@ -2942,10 +3196,12 @@ def _spawn_stored_observer_transaction_boundary_worker(
         result_queue.put(("boundary-error", repr(exc)))
     finally:
         observer.close()
+        _CURRENT_HARNESS.reset(harness_context)
+        harness.close()
 
 
 def _spawn_recovery_after_outer_transaction_worker(
-    db_path: str,
+    descriptor: Architecture77HarnessDescriptor,
     session_id: str,
     reservation_id: str,
     result_queue: Any,
@@ -2953,9 +3209,11 @@ def _spawn_recovery_after_outer_transaction_worker(
     transaction_started: Any,
     transaction_released: Any,
 ) -> None:
+    harness = Architecture77HarnessAuthority.open_from_descriptor(descriptor)
+    harness_context = _CURRENT_HARNESS.set(harness)
     connection: sqlite3.Connection | None = None
     try:
-        connection = _connect(Path(db_path))
+        connection = _connect(Path(descriptor.database_path))
         harness = _test_service(connection)
         with harness.lifecycle_lease(reservation_id) as lease:
             recovery_acquired.set()
@@ -2978,18 +3236,200 @@ def _spawn_recovery_after_outer_transaction_worker(
     finally:
         if connection is not None:
             connection.close()
+        _CURRENT_HARNESS.reset(harness_context)
+        harness.close()
 
 
 @pytest.fixture
 def db_path(request: pytest.FixtureRequest) -> Path:
     harness = Architecture77HarnessAuthority.create()
-    request.addfinalizer(harness.close)
+    harness_context = _CURRENT_HARNESS.set(harness)
+
+    def finalize() -> None:
+        _CURRENT_HARNESS.reset(harness_context)
+        harness.close()
+
+    request.addfinalizer(finalize)
     return harness.database_path
+
+
+def _descriptor_for(db_path: Path) -> Architecture77HarnessDescriptor:
+    harness = _CURRENT_HARNESS.get()
+    if harness is None or harness.database_path != db_path.resolve(strict=False):
+        raise HarnessLifecycleError("database path is not bound to the active harness")
+    return harness.descriptor
+
+
+def _direct_test_core(connection: sqlite3.Connection) -> TransactionalAuthorityCore:
+    return TransactionalAuthorityCore.for_harness(
+        connection,
+        lifecycle_arbiter_factory=_current_lifecycle_arbiter,
+        service_token=object(),
+    )
+
+
+def _inherit_harness_thread(
+    target: Callable[..., Any], *args: Any
+) -> Callable[[], Any]:
+    harness = _CURRENT_HARNESS.get()
+    if harness is None:
+        raise HarnessLifecycleError("thread requires an active Architecture-77 harness")
+
+    def run() -> Any:
+        context_token = _CURRENT_HARNESS.set(harness)
+        try:
+            return target(*args)
+        finally:
+            _CURRENT_HARNESS.reset(context_token)
+
+    return run
+
+
+def test_harness_provenance_does_not_survive_same_path_reuse(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = tmp_path / "reused-harness-root"
+
+    def fresh_root(*, prefix: str) -> str:
+        del prefix
+        root.mkdir()
+        return str(root)
+
+    monkeypatch.setattr(tempfile, "mkdtemp", fresh_root)
+    first = Architecture77HarnessAuthority.create()
+    session_id = first.create_session(_request())
+    attempt_id = first.allocate_attempt(session_id)
+    claim_id = first.commit_claim(attempt_id)
+    permit = first.reserve_launch(claim_id)
+    first.close()
+    assert not root.exists()
+
+    second = Architecture77HarnessAuthority.create()
+    try:
+        assert second.database_path == root / "authority.sqlite3"
+        before = _database_rows(second._connection)
+        with pytest.raises(TypeError, match="invalid test service provenance service"):
+            second.require_test_capability(permit)
+        assert _database_rows(second._connection) == before
+    finally:
+        second.close()
+
+
+def test_simultaneous_harness_lifetimes_have_distinct_provenance() -> None:
+    first = Architecture77HarnessAuthority.create()
+    second = Architecture77HarnessAuthority.create()
+    try:
+        assert first._service_token is not second._service_token
+        session_a = first.create_session(_request())
+        attempt_a = first.allocate_attempt(session_a)
+        claim_a = first.commit_claim(attempt_a)
+        permit_a = first.reserve_launch(claim_a)
+        session_b = second.create_session(_request())
+        attempt_b = second.allocate_attempt(session_b)
+        claim_b = second.commit_claim(attempt_b)
+        second.reserve_launch(claim_b)
+        with pytest.raises(TypeError, match="invalid test service provenance service"):
+            second.require_test_capability(permit_a)
+    finally:
+        first.close()
+        second.close()
+
+
+def test_closed_harness_rejects_bindings_and_operations_without_stale_cache() -> None:
+    harness = Architecture77HarnessAuthority.create()
+    connection = harness._connection
+    service = harness.bind_connection(connection)
+    harness.close()
+    harness.close()
+    with pytest.raises(HarnessLifecycleError, match="lifecycle is closed"):
+        service.create_session(_request())
+    with pytest.raises(HarnessLifecycleError, match="lifecycle is closed"):
+        harness.bind_connection(connection)
+
+
+def test_harness_descriptor_reopen_requires_factory_database_identity(
+    tmp_path: Path,
+) -> None:
+    harness = Architecture77HarnessAuthority.create()
+    descriptor = harness.descriptor
+    child = Architecture77HarnessAuthority.open_from_descriptor(descriptor)
+    child.close()
+    assert harness._root.exists()
+    try:
+        wrong_root = tmp_path / "wrong-root"
+        wrong_root.mkdir()
+        with pytest.raises(HarnessLifecycleError, match="escaped"):
+            Architecture77HarnessAuthority.open_from_descriptor(
+                replace(descriptor, root=str(wrong_root))
+            )
+        with pytest.raises(HarnessLifecycleError, match="escaped"):
+            Architecture77HarnessAuthority.open_from_descriptor(
+                replace(
+                    descriptor,
+                    database_path=str(harness._root / "other.sqlite3"),
+                )
+            )
+        production_path = Path(PRODUCTION_AUTHORITY_PATHS.database).resolve()
+        with pytest.raises(HarnessLifecycleError, match="production authority"):
+            Architecture77HarnessAuthority.open_from_descriptor(
+                replace(
+                    descriptor,
+                    root=str(production_path.parent),
+                    database_path=str(production_path),
+                )
+            )
+        wrong_schema_root = tmp_path / "wrong-schema-root"
+        wrong_schema_root.mkdir()
+        wrong_schema_path = wrong_schema_root / "authority.sqlite3"
+        wrong_schema_connection = _connect(wrong_schema_path)
+        _install_schema(wrong_schema_connection)
+        wrong_schema_connection.close()
+        with pytest.raises(HarnessLifecycleError, match="schema"):
+            Architecture77HarnessAuthority.open_from_descriptor(
+                Architecture77HarnessDescriptor(
+                    root=str(wrong_schema_root),
+                    database_path=str(wrong_schema_path),
+                )
+            )
+        harness._connection.execute("ATTACH DATABASE ':memory:' AS attached_test")
+        with pytest.raises(HarnessLifecycleError, match="exactly one main"):
+            harness._validate_connection(harness._connection)
+        harness._connection.execute("DETACH DATABASE attached_test")
+    finally:
+        harness.close()
+
+
+def test_lifecycle_lease_binds_one_reservation_and_invalidates_on_exit() -> None:
+    harness = Architecture77HarnessAuthority.create()
+    try:
+        session_a = harness.create_session(_request())
+        attempt_a = harness.allocate_attempt(session_a)
+        claim_a = harness.commit_claim(attempt_a)
+        reservation_a = str(harness.reserve_launch(claim_a))
+        session_b = harness.create_session(_request("2026-01-02"))
+        attempt_b = harness.allocate_attempt(session_b)
+        claim_b = harness.commit_claim(attempt_b)
+        reservation_b = str(harness.reserve_launch(claim_b))
+        lease = harness.lifecycle_lease(reservation_a)
+        before = _database_rows(harness._connection)
+        with pytest.raises(HarnessLifecycleError, match="not active"):
+            lease.record_execution(reservation_a, object())  # type: ignore[arg-type]
+        with lease:
+            with pytest.raises(ValueError, match="does not match"):
+                lease.record_execution(reservation_b, object())  # type: ignore[arg-type]
+            with pytest.raises(HarnessLifecycleError, match="re-entered"):
+                lease.__enter__()
+        with pytest.raises(HarnessLifecycleError, match="not active"):
+            lease.record_execution(reservation_a, object())  # type: ignore[arg-type]
+        assert _database_rows(harness._connection) == before
+    finally:
+        harness.close()
 
 
 def _run_spawn_race(
     db_path: Path, scenario: str, winner: str
 ) -> tuple[dict[str, tuple[str, list[str]]], str, str | None]:
+    descriptor = _descriptor_for(db_path)
     context = multiprocessing.get_context("spawn")
     setup_queue = context.Queue()
     result_queue = context.Queue()
@@ -3004,7 +3444,7 @@ def _run_spawn_race(
     boundary = context.Process(
         target=_spawn_boundary_worker,
         args=(
-            str(db_path),
+            descriptor,
             scenario,
             winner == "boundary",
             setup_queue,
@@ -3027,7 +3467,7 @@ def _run_spawn_race(
     recovery = context.Process(
         target=_spawn_recovery_worker,
         args=(
-            str(db_path),
+            descriptor,
             session_id,
             reservation_id,
             action,
@@ -3268,7 +3708,7 @@ def test_spawned_process_crash_releases_lifecycle_arbiter_without_retry(
     recovery = context.Process(
         target=_spawn_recovery_worker,
         args=(
-            str(db_path),
+            _descriptor_for(db_path),
             session_id,
             reservation_id,
             "CLASSIFY_LAUNCH_RESERVATION",
@@ -3311,7 +3751,7 @@ def test_spawned_process_rejects_reconstructed_process_local_capabilities(
     result_queue = context.Queue()
     child = context.Process(
         target=_spawn_reconstructed_capability_worker,
-        args=(str(db_path), reservation_id, result_queue),
+        args=(_descriptor_for(db_path), reservation_id, result_queue),
     )
     child.start()
     child.join(20)
@@ -3340,7 +3780,7 @@ def test_spawned_outer_transaction_rejects_before_arbiter_and_releases_writer(
     boundary = context.Process(
         target=_spawn_outer_transaction_boundary_worker,
         args=(
-            str(db_path),
+            _descriptor_for(db_path),
             setup_queue,
             result_queue,
             recovery_acquired,
@@ -3353,7 +3793,7 @@ def test_spawned_outer_transaction_rejects_before_arbiter_and_releases_writer(
     recovery = context.Process(
         target=_spawn_recovery_after_outer_transaction_worker,
         args=(
-            str(db_path),
+            _descriptor_for(db_path),
             session_id,
             reservation_id,
             result_queue,
@@ -3397,7 +3837,7 @@ def test_spawned_stored_observer_transaction_rejects_before_arbiter(
     boundary = context.Process(
         target=_spawn_stored_observer_transaction_boundary_worker,
         args=(
-            str(db_path),
+            _descriptor_for(db_path),
             setup_queue,
             result_queue,
             recovery_acquired,
@@ -3410,7 +3850,7 @@ def test_spawned_stored_observer_transaction_rejects_before_arbiter(
     recovery = context.Process(
         target=_spawn_recovery_after_outer_transaction_worker,
         args=(
-            str(db_path),
+            _descriptor_for(db_path),
             session_id,
             reservation_id,
             result_queue,
@@ -3921,34 +4361,37 @@ def test_session_creation_rejects_descriptor_drift_before_persistence(
 ) -> None:
     path = tmp_path / "descriptor-drift.sqlite3"
     connection = _connect(path)
-    _install_schema(connection)
-    _insert_metadata(
-        connection,
-        provider_id=metadata_provider_id,
-        permitted_provider_operation=metadata_operation,
-    )
-    _insert_migration(connection)
-    side_effects = FakeSideEffects(connection)
-    request = _request()
-    if request_field is not None:
-        if remove_field:
-            del request[request_field]
-        else:
-            request[request_field] = request_value
+    try:
+        _install_schema(connection)
+        _insert_metadata(
+            connection,
+            provider_id=metadata_provider_id,
+            permitted_provider_operation=metadata_operation,
+        )
+        _insert_migration(connection)
+        core = _direct_test_core(connection)
+        side_effects = FakeSideEffects(connection)
+        request = _request()
+        if request_field is not None:
+            if remove_field:
+                del request[request_field]
+            else:
+                request[request_field] = request_value
 
-    with pytest.raises(ValueError):
-        create_session(connection, request)
+        with pytest.raises(ValueError):
+            core.create_session(request)
 
-    assert connection.execute(
-        "SELECT count(*), coalesce(sum(next_attempt_ordinal), 0), "
-        "coalesce(sum(next_recovery_ordinal), 0) FROM sessions"
-    ).fetchone() == (0, 0, 0)
-    assert connection.execute("SELECT count(*) FROM attempts").fetchone() == (0,)
-    assert connection.execute(
-        "SELECT count(*) FROM provider_call_claims"
-    ).fetchone() == (0,)
-    assert side_effects.events == []
-    connection.close()
+        assert connection.execute(
+            "SELECT count(*), coalesce(sum(next_attempt_ordinal), 0), "
+            "coalesce(sum(next_recovery_ordinal), 0) FROM sessions"
+        ).fetchone() == (0, 0, 0)
+        assert connection.execute("SELECT count(*) FROM attempts").fetchone() == (0,)
+        assert connection.execute(
+            "SELECT count(*) FROM provider_call_claims"
+        ).fetchone() == (0,)
+        assert side_effects.events == []
+    finally:
+        connection.close()
 
 
 def _assert_no_capture_authority_side_effects(
@@ -4087,21 +4530,24 @@ def test_session_creation_rejects_unsupported_signed_policy_before_persistence(
 ) -> None:
     path = tmp_path / "unsupported-policy.sqlite3"
     connection = _connect(path)
-    _install_schema(connection)
-    _insert_metadata(
-        connection,
-        authority_policy_version=authority_policy_version,
-        claim_policy_version=claim_policy_version,
-    )
-    _insert_migration(connection)
-    side_effects = FakeSideEffects(connection)
+    try:
+        _install_schema(connection)
+        _insert_metadata(
+            connection,
+            authority_policy_version=authority_policy_version,
+            claim_policy_version=claim_policy_version,
+        )
+        _insert_migration(connection)
+        core = _direct_test_core(connection)
+        side_effects = FakeSideEffects(connection)
 
-    with pytest.raises(ValueError, match="policy is unsupported"):
-        create_session(connection)
+        with pytest.raises(ValueError, match="policy is unsupported"):
+            core.create_session(_request())
 
-    _assert_no_capture_authority_side_effects(connection)
-    assert side_effects.events == []
-    connection.close()
+        _assert_no_capture_authority_side_effects(connection)
+        assert side_effects.events == []
+    finally:
+        connection.close()
 
 
 @pytest.mark.parametrize("missing_field", sorted(CAPTURE_REQUEST_FIELDS))
@@ -6220,41 +6666,53 @@ def test_recovery_action_matrix_allows_documented_actions(db_path: Path) -> None
 def test_recovery_persists_explicit_operator_evidence_without_identity_binding(
     tmp_path: Path,
 ) -> None:
-    first_path = tmp_path / "recovery-evidence-first.sqlite3"
-    second_path = tmp_path / "recovery-evidence-second.sqlite3"
-    for path in (first_path, second_path):
-        connection = _connect(path)
-        _install_schema(connection)
-        _insert_metadata(connection)
-        connection.close()
-    _seed_lifecycle(first_path)
-    _seed_lifecycle(second_path)
+    del tmp_path
+    first_harness = Architecture77HarnessAuthority.create()
+    second_harness = Architecture77HarnessAuthority.create()
+    first_path = first_harness.database_path
+    second_path = second_harness.database_path
+    for harness in (first_harness, second_harness):
+        context_token = _CURRENT_HARNESS.set(harness)
+        try:
+            _seed_lifecycle(harness.database_path)
+        finally:
+            _CURRENT_HARNESS.reset(context_token)
     first_evidence, first_digest = _evidence("operator-evidence-first")
     second_evidence, second_digest = _evidence("operator-evidence-second")
 
     recovery_ids: list[str] = []
-    for path, evidence, digest in (
-        (first_path, first_evidence, first_digest),
-        (second_path, second_evidence, second_digest),
-    ):
-        connection = _connect(path)
-        session_id = connection.execute("SELECT session_id FROM sessions").fetchone()[0]
-        recovery_id = record_recovery(
-            connection,
-            session_id,
-            "SESSION",
-            session_id,
-            "CLOSE_SESSION",
-            operator_evidence_json=evidence,
-            operator_evidence_digest=digest,
-        )
-        recovery_ids.append(recovery_id)
-        assert connection.execute(
-            "SELECT operator_evidence_json, operator_evidence_digest "
-            "FROM manual_recoveries WHERE recovery_id = ?",
-            (recovery_id,),
-        ).fetchone() == (evidence, digest)
-        connection.close()
+    try:
+        for harness, path, evidence, digest in (
+            (first_harness, first_path, first_evidence, first_digest),
+            (second_harness, second_path, second_evidence, second_digest),
+        ):
+            context_token = _CURRENT_HARNESS.set(harness)
+            try:
+                connection = _connect(path)
+                session_id = connection.execute(
+                    "SELECT session_id FROM sessions"
+                ).fetchone()[0]
+                recovery_id = record_recovery(
+                    connection,
+                    session_id,
+                    "SESSION",
+                    session_id,
+                    "CLOSE_SESSION",
+                    operator_evidence_json=evidence,
+                    operator_evidence_digest=digest,
+                )
+                recovery_ids.append(recovery_id)
+                assert connection.execute(
+                    "SELECT operator_evidence_json, operator_evidence_digest "
+                    "FROM manual_recoveries WHERE recovery_id = ?",
+                    (recovery_id,),
+                ).fetchone() == (evidence, digest)
+                connection.close()
+            finally:
+                _CURRENT_HARNESS.reset(context_token)
+    finally:
+        first_harness.close()
+        second_harness.close()
 
     assert recovery_ids[0] == recovery_ids[1]
     assert first_evidence != second_evidence
@@ -6448,7 +6906,9 @@ def test_attempt_ordinals_serialize_across_connections_and_sessions(
         finally:
             connection.close()
 
-    threads = [threading.Thread(target=worker) for _ in range(2)]
+    threads = [
+        threading.Thread(target=_inherit_harness_thread(worker)) for _ in range(2)
+    ]
     for thread in threads:
         thread.start()
     for thread in threads:
@@ -7410,7 +7870,9 @@ def test_process_intent_race_grants_exactly_one_process_call(db_path: Path) -> N
             outcomes.append(outcome)
         connection.close()
 
-    threads = [threading.Thread(target=worker) for _ in range(2)]
+    threads = [
+        threading.Thread(target=_inherit_harness_thread(worker)) for _ in range(2)
+    ]
     for thread in threads:
         thread.start()
     for thread in threads:
@@ -7437,20 +7899,15 @@ def test_process_intent_race_grants_exactly_one_process_call(db_path: Path) -> N
 def test_test_capabilities_are_bound_to_issuing_harness_service(
     tmp_path: Path,
 ) -> None:
-    db_path_a = tmp_path / "service-a.sqlite3"
-    db_path_b = tmp_path / "service-b.sqlite3"
-    connection_a = _connect(db_path_a)
-    connection_b = _connect(db_path_b)
-    _install_schema(connection_a)
-    _insert_metadata(connection_a)
-    _insert_migration(connection_a)
-    _install_schema(connection_b)
-    _insert_metadata(connection_b)
-    _insert_migration(connection_b)
-    service_a = _test_service(connection_a)
-    service_b = _test_service(connection_b)
-    hooks_a = FakeSideEffects(connection_a)
-    hooks_b = FakeSideEffects(connection_b)
+    del tmp_path
+    harness_a = Architecture77HarnessAuthority.create()
+    harness_b = Architecture77HarnessAuthority.create()
+    connection_a = harness_a._connection
+    connection_b = harness_b._connection
+    service_a = harness_a.bind_connection(connection_a)
+    service_b = harness_b.bind_connection(connection_b)
+    hooks_a = FakeSideEffects(connection_a, service=service_a)
+    hooks_b = FakeSideEffects(connection_b, service=service_b)
 
     try:
         session_id = service_a.create_session(_request())
@@ -7515,8 +7972,8 @@ def test_test_capabilities_are_bound_to_issuing_harness_service(
 
         service_a.record_post_resume_evidence(execution_id, resume_result)
     finally:
-        connection_a.close()
-        connection_b.close()
+        harness_a.close()
+        harness_b.close()
 
 
 def test_reservation_race_issues_one_provider_permit_and_construction(
@@ -7547,7 +8004,9 @@ def test_reservation_race_issues_one_provider_permit_and_construction(
             outcomes.append(outcome)
         connection.close()
 
-    threads = [threading.Thread(target=worker) for _ in range(2)]
+    threads = [
+        threading.Thread(target=_inherit_harness_thread(worker)) for _ in range(2)
+    ]
     for thread in threads:
         thread.start()
     for thread in threads:
@@ -8223,8 +8682,12 @@ def test_process_dispatch_and_recovery_share_lifecycle_arbiter(
         connection.close()
 
     threads = [
-        threading.Thread(target=run_recovery, args=(winner == "recovery",)),
-        threading.Thread(target=run_dispatch, args=(winner == "dispatch",)),
+        threading.Thread(
+            target=_inherit_harness_thread(run_recovery, winner == "recovery")
+        ),
+        threading.Thread(
+            target=_inherit_harness_thread(run_dispatch, winner == "dispatch")
+        ),
     ]
     for thread in threads:
         thread.start()
@@ -8344,8 +8807,12 @@ def test_process_result_persistence_and_recovery_are_serialized(
         connection.close()
 
     threads = [
-        threading.Thread(target=run_recovery, args=(winner == "recovery",)),
-        threading.Thread(target=run_persistence, args=(winner == "persistence",)),
+        threading.Thread(
+            target=_inherit_harness_thread(run_recovery, winner == "recovery")
+        ),
+        threading.Thread(
+            target=_inherit_harness_thread(run_persistence, winner == "persistence")
+        ),
     ]
     for thread in threads:
         thread.start()
@@ -9063,8 +9530,8 @@ def test_recovery_race_with_resume_intent_has_one_valid_winner(db_path: Path) ->
         connection.close()
 
     threads = [
-        threading.Thread(target=intent_worker),
-        threading.Thread(target=recovery_worker),
+        threading.Thread(target=_inherit_harness_thread(intent_worker)),
+        threading.Thread(target=_inherit_harness_thread(recovery_worker)),
     ]
     for thread in threads:
         thread.start()
@@ -9169,8 +9636,10 @@ def test_recovery_race_with_resume_dispatch_is_serialized(
         connection.close()
 
     threads = [
-        threading.Thread(target=run_recovery, args=(winner == "recovery",)),
-        threading.Thread(target=run_hook, args=(winner == "hook",)),
+        threading.Thread(
+            target=_inherit_harness_thread(run_recovery, winner == "recovery")
+        ),
+        threading.Thread(target=_inherit_harness_thread(run_hook, winner == "hook")),
     ]
     for thread in threads:
         thread.start()
@@ -9250,6 +9719,7 @@ def test_recovery_race_with_receipt_persistence_is_serialized(
                 _require_no_active_transaction(connection)
                 with _test_service(connection).lifecycle_lease(reservation_id) as lease:
                     winner_has_lock.set()
+                    lease.bind_execution(execution_id)
                     lease.record_post_resume_evidence(execution_id, receipt)
             else:
                 winner_has_lock.wait()
@@ -9262,8 +9732,12 @@ def test_recovery_race_with_receipt_persistence_is_serialized(
         connection.close()
 
     threads = [
-        threading.Thread(target=run_recovery, args=(winner == "recovery",)),
-        threading.Thread(target=run_receipt, args=(winner == "receipt",)),
+        threading.Thread(
+            target=_inherit_harness_thread(run_recovery, winner == "recovery")
+        ),
+        threading.Thread(
+            target=_inherit_harness_thread(run_receipt, winner == "receipt")
+        ),
     ]
     for thread in threads:
         thread.start()
@@ -9388,7 +9862,9 @@ def test_resume_intent_race_grants_exactly_one_hook_authority(db_path: Path) -> 
             results.append(outcome)
         connection.close()
 
-    threads = [threading.Thread(target=worker) for _ in range(2)]
+    threads = [
+        threading.Thread(target=_inherit_harness_thread(worker)) for _ in range(2)
+    ]
     for thread in threads:
         thread.start()
     for thread in threads:
@@ -10684,12 +11160,14 @@ def test_recovery_race_produces_consecutive_ordinals(db_path: Path) -> None:
 
     threads = [
         threading.Thread(
-            target=worker,
-            args=("ATTEMPT", target_attempt, "RECORD_ATTEMPT_AMBIGUITY"),
+            target=_inherit_harness_thread(
+                worker, "ATTEMPT", target_attempt, "RECORD_ATTEMPT_AMBIGUITY"
+            )
         ),
         threading.Thread(
-            target=worker,
-            args=("SESSION", session_id, "ACKNOWLEDGE_RESTORE"),
+            target=_inherit_harness_thread(
+                worker, "SESSION", session_id, "ACKNOWLEDGE_RESTORE"
+            )
         ),
     ]
     for thread in threads:

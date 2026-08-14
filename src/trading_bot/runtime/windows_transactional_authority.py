@@ -3065,23 +3065,21 @@ def snapshot_capture_request_for_test(request: object) -> ValidatedCaptureReques
     return _snapshot_capture_request(request)
 
 
-_HARNESS_SERVICE_TOKENS: dict[str, object] = {}
-_HARNESS_SERVICE_TOKENS_LOCK = threading.Lock()
+class _TransactionalLeaseWitness:
+    """Process-local proof supplied by the reviewed test lease adapter."""
 
+    __slots__ = ("core", "service_token", "reservation_id", "active")
 
-def _harness_service_token(connection: sqlite3.Connection) -> object:
-    """Return the process-local token for one logical file-backed harness."""
-
-    database_list = connection.execute("PRAGMA database_list").fetchall()
-    if len(database_list) != 1 or database_list[0][1] != "main":
-        raise ExternalAuthorityBoundaryUnavailable(
-            "Architecture-77 harness requires one main database"
-        )
-    database_path = str(database_list[0][2])
-    if not database_path:
-        return object()
-    with _HARNESS_SERVICE_TOKENS_LOCK:
-        return _HARNESS_SERVICE_TOKENS.setdefault(database_path, object())
+    def __init__(
+        self,
+        core: TransactionalAuthorityCore,
+        service_token: object,
+        reservation_id: str,
+    ) -> None:
+        self.core = core
+        self.service_token = service_token
+        self.reservation_id = reservation_id
+        self.active = True
 
 
 class TransactionalAuthorityCore:
@@ -3112,6 +3110,7 @@ class TransactionalAuthorityCore:
         capture_request_factory: Callable[[object], ValidatedCaptureRequest]
         | None = None,
         external_adapter: TransactionalAuthorityAdapter | None = None,
+        service_token: object | None = None,
     ) -> Self:
         if type(connection) is not sqlite3.Connection:
             raise TypeError(
@@ -3130,9 +3129,46 @@ class TransactionalAuthorityCore:
                 ),
                 test_only=True,
                 external_adapter=external_adapter,
-                test_service_token=_harness_service_token(connection),
+                test_service_token=(
+                    object() if service_token is None else service_token
+                ),
             ),
         )
+
+    def create_lifecycle_lease_witness(self, reservation_id: str) -> object:
+        """Create a process-local witness for the reviewed test lease adapter."""
+
+        if not self._context.test_only or self._context.test_service_token is None:
+            raise ExternalAuthorityBoundaryUnavailable(
+                "lifecycle lease witnesses are test-only"
+            )
+        return _TransactionalLeaseWitness(
+            self, self._context.test_service_token, str(reservation_id)
+        )
+
+    def invalidate_lifecycle_lease_witness(self, witness: object) -> None:
+        if type(witness) is not _TransactionalLeaseWitness or witness.core is not self:
+            raise TypeError("lifecycle lease witness does not belong to this core")
+        witness.active = False
+
+    def _require_lifecycle_lease_witness(
+        self, witness: object, reservation_id: str | None = None
+    ) -> _TransactionalLeaseWitness:
+        if type(witness) is not _TransactionalLeaseWitness:
+            raise TypeError(
+                "already-held operation requires a reviewed lifecycle lease"
+            )
+        if (
+            witness.core is not self
+            or not witness.active
+            or witness.service_token is not self._context.test_service_token
+            or (
+                reservation_id is not None
+                and witness.reservation_id != str(reservation_id)
+            )
+        ):
+            raise ValueError("lifecycle lease witness is invalid or mismatched")
+        return witness
 
     @contextmanager
     def bind_external_effects(self) -> Iterator[None]:
@@ -3367,8 +3403,13 @@ class TransactionalAuthorityCore:
             )
 
     def commit_process_intent_while_held(
-        self, reservation_id: str, provider: ConstructedProvider
+        self,
+        reservation_id: str,
+        provider: ConstructedProvider,
+        *,
+        lease_witness: object,
     ) -> ProcessIntent:
+        self._require_lifecycle_lease_witness(lease_witness, reservation_id)
         with self._bound_context():
             if type(provider) is not ConstructedProvider:
                 raise TypeError(
@@ -3385,8 +3426,13 @@ class TransactionalAuthorityCore:
             )
 
     def record_execution_while_held(
-        self, reservation_id: str, receipt: ProcessCreationReceipt
+        self,
+        reservation_id: str,
+        receipt: ProcessCreationReceipt,
+        *,
+        lease_witness: object,
     ) -> str:
+        self._require_lifecycle_lease_witness(lease_witness, reservation_id)
         with self._bound_context():
             if type(receipt) is not ProcessCreationReceipt:
                 raise TypeError(
@@ -3401,16 +3447,26 @@ class TransactionalAuthorityCore:
             return _record_execution_locked(self._connection, reservation_id, receipt)
 
     def commit_resume_intent_while_held(
-        self, execution_id: str, reservation_id: str
+        self,
+        execution_id: str,
+        reservation_id: str,
+        *,
+        lease_witness: object,
     ) -> ResumeIntent:
+        self._require_lifecycle_lease_witness(lease_witness, reservation_id)
         with self._bound_context():
             return _commit_resume_intent_locked(
                 self._connection, execution_id, reservation_id
             )
 
     def record_process_creation_failure_while_held(
-        self, reservation_id: str, failure: ProcessCreationFailure
+        self,
+        reservation_id: str,
+        failure: ProcessCreationFailure,
+        *,
+        lease_witness: object,
     ) -> None:
+        self._require_lifecycle_lease_witness(lease_witness, reservation_id)
         with self._bound_context():
             _require_service_provenance(
                 failure,
@@ -3423,8 +3479,13 @@ class TransactionalAuthorityCore:
             )
 
     def record_post_resume_evidence_while_held(
-        self, execution_id: str, receipt: ResumeReceipt
+        self,
+        execution_id: str,
+        receipt: ResumeReceipt,
+        *,
+        lease_witness: object,
     ) -> None:
+        self._require_lifecycle_lease_witness(lease_witness)
         with self._bound_context():
             if type(receipt) is not ResumeReceipt:
                 raise TypeError("post-resume evidence requires a fake resume receipt")
@@ -3445,7 +3506,9 @@ class TransactionalAuthorityCore:
         disposition: str = "CONFIRMED",
         *,
         snapshot_digest: bytes | None,
+        lease_witness: object,
     ) -> str:
+        self._require_lifecycle_lease_witness(lease_witness, reservation_id)
         with self._bound_context():
             return _record_terminal_locked(
                 self._connection,
@@ -3465,7 +3528,14 @@ class TransactionalAuthorityCore:
         *,
         operator_evidence_json: bytes,
         operator_evidence_digest: bytes,
+        lease_witness: object,
     ) -> str:
+        witness = self._require_lifecycle_lease_witness(lease_witness)
+        if (
+            target_kind == "LAUNCH_RESERVATION"
+            and str(target_id) != witness.reservation_id
+        ):
+            raise ValueError("recovery target is outside the held reservation")
         with self._bound_context():
             return _record_recovery_locked(
                 self._connection,
@@ -3476,12 +3546,6 @@ class TransactionalAuthorityCore:
                 ordinal,
                 operator_evidence_json=operator_evidence_json,
                 operator_evidence_digest=operator_evidence_digest,
-            )
-
-    def insert_selection_in_transaction(self, session_id: str, terminal_id: str) -> str:
-        with self._bound_context():
-            return _insert_selection_in_transaction(
-                self._connection, session_id, terminal_id
             )
 
     def target_state(self, target_kind: str, target_id: str) -> str:

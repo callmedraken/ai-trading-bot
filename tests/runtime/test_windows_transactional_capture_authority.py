@@ -4844,9 +4844,6 @@ def _prepare_owned_insert_parent(
     context["reservation_id"] = reserve_launch(connection, context["claim_id"])
     if table == "manual_recoveries":
         return context
-    context["process_intent"] = _construct_provider_and_commit_process_intent(
-        connection, context["reservation_id"]
-    )
     context["execution_id"] = _record_successful_process(
         connection, context["reservation_id"]
     )

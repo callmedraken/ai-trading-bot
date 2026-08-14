@@ -157,28 +157,42 @@ def _capability_is_registered(capability: object) -> bool:
 def _consume_capability_for_test(capability: object) -> None:
     if not _capability_is_registered(capability):
         return
+    harness = _CURRENT_HARNESS.get()
+    if harness is None:
+        raise HarnessLifecycleError(
+            "capability consumer requires an active Architecture-77 harness"
+        )
+    core = harness._core
     if type(capability) is FakeProviderConstructionPermit:
         _consume_provider_construction_permit(
-            capability, _registered_provider_reservation_id(capability)
+            capability,
+            _registered_provider_reservation_id(capability),
+            core=core,
         )
     elif type(capability) is FakeConstructedProvider:
         _consume_constructed_provider(
-            capability, _registered_constructed_provider_reservation_id(capability)
+            capability,
+            _registered_constructed_provider_reservation_id(capability),
+            core=core,
         )
     elif type(capability) is FakeProcessIntent:
         _consume_process_intent(
-            capability, _registered_process_intent_reservation_id(capability)
+            capability,
+            _registered_process_intent_reservation_id(capability),
+            core=core,
         )
     elif type(capability) in {FakeProcessCreationReceipt, FakeProcessCreationFailure}:
         _consume_process_result(
-            capability, _registered_process_result_reservation_id(capability)
+            capability,
+            _registered_process_result_reservation_id(capability),
+            core=core,
         )
     elif type(capability) is FakeResumeIntent:
         execution_id, reservation_id = _registered_resume_intent_binding(capability)
-        _consume_resume_intent(capability, execution_id, reservation_id)
+        _consume_resume_intent(capability, execution_id, reservation_id, core=core)
     elif type(capability) is FakeResumeReceipt:
         execution_id, reservation_id = _registered_resume_result_binding(capability)
-        _consume_resume_result(capability, execution_id, reservation_id)
+        _consume_resume_result(capability, execution_id, reservation_id, core=core)
 
 
 def _assert_capability_available(capability: object) -> None:
@@ -2599,7 +2613,9 @@ class FakeSideEffects:
             or row[24] != 1
         ):
             raise ValueError("provider construction lineage evidence is invalid")
-        _consume_provider_construction_permit(capability, reservation_id)
+        _consume_provider_construction_permit(
+            capability, reservation_id, core=self._bound_service._core
+        )
 
         assert not self.observer.in_transaction
         self._emit("provider-constructed")
@@ -2663,7 +2679,9 @@ class FakeSideEffects:
             or process_intent.intent_digest != _digest(expected_intent)
         ):
             raise ValueError("CreateProcessW intent does not match durable authority")
-        _consume_process_intent(process_intent, reservation_id)
+        _consume_process_intent(
+            process_intent, reservation_id, core=self._bound_service._core
+        )
 
         self._emit("process-intent-committed")
         assert not self.observer.in_transaction
@@ -2768,7 +2786,12 @@ class FakeSideEffects:
             or resume_intent.intent_digest != _digest(expected_intent)
         ):
             raise ValueError("ResumeThread intent is not canonical")
-        _consume_resume_intent(resume_intent, execution_id, reservation_id)
+        _consume_resume_intent(
+            resume_intent,
+            execution_id,
+            reservation_id,
+            core=self._bound_service._core,
+        )
 
         self._emit("resume-intent-committed")
         assert not self.observer.in_transaction
@@ -2887,6 +2910,125 @@ def _prepare_lease_recovery_lineage_case(
         session_a, reservation_a, target_a = build_lineage("2026-01-01")
         _, _, target_b = build_lineage("2026-01-02")
     return session_a, reservation_a, target_a, target_b, action
+
+
+def _prepare_test_consumer_capability(
+    harness: Architecture77HarnessAuthority, family: str
+) -> tuple[object, str, str | None]:
+    with _bind_harness(harness):
+        connection = harness._connection
+        if family in {"provider", "process_intent", "resume_intent"}:
+            session_id = create_session(connection, _request())
+            attempt_id = allocate_attempt(connection, session_id)
+            claim_id = commit_claim(connection, attempt_id)
+            permit = reserve_launch(connection, claim_id)
+            reservation_id = str(permit)
+        else:
+            permit = None
+            reservation_id = "consumer-reservation"
+
+        if family == "provider":
+            return permit, reservation_id, None
+        if family == "constructed":
+            with harness.bind_external_effects():
+                return _issue_constructed_provider(reservation_id), reservation_id, None
+        if family == "process_intent":
+            assert type(permit) is FakeProviderConstructionPermit
+            return (
+                _construct_provider_and_commit_process_intent(connection, permit),
+                reservation_id,
+                None,
+            )
+        if family == "process_result":
+            with harness.bind_external_effects():
+                return (
+                    _issue_process_creation_receipt(
+                        reservation_id,
+                        b"intent-digest",
+                        b"process",
+                        _digest(b"process"),
+                        b"job",
+                        _digest(b"job"),
+                        b"resume",
+                        _digest(b"resume"),
+                    ),
+                    reservation_id,
+                    None,
+                )
+        if family == "resume_intent":
+            assert type(permit) is FakeProviderConstructionPermit
+            execution_id = _record_successful_process(connection, permit)
+            return (
+                commit_resume_intent(connection, execution_id, reservation_id),
+                reservation_id,
+                execution_id,
+            )
+        if family == "resume_result":
+            with harness.bind_external_effects():
+                return (
+                    _issue_resume_receipt(
+                        "consumer-execution",
+                        reservation_id,
+                        b"resume-intent-digest",
+                        b"resumed",
+                        _digest(b"resumed"),
+                    ),
+                    reservation_id,
+                    "consumer-execution",
+                )
+    raise AssertionError(f"unsupported capability family: {family}")
+
+
+def _consume_test_consumer_capability(
+    family: str,
+    capability: object,
+    reservation_id: str,
+    execution_id: str | None,
+    *,
+    core: TransactionalAuthorityCore,
+) -> None:
+    if family == "provider":
+        _consume_provider_construction_permit(
+            capability,
+            reservation_id,
+            core=core,  # type: ignore[arg-type]
+        )
+    elif family == "constructed":
+        _consume_constructed_provider(
+            capability,
+            reservation_id,
+            core=core,  # type: ignore[arg-type]
+        )
+    elif family == "process_intent":
+        _consume_process_intent(
+            capability,
+            reservation_id,
+            core=core,  # type: ignore[arg-type]
+        )
+    elif family == "process_result":
+        _consume_process_result(
+            capability,
+            reservation_id,
+            core=core,  # type: ignore[arg-type]
+        )
+    elif family == "resume_intent":
+        assert execution_id is not None
+        _consume_resume_intent(
+            capability,
+            execution_id,
+            reservation_id,
+            core=core,  # type: ignore[arg-type]
+        )
+    elif family == "resume_result":
+        assert execution_id is not None
+        _consume_resume_result(
+            capability,
+            execution_id,
+            reservation_id,
+            core=core,  # type: ignore[arg-type]
+        )
+    else:
+        raise AssertionError(f"unsupported capability family: {family}")
 
 
 def _record_definitive_process_failure(
@@ -3509,6 +3651,57 @@ def test_valid_harness_core_binding_runs_the_shared_state_machine() -> None:
         assert isinstance(session_id, str)
     finally:
         harness.close()
+
+
+@pytest.mark.parametrize(
+    "family",
+    [
+        "provider",
+        "constructed",
+        "process_intent",
+        "process_result",
+        "resume_intent",
+        "resume_result",
+    ],
+)
+def test_public_test_consumers_require_matching_test_service_provenance(
+    family: str,
+) -> None:
+    owner = Architecture77HarnessAuthority.create()
+    other = Architecture77HarnessAuthority.create()
+    try:
+        capability, reservation_id, execution_id = _prepare_test_consumer_capability(
+            owner, family
+        )
+        with pytest.raises(TypeError, match="invalid test service provenance service"):
+            _consume_test_consumer_capability(
+                family,
+                capability,
+                reservation_id,
+                execution_id,
+                core=other._core,
+            )
+        assert _capability_is_registered(capability)
+        with pytest.raises(TypeError, match="unsupported transactional capability"):
+            _consume_test_consumer_capability(
+                family,
+                object(),
+                reservation_id,
+                execution_id,
+                core=owner._core,
+            )
+        assert _capability_is_registered(capability)
+        _consume_test_consumer_capability(
+            family,
+            capability,
+            reservation_id,
+            execution_id,
+            core=owner._core,
+        )
+        assert not _capability_is_registered(capability)
+    finally:
+        owner.close()
+        other.close()
 
 
 def test_closed_connection_does_not_close_harness_lifecycle() -> None:

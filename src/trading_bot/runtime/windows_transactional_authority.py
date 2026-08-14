@@ -4371,9 +4371,23 @@ def registered_provider_reservation_id_for_test(
     return _registered_provider_reservation_id(capability)
 
 
-def consume_provider_construction_permit_for_test(
-    capability: ProviderConstructionPermit, reservation_id: str
+def _require_test_consumer_core(
+    core: TransactionalAuthorityCore, capability: object
 ) -> None:
+    if type(core) is not TransactionalAuthorityCore or not core._context.test_only:
+        raise ExternalAuthorityBoundaryUnavailable(
+            "test capability consumer requires an explicit test service"
+        )
+    core.require_test_capability(capability)
+
+
+def consume_provider_construction_permit_for_test(
+    capability: ProviderConstructionPermit,
+    reservation_id: str,
+    *,
+    core: TransactionalAuthorityCore,
+) -> None:
+    _require_test_consumer_core(core, capability)
     return _consume_provider_construction_permit(capability, reservation_id)
 
 
@@ -4384,8 +4398,12 @@ def registered_constructed_provider_reservation_id_for_test(
 
 
 def consume_constructed_provider_for_test(
-    provider: ConstructedProvider, reservation_id: str
+    provider: ConstructedProvider,
+    reservation_id: str,
+    *,
+    core: TransactionalAuthorityCore,
 ) -> None:
+    _require_test_consumer_core(core, provider)
     return _consume_constructed_provider(provider, reservation_id)
 
 
@@ -4393,7 +4411,13 @@ def registered_process_intent_reservation_id_for_test(intent: ProcessIntent) -> 
     return _registered_process_intent_reservation_id(intent)
 
 
-def consume_process_intent_for_test(intent: ProcessIntent, reservation_id: str) -> None:
+def consume_process_intent_for_test(
+    intent: ProcessIntent,
+    reservation_id: str,
+    *,
+    core: TransactionalAuthorityCore,
+) -> None:
+    _require_test_consumer_core(core, intent)
     return _consume_process_intent(intent, reservation_id)
 
 
@@ -4404,8 +4428,12 @@ def registered_process_result_reservation_id_for_test(
 
 
 def consume_process_result_for_test(
-    result: ProcessCreationReceipt | ProcessCreationFailure, reservation_id: str
+    result: ProcessCreationReceipt | ProcessCreationFailure,
+    reservation_id: str,
+    *,
+    core: TransactionalAuthorityCore,
 ) -> None:
+    _require_test_consumer_core(core, result)
     return _consume_process_result(result, reservation_id)
 
 
@@ -4414,8 +4442,13 @@ def registered_resume_intent_binding_for_test(intent: ResumeIntent) -> tuple[str
 
 
 def consume_resume_intent_for_test(
-    intent: ResumeIntent, execution_id: str, reservation_id: str
+    intent: ResumeIntent,
+    execution_id: str,
+    reservation_id: str,
+    *,
+    core: TransactionalAuthorityCore,
 ) -> None:
+    _require_test_consumer_core(core, intent)
     return _consume_resume_intent(intent, execution_id, reservation_id)
 
 
@@ -4426,8 +4459,13 @@ def registered_resume_result_binding_for_test(
 
 
 def consume_resume_result_for_test(
-    result: ResumeReceipt, execution_id: str, reservation_id: str
+    result: ResumeReceipt,
+    execution_id: str,
+    reservation_id: str,
+    *,
+    core: TransactionalAuthorityCore,
 ) -> None:
+    _require_test_consumer_core(core, result)
     return _consume_resume_result(result, execution_id, reservation_id)
 
 

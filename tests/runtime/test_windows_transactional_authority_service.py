@@ -37,9 +37,13 @@ from trading_bot.runtime.windows_transactional_authority import (
     DisposableAuthorityDatabaseForTest,
     ExternalAuthorityBoundaryUnavailable,
     ProviderConstructionPermit,
+    TransactionalAuthorityCore,
     WindowsTransactionalAuthority,
     consume_constructed_provider_for_test,
+    consume_process_intent_for_test,
     consume_process_result_for_test,
+    consume_provider_construction_permit_for_test,
+    consume_resume_intent_for_test,
     consume_resume_result_for_test,
     issue_constructed_provider_for_test,
     issue_process_creation_failure_for_test,
@@ -175,6 +179,19 @@ def _test_authority() -> ValidatedProductionAuthority:
         bootstrap_digest=bootstrap.digest,
         production_evidence=_production_evidence(),
     )
+
+
+def _test_consumer_core() -> tuple[
+    WindowsTransactionalAuthority, TransactionalAuthorityCore
+]:
+    database = open_disposable_authority_database_for_test(":memory:")
+    service = WindowsTransactionalAuthority.for_test(
+        database=database,
+        lifecycle_arbiter_factory=lambda reservation_id: GlobalLifecycleMutex(
+            "machine", "epoch", reservation_id
+        ),
+    )
+    return service, service._core_for_operation()
 
 
 def test_production_constructor_requires_genuine_capability() -> None:
@@ -389,6 +406,21 @@ def test_test_factory_has_no_production_authority_or_raw_connection_argument() -
     assert "database" in parameters
 
 
+def test_test_consumers_require_an_explicit_test_core() -> None:
+    consumers = (
+        consume_provider_construction_permit_for_test,
+        consume_constructed_provider_for_test,
+        consume_process_intent_for_test,
+        consume_process_result_for_test,
+        consume_resume_intent_for_test,
+        consume_resume_result_for_test,
+    )
+    for consumer in consumers:
+        parameter = signature(consumer).parameters["core"]
+        assert parameter.kind is parameter.KEYWORD_ONLY
+        assert parameter.default is parameter.empty
+
+
 def test_production_module_has_no_raw_connection_mutator_surface() -> None:
     import trading_bot.runtime.windows_transactional_authority as production
 
@@ -461,35 +493,37 @@ def test_production_rejects_test_external_effect_provenance_before_database_muta
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     service = WindowsTransactionalAuthority(_production_validation(monkeypatch))
+    consumer_service, consumer_core = _test_consumer_core()
     open_calls: list[tuple[object, ...]] = []
     monkeypatch.setattr(
         "trading_bot.runtime.windows_transactional_authority.open_writable_authority_sqlite_connection",
         lambda *args, **kwargs: open_calls.append((args, kwargs)),
     )
-    provider = issue_constructed_provider_for_test("reservation")
-    process_receipt = issue_process_creation_receipt_for_test(
-        "reservation",
-        b"intent",
-        b"process",
-        b"process-digest",
-        b"job",
-        b"job-digest",
-        b"resume",
-        b"resume-digest",
-    )
-    process_failure = issue_process_creation_failure_for_test(
-        "reservation",
-        b"intent",
-        b"failure",
-        b"failure-digest",
-    )
-    resume_receipt = issue_resume_receipt_for_test(
-        "execution",
-        "reservation",
-        b"resume-intent",
-        b"resumed",
-        b"resumed-digest",
-    )
+    with consumer_core.bind_external_effects():
+        provider = issue_constructed_provider_for_test("reservation")
+        process_receipt = issue_process_creation_receipt_for_test(
+            "reservation",
+            b"intent",
+            b"process",
+            b"process-digest",
+            b"job",
+            b"job-digest",
+            b"resume",
+            b"resume-digest",
+        )
+        process_failure = issue_process_creation_failure_for_test(
+            "reservation",
+            b"intent",
+            b"failure",
+            b"failure-digest",
+        )
+        resume_receipt = issue_resume_receipt_for_test(
+            "execution",
+            "reservation",
+            b"resume-intent",
+            b"resumed",
+            b"resumed-digest",
+        )
     try:
         with pytest.raises(ExternalAuthorityBoundaryUnavailable, match="provenance"):
             service.commit_process_intent("reservation", provider)
@@ -501,10 +535,20 @@ def test_production_rejects_test_external_effect_provenance_before_database_muta
             service.record_post_resume_evidence("execution", resume_receipt)
         assert open_calls == []
     finally:
-        consume_constructed_provider_for_test(provider, "reservation")
-        consume_process_result_for_test(process_receipt, "reservation")
-        consume_process_result_for_test(process_failure, "reservation")
-        consume_resume_result_for_test(resume_receipt, "execution", "reservation")
+        consume_constructed_provider_for_test(
+            provider, "reservation", core=consumer_core
+        )
+        consume_process_result_for_test(
+            process_receipt, "reservation", core=consumer_core
+        )
+        consume_process_result_for_test(
+            process_failure, "reservation", core=consumer_core
+        )
+        consume_resume_result_for_test(
+            resume_receipt, "execution", "reservation", core=consumer_core
+        )
+        consumer_service.close()
+        service.close()
 
 
 def test_production_lifecycle_factory_uses_reviewed_global_mutex(
@@ -550,11 +594,15 @@ def test_production_lifecycle_factory_uses_reviewed_global_mutex(
     )
     execute_schema_artifact(connection)
     service = WindowsTransactionalAuthority(authority)
-    provider = issue_constructed_provider_for_test("durable-reservation")
+    consumer_service, consumer_core = _test_consumer_core()
+    with consumer_core.bind_external_effects():
+        provider = issue_constructed_provider_for_test("durable-reservation")
     try:
         with pytest.raises(ExternalAuthorityBoundaryUnavailable, match="provenance"):
             service.commit_process_intent("durable-reservation", provider)
-        consume_constructed_provider_for_test(provider, "durable-reservation")
+        consume_constructed_provider_for_test(
+            provider, "durable-reservation", core=consumer_core
+        )
 
         with pytest.raises(ValueError, match="unknown recovery session"):
             service.record_recovery(
@@ -577,9 +625,12 @@ def test_production_lifecycle_factory_uses_reviewed_global_mutex(
         ]
     finally:
         try:
-            consume_constructed_provider_for_test(provider, "durable-reservation")
+            consume_constructed_provider_for_test(
+                provider, "durable-reservation", core=consumer_core
+            )
         except ValueError:
             pass
+        consumer_service.close()
         service.close()
         connection.close()
 

@@ -1674,10 +1674,6 @@ class Architecture77HarnessAuthority:
     def _require_open(self) -> None:
         if self._owner._closed:
             raise HarnessLifecycleError("Architecture-77 harness lifecycle is closed")
-        try:
-            self._connection.execute("SELECT 1")
-        except sqlite3.ProgrammingError as exc:
-            raise HarnessLifecycleError("harness connection is closed") from exc
 
     def _register_connection(self, connection: sqlite3.Connection) -> None:
         self._require_open()
@@ -3345,6 +3341,17 @@ def test_closed_harness_rejects_bindings_and_operations_without_stale_cache() ->
         service.create_session(_request())
     with pytest.raises(HarnessLifecycleError, match="lifecycle is closed"):
         harness.bind_connection(connection)
+
+
+def test_closed_connection_does_not_close_harness_lifecycle() -> None:
+    harness = Architecture77HarnessAuthority.create()
+    try:
+        harness._connection.close()
+        replacement = harness.open_connection()
+        service = harness.bind_connection(replacement)
+        assert service.create_session(_request())
+    finally:
+        harness.close()
 
 
 def test_harness_descriptor_reopen_requires_factory_database_identity(

@@ -45,6 +45,7 @@ from trading_bot.runtime.windows_transactional_authority import (
 )
 from trading_bot.runtime.windows_transactional_authority import (
     DisposableAuthorityDatabaseForTest,
+    ExternalAuthorityBoundaryUnavailable,
     TransactionalAuthorityCore,
     TransactionalAuthorityCoreBinding,
     ValidatedCaptureRequest,
@@ -1594,7 +1595,12 @@ class Architecture77HarnessAuthority:
             self._connections: dict[int, sqlite3.Connection] = {}
             self._bindings: list[TransactionalAuthorityCoreBinding] = []
         self._register_connection(connection)
-        self._core_binding = TransactionalAuthorityCoreBinding.issue_for_harness(self)
+        self._core_binding_issuer = (
+            TransactionalAuthorityCoreBinding.create_harness_issuer(self)
+        )
+        self._core_binding = TransactionalAuthorityCoreBinding.issue_for_harness(
+            self._core_binding_issuer
+        )
         self._owner._bindings.append(self._core_binding)
         self._core = TransactionalAuthorityCore.from_harness_binding(self._core_binding)
 
@@ -1688,6 +1694,7 @@ class Architecture77HarnessAuthority:
 
     def _issue_transactional_core_binding(
         self,
+        issuer: object,
     ) -> tuple[
         sqlite3.Connection,
         Callable[[str], AbstractContextManager[object]],
@@ -1698,6 +1705,10 @@ class Architecture77HarnessAuthority:
         """Return reviewed components to the supported core binding issuer."""
 
         self._require_open()
+        if issuer is not self._core_binding_issuer:
+            raise TypeError(
+                "harness core binding issuer is not owned by this lifecycle"
+            )
         self._validate_connection(self._connection)
         return (
             self._connection,
@@ -1796,14 +1807,12 @@ class Architecture77HarnessAuthority:
         with self._core.bind_external_effects():
             yield
 
-    def _acquire_lifecycle_lease(
-        self, reservation_id: str
-    ) -> tuple[AbstractContextManager[object], object]:
+    def _acquire_lifecycle_lease(self, reservation_id: str) -> object:
         self._require_open()
         return self._core_binding.acquire_lifecycle_lease(self._core, reservation_id)
 
-    def _invalidate_lease_witness(self, witness: object) -> None:
-        self._core.invalidate_lifecycle_lease_witness(witness)
+    def _release_lifecycle_lease(self, lease: object, *args: object) -> None:
+        self._core_binding.release_lifecycle_lease(lease, *args)
 
     def _core_for_use(self) -> TransactionalAuthorityCore:
         self._require_open()
@@ -1932,19 +1941,16 @@ class TestLifecycleLease:
         authority._require_open()
         self._authority = authority
         self._reservation_id = str(reservation_id)
-        self._arbiter: Any = None
-        self._witness: object | None = None
+        self._core_lease: object | None = None
         self._entered = False
         self._exited = False
         self._execution_ids: set[str] = set()
 
     def _require_active(self) -> object:
         self._authority._require_open()
-        if not self._entered or self._exited or self._arbiter is None:
+        if not self._entered or self._exited or self._core_lease is None:
             raise HarnessLifecycleError("lifecycle lease is not active")
-        if self._witness is None:
-            raise HarnessLifecycleError("lifecycle lease has no core witness")
-        return self._witness
+        return self._core_lease
 
     def _require_reservation(self, reservation_id: str) -> object:
         witness = self._require_active()
@@ -1959,28 +1965,24 @@ class TestLifecycleLease:
             raise HarnessLifecycleError("lifecycle lease cannot be re-entered")
         self._authority._require_open()
         try:
-            self._arbiter, self._witness = self._authority._acquire_lifecycle_lease(
+            self._core_lease = self._authority._acquire_lifecycle_lease(
                 self._reservation_id
             )
             self._entered = True
             return self
         except BaseException:
-            self._arbiter = None
-            self._witness = None
+            self._core_lease = None
             raise
 
     def __exit__(self, *args: object) -> None:
-        if self._arbiter is None:
+        if self._core_lease is None:
+            if self._exited:
+                raise HarnessLifecycleError("lifecycle lease was already exited")
             return None
-        witness = self._witness
-        self._witness = None
+        lease = self._core_lease
+        self._core_lease = None
         self._exited = True
-        try:
-            if witness is not None:
-                self._authority._invalidate_lease_witness(witness)
-        finally:
-            self._arbiter.__exit__(*args)
-            self._arbiter = None
+        self._authority._release_lifecycle_lease(lease, *args)
 
     def bind_execution(self, execution_id: str) -> None:
         witness = self._require_active()
@@ -2068,11 +2070,6 @@ class TestLifecycleLease:
         operator_evidence_digest: bytes,
     ) -> str:
         witness = self._require_active()
-        if (
-            target_kind != "LAUNCH_RESERVATION"
-            or str(target_id) != self._reservation_id
-        ):
-            raise ValueError("recovery target is outside the held reservation")
         return self._authority._core_for_use().record_recovery_while_held(
             session_id,
             target_kind,
@@ -2850,6 +2847,48 @@ def _prepare_lease_resume_case(
     return session_id, str(reservation_id), execution_id, receipt
 
 
+def _prepare_lease_recovery_lineage_case(
+    harness: Architecture77HarnessAuthority, target_kind: str
+) -> tuple[str, str, str, str, str]:
+    action = {
+        "SESSION": "CLOSE_SESSION",
+        "ATTEMPT": "RECORD_ATTEMPT_AMBIGUITY",
+        "CLAIM": "RECORD_CLAIM_AMBIGUITY",
+        "LAUNCH_RESERVATION": "CLASSIFY_LAUNCH_RESERVATION",
+        "TERMINAL": "SELECT_COMMITTED_SUCCESS",
+    }[target_kind]
+
+    def build_lineage(target_date: str) -> tuple[str, str, str]:
+        session_id = create_session(harness._connection, _request(target_date))
+        attempt_id = allocate_attempt(harness._connection, session_id)
+        claim_id = commit_claim(harness._connection, attempt_id)
+        reservation_permit = reserve_launch(harness._connection, claim_id)
+        reservation_id = str(reservation_permit)
+        target_id = {
+            "SESSION": session_id,
+            "ATTEMPT": attempt_id,
+            "CLAIM": claim_id,
+            "LAUNCH_RESERVATION": reservation_id,
+        }.get(target_kind)
+        if target_kind in {"ATTEMPT", "CLAIM", "TERMINAL"}:
+            execution_id = _record_successful_process(
+                harness._connection, reservation_permit
+            )
+            _resume_and_persist(harness._connection, execution_id, reservation_id)
+            if target_kind == "TERMINAL":
+                target_id = record_terminal(
+                    harness._connection,
+                    reservation_id,
+                    snapshot_digest=TEST_SNAPSHOT_DIGEST,
+                )
+        return session_id, reservation_id, target_id
+
+    with _bind_harness(harness):
+        session_a, reservation_a, target_a = build_lineage("2026-01-01")
+        _, _, target_b = build_lineage("2026-01-02")
+    return session_a, reservation_a, target_a, target_b, action
+
+
 def _record_definitive_process_failure(
     connection: sqlite3.Connection, reservation_id: str
 ) -> None:
@@ -3557,6 +3596,8 @@ def test_lifecycle_lease_binds_one_reservation_and_invalidates_on_exit() -> None
                 lease.__enter__()
         with pytest.raises(HarnessLifecycleError, match="not active"):
             lease.record_execution(reservation_a, object())  # type: ignore[arg-type]
+        with pytest.raises(HarnessLifecycleError, match="already exited"):
+            lease.__exit__(None, None, None)
         assert _database_rows(harness._connection) == before
     finally:
         harness.close()
@@ -3597,12 +3638,12 @@ def test_lifecycle_lease_binds_execution_to_its_reservation() -> None:
         with harness.lifecycle_lease(reservation_a) as lease:
             with pytest.raises(ValueError, match="does not belong"):
                 lease.bind_execution(execution_b)
-            assert lease._witness is not None
+            assert lease._core_lease is not None
             with pytest.raises(ValueError, match="held reservation"):
                 harness._core.record_post_resume_evidence_while_held(
                     execution_b,
                     receipt_b,
-                    lease_witness=lease._witness,
+                    lease_witness=lease._core_lease,
                 )
             lease.bind_execution(execution_a)
 
@@ -3637,6 +3678,57 @@ def test_lifecycle_lease_accepts_same_reservation_post_resume_receipt() -> None:
         harness.close()
 
 
+def test_lifecycle_lease_invalidates_before_release_and_reacquisition() -> None:
+    harness = Architecture77HarnessAuthority.create()
+    try:
+        session_id = harness.create_session(_request())
+        attempt_id = harness.allocate_attempt(session_id)
+        claim_id = harness.commit_claim(attempt_id)
+        reservation_id = str(harness.reserve_launch(claim_id))
+        lease = harness.lifecycle_lease(reservation_id)
+        with lease:
+            core_lease = lease._core_lease
+            assert core_lease is not None
+            arbiter = core_lease._arbiter
+            observed: list[bool] = []
+
+            class ArbiterExitProbe:
+                def __exit__(self, *args: object) -> None:
+                    observed.append(core_lease._witness.active)
+                    arbiter.__exit__(*args)
+
+            core_lease._arbiter = ArbiterExitProbe()
+        assert observed == [False]
+        with pytest.raises(ExternalAuthorityBoundaryUnavailable, match="closed"):
+            harness._core.record_post_resume_evidence_while_held(
+                "missing-execution", object(), lease_witness=core_lease
+            )
+        with harness.lifecycle_lease(reservation_id):
+            with pytest.raises(ExternalAuthorityBoundaryUnavailable, match="closed"):
+                harness._core.record_post_resume_evidence_while_held(
+                    "missing-execution", object(), lease_witness=core_lease
+                )
+    finally:
+        harness.close()
+
+
+def test_harness_close_invalidates_outstanding_lifecycle_lease() -> None:
+    harness = Architecture77HarnessAuthority.create()
+    session_id = harness.create_session(_request())
+    attempt_id = harness.allocate_attempt(session_id)
+    claim_id = harness.commit_claim(attempt_id)
+    reservation_id = str(harness.reserve_launch(claim_id))
+    lease = harness.lifecycle_lease(reservation_id)
+    lease.__enter__()
+    core_lease = lease._core_lease
+    assert core_lease is not None
+    harness.close()
+    with pytest.raises(HarnessLifecycleError, match="closed"):
+        harness._core.record_post_resume_evidence_while_held(
+            "missing-execution", object(), lease_witness=core_lease
+        )
+
+
 def test_lifecycle_witness_lifetime_and_cross_harness_binding() -> None:
     first = Architecture77HarnessAuthority.create()
     second = Architecture77HarnessAuthority.create()
@@ -3653,21 +3745,72 @@ def test_lifecycle_witness_lifetime_and_cross_harness_binding() -> None:
                 execution_a, receipt_a, lease_witness=None
             )
         with lease:
-            witness = lease._witness
-            assert witness is not None
+            core_lease = lease._core_lease
+            assert core_lease is not None
             with pytest.raises(ValueError, match="invalid or mismatched"):
                 second._core.record_post_resume_evidence_while_held(
-                    execution_b, receipt_b, lease_witness=witness
+                    execution_b, receipt_b, lease_witness=core_lease
                 )
-        with pytest.raises(ValueError, match="invalid or mismatched"):
+        with pytest.raises(ExternalAuthorityBoundaryUnavailable, match="closed"):
             first._core.record_post_resume_evidence_while_held(
-                execution_a, receipt_a, lease_witness=witness
+                execution_a, receipt_a, lease_witness=core_lease
             )
         _assert_capability_available(receipt_a)
         _assert_capability_available(receipt_b)
     finally:
         first.close()
         second.close()
+
+
+@pytest.mark.parametrize(
+    "target_kind",
+    [
+        "SESSION",
+        "ATTEMPT",
+        "CLAIM",
+        "LAUNCH_RESERVATION",
+        "TERMINAL",
+    ],
+)
+def test_lifecycle_recovery_rejects_target_outside_held_reservation(
+    target_kind: str,
+) -> None:
+    harness = Architecture77HarnessAuthority.create()
+    try:
+        session_id, reservation_id, target_a, target_b, action = (
+            _prepare_lease_recovery_lineage_case(harness, target_kind)
+        )
+        before = _database_rows(harness._connection)
+        with harness.lifecycle_lease(reservation_id) as lease:
+            with pytest.raises(ValueError, match="outside the held reservation"):
+                lease.record_recovery(
+                    session_id,
+                    target_kind,
+                    target_b,
+                    action,
+                    operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+                    operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
+                )
+            assert _database_rows(harness._connection) == before
+            retry_kind, retry_id, retry_action = (
+                ("LAUNCH_RESERVATION", reservation_id, "CLASSIFY_LAUNCH_RESERVATION")
+                if target_kind == "SESSION"
+                else (target_kind, target_a, action)
+            )
+            recovery_id = lease.record_recovery(
+                session_id,
+                retry_kind,
+                retry_id,
+                retry_action,
+                operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+                operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
+            )
+        assert harness._connection.execute(
+            "SELECT recovery_id FROM manual_recoveries WHERE recovery_id = ?",
+            (recovery_id,),
+        ).fetchone() == (recovery_id,)
+    finally:
+        harness.close()
 
 
 def _run_spawn_race(

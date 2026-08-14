@@ -3087,7 +3087,116 @@ class _TransactionalLeaseWitness:
         self.active = True
 
 
+class _TransactionalLease:
+    """Encapsulate one held arbiter and its invalidated-on-exit witness."""
+
+    __slots__ = (
+        "_arbiter",
+        "_binding",
+        "_lifecycle_error",
+        "_witness",
+        "active",
+    )
+
+    def __init__(
+        self,
+        binding: TransactionalAuthorityCoreBinding,
+        arbiter: AbstractContextManager[object],
+        witness: _TransactionalLeaseWitness,
+    ) -> None:
+        self._arbiter = arbiter
+        self._binding = binding
+        self._lifecycle_error: BaseException | None = None
+        self._witness = witness
+        self.active = True
+
+    def _require_active_witness(self) -> _TransactionalLeaseWitness:
+        if not self.active:
+            if self._lifecycle_error is not None:
+                raise self._lifecycle_error
+            raise ExternalAuthorityBoundaryUnavailable(
+                "transactional lifecycle lease is closed"
+            )
+        return self._witness
+
+    def __enter__(self) -> Self:
+        self._require_active_witness()
+        return self
+
+    def __exit__(self, *args: object) -> None:
+        if not self.active:
+            if self._lifecycle_error is not None:
+                raise self._lifecycle_error
+            raise ExternalAuthorityBoundaryUnavailable(
+                "transactional lifecycle lease was already released"
+            )
+        self.active = False
+        self._witness.active = False
+        try:
+            self._arbiter.__exit__(*args)
+        finally:
+            self._binding._active_leases.discard(self)
+
+    def invalidate_for_harness_close(self, error: BaseException) -> None:
+        if not self.active:
+            return
+        self.active = False
+        self._witness.active = False
+        self._lifecycle_error = error
+        try:
+            self._arbiter.__exit__(None, None, None)
+        finally:
+            self._binding._active_leases.discard(self)
+
+    def __reduce__(self) -> object:
+        raise TypeError("transactional lifecycle leases cannot be serialized")
+
+
 _CORE_BINDING_CONSTRUCTOR = object()
+_HARNESS_BINDING_ISSUER_CONSTRUCTOR = object()
+
+
+class _HarnessCoreBindingIssuer:
+    """Non-subclassable, one-shot issuer owned by one harness lifetime."""
+
+    __slots__ = ("_consumed", "_harness", "_provenance")
+
+    def __init_subclass__(cls, **kwargs: object) -> None:
+        del kwargs
+        raise TypeError("harness core binding issuers cannot be subclassed")
+
+    def __new__(cls, *args: object) -> Self:
+        if args or cls is not _HarnessCoreBindingIssuer:
+            raise TypeError("harness core binding issuer requires its factory")
+        return super().__new__(cls)
+
+    def __init__(self, *args: object) -> None:
+        del args
+        raise TypeError("harness core binding issuer requires its factory")
+
+    @classmethod
+    def _create(cls, harness: object) -> Self:
+        issuer = object.__new__(cls)
+        issuer._consumed = False
+        issuer._harness = harness
+        issuer._provenance = _HARNESS_BINDING_ISSUER_CONSTRUCTOR
+        return issuer
+
+    def _components(self) -> tuple[object, ...]:
+        if (
+            self._provenance is not _HARNESS_BINDING_ISSUER_CONSTRUCTOR
+            or self._consumed
+        ):
+            raise TypeError("harness core binding issuer is unavailable")
+        issuer = getattr(self._harness, "_issue_transactional_core_binding", None)
+        if not callable(issuer):
+            raise TypeError("harness core binding issuer requires its lifecycle")
+        components = issuer(self)
+        self._consumed = True
+        return components
+
+    def __reduce__(self) -> object:
+        raise TypeError("harness core binding issuers cannot be serialized")
 
 
 class TransactionalAuthorityCoreBinding:
@@ -3103,6 +3212,7 @@ class TransactionalAuthorityCoreBinding:
         "_capture_request_factory",
         "_connection",
         "_external_adapter",
+        "_active_leases",
         "_lifecycle_arbiter_factory",
         "_lifecycle_error",
         "_issuance_provenance",
@@ -3129,19 +3239,28 @@ class TransactionalAuthorityCoreBinding:
         raise TypeError("transactional authority core binding requires its issuer")
 
     @classmethod
-    def issue_for_harness(cls, harness: object) -> Self:
+    def create_harness_issuer(cls, harness: object) -> object:
+        if cls is not TransactionalAuthorityCoreBinding:
+            raise TypeError(
+                "transactional authority core bindings cannot be subclassed"
+            )
+        return _HarnessCoreBindingIssuer._create(harness)
+
+    @classmethod
+    def issue_for_harness(cls, issuer: object) -> Self:
         """Issue one binding from a validated Architecture-77 harness issuer.
 
-        The harness supplies components only through its named issuance path;
-        callers cannot select a connection, path, arbiter, or token through
-        this API.  The storage contract is checked again here before the
-        binding becomes runnable.
+        Only the exact one-shot issuer created for one harness lifecycle can
+        reach the lifecycle component provider. The storage contract is
+        checked again before the binding becomes runnable.
         """
 
-        issuer = getattr(harness, "_issue_transactional_core_binding", None)
-        if not callable(issuer):
-            raise TypeError("transactional core binding requires the reviewed harness")
-        components = issuer()
+        if (
+            type(issuer) is not _HarnessCoreBindingIssuer
+            or issuer._provenance is not _HARNESS_BINDING_ISSUER_CONSTRUCTOR
+        ):
+            raise TypeError("transactional core binding requires the reviewed issuer")
+        components = issuer._components()
         if type(components) is not tuple or len(components) != 5:
             raise TypeError(
                 "transactional core binding issuer returned invalid material"
@@ -3206,6 +3325,7 @@ class TransactionalAuthorityCoreBinding:
             )
         binding = object.__new__(cls)
         binding._active = True
+        binding._active_leases = set()
         binding._connection = connection
         binding._lifecycle_arbiter_factory = lifecycle_arbiter_factory
         binding._capture_request_factory = capture_request_factory
@@ -3245,7 +3365,7 @@ class TransactionalAuthorityCoreBinding:
         self,
         core: TransactionalAuthorityCore,
         reservation_id: str,
-    ) -> tuple[AbstractContextManager[object], object]:
+    ) -> _TransactionalLease:
         """Acquire the reviewed arbiter before issuing a lease witness."""
 
         self._require_active()
@@ -3265,11 +3385,28 @@ class TransactionalAuthorityCoreBinding:
         except BaseException:
             arbiter.__exit__(None, None, None)
             raise
-        return arbiter, witness
+        lease = _TransactionalLease(self, arbiter, witness)
+        self._active_leases.add(lease)
+        return lease
+
+    def release_lifecycle_lease(self, lease: object, *args: object) -> None:
+        if type(lease) is not _TransactionalLease or lease._binding is not self:
+            raise TypeError("lifecycle lease does not belong to this core binding")
+        lease.__exit__(*args)
 
     def invalidate_for_harness_close(self, error: BaseException | None = None) -> None:
         self._active = False
         self._lifecycle_error = error
+        close_error = (
+            error
+            if error is not None
+            else ExternalAuthorityBoundaryUnavailable(
+                "transactional core binding lifecycle is closed"
+            )
+        )
+        for lease in tuple(self._active_leases):
+            lease.invalidate_for_harness_close(close_error)
+        self._active_leases.clear()
 
     def __reduce__(self) -> object:
         raise TypeError("transactional core bindings cannot be serialized")
@@ -3360,30 +3497,25 @@ class TransactionalAuthorityCore:
         if self._harness_binding is not None:
             self._harness_binding._require_active()
 
-    def invalidate_lifecycle_lease_witness(self, witness: object) -> None:
-        if type(witness) is not _TransactionalLeaseWitness or witness.core is not self:
-            raise TypeError("lifecycle lease witness does not belong to this core")
-        witness.active = False
-
     def _require_lifecycle_lease_witness(
         self, witness: object, reservation_id: str | None = None
     ) -> _TransactionalLeaseWitness:
         self._require_binding_active()
-        if type(witness) is not _TransactionalLeaseWitness:
+        if type(witness) is not _TransactionalLease:
             raise TypeError(
                 "already-held operation requires a reviewed lifecycle lease"
             )
+        lease_witness = witness._require_active_witness()
         if (
-            witness.core is not self
-            or not witness.active
-            or witness.service_token is not self._context.test_service_token
+            lease_witness.core is not self
+            or lease_witness.service_token is not self._context.test_service_token
             or (
                 reservation_id is not None
-                and witness.reservation_id != str(reservation_id)
+                and lease_witness.reservation_id != str(reservation_id)
             )
         ):
             raise ValueError("lifecycle lease witness is invalid or mismatched")
-        return witness
+        return lease_witness
 
     def require_execution_binding_while_held(
         self,
@@ -3772,11 +3904,12 @@ class TransactionalAuthorityCore:
         lease_witness: object,
     ) -> str:
         witness = self._require_lifecycle_lease_witness(lease_witness)
-        if (
-            target_kind == "LAUNCH_RESERVATION"
-            and str(target_id) != witness.reservation_id
-        ):
-            raise ValueError("recovery target is outside the held reservation")
+        self._require_recovery_target_reservation(
+            session_id,
+            target_kind,
+            target_id,
+            witness.reservation_id,
+        )
         with self._bound_context():
             return _record_recovery_locked(
                 self._connection,
@@ -3788,6 +3921,89 @@ class TransactionalAuthorityCore:
                 operator_evidence_json=operator_evidence_json,
                 operator_evidence_digest=operator_evidence_digest,
             )
+
+    def _require_recovery_target_reservation(
+        self,
+        session_id: str,
+        target_kind: str,
+        target_id: str,
+        reservation_id: str,
+    ) -> None:
+        target_id = str(target_id)
+        reservation_id = str(reservation_id)
+        queries = {
+            "SESSION": (
+                """
+                SELECT r.launch_reservation_id
+                FROM sessions s
+                JOIN attempts a ON a.session_id = s.session_id
+                JOIN provider_call_claims c ON c.attempt_id = a.attempt_id
+                JOIN launch_reservations r ON r.claim_id = c.claim_id
+                WHERE s.session_id = ? AND s.session_id = ?
+                  AND r.launch_reservation_id = ?
+                """,
+                (target_id, str(session_id), reservation_id),
+            ),
+            "ATTEMPT": (
+                """
+                SELECT r.launch_reservation_id
+                FROM attempts a
+                JOIN sessions s ON s.session_id = a.session_id
+                JOIN provider_call_claims c ON c.attempt_id = a.attempt_id
+                JOIN launch_reservations r ON r.claim_id = c.claim_id
+                WHERE a.attempt_id = ? AND s.session_id = ?
+                  AND r.launch_reservation_id = ?
+                """,
+                (target_id, str(session_id), reservation_id),
+            ),
+            "CLAIM": (
+                """
+                SELECT r.launch_reservation_id
+                FROM provider_call_claims c
+                JOIN attempts a ON a.attempt_id = c.attempt_id
+                JOIN sessions s ON s.session_id = a.session_id
+                JOIN launch_reservations r ON r.claim_id = c.claim_id
+                WHERE c.claim_id = ? AND s.session_id = ?
+                  AND r.launch_reservation_id = ?
+                """,
+                (target_id, str(session_id), reservation_id),
+            ),
+            "LAUNCH_RESERVATION": (
+                """
+                SELECT r.launch_reservation_id
+                FROM launch_reservations r
+                JOIN provider_call_claims c ON c.claim_id = r.claim_id
+                JOIN attempts a ON a.attempt_id = c.attempt_id
+                JOIN sessions s ON s.session_id = a.session_id
+                WHERE r.launch_reservation_id = ? AND s.session_id = ?
+                  AND r.launch_reservation_id = ?
+                """,
+                (target_id, str(session_id), reservation_id),
+            ),
+            "TERMINAL": (
+                """
+                SELECT r.launch_reservation_id
+                FROM terminals t
+                JOIN launch_reservations r
+                  ON r.launch_reservation_id = t.launch_reservation_id
+                JOIN provider_call_claims c ON c.claim_id = r.claim_id
+                JOIN attempts a ON a.attempt_id = c.attempt_id
+                JOIN sessions s ON s.session_id = a.session_id
+                WHERE t.terminal_id = ? AND s.session_id = ?
+                  AND r.launch_reservation_id = ?
+                """,
+                (target_id, str(session_id), reservation_id),
+            ),
+        }
+        query = queries.get(target_kind)
+        if query is None:
+            raise ValueError(
+                "recovery target kind cannot be bound to the held reservation"
+            )
+        with self._bound_context():
+            row = self._connection.execute(*query).fetchone()
+        if row is None:
+            raise ValueError("recovery target is outside the held reservation")
 
     def target_state(self, target_kind: str, target_id: str) -> str:
         with self._bound_context():

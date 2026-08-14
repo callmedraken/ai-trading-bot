@@ -4839,14 +4839,14 @@ def _prepare_owned_insert_parent(
     context["claim_id"] = commit_claim(connection, context["attempt_id"])
     if table == "launch_reservations":
         return context
+    if table == "launch_executions":
+        return context
     context["reservation_id"] = reserve_launch(connection, context["claim_id"])
     if table == "manual_recoveries":
         return context
-    if table == "launch_executions":
-        context["process_intent"] = _construct_provider_and_commit_process_intent(
-            connection, context["reservation_id"]
-        )
-        return context
+    context["process_intent"] = _construct_provider_and_commit_process_intent(
+        connection, context["reservation_id"]
+    )
     context["execution_id"] = _record_successful_process(
         connection, context["reservation_id"]
     )
@@ -4874,9 +4874,13 @@ def _create_owned_insert_candidate(
     elif table == "launch_reservations":
         reserve_launch(connection, context["claim_id"])
     elif table == "launch_executions":
-        receipt = FakeSideEffects(connection).create_process(context["process_intent"])
+        reservation_id = reserve_launch(connection, context["claim_id"])
+        process_intent = _construct_provider_and_commit_process_intent(
+            connection, reservation_id
+        )
+        receipt = FakeSideEffects(connection).create_process(process_intent)
         assert type(receipt) is FakeProcessCreationReceipt
-        record_execution(connection, context["reservation_id"], receipt)
+        record_execution(connection, reservation_id, receipt)
     elif table == "terminals":
         record_terminal(connection, context["reservation_id"])
     elif table == "session_selections":

@@ -16,7 +16,7 @@ import tempfile
 import threading
 import uuid
 from collections.abc import Callable, Iterator
-from contextlib import contextmanager
+from contextlib import AbstractContextManager, contextmanager
 from dataclasses import FrozenInstanceError, dataclass, replace
 from pathlib import Path
 from typing import Any
@@ -46,6 +46,7 @@ from trading_bot.runtime.windows_transactional_authority import (
 from trading_bot.runtime.windows_transactional_authority import (
     DisposableAuthorityDatabaseForTest,
     TransactionalAuthorityCore,
+    TransactionalAuthorityCoreBinding,
     ValidatedCaptureRequest,
 )
 from trading_bot.runtime.windows_transactional_authority import (
@@ -1548,9 +1549,52 @@ class HarnessLifecycleError(RuntimeError):
 
 
 _HARNESS_CONSTRUCTOR_TOKEN = object()
+_HARNESS_CORE_BINDING_CONSTRUCTOR_TOKEN = object()
 _CURRENT_HARNESS: contextvars.ContextVar[Any] = contextvars.ContextVar(
     "architecture77_harness", default=None
 )
+
+
+class Architecture77HarnessCoreBinding(TransactionalAuthorityCoreBinding):
+    """Opaque binding issued only after harness connection validation."""
+
+    def __init__(
+        self,
+        authority: Architecture77HarnessAuthority,
+        connection: sqlite3.Connection,
+        capture_request_factory: Callable[[object], ValidatedCaptureRequest] | None,
+        *,
+        _construction_token: object,
+    ) -> None:
+        if _construction_token is not _HARNESS_CORE_BINDING_CONSTRUCTOR_TOKEN:
+            raise TypeError("harness core bindings require the reviewed issuer")
+        self._authority = authority
+        self._connection = connection
+        self._capture_request_factory = capture_request_factory
+
+    def require_active(self) -> None:
+        self._authority._require_open()
+        owner = self._authority._owner
+        if owner._connections.get(id(self._connection)) is not self._connection:
+            raise HarnessLifecycleError("harness core binding is not registered")
+
+    def core_binding_components(
+        self,
+    ) -> tuple[
+        sqlite3.Connection,
+        Callable[[str], AbstractContextManager[object]],
+        Callable[[object], ValidatedCaptureRequest] | None,
+        None,
+        object,
+    ]:
+        self.require_active()
+        return (
+            self._connection,
+            _current_lifecycle_arbiter,
+            self._capture_request_factory,
+            None,
+            self._authority._owner._service_token,
+        )
 
 
 class Architecture77HarnessAuthority:
@@ -1587,16 +1631,18 @@ class Architecture77HarnessAuthority:
         self._owner = self if _owner is None else _owner
         self._service_token = object() if _service_token is None else _service_token
         self._cleanup_root = _cleanup_root if _owner is None else False
+        self._capture_request_factory = capture_request_factory
         self._closed = False
         if _owner is None:
             self._connections: dict[int, sqlite3.Connection] = {}
         self._register_connection(connection)
-        self._core = TransactionalAuthorityCore.for_harness(
+        self._core_binding = Architecture77HarnessCoreBinding(
+            self,
             connection,
-            lifecycle_arbiter_factory=_current_lifecycle_arbiter,
-            capture_request_factory=capture_request_factory,
-            service_token=self._service_token,
+            capture_request_factory,
+            _construction_token=_HARNESS_CORE_BINDING_CONSTRUCTOR_TOKEN,
         )
+        self._core = TransactionalAuthorityCore.from_harness_binding(self._core_binding)
 
     @classmethod
     def create(cls) -> Architecture77HarnessAuthority:
@@ -3256,14 +3302,6 @@ def _descriptor_for(db_path: Path) -> Architecture77HarnessDescriptor:
     return harness.descriptor
 
 
-def _direct_test_core(connection: sqlite3.Connection) -> TransactionalAuthorityCore:
-    return TransactionalAuthorityCore.for_harness(
-        connection,
-        lifecycle_arbiter_factory=_current_lifecycle_arbiter,
-        service_token=object(),
-    )
-
-
 def _inherit_harness_thread(
     target: Callable[..., Any], *args: Any
 ) -> Callable[[], Any]:
@@ -3279,6 +3317,27 @@ def _inherit_harness_thread(
             _CURRENT_HARNESS.reset(context_token)
 
     return run
+
+
+@contextmanager
+def _bind_harness(harness: Architecture77HarnessAuthority) -> Iterator[None]:
+    context_token = _CURRENT_HARNESS.set(harness)
+    try:
+        yield
+    finally:
+        _CURRENT_HARNESS.reset(context_token)
+
+
+def _seed_harness_metadata(
+    harness: Architecture77HarnessAuthority, **metadata: Any
+) -> None:
+    seed = sqlite3.connect(":memory:", isolation_level=None)
+    try:
+        _install_schema(seed)
+        _insert_metadata(seed, **metadata)
+        seed.backup(harness._connection)
+    finally:
+        seed.close()
 
 
 def test_harness_provenance_does_not_survive_same_path_reuse(
@@ -3341,6 +3400,32 @@ def test_closed_harness_rejects_bindings_and_operations_without_stale_cache() ->
         service.create_session(_request())
     with pytest.raises(HarnessLifecycleError, match="lifecycle is closed"):
         harness.bind_connection(connection)
+    with pytest.raises(HarnessLifecycleError, match="lifecycle is closed"):
+        harness._core.create_session(_request())
+    with pytest.raises(HarnessLifecycleError, match="lifecycle is closed"):
+        TransactionalAuthorityCore.from_harness_binding(harness._core_binding)
+
+
+def test_raw_connection_cannot_create_a_transactional_core() -> None:
+    harness = Architecture77HarnessAuthority.create()
+    try:
+        before = _database_rows(harness._connection)
+        with pytest.raises(TypeError, match="reviewed harness binding"):
+            TransactionalAuthorityCore.from_harness_binding(harness._connection)
+        with pytest.raises(TypeError, match="reviewed storage binding"):
+            TransactionalAuthorityCore(harness._connection)
+        assert _database_rows(harness._connection) == before
+    finally:
+        harness.close()
+
+
+def test_valid_harness_core_binding_runs_the_shared_state_machine() -> None:
+    harness = Architecture77HarnessAuthority.create()
+    try:
+        session_id = harness._core.create_session(_request())
+        assert isinstance(session_id, str)
+    finally:
+        harness.close()
 
 
 def test_closed_connection_does_not_close_harness_lifecycle() -> None:
@@ -4359,24 +4444,21 @@ def test_lifecycle_transaction_guard_requires_exact_sqlite_connection() -> None:
     ],
 )
 def test_session_creation_rejects_descriptor_drift_before_persistence(
-    tmp_path: Path,
     request_field: str | None,
     request_value: object,
     remove_field: bool,
     metadata_provider_id: str,
     metadata_operation: str,
 ) -> None:
-    path = tmp_path / "descriptor-drift.sqlite3"
-    connection = _connect(path)
+    harness = Architecture77HarnessAuthority.create()
+    connection = harness._connection
     try:
-        _install_schema(connection)
-        _insert_metadata(
-            connection,
+        _seed_harness_metadata(
+            harness,
             provider_id=metadata_provider_id,
             permitted_provider_operation=metadata_operation,
         )
-        _insert_migration(connection)
-        core = _direct_test_core(connection)
+        core = harness._core
         side_effects = FakeSideEffects(connection)
         request = _request()
         if request_field is not None:
@@ -4398,7 +4480,7 @@ def test_session_creation_rejects_descriptor_drift_before_persistence(
         ).fetchone() == (0,)
         assert side_effects.events == []
     finally:
-        connection.close()
+        harness.close()
 
 
 def _assert_no_capture_authority_side_effects(
@@ -4531,21 +4613,18 @@ def test_symbol_normalization_equivalence_is_detected_as_duplicate() -> None:
     ids=["unsupported-authority-policy", "unsupported-claim-policy"],
 )
 def test_session_creation_rejects_unsupported_signed_policy_before_persistence(
-    tmp_path: Path,
     authority_policy_version: str,
     claim_policy_version: str,
 ) -> None:
-    path = tmp_path / "unsupported-policy.sqlite3"
-    connection = _connect(path)
+    harness = Architecture77HarnessAuthority.create()
+    connection = harness._connection
     try:
-        _install_schema(connection)
-        _insert_metadata(
-            connection,
+        _seed_harness_metadata(
+            harness,
             authority_policy_version=authority_policy_version,
             claim_policy_version=claim_policy_version,
         )
-        _insert_migration(connection)
-        core = _direct_test_core(connection)
+        core = harness._core
         side_effects = FakeSideEffects(connection)
 
         with pytest.raises(ValueError, match="policy is unsupported"):
@@ -4554,7 +4633,7 @@ def test_session_creation_rejects_unsupported_signed_policy_before_persistence(
         _assert_no_capture_authority_side_effects(connection)
         assert side_effects.events == []
     finally:
-        connection.close()
+        harness.close()
 
 
 @pytest.mark.parametrize("missing_field", sorted(CAPTURE_REQUEST_FIELDS))
@@ -5454,35 +5533,48 @@ def _database_rows(connection: sqlite3.Connection) -> dict[str, list[tuple[Any, 
 )
 @pytest.mark.parametrize("invalid_part", ["bytes", "digest"])
 def test_every_owned_insert_pair_rejects_python_mismatch_before_mutation(
-    tmp_path: Path,
     owned_pair: tuple[str, str, str],
     invalid_part: str,
 ) -> None:
     table, blob_column, digest_column = owned_pair
-    base = _connect(tmp_path / "owned-pair-base.sqlite3")
-    _install_schema(base)
-    context = _prepare_owned_insert_parent(base, table)
+    base_harness = Architecture77HarnessAuthority.create()
+    candidate_harness = Architecture77HarnessAuthority.create()
+    try:
+        base = base_harness._connection
+        candidate = candidate_harness._connection
+        schema_seed = sqlite3.connect(":memory:", isolation_level=None)
+        try:
+            _install_schema(schema_seed)
+            schema_seed.backup(base)
+        finally:
+            schema_seed.close()
+        with _bind_harness(base_harness):
+            context = _prepare_owned_insert_parent(base, table)
+        base.backup(candidate)
+        if table != "authority_metadata":
+            candidate_harness._validate_connection(candidate)
+        with _bind_harness(candidate_harness):
+            _create_owned_insert_candidate(candidate, table, context)
+        columns = [row[1] for row in candidate.execute(f"PRAGMA table_info({table})")]
+        values = list(candidate.execute(f"SELECT * FROM {table}").fetchone())
 
-    candidate = _connect(tmp_path / "owned-pair-candidate.sqlite3")
-    base.backup(candidate)
-    _create_owned_insert_candidate(candidate, table, context)
-    columns = [row[1] for row in candidate.execute(f"PRAGMA table_info({table})")]
-    values = list(candidate.execute(f"SELECT * FROM {table}").fetchone())
-    candidate.close()
-
-    if invalid_part == "bytes":
-        values[columns.index(blob_column)] += b" "
-    else:
-        values[columns.index(digest_column)] = _digest(b"wrong-owned-pair-digest")
-    before = _database_rows(base)
-    with pytest.raises(SchemaValidationError, match="does not match evidence bytes"):
-        _require_evidence_pair(
-            values[columns.index(blob_column)],
-            values[columns.index(digest_column)],
-            field=f"{table}.{blob_column}",
-        )
-    assert _database_rows(base) == before
-    base.close()
+        if invalid_part == "bytes":
+            values[columns.index(blob_column)] += b" "
+        else:
+            values[columns.index(digest_column)] = _digest(b"wrong-owned-pair-digest")
+        before = _database_rows(base)
+        with pytest.raises(
+            SchemaValidationError, match="does not match evidence bytes"
+        ):
+            _require_evidence_pair(
+                values[columns.index(blob_column)],
+                values[columns.index(digest_column)],
+                field=f"{table}.{blob_column}",
+            )
+        assert _database_rows(base) == before
+    finally:
+        candidate_harness.close()
+        base_harness.close()
 
 
 @pytest.mark.parametrize("copied_pair", ["attempt-request", "claim-request"])
@@ -12339,10 +12431,17 @@ def test_harness_imports_only_the_supported_transactional_core() -> None:
         if isinstance(node, ast.ImportFrom)
         and node.module == "trading_bot.runtime.windows_transactional_authority"
         for alias in node.names
-        if alias.name == "TransactionalAuthorityCore"
+        if alias.name
+        in {
+            "TransactionalAuthorityCore",
+            "TransactionalAuthorityCoreBinding",
+        }
     ]
     assert private_imports == []
-    assert supported_imports == ["TransactionalAuthorityCore"]
+    assert supported_imports == [
+        "TransactionalAuthorityCore",
+        "TransactionalAuthorityCoreBinding",
+    ]
 
 
 @pytest.mark.parametrize(

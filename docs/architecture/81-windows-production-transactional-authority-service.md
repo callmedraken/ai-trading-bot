@@ -53,24 +53,30 @@ configuration, reopens and validates the database through the descriptor, and
 creates a fresh process-local lifecycle and token. Descriptor equality therefore
 does not imply shared provenance. The harness checks root placement, one main
 database with no attachments, fixed production-path exclusion, schema identity,
-and descriptor/database agreement before binding the file connection directly
-to the supported shared `TransactionalAuthorityCore` implementation API. The
-core accepts the exact reviewed connection supplied by its binding, but it is
-not executable production authority. The harness is test correctness/isolation
+and descriptor/database agreement before issuing an opaque process-local
+harness core binding. The binding carries the exact reviewed connection,
+lifecycle provenance, and reviewed arbiter configuration to the supported
+shared `TransactionalAuthorityCore` implementation API. The core accepts a
+validated binding, not an arbitrary connection plus caller arbiter; no
+`for_harness(connection, ...)` construction route exists. The binding is not
+executable production authority. The harness is test correctness/isolation
 infrastructure, not test protection against a hostile same-user filesystem
 process and not production executable authority. It never passes its path,
 connection, descriptor, token, or capabilities to a production facade. Direct
 SQL/schema fixtures remain test-owned raw SQLite infrastructure.
 
 The anonymous service, file-backed harness, and production facade execute the
-same `TransactionalAuthorityCore` state-machine implementation. Production
-storage remains selected only by the genuine `ValidatedProductionAuthority`
-and its fixed approved VFS/storage binding. Consequently test arbiters,
+same `TransactionalAuthorityCore` state-machine implementation. The core is a
+supported shared implementation API, but storage binding is mandatory:
+production obtains its binding only inside `WindowsTransactionalAuthority`,
+and file-backed test storage obtains its binding only from the validated
+`Architecture77HarnessAuthority` lifecycle. Production storage remains
+selected only by the genuine `ValidatedProductionAuthority` and its fixed
+approved VFS/storage binding. Consequently test arbiters,
 adapters, test-issued capabilities or receipts, harness paths, and harness
 descriptors cannot operate production storage through a production API. The
-core is intentionally supported as an implementation interface, but is not a
-proof of production authority and is not broadly re-exported by package
-convenience modules.
+core is not a proof of production authority and is not broadly re-exported by
+package convenience modules.
 
 ## Fixed database binding
 

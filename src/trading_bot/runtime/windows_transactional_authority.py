@@ -3082,62 +3082,111 @@ class _TransactionalLeaseWitness:
         self.active = True
 
 
-class TransactionalAuthorityCore:
-    """Supported shared transactional state-machine implementation.
+class TransactionalAuthorityCoreBinding:
+    """Supported opaque binding contract for non-production core users."""
 
-    This implementation API accepts the exact SQLite connection supplied by a
-    reviewed binding.  It is not an executable production-authority boundary;
-    production storage remains selected and validated by
-    ``WindowsTransactionalAuthority``.
-    """
-
-    def __init__(
+    def core_binding_components(
         self,
-        connection: sqlite3.Connection,
-        context: _ServiceContext,
-    ) -> None:
-        if type(connection) is not sqlite3.Connection:
-            raise TypeError("transactional core requires an exact sqlite3.Connection")
-        self._connection = connection
-        self._context = context
+    ) -> tuple[
+        sqlite3.Connection,
+        Callable[[str], AbstractContextManager[object]],
+        Callable[[object], ValidatedCaptureRequest] | None,
+        TransactionalAuthorityAdapter | None,
+        object,
+    ]:
+        raise TypeError("transactional authority core binding is not issuable")
+
+    def require_active(self) -> None:
+        raise TypeError("transactional authority core binding is not active")
+
+
+_CORE_CONSTRUCTOR = object()
+
+
+@dataclass(frozen=True, slots=True)
+class _CoreConstruction:
+    connection: sqlite3.Connection
+    context: _ServiceContext
+    harness_binding: TransactionalAuthorityCoreBinding | None
+    constructor: object
+
+
+class TransactionalAuthorityCore:
+    """Supported shared transactional state-machine implementation."""
+
+    def __init__(self, construction: _CoreConstruction) -> None:
+        if (
+            type(construction) is not _CoreConstruction
+            or construction.constructor is not _CORE_CONSTRUCTOR
+        ):
+            raise TypeError("transactional core requires a reviewed storage binding")
+        self._connection = construction.connection
+        self._context = construction.context
+        self._harness_binding = construction.harness_binding
 
     @classmethod
-    def for_harness(
+    def from_harness_binding(
         cls,
-        connection: sqlite3.Connection,
-        *,
-        lifecycle_arbiter_factory: Callable[[str], AbstractContextManager[object]],
-        capture_request_factory: Callable[[object], ValidatedCaptureRequest]
-        | None = None,
-        external_adapter: TransactionalAuthorityAdapter | None = None,
-        service_token: object | None = None,
+        binding: TransactionalAuthorityCoreBinding,
     ) -> Self:
-        if type(connection) is not sqlite3.Connection:
-            raise TypeError(
-                "Architecture-77 harness requires an exact sqlite3.Connection"
-            )
-        return cls(
+        if not isinstance(binding, TransactionalAuthorityCoreBinding):
+            raise TypeError("transactional core requires a reviewed harness binding")
+        binding.require_active()
+        (
             connection,
-            _ServiceContext(
-                authority=None,
-                lifecycle_arbiter_factory=lifecycle_arbiter_factory,
-                timestamp_provider=lambda fallback: fallback,
-                capture_request_provider=(
-                    _snapshot_capture_request
-                    if capture_request_factory is None
-                    else capture_request_factory
+            lifecycle_arbiter_factory,
+            capture_request_factory,
+            external_adapter,
+            service_token,
+        ) = binding.core_binding_components()
+        if type(connection) is not sqlite3.Connection:
+            raise TypeError("transactional core requires an exact sqlite3.Connection")
+        if service_token is None:
+            raise TypeError("transactional core requires harness provenance")
+        return cls(
+            _CoreConstruction(
+                connection=connection,
+                context=_ServiceContext(
+                    authority=None,
+                    lifecycle_arbiter_factory=lifecycle_arbiter_factory,
+                    timestamp_provider=lambda fallback: fallback,
+                    capture_request_provider=(
+                        _snapshot_capture_request
+                        if capture_request_factory is None
+                        else capture_request_factory
+                    ),
+                    test_only=True,
+                    external_adapter=external_adapter,
+                    test_service_token=service_token,
                 ),
-                test_only=True,
-                external_adapter=external_adapter,
-                test_service_token=(
-                    object() if service_token is None else service_token
-                ),
+                harness_binding=binding,
+                constructor=_CORE_CONSTRUCTOR,
             ),
         )
+
+    @classmethod
+    def _from_context(
+        cls, connection: sqlite3.Connection, context: _ServiceContext
+    ) -> Self:
+        if type(connection) is not sqlite3.Connection:
+            raise TypeError("transactional core requires an exact sqlite3.Connection")
+        return cls(
+            _CoreConstruction(
+                connection=connection,
+                context=context,
+                harness_binding=None,
+                constructor=_CORE_CONSTRUCTOR,
+            )
+        )
+
+    def _require_binding_active(self) -> None:
+        if self._harness_binding is not None:
+            self._harness_binding.require_active()
 
     def create_lifecycle_lease_witness(self, reservation_id: str) -> object:
         """Create a process-local witness for the reviewed test lease adapter."""
 
+        self._require_binding_active()
         if not self._context.test_only or self._context.test_service_token is None:
             raise ExternalAuthorityBoundaryUnavailable(
                 "lifecycle lease witnesses are test-only"
@@ -3179,6 +3228,7 @@ class TransactionalAuthorityCore:
 
     @contextmanager
     def _bound_context(self) -> Iterator[None]:
+        self._require_binding_active()
         token = _CURRENT_SERVICE_CONTEXT.set(self._context)
         try:
             yield
@@ -3686,7 +3736,7 @@ class WindowsTransactionalAuthority:
                 "transactional authority has no database connection"
             )
         if self._core is None:
-            self._core = TransactionalAuthorityCore(
+            self._core = TransactionalAuthorityCore._from_context(
                 self._connection,
                 self._context,
             )

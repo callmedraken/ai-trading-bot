@@ -2906,6 +2906,7 @@ def _core_record_recovery(
     operator_evidence_digest: bytes,
 ) -> str:
     _require_service_context()
+    _require_no_active_transaction(connection)
     _require_evidence_pair(
         operator_evidence_json,
         operator_evidence_digest,
@@ -2916,7 +2917,6 @@ def _core_record_recovery(
     )
     target_id = str(target_id)
     if target_kind == "LAUNCH_RESERVATION" and action.startswith("CLASSIFY_"):
-        _require_no_active_transaction(connection)
         with _lifecycle_arbiter(target_id):
             return _record_recovery_locked(
                 connection,
@@ -3590,8 +3590,7 @@ class TransactionalAuthorityCore:
         with self._bound_context():
             if ordinal is not None:
                 _canonical_ordinal(ordinal, "recovery ordinal")
-            if target_kind == "LAUNCH_RESERVATION" and action.startswith("CLASSIFY_"):
-                _require_no_active_transaction(self._connection)
+            _require_no_active_transaction(self._connection)
             return _core_record_recovery(
                 self._connection,
                 session_id,

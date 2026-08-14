@@ -1907,6 +1907,7 @@ class Architecture77HarnessAuthority:
         self._require_open()
         if ordinal is not None:
             _canonical_ordinal(ordinal, "recovery ordinal")
+        _require_no_active_transaction(self._connection)
         return self._core.record_recovery(
             session_id,
             target_kind,
@@ -4230,6 +4231,90 @@ def test_arbiter_sqlite_boundaries_reject_active_caller_transaction_before_lock(
     if capability is not None:
         _assert_capability_consumed(capability)
     assert _database_rows(connection) != before
+    connection.close()
+
+
+@pytest.mark.parametrize(
+    "transaction_entry",
+    ["BEGIN IMMEDIATE", "SAVEPOINT caller_work"],
+    ids=["begin-immediate", "savepoint"],
+)
+@pytest.mark.parametrize("action", list(_RECOVERY_ACTIONS))
+def test_every_recovery_action_rejects_active_transaction_before_dispatch(
+    db_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    action: str,
+    transaction_entry: str,
+) -> None:
+    connection = _connect(db_path)
+    session_id, target_kind, target_id, _, _ = _prepare_recovery_chronology_case(
+        connection, action
+    )
+    service = _test_service(connection)
+    before = _database_rows(connection)
+    arbiter_attempts: list[str] = []
+
+    class ArbiterProbe:
+        def __init__(self, reservation_id: str) -> None:
+            arbiter_attempts.append(str(reservation_id))
+
+        def __enter__(self) -> ArbiterProbe:
+            raise AssertionError("active recovery reached arbiter acquisition")
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+    connection.execute(transaction_entry)
+    traces: list[str] = []
+    connection.set_trace_callback(traces.append)
+    with monkeypatch.context() as context:
+        context.setattr(
+            sys.modules[__name__], "InterprocessLifecycleArbiter", ArbiterProbe
+        )
+        with pytest.raises(
+            ValueError,
+            match="lifecycle boundary requires no active SQLite transaction",
+        ):
+            service.record_recovery(
+                session_id,
+                target_kind,
+                target_id,
+                action,
+                operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+                operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
+            )
+    connection.set_trace_callback(None)
+
+    assert traces == []
+    assert arbiter_attempts == []
+    assert connection.in_transaction
+    assert _database_rows(connection) == before
+    assert connection.execute(
+        "SELECT next_recovery_ordinal FROM sessions WHERE session_id = ?",
+        (session_id,),
+    ).fetchone() == (0,)
+
+    if transaction_entry.startswith("SAVEPOINT"):
+        connection.execute("ROLLBACK TO caller_work")
+        connection.execute("RELEASE caller_work")
+    else:
+        connection.rollback()
+    assert not connection.in_transaction
+
+    recovery_id = service.record_recovery(
+        session_id,
+        target_kind,
+        target_id,
+        action,
+        operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+        operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
+    )
+    assert type(recovery_id) is str
+    assert _database_rows(connection) != before
+    assert connection.execute(
+        "SELECT next_recovery_ordinal FROM sessions WHERE session_id = ?",
+        (session_id,),
+    ).fetchone() == (1,)
     connection.close()
 
 

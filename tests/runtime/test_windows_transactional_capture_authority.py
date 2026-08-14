@@ -1549,52 +1549,9 @@ class HarnessLifecycleError(RuntimeError):
 
 
 _HARNESS_CONSTRUCTOR_TOKEN = object()
-_HARNESS_CORE_BINDING_CONSTRUCTOR_TOKEN = object()
 _CURRENT_HARNESS: contextvars.ContextVar[Any] = contextvars.ContextVar(
     "architecture77_harness", default=None
 )
-
-
-class Architecture77HarnessCoreBinding(TransactionalAuthorityCoreBinding):
-    """Opaque binding issued only after harness connection validation."""
-
-    def __init__(
-        self,
-        authority: Architecture77HarnessAuthority,
-        connection: sqlite3.Connection,
-        capture_request_factory: Callable[[object], ValidatedCaptureRequest] | None,
-        *,
-        _construction_token: object,
-    ) -> None:
-        if _construction_token is not _HARNESS_CORE_BINDING_CONSTRUCTOR_TOKEN:
-            raise TypeError("harness core bindings require the reviewed issuer")
-        self._authority = authority
-        self._connection = connection
-        self._capture_request_factory = capture_request_factory
-
-    def require_active(self) -> None:
-        self._authority._require_open()
-        owner = self._authority._owner
-        if owner._connections.get(id(self._connection)) is not self._connection:
-            raise HarnessLifecycleError("harness core binding is not registered")
-
-    def core_binding_components(
-        self,
-    ) -> tuple[
-        sqlite3.Connection,
-        Callable[[str], AbstractContextManager[object]],
-        Callable[[object], ValidatedCaptureRequest] | None,
-        None,
-        object,
-    ]:
-        self.require_active()
-        return (
-            self._connection,
-            _current_lifecycle_arbiter,
-            self._capture_request_factory,
-            None,
-            self._authority._owner._service_token,
-        )
 
 
 class Architecture77HarnessAuthority:
@@ -1635,13 +1592,10 @@ class Architecture77HarnessAuthority:
         self._closed = False
         if _owner is None:
             self._connections: dict[int, sqlite3.Connection] = {}
+            self._bindings: list[TransactionalAuthorityCoreBinding] = []
         self._register_connection(connection)
-        self._core_binding = Architecture77HarnessCoreBinding(
-            self,
-            connection,
-            capture_request_factory,
-            _construction_token=_HARNESS_CORE_BINDING_CONSTRUCTOR_TOKEN,
-        )
+        self._core_binding = TransactionalAuthorityCoreBinding.issue_for_harness(self)
+        self._owner._bindings.append(self._core_binding)
         self._core = TransactionalAuthorityCore.from_harness_binding(self._core_binding)
 
     @classmethod
@@ -1732,6 +1686,27 @@ class Architecture77HarnessAuthority:
         self._validate_connection(connection)
         self._owner._connections[id(connection)] = connection
 
+    def _issue_transactional_core_binding(
+        self,
+    ) -> tuple[
+        sqlite3.Connection,
+        Callable[[str], AbstractContextManager[object]],
+        Callable[[object], ValidatedCaptureRequest] | None,
+        None,
+        object,
+    ]:
+        """Return reviewed components to the supported core binding issuer."""
+
+        self._require_open()
+        self._validate_connection(self._connection)
+        return (
+            self._connection,
+            _current_lifecycle_arbiter,
+            self._capture_request_factory,
+            None,
+            self._owner._service_token,
+        )
+
     def _validate_connection(self, connection: sqlite3.Connection) -> None:
         try:
             rows = connection.execute("PRAGMA database_list").fetchall()
@@ -1798,6 +1773,12 @@ class Architecture77HarnessAuthority:
         if owner._closed:
             return
         owner._closed = True
+        close_error = HarnessLifecycleError(
+            "Architecture-77 harness lifecycle is closed"
+        )
+        for binding in tuple(owner._bindings):
+            binding.invalidate_for_harness_close(close_error)
+        owner._bindings.clear()
         for connection in tuple(owner._connections.values()):
             try:
                 connection.execute("SELECT 1")
@@ -3417,6 +3398,48 @@ def test_raw_connection_cannot_create_a_transactional_core() -> None:
         assert _database_rows(harness._connection) == before
     finally:
         harness.close()
+
+
+def test_harness_core_binding_cannot_be_subclassed_or_faked() -> None:
+    with pytest.raises(TypeError, match="cannot be subclassed"):
+
+        class ForgedBinding(TransactionalAuthorityCoreBinding):
+            pass
+
+    class FakeBinding:
+        pass
+
+    with pytest.raises(TypeError, match="reviewed harness binding"):
+        TransactionalAuthorityCore.from_harness_binding(FakeBinding())  # type: ignore[arg-type]
+
+
+def test_fake_writable_binding_is_rejected_before_arbiter_or_mutation() -> None:
+    connection = sqlite3.connect(":memory:", isolation_level=None)
+
+    class FakeBinding:
+        def __init__(self, writable_connection: sqlite3.Connection) -> None:
+            self.writable_connection = writable_connection
+
+        def _components(self) -> tuple[object, ...]:
+            raise AssertionError("fake binding components must not be inspected")
+
+    try:
+        with pytest.raises(TypeError, match="reviewed harness binding"):
+            TransactionalAuthorityCore.from_harness_binding(  # type: ignore[arg-type]
+                FakeBinding(connection)
+            )
+        with pytest.raises(TypeError, match="requires its issuer"):
+            TransactionalAuthorityCoreBinding(
+                object(),
+                connection,
+                lambda _reservation: None,
+                None,
+                None,
+                object(),
+            )
+        assert connection.execute("SELECT 1").fetchone() == (1,)
+    finally:
+        connection.close()
 
 
 def test_valid_harness_core_binding_runs_the_shared_state_machine() -> None:

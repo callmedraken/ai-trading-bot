@@ -18,6 +18,7 @@ from collections.abc import Callable, Iterator
 from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
+from pathlib import Path
 from typing import Any, Protocol, Self
 
 from trading_bot.domain import Symbol
@@ -26,10 +27,14 @@ from trading_bot.market_data import (
     MAX_DAILY_SNAPSHOT_SYMBOLS,
 )
 from trading_bot.runtime.windows_authority import (
+    PRODUCTION_AUTHORITY_PATHS,
     WindowsAuthorityError,
 )
 from trading_bot.runtime.windows_authority_mutex import GlobalLifecycleMutex
 from trading_bot.runtime.windows_authority_schema import (
+    PRODUCTION_SCHEMA_ARTIFACT_SHA256,
+    PRODUCTION_SCHEMA_ID,
+    PRODUCTION_SCHEMA_VERSION,
     SchemaValidationError,
     configure_trusted_schema_off,
     require_evidence_digest,
@@ -3082,10 +3087,143 @@ class _TransactionalLeaseWitness:
         self.active = True
 
 
-class TransactionalAuthorityCoreBinding:
-    """Supported opaque binding contract for non-production core users."""
+_CORE_BINDING_CONSTRUCTOR = object()
 
-    def core_binding_components(
+
+class TransactionalAuthorityCoreBinding:
+    """Exact, issuer-gated binding for the reviewed file-backed test harness.
+
+    This is a supported implementation value, not production authority.  It
+    deliberately has no subclass contract: the core reads only fields on this
+    exact runtime type after the reviewed harness issuer has validated them.
+    """
+
+    __slots__ = (
+        "_active",
+        "_capture_request_factory",
+        "_connection",
+        "_external_adapter",
+        "_lifecycle_arbiter_factory",
+        "_lifecycle_error",
+        "_issuance_provenance",
+        "_service_token",
+        "__weakref__",
+    )
+
+    def __init_subclass__(cls, **kwargs: object) -> None:
+        del kwargs
+        raise TypeError("transactional authority core bindings cannot be subclassed")
+
+    def __new__(cls, *args: object) -> Self:
+        if args:
+            raise TypeError("transactional authority core binding requires its issuer")
+        if cls is not TransactionalAuthorityCoreBinding:
+            raise TypeError(
+                "transactional authority core bindings cannot be subclassed"
+            )
+        instance = super().__new__(cls)
+        return instance
+
+    def __init__(self, *args: object) -> None:
+        del args
+        raise TypeError("transactional authority core binding requires its issuer")
+
+    @classmethod
+    def issue_for_harness(cls, harness: object) -> Self:
+        """Issue one binding from a validated Architecture-77 harness issuer.
+
+        The harness supplies components only through its named issuance path;
+        callers cannot select a connection, path, arbiter, or token through
+        this API.  The storage contract is checked again here before the
+        binding becomes runnable.
+        """
+
+        issuer = getattr(harness, "_issue_transactional_core_binding", None)
+        if not callable(issuer):
+            raise TypeError("transactional core binding requires the reviewed harness")
+        components = issuer()
+        if type(components) is not tuple or len(components) != 5:
+            raise TypeError(
+                "transactional core binding issuer returned invalid material"
+            )
+        (
+            connection,
+            lifecycle_arbiter_factory,
+            capture_request_factory,
+            external_adapter,
+            service_token,
+        ) = components
+        if type(connection) is not sqlite3.Connection:
+            raise TypeError(
+                "transactional core binding requires an exact sqlite3.Connection"
+            )
+        if not callable(lifecycle_arbiter_factory):
+            raise TypeError("transactional core binding requires a lifecycle arbiter")
+        if capture_request_factory is not None and not callable(
+            capture_request_factory
+        ):
+            raise TypeError(
+                "transactional core binding requires a named capture adapter"
+            )
+        if service_token is None:
+            raise TypeError("transactional core binding requires harness provenance")
+        try:
+            database_list = connection.execute("PRAGMA database_list").fetchall()
+            schema = connection.execute(
+                "SELECT production_schema_id, production_schema_version, "
+                "production_schema_digest FROM authority_metadata "
+                "WHERE singleton_key = 1"
+            ).fetchone()
+        except sqlite3.Error as exc:
+            raise TypeError(
+                "transactional core binding storage is not reviewed"
+            ) from exc
+        if len(database_list) != 1 or database_list[0][1] != "main":
+            raise TypeError("transactional core binding requires one main database")
+        database_path = str(database_list[0][2] or "")
+        if not database_path:
+            raise TypeError(
+                "transactional core binding requires file-backed harness storage"
+            )
+        if (
+            Path(database_path).resolve()
+            == Path(PRODUCTION_AUTHORITY_PATHS.database).resolve()
+        ):
+            raise TypeError(
+                "transactional core binding cannot target production storage"
+            )
+        if schema != (
+            PRODUCTION_SCHEMA_ID,
+            PRODUCTION_SCHEMA_VERSION,
+            bytes.fromhex(PRODUCTION_SCHEMA_ARTIFACT_SHA256),
+        ):
+            raise TypeError(
+                "transactional core binding schema identity is not reviewed"
+            )
+        if cls is not TransactionalAuthorityCoreBinding:
+            raise TypeError(
+                "transactional authority core bindings cannot be subclassed"
+            )
+        binding = object.__new__(cls)
+        binding._active = True
+        binding._connection = connection
+        binding._lifecycle_arbiter_factory = lifecycle_arbiter_factory
+        binding._capture_request_factory = capture_request_factory
+        binding._external_adapter = external_adapter
+        binding._lifecycle_error = None
+        binding._issuance_provenance = _CORE_BINDING_CONSTRUCTOR
+        binding._service_token = service_token
+        return binding
+
+    def _require_active(self) -> None:
+        if not self._active:
+            if self._lifecycle_error is not None:
+                raise self._lifecycle_error
+            raise ExternalAuthorityBoundaryUnavailable(
+                "transactional core binding lifecycle is closed"
+            )
+
+    def _components(
         self,
     ) -> tuple[
         sqlite3.Connection,
@@ -3094,10 +3232,21 @@ class TransactionalAuthorityCoreBinding:
         TransactionalAuthorityAdapter | None,
         object,
     ]:
-        raise TypeError("transactional authority core binding is not issuable")
+        self._require_active()
+        return (
+            self._connection,
+            self._lifecycle_arbiter_factory,
+            self._capture_request_factory,
+            self._external_adapter,
+            self._service_token,
+        )
 
-    def require_active(self) -> None:
-        raise TypeError("transactional authority core binding is not active")
+    def invalidate_for_harness_close(self, error: BaseException | None = None) -> None:
+        self._active = False
+        self._lifecycle_error = error
+
+    def __reduce__(self) -> object:
+        raise TypeError("transactional core bindings cannot be serialized")
 
 
 _CORE_CONSTRUCTOR = object()
@@ -3129,16 +3278,18 @@ class TransactionalAuthorityCore:
         cls,
         binding: TransactionalAuthorityCoreBinding,
     ) -> Self:
-        if not isinstance(binding, TransactionalAuthorityCoreBinding):
+        if (
+            type(binding) is not TransactionalAuthorityCoreBinding
+            or binding._issuance_provenance is not _CORE_BINDING_CONSTRUCTOR
+        ):
             raise TypeError("transactional core requires a reviewed harness binding")
-        binding.require_active()
         (
             connection,
             lifecycle_arbiter_factory,
             capture_request_factory,
             external_adapter,
             service_token,
-        ) = binding.core_binding_components()
+        ) = binding._components()
         if type(connection) is not sqlite3.Connection:
             raise TypeError("transactional core requires an exact sqlite3.Connection")
         if service_token is None:
@@ -3181,7 +3332,7 @@ class TransactionalAuthorityCore:
 
     def _require_binding_active(self) -> None:
         if self._harness_binding is not None:
-            self._harness_binding.require_active()
+            self._harness_binding._require_active()
 
     def create_lifecycle_lease_witness(self, reservation_id: str) -> object:
         """Create a process-local witness for the reviewed test lease adapter."""

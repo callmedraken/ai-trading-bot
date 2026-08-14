@@ -53,17 +53,20 @@ configuration, reopens and validates the database through the descriptor, and
 creates a fresh process-local lifecycle and token. Descriptor equality therefore
 does not imply shared provenance. The harness checks root placement, one main
 database with no attachments, fixed production-path exclusion, schema identity,
-and descriptor/database agreement before issuing an opaque process-local
-harness core binding. The binding carries the exact reviewed connection,
-lifecycle provenance, and reviewed arbiter configuration to the supported
-shared `TransactionalAuthorityCore` implementation API. The core accepts a
-validated binding, not an arbitrary connection plus caller arbiter; no
-`for_harness(connection, ...)` construction route exists. The binding is not
-executable production authority. The harness is test correctness/isolation
-infrastructure, not test protection against a hostile same-user filesystem
-process and not production executable authority. It never passes its path,
-connection, descriptor, token, or capabilities to a production facade. Direct
-SQL/schema fixtures remain test-owned raw SQLite infrastructure.
+and descriptor/database agreement before the supported runtime issuer returns
+an exact, sealed, process-local harness core binding. The binding carries the
+exact reviewed connection, lifecycle provenance, and reviewed arbiter
+configuration to the supported shared `TransactionalAuthorityCore`
+implementation API. `from_harness_binding()` accepts only that exact concrete
+binding; public subclasses, fakes, serialized values, and caller-defined
+binding methods are not accepted. The core accepts a validated binding, not an
+arbitrary connection plus caller arbiter; no `for_harness(connection, ...)`
+construction route exists. The binding is not executable production
+authority. The harness is test correctness/isolation infrastructure, not test
+protection against a hostile same-user filesystem process and not production
+executable authority. It never passes its path, connection, descriptor, token,
+or capabilities to a production facade. Direct SQL/schema fixtures remain
+test-owned raw SQLite infrastructure.
 
 The anonymous service, file-backed harness, and production facade execute the
 same `TransactionalAuthorityCore` state-machine implementation. The core is a
@@ -224,6 +227,17 @@ credentials, Windows process effects, scheduling, unattended execution, or
 live trading. It does not change the Architecture-79 SQL resource, schema
 version, deterministic identity material, canonical bytes, or evidence
 digests.
+
+`snapshot_digest` on a successful terminal is an upstream-verified evidence
+input contract. C2 checks its explicit 32-byte shape and persists the supplied
+canonical evidence, but it does not verify external provider output or issue a
+verified-snapshot capability. C2 has no reviewed production
+provider/output-verification implementation; consequently production
+successful capture remains unavailable/NO-GO until a future reviewed
+effectful boundary establishes verified snapshot evidence. C3 must define how
+captured content is verified and how that verified result is authorized and
+passed into terminal recording before production enablement. C2 does not
+invent that mechanism.
 
 The next milestone must separately review and implement the inert-to-effectful
 external boundary: approved provider construction and transport, suspended

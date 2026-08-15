@@ -87,7 +87,12 @@ Production opens only the database path already bound into the validated C1
 capability. The approved SQLite build/VFS is loaded from code-owned reviewed
 material and must match the capability's build-manifest digest. The caller
 cannot select a path, URI, VFS, schema artifact, alternate database, or
-connection.
+connection. Every lazy writable open or reopen revalidates that same opened
+connection against the exact `ValidatedProductionAuthority` before assigning
+it to the service, binding the transactional core, acquiring lifecycle
+authority, consuming a capability, or performing durable mutation. A failed
+identity revalidation closes the opened connection and leaves the service
+unbound.
 
 The reviewed SQLite connection contract remains `foreign_keys=ON`,
 `journal_mode=PERSIST`, `synchronous=FULL`, and `trusted_schema=OFF` where the

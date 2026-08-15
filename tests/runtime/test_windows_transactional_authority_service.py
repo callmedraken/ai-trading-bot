@@ -194,6 +194,100 @@ def _test_consumer_core() -> tuple[
     return service, service._core_for_operation()
 
 
+def _production_database_evidence(
+    authority: ValidatedProductionAuthority,
+    **overrides: object,
+) -> ProductionAuthorityEvidence:
+    values: dict[str, object] = {
+        "database_path": authority.database_path,
+        "schema_id": authority.schema_id,
+        "schema_version": authority.schema_version,
+        "schema_digest": authority.schema_digest,
+        "metadata_digest": authority.metadata_digest,
+        "migration_id": authority.migration_id,
+        "release_manifest_digest": authority.release_manifest_digest,
+        "sqlite_build_manifest_digest": authority.sqlite_build_manifest_digest,
+    }
+    values.update(overrides)
+    return ProductionAuthorityEvidence(**values)  # type: ignore[arg-type]
+
+
+def _patch_opened_connection_validation(
+    monkeypatch: pytest.MonkeyPatch,
+    authority: ValidatedProductionAuthority,
+    observed: ProductionAuthorityEvidence,
+) -> list[sqlite3.Connection]:
+    import trading_bot.runtime.windows_authority_validation as validation
+
+    seen: list[sqlite3.Connection] = []
+    monkeypatch.setattr(
+        validation,
+        "load_approved_release_manifest",
+        lambda: type(
+            "ApprovedRelease",
+            (),
+            {"digest": bytes.fromhex(authority.release_manifest_digest)},
+        )(),
+    )
+    monkeypatch.setattr(
+        validation,
+        "load_approved_sqlite_authority_build",
+        lambda: type(
+            "ApprovedBuild",
+            (),
+            {"digest": bytes.fromhex(authority.sqlite_build_manifest_digest)},
+        )(),
+    )
+
+    def validate(
+        connection: sqlite3.Connection, **kwargs: object
+    ) -> ProductionAuthorityEvidence:
+        seen.append(connection)
+        assert kwargs["bootstrap_digest"] == authority.bootstrap_digest
+        bootstrap = kwargs["bootstrap"]
+        assert type(bootstrap) is WindowsAuthorityBootstrap
+        assert bootstrap.machine_authority_id == authority.machine_authority_id
+        assert bootstrap.authority_epoch_id == authority.authority_epoch_id
+        assert bootstrap.database_identity_digest == authority.database_identity_digest
+        return observed
+
+    monkeypatch.setattr(
+        validation, "validate_production_authority_database_connection", validate
+    )
+    return seen
+
+
+def _patch_production_open(
+    monkeypatch: pytest.MonkeyPatch,
+    authority: ValidatedProductionAuthority,
+    connection: sqlite3.Connection,
+) -> None:
+    import trading_bot.runtime.windows_transactional_authority as production
+
+    monkeypatch.setattr(
+        production,
+        "_approved_sqlite_build_for_authority",
+        lambda _: type(
+            "ApprovedBuild",
+            (),
+            {
+                "vfs": "test-vfs",
+                "digest": bytes.fromhex(authority.sqlite_build_manifest_digest),
+            },
+        )(),
+    )
+    monkeypatch.setattr(
+        production,
+        "open_writable_authority_sqlite_connection",
+        lambda *args, **kwargs: connection,
+    )
+    monkeypatch.setattr(
+        production,
+        "configure_and_validate_authority_sqlite_connection",
+        lambda *args, **kwargs: None,
+    )
+
+
 def test_production_constructor_requires_genuine_capability() -> None:
     with pytest.raises(WindowsAuthorityError):
         WindowsTransactionalAuthority(_test_authority())
@@ -210,6 +304,128 @@ def test_genuine_capability_is_required_and_binds_the_database(
     assert service.authority is authority
     assert service.database_path == authority.database_path
     service.close()
+
+
+def test_open_revalidates_the_same_connection_before_binding(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    authority = _production_validation(monkeypatch)
+    connection = sqlite3.connect(":memory:")
+    observed = _production_database_evidence(authority)
+    seen = _patch_opened_connection_validation(monkeypatch, authority, observed)
+    _patch_production_open(monkeypatch, authority, connection)
+    service = WindowsTransactionalAuthority(authority)
+    try:
+        assert service._open_production_connection() is connection
+        assert seen == [connection]
+        assert service._connection is connection
+    finally:
+        service.close()
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        "database_path",
+        "schema_id",
+        "schema_version",
+        "schema_digest",
+        "metadata_digest",
+        "migration_id",
+        "release_manifest_digest",
+        "sqlite_build_manifest_digest",
+    ],
+)
+def test_open_rejects_database_evidence_not_matching_authority(
+    monkeypatch: pytest.MonkeyPatch,
+    field: str,
+) -> None:
+    authority = _production_validation(monkeypatch)
+    connection = sqlite3.connect(":memory:")
+    mismatched = {
+        "database_path": str(PRODUCTION_AUTHORITY_PATHS.root / "other.sqlite3"),
+        "schema_id": "authority-schema/other",
+        "schema_version": 2,
+        "schema_digest": "00" * 32,
+        "metadata_digest": "44" * 32,
+        "migration_id": "migration-other",
+        "release_manifest_digest": "55" * 32,
+        "sqlite_build_manifest_digest": "66" * 32,
+    }
+    observed = _production_database_evidence(authority, **{field: mismatched[field]})
+    _patch_opened_connection_validation(monkeypatch, authority, observed)
+    _patch_production_open(monkeypatch, authority, connection)
+    service = WindowsTransactionalAuthority(authority)
+
+    with pytest.raises(WindowsAuthorityError, match="does not match"):
+        service.create_session({})
+
+    assert service._connection is None
+    assert service._core is None
+    with pytest.raises(sqlite3.ProgrammingError):
+        connection.execute("SELECT 1")
+    service.close()
+
+
+def test_replacement_after_close_is_rejected_before_rebinding(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import trading_bot.runtime.windows_transactional_authority as production
+
+    authority = _production_validation(monkeypatch)
+    first = sqlite3.connect(":memory:")
+    replacement = sqlite3.connect(":memory:")
+    opened = [first, replacement]
+    seen: list[sqlite3.Connection] = []
+    monkeypatch.setattr(
+        production,
+        "_approved_sqlite_build_for_authority",
+        lambda _: type(
+            "ApprovedBuild",
+            (),
+            {
+                "vfs": "test-vfs",
+                "digest": bytes.fromhex(authority.sqlite_build_manifest_digest),
+            },
+        )(),
+    )
+    monkeypatch.setattr(
+        production,
+        "open_writable_authority_sqlite_connection",
+        lambda *args, **kwargs: opened.pop(0),
+    )
+    monkeypatch.setattr(
+        production,
+        "configure_and_validate_authority_sqlite_connection",
+        lambda *args, **kwargs: None,
+    )
+
+    def validate(
+        expected: ValidatedProductionAuthority, connection: sqlite3.Connection
+    ) -> None:
+        assert expected is authority
+        seen.append(connection)
+        if connection is replacement:
+            raise WindowsAuthorityError(
+                "opened production connection does not match validated authority"
+            )
+
+    monkeypatch.setattr(
+        production, "require_open_connection_matches_validated_authority", validate
+    )
+    service = WindowsTransactionalAuthority(authority)
+    try:
+        assert service._open_production_connection() is first
+        service.close()
+        with pytest.raises(WindowsAuthorityError, match="does not match"):
+            service.create_session({})
+        assert seen == [first, replacement]
+        assert service._connection is None
+        assert service._core is None
+        with pytest.raises(sqlite3.ProgrammingError):
+            replacement.execute("SELECT 1")
+    finally:
+        service.close()
 
 
 def test_production_constructor_has_no_caller_path_or_connection_seam() -> None:
@@ -591,6 +807,10 @@ def test_production_lifecycle_factory_uses_reviewed_global_mutex(
     monkeypatch.setattr(
         "trading_bot.runtime.windows_transactional_authority.configure_and_validate_authority_sqlite_connection",
         lambda *args, **kwargs: object(),
+    )
+    monkeypatch.setattr(
+        "trading_bot.runtime.windows_transactional_authority.require_open_connection_matches_validated_authority",
+        lambda *args, **kwargs: None,
     )
     execute_schema_artifact(connection)
     service = WindowsTransactionalAuthority(authority)

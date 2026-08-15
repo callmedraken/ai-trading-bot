@@ -45,6 +45,7 @@ from trading_bot.runtime.windows_authority_sqlite import (
 )
 from trading_bot.runtime.windows_authority_validation import (
     ValidatedProductionAuthority,
+    require_open_connection_matches_validated_authority,
     require_validated_production_authority,
 )
 
@@ -4107,6 +4108,9 @@ class WindowsTransactionalAuthority:
                 connection,
                 database_path=self._authority.database_path,
                 journal_path=f"{self._authority.database_path}-journal",
+            )
+            require_open_connection_matches_validated_authority(
+                self._authority, connection
             )
         except BaseException:
             connection.close()

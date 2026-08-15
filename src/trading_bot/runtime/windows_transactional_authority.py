@@ -1629,6 +1629,45 @@ def _require_provider_construction_lineage(
         (str(reservation_id),),
     ).fetchone()
     if row is None:
+        durable_status = connection.execute(
+            """
+            SELECT r.reservation_state, r.process_intent_json,
+                   EXISTS (
+                       SELECT 1 FROM launch_executions e
+                       WHERE e.launch_reservation_id = r.launch_reservation_id
+                   ),
+                   EXISTS (
+                       SELECT 1 FROM terminals t
+                       WHERE t.launch_reservation_id = r.launch_reservation_id
+                   ),
+                   EXISTS (
+                       SELECT 1 FROM session_selections ss
+                       JOIN attempts a ON a.session_id = ss.session_id
+                       JOIN provider_call_claims c ON c.attempt_id = a.attempt_id
+                       JOIN launch_reservations lr ON lr.claim_id = c.claim_id
+                       WHERE lr.launch_reservation_id = r.launch_reservation_id
+                   )
+            FROM launch_reservations r
+            WHERE r.launch_reservation_id = ?
+            """,
+            (str(reservation_id),),
+        ).fetchone()
+        if durable_status is not None:
+            (
+                durable_reservation_state,
+                durable_process_intent_json,
+                has_execution,
+                has_terminal,
+                has_selection,
+            ) = durable_status
+            if (
+                durable_reservation_state != "COMMITTED"
+                or durable_process_intent_json is not None
+                or has_execution
+                or has_terminal
+                or has_selection
+            ):
+                raise ValueError("provider construction lineage is revoked")
         raise ValueError("provider construction active lineage is unavailable")
     (
         reservation_state,
@@ -3351,29 +3390,27 @@ class _TransactionalLease:
         return self
 
     def __exit__(self, *args: object) -> None:
-        if not self.active:
-            if self._lifecycle_error is not None:
-                raise self._lifecycle_error
-            raise ExternalAuthorityBoundaryUnavailable(
-                "transactional lifecycle lease was already released"
-            )
-        self.active = False
-        self._witness.active = False
-        try:
-            self._arbiter.__exit__(*args)
-        finally:
+        with self._binding._lifecycle_state_lock:
+            if not self.active:
+                if self._lifecycle_error is not None:
+                    raise self._lifecycle_error
+                raise ExternalAuthorityBoundaryUnavailable(
+                    "transactional lifecycle lease was already released"
+                )
+            self.active = False
+            self._witness.active = False
             self._binding._active_leases.discard(self)
+        self._arbiter.__exit__(*args)
 
     def invalidate_for_harness_close(self, error: BaseException) -> None:
-        if not self.active:
-            return
-        self.active = False
-        self._witness.active = False
-        self._lifecycle_error = error
-        try:
-            self._arbiter.__exit__(None, None, None)
-        finally:
+        with self._binding._lifecycle_state_lock:
+            if not self.active:
+                return
+            self.active = False
+            self._witness.active = False
+            self._lifecycle_error = error
             self._binding._active_leases.discard(self)
+        self._arbiter.__exit__(None, None, None)
 
     def __reduce__(self) -> object:
         raise TypeError("transactional lifecycle leases cannot be serialized")
@@ -3440,6 +3477,7 @@ class TransactionalAuthorityCoreBinding:
         "_connection",
         "_external_adapter",
         "_active_leases",
+        "_lifecycle_state_lock",
         "_lifecycle_arbiter_factory",
         "_lifecycle_error",
         "_issuance_provenance",
@@ -3554,6 +3592,7 @@ class TransactionalAuthorityCoreBinding:
         binding = object.__new__(cls)
         binding._active = True
         binding._active_leases = set()
+        binding._lifecycle_state_lock = threading.RLock()
         binding._connection = connection
         binding._lifecycle_arbiter_factory = lifecycle_arbiter_factory
         binding._capture_request_factory = capture_request_factory
@@ -3564,12 +3603,13 @@ class TransactionalAuthorityCoreBinding:
         return binding
 
     def _require_active(self) -> None:
-        if not self._active:
-            if self._lifecycle_error is not None:
-                raise self._lifecycle_error
-            raise ExternalAuthorityBoundaryUnavailable(
-                "transactional core binding lifecycle is closed"
-            )
+        with self._lifecycle_state_lock:
+            if not self._active:
+                if self._lifecycle_error is not None:
+                    raise self._lifecycle_error
+                raise ExternalAuthorityBoundaryUnavailable(
+                    "transactional core binding lifecycle is closed"
+                )
 
     def _components(
         self,
@@ -3609,12 +3649,19 @@ class TransactionalAuthorityCoreBinding:
             arbiter = self._lifecycle_arbiter_factory(str(reservation_id))
             arbiter.__enter__()
             try:
-                witness = _TransactionalLeaseWitness(
-                    core, self._service_token, str(reservation_id)
-                )
-                lease = _TransactionalLease(self, arbiter, witness)
-                self._active_leases.add(lease)
-                return lease
+                with self._lifecycle_state_lock:
+                    if not self._active:
+                        if self._lifecycle_error is not None:
+                            raise self._lifecycle_error
+                        raise ExternalAuthorityBoundaryUnavailable(
+                            "transactional core binding lifecycle is closed"
+                        )
+                    witness = _TransactionalLeaseWitness(
+                        core, self._service_token, str(reservation_id)
+                    )
+                    lease = _TransactionalLease(self, arbiter, witness)
+                    self._active_leases.add(lease)
+                    return lease
             except BaseException:
                 arbiter.__exit__(None, None, None)
                 raise
@@ -3625,8 +3672,6 @@ class TransactionalAuthorityCoreBinding:
         lease.__exit__(*args)
 
     def invalidate_for_harness_close(self, error: BaseException | None = None) -> None:
-        self._active = False
-        self._lifecycle_error = error
         close_error = (
             error
             if error is not None
@@ -3634,9 +3679,13 @@ class TransactionalAuthorityCoreBinding:
                 "transactional core binding lifecycle is closed"
             )
         )
-        for lease in tuple(self._active_leases):
+        with self._lifecycle_state_lock:
+            self._active = False
+            self._lifecycle_error = close_error
+            leases = tuple(self._active_leases)
+            self._active_leases.clear()
+        for lease in leases:
             lease.invalidate_for_harness_close(close_error)
-        self._active_leases.clear()
 
     def __reduce__(self) -> object:
         raise TypeError("transactional core bindings cannot be serialized")

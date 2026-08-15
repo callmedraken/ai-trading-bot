@@ -1589,6 +1589,8 @@ class Architecture77HarnessAuthority:
         _service_token: object | None = None,
         _owner: Architecture77HarnessAuthority | None = None,
         _cleanup_root: bool = True,
+        _lifecycle_arbiter_factory: Callable[[str], AbstractContextManager[object]]
+        | None = None,
     ) -> None:
         if _construction_token is not _HARNESS_CONSTRUCTOR_TOKEN:
             raise TypeError(
@@ -1610,6 +1612,15 @@ class Architecture77HarnessAuthority:
         self._service_token = (
             _HarnessServiceToken() if _service_token is None else _service_token
         )
+        self._lifecycle_arbiter_factory = (
+            self._owner._lifecycle_arbiter_factory
+            if _owner is not None
+            else (
+                _current_lifecycle_arbiter
+                if _lifecycle_arbiter_factory is None
+                else _lifecycle_arbiter_factory
+            )
+        )
         self._cleanup_root = _cleanup_root if _owner is None else False
         self._capture_request_factory = capture_request_factory
         self._closed = False
@@ -1627,7 +1638,14 @@ class Architecture77HarnessAuthority:
         self._core = TransactionalAuthorityCore.from_harness_binding(self._core_binding)
 
     @classmethod
-    def create(cls) -> Architecture77HarnessAuthority:
+    def create(
+        cls,
+        *,
+        lifecycle_arbiter_factory: Callable[[str], AbstractContextManager[object]]
+        | None = None,
+    ) -> Architecture77HarnessAuthority:
+        """Create a harness with optional reviewed arbiter test configuration."""
+
         root = Path(tempfile.mkdtemp(prefix="ai-trading-bot-arch77-"))
         path = root / "authority.sqlite3"
         connection: sqlite3.Connection | None = None
@@ -1640,6 +1658,7 @@ class Architecture77HarnessAuthority:
                 connection,
                 root=root,
                 _construction_token=_HARNESS_CONSTRUCTOR_TOKEN,
+                _lifecycle_arbiter_factory=lifecycle_arbiter_factory,
             )
             instance._validate_storage()
             return instance
@@ -1734,7 +1753,7 @@ class Architecture77HarnessAuthority:
         self._validate_connection(self._connection)
         return (
             self._connection,
-            _current_lifecycle_arbiter,
+            self._owner._lifecycle_arbiter_factory,
             self._capture_request_factory,
             None,
             self._owner._service_token,
@@ -3306,19 +3325,25 @@ def _spawn_reconstructed_capability_worker(
         reconstructed_permit = _forged_capability(
             FakeProviderConstructionPermit,
             reservation_id=reservation_id,
+            _issuer=object(),
+            _permit=object(),
+            _service_token=object(),
         )
         try:
             hooks.construct_provider(reconstructed_permit)
         except (AttributeError, TypeError, ValueError) as exc:
-            outcomes.append(f"rejected:{type(exc).__name__}")
+            outcomes.append(f"rejected:{type(exc).__name__}:{exc}")
         reconstructed_provider = _forged_capability(
             FakeConstructedProvider,
             reservation_id=reservation_id,
+            _issuer=object(),
+            _permit=object(),
+            _service_token=object(),
         )
         try:
             commit_process_intent(connection, reservation_id, reconstructed_provider)
         except (AttributeError, TypeError, ValueError) as exc:
-            outcomes.append(f"rejected:{type(exc).__name__}")
+            outcomes.append(f"rejected:{type(exc).__name__}:{exc}")
         result_queue.put(outcomes)
     finally:
         connection.close()
@@ -3921,39 +3946,38 @@ def test_lifecycle_lease_invalidates_before_release_and_reacquisition() -> None:
 def test_lifecycle_lease_rejects_active_transaction_before_arbiter(
     transaction_entry: str,
 ) -> None:
-    harness = Architecture77HarnessAuthority.create()
+    factory_calls: list[str] = []
+
+    class ArbiterProbe:
+        def __enter__(self) -> ArbiterProbe:
+            factory_calls.append("enter")
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            factory_calls.append("exit")
+
+    def arbiter_factory(selected_reservation_id: str) -> ArbiterProbe:
+        factory_calls.append(str(selected_reservation_id))
+        return ArbiterProbe()
+
+    harness = Architecture77HarnessAuthority.create(
+        lifecycle_arbiter_factory=arbiter_factory
+    )
     try:
         session_id = harness.create_session(_request())
         attempt_id = harness.allocate_attempt(session_id)
         claim_id = harness.commit_claim(attempt_id)
         reservation_id = str(harness.reserve_launch(claim_id))
-        binding = harness._core_binding
-        factory_calls: list[str] = []
-
-        class ArbiterProbe:
-            def __enter__(self) -> ArbiterProbe:
-                factory_calls.append("enter")
-                return self
-
-            def __exit__(self, *args: object) -> None:
-                factory_calls.append("exit")
-
-        def arbiter_factory(selected_reservation_id: str) -> ArbiterProbe:
-            factory_calls.append(str(selected_reservation_id))
-            return ArbiterProbe()
-
-        binding._lifecycle_arbiter_factory = arbiter_factory
-        before_leases = set(binding._active_leases)
         harness._connection.execute(transaction_entry)
         with pytest.raises(
             ValueError,
             match="lifecycle boundary requires no active SQLite transaction",
         ):
-            binding.acquire_lifecycle_lease(harness._core, reservation_id)
+            with harness.lifecycle_lease(reservation_id):
+                pass
 
         assert harness._connection.in_transaction
         assert factory_calls == []
-        assert binding._active_leases == before_leases
 
         if transaction_entry.startswith("SAVEPOINT"):
             harness._connection.execute("ROLLBACK TO caller_work")
@@ -3970,118 +3994,155 @@ def test_lifecycle_lease_rejects_active_transaction_before_arbiter(
 
 
 def test_lifecycle_lease_factory_failure_does_not_enter_or_exit() -> None:
-    harness = Architecture77HarnessAuthority.create()
+    sentinel = RuntimeError("factory failure")
+    factory_calls: list[str] = []
+
+    def arbiter_factory(reservation_id: str) -> object:
+        factory_calls.append(reservation_id)
+        raise sentinel
+
+    harness = Architecture77HarnessAuthority.create(
+        lifecycle_arbiter_factory=arbiter_factory
+    )
     try:
-        sentinel = RuntimeError("factory failure")
-        factory_calls: list[str] = []
-
-        def arbiter_factory(reservation_id: str) -> object:
-            factory_calls.append(reservation_id)
-            raise sentinel
-
-        harness._core_binding._lifecycle_arbiter_factory = arbiter_factory
-        before_leases = set(harness._core_binding._active_leases)
         with pytest.raises(RuntimeError) as raised:
-            harness._core_binding.acquire_lifecycle_lease(harness._core, "reservation")
+            with harness.lifecycle_lease("reservation"):
+                pass
         assert raised.value is sentinel
         assert factory_calls == ["reservation"]
-        assert harness._core_binding._active_leases == before_leases
     finally:
         harness.close()
 
 
 def test_lifecycle_lease_enter_failure_does_not_call_exit() -> None:
-    harness = Architecture77HarnessAuthority.create()
+    sentinel = RuntimeError("enter failure")
+    events: list[str] = []
+
+    class ArbiterProbe:
+        def __enter__(self) -> ArbiterProbe:
+            events.append("enter")
+            raise sentinel
+
+        def __exit__(self, *args: object) -> None:
+            del args
+            events.append("exit")
+
+    def arbiter_factory(reservation_id: str) -> ArbiterProbe:
+        events.append(reservation_id)
+        return ArbiterProbe()
+
+    harness = Architecture77HarnessAuthority.create(
+        lifecycle_arbiter_factory=arbiter_factory
+    )
     try:
-        sentinel = RuntimeError("enter failure")
-        events: list[str] = []
-
-        class ArbiterProbe:
-            def __enter__(self) -> ArbiterProbe:
-                events.append("enter")
-                raise sentinel
-
-            def __exit__(self, *args: object) -> None:
-                del args
-                events.append("exit")
-
-        def arbiter_factory(reservation_id: str) -> ArbiterProbe:
-            events.append(reservation_id)
-            return ArbiterProbe()
-
-        harness._core_binding._lifecycle_arbiter_factory = arbiter_factory
-        before_leases = set(harness._core_binding._active_leases)
         with pytest.raises(RuntimeError) as raised:
-            harness._core_binding.acquire_lifecycle_lease(harness._core, "reservation")
+            with harness.lifecycle_lease("reservation"):
+                pass
         assert raised.value is sentinel
         assert events == ["reservation", "enter"]
-        assert harness._core_binding._active_leases == before_leases
     finally:
         harness.close()
 
 
 def test_lifecycle_lease_success_enters_and_releases_once() -> None:
-    harness = Architecture77HarnessAuthority.create()
+    events: list[str] = []
+
+    class ArbiterProbe:
+        def __enter__(self) -> ArbiterProbe:
+            events.append("enter")
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            del args
+            events.append("exit")
+
+    harness = Architecture77HarnessAuthority.create(
+        lifecycle_arbiter_factory=lambda reservation_id: ArbiterProbe()
+    )
     try:
-        events: list[str] = []
-
-        class ArbiterProbe:
-            def __enter__(self) -> ArbiterProbe:
-                events.append("enter")
-                return self
-
-            def __exit__(self, *args: object) -> None:
-                del args
-                events.append("exit")
-
-        harness._core_binding._lifecycle_arbiter_factory = lambda reservation_id: (
-            ArbiterProbe()
-        )
-        lease = harness._core_binding.acquire_lifecycle_lease(
-            harness._core, "reservation"
-        )
+        lease = harness.lifecycle_lease("reservation")
+        lease.__enter__()
         assert events == ["enter"]
-        assert lease in harness._core_binding._active_leases
-        assert lease._witness.active
 
-        harness._core_binding.release_lifecycle_lease(lease)
+        lease.__exit__(None, None, None)
         assert events == ["enter", "exit"]
-        assert lease not in harness._core_binding._active_leases
-        assert not lease._witness.active
     finally:
         harness.close()
 
 
 def test_lifecycle_lease_post_enter_setup_failure_releases_once() -> None:
-    harness = Architecture77HarnessAuthority.create()
+    events: list[str] = []
+    harness: Architecture77HarnessAuthority | None = None
+
+    class ArbiterProbe:
+        def __enter__(self) -> ArbiterProbe:
+            events.append("enter")
+            assert harness is not None
+            harness.close()
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            del args
+            events.append("exit")
+
+    harness = Architecture77HarnessAuthority.create(
+        lifecycle_arbiter_factory=lambda reservation_id: ArbiterProbe()
+    )
     try:
-        sentinel = RuntimeError("lease setup failure")
-        events: list[str] = []
-
-        class ArbiterProbe:
-            def __enter__(self) -> ArbiterProbe:
-                events.append("enter")
-                return self
-
-            def __exit__(self, *args: object) -> None:
-                del args
-                events.append("exit")
-
-        class FailingLeaseSet(set[object]):
-            def add(self, value: object) -> None:
-                del value
-                raise sentinel
-
-        harness._core_binding._lifecycle_arbiter_factory = lambda reservation_id: (
-            ArbiterProbe()
-        )
-        harness._core_binding._active_leases = FailingLeaseSet()
-        with pytest.raises(RuntimeError) as raised:
-            harness._core_binding.acquire_lifecycle_lease(harness._core, "reservation")
-        assert raised.value is sentinel
+        with pytest.raises(HarnessLifecycleError, match="closed"):
+            with harness.lifecycle_lease("reservation"):
+                pass
         assert events == ["enter", "exit"]
-        assert not harness._core_binding._active_leases
     finally:
+        harness.close()
+
+
+def test_lifecycle_lease_close_wins_against_blocked_arbiter_entry() -> None:
+    entered = threading.Event()
+    release_entry = threading.Event()
+    exited = threading.Event()
+    events: list[str] = []
+
+    class BlockingArbiter:
+        def __enter__(self) -> BlockingArbiter:
+            events.append("enter")
+            entered.set()
+            assert release_entry.wait(10)
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            del args
+            events.append("exit")
+            exited.set()
+
+    harness = Architecture77HarnessAuthority.create(
+        lifecycle_arbiter_factory=lambda reservation_id: BlockingArbiter()
+    )
+    reservation_id = "blocked-reservation"
+    outcomes: list[BaseException | str] = []
+
+    def acquire() -> None:
+        try:
+            with harness.lifecycle_lease(reservation_id):
+                outcomes.append("acquired")
+        except BaseException as exc:
+            outcomes.append(exc)
+
+    worker = threading.Thread(target=acquire)
+    worker.start()
+    try:
+        assert entered.wait(10)
+        harness.close()
+        release_entry.set()
+        worker.join(10)
+        assert not worker.is_alive()
+        assert len(outcomes) == 1
+        assert isinstance(outcomes[0], HarnessLifecycleError)
+        assert events == ["enter", "exit"]
+        assert exited.is_set()
+    finally:
+        release_entry.set()
+        worker.join(10)
         harness.close()
 
 
@@ -4664,7 +4725,10 @@ def test_spawned_process_rejects_reconstructed_process_local_capabilities(
     assert child.exitcode == 0
     outcomes = result_queue.get(timeout=10)
     assert len(outcomes) == 2
-    assert all(outcome.startswith("rejected:") for outcome in outcomes)
+    assert all(outcome.startswith("rejected:TypeError:") for outcome in outcomes)
+    assert all(
+        "invalid test service provenance issuer" in outcome for outcome in outcomes
+    )
     verify = _connect(db_path)
     assert verify.execute(
         "SELECT reservation_state, process_intent_json "
@@ -9015,9 +9079,10 @@ def test_provider_permit_and_constructed_provider_are_exact_one_shot_objects(
         _permit=object(),
     )
     copied = replace(first_permit)
-    for invalid in (reconstructed, copied):
-        with pytest.raises((TypeError, ValueError), match="invalid|not issued"):
-            hooks.construct_provider(invalid)
+    with pytest.raises(TypeError, match="invalid test service provenance issuer"):
+        hooks.construct_provider(reconstructed)
+    with pytest.raises(ValueError, match="registry binding mismatch"):
+        hooks.construct_provider(copied)
     with pytest.raises(TypeError, match="reservation-issued"):
         hooks.construct_provider(first_claim)  # type: ignore[arg-type]
 
@@ -9042,9 +9107,10 @@ def test_provider_permit_and_constructed_provider_are_exact_one_shot_objects(
         _issuer=object(),
         _permit=object(),
     )
-    for invalid_provider in (replace(provider), forged_provider):
-        with pytest.raises((TypeError, ValueError), match="invalid|not issued"):
-            commit_process_intent(connection, first_permit, invalid_provider)
+    with pytest.raises(TypeError, match="invalid test service provenance issuer"):
+        commit_process_intent(connection, first_permit, forged_provider)
+    with pytest.raises(ValueError, match="registry binding mismatch"):
+        commit_process_intent(connection, first_permit, replace(provider))
     with pytest.raises(ValueError, match="another reservation"):
         commit_process_intent(connection, second_permit, provider)
 
@@ -9526,11 +9592,18 @@ def test_process_result_requires_adapter_provenance_and_survives_rollback(
     intent = _construct_provider_and_commit_process_intent(connection, reservation_id)
     result = FakeSideEffects(connection).create_process(intent, fail=failure_result)
 
+    with _mutated_frozen_object_for_test(result, _issuer=object()):
+        with pytest.raises(TypeError, match="invalid test service provenance issuer"):
+            if failure_result:
+                record_process_creation_failure(connection, reservation_id, result)
+            else:
+                record_execution(connection, reservation_id, result)
+
     for fabricated in (
         replace(result),
         replace(result, reservation_id=str(uuid.UUID(int=0))),
     ):
-        with pytest.raises(ValueError, match="not issued"):
+        with pytest.raises(ValueError, match="registry binding mismatch"):
             if failure_result:
                 assert type(fabricated) is FakeProcessCreationFailure
                 record_process_creation_failure(connection, reservation_id, fabricated)
@@ -10971,13 +11044,16 @@ def test_resume_receipt_requires_adapter_provenance_and_one_shot_permit(
         _issuer=object(),
         _permit=object(),
     )
-    for fabricated in (
-        reconstructed,
-        replace(receipt),
-        replace(receipt, result_digest=_digest(b"replacement")),
-    ):
-        with pytest.raises((TypeError, ValueError)):
-            record_post_resume_evidence(connection, execution_id, fabricated)
+    with pytest.raises(TypeError, match="invalid test service provenance issuer"):
+        record_post_resume_evidence(connection, execution_id, reconstructed)
+    with pytest.raises(ValueError, match="registry binding mismatch"):
+        record_post_resume_evidence(connection, execution_id, replace(receipt))
+    with pytest.raises(ValueError, match="registry binding mismatch"):
+        record_post_resume_evidence(
+            connection,
+            execution_id,
+            replace(receipt, result_digest=_digest(b"replacement")),
+        )
     with _mutated_frozen_object_for_test(receipt, _issuer=object()):
         with pytest.raises(TypeError, match="issuer"):
             record_post_resume_evidence(connection, execution_id, receipt)

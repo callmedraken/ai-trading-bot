@@ -37,7 +37,11 @@ from trading_bot.runtime.windows_transactional_authority import (
     ConstructedProvider,
     DisposableAuthorityDatabaseForTest,
     ExternalAuthorityBoundaryUnavailable,
+    ProcessCreationReceipt,
+    ProcessIntent,
     ProviderConstructionPermit,
+    ResumeIntent,
+    ResumeReceipt,
     TransactionalAuthorityCore,
     WindowsTransactionalAuthority,
     consume_constructed_provider_for_test,
@@ -51,6 +55,7 @@ from trading_bot.runtime.windows_transactional_authority import (
     issue_process_creation_receipt_for_test,
     issue_resume_receipt_for_test,
     open_disposable_authority_database_for_test,
+    process_success_evidence_for_test,
     snapshot_capture_request_for_test,
 )
 
@@ -253,6 +258,142 @@ def _test_capture_request() -> dict[str, object]:
         "request_window_start_date": "2025-01-01",
         "target_session_date": "2026-01-01",
     }
+
+
+class _CountingExternalAdapter:
+    def __init__(
+        self,
+        *,
+        fail_operation: str | None = None,
+        dispatch_started: threading.Event | None = None,
+        dispatch_release: threading.Event | None = None,
+    ) -> None:
+        self.fail_operation = fail_operation
+        self.dispatch_started = dispatch_started
+        self.dispatch_release = dispatch_release
+        self.calls = {"provider": 0, "process": 0, "resume": 0}
+        self.results: list[object] = []
+
+    def reset(self) -> None:
+        self.calls = {"provider": 0, "process": 0, "resume": 0}
+        self.results.clear()
+
+    def _dispatch_started(self, operation: str) -> None:
+        self.calls[operation] += 1
+        if self.dispatch_started is not None:
+            self.dispatch_started.set()
+        if self.dispatch_release is not None:
+            assert self.dispatch_release.wait(10)
+        if self.fail_operation == operation:
+            raise RuntimeError(f"{operation} adapter failed")
+
+    def construct_provider(
+        self, capability: ProviderConstructionPermit, *, fail: bool = False
+    ) -> ConstructedProvider:
+        self._dispatch_started("provider")
+        if fail:
+            raise RuntimeError("provider adapter failed")
+        result = issue_constructed_provider_for_test(capability.reservation_id)
+        self.results.append(result)
+        return result
+
+    def create_process(
+        self, process_intent: ProcessIntent, *, fail: bool = False
+    ) -> ProcessCreationReceipt:
+        self._dispatch_started("process")
+        if fail:
+            raise RuntimeError("process adapter failed")
+        process_json, job_json, resume_json = process_success_evidence_for_test(
+            process_intent.reservation_id, process_intent.intent_digest
+        )
+        result = issue_process_creation_receipt_for_test(
+            process_intent.reservation_id,
+            process_intent.intent_digest,
+            process_json,
+            hashlib.sha256(process_json).digest(),
+            job_json,
+            hashlib.sha256(job_json).digest(),
+            resume_json,
+            hashlib.sha256(resume_json).digest(),
+        )
+        self.results.append(result)
+        return result
+
+    def resume_thread(
+        self, resume_intent: ResumeIntent, *, fail: bool = False
+    ) -> ResumeReceipt:
+        self._dispatch_started("resume")
+        if fail:
+            raise RuntimeError("resume adapter failed")
+        result_json = b'{"resume":"ok"}'
+        result = issue_resume_receipt_for_test(
+            resume_intent.execution_id,
+            resume_intent.reservation_id,
+            resume_intent.intent_digest,
+            result_json,
+            hashlib.sha256(result_json).digest(),
+        )
+        self.results.append(result)
+        return result
+
+
+class _TestLifecycleArbiter:
+    def __enter__(self) -> _TestLifecycleArbiter:
+        return self
+
+    def __exit__(self, *args: object) -> None:
+        del args
+
+
+def _service_with_adapter(
+    adapter: _CountingExternalAdapter,
+) -> tuple[WindowsTransactionalAuthority, sqlite3.Connection]:
+    database = open_disposable_authority_database_for_test(":memory:")
+    connection = _initialize_test_service_database(database)
+    service = WindowsTransactionalAuthority.for_test(
+        database=database,
+        lifecycle_arbiter_factory=lambda reservation_id: _TestLifecycleArbiter(),
+        external_adapter=adapter,
+    )
+    return service, connection
+
+
+def _prepare_external_input(
+    service: WindowsTransactionalAuthority,
+    adapter: _CountingExternalAdapter,
+    operation: str,
+) -> tuple[object, str, str]:
+    session_id = service.create_session(_test_capture_request())
+    attempt_id = service.allocate_attempt(session_id)
+    claim_id = service.commit_claim(attempt_id)
+    permit = service.reserve_launch(claim_id)
+    reservation_id = str(permit)
+    if operation == "provider":
+        return permit, reservation_id, "COMMITTED"
+
+    provider = service.construct_provider(permit)
+    process_intent = service.commit_process_intent(reservation_id, provider)
+    if operation == "process":
+        adapter.reset()
+        return process_intent, reservation_id, "PROCESS_INTENT_COMMITTED"
+
+    process_result = service.create_process(process_intent)
+    execution_id = service.record_execution(reservation_id, process_result)
+    resume_intent = service.commit_resume_intent(execution_id, reservation_id)
+    adapter.reset()
+    return resume_intent, reservation_id, "PROCESS_CREATED"
+
+
+def _external_dispatch(
+    service: WindowsTransactionalAuthority, operation: str, capability: object
+) -> object:
+    if operation == "provider":
+        return service.construct_provider(capability)  # type: ignore[arg-type]
+    if operation == "process":
+        return service.create_process(capability)  # type: ignore[arg-type]
+    if operation == "resume":
+        return service.resume_thread(capability)  # type: ignore[arg-type]
+    raise AssertionError(f"unsupported external operation: {operation}")
 
 
 def _production_database_evidence(
@@ -635,6 +776,155 @@ def test_disposable_database_service_claim_is_atomic_under_concurrency() -> None
     assert isinstance(failures[0], ExternalAuthorityBoundaryUnavailable)
     assert isinstance(successes[0], WindowsTransactionalAuthority)
     successes[0].close()
+
+
+@pytest.mark.parametrize("operation", ["provider", "process", "resume"])
+def test_service_consumes_external_input_before_duplicate_dispatch(
+    operation: str,
+) -> None:
+    adapter = _CountingExternalAdapter()
+    service, connection = _service_with_adapter(adapter)
+    try:
+        capability, reservation_id, expected_state = _prepare_external_input(
+            service, adapter, operation
+        )
+        before = connection.execute(
+            "SELECT reservation_state FROM launch_reservations "
+            "WHERE launch_reservation_id = ?",
+            (reservation_id,),
+        ).fetchone()
+        first_result = _external_dispatch(service, operation, capability)
+        assert first_result is not None
+        assert adapter.calls[operation] == 1
+        assert len(adapter.results) == 1
+
+        with pytest.raises(ValueError, match="consumed"):
+            _external_dispatch(service, operation, capability)
+        assert adapter.calls[operation] == 1
+        assert len(adapter.results) == 1
+        assert (
+            connection.execute(
+                "SELECT reservation_state FROM launch_reservations "
+                "WHERE launch_reservation_id = ?",
+                (reservation_id,),
+            ).fetchone()
+            == before
+            == (expected_state,)
+        )
+    finally:
+        service.close()
+
+
+@pytest.mark.parametrize("operation", ["provider", "process", "resume"])
+def test_service_consumes_external_input_when_adapter_fails(
+    operation: str,
+) -> None:
+    adapter = _CountingExternalAdapter(fail_operation=operation)
+    service, connection = _service_with_adapter(adapter)
+    try:
+        capability, reservation_id, _ = _prepare_external_input(
+            service, adapter, operation
+        )
+        before = connection.execute(
+            "SELECT reservation_state FROM launch_reservations "
+            "WHERE launch_reservation_id = ?",
+            (reservation_id,),
+        ).fetchone()
+        with pytest.raises(RuntimeError, match="adapter failed"):
+            _external_dispatch(service, operation, capability)
+        assert adapter.calls[operation] == 1
+        assert adapter.results == []
+
+        with pytest.raises(ValueError, match="consumed"):
+            _external_dispatch(service, operation, capability)
+        assert adapter.calls[operation] == 1
+        assert (
+            connection.execute(
+                "SELECT reservation_state FROM launch_reservations "
+                "WHERE launch_reservation_id = ?",
+                (reservation_id,),
+            ).fetchone()
+            == before
+        )
+    finally:
+        service.close()
+
+
+@pytest.mark.parametrize("operation", ["provider", "process", "resume"])
+def test_cross_service_external_input_provenance_fails_before_consumption(
+    operation: str,
+) -> None:
+    first_adapter = _CountingExternalAdapter()
+    second_adapter = _CountingExternalAdapter()
+    first, first_connection = _service_with_adapter(first_adapter)
+    second, _ = _service_with_adapter(second_adapter)
+    try:
+        capability, reservation_id, _ = _prepare_external_input(
+            first, first_adapter, operation
+        )
+        with pytest.raises(TypeError, match="test service provenance"):
+            _external_dispatch(second, operation, capability)
+        assert second_adapter.calls[operation] == 0
+        _external_dispatch(first, operation, capability)
+        assert first_adapter.calls[operation] == 1
+        assert (
+            first_connection.execute(
+                "SELECT reservation_state FROM launch_reservations "
+                "WHERE launch_reservation_id = ?",
+                (reservation_id,),
+            ).fetchone()
+            is not None
+        )
+    finally:
+        first.close()
+        second.close()
+
+
+def test_concurrent_duplicate_external_dispatch_consumes_once() -> None:
+    dispatch_started = threading.Event()
+    dispatch_release = threading.Event()
+    adapter = _CountingExternalAdapter(
+        dispatch_started=dispatch_started,
+        dispatch_release=dispatch_release,
+    )
+    service, connection = _service_with_adapter(adapter)
+    try:
+        capability, reservation_id, _ = _prepare_external_input(
+            service, adapter, "provider"
+        )
+        outcomes: list[tuple[str, object]] = []
+        start = threading.Barrier(2)
+
+        def dispatch() -> None:
+            start.wait()
+            try:
+                _external_dispatch(service, "provider", capability)
+            except BaseException as error:
+                outcomes.append(("failure", error))
+            else:
+                outcomes.append(("success", None))
+
+        threads = [threading.Thread(target=dispatch) for _ in range(2)]
+        for thread in threads:
+            thread.start()
+        assert dispatch_started.wait(10)
+        dispatch_release.set()
+        for thread in threads:
+            thread.join(10)
+
+        assert sorted(kind for kind, _ in outcomes) == ["failure", "success"]
+        assert isinstance(outcomes[0][1], BaseException) or isinstance(
+            outcomes[1][1], BaseException
+        )
+        assert adapter.calls["provider"] == 1
+        assert len(adapter.results) == 1
+        assert connection.execute(
+            "SELECT reservation_state FROM launch_reservations "
+            "WHERE launch_reservation_id = ?",
+            (reservation_id,),
+        ).fetchone() == ("COMMITTED",)
+    finally:
+        service.close()
 
 
 def test_test_factory_rejects_raw_connection_before_callbacks() -> None:

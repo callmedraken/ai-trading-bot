@@ -4312,8 +4312,10 @@ class WindowsTransactionalAuthority:
             test_only=self._context.test_only,
             service_token=self._context.test_service_token,
         )
+        reservation_id = _registered_provider_reservation_id(capability)
         core = self._core_for_operation()
         with core.bind_external_effects():
+            _consume_provider_construction_permit(capability, reservation_id)
             return adapter.construct_provider(capability, fail=fail)
 
     def create_process(
@@ -4334,8 +4336,10 @@ class WindowsTransactionalAuthority:
             test_only=self._context.test_only,
             service_token=self._context.test_service_token,
         )
+        reservation_id = _registered_process_intent_reservation_id(process_intent)
         core = self._core_for_operation()
         with core.bind_external_effects():
+            _consume_process_intent(process_intent, reservation_id)
             return adapter.create_process(process_intent, fail=fail)
 
     def resume_thread(
@@ -4356,8 +4360,10 @@ class WindowsTransactionalAuthority:
             test_only=self._context.test_only,
             service_token=self._context.test_service_token,
         )
+        execution_id, reservation_id = _registered_resume_intent_binding(resume_intent)
         core = self._core_for_operation()
         with core.bind_external_effects():
+            _consume_resume_intent(resume_intent, execution_id, reservation_id)
             return adapter.resume_thread(resume_intent, fail=fail)
 
 

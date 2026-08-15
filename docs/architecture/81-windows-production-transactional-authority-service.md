@@ -158,7 +158,9 @@ Provider-construction permits, process intents/results, and resume intents/
 results are immutable process-local objects. Private issuer tokens and
 registries retain the reviewed provenance checks; visible fields do not select
 lineage or arbiter identity. Registry records are checked before consumption,
-and one-shot permits are consumed at most once. The objects reject pickling
+and one-shot external-effect input capabilities are consumed by the service
+immediately before adapter dispatch, never delegated to an adapter. They are
+consumed at most once and reject pickling
 and serialization. Each anonymous `for_test` service receives a fresh opaque
 process-local service token. Each file-backed Architecture-77 harness
 lifecycle receives its own fresh token; all explicitly bound parent observer

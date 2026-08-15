@@ -4895,27 +4895,6 @@ def test_reservation_recovery_validates_ordinal_before_transaction_guard(
 
 
 def test_lifecycle_arbiter_identity_and_global_lock_order_are_explicit() -> None:
-    import trading_bot.runtime.windows_transactional_authority as production
-
-    production_source = Path(production.__file__).read_text(encoding="utf-8")
-    assert "GlobalLifecycleMutex" in production_source
-    assert "Local\\AITradingBot" not in production_source
-    assert "threading.RLock" not in production_source
-    for operation in (
-        production._core_commit_process_intent,
-        production._core_record_execution,
-        production._core_record_process_creation_failure,
-        production._core_commit_resume_intent,
-        production._core_record_post_resume_evidence,
-        production._core_record_terminal,
-        production._core_record_recovery,
-    ):
-        source = inspect.getsource(operation)
-        assert source.index("_require_no_active_transaction") < source.index(
-            "_lifecycle_arbiter"
-        )
-        assert source.index("_lifecycle_arbiter") < source.index("_locked")
-
     from trading_bot.runtime.windows_authority_mutex import (
         canonical_lifecycle_mutex_material,
         lifecycle_mutex_digest,

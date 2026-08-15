@@ -1667,7 +1667,7 @@ def _require_provider_construction_lineage(
                 or has_terminal
                 or has_selection
             ):
-                raise ValueError("provider construction lineage is revoked")
+                raise ValueError("provider construction active lineage is revoked")
         raise ValueError("provider construction active lineage is unavailable")
     (
         reservation_state,
@@ -3360,6 +3360,9 @@ class _TransactionalLease:
         "_arbiter",
         "_binding",
         "_lifecycle_error",
+        "_release_complete",
+        "_release_exception",
+        "_state",
         "_witness",
         "active",
     )
@@ -3373,6 +3376,9 @@ class _TransactionalLease:
         self._arbiter = arbiter
         self._binding = binding
         self._lifecycle_error: BaseException | None = None
+        self._release_complete = threading.Event()
+        self._release_exception: BaseException | None = None
+        self._state = "ACTIVE"
         self._witness = witness
         self.active = True
 
@@ -3391,26 +3397,53 @@ class _TransactionalLease:
 
     def __exit__(self, *args: object) -> None:
         with self._binding._lifecycle_state_lock:
-            if not self.active:
+            if self._state == "RELEASED":
                 if self._lifecycle_error is not None:
                     raise self._lifecycle_error
                 raise ExternalAuthorityBoundaryUnavailable(
                     "transactional lifecycle lease was already released"
                 )
-            self.active = False
-            self._witness.active = False
-            self._binding._active_leases.discard(self)
-        self._arbiter.__exit__(*args)
+            if self._state == "RELEASING":
+                wait_for_release = True
+            else:
+                self._state = "RELEASING"
+                self.active = False
+                self._witness.active = False
+                wait_for_release = False
+        if wait_for_release:
+            self._release_complete.wait()
+            with self._binding._lifecycle_state_lock:
+                if self._lifecycle_error is not None:
+                    raise self._lifecycle_error
+            raise ExternalAuthorityBoundaryUnavailable(
+                "transactional lifecycle lease was already released"
+            )
+        self._release_arbiter(*args)
 
     def invalidate_for_harness_close(self, error: BaseException) -> None:
         with self._binding._lifecycle_state_lock:
-            if not self.active:
+            if self._state == "RELEASED":
                 return
+            self._lifecycle_error = error
+            if self._state == "RELEASING":
+                return
+            self._state = "RELEASING"
             self.active = False
             self._witness.active = False
-            self._lifecycle_error = error
-            self._binding._active_leases.discard(self)
-        self._arbiter.__exit__(None, None, None)
+        self._release_arbiter(None, None, None)
+
+    def _release_arbiter(self, *args: object) -> None:
+        try:
+            self._arbiter.__exit__(*args)
+        except BaseException as exc:
+            with self._binding._lifecycle_state_lock:
+                self._release_exception = exc
+            raise
+        finally:
+            with self._binding._lifecycle_state_lock:
+                self._state = "RELEASED"
+                self._binding._active_leases.discard(self)
+                self._release_complete.set()
 
     def __reduce__(self) -> object:
         raise TypeError("transactional lifecycle leases cannot be serialized")
@@ -3683,9 +3716,19 @@ class TransactionalAuthorityCoreBinding:
             self._active = False
             self._lifecycle_error = close_error
             leases = tuple(self._active_leases)
-            self._active_leases.clear()
+        release_error: BaseException | None = None
         for lease in leases:
-            lease.invalidate_for_harness_close(close_error)
+            try:
+                lease.invalidate_for_harness_close(close_error)
+            except BaseException as exc:
+                if release_error is None:
+                    release_error = exc
+        for lease in leases:
+            lease._release_complete.wait()
+            if release_error is None and lease._release_exception is not None:
+                release_error = lease._release_exception
+        if release_error is not None:
+            raise release_error
 
     def __reduce__(self) -> object:
         raise TypeError("transactional core bindings cannot be serialized")

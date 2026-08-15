@@ -4146,6 +4146,156 @@ def test_lifecycle_lease_close_wins_against_blocked_arbiter_entry() -> None:
         harness.close()
 
 
+def test_lifecycle_lease_close_releases_registered_lease_once() -> None:
+    events: list[str] = []
+
+    class ArbiterProbe:
+        def __enter__(self) -> ArbiterProbe:
+            events.append("enter")
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            del args
+            events.append("exit")
+
+    harness = Architecture77HarnessAuthority.create(
+        lifecycle_arbiter_factory=lambda reservation_id: ArbiterProbe()
+    )
+    lease = harness.lifecycle_lease("registered-reservation")
+    lease.__enter__()
+    try:
+        harness.close()
+        assert events == ["enter", "exit"]
+        with pytest.raises(HarnessLifecycleError, match="closed"):
+            lease.__exit__(None, None, None)
+    finally:
+        harness.close()
+
+
+def test_lifecycle_lease_blocked_exit_keeps_close_incomplete() -> None:
+    exit_started = threading.Event()
+    allow_exit = threading.Event()
+    close_started = threading.Event()
+    close_done = threading.Event()
+    events: list[str] = []
+
+    class BlockingExitArbiter:
+        def __enter__(self) -> BlockingExitArbiter:
+            events.append("enter")
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            del args
+            events.append("exit-start")
+            exit_started.set()
+            assert allow_exit.wait(10)
+            events.append("exit-complete")
+
+    harness = Architecture77HarnessAuthority.create(
+        lifecycle_arbiter_factory=lambda reservation_id: BlockingExitArbiter()
+    )
+    lease = harness.lifecycle_lease("blocked-exit-reservation")
+    lease.__enter__()
+    release_outcomes: list[str] = []
+
+    def release() -> None:
+        lease.__exit__(None, None, None)
+        release_outcomes.append("released")
+
+    def close() -> None:
+        close_started.set()
+        harness.close()
+        close_done.set()
+
+    release_thread = threading.Thread(target=release)
+    close_thread = threading.Thread(target=close)
+    release_thread.start()
+    try:
+        assert exit_started.wait(10)
+        close_thread.start()
+        assert close_started.wait(10)
+        assert not close_done.is_set()
+        allow_exit.set()
+        release_thread.join(10)
+        close_thread.join(10)
+        assert not release_thread.is_alive()
+        assert not close_thread.is_alive()
+        assert release_outcomes == ["released"]
+        assert close_done.is_set()
+        assert events == ["enter", "exit-start", "exit-complete"]
+    finally:
+        allow_exit.set()
+        release_thread.join(10)
+        close_thread.join(10)
+        harness.close()
+
+
+def test_lifecycle_lease_close_owned_release_rejects_concurrent_caller() -> None:
+    exit_started = threading.Event()
+    allow_exit = threading.Event()
+    close_done = threading.Event()
+    caller_started = threading.Event()
+    caller_done = threading.Event()
+    events: list[str] = []
+
+    class BlockingExitArbiter:
+        def __enter__(self) -> BlockingExitArbiter:
+            events.append("enter")
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            del args
+            events.append("exit-start")
+            exit_started.set()
+            assert allow_exit.wait(10)
+            events.append("exit-complete")
+
+    harness = Architecture77HarnessAuthority.create(
+        lifecycle_arbiter_factory=lambda reservation_id: BlockingExitArbiter()
+    )
+    lease = harness.lifecycle_lease("close-owned-reservation")
+    lease.__enter__()
+    caller_outcomes: list[BaseException | str] = []
+
+    def close() -> None:
+        harness.close()
+        close_done.set()
+
+    def caller_release() -> None:
+        caller_started.set()
+        try:
+            lease.__exit__(None, None, None)
+            caller_outcomes.append("released")
+        except BaseException as exc:
+            caller_outcomes.append(exc)
+        finally:
+            caller_done.set()
+
+    close_thread = threading.Thread(target=close)
+    caller_thread = threading.Thread(target=caller_release)
+    close_thread.start()
+    try:
+        assert exit_started.wait(10)
+        caller_thread.start()
+        assert caller_started.wait(10)
+        assert not caller_done.is_set()
+        assert not close_done.is_set()
+        allow_exit.set()
+        close_thread.join(10)
+        caller_thread.join(10)
+        assert not close_thread.is_alive()
+        assert not caller_thread.is_alive()
+        assert close_done.is_set()
+        assert len(caller_outcomes) == 1
+        assert isinstance(caller_outcomes[0], HarnessLifecycleError)
+        assert events == ["enter", "exit-start", "exit-complete"]
+    finally:
+        allow_exit.set()
+        close_thread.join(10)
+        caller_thread.join(10)
+        harness.close()
+
+
 @pytest.mark.parametrize(
     "transaction_entry",
     ["BEGIN IMMEDIATE", "SAVEPOINT caller_work"],

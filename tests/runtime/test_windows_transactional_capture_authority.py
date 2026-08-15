@@ -3969,6 +3969,122 @@ def test_lifecycle_lease_rejects_active_transaction_before_arbiter(
         harness.close()
 
 
+def test_lifecycle_lease_factory_failure_does_not_enter_or_exit() -> None:
+    harness = Architecture77HarnessAuthority.create()
+    try:
+        sentinel = RuntimeError("factory failure")
+        factory_calls: list[str] = []
+
+        def arbiter_factory(reservation_id: str) -> object:
+            factory_calls.append(reservation_id)
+            raise sentinel
+
+        harness._core_binding._lifecycle_arbiter_factory = arbiter_factory
+        before_leases = set(harness._core_binding._active_leases)
+        with pytest.raises(RuntimeError) as raised:
+            harness._core_binding.acquire_lifecycle_lease(harness._core, "reservation")
+        assert raised.value is sentinel
+        assert factory_calls == ["reservation"]
+        assert harness._core_binding._active_leases == before_leases
+    finally:
+        harness.close()
+
+
+def test_lifecycle_lease_enter_failure_does_not_call_exit() -> None:
+    harness = Architecture77HarnessAuthority.create()
+    try:
+        sentinel = RuntimeError("enter failure")
+        events: list[str] = []
+
+        class ArbiterProbe:
+            def __enter__(self) -> ArbiterProbe:
+                events.append("enter")
+                raise sentinel
+
+            def __exit__(self, *args: object) -> None:
+                del args
+                events.append("exit")
+
+        def arbiter_factory(reservation_id: str) -> ArbiterProbe:
+            events.append(reservation_id)
+            return ArbiterProbe()
+
+        harness._core_binding._lifecycle_arbiter_factory = arbiter_factory
+        before_leases = set(harness._core_binding._active_leases)
+        with pytest.raises(RuntimeError) as raised:
+            harness._core_binding.acquire_lifecycle_lease(harness._core, "reservation")
+        assert raised.value is sentinel
+        assert events == ["reservation", "enter"]
+        assert harness._core_binding._active_leases == before_leases
+    finally:
+        harness.close()
+
+
+def test_lifecycle_lease_success_enters_and_releases_once() -> None:
+    harness = Architecture77HarnessAuthority.create()
+    try:
+        events: list[str] = []
+
+        class ArbiterProbe:
+            def __enter__(self) -> ArbiterProbe:
+                events.append("enter")
+                return self
+
+            def __exit__(self, *args: object) -> None:
+                del args
+                events.append("exit")
+
+        harness._core_binding._lifecycle_arbiter_factory = lambda reservation_id: (
+            ArbiterProbe()
+        )
+        lease = harness._core_binding.acquire_lifecycle_lease(
+            harness._core, "reservation"
+        )
+        assert events == ["enter"]
+        assert lease in harness._core_binding._active_leases
+        assert lease._witness.active
+
+        harness._core_binding.release_lifecycle_lease(lease)
+        assert events == ["enter", "exit"]
+        assert lease not in harness._core_binding._active_leases
+        assert not lease._witness.active
+    finally:
+        harness.close()
+
+
+def test_lifecycle_lease_post_enter_setup_failure_releases_once() -> None:
+    harness = Architecture77HarnessAuthority.create()
+    try:
+        sentinel = RuntimeError("lease setup failure")
+        events: list[str] = []
+
+        class ArbiterProbe:
+            def __enter__(self) -> ArbiterProbe:
+                events.append("enter")
+                return self
+
+            def __exit__(self, *args: object) -> None:
+                del args
+                events.append("exit")
+
+        class FailingLeaseSet(set[object]):
+            def add(self, value: object) -> None:
+                del value
+                raise sentinel
+
+        harness._core_binding._lifecycle_arbiter_factory = lambda reservation_id: (
+            ArbiterProbe()
+        )
+        harness._core_binding._active_leases = FailingLeaseSet()
+        with pytest.raises(RuntimeError) as raised:
+            harness._core_binding.acquire_lifecycle_lease(harness._core, "reservation")
+        assert raised.value is sentinel
+        assert events == ["enter", "exit"]
+        assert not harness._core_binding._active_leases
+    finally:
+        harness.close()
+
+
 @pytest.mark.parametrize(
     "transaction_entry",
     ["BEGIN IMMEDIATE", "SAVEPOINT caller_work"],

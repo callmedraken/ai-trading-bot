@@ -157,7 +157,10 @@ adapter, which is deliberately not a production security boundary.
 Provider-construction permits, process intents/results, and resume intents/
 results are immutable process-local objects. Private issuer tokens and
 registries retain the reviewed provenance checks; visible fields do not select
-lineage or arbiter identity. Registry records are checked before consumption,
+lineage or arbiter identity. Issuance registries weakly own live capability,
+result, permit, and service-token objects, so abandoned capabilities are
+reclaimable without weakening exact-object provenance or one-shot semantics.
+Registry records are checked before consumption,
 and one-shot external-effect input capabilities are consumed by the service
 immediately before adapter dispatch, never delegated to an adapter. They are
 consumed at most once and reject pickling

@@ -14,6 +14,7 @@ import json
 import sqlite3
 import threading
 import uuid
+import weakref
 from collections.abc import Callable, Iterator
 from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass, field
@@ -373,6 +374,12 @@ class _ProcessLocalCapability:
         raise TypeError("transactional authority capabilities cannot be pickled")
 
 
+class _TestServiceToken:
+    """Weak-referenceable identity token for one test service lifecycle."""
+
+    __slots__ = ("__weakref__",)
+
+
 @dataclass(eq=False)
 class _ProcessPermit:
     lock: threading.Lock = field(default_factory=threading.Lock)
@@ -559,80 +566,133 @@ sqlite3.register_adapter(ProviderConstructionPermit, str)
 
 @dataclass(frozen=True, slots=True)
 class _ProviderConstructionIssuance:
-    capability: ProviderConstructionPermit
+    capability: weakref.ReferenceType[ProviderConstructionPermit]
     reservation_id: str
     issuer: object
-    permit: _ProviderConstructionOneShot
-    service_token: object | None
+    permit: weakref.ReferenceType[_ProviderConstructionOneShot]
+    service_token: weakref.ReferenceType[object] | None
 
 
 @dataclass(frozen=True, slots=True)
 class _ConstructedProviderIssuance:
-    provider: ConstructedProvider
+    provider: weakref.ReferenceType[ConstructedProvider]
     reservation_id: str
     issuer: object
-    permit: _ConstructedProviderOneShot
-    service_token: object | None
+    permit: weakref.ReferenceType[_ConstructedProviderOneShot]
+    service_token: weakref.ReferenceType[object] | None
 
 
 @dataclass(frozen=True, slots=True)
 class _ProcessIntentIssuance:
-    intent: ProcessIntent
+    intent: weakref.ReferenceType[ProcessIntent]
     reservation_id: str
     intent_json: bytes
     intent_digest: bytes
     issuer: object
-    permit: _ProcessPermit
-    service_token: object | None
+    permit: weakref.ReferenceType[_ProcessPermit]
+    service_token: weakref.ReferenceType[object] | None
 
 
 @dataclass(frozen=True, slots=True)
 class _ProcessResultIssuance:
-    result: ProcessCreationReceipt | ProcessCreationFailure
+    result: weakref.ReferenceType[ProcessCreationReceipt | ProcessCreationFailure]
     reservation_id: str
     process_intent_digest: bytes
     evidence: tuple[bytes, ...]
     digests: tuple[bytes, ...]
     issuer: object
-    permit: _ProcessResultPermit
-    service_token: object | None
+    permit: weakref.ReferenceType[_ProcessResultPermit]
+    service_token: weakref.ReferenceType[object] | None
 
 
 @dataclass(frozen=True, slots=True)
 class _ResumeIntentIssuance:
-    intent: ResumeIntent
+    intent: weakref.ReferenceType[ResumeIntent]
     execution_id: str
     reservation_id: str
     intent_json: bytes
     intent_digest: bytes
     issuer: object
-    permit: _ResumePermit
-    service_token: object | None
+    permit: weakref.ReferenceType[_ResumePermit]
+    service_token: weakref.ReferenceType[object] | None
 
 
 @dataclass(frozen=True, slots=True)
 class _ResumeResultIssuance:
-    result: ResumeReceipt
+    result: weakref.ReferenceType[ResumeReceipt]
     execution_id: str
     reservation_id: str
     resume_intent_digest: bytes
     result_json: bytes
     result_digest: bytes
     issuer: object
-    permit: _ResumeResultPermit
-    service_token: object | None
+    permit: weakref.ReferenceType[_ResumeResultPermit]
+    service_token: weakref.ReferenceType[object] | None
 
 
-_ISSUED_PROVIDER_CONSTRUCTION_PERMITS: dict[
-    _ProviderConstructionOneShot, _ProviderConstructionIssuance
-] = {}
-_ISSUED_CONSTRUCTED_PROVIDERS: dict[
-    _ConstructedProviderOneShot, _ConstructedProviderIssuance
-] = {}
-_ISSUED_PROCESS_PERMITS: dict[_ProcessPermit, _ProcessIntentIssuance] = {}
-_ISSUED_PROCESS_RESULTS: dict[_ProcessResultPermit, _ProcessResultIssuance] = {}
-_ISSUED_RESUME_PERMITS: dict[_ResumePermit, _ResumeIntentIssuance] = {}
-_ISSUED_RESUME_RESULTS: dict[_ResumeResultPermit, _ResumeResultIssuance] = {}
+class _WeakIssuanceRegistry:
+    """Weakly own one-shot issuance records without retaining their objects."""
+
+    def __init__(self, lock: threading.Lock) -> None:
+        self._lock = lock
+        self._entries: dict[weakref.ReferenceType[Any], Any] = {}
+
+    def _remove(self, reference: weakref.ReferenceType[Any]) -> None:
+        with self._lock:
+            self._entries.pop(reference, None)
+
+    def __setitem__(self, permit: object, issuance: object) -> None:
+        reference = weakref.ref(permit, self._remove)
+        self._entries[reference] = issuance
+
+    def get(self, permit: object, default: object = None) -> object:
+        return self._entries.get(weakref.ref(permit), default)
+
+    def __delitem__(self, permit: object) -> None:
+        del self._entries[weakref.ref(permit)]
+
+    def __len__(self) -> int:
+        with self._lock:
+            return len(self._entries)
+
+
+_ISSUED_PROVIDER_CONSTRUCTION_PERMITS: _WeakIssuanceRegistry
+_ISSUED_CONSTRUCTED_PROVIDERS: _WeakIssuanceRegistry
+_ISSUED_PROCESS_PERMITS: _WeakIssuanceRegistry
+_ISSUED_PROCESS_RESULTS: _WeakIssuanceRegistry
+_ISSUED_RESUME_PERMITS: _WeakIssuanceRegistry
+_ISSUED_RESUME_RESULTS: _WeakIssuanceRegistry
+
+
+_ISSUED_PROVIDER_CONSTRUCTION_PERMITS = _WeakIssuanceRegistry(
+    _ISSUED_PROVIDER_CONSTRUCTION_PERMITS_LOCK
+)
+_ISSUED_CONSTRUCTED_PROVIDERS = _WeakIssuanceRegistry(
+    _ISSUED_CONSTRUCTED_PROVIDERS_LOCK
+)
+_ISSUED_PROCESS_PERMITS = _WeakIssuanceRegistry(_ISSUED_PROCESS_PERMITS_LOCK)
+_ISSUED_PROCESS_RESULTS = _WeakIssuanceRegistry(_ISSUED_PROCESS_RESULTS_LOCK)
+_ISSUED_RESUME_PERMITS = _WeakIssuanceRegistry(_ISSUED_RESUME_PERMITS_LOCK)
+_ISSUED_RESUME_RESULTS = _WeakIssuanceRegistry(_ISSUED_RESUME_RESULTS_LOCK)
+
+
+def _weak_reference(value: object, label: str) -> weakref.ReferenceType[Any]:
+    try:
+        return weakref.ref(value)
+    except TypeError as error:
+        raise TypeError(f"{label} must be weak-referenceable") from error
+
+
+def _optional_weak_reference(
+    value: object | None, label: str
+) -> weakref.ReferenceType[object] | None:
+    return None if value is None else _weak_reference(value, label)
+
+
+def _resolve_weak_reference(
+    reference: weakref.ReferenceType[Any] | None,
+) -> Any:
+    return None if reference is None else reference()
 
 
 def _frame(value: str) -> str:
@@ -1365,11 +1425,13 @@ def _core_reserve_launch(
     )
     with _ISSUED_PROVIDER_CONSTRUCTION_PERMITS_LOCK:
         _ISSUED_PROVIDER_CONSTRUCTION_PERMITS[one_shot] = _ProviderConstructionIssuance(
-            capability=capability,
+            capability=_weak_reference(capability, "provider capability"),
             reservation_id=reservation_id,
             issuer=issuer,
-            permit=one_shot,
-            service_token=capability._service_token,
+            permit=_weak_reference(one_shot, "provider permit"),
+            service_token=_optional_weak_reference(
+                capability._service_token, "provider service token"
+            ),
         )
     return capability
 
@@ -1414,10 +1476,11 @@ def _registered_provider_reservation_id(
                     "provider construction permit was consumed or not issued"
                 )
             if (
-                issuance.capability is not capability
-                or issuance.permit is not permit
+                _resolve_weak_reference(issuance.capability) is not capability
+                or _resolve_weak_reference(issuance.permit) is not permit
                 or issuance.issuer is not capability._issuer
-                or issuance.service_token is not capability._service_token
+                or _resolve_weak_reference(issuance.service_token)
+                is not capability._service_token
                 or issuance.reservation_id != capability.reservation_id
             ):
                 raise ValueError(
@@ -1441,10 +1504,11 @@ def _consume_provider_construction_permit(
                     "provider construction permit was consumed or not issued"
                 )
             if (
-                issuance.capability is not capability
-                or issuance.permit is not permit
+                _resolve_weak_reference(issuance.capability) is not capability
+                or _resolve_weak_reference(issuance.permit) is not permit
                 or issuance.issuer is not capability._issuer
-                or issuance.service_token is not capability._service_token
+                or _resolve_weak_reference(issuance.service_token)
+                is not capability._service_token
                 or issuance.reservation_id != capability.reservation_id
                 or issuance.reservation_id != reservation_id
             ):
@@ -1477,10 +1541,11 @@ def _registered_constructed_provider_reservation_id(
                     "constructed provider was already consumed or not issued"
                 )
             if (
-                issuance.provider is not provider
-                or issuance.permit is not permit
+                _resolve_weak_reference(issuance.provider) is not provider
+                or _resolve_weak_reference(issuance.permit) is not permit
                 or issuance.issuer is not provider._issuer
-                or issuance.service_token is not provider._service_token
+                or _resolve_weak_reference(issuance.service_token)
+                is not provider._service_token
                 or issuance.reservation_id != provider.reservation_id
             ):
                 raise ValueError(
@@ -1504,10 +1569,11 @@ def _consume_constructed_provider(
                     "constructed provider was already consumed or not issued"
                 )
             if (
-                issuance.provider is not provider
-                or issuance.permit is not permit
+                _resolve_weak_reference(issuance.provider) is not provider
+                or _resolve_weak_reference(issuance.permit) is not permit
                 or issuance.issuer is not provider._issuer
-                or issuance.service_token is not provider._service_token
+                or _resolve_weak_reference(issuance.service_token)
+                is not provider._service_token
                 or issuance.reservation_id != provider.reservation_id
                 or issuance.reservation_id != reservation_id
             ):
@@ -1716,13 +1782,15 @@ def _commit_process_intent_locked(
     )
     with _ISSUED_PROCESS_PERMITS_LOCK:
         _ISSUED_PROCESS_PERMITS[permit] = _ProcessIntentIssuance(
-            intent=intent,
+            intent=_weak_reference(intent, "process intent"),
             reservation_id=reservation_id,
             intent_json=intent_json,
             intent_digest=intent_digest,
             issuer=issuer,
-            permit=permit,
-            service_token=intent._service_token,
+            permit=_weak_reference(permit, "process intent permit"),
+            service_token=_optional_weak_reference(
+                intent._service_token, "process intent service token"
+            ),
         )
     return intent
 
@@ -1771,10 +1839,11 @@ def _registered_process_intent_reservation_id(intent: ProcessIntent) -> str:
                     "CreateProcessW process intent was already consumed or not issued"
                 )
             if (
-                issuance.intent is not intent
-                or issuance.permit is not permit
+                _resolve_weak_reference(issuance.intent) is not intent
+                or _resolve_weak_reference(issuance.permit) is not permit
                 or issuance.issuer is not intent._issuer
-                or issuance.service_token is not intent._service_token
+                or _resolve_weak_reference(issuance.service_token)
+                is not intent._service_token
                 or issuance.reservation_id != intent.reservation_id
                 or issuance.intent_json != intent.intent_json
                 or issuance.intent_digest != intent.intent_digest
@@ -1798,10 +1867,11 @@ def _consume_process_intent(intent: ProcessIntent, reservation_id: str) -> None:
                     "CreateProcessW process intent was already consumed or not issued"
                 )
             if (
-                issuance.intent is not intent
-                or issuance.permit is not permit
+                _resolve_weak_reference(issuance.intent) is not intent
+                or _resolve_weak_reference(issuance.permit) is not permit
                 or issuance.issuer is not intent._issuer
-                or issuance.service_token is not intent._service_token
+                or _resolve_weak_reference(issuance.service_token)
+                is not intent._service_token
                 or issuance.reservation_id != intent.reservation_id
                 or issuance.reservation_id != reservation_id
                 or issuance.intent_json != intent.intent_json
@@ -1853,10 +1923,11 @@ def _registered_process_result_reservation_id(
                 raise ValueError("process result was already consumed or not issued")
             evidence, digests = _process_result_visible_evidence(result)
             if (
-                issuance.result is not result
-                or issuance.permit is not permit
+                _resolve_weak_reference(issuance.result) is not result
+                or _resolve_weak_reference(issuance.permit) is not permit
                 or issuance.issuer is not result._issuer
-                or issuance.service_token is not result._service_token
+                or _resolve_weak_reference(issuance.service_token)
+                is not result._service_token
                 or issuance.reservation_id != result.reservation_id
                 or issuance.process_intent_digest != result.process_intent_digest
                 or issuance.evidence != evidence
@@ -1883,10 +1954,11 @@ def _consume_process_result(
                 raise ValueError("process result was already consumed or not issued")
             evidence, digests = _process_result_visible_evidence(result)
             if (
-                issuance.result is not result
-                or issuance.permit is not permit
+                _resolve_weak_reference(issuance.result) is not result
+                or _resolve_weak_reference(issuance.permit) is not permit
                 or issuance.issuer is not result._issuer
-                or issuance.service_token is not result._service_token
+                or _resolve_weak_reference(issuance.service_token)
+                is not result._service_token
                 or issuance.reservation_id != result.reservation_id
                 or issuance.reservation_id != reservation_id
                 or issuance.process_intent_digest != result.process_intent_digest
@@ -1917,10 +1989,11 @@ def _registered_resume_intent_binding(intent: ResumeIntent) -> tuple[str, str]:
                     "ResumeThread intent was already consumed or not issued"
                 )
             if (
-                issuance.intent is not intent
-                or issuance.permit is not permit
+                _resolve_weak_reference(issuance.intent) is not intent
+                or _resolve_weak_reference(issuance.permit) is not permit
                 or issuance.issuer is not intent._issuer
-                or issuance.service_token is not intent._service_token
+                or _resolve_weak_reference(issuance.service_token)
+                is not intent._service_token
                 or issuance.execution_id != intent.execution_id
                 or issuance.reservation_id != intent.reservation_id
                 or issuance.intent_json != intent.intent_json
@@ -1947,10 +2020,11 @@ def _consume_resume_intent(
                     "ResumeThread intent was already consumed or not issued"
                 )
             if (
-                issuance.intent is not intent
-                or issuance.permit is not permit
+                _resolve_weak_reference(issuance.intent) is not intent
+                or _resolve_weak_reference(issuance.permit) is not permit
                 or issuance.issuer is not intent._issuer
-                or issuance.service_token is not intent._service_token
+                or _resolve_weak_reference(issuance.service_token)
+                is not intent._service_token
                 or issuance.execution_id != intent.execution_id
                 or issuance.execution_id != execution_id
                 or issuance.reservation_id != intent.reservation_id
@@ -1980,10 +2054,11 @@ def _registered_resume_result_binding(result: ResumeReceipt) -> tuple[str, str]:
             if permit.consumed or issuance is None:
                 raise ValueError("resume result was already consumed or not issued")
             if (
-                issuance.result is not result
-                or issuance.permit is not permit
+                _resolve_weak_reference(issuance.result) is not result
+                or _resolve_weak_reference(issuance.permit) is not permit
                 or issuance.issuer is not result._issuer
-                or issuance.service_token is not result._service_token
+                or _resolve_weak_reference(issuance.service_token)
+                is not result._service_token
                 or issuance.execution_id != result.execution_id
                 or issuance.reservation_id != result.reservation_id
                 or issuance.resume_intent_digest != result.resume_intent_digest
@@ -2009,10 +2084,11 @@ def _consume_resume_result(
             if permit.consumed or issuance is None:
                 raise ValueError("resume result was already consumed or not issued")
             if (
-                issuance.result is not result
-                or issuance.permit is not permit
+                _resolve_weak_reference(issuance.result) is not result
+                or _resolve_weak_reference(issuance.permit) is not permit
                 or issuance.issuer is not result._issuer
-                or issuance.service_token is not result._service_token
+                or _resolve_weak_reference(issuance.service_token)
+                is not result._service_token
                 or issuance.execution_id != result.execution_id
                 or issuance.execution_id != execution_id
                 or issuance.reservation_id != result.reservation_id
@@ -2336,14 +2412,16 @@ def _commit_resume_intent_locked(
     )
     with _ISSUED_RESUME_PERMITS_LOCK:
         _ISSUED_RESUME_PERMITS[permit] = _ResumeIntentIssuance(
-            intent=intent,
+            intent=_weak_reference(intent, "resume intent"),
             execution_id=execution_id,
             reservation_id=reservation_id,
             intent_json=intent_json,
             intent_digest=intent_digest,
             issuer=issuer,
-            permit=permit,
-            service_token=intent._service_token,
+            permit=_weak_reference(permit, "resume intent permit"),
+            service_token=_optional_weak_reference(
+                intent._service_token, "resume intent service token"
+            ),
         )
     return intent
 
@@ -3435,6 +3513,7 @@ class TransactionalAuthorityCoreBinding:
             )
         if service_token is None:
             raise TypeError("transactional core binding requires harness provenance")
+        _weak_reference(service_token, "transactional core binding service token")
         try:
             database_list = connection.execute("PRAGMA database_list").fetchall()
             schema = connection.execute(
@@ -4381,7 +4460,7 @@ class WindowsTransactionalAuthority:
             test_only=True,
             external_adapter=external_adapter,
             test_database=database,
-            test_service_token=object(),
+            test_service_token=_TestServiceToken(),
         )
         return instance
 
@@ -4778,11 +4857,13 @@ def issue_constructed_provider_for_test(reservation_id: str) -> ConstructedProvi
     )
     with _ISSUED_CONSTRUCTED_PROVIDERS_LOCK:
         _ISSUED_CONSTRUCTED_PROVIDERS[permit] = _ConstructedProviderIssuance(
-            provider=provider,
+            provider=_weak_reference(provider, "constructed provider"),
             reservation_id=reservation_id,
             issuer=_TEST_CONSTRUCTED_PROVIDER_ISSUER,
-            permit=permit,
-            service_token=provider._service_token,
+            permit=_weak_reference(permit, "constructed provider permit"),
+            service_token=_optional_weak_reference(
+                provider._service_token, "constructed provider service token"
+            ),
         )
     return provider
 
@@ -4814,14 +4895,16 @@ def issue_process_creation_receipt_for_test(
     evidence, digests = _process_result_visible_evidence(result)
     with _ISSUED_PROCESS_RESULTS_LOCK:
         _ISSUED_PROCESS_RESULTS[permit] = _ProcessResultIssuance(
-            result=result,
+            result=_weak_reference(result, "process result"),
             reservation_id=reservation_id,
             process_intent_digest=process_intent_digest,
             evidence=evidence,
             digests=digests,
             issuer=_TEST_PROCESS_RESULT_ISSUER,
-            permit=permit,
-            service_token=result._service_token,
+            permit=_weak_reference(permit, "process result permit"),
+            service_token=_optional_weak_reference(
+                result._service_token, "process result service token"
+            ),
         )
     return result
 
@@ -4845,14 +4928,16 @@ def issue_process_creation_failure_for_test(
     evidence, digests = _process_result_visible_evidence(result)
     with _ISSUED_PROCESS_RESULTS_LOCK:
         _ISSUED_PROCESS_RESULTS[permit] = _ProcessResultIssuance(
-            result=result,
+            result=_weak_reference(result, "process failure"),
             reservation_id=reservation_id,
             process_intent_digest=process_intent_digest,
             evidence=evidence,
             digests=digests,
             issuer=_TEST_PROCESS_RESULT_ISSUER,
-            permit=permit,
-            service_token=result._service_token,
+            permit=_weak_reference(permit, "process failure permit"),
+            service_token=_optional_weak_reference(
+                result._service_token, "process failure service token"
+            ),
         )
     return result
 
@@ -4877,14 +4962,16 @@ def issue_resume_receipt_for_test(
     )
     with _ISSUED_RESUME_RESULTS_LOCK:
         _ISSUED_RESUME_RESULTS[permit] = _ResumeResultIssuance(
-            result=result,
+            result=_weak_reference(result, "resume result"),
             execution_id=execution_id,
             reservation_id=reservation_id,
             resume_intent_digest=resume_intent_digest,
             result_json=result_json,
             result_digest=result_digest,
             issuer=_TEST_RESUME_RESULT_ISSUER,
-            permit=permit,
-            service_token=result._service_token,
+            permit=_weak_reference(permit, "resume result permit"),
+            service_token=_optional_weak_reference(
+                result._service_token, "resume result service token"
+            ),
         )
     return result

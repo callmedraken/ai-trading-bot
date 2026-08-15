@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import gc
 import hashlib
 import pickle
 import sqlite3
 import threading
+import weakref
 from inspect import signature
 
 import pytest
@@ -389,8 +391,12 @@ def _prepare_external_case(
     service: WindowsTransactionalAuthority,
     adapter: _CountingExternalAdapter,
     operation: str,
+    *,
+    target_date: str = "2026-01-01",
 ) -> tuple[str, object, str, str]:
-    session_id = service.create_session(_test_capture_request())
+    request = _test_capture_request()
+    request["target_session_date"] = target_date
+    session_id = service.create_session(request)
     attempt_id = service.allocate_attempt(session_id)
     claim_id = service.commit_claim(attempt_id)
     permit = service.reserve_launch(claim_id)
@@ -1520,6 +1526,179 @@ def test_transactional_capabilities_are_process_local_and_non_serializable() -> 
     assert not isinstance(capability, ProviderConstructionPermit)
     with pytest.raises(TypeError, match="cannot be pickled"):
         pickle.dumps(capability)
+
+
+def test_unreachable_capability_families_are_reclaimable() -> None:
+    adapter = _CountingExternalAdapter()
+    service, _ = _service_with_adapter(adapter)
+    consumer_service, consumer_core = _test_consumer_core()
+    try:
+        _, provider_permit, _, _ = _prepare_external_case(
+            service, adapter, "provider", target_date="2026-01-01"
+        )
+        _, process_intent, _, _ = _prepare_external_case(
+            service, adapter, "process", target_date="2026-01-02"
+        )
+        _, resume_intent, _, _ = _prepare_external_case(
+            service, adapter, "resume", target_date="2026-01-03"
+        )
+        with consumer_core.bind_external_effects():
+            constructed_provider = issue_constructed_provider_for_test("reservation")
+            process_receipt = issue_process_creation_receipt_for_test(
+                "reservation",
+                b"intent",
+                b"process",
+                hashlib.sha256(b"process").digest(),
+                b"job",
+                hashlib.sha256(b"job").digest(),
+                b"resume",
+                hashlib.sha256(b"resume").digest(),
+            )
+            process_failure = issue_process_creation_failure_for_test(
+                "reservation",
+                b"intent",
+                b"failure",
+                hashlib.sha256(b"failure").digest(),
+            )
+            resume_receipt = issue_resume_receipt_for_test(
+                "execution",
+                "reservation",
+                b"resume-intent",
+                b"resumed",
+                hashlib.sha256(b"resumed").digest(),
+            )
+
+        capabilities = (
+            provider_permit,
+            constructed_provider,
+            process_intent,
+            process_receipt,
+            process_failure,
+            resume_intent,
+            resume_receipt,
+        )
+        references = tuple(
+            (weakref.ref(capability), weakref.ref(capability._permit))
+            for capability in capabilities
+        )
+        del (
+            provider_permit,
+            constructed_provider,
+            process_intent,
+            process_receipt,
+            process_failure,
+            resume_intent,
+            resume_receipt,
+            capabilities,
+        )
+        for _ in range(3):
+            gc.collect()
+        assert all(
+            capability_ref() is None and permit_ref() is None
+            for capability_ref, permit_ref in references
+        )
+    finally:
+        consumer_service.close()
+        service.close()
+
+
+def test_weak_registry_preserves_exact_identity_and_one_shot_consumption() -> None:
+    consumer_service, consumer_core = _test_consumer_core()
+    try:
+        with consumer_core.bind_external_effects():
+            provider = issue_constructed_provider_for_test("reservation")
+        lookalike = ConstructedProvider(
+            provider.reservation_id,
+            _issuer=provider._issuer,
+            _permit=provider._permit,
+            _service_token=provider._service_token,
+        )
+        with pytest.raises(ValueError, match="registry binding mismatch"):
+            consume_constructed_provider_for_test(
+                lookalike, "reservation", core=consumer_core
+            )
+        consume_constructed_provider_for_test(
+            provider, "reservation", core=consumer_core
+        )
+        with pytest.raises(ValueError, match="already consumed"):
+            consume_constructed_provider_for_test(
+                provider, "reservation", core=consumer_core
+            )
+    finally:
+        consumer_service.close()
+
+
+def test_recovered_capability_can_be_abandoned_and_reclaimed() -> None:
+    adapter = _CountingExternalAdapter()
+    service, _ = _service_with_adapter(adapter)
+    try:
+        session_id, permit, reservation_id, _ = _prepare_external_case(
+            service, adapter, "provider"
+        )
+        permit_ref = weakref.ref(permit)
+        permit_token_ref = weakref.ref(permit._permit)
+        operator_evidence = b'{"operator":"test","schema":1}'
+        service.record_recovery(
+            session_id,
+            "LAUNCH_RESERVATION",
+            reservation_id,
+            "CLASSIFY_LAUNCH_RESERVATION",
+            operator_evidence_json=operator_evidence,
+            operator_evidence_digest=hashlib.sha256(operator_evidence).digest(),
+        )
+        with pytest.raises(ValueError, match="active lineage"):
+            service.construct_provider(permit)
+        del permit
+        for _ in range(3):
+            gc.collect()
+        assert permit_ref() is None
+        assert permit_token_ref() is None
+    finally:
+        service.close()
+
+
+def test_issuance_cleanup_and_consumption_are_concurrency_safe() -> None:
+    consumer_service, consumer_core = _test_consumer_core()
+    try:
+        with consumer_core.bind_external_effects():
+            consumed = issue_constructed_provider_for_test("consumed")
+            abandoned = issue_constructed_provider_for_test("abandoned")
+        consumed_permit = consumed._permit
+        abandoned_ref = weakref.ref(abandoned)
+        abandoned_permit_ref = weakref.ref(abandoned._permit)
+        abandoned_holder = {"capability": abandoned}
+        del abandoned
+        barrier = threading.Barrier(2)
+        errors: list[BaseException] = []
+
+        def consume() -> None:
+            try:
+                barrier.wait()
+                consume_constructed_provider_for_test(
+                    consumed, "consumed", core=consumer_core
+                )
+            except BaseException as error:
+                errors.append(error)
+
+        def abandon() -> None:
+            try:
+                barrier.wait()
+                abandoned_holder.pop("capability")
+                gc.collect()
+            except BaseException as error:
+                errors.append(error)
+
+        threads = [threading.Thread(target=consume), threading.Thread(target=abandon)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+        assert errors == []
+        assert consumed_permit.consumed
+        assert abandoned_ref() is None
+        assert abandoned_permit_ref() is None
+    finally:
+        consumer_service.close()
 
 
 def test_capture_request_vector_remains_exact() -> None:

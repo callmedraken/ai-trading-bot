@@ -1564,6 +1564,12 @@ class HarnessLifecycleError(RuntimeError):
 
 
 _HARNESS_CONSTRUCTOR_TOKEN = object()
+
+
+class _HarnessServiceToken:
+    __slots__ = ("__weakref__",)
+
+
 _CURRENT_HARNESS: contextvars.ContextVar[Any] = contextvars.ContextVar(
     "architecture77_harness", default=None
 )
@@ -1601,7 +1607,9 @@ class Architecture77HarnessAuthority:
             strict=False
         )
         self._owner = self if _owner is None else _owner
-        self._service_token = object() if _service_token is None else _service_token
+        self._service_token = (
+            _HarnessServiceToken() if _service_token is None else _service_token
+        )
         self._cleanup_root = _cleanup_root if _owner is None else False
         self._capture_request_factory = capture_request_factory
         self._closed = False

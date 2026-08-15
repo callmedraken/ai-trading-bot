@@ -3679,6 +3679,7 @@ class TransactionalAuthorityCore:
 
         self._require_lifecycle_lease_witness(lease_witness, reservation_id)
         with self._bound_context():
+            _require_no_active_transaction(self._connection)
             row = self._connection.execute(
                 "SELECT launch_reservation_id FROM launch_executions "
                 "WHERE launch_execution_id = ?",
@@ -4071,6 +4072,7 @@ class TransactionalAuthorityCore:
     ) -> ProcessIntent:
         self._require_lifecycle_lease_witness(lease_witness, reservation_id)
         with self._bound_context():
+            _require_no_active_transaction(self._connection)
             if type(provider) is not ConstructedProvider:
                 raise TypeError(
                     "commit_process_intent requires an opaque constructed provider"
@@ -4094,6 +4096,7 @@ class TransactionalAuthorityCore:
     ) -> str:
         self._require_lifecycle_lease_witness(lease_witness, reservation_id)
         with self._bound_context():
+            _require_no_active_transaction(self._connection)
             if type(receipt) is not ProcessCreationReceipt:
                 raise TypeError(
                     "record_execution requires a fake process creation receipt"
@@ -4115,6 +4118,7 @@ class TransactionalAuthorityCore:
     ) -> ResumeIntent:
         self._require_lifecycle_lease_witness(lease_witness, reservation_id)
         with self._bound_context():
+            _require_no_active_transaction(self._connection)
             return _commit_resume_intent_locked(
                 self._connection, execution_id, reservation_id
             )
@@ -4128,6 +4132,7 @@ class TransactionalAuthorityCore:
     ) -> None:
         self._require_lifecycle_lease_witness(lease_witness, reservation_id)
         with self._bound_context():
+            _require_no_active_transaction(self._connection)
             _require_service_provenance(
                 failure,
                 production_issuer=_PROCESS_RESULT_ISSUER,
@@ -4147,6 +4152,7 @@ class TransactionalAuthorityCore:
     ) -> None:
         witness = self._require_lifecycle_lease_witness(lease_witness)
         with self._bound_context():
+            _require_no_active_transaction(self._connection)
             if type(receipt) is not ResumeReceipt:
                 raise TypeError("post-resume evidence requires a fake resume receipt")
             _require_service_provenance(
@@ -4177,6 +4183,7 @@ class TransactionalAuthorityCore:
     ) -> str:
         self._require_lifecycle_lease_witness(lease_witness, reservation_id)
         with self._bound_context():
+            _require_no_active_transaction(self._connection)
             return _record_terminal_locked(
                 self._connection,
                 reservation_id,
@@ -4198,13 +4205,14 @@ class TransactionalAuthorityCore:
         lease_witness: object,
     ) -> str:
         witness = self._require_lifecycle_lease_witness(lease_witness)
-        self._require_recovery_target_reservation(
-            session_id,
-            target_kind,
-            target_id,
-            witness.reservation_id,
-        )
         with self._bound_context():
+            _require_no_active_transaction(self._connection)
+            self._require_recovery_target_reservation(
+                session_id,
+                target_kind,
+                target_id,
+                witness.reservation_id,
+            )
             return _record_recovery_locked(
                 self._connection,
                 session_id,

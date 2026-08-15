@@ -3961,6 +3961,152 @@ def test_lifecycle_lease_rejects_active_transaction_before_arbiter(
         harness.close()
 
 
+@pytest.mark.parametrize(
+    "transaction_entry",
+    ["BEGIN IMMEDIATE", "SAVEPOINT caller_work"],
+    ids=["begin-immediate", "savepoint"],
+)
+def test_all_held_lease_entries_reject_active_transaction_before_sql(
+    transaction_entry: str,
+) -> None:
+    harness = Architecture77HarnessAuthority.create()
+    try:
+        session_id = harness.create_session(_request())
+        attempt_id = harness.allocate_attempt(session_id)
+        claim_id = harness.commit_claim(attempt_id)
+        reservation_id = str(harness.reserve_launch(claim_id))
+        lease = harness.lifecycle_lease(reservation_id)
+        lease.__enter__()
+        core_lease = lease._core_lease
+        assert core_lease is not None
+        core = harness._core
+        before_rows = _database_rows(harness._connection)
+        active_transaction_error = "no active SQLite transaction"
+        operations: list[tuple[str, Callable[[], object]]] = [
+            (
+                "require_execution_binding",
+                lambda: core.require_execution_binding_while_held(
+                    "missing-execution",
+                    reservation_id,
+                    lease_witness=core_lease,
+                ),
+            ),
+            (
+                "commit_process_intent",
+                lambda: core.commit_process_intent_while_held(
+                    reservation_id, object(), lease_witness=core_lease
+                ),
+            ),
+            (
+                "record_execution",
+                lambda: core.record_execution_while_held(
+                    reservation_id, object(), lease_witness=core_lease
+                ),
+            ),
+            (
+                "commit_resume_intent",
+                lambda: core.commit_resume_intent_while_held(
+                    "missing-execution", reservation_id, lease_witness=core_lease
+                ),
+            ),
+            (
+                "record_process_creation_failure",
+                lambda: core.record_process_creation_failure_while_held(
+                    reservation_id, object(), lease_witness=core_lease
+                ),
+            ),
+            (
+                "record_post_resume_evidence",
+                lambda: core.record_post_resume_evidence_while_held(
+                    "missing-execution", object(), lease_witness=core_lease
+                ),
+            ),
+            (
+                "record_terminal",
+                lambda: core.record_terminal_while_held(
+                    reservation_id,
+                    snapshot_digest=None,
+                    lease_witness=core_lease,
+                ),
+            ),
+            (
+                "record_recovery",
+                lambda: core.record_recovery_while_held(
+                    session_id,
+                    "ATTEMPT",
+                    attempt_id,
+                    "CLASSIFY_LAUNCH_RESERVATION",
+                    operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+                    operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
+                    lease_witness=core_lease,
+                ),
+            ),
+        ]
+        try:
+            for name, operation in operations:
+                harness._connection.execute(transaction_entry)
+                traces: list[str] = []
+                harness._connection.set_trace_callback(traces.append)
+                try:
+                    with pytest.raises(
+                        ValueError,
+                        match=active_transaction_error,
+                    ):
+                        operation()
+                finally:
+                    harness._connection.set_trace_callback(None)
+
+                assert traces == [], name
+                assert harness._connection.in_transaction, name
+                assert lease._core_lease is core_lease, name
+                assert core_lease.active, name
+                if transaction_entry.startswith("SAVEPOINT"):
+                    harness._connection.execute("ROLLBACK TO caller_work")
+                    harness._connection.execute("RELEASE caller_work")
+                else:
+                    harness._connection.rollback()
+                assert not harness._connection.in_transaction, name
+                assert _database_rows(harness._connection) == before_rows, name
+        finally:
+            if harness._connection.in_transaction:
+                harness._connection.rollback()
+            lease.__exit__(None, None, None)
+    finally:
+        harness.close()
+
+
+def test_held_lease_remains_usable_after_transaction_rejection() -> None:
+    harness = Architecture77HarnessAuthority.create()
+    try:
+        _, reservation_id, execution_id, receipt = _prepare_lease_resume_case(
+            harness, "2026-01-01"
+        )
+        with harness.lifecycle_lease(reservation_id) as lease:
+            core_lease = lease._core_lease
+            assert core_lease is not None
+            harness._connection.execute("BEGIN IMMEDIATE")
+            with pytest.raises(
+                ValueError,
+                match="lifecycle boundary requires no active SQLite transaction",
+            ):
+                harness._core.require_execution_binding_while_held(
+                    execution_id,
+                    reservation_id,
+                    lease_witness=core_lease,
+                )
+            assert harness._connection.in_transaction
+            harness._connection.rollback()
+            lease.bind_execution(execution_id)
+            lease.record_post_resume_evidence(execution_id, receipt)
+
+        assert harness._connection.execute(
+            "SELECT phase FROM launch_executions WHERE launch_execution_id = ?",
+            (execution_id,),
+        ).fetchone() == ("RESUME_RECORDED",)
+    finally:
+        harness.close()
+
+
 def test_harness_close_invalidates_outstanding_lifecycle_lease() -> None:
     harness = Architecture77HarnessAuthority.create()
     session_id = harness.create_session(_request())

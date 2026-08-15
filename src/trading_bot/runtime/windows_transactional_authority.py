@@ -3525,18 +3525,20 @@ class TransactionalAuthorityCoreBinding:
             raise TypeError(
                 "lifecycle lease witness requires its reviewed core binding"
             )
-        arbiter = self._lifecycle_arbiter_factory(str(reservation_id))
-        try:
-            arbiter.__enter__()
-            witness = _TransactionalLeaseWitness(
-                core, self._service_token, str(reservation_id)
-            )
-        except BaseException:
-            arbiter.__exit__(None, None, None)
-            raise
-        lease = _TransactionalLease(self, arbiter, witness)
-        self._active_leases.add(lease)
-        return lease
+        with core._bound_context():
+            _require_no_active_transaction(self._connection)
+            arbiter = self._lifecycle_arbiter_factory(str(reservation_id))
+            try:
+                arbiter.__enter__()
+                witness = _TransactionalLeaseWitness(
+                    core, self._service_token, str(reservation_id)
+                )
+            except BaseException:
+                arbiter.__exit__(None, None, None)
+                raise
+            lease = _TransactionalLease(self, arbiter, witness)
+            self._active_leases.add(lease)
+            return lease
 
     def release_lifecycle_lease(self, lease: object, *args: object) -> None:
         if type(lease) is not _TransactionalLease or lease._binding is not self:

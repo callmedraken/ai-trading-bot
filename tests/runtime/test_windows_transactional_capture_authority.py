@@ -3905,6 +3905,62 @@ def test_lifecycle_lease_invalidates_before_release_and_reacquisition() -> None:
         harness.close()
 
 
+@pytest.mark.parametrize(
+    "transaction_entry",
+    ["BEGIN IMMEDIATE", "SAVEPOINT caller_work"],
+    ids=["begin-immediate", "savepoint"],
+)
+def test_lifecycle_lease_rejects_active_transaction_before_arbiter(
+    transaction_entry: str,
+) -> None:
+    harness = Architecture77HarnessAuthority.create()
+    try:
+        session_id = harness.create_session(_request())
+        attempt_id = harness.allocate_attempt(session_id)
+        claim_id = harness.commit_claim(attempt_id)
+        reservation_id = str(harness.reserve_launch(claim_id))
+        binding = harness._core_binding
+        factory_calls: list[str] = []
+
+        class ArbiterProbe:
+            def __enter__(self) -> ArbiterProbe:
+                factory_calls.append("enter")
+                return self
+
+            def __exit__(self, *args: object) -> None:
+                factory_calls.append("exit")
+
+        def arbiter_factory(selected_reservation_id: str) -> ArbiterProbe:
+            factory_calls.append(str(selected_reservation_id))
+            return ArbiterProbe()
+
+        binding._lifecycle_arbiter_factory = arbiter_factory
+        before_leases = set(binding._active_leases)
+        harness._connection.execute(transaction_entry)
+        with pytest.raises(
+            ValueError,
+            match="lifecycle boundary requires no active SQLite transaction",
+        ):
+            binding.acquire_lifecycle_lease(harness._core, reservation_id)
+
+        assert harness._connection.in_transaction
+        assert factory_calls == []
+        assert binding._active_leases == before_leases
+
+        if transaction_entry.startswith("SAVEPOINT"):
+            harness._connection.execute("ROLLBACK TO caller_work")
+            harness._connection.execute("RELEASE caller_work")
+        else:
+            harness._connection.rollback()
+        assert not harness._connection.in_transaction
+
+        with harness.lifecycle_lease(reservation_id):
+            pass
+        assert factory_calls == [reservation_id, "enter", "exit"]
+    finally:
+        harness.close()
+
+
 def test_harness_close_invalidates_outstanding_lifecycle_lease() -> None:
     harness = Architecture77HarnessAuthority.create()
     session_id = harness.create_session(_request())

@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import pickle
 import sqlite3
+import threading
 from inspect import signature
 
 import pytest
@@ -192,6 +193,66 @@ def _test_consumer_core() -> tuple[
         ),
     )
     return service, service._core_for_operation()
+
+
+def _initialize_test_service_database(
+    database: DisposableAuthorityDatabaseForTest,
+) -> sqlite3.Connection:
+    connection = database._connection
+    execute_schema_artifact(connection)
+    connection.execute(
+        """
+        INSERT INTO authority_metadata (
+            authority_epoch_id, machine_authority_id, bootstrap_schema,
+            bootstrap_generation, signing_key_id, approved_account_sid,
+            provider_id, permitted_provider_operation, authority_policy_version,
+            claim_policy_version, created_at_utc, bootstrap_digest,
+            database_identity_digest, metadata_json, metadata_digest,
+            production_schema_id, production_schema_version,
+            production_schema_digest, metadata_encoding_version,
+            initialization_policy_version, singleton_key
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            "test-epoch",
+            "test-machine",
+            1,
+            1,
+            "test-key",
+            "S-1-5-21-test",
+            ALPACA_DAILY_SNAPSHOT_DESCRIPTOR.provider_id,
+            ALPACA_DAILY_SNAPSHOT_DESCRIPTOR.operation,
+            "authority-policy/v1",
+            "claim-policy/v1",
+            "2026-01-01T00:00:00Z",
+            b"b" * 32,
+            b"d" * 32,
+            b"{}",
+            b"m" * 32,
+            PRODUCTION_SCHEMA_ID,
+            PRODUCTION_SCHEMA_VERSION,
+            bytes.fromhex(PRODUCTION_SCHEMA_ARTIFACT_SHA256),
+            "authority-metadata/v1",
+            "authority-initialization/v1",
+            1,
+        ),
+    )
+    return connection
+
+
+def _test_capture_request() -> dict[str, object]:
+    return {
+        "bar_interval": "1d",
+        "child_operation_version": "child/v1",
+        "ordered_universe": ["AAPL", "MSFT"],
+        "output_policy_version": "output/v1",
+        "permitted_provider_operation": ALPACA_DAILY_SNAPSHOT_DESCRIPTOR.operation,
+        "provider_id": ALPACA_DAILY_SNAPSHOT_DESCRIPTOR.provider_id,
+        "request_limit": 2,
+        "request_window_end_date": "2025-12-31",
+        "request_window_start_date": "2025-01-01",
+        "target_session_date": "2026-01-01",
+    }
 
 
 def _production_database_evidence(
@@ -482,6 +543,98 @@ def test_test_factory_is_explicit_and_rejects_active_transaction_before_arbiter(
     finally:
         connection.rollback()
         connection.close()
+
+
+def test_disposable_database_has_one_service_owner_and_preserves_first_owner() -> None:
+    database = open_disposable_authority_database_for_test(":memory:")
+    connection = _initialize_test_service_database(database)
+    first_arbiter_calls: list[str] = []
+    second_arbiter_calls: list[str] = []
+    first = WindowsTransactionalAuthority.for_test(
+        database=database,
+        lifecycle_arbiter_factory=lambda reservation_id: (
+            first_arbiter_calls.append(reservation_id)
+            or GlobalLifecycleMutex("machine", "epoch", reservation_id)
+        ),
+    )
+    before = connection.execute("SELECT count(*) FROM sessions").fetchone()
+    try:
+        with pytest.raises(
+            ExternalAuthorityBoundaryUnavailable,
+            match="already has a service owner",
+        ):
+            WindowsTransactionalAuthority.for_test(
+                database=database,
+                lifecycle_arbiter_factory=lambda reservation_id: (
+                    second_arbiter_calls.append(reservation_id)
+                    or GlobalLifecycleMutex("machine", "epoch", reservation_id)
+                ),
+            )
+        assert second_arbiter_calls == []
+        assert connection.execute("SELECT count(*) FROM sessions").fetchone() == before
+        session_id = first.create_session(_test_capture_request())
+        assert isinstance(session_id, str)
+        assert first_arbiter_calls == []
+        assert connection.execute("SELECT count(*) FROM sessions").fetchone() == (1,)
+    finally:
+        first.close()
+
+
+def test_distinct_disposable_databases_have_independent_service_owners() -> None:
+    first_database = open_disposable_authority_database_for_test(":memory:")
+    second_database = open_disposable_authority_database_for_test(":memory:")
+    first = WindowsTransactionalAuthority.for_test(
+        database=first_database,
+        lifecycle_arbiter_factory=lambda reservation_id: GlobalLifecycleMutex(
+            "machine", "epoch", reservation_id
+        ),
+    )
+    second = WindowsTransactionalAuthority.for_test(
+        database=second_database,
+        lifecycle_arbiter_factory=lambda reservation_id: GlobalLifecycleMutex(
+            "machine", "epoch", reservation_id
+        ),
+    )
+    try:
+        assert first._connection is first_database._connection
+        assert second._connection is second_database._connection
+        assert first._connection is not second._connection
+    finally:
+        first.close()
+        second.close()
+
+
+def test_disposable_database_service_claim_is_atomic_under_concurrency() -> None:
+    database = open_disposable_authority_database_for_test(":memory:")
+    barrier = threading.Barrier(2)
+    outcomes: list[tuple[str, object]] = []
+
+    def claim() -> None:
+        barrier.wait()
+        try:
+            service = WindowsTransactionalAuthority.for_test(
+                database=database,
+                lifecycle_arbiter_factory=lambda reservation_id: GlobalLifecycleMutex(
+                    "machine", "epoch", reservation_id
+                ),
+            )
+            outcomes.append(("success", service))
+        except BaseException as error:
+            outcomes.append(("failure", error))
+
+    threads = [threading.Thread(target=claim) for _ in range(2)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    successes = [value for kind, value in outcomes if kind == "success"]
+    failures = [value for kind, value in outcomes if kind == "failure"]
+    assert len(successes) == 1
+    assert len(failures) == 1
+    assert isinstance(failures[0], ExternalAuthorityBoundaryUnavailable)
+    assert isinstance(successes[0], WindowsTransactionalAuthority)
+    successes[0].close()
 
 
 def test_test_factory_rejects_raw_connection_before_callbacks() -> None:

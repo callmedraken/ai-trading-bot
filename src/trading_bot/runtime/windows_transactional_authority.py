@@ -148,7 +148,7 @@ def _inspect_disposable_database_identity(
 class DisposableAuthorityDatabaseForTest:
     """Opaque database opened and identity-checked by the disposable test seam."""
 
-    __slots__ = ("_connection", "_identity", "__weakref__")
+    __slots__ = ("_connection", "_identity", "_claim_lock", "_claimed", "__weakref__")
 
     def __new__(
         cls,
@@ -161,6 +161,8 @@ class DisposableAuthorityDatabaseForTest:
         instance = super().__new__(cls)
         instance._connection = connection
         instance._identity = identity
+        instance._claim_lock = threading.Lock()
+        instance._claimed = False
         return instance
 
     def __init__(
@@ -180,6 +182,15 @@ class DisposableAuthorityDatabaseForTest:
             raise ExternalAuthorityBoundaryUnavailable(
                 "disposable test database identity changed after opening"
             )
+
+    def _claim_test_service(self) -> None:
+        with self._claim_lock:
+            if self._claimed:
+                raise ExternalAuthorityBoundaryUnavailable(
+                    "disposable test database already has a service owner"
+                )
+            self.validate_identity()
+            self._claimed = True
 
     def close(self) -> None:
         self._connection.close()
@@ -4062,7 +4073,7 @@ class WindowsTransactionalAuthority:
             raise TypeError(
                 "test authority service requires a reviewed disposable database"
             )
-        database.validate_identity()
+        database._claim_test_service()
         instance = cls.__new__(cls)
         instance._authority = None
         instance._connection = database._connection

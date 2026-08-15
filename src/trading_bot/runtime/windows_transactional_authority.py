@@ -113,6 +113,27 @@ class _ServiceContext:
     test_service_token: object | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class _ProviderConstructionLineage:
+    request_digest: bytes
+    authority_policy_version: str
+    claim_policy_version: str
+
+
+@dataclass(frozen=True, slots=True)
+class _ProcessCreationLineage:
+    application_release_version: str
+    authority_policy_version: str
+    process_intent_json: bytes
+    process_intent_digest: bytes
+
+
+@dataclass(frozen=True, slots=True)
+class _ResumeThreadLineage:
+    resume_intent_json: bytes
+    resume_intent_digest: bytes
+
+
 _DISPOSABLE_DATABASE_CONSTRUCTOR = object()
 
 
@@ -1498,6 +1519,122 @@ def _consume_constructed_provider(
         permit.consumed = True
 
 
+def _require_provider_construction_lineage(
+    connection: sqlite3.Connection, reservation_id: str
+) -> _ProviderConstructionLineage:
+    row = connection.execute(
+        """
+        SELECT r.reservation_state, r.request_digest,
+               r.authority_policy_version, r.claim_policy_version,
+               r.process_intent_json, r.process_intent_digest,
+               r.reservation_evidence_json, r.reservation_evidence_digest,
+               c.state, c.request_json, c.request_digest,
+               c.claim_policy_version, c.claim_evidence_json,
+               c.claim_evidence_digest,
+               a.state, a.request_json, a.request_digest,
+               a.attempt_policy_version, a.provider_id,
+               a.permitted_provider_operation, a.provider_call_budget,
+               s.state, s.request_json, s.request_digest,
+               s.authority_policy_version, s.claim_policy_version,
+               m.provider_id, m.permitted_provider_operation,
+               m.authority_policy_version, m.claim_policy_version
+        FROM launch_reservations r
+        JOIN provider_call_claims c ON c.claim_id = r.claim_id
+        JOIN attempts a ON a.attempt_id = c.attempt_id
+        JOIN sessions s ON s.session_id = a.session_id
+        JOIN authority_metadata m ON m.singleton_key = 1
+        WHERE r.launch_reservation_id = ?
+          AND r.reservation_state = 'COMMITTED'
+          AND r.process_intent_json IS NULL
+          AND r.process_intent_digest IS NULL
+          AND NOT EXISTS (
+              SELECT 1 FROM launch_executions e
+              WHERE e.launch_reservation_id = r.launch_reservation_id
+          )
+          AND NOT EXISTS (
+              SELECT 1 FROM terminals t
+              WHERE t.launch_reservation_id = r.launch_reservation_id
+          )
+          AND NOT EXISTS (
+              SELECT 1 FROM session_selections ss
+              WHERE ss.session_id = s.session_id
+          )
+        """,
+        (str(reservation_id),),
+    ).fetchone()
+    if row is None:
+        raise ValueError("provider construction active lineage is unavailable")
+    (
+        reservation_state,
+        request_digest,
+        authority_policy_version,
+        claim_policy_version,
+        process_intent_json,
+        process_intent_digest,
+        reservation_evidence,
+        reservation_evidence_digest,
+        claim_state,
+        claim_request,
+        claim_request_digest,
+        claim_policy,
+        claim_evidence,
+        claim_evidence_digest,
+        attempt_state,
+        attempt_request,
+        attempt_request_digest,
+        attempt_policy,
+        attempt_provider,
+        attempt_operation,
+        attempt_budget,
+        session_state,
+        session_request,
+        session_request_digest,
+        session_authority_policy,
+        session_claim_policy,
+        metadata_provider,
+        metadata_operation,
+        metadata_authority_policy,
+        metadata_claim_policy,
+    ) = row
+    if reservation_state != "COMMITTED" or process_intent_json is not None:
+        raise ValueError("provider construction requires COMMITTED")
+    if process_intent_digest is not None:
+        raise ValueError("provider construction intent lineage is invalid")
+    if (
+        _digest(reservation_evidence) != reservation_evidence_digest
+        or _digest(claim_evidence) != claim_evidence_digest
+        or _digest(claim_request) != claim_request_digest
+        or claim_request != attempt_request
+        or claim_request != session_request
+        or request_digest != claim_request_digest
+        or request_digest != attempt_request_digest
+        or request_digest != session_request_digest
+    ):
+        raise ValueError("provider construction request or evidence binding is invalid")
+    if (
+        claim_state != "COMMITTED"
+        or attempt_state != "LAUNCH_RESERVED"
+        or session_state != "OPEN"
+        or claim_policy_version != claim_policy
+        or claim_policy != attempt_policy
+        or claim_policy != session_claim_policy
+        or claim_policy != metadata_claim_policy
+        or authority_policy_version != session_authority_policy
+        or authority_policy_version != metadata_authority_policy
+        or attempt_provider != metadata_provider
+        or attempt_provider != PROVIDER
+        or attempt_operation != metadata_operation
+        or attempt_operation != OPERATION
+        or attempt_budget != 1
+    ):
+        raise ValueError("provider construction policy or claim binding is invalid")
+    return _ProviderConstructionLineage(
+        request_digest=request_digest,
+        authority_policy_version=authority_policy_version,
+        claim_policy_version=claim_policy_version,
+    )
+
+
 def _core_commit_process_intent(
     connection: sqlite3.Connection,
     reservation_id: str,
@@ -1532,94 +1669,12 @@ def _commit_process_intent_locked(
     reservation_id = str(reservation_id)
     if _registered_constructed_provider_reservation_id(provider) != reservation_id:
         raise ValueError("constructed provider registry binding mismatch")
+    lineage = _require_provider_construction_lineage(connection, reservation_id)
+    request_digest = lineage.request_digest
+    authority_policy_version = lineage.authority_policy_version
+    claim_policy_version = lineage.claim_policy_version
     _begin(connection)
     try:
-        row = connection.execute(
-            """
-            SELECT r.reservation_state, r.request_digest,
-                   r.authority_policy_version, r.claim_policy_version,
-                   r.reservation_evidence_json, r.reservation_evidence_digest,
-                   c.state, c.request_json, c.request_digest,
-                   c.claim_policy_version, c.claim_evidence_json,
-                   c.claim_evidence_digest,
-                   a.state, a.request_json, a.request_digest,
-                   a.attempt_policy_version, a.provider_id,
-                   a.permitted_provider_operation, a.provider_call_budget,
-                   s.state, s.request_json, s.request_digest,
-                   s.authority_policy_version, s.claim_policy_version,
-                   m.provider_id, m.permitted_provider_operation,
-                   m.authority_policy_version, m.claim_policy_version
-            FROM launch_reservations r
-            JOIN provider_call_claims c ON c.claim_id = r.claim_id
-            JOIN attempts a ON a.attempt_id = c.attempt_id
-            JOIN sessions s ON s.session_id = a.session_id
-            JOIN authority_metadata m ON m.singleton_key = 1
-            WHERE r.launch_reservation_id = ?
-            """,
-            (str(reservation_id),),
-        ).fetchone()
-        if row is None:
-            raise ValueError("unknown reservation")
-        (
-            reservation_state,
-            request_digest,
-            authority_policy_version,
-            claim_policy_version,
-            reservation_evidence,
-            reservation_evidence_digest,
-            claim_state,
-            claim_request,
-            claim_request_digest,
-            claim_policy,
-            claim_evidence,
-            claim_evidence_digest,
-            attempt_state,
-            attempt_request,
-            attempt_request_digest,
-            attempt_policy,
-            attempt_provider,
-            attempt_operation,
-            attempt_budget,
-            session_state,
-            session_request,
-            session_request_digest,
-            session_authority_policy,
-            session_claim_policy,
-            metadata_provider,
-            metadata_operation,
-            metadata_authority_policy,
-            metadata_claim_policy,
-        ) = row
-        if reservation_state != "COMMITTED":
-            raise ValueError("process intent requires COMMITTED")
-        if (
-            _digest(reservation_evidence) != reservation_evidence_digest
-            or _digest(claim_evidence) != claim_evidence_digest
-            or _digest(claim_request) != claim_request_digest
-            or claim_request != attempt_request
-            or claim_request != session_request
-            or request_digest != claim_request_digest
-            or request_digest != attempt_request_digest
-            or request_digest != session_request_digest
-        ):
-            raise ValueError("process intent request or evidence binding is invalid")
-        if (
-            claim_state != "COMMITTED"
-            or attempt_state != "LAUNCH_RESERVED"
-            or session_state != "OPEN"
-            or claim_policy_version != claim_policy
-            or claim_policy != attempt_policy
-            or claim_policy != session_claim_policy
-            or claim_policy != metadata_claim_policy
-            or authority_policy_version != session_authority_policy
-            or authority_policy_version != metadata_authority_policy
-            or attempt_provider != metadata_provider
-            or attempt_provider != PROVIDER
-            or attempt_operation != metadata_operation
-            or attempt_operation != OPERATION
-            or attempt_budget != 1
-        ):
-            raise ValueError("process intent policy or claim binding is invalid")
         intent_json = _process_intent_json(
             reservation_id,
             request_digest,
@@ -1974,6 +2029,71 @@ def _consume_resume_result(
         permit.consumed = True
 
 
+def _require_process_creation_lineage(
+    connection: sqlite3.Connection,
+    reservation_id: str,
+    process_intent_digest: bytes,
+    process_intent_json: bytes | None = None,
+) -> _ProcessCreationLineage:
+    row = connection.execute(
+        """
+        SELECT r.application_release_version, r.authority_policy_version,
+               r.reservation_state, r.process_intent_json,
+               r.process_intent_digest, c.state, a.state, s.state
+        FROM launch_reservations r
+        JOIN provider_call_claims c ON c.claim_id = r.claim_id
+        JOIN attempts a ON a.attempt_id = c.attempt_id
+        JOIN sessions s ON s.session_id = a.session_id
+        WHERE r.launch_reservation_id = ?
+          AND NOT EXISTS (
+              SELECT 1 FROM terminals t
+              WHERE t.launch_reservation_id = r.launch_reservation_id
+          )
+          AND NOT EXISTS (
+              SELECT 1 FROM session_selections ss
+              WHERE ss.session_id = s.session_id
+          )
+        """,
+        (str(reservation_id),),
+    ).fetchone()
+    if row is None:
+        raise ValueError("process creation active lineage is unavailable")
+    (
+        application_release_version,
+        authority_policy_version,
+        reservation_state,
+        committed_intent_json,
+        committed_intent_digest,
+        claim_state,
+        attempt_state,
+        session_state,
+    ) = row
+    if reservation_state != "PROCESS_INTENT_COMMITTED":
+        raise ValueError("process creation requires PROCESS_INTENT_COMMITTED")
+    if (
+        claim_state != "COMMITTED"
+        or attempt_state != "LAUNCH_RESERVED"
+        or session_state != "OPEN"
+    ):
+        raise ValueError("process creation active parent lineage is revoked")
+    if (
+        committed_intent_json is None
+        or _digest(committed_intent_json) != committed_intent_digest
+        or process_intent_digest != committed_intent_digest
+        or (
+            process_intent_json is not None
+            and process_intent_json != committed_intent_json
+        )
+    ):
+        raise ValueError("process creation intent binding is invalid")
+    return _ProcessCreationLineage(
+        application_release_version=application_release_version,
+        authority_policy_version=authority_policy_version,
+        process_intent_json=committed_intent_json,
+        process_intent_digest=committed_intent_digest,
+    )
+
+
 def _core_record_execution(
     connection: sqlite3.Connection,
     reservation_id: str,
@@ -2016,55 +2136,14 @@ def _record_execution_locked(
         or receipt.resume_authorization_digest != _digest(resume)
     ):
         raise ValueError("process creation receipt is not exact canonical evidence")
+    lineage = _require_process_creation_lineage(
+        connection, reservation_id, receipt.process_intent_digest
+    )
+    application_release_version = lineage.application_release_version
+    authority_policy_version = lineage.authority_policy_version
+    intent_digest = lineage.process_intent_digest
     _begin(connection)
     try:
-        reservation = connection.execute(
-            """
-            SELECT r.application_release_version, r.authority_policy_version,
-                   r.reservation_state, r.process_intent_json,
-                   r.process_intent_digest, c.state, a.state, s.state
-            FROM launch_reservations r
-            JOIN provider_call_claims c ON c.claim_id = r.claim_id
-            JOIN attempts a ON a.attempt_id = c.attempt_id
-            JOIN sessions s ON s.session_id = a.session_id
-            WHERE r.launch_reservation_id = ?
-              AND NOT EXISTS (
-                  SELECT 1 FROM terminals t
-                  WHERE t.launch_reservation_id = r.launch_reservation_id
-              )
-              AND NOT EXISTS (
-                  SELECT 1 FROM session_selections ss
-                  WHERE ss.session_id = s.session_id
-              )
-            """,
-            (str(reservation_id),),
-        ).fetchone()
-        if reservation is None:
-            raise ValueError("unknown reservation")
-        (
-            application_release_version,
-            authority_policy_version,
-            reservation_state,
-            intent_json,
-            intent_digest,
-            claim_state,
-            attempt_state,
-            session_state,
-        ) = reservation
-        if reservation_state != "PROCESS_INTENT_COMMITTED":
-            raise ValueError("execution requires PROCESS_INTENT_COMMITTED")
-        if (
-            claim_state != "COMMITTED"
-            or attempt_state != "LAUNCH_RESERVED"
-            or session_state != "OPEN"
-        ):
-            raise ValueError("execution active parent lineage is revoked")
-        if (
-            intent_json is None
-            or _digest(intent_json) != intent_digest
-            or receipt.process_intent_digest != intent_digest
-        ):
-            raise ValueError("process creation receipt intent binding is invalid")
         execution_id = _execution_id(
             reservation_id,
             application_release_version,
@@ -2387,6 +2466,91 @@ def _record_process_creation_failure_locked(
     _consume_process_result(failure, reservation_id)
 
 
+def _require_resume_thread_lineage(
+    connection: sqlite3.Connection,
+    execution_id: str,
+    reservation_id: str,
+    resume_intent_digest: bytes,
+    resume_intent_json: bytes | None = None,
+) -> _ResumeThreadLineage:
+    row = connection.execute(
+        """
+        SELECT e.phase, e.process_creation_json, e.process_creation_digest,
+               e.job_object_json, e.job_object_digest,
+               e.resume_authorization_json, e.resume_authorization_digest,
+               e.resume_intent_json, e.resume_intent_digest,
+               r.reservation_state, s.state, e.launch_reservation_id
+        FROM launch_executions e
+        JOIN launch_reservations r
+          ON r.launch_reservation_id = e.launch_reservation_id
+        JOIN provider_call_claims c ON c.claim_id = r.claim_id
+        JOIN attempts a ON a.attempt_id = c.attempt_id
+        JOIN sessions s ON s.session_id = a.session_id
+        WHERE e.launch_execution_id = ?
+          AND NOT EXISTS (
+              SELECT 1 FROM terminals t
+              WHERE t.launch_reservation_id = r.launch_reservation_id
+          )
+          AND NOT EXISTS (
+              SELECT 1 FROM session_selections ss
+              WHERE ss.session_id = s.session_id
+          )
+        """,
+        (str(execution_id),),
+    ).fetchone()
+    if row is None:
+        raise ValueError("resume active lineage is unavailable")
+    (
+        phase,
+        process_json,
+        process_digest,
+        job_json,
+        job_digest,
+        resume_authorization_json,
+        resume_authorization_digest,
+        committed_intent_json,
+        committed_intent_digest,
+        reservation_state,
+        session_state,
+        committed_reservation_id,
+    ) = row
+    if committed_reservation_id != str(reservation_id):
+        raise ValueError("resume execution belongs to another reservation")
+    if phase != "RESUME_INTENT_COMMITTED":
+        raise ValueError("resume requires RESUME_INTENT_COMMITTED")
+    if reservation_state != "PROCESS_CREATED" or session_state != "OPEN":
+        raise ValueError("resume active parent lineage is revoked")
+    for evidence_json, evidence_digest in (
+        (process_json, process_digest),
+        (job_json, job_digest),
+        (resume_authorization_json, resume_authorization_digest),
+    ):
+        if evidence_json is None or _digest(evidence_json) != evidence_digest:
+            raise ValueError("resume requires exact pre-resume evidence")
+    expected_intent_json = _json(
+        {
+            "execution_id": str(execution_id),
+            "resume_operation": "ResumeThread",
+            "schema": 1,
+        }
+    )
+    if (
+        committed_intent_json is None
+        or _digest(committed_intent_json) != committed_intent_digest
+        or committed_intent_json != expected_intent_json
+        or resume_intent_digest != committed_intent_digest
+        or (
+            resume_intent_json is not None
+            and resume_intent_json != committed_intent_json
+        )
+    ):
+        raise ValueError("resume intent binding is invalid")
+    return _ResumeThreadLineage(
+        resume_intent_json=committed_intent_json,
+        resume_intent_digest=committed_intent_digest,
+    )
+
+
 def _core_record_post_resume_evidence(
     connection: sqlite3.Connection,
     execution_id: str,
@@ -2430,46 +2594,19 @@ def _record_post_resume_evidence_locked(
     cleanup, cleanup_digest = _evidence(f"cleanup:{execution_id}")
     if _digest(cleanup) != cleanup_digest:
         raise ValueError("cleanup evidence digest is invalid")
+    lineage = _require_resume_thread_lineage(
+        connection,
+        execution_id,
+        reservation_id,
+        resume_receipt.resume_intent_digest,
+    )
+    resume_intent_digest = lineage.resume_intent_digest
     _begin(connection)
     try:
-        row = connection.execute(
-            """
-            SELECT e.phase, e.resume_intent_digest, e.resume_intent_json,
-                   r.reservation_state, s.state, e.launch_reservation_id
-            FROM launch_executions e
-            JOIN launch_reservations r
-              ON r.launch_reservation_id = e.launch_reservation_id
-            JOIN provider_call_claims c ON c.claim_id = r.claim_id
-            JOIN attempts a ON a.attempt_id = c.attempt_id
-            JOIN sessions s ON s.session_id = a.session_id
-            WHERE e.launch_execution_id = ?
-              AND NOT EXISTS (
-                  SELECT 1 FROM terminals t
-                  WHERE t.launch_reservation_id = r.launch_reservation_id
-              )
-              AND NOT EXISTS (
-                  SELECT 1 FROM session_selections ss
-                  WHERE ss.session_id = s.session_id
-              )
-            """,
-            (execution_id,),
-        ).fetchone()
-        if row is None:
-            raise ValueError("post-resume active lineage is unavailable")
-        if row[0] != "RESUME_INTENT_COMMITTED":
-            raise ValueError("post-resume evidence requires committed resume intent")
-        if row[3] != "PROCESS_CREATED" or row[4] != "OPEN":
-            raise ValueError("post-resume active parent lineage is revoked")
-        if row[5] != reservation_id:
-            raise ValueError("fake resume receipt belongs to another reservation")
-        if row[2] is None or _digest(row[2]) != row[1]:
-            raise ValueError("post-resume committed intent evidence is invalid")
-        if resume_receipt.resume_intent_digest != row[1]:
-            raise ValueError("fake resume receipt binds another resume intent")
         expected_result = _json(
             {
                 "execution_id": execution_id,
-                "resume_intent_digest": row[1].hex(),
+                "resume_intent_digest": resume_intent_digest.hex(),
                 "resume_result": "RESUMED",
                 "schema": 1,
             }
@@ -2512,7 +2649,7 @@ def _record_post_resume_evidence_locked(
                 cleanup,
                 cleanup_digest,
                 execution_id,
-                row[1],
+                resume_intent_digest,
             ),
         )
         if cursor.rowcount != 1:
@@ -3555,6 +3692,149 @@ class TransactionalAuthorityCore:
         with self._bound_context():
             yield
 
+    def _dispatch_external_effect(
+        self,
+        operation: str,
+        capability: object,
+        *,
+        fail: bool = False,
+    ) -> (
+        ConstructedProvider
+        | ProcessCreationReceipt
+        | ProcessCreationFailure
+        | ResumeReceipt
+    ):
+        """Run one complete arbiter-bound external-effect authority boundary."""
+
+        with self._bound_context():
+            _require_no_active_transaction(self._connection)
+            adapter = self._context.external_adapter
+            if adapter is None:
+                raise ExternalAuthorityBoundaryUnavailable(
+                    "C2 production has no external-effect adapter"
+                )
+            if operation == "provider":
+                if type(capability) is not ProviderConstructionPermit:
+                    raise TypeError(
+                        "provider construction requires a reservation-issued permit"
+                    )
+                _require_service_provenance(
+                    capability,
+                    production_issuer=_PROVIDER_CONSTRUCTION_ISSUER,
+                    test_issuer=_TEST_PROVIDER_CONSTRUCTION_ISSUER,
+                    label="provider construction permit",
+                )
+                reservation_id = _registered_provider_reservation_id(capability)
+                with _lifecycle_arbiter(reservation_id):
+                    _require_provider_construction_lineage(
+                        self._connection, reservation_id
+                    )
+                    _consume_provider_construction_permit(capability, reservation_id)
+                    result = adapter.construct_provider(capability, fail=fail)
+                    if type(result) is not ConstructedProvider:
+                        raise TypeError(
+                            "provider construction adapter returned an invalid result"
+                        )
+                    _require_service_provenance(
+                        result,
+                        production_issuer=_CONSTRUCTED_PROVIDER_ISSUER,
+                        test_issuer=_TEST_CONSTRUCTED_PROVIDER_ISSUER,
+                        label="constructed provider",
+                    )
+                    if _registered_constructed_provider_reservation_id(result) != (
+                        reservation_id
+                    ):
+                        raise ValueError(
+                            "constructed provider belongs to another reservation"
+                        )
+                    return result
+            if operation == "process":
+                if type(capability) is not ProcessIntent:
+                    raise TypeError(
+                        "CreateProcessW requires an opaque fake process intent"
+                    )
+                _require_service_provenance(
+                    capability,
+                    production_issuer=_PROCESS_INTENT_ISSUER,
+                    test_issuer=_TEST_PROCESS_INTENT_ISSUER,
+                    label="process intent",
+                )
+                reservation_id = _registered_process_intent_reservation_id(capability)
+                with _lifecycle_arbiter(reservation_id):
+                    _require_process_creation_lineage(
+                        self._connection,
+                        reservation_id,
+                        capability.intent_digest,
+                        capability.intent_json,
+                    )
+                    _consume_process_intent(capability, reservation_id)
+                    result = adapter.create_process(capability, fail=fail)
+                    if type(result) not in {
+                        ProcessCreationReceipt,
+                        ProcessCreationFailure,
+                    }:
+                        raise TypeError(
+                            "process creation adapter returned an invalid result"
+                        )
+                    _require_service_provenance(
+                        result,
+                        production_issuer=_PROCESS_RESULT_ISSUER,
+                        test_issuer=_TEST_PROCESS_RESULT_ISSUER,
+                        label="process creation result",
+                    )
+                    if (
+                        _registered_process_result_reservation_id(result)
+                        != reservation_id
+                        or result.process_intent_digest != capability.intent_digest
+                    ):
+                        raise ValueError(
+                            "process creation result does not match process intent"
+                        )
+                    return result
+            if operation == "resume":
+                if type(capability) is not ResumeIntent:
+                    raise TypeError(
+                        "ResumeThread requires an opaque fake resume intent"
+                    )
+                _require_service_provenance(
+                    capability,
+                    production_issuer=_RESUME_INTENT_ISSUER,
+                    test_issuer=_TEST_RESUME_INTENT_ISSUER,
+                    label="resume intent",
+                )
+                execution_id, reservation_id = _registered_resume_intent_binding(
+                    capability
+                )
+                with _lifecycle_arbiter(reservation_id):
+                    _require_resume_thread_lineage(
+                        self._connection,
+                        execution_id,
+                        reservation_id,
+                        capability.intent_digest,
+                        capability.intent_json,
+                    )
+                    _consume_resume_intent(capability, execution_id, reservation_id)
+                    result = adapter.resume_thread(capability, fail=fail)
+                    if type(result) is not ResumeReceipt:
+                        raise TypeError("resume adapter returned an invalid result")
+                    _require_service_provenance(
+                        result,
+                        production_issuer=_RESUME_RESULT_ISSUER,
+                        test_issuer=_TEST_RESUME_RESULT_ISSUER,
+                        label="resume receipt",
+                    )
+                    result_execution_id, result_reservation_id = (
+                        _registered_resume_result_binding(result)
+                    )
+                    if (
+                        result_execution_id != execution_id
+                        or result_reservation_id != reservation_id
+                        or result.resume_intent_digest != capability.intent_digest
+                    ):
+                        raise ValueError("resume receipt does not match resume intent")
+                    return result
+            raise ValueError("unsupported external-effect operation")
+
     @contextmanager
     def _bound_context(self) -> Iterator[None]:
         self._require_binding_active()
@@ -4295,76 +4575,35 @@ class WindowsTransactionalAuthority:
     def construct_provider(
         self, capability: ProviderConstructionPermit, *, fail: bool = False
     ) -> ConstructedProvider:
-        adapter = self._context.external_adapter
-        if adapter is None:
+        if self._context.external_adapter is None:
             raise ExternalAuthorityBoundaryUnavailable(
                 "C2 production has no provider construction adapter"
             )
-        if type(capability) is not ProviderConstructionPermit:
-            raise TypeError(
-                "provider construction requires a reservation-issued permit"
-            )
-        _require_service_provenance(
-            capability,
-            production_issuer=_PROVIDER_CONSTRUCTION_ISSUER,
-            test_issuer=_TEST_PROVIDER_CONSTRUCTION_ISSUER,
-            label="provider construction permit",
-            test_only=self._context.test_only,
-            service_token=self._context.test_service_token,
-        )
-        reservation_id = _registered_provider_reservation_id(capability)
-        core = self._core_for_operation()
-        with core.bind_external_effects():
-            _consume_provider_construction_permit(capability, reservation_id)
-            return adapter.construct_provider(capability, fail=fail)
+        return self._core_for_operation()._dispatch_external_effect(
+            "provider", capability, fail=fail
+        )  # type: ignore[return-value]
 
     def create_process(
         self, process_intent: ProcessIntent, *, fail: bool = False
     ) -> ProcessCreationReceipt | ProcessCreationFailure:
-        adapter = self._context.external_adapter
-        if adapter is None:
+        if self._context.external_adapter is None:
             raise ExternalAuthorityBoundaryUnavailable(
                 "C2 production has no process creation adapter"
             )
-        if type(process_intent) is not ProcessIntent:
-            raise TypeError("CreateProcessW requires an opaque fake process intent")
-        _require_service_provenance(
-            process_intent,
-            production_issuer=_PROCESS_INTENT_ISSUER,
-            test_issuer=_TEST_PROCESS_INTENT_ISSUER,
-            label="process intent",
-            test_only=self._context.test_only,
-            service_token=self._context.test_service_token,
-        )
-        reservation_id = _registered_process_intent_reservation_id(process_intent)
-        core = self._core_for_operation()
-        with core.bind_external_effects():
-            _consume_process_intent(process_intent, reservation_id)
-            return adapter.create_process(process_intent, fail=fail)
+        return self._core_for_operation()._dispatch_external_effect(
+            "process", process_intent, fail=fail
+        )  # type: ignore[return-value]
 
     def resume_thread(
         self, resume_intent: ResumeIntent, *, fail: bool = False
     ) -> ResumeReceipt:
-        adapter = self._context.external_adapter
-        if adapter is None:
+        if self._context.external_adapter is None:
             raise ExternalAuthorityBoundaryUnavailable(
                 "C2 production has no resume adapter"
             )
-        if type(resume_intent) is not ResumeIntent:
-            raise TypeError("ResumeThread requires an opaque fake resume intent")
-        _require_service_provenance(
-            resume_intent,
-            production_issuer=_RESUME_INTENT_ISSUER,
-            test_issuer=_TEST_RESUME_INTENT_ISSUER,
-            label="resume intent",
-            test_only=self._context.test_only,
-            service_token=self._context.test_service_token,
-        )
-        execution_id, reservation_id = _registered_resume_intent_binding(resume_intent)
-        core = self._core_for_operation()
-        with core.bind_external_effects():
-            _consume_resume_intent(resume_intent, execution_id, reservation_id)
-            return adapter.resume_thread(resume_intent, fail=fail)
+        return self._core_for_operation()._dispatch_external_effect(
+            "resume", resume_intent, fail=fail
+        )  # type: ignore[return-value]
 
 
 def _approved_sqlite_build_for_authority(

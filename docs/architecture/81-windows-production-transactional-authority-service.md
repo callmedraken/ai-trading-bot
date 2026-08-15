@@ -209,6 +209,14 @@ Recovery remains derived only from validated durable state. In particular:
 Unknown outcomes remain manual-review states and do not grant retry
 permission or fresh capabilities.
 
+The service's external-effect boundary acquires the reservation arbiter and
+revalidates the current durable lineage immediately before consuming the input
+capability and dispatching the typed adapter call. The subsequent receipt or
+evidence method uses that same reservation lifecycle authority. If recovery
+wins after an effect result is produced but before its durable receipt is
+recorded, persistence is rejected conservatively and the already-consumed
+input is never redispatched.
+
 ## Production versus test adapter boundary
 
 C2 provides the typed adapter protocol only. There is no production provider

@@ -273,13 +273,18 @@ class _CountingExternalAdapter:
         self.dispatch_release = dispatch_release
         self.calls = {"provider": 0, "process": 0, "resume": 0}
         self.results: list[object] = []
+        self.connection: sqlite3.Connection | None = None
+        self.transaction_states: list[bool] = []
 
     def reset(self) -> None:
         self.calls = {"provider": 0, "process": 0, "resume": 0}
         self.results.clear()
+        self.transaction_states.clear()
 
     def _dispatch_started(self, operation: str) -> None:
         self.calls[operation] += 1
+        if self.connection is not None:
+            self.transaction_states.append(self.connection.in_transaction)
         if self.dispatch_started is not None:
             self.dispatch_started.set()
         if self.dispatch_release is not None:
@@ -345,17 +350,65 @@ class _TestLifecycleArbiter:
         del args
 
 
+class _SerializedTestLifecycleArbiter:
+    def __init__(self, lock: threading.Lock) -> None:
+        self._lock = lock
+
+    def __enter__(self) -> _SerializedTestLifecycleArbiter:
+        self._lock.acquire()
+        return self
+
+    def __exit__(self, *args: object) -> None:
+        del args
+        self._lock.release()
+
+
 def _service_with_adapter(
     adapter: _CountingExternalAdapter,
+    *,
+    lifecycle_arbiter_factory: object | None = None,
 ) -> tuple[WindowsTransactionalAuthority, sqlite3.Connection]:
     database = open_disposable_authority_database_for_test(":memory:")
     connection = _initialize_test_service_database(database)
+    if lifecycle_arbiter_factory is None:
+
+        def lifecycle_arbiter_factory(reservation_id: str) -> _TestLifecycleArbiter:
+            del reservation_id
+            return _TestLifecycleArbiter()
+
     service = WindowsTransactionalAuthority.for_test(
         database=database,
-        lifecycle_arbiter_factory=lambda reservation_id: _TestLifecycleArbiter(),
+        lifecycle_arbiter_factory=lifecycle_arbiter_factory,  # type: ignore[arg-type]
         external_adapter=adapter,
     )
+    adapter.connection = connection
     return service, connection
+
+
+def _prepare_external_case(
+    service: WindowsTransactionalAuthority,
+    adapter: _CountingExternalAdapter,
+    operation: str,
+) -> tuple[str, object, str, str]:
+    session_id = service.create_session(_test_capture_request())
+    attempt_id = service.allocate_attempt(session_id)
+    claim_id = service.commit_claim(attempt_id)
+    permit = service.reserve_launch(claim_id)
+    reservation_id = str(permit)
+    if operation == "provider":
+        return session_id, permit, reservation_id, "COMMITTED"
+
+    provider = service.construct_provider(permit)
+    process_intent = service.commit_process_intent(reservation_id, provider)
+    if operation == "process":
+        adapter.reset()
+        return session_id, process_intent, reservation_id, "PROCESS_INTENT_COMMITTED"
+
+    process_result = service.create_process(process_intent)
+    execution_id = service.record_execution(reservation_id, process_result)
+    resume_intent = service.commit_resume_intent(execution_id, reservation_id)
+    adapter.reset()
+    return session_id, resume_intent, reservation_id, "PROCESS_CREATED"
 
 
 def _prepare_external_input(
@@ -363,25 +416,10 @@ def _prepare_external_input(
     adapter: _CountingExternalAdapter,
     operation: str,
 ) -> tuple[object, str, str]:
-    session_id = service.create_session(_test_capture_request())
-    attempt_id = service.allocate_attempt(session_id)
-    claim_id = service.commit_claim(attempt_id)
-    permit = service.reserve_launch(claim_id)
-    reservation_id = str(permit)
-    if operation == "provider":
-        return permit, reservation_id, "COMMITTED"
-
-    provider = service.construct_provider(permit)
-    process_intent = service.commit_process_intent(reservation_id, provider)
-    if operation == "process":
-        adapter.reset()
-        return process_intent, reservation_id, "PROCESS_INTENT_COMMITTED"
-
-    process_result = service.create_process(process_intent)
-    execution_id = service.record_execution(reservation_id, process_result)
-    resume_intent = service.commit_resume_intent(execution_id, reservation_id)
-    adapter.reset()
-    return resume_intent, reservation_id, "PROCESS_CREATED"
+    _, capability, reservation_id, expected_state = _prepare_external_case(
+        service, adapter, operation
+    )
+    return capability, reservation_id, expected_state
 
 
 def _external_dispatch(
@@ -797,6 +835,7 @@ def test_service_consumes_external_input_before_duplicate_dispatch(
         assert first_result is not None
         assert adapter.calls[operation] == 1
         assert len(adapter.results) == 1
+        assert adapter.transaction_states == [False]
 
         with pytest.raises(ValueError, match="consumed"):
             _external_dispatch(service, operation, capability)
@@ -834,6 +873,7 @@ def test_service_consumes_external_input_when_adapter_fails(
             _external_dispatch(service, operation, capability)
         assert adapter.calls[operation] == 1
         assert adapter.results == []
+        assert adapter.transaction_states == [False]
 
         with pytest.raises(ValueError, match="consumed"):
             _external_dispatch(service, operation, capability)
@@ -923,6 +963,182 @@ def test_concurrent_duplicate_external_dispatch_consumes_once() -> None:
             "WHERE launch_reservation_id = ?",
             (reservation_id,),
         ).fetchone() == ("COMMITTED",)
+    finally:
+        service.close()
+
+
+_RECOVERY_ACTIONS = {
+    "provider": "CLASSIFY_LAUNCH_RESERVATION",
+    "process": "CLASSIFY_PROCESS_OUTCOME_UNKNOWN",
+    "resume": "CLASSIFY_RESUME_OUTCOME_UNKNOWN",
+}
+_RECOVERY_EVIDENCE = b'{"operator":"test"}'
+_RECOVERY_EVIDENCE_DIGEST = hashlib.sha256(_RECOVERY_EVIDENCE).digest()
+
+
+def _recover_reservation(
+    service: WindowsTransactionalAuthority,
+    session_id: str,
+    reservation_id: str,
+    operation: str,
+) -> None:
+    service.record_recovery(
+        session_id,
+        "LAUNCH_RESERVATION",
+        reservation_id,
+        _RECOVERY_ACTIONS[operation],
+        operator_evidence_json=_RECOVERY_EVIDENCE,
+        operator_evidence_digest=_RECOVERY_EVIDENCE_DIGEST,
+    )
+
+
+@pytest.mark.parametrize("operation", ["provider", "process", "resume"])
+def test_recovery_wins_before_external_dispatch_rejects_stale_input(
+    operation: str,
+) -> None:
+    adapter = _CountingExternalAdapter()
+    service, connection = _service_with_adapter(adapter)
+    try:
+        session_id, capability, reservation_id, _ = _prepare_external_case(
+            service, adapter, operation
+        )
+        _recover_reservation(service, session_id, reservation_id, operation)
+
+        with pytest.raises(ValueError, match="active lineage|PROCESS|resume"):
+            _external_dispatch(service, operation, capability)
+        assert adapter.calls[operation] == 0
+        assert not capability._permit.consumed  # type: ignore[attr-defined]
+        assert connection.execute(
+            "SELECT reservation_state FROM launch_reservations "
+            "WHERE launch_reservation_id = ?",
+            (reservation_id,),
+        ).fetchone() == ("MANUAL_REVIEW",)
+    finally:
+        service.close()
+
+
+@pytest.mark.parametrize("operation", ["provider", "process", "resume"])
+def test_external_dispatch_holds_arbiter_against_recovery(
+    operation: str,
+) -> None:
+    dispatch_started = threading.Event()
+    dispatch_release = threading.Event()
+    arbiter_lock = threading.Lock()
+    adapter = _CountingExternalAdapter()
+    service, connection = _service_with_adapter(
+        adapter,
+        lifecycle_arbiter_factory=lambda reservation_id: (
+            _SerializedTestLifecycleArbiter(arbiter_lock)
+        ),
+    )
+    try:
+        session_id, capability, reservation_id, _ = _prepare_external_case(
+            service, adapter, operation
+        )
+        adapter.dispatch_started = dispatch_started
+        adapter.dispatch_release = dispatch_release
+        effect_outcomes: list[object] = []
+        recovery_outcomes: list[object] = []
+        recovery_attempted = threading.Event()
+        recovery_done = threading.Event()
+
+        def run_effect() -> None:
+            try:
+                effect_outcomes.append(
+                    _external_dispatch(service, operation, capability)
+                )
+            except BaseException as error:
+                effect_outcomes.append(error)
+
+        def run_recovery() -> None:
+            recovery_attempted.set()
+            try:
+                _recover_reservation(service, session_id, reservation_id, operation)
+            except BaseException as error:
+                recovery_outcomes.append(error)
+            else:
+                recovery_outcomes.append("recovered")
+            finally:
+                recovery_done.set()
+
+        effect_thread = threading.Thread(target=run_effect)
+        effect_thread.start()
+        assert dispatch_started.wait(10)
+        recovery_thread = threading.Thread(target=run_recovery)
+        recovery_thread.start()
+        assert recovery_attempted.wait(10)
+        assert not recovery_done.wait(0.1)
+        dispatch_release.set()
+        effect_thread.join(10)
+        recovery_thread.join(10)
+
+        assert len(effect_outcomes) == 1
+        assert not isinstance(effect_outcomes[0], BaseException)
+        assert recovery_outcomes == ["recovered"]
+        assert adapter.calls[operation] == 1
+        assert adapter.transaction_states == [False]
+        assert capability._permit.consumed  # type: ignore[attr-defined]
+        assert connection.execute(
+            "SELECT reservation_state FROM launch_reservations "
+            "WHERE launch_reservation_id = ?",
+            (reservation_id,),
+        ).fetchone() == ("MANUAL_REVIEW",)
+    finally:
+        dispatch_release.set()
+        service.close()
+
+
+@pytest.mark.parametrize("operation", ["process", "resume"])
+def test_effect_result_persistence_after_recovery_is_conservative(
+    operation: str,
+) -> None:
+    dispatch_started = threading.Event()
+    dispatch_release = threading.Event()
+    arbiter_lock = threading.Lock()
+    adapter = _CountingExternalAdapter()
+    service, connection = _service_with_adapter(
+        adapter,
+        lifecycle_arbiter_factory=lambda reservation_id: (
+            _SerializedTestLifecycleArbiter(arbiter_lock)
+        ),
+    )
+    try:
+        session_id, capability, reservation_id, _ = _prepare_external_case(
+            service, adapter, operation
+        )
+        adapter.dispatch_started = dispatch_started
+        adapter.dispatch_release = dispatch_release
+        effect_outcomes: list[object] = []
+
+        def run_effect() -> None:
+            effect_outcomes.append(_external_dispatch(service, operation, capability))
+
+        effect_thread = threading.Thread(target=run_effect)
+        effect_thread.start()
+        assert dispatch_started.wait(10)
+        dispatch_release.set()
+        effect_thread.join(10)
+        assert len(effect_outcomes) == 1
+        result = effect_outcomes[0]
+
+        _recover_reservation(service, session_id, reservation_id, operation)
+        if operation == "process":
+            with pytest.raises(ValueError, match="process creation|active lineage"):
+                service.record_execution(reservation_id, result)  # type: ignore[arg-type]
+        else:
+            with pytest.raises(ValueError, match="resume"):
+                service.record_post_resume_evidence(
+                    capability.execution_id,
+                    result,  # type: ignore[attr-defined,arg-type]
+                )
+        assert not result._permit.consumed  # type: ignore[attr-defined]
+        assert adapter.calls[operation] == 1
+        assert adapter.transaction_states == [False]
+        assert connection.execute(
+            "SELECT reservation_state FROM launch_reservations "
+            "WHERE launch_reservation_id = ?",
+            (reservation_id,),
+        ).fetchone() == ("MANUAL_REVIEW",)
     finally:
         service.close()
 

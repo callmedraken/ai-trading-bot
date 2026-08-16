@@ -48,6 +48,7 @@ from trading_bot.runtime.windows_transactional_authority import (
     ExternalAuthorityBoundaryUnavailable,
     TransactionalAuthorityCore,
     TransactionalAuthorityCoreBinding,
+    TransactionalAuthorityLifecycle,
     ValidatedCaptureRequest,
 )
 from trading_bot.runtime.windows_transactional_authority import (
@@ -1625,8 +1626,14 @@ class Architecture77HarnessAuthority:
         self._capture_request_factory = capture_request_factory
         self._closed = False
         if _owner is None:
+            self._lifecycle = TransactionalAuthorityLifecycle()
+            self._close_lock = threading.Lock()
+            self._cleanup_complete = threading.Event()
+            self._cleanup_started = False
             self._connections: dict[int, sqlite3.Connection] = {}
             self._bindings: list[TransactionalAuthorityCoreBinding] = []
+        else:
+            self._lifecycle = self._owner._lifecycle
         self._register_connection(connection)
         self._core_binding_issuer = (
             TransactionalAuthorityCoreBinding.create_harness_issuer(self)
@@ -1723,15 +1730,16 @@ class Architecture77HarnessAuthority:
             raise HarnessLifecycleError("Architecture-77 harness lifecycle is closed")
 
     def _register_connection(self, connection: sqlite3.Connection) -> None:
-        self._require_open()
-        if type(connection) is not sqlite3.Connection:
-            raise TypeError("harness binding requires an exact sqlite3.Connection")
-        try:
-            connection.execute("SELECT 1")
-        except sqlite3.ProgrammingError as exc:
-            raise HarnessLifecycleError("harness connection is closed") from exc
-        self._validate_connection(connection)
-        self._owner._connections[id(connection)] = connection
+        with self._owner._lifecycle.admit():
+            self._require_open()
+            if type(connection) is not sqlite3.Connection:
+                raise TypeError("harness binding requires an exact sqlite3.Connection")
+            try:
+                connection.execute("SELECT 1")
+            except sqlite3.ProgrammingError as exc:
+                raise HarnessLifecycleError("harness connection is closed") from exc
+            self._validate_connection(connection)
+            self._owner._connections[id(connection)] = connection
 
     def _issue_transactional_core_binding(
         self,
@@ -1745,19 +1753,21 @@ class Architecture77HarnessAuthority:
     ]:
         """Return reviewed components to the supported core binding issuer."""
 
-        self._require_open()
-        if issuer is not self._core_binding_issuer:
-            raise TypeError(
-                "harness core binding issuer is not owned by this lifecycle"
+        with self._owner._lifecycle.admit():
+            self._require_open()
+            if issuer is not self._core_binding_issuer:
+                raise TypeError(
+                    "harness core binding issuer is not owned by this lifecycle"
+                )
+            self._validate_connection(self._connection)
+            return (
+                self._connection,
+                self._owner._lifecycle_arbiter_factory,
+                self._capture_request_factory,
+                None,
+                self._owner._service_token,
+                self._owner._lifecycle,
             )
-        self._validate_connection(self._connection)
-        return (
-            self._connection,
-            self._owner._lifecycle_arbiter_factory,
-            self._capture_request_factory,
-            None,
-            self._owner._service_token,
-        )
 
     def _validate_connection(self, connection: sqlite3.Connection) -> None:
         try:
@@ -1822,25 +1832,48 @@ class Architecture77HarnessAuthority:
 
     def close(self) -> None:
         owner = self._owner
-        if owner._closed:
+        with owner._close_lock:
+            if owner._cleanup_complete.is_set():
+                return
+            if owner._cleanup_started:
+                wait_for_cleanup = True
+            else:
+                owner._cleanup_started = True
+                owner._closed = True
+                wait_for_cleanup = False
+        if wait_for_cleanup:
+            owner._cleanup_complete.wait()
             return
-        owner._closed = True
         close_error = HarnessLifecycleError(
             "Architecture-77 harness lifecycle is closed"
         )
-        for binding in tuple(owner._bindings):
-            binding.invalidate_for_harness_close(close_error)
-        owner._bindings.clear()
-        for connection in tuple(owner._connections.values()):
-            try:
-                connection.execute("SELECT 1")
-            except sqlite3.ProgrammingError:
-                pass
-            else:
-                connection.close()
-        owner._connections.clear()
-        if owner._cleanup_root:
-            shutil.rmtree(owner._root, ignore_errors=True)
+        first_error: BaseException | None = None
+        try:
+            owner._lifecycle.close(close_error)
+            for binding in tuple(owner._bindings):
+                try:
+                    binding.invalidate_for_harness_close(close_error)
+                except BaseException as exc:
+                    if first_error is None:
+                        first_error = exc
+            owner._bindings.clear()
+            for connection in tuple(owner._connections.values()):
+                try:
+                    connection.close()
+                except BaseException as exc:
+                    if first_error is None:
+                        first_error = exc
+            owner._connections.clear()
+            if owner._cleanup_root:
+                try:
+                    shutil.rmtree(owner._root)
+                except BaseException as exc:
+                    if first_error is None:
+                        first_error = exc
+        finally:
+            owner._cleanup_complete.set()
+        if first_error is not None:
+            raise first_error
 
     @contextmanager
     def bind_external_effects(self) -> Iterator[None]:
@@ -1985,6 +2018,7 @@ class TestLifecycleLease:
         self._core_lease: object | None = None
         self._entered = False
         self._exited = False
+        self._release_error: BaseException | None = None
         self._execution_ids: set[str] = set()
 
     def _require_active(self) -> object:
@@ -2018,12 +2052,18 @@ class TestLifecycleLease:
     def __exit__(self, *args: object) -> None:
         if self._core_lease is None:
             if self._exited:
+                if self._release_error is not None:
+                    raise self._release_error
                 raise HarnessLifecycleError("lifecycle lease was already exited")
             return None
         lease = self._core_lease
         self._core_lease = None
         self._exited = True
-        self._authority._release_lifecycle_lease(lease, *args)
+        try:
+            self._authority._release_lifecycle_lease(lease, *args)
+        except BaseException as error:
+            self._release_error = error
+            raise
 
     def bind_execution(self, execution_id: str) -> None:
         witness = self._require_active()
@@ -3622,6 +3662,41 @@ def test_closed_harness_rejects_bindings_and_operations_without_stale_cache() ->
         TransactionalAuthorityCore.from_harness_binding(harness._core_binding)
 
 
+def test_same_exact_connection_views_share_one_operation_owner() -> None:
+    harness = Architecture77HarnessAuthority.create()
+    view = harness.bind_connection(harness._connection)
+    barrier = threading.Barrier(2)
+    outcomes: list[object] = []
+
+    def create(authority: Architecture77HarnessAuthority, target_date: str) -> None:
+        request = _request()
+        request["target_session_date"] = target_date
+        try:
+            barrier.wait()
+            outcomes.append(authority.create_session(request))
+        except BaseException as error:
+            outcomes.append(error)
+
+    threads = [
+        threading.Thread(target=create, args=(harness, "2026-01-01")),
+        threading.Thread(target=create, args=(view, "2026-01-02")),
+    ]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(10)
+
+    try:
+        assert len(outcomes) == 2
+        assert all(not isinstance(outcome, BaseException) for outcome in outcomes)
+        assert harness._connection.execute(
+            "SELECT count(*) FROM sessions"
+        ).fetchone() == (2,)
+        assert not harness._connection.in_transaction
+    finally:
+        harness.close()
+
+
 def test_raw_connection_cannot_create_a_transactional_core() -> None:
     harness = Architecture77HarnessAuthority.create()
     try:
@@ -4070,6 +4145,41 @@ def test_lifecycle_lease_success_enters_and_releases_once() -> None:
         harness.close()
 
 
+def test_lifecycle_lease_release_failure_is_terminal_and_exactly_once() -> None:
+    sentinel = RuntimeError("arbiter exit failed")
+    events: list[str] = []
+
+    class FailingExitArbiter:
+        def __enter__(self) -> FailingExitArbiter:
+            events.append("enter")
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            del args
+            events.append("exit")
+            raise sentinel
+
+    harness = Architecture77HarnessAuthority.create(
+        lifecycle_arbiter_factory=lambda reservation_id: FailingExitArbiter()
+    )
+    lease = harness.lifecycle_lease("failed-release")
+    lease.__enter__()
+    try:
+        with pytest.raises(RuntimeError, match="arbiter exit failed") as first:
+            lease.__exit__(None, None, None)
+        with pytest.raises(RuntimeError, match="arbiter exit failed") as second:
+            lease.__exit__(None, None, None)
+        assert first.value is sentinel
+        assert second.value is sentinel
+        assert events == ["enter", "exit"]
+        with pytest.raises(RuntimeError, match="arbiter exit failed"):
+            harness.close()
+        harness.close()
+        assert events == ["enter", "exit"]
+    finally:
+        harness.close()
+
+
 def test_lifecycle_lease_post_enter_setup_failure_releases_once() -> None:
     events: list[str] = []
     harness: Architecture77HarnessAuthority | None = None
@@ -4172,6 +4282,48 @@ def test_lifecycle_lease_close_releases_registered_lease_once() -> None:
         harness.close()
 
 
+def test_harness_close_attempts_all_bindings_and_preserves_first_cleanup_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    first_error = RuntimeError("first cleanup error")
+    events: list[str] = []
+
+    class FailingExitArbiter:
+        def __enter__(self) -> FailingExitArbiter:
+            events.append("enter")
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            del args
+            events.append("exit")
+            raise first_error
+
+    harness = Architecture77HarnessAuthority.create(
+        lifecycle_arbiter_factory=lambda reservation_id: FailingExitArbiter()
+    )
+    second = harness.bind_connection(harness._connection)
+    first_lease = harness.lifecycle_lease("first")
+    second_lease = second.lifecycle_lease("second")
+    first_lease.__enter__()
+    second_lease.__enter__()
+    root_cleanup_calls: list[Path] = []
+
+    def fail_root_cleanup(root: Path) -> None:
+        root_cleanup_calls.append(root)
+        raise OSError("root cleanup failed")
+
+    monkeypatch.setattr(shutil, "rmtree", fail_root_cleanup)
+    try:
+        with pytest.raises(RuntimeError, match="first cleanup error"):
+            harness.close()
+        assert events == ["enter", "enter", "exit", "exit"]
+        assert root_cleanup_calls == [harness._root]
+        harness.close()
+        assert events == ["enter", "enter", "exit", "exit"]
+    finally:
+        harness.close()
+
+
 def test_lifecycle_lease_blocked_exit_keeps_close_incomplete() -> None:
     exit_started = threading.Event()
     allow_exit = threading.Event()
@@ -4226,6 +4378,60 @@ def test_lifecycle_lease_blocked_exit_keeps_close_incomplete() -> None:
     finally:
         allow_exit.set()
         release_thread.join(10)
+        close_thread.join(10)
+        harness.close()
+
+
+def test_harness_close_waits_for_held_persistence_to_quiesce(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import trading_bot.runtime.windows_transactional_authority as authority_module
+
+    harness = Architecture77HarnessAuthority.create()
+    _, reservation_id, execution_id, receipt = _prepare_lease_resume_case(
+        harness, "2026-01-01"
+    )
+    lease = harness.lifecycle_lease(reservation_id)
+    lease.__enter__()
+    lease.bind_execution(execution_id)
+    begin_started = threading.Event()
+    release_begin = threading.Event()
+    close_done = threading.Event()
+    outcomes: list[object] = []
+    original_begin = authority_module._begin
+
+    def blocked_begin(connection: sqlite3.Connection) -> None:
+        begin_started.set()
+        assert release_begin.wait(10)
+        original_begin(connection)
+
+    monkeypatch.setattr(authority_module, "_begin", blocked_begin)
+
+    def persist() -> None:
+        try:
+            outcomes.append(lease.record_post_resume_evidence(execution_id, receipt))
+        except BaseException as error:
+            outcomes.append(error)
+
+    def close() -> None:
+        harness.close()
+        close_done.set()
+
+    persist_thread = threading.Thread(target=persist)
+    close_thread = threading.Thread(target=close)
+    persist_thread.start()
+    try:
+        assert begin_started.wait(10)
+        close_thread.start()
+        assert not close_done.wait(0.1)
+        release_begin.set()
+        persist_thread.join(10)
+        close_thread.join(10)
+        assert outcomes == [None]
+        assert close_done.is_set()
+    finally:
+        release_begin.set()
+        persist_thread.join(10)
         close_thread.join(10)
         harness.close()
 
@@ -5432,6 +5638,72 @@ def test_reservation_recovery_validates_ordinal_before_transaction_guard(
     assert _database_rows(connection) == before
     connection.rollback()
     connection.close()
+
+
+@pytest.mark.parametrize("ordinal", [True, -1, 1.5, "1"])
+def test_recovery_preflight_rejects_invalid_ordinal_before_begin(
+    ordinal: object,
+) -> None:
+    harness = Architecture77HarnessAuthority.create()
+    try:
+        session_id = harness.create_session(_request())
+        attempt_id = harness.allocate_attempt(session_id)
+        claim_id = harness.commit_claim(attempt_id)
+        reservation_id = str(harness.reserve_launch(claim_id))
+        before = _database_rows(harness._connection)
+        traces: list[str] = []
+        harness._connection.set_trace_callback(traces.append)
+        try:
+            with pytest.raises(ValueError, match="exact non-negative int"):
+                harness.record_recovery(
+                    session_id,
+                    "LAUNCH_RESERVATION",
+                    reservation_id,
+                    "CLASSIFY_LAUNCH_RESERVATION",
+                    ordinal=ordinal,  # type: ignore[arg-type]
+                    operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+                    operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
+                )
+        finally:
+            harness._connection.set_trace_callback(None)
+        assert not any(
+            statement.startswith(("BEGIN", "ROLLBACK", "INSERT INTO manual_recoveries"))
+            for statement in traces
+        )
+        assert _database_rows(harness._connection) == before
+    finally:
+        harness.close()
+
+
+def test_recovery_preflight_rejects_unknown_action_before_begin() -> None:
+    harness = Architecture77HarnessAuthority.create()
+    try:
+        session_id = harness.create_session(_request())
+        attempt_id = harness.allocate_attempt(session_id)
+        claim_id = harness.commit_claim(attempt_id)
+        reservation_id = str(harness.reserve_launch(claim_id))
+        before = _database_rows(harness._connection)
+        traces: list[str] = []
+        harness._connection.set_trace_callback(traces.append)
+        try:
+            with pytest.raises(ValueError, match="unknown recovery action"):
+                harness.record_recovery(
+                    session_id,
+                    "LAUNCH_RESERVATION",
+                    reservation_id,
+                    "UNKNOWN_ACTION",
+                    operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+                    operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
+                )
+        finally:
+            harness._connection.set_trace_callback(None)
+        assert not any(
+            statement.startswith(("BEGIN", "ROLLBACK", "INSERT INTO manual_recoveries"))
+            for statement in traces
+        )
+        assert _database_rows(harness._connection) == before
+    finally:
+        harness.close()
 
 
 def test_lifecycle_arbiter_identity_and_global_lock_order_are_explicit() -> None:

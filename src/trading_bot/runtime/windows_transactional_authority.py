@@ -19,6 +19,7 @@ from collections.abc import Callable, Iterator
 from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
+from functools import wraps
 from pathlib import Path
 from typing import Any, Protocol, Self
 
@@ -88,6 +89,130 @@ class ExternalAuthorityBoundaryUnavailable(WindowsAuthorityError):
     """C2 has no production provider/process side-effect adapter."""
 
 
+class TransactionalAuthorityLifecycle:
+    """Shared admission/quiescence state for one disposable test lifecycle."""
+
+    __slots__ = (
+        "_active_operations",
+        "_close_error",
+        "_close_complete",
+        "_quiescing_operations",
+        "_state",
+        "_state_lock",
+        "_drained",
+    )
+
+    def __init__(self) -> None:
+        self._state_lock = threading.Lock()
+        self._state = "OPEN"
+        self._active_operations = 0
+        self._quiescing_operations = 0
+        self._drained = threading.Event()
+        self._drained.set()
+        self._close_complete = threading.Event()
+        self._close_error: BaseException | None = None
+
+    def _closed_error(self) -> BaseException:
+        return self._close_error or ExternalAuthorityBoundaryUnavailable(
+            "transactional authority lifecycle is closed"
+        )
+
+    def require_open(self) -> None:
+        with self._state_lock:
+            if self._state != "OPEN":
+                raise self._closed_error()
+
+    @contextmanager
+    def admit(self, *, wait_for_close: bool = True) -> Iterator[None]:
+        with self._state_lock:
+            if self._state != "OPEN":
+                raise self._closed_error()
+            self._active_operations += 1
+            if wait_for_close:
+                if self._quiescing_operations == 0:
+                    self._drained.clear()
+                self._quiescing_operations += 1
+        try:
+            yield
+        finally:
+            with self._state_lock:
+                self._active_operations -= 1
+                if wait_for_close:
+                    self._quiescing_operations -= 1
+                    if self._quiescing_operations == 0:
+                        self._drained.set()
+
+    def close(self, error: BaseException | None = None) -> None:
+        """Stop admission, drain ordinary operations, and become terminal."""
+
+        with self._state_lock:
+            if self._state == "CLOSED":
+                return
+            if self._state == "CLOSING":
+                wait_for_close = True
+            else:
+                self._state = "CLOSING"
+                self._close_error = error
+                wait_for_close = False
+        if wait_for_close:
+            self._close_complete.wait()
+            return
+        self._drained.wait()
+        with self._state_lock:
+            self._state = "CLOSED"
+            self._close_complete.set()
+
+
+class _ConnectionOperationCoordinator:
+    """Serialize complete logical transactions for one exact connection."""
+
+    __slots__ = ("lock",)
+
+    def __init__(self) -> None:
+        self.lock = threading.RLock()
+
+
+_CONNECTION_COORDINATORS_LOCK = threading.Lock()
+_CONNECTION_COORDINATORS: dict[
+    int, tuple[sqlite3.Connection, _ConnectionOperationCoordinator]
+] = {}
+
+
+def _connection_operation_coordinator(
+    connection: sqlite3.Connection,
+) -> _ConnectionOperationCoordinator:
+    if type(connection) is not sqlite3.Connection:
+        raise TypeError("connection operation requires an exact sqlite3.Connection")
+    identity = id(connection)
+    with _CONNECTION_COORDINATORS_LOCK:
+        entry = _CONNECTION_COORDINATORS.get(identity)
+        if entry is None or entry[0] is not connection:
+            coordinator = _ConnectionOperationCoordinator()
+            _CONNECTION_COORDINATORS[identity] = (connection, coordinator)
+            return coordinator
+        return entry[1]
+
+
+@contextmanager
+def _connection_operation(connection: sqlite3.Connection) -> Iterator[None]:
+    coordinator = _connection_operation_coordinator(connection)
+    with coordinator.lock:
+        yield
+
+
+def _serialized_connection_operation(
+    function: Callable[..., Any],
+) -> Callable[..., Any]:
+    """Wrap one complete SQL state-machine transition in connection ownership."""
+
+    @wraps(function)
+    def wrapped(connection: sqlite3.Connection, *args: Any, **kwargs: Any) -> Any:
+        with _connection_operation(connection):
+            return function(connection, *args, **kwargs)
+
+    return wrapped
+
+
 class TransactionalAuthorityAdapter(Protocol):
     """Narrow future side-effect adapter; C2 supplies no production instance."""
 
@@ -109,6 +234,7 @@ class _ServiceContext:
     timestamp_provider: Callable[[str], str]
     capture_request_provider: Callable[[object], ValidatedCaptureRequest]
     test_only: bool
+    lifecycle: TransactionalAuthorityLifecycle | None = None
     external_adapter: TransactionalAuthorityAdapter | None = None
     test_database: DisposableAuthorityDatabaseForTest | None = None
     test_service_token: object | None = None
@@ -148,7 +274,8 @@ def _inspect_disposable_database_identity(
 ) -> _DisposableDatabaseIdentity:
     if type(connection) is not sqlite3.Connection:
         raise TypeError("disposable database requires exact sqlite3.Connection")
-    rows = connection.execute("PRAGMA database_list").fetchall()
+    with _connection_operation(connection):
+        rows = connection.execute("PRAGMA database_list").fetchall()
     identity = _DisposableDatabaseIdentity(
         tuple(
             (int(sequence), str(name), "" if filename is None else str(filename))
@@ -1002,13 +1129,14 @@ def _recovery_id(
 def _require_no_active_transaction(connection: sqlite3.Connection) -> None:
     if type(connection) is not sqlite3.Connection:
         raise TypeError("lifecycle boundary requires an exact sqlite3.Connection")
-    if connection.in_transaction:
-        raise ValueError("lifecycle boundary requires no active SQLite transaction")
-    context = _require_service_context()
-    if context.test_only:
-        test_database = context.test_database
-        if test_database is not None:
-            test_database.validate_identity()
+    with _connection_operation(connection):
+        if connection.in_transaction:
+            raise ValueError("lifecycle boundary requires no active SQLite transaction")
+        context = _require_service_context()
+        if context.test_only:
+            test_database = context.test_database
+            if test_database is not None:
+                test_database.validate_identity()
 
 
 def _begin(connection: sqlite3.Connection) -> None:
@@ -1019,6 +1147,7 @@ def _finish(connection: sqlite3.Connection, commit: bool) -> None:
     (connection.commit if commit else connection.rollback)()
 
 
+@_serialized_connection_operation
 def _core_create_session(
     connection: sqlite3.Connection,
     request: dict[str, Any] | None = None,
@@ -1107,6 +1236,7 @@ def _core_create_session(
     return session_id
 
 
+@_serialized_connection_operation
 def _core_allocate_attempt(
     connection: sqlite3.Connection,
     session_id: str,
@@ -1263,6 +1393,7 @@ def _validate_claim_admission_evidence(
         )
 
 
+@_serialized_connection_operation
 def _core_commit_claim(
     connection: sqlite3.Connection,
     attempt_id: str,
@@ -1339,6 +1470,7 @@ def _core_commit_claim(
     return claim_id
 
 
+@_serialized_connection_operation
 def _core_reserve_launch(
     connection: sqlite3.Connection,
     claim_id: str,
@@ -1766,6 +1898,7 @@ def _core_commit_process_intent(
         )
 
 
+@_serialized_connection_operation
 def _commit_process_intent_locked(
     connection: sqlite3.Connection,
     reservation_id: str,
@@ -2231,6 +2364,7 @@ def _core_record_execution(
         return _record_execution_locked(connection, registered_reservation_id, receipt)
 
 
+@_serialized_connection_operation
 def _record_execution_locked(
     connection: sqlite3.Connection,
     reservation_id: str,
@@ -2343,6 +2477,7 @@ def _core_commit_resume_intent(
         return _commit_resume_intent_locked(connection, execution_id, reservation_id)
 
 
+@_serialized_connection_operation
 def _commit_resume_intent_locked(
     connection: sqlite3.Connection, execution_id: str, reservation_id: str
 ) -> ResumeIntent:
@@ -2491,6 +2626,7 @@ def _core_record_process_creation_failure(
         )
 
 
+@_serialized_connection_operation
 def _record_process_creation_failure_locked(
     connection: sqlite3.Connection,
     reservation_id: str,
@@ -2696,6 +2832,7 @@ def _core_record_post_resume_evidence(
         )
 
 
+@_serialized_connection_operation
 def _record_post_resume_evidence_locked(
     connection: sqlite3.Connection,
     execution_id: str,
@@ -2800,6 +2937,7 @@ def _core_record_terminal(
         )
 
 
+@_serialized_connection_operation
 def _record_terminal_locked(
     connection: sqlite3.Connection,
     reservation_id: str,
@@ -2956,6 +3094,7 @@ def _insert_selection_in_transaction(
     return selection_id
 
 
+@_serialized_connection_operation
 def _core_select_terminal(
     connection: sqlite3.Connection, session_id: str, terminal_id: str
 ) -> str:
@@ -3160,6 +3299,27 @@ def _validate_recovery_target_evidence(
         _require_evidence_pair(values[0], values[1], field=f"{pair} digest")
 
 
+def _preflight_recovery_request(
+    target_kind: str,
+    action: str,
+    ordinal: object,
+    *,
+    operator_evidence_json: bytes,
+    operator_evidence_digest: bytes,
+) -> int | None:
+    if action not in _RECOVERY_ACTIONS:
+        raise ValueError("unknown recovery action")
+    expected_kind, _, _ = _RECOVERY_ACTIONS[action]
+    if target_kind != expected_kind:
+        raise ValueError("recovery action target kind is invalid")
+    _require_evidence_pair(
+        operator_evidence_json,
+        operator_evidence_digest,
+        field="operator evidence digest",
+    )
+    return None if ordinal is None else _canonical_ordinal(ordinal, "recovery ordinal")
+
+
 def _core_record_recovery(
     connection: sqlite3.Connection,
     session_id: str,
@@ -3172,15 +3332,14 @@ def _core_record_recovery(
     operator_evidence_digest: bytes,
 ) -> str:
     _require_service_context()
+    requested_ordinal = _preflight_recovery_request(
+        target_kind,
+        action,
+        ordinal,
+        operator_evidence_json=operator_evidence_json,
+        operator_evidence_digest=operator_evidence_digest,
+    )
     _require_no_active_transaction(connection)
-    _require_evidence_pair(
-        operator_evidence_json,
-        operator_evidence_digest,
-        field="operator evidence digest",
-    )
-    requested_ordinal = (
-        None if ordinal is None else _canonical_ordinal(ordinal, "recovery ordinal")
-    )
     target_id = str(target_id)
     if target_kind == "LAUNCH_RESERVATION" and action.startswith("CLASSIFY_"):
         with _lifecycle_arbiter(target_id):
@@ -3206,6 +3365,7 @@ def _core_record_recovery(
     )
 
 
+@_serialized_connection_operation
 def _record_recovery_locked(
     connection: sqlite3.Connection,
     session_id: str,
@@ -3218,11 +3378,14 @@ def _record_recovery_locked(
     operator_evidence_digest: bytes,
 ) -> str:
     target_id = str(target_id)
-    _require_evidence_pair(
-        operator_evidence_json,
-        operator_evidence_digest,
-        field="operator evidence digest",
+    requested_ordinal = _preflight_recovery_request(
+        target_kind,
+        action,
+        ordinal,
+        operator_evidence_json=operator_evidence_json,
+        operator_evidence_digest=operator_evidence_digest,
     )
+    _require_no_active_transaction(connection)
     _begin(connection)
     try:
         expected_kind, _, resulting = _RECOVERY_ACTIONS[action]
@@ -3235,9 +3398,6 @@ def _record_recovery_locked(
         if row is None:
             raise ValueError("unknown recovery session")
         current_ordinal = _canonical_ordinal(row[0], "recovery ordinal")
-        requested_ordinal = (
-            None if ordinal is None else _canonical_ordinal(ordinal, "recovery ordinal")
-        )
         recovery_ordinal = (
             current_ordinal if requested_ordinal is None else requested_ordinal
         )
@@ -3397,7 +3557,9 @@ class _TransactionalLease:
 
     def __exit__(self, *args: object) -> None:
         with self._binding._lifecycle_state_lock:
-            if self._state == "RELEASED":
+            if self._state in {"RELEASED", "RELEASE_FAILED"}:
+                if self._release_exception is not None:
+                    raise self._release_exception
                 if self._lifecycle_error is not None:
                     raise self._lifecycle_error
                 raise ExternalAuthorityBoundaryUnavailable(
@@ -3413,6 +3575,8 @@ class _TransactionalLease:
         if wait_for_release:
             self._release_complete.wait()
             with self._binding._lifecycle_state_lock:
+                if self._release_exception is not None:
+                    raise self._release_exception
                 if self._lifecycle_error is not None:
                     raise self._lifecycle_error
             raise ExternalAuthorityBoundaryUnavailable(
@@ -3422,7 +3586,7 @@ class _TransactionalLease:
 
     def invalidate_for_harness_close(self, error: BaseException) -> None:
         with self._binding._lifecycle_state_lock:
-            if self._state == "RELEASED":
+            if self._state in {"RELEASED", "RELEASE_FAILED"}:
                 return
             self._lifecycle_error = error
             if self._state == "RELEASING":
@@ -3438,10 +3602,15 @@ class _TransactionalLease:
         except BaseException as exc:
             with self._binding._lifecycle_state_lock:
                 self._release_exception = exc
+                self._state = "RELEASE_FAILED"
+                self._binding._release_failures.append(exc)
             raise
         finally:
             with self._binding._lifecycle_state_lock:
-                self._state = "RELEASED"
+                if self._state != "RELEASE_FAILED":
+                    self._state = "RELEASED"
+                self.active = False
+                self._witness.active = False
                 self._binding._active_leases.discard(self)
                 self._release_complete.set()
 
@@ -3510,6 +3679,8 @@ class TransactionalAuthorityCoreBinding:
         "_connection",
         "_external_adapter",
         "_active_leases",
+        "_release_failures",
+        "_lifecycle",
         "_lifecycle_state_lock",
         "_lifecycle_arbiter_factory",
         "_lifecycle_error",
@@ -3559,7 +3730,7 @@ class TransactionalAuthorityCoreBinding:
         ):
             raise TypeError("transactional core binding requires the reviewed issuer")
         components = issuer._components()
-        if type(components) is not tuple or len(components) != 5:
+        if type(components) is not tuple or len(components) != 6:
             raise TypeError(
                 "transactional core binding issuer returned invalid material"
             )
@@ -3569,6 +3740,7 @@ class TransactionalAuthorityCoreBinding:
             capture_request_factory,
             external_adapter,
             service_token,
+            lifecycle,
         ) = components
         if type(connection) is not sqlite3.Connection:
             raise TypeError(
@@ -3584,14 +3756,17 @@ class TransactionalAuthorityCoreBinding:
             )
         if service_token is None:
             raise TypeError("transactional core binding requires harness provenance")
+        if type(lifecycle) is not TransactionalAuthorityLifecycle:
+            raise TypeError("transactional core binding requires lifecycle state")
         _weak_reference(service_token, "transactional core binding service token")
         try:
-            database_list = connection.execute("PRAGMA database_list").fetchall()
-            schema = connection.execute(
-                "SELECT production_schema_id, production_schema_version, "
-                "production_schema_digest FROM authority_metadata "
-                "WHERE singleton_key = 1"
-            ).fetchone()
+            with _connection_operation(connection):
+                database_list = connection.execute("PRAGMA database_list").fetchall()
+                schema = connection.execute(
+                    "SELECT production_schema_id, production_schema_version, "
+                    "production_schema_digest FROM authority_metadata "
+                    "WHERE singleton_key = 1"
+                ).fetchone()
         except sqlite3.Error as exc:
             raise TypeError(
                 "transactional core binding storage is not reviewed"
@@ -3625,6 +3800,8 @@ class TransactionalAuthorityCoreBinding:
         binding = object.__new__(cls)
         binding._active = True
         binding._active_leases = set()
+        binding._release_failures = []
+        binding._lifecycle = lifecycle
         binding._lifecycle_state_lock = threading.RLock()
         binding._connection = connection
         binding._lifecycle_arbiter_factory = lifecycle_arbiter_factory
@@ -3652,6 +3829,7 @@ class TransactionalAuthorityCoreBinding:
         Callable[[object], ValidatedCaptureRequest] | None,
         TransactionalAuthorityAdapter | None,
         object,
+        TransactionalAuthorityLifecycle,
     ]:
         self._require_active()
         return (
@@ -3660,6 +3838,7 @@ class TransactionalAuthorityCoreBinding:
             self._capture_request_factory,
             self._external_adapter,
             self._service_token,
+            self._lifecycle,
         )
 
     def acquire_lifecycle_lease(
@@ -3677,7 +3856,7 @@ class TransactionalAuthorityCoreBinding:
             raise TypeError(
                 "lifecycle lease witness requires its reviewed core binding"
             )
-        with core._bound_context():
+        with core._bound_context(wait_for_close=False):
             _require_no_active_transaction(self._connection)
             arbiter = self._lifecycle_arbiter_factory(str(reservation_id))
             arbiter.__enter__()
@@ -3716,7 +3895,9 @@ class TransactionalAuthorityCoreBinding:
             self._active = False
             self._lifecycle_error = close_error
             leases = tuple(self._active_leases)
-        release_error: BaseException | None = None
+            release_error: BaseException | None = (
+                self._release_failures[0] if self._release_failures else None
+            )
         for lease in leases:
             try:
                 lease.invalidate_for_harness_close(close_error)
@@ -3774,6 +3955,7 @@ class TransactionalAuthorityCore:
             capture_request_factory,
             external_adapter,
             service_token,
+            lifecycle,
         ) = binding._components()
         if type(connection) is not sqlite3.Connection:
             raise TypeError("transactional core requires an exact sqlite3.Connection")
@@ -3792,6 +3974,7 @@ class TransactionalAuthorityCore:
                         else capture_request_factory
                     ),
                     test_only=True,
+                    lifecycle=lifecycle,
                     external_adapter=external_adapter,
                     test_service_token=service_token,
                 ),
@@ -3850,12 +4033,13 @@ class TransactionalAuthorityCore:
 
         self._require_lifecycle_lease_witness(lease_witness, reservation_id)
         with self._bound_context():
-            _require_no_active_transaction(self._connection)
-            row = self._connection.execute(
-                "SELECT launch_reservation_id FROM launch_executions "
-                "WHERE launch_execution_id = ?",
-                (str(execution_id),),
-            ).fetchone()
+            with _connection_operation(self._connection):
+                _require_no_active_transaction(self._connection)
+                row = self._connection.execute(
+                    "SELECT launch_reservation_id FROM launch_executions "
+                    "WHERE launch_execution_id = ?",
+                    (str(execution_id),),
+                ).fetchone()
         if row is None or row[0] != str(reservation_id):
             raise ValueError("execution does not belong to the held reservation")
 
@@ -3900,9 +4084,10 @@ class TransactionalAuthorityCore:
                 )
                 reservation_id = _registered_provider_reservation_id(capability)
                 with _lifecycle_arbiter(reservation_id):
-                    _require_provider_construction_lineage(
-                        self._connection, reservation_id
-                    )
+                    with _connection_operation(self._connection):
+                        _require_provider_construction_lineage(
+                            self._connection, reservation_id
+                        )
                     _consume_provider_construction_permit(capability, reservation_id)
                     result = adapter.construct_provider(capability, fail=fail)
                     if type(result) is not ConstructedProvider:
@@ -3935,12 +4120,13 @@ class TransactionalAuthorityCore:
                 )
                 reservation_id = _registered_process_intent_reservation_id(capability)
                 with _lifecycle_arbiter(reservation_id):
-                    _require_process_creation_lineage(
-                        self._connection,
-                        reservation_id,
-                        capability.intent_digest,
-                        capability.intent_json,
-                    )
+                    with _connection_operation(self._connection):
+                        _require_process_creation_lineage(
+                            self._connection,
+                            reservation_id,
+                            capability.intent_digest,
+                            capability.intent_json,
+                        )
                     _consume_process_intent(capability, reservation_id)
                     result = adapter.create_process(capability, fail=fail)
                     if type(result) not in {
@@ -3980,13 +4166,14 @@ class TransactionalAuthorityCore:
                     capability
                 )
                 with _lifecycle_arbiter(reservation_id):
-                    _require_resume_thread_lineage(
-                        self._connection,
-                        execution_id,
-                        reservation_id,
-                        capability.intent_digest,
-                        capability.intent_json,
-                    )
+                    with _connection_operation(self._connection):
+                        _require_resume_thread_lineage(
+                            self._connection,
+                            execution_id,
+                            reservation_id,
+                            capability.intent_digest,
+                            capability.intent_json,
+                        )
                     _consume_resume_intent(capability, execution_id, reservation_id)
                     result = adapter.resume_thread(capability, fail=fail)
                     if type(result) is not ResumeReceipt:
@@ -4010,13 +4197,23 @@ class TransactionalAuthorityCore:
             raise ValueError("unsupported external-effect operation")
 
     @contextmanager
-    def _bound_context(self) -> Iterator[None]:
+    def _bound_context(self, *, wait_for_close: bool = True) -> Iterator[None]:
         self._require_binding_active()
-        token = _CURRENT_SERVICE_CONTEXT.set(self._context)
-        try:
-            yield
-        finally:
-            _CURRENT_SERVICE_CONTEXT.reset(token)
+        lifecycle = self._context.lifecycle
+        if lifecycle is None:
+            token = _CURRENT_SERVICE_CONTEXT.set(self._context)
+            try:
+                yield
+            finally:
+                _CURRENT_SERVICE_CONTEXT.reset(token)
+            return
+        with lifecycle.admit(wait_for_close=wait_for_close):
+            self._require_binding_active()
+            token = _CURRENT_SERVICE_CONTEXT.set(self._context)
+            try:
+                yield
+            finally:
+                _CURRENT_SERVICE_CONTEXT.reset(token)
 
     def require_test_capability(self, capability: object) -> None:
         with self._bound_context():
@@ -4378,22 +4575,31 @@ class TransactionalAuthorityCore:
         witness = self._require_lifecycle_lease_witness(lease_witness)
         with self._bound_context():
             _require_no_active_transaction(self._connection)
-            self._require_recovery_target_reservation(
-                session_id,
+            requested_ordinal = _preflight_recovery_request(
                 target_kind,
-                target_id,
-                witness.reservation_id,
-            )
-            return _record_recovery_locked(
-                self._connection,
-                session_id,
-                target_kind,
-                target_id,
                 action,
                 ordinal,
                 operator_evidence_json=operator_evidence_json,
                 operator_evidence_digest=operator_evidence_digest,
             )
+            with _connection_operation(self._connection):
+                _require_no_active_transaction(self._connection)
+                self._require_recovery_target_reservation(
+                    session_id,
+                    target_kind,
+                    target_id,
+                    witness.reservation_id,
+                )
+                return _record_recovery_locked(
+                    self._connection,
+                    session_id,
+                    target_kind,
+                    target_id,
+                    action,
+                    requested_ordinal,
+                    operator_evidence_json=operator_evidence_json,
+                    operator_evidence_digest=operator_evidence_digest,
+                )
 
     def _require_recovery_target_reservation(
         self,
@@ -4473,14 +4679,14 @@ class TransactionalAuthorityCore:
             raise ValueError(
                 "recovery target kind cannot be bound to the held reservation"
             )
-        with self._bound_context():
-            row = self._connection.execute(*query).fetchone()
+        row = self._connection.execute(*query).fetchone()
         if row is None:
             raise ValueError("recovery target is outside the held reservation")
 
     def target_state(self, target_kind: str, target_id: str) -> str:
         with self._bound_context():
-            return _target_state(self._connection, target_kind, target_id)
+            with _connection_operation(self._connection):
+                return _target_state(self._connection, target_kind, target_id)
 
     def validate_recovery_target_evidence(
         self,
@@ -4490,9 +4696,10 @@ class TransactionalAuthorityCore:
         action: str,
     ) -> None:
         with self._bound_context():
-            return _validate_recovery_target_evidence(
-                self._connection, session_id, target_kind, target_id, action
-            )
+            with _connection_operation(self._connection):
+                return _validate_recovery_target_evidence(
+                    self._connection, session_id, target_kind, target_id, action
+                )
 
 
 class WindowsTransactionalAuthority:
@@ -4540,6 +4747,7 @@ class WindowsTransactionalAuthority:
         instance._connection = database._connection
         instance._core = None
         instance._test_database = database
+        lifecycle = TransactionalAuthorityLifecycle()
         instance._context = _ServiceContext(
             authority=None,
             lifecycle_arbiter_factory=lifecycle_arbiter_factory,
@@ -4550,6 +4758,7 @@ class WindowsTransactionalAuthority:
                 else capture_request_factory
             ),
             test_only=True,
+            lifecycle=lifecycle,
             external_adapter=external_adapter,
             test_database=database,
             test_service_token=_TestServiceToken(),
@@ -4585,7 +4794,10 @@ class WindowsTransactionalAuthority:
                 self._authority, connection
             )
         except BaseException:
-            connection.close()
+            try:
+                connection.close()
+            except BaseException:
+                pass
             raise
         self._connection = connection
         return connection
@@ -4593,7 +4805,19 @@ class WindowsTransactionalAuthority:
     def _service_timestamp(self, fallback: str) -> str:
         return self._context.timestamp_provider(fallback)
 
+    def _require_service_open(self) -> None:
+        lifecycle = self._context.lifecycle
+        if lifecycle is not None:
+            lifecycle.require_open()
+
     def close(self) -> None:
+        lifecycle = self._context.lifecycle
+        if lifecycle is not None:
+            lifecycle.close(
+                ExternalAuthorityBoundaryUnavailable(
+                    "test authority service lifecycle is closed"
+                )
+            )
         connection = self._connection
         self._connection = None
         self._core = None
@@ -4603,17 +4827,18 @@ class WindowsTransactionalAuthority:
 
     def _core_for_operation(self) -> TransactionalAuthorityCore:
         if self._context.test_only:
-            test_database = self._test_database
-            if test_database is None:
+            lifecycle = self._context.lifecycle
+            if lifecycle is None:
+                raise ExternalAuthorityBoundaryUnavailable(
+                    "test service has no lifecycle state"
+                )
+            lifecycle.require_open()
+            if self._test_database is None or self._connection is None:
                 raise ExternalAuthorityBoundaryUnavailable(
                     "test service has no reviewed disposable database"
                 )
-            if self._connection is not None and self._connection.in_transaction:
-                raise ValueError(
-                    "lifecycle boundary requires no active SQLite transaction"
-                )
-            test_database.validate_identity()
-        self._open_production_connection()
+        else:
+            self._open_production_connection()
         if self._connection is None:
             raise ExternalAuthorityBoundaryUnavailable(
                 "transactional authority has no database connection"
@@ -4650,6 +4875,7 @@ class WindowsTransactionalAuthority:
     def commit_process_intent(
         self, reservation_id: str, provider: ConstructedProvider
     ) -> ProcessIntent:
+        self._require_service_open()
         _require_service_provenance(
             provider,
             production_issuer=_CONSTRUCTED_PROVIDER_ISSUER,
@@ -4665,6 +4891,7 @@ class WindowsTransactionalAuthority:
     def record_execution(
         self, reservation_id: str, receipt: ProcessCreationReceipt
     ) -> str:
+        self._require_service_open()
         _require_service_provenance(
             receipt,
             production_issuer=_PROCESS_RESULT_ISSUER,
@@ -4685,6 +4912,7 @@ class WindowsTransactionalAuthority:
     def record_process_creation_failure(
         self, reservation_id: str, failure: ProcessCreationFailure
     ) -> None:
+        self._require_service_open()
         _require_service_provenance(
             failure,
             production_issuer=_PROCESS_RESULT_ISSUER,
@@ -4700,6 +4928,7 @@ class WindowsTransactionalAuthority:
     def record_post_resume_evidence(
         self, execution_id: str, receipt: ResumeReceipt
     ) -> None:
+        self._require_service_open()
         _require_service_provenance(
             receipt,
             production_issuer=_RESUME_RESULT_ISSUER,
@@ -4756,6 +4985,7 @@ class WindowsTransactionalAuthority:
     def construct_provider(
         self, capability: ProviderConstructionPermit, *, fail: bool = False
     ) -> ConstructedProvider:
+        self._require_service_open()
         if self._context.external_adapter is None:
             raise ExternalAuthorityBoundaryUnavailable(
                 "C2 production has no provider construction adapter"
@@ -4767,6 +4997,7 @@ class WindowsTransactionalAuthority:
     def create_process(
         self, process_intent: ProcessIntent, *, fail: bool = False
     ) -> ProcessCreationReceipt | ProcessCreationFailure:
+        self._require_service_open()
         if self._context.external_adapter is None:
             raise ExternalAuthorityBoundaryUnavailable(
                 "C2 production has no process creation adapter"
@@ -4778,6 +5009,7 @@ class WindowsTransactionalAuthority:
     def resume_thread(
         self, resume_intent: ResumeIntent, *, fail: bool = False
     ) -> ResumeReceipt:
+        self._require_service_open()
         if self._context.external_adapter is None:
             raise ExternalAuthorityBoundaryUnavailable(
                 "C2 production has no resume adapter"

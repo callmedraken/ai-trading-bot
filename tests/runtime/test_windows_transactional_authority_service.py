@@ -822,6 +822,186 @@ def test_disposable_database_service_claim_is_atomic_under_concurrency() -> None
     successes[0].close()
 
 
+def test_same_exact_service_connection_serializes_concurrent_sessions() -> None:
+    adapter = _CountingExternalAdapter()
+    service, connection = _service_with_adapter(adapter)
+    barrier = threading.Barrier(2)
+    outcomes: list[object] = []
+
+    def create(target_date: str) -> None:
+        request = _test_capture_request()
+        request["target_session_date"] = target_date
+        try:
+            barrier.wait()
+            outcomes.append(service.create_session(request))
+        except BaseException as error:
+            outcomes.append(error)
+
+    threads = [
+        threading.Thread(target=create, args=("2026-01-01",)),
+        threading.Thread(target=create, args=("2026-01-02",)),
+    ]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(10)
+
+    try:
+        assert all(not isinstance(outcome, BaseException) for outcome in outcomes)
+        assert len(outcomes) == 2
+        assert connection.execute("SELECT count(*) FROM sessions").fetchone() == (2,)
+        assert not connection.in_transaction
+    finally:
+        service.close()
+
+
+def test_same_exact_service_connection_rolls_back_one_failed_operation_only() -> None:
+    adapter = _CountingExternalAdapter()
+    service, connection = _service_with_adapter(adapter)
+    request = _test_capture_request()
+    barrier = threading.Barrier(2)
+    outcomes: list[object] = []
+
+    def create() -> None:
+        try:
+            barrier.wait()
+            outcomes.append(service.create_session(request))
+        except BaseException as error:
+            outcomes.append(error)
+
+    threads = [threading.Thread(target=create) for _ in range(2)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(10)
+
+    try:
+        assert len(outcomes) == 2
+        assert sum(isinstance(outcome, str) for outcome in outcomes) == 1
+        assert (
+            sum(isinstance(outcome, sqlite3.IntegrityError) for outcome in outcomes)
+            == 1
+        )
+        assert connection.execute("SELECT count(*) FROM sessions").fetchone() == (1,)
+        assert not connection.in_transaction
+    finally:
+        service.close()
+
+
+def test_test_service_close_waits_for_blocked_durable_operation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import trading_bot.runtime.windows_transactional_authority as authority_module
+
+    adapter = _CountingExternalAdapter()
+    service, _ = _service_with_adapter(adapter)
+    begin_started = threading.Event()
+    release_begin = threading.Event()
+    close_started = threading.Event()
+    close_done = threading.Event()
+    outcomes: list[object] = []
+    original_begin = authority_module._begin
+
+    def blocked_begin(connection: sqlite3.Connection) -> None:
+        begin_started.set()
+        assert release_begin.wait(10)
+        original_begin(connection)
+
+    monkeypatch.setattr(authority_module, "_begin", blocked_begin)
+
+    def create() -> None:
+        try:
+            outcomes.append(service.create_session(_test_capture_request()))
+        except BaseException as error:
+            outcomes.append(error)
+
+    def close() -> None:
+        close_started.set()
+        service.close()
+        close_done.set()
+
+    operation_thread = threading.Thread(target=create)
+    close_thread = threading.Thread(target=close)
+    operation_thread.start()
+    try:
+        assert begin_started.wait(10)
+        close_thread.start()
+        assert close_started.wait(10)
+        assert not close_done.wait(0.1)
+        release_begin.set()
+        operation_thread.join(10)
+        close_thread.join(10)
+        assert outcomes and isinstance(outcomes[0], str)
+        assert close_done.is_set()
+    finally:
+        release_begin.set()
+        operation_thread.join(10)
+        close_thread.join(10)
+        service.close()
+
+
+def test_test_service_close_waits_for_external_adapter_completion() -> None:
+    dispatch_started = threading.Event()
+    dispatch_release = threading.Event()
+    adapter = _CountingExternalAdapter(
+        dispatch_started=dispatch_started,
+        dispatch_release=dispatch_release,
+    )
+    service, _ = _service_with_adapter(adapter)
+    capability, _, _ = _prepare_external_input(service, adapter, "provider")
+    outcomes: list[object] = []
+    close_started = threading.Event()
+    close_done = threading.Event()
+
+    def dispatch() -> None:
+        try:
+            outcomes.append(_external_dispatch(service, "provider", capability))
+        except BaseException as error:
+            outcomes.append(error)
+
+    def close() -> None:
+        close_started.set()
+        service.close()
+        close_done.set()
+
+    dispatch_thread = threading.Thread(target=dispatch)
+    close_thread = threading.Thread(target=close)
+    dispatch_thread.start()
+    try:
+        assert dispatch_started.wait(10)
+        close_thread.start()
+        assert close_started.wait(10)
+        assert not close_done.wait(0.1)
+        dispatch_release.set()
+        dispatch_thread.join(10)
+        close_thread.join(10)
+        assert outcomes and not isinstance(outcomes[0], BaseException)
+        assert close_done.is_set()
+        assert adapter.transaction_states == [False]
+    finally:
+        dispatch_release.set()
+        dispatch_thread.join(10)
+        close_thread.join(10)
+        service.close()
+
+
+def test_anonymous_test_service_close_invalidates_retained_core_and_capability() -> (
+    None
+):
+    service, core = _test_consumer_core()
+    with core.bind_external_effects():
+        capability = issue_constructed_provider_for_test("closed-service")
+    service.close()
+    service.close()
+
+    with pytest.raises(ExternalAuthorityBoundaryUnavailable, match="closed"):
+        service.create_session(_test_capture_request())
+    with pytest.raises(ExternalAuthorityBoundaryUnavailable, match="closed"):
+        core.create_session(_test_capture_request())
+    with pytest.raises(ExternalAuthorityBoundaryUnavailable, match="closed"):
+        consume_constructed_provider_for_test(capability, "closed-service", core=core)
+
+
 @pytest.mark.parametrize("operation", ["provider", "process", "resume"])
 def test_service_consumes_external_input_before_duplicate_dispatch(
     operation: str,

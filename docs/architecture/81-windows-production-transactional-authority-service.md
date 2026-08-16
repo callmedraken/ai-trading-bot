@@ -105,6 +105,17 @@ arbitrary operation callback. Public raw-connection durable mutators and
 public raw-connection `*_locked_for_test` writers do not exist. Already-held
 arbiter tests use the harness-owned named `TestLifecycleLease` operations.
 
+Lifecycle close has an intentional production-versus-test distinction.
+`WindowsTransactionalAuthority.close()` is non-terminal in production: it
+releases the current database connection, and a later operation may reopen it
+only after the existing exact `ValidatedProductionAuthority` identity
+revalidation succeeds. The anonymous `for_test` service and the file-backed
+Architecture-77 harness have terminal disposable lifetimes. Their close
+operations stop new admission, drain in-flight work, invalidate retained
+bindings/leases, and close owned storage; retained test cores, service tokens,
+and capabilities therefore cannot exercise the closed test authority or
+rebind its storage.
+
 ## Durable state-machine ownership
 
 The service owns the Architecture-77 lifecycle across

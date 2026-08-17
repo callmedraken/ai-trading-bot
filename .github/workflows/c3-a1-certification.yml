@@ -1,0 +1,57 @@
+name: C3 A1 certification
+
+on:
+  push:
+    branches:
+      - feature/c3-a1-certification
+
+permissions:
+  contents: read
+
+jobs:
+  certify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install project
+        run: python -m pip install -e ".[dev]"
+
+      - name: C3 A1 focused tests
+        run: >-
+          python -m pytest
+          tests/runtime/test_windows_effectful_capture_contracts.py
+          tests/market_data/test_daily_snapshot_provider.py
+          tests/market_data/test_daily_snapshot_identity.py
+          tests/market_data/test_daily_snapshot_verification.py
+          -q
+
+      - name: Ruff check
+        run: >-
+          python -m ruff check
+          src/trading_bot/runtime/windows_effectful_capture.py
+          tests/runtime/test_windows_effectful_capture_contracts.py
+
+      - name: Ruff format check
+        run: >-
+          python -m ruff format --check
+          src/trading_bot/runtime/windows_effectful_capture.py
+          tests/runtime/test_windows_effectful_capture_contracts.py
+
+      - name: SQL identity
+        shell: python
+        run: |
+          import hashlib
+          from pathlib import Path
+
+          path = Path("src/trading_bot/runtime/schema/windows_transactional_authority_v1.sql")
+          payload = path.read_bytes()
+          assert len(payload) == 118896, len(payload)
+          assert hashlib.sha256(payload).hexdigest() == "aa61df2f5db0090f8373222d1f5e492a58f4c10273afacfab45e382bacd4bb58"
+          print(len(payload), hashlib.sha256(payload).hexdigest())

@@ -13,6 +13,7 @@ from typing import Protocol
 
 from trading_bot.market_data.exceptions import (
     AlpacaHttpStatusError,
+    AlpacaTimeoutError,
     AlpacaTransportError,
 )
 
@@ -242,7 +243,11 @@ class StdlibAlpacaHistoricalBarsTransport:
             )
         except (AlpacaHttpStatusError, AlpacaTransportError):
             raise
-        except (OSError, TimeoutError, ssl.SSLError, http.client.HTTPException):
+        except TimeoutError:
+            raise AlpacaTimeoutError(
+                "Alpaca HTTPS request reached the approved socket timeout"
+            ) from None
+        except (OSError, ssl.SSLError, http.client.HTTPException):
             raise AlpacaTransportError(
                 "Alpaca HTTPS request failed before a safe response was obtained"
             ) from None

@@ -113,6 +113,10 @@ class AlpacaTransportError(AlpacaDailySnapshotError):
     """Raised when the one permitted HTTPS attempt cannot complete safely."""
 
 
+class AlpacaTimeoutError(AlpacaTransportError):
+    """Raised when the one permitted HTTPS attempt reaches its socket timeout."""
+
+
 class AlpacaHttpStatusError(AlpacaTransportError):
     """Raised for a sanitized non-200 Alpaca response."""
 

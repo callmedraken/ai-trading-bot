@@ -3520,6 +3520,8 @@ class _TransactionalLease:
         "_arbiter",
         "_binding",
         "_lifecycle_error",
+        "_operation_count",
+        "_operations_drained",
         "_release_complete",
         "_release_exception",
         "_state",
@@ -3536,6 +3538,9 @@ class _TransactionalLease:
         self._arbiter = arbiter
         self._binding = binding
         self._lifecycle_error: BaseException | None = None
+        self._operation_count = 0
+        self._operations_drained = threading.Event()
+        self._operations_drained.set()
         self._release_complete = threading.Event()
         self._release_exception: BaseException | None = None
         self._state = "ACTIVE"
@@ -3550,6 +3555,45 @@ class _TransactionalLease:
                 "transactional lifecycle lease is closed"
             )
         return self._witness
+
+    @contextmanager
+    def admit_operation(
+        self,
+        core: TransactionalAuthorityCore,
+        service_token: object | None,
+        reservation_id: str | None = None,
+    ) -> Iterator[_TransactionalLeaseWitness]:
+        """Pin this lease and its arbiter for one complete while-held operation."""
+
+        with self._binding._lifecycle_state_lock:
+            if self._state != "ACTIVE" or not self.active or not self._witness.active:
+                if self._release_exception is not None:
+                    raise self._release_exception
+                if self._lifecycle_error is not None:
+                    raise self._lifecycle_error
+                raise ExternalAuthorityBoundaryUnavailable(
+                    "transactional lifecycle lease is closed"
+                )
+            witness = self._witness
+            if (
+                witness.core is not core
+                or witness.service_token is not service_token
+                or (
+                    reservation_id is not None
+                    and witness.reservation_id != str(reservation_id)
+                )
+            ):
+                raise ValueError("lifecycle lease witness is invalid or mismatched")
+            self._operation_count += 1
+            if self._operation_count == 1:
+                self._operations_drained.clear()
+        try:
+            yield witness
+        finally:
+            with self._binding._lifecycle_state_lock:
+                self._operation_count -= 1
+                if self._operation_count == 0:
+                    self._operations_drained.set()
 
     def __enter__(self) -> Self:
         self._require_active_witness()
@@ -3582,6 +3626,7 @@ class _TransactionalLease:
             raise ExternalAuthorityBoundaryUnavailable(
                 "transactional lifecycle lease was already released"
             )
+        self._operations_drained.wait()
         self._release_arbiter(*args)
 
     def invalidate_for_harness_close(self, error: BaseException) -> None:
@@ -3594,6 +3639,7 @@ class _TransactionalLease:
             self._state = "RELEASING"
             self.active = False
             self._witness.active = False
+        self._operations_drained.wait()
         self._release_arbiter(None, None, None)
 
     def _release_arbiter(self, *args: object) -> None:
@@ -3856,11 +3902,12 @@ class TransactionalAuthorityCoreBinding:
             raise TypeError(
                 "lifecycle lease witness requires its reviewed core binding"
             )
-        with core._bound_context(wait_for_close=False):
+        with core._bound_context():
             _require_no_active_transaction(self._connection)
             arbiter = self._lifecycle_arbiter_factory(str(reservation_id))
             arbiter.__enter__()
             try:
+                self._lifecycle.require_open()
                 with self._lifecycle_state_lock:
                     if not self._active:
                         if self._lifecycle_error is not None:
@@ -4002,25 +4049,26 @@ class TransactionalAuthorityCore:
         if self._harness_binding is not None:
             self._harness_binding._require_active()
 
-    def _require_lifecycle_lease_witness(
-        self, witness: object, reservation_id: str | None = None
-    ) -> _TransactionalLeaseWitness:
-        self._require_binding_active()
-        if type(witness) is not _TransactionalLease:
-            raise TypeError(
-                "already-held operation requires a reviewed lifecycle lease"
-            )
-        lease_witness = witness._require_active_witness()
-        if (
-            lease_witness.core is not self
-            or lease_witness.service_token is not self._context.test_service_token
-            or (
-                reservation_id is not None
-                and lease_witness.reservation_id != str(reservation_id)
-            )
-        ):
-            raise ValueError("lifecycle lease witness is invalid or mismatched")
-        return lease_witness
+    @contextmanager
+    def _held_lifecycle_operation(
+        self, lease: object, reservation_id: str | None = None
+    ) -> Iterator[_TransactionalLeaseWitness]:
+        """Admit one operation while its exact lifecycle lease remains held."""
+
+        with self._bound_context():
+            if type(lease) is not _TransactionalLease:
+                raise TypeError(
+                    "already-held operation requires a reviewed lifecycle lease"
+                )
+            if (
+                self._harness_binding is None
+                or lease._binding is not self._harness_binding
+            ):
+                raise ValueError("lifecycle lease witness is invalid or mismatched")
+            with lease.admit_operation(
+                self, self._context.test_service_token, reservation_id
+            ) as witness:
+                yield witness
 
     def require_execution_binding_while_held(
         self,
@@ -4031,8 +4079,7 @@ class TransactionalAuthorityCore:
     ) -> None:
         """Require durable execution lineage to match the held reservation."""
 
-        self._require_lifecycle_lease_witness(lease_witness, reservation_id)
-        with self._bound_context():
+        with self._held_lifecycle_operation(lease_witness, reservation_id):
             with _connection_operation(self._connection):
                 _require_no_active_transaction(self._connection)
                 row = self._connection.execute(
@@ -4040,8 +4087,8 @@ class TransactionalAuthorityCore:
                     "WHERE launch_execution_id = ?",
                     (str(execution_id),),
                 ).fetchone()
-        if row is None or row[0] != str(reservation_id):
-            raise ValueError("execution does not belong to the held reservation")
+            if row is None or row[0] != str(reservation_id):
+                raise ValueError("execution does not belong to the held reservation")
 
     @contextmanager
     def bind_external_effects(self) -> Iterator[None]:
@@ -4438,8 +4485,7 @@ class TransactionalAuthorityCore:
         *,
         lease_witness: object,
     ) -> ProcessIntent:
-        self._require_lifecycle_lease_witness(lease_witness, reservation_id)
-        with self._bound_context():
+        with self._held_lifecycle_operation(lease_witness, reservation_id):
             _require_no_active_transaction(self._connection)
             if type(provider) is not ConstructedProvider:
                 raise TypeError(
@@ -4462,8 +4508,7 @@ class TransactionalAuthorityCore:
         *,
         lease_witness: object,
     ) -> str:
-        self._require_lifecycle_lease_witness(lease_witness, reservation_id)
-        with self._bound_context():
+        with self._held_lifecycle_operation(lease_witness, reservation_id):
             _require_no_active_transaction(self._connection)
             if type(receipt) is not ProcessCreationReceipt:
                 raise TypeError(
@@ -4484,8 +4529,7 @@ class TransactionalAuthorityCore:
         *,
         lease_witness: object,
     ) -> ResumeIntent:
-        self._require_lifecycle_lease_witness(lease_witness, reservation_id)
-        with self._bound_context():
+        with self._held_lifecycle_operation(lease_witness, reservation_id):
             _require_no_active_transaction(self._connection)
             return _commit_resume_intent_locked(
                 self._connection, execution_id, reservation_id
@@ -4498,8 +4542,7 @@ class TransactionalAuthorityCore:
         *,
         lease_witness: object,
     ) -> None:
-        self._require_lifecycle_lease_witness(lease_witness, reservation_id)
-        with self._bound_context():
+        with self._held_lifecycle_operation(lease_witness, reservation_id):
             _require_no_active_transaction(self._connection)
             _require_service_provenance(
                 failure,
@@ -4518,8 +4561,7 @@ class TransactionalAuthorityCore:
         *,
         lease_witness: object,
     ) -> None:
-        witness = self._require_lifecycle_lease_witness(lease_witness)
-        with self._bound_context():
+        with self._held_lifecycle_operation(lease_witness) as witness:
             _require_no_active_transaction(self._connection)
             if type(receipt) is not ResumeReceipt:
                 raise TypeError("post-resume evidence requires a fake resume receipt")
@@ -4549,8 +4591,7 @@ class TransactionalAuthorityCore:
         snapshot_digest: bytes | None,
         lease_witness: object,
     ) -> str:
-        self._require_lifecycle_lease_witness(lease_witness, reservation_id)
-        with self._bound_context():
+        with self._held_lifecycle_operation(lease_witness, reservation_id):
             _require_no_active_transaction(self._connection)
             return _record_terminal_locked(
                 self._connection,
@@ -4572,8 +4613,7 @@ class TransactionalAuthorityCore:
         operator_evidence_digest: bytes,
         lease_witness: object,
     ) -> str:
-        witness = self._require_lifecycle_lease_witness(lease_witness)
-        with self._bound_context():
+        with self._held_lifecycle_operation(lease_witness) as witness:
             _require_no_active_transaction(self._connection)
             requested_ordinal = _preflight_recovery_request(
                 target_kind,

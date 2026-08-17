@@ -4013,6 +4013,106 @@ def test_lifecycle_lease_invalidates_before_release_and_reacquisition() -> None:
         harness.close()
 
 
+def test_lifecycle_lease_release_waits_for_in_flight_held_operation() -> None:
+    sql_blocked = threading.Event()
+    release_sql = threading.Event()
+    release_finished = threading.Event()
+    operation_errors: list[BaseException] = []
+    release_errors: list[BaseException] = []
+    arbiters: list[object] = []
+
+    class ArbiterProbe:
+        def __init__(self) -> None:
+            self.exited = threading.Event()
+            self.exit_calls = 0
+
+        def __enter__(self) -> ArbiterProbe:
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            del args
+            self.exit_calls += 1
+            self.exited.set()
+
+    def arbiter_factory(reservation_id: str) -> ArbiterProbe:
+        del reservation_id
+        arbiter = ArbiterProbe()
+        arbiters.append(arbiter)
+        return arbiter
+
+    harness = Architecture77HarnessAuthority.create(
+        lifecycle_arbiter_factory=arbiter_factory
+    )
+    lease: TestLifecycleLease | None = None
+    worker: threading.Thread | None = None
+    releaser: threading.Thread | None = None
+    try:
+        _, reservation_id, execution_id, _ = _prepare_lease_resume_case(
+            harness, "2026-01-01"
+        )
+        lease = harness.lifecycle_lease(reservation_id)
+        lease.__enter__()
+        lease_arbiter = arbiters[-1]
+
+        def trace(statement: str) -> None:
+            normalized = " ".join(statement.split())
+            if (
+                "SELECT launch_reservation_id FROM launch_executions" in normalized
+                and "WHERE launch_execution_id" in normalized
+                and not sql_blocked.is_set()
+            ):
+                sql_blocked.set()
+                assert release_sql.wait(10)
+
+        harness._connection.set_trace_callback(trace)
+
+        def bind_execution() -> None:
+            try:
+                assert lease is not None
+                lease.bind_execution(execution_id)
+            except BaseException as exc:
+                operation_errors.append(exc)
+
+        def release_lease() -> None:
+            try:
+                assert lease is not None
+                lease.__exit__(None, None, None)
+            except BaseException as exc:
+                release_errors.append(exc)
+            finally:
+                release_finished.set()
+
+        worker = threading.Thread(target=bind_execution)
+        worker.start()
+        assert sql_blocked.wait(10)
+        releaser = threading.Thread(target=release_lease)
+        releaser.start()
+
+        assert not release_finished.wait(0.1)
+        assert not lease_arbiter.exited.is_set()
+        assert lease_arbiter.exit_calls == 0
+
+        release_sql.set()
+        worker.join(10)
+        releaser.join(10)
+        assert not worker.is_alive()
+        assert not releaser.is_alive()
+        assert operation_errors == []
+        assert release_errors == []
+        assert lease_arbiter.exit_calls == 1
+        assert lease_arbiter.exited.is_set()
+    finally:
+        harness._connection.set_trace_callback(None)
+        release_sql.set()
+        if worker is not None:
+            worker.join(10)
+        if releaser is not None:
+            releaser.join(10)
+        if lease is not None and not lease._exited:
+            lease.__exit__(None, None, None)
+        harness.close()
+
+
 @pytest.mark.parametrize(
     "transaction_entry",
     ["BEGIN IMMEDIATE", "SAVEPOINT caller_work"],
@@ -4183,12 +4283,13 @@ def test_lifecycle_lease_release_failure_is_terminal_and_exactly_once() -> None:
 def test_lifecycle_lease_post_enter_setup_failure_releases_once() -> None:
     events: list[str] = []
     harness: Architecture77HarnessAuthority | None = None
+    sentinel = HarnessLifecycleError("forced binding closure")
 
     class ArbiterProbe:
         def __enter__(self) -> ArbiterProbe:
             events.append("enter")
             assert harness is not None
-            harness.close()
+            harness._core_binding.invalidate_for_harness_close(sentinel)
             return self
 
         def __exit__(self, *args: object) -> None:
@@ -4199,7 +4300,7 @@ def test_lifecycle_lease_post_enter_setup_failure_releases_once() -> None:
         lifecycle_arbiter_factory=lambda reservation_id: ArbiterProbe()
     )
     try:
-        with pytest.raises(HarnessLifecycleError, match="closed"):
+        with pytest.raises(HarnessLifecycleError, match="forced binding closure"):
             with harness.lifecycle_lease("reservation"):
                 pass
         assert events == ["enter", "exit"]
@@ -4211,6 +4312,7 @@ def test_lifecycle_lease_close_wins_against_blocked_arbiter_entry() -> None:
     entered = threading.Event()
     release_entry = threading.Event()
     exited = threading.Event()
+    close_finished = threading.Event()
     events: list[str] = []
 
     class BlockingArbiter:
@@ -4228,8 +4330,10 @@ def test_lifecycle_lease_close_wins_against_blocked_arbiter_entry() -> None:
     harness = Architecture77HarnessAuthority.create(
         lifecycle_arbiter_factory=lambda reservation_id: BlockingArbiter()
     )
+    root = harness._root
     reservation_id = "blocked-reservation"
     outcomes: list[BaseException | str] = []
+    close_errors: list[BaseException] = []
 
     def acquire() -> None:
         try:
@@ -4238,21 +4342,38 @@ def test_lifecycle_lease_close_wins_against_blocked_arbiter_entry() -> None:
         except BaseException as exc:
             outcomes.append(exc)
 
+    def close_harness() -> None:
+        try:
+            harness.close()
+        except BaseException as exc:
+            close_errors.append(exc)
+        finally:
+            close_finished.set()
+
     worker = threading.Thread(target=acquire)
+    closer = threading.Thread(target=close_harness)
     worker.start()
     try:
         assert entered.wait(10)
-        harness.close()
+        closer.start()
+        assert not close_finished.wait(0.1)
+        assert root.exists()
+        assert events == ["enter"]
         release_entry.set()
         worker.join(10)
+        closer.join(10)
         assert not worker.is_alive()
+        assert not closer.is_alive()
+        assert close_errors == []
         assert len(outcomes) == 1
         assert isinstance(outcomes[0], HarnessLifecycleError)
         assert events == ["enter", "exit"]
         assert exited.is_set()
+        assert not root.exists()
     finally:
         release_entry.set()
         worker.join(10)
+        closer.join(10)
         harness.close()
 
 

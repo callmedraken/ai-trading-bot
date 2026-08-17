@@ -16,7 +16,11 @@ from uuid import UUID, uuid5
 from zoneinfo import ZoneInfo
 
 from trading_bot.domain import Symbol
-from trading_bot.market_calendar import MarketCalendarError, NYSEMarketCalendar, TradingSession
+from trading_bot.market_calendar import (
+    MarketCalendarError,
+    NYSEMarketCalendar,
+    TradingSession,
+)
 from trading_bot.market_data import (
     ALPACA_DAILY_SNAPSHOT_DESCRIPTOR,
     MAX_DAILY_SNAPSHOT_SYMBOLS,
@@ -168,7 +172,10 @@ class ProductionCapturePlan:
                 "authorized snapshot session must be TradingSession"
             )
         expected_json = self.request.canonical_c2_request_json()
-        if type(self.c2_request_json) is not bytes or self.c2_request_json != expected_json:
+        if (
+            type(self.c2_request_json) is not bytes
+            or self.c2_request_json != expected_json
+        ):
             raise WindowsEffectfulCapturePlanError(
                 "capture plan C2 request bytes are inconsistent"
             )
@@ -215,7 +222,10 @@ class BoundProductionCapturePlan:
             raise WindowsEffectfulCapturePlanError(
                 "bound provider request is inconsistent"
             )
-        if self.provider_request.target_session != self.plan.authorized_snapshot_session:
+        if (
+            self.provider_request.target_session
+            != self.plan.authorized_snapshot_session
+        ):
             raise WindowsEffectfulCapturePlanError(
                 "provider target does not match authorized snapshot session"
             )

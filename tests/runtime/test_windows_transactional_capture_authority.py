@@ -3,29 +3,31 @@
 from __future__ import annotations
 
 import ast
+import contextvars
 import hashlib
 import inspect
 import json
 import multiprocessing
 import os
+import shutil
 import sqlite3
 import sys
+import tempfile
 import threading
 import uuid
 from collections.abc import Callable, Iterator
-from contextlib import contextmanager
-from dataclasses import FrozenInstanceError, dataclass, field, replace
-from datetime import date
+from contextlib import AbstractContextManager, contextmanager
+from dataclasses import FrozenInstanceError, dataclass, replace
 from pathlib import Path
 from typing import Any
 
 import pytest
 
-from trading_bot.domain import Symbol
 from trading_bot.market_data import (
     ALPACA_DAILY_SNAPSHOT_DESCRIPTOR,
     MAX_DAILY_SNAPSHOT_SYMBOLS,
 )
+from trading_bot.runtime.windows_authority import PRODUCTION_AUTHORITY_PATHS
 from trading_bot.runtime.windows_authority_schema import (
     INITIALIZATION_POLICY_VERSION,
     METADATA_ENCODING_VERSION,
@@ -38,6 +40,176 @@ from trading_bot.runtime.windows_authority_schema import (
     execute_schema_artifact,
     require_evidence_digest,
 )
+from trading_bot.runtime.windows_transactional_authority import (
+    ConstructedProvider as FakeConstructedProvider,
+)
+from trading_bot.runtime.windows_transactional_authority import (
+    DisposableAuthorityDatabaseForTest,
+    ExternalAuthorityBoundaryUnavailable,
+    TransactionalAuthorityCore,
+    TransactionalAuthorityCoreBinding,
+    TransactionalAuthorityLifecycle,
+    ValidatedCaptureRequest,
+)
+from trading_bot.runtime.windows_transactional_authority import (
+    ProcessCreationFailure as FakeProcessCreationFailure,
+)
+from trading_bot.runtime.windows_transactional_authority import (
+    ProcessCreationReceipt as FakeProcessCreationReceipt,
+)
+from trading_bot.runtime.windows_transactional_authority import (
+    ProcessIntent as FakeProcessIntent,
+)
+from trading_bot.runtime.windows_transactional_authority import (
+    ProviderConstructionPermit as FakeProviderConstructionPermit,
+)
+from trading_bot.runtime.windows_transactional_authority import (
+    ResumeIntent as FakeResumeIntent,
+)
+from trading_bot.runtime.windows_transactional_authority import (
+    ResumeReceipt as FakeResumeReceipt,
+)
+from trading_bot.runtime.windows_transactional_authority import (
+    consume_constructed_provider_for_test as _consume_constructed_provider,
+)
+from trading_bot.runtime.windows_transactional_authority import (
+    consume_process_intent_for_test as _consume_process_intent,
+)
+from trading_bot.runtime.windows_transactional_authority import (
+    consume_process_result_for_test as _consume_process_result,
+)
+from trading_bot.runtime.windows_transactional_authority import (
+    consume_provider_construction_permit_for_test as _consume_provider_construction_permit,  # noqa: E501
+)
+from trading_bot.runtime.windows_transactional_authority import (
+    consume_resume_intent_for_test as _consume_resume_intent,
+)
+from trading_bot.runtime.windows_transactional_authority import (
+    consume_resume_result_for_test as _consume_resume_result,
+)
+from trading_bot.runtime.windows_transactional_authority import (
+    issue_constructed_provider_for_test as _issue_constructed_provider,
+)
+from trading_bot.runtime.windows_transactional_authority import (
+    issue_process_creation_failure_for_test as _issue_process_creation_failure,
+)
+from trading_bot.runtime.windows_transactional_authority import (
+    issue_process_creation_receipt_for_test as _issue_process_creation_receipt,
+)
+from trading_bot.runtime.windows_transactional_authority import (
+    issue_resume_receipt_for_test as _issue_resume_receipt,
+)
+from trading_bot.runtime.windows_transactional_authority import (
+    process_failure_json_for_test as _process_failure_json,
+)
+from trading_bot.runtime.windows_transactional_authority import (
+    process_intent_json_for_test as _process_intent_json,
+)
+from trading_bot.runtime.windows_transactional_authority import (
+    process_success_evidence_for_test as _process_success_evidence,
+)
+from trading_bot.runtime.windows_transactional_authority import (
+    registered_constructed_provider_reservation_id_for_test as _registered_constructed_provider_reservation_id,  # noqa: E501
+)
+from trading_bot.runtime.windows_transactional_authority import (
+    registered_process_intent_reservation_id_for_test as _registered_process_intent_reservation_id,  # noqa: E501
+)
+from trading_bot.runtime.windows_transactional_authority import (
+    registered_process_result_reservation_id_for_test as _registered_process_result_reservation_id,  # noqa: E501
+)
+from trading_bot.runtime.windows_transactional_authority import (
+    registered_provider_reservation_id_for_test as _registered_provider_reservation_id,
+)
+from trading_bot.runtime.windows_transactional_authority import (
+    registered_resume_intent_binding_for_test as _registered_resume_intent_binding,
+)
+from trading_bot.runtime.windows_transactional_authority import (
+    registered_resume_result_binding_for_test as _registered_resume_result_binding,
+)
+from trading_bot.runtime.windows_transactional_authority import (
+    snapshot_capture_request_for_test as _snapshot_capture_request,
+)
+
+
+def _capability_is_registered(capability: object) -> bool:
+    try:
+        if type(capability) is FakeProviderConstructionPermit:
+            _registered_provider_reservation_id(capability)
+        elif type(capability) is FakeConstructedProvider:
+            _registered_constructed_provider_reservation_id(capability)
+        elif type(capability) is FakeProcessIntent:
+            _registered_process_intent_reservation_id(capability)
+        elif type(capability) in {
+            FakeProcessCreationReceipt,
+            FakeProcessCreationFailure,
+        }:
+            _registered_process_result_reservation_id(capability)
+        elif type(capability) is FakeResumeIntent:
+            _registered_resume_intent_binding(capability)
+        elif type(capability) is FakeResumeReceipt:
+            _registered_resume_result_binding(capability)
+        else:
+            return False
+    except (AttributeError, TypeError, ValueError):
+        return False
+    return True
+
+
+def _consume_capability_for_test(capability: object) -> None:
+    if not _capability_is_registered(capability):
+        return
+    harness = _CURRENT_HARNESS.get()
+    if harness is None:
+        raise HarnessLifecycleError(
+            "capability consumer requires an active Architecture-77 harness"
+        )
+    core = harness._core
+    if type(capability) is FakeProviderConstructionPermit:
+        _consume_provider_construction_permit(
+            capability,
+            _registered_provider_reservation_id(capability),
+            core=core,
+        )
+    elif type(capability) is FakeConstructedProvider:
+        _consume_constructed_provider(
+            capability,
+            _registered_constructed_provider_reservation_id(capability),
+            core=core,
+        )
+    elif type(capability) is FakeProcessIntent:
+        _consume_process_intent(
+            capability,
+            _registered_process_intent_reservation_id(capability),
+            core=core,
+        )
+    elif type(capability) in {FakeProcessCreationReceipt, FakeProcessCreationFailure}:
+        _consume_process_result(
+            capability,
+            _registered_process_result_reservation_id(capability),
+            core=core,
+        )
+    elif type(capability) is FakeResumeIntent:
+        execution_id, reservation_id = _registered_resume_intent_binding(capability)
+        _consume_resume_intent(capability, execution_id, reservation_id, core=core)
+    elif type(capability) is FakeResumeReceipt:
+        execution_id, reservation_id = _registered_resume_result_binding(capability)
+        _consume_resume_result(capability, execution_id, reservation_id, core=core)
+
+
+def _assert_capability_available(capability: object) -> None:
+    assert _capability_is_registered(capability)
+
+
+def _assert_capability_consumed(capability: object) -> None:
+    assert not _capability_is_registered(capability)
+
+
+def _forged_capability(capability_type: type[object], **fields: object) -> object:
+    forged = object.__new__(capability_type)
+    for field_name, value in fields.items():
+        object.__setattr__(forged, field_name, value)
+    return forged
+
 
 _HARNESS_MODULE_PATH = Path(__file__).resolve(strict=True)
 _HARNESS_REPOSITORY_ROOT = _HARNESS_MODULE_PATH.parents[2]
@@ -437,18 +609,6 @@ _DEPENDENT_DIGEST_AUDIT = (
         "_validate_recovery_target_evidence",
     ),
 )
-_RESUME_INTENT_ISSUER = object()
-_PROCESS_INTENT_ISSUER = object()
-_PROCESS_RESULT_ISSUER = object()
-_RESUME_RESULT_ISSUER = object()
-_PROVIDER_CONSTRUCTION_ISSUER = object()
-_CONSTRUCTED_PROVIDER_ISSUER = object()
-_ISSUED_RESUME_PERMITS_LOCK = threading.Lock()
-_ISSUED_PROCESS_PERMITS_LOCK = threading.Lock()
-_ISSUED_PROCESS_RESULTS_LOCK = threading.Lock()
-_ISSUED_RESUME_RESULTS_LOCK = threading.Lock()
-_ISSUED_PROVIDER_CONSTRUCTION_PERMITS_LOCK = threading.Lock()
-_ISSUED_CONSTRUCTED_PROVIDERS_LOCK = threading.Lock()
 
 
 class InterprocessLifecycleArbiter:
@@ -554,233 +714,6 @@ class InterprocessLifecycleArbiter:
             raise ctypes.WinError()
 
 
-@dataclass(eq=False)
-class _ProcessPermit:
-    lock: threading.Lock = field(default_factory=threading.Lock)
-    consumed: bool = False
-
-
-@dataclass(eq=False)
-class _ProcessResultPermit:
-    lock: threading.Lock = field(default_factory=threading.Lock)
-    consumed: bool = False
-
-
-@dataclass(eq=False)
-class _ResumePermit:
-    lock: threading.Lock = field(default_factory=threading.Lock)
-    consumed: bool = False
-
-
-@dataclass(eq=False)
-class _ResumeResultPermit:
-    lock: threading.Lock = field(default_factory=threading.Lock)
-    consumed: bool = False
-
-
-@dataclass(eq=False)
-class _ProviderConstructionOneShot:
-    lock: threading.Lock = field(default_factory=threading.Lock)
-    consumed: bool = False
-
-
-@dataclass(eq=False)
-class _ConstructedProviderOneShot:
-    lock: threading.Lock = field(default_factory=threading.Lock)
-    consumed: bool = False
-
-
-@dataclass(frozen=True, slots=True, eq=False)
-class FakeProviderConstructionPermit:
-    """Reservation identity plus opaque one-shot provider-construction authority."""
-
-    reservation_id: str
-    _issuer: object = field(repr=False, compare=False)
-    _permit: _ProviderConstructionOneShot = field(repr=False, compare=False)
-
-    def __post_init__(self) -> None:
-        if self._issuer is not _PROVIDER_CONSTRUCTION_ISSUER:
-            raise TypeError(
-                "fake provider construction permits require reservation commit"
-            )
-
-    def __str__(self) -> str:
-        return self.reservation_id
-
-
-@dataclass(frozen=True, slots=True)
-class FakeConstructedProvider:
-    """Opaque one-shot handoff from provider construction to process intent."""
-
-    reservation_id: str
-    _issuer: object = field(repr=False, compare=False)
-    _permit: _ConstructedProviderOneShot = field(repr=False, compare=False)
-
-    def __post_init__(self) -> None:
-        if self._issuer is not _CONSTRUCTED_PROVIDER_ISSUER:
-            raise TypeError("fake constructed providers can only come from the adapter")
-
-
-@dataclass(frozen=True, slots=True)
-class FakeProcessIntent:
-    """Opaque one-shot authority returned only by the intent transaction."""
-
-    reservation_id: str
-    intent_json: bytes
-    intent_digest: bytes
-    _issuer: object = field(repr=False, compare=False)
-    _permit: _ProcessPermit = field(repr=False, compare=False)
-
-    def __post_init__(self) -> None:
-        if self._issuer is not _PROCESS_INTENT_ISSUER:
-            raise TypeError("fake process intents can only be issued after commit")
-
-
-@dataclass(frozen=True, slots=True)
-class FakeProcessCreationReceipt:
-    """Canonical successful CreateProcessW and Job Object result."""
-
-    reservation_id: str
-    process_intent_digest: bytes
-    process_json: bytes
-    process_digest: bytes
-    job_json: bytes
-    job_digest: bytes
-    resume_authorization_json: bytes
-    resume_authorization_digest: bytes
-    _issuer: object = field(repr=False, compare=False)
-    _permit: _ProcessResultPermit = field(repr=False, compare=False)
-
-    def __post_init__(self) -> None:
-        if self._issuer is not _PROCESS_RESULT_ISSUER:
-            raise TypeError("fake process receipts can only come from the adapter")
-
-
-@dataclass(frozen=True, slots=True)
-class FakeProcessCreationFailure:
-    """Canonical definitive CreateProcessW not-created result."""
-
-    reservation_id: str
-    process_intent_digest: bytes
-    result_json: bytes
-    result_digest: bytes
-    _issuer: object = field(repr=False, compare=False)
-    _permit: _ProcessResultPermit = field(repr=False, compare=False)
-
-    def __post_init__(self) -> None:
-        if self._issuer is not _PROCESS_RESULT_ISSUER:
-            raise TypeError("fake process failures can only come from the adapter")
-
-
-@dataclass(frozen=True, slots=True)
-class FakeResumeIntent:
-    """Opaque one-shot authority returned only by the intent transaction."""
-
-    execution_id: str
-    reservation_id: str
-    intent_json: bytes
-    intent_digest: bytes
-    _issuer: object = field(repr=False, compare=False)
-    _permit: _ResumePermit = field(repr=False, compare=False)
-
-    def __post_init__(self) -> None:
-        if self._issuer is not _RESUME_INTENT_ISSUER:
-            raise TypeError("fake resume intents can only be issued after commit")
-
-
-@dataclass(frozen=True, slots=True)
-class FakeResumeReceipt:
-    """Canonical result returned by the fake external ResumeThread boundary."""
-
-    execution_id: str
-    reservation_id: str
-    resume_intent_digest: bytes
-    result_json: bytes
-    result_digest: bytes
-    _issuer: object = field(repr=False, compare=False)
-    _permit: _ResumeResultPermit = field(repr=False, compare=False)
-
-    def __post_init__(self) -> None:
-        if self._issuer is not _RESUME_RESULT_ISSUER:
-            raise TypeError("fake resume receipts can only come from the adapter")
-
-
-@dataclass(frozen=True, slots=True)
-class _ProviderConstructionIssuance:
-    capability: FakeProviderConstructionPermit
-    reservation_id: str
-    issuer: object
-    permit: _ProviderConstructionOneShot
-
-
-@dataclass(frozen=True, slots=True)
-class _ConstructedProviderIssuance:
-    provider: FakeConstructedProvider
-    reservation_id: str
-    issuer: object
-    permit: _ConstructedProviderOneShot
-
-
-@dataclass(frozen=True, slots=True)
-class _ProcessIntentIssuance:
-    intent: FakeProcessIntent
-    reservation_id: str
-    intent_json: bytes
-    intent_digest: bytes
-    issuer: object
-    permit: _ProcessPermit
-
-
-@dataclass(frozen=True, slots=True)
-class _ProcessResultIssuance:
-    result: FakeProcessCreationReceipt | FakeProcessCreationFailure
-    reservation_id: str
-    process_intent_digest: bytes
-    evidence: tuple[bytes, ...]
-    digests: tuple[bytes, ...]
-    issuer: object
-    permit: _ProcessResultPermit
-
-
-@dataclass(frozen=True, slots=True)
-class _ResumeIntentIssuance:
-    intent: FakeResumeIntent
-    execution_id: str
-    reservation_id: str
-    intent_json: bytes
-    intent_digest: bytes
-    issuer: object
-    permit: _ResumePermit
-
-
-@dataclass(frozen=True, slots=True)
-class _ResumeResultIssuance:
-    result: FakeResumeReceipt
-    execution_id: str
-    reservation_id: str
-    resume_intent_digest: bytes
-    result_json: bytes
-    result_digest: bytes
-    issuer: object
-    permit: _ResumeResultPermit
-
-
-_ISSUED_PROVIDER_CONSTRUCTION_PERMITS: dict[
-    _ProviderConstructionOneShot, _ProviderConstructionIssuance
-] = {}
-_ISSUED_CONSTRUCTED_PROVIDERS: dict[
-    _ConstructedProviderOneShot, _ConstructedProviderIssuance
-] = {}
-_ISSUED_PROCESS_PERMITS: dict[_ProcessPermit, _ProcessIntentIssuance] = {}
-_ISSUED_PROCESS_RESULTS: dict[_ProcessResultPermit, _ProcessResultIssuance] = {}
-_ISSUED_RESUME_PERMITS: dict[_ResumePermit, _ResumeIntentIssuance] = {}
-_ISSUED_RESUME_RESULTS: dict[_ResumeResultPermit, _ResumeResultIssuance] = {}
-
-# Preserve direct test-query convenience after removing ``str`` inheritance.
-# Capability boundaries never use this adapter to select authoritative lineage.
-sqlite3.register_adapter(FakeProviderConstructionPermit, str)
-
-
 @contextmanager
 def _mutated_frozen_object_for_test(
     value: object, **changes: object
@@ -855,6 +788,12 @@ def _json(value: Any) -> bytes:
 def _evidence(label: str) -> tuple[bytes, bytes]:
     value = _json({"evidence": label, "schema": 1})
     return value, _digest(value)
+
+
+TEST_SNAPSHOT_DIGEST = _digest(b"verified-snapshot")
+TEST_OPERATOR_EVIDENCE_JSON, TEST_OPERATOR_EVIDENCE_DIGEST = _evidence(
+    "explicit-test-operator-evidence"
+)
 
 
 def _insert_session_row_for_test(
@@ -1157,7 +1096,7 @@ def _insert_terminal_row_for_test(
         diagnostics, diagnostics_hash, field="terminal diagnostics digest"
     )
     snapshot = (
-        _digest(b"raw-snapshot")
+        TEST_SNAPSHOT_DIGEST
         if snapshot_mode == "present"
         or (snapshot_mode == "auto" and state == "SUCCEEDED")
         else None
@@ -1269,119 +1208,6 @@ def _request(target_date: str = "2026-01-01") -> dict[str, Any]:
         "request_window_start_date": "2025-12-01",
         "target_session_date": target_date,
     }
-
-
-@dataclass(frozen=True, slots=True)
-class ValidatedCaptureRequest:
-    bar_interval: str
-    child_operation_version: str
-    ordered_universe: tuple[str, ...]
-    output_policy_version: str
-    permitted_provider_operation: str
-    provider_id: str
-    request_limit: int
-    request_window_end_date: str
-    request_window_start_date: str
-    target_session_date: str
-
-    def canonical_json(self) -> bytes:
-        return _json(
-            {
-                "bar_interval": self.bar_interval,
-                "child_operation_version": self.child_operation_version,
-                "ordered_universe": list(self.ordered_universe),
-                "output_policy_version": self.output_policy_version,
-                "permitted_provider_operation": self.permitted_provider_operation,
-                "provider_id": self.provider_id,
-                "request_limit": self.request_limit,
-                "request_window_end_date": self.request_window_end_date,
-                "request_window_start_date": self.request_window_start_date,
-                "target_session_date": self.target_session_date,
-            }
-        )
-
-
-def _snapshot_capture_request(request: object) -> ValidatedCaptureRequest:
-    if type(request) is not dict:
-        raise ValueError("capture_request/v2 must be an exact object")
-    captured = request.copy()
-    if set(captured) != CAPTURE_REQUEST_FIELDS:
-        raise ValueError("capture_request/v2 has a missing or unknown field")
-
-    string_fields = CAPTURE_REQUEST_FIELDS - {"ordered_universe", "request_limit"}
-    if any(type(captured[field]) is not str for field in string_fields):
-        raise ValueError("capture_request/v2 string fields require exact strings")
-    if type(captured["ordered_universe"]) is not list:
-        raise ValueError("ordered_universe must be an exact list")
-    captured_universe = tuple(captured["ordered_universe"])
-    if not 1 <= len(captured_universe) <= MAX_DAILY_SNAPSHOT_SYMBOLS:
-        raise ValueError("ordered_universe is empty or exceeds its bound")
-    canonical_universe: list[str] = []
-    for entry in captured_universe:
-        if type(entry) is not str:
-            raise ValueError("ordered_universe members must be exact strings")
-        try:
-            canonical_text = str(Symbol(entry))
-        except (TypeError, ValueError) as error:
-            raise ValueError("ordered_universe member is not a valid Symbol") from error
-        canonical_universe.append(canonical_text)
-    if len(set(canonical_universe)) != len(canonical_universe):
-        raise ValueError("ordered_universe must be duplicate-free")
-    if any(
-        entry != canonical_text
-        for entry, canonical_text in zip(
-            captured_universe, canonical_universe, strict=True
-        )
-    ):
-        raise ValueError("ordered_universe members must already be canonical Symbols")
-    request_limit = captured["request_limit"]
-    if type(request_limit) is not int or request_limit <= 0:
-        raise ValueError("request_limit must be an exact positive integer")
-    if (
-        request_limit != len(canonical_universe)
-        or request_limit > MAX_DAILY_SNAPSHOT_SYMBOLS
-    ):
-        raise ValueError("request_limit must equal the bounded universe size")
-
-    for field_name in (
-        "request_window_start_date",
-        "request_window_end_date",
-        "target_session_date",
-    ):
-        value = captured[field_name]
-        try:
-            parsed = date.fromisoformat(value)
-        except ValueError as error:
-            raise ValueError(f"{field_name} is not a canonical date") from error
-        if parsed.isoformat() != value:
-            raise ValueError(f"{field_name} is not a canonical date")
-    window_start = date.fromisoformat(captured["request_window_start_date"])
-    window_end = date.fromisoformat(captured["request_window_end_date"])
-    target_session = date.fromisoformat(captured["target_session_date"])
-    if not window_start <= window_end < target_session:
-        raise ValueError("capture request dates are not causally ordered")
-
-    fixed_values = {
-        "bar_interval": "1d",
-        "child_operation_version": "child/v1",
-        "output_policy_version": "output/v1",
-        "provider_id": ALPACA_DAILY_SNAPSHOT_DESCRIPTOR.provider_id,
-        "permitted_provider_operation": ALPACA_DAILY_SNAPSHOT_DESCRIPTOR.operation,
-    }
-    if any(captured[field] != value for field, value in fixed_values.items()):
-        raise ValueError("capture_request/v2 fixed semantics are invalid")
-    return ValidatedCaptureRequest(
-        bar_interval=captured["bar_interval"],
-        child_operation_version=captured["child_operation_version"],
-        ordered_universe=tuple(canonical_universe),
-        output_policy_version=captured["output_policy_version"],
-        permitted_provider_operation=captured["permitted_provider_operation"],
-        provider_id=captured["provider_id"],
-        request_limit=request_limit,
-        request_window_end_date=captured["request_window_end_date"],
-        request_window_start_date=captured["request_window_start_date"],
-        target_session_date=captured["target_session_date"],
-    )
 
 
 def _session_id(
@@ -1527,22 +1353,42 @@ def _recovery_id(
     )
 
 
-def _connect(path: Path) -> sqlite3.Connection:
-    connection = sqlite3.connect(
-        path, timeout=5.0, isolation_level=None, check_same_thread=False
-    )
-    # This executable harness deliberately uses the same SQLite trust fence as
-    # the production artifact.  Evidence digests are checked by Python
-    # mutation/validation boundaries, never by a test-only SQL UDF.
-    configure_trusted_schema_off(connection)
-    connection.execute("PRAGMA foreign_keys = ON")
-    connection.execute("PRAGMA busy_timeout = 5000")
+def _raw_connection_for_test(
+    connection: sqlite3.Connection | DisposableAuthorityDatabaseForTest,
+) -> sqlite3.Connection:
+    if type(connection) is DisposableAuthorityDatabaseForTest:
+        return connection._connection
     return connection
 
 
-def _install_schema(connection: sqlite3.Connection) -> None:
-    execute_schema_artifact(connection)
-    connection.execute("PRAGMA foreign_keys = ON")
+def _connect(path: Path) -> sqlite3.Connection:
+    """Open a harness-owned file database for cross-process Architecture-77 tests."""
+
+    connection = sqlite3.connect(
+        path,
+        timeout=5.0,
+        isolation_level=None,
+        check_same_thread=False,
+    )
+    try:
+        configure_trusted_schema_off(connection)
+        connection.execute("PRAGMA foreign_keys = ON")
+        connection.execute("PRAGMA busy_timeout = 5000")
+        harness = _CURRENT_HARNESS.get()
+        if harness is not None and path.resolve(strict=False) == harness.database_path:
+            harness._register_connection(connection)
+        return connection
+    except BaseException:
+        connection.close()
+        raise
+
+
+def _install_schema(
+    connection: sqlite3.Connection | DisposableAuthorityDatabaseForTest,
+) -> None:
+    raw_connection = _raw_connection_for_test(connection)
+    execute_schema_artifact(raw_connection)
+    raw_connection.execute("PRAGMA foreign_keys = ON")
 
 
 def test_transactional_harness_uses_pinned_packaged_production_artifact() -> None:
@@ -1686,10 +1532,13 @@ def _insert_migration(
     return migration_id
 
 
-def _require_no_active_transaction(connection: sqlite3.Connection) -> None:
-    if type(connection) is not sqlite3.Connection:
+def _require_no_active_transaction(
+    connection: sqlite3.Connection | DisposableAuthorityDatabaseForTest,
+) -> None:
+    raw_connection = _raw_connection_for_test(connection)
+    if type(raw_connection) is not sqlite3.Connection:
         raise TypeError("lifecycle boundary requires an exact sqlite3.Connection")
-    if connection.in_transaction:
+    if raw_connection.in_transaction:
         raise ValueError("lifecycle boundary requires no active SQLite transaction")
 
 
@@ -1701,89 +1550,641 @@ def _finish(connection: sqlite3.Connection, commit: bool) -> None:
     (connection.commit if commit else connection.rollback)()
 
 
+def _current_lifecycle_arbiter(reservation_id: str):
+    return InterprocessLifecycleArbiter(reservation_id)
+
+
+@dataclass(frozen=True, slots=True)
+class Architecture77HarnessDescriptor:
+    root: str
+    database_path: str
+
+
+class HarnessLifecycleError(RuntimeError):
+    """A reviewed Architecture-77 harness lifecycle has been closed or invalid."""
+
+
+_HARNESS_CONSTRUCTOR_TOKEN = object()
+
+
+class _HarnessServiceToken:
+    __slots__ = ("__weakref__",)
+
+
+_CURRENT_HARNESS: contextvars.ContextVar[Any] = contextvars.ContextVar(
+    "architecture77_harness", default=None
+)
+
+
+class Architecture77HarnessAuthority:
+    """Own one explicit file-backed Architecture-77 test lifecycle."""
+
+    def __init__(
+        self,
+        connection: sqlite3.Connection,
+        capture_request_factory: Callable[[object], ValidatedCaptureRequest]
+        | None = None,
+        *,
+        root: Path,
+        _construction_token: object,
+        _service_token: object | None = None,
+        _owner: Architecture77HarnessAuthority | None = None,
+        _cleanup_root: bool = True,
+        _lifecycle_arbiter_factory: Callable[[str], AbstractContextManager[object]]
+        | None = None,
+    ) -> None:
+        if _construction_token is not _HARNESS_CONSTRUCTOR_TOKEN:
+            raise TypeError(
+                "Architecture-77 harness instances require an explicit factory"
+            )
+        if type(connection) is not sqlite3.Connection:
+            raise TypeError(
+                "Architecture-77 harness requires an exact sqlite3.Connection"
+            )
+        resolved_root = root.resolve(strict=True)
+        if not resolved_root.is_dir():
+            raise HarnessLifecycleError("harness root is not a directory")
+        self._connection = connection
+        self._root = resolved_root
+        self._database_path = (resolved_root / "authority.sqlite3").resolve(
+            strict=False
+        )
+        self._owner = self if _owner is None else _owner
+        self._service_token = (
+            _HarnessServiceToken() if _service_token is None else _service_token
+        )
+        self._lifecycle_arbiter_factory = (
+            self._owner._lifecycle_arbiter_factory
+            if _owner is not None
+            else (
+                _current_lifecycle_arbiter
+                if _lifecycle_arbiter_factory is None
+                else _lifecycle_arbiter_factory
+            )
+        )
+        self._cleanup_root = _cleanup_root if _owner is None else False
+        self._capture_request_factory = capture_request_factory
+        self._closed = False
+        if _owner is None:
+            self._lifecycle = TransactionalAuthorityLifecycle()
+            self._close_lock = threading.Lock()
+            self._cleanup_complete = threading.Event()
+            self._cleanup_started = False
+            self._connections: dict[int, sqlite3.Connection] = {}
+            self._bindings: list[TransactionalAuthorityCoreBinding] = []
+        else:
+            self._lifecycle = self._owner._lifecycle
+        self._register_connection(connection)
+        self._core_binding_issuer = (
+            TransactionalAuthorityCoreBinding.create_harness_issuer(self)
+        )
+        self._core_binding = TransactionalAuthorityCoreBinding.issue_for_harness(
+            self._core_binding_issuer
+        )
+        self._owner._bindings.append(self._core_binding)
+        self._core = TransactionalAuthorityCore.from_harness_binding(self._core_binding)
+
+    @classmethod
+    def create(
+        cls,
+        *,
+        lifecycle_arbiter_factory: Callable[[str], AbstractContextManager[object]]
+        | None = None,
+    ) -> Architecture77HarnessAuthority:
+        """Create a harness with optional reviewed arbiter test configuration."""
+
+        root = Path(tempfile.mkdtemp(prefix="ai-trading-bot-arch77-"))
+        path = root / "authority.sqlite3"
+        connection: sqlite3.Connection | None = None
+        try:
+            connection = _connect(path)
+            _install_schema(connection)
+            _insert_metadata(connection)
+            _insert_migration(connection)
+            instance = cls(
+                connection,
+                root=root,
+                _construction_token=_HARNESS_CONSTRUCTOR_TOKEN,
+                _lifecycle_arbiter_factory=lifecycle_arbiter_factory,
+            )
+            instance._validate_storage()
+            return instance
+        except BaseException:
+            if connection is not None:
+                connection.close()
+            shutil.rmtree(root, ignore_errors=True)
+            raise
+
+    @classmethod
+    def open_from_descriptor(
+        cls, descriptor: Architecture77HarnessDescriptor
+    ) -> Architecture77HarnessAuthority:
+        """Open a fresh child-process lifecycle from the factory descriptor."""
+
+        if type(descriptor) is not Architecture77HarnessDescriptor:
+            raise HarnessLifecycleError("spawn requires an Architecture-77 descriptor")
+        database_path = Path(descriptor.database_path).resolve(strict=False)
+        if database_path == Path(PRODUCTION_AUTHORITY_PATHS.database).resolve():
+            raise HarnessLifecycleError(
+                "descriptor selected the production authority path"
+            )
+        try:
+            root = Path(descriptor.root).resolve(strict=True)
+        except (OSError, RuntimeError) as exc:
+            raise HarnessLifecycleError("descriptor root is unavailable") from exc
+        expected_path = (root / "authority.sqlite3").resolve(strict=False)
+        if database_path != expected_path:
+            raise HarnessLifecycleError("descriptor database escaped its harness root")
+        if not database_path.is_file():
+            raise HarnessLifecycleError("descriptor database is unavailable")
+        connection: sqlite3.Connection | None = None
+        try:
+            connection = _connect(database_path)
+            instance = cls(
+                connection,
+                root=root,
+                _construction_token=_HARNESS_CONSTRUCTOR_TOKEN,
+                _cleanup_root=False,
+            )
+            instance._validate_storage()
+            return instance
+        except BaseException:
+            if connection is not None:
+                connection.close()
+            raise
+
+    @property
+    def database_path(self) -> Path:
+        self._require_open()
+        return self._database_path
+
+    @property
+    def descriptor(self) -> Architecture77HarnessDescriptor:
+        self._require_open()
+        return Architecture77HarnessDescriptor(
+            root=str(self._root), database_path=str(self.database_path)
+        )
+
+    def _require_open(self) -> None:
+        if self._owner._closed:
+            raise HarnessLifecycleError("Architecture-77 harness lifecycle is closed")
+
+    def _register_connection(self, connection: sqlite3.Connection) -> None:
+        with self._owner._lifecycle.admit():
+            self._require_open()
+            if type(connection) is not sqlite3.Connection:
+                raise TypeError("harness binding requires an exact sqlite3.Connection")
+            try:
+                connection.execute("SELECT 1")
+            except sqlite3.ProgrammingError as exc:
+                raise HarnessLifecycleError("harness connection is closed") from exc
+            self._validate_connection(connection)
+            self._owner._connections[id(connection)] = connection
+
+    def _issue_transactional_core_binding(
+        self,
+        issuer: object,
+    ) -> tuple[
+        sqlite3.Connection,
+        Callable[[str], AbstractContextManager[object]],
+        Callable[[object], ValidatedCaptureRequest] | None,
+        None,
+        object,
+    ]:
+        """Return reviewed components to the supported core binding issuer."""
+
+        with self._owner._lifecycle.admit():
+            self._require_open()
+            if issuer is not self._core_binding_issuer:
+                raise TypeError(
+                    "harness core binding issuer is not owned by this lifecycle"
+                )
+            self._validate_connection(self._connection)
+            return (
+                self._connection,
+                self._owner._lifecycle_arbiter_factory,
+                self._capture_request_factory,
+                None,
+                self._owner._service_token,
+                self._owner._lifecycle,
+            )
+
+    def _validate_connection(self, connection: sqlite3.Connection) -> None:
+        try:
+            rows = connection.execute("PRAGMA database_list").fetchall()
+            if len(rows) != 1 or rows[0][1] != "main":
+                raise HarnessLifecycleError(
+                    "harness database must have exactly one main database"
+                )
+            opened_path = str(rows[0][2])
+            if not opened_path or Path(opened_path).resolve() != self._database_path:
+                raise HarnessLifecycleError(
+                    "harness connection identity mismatches descriptor"
+                )
+            schema = connection.execute(
+                "SELECT production_schema_id, production_schema_version, "
+                "production_schema_digest FROM authority_metadata "
+                "WHERE singleton_key = 1"
+            ).fetchone()
+        except sqlite3.Error as exc:
+            raise HarnessLifecycleError(
+                "harness database schema is unavailable"
+            ) from exc
+        if schema != (
+            PRODUCTION_SCHEMA_ID,
+            PRODUCTION_SCHEMA_VERSION,
+            bytes.fromhex(SCHEMA_SHA256),
+        ):
+            raise HarnessLifecycleError(
+                "harness database schema identity is not reviewed"
+            )
+
+    def bind_connection(
+        self,
+        connection: sqlite3.Connection,
+        capture_request_factory: Callable[[object], ValidatedCaptureRequest]
+        | None = None,
+    ) -> Architecture77HarnessAuthority:
+        self._register_connection(connection)
+        return type(self)(
+            connection,
+            capture_request_factory,
+            root=self._root,
+            _construction_token=_HARNESS_CONSTRUCTOR_TOKEN,
+            _service_token=self._service_token,
+            _owner=self._owner,
+            _cleanup_root=False,
+        )
+
+    def open_connection(self) -> sqlite3.Connection:
+        self._require_open()
+        return _connect(self.database_path)
+
+    def _validate_storage(self) -> None:
+        root = self._root
+        if self.database_path.parent != root:
+            raise AssertionError("harness database escaped its private temporary root")
+        if self.database_path == Path(PRODUCTION_AUTHORITY_PATHS.database).resolve():
+            raise AssertionError(
+                "harness database selected the production authority path"
+            )
+        self._validate_connection(self._connection)
+
+    def close(self) -> None:
+        owner = self._owner
+        with owner._close_lock:
+            if owner._cleanup_complete.is_set():
+                return
+            if owner._cleanup_started:
+                wait_for_cleanup = True
+            else:
+                owner._cleanup_started = True
+                owner._closed = True
+                wait_for_cleanup = False
+        if wait_for_cleanup:
+            owner._cleanup_complete.wait()
+            return
+        close_error = HarnessLifecycleError(
+            "Architecture-77 harness lifecycle is closed"
+        )
+        first_error: BaseException | None = None
+        try:
+            owner._lifecycle.close(close_error)
+            for binding in tuple(owner._bindings):
+                try:
+                    binding.invalidate_for_harness_close(close_error)
+                except BaseException as exc:
+                    if first_error is None:
+                        first_error = exc
+            owner._bindings.clear()
+            for connection in tuple(owner._connections.values()):
+                try:
+                    connection.close()
+                except BaseException as exc:
+                    if first_error is None:
+                        first_error = exc
+            owner._connections.clear()
+            if owner._cleanup_root:
+                try:
+                    shutil.rmtree(owner._root)
+                except BaseException as exc:
+                    if first_error is None:
+                        first_error = exc
+        finally:
+            owner._cleanup_complete.set()
+        if first_error is not None:
+            raise first_error
+
+    @contextmanager
+    def bind_external_effects(self) -> Iterator[None]:
+        self._require_open()
+        with self._core.bind_external_effects():
+            yield
+
+    def _acquire_lifecycle_lease(self, reservation_id: str) -> object:
+        self._require_open()
+        return self._core_binding.acquire_lifecycle_lease(self._core, reservation_id)
+
+    def _release_lifecycle_lease(self, lease: object, *args: object) -> None:
+        self._core_binding.release_lifecycle_lease(lease, *args)
+
+    def _core_for_use(self) -> TransactionalAuthorityCore:
+        self._require_open()
+        return self._core
+
+    def require_test_capability(self, capability: object) -> None:
+        self._require_open()
+        self._core.require_test_capability(capability)
+
+    def lifecycle_lease(self, reservation_id: str) -> TestLifecycleLease:
+        self._require_open()
+        return TestLifecycleLease(self, reservation_id)
+
+    def create_session(
+        self, request: dict[str, Any], *, created_at_utc: str = TIMESTAMP
+    ) -> str:
+        self._require_open()
+        return self._core.create_session(request, created_at_utc=created_at_utc)
+
+    def allocate_attempt(
+        self,
+        session_id: str,
+        ordinal: int | None = None,
+        *,
+        created_at_utc: str = TIMESTAMP,
+    ) -> str:
+        self._require_open()
+        return self._core.allocate_attempt(
+            session_id, ordinal=ordinal, created_at_utc=created_at_utc
+        )
+
+    def commit_claim(
+        self, attempt_id: str, *, committed_at_utc: str = TIMESTAMP
+    ) -> str:
+        self._require_open()
+        return self._core.commit_claim(attempt_id, committed_at_utc=committed_at_utc)
+
+    def reserve_launch(
+        self, claim_id: str, *, committed_at_utc: str = TIMESTAMP
+    ) -> FakeProviderConstructionPermit:
+        self._require_open()
+        return self._core.reserve_launch(claim_id, committed_at_utc=committed_at_utc)
+
+    def commit_process_intent(
+        self, reservation_id: str, provider: FakeConstructedProvider | None = None
+    ) -> FakeProcessIntent:
+        self._require_open()
+        return self._core.commit_process_intent(  # type: ignore[arg-type]
+            reservation_id, provider
+        )
+
+    def record_execution(
+        self, reservation_id: str, receipt: FakeProcessCreationReceipt
+    ) -> str:
+        self._require_open()
+        return self._core.record_execution(reservation_id, receipt)
+
+    def commit_resume_intent(
+        self, execution_id: str, reservation_id: str
+    ) -> FakeResumeIntent:
+        self._require_open()
+        return self._core.commit_resume_intent(execution_id, reservation_id)
+
+    def record_process_creation_failure(
+        self, reservation_id: str, failure: FakeProcessCreationFailure
+    ) -> None:
+        self._require_open()
+        return self._core.record_process_creation_failure(reservation_id, failure)
+
+    def record_post_resume_evidence(
+        self, execution_id: str, resume_receipt: FakeResumeReceipt
+    ) -> None:
+        self._require_open()
+        return self._core.record_post_resume_evidence(execution_id, resume_receipt)
+
+    def record_terminal(
+        self,
+        reservation_id: str,
+        state: str = "SUCCEEDED",
+        disposition: str = "CONFIRMED",
+        *,
+        snapshot_digest: bytes | None,
+    ) -> str:
+        self._require_open()
+        return self._core.record_terminal(
+            reservation_id,
+            state,
+            disposition,
+            snapshot_digest=snapshot_digest,
+        )
+
+    def record_recovery(
+        self,
+        session_id: str,
+        target_kind: str,
+        target_id: str,
+        action: str,
+        ordinal: int | None = None,
+        *,
+        operator_evidence_json: bytes,
+        operator_evidence_digest: bytes,
+    ) -> str:
+        self._require_open()
+        if ordinal is not None:
+            _canonical_ordinal(ordinal, "recovery ordinal")
+        _require_no_active_transaction(self._connection)
+        return self._core.record_recovery(
+            session_id,
+            target_kind,
+            target_id,
+            action,
+            ordinal,
+            operator_evidence_json=operator_evidence_json,
+            operator_evidence_digest=operator_evidence_digest,
+        )
+
+
+class TestLifecycleLease:
+    """Explicit named-operation lease for already-held arbiter tests."""
+
+    __test__ = False
+
+    def __init__(
+        self, authority: Architecture77HarnessAuthority, reservation_id: str
+    ) -> None:
+        authority._require_open()
+        self._authority = authority
+        self._reservation_id = str(reservation_id)
+        self._core_lease: object | None = None
+        self._entered = False
+        self._exited = False
+        self._release_error: BaseException | None = None
+        self._execution_ids: set[str] = set()
+
+    def _require_active(self) -> object:
+        self._authority._require_open()
+        if not self._entered or self._exited or self._core_lease is None:
+            raise HarnessLifecycleError("lifecycle lease is not active")
+        return self._core_lease
+
+    def _require_reservation(self, reservation_id: str) -> object:
+        witness = self._require_active()
+        if str(reservation_id) != self._reservation_id:
+            raise ValueError(
+                "operation reservation does not match held lifecycle lease"
+            )
+        return witness
+
+    def __enter__(self) -> TestLifecycleLease:
+        if self._entered or self._exited:
+            raise HarnessLifecycleError("lifecycle lease cannot be re-entered")
+        self._authority._require_open()
+        try:
+            self._core_lease = self._authority._acquire_lifecycle_lease(
+                self._reservation_id
+            )
+            self._entered = True
+            return self
+        except BaseException:
+            self._core_lease = None
+            raise
+
+    def __exit__(self, *args: object) -> None:
+        if self._core_lease is None:
+            if self._exited:
+                if self._release_error is not None:
+                    raise self._release_error
+                raise HarnessLifecycleError("lifecycle lease was already exited")
+            return None
+        lease = self._core_lease
+        self._core_lease = None
+        self._exited = True
+        try:
+            self._authority._release_lifecycle_lease(lease, *args)
+        except BaseException as error:
+            self._release_error = error
+            raise
+
+    def bind_execution(self, execution_id: str) -> None:
+        witness = self._require_active()
+        if not isinstance(execution_id, str) or not execution_id:
+            raise ValueError("lifecycle lease requires a canonical execution id")
+        self._authority._core_for_use().require_execution_binding_while_held(
+            execution_id,
+            self._reservation_id,
+            lease_witness=witness,
+        )
+        self._execution_ids.add(execution_id)
+
+    def record_execution(
+        self, reservation_id: str, receipt: FakeProcessCreationReceipt
+    ) -> str:
+        witness = self._require_reservation(reservation_id)
+        return self._authority._core_for_use().record_execution_while_held(
+            reservation_id, receipt, lease_witness=witness
+        )
+
+    def commit_process_intent(
+        self, reservation_id: str, provider: FakeConstructedProvider
+    ) -> FakeProcessIntent:
+        witness = self._require_reservation(reservation_id)
+        return self._authority._core_for_use().commit_process_intent_while_held(
+            reservation_id, provider, lease_witness=witness
+        )
+
+    def commit_resume_intent(
+        self, execution_id: str, reservation_id: str
+    ) -> FakeResumeIntent:
+        witness = self._require_reservation(reservation_id)
+        result = self._authority._core_for_use().commit_resume_intent_while_held(
+            execution_id, reservation_id, lease_witness=witness
+        )
+        self._execution_ids.add(execution_id)
+        return result
+
+    def record_process_creation_failure(
+        self, reservation_id: str, failure: FakeProcessCreationFailure
+    ) -> None:
+        witness = self._require_reservation(reservation_id)
+        return (
+            self._authority._core_for_use().record_process_creation_failure_while_held(
+                reservation_id, failure, lease_witness=witness
+            )
+        )
+
+    def record_post_resume_evidence(
+        self, execution_id: str, receipt: FakeResumeReceipt
+    ) -> None:
+        witness = self._require_active()
+        if execution_id not in self._execution_ids:
+            raise ValueError("execution is not bound to the held lifecycle lease")
+        return self._authority._core_for_use().record_post_resume_evidence_while_held(
+            execution_id, receipt, lease_witness=witness
+        )
+
+    def record_terminal(
+        self,
+        reservation_id: str,
+        state: str = "SUCCEEDED",
+        disposition: str = "CONFIRMED",
+        *,
+        snapshot_digest: bytes | None,
+    ) -> str:
+        witness = self._require_reservation(reservation_id)
+        return self._authority._core_for_use().record_terminal_while_held(
+            reservation_id,
+            state,
+            disposition,
+            snapshot_digest=snapshot_digest,
+            lease_witness=witness,
+        )
+
+    def record_recovery(
+        self,
+        session_id: str,
+        target_kind: str,
+        target_id: str,
+        action: str,
+        ordinal: int | None = None,
+        *,
+        operator_evidence_json: bytes,
+        operator_evidence_digest: bytes,
+    ) -> str:
+        witness = self._require_active()
+        return self._authority._core_for_use().record_recovery_while_held(
+            session_id,
+            target_kind,
+            target_id,
+            action,
+            ordinal,
+            operator_evidence_json=operator_evidence_json,
+            operator_evidence_digest=operator_evidence_digest,
+            lease_witness=witness,
+        )
+
+
+def _test_service(
+    connection: sqlite3.Connection,
+    *,
+    capture_request_factory: Callable[[object], ValidatedCaptureRequest] | None = None,
+) -> Architecture77HarnessAuthority:
+    harness = _CURRENT_HARNESS.get()
+    if harness is None:
+        raise HarnessLifecycleError(
+            "test service requires an explicitly bound Architecture-77 harness"
+        )
+    return harness.bind_connection(connection, capture_request_factory)
+
+
 def create_session(
     connection: sqlite3.Connection,
     request: dict[str, Any] | None = None,
     *,
     created_at_utc: str = TIMESTAMP,
 ) -> str:
-    snapshot = _snapshot_capture_request(_request() if request is None else request)
-    _begin(connection)
-    try:
-        metadata = connection.execute(
-            """
-            SELECT authority_epoch_id, machine_authority_id, provider_id,
-                   permitted_provider_operation, authority_policy_version,
-                   claim_policy_version
-            FROM authority_metadata
-            WHERE singleton_key = 1
-            """
-        ).fetchone()
-        if metadata is None:
-            raise ValueError("authority metadata is missing")
-        (
-            authority_epoch_id,
-            machine_authority_id,
-            metadata_provider_id,
-            metadata_operation,
-            authority_policy_version,
-            claim_policy_version,
-        ) = metadata
-        if authority_policy_version != POLICY:
-            raise ValueError("authority policy is unsupported by this release")
-        if claim_policy_version != CLAIM_POLICY:
-            raise ValueError("claim policy is unsupported by this release")
-        if (
-            metadata_provider_id != ALPACA_DAILY_SNAPSHOT_DESCRIPTOR.provider_id
-            or metadata_operation != ALPACA_DAILY_SNAPSHOT_DESCRIPTOR.operation
-        ):
-            raise ValueError("authority metadata does not match the Alpaca descriptor")
-        request_provider_id = snapshot.provider_id
-        request_operation = snapshot.permitted_provider_operation
-        if request_provider_id != metadata_provider_id:
-            raise ValueError("request provider_id does not match authority metadata")
-        if request_operation != metadata_operation:
-            raise ValueError(
-                "request permitted_provider_operation does not match authority metadata"
-            )
-        request_bytes = snapshot.canonical_json()
-        request_digest = _digest(request_bytes)
-        _require_evidence_pair(
-            request_bytes, request_digest, field="session request digest"
-        )
-        session_id = _session_id(
-            snapshot,
-            machine_authority_id=machine_authority_id,
-            authority_epoch_id=authority_epoch_id,
-            authority_policy_version=authority_policy_version,
-            claim_policy_version=claim_policy_version,
-        )
-        connection.execute(
-            """
-            INSERT INTO sessions (
-                session_id, authority_epoch_id, session_schema,
-                authority_policy_version, claim_policy_version,
-                target_session_date, state, next_attempt_ordinal,
-                next_recovery_ordinal, request_json, request_digest,
-                created_at_utc, closed_at_utc, close_reason
-            ) VALUES (?, ?, 1, ?, ?, ?, 'OPEN', 0, 0, ?, ?, ?, NULL, NULL)
-            """,
-            (
-                session_id,
-                authority_epoch_id,
-                authority_policy_version,
-                claim_policy_version,
-                snapshot.target_session_date,
-                request_bytes,
-                request_digest,
-                created_at_utc,
-            ),
-        )
-        _finish(connection, True)
-    except BaseException:
-        _finish(connection, False)
-        raise
-    return session_id
+    return _test_service(connection).create_session(
+        _request() if request is None else request, created_at_utc=created_at_utc
+    )
 
 
 def allocate_attempt(
@@ -1793,152 +2194,9 @@ def allocate_attempt(
     *,
     created_at_utc: str = TIMESTAMP,
 ) -> str:
-    requested_ordinal = (
-        None if ordinal is None else _canonical_ordinal(ordinal, "attempt ordinal")
+    return _test_service(connection).allocate_attempt(
+        session_id, ordinal, created_at_utc=created_at_utc
     )
-    _begin(connection)
-    try:
-        row = connection.execute(
-            """
-            SELECT s.next_attempt_ordinal, s.request_json, s.request_digest,
-                   m.provider_id, m.permitted_provider_operation,
-                   s.authority_policy_version, s.claim_policy_version,
-                   m.authority_policy_version, m.claim_policy_version
-            FROM sessions s
-            JOIN authority_metadata m
-              ON m.authority_epoch_id = s.authority_epoch_id
-            WHERE s.session_id = ?
-            """,
-            (session_id,),
-        ).fetchone()
-        if row is None:
-            raise ValueError("unknown session")
-        (
-            current_ordinal,
-            request_bytes,
-            request_digest,
-            provider_id,
-            operation,
-            authority_policy_version,
-            claim_policy_version,
-            metadata_authority_policy,
-            metadata_claim_policy,
-        ) = row
-        if (
-            authority_policy_version != metadata_authority_policy
-            or claim_policy_version != metadata_claim_policy
-        ):
-            raise ValueError("session policy lineage does not match metadata")
-        current_ordinal = _canonical_ordinal(current_ordinal, "attempt ordinal")
-        allocated_ordinal = (
-            current_ordinal if requested_ordinal is None else requested_ordinal
-        )
-        attempt_id = _attempt_id(
-            session_id,
-            allocated_ordinal,
-            provider_id,
-            operation,
-            claim_policy_version,
-        )
-        allocation_evidence, allocation_digest = _evidence(
-            f"allocation:{allocated_ordinal}"
-        )
-        attempt_evidence, attempt_digest = _evidence(f"attempt:{allocated_ordinal}")
-        _require_evidence_pair(
-            request_bytes, request_digest, field="attempt request digest"
-        )
-        _require_evidence_pair(
-            allocation_evidence, allocation_digest, field="attempt allocation digest"
-        )
-        _require_evidence_pair(
-            attempt_evidence, attempt_digest, field="attempt evidence digest"
-        )
-        connection.execute(
-            """
-            INSERT INTO attempts (
-                attempt_id, session_id, ordinal, provider_id,
-                permitted_provider_operation, provider_call_budget,
-                request_json, request_digest, attempt_schema,
-                attempt_policy_version, allocation_evidence_json,
-                allocation_evidence_digest, attempt_evidence_json,
-                attempt_evidence_digest, state, created_at_utc
-            ) VALUES (?, ?, ?, ?, ?, 1, ?, ?, 1, ?, ?, ?, ?, ?, 'ALLOCATED', ?)
-            """,
-            (
-                attempt_id,
-                session_id,
-                allocated_ordinal,
-                provider_id,
-                operation,
-                request_bytes,
-                request_digest,
-                claim_policy_version,
-                allocation_evidence,
-                allocation_digest,
-                attempt_evidence,
-                attempt_digest,
-                created_at_utc,
-            ),
-        )
-        _finish(connection, True)
-    except BaseException:
-        _finish(connection, False)
-        raise
-    return attempt_id
-
-
-def _validate_claim_admission_evidence(
-    connection: sqlite3.Connection, session_id: str
-) -> None:
-    """Validate retry-safe prior outcomes before admitting a new claim."""
-
-    rows = connection.execute(
-        """
-        SELECT safe_reservation.process_creation_failure_json,
-               safe_reservation.process_creation_failure_digest,
-               safe_reservation.process_intent_json,
-               safe_reservation.process_intent_digest
-        FROM provider_call_claims prior_claim
-        JOIN attempts prior_attempt
-          ON prior_attempt.attempt_id = prior_claim.attempt_id
-        JOIN launch_reservations safe_reservation
-          ON safe_reservation.claim_id = prior_claim.claim_id
-        JOIN terminals safe_terminal
-          ON safe_terminal.launch_reservation_id =
-             safe_reservation.launch_reservation_id
-        WHERE prior_attempt.session_id = ?
-          AND prior_attempt.state = 'TERMINAL_RECORDED'
-          AND safe_reservation.reservation_state = 'TERMINAL_RECORDED'
-          AND safe_reservation.process_creation_failure_json IS NOT NULL
-          AND safe_reservation.process_creation_failure_digest IS NOT NULL
-          AND safe_terminal.terminal_state = 'FAILED'
-          AND safe_terminal.provider_call_disposition = 'NOT_STARTED'
-          AND safe_terminal.snapshot_digest IS NULL
-          AND NOT EXISTS (
-              SELECT 1
-              FROM launch_executions prior_execution
-              WHERE prior_execution.launch_reservation_id =
-                    safe_reservation.launch_reservation_id
-          )
-        """,
-        (session_id,),
-    ).fetchall()
-    for (
-        process_failure,
-        process_failure_digest,
-        process_intent,
-        process_intent_digest,
-    ) in rows:
-        _require_evidence_pair(
-            process_failure,
-            process_failure_digest,
-            field="retry-safe process failure digest",
-        )
-        _require_evidence_pair(
-            process_intent,
-            process_intent_digest,
-            field="retry-safe process intent digest",
-        )
 
 
 def commit_claim(
@@ -1947,73 +2205,9 @@ def commit_claim(
     *,
     committed_at_utc: str = TIMESTAMP,
 ) -> str:
-    evidence, evidence_digest = _evidence(f"claim:{attempt_id}")
-    _begin(connection)
-    try:
-        attempt = connection.execute(
-            """
-            SELECT a.session_id, a.request_json, a.request_digest, a.provider_id,
-                   a.permitted_provider_operation, a.provider_call_budget,
-                   a.attempt_policy_version
-            FROM attempts a WHERE attempt_id = ?
-            """,
-            (attempt_id,),
-        ).fetchone()
-        if attempt is None:
-            raise ValueError("unknown attempt")
-        (
-            session_id,
-            request_bytes,
-            request_digest,
-            provider_id,
-            operation,
-            budget,
-            claim_policy_version,
-        ) = attempt
-        _require_evidence_pair(
-            request_bytes, request_digest, field="claim request digest"
-        )
-        _validate_claim_admission_evidence(connection, session_id)
-        _require_evidence_pair(evidence, evidence_digest, field="claim evidence digest")
-        claim_id = _claim_id(
-            attempt_id,
-            claim_policy_version,
-            provider_id,
-            operation,
-            budget,
-        )
-        connection.execute(
-            """
-            INSERT INTO provider_call_claims (
-                claim_id, attempt_id, claim_schema, claim_policy_version,
-                provider_id, permitted_provider_operation, provider_call_budget,
-                request_json, request_digest, claim_evidence_json,
-                claim_evidence_digest, state, committed_at_utc
-            ) VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, 'COMMITTED', ?)
-            """,
-            (
-                claim_id,
-                attempt_id,
-                claim_policy_version,
-                provider_id,
-                operation,
-                budget,
-                request_bytes,
-                request_digest,
-                evidence,
-                evidence_digest,
-                committed_at_utc,
-            ),
-        )
-        connection.execute(
-            "UPDATE attempts SET state = 'CLAIM_COMMITTED' WHERE attempt_id = ?",
-            (attempt_id,),
-        )
-        _finish(connection, True)
-    except BaseException:
-        _finish(connection, False)
-        raise
-    return claim_id
+    return _test_service(connection).commit_claim(
+        attempt_id, committed_at_utc=committed_at_utc
+    )
 
 
 def reserve_launch(
@@ -2022,221 +2216,9 @@ def reserve_launch(
     *,
     committed_at_utc: str = TIMESTAMP,
 ) -> FakeProviderConstructionPermit:
-    evidence, evidence_digest = _evidence(f"reservation:{claim_id}")
-    _begin(connection)
-    try:
-        claim = connection.execute(
-            """
-            SELECT c.attempt_id, c.request_digest, c.claim_policy_version,
-                   s.authority_policy_version, a.request_json
-            FROM provider_call_claims c
-            JOIN attempts a ON a.attempt_id = c.attempt_id
-            JOIN sessions s ON s.session_id = a.session_id
-            WHERE c.claim_id = ?
-            """,
-            (claim_id,),
-        ).fetchone()
-        if claim is None:
-            raise ValueError("unknown claim")
-        (
-            attempt_id,
-            request_digest,
-            claim_policy_version,
-            authority_policy_version,
-            request_bytes,
-        ) = claim
-        _require_evidence_pair(
-            request_bytes, request_digest, field="reservation request digest"
-        )
-        _require_evidence_pair(
-            evidence, evidence_digest, field="reservation evidence digest"
-        )
-        reservation_id = _reservation_id(
-            claim_id,
-            RELEASE,
-            authority_policy_version,
-            claim_policy_version,
-        )
-        connection.execute(
-            """
-            INSERT INTO launch_reservations (
-                launch_reservation_id, claim_id, launch_reservation_schema,
-                application_release_version, authority_policy_version,
-                claim_policy_version, request_digest, reservation_evidence_json,
-                reservation_evidence_digest, reservation_state,
-                process_creation_failure_json, process_creation_failure_digest,
-                committed_at_utc, outcome_recorded_at_utc
-            ) VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, 'COMMITTED', NULL, NULL, ?, NULL)
-            """,
-            (
-                reservation_id,
-                claim_id,
-                RELEASE,
-                authority_policy_version,
-                claim_policy_version,
-                request_digest,
-                evidence,
-                evidence_digest,
-                committed_at_utc,
-            ),
-        )
-        connection.execute(
-            "UPDATE attempts SET state = 'LAUNCH_RESERVED' WHERE attempt_id = ?",
-            (attempt_id,),
-        )
-        _finish(connection, True)
-    except BaseException:
-        _finish(connection, False)
-        raise
-    one_shot = _ProviderConstructionOneShot()
-    capability = FakeProviderConstructionPermit(
-        reservation_id,
-        _issuer=_PROVIDER_CONSTRUCTION_ISSUER,
-        _permit=one_shot,
+    return _test_service(connection).reserve_launch(
+        claim_id, committed_at_utc=committed_at_utc
     )
-    with _ISSUED_PROVIDER_CONSTRUCTION_PERMITS_LOCK:
-        _ISSUED_PROVIDER_CONSTRUCTION_PERMITS[one_shot] = _ProviderConstructionIssuance(
-            capability=capability,
-            reservation_id=reservation_id,
-            issuer=_PROVIDER_CONSTRUCTION_ISSUER,
-            permit=one_shot,
-        )
-    return capability
-
-
-def _process_intent_json(
-    reservation_id: str,
-    request_digest: bytes,
-    authority_policy_version: str,
-    claim_policy_version: str,
-) -> bytes:
-    reservation_id = str(reservation_id)
-    return _json(
-        {
-            "authority_policy_version": authority_policy_version,
-            "claim_policy_version": claim_policy_version,
-            "launch_reservation_id": reservation_id,
-            "process_operation": "CreateProcessW",
-            "request_digest": request_digest.hex(),
-            "schema": 1,
-        }
-    )
-
-
-def _registered_provider_reservation_id(
-    capability: FakeProviderConstructionPermit,
-) -> str:
-    if type(capability) is not FakeProviderConstructionPermit:
-        raise TypeError("provider construction requires a reservation-issued permit")
-    if capability._issuer is not _PROVIDER_CONSTRUCTION_ISSUER:
-        raise TypeError("provider construction permit issuer is invalid")
-    permit = capability._permit
-    if type(permit) is not _ProviderConstructionOneShot:
-        raise ValueError("provider construction permit registry binding mismatch")
-    with permit.lock:
-        with _ISSUED_PROVIDER_CONSTRUCTION_PERMITS_LOCK:
-            issuance = _ISSUED_PROVIDER_CONSTRUCTION_PERMITS.get(permit)
-            if permit.consumed or issuance is None:
-                raise ValueError(
-                    "provider construction permit was consumed or not issued"
-                )
-            if (
-                issuance.capability is not capability
-                or issuance.permit is not permit
-                or issuance.issuer is not capability._issuer
-                or issuance.reservation_id != capability.reservation_id
-            ):
-                raise ValueError(
-                    "provider construction permit registry binding mismatch: "
-                    "exact object or fields were not issued"
-                )
-            return issuance.reservation_id
-
-
-def _consume_provider_construction_permit(
-    capability: FakeProviderConstructionPermit, reservation_id: str
-) -> None:
-    permit = capability._permit
-    if type(permit) is not _ProviderConstructionOneShot:
-        raise ValueError("provider construction permit registry binding mismatch")
-    with permit.lock:
-        with _ISSUED_PROVIDER_CONSTRUCTION_PERMITS_LOCK:
-            issuance = _ISSUED_PROVIDER_CONSTRUCTION_PERMITS.get(permit)
-            if permit.consumed or issuance is None:
-                raise ValueError(
-                    "provider construction permit was consumed or not issued"
-                )
-            if (
-                issuance.capability is not capability
-                or issuance.permit is not permit
-                or issuance.issuer is not capability._issuer
-                or issuance.reservation_id != capability.reservation_id
-                or issuance.reservation_id != reservation_id
-            ):
-                raise ValueError(
-                    "provider construction permit registry binding mismatch: "
-                    "exact object or fields were not issued"
-                )
-            del _ISSUED_PROVIDER_CONSTRUCTION_PERMITS[permit]
-        permit.consumed = True
-
-
-def _registered_constructed_provider_reservation_id(
-    provider: FakeConstructedProvider,
-) -> str:
-    if type(provider) is not FakeConstructedProvider:
-        raise TypeError("process intent requires an opaque constructed provider")
-    if provider._issuer is not _CONSTRUCTED_PROVIDER_ISSUER:
-        raise TypeError("constructed provider issuer is invalid")
-    permit = provider._permit
-    if type(permit) is not _ConstructedProviderOneShot:
-        raise ValueError("constructed provider registry binding mismatch")
-    with permit.lock:
-        with _ISSUED_CONSTRUCTED_PROVIDERS_LOCK:
-            issuance = _ISSUED_CONSTRUCTED_PROVIDERS.get(permit)
-            if permit.consumed or issuance is None:
-                raise ValueError(
-                    "constructed provider was already consumed or not issued"
-                )
-            if (
-                issuance.provider is not provider
-                or issuance.permit is not permit
-                or issuance.issuer is not provider._issuer
-                or issuance.reservation_id != provider.reservation_id
-            ):
-                raise ValueError(
-                    "constructed provider registry binding mismatch: "
-                    "exact object or fields were not issued"
-                )
-            return issuance.reservation_id
-
-
-def _consume_constructed_provider(
-    provider: FakeConstructedProvider, reservation_id: str
-) -> None:
-    permit = provider._permit
-    if type(permit) is not _ConstructedProviderOneShot:
-        raise ValueError("constructed provider registry binding mismatch")
-    with permit.lock:
-        with _ISSUED_CONSTRUCTED_PROVIDERS_LOCK:
-            issuance = _ISSUED_CONSTRUCTED_PROVIDERS.get(permit)
-            if permit.consumed or issuance is None:
-                raise ValueError(
-                    "constructed provider was already consumed or not issued"
-                )
-            if (
-                issuance.provider is not provider
-                or issuance.permit is not permit
-                or issuance.issuer is not provider._issuer
-                or issuance.reservation_id != provider.reservation_id
-                or issuance.reservation_id != reservation_id
-            ):
-                raise ValueError(
-                    "constructed provider registry binding mismatch: "
-                    "exact object or fields were not issued"
-                )
-            del _ISSUED_CONSTRUCTED_PROVIDERS[permit]
-        permit.consumed = True
 
 
 def commit_process_intent(
@@ -2244,450 +2226,7 @@ def commit_process_intent(
     reservation_id: str,
     provider: FakeConstructedProvider | None = None,
 ) -> FakeProcessIntent:
-    _require_no_active_transaction(connection)
-    if type(provider) is not FakeConstructedProvider:
-        raise TypeError("process intent requires an opaque constructed provider")
-    registered_reservation_id = _registered_constructed_provider_reservation_id(
-        provider
-    )
-    if registered_reservation_id != str(reservation_id):
-        raise ValueError("constructed provider belongs to another reservation")
-    with InterprocessLifecycleArbiter(registered_reservation_id):
-        return _commit_process_intent_locked(
-            connection, registered_reservation_id, provider
-        )
-
-
-def _commit_process_intent_locked(
-    connection: sqlite3.Connection,
-    reservation_id: str,
-    provider: FakeConstructedProvider,
-) -> FakeProcessIntent:
-    reservation_id = str(reservation_id)
-    if _registered_constructed_provider_reservation_id(provider) != reservation_id:
-        raise ValueError("constructed provider registry binding mismatch")
-    _begin(connection)
-    try:
-        row = connection.execute(
-            """
-            SELECT r.reservation_state, r.request_digest,
-                   r.authority_policy_version, r.claim_policy_version,
-                   r.reservation_evidence_json, r.reservation_evidence_digest,
-                   c.state, c.request_json, c.request_digest,
-                   c.claim_policy_version, c.claim_evidence_json,
-                   c.claim_evidence_digest,
-                   a.state, a.request_json, a.request_digest,
-                   a.attempt_policy_version, a.provider_id,
-                   a.permitted_provider_operation, a.provider_call_budget,
-                   s.state, s.request_json, s.request_digest,
-                   s.authority_policy_version, s.claim_policy_version,
-                   m.provider_id, m.permitted_provider_operation,
-                   m.authority_policy_version, m.claim_policy_version
-            FROM launch_reservations r
-            JOIN provider_call_claims c ON c.claim_id = r.claim_id
-            JOIN attempts a ON a.attempt_id = c.attempt_id
-            JOIN sessions s ON s.session_id = a.session_id
-            JOIN authority_metadata m ON m.singleton_key = 1
-            WHERE r.launch_reservation_id = ?
-            """,
-            (str(reservation_id),),
-        ).fetchone()
-        if row is None:
-            raise ValueError("unknown reservation")
-        (
-            reservation_state,
-            request_digest,
-            authority_policy_version,
-            claim_policy_version,
-            reservation_evidence,
-            reservation_evidence_digest,
-            claim_state,
-            claim_request,
-            claim_request_digest,
-            claim_policy,
-            claim_evidence,
-            claim_evidence_digest,
-            attempt_state,
-            attempt_request,
-            attempt_request_digest,
-            attempt_policy,
-            attempt_provider,
-            attempt_operation,
-            attempt_budget,
-            session_state,
-            session_request,
-            session_request_digest,
-            session_authority_policy,
-            session_claim_policy,
-            metadata_provider,
-            metadata_operation,
-            metadata_authority_policy,
-            metadata_claim_policy,
-        ) = row
-        if reservation_state != "COMMITTED":
-            raise ValueError("process intent requires COMMITTED")
-        if (
-            _digest(reservation_evidence) != reservation_evidence_digest
-            or _digest(claim_evidence) != claim_evidence_digest
-            or _digest(claim_request) != claim_request_digest
-            or claim_request != attempt_request
-            or claim_request != session_request
-            or request_digest != claim_request_digest
-            or request_digest != attempt_request_digest
-            or request_digest != session_request_digest
-        ):
-            raise ValueError("process intent request or evidence binding is invalid")
-        if (
-            claim_state != "COMMITTED"
-            or attempt_state != "LAUNCH_RESERVED"
-            or session_state != "OPEN"
-            or claim_policy_version != claim_policy
-            or claim_policy != attempt_policy
-            or claim_policy != session_claim_policy
-            or claim_policy != metadata_claim_policy
-            or authority_policy_version != session_authority_policy
-            or authority_policy_version != metadata_authority_policy
-            or attempt_provider != metadata_provider
-            or attempt_provider != PROVIDER
-            or attempt_operation != metadata_operation
-            or attempt_operation != OPERATION
-            or attempt_budget != 1
-        ):
-            raise ValueError("process intent policy or claim binding is invalid")
-        intent_json = _process_intent_json(
-            reservation_id,
-            request_digest,
-            authority_policy_version,
-            claim_policy_version,
-        )
-        intent_digest = _digest(intent_json)
-        cursor = connection.execute(
-            """
-            UPDATE launch_reservations
-            SET reservation_state = 'PROCESS_INTENT_COMMITTED',
-                process_intent_json = ?, process_intent_digest = ?,
-                process_intent_committed_at_utc = ?
-            WHERE launch_reservation_id = ? AND reservation_state = 'COMMITTED'
-            """,
-            (intent_json, intent_digest, PROCESS_INTENT_TIMESTAMP, reservation_id),
-        )
-        if cursor.rowcount != 1:
-            raise ValueError("process intent ownership was not acquired")
-        _finish(connection, True)
-    except BaseException:
-        _finish(connection, False)
-        raise
-    _consume_constructed_provider(provider, reservation_id)
-    permit = _ProcessPermit()
-    intent = FakeProcessIntent(
-        reservation_id=reservation_id,
-        intent_json=intent_json,
-        intent_digest=intent_digest,
-        _issuer=_PROCESS_INTENT_ISSUER,
-        _permit=permit,
-    )
-    with _ISSUED_PROCESS_PERMITS_LOCK:
-        _ISSUED_PROCESS_PERMITS[permit] = _ProcessIntentIssuance(
-            intent=intent,
-            reservation_id=reservation_id,
-            intent_json=intent_json,
-            intent_digest=intent_digest,
-            issuer=_PROCESS_INTENT_ISSUER,
-            permit=permit,
-        )
-    return intent
-
-
-def _process_success_evidence(
-    reservation_id: str, process_intent_digest: bytes
-) -> tuple[bytes, bytes, bytes]:
-    reservation_id = str(reservation_id)
-    common = {
-        "process_intent_digest": process_intent_digest.hex(),
-        "reservation_id": reservation_id,
-        "schema": 1,
-    }
-    return (
-        _json({**common, "creation_result": "SUSPENDED_CHILD_CREATED"}),
-        _json({**common, "job_object_result": "ASSIGNED"}),
-        _json({**common, "resume_authorization": "SUSPENDED_THREAD_OWNED"}),
-    )
-
-
-def _process_failure_json(reservation_id: str, process_intent_digest: bytes) -> bytes:
-    reservation_id = str(reservation_id)
-    return _json(
-        {
-            "creation_result": "NOT_CREATED",
-            "process_intent_digest": process_intent_digest.hex(),
-            "reservation_id": reservation_id,
-            "schema": 1,
-        }
-    )
-
-
-def _registered_process_intent_reservation_id(intent: FakeProcessIntent) -> str:
-    if type(intent) is not FakeProcessIntent:
-        raise TypeError("CreateProcessW requires an opaque fake process intent")
-    if intent._issuer is not _PROCESS_INTENT_ISSUER:
-        raise TypeError("CreateProcessW process intent issuer is invalid")
-    permit = intent._permit
-    if type(permit) is not _ProcessPermit:
-        raise ValueError("CreateProcessW process intent registry binding mismatch")
-    with permit.lock:
-        with _ISSUED_PROCESS_PERMITS_LOCK:
-            issuance = _ISSUED_PROCESS_PERMITS.get(permit)
-            if permit.consumed or issuance is None:
-                raise ValueError(
-                    "CreateProcessW process intent was already consumed or not issued"
-                )
-            if (
-                issuance.intent is not intent
-                or issuance.permit is not permit
-                or issuance.issuer is not intent._issuer
-                or issuance.reservation_id != intent.reservation_id
-                or issuance.intent_json != intent.intent_json
-                or issuance.intent_digest != intent.intent_digest
-            ):
-                raise ValueError(
-                    "CreateProcessW process intent registry binding mismatch: "
-                    "exact object or fields were not issued"
-                )
-            return issuance.reservation_id
-
-
-def _consume_process_intent(intent: FakeProcessIntent, reservation_id: str) -> None:
-    permit = intent._permit
-    if type(permit) is not _ProcessPermit:
-        raise ValueError("CreateProcessW process intent registry binding mismatch")
-    with permit.lock:
-        with _ISSUED_PROCESS_PERMITS_LOCK:
-            issuance = _ISSUED_PROCESS_PERMITS.get(permit)
-            if permit.consumed or issuance is None:
-                raise ValueError(
-                    "CreateProcessW process intent was already consumed or not issued"
-                )
-            if (
-                issuance.intent is not intent
-                or issuance.permit is not permit
-                or issuance.issuer is not intent._issuer
-                or issuance.reservation_id != intent.reservation_id
-                or issuance.reservation_id != reservation_id
-                or issuance.intent_json != intent.intent_json
-                or issuance.intent_digest != intent.intent_digest
-            ):
-                raise ValueError(
-                    "CreateProcessW process intent registry binding mismatch: "
-                    "exact object or fields were not issued"
-                )
-            del _ISSUED_PROCESS_PERMITS[permit]
-        permit.consumed = True
-
-
-def _process_result_visible_evidence(
-    result: FakeProcessCreationReceipt | FakeProcessCreationFailure,
-) -> tuple[tuple[bytes, ...], tuple[bytes, ...]]:
-    if type(result) is FakeProcessCreationReceipt:
-        return (
-            (
-                result.process_json,
-                result.job_json,
-                result.resume_authorization_json,
-            ),
-            (
-                result.process_digest,
-                result.job_digest,
-                result.resume_authorization_digest,
-            ),
-        )
-    if type(result) is FakeProcessCreationFailure:
-        return (result.result_json,), (result.result_digest,)
-    raise TypeError("process result type is invalid")
-
-
-def _registered_process_result_reservation_id(
-    result: FakeProcessCreationReceipt | FakeProcessCreationFailure,
-) -> str:
-    if result._issuer is not _PROCESS_RESULT_ISSUER:
-        raise TypeError("process result issuer is invalid")
-    permit = result._permit
-    if type(permit) is not _ProcessResultPermit:
-        raise ValueError("process result registry binding mismatch")
-    with permit.lock:
-        with _ISSUED_PROCESS_RESULTS_LOCK:
-            issuance = _ISSUED_PROCESS_RESULTS.get(permit)
-            if permit.consumed or issuance is None:
-                raise ValueError("process result was already consumed or not issued")
-            evidence, digests = _process_result_visible_evidence(result)
-            if (
-                issuance.result is not result
-                or issuance.permit is not permit
-                or issuance.issuer is not result._issuer
-                or issuance.reservation_id != result.reservation_id
-                or issuance.process_intent_digest != result.process_intent_digest
-                or issuance.evidence != evidence
-                or issuance.digests != digests
-            ):
-                raise ValueError(
-                    "process result registry binding mismatch: "
-                    "exact object or fields were not issued"
-                )
-            return issuance.reservation_id
-
-
-def _consume_process_result(
-    result: FakeProcessCreationReceipt | FakeProcessCreationFailure,
-    reservation_id: str,
-) -> None:
-    permit = result._permit
-    if type(permit) is not _ProcessResultPermit:
-        raise ValueError("process result registry binding mismatch")
-    with permit.lock:
-        with _ISSUED_PROCESS_RESULTS_LOCK:
-            issuance = _ISSUED_PROCESS_RESULTS.get(permit)
-            if permit.consumed or issuance is None:
-                raise ValueError("process result was already consumed or not issued")
-            evidence, digests = _process_result_visible_evidence(result)
-            if (
-                issuance.result is not result
-                or issuance.permit is not permit
-                or issuance.issuer is not result._issuer
-                or issuance.reservation_id != result.reservation_id
-                or issuance.reservation_id != reservation_id
-                or issuance.process_intent_digest != result.process_intent_digest
-                or issuance.evidence != evidence
-                or issuance.digests != digests
-            ):
-                raise ValueError(
-                    "process result registry binding mismatch: "
-                    "exact object or fields were not issued"
-                )
-            del _ISSUED_PROCESS_RESULTS[permit]
-        permit.consumed = True
-
-
-def _registered_resume_intent_binding(intent: FakeResumeIntent) -> tuple[str, str]:
-    if type(intent) is not FakeResumeIntent:
-        raise TypeError("ResumeThread requires an opaque fake resume intent")
-    if intent._issuer is not _RESUME_INTENT_ISSUER:
-        raise TypeError("ResumeThread intent issuer is invalid")
-    permit = intent._permit
-    if type(permit) is not _ResumePermit:
-        raise ValueError("ResumeThread intent registry binding mismatch")
-    with permit.lock:
-        with _ISSUED_RESUME_PERMITS_LOCK:
-            issuance = _ISSUED_RESUME_PERMITS.get(permit)
-            if permit.consumed or issuance is None:
-                raise ValueError(
-                    "ResumeThread intent was already consumed or not issued"
-                )
-            if (
-                issuance.intent is not intent
-                or issuance.permit is not permit
-                or issuance.issuer is not intent._issuer
-                or issuance.execution_id != intent.execution_id
-                or issuance.reservation_id != intent.reservation_id
-                or issuance.intent_json != intent.intent_json
-                or issuance.intent_digest != intent.intent_digest
-            ):
-                raise ValueError(
-                    "ResumeThread intent registry binding mismatch: "
-                    "exact object or fields were not issued"
-                )
-            return issuance.execution_id, issuance.reservation_id
-
-
-def _consume_resume_intent(
-    intent: FakeResumeIntent, execution_id: str, reservation_id: str
-) -> None:
-    permit = intent._permit
-    if type(permit) is not _ResumePermit:
-        raise ValueError("ResumeThread intent registry binding mismatch")
-    with permit.lock:
-        with _ISSUED_RESUME_PERMITS_LOCK:
-            issuance = _ISSUED_RESUME_PERMITS.get(permit)
-            if permit.consumed or issuance is None:
-                raise ValueError(
-                    "ResumeThread intent was already consumed or not issued"
-                )
-            if (
-                issuance.intent is not intent
-                or issuance.permit is not permit
-                or issuance.issuer is not intent._issuer
-                or issuance.execution_id != intent.execution_id
-                or issuance.execution_id != execution_id
-                or issuance.reservation_id != intent.reservation_id
-                or issuance.reservation_id != reservation_id
-                or issuance.intent_json != intent.intent_json
-                or issuance.intent_digest != intent.intent_digest
-            ):
-                raise ValueError(
-                    "ResumeThread intent registry binding mismatch: "
-                    "exact object or fields were not issued"
-                )
-            del _ISSUED_RESUME_PERMITS[permit]
-        permit.consumed = True
-
-
-def _registered_resume_result_binding(result: FakeResumeReceipt) -> tuple[str, str]:
-    if type(result) is not FakeResumeReceipt:
-        raise TypeError("post-resume evidence requires a fake resume receipt")
-    if result._issuer is not _RESUME_RESULT_ISSUER:
-        raise TypeError("resume result issuer is invalid")
-    permit = result._permit
-    if type(permit) is not _ResumeResultPermit:
-        raise ValueError("resume result registry binding mismatch")
-    with permit.lock:
-        with _ISSUED_RESUME_RESULTS_LOCK:
-            issuance = _ISSUED_RESUME_RESULTS.get(permit)
-            if permit.consumed or issuance is None:
-                raise ValueError("resume result was already consumed or not issued")
-            if (
-                issuance.result is not result
-                or issuance.permit is not permit
-                or issuance.issuer is not result._issuer
-                or issuance.execution_id != result.execution_id
-                or issuance.reservation_id != result.reservation_id
-                or issuance.resume_intent_digest != result.resume_intent_digest
-                or issuance.result_json != result.result_json
-                or issuance.result_digest != result.result_digest
-            ):
-                raise ValueError(
-                    "resume result registry binding mismatch: "
-                    "exact object or fields were not issued"
-                )
-            return issuance.execution_id, issuance.reservation_id
-
-
-def _consume_resume_result(
-    result: FakeResumeReceipt, execution_id: str, reservation_id: str
-) -> None:
-    permit = result._permit
-    if type(permit) is not _ResumeResultPermit:
-        raise ValueError("resume result registry binding mismatch")
-    with permit.lock:
-        with _ISSUED_RESUME_RESULTS_LOCK:
-            issuance = _ISSUED_RESUME_RESULTS.get(permit)
-            if permit.consumed or issuance is None:
-                raise ValueError("resume result was already consumed or not issued")
-            if (
-                issuance.result is not result
-                or issuance.permit is not permit
-                or issuance.issuer is not result._issuer
-                or issuance.execution_id != result.execution_id
-                or issuance.execution_id != execution_id
-                or issuance.reservation_id != result.reservation_id
-                or issuance.reservation_id != reservation_id
-                or issuance.resume_intent_digest != result.resume_intent_digest
-                or issuance.result_json != result.result_json
-                or issuance.result_digest != result.result_digest
-            ):
-                raise ValueError(
-                    "resume result registry binding mismatch: "
-                    "exact object or fields were not issued"
-                )
-            del _ISSUED_RESUME_RESULTS[permit]
-        permit.consumed = True
+    return _test_service(connection).commit_process_intent(reservation_id, provider)
 
 
 def record_execution(
@@ -2695,155 +2234,7 @@ def record_execution(
     reservation_id: str,
     receipt: FakeProcessCreationReceipt,
 ) -> str:
-    _require_no_active_transaction(connection)
-    if type(receipt) is not FakeProcessCreationReceipt:
-        raise TypeError("record_execution requires a fake process creation receipt")
-    registered_reservation_id = _registered_process_result_reservation_id(receipt)
-    if registered_reservation_id != str(reservation_id):
-        raise ValueError("process creation receipt belongs to another reservation")
-    with InterprocessLifecycleArbiter(registered_reservation_id):
-        return _record_execution_locked(connection, registered_reservation_id, receipt)
-
-
-def _record_execution_locked(
-    connection: sqlite3.Connection,
-    reservation_id: str,
-    receipt: FakeProcessCreationReceipt,
-) -> str:
-    reservation_id = str(reservation_id)
-    if _registered_process_result_reservation_id(receipt) != reservation_id:
-        raise ValueError("process result registry binding mismatch")
-    process, job, resume = _process_success_evidence(
-        reservation_id, receipt.process_intent_digest
-    )
-    if (
-        receipt.process_json != process
-        or receipt.process_digest != _digest(process)
-        or receipt.job_json != job
-        or receipt.job_digest != _digest(job)
-        or receipt.resume_authorization_json != resume
-        or receipt.resume_authorization_digest != _digest(resume)
-    ):
-        raise ValueError("process creation receipt is not exact canonical evidence")
-    _begin(connection)
-    try:
-        reservation = connection.execute(
-            """
-            SELECT r.application_release_version, r.authority_policy_version,
-                   r.reservation_state, r.process_intent_json,
-                   r.process_intent_digest, c.state, a.state, s.state
-            FROM launch_reservations r
-            JOIN provider_call_claims c ON c.claim_id = r.claim_id
-            JOIN attempts a ON a.attempt_id = c.attempt_id
-            JOIN sessions s ON s.session_id = a.session_id
-            WHERE r.launch_reservation_id = ?
-              AND NOT EXISTS (
-                  SELECT 1 FROM terminals t
-                  WHERE t.launch_reservation_id = r.launch_reservation_id
-              )
-              AND NOT EXISTS (
-                  SELECT 1 FROM session_selections ss
-                  WHERE ss.session_id = s.session_id
-              )
-            """,
-            (str(reservation_id),),
-        ).fetchone()
-        if reservation is None:
-            raise ValueError("unknown reservation")
-        (
-            application_release_version,
-            authority_policy_version,
-            reservation_state,
-            intent_json,
-            intent_digest,
-            claim_state,
-            attempt_state,
-            session_state,
-        ) = reservation
-        if reservation_state != "PROCESS_INTENT_COMMITTED":
-            raise ValueError("execution requires PROCESS_INTENT_COMMITTED")
-        if (
-            claim_state != "COMMITTED"
-            or attempt_state != "LAUNCH_RESERVED"
-            or session_state != "OPEN"
-        ):
-            raise ValueError("execution active parent lineage is revoked")
-        if (
-            intent_json is None
-            or _digest(intent_json) != intent_digest
-            or receipt.process_intent_digest != intent_digest
-        ):
-            raise ValueError("process creation receipt intent binding is invalid")
-        execution_id = _execution_id(
-            reservation_id,
-            application_release_version,
-            authority_policy_version,
-        )
-        connection.execute(
-            """
-            INSERT INTO launch_executions (
-                launch_execution_id, launch_reservation_id, launch_schema,
-                application_release_version, authority_policy_version, phase,
-                process_creation_json, process_creation_digest, job_object_json,
-                job_object_digest, resume_authorization_json,
-                resume_authorization_digest, resume_intent_json,
-                resume_intent_digest, resume_intent_committed_at_utc,
-                post_resume_json, post_resume_digest, cleanup_json,
-                cleanup_digest, created_at_utc
-            ) VALUES (?, ?, 1, ?, ?, 'PRE_RESUME_READY', ?, ?, ?, ?, ?, ?,
-                      NULL, NULL, NULL, NULL, NULL, NULL, NULL, ?)
-            """,
-            (
-                execution_id,
-                reservation_id,
-                application_release_version,
-                authority_policy_version,
-                process,
-                receipt.process_digest,
-                job,
-                receipt.job_digest,
-                resume,
-                receipt.resume_authorization_digest,
-                PROCESS_CREATED_TIMESTAMP,
-            ),
-        )
-        cursor = connection.execute(
-            """
-            UPDATE launch_reservations
-            SET reservation_state = 'PROCESS_CREATED', outcome_recorded_at_utc = ?
-            WHERE launch_reservation_id = ?
-              AND reservation_state = 'PROCESS_INTENT_COMMITTED'
-              AND process_intent_digest IS ?
-              AND EXISTS (
-                  SELECT 1
-                  FROM provider_call_claims c
-                  JOIN attempts a ON a.attempt_id = c.attempt_id
-                  JOIN sessions s ON s.session_id = a.session_id
-                  WHERE c.claim_id = launch_reservations.claim_id
-                    AND c.state = 'COMMITTED'
-                    AND a.state = 'LAUNCH_RESERVED'
-                    AND s.state = 'OPEN'
-                    AND NOT EXISTS (
-                        SELECT 1 FROM terminals t
-                        WHERE t.launch_reservation_id =
-                              launch_reservations.launch_reservation_id
-                    )
-                    AND NOT EXISTS (
-                        SELECT 1 FROM session_selections ss
-                        WHERE ss.session_id = s.session_id
-                    )
-              )
-            """,
-            (PROCESS_CREATED_TIMESTAMP, reservation_id, intent_digest),
-        )
-        if cursor.rowcount != 1:
-            raise ValueError("execution active parent lineage changed")
-        _finish(connection, True)
-    except BaseException:
-        _finish(connection, False)
-        raise
-    _consume_process_result(receipt, reservation_id)
-    return execution_id
+    return _test_service(connection).record_execution(reservation_id, receipt)
 
 
 def commit_resume_intent(
@@ -2851,122 +2242,7 @@ def commit_resume_intent(
     execution_id: str,
     reservation_id: str,
 ) -> FakeResumeIntent:
-    _require_no_active_transaction(connection)
-    reservation_id = str(reservation_id)
-    with InterprocessLifecycleArbiter(reservation_id):
-        return _commit_resume_intent_locked(connection, execution_id, reservation_id)
-
-
-def _commit_resume_intent_locked(
-    connection: sqlite3.Connection, execution_id: str, reservation_id: str
-) -> FakeResumeIntent:
-    reservation_id = str(reservation_id)
-    intent_json = _json(
-        {
-            "execution_id": execution_id,
-            "resume_operation": "ResumeThread",
-            "schema": 1,
-        }
-    )
-    intent_digest = _digest(intent_json)
-    _begin(connection)
-    try:
-        row = connection.execute(
-            """
-            SELECT e.phase, e.process_creation_json, e.process_creation_digest,
-                   e.job_object_json, e.job_object_digest,
-                   e.resume_authorization_json, e.resume_authorization_digest,
-                   r.reservation_state, s.state, e.launch_reservation_id
-            FROM launch_executions e
-            JOIN launch_reservations r
-              ON r.launch_reservation_id = e.launch_reservation_id
-            JOIN provider_call_claims c ON c.claim_id = r.claim_id
-            JOIN attempts a ON a.attempt_id = c.attempt_id
-            JOIN sessions s ON s.session_id = a.session_id
-            WHERE e.launch_execution_id = ?
-              AND NOT EXISTS (
-                  SELECT 1 FROM terminals t
-                  WHERE t.launch_reservation_id = r.launch_reservation_id
-              )
-              AND NOT EXISTS (
-                  SELECT 1 FROM session_selections ss
-                  WHERE ss.session_id = s.session_id
-              )
-            """,
-            (execution_id,),
-        ).fetchone()
-        if row is None:
-            raise ValueError(
-                "unknown execution or resume intent active lineage is unavailable"
-            )
-        if row[9] != reservation_id:
-            raise ValueError("resume execution belongs to another reservation")
-        if row[0] != "PRE_RESUME_READY":
-            raise ValueError("resume intent requires PRE_RESUME_READY")
-        if row[7] != "PROCESS_CREATED" or row[8] != "OPEN":
-            raise ValueError("resume intent active parent lineage is revoked")
-        for evidence_json, evidence_digest in (
-            (row[1], row[2]),
-            (row[3], row[4]),
-            (row[5], row[6]),
-        ):
-            if evidence_json is None or _digest(evidence_json) != evidence_digest:
-                raise ValueError("resume intent requires exact pre-resume evidence")
-        cursor = connection.execute(
-            """
-            UPDATE launch_executions
-            SET phase = 'RESUME_INTENT_COMMITTED', resume_intent_json = ?,
-                resume_intent_digest = ?, resume_intent_committed_at_utc = ?
-            WHERE launch_execution_id = ?
-              AND phase = 'PRE_RESUME_READY'
-              AND EXISTS (
-                  SELECT 1
-                  FROM launch_reservations r
-                  JOIN provider_call_claims c ON c.claim_id = r.claim_id
-                  JOIN attempts a ON a.attempt_id = c.attempt_id
-                  JOIN sessions s ON s.session_id = a.session_id
-                  WHERE r.launch_reservation_id =
-                        launch_executions.launch_reservation_id
-                    AND r.reservation_state = 'PROCESS_CREATED'
-                    AND s.state = 'OPEN'
-                    AND NOT EXISTS (
-                        SELECT 1 FROM terminals t
-                        WHERE t.launch_reservation_id = r.launch_reservation_id
-                    )
-                    AND NOT EXISTS (
-                        SELECT 1 FROM session_selections ss
-                        WHERE ss.session_id = s.session_id
-                    )
-              )
-            """,
-            (intent_json, intent_digest, RESUME_INTENT_TIMESTAMP, execution_id),
-        )
-        if cursor.rowcount != 1:
-            raise ValueError("resume intent ownership was not acquired")
-        _finish(connection, True)
-    except BaseException:
-        _finish(connection, False)
-        raise
-    permit = _ResumePermit()
-    intent = FakeResumeIntent(
-        execution_id=execution_id,
-        reservation_id=reservation_id,
-        intent_json=intent_json,
-        intent_digest=intent_digest,
-        _issuer=_RESUME_INTENT_ISSUER,
-        _permit=permit,
-    )
-    with _ISSUED_RESUME_PERMITS_LOCK:
-        _ISSUED_RESUME_PERMITS[permit] = _ResumeIntentIssuance(
-            intent=intent,
-            execution_id=execution_id,
-            reservation_id=reservation_id,
-            intent_json=intent_json,
-            intent_digest=intent_digest,
-            issuer=_RESUME_INTENT_ISSUER,
-            permit=permit,
-        )
-    return intent
+    return _test_service(connection).commit_resume_intent(execution_id, reservation_id)
 
 
 def record_process_creation_failure(
@@ -2974,110 +2250,9 @@ def record_process_creation_failure(
     reservation_id: str,
     failure: FakeProcessCreationFailure,
 ) -> None:
-    _require_no_active_transaction(connection)
-    if type(failure) is not FakeProcessCreationFailure:
-        raise TypeError(
-            "record_process_creation_failure requires a fake process creation failure"
-        )
-    registered_reservation_id = _registered_process_result_reservation_id(failure)
-    if registered_reservation_id != str(reservation_id):
-        raise ValueError("process creation failure belongs to another reservation")
-    with InterprocessLifecycleArbiter(registered_reservation_id):
-        _record_process_creation_failure_locked(
-            connection, registered_reservation_id, failure
-        )
-
-
-def _record_process_creation_failure_locked(
-    connection: sqlite3.Connection,
-    reservation_id: str,
-    failure: FakeProcessCreationFailure,
-) -> None:
-    reservation_id = str(reservation_id)
-    if _registered_process_result_reservation_id(failure) != reservation_id:
-        raise ValueError("process result registry binding mismatch")
-    expected = _process_failure_json(reservation_id, failure.process_intent_digest)
-    if failure.result_json != expected or failure.result_digest != _digest(expected):
-        raise ValueError("process creation failure is not exact canonical evidence")
-    _begin(connection)
-    try:
-        row = connection.execute(
-            """
-            SELECT r.reservation_state, r.process_intent_json,
-                   r.process_intent_digest, c.state, a.state, s.state
-            FROM launch_reservations r
-            JOIN provider_call_claims c ON c.claim_id = r.claim_id
-            JOIN attempts a ON a.attempt_id = c.attempt_id
-            JOIN sessions s ON s.session_id = a.session_id
-            WHERE r.launch_reservation_id = ?
-              AND NOT EXISTS (
-                  SELECT 1 FROM terminals t
-                  WHERE t.launch_reservation_id = r.launch_reservation_id
-              )
-              AND NOT EXISTS (
-                  SELECT 1 FROM session_selections ss
-                  WHERE ss.session_id = s.session_id
-              )
-            """,
-            (str(reservation_id),),
-        ).fetchone()
-        if row is None:
-            raise ValueError("unknown reservation")
-        if (
-            row[0] != "PROCESS_INTENT_COMMITTED"
-            or row[1] is None
-            or _digest(row[1]) != row[2]
-            or failure.process_intent_digest != row[2]
-            or row[3] != "COMMITTED"
-            or row[4] != "LAUNCH_RESERVED"
-            or row[5] != "OPEN"
-        ):
-            raise ValueError("process creation failure intent binding is invalid")
-        cursor = connection.execute(
-            """
-            UPDATE launch_reservations
-            SET reservation_state = 'PROCESS_CREATION_FAILED',
-                process_creation_failure_json = ?,
-                process_creation_failure_digest = ?,
-                outcome_recorded_at_utc = ?
-            WHERE launch_reservation_id = ?
-              AND reservation_state = 'PROCESS_INTENT_COMMITTED'
-              AND process_intent_digest IS ?
-              AND EXISTS (
-                  SELECT 1
-                  FROM provider_call_claims c
-                  JOIN attempts a ON a.attempt_id = c.attempt_id
-                  JOIN sessions s ON s.session_id = a.session_id
-                  WHERE c.claim_id = launch_reservations.claim_id
-                    AND c.state = 'COMMITTED'
-                    AND a.state = 'LAUNCH_RESERVED'
-                    AND s.state = 'OPEN'
-                    AND NOT EXISTS (
-                        SELECT 1 FROM terminals t
-                        WHERE t.launch_reservation_id =
-                              launch_reservations.launch_reservation_id
-                    )
-                    AND NOT EXISTS (
-                        SELECT 1 FROM session_selections ss
-                        WHERE ss.session_id = s.session_id
-                    )
-              )
-            """,
-            (
-                failure.result_json,
-                failure.result_digest,
-                PROCESS_FAILURE_TIMESTAMP,
-                reservation_id,
-                row[2],
-            ),
-        )
-        if cursor.rowcount != 1:
-            raise ValueError("process failure active parent lineage changed")
-        _finish(connection, True)
-    except BaseException:
-        _finish(connection, False)
-        raise
-    _consume_process_result(failure, reservation_id)
+    return _test_service(connection).record_process_creation_failure(
+        reservation_id, failure
+    )
 
 
 def record_post_resume_evidence(
@@ -3085,129 +2260,9 @@ def record_post_resume_evidence(
     execution_id: str,
     resume_receipt: FakeResumeReceipt,
 ) -> None:
-    _require_no_active_transaction(connection)
-    if type(resume_receipt) is not FakeResumeReceipt:
-        raise TypeError("post-resume evidence requires a fake resume receipt")
-    registered_execution_id, registered_reservation_id = (
-        _registered_resume_result_binding(resume_receipt)
+    return _test_service(connection).record_post_resume_evidence(
+        execution_id, resume_receipt
     )
-    if registered_execution_id != execution_id:
-        raise ValueError("fake resume receipt belongs to another execution")
-    with InterprocessLifecycleArbiter(registered_reservation_id):
-        _record_post_resume_evidence_locked(
-            connection,
-            registered_execution_id,
-            resume_receipt,
-        )
-
-
-def _record_post_resume_evidence_locked(
-    connection: sqlite3.Connection,
-    execution_id: str,
-    resume_receipt: FakeResumeReceipt,
-) -> None:
-    if type(resume_receipt) is not FakeResumeReceipt:
-        raise TypeError("post-resume evidence requires a fake resume receipt")
-    registered_execution_id, reservation_id = _registered_resume_result_binding(
-        resume_receipt
-    )
-    if registered_execution_id != execution_id:
-        raise ValueError("resume result registry binding mismatch")
-    cleanup, cleanup_digest = _evidence(f"cleanup:{execution_id}")
-    if _digest(cleanup) != cleanup_digest:
-        raise ValueError("cleanup evidence digest is invalid")
-    _begin(connection)
-    try:
-        row = connection.execute(
-            """
-            SELECT e.phase, e.resume_intent_digest, e.resume_intent_json,
-                   r.reservation_state, s.state, e.launch_reservation_id
-            FROM launch_executions e
-            JOIN launch_reservations r
-              ON r.launch_reservation_id = e.launch_reservation_id
-            JOIN provider_call_claims c ON c.claim_id = r.claim_id
-            JOIN attempts a ON a.attempt_id = c.attempt_id
-            JOIN sessions s ON s.session_id = a.session_id
-            WHERE e.launch_execution_id = ?
-              AND NOT EXISTS (
-                  SELECT 1 FROM terminals t
-                  WHERE t.launch_reservation_id = r.launch_reservation_id
-              )
-              AND NOT EXISTS (
-                  SELECT 1 FROM session_selections ss
-                  WHERE ss.session_id = s.session_id
-              )
-            """,
-            (execution_id,),
-        ).fetchone()
-        if row is None:
-            raise ValueError("post-resume active lineage is unavailable")
-        if row[0] != "RESUME_INTENT_COMMITTED":
-            raise ValueError("post-resume evidence requires committed resume intent")
-        if row[3] != "PROCESS_CREATED" or row[4] != "OPEN":
-            raise ValueError("post-resume active parent lineage is revoked")
-        if row[5] != reservation_id:
-            raise ValueError("fake resume receipt belongs to another reservation")
-        if row[2] is None or _digest(row[2]) != row[1]:
-            raise ValueError("post-resume committed intent evidence is invalid")
-        if resume_receipt.resume_intent_digest != row[1]:
-            raise ValueError("fake resume receipt binds another resume intent")
-        expected_result = _json(
-            {
-                "execution_id": execution_id,
-                "resume_intent_digest": row[1].hex(),
-                "resume_result": "RESUMED",
-                "schema": 1,
-            }
-        )
-        if resume_receipt.result_json != expected_result:
-            raise ValueError("fake resume receipt is not the exact canonical success")
-        if resume_receipt.result_digest != _digest(expected_result):
-            raise ValueError("fake resume receipt digest is invalid")
-        cursor = connection.execute(
-            """
-            UPDATE launch_executions
-            SET phase = 'RESUME_RECORDED', post_resume_json = ?,
-                post_resume_digest = ?, cleanup_json = ?, cleanup_digest = ?
-            WHERE launch_execution_id = ?
-              AND phase = 'RESUME_INTENT_COMMITTED'
-              AND resume_intent_digest IS ?
-              AND EXISTS (
-                  SELECT 1
-                  FROM launch_reservations r
-                  JOIN provider_call_claims c ON c.claim_id = r.claim_id
-                  JOIN attempts a ON a.attempt_id = c.attempt_id
-                  JOIN sessions s ON s.session_id = a.session_id
-                  WHERE r.launch_reservation_id =
-                        launch_executions.launch_reservation_id
-                    AND r.reservation_state = 'PROCESS_CREATED'
-                    AND s.state = 'OPEN'
-                    AND NOT EXISTS (
-                        SELECT 1 FROM terminals t
-                        WHERE t.launch_reservation_id = r.launch_reservation_id
-                    )
-                    AND NOT EXISTS (
-                        SELECT 1 FROM session_selections ss
-                        WHERE ss.session_id = s.session_id
-                    )
-              )
-            """,
-            (
-                expected_result,
-                resume_receipt.result_digest,
-                cleanup,
-                cleanup_digest,
-                execution_id,
-                row[1],
-            ),
-        )
-        if cursor.rowcount != 1:
-            raise ValueError("post-resume active lineage changed before persistence")
-        _finish(connection, True)
-    except BaseException:
-        _finish(connection, False)
-        raise
-    _consume_resume_result(resume_receipt, execution_id, reservation_id)
 
 
 def record_terminal(
@@ -3215,165 +2270,43 @@ def record_terminal(
     reservation_id: str,
     state: str = "SUCCEEDED",
     disposition: str = "CONFIRMED",
+    *,
+    snapshot_digest: bytes | None,
 ) -> str:
-    _require_no_active_transaction(connection)
-    reservation_id = str(reservation_id)
-    with InterprocessLifecycleArbiter(reservation_id):
-        return _record_terminal_locked(connection, reservation_id, state, disposition)
-
-
-def _record_terminal_locked(
-    connection: sqlite3.Connection,
-    reservation_id: str,
-    state: str,
-    disposition: str,
-) -> str:
-    reservation_id = str(reservation_id)
-    terminal_policy_version = TERMINAL_POLICY
-    terminal_id = _terminal_id(reservation_id, terminal_policy_version)
-    evidence, evidence_digest = _evidence(f"terminal:{reservation_id}")
-    diagnostics, diagnostics_digest = _evidence("sanitized-diagnostics")
-    _require_evidence_pair(evidence, evidence_digest, field="terminal evidence digest")
-    _require_evidence_pair(
-        diagnostics, diagnostics_digest, field="terminal diagnostics digest"
+    return _test_service(connection).record_terminal(
+        reservation_id,
+        state,
+        disposition,
+        snapshot_digest=snapshot_digest,
     )
-    snapshot = _digest(b"verified-snapshot") if state == "SUCCEEDED" else None
-    _begin(connection)
-    try:
-        reservation = connection.execute(
-            """
-            SELECT claim_id, request_digest, reservation_state,
-                   process_creation_failure_json, process_creation_failure_digest,
-                   process_intent_json, process_intent_digest
-            FROM launch_reservations WHERE launch_reservation_id = ?
-            """,
-            (str(reservation_id),),
-        ).fetchone()
-        if reservation is None:
-            raise ValueError("unknown reservation")
-        if (
-            state == "FAILED"
-            and disposition == "NOT_STARTED"
-            and reservation[2] == "PROCESS_CREATION_FAILED"
-        ):
-            _require_evidence_pair(
-                reservation[5],
-                reservation[6],
-                field="terminal parent process intent digest",
-            )
-        connection.execute(
-            """
-            INSERT INTO terminals (
-                terminal_id, launch_reservation_id, terminal_schema,
-                terminal_policy_version, terminal_state,
-                provider_call_disposition, request_digest, evidence_json,
-                evidence_digest, snapshot_digest, sanitized_diagnostics_json,
-                sanitized_diagnostics_digest, recorded_at_utc
-            ) VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                terminal_id,
-                reservation_id,
-                terminal_policy_version,
-                state,
-                disposition,
-                reservation[1],
-                evidence,
-                evidence_digest,
-                snapshot,
-                diagnostics,
-                diagnostics_digest,
-                TERMINAL_TIMESTAMP,
-            ),
-        )
-        if reservation[2] != "MANUAL_REVIEW":
-            connection.execute(
-                """
-                UPDATE launch_executions
-                SET phase = 'TERMINAL_RECORDED'
-                WHERE launch_reservation_id = ?
-                """,
-                (str(reservation_id),),
-            )
-        connection.execute(
-            """
-            UPDATE launch_reservations
-            SET reservation_state = 'TERMINAL_RECORDED'
-            WHERE launch_reservation_id = ?
-            """,
-            (str(reservation_id),),
-        )
-        attempt_id = connection.execute(
-            """
-            SELECT c.attempt_id FROM provider_call_claims c
-            JOIN launch_reservations r ON r.claim_id = c.claim_id
-            WHERE r.launch_reservation_id = ?
-            """,
-            (str(reservation_id),),
-        ).fetchone()[0]
-        connection.execute(
-            "UPDATE attempts SET state = 'TERMINAL_RECORDED' WHERE attempt_id = ?",
-            (attempt_id,),
-        )
-        _finish(connection, True)
-    except BaseException:
-        _finish(connection, False)
-        raise
-    return terminal_id
 
 
-def _insert_selection_in_transaction(
+def select_terminal(
     connection: sqlite3.Connection, session_id: str, terminal_id: str
 ) -> str:
-    snapshot = connection.execute(
-        "SELECT snapshot_digest FROM terminals WHERE terminal_id = ?", (terminal_id,)
-    ).fetchone()
-    if snapshot is None or snapshot[0] is None:
-        raise ValueError("terminal has no snapshot")
-    selection_policy_version = SELECTION_POLICY
-    selection_id = _selection_id(session_id, terminal_id, selection_policy_version)
-    evidence, evidence_digest = _evidence(f"selection:{terminal_id}")
-    _require_evidence_pair(evidence, evidence_digest, field="selection evidence digest")
-    connection.execute(
-        """
-        INSERT INTO session_selections (
-            selection_id, session_id, terminal_id, selection_schema,
-            selection_policy_version, snapshot_digest,
-            selection_evidence_json, selection_evidence_digest,
-            selected_at_utc
-        ) VALUES (?, ?, ?, 1, ?, ?, ?, ?, ?)
-        """,
-        (
-            selection_id,
-            session_id,
-            terminal_id,
-            selection_policy_version,
-            snapshot[0],
-            evidence,
-            evidence_digest,
-            SELECTION_TIMESTAMP,
-        ),
+    return _test_service(connection)._core.select_terminal(session_id, terminal_id)
+
+
+def record_recovery(
+    connection: sqlite3.Connection,
+    session_id: str,
+    target_kind: str,
+    target_id: str,
+    action: str,
+    ordinal: int | None = None,
+    *,
+    operator_evidence_json: bytes,
+    operator_evidence_digest: bytes,
+) -> str:
+    return _test_service(connection).record_recovery(
+        session_id,
+        target_kind,
+        target_id,
+        action,
+        ordinal,
+        operator_evidence_json=operator_evidence_json,
+        operator_evidence_digest=operator_evidence_digest,
     )
-    attempt_id = connection.execute(
-        """
-        SELECT a.attempt_id
-        FROM attempts a
-        JOIN provider_call_claims c ON c.attempt_id = a.attempt_id
-        JOIN launch_reservations r ON r.claim_id = c.claim_id
-        JOIN terminals t ON t.launch_reservation_id = r.launch_reservation_id
-        WHERE t.terminal_id = ?
-        """,
-        (terminal_id,),
-    ).fetchone()[0]
-    connection.execute(
-        "UPDATE attempts SET state = 'SUCCESS_SELECTED' WHERE attempt_id = ?",
-        (attempt_id,),
-    )
-    connection.execute(
-        "UPDATE sessions SET state = 'SUCCESS_SELECTED' WHERE session_id = ?",
-        (session_id,),
-    )
-    return selection_id
 
 
 def _insert_selection_row_for_test(
@@ -3413,21 +2346,6 @@ def _insert_selection_row_for_test(
             selected_at_utc,
         ),
     )
-    return selection_id
-
-
-def select_terminal(
-    connection: sqlite3.Connection, session_id: str, terminal_id: str
-) -> str:
-    _begin(connection)
-    try:
-        selection_id = _insert_selection_in_transaction(
-            connection, session_id, terminal_id
-        )
-        _finish(connection, True)
-    except BaseException:
-        _finish(connection, False)
-        raise
     return selection_id
 
 
@@ -3564,96 +2482,6 @@ _RECOVERY_TARGET_EVIDENCE_PAIRS: dict[str, tuple[str, ...]] = {
 }
 
 
-def _validate_recovery_target_evidence(
-    connection: sqlite3.Connection,
-    session_id: str,
-    target_kind: str,
-    target_id: str,
-    action: str,
-) -> None:
-    """Validate only the stored cryptographic pairs required by one recovery."""
-
-    required_pairs = _RECOVERY_TARGET_EVIDENCE_PAIRS[action]
-    if not required_pairs:
-        return
-
-    if action in {"RECORD_ATTEMPT_AMBIGUITY", "RECORD_CLAIM_AMBIGUITY"}:
-        target_column = "a.attempt_id" if target_kind == "ATTEMPT" else "c.claim_id"
-        row = connection.execute(
-            f"""
-            SELECT e.post_resume_json, e.post_resume_digest,
-                   e.cleanup_json, e.cleanup_digest, e.phase
-            FROM launch_executions e
-            JOIN launch_reservations r
-              ON r.launch_reservation_id = e.launch_reservation_id
-            JOIN provider_call_claims c ON c.claim_id = r.claim_id
-            JOIN attempts a ON a.attempt_id = c.attempt_id
-            WHERE {target_column} = ? AND a.session_id = ?
-            """,
-            (target_id, session_id),
-        ).fetchone()
-        if row is None or row[4] != "RESUME_RECORDED":
-            return
-        pair_values = {
-            "launch_executions.post_resume": (row[0], row[1]) if row else None,
-            "launch_executions.cleanup": (row[2], row[3]) if row else None,
-        }
-    elif action == "CLASSIFY_PROCESS_OUTCOME_UNKNOWN":
-        row = connection.execute(
-            """
-            SELECT r.process_intent_json, r.process_intent_digest,
-                   r.reservation_state
-            FROM launch_reservations r
-            JOIN provider_call_claims c ON c.claim_id = r.claim_id
-            JOIN attempts a ON a.attempt_id = c.attempt_id
-            WHERE r.launch_reservation_id = ? AND a.session_id = ?
-            """,
-            (target_id, session_id),
-        ).fetchone()
-        if row is None or row[2] != "PROCESS_INTENT_COMMITTED":
-            return
-        pair_values = {
-            "launch_reservations.process_intent": ((row[0], row[1]) if row else None),
-        }
-    else:
-        row = connection.execute(
-            """
-            SELECT e.process_creation_json, e.process_creation_digest,
-                   e.job_object_json, e.job_object_digest,
-                   e.resume_authorization_json, e.resume_authorization_digest,
-                   e.resume_intent_json, e.resume_intent_digest, e.phase
-            FROM launch_executions e
-            JOIN launch_reservations r
-              ON r.launch_reservation_id = e.launch_reservation_id
-            JOIN provider_call_claims c ON c.claim_id = r.claim_id
-            JOIN attempts a ON a.attempt_id = c.attempt_id
-            WHERE r.launch_reservation_id = ? AND a.session_id = ?
-            """,
-            (target_id, session_id),
-        ).fetchone()
-        expected_phase = (
-            "PRE_RESUME_READY"
-            if action == "CLASSIFY_PRE_RESUME_READY"
-            else "RESUME_INTENT_COMMITTED"
-        )
-        if row is None or row[8] != expected_phase:
-            return
-        pair_values = {
-            "launch_executions.process_creation": ((row[0], row[1]) if row else None),
-            "launch_executions.job_object": (row[2], row[3]) if row else None,
-            "launch_executions.resume_authorization": (
-                (row[4], row[5]) if row else None
-            ),
-            "launch_executions.resume_intent": ((row[6], row[7]) if row else None),
-        }
-
-    for pair in required_pairs:
-        values = pair_values[pair]
-        if values is None:
-            raise ValueError(f"recovery target evidence is unavailable: {pair}")
-        _require_evidence_pair(values[0], values[1], field=f"{pair} digest")
-
-
 def _insert_recovery_fact_for_test(
     connection: sqlite3.Connection,
     session_id: str,
@@ -3661,6 +2489,8 @@ def _insert_recovery_fact_for_test(
     target_id: str,
     action: str,
     *,
+    operator_evidence_json: bytes,
+    operator_evidence_digest: bytes,
     recovery_schema: int = 1,
     created_at_utc: str = MANUAL_REVIEW_TIMESTAMP,
 ) -> str:
@@ -3685,8 +2515,11 @@ def _insert_recovery_fact_for_test(
         recovery_ordinal,
         RECOVERY_POLICY,
     )
-    evidence, evidence_digest = _evidence(f"recovery:{recovery_id}")
-    _require_evidence_pair(evidence, evidence_digest, field="operator evidence digest")
+    _require_evidence_pair(
+        operator_evidence_json,
+        operator_evidence_digest,
+        field="operator evidence digest",
+    )
     connection.execute(
         """
         INSERT INTO manual_recoveries (
@@ -3708,164 +2541,11 @@ def _insert_recovery_fact_for_test(
             resulting,
             recovery_schema,
             RECOVERY_POLICY,
-            evidence,
-            evidence_digest,
+            operator_evidence_json,
+            operator_evidence_digest,
             created_at_utc,
         ),
     )
-    return recovery_id
-
-
-def record_recovery(
-    connection: sqlite3.Connection,
-    session_id: str,
-    target_kind: str,
-    target_id: str,
-    action: str,
-    ordinal: int | None = None,
-) -> str:
-    requested_ordinal = (
-        None if ordinal is None else _canonical_ordinal(ordinal, "recovery ordinal")
-    )
-    target_id = str(target_id)
-    if target_kind == "LAUNCH_RESERVATION" and action.startswith("CLASSIFY_"):
-        _require_no_active_transaction(connection)
-        with InterprocessLifecycleArbiter(target_id):
-            return _record_recovery_locked(
-                connection,
-                session_id,
-                target_kind,
-                target_id,
-                action,
-                requested_ordinal,
-            )
-    return _record_recovery_locked(
-        connection,
-        session_id,
-        target_kind,
-        target_id,
-        action,
-        requested_ordinal,
-    )
-
-
-def _record_recovery_locked(
-    connection: sqlite3.Connection,
-    session_id: str,
-    target_kind: str,
-    target_id: str,
-    action: str,
-    ordinal: int | None,
-) -> str:
-    target_id = str(target_id)
-    _begin(connection)
-    try:
-        expected_kind, _, resulting = _RECOVERY_ACTIONS[action]
-        if target_kind != expected_kind:
-            raise ValueError("recovery action target kind is invalid")
-        row = connection.execute(
-            "SELECT next_recovery_ordinal FROM sessions WHERE session_id = ?",
-            (session_id,),
-        ).fetchone()
-        if row is None:
-            raise ValueError("unknown recovery session")
-        current_ordinal = _canonical_ordinal(row[0], "recovery ordinal")
-        requested_ordinal = (
-            None if ordinal is None else _canonical_ordinal(ordinal, "recovery ordinal")
-        )
-        recovery_ordinal = (
-            current_ordinal if requested_ordinal is None else requested_ordinal
-        )
-        predecessor = _target_state(connection, target_kind, target_id)
-        _validate_recovery_target_evidence(
-            connection,
-            session_id,
-            target_kind,
-            target_id,
-            action,
-        )
-        recovery_id = _recovery_id(
-            session_id,
-            target_kind,
-            target_id,
-            action,
-            predecessor,
-            resulting,
-            recovery_ordinal,
-            RECOVERY_POLICY,
-        )
-        evidence, evidence_digest = _evidence(f"recovery:{recovery_id}")
-        _require_evidence_pair(
-            evidence, evidence_digest, field="operator evidence digest"
-        )
-        recovery_timestamp = {
-            "SELECT_COMMITTED_SUCCESS": SELECTION_TIMESTAMP,
-            "CLOSE_SESSION": CLOSE_TIMESTAMP,
-        }.get(action, MANUAL_REVIEW_TIMESTAMP)
-        connection.execute(
-            """
-            INSERT INTO manual_recoveries (
-                recovery_id, session_id, recovery_ordinal, target_kind,
-                target_id, action, predecessor_state, resulting_state,
-                recovery_schema, recovery_policy_version,
-                operator_evidence_json, operator_evidence_digest,
-                created_at_utc
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)
-            """,
-            (
-                recovery_id,
-                session_id,
-                recovery_ordinal,
-                target_kind,
-                target_id,
-                action,
-                predecessor,
-                resulting,
-                RECOVERY_POLICY,
-                evidence,
-                evidence_digest,
-                recovery_timestamp,
-            ),
-        )
-        if action in (
-            "CLASSIFY_LAUNCH_RESERVATION",
-            "CLASSIFY_PROCESS_OUTCOME_UNKNOWN",
-        ):
-            connection.execute(
-                """
-                UPDATE launch_reservations
-                SET reservation_state = 'MANUAL_REVIEW', outcome_recorded_at_utc = ?
-                WHERE launch_reservation_id = ?
-                """,
-                (MANUAL_REVIEW_TIMESTAMP, target_id),
-            )
-        elif action in (
-            "CLASSIFY_PRE_RESUME_READY",
-            "CLASSIFY_RESUME_OUTCOME_UNKNOWN",
-        ):
-            connection.execute(
-                """
-                UPDATE launch_reservations
-                SET reservation_state = 'MANUAL_REVIEW'
-                WHERE launch_reservation_id = ?
-                """,
-                (target_id,),
-            )
-        elif action == "SELECT_COMMITTED_SUCCESS":
-            _insert_selection_in_transaction(connection, session_id, target_id)
-        elif action == "CLOSE_SESSION":
-            connection.execute(
-                """
-                UPDATE sessions
-                SET state = 'CLOSED', closed_at_utc = ?, close_reason = ?
-                WHERE session_id = ?
-                """,
-                (CLOSE_TIMESTAMP, "recovery-approved-close", session_id),
-            )
-        _finish(connection, True)
-    except BaseException:
-        _finish(connection, False)
-        raise
     return recovery_id
 
 
@@ -3877,10 +2557,25 @@ class FakeSideEffects:
         observer: sqlite3.Connection,
         events: list[str] | None = None,
         event_lock: threading.Lock | None = None,
+        *,
+        service: Architecture77HarnessAuthority | None = None,
     ) -> None:
         self.observer = observer
         self.events = [] if events is None else events
         self._event_lock = threading.Lock() if event_lock is None else event_lock
+        self._service = (
+            _test_service(observer)
+            if service is None and _CURRENT_HARNESS.get() is not None
+            else service
+        )
+
+    @property
+    def _bound_service(self) -> Architecture77HarnessAuthority:
+        if self._service is None:
+            raise HarnessLifecycleError(
+                "external-effect test adapter requires an explicit harness service"
+            )
+        return self._service
 
     def _emit(self, event: str) -> None:
         with self._event_lock:
@@ -3892,6 +2587,11 @@ class FakeSideEffects:
         *,
         fail: bool = False,
     ) -> FakeConstructedProvider:
+        if type(capability) is not FakeProviderConstructionPermit:
+            raise TypeError(
+                "provider construction requires the reservation-issued permit"
+            )
+        self._bound_service.require_test_capability(capability)
         _require_no_active_transaction(self.observer)
         reservation_id = _registered_provider_reservation_id(capability)
         with InterprocessLifecycleArbiter(reservation_id):
@@ -3980,31 +2680,24 @@ class FakeSideEffects:
             or row[24] != 1
         ):
             raise ValueError("provider construction lineage evidence is invalid")
-        _consume_provider_construction_permit(capability, reservation_id)
+        _consume_provider_construction_permit(
+            capability, reservation_id, core=self._bound_service._core
+        )
 
         assert not self.observer.in_transaction
         self._emit("provider-constructed")
         if fail:
             self._emit("provider-construction-failed")
             raise RuntimeError("modeled provider construction failure")
-        one_shot = _ConstructedProviderOneShot()
-        provider = FakeConstructedProvider(
-            reservation_id=reservation_id,
-            _issuer=_CONSTRUCTED_PROVIDER_ISSUER,
-            _permit=one_shot,
-        )
-        with _ISSUED_CONSTRUCTED_PROVIDERS_LOCK:
-            _ISSUED_CONSTRUCTED_PROVIDERS[one_shot] = _ConstructedProviderIssuance(
-                provider=provider,
-                reservation_id=reservation_id,
-                issuer=_CONSTRUCTED_PROVIDER_ISSUER,
-                permit=one_shot,
-            )
-        return provider
+        with self._bound_service.bind_external_effects():
+            return _issue_constructed_provider(reservation_id)
 
     def create_process(
         self, process_intent: FakeProcessIntent, *, fail: bool = False
     ) -> FakeProcessCreationReceipt | FakeProcessCreationFailure:
+        if type(process_intent) is not FakeProcessIntent:
+            raise TypeError("create process requires an opaque fake process intent")
+        self._bound_service.require_test_capability(process_intent)
         _require_no_active_transaction(self.observer)
         reservation_id = _registered_process_intent_reservation_id(process_intent)
         with InterprocessLifecycleArbiter(reservation_id):
@@ -4053,60 +2746,47 @@ class FakeSideEffects:
             or process_intent.intent_digest != _digest(expected_intent)
         ):
             raise ValueError("CreateProcessW intent does not match durable authority")
-        _consume_process_intent(process_intent, reservation_id)
+        _consume_process_intent(
+            process_intent, reservation_id, core=self._bound_service._core
+        )
 
         self._emit("process-intent-committed")
         assert not self.observer.in_transaction
         self._emit("create-process")
-        result_permit = _ProcessResultPermit()
         if fail:
             self._emit("process-creation-failed")
             result_json = _process_failure_json(
                 reservation_id, process_intent.intent_digest
             )
-            result: FakeProcessCreationReceipt | FakeProcessCreationFailure = (
-                FakeProcessCreationFailure(
-                    reservation_id=reservation_id,
-                    process_intent_digest=process_intent.intent_digest,
-                    result_json=result_json,
-                    result_digest=_digest(result_json),
-                    _issuer=_PROCESS_RESULT_ISSUER,
-                    _permit=result_permit,
+            with self._bound_service.bind_external_effects():
+                return _issue_process_creation_failure(
+                    reservation_id,
+                    process_intent.intent_digest,
+                    result_json,
+                    _digest(result_json),
                 )
+        self._emit("process-created")
+        process_json, job_json, resume_json = _process_success_evidence(
+            reservation_id, process_intent.intent_digest
+        )
+        with self._bound_service.bind_external_effects():
+            return _issue_process_creation_receipt(
+                reservation_id,
+                process_intent.intent_digest,
+                process_json,
+                _digest(process_json),
+                job_json,
+                _digest(job_json),
+                resume_json,
+                _digest(resume_json),
             )
-        else:
-            self._emit("process-created")
-            process_json, job_json, resume_json = _process_success_evidence(
-                reservation_id, process_intent.intent_digest
-            )
-            result = FakeProcessCreationReceipt(
-                reservation_id=reservation_id,
-                process_intent_digest=process_intent.intent_digest,
-                process_json=process_json,
-                process_digest=_digest(process_json),
-                job_json=job_json,
-                job_digest=_digest(job_json),
-                resume_authorization_json=resume_json,
-                resume_authorization_digest=_digest(resume_json),
-                _issuer=_PROCESS_RESULT_ISSUER,
-                _permit=result_permit,
-            )
-        with _ISSUED_PROCESS_RESULTS_LOCK:
-            evidence, digests = _process_result_visible_evidence(result)
-            _ISSUED_PROCESS_RESULTS[result_permit] = _ProcessResultIssuance(
-                result=result,
-                reservation_id=reservation_id,
-                process_intent_digest=process_intent.intent_digest,
-                evidence=evidence,
-                digests=digests,
-                issuer=_PROCESS_RESULT_ISSUER,
-                permit=result_permit,
-            )
-        return result
 
     def resume_thread(
         self, resume_intent: FakeResumeIntent, *, fail: bool = False
     ) -> FakeResumeReceipt:
+        if type(resume_intent) is not FakeResumeIntent:
+            raise TypeError("resume thread requires an opaque fake resume intent")
+        self._bound_service.require_test_capability(resume_intent)
         _require_no_active_transaction(self.observer)
         execution_id, reservation_id = _registered_resume_intent_binding(resume_intent)
         with InterprocessLifecycleArbiter(reservation_id):
@@ -4173,7 +2853,12 @@ class FakeSideEffects:
             or resume_intent.intent_digest != _digest(expected_intent)
         ):
             raise ValueError("ResumeThread intent is not canonical")
-        _consume_resume_intent(resume_intent, execution_id, reservation_id)
+        _consume_resume_intent(
+            resume_intent,
+            execution_id,
+            reservation_id,
+            core=self._bound_service._core,
+        )
 
         self._emit("resume-intent-committed")
         assert not self.observer.in_transaction
@@ -4189,28 +2874,14 @@ class FakeSideEffects:
                 "schema": 1,
             }
         )
-        result_permit = _ResumeResultPermit()
-        result = FakeResumeReceipt(
-            execution_id=execution_id,
-            reservation_id=reservation_id,
-            resume_intent_digest=resume_intent.intent_digest,
-            result_json=result_json,
-            result_digest=_digest(result_json),
-            _issuer=_RESUME_RESULT_ISSUER,
-            _permit=result_permit,
-        )
-        with _ISSUED_RESUME_RESULTS_LOCK:
-            _ISSUED_RESUME_RESULTS[result_permit] = _ResumeResultIssuance(
-                result=result,
-                execution_id=execution_id,
-                reservation_id=reservation_id,
-                resume_intent_digest=resume_intent.intent_digest,
-                result_json=result_json,
-                result_digest=_digest(result_json),
-                issuer=_RESUME_RESULT_ISSUER,
-                permit=result_permit,
+        with self._bound_service.bind_external_effects():
+            return _issue_resume_receipt(
+                execution_id,
+                reservation_id,
+                resume_intent.intent_digest,
+                result_json,
+                _digest(result_json),
             )
-        return result
 
     def observe_post_resume_evidence(self, execution_id: str) -> None:
         assert (
@@ -4249,6 +2920,182 @@ def _record_successful_process(
 ) -> str:
     receipt = _create_process_receipt(connection, reservation_id)
     return record_execution(connection, reservation_id, receipt)
+
+
+def _prepare_lease_resume_case(
+    harness: Architecture77HarnessAuthority, target_date: str
+) -> tuple[str, str, str, FakeResumeReceipt]:
+    with _bind_harness(harness):
+        connection = harness._connection
+        session_id = create_session(connection, _request(target_date))
+        attempt_id = allocate_attempt(connection, session_id)
+        claim_id = commit_claim(connection, attempt_id)
+        reservation_id = reserve_launch(connection, claim_id)
+        execution_id = _record_successful_process(connection, reservation_id)
+        intent = commit_resume_intent(connection, execution_id, reservation_id)
+        receipt = FakeSideEffects(connection).resume_thread(intent)
+    return session_id, str(reservation_id), execution_id, receipt
+
+
+def _prepare_lease_recovery_lineage_case(
+    harness: Architecture77HarnessAuthority, target_kind: str
+) -> tuple[str, str, str, str, str]:
+    action = {
+        "SESSION": "CLOSE_SESSION",
+        "ATTEMPT": "RECORD_ATTEMPT_AMBIGUITY",
+        "CLAIM": "RECORD_CLAIM_AMBIGUITY",
+        "LAUNCH_RESERVATION": "CLASSIFY_LAUNCH_RESERVATION",
+        "TERMINAL": "SELECT_COMMITTED_SUCCESS",
+    }[target_kind]
+
+    def build_lineage(target_date: str) -> tuple[str, str, str]:
+        session_id = create_session(harness._connection, _request(target_date))
+        attempt_id = allocate_attempt(harness._connection, session_id)
+        claim_id = commit_claim(harness._connection, attempt_id)
+        reservation_permit = reserve_launch(harness._connection, claim_id)
+        reservation_id = str(reservation_permit)
+        target_id = {
+            "SESSION": session_id,
+            "ATTEMPT": attempt_id,
+            "CLAIM": claim_id,
+            "LAUNCH_RESERVATION": reservation_id,
+        }.get(target_kind)
+        if target_kind in {"ATTEMPT", "CLAIM", "TERMINAL"}:
+            execution_id = _record_successful_process(
+                harness._connection, reservation_permit
+            )
+            _resume_and_persist(harness._connection, execution_id, reservation_id)
+            if target_kind == "TERMINAL":
+                target_id = record_terminal(
+                    harness._connection,
+                    reservation_id,
+                    snapshot_digest=TEST_SNAPSHOT_DIGEST,
+                )
+        return session_id, reservation_id, target_id
+
+    with _bind_harness(harness):
+        session_a, reservation_a, target_a = build_lineage("2026-01-01")
+        _, _, target_b = build_lineage("2026-01-02")
+    return session_a, reservation_a, target_a, target_b, action
+
+
+def _prepare_test_consumer_capability(
+    harness: Architecture77HarnessAuthority, family: str
+) -> tuple[object, str, str | None]:
+    with _bind_harness(harness):
+        connection = harness._connection
+        if family in {"provider", "process_intent", "resume_intent"}:
+            session_id = create_session(connection, _request())
+            attempt_id = allocate_attempt(connection, session_id)
+            claim_id = commit_claim(connection, attempt_id)
+            permit = reserve_launch(connection, claim_id)
+            reservation_id = str(permit)
+        else:
+            permit = None
+            reservation_id = "consumer-reservation"
+
+        if family == "provider":
+            return permit, reservation_id, None
+        if family == "constructed":
+            with harness.bind_external_effects():
+                return _issue_constructed_provider(reservation_id), reservation_id, None
+        if family == "process_intent":
+            assert type(permit) is FakeProviderConstructionPermit
+            return (
+                _construct_provider_and_commit_process_intent(connection, permit),
+                reservation_id,
+                None,
+            )
+        if family == "process_result":
+            with harness.bind_external_effects():
+                return (
+                    _issue_process_creation_receipt(
+                        reservation_id,
+                        b"intent-digest",
+                        b"process",
+                        _digest(b"process"),
+                        b"job",
+                        _digest(b"job"),
+                        b"resume",
+                        _digest(b"resume"),
+                    ),
+                    reservation_id,
+                    None,
+                )
+        if family == "resume_intent":
+            assert type(permit) is FakeProviderConstructionPermit
+            execution_id = _record_successful_process(connection, permit)
+            return (
+                commit_resume_intent(connection, execution_id, reservation_id),
+                reservation_id,
+                execution_id,
+            )
+        if family == "resume_result":
+            with harness.bind_external_effects():
+                return (
+                    _issue_resume_receipt(
+                        "consumer-execution",
+                        reservation_id,
+                        b"resume-intent-digest",
+                        b"resumed",
+                        _digest(b"resumed"),
+                    ),
+                    reservation_id,
+                    "consumer-execution",
+                )
+    raise AssertionError(f"unsupported capability family: {family}")
+
+
+def _consume_test_consumer_capability(
+    family: str,
+    capability: object,
+    reservation_id: str,
+    execution_id: str | None,
+    *,
+    core: TransactionalAuthorityCore,
+) -> None:
+    if family == "provider":
+        _consume_provider_construction_permit(
+            capability,
+            reservation_id,
+            core=core,  # type: ignore[arg-type]
+        )
+    elif family == "constructed":
+        _consume_constructed_provider(
+            capability,
+            reservation_id,
+            core=core,  # type: ignore[arg-type]
+        )
+    elif family == "process_intent":
+        _consume_process_intent(
+            capability,
+            reservation_id,
+            core=core,  # type: ignore[arg-type]
+        )
+    elif family == "process_result":
+        _consume_process_result(
+            capability,
+            reservation_id,
+            core=core,  # type: ignore[arg-type]
+        )
+    elif family == "resume_intent":
+        assert execution_id is not None
+        _consume_resume_intent(
+            capability,
+            execution_id,
+            reservation_id,
+            core=core,  # type: ignore[arg-type]
+        )
+    elif family == "resume_result":
+        assert execution_id is not None
+        _consume_resume_result(
+            capability,
+            execution_id,
+            reservation_id,
+            core=core,  # type: ignore[arg-type]
+        )
+    else:
+        raise AssertionError(f"unsupported capability family: {family}")
 
 
 def _record_definitive_process_failure(
@@ -4306,7 +3153,7 @@ def _resume_and_persist(
 
 
 def _spawn_boundary_worker(
-    db_path: str,
+    descriptor: Architecture77HarnessDescriptor,
     scenario: str,
     first: bool,
     setup_queue: Any,
@@ -4316,7 +3163,9 @@ def _spawn_boundary_worker(
     release: Any,
     started: Any,
 ) -> None:
-    connection = _connect(Path(db_path))
+    harness = Architecture77HarnessAuthority.open_from_descriptor(descriptor)
+    harness_context = _CURRENT_HARNESS.set(harness)
+    connection = harness._connection
     events: list[str] = []
     hooks = FakeSideEffects(connection, events)
     try:
@@ -4352,38 +3201,35 @@ def _spawn_boundary_worker(
         if not go.wait(20):
             raise TimeoutError("boundary worker was not released to race")
 
-        def invoke_locked() -> None:
-            if scenario == "provider-dispatch":
-                assert type(capability) is FakeProviderConstructionPermit
-                hooks._construct_provider_locked(capability, fail=False)
-            elif scenario == "process-dispatch":
-                assert type(capability) is FakeProcessIntent
-                hooks._create_process_locked(capability, fail=False)
-            elif scenario == "process-persistence":
-                assert type(capability) is FakeProcessCreationReceipt
-                _record_execution_locked(connection, reservation_id, capability)
-            elif scenario == "resume-dispatch":
-                assert type(capability) is FakeResumeIntent
-                hooks._resume_thread_locked(capability, fail=False)
-            else:
-                assert scenario == "resume-persistence"
-                assert execution_id is not None
-                assert type(capability) is FakeResumeReceipt
-                _record_post_resume_evidence_locked(
-                    connection, execution_id, capability
-                )
-
         try:
             if not first:
                 started.set()
-            with InterprocessLifecycleArbiter(reservation_id):
+            connection = _connect(Path(descriptor.database_path))
+            hooks.observer = connection
+            harness = _test_service(connection)
+            with harness.lifecycle_lease(reservation_id) as lease:
                 if first:
                     acquired.set()
                     if not release.wait(20):
                         raise TimeoutError("boundary winner was not released")
-                connection = _connect(Path(db_path))
-                hooks.observer = connection
-                invoke_locked()
+                if scenario == "provider-dispatch":
+                    assert type(capability) is FakeProviderConstructionPermit
+                    hooks._construct_provider_locked(capability, fail=False)
+                elif scenario == "process-dispatch":
+                    assert type(capability) is FakeProcessIntent
+                    hooks._create_process_locked(capability, fail=False)
+                elif scenario == "process-persistence":
+                    assert type(capability) is FakeProcessCreationReceipt
+                    lease.record_execution(reservation_id, capability)
+                elif scenario == "resume-dispatch":
+                    assert type(capability) is FakeResumeIntent
+                    hooks._resume_thread_locked(capability, fail=False)
+                else:
+                    assert scenario == "resume-persistence"
+                    assert execution_id is not None
+                    assert type(capability) is FakeResumeReceipt
+                    lease.bind_execution(execution_id)
+                    lease.record_post_resume_evidence(execution_id, capability)
             outcome = "ok"
         except (TypeError, ValueError, sqlite3.IntegrityError) as exc:
             outcome = f"rejected:{type(exc).__name__}"
@@ -4393,10 +3239,12 @@ def _spawn_boundary_worker(
     finally:
         if connection is not None:
             connection.close()
+        _CURRENT_HARNESS.reset(harness_context)
+        harness.close()
 
 
 def _spawn_recovery_worker(
-    db_path: str,
+    descriptor: Architecture77HarnessDescriptor,
     session_id: str,
     reservation_id: str,
     action: str,
@@ -4407,6 +3255,8 @@ def _spawn_recovery_worker(
     release: Any,
     started: Any,
 ) -> None:
+    harness = Architecture77HarnessAuthority.open_from_descriptor(descriptor)
+    harness_context = _CURRENT_HARNESS.set(harness)
     connection: sqlite3.Connection | None = None
     try:
         if not go.wait(20):
@@ -4414,19 +3264,21 @@ def _spawn_recovery_worker(
         try:
             if not first:
                 started.set()
-            with InterprocessLifecycleArbiter(reservation_id):
+            connection = _connect(Path(descriptor.database_path))
+            harness = _test_service(connection)
+            with harness.lifecycle_lease(reservation_id) as lease:
                 if first:
                     acquired.set()
                     if not release.wait(20):
                         raise TimeoutError("recovery winner was not released")
-                connection = _connect(Path(db_path))
-                _record_recovery_locked(
-                    connection,
+                lease.record_recovery(
                     session_id,
                     "LAUNCH_RESERVATION",
                     reservation_id,
                     action,
                     None,
+                    operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+                    operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
                 )
             outcome = "ok"
         except (TypeError, ValueError, sqlite3.IntegrityError) as exc:
@@ -4437,6 +3289,8 @@ def _spawn_recovery_worker(
     finally:
         if connection is not None:
             connection.close()
+        _CURRENT_HARNESS.reset(harness_context)
+        harness.close()
 
 
 @contextmanager
@@ -4500,44 +3354,54 @@ def _spawn_crash_while_holding_arbiter(reservation_id: str, acquired: Any) -> No
 
 
 def _spawn_reconstructed_capability_worker(
-    db_path: str, reservation_id: str, result_queue: Any
+    descriptor: Architecture77HarnessDescriptor, reservation_id: str, result_queue: Any
 ) -> None:
-    connection = _connect(Path(db_path))
+    harness = Architecture77HarnessAuthority.open_from_descriptor(descriptor)
+    harness_context = _CURRENT_HARNESS.set(harness)
+    connection = harness._connection
     hooks = FakeSideEffects(connection)
     outcomes: list[str] = []
     try:
-        reconstructed_permit = FakeProviderConstructionPermit(
-            reservation_id,
-            _issuer=_PROVIDER_CONSTRUCTION_ISSUER,
-            _permit=_ProviderConstructionOneShot(),
+        reconstructed_permit = _forged_capability(
+            FakeProviderConstructionPermit,
+            reservation_id=reservation_id,
+            _issuer=object(),
+            _permit=object(),
+            _service_token=object(),
         )
         try:
             hooks.construct_provider(reconstructed_permit)
-        except ValueError as exc:
-            outcomes.append(str(exc))
-        reconstructed_provider = FakeConstructedProvider(
+        except (AttributeError, TypeError, ValueError) as exc:
+            outcomes.append(f"rejected:{type(exc).__name__}:{exc}")
+        reconstructed_provider = _forged_capability(
+            FakeConstructedProvider,
             reservation_id=reservation_id,
-            _issuer=_CONSTRUCTED_PROVIDER_ISSUER,
-            _permit=_ConstructedProviderOneShot(),
+            _issuer=object(),
+            _permit=object(),
+            _service_token=object(),
         )
         try:
             commit_process_intent(connection, reservation_id, reconstructed_provider)
-        except ValueError as exc:
-            outcomes.append(str(exc))
+        except (AttributeError, TypeError, ValueError) as exc:
+            outcomes.append(f"rejected:{type(exc).__name__}:{exc}")
         result_queue.put(outcomes)
     finally:
         connection.close()
+        _CURRENT_HARNESS.reset(harness_context)
+        harness.close()
 
 
 def _spawn_outer_transaction_boundary_worker(
-    db_path: str,
+    descriptor: Architecture77HarnessDescriptor,
     setup_queue: Any,
     result_queue: Any,
     recovery_acquired: Any,
     transaction_started: Any,
     transaction_released: Any,
 ) -> None:
-    connection = _connect(Path(db_path))
+    harness = Architecture77HarnessAuthority.open_from_descriptor(descriptor)
+    harness_context = _CURRENT_HARNESS.set(harness)
+    connection = harness._connection
     hooks = FakeSideEffects(connection)
     try:
         session_id = create_session(connection)
@@ -4559,7 +3423,7 @@ def _spawn_outer_transaction_boundary_worker(
         else:
             raise AssertionError("active transaction reached lifecycle arbiter")
         assert connection.in_transaction
-        assert not provider._permit.consumed
+        _assert_capability_available(provider)
         assert hooks.events == events_before
         assert _database_rows(connection) == before
         connection.rollback()
@@ -4571,17 +3435,21 @@ def _spawn_outer_transaction_boundary_worker(
         result_queue.put(("boundary-error", repr(exc)))
     finally:
         connection.close()
+        _CURRENT_HARNESS.reset(harness_context)
+        harness.close()
 
 
 def _spawn_stored_observer_transaction_boundary_worker(
-    db_path: str,
+    descriptor: Architecture77HarnessDescriptor,
     setup_queue: Any,
     result_queue: Any,
     recovery_acquired: Any,
     transaction_started: Any,
     transaction_released: Any,
 ) -> None:
-    observer = _connect(Path(db_path))
+    harness = Architecture77HarnessAuthority.open_from_descriptor(descriptor)
+    harness_context = _CURRENT_HARNESS.set(harness)
+    observer = harness._connection
     events: list[str] = []
     hooks = FakeSideEffects(observer, events)
     try:
@@ -4604,7 +3472,7 @@ def _spawn_stored_observer_transaction_boundary_worker(
                 "active observer transaction reached lifecycle arbiter"
             )
         assert observer.in_transaction
-        assert not permit._permit.consumed
+        _assert_capability_available(permit)
         assert events == []
         assert _database_rows(observer) == before
         observer.rollback()
@@ -4612,7 +3480,12 @@ def _spawn_stored_observer_transaction_boundary_worker(
         result_queue.put(
             (
                 "boundary",
-                (rejection, permit._permit.consumed, observer.in_transaction, events),
+                (
+                    rejection,
+                    _capability_is_registered(permit),
+                    observer.in_transaction,
+                    events,
+                ),
             )
         )
     except BaseException as exc:
@@ -4621,10 +3494,12 @@ def _spawn_stored_observer_transaction_boundary_worker(
         result_queue.put(("boundary-error", repr(exc)))
     finally:
         observer.close()
+        _CURRENT_HARNESS.reset(harness_context)
+        harness.close()
 
 
 def _spawn_recovery_after_outer_transaction_worker(
-    db_path: str,
+    descriptor: Architecture77HarnessDescriptor,
     session_id: str,
     reservation_id: str,
     result_queue: Any,
@@ -4632,22 +3507,26 @@ def _spawn_recovery_after_outer_transaction_worker(
     transaction_started: Any,
     transaction_released: Any,
 ) -> None:
+    harness = Architecture77HarnessAuthority.open_from_descriptor(descriptor)
+    harness_context = _CURRENT_HARNESS.set(harness)
     connection: sqlite3.Connection | None = None
     try:
-        with InterprocessLifecycleArbiter(reservation_id):
+        connection = _connect(Path(descriptor.database_path))
+        harness = _test_service(connection)
+        with harness.lifecycle_lease(reservation_id) as lease:
             recovery_acquired.set()
             if not transaction_started.wait(20):
                 raise TimeoutError("boundary worker did not begin its transaction")
             if not transaction_released.wait(20):
                 raise TimeoutError("boundary worker did not release its transaction")
-            connection = _connect(Path(db_path))
-            recovery_id = _record_recovery_locked(
-                connection,
+            recovery_id = lease.record_recovery(
                 session_id,
                 "LAUNCH_RESERVATION",
                 reservation_id,
                 "CLASSIFY_LAUNCH_RESERVATION",
                 None,
+                operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+                operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
             )
         result_queue.put(("recovery", recovery_id))
     except BaseException as exc:
@@ -4655,22 +3534,1346 @@ def _spawn_recovery_after_outer_transaction_worker(
     finally:
         if connection is not None:
             connection.close()
+        _CURRENT_HARNESS.reset(harness_context)
+        harness.close()
 
 
 @pytest.fixture
-def db_path(tmp_path: Path) -> Path:
-    path = tmp_path / "authority.sqlite3"
-    connection = _connect(path)
-    _install_schema(connection)
-    _insert_metadata(connection)
-    _insert_migration(connection)
-    connection.close()
-    return path
+def db_path(request: pytest.FixtureRequest) -> Path:
+    harness = Architecture77HarnessAuthority.create()
+    harness_context = _CURRENT_HARNESS.set(harness)
+
+    def finalize() -> None:
+        _CURRENT_HARNESS.reset(harness_context)
+        harness.close()
+
+    request.addfinalizer(finalize)
+    return harness.database_path
+
+
+def _descriptor_for(db_path: Path) -> Architecture77HarnessDescriptor:
+    harness = _CURRENT_HARNESS.get()
+    if harness is None or harness.database_path != db_path.resolve(strict=False):
+        raise HarnessLifecycleError("database path is not bound to the active harness")
+    return harness.descriptor
+
+
+def _inherit_harness_thread(
+    target: Callable[..., Any], *args: Any
+) -> Callable[[], Any]:
+    harness = _CURRENT_HARNESS.get()
+    if harness is None:
+        raise HarnessLifecycleError("thread requires an active Architecture-77 harness")
+
+    def run() -> Any:
+        context_token = _CURRENT_HARNESS.set(harness)
+        try:
+            return target(*args)
+        finally:
+            _CURRENT_HARNESS.reset(context_token)
+
+    return run
+
+
+@contextmanager
+def _bind_harness(harness: Architecture77HarnessAuthority) -> Iterator[None]:
+    context_token = _CURRENT_HARNESS.set(harness)
+    try:
+        yield
+    finally:
+        _CURRENT_HARNESS.reset(context_token)
+
+
+def _seed_harness_metadata(
+    harness: Architecture77HarnessAuthority, **metadata: Any
+) -> None:
+    seed = sqlite3.connect(":memory:", isolation_level=None)
+    try:
+        _install_schema(seed)
+        _insert_metadata(seed, **metadata)
+        seed.backup(harness._connection)
+    finally:
+        seed.close()
+
+
+def test_harness_provenance_does_not_survive_same_path_reuse(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = tmp_path / "reused-harness-root"
+
+    def fresh_root(*, prefix: str) -> str:
+        del prefix
+        root.mkdir()
+        return str(root)
+
+    monkeypatch.setattr(tempfile, "mkdtemp", fresh_root)
+    first = Architecture77HarnessAuthority.create()
+    session_id = first.create_session(_request())
+    attempt_id = first.allocate_attempt(session_id)
+    claim_id = first.commit_claim(attempt_id)
+    permit = first.reserve_launch(claim_id)
+    first.close()
+    assert not root.exists()
+
+    second = Architecture77HarnessAuthority.create()
+    try:
+        assert second.database_path == root / "authority.sqlite3"
+        before = _database_rows(second._connection)
+        with pytest.raises(TypeError, match="invalid test service provenance service"):
+            second.require_test_capability(permit)
+        assert _database_rows(second._connection) == before
+    finally:
+        second.close()
+
+
+def test_simultaneous_harness_lifetimes_have_distinct_provenance() -> None:
+    first = Architecture77HarnessAuthority.create()
+    second = Architecture77HarnessAuthority.create()
+    try:
+        assert first._service_token is not second._service_token
+        session_a = first.create_session(_request())
+        attempt_a = first.allocate_attempt(session_a)
+        claim_a = first.commit_claim(attempt_a)
+        permit_a = first.reserve_launch(claim_a)
+        session_b = second.create_session(_request())
+        attempt_b = second.allocate_attempt(session_b)
+        claim_b = second.commit_claim(attempt_b)
+        second.reserve_launch(claim_b)
+        with pytest.raises(TypeError, match="invalid test service provenance service"):
+            second.require_test_capability(permit_a)
+    finally:
+        first.close()
+        second.close()
+
+
+def test_closed_harness_rejects_bindings_and_operations_without_stale_cache() -> None:
+    harness = Architecture77HarnessAuthority.create()
+    connection = harness._connection
+    service = harness.bind_connection(connection)
+    harness.close()
+    harness.close()
+    with pytest.raises(HarnessLifecycleError, match="lifecycle is closed"):
+        service.create_session(_request())
+    with pytest.raises(HarnessLifecycleError, match="lifecycle is closed"):
+        harness.bind_connection(connection)
+    with pytest.raises(HarnessLifecycleError, match="lifecycle is closed"):
+        harness._core.create_session(_request())
+    with pytest.raises(HarnessLifecycleError, match="lifecycle is closed"):
+        TransactionalAuthorityCore.from_harness_binding(harness._core_binding)
+
+
+def test_same_exact_connection_views_share_one_operation_owner() -> None:
+    harness = Architecture77HarnessAuthority.create()
+    view = harness.bind_connection(harness._connection)
+    barrier = threading.Barrier(2)
+    outcomes: list[object] = []
+
+    def create(authority: Architecture77HarnessAuthority, target_date: str) -> None:
+        request = _request()
+        request["target_session_date"] = target_date
+        try:
+            barrier.wait()
+            outcomes.append(authority.create_session(request))
+        except BaseException as error:
+            outcomes.append(error)
+
+    threads = [
+        threading.Thread(target=create, args=(harness, "2026-01-01")),
+        threading.Thread(target=create, args=(view, "2026-01-02")),
+    ]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(10)
+
+    try:
+        assert len(outcomes) == 2
+        assert all(not isinstance(outcome, BaseException) for outcome in outcomes)
+        assert harness._connection.execute(
+            "SELECT count(*) FROM sessions"
+        ).fetchone() == (2,)
+        assert not harness._connection.in_transaction
+    finally:
+        harness.close()
+
+
+def test_raw_connection_cannot_create_a_transactional_core() -> None:
+    harness = Architecture77HarnessAuthority.create()
+    try:
+        before = _database_rows(harness._connection)
+        with pytest.raises(TypeError, match="reviewed harness binding"):
+            TransactionalAuthorityCore.from_harness_binding(harness._connection)
+        with pytest.raises(TypeError, match="reviewed storage binding"):
+            TransactionalAuthorityCore(harness._connection)
+        assert _database_rows(harness._connection) == before
+    finally:
+        harness.close()
+
+
+def test_harness_core_binding_cannot_be_subclassed_or_faked() -> None:
+    with pytest.raises(TypeError, match="cannot be subclassed"):
+
+        class ForgedBinding(TransactionalAuthorityCoreBinding):
+            pass
+
+    class FakeBinding:
+        pass
+
+    with pytest.raises(TypeError, match="reviewed harness binding"):
+        TransactionalAuthorityCore.from_harness_binding(FakeBinding())  # type: ignore[arg-type]
+
+
+def test_fake_writable_binding_is_rejected_before_arbiter_or_mutation() -> None:
+    connection = sqlite3.connect(":memory:", isolation_level=None)
+
+    class FakeBinding:
+        def __init__(self, writable_connection: sqlite3.Connection) -> None:
+            self.writable_connection = writable_connection
+
+        def _components(self) -> tuple[object, ...]:
+            raise AssertionError("fake binding components must not be inspected")
+
+    try:
+        with pytest.raises(TypeError, match="reviewed harness binding"):
+            TransactionalAuthorityCore.from_harness_binding(  # type: ignore[arg-type]
+                FakeBinding(connection)
+            )
+        with pytest.raises(TypeError, match="requires its issuer"):
+            TransactionalAuthorityCoreBinding(
+                object(),
+                connection,
+                lambda _reservation: None,
+                None,
+                None,
+                object(),
+            )
+        assert connection.execute("SELECT 1").fetchone() == (1,)
+    finally:
+        connection.close()
+
+
+def test_valid_harness_core_binding_runs_the_shared_state_machine() -> None:
+    harness = Architecture77HarnessAuthority.create()
+    try:
+        session_id = harness._core.create_session(_request())
+        assert isinstance(session_id, str)
+    finally:
+        harness.close()
+
+
+@pytest.mark.parametrize(
+    "family",
+    [
+        "provider",
+        "constructed",
+        "process_intent",
+        "process_result",
+        "resume_intent",
+        "resume_result",
+    ],
+)
+def test_public_test_consumers_require_matching_test_service_provenance(
+    family: str,
+) -> None:
+    owner = Architecture77HarnessAuthority.create()
+    other = Architecture77HarnessAuthority.create()
+    try:
+        capability, reservation_id, execution_id = _prepare_test_consumer_capability(
+            owner, family
+        )
+        with pytest.raises(TypeError, match="invalid test service provenance service"):
+            _consume_test_consumer_capability(
+                family,
+                capability,
+                reservation_id,
+                execution_id,
+                core=other._core,
+            )
+        assert _capability_is_registered(capability)
+        with pytest.raises(TypeError, match="unsupported transactional capability"):
+            _consume_test_consumer_capability(
+                family,
+                object(),
+                reservation_id,
+                execution_id,
+                core=owner._core,
+            )
+        assert _capability_is_registered(capability)
+        _consume_test_consumer_capability(
+            family,
+            capability,
+            reservation_id,
+            execution_id,
+            core=owner._core,
+        )
+        assert not _capability_is_registered(capability)
+    finally:
+        owner.close()
+        other.close()
+
+
+def test_closed_connection_does_not_close_harness_lifecycle() -> None:
+    harness = Architecture77HarnessAuthority.create()
+    try:
+        harness._connection.close()
+        replacement = harness.open_connection()
+        service = harness.bind_connection(replacement)
+        assert service.create_session(_request())
+    finally:
+        harness.close()
+
+
+def test_harness_descriptor_reopen_requires_factory_database_identity(
+    tmp_path: Path,
+) -> None:
+    harness = Architecture77HarnessAuthority.create()
+    descriptor = harness.descriptor
+    child = Architecture77HarnessAuthority.open_from_descriptor(descriptor)
+    child.close()
+    assert harness._root.exists()
+    try:
+        wrong_root = tmp_path / "wrong-root"
+        wrong_root.mkdir()
+        with pytest.raises(HarnessLifecycleError, match="escaped"):
+            Architecture77HarnessAuthority.open_from_descriptor(
+                replace(descriptor, root=str(wrong_root))
+            )
+        with pytest.raises(HarnessLifecycleError, match="escaped"):
+            Architecture77HarnessAuthority.open_from_descriptor(
+                replace(
+                    descriptor,
+                    database_path=str(harness._root / "other.sqlite3"),
+                )
+            )
+        production_path = Path(PRODUCTION_AUTHORITY_PATHS.database).resolve()
+        with pytest.raises(HarnessLifecycleError, match="production authority"):
+            Architecture77HarnessAuthority.open_from_descriptor(
+                replace(
+                    descriptor,
+                    root=str(production_path.parent),
+                    database_path=str(production_path),
+                )
+            )
+        wrong_schema_root = tmp_path / "wrong-schema-root"
+        wrong_schema_root.mkdir()
+        wrong_schema_path = wrong_schema_root / "authority.sqlite3"
+        wrong_schema_connection = _connect(wrong_schema_path)
+        _install_schema(wrong_schema_connection)
+        wrong_schema_connection.close()
+        with pytest.raises(HarnessLifecycleError, match="schema"):
+            Architecture77HarnessAuthority.open_from_descriptor(
+                Architecture77HarnessDescriptor(
+                    root=str(wrong_schema_root),
+                    database_path=str(wrong_schema_path),
+                )
+            )
+        harness._connection.execute("ATTACH DATABASE ':memory:' AS attached_test")
+        with pytest.raises(HarnessLifecycleError, match="exactly one main"):
+            harness._validate_connection(harness._connection)
+        harness._connection.execute("DETACH DATABASE attached_test")
+    finally:
+        harness.close()
+
+
+def test_lifecycle_lease_binds_one_reservation_and_invalidates_on_exit() -> None:
+    harness = Architecture77HarnessAuthority.create()
+    try:
+        session_a = harness.create_session(_request())
+        attempt_a = harness.allocate_attempt(session_a)
+        claim_a = harness.commit_claim(attempt_a)
+        reservation_a = str(harness.reserve_launch(claim_a))
+        session_b = harness.create_session(_request("2026-01-02"))
+        attempt_b = harness.allocate_attempt(session_b)
+        claim_b = harness.commit_claim(attempt_b)
+        reservation_b = str(harness.reserve_launch(claim_b))
+        lease = harness.lifecycle_lease(reservation_a)
+        before = _database_rows(harness._connection)
+        with pytest.raises(HarnessLifecycleError, match="not active"):
+            lease.record_execution(reservation_a, object())  # type: ignore[arg-type]
+        with lease:
+            with pytest.raises(ValueError, match="does not match"):
+                lease.record_execution(reservation_b, object())  # type: ignore[arg-type]
+            with pytest.raises(HarnessLifecycleError, match="re-entered"):
+                lease.__enter__()
+        with pytest.raises(HarnessLifecycleError, match="not active"):
+            lease.record_execution(reservation_a, object())  # type: ignore[arg-type]
+        with pytest.raises(HarnessLifecycleError, match="already exited"):
+            lease.__exit__(None, None, None)
+        assert _database_rows(harness._connection) == before
+    finally:
+        harness.close()
+
+
+def test_core_cannot_mint_lifecycle_witness_without_entered_lease() -> None:
+    harness = Architecture77HarnessAuthority.create()
+    try:
+        session_id = harness.create_session(_request())
+        attempt_id = harness.allocate_attempt(session_id)
+        claim_id = harness.commit_claim(attempt_id)
+        reservation_id = str(harness.reserve_launch(claim_id))
+        before = _database_rows(harness._connection)
+
+        witness_factory_name = "create_lifecycle_lease_witness"
+        with pytest.raises(AttributeError, match=witness_factory_name):
+            getattr(harness._core, witness_factory_name)(reservation_id)
+
+        assert _database_rows(harness._connection) == before
+    finally:
+        harness.close()
+
+
+def test_lifecycle_lease_binds_execution_to_its_reservation() -> None:
+    harness = Architecture77HarnessAuthority.create()
+    try:
+        _, reservation_a, execution_a, receipt_a = _prepare_lease_resume_case(
+            harness, "2026-01-01"
+        )
+        _, reservation_b, execution_b, receipt_b = _prepare_lease_resume_case(
+            harness, "2026-01-02"
+        )
+        before = harness._connection.execute(
+            "SELECT launch_execution_id, launch_reservation_id, phase "
+            "FROM launch_executions ORDER BY launch_execution_id"
+        ).fetchall()
+
+        with harness.lifecycle_lease(reservation_a) as lease:
+            with pytest.raises(ValueError, match="does not belong"):
+                lease.bind_execution(execution_b)
+            assert lease._core_lease is not None
+            with pytest.raises(ValueError, match="held reservation"):
+                harness._core.record_post_resume_evidence_while_held(
+                    execution_b,
+                    receipt_b,
+                    lease_witness=lease._core_lease,
+                )
+            lease.bind_execution(execution_a)
+
+        assert (
+            harness._connection.execute(
+                "SELECT launch_execution_id, launch_reservation_id, phase "
+                "FROM launch_executions ORDER BY launch_execution_id"
+            ).fetchall()
+            == before
+        )
+        _assert_capability_available(receipt_b)
+        assert receipt_a is not receipt_b
+    finally:
+        harness.close()
+
+
+def test_lifecycle_lease_accepts_same_reservation_post_resume_receipt() -> None:
+    harness = Architecture77HarnessAuthority.create()
+    try:
+        _, reservation_id, execution_id, receipt = _prepare_lease_resume_case(
+            harness, "2026-01-01"
+        )
+        with harness.lifecycle_lease(reservation_id) as lease:
+            lease.bind_execution(execution_id)
+            lease.record_post_resume_evidence(execution_id, receipt)
+        assert harness._connection.execute(
+            "SELECT phase FROM launch_executions WHERE launch_execution_id = ?",
+            (execution_id,),
+        ).fetchone() == ("RESUME_RECORDED",)
+        _assert_capability_consumed(receipt)
+    finally:
+        harness.close()
+
+
+def test_lifecycle_lease_invalidates_before_release_and_reacquisition() -> None:
+    harness = Architecture77HarnessAuthority.create()
+    try:
+        session_id = harness.create_session(_request())
+        attempt_id = harness.allocate_attempt(session_id)
+        claim_id = harness.commit_claim(attempt_id)
+        reservation_id = str(harness.reserve_launch(claim_id))
+        lease = harness.lifecycle_lease(reservation_id)
+        with lease:
+            core_lease = lease._core_lease
+            assert core_lease is not None
+            arbiter = core_lease._arbiter
+            observed: list[bool] = []
+
+            class ArbiterExitProbe:
+                def __exit__(self, *args: object) -> None:
+                    observed.append(core_lease._witness.active)
+                    arbiter.__exit__(*args)
+
+            core_lease._arbiter = ArbiterExitProbe()
+        assert observed == [False]
+        with pytest.raises(ExternalAuthorityBoundaryUnavailable, match="closed"):
+            harness._core.record_post_resume_evidence_while_held(
+                "missing-execution", object(), lease_witness=core_lease
+            )
+        with harness.lifecycle_lease(reservation_id):
+            with pytest.raises(ExternalAuthorityBoundaryUnavailable, match="closed"):
+                harness._core.record_post_resume_evidence_while_held(
+                    "missing-execution", object(), lease_witness=core_lease
+                )
+    finally:
+        harness.close()
+
+
+def test_lifecycle_lease_release_waits_for_in_flight_held_operation() -> None:
+    sql_blocked = threading.Event()
+    release_sql = threading.Event()
+    release_finished = threading.Event()
+    operation_errors: list[BaseException] = []
+    release_errors: list[BaseException] = []
+    arbiters: list[object] = []
+
+    class ArbiterProbe:
+        def __init__(self) -> None:
+            self.exited = threading.Event()
+            self.exit_calls = 0
+
+        def __enter__(self) -> ArbiterProbe:
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            del args
+            self.exit_calls += 1
+            self.exited.set()
+
+    def arbiter_factory(reservation_id: str) -> ArbiterProbe:
+        del reservation_id
+        arbiter = ArbiterProbe()
+        arbiters.append(arbiter)
+        return arbiter
+
+    harness = Architecture77HarnessAuthority.create(
+        lifecycle_arbiter_factory=arbiter_factory
+    )
+    lease: TestLifecycleLease | None = None
+    worker: threading.Thread | None = None
+    releaser: threading.Thread | None = None
+    try:
+        _, reservation_id, execution_id, _ = _prepare_lease_resume_case(
+            harness, "2026-01-01"
+        )
+        lease = harness.lifecycle_lease(reservation_id)
+        lease.__enter__()
+        lease_arbiter = arbiters[-1]
+
+        def trace(statement: str) -> None:
+            normalized = " ".join(statement.split())
+            if (
+                "SELECT launch_reservation_id FROM launch_executions" in normalized
+                and "WHERE launch_execution_id" in normalized
+                and not sql_blocked.is_set()
+            ):
+                sql_blocked.set()
+                assert release_sql.wait(10)
+
+        harness._connection.set_trace_callback(trace)
+
+        def bind_execution() -> None:
+            try:
+                assert lease is not None
+                lease.bind_execution(execution_id)
+            except BaseException as exc:
+                operation_errors.append(exc)
+
+        def release_lease() -> None:
+            try:
+                assert lease is not None
+                lease.__exit__(None, None, None)
+            except BaseException as exc:
+                release_errors.append(exc)
+            finally:
+                release_finished.set()
+
+        worker = threading.Thread(target=bind_execution)
+        worker.start()
+        assert sql_blocked.wait(10)
+        releaser = threading.Thread(target=release_lease)
+        releaser.start()
+
+        assert not release_finished.wait(0.1)
+        assert not lease_arbiter.exited.is_set()
+        assert lease_arbiter.exit_calls == 0
+
+        release_sql.set()
+        worker.join(10)
+        releaser.join(10)
+        assert not worker.is_alive()
+        assert not releaser.is_alive()
+        assert operation_errors == []
+        assert release_errors == []
+        assert lease_arbiter.exit_calls == 1
+        assert lease_arbiter.exited.is_set()
+    finally:
+        harness._connection.set_trace_callback(None)
+        release_sql.set()
+        if worker is not None:
+            worker.join(10)
+        if releaser is not None:
+            releaser.join(10)
+        if lease is not None and not lease._exited:
+            lease.__exit__(None, None, None)
+        harness.close()
+
+
+@pytest.mark.parametrize(
+    "transaction_entry",
+    ["BEGIN IMMEDIATE", "SAVEPOINT caller_work"],
+    ids=["begin-immediate", "savepoint"],
+)
+def test_lifecycle_lease_rejects_active_transaction_before_arbiter(
+    transaction_entry: str,
+) -> None:
+    factory_calls: list[str] = []
+
+    class ArbiterProbe:
+        def __enter__(self) -> ArbiterProbe:
+            factory_calls.append("enter")
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            factory_calls.append("exit")
+
+    def arbiter_factory(selected_reservation_id: str) -> ArbiterProbe:
+        factory_calls.append(str(selected_reservation_id))
+        return ArbiterProbe()
+
+    harness = Architecture77HarnessAuthority.create(
+        lifecycle_arbiter_factory=arbiter_factory
+    )
+    try:
+        session_id = harness.create_session(_request())
+        attempt_id = harness.allocate_attempt(session_id)
+        claim_id = harness.commit_claim(attempt_id)
+        reservation_id = str(harness.reserve_launch(claim_id))
+        harness._connection.execute(transaction_entry)
+        with pytest.raises(
+            ValueError,
+            match="lifecycle boundary requires no active SQLite transaction",
+        ):
+            with harness.lifecycle_lease(reservation_id):
+                pass
+
+        assert harness._connection.in_transaction
+        assert factory_calls == []
+
+        if transaction_entry.startswith("SAVEPOINT"):
+            harness._connection.execute("ROLLBACK TO caller_work")
+            harness._connection.execute("RELEASE caller_work")
+        else:
+            harness._connection.rollback()
+        assert not harness._connection.in_transaction
+
+        with harness.lifecycle_lease(reservation_id):
+            pass
+        assert factory_calls == [reservation_id, "enter", "exit"]
+    finally:
+        harness.close()
+
+
+def test_lifecycle_lease_factory_failure_does_not_enter_or_exit() -> None:
+    sentinel = RuntimeError("factory failure")
+    factory_calls: list[str] = []
+
+    def arbiter_factory(reservation_id: str) -> object:
+        factory_calls.append(reservation_id)
+        raise sentinel
+
+    harness = Architecture77HarnessAuthority.create(
+        lifecycle_arbiter_factory=arbiter_factory
+    )
+    try:
+        with pytest.raises(RuntimeError) as raised:
+            with harness.lifecycle_lease("reservation"):
+                pass
+        assert raised.value is sentinel
+        assert factory_calls == ["reservation"]
+    finally:
+        harness.close()
+
+
+def test_lifecycle_lease_enter_failure_does_not_call_exit() -> None:
+    sentinel = RuntimeError("enter failure")
+    events: list[str] = []
+
+    class ArbiterProbe:
+        def __enter__(self) -> ArbiterProbe:
+            events.append("enter")
+            raise sentinel
+
+        def __exit__(self, *args: object) -> None:
+            del args
+            events.append("exit")
+
+    def arbiter_factory(reservation_id: str) -> ArbiterProbe:
+        events.append(reservation_id)
+        return ArbiterProbe()
+
+    harness = Architecture77HarnessAuthority.create(
+        lifecycle_arbiter_factory=arbiter_factory
+    )
+    try:
+        with pytest.raises(RuntimeError) as raised:
+            with harness.lifecycle_lease("reservation"):
+                pass
+        assert raised.value is sentinel
+        assert events == ["reservation", "enter"]
+    finally:
+        harness.close()
+
+
+def test_lifecycle_lease_success_enters_and_releases_once() -> None:
+    events: list[str] = []
+
+    class ArbiterProbe:
+        def __enter__(self) -> ArbiterProbe:
+            events.append("enter")
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            del args
+            events.append("exit")
+
+    harness = Architecture77HarnessAuthority.create(
+        lifecycle_arbiter_factory=lambda reservation_id: ArbiterProbe()
+    )
+    try:
+        lease = harness.lifecycle_lease("reservation")
+        lease.__enter__()
+        assert events == ["enter"]
+
+        lease.__exit__(None, None, None)
+        assert events == ["enter", "exit"]
+    finally:
+        harness.close()
+
+
+def test_lifecycle_lease_release_failure_is_terminal_and_exactly_once() -> None:
+    sentinel = RuntimeError("arbiter exit failed")
+    events: list[str] = []
+
+    class FailingExitArbiter:
+        def __enter__(self) -> FailingExitArbiter:
+            events.append("enter")
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            del args
+            events.append("exit")
+            raise sentinel
+
+    harness = Architecture77HarnessAuthority.create(
+        lifecycle_arbiter_factory=lambda reservation_id: FailingExitArbiter()
+    )
+    lease = harness.lifecycle_lease("failed-release")
+    lease.__enter__()
+    try:
+        with pytest.raises(RuntimeError, match="arbiter exit failed") as first:
+            lease.__exit__(None, None, None)
+        with pytest.raises(RuntimeError, match="arbiter exit failed") as second:
+            lease.__exit__(None, None, None)
+        assert first.value is sentinel
+        assert second.value is sentinel
+        assert events == ["enter", "exit"]
+        with pytest.raises(RuntimeError, match="arbiter exit failed"):
+            harness.close()
+        harness.close()
+        assert events == ["enter", "exit"]
+    finally:
+        harness.close()
+
+
+def test_lifecycle_lease_post_enter_setup_failure_releases_once() -> None:
+    events: list[str] = []
+    harness: Architecture77HarnessAuthority | None = None
+    sentinel = HarnessLifecycleError("forced binding closure")
+
+    class ArbiterProbe:
+        def __enter__(self) -> ArbiterProbe:
+            events.append("enter")
+            assert harness is not None
+            harness._core_binding.invalidate_for_harness_close(sentinel)
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            del args
+            events.append("exit")
+
+    harness = Architecture77HarnessAuthority.create(
+        lifecycle_arbiter_factory=lambda reservation_id: ArbiterProbe()
+    )
+    try:
+        with pytest.raises(HarnessLifecycleError, match="forced binding closure"):
+            with harness.lifecycle_lease("reservation"):
+                pass
+        assert events == ["enter", "exit"]
+    finally:
+        harness.close()
+
+
+def test_lifecycle_lease_close_wins_against_blocked_arbiter_entry() -> None:
+    entered = threading.Event()
+    release_entry = threading.Event()
+    exited = threading.Event()
+    close_finished = threading.Event()
+    events: list[str] = []
+
+    class BlockingArbiter:
+        def __enter__(self) -> BlockingArbiter:
+            events.append("enter")
+            entered.set()
+            assert release_entry.wait(10)
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            del args
+            events.append("exit")
+            exited.set()
+
+    harness = Architecture77HarnessAuthority.create(
+        lifecycle_arbiter_factory=lambda reservation_id: BlockingArbiter()
+    )
+    root = harness._root
+    reservation_id = "blocked-reservation"
+    outcomes: list[BaseException | str] = []
+    close_errors: list[BaseException] = []
+
+    def acquire() -> None:
+        try:
+            with harness.lifecycle_lease(reservation_id):
+                outcomes.append("acquired")
+        except BaseException as exc:
+            outcomes.append(exc)
+
+    def close_harness() -> None:
+        try:
+            harness.close()
+        except BaseException as exc:
+            close_errors.append(exc)
+        finally:
+            close_finished.set()
+
+    worker = threading.Thread(target=acquire)
+    closer = threading.Thread(target=close_harness)
+    worker.start()
+    try:
+        assert entered.wait(10)
+        closer.start()
+        assert not close_finished.wait(0.1)
+        assert root.exists()
+        assert events == ["enter"]
+        release_entry.set()
+        worker.join(10)
+        closer.join(10)
+        assert not worker.is_alive()
+        assert not closer.is_alive()
+        assert close_errors == []
+        assert len(outcomes) == 1
+        assert isinstance(outcomes[0], HarnessLifecycleError)
+        assert events == ["enter", "exit"]
+        assert exited.is_set()
+        assert not root.exists()
+    finally:
+        release_entry.set()
+        worker.join(10)
+        closer.join(10)
+        harness.close()
+
+
+def test_lifecycle_lease_close_releases_registered_lease_once() -> None:
+    events: list[str] = []
+
+    class ArbiterProbe:
+        def __enter__(self) -> ArbiterProbe:
+            events.append("enter")
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            del args
+            events.append("exit")
+
+    harness = Architecture77HarnessAuthority.create(
+        lifecycle_arbiter_factory=lambda reservation_id: ArbiterProbe()
+    )
+    lease = harness.lifecycle_lease("registered-reservation")
+    lease.__enter__()
+    try:
+        harness.close()
+        assert events == ["enter", "exit"]
+        with pytest.raises(HarnessLifecycleError, match="closed"):
+            lease.__exit__(None, None, None)
+    finally:
+        harness.close()
+
+
+def test_harness_close_attempts_all_bindings_and_preserves_first_cleanup_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    first_error = RuntimeError("first cleanup error")
+    events: list[str] = []
+
+    class FailingExitArbiter:
+        def __enter__(self) -> FailingExitArbiter:
+            events.append("enter")
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            del args
+            events.append("exit")
+            raise first_error
+
+    harness = Architecture77HarnessAuthority.create(
+        lifecycle_arbiter_factory=lambda reservation_id: FailingExitArbiter()
+    )
+    second = harness.bind_connection(harness._connection)
+    first_lease = harness.lifecycle_lease("first")
+    second_lease = second.lifecycle_lease("second")
+    first_lease.__enter__()
+    second_lease.__enter__()
+    root_cleanup_calls: list[Path] = []
+
+    def fail_root_cleanup(root: Path) -> None:
+        root_cleanup_calls.append(root)
+        raise OSError("root cleanup failed")
+
+    monkeypatch.setattr(shutil, "rmtree", fail_root_cleanup)
+    try:
+        with pytest.raises(RuntimeError, match="first cleanup error"):
+            harness.close()
+        assert events == ["enter", "enter", "exit", "exit"]
+        assert root_cleanup_calls == [harness._root]
+        harness.close()
+        assert events == ["enter", "enter", "exit", "exit"]
+    finally:
+        harness.close()
+
+
+def test_lifecycle_lease_blocked_exit_keeps_close_incomplete() -> None:
+    exit_started = threading.Event()
+    allow_exit = threading.Event()
+    close_started = threading.Event()
+    close_done = threading.Event()
+    events: list[str] = []
+
+    class BlockingExitArbiter:
+        def __enter__(self) -> BlockingExitArbiter:
+            events.append("enter")
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            del args
+            events.append("exit-start")
+            exit_started.set()
+            assert allow_exit.wait(10)
+            events.append("exit-complete")
+
+    harness = Architecture77HarnessAuthority.create(
+        lifecycle_arbiter_factory=lambda reservation_id: BlockingExitArbiter()
+    )
+    lease = harness.lifecycle_lease("blocked-exit-reservation")
+    lease.__enter__()
+    release_outcomes: list[str] = []
+
+    def release() -> None:
+        lease.__exit__(None, None, None)
+        release_outcomes.append("released")
+
+    def close() -> None:
+        close_started.set()
+        harness.close()
+        close_done.set()
+
+    release_thread = threading.Thread(target=release)
+    close_thread = threading.Thread(target=close)
+    release_thread.start()
+    try:
+        assert exit_started.wait(10)
+        close_thread.start()
+        assert close_started.wait(10)
+        assert not close_done.is_set()
+        allow_exit.set()
+        release_thread.join(10)
+        close_thread.join(10)
+        assert not release_thread.is_alive()
+        assert not close_thread.is_alive()
+        assert release_outcomes == ["released"]
+        assert close_done.is_set()
+        assert events == ["enter", "exit-start", "exit-complete"]
+    finally:
+        allow_exit.set()
+        release_thread.join(10)
+        close_thread.join(10)
+        harness.close()
+
+
+def test_harness_close_waits_for_held_persistence_to_quiesce(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import trading_bot.runtime.windows_transactional_authority as authority_module
+
+    harness = Architecture77HarnessAuthority.create()
+    _, reservation_id, execution_id, receipt = _prepare_lease_resume_case(
+        harness, "2026-01-01"
+    )
+    lease = harness.lifecycle_lease(reservation_id)
+    lease.__enter__()
+    lease.bind_execution(execution_id)
+    begin_started = threading.Event()
+    release_begin = threading.Event()
+    close_done = threading.Event()
+    outcomes: list[object] = []
+    original_begin = authority_module._begin
+
+    def blocked_begin(connection: sqlite3.Connection) -> None:
+        begin_started.set()
+        assert release_begin.wait(10)
+        original_begin(connection)
+
+    monkeypatch.setattr(authority_module, "_begin", blocked_begin)
+
+    def persist() -> None:
+        try:
+            outcomes.append(lease.record_post_resume_evidence(execution_id, receipt))
+        except BaseException as error:
+            outcomes.append(error)
+
+    def close() -> None:
+        harness.close()
+        close_done.set()
+
+    persist_thread = threading.Thread(target=persist)
+    close_thread = threading.Thread(target=close)
+    persist_thread.start()
+    try:
+        assert begin_started.wait(10)
+        close_thread.start()
+        assert not close_done.wait(0.1)
+        release_begin.set()
+        persist_thread.join(10)
+        close_thread.join(10)
+        assert outcomes == [None]
+        assert close_done.is_set()
+    finally:
+        release_begin.set()
+        persist_thread.join(10)
+        close_thread.join(10)
+        harness.close()
+
+
+def test_lifecycle_lease_close_owned_release_rejects_concurrent_caller() -> None:
+    exit_started = threading.Event()
+    allow_exit = threading.Event()
+    close_done = threading.Event()
+    caller_started = threading.Event()
+    caller_done = threading.Event()
+    events: list[str] = []
+
+    class BlockingExitArbiter:
+        def __enter__(self) -> BlockingExitArbiter:
+            events.append("enter")
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            del args
+            events.append("exit-start")
+            exit_started.set()
+            assert allow_exit.wait(10)
+            events.append("exit-complete")
+
+    harness = Architecture77HarnessAuthority.create(
+        lifecycle_arbiter_factory=lambda reservation_id: BlockingExitArbiter()
+    )
+    lease = harness.lifecycle_lease("close-owned-reservation")
+    lease.__enter__()
+    caller_outcomes: list[BaseException | str] = []
+
+    def close() -> None:
+        harness.close()
+        close_done.set()
+
+    def caller_release() -> None:
+        caller_started.set()
+        try:
+            lease.__exit__(None, None, None)
+            caller_outcomes.append("released")
+        except BaseException as exc:
+            caller_outcomes.append(exc)
+        finally:
+            caller_done.set()
+
+    close_thread = threading.Thread(target=close)
+    caller_thread = threading.Thread(target=caller_release)
+    close_thread.start()
+    try:
+        assert exit_started.wait(10)
+        caller_thread.start()
+        assert caller_started.wait(10)
+        assert not caller_done.is_set()
+        assert not close_done.is_set()
+        allow_exit.set()
+        close_thread.join(10)
+        caller_thread.join(10)
+        assert not close_thread.is_alive()
+        assert not caller_thread.is_alive()
+        assert close_done.is_set()
+        assert len(caller_outcomes) == 1
+        assert isinstance(caller_outcomes[0], HarnessLifecycleError)
+        assert events == ["enter", "exit-start", "exit-complete"]
+    finally:
+        allow_exit.set()
+        close_thread.join(10)
+        caller_thread.join(10)
+        harness.close()
+
+
+@pytest.mark.parametrize(
+    "transaction_entry",
+    ["BEGIN IMMEDIATE", "SAVEPOINT caller_work"],
+    ids=["begin-immediate", "savepoint"],
+)
+def test_all_held_lease_entries_reject_active_transaction_before_sql(
+    transaction_entry: str,
+) -> None:
+    harness = Architecture77HarnessAuthority.create()
+    try:
+        session_id = harness.create_session(_request())
+        attempt_id = harness.allocate_attempt(session_id)
+        claim_id = harness.commit_claim(attempt_id)
+        reservation_id = str(harness.reserve_launch(claim_id))
+        lease = harness.lifecycle_lease(reservation_id)
+        lease.__enter__()
+        core_lease = lease._core_lease
+        assert core_lease is not None
+        core = harness._core
+        before_rows = _database_rows(harness._connection)
+        active_transaction_error = "no active SQLite transaction"
+        operations: list[tuple[str, Callable[[], object]]] = [
+            (
+                "require_execution_binding",
+                lambda: core.require_execution_binding_while_held(
+                    "missing-execution",
+                    reservation_id,
+                    lease_witness=core_lease,
+                ),
+            ),
+            (
+                "commit_process_intent",
+                lambda: core.commit_process_intent_while_held(
+                    reservation_id, object(), lease_witness=core_lease
+                ),
+            ),
+            (
+                "record_execution",
+                lambda: core.record_execution_while_held(
+                    reservation_id, object(), lease_witness=core_lease
+                ),
+            ),
+            (
+                "commit_resume_intent",
+                lambda: core.commit_resume_intent_while_held(
+                    "missing-execution", reservation_id, lease_witness=core_lease
+                ),
+            ),
+            (
+                "record_process_creation_failure",
+                lambda: core.record_process_creation_failure_while_held(
+                    reservation_id, object(), lease_witness=core_lease
+                ),
+            ),
+            (
+                "record_post_resume_evidence",
+                lambda: core.record_post_resume_evidence_while_held(
+                    "missing-execution", object(), lease_witness=core_lease
+                ),
+            ),
+            (
+                "record_terminal",
+                lambda: core.record_terminal_while_held(
+                    reservation_id,
+                    snapshot_digest=None,
+                    lease_witness=core_lease,
+                ),
+            ),
+            (
+                "record_recovery",
+                lambda: core.record_recovery_while_held(
+                    session_id,
+                    "ATTEMPT",
+                    attempt_id,
+                    "CLASSIFY_LAUNCH_RESERVATION",
+                    operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+                    operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
+                    lease_witness=core_lease,
+                ),
+            ),
+        ]
+        try:
+            for name, operation in operations:
+                harness._connection.execute(transaction_entry)
+                traces: list[str] = []
+                harness._connection.set_trace_callback(traces.append)
+                try:
+                    with pytest.raises(
+                        ValueError,
+                        match=active_transaction_error,
+                    ):
+                        operation()
+                finally:
+                    harness._connection.set_trace_callback(None)
+
+                assert traces == [], name
+                assert harness._connection.in_transaction, name
+                assert lease._core_lease is core_lease, name
+                assert core_lease.active, name
+                if transaction_entry.startswith("SAVEPOINT"):
+                    harness._connection.execute("ROLLBACK TO caller_work")
+                    harness._connection.execute("RELEASE caller_work")
+                else:
+                    harness._connection.rollback()
+                assert not harness._connection.in_transaction, name
+                assert _database_rows(harness._connection) == before_rows, name
+        finally:
+            if harness._connection.in_transaction:
+                harness._connection.rollback()
+            lease.__exit__(None, None, None)
+    finally:
+        harness.close()
+
+
+def test_held_lease_remains_usable_after_transaction_rejection() -> None:
+    harness = Architecture77HarnessAuthority.create()
+    try:
+        _, reservation_id, execution_id, receipt = _prepare_lease_resume_case(
+            harness, "2026-01-01"
+        )
+        with harness.lifecycle_lease(reservation_id) as lease:
+            core_lease = lease._core_lease
+            assert core_lease is not None
+            harness._connection.execute("BEGIN IMMEDIATE")
+            with pytest.raises(
+                ValueError,
+                match="lifecycle boundary requires no active SQLite transaction",
+            ):
+                harness._core.require_execution_binding_while_held(
+                    execution_id,
+                    reservation_id,
+                    lease_witness=core_lease,
+                )
+            assert harness._connection.in_transaction
+            harness._connection.rollback()
+            lease.bind_execution(execution_id)
+            lease.record_post_resume_evidence(execution_id, receipt)
+
+        assert harness._connection.execute(
+            "SELECT phase FROM launch_executions WHERE launch_execution_id = ?",
+            (execution_id,),
+        ).fetchone() == ("RESUME_RECORDED",)
+    finally:
+        harness.close()
+
+
+def test_harness_close_invalidates_outstanding_lifecycle_lease() -> None:
+    harness = Architecture77HarnessAuthority.create()
+    session_id = harness.create_session(_request())
+    attempt_id = harness.allocate_attempt(session_id)
+    claim_id = harness.commit_claim(attempt_id)
+    reservation_id = str(harness.reserve_launch(claim_id))
+    lease = harness.lifecycle_lease(reservation_id)
+    lease.__enter__()
+    core_lease = lease._core_lease
+    assert core_lease is not None
+    harness.close()
+    with pytest.raises(HarnessLifecycleError, match="closed"):
+        harness._core.record_post_resume_evidence_while_held(
+            "missing-execution", object(), lease_witness=core_lease
+        )
+
+
+def test_lifecycle_witness_lifetime_and_cross_harness_binding() -> None:
+    first = Architecture77HarnessAuthority.create()
+    second = Architecture77HarnessAuthority.create()
+    try:
+        _, reservation_a, execution_a, receipt_a = _prepare_lease_resume_case(
+            first, "2026-01-01"
+        )
+        _, reservation_b, execution_b, receipt_b = _prepare_lease_resume_case(
+            second, "2026-01-02"
+        )
+        lease = first.lifecycle_lease(reservation_a)
+        with pytest.raises(TypeError, match="already-held operation"):
+            first._core.record_post_resume_evidence_while_held(
+                execution_a, receipt_a, lease_witness=None
+            )
+        with lease:
+            core_lease = lease._core_lease
+            assert core_lease is not None
+            with pytest.raises(ValueError, match="invalid or mismatched"):
+                second._core.record_post_resume_evidence_while_held(
+                    execution_b, receipt_b, lease_witness=core_lease
+                )
+        with pytest.raises(ExternalAuthorityBoundaryUnavailable, match="closed"):
+            first._core.record_post_resume_evidence_while_held(
+                execution_a, receipt_a, lease_witness=core_lease
+            )
+        _assert_capability_available(receipt_a)
+        _assert_capability_available(receipt_b)
+    finally:
+        first.close()
+        second.close()
+
+
+@pytest.mark.parametrize(
+    "target_kind",
+    [
+        "SESSION",
+        "ATTEMPT",
+        "CLAIM",
+        "LAUNCH_RESERVATION",
+        "TERMINAL",
+    ],
+)
+def test_lifecycle_recovery_rejects_target_outside_held_reservation(
+    target_kind: str,
+) -> None:
+    harness = Architecture77HarnessAuthority.create()
+    try:
+        session_id, reservation_id, target_a, target_b, action = (
+            _prepare_lease_recovery_lineage_case(harness, target_kind)
+        )
+        before = _database_rows(harness._connection)
+        with harness.lifecycle_lease(reservation_id) as lease:
+            with pytest.raises(ValueError, match="outside the held reservation"):
+                lease.record_recovery(
+                    session_id,
+                    target_kind,
+                    target_b,
+                    action,
+                    operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+                    operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
+                )
+            assert _database_rows(harness._connection) == before
+            retry_kind, retry_id, retry_action = (
+                ("LAUNCH_RESERVATION", reservation_id, "CLASSIFY_LAUNCH_RESERVATION")
+                if target_kind == "SESSION"
+                else (target_kind, target_a, action)
+            )
+            recovery_id = lease.record_recovery(
+                session_id,
+                retry_kind,
+                retry_id,
+                retry_action,
+                operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+                operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
+            )
+        assert harness._connection.execute(
+            "SELECT recovery_id FROM manual_recoveries WHERE recovery_id = ?",
+            (recovery_id,),
+        ).fetchone() == (recovery_id,)
+    finally:
+        harness.close()
 
 
 def _run_spawn_race(
     db_path: Path, scenario: str, winner: str
 ) -> tuple[dict[str, tuple[str, list[str]]], str, str | None]:
+    descriptor = _descriptor_for(db_path)
     context = multiprocessing.get_context("spawn")
     setup_queue = context.Queue()
     result_queue = context.Queue()
@@ -4685,7 +4888,7 @@ def _run_spawn_race(
     boundary = context.Process(
         target=_spawn_boundary_worker,
         args=(
-            str(db_path),
+            descriptor,
             scenario,
             winner == "boundary",
             setup_queue,
@@ -4708,7 +4911,7 @@ def _run_spawn_race(
     recovery = context.Process(
         target=_spawn_recovery_worker,
         args=(
-            str(db_path),
+            descriptor,
             session_id,
             reservation_id,
             action,
@@ -4949,7 +5152,7 @@ def test_spawned_process_crash_releases_lifecycle_arbiter_without_retry(
     recovery = context.Process(
         target=_spawn_recovery_worker,
         args=(
-            str(db_path),
+            _descriptor_for(db_path),
             session_id,
             reservation_id,
             "CLASSIFY_LAUNCH_RESERVATION",
@@ -4992,14 +5195,17 @@ def test_spawned_process_rejects_reconstructed_process_local_capabilities(
     result_queue = context.Queue()
     child = context.Process(
         target=_spawn_reconstructed_capability_worker,
-        args=(str(db_path), reservation_id, result_queue),
+        args=(_descriptor_for(db_path), reservation_id, result_queue),
     )
     child.start()
     child.join(20)
     assert child.exitcode == 0
     outcomes = result_queue.get(timeout=10)
     assert len(outcomes) == 2
-    assert all("not issued" in outcome for outcome in outcomes)
+    assert all(outcome.startswith("rejected:TypeError:") for outcome in outcomes)
+    assert all(
+        "invalid test service provenance issuer" in outcome for outcome in outcomes
+    )
     verify = _connect(db_path)
     assert verify.execute(
         "SELECT reservation_state, process_intent_json "
@@ -5021,7 +5227,7 @@ def test_spawned_outer_transaction_rejects_before_arbiter_and_releases_writer(
     boundary = context.Process(
         target=_spawn_outer_transaction_boundary_worker,
         args=(
-            str(db_path),
+            _descriptor_for(db_path),
             setup_queue,
             result_queue,
             recovery_acquired,
@@ -5034,7 +5240,7 @@ def test_spawned_outer_transaction_rejects_before_arbiter_and_releases_writer(
     recovery = context.Process(
         target=_spawn_recovery_after_outer_transaction_worker,
         args=(
-            str(db_path),
+            _descriptor_for(db_path),
             session_id,
             reservation_id,
             result_queue,
@@ -5078,7 +5284,7 @@ def test_spawned_stored_observer_transaction_rejects_before_arbiter(
     boundary = context.Process(
         target=_spawn_stored_observer_transaction_boundary_worker,
         args=(
-            str(db_path),
+            _descriptor_for(db_path),
             setup_queue,
             result_queue,
             recovery_acquired,
@@ -5091,7 +5297,7 @@ def test_spawned_stored_observer_transaction_rejects_before_arbiter(
     recovery = context.Process(
         target=_spawn_recovery_after_outer_transaction_worker,
         args=(
-            str(db_path),
+            _descriptor_for(db_path),
             session_id,
             reservation_id,
             result_queue,
@@ -5109,7 +5315,7 @@ def test_spawned_stored_observer_transaction_rejects_before_arbiter(
     assert set(outcomes) == {"boundary", "recovery"}
     assert outcomes["boundary"] == (
         "lifecycle boundary requires no active SQLite transaction",
-        False,
+        True,
         False,
         [],
     )
@@ -5132,6 +5338,7 @@ def _prepare_active_transaction_boundary(
 ) -> tuple[Callable[[], object], object | None, list[str]]:
     events: list[str] = []
     hooks = FakeSideEffects(connection, events)
+    service = _test_service(connection)
     session_id = create_session(connection)
     attempt_id = allocate_attempt(connection, session_id)
     claim_id = commit_claim(connection, attempt_id)
@@ -5140,12 +5347,13 @@ def _prepare_active_transaction_boundary(
 
     if boundary == "recover-launch-reservation":
         return (
-            lambda: record_recovery(
-                connection,
+            lambda: service.record_recovery(
                 session_id,
                 "LAUNCH_RESERVATION",
                 reservation_id,
                 "CLASSIFY_LAUNCH_RESERVATION",
+                operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+                operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
             ),
             None,
             events,
@@ -5154,7 +5362,7 @@ def _prepare_active_transaction_boundary(
     provider = hooks.construct_provider(reservation)
     if boundary == "commit-process-intent":
         return (
-            lambda: commit_process_intent(connection, reservation_id, provider),
+            lambda: service.commit_process_intent(reservation_id, provider),
             provider,
             events,
         )
@@ -5162,12 +5370,13 @@ def _prepare_active_transaction_boundary(
     process_intent = commit_process_intent(connection, reservation_id, provider)
     if boundary == "recover-process-outcome":
         return (
-            lambda: record_recovery(
-                connection,
+            lambda: service.record_recovery(
                 session_id,
                 "LAUNCH_RESERVATION",
                 reservation_id,
                 "CLASSIFY_PROCESS_OUTCOME_UNKNOWN",
+                operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+                operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
             ),
             None,
             events,
@@ -5179,8 +5388,8 @@ def _prepare_active_transaction_boundary(
     if boundary == "record-process-creation-failure":
         assert type(process_result) is FakeProcessCreationFailure
         return (
-            lambda: record_process_creation_failure(
-                connection, reservation_id, process_result
+            lambda: service.record_process_creation_failure(
+                reservation_id, process_result
             ),
             process_result,
             events,
@@ -5188,7 +5397,7 @@ def _prepare_active_transaction_boundary(
     assert type(process_result) is FakeProcessCreationReceipt
     if boundary == "record-execution":
         return (
-            lambda: record_execution(connection, reservation_id, process_result),
+            lambda: service.record_execution(reservation_id, process_result),
             process_result,
             events,
         )
@@ -5196,19 +5405,20 @@ def _prepare_active_transaction_boundary(
     execution_id = record_execution(connection, reservation_id, process_result)
     if boundary == "recover-pre-resume":
         return (
-            lambda: record_recovery(
-                connection,
+            lambda: service.record_recovery(
                 session_id,
                 "LAUNCH_RESERVATION",
                 reservation_id,
                 "CLASSIFY_PRE_RESUME_READY",
+                operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+                operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
             ),
             None,
             events,
         )
     if boundary == "commit-resume-intent":
         return (
-            lambda: commit_resume_intent(connection, execution_id, reservation_id),
+            lambda: service.commit_resume_intent(execution_id, reservation_id),
             None,
             events,
         )
@@ -5216,12 +5426,13 @@ def _prepare_active_transaction_boundary(
     resume_intent = commit_resume_intent(connection, execution_id, reservation_id)
     if boundary == "recover-resume-outcome":
         return (
-            lambda: record_recovery(
-                connection,
+            lambda: service.record_recovery(
                 session_id,
                 "LAUNCH_RESERVATION",
                 reservation_id,
                 "CLASSIFY_RESUME_OUTCOME_UNKNOWN",
+                operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+                operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
             ),
             None,
             events,
@@ -5230,9 +5441,7 @@ def _prepare_active_transaction_boundary(
     resume_receipt = hooks.resume_thread(resume_intent)
     if boundary == "record-post-resume-evidence":
         return (
-            lambda: record_post_resume_evidence(
-                connection, execution_id, resume_receipt
-            ),
+            lambda: service.record_post_resume_evidence(execution_id, resume_receipt),
             resume_receipt,
             events,
         )
@@ -5240,7 +5449,9 @@ def _prepare_active_transaction_boundary(
     assert boundary == "record-terminal"
     record_post_resume_evidence(connection, execution_id, resume_receipt)
     return (
-        lambda: record_terminal(connection, reservation_id),
+        lambda: service.record_terminal(
+            reservation_id, snapshot_digest=TEST_SNAPSHOT_DIGEST
+        ),
         None,
         events,
     )
@@ -5339,7 +5550,7 @@ def test_arbiter_sqlite_boundaries_reject_active_caller_transaction_before_lock(
     assert events == events_before
     assert _database_rows(connection) == before
     if capability is not None:
-        assert not capability._permit.consumed  # type: ignore[union-attr]
+        _assert_capability_available(capability)
     connection.rollback()
     assert not connection.in_transaction
 
@@ -5349,8 +5560,92 @@ def test_arbiter_sqlite_boundaries_reject_active_caller_transaction_before_lock(
         "record-post-resume-evidence",
     }
     if capability is not None:
-        assert capability._permit.consumed  # type: ignore[union-attr]
+        _assert_capability_consumed(capability)
     assert _database_rows(connection) != before
+    connection.close()
+
+
+@pytest.mark.parametrize(
+    "transaction_entry",
+    ["BEGIN IMMEDIATE", "SAVEPOINT caller_work"],
+    ids=["begin-immediate", "savepoint"],
+)
+@pytest.mark.parametrize("action", list(_RECOVERY_ACTIONS))
+def test_every_recovery_action_rejects_active_transaction_before_dispatch(
+    db_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    action: str,
+    transaction_entry: str,
+) -> None:
+    connection = _connect(db_path)
+    session_id, target_kind, target_id, _, _ = _prepare_recovery_chronology_case(
+        connection, action
+    )
+    service = _test_service(connection)
+    before = _database_rows(connection)
+    arbiter_attempts: list[str] = []
+
+    class ArbiterProbe:
+        def __init__(self, reservation_id: str) -> None:
+            arbiter_attempts.append(str(reservation_id))
+
+        def __enter__(self) -> ArbiterProbe:
+            raise AssertionError("active recovery reached arbiter acquisition")
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+    connection.execute(transaction_entry)
+    traces: list[str] = []
+    connection.set_trace_callback(traces.append)
+    with monkeypatch.context() as context:
+        context.setattr(
+            sys.modules[__name__], "InterprocessLifecycleArbiter", ArbiterProbe
+        )
+        with pytest.raises(
+            ValueError,
+            match="lifecycle boundary requires no active SQLite transaction",
+        ):
+            service.record_recovery(
+                session_id,
+                target_kind,
+                target_id,
+                action,
+                operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+                operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
+            )
+    connection.set_trace_callback(None)
+
+    assert traces == []
+    assert arbiter_attempts == []
+    assert connection.in_transaction
+    assert _database_rows(connection) == before
+    assert connection.execute(
+        "SELECT next_recovery_ordinal FROM sessions WHERE session_id = ?",
+        (session_id,),
+    ).fetchone() == (0,)
+
+    if transaction_entry.startswith("SAVEPOINT"):
+        connection.execute("ROLLBACK TO caller_work")
+        connection.execute("RELEASE caller_work")
+    else:
+        connection.rollback()
+    assert not connection.in_transaction
+
+    recovery_id = service.record_recovery(
+        session_id,
+        target_kind,
+        target_id,
+        action,
+        operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+        operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
+    )
+    assert type(recovery_id) is str
+    assert _database_rows(connection) != before
+    assert connection.execute(
+        "SELECT next_recovery_ordinal FROM sessions WHERE session_id = ?",
+        (session_id,),
+    ).fetchone() == (1,)
     connection.close()
 
 
@@ -5372,7 +5667,7 @@ def test_stored_observer_boundaries_reject_active_transaction_before_lock(
     connection = _connect(db_path)
     observer = _connect(db_path)
     events: list[str] = []
-    hooks = FakeSideEffects(observer, events)
+    hooks = FakeSideEffects(observer, events, service=_test_service(connection))
     invoke, capability, effect = _prepare_stored_observer_boundary(
         connection, hooks, boundary
     )
@@ -5408,7 +5703,7 @@ def test_stored_observer_boundaries_reject_active_transaction_before_lock(
     assert observer.in_transaction
     assert events == events_before
     assert _database_rows(observer) == before
-    assert not capability._permit.consumed
+    _assert_capability_available(capability)
     if transaction_entry.startswith("SAVEPOINT"):
         observer.execute("ROLLBACK TO caller_work")
         observer.execute("RELEASE caller_work")
@@ -5418,7 +5713,7 @@ def test_stored_observer_boundaries_reject_active_transaction_before_lock(
 
     result = invoke()
     assert result is not None
-    assert capability._permit.consumed
+    _assert_capability_consumed(capability)
     assert events.count(effect) == events_before.count(effect) + 1
     events_after_success = list(events)
     with pytest.raises(ValueError):
@@ -5436,6 +5731,7 @@ def test_reservation_recovery_validates_ordinal_before_transaction_guard(
     attempt_id = allocate_attempt(connection, session_id)
     claim_id = commit_claim(connection, attempt_id)
     reservation_id = str(reserve_launch(connection, claim_id))
+    service = _test_service(connection)
     before = _database_rows(connection)
     arbiter_attempts: list[str] = []
 
@@ -5449,13 +5745,14 @@ def test_reservation_recovery_validates_ordinal_before_transaction_guard(
             sys.modules[__name__], "InterprocessLifecycleArbiter", ArbiterProbe
         )
         with pytest.raises(ValueError, match="exact non-negative int"):
-            record_recovery(
-                connection,
+            service.record_recovery(
                 session_id,
                 "LAUNCH_RESERVATION",
                 reservation_id,
                 "CLASSIFY_LAUNCH_RESERVATION",
                 ordinal=False,
+                operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+                operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
             )
     assert arbiter_attempts == []
     assert connection.in_transaction
@@ -5464,195 +5761,97 @@ def test_reservation_recovery_validates_ordinal_before_transaction_guard(
     connection.close()
 
 
+@pytest.mark.parametrize("ordinal", [True, -1, 1.5, "1"])
+def test_recovery_preflight_rejects_invalid_ordinal_before_begin(
+    ordinal: object,
+) -> None:
+    harness = Architecture77HarnessAuthority.create()
+    try:
+        session_id = harness.create_session(_request())
+        attempt_id = harness.allocate_attempt(session_id)
+        claim_id = harness.commit_claim(attempt_id)
+        reservation_id = str(harness.reserve_launch(claim_id))
+        before = _database_rows(harness._connection)
+        traces: list[str] = []
+        harness._connection.set_trace_callback(traces.append)
+        try:
+            with pytest.raises(ValueError, match="exact non-negative int"):
+                harness.record_recovery(
+                    session_id,
+                    "LAUNCH_RESERVATION",
+                    reservation_id,
+                    "CLASSIFY_LAUNCH_RESERVATION",
+                    ordinal=ordinal,  # type: ignore[arg-type]
+                    operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+                    operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
+                )
+        finally:
+            harness._connection.set_trace_callback(None)
+        assert not any(
+            statement.startswith(("BEGIN", "ROLLBACK", "INSERT INTO manual_recoveries"))
+            for statement in traces
+        )
+        assert _database_rows(harness._connection) == before
+    finally:
+        harness.close()
+
+
+def test_recovery_preflight_rejects_unknown_action_before_begin() -> None:
+    harness = Architecture77HarnessAuthority.create()
+    try:
+        session_id = harness.create_session(_request())
+        attempt_id = harness.allocate_attempt(session_id)
+        claim_id = harness.commit_claim(attempt_id)
+        reservation_id = str(harness.reserve_launch(claim_id))
+        before = _database_rows(harness._connection)
+        traces: list[str] = []
+        harness._connection.set_trace_callback(traces.append)
+        try:
+            with pytest.raises(ValueError, match="unknown recovery action"):
+                harness.record_recovery(
+                    session_id,
+                    "LAUNCH_RESERVATION",
+                    reservation_id,
+                    "UNKNOWN_ACTION",
+                    operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+                    operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
+                )
+        finally:
+            harness._connection.set_trace_callback(None)
+        assert not any(
+            statement.startswith(("BEGIN", "ROLLBACK", "INSERT INTO manual_recoveries"))
+            for statement in traces
+        )
+        assert _database_rows(harness._connection) == before
+    finally:
+        harness.close()
+
+
 def test_lifecycle_arbiter_identity_and_global_lock_order_are_explicit() -> None:
-    reservation_id = "reservation/raw/value"
-    first = InterprocessLifecycleArbiter(reservation_id)
-    second = InterprocessLifecycleArbiter(reservation_id)
-    different = InterprocessLifecycleArbiter("different-reservation")
-    expected_material = (
+    from trading_bot.runtime.windows_authority_mutex import (
+        canonical_lifecycle_mutex_material,
+        lifecycle_mutex_digest,
+        lifecycle_mutex_name,
+    )
+
+    material = canonical_lifecycle_mutex_material(
+        MACHINE, EPOCH, "reservation/raw/value"
+    )
+    assert material == (
         b'{"authority_epoch_id":"12345678-1234-5678-9abc-def012345678",'
         b'"label":"lifecycle-arbiter/v1",'
         b'"launch_reservation_id":"reservation/raw/value",'
         b'"machine_authority_id":"87654321-4321-8765-cba9-876543210987"}'
     )
-    assert first.identity == second.identity
-    assert first.identity == hashlib.sha256(expected_material).hexdigest()
-    assert len(first.identity) == 64
-    assert first.identity == first.identity.lower()
-    assert set(first.identity) <= set("0123456789abcdef")
-    assert reservation_id not in first.path.name
-    assert first.path.parent == _LIFECYCLE_ARBITER_ROOT
-    assert first.path == second.path
-    assert first.path != different.path
-    assert first.path.is_absolute()
-    assert (
-        _LIFECYCLE_ARBITER_ROOT
-        == (
-            Path(__file__).resolve().parents[2]
-            / ".pytest_cache"
-            / "ai-trading-bot-lifecycle-arbiters-v1"
-        ).resolve()
+    digest = lifecycle_mutex_digest(MACHINE, EPOCH, "reservation/raw/value")
+    assert digest == hashlib.sha256(material).hexdigest()
+    assert lifecycle_mutex_name(MACHINE, EPOCH, "reservation/raw/value") == (
+        "Global\\AITradingBot-Lifecycle-v1-" + digest
     )
 
-    module_source = Path(__file__).read_text(encoding="utf-8")
-    assert "threading." + "RLock" not in module_source
-    assert "_RESERVATION_LIFECYCLE_" + "LOCKS" not in module_source
-    root_definition_source = module_source[
-        : module_source.index("class " + "InterprocessLifecycleArbiter")
-    ]
-    assert root_definition_source.count("_LIFECYCLE_ARBITER_" + "ROOT =") == 1
-    for forbidden_root_source in (
-        "tempfile." + "gettempdir",
-        "os." + "environ",
-        "os." + "getenv",
-        "Path." + "cwd",
-        "os." + "getcwd",
-        "os." + "getpid",
-        "threading." + "get_ident",
-        "uuid." + "uuid4",
-    ):
-        assert forbidden_root_source not in root_definition_source
-    arbiter_source = inspect.getsource(InterprocessLifecycleArbiter)
-    assert "self.path = _LIFECYCLE_ARBITER_ROOT" in arbiter_source
-    assert "resolve(" not in arbiter_source
-
-    arbiter_construction_owners: list[str] = []
-
-    class ArbiterConstructionVisitor(ast.NodeVisitor):
-        def __init__(self) -> None:
-            self.owner_stack: list[str] = []
-
-        def _visit_owner(self, node: ast.ClassDef | ast.FunctionDef) -> None:
-            self.owner_stack.append(node.name)
-            self.generic_visit(node)
-            self.owner_stack.pop()
-
-        def visit_ClassDef(self, node: ast.ClassDef) -> None:
-            self._visit_owner(node)
-
-        def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
-            self._visit_owner(node)
-
-        def visit_Call(self, node: ast.Call) -> None:
-            if (
-                isinstance(node.func, ast.Name)
-                and node.func.id == "InterprocessLifecycleArbiter"
-            ):
-                arbiter_construction_owners.append(".".join(self.owner_stack))
-            self.generic_visit(node)
-
-    ArbiterConstructionVisitor().visit(ast.parse(module_source))
-    classifications = {
-        "A-supplied-sqlite": (
-            "commit_process_intent",
-            "record_execution",
-            "commit_resume_intent",
-            "record_process_creation_failure",
-            "record_post_resume_evidence",
-            "record_terminal",
-            "record_recovery",
-            "test_process_dispatch_and_recovery_share_lifecycle_arbiter",
-            "test_process_result_persistence_and_recovery_are_serialized",
-            "test_recovery_race_with_resume_dispatch_is_serialized",
-            "test_recovery_race_with_receipt_persistence_is_serialized",
-        ),
-        "B-stored-sqlite-observer": (
-            "FakeSideEffects.construct_provider",
-            "FakeSideEffects.create_process",
-            "FakeSideEffects.resume_thread",
-        ),
-        "C-worker-opens-after-arbiter": (
-            "_spawn_boundary_worker",
-            "_spawn_recovery_worker",
-            "_spawn_recovery_after_outer_transaction_worker",
-        ),
-        "D-pure-arbiter-no-sqlite": (
-            "_spawn_crash_while_holding_arbiter",
-            "test_lifecycle_arbiter_identity_and_global_lock_order_are_explicit",
-            "test_lifecycle_arbiter_identity_and_global_lock_order_are_explicit",
-            "test_lifecycle_arbiter_identity_and_global_lock_order_are_explicit",
-        ),
-        "E-external-boundary-no-sqlite": ("_spawn_cross_environment_arbiter_worker",),
-    }
-    assert sorted(arbiter_construction_owners) == sorted(
-        owner for owners in classifications.values() for owner in owners
-    )
-
-    sqlite_wrappers = (
-        (commit_process_intent, "_commit_process_intent_locked"),
-        (record_execution, "_record_execution_locked"),
-        (record_process_creation_failure, "_record_process_creation_failure_locked"),
-        (commit_resume_intent, "_commit_resume_intent_locked"),
-        (record_post_resume_evidence, "_record_post_resume_evidence_locked"),
-        (record_terminal, "_record_terminal_locked"),
-        (record_recovery, "_record_recovery_locked"),
-    )
-    for wrapper, locked_name in sqlite_wrappers:
-        source = inspect.getsource(wrapper)
-        guard_index = source.index("_require_no_active_transaction")
-        arbiter_index = source.index("InterprocessLifecycleArbiter")
-        assert ".execute(" not in source[:arbiter_index]
-        assert "_begin(" not in source[:arbiter_index]
-        assert guard_index < arbiter_index < source.index(locked_name)
-
-    test_owned_sqlite_arbiters = (
-        test_process_dispatch_and_recovery_share_lifecycle_arbiter,
-        test_process_result_persistence_and_recovery_are_serialized,
-        test_recovery_race_with_resume_dispatch_is_serialized,
-        test_recovery_race_with_receipt_persistence_is_serialized,
-    )
-    for boundary_test in test_owned_sqlite_arbiters:
-        source = inspect.getsource(boundary_test)
-        assert source.count(
-            "_require_no_active_transaction(connection)"
-        ) == source.count("with lifecycle_lock")
-
-    external_wrappers = (
-        (
-            FakeSideEffects.construct_provider,
-            "_registered_provider_reservation_id",
-            "_construct_provider_locked",
-        ),
-        (
-            FakeSideEffects.create_process,
-            "_registered_process_intent_reservation_id",
-            "_create_process_locked",
-        ),
-        (
-            FakeSideEffects.resume_thread,
-            "_registered_resume_intent_binding",
-            "_resume_thread_locked",
-        ),
-    )
-    for wrapper, registry_name, locked_name in external_wrappers:
-        source = inspect.getsource(wrapper)
-        guard_index = source.index("_require_no_active_transaction(self.observer)")
-        registry_index = source.index(registry_name)
-        arbiter_index = source.index("InterprocessLifecycleArbiter")
-        assert ".execute(" not in source[:arbiter_index]
-        assert "self.observer" in source
-        assert guard_index < registry_index < arbiter_index < source.index(locked_name)
-
-    for worker in (
-        _spawn_boundary_worker,
-        _spawn_recovery_worker,
-        _spawn_recovery_after_outer_transaction_worker,
-    ):
-        source = inspect.getsource(worker)
-        arbiter_index = source.index("with InterprocessLifecycleArbiter")
-        assert arbiter_index < source.rindex("_connect(Path(db_path))")
-    boundary_worker_source = inspect.getsource(_spawn_boundary_worker)
-    assert boundary_worker_source.index("connection.close()") < (
-        boundary_worker_source.index("with InterprocessLifecycleArbiter")
-    )
-    assert "_connect" not in inspect.getsource(_spawn_crash_while_holding_arbiter)
-
-    for hook in (
-        FakeSideEffects._construct_provider_locked,
-        FakeSideEffects._create_process_locked,
-        FakeSideEffects._resume_thread_locked,
-    ):
-        assert "assert not self.observer.in_transaction" in inspect.getsource(hook)
+    adapter = InterprocessLifecycleArbiter("reservation/raw/value")
+    assert adapter.identity == digest
+    assert adapter.path.parent == _LIFECYCLE_ARBITER_ROOT
 
 
 def test_lifecycle_transaction_guard_requires_exact_sqlite_connection() -> None:
@@ -5729,43 +5928,43 @@ def test_lifecycle_transaction_guard_requires_exact_sqlite_connection() -> None:
     ],
 )
 def test_session_creation_rejects_descriptor_drift_before_persistence(
-    tmp_path: Path,
     request_field: str | None,
     request_value: object,
     remove_field: bool,
     metadata_provider_id: str,
     metadata_operation: str,
 ) -> None:
-    path = tmp_path / "descriptor-drift.sqlite3"
-    connection = _connect(path)
-    _install_schema(connection)
-    _insert_metadata(
-        connection,
-        provider_id=metadata_provider_id,
-        permitted_provider_operation=metadata_operation,
-    )
-    _insert_migration(connection)
-    side_effects = FakeSideEffects(connection)
-    request = _request()
-    if request_field is not None:
-        if remove_field:
-            del request[request_field]
-        else:
-            request[request_field] = request_value
+    harness = Architecture77HarnessAuthority.create()
+    connection = harness._connection
+    try:
+        _seed_harness_metadata(
+            harness,
+            provider_id=metadata_provider_id,
+            permitted_provider_operation=metadata_operation,
+        )
+        core = harness._core
+        side_effects = FakeSideEffects(connection)
+        request = _request()
+        if request_field is not None:
+            if remove_field:
+                del request[request_field]
+            else:
+                request[request_field] = request_value
 
-    with pytest.raises(ValueError):
-        create_session(connection, request)
+        with pytest.raises(ValueError):
+            core.create_session(request)
 
-    assert connection.execute(
-        "SELECT count(*), coalesce(sum(next_attempt_ordinal), 0), "
-        "coalesce(sum(next_recovery_ordinal), 0) FROM sessions"
-    ).fetchone() == (0, 0, 0)
-    assert connection.execute("SELECT count(*) FROM attempts").fetchone() == (0,)
-    assert connection.execute(
-        "SELECT count(*) FROM provider_call_claims"
-    ).fetchone() == (0,)
-    assert side_effects.events == []
-    connection.close()
+        assert connection.execute(
+            "SELECT count(*), coalesce(sum(next_attempt_ordinal), 0), "
+            "coalesce(sum(next_recovery_ordinal), 0) FROM sessions"
+        ).fetchone() == (0, 0, 0)
+        assert connection.execute("SELECT count(*) FROM attempts").fetchone() == (0,)
+        assert connection.execute(
+            "SELECT count(*) FROM provider_call_claims"
+        ).fetchone() == (0,)
+        assert side_effects.events == []
+    finally:
+        harness.close()
 
 
 def _assert_no_capture_authority_side_effects(
@@ -5842,8 +6041,8 @@ def test_caller_mutation_after_snapshot_cannot_desynchronize_session(
         request["target_session_date"] = "2099-12-31"
         return snapshot
 
-    monkeypatch.setitem(globals(), "_snapshot_capture_request", snapshot_then_mutate)
-    session_id = create_session(connection, caller_request)
+    service = _test_service(connection, capture_request_factory=snapshot_then_mutate)
+    session_id = service.create_session(caller_request)
     snapshot = snapshots[0]
     expected_bytes = snapshot.canonical_json()
     expected_id = _session_id(
@@ -5898,27 +6097,27 @@ def test_symbol_normalization_equivalence_is_detected_as_duplicate() -> None:
     ids=["unsupported-authority-policy", "unsupported-claim-policy"],
 )
 def test_session_creation_rejects_unsupported_signed_policy_before_persistence(
-    tmp_path: Path,
     authority_policy_version: str,
     claim_policy_version: str,
 ) -> None:
-    path = tmp_path / "unsupported-policy.sqlite3"
-    connection = _connect(path)
-    _install_schema(connection)
-    _insert_metadata(
-        connection,
-        authority_policy_version=authority_policy_version,
-        claim_policy_version=claim_policy_version,
-    )
-    _insert_migration(connection)
-    side_effects = FakeSideEffects(connection)
+    harness = Architecture77HarnessAuthority.create()
+    connection = harness._connection
+    try:
+        _seed_harness_metadata(
+            harness,
+            authority_policy_version=authority_policy_version,
+            claim_policy_version=claim_policy_version,
+        )
+        core = harness._core
+        side_effects = FakeSideEffects(connection)
 
-    with pytest.raises(ValueError, match="policy is unsupported"):
-        create_session(connection)
+        with pytest.raises(ValueError, match="policy is unsupported"):
+            core.create_session(_request())
 
-    _assert_no_capture_authority_side_effects(connection)
-    assert side_effects.events == []
-    connection.close()
+        _assert_no_capture_authority_side_effects(connection)
+        assert side_effects.events == []
+    finally:
+        harness.close()
 
 
 @pytest.mark.parametrize("missing_field", sorted(CAPTURE_REQUEST_FIELDS))
@@ -6071,7 +6270,9 @@ def _seed_lifecycle(path: Path) -> dict[str, str]:
     reservation_id = reserve_launch(connection, claim_id)
     execution_id = _record_successful_process(connection, reservation_id)
     _resume_and_persist(connection, execution_id, reservation_id)
-    terminal_id = record_terminal(connection, reservation_id)
+    terminal_id = record_terminal(
+        connection, reservation_id, snapshot_digest=TEST_SNAPSHOT_DIGEST
+    )
     connection.close()
     return {
         "session_id": session_id,
@@ -6286,6 +6487,8 @@ def test_identity_bearing_rows_reject_unsupported_schema_at_insert(
                                 session_id,
                                 "ACKNOWLEDGE_RESTORE",
                                 recovery_schema=unsupported_schema,
+                                operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+                                operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
                             )
 
                     else:
@@ -6306,7 +6509,11 @@ def test_identity_bearing_rows_reject_unsupported_schema_at_insert(
                                 )
 
                         else:
-                            terminal_id = record_terminal(connection, reservation_id)
+                            terminal_id = record_terminal(
+                                connection,
+                                reservation_id,
+                                snapshot_digest=TEST_SNAPSHOT_DIGEST,
+                            )
 
                             def insert_invalid() -> None:
                                 _insert_selection_row_for_test(
@@ -6321,8 +6528,7 @@ def test_identity_bearing_rows_reject_unsupported_schema_at_insert(
         insert_invalid()
     assert _database_rows(connection) == before
     if process_intent is not None:
-        with _ISSUED_PROCESS_PERMITS_LOCK:
-            _ISSUED_PROCESS_PERMITS.pop(process_intent._permit, None)
+        _consume_capability_for_test(process_intent)
     connection.close()
 
 
@@ -6726,13 +6932,10 @@ def _prepare_owned_insert_parent(
     context["claim_id"] = commit_claim(connection, context["attempt_id"])
     if table == "launch_reservations":
         return context
+    if table == "launch_executions":
+        return context
     context["reservation_id"] = reserve_launch(connection, context["claim_id"])
     if table == "manual_recoveries":
-        return context
-    if table == "launch_executions":
-        context["process_intent"] = _construct_provider_and_commit_process_intent(
-            connection, context["reservation_id"]
-        )
         return context
     context["execution_id"] = _record_successful_process(
         connection, context["reservation_id"]
@@ -6741,7 +6944,9 @@ def _prepare_owned_insert_parent(
     if table == "terminals":
         return context
     assert table == "session_selections"
-    context["terminal_id"] = record_terminal(connection, context["reservation_id"])
+    context["terminal_id"] = record_terminal(
+        connection, context["reservation_id"], snapshot_digest=TEST_SNAPSHOT_DIGEST
+    )
     return context
 
 
@@ -6761,11 +6966,17 @@ def _create_owned_insert_candidate(
     elif table == "launch_reservations":
         reserve_launch(connection, context["claim_id"])
     elif table == "launch_executions":
-        receipt = FakeSideEffects(connection).create_process(context["process_intent"])
+        reservation_id = reserve_launch(connection, context["claim_id"])
+        process_intent = _construct_provider_and_commit_process_intent(
+            connection, reservation_id
+        )
+        receipt = FakeSideEffects(connection).create_process(process_intent)
         assert type(receipt) is FakeProcessCreationReceipt
-        record_execution(connection, context["reservation_id"], receipt)
+        record_execution(connection, reservation_id, receipt)
     elif table == "terminals":
-        record_terminal(connection, context["reservation_id"])
+        record_terminal(
+            connection, context["reservation_id"], snapshot_digest=TEST_SNAPSHOT_DIGEST
+        )
     elif table == "session_selections":
         select_terminal(connection, context["session_id"], context["terminal_id"])
     else:
@@ -6776,6 +6987,8 @@ def _create_owned_insert_candidate(
             "LAUNCH_RESERVATION",
             context["reservation_id"],
             "CLASSIFY_LAUNCH_RESERVATION",
+            operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+            operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
         )
 
 
@@ -6804,35 +7017,48 @@ def _database_rows(connection: sqlite3.Connection) -> dict[str, list[tuple[Any, 
 )
 @pytest.mark.parametrize("invalid_part", ["bytes", "digest"])
 def test_every_owned_insert_pair_rejects_python_mismatch_before_mutation(
-    tmp_path: Path,
     owned_pair: tuple[str, str, str],
     invalid_part: str,
 ) -> None:
     table, blob_column, digest_column = owned_pair
-    base = _connect(tmp_path / "owned-pair-base.sqlite3")
-    _install_schema(base)
-    context = _prepare_owned_insert_parent(base, table)
+    base_harness = Architecture77HarnessAuthority.create()
+    candidate_harness = Architecture77HarnessAuthority.create()
+    try:
+        base = base_harness._connection
+        candidate = candidate_harness._connection
+        schema_seed = sqlite3.connect(":memory:", isolation_level=None)
+        try:
+            _install_schema(schema_seed)
+            schema_seed.backup(base)
+        finally:
+            schema_seed.close()
+        with _bind_harness(base_harness):
+            context = _prepare_owned_insert_parent(base, table)
+        base.backup(candidate)
+        if table != "authority_metadata":
+            candidate_harness._validate_connection(candidate)
+        with _bind_harness(candidate_harness):
+            _create_owned_insert_candidate(candidate, table, context)
+        columns = [row[1] for row in candidate.execute(f"PRAGMA table_info({table})")]
+        values = list(candidate.execute(f"SELECT * FROM {table}").fetchone())
 
-    candidate = _connect(tmp_path / "owned-pair-candidate.sqlite3")
-    base.backup(candidate)
-    _create_owned_insert_candidate(candidate, table, context)
-    columns = [row[1] for row in candidate.execute(f"PRAGMA table_info({table})")]
-    values = list(candidate.execute(f"SELECT * FROM {table}").fetchone())
-    candidate.close()
-
-    if invalid_part == "bytes":
-        values[columns.index(blob_column)] += b" "
-    else:
-        values[columns.index(digest_column)] = _digest(b"wrong-owned-pair-digest")
-    before = _database_rows(base)
-    with pytest.raises(SchemaValidationError, match="does not match evidence bytes"):
-        _require_evidence_pair(
-            values[columns.index(blob_column)],
-            values[columns.index(digest_column)],
-            field=f"{table}.{blob_column}",
-        )
-    assert _database_rows(base) == before
-    base.close()
+        if invalid_part == "bytes":
+            values[columns.index(blob_column)] += b" "
+        else:
+            values[columns.index(digest_column)] = _digest(b"wrong-owned-pair-digest")
+        before = _database_rows(base)
+        with pytest.raises(
+            SchemaValidationError, match="does not match evidence bytes"
+        ):
+            _require_evidence_pair(
+                values[columns.index(blob_column)],
+                values[columns.index(digest_column)],
+                field=f"{table}.{blob_column}",
+            )
+        assert _database_rows(base) == before
+    finally:
+        candidate_harness.close()
+        base_harness.close()
 
 
 @pytest.mark.parametrize("copied_pair", ["attempt-request", "claim-request"])
@@ -6967,8 +7193,7 @@ def test_append_on_update_pairs_reject_wrong_digest_at_python_boundary(
             "FROM launch_reservations WHERE launch_reservation_id = ?",
             (str(reservation_id),),
         ).fetchone()
-        with _ISSUED_PROCESS_PERMITS_LOCK:
-            _ISSUED_PROCESS_PERMITS.pop(intent._permit, None)
+        _consume_capability_for_test(intent)
     else:
         execution_id = _record_successful_process(connection, reservation_id)
         if appended_pair == "resume-intent":
@@ -7034,8 +7259,7 @@ def test_append_on_update_pairs_reject_wrong_digest_at_python_boundary(
                 "cleanup_digest FROM launch_executions WHERE launch_execution_id = ?",
                 (execution_id,),
             ).fetchone()
-            with _ISSUED_RESUME_PERMITS_LOCK:
-                _ISSUED_RESUME_PERMITS.pop(intent._permit, None)
+            _consume_capability_for_test(intent)
     assert after == before
     assert connection.execute(
         "SELECT next_attempt_ordinal, next_recovery_ordinal FROM sessions "
@@ -7232,7 +7456,9 @@ def test_valid_lifecycle_from_metadata_to_selection(db_path: Path) -> None:
     reservation_id = reserve_launch(connection, claim_id)
     execution_id = _record_successful_process(connection, reservation_id)
     _resume_and_persist(connection, execution_id, reservation_id)
-    terminal_id = record_terminal(connection, reservation_id)
+    terminal_id = record_terminal(
+        connection, reservation_id, snapshot_digest=TEST_SNAPSHOT_DIGEST
+    )
     selection_id = select_terminal(connection, session_id, terminal_id)
     expected_request = _snapshot_capture_request(request).canonical_json()
     expected_digest = _digest(expected_request)
@@ -7501,7 +7727,9 @@ def test_process_creation_failure_can_record_terminal_without_execution(
     claim_id = commit_claim(connection, attempt_id)
     reservation_id = reserve_launch(connection, claim_id)
     _record_definitive_process_failure(connection, reservation_id)
-    terminal_id = record_terminal(connection, reservation_id, "FAILED", "NOT_STARTED")
+    terminal_id = record_terminal(
+        connection, reservation_id, "FAILED", "NOT_STARTED", snapshot_digest=None
+    )
     assert connection.execute("SELECT count(*) FROM launch_executions").fetchone() == (
         0,
     )
@@ -7530,7 +7758,9 @@ def test_failed_not_started_terminal_revalidates_parent_process_intent(
     with pytest.raises(
         SchemaValidationError, match="terminal parent process intent digest"
     ):
-        record_terminal(connection, reservation_id, "FAILED", "NOT_STARTED")
+        record_terminal(
+            connection, reservation_id, "FAILED", "NOT_STARTED", snapshot_digest=None
+        )
 
     assert not connection.in_transaction
     assert _database_rows(connection) == before
@@ -7573,6 +7803,8 @@ def _prepare_terminal_insert_path(
             "LAUNCH_RESERVATION",
             reservation_id,
             "CLASSIFY_LAUNCH_RESERVATION",
+            operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+            operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
         )
         disposition = "MAY_HAVE_OCCURRED"
     return session_id, attempt_id, reservation_id, disposition
@@ -7619,10 +7851,18 @@ def test_terminal_state_disposition_matrix(
             "LAUNCH_RESERVATION",
             reservation_id,
             "CLASSIFY_LAUNCH_RESERVATION",
+            operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+            operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
         )
 
     if valid:
-        terminal_id = record_terminal(connection, reservation_id, state, disposition)
+        terminal_id = record_terminal(
+            connection,
+            reservation_id,
+            state,
+            disposition,
+            snapshot_digest=TEST_SNAPSHOT_DIGEST if state == "SUCCEEDED" else None,
+        )
         assert connection.execute(
             "SELECT terminal_state, provider_call_disposition, snapshot_digest "
             "FROM terminals WHERE terminal_id = ?",
@@ -7645,6 +7885,80 @@ def test_terminal_state_disposition_matrix(
                 snapshot_mode,
             )
         connection.rollback()
+    connection.close()
+
+
+def test_terminal_persists_supplied_snapshot_and_selection_copies_it(
+    db_path: Path,
+) -> None:
+    connection = _connect(db_path)
+    snapshot_digests = (_digest(b"snapshot-one"), _digest(b"snapshot-two"))
+    terminal_ids: list[str] = []
+    for index, snapshot_digest in enumerate(snapshot_digests, start=1):
+        session_id = create_session(connection, _request(f"2026-01-0{index}"))
+        attempt_id = allocate_attempt(connection, session_id)
+        claim_id = commit_claim(connection, attempt_id)
+        reservation_id = reserve_launch(connection, claim_id)
+        execution_id = _record_successful_process(connection, reservation_id)
+        _resume_and_persist(connection, execution_id, reservation_id)
+        terminal_id = record_terminal(
+            connection,
+            reservation_id,
+            snapshot_digest=snapshot_digest,
+        )
+        terminal_ids.append(terminal_id)
+        assert connection.execute(
+            "SELECT snapshot_digest FROM terminals WHERE terminal_id = ?",
+            (terminal_id,),
+        ).fetchone() == (snapshot_digest,)
+        select_terminal(connection, session_id, terminal_id)
+        assert connection.execute(
+            "SELECT snapshot_digest FROM session_selections WHERE terminal_id = ?",
+            (terminal_id,),
+        ).fetchone() == (snapshot_digest,)
+
+    assert terminal_ids[0] != terminal_ids[1]
+    assert snapshot_digests[0] != snapshot_digests[1]
+    connection.close()
+
+
+@pytest.mark.parametrize("snapshot_digest", [None, b"invalid-snapshot-digest"])
+def test_successful_terminal_requires_supplied_snapshot_digest(
+    db_path: Path, snapshot_digest: bytes | None
+) -> None:
+    connection = _connect(db_path)
+    session_id, _, reservation_id, _ = _prepare_terminal_insert_path(
+        connection, "SUCCEEDED"
+    )
+    before = _database_rows(connection)
+    with pytest.raises(SchemaValidationError, match="snapshot digest"):
+        record_terminal(
+            connection,
+            reservation_id,
+            snapshot_digest=snapshot_digest,
+        )
+    assert _database_rows(connection) == before
+    assert connection.execute(
+        "SELECT next_recovery_ordinal FROM sessions WHERE session_id = ?",
+        (session_id,),
+    ).fetchone() == (0,)
+    connection.close()
+
+
+def test_failed_terminal_persists_no_snapshot_digest(db_path: Path) -> None:
+    connection = _connect(db_path)
+    _, _, reservation_id, _ = _prepare_terminal_insert_path(connection, "FAILED")
+    terminal_id = record_terminal(
+        connection,
+        reservation_id,
+        "FAILED",
+        "NOT_STARTED",
+        snapshot_digest=None,
+    )
+    assert connection.execute(
+        "SELECT snapshot_digest FROM terminals WHERE terminal_id = ?",
+        (terminal_id,),
+    ).fetchone() == (None,)
     connection.close()
 
 
@@ -7772,7 +8086,9 @@ def test_selection_evidence_pair_fails_at_python_service_boundary(
     reservation_id = reserve_launch(connection, claim_id)
     execution_id = _record_successful_process(connection, reservation_id)
     _resume_and_persist(connection, execution_id, reservation_id)
-    terminal_id = record_terminal(connection, reservation_id)
+    terminal_id = record_terminal(
+        connection, reservation_id, snapshot_digest=TEST_SNAPSHOT_DIGEST
+    )
     evidence, evidence_digest = _evidence(f"selection:{terminal_id}")
     if invalid_part == "bytes":
         evidence = b'{"malformed":true}'
@@ -7821,6 +8137,8 @@ def test_recovery_action_matrix_allows_documented_actions(db_path: Path) -> None
         "CLAIM",
         claim_id,
         "RECORD_CLAIM_AMBIGUITY",
+        operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+        operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
     )
     assert connection.execute(
         "SELECT state FROM provider_call_claims WHERE claim_id = ?", (claim_id,)
@@ -7840,6 +8158,8 @@ def test_recovery_action_matrix_allows_documented_actions(db_path: Path) -> None
         "LAUNCH_RESERVATION",
         review_reservation,
         "CLASSIFY_LAUNCH_RESERVATION",
+        operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+        operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
     )
     assert connection.execute(
         "SELECT reservation_state FROM launch_reservations "
@@ -7854,13 +8174,17 @@ def test_recovery_action_matrix_allows_documented_actions(db_path: Path) -> None
     select_reservation = reserve_launch(connection, select_claim)
     select_execution = _record_successful_process(connection, select_reservation)
     _resume_and_persist(connection, select_execution, select_reservation)
-    select_terminal = record_terminal(connection, select_reservation)
+    select_terminal = record_terminal(
+        connection, select_reservation, snapshot_digest=TEST_SNAPSHOT_DIGEST
+    )
     select_recovery = record_recovery(
         connection,
         select_session,
         "TERMINAL",
         select_terminal,
         "SELECT_COMMITTED_SUCCESS",
+        operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+        operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
     )
     assert connection.execute(
         "SELECT state FROM sessions WHERE session_id = ?", (select_session,)
@@ -7897,6 +8221,8 @@ def test_recovery_action_matrix_allows_documented_actions(db_path: Path) -> None
         "SESSION",
         close_session,
         "CLOSE_SESSION",
+        operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+        operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
     )
     assert connection.execute(
         "SELECT state FROM sessions WHERE session_id = ?", (close_session,)
@@ -7910,11 +8236,93 @@ def test_recovery_action_matrix_allows_documented_actions(db_path: Path) -> None
         "SESSION",
         restore_session,
         "ACKNOWLEDGE_RESTORE",
+        operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+        operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
     )
     assert connection.execute(
         "SELECT state FROM sessions WHERE session_id = ?", (restore_session,)
     ).fetchone() == ("OPEN",)
     assert restore_recovery
+    connection.close()
+
+
+def test_recovery_persists_explicit_operator_evidence_without_identity_binding(
+    tmp_path: Path,
+) -> None:
+    del tmp_path
+    first_harness = Architecture77HarnessAuthority.create()
+    second_harness = Architecture77HarnessAuthority.create()
+    first_path = first_harness.database_path
+    second_path = second_harness.database_path
+    for harness in (first_harness, second_harness):
+        context_token = _CURRENT_HARNESS.set(harness)
+        try:
+            _seed_lifecycle(harness.database_path)
+        finally:
+            _CURRENT_HARNESS.reset(context_token)
+    first_evidence, first_digest = _evidence("operator-evidence-first")
+    second_evidence, second_digest = _evidence("operator-evidence-second")
+
+    recovery_ids: list[str] = []
+    try:
+        for harness, path, evidence, digest in (
+            (first_harness, first_path, first_evidence, first_digest),
+            (second_harness, second_path, second_evidence, second_digest),
+        ):
+            context_token = _CURRENT_HARNESS.set(harness)
+            try:
+                connection = _connect(path)
+                session_id = connection.execute(
+                    "SELECT session_id FROM sessions"
+                ).fetchone()[0]
+                recovery_id = record_recovery(
+                    connection,
+                    session_id,
+                    "SESSION",
+                    session_id,
+                    "CLOSE_SESSION",
+                    operator_evidence_json=evidence,
+                    operator_evidence_digest=digest,
+                )
+                recovery_ids.append(recovery_id)
+                assert connection.execute(
+                    "SELECT operator_evidence_json, operator_evidence_digest "
+                    "FROM manual_recoveries WHERE recovery_id = ?",
+                    (recovery_id,),
+                ).fetchone() == (evidence, digest)
+                connection.close()
+            finally:
+                _CURRENT_HARNESS.reset(context_token)
+    finally:
+        first_harness.close()
+        second_harness.close()
+
+    assert recovery_ids[0] == recovery_ids[1]
+    assert first_evidence != second_evidence
+
+
+def test_bad_recovery_evidence_fails_before_ordinal_or_mutation(
+    db_path: Path,
+) -> None:
+    values = _seed_lifecycle(db_path)
+    connection = _connect(db_path)
+    before = _database_rows(connection)
+    bad_evidence = b'{"operator":"bad"}'
+    with pytest.raises(SchemaValidationError, match="does not match evidence bytes"):
+        record_recovery(
+            connection,
+            values["session_id"],
+            "SESSION",
+            values["session_id"],
+            "CLOSE_SESSION",
+            operator_evidence_json=bad_evidence,
+            operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
+        )
+    assert _database_rows(connection) == before
+    assert connection.execute(
+        "SELECT next_recovery_ordinal FROM sessions WHERE session_id = ?",
+        (values["session_id"],),
+    ).fetchone() == (0,)
     connection.close()
 
 
@@ -7928,7 +8336,9 @@ def test_one_to_one_parent_fences(db_path: Path) -> None:
     with pytest.raises((ValueError, sqlite3.IntegrityError)):
         _record_successful_process(connection, values["reservation_id"])
     with pytest.raises(sqlite3.IntegrityError):
-        record_terminal(connection, values["reservation_id"])
+        record_terminal(
+            connection, values["reservation_id"], snapshot_digest=TEST_SNAPSHOT_DIGEST
+        )
     select_terminal(connection, values["session_id"], values["terminal_id"])
     with pytest.raises(sqlite3.IntegrityError):
         select_terminal(connection, values["session_id"], values["terminal_id"])
@@ -7946,14 +8356,18 @@ def test_selection_and_recovery_lineage_is_session_scoped(db_path: Path) -> None
     first_reservation = reserve_launch(connection, first_claim)
     first_execution = _record_successful_process(connection, first_reservation)
     _resume_and_persist(connection, first_execution, first_reservation)
-    first_terminal = record_terminal(connection, first_reservation)
+    first_terminal = record_terminal(
+        connection, first_reservation, snapshot_digest=TEST_SNAPSHOT_DIGEST
+    )
     second_session = create_session(connection, _request("2026-01-02"))
     second_attempt = allocate_attempt(connection, second_session)
     second_claim = commit_claim(connection, second_attempt)
     second_reservation = reserve_launch(connection, second_claim)
     second_execution = _record_successful_process(connection, second_reservation)
     _resume_and_persist(connection, second_execution, second_reservation)
-    second_terminal = record_terminal(connection, second_reservation)
+    second_terminal = record_terminal(
+        connection, second_reservation, snapshot_digest=TEST_SNAPSHOT_DIGEST
+    )
     with pytest.raises(sqlite3.IntegrityError):
         select_terminal(connection, second_session, first_terminal)
     for target_kind, target_id, action in (
@@ -7970,6 +8384,8 @@ def test_selection_and_recovery_lineage_is_session_scoped(db_path: Path) -> None
                 target_kind,
                 target_id,
                 action,
+                operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+                operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
             )
     assert first_execution != second_execution
     connection.close()
@@ -8073,7 +8489,9 @@ def test_attempt_ordinals_serialize_across_connections_and_sessions(
         finally:
             connection.close()
 
-    threads = [threading.Thread(target=worker) for _ in range(2)]
+    threads = [
+        threading.Thread(target=_inherit_harness_thread(worker)) for _ in range(2)
+    ]
     for thread in threads:
         thread.start()
     for thread in threads:
@@ -8101,6 +8519,8 @@ def test_recovery_ordinal_trigger_is_atomic_and_session_local(db_path: Path) -> 
         "ATTEMPT",
         target_attempt,
         "RECORD_ATTEMPT_AMBIGUITY",
+        operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+        operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
     )
     assert first_recovery == _recovery_id(
         session_id,
@@ -8120,6 +8540,8 @@ def test_recovery_ordinal_trigger_is_atomic_and_session_local(db_path: Path) -> 
             session_id,
             "ACKNOWLEDGE_RESTORE",
             ordinal=0,
+            operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+            operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
         )
     with pytest.raises(sqlite3.IntegrityError):
         record_recovery(
@@ -8129,6 +8551,8 @@ def test_recovery_ordinal_trigger_is_atomic_and_session_local(db_path: Path) -> 
             session_id,
             "ACKNOWLEDGE_RESTORE",
             ordinal=2,
+            operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+            operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
         )
     with pytest.raises(sqlite3.IntegrityError):
         connection.execute(
@@ -8180,6 +8604,8 @@ def test_recovery_ordinal_trigger_is_atomic_and_session_local(db_path: Path) -> 
         "SESSION",
         session_id,
         "ACKNOWLEDGE_RESTORE",
+        operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+        operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
     )
     assert second_recovery != first_recovery
     assert connection.execute(
@@ -8192,6 +8618,8 @@ def test_recovery_ordinal_trigger_is_atomic_and_session_local(db_path: Path) -> 
         "SESSION",
         second_session,
         "ACKNOWLEDGE_RESTORE",
+        operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+        operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
     )
     assert second_recovery != first_recovery
     assert connection.execute(
@@ -8212,6 +8640,8 @@ def test_recovery_after_absorbing_session_state_fails(db_path: Path) -> None:
             "SESSION",
             values["session_id"],
             "CLOSE_SESSION",
+            operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+            operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
         )
     connection.close()
 
@@ -8221,7 +8651,7 @@ def test_claim_and_launch_boundaries_commit_before_fake_side_effects(
 ) -> None:
     connection = _connect(db_path)
     observer = _connect(db_path)
-    hooks = FakeSideEffects(observer)
+    hooks = FakeSideEffects(observer, service=_test_service(connection))
     session_id = create_session(connection)
     attempt_id = allocate_attempt(connection, session_id)
     claim_id = commit_claim(connection, attempt_id)
@@ -8237,7 +8667,11 @@ def test_claim_and_launch_boundaries_commit_before_fake_side_effects(
     record_post_resume_evidence(connection, execution_id, resume_receipt)
     hooks.observe_post_resume_evidence(execution_id)
     terminal_id = record_terminal(
-        connection, reservation_id, "AMBIGUOUS", "MAY_HAVE_OCCURRED"
+        connection,
+        reservation_id,
+        "AMBIGUOUS",
+        "MAY_HAVE_OCCURRED",
+        snapshot_digest=None,
     )
     assert terminal_id
     hooks.observe_terminal(reservation_id)
@@ -8279,7 +8713,9 @@ def test_valid_capability_matrix_lifecycle_has_exactly_one_of_each(
     resume_intent = commit_resume_intent(connection, execution_id, reservation_id)
     resume_result = hooks.resume_thread(resume_intent)
     record_post_resume_evidence(connection, execution_id, resume_result)
-    terminal_id = record_terminal(connection, reservation_id)
+    terminal_id = record_terminal(
+        connection, reservation_id, snapshot_digest=TEST_SNAPSHOT_DIGEST
+    )
     select_terminal(connection, session_id, terminal_id)
 
     assert events == [
@@ -8290,10 +8726,10 @@ def test_valid_capability_matrix_lifecycle_has_exactly_one_of_each(
         "resume-intent-committed",
         "resume-thread",
     ]
-    assert process_intent._permit.consumed
-    assert process_result._permit.consumed
-    assert resume_intent._permit.consumed
-    assert resume_result._permit.consumed
+    _assert_capability_consumed(process_intent)
+    _assert_capability_consumed(process_result)
+    _assert_capability_consumed(resume_intent)
+    _assert_capability_consumed(resume_result)
     assert connection.execute(
         """
         SELECT
@@ -8365,6 +8801,8 @@ def test_claim_admission_blocks_non_retry_safe_prior_outcomes(
             "LAUNCH_RESERVATION",
             first_reservation,
             "CLASSIFY_LAUNCH_RESERVATION",
+            operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+            operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
         )
     elif blocked_case == "pre_resume_ready":
         assert first_reservation is not None
@@ -8385,6 +8823,8 @@ def test_claim_admission_blocks_non_retry_safe_prior_outcomes(
                 "ATTEMPT",
                 first_attempt,
                 "RECORD_ATTEMPT_AMBIGUITY",
+                operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+                operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
             )
             connection.execute(
                 "UPDATE launch_executions SET phase = 'POST_RESUME_AMBIGUOUS' "
@@ -8396,7 +8836,13 @@ def test_claim_admission_blocks_non_retry_safe_prior_outcomes(
         assert first_reservation is not None
         execution_id = _record_successful_process(connection, first_reservation)
         _resume_and_persist(connection, execution_id, first_reservation)
-        record_terminal(connection, first_reservation, "AMBIGUOUS", "MAY_HAVE_OCCURRED")
+        record_terminal(
+            connection,
+            first_reservation,
+            "AMBIGUOUS",
+            "MAY_HAVE_OCCURRED",
+            snapshot_digest=None,
+        )
     elif blocked_case == "closed_terminal":
         assert first_reservation is not None
         record_recovery(
@@ -8405,23 +8851,37 @@ def test_claim_admission_blocks_non_retry_safe_prior_outcomes(
             "LAUNCH_RESERVATION",
             first_reservation,
             "CLASSIFY_LAUNCH_RESERVATION",
+            operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+            operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
         )
-        record_terminal(connection, first_reservation, "CLOSED", "MAY_HAVE_OCCURRED")
+        record_terminal(
+            connection,
+            first_reservation,
+            "CLOSED",
+            "MAY_HAVE_OCCURRED",
+            snapshot_digest=None,
+        )
     elif blocked_case == "failed_confirmed":
         assert first_reservation is not None
         execution_id = _record_successful_process(connection, first_reservation)
         _resume_and_persist(connection, execution_id, first_reservation)
-        record_terminal(connection, first_reservation, "FAILED", "CONFIRMED")
+        record_terminal(
+            connection, first_reservation, "FAILED", "CONFIRMED", snapshot_digest=None
+        )
     elif blocked_case == "successful_terminal":
         assert first_reservation is not None
         execution_id = _record_successful_process(connection, first_reservation)
         _resume_and_persist(connection, execution_id, first_reservation)
-        record_terminal(connection, first_reservation)
+        record_terminal(
+            connection, first_reservation, snapshot_digest=TEST_SNAPSHOT_DIGEST
+        )
     elif blocked_case == "successful_selection":
         assert first_reservation is not None
         execution_id = _record_successful_process(connection, first_reservation)
         _resume_and_persist(connection, execution_id, first_reservation)
-        terminal_id = record_terminal(connection, first_reservation)
+        terminal_id = record_terminal(
+            connection, first_reservation, snapshot_digest=TEST_SNAPSHOT_DIGEST
+        )
         select_terminal(connection, session_id, terminal_id)
     else:
         raise AssertionError(f"unhandled blocked case: {blocked_case}")
@@ -8451,7 +8911,15 @@ def test_closed_session_rejects_new_attempt_admission(db_path: Path) -> None:
         "SELECT request_json, request_digest FROM sessions WHERE session_id = ?",
         (session_id,),
     ).fetchone()
-    record_recovery(connection, session_id, "SESSION", session_id, "CLOSE_SESSION")
+    record_recovery(
+        connection,
+        session_id,
+        "SESSION",
+        session_id,
+        "CLOSE_SESSION",
+        operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+        operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
+    )
     before = _database_rows(connection)
     with pytest.raises(sqlite3.IntegrityError, match="session is not open"):
         _insert_attempt_row_for_test(
@@ -8475,7 +8943,9 @@ def test_claim_admission_allows_only_retry_safe_failed_not_started(
     first_claim = commit_claim(connection, first_attempt)
     first_reservation = reserve_launch(connection, first_claim)
     _record_definitive_process_failure(connection, first_reservation)
-    record_terminal(connection, first_reservation, "FAILED", "NOT_STARTED")
+    record_terminal(
+        connection, first_reservation, "FAILED", "NOT_STARTED", snapshot_digest=None
+    )
     assert connection.execute(
         "SELECT reservation_state, outcome_recorded_at_utc "
         "FROM launch_reservations WHERE launch_reservation_id = ?",
@@ -8514,7 +8984,9 @@ def test_claim_admission_revalidates_retry_safe_parent_digest(
     first_claim = commit_claim(connection, first_attempt)
     first_reservation = reserve_launch(connection, first_claim)
     _record_definitive_process_failure(connection, first_reservation)
-    record_terminal(connection, first_reservation, "FAILED", "NOT_STARTED")
+    record_terminal(
+        connection, first_reservation, "FAILED", "NOT_STARTED", snapshot_digest=None
+    )
     wrong_digest = _corrupt_retry_safe_prior_evidence(
         connection, first_reservation, pair
     )
@@ -8601,11 +9073,19 @@ def test_reservation_outcome_timestamp_is_preserved_and_write_once(
         execution_id = _record_successful_process(connection, reservation_id)
         _resume_and_persist(connection, execution_id, reservation_id)
         expected_timestamp = PROCESS_CREATED_TIMESTAMP
-        record_terminal(connection, reservation_id, "AMBIGUOUS", "MAY_HAVE_OCCURRED")
+        record_terminal(
+            connection,
+            reservation_id,
+            "AMBIGUOUS",
+            "MAY_HAVE_OCCURRED",
+            snapshot_digest=None,
+        )
     elif outcome_kind == "failure":
         _record_definitive_process_failure(connection, reservation_id)
         expected_timestamp = PROCESS_FAILURE_TIMESTAMP
-        record_terminal(connection, reservation_id, "FAILED", "NOT_STARTED")
+        record_terminal(
+            connection, reservation_id, "FAILED", "NOT_STARTED", snapshot_digest=None
+        )
     else:
         record_recovery(
             connection,
@@ -8613,9 +9093,17 @@ def test_reservation_outcome_timestamp_is_preserved_and_write_once(
             "LAUNCH_RESERVATION",
             reservation_id,
             "CLASSIFY_LAUNCH_RESERVATION",
+            operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+            operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
         )
         expected_timestamp = MANUAL_REVIEW_TIMESTAMP
-        record_terminal(connection, reservation_id, "CLOSED", "MAY_HAVE_OCCURRED")
+        record_terminal(
+            connection,
+            reservation_id,
+            "CLOSED",
+            "MAY_HAVE_OCCURRED",
+            snapshot_digest=None,
+        )
 
     assert connection.execute(
         "SELECT outcome_recorded_at_utc FROM launch_reservations "
@@ -8682,6 +9170,8 @@ def test_resume_outcome_unknown_recovery_is_conservative_and_closable(
         "LAUNCH_RESERVATION",
         reservation_id,
         "CLASSIFY_RESUME_OUTCOME_UNKNOWN",
+        operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+        operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
     )
     assert recovery_id
     assert connection.execute(
@@ -8701,14 +9191,30 @@ def test_resume_outcome_unknown_recovery_is_conservative_and_closable(
             "LAUNCH_RESERVATION",
             reservation_id,
             "CLASSIFY_RESUME_OUTCOME_UNKNOWN",
+            operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+            operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
         )
     with pytest.raises(sqlite3.IntegrityError):
-        record_terminal(connection, reservation_id, "SUCCEEDED", "CONFIRMED")
+        record_terminal(
+            connection,
+            reservation_id,
+            "SUCCEEDED",
+            "CONFIRMED",
+            snapshot_digest=TEST_SNAPSHOT_DIGEST,
+        )
     terminal_id = record_terminal(
-        connection, reservation_id, "CLOSED", "MAY_HAVE_OCCURRED"
+        connection, reservation_id, "CLOSED", "MAY_HAVE_OCCURRED", snapshot_digest=None
     )
     assert terminal_id
-    record_recovery(connection, session_id, "SESSION", session_id, "CLOSE_SESSION")
+    record_recovery(
+        connection,
+        session_id,
+        "SESSION",
+        session_id,
+        "CLOSE_SESSION",
+        operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+        operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
+    )
     assert connection.execute(
         "SELECT state, closed_at_utc, close_reason FROM sessions WHERE session_id = ?",
         (session_id,),
@@ -8732,6 +9238,8 @@ def test_pre_resume_ready_has_separate_conservative_recovery_path(
             "LAUNCH_RESERVATION",
             reservation_id,
             "CLASSIFY_RESUME_OUTCOME_UNKNOWN",
+            operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+            operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
         )
     recovery_id = record_recovery(
         connection,
@@ -8739,6 +9247,8 @@ def test_pre_resume_ready_has_separate_conservative_recovery_path(
         "LAUNCH_RESERVATION",
         reservation_id,
         "CLASSIFY_PRE_RESUME_READY",
+        operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+        operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
     )
     assert recovery_id
     assert connection.execute(
@@ -8770,6 +9280,8 @@ def test_resume_outcome_unknown_recovery_grants_no_new_claim(db_path: Path) -> N
         "LAUNCH_RESERVATION",
         reservation_id,
         "CLASSIFY_RESUME_OUTCOME_UNKNOWN",
+        operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+        operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
     )
 
     with pytest.raises(sqlite3.IntegrityError, match="claim admission policy rejected"):
@@ -8809,6 +9321,8 @@ def test_resume_outcome_unknown_requires_exact_unresolved_pre_resume_execution(
             "LAUNCH_RESERVATION",
             reservation_id,
             "CLASSIFY_RESUME_OUTCOME_UNKNOWN",
+            operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+            operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
         )
     assert connection.execute("SELECT count(*) FROM manual_recoveries").fetchone() == (
         0,
@@ -8844,7 +9358,15 @@ def test_session_close_facts_are_write_once_and_only_close_with_state(
             "close_reason = ? WHERE session_id = ?",
             (CLOSE_TIMESTAMP, "direct-close", session_id),
         )
-    record_recovery(connection, session_id, "SESSION", session_id, "CLOSE_SESSION")
+    record_recovery(
+        connection,
+        session_id,
+        "SESSION",
+        session_id,
+        "CLOSE_SESSION",
+        operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+        operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
+    )
     with pytest.raises(sqlite3.IntegrityError):
         connection.execute(
             "UPDATE sessions SET closed_at_utc = ? WHERE session_id = ?",
@@ -8868,7 +9390,9 @@ def test_session_close_facts_are_write_once_and_only_close_with_state(
     selected_reservation = reserve_launch(connection, selected_claim)
     selected_execution = _record_successful_process(connection, selected_reservation)
     _resume_and_persist(connection, selected_execution, selected_reservation)
-    selected_terminal = record_terminal(connection, selected_reservation)
+    selected_terminal = record_terminal(
+        connection, selected_reservation, snapshot_digest=TEST_SNAPSHOT_DIGEST
+    )
     select_terminal(connection, selected_session, selected_terminal)
     connection.execute(
         "UPDATE sessions SET state = 'CLOSED', closed_at_utc = ?, close_reason = ? "
@@ -8929,7 +9453,9 @@ def test_process_intent_race_grants_exactly_one_process_call(db_path: Path) -> N
             outcomes.append(outcome)
         connection.close()
 
-    threads = [threading.Thread(target=worker) for _ in range(2)]
+    threads = [
+        threading.Thread(target=_inherit_harness_thread(worker)) for _ in range(2)
+    ]
     for thread in threads:
         thread.start()
     for thread in threads:
@@ -8951,6 +9477,86 @@ def test_process_intent_race_grants_exactly_one_process_call(db_path: Path) -> N
     ).fetchone() == ("PROCESS_CREATED", 1, 1, PROCESS_INTENT_TIMESTAMP)
     assert verify.execute("SELECT count(*) FROM launch_executions").fetchone() == (1,)
     verify.close()
+
+
+def test_test_capabilities_are_bound_to_issuing_harness_service(
+    tmp_path: Path,
+) -> None:
+    del tmp_path
+    harness_a = Architecture77HarnessAuthority.create()
+    harness_b = Architecture77HarnessAuthority.create()
+    connection_a = harness_a._connection
+    connection_b = harness_b._connection
+    service_a = harness_a.bind_connection(connection_a)
+    service_b = harness_b.bind_connection(connection_b)
+    hooks_a = FakeSideEffects(connection_a, service=service_a)
+    hooks_b = FakeSideEffects(connection_b, service=service_b)
+
+    try:
+        session_id = service_a.create_session(_request())
+        attempt_id = service_a.allocate_attempt(session_id)
+        claim_id = service_a.commit_claim(attempt_id)
+        permit = service_a.reserve_launch(claim_id)
+        reservation_id = permit.reservation_id
+        session_b = service_b.create_session(_request())
+        attempt_b = service_b.allocate_attempt(session_b)
+        claim_b = service_b.commit_claim(attempt_b)
+        permit_b = service_b.reserve_launch(claim_b)
+        assert (session_id, attempt_id, claim_id, permit.reservation_id) == (
+            session_b,
+            attempt_b,
+            claim_b,
+            permit_b.reservation_id,
+        )
+        before_b = _database_rows(connection_b)
+
+        before = _database_rows(connection_a)
+        with pytest.raises(TypeError, match="invalid test service provenance service"):
+            hooks_b.construct_provider(permit)
+        assert _database_rows(connection_a) == before
+        assert _database_rows(connection_b) == before_b
+
+        provider = hooks_a.construct_provider(permit)
+        before = _database_rows(connection_a)
+        with pytest.raises(TypeError, match="invalid test service provenance service"):
+            service_b.commit_process_intent(reservation_id, provider)
+        assert _database_rows(connection_a) == before
+        assert _database_rows(connection_b) == before_b
+
+        process_intent = service_a.commit_process_intent(reservation_id, provider)
+        before = _database_rows(connection_a)
+        with pytest.raises(TypeError, match="invalid test service provenance service"):
+            hooks_b.create_process(process_intent)
+        assert _database_rows(connection_a) == before
+        assert _database_rows(connection_b) == before_b
+
+        process_result = hooks_a.create_process(process_intent)
+        assert type(process_result) is FakeProcessCreationReceipt
+        before = _database_rows(connection_a)
+        with pytest.raises(TypeError, match="invalid test service provenance service"):
+            service_b.record_execution(reservation_id, process_result)
+        assert _database_rows(connection_a) == before
+        assert _database_rows(connection_b) == before_b
+
+        execution_id = service_a.record_execution(reservation_id, process_result)
+        resume_intent = service_a.commit_resume_intent(execution_id, reservation_id)
+        before = _database_rows(connection_a)
+        with pytest.raises(TypeError, match="invalid test service provenance service"):
+            hooks_b.resume_thread(resume_intent)
+        assert _database_rows(connection_a) == before
+        assert _database_rows(connection_b) == before_b
+
+        resume_result = hooks_a.resume_thread(resume_intent)
+        before = _database_rows(connection_a)
+        with pytest.raises(TypeError, match="invalid test service provenance service"):
+            service_b.record_post_resume_evidence(execution_id, resume_result)
+        assert _database_rows(connection_a) == before
+        assert _database_rows(connection_b) == before_b
+
+        service_a.record_post_resume_evidence(execution_id, resume_result)
+    finally:
+        harness_a.close()
+        harness_b.close()
 
 
 def test_reservation_race_issues_one_provider_permit_and_construction(
@@ -8981,7 +9587,9 @@ def test_reservation_race_issues_one_provider_permit_and_construction(
             outcomes.append(outcome)
         connection.close()
 
-    threads = [threading.Thread(target=worker) for _ in range(2)]
+    threads = [
+        threading.Thread(target=_inherit_harness_thread(worker)) for _ in range(2)
+    ]
     for thread in threads:
         thread.start()
     for thread in threads:
@@ -8994,8 +9602,7 @@ def test_reservation_race_issues_one_provider_permit_and_construction(
     verify.close()
     provider = next(provider for name, provider in outcomes if name == "winner")
     assert provider is not None
-    with _ISSUED_CONSTRUCTED_PROVIDERS_LOCK:
-        _ISSUED_CONSTRUCTED_PROVIDERS.pop(provider._permit, None)
+    _consume_capability_for_test(provider)
 
 
 def test_provider_permit_and_constructed_provider_are_exact_one_shot_objects(
@@ -9008,25 +9615,17 @@ def test_provider_permit_and_constructed_provider_are_exact_one_shot_objects(
     first_permit = reserve_launch(connection, first_claim)
     hooks = FakeSideEffects(connection)
 
-    with pytest.raises(TypeError, match="require reservation commit"):
-        FakeProviderConstructionPermit(
-            first_permit.reservation_id,
-            _issuer=object(),
-            _permit=_ProviderConstructionOneShot(),
-        )
-    reconstructed = FakeProviderConstructionPermit(
-        first_permit.reservation_id,
-        _issuer=_PROVIDER_CONSTRUCTION_ISSUER,
-        _permit=_ProviderConstructionOneShot(),
+    reconstructed = _forged_capability(
+        type(first_permit),
+        reservation_id=first_permit.reservation_id,
+        _issuer=object(),
+        _permit=object(),
     )
-    copied = FakeProviderConstructionPermit(
-        first_permit.reservation_id,
-        _issuer=_PROVIDER_CONSTRUCTION_ISSUER,
-        _permit=first_permit._permit,
-    )
-    for invalid in (reconstructed, copied):
-        with pytest.raises(ValueError, match="not issued"):
-            hooks.construct_provider(invalid)
+    copied = replace(first_permit)
+    with pytest.raises(TypeError, match="invalid test service provenance issuer"):
+        hooks.construct_provider(reconstructed)
+    with pytest.raises(ValueError, match="registry binding mismatch"):
+        hooks.construct_provider(copied)
     with pytest.raises(TypeError, match="reservation-issued"):
         hooks.construct_provider(first_claim)  # type: ignore[arg-type]
 
@@ -9034,10 +9633,8 @@ def test_provider_permit_and_constructed_provider_are_exact_one_shot_objects(
     second_attempt = allocate_attempt(connection, second_session)
     second_claim = commit_claim(connection, second_attempt)
     second_permit = reserve_launch(connection, second_claim)
-    cross_reservation = FakeProviderConstructionPermit(
-        second_permit.reservation_id,
-        _issuer=_PROVIDER_CONSTRUCTION_ISSUER,
-        _permit=first_permit._permit,
+    cross_reservation = replace(
+        first_permit, reservation_id=second_permit.reservation_id
     )
     with pytest.raises(ValueError, match="not issued"):
         hooks.construct_provider(cross_reservation)
@@ -9047,22 +9644,23 @@ def test_provider_permit_and_constructed_provider_are_exact_one_shot_objects(
         hooks.construct_provider(first_permit)
     with pytest.raises(TypeError, match="opaque constructed provider"):
         commit_process_intent(connection, first_permit)  # type: ignore[call-arg]
-    with pytest.raises(TypeError, match="only come from the adapter"):
-        replace(provider, _issuer=object())
-    for invalid_provider in (
-        replace(provider),
-        replace(provider, _permit=_ConstructedProviderOneShot()),
-    ):
-        with pytest.raises(ValueError, match="not issued"):
-            commit_process_intent(connection, first_permit, invalid_provider)
+    forged_provider = _forged_capability(
+        type(provider),
+        reservation_id=provider.reservation_id,
+        _issuer=object(),
+        _permit=object(),
+    )
+    with pytest.raises(TypeError, match="invalid test service provenance issuer"):
+        commit_process_intent(connection, first_permit, forged_provider)
+    with pytest.raises(ValueError, match="registry binding mismatch"):
+        commit_process_intent(connection, first_permit, replace(provider))
     with pytest.raises(ValueError, match="another reservation"):
         commit_process_intent(connection, second_permit, provider)
 
     commit_process_intent(connection, first_permit, provider)
     with pytest.raises(ValueError, match="consumed|not issued"):
         commit_process_intent(connection, first_permit, provider)
-    with _ISSUED_PROVIDER_CONSTRUCTION_PERMITS_LOCK:
-        _ISSUED_PROVIDER_CONSTRUCTION_PERMITS.pop(second_permit._permit, None)
+    _consume_capability_for_test(second_permit)
     connection.close()
 
 
@@ -9079,11 +9677,7 @@ def test_provider_permit_is_frozen_and_forced_mutation_cannot_redirect(
         permits.append(reserve_launch(connection, claim_id))
     original, substituted = permits
 
-    for field_name, value in (
-        ("reservation_id", substituted.reservation_id),
-        ("_issuer", object()),
-        ("_permit", _ProviderConstructionOneShot()),
-    ):
+    for field_name, value in (("reservation_id", substituted.reservation_id),):
         with pytest.raises(FrozenInstanceError):
             setattr(original, field_name, value)
 
@@ -9135,9 +9729,8 @@ def test_provider_permit_is_frozen_and_forced_mutation_cannot_redirect(
     with pytest.raises(ValueError, match="consumed|not issued"):
         hooks.construct_provider(substituted)
     original_provider = hooks.construct_provider(original)
-    with _ISSUED_CONSTRUCTED_PROVIDERS_LOCK:
-        _ISSUED_CONSTRUCTED_PROVIDERS.pop(substituted_provider._permit, None)
-        _ISSUED_CONSTRUCTED_PROVIDERS.pop(original_provider._permit, None)
+    _consume_capability_for_test(substituted_provider)
+    _consume_capability_for_test(original_provider)
     assert hooks.events == ["provider-constructed", "provider-constructed"]
     connection.close()
 
@@ -9267,21 +9860,17 @@ def test_all_process_local_registries_reject_visible_lineage_mutation(
     assert selected_arbiters == []
     assert _database_rows(connection) == before_rows
     assert hooks.events == events_before
-    permit = authority._permit
-    assert not permit.consumed
+    _assert_capability_available(authority)
 
     if capability_name == "provider-permit":
         produced = hooks.construct_provider(provider_permit)
-        with _ISSUED_CONSTRUCTED_PROVIDERS_LOCK:
-            _ISSUED_CONSTRUCTED_PROVIDERS.pop(produced._permit, None)
+        _consume_capability_for_test(produced)
     elif capability_name == "constructed-provider":
         produced = commit_process_intent(connection, reservation_id, authority)
-        with _ISSUED_PROCESS_PERMITS_LOCK:
-            _ISSUED_PROCESS_PERMITS.pop(produced._permit, None)
+        _consume_capability_for_test(produced)
     elif capability_name == "process-intent":
         produced = hooks.create_process(authority)
-        with _ISSUED_PROCESS_RESULTS_LOCK:
-            _ISSUED_PROCESS_RESULTS.pop(produced._permit, None)
+        _consume_capability_for_test(produced)
     elif capability_name == "process-success-result":
         assert type(authority) is FakeProcessCreationReceipt
         record_execution(connection, reservation_id, authority)
@@ -9291,13 +9880,12 @@ def test_all_process_local_registries_reject_visible_lineage_mutation(
     elif capability_name == "resume-intent":
         assert type(authority) is FakeResumeIntent
         produced = hooks.resume_thread(authority)
-        with _ISSUED_RESUME_RESULTS_LOCK:
-            _ISSUED_RESUME_RESULTS.pop(produced._permit, None)
+        _consume_capability_for_test(produced)
     else:
         assert execution_id is not None
         assert type(authority) is FakeResumeReceipt
         record_post_resume_evidence(connection, execution_id, authority)
-    assert permit.consumed
+    _assert_capability_consumed(authority)
     connection.close()
 
 
@@ -9325,10 +9913,8 @@ def test_constructed_provider_retry_survives_rollback_until_recovery(
 
     with pytest.raises(sqlite3.IntegrityError, match="transient provider"):
         commit_process_intent(connection, permit, provider)
-    assert not provider._permit.consumed
-    with _ISSUED_CONSTRUCTED_PROVIDERS_LOCK:
-        issuance = _ISSUED_CONSTRUCTED_PROVIDERS.get(provider._permit)
-        assert issuance is not None and issuance.provider is provider
+    _assert_capability_available(provider)
+    _assert_capability_available(provider)
     connection.execute("DROP TRIGGER fail_provider_handoff_for_test")
     connection.commit()
 
@@ -9339,18 +9925,18 @@ def test_constructed_provider_retry_survives_rollback_until_recovery(
             "LAUNCH_RESERVATION",
             permit,
             "CLASSIFY_LAUNCH_RESERVATION",
+            operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+            operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
         )
         with pytest.raises(ValueError, match="COMMITTED|revoked|not issued"):
             commit_process_intent(connection, permit, provider)
-        assert not provider._permit.consumed
-        with _ISSUED_CONSTRUCTED_PROVIDERS_LOCK:
-            _ISSUED_CONSTRUCTED_PROVIDERS.pop(provider._permit, None)
+        _assert_capability_available(provider)
+        _consume_capability_for_test(provider)
     else:
         intent = commit_process_intent(connection, permit, provider)
         assert intent
-        assert provider._permit.consumed
-        with _ISSUED_PROCESS_PERMITS_LOCK:
-            _ISSUED_PROCESS_PERMITS.pop(intent._permit, None)
+        _assert_capability_consumed(provider)
+        _consume_capability_for_test(intent)
     connection.close()
 
 
@@ -9372,8 +9958,7 @@ def test_provider_construction_loss_allows_only_reservation_recovery(
         assert events == ["provider-constructed", "provider-construction-failed"]
     else:
         provider = hooks.construct_provider(permit)
-        with _ISSUED_CONSTRUCTED_PROVIDERS_LOCK:
-            _ISSUED_CONSTRUCTED_PROVIDERS.pop(provider._permit, None)
+        _consume_capability_for_test(provider)
         assert events == ["provider-constructed"]
 
     with pytest.raises(ValueError, match="consumed|not issued"):
@@ -9392,6 +9977,8 @@ def test_provider_construction_loss_allows_only_reservation_recovery(
         "LAUNCH_RESERVATION",
         permit,
         "CLASSIFY_LAUNCH_RESERVATION",
+        operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+        operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
     )
     connection.close()
 
@@ -9409,22 +9996,17 @@ def test_process_hook_requires_matching_one_shot_opaque_permit(db_path: Path) ->
     intent = _construct_provider_and_commit_process_intent(
         connection, first_reservation, hooks
     )
-    with pytest.raises(TypeError, match="only be issued after commit"):
-        replace(intent, _issuer=object())
-    for fabricated in (replace(intent), replace(intent, _permit=_ProcessPermit())):
+    for fabricated in (
+        replace(intent),
+        replace(intent, reservation_id=str(uuid.UUID(int=0))),
+    ):
         with pytest.raises(ValueError, match="not issued"):
             hooks.create_process(fabricated)
     second_session = create_session(connection, _request("2026-01-02"))
     second_attempt = allocate_attempt(connection, second_session)
     second_claim = commit_claim(connection, second_attempt)
     second_reservation = reserve_launch(connection, second_claim)
-    cross_reservation = FakeProcessIntent(
-        reservation_id=second_reservation,
-        intent_json=intent.intent_json,
-        intent_digest=intent.intent_digest,
-        _issuer=_PROCESS_INTENT_ISSUER,
-        _permit=intent._permit,
-    )
+    cross_reservation = replace(intent, reservation_id=second_reservation)
     with pytest.raises(ValueError, match="registry binding mismatch"):
         hooks.create_process(cross_reservation)
 
@@ -9529,7 +10111,9 @@ def test_process_failure_result_is_exact_and_only_not_started_path(
         record_process_creation_failure(connection, other_reservation, failure)
 
     record_process_creation_failure(connection, reservation_id, failure)
-    terminal_id = record_terminal(connection, reservation_id, "FAILED", "NOT_STARTED")
+    terminal_id = record_terminal(
+        connection, reservation_id, "FAILED", "NOT_STARTED", snapshot_digest=None
+    )
     assert terminal_id
     assert connection.execute("SELECT count(*) FROM launch_executions").fetchone() == (
         0,
@@ -9551,13 +10135,18 @@ def test_process_result_requires_adapter_provenance_and_survives_rollback(
     intent = _construct_provider_and_commit_process_intent(connection, reservation_id)
     result = FakeSideEffects(connection).create_process(intent, fail=failure_result)
 
-    with pytest.raises(TypeError, match="only come from the adapter"):
-        replace(result, _issuer=object())
+    with _mutated_frozen_object_for_test(result, _issuer=object()):
+        with pytest.raises(TypeError, match="invalid test service provenance issuer"):
+            if failure_result:
+                record_process_creation_failure(connection, reservation_id, result)
+            else:
+                record_execution(connection, reservation_id, result)
+
     for fabricated in (
         replace(result),
-        replace(result, _permit=_ProcessResultPermit()),
+        replace(result, reservation_id=str(uuid.UUID(int=0))),
     ):
-        with pytest.raises(ValueError, match="not issued"):
+        with pytest.raises(ValueError, match="registry binding mismatch"):
             if failure_result:
                 assert type(fabricated) is FakeProcessCreationFailure
                 record_process_creation_failure(connection, reservation_id, fabricated)
@@ -9595,10 +10184,8 @@ def test_process_result_requires_adapter_provenance_and_survives_rollback(
             record_process_creation_failure(connection, reservation_id, result)
         else:
             record_execution(connection, reservation_id, result)
-    assert not result._permit.consumed
-    with _ISSUED_PROCESS_RESULTS_LOCK:
-        issuance = _ISSUED_PROCESS_RESULTS.get(result._permit)
-        assert issuance is not None and issuance.result is result
+    _assert_capability_available(result)
+    _assert_capability_available(result)
     assert connection.execute(
         "SELECT reservation_state FROM launch_reservations "
         "WHERE launch_reservation_id = ?",
@@ -9611,7 +10198,7 @@ def test_process_result_requires_adapter_provenance_and_survives_rollback(
         record_process_creation_failure(connection, reservation_id, result)
     else:
         record_execution(connection, reservation_id, result)
-    assert result._permit.consumed
+    _assert_capability_consumed(result)
     connection.close()
 
 
@@ -9638,15 +10225,16 @@ def test_process_dispatch_and_recovery_share_lifecycle_arbiter(
         try:
             if first:
                 _require_no_active_transaction(connection)
-                with lifecycle_lock:
+                with _test_service(connection).lifecycle_lease(reservation_id) as lease:
                     winner_has_lock.set()
-                    _record_recovery_locked(
-                        connection,
+                    lease.record_recovery(
                         session_id,
                         "LAUNCH_RESERVATION",
                         reservation_id,
                         "CLASSIFY_PROCESS_OUTCOME_UNKNOWN",
                         None,
+                        operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+                        operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
                     )
             else:
                 winner_has_lock.wait()
@@ -9656,6 +10244,8 @@ def test_process_dispatch_and_recovery_share_lifecycle_arbiter(
                     "LAUNCH_RESERVATION",
                     reservation_id,
                     "CLASSIFY_PROCESS_OUTCOME_UNKNOWN",
+                    operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+                    operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
                 )
             outcome: tuple[str, object | None] = ("recovery", None)
         except (ValueError, sqlite3.IntegrityError):
@@ -9684,8 +10274,12 @@ def test_process_dispatch_and_recovery_share_lifecycle_arbiter(
         connection.close()
 
     threads = [
-        threading.Thread(target=run_recovery, args=(winner == "recovery",)),
-        threading.Thread(target=run_dispatch, args=(winner == "dispatch",)),
+        threading.Thread(
+            target=_inherit_harness_thread(run_recovery, winner == "recovery")
+        ),
+        threading.Thread(
+            target=_inherit_harness_thread(run_dispatch, winner == "dispatch")
+        ),
     ]
     for thread in threads:
         thread.start()
@@ -9698,7 +10292,7 @@ def test_process_dispatch_and_recovery_share_lifecycle_arbiter(
             "recovery",
         ]
         assert events == []
-        assert not intent._permit.consumed
+        _assert_capability_available(intent)
     else:
         assert sorted(name for name, _ in outcomes) == ["dispatch", "recovery"]
         assert events == [
@@ -9706,7 +10300,7 @@ def test_process_dispatch_and_recovery_share_lifecycle_arbiter(
             "create-process",
             "process-created",
         ]
-        assert intent._permit.consumed
+        _assert_capability_consumed(intent)
     verify = _connect(db_path)
     assert verify.execute(
         "SELECT reservation_state FROM launch_reservations "
@@ -9714,13 +10308,11 @@ def test_process_dispatch_and_recovery_share_lifecycle_arbiter(
         (str(reservation_id),),
     ).fetchone() == ("MANUAL_REVIEW",)
     verify.close()
-    with _ISSUED_PROCESS_PERMITS_LOCK:
-        _ISSUED_PROCESS_PERMITS.pop(intent._permit, None)
+    _consume_capability_for_test(intent)
     for outcome, result in outcomes:
         if outcome == "dispatch":
             assert isinstance(result, FakeProcessCreationReceipt)
-            with _ISSUED_PROCESS_RESULTS_LOCK:
-                _ISSUED_PROCESS_RESULTS.pop(result._permit, None)
+            _consume_capability_for_test(result)
 
 
 @pytest.mark.parametrize("failure_result", [False, True])
@@ -9736,7 +10328,6 @@ def test_process_result_persistence_and_recovery_are_serialized(
     intent = _construct_provider_and_commit_process_intent(setup, reservation_id)
     result = FakeSideEffects(setup).create_process(intent, fail=failure_result)
     setup.close()
-    lifecycle_lock = InterprocessLifecycleArbiter(reservation_id)
     winner_has_lock = threading.Event()
     outcomes: list[str] = []
     outcomes_lock = threading.Lock()
@@ -9746,15 +10337,16 @@ def test_process_result_persistence_and_recovery_are_serialized(
         try:
             if first:
                 _require_no_active_transaction(connection)
-                with lifecycle_lock:
+                with _test_service(connection).lifecycle_lease(reservation_id) as lease:
                     winner_has_lock.set()
-                    _record_recovery_locked(
-                        connection,
+                    lease.record_recovery(
                         session_id,
                         "LAUNCH_RESERVATION",
                         reservation_id,
                         "CLASSIFY_PROCESS_OUTCOME_UNKNOWN",
                         None,
+                        operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+                        operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
                     )
             else:
                 winner_has_lock.wait()
@@ -9764,6 +10356,8 @@ def test_process_result_persistence_and_recovery_are_serialized(
                     "LAUNCH_RESERVATION",
                     reservation_id,
                     "CLASSIFY_PROCESS_OUTCOME_UNKNOWN",
+                    operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+                    operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
                 )
             outcome = "recovery"
         except (ValueError, sqlite3.IntegrityError):
@@ -9786,16 +10380,14 @@ def test_process_result_persistence_and_recovery_are_serialized(
         try:
             if first:
                 _require_no_active_transaction(connection)
-                with lifecycle_lock:
+                with _test_service(connection).lifecycle_lease(reservation_id) as lease:
                     winner_has_lock.set()
                     if failure_result:
                         assert type(result) is FakeProcessCreationFailure
-                        _record_process_creation_failure_locked(
-                            connection, reservation_id, result
-                        )
+                        lease.record_process_creation_failure(reservation_id, result)
                     else:
                         assert type(result) is FakeProcessCreationReceipt
-                        _record_execution_locked(connection, reservation_id, result)
+                        lease.record_execution(reservation_id, result)
             else:
                 winner_has_lock.wait()
                 persist()
@@ -9807,8 +10399,12 @@ def test_process_result_persistence_and_recovery_are_serialized(
         connection.close()
 
     threads = [
-        threading.Thread(target=run_recovery, args=(winner == "recovery",)),
-        threading.Thread(target=run_persistence, args=(winner == "persistence",)),
+        threading.Thread(
+            target=_inherit_harness_thread(run_recovery, winner == "recovery")
+        ),
+        threading.Thread(
+            target=_inherit_harness_thread(run_persistence, winner == "persistence")
+        ),
     ]
     for thread in threads:
         thread.start()
@@ -9823,9 +10419,8 @@ def test_process_result_persistence_and_recovery_are_serialized(
             "WHERE launch_reservation_id = ?",
             (str(reservation_id),),
         ).fetchone() == ("MANUAL_REVIEW",)
-        assert not result._permit.consumed
-        with _ISSUED_PROCESS_RESULTS_LOCK:
-            _ISSUED_PROCESS_RESULTS.pop(result._permit, None)
+        _assert_capability_available(result)
+        _consume_capability_for_test(result)
     else:
         assert sorted(outcomes) == ["persistence", "recovery-rejected"]
         expected_state = (
@@ -9836,7 +10431,7 @@ def test_process_result_persistence_and_recovery_are_serialized(
             "WHERE launch_reservation_id = ?",
             (str(reservation_id),),
         ).fetchone() == (expected_state,)
-        assert result._permit.consumed
+        _assert_capability_consumed(result)
     verify.close()
 
 
@@ -9897,7 +10492,9 @@ def test_authority_capability_revocation_matrix(
         resume_intent = commit_resume_intent(connection, execution_id, reservation_id)
         resume_result = hooks.resume_thread(resume_intent)
         record_post_resume_evidence(connection, execution_id, resume_result)
-        terminal_id = record_terminal(connection, reservation_id)
+        terminal_id = record_terminal(
+            connection, reservation_id, snapshot_digest=TEST_SNAPSHOT_DIGEST
+        )
         select_terminal(connection, session_id, terminal_id)
         if revoking_state == "CLOSED_AFTER_SELECTION":
             connection.execute(
@@ -9941,6 +10538,8 @@ def test_authority_capability_revocation_matrix(
                 "LAUNCH_RESERVATION",
                 reservation_id,
                 "CLASSIFY_LAUNCH_RESERVATION",
+                operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+                operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
             )
     elif capability.startswith("process"):
         process_intent = _construct_provider_and_commit_process_intent(
@@ -9959,6 +10558,8 @@ def test_authority_capability_revocation_matrix(
             "LAUNCH_RESERVATION",
             reservation_id,
             "CLASSIFY_PROCESS_OUTCOME_UNKNOWN",
+            operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+            operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
         )
     else:
         execution_id = _record_successful_process(connection, reservation_id)
@@ -9973,12 +10574,28 @@ def test_authority_capability_revocation_matrix(
             "LAUNCH_RESERVATION",
             reservation_id,
             "CLASSIFY_RESUME_OUTCOME_UNKNOWN",
+            operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+            operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
         )
 
     if revoking_state in {"TERMINAL_RECORDED", "CLOSED"}:
-        record_terminal(connection, reservation_id, "CLOSED", "MAY_HAVE_OCCURRED")
+        record_terminal(
+            connection,
+            reservation_id,
+            "CLOSED",
+            "MAY_HAVE_OCCURRED",
+            snapshot_digest=None,
+        )
     if revoking_state == "CLOSED":
-        record_recovery(connection, session_id, "SESSION", session_id, "CLOSE_SESSION")
+        record_recovery(
+            connection,
+            session_id,
+            "SESSION",
+            session_id,
+            "CLOSE_SESSION",
+            operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+            operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
+        )
 
     before = connection.execute(
         """
@@ -10047,27 +10664,7 @@ def test_authority_capability_revocation_matrix(
     assert after == before
     assert events == events_before
 
-    if type(authority) is FakeProviderConstructionPermit:
-        with _ISSUED_PROVIDER_CONSTRUCTION_PERMITS_LOCK:
-            _ISSUED_PROVIDER_CONSTRUCTION_PERMITS.pop(authority._permit, None)
-    elif isinstance(authority, FakeConstructedProvider):
-        with _ISSUED_CONSTRUCTED_PROVIDERS_LOCK:
-            _ISSUED_CONSTRUCTED_PROVIDERS.pop(authority._permit, None)
-    elif isinstance(authority, FakeProcessIntent):
-        with _ISSUED_PROCESS_PERMITS_LOCK:
-            _ISSUED_PROCESS_PERMITS.pop(authority._permit, None)
-    elif isinstance(
-        authority, (FakeProcessCreationReceipt, FakeProcessCreationFailure)
-    ):
-        with _ISSUED_PROCESS_RESULTS_LOCK:
-            _ISSUED_PROCESS_RESULTS.pop(authority._permit, None)
-    elif isinstance(authority, FakeResumeIntent):
-        with _ISSUED_RESUME_PERMITS_LOCK:
-            _ISSUED_RESUME_PERMITS.pop(authority._permit, None)
-    else:
-        assert isinstance(authority, FakeResumeReceipt)
-        with _ISSUED_RESUME_RESULTS_LOCK:
-            _ISSUED_RESUME_RESULTS.pop(authority._permit, None)
+    _consume_capability_for_test(authority)
     connection.close()
 
 
@@ -10085,11 +10682,9 @@ def test_crash_around_process_call_is_unretryable_and_conservative(
     if invoke_create_process:
         result = FakeSideEffects(connection).create_process(intent)
     connection.close()
-    with _ISSUED_PROCESS_PERMITS_LOCK:
-        _ISSUED_PROCESS_PERMITS.pop(intent._permit, None)
+    _consume_capability_for_test(intent)
     if result is not None:
-        with _ISSUED_PROCESS_RESULTS_LOCK:
-            _ISSUED_PROCESS_RESULTS.pop(result._permit, None)
+        _consume_capability_for_test(result)
 
     recovered = _connect(db_path)
     durable = recovered.execute(
@@ -10118,6 +10713,8 @@ def test_crash_around_process_call_is_unretryable_and_conservative(
         "LAUNCH_RESERVATION",
         reservation_id,
         "CLASSIFY_PROCESS_OUTCOME_UNKNOWN",
+        operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+        operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
     )
     assert recovered.execute(
         "SELECT reservation_state, process_intent_json, process_intent_digest, "
@@ -10157,20 +10754,29 @@ def test_process_unknown_recovery_allows_only_conservative_close_path(
     claim_id = commit_claim(connection, attempt_id)
     reservation_id = reserve_launch(connection, claim_id)
     intent = _construct_provider_and_commit_process_intent(connection, reservation_id)
-    with _ISSUED_PROCESS_PERMITS_LOCK:
-        _ISSUED_PROCESS_PERMITS.pop(intent._permit, None)
+    _consume_capability_for_test(intent)
     record_recovery(
         connection,
         session_id,
         "LAUNCH_RESERVATION",
         reservation_id,
         "CLASSIFY_PROCESS_OUTCOME_UNKNOWN",
+        operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+        operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
     )
     terminal_id = record_terminal(
-        connection, reservation_id, "CLOSED", "MAY_HAVE_OCCURRED"
+        connection, reservation_id, "CLOSED", "MAY_HAVE_OCCURRED", snapshot_digest=None
     )
     assert terminal_id
-    record_recovery(connection, session_id, "SESSION", session_id, "CLOSE_SESSION")
+    record_recovery(
+        connection,
+        session_id,
+        "SESSION",
+        session_id,
+        "CLOSE_SESSION",
+        operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+        operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
+    )
     assert connection.execute(
         "SELECT state FROM sessions WHERE session_id = ?", (session_id,)
     ).fetchone() == ("CLOSED",)
@@ -10238,26 +10844,33 @@ def test_pre_resume_recovery_revokes_intent_before_terminal_and_close(
     claim_id = commit_claim(connection, attempt_id)
     reservation_id = reserve_launch(connection, claim_id)
     execution_id = _record_successful_process(connection, reservation_id)
-    with _ISSUED_RESUME_PERMITS_LOCK:
-        permits_before = dict(_ISSUED_RESUME_PERMITS)
-
     record_recovery(
         connection,
         session_id,
         "LAUNCH_RESERVATION",
         reservation_id,
         "CLASSIFY_PRE_RESUME_READY",
+        operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+        operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
     )
     with pytest.raises(ValueError, match="revoked|unavailable"):
         commit_resume_intent(connection, execution_id, reservation_id)
-    with _ISSUED_RESUME_PERMITS_LOCK:
-        assert _ISSUED_RESUME_PERMITS == permits_before
     assert events == []
 
-    record_terminal(connection, reservation_id, "CLOSED", "MAY_HAVE_OCCURRED")
+    record_terminal(
+        connection, reservation_id, "CLOSED", "MAY_HAVE_OCCURRED", snapshot_digest=None
+    )
     with pytest.raises(ValueError, match="revoked|unavailable"):
         commit_resume_intent(connection, execution_id, reservation_id)
-    record_recovery(connection, session_id, "SESSION", session_id, "CLOSE_SESSION")
+    record_recovery(
+        connection,
+        session_id,
+        "SESSION",
+        session_id,
+        "CLOSE_SESSION",
+        operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+        operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
+    )
     with pytest.raises(ValueError, match="revoked|unavailable"):
         commit_resume_intent(connection, execution_id, reservation_id)
     assert connection.execute(
@@ -10284,11 +10897,13 @@ def test_resume_permit_is_revoked_by_unknown_outcome_recovery(db_path: Path) -> 
         "LAUNCH_RESERVATION",
         reservation_id,
         "CLASSIFY_RESUME_OUTCOME_UNKNOWN",
+        operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+        operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
     )
 
     with pytest.raises(ValueError, match="revoked"):
         hooks.resume_thread(intent)
-    assert not intent._permit.consumed
+    _assert_capability_available(intent)
     assert events == []
     assert connection.execute(
         "SELECT reservation_state FROM launch_reservations "
@@ -10302,18 +10917,29 @@ def test_resume_permit_is_revoked_by_unknown_outcome_recovery(db_path: Path) -> 
     ).fetchone() == ("RESUME_INTENT_COMMITTED", None, None)
 
     with pytest.raises(sqlite3.IntegrityError):
-        record_terminal(connection, reservation_id)
-    record_terminal(connection, reservation_id, "CLOSED", "MAY_HAVE_OCCURRED")
+        record_terminal(
+            connection, reservation_id, snapshot_digest=TEST_SNAPSHOT_DIGEST
+        )
+    record_terminal(
+        connection, reservation_id, "CLOSED", "MAY_HAVE_OCCURRED", snapshot_digest=None
+    )
     with pytest.raises(ValueError, match="revoked|unavailable"):
         hooks.resume_thread(intent)
-    record_recovery(connection, session_id, "SESSION", session_id, "CLOSE_SESSION")
+    record_recovery(
+        connection,
+        session_id,
+        "SESSION",
+        session_id,
+        "CLOSE_SESSION",
+        operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+        operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
+    )
     with pytest.raises(ValueError, match="revoked|unavailable"):
         hooks.resume_thread(intent)
     assert connection.execute("SELECT count(*) FROM session_selections").fetchone() == (
         0,
     )
-    with _ISSUED_RESUME_PERMITS_LOCK:
-        _ISSUED_RESUME_PERMITS.pop(intent._permit, None)
+    _consume_capability_for_test(intent)
     connection.close()
 
 
@@ -10332,6 +10958,8 @@ def test_delayed_resume_receipt_is_revoked_by_recovery(db_path: Path) -> None:
         "LAUNCH_RESERVATION",
         reservation_id,
         "CLASSIFY_RESUME_OUTCOME_UNKNOWN",
+        operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+        operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
     )
 
     with pytest.raises(ValueError, match="revoked"):
@@ -10347,10 +10975,20 @@ def test_delayed_resume_receipt_is_revoked_by_recovery(db_path: Path) -> None:
         "WHERE launch_reservation_id = ?",
         (str(reservation_id),),
     ).fetchone() == ("MANUAL_REVIEW",)
-    record_terminal(connection, reservation_id, "CLOSED", "MAY_HAVE_OCCURRED")
+    record_terminal(
+        connection, reservation_id, "CLOSED", "MAY_HAVE_OCCURRED", snapshot_digest=None
+    )
     with pytest.raises(ValueError, match="revoked|unavailable"):
         record_post_resume_evidence(connection, execution_id, receipt)
-    record_recovery(connection, session_id, "SESSION", session_id, "CLOSE_SESSION")
+    record_recovery(
+        connection,
+        session_id,
+        "SESSION",
+        session_id,
+        "CLOSE_SESSION",
+        operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+        operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
+    )
     with pytest.raises(ValueError, match="revoked|unavailable"):
         record_post_resume_evidence(connection, execution_id, receipt)
     connection.close()
@@ -10380,6 +11018,8 @@ def test_direct_sql_resume_phase_advance_fails_after_manual_review(
             "LAUNCH_RESERVATION",
             reservation_id,
             "CLASSIFY_PRE_RESUME_READY",
+            operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+            operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
         )
         with pytest.raises(sqlite3.IntegrityError):
             connection.execute(
@@ -10401,6 +11041,8 @@ def test_direct_sql_resume_phase_advance_fails_after_manual_review(
             "LAUNCH_RESERVATION",
             reservation_id,
             "CLASSIFY_RESUME_OUTCOME_UNKNOWN",
+            operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+            operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
         )
         post_json = _json(
             {
@@ -10424,8 +11066,7 @@ def test_direct_sql_resume_phase_advance_fails_after_manual_review(
                     execution_id,
                 ),
             )
-        with _ISSUED_RESUME_PERMITS_LOCK:
-            _ISSUED_RESUME_PERMITS.pop(intent._permit, None)
+        _consume_capability_for_test(intent)
     connection.rollback()
     assert connection.execute(
         "SELECT reservation_state FROM launch_reservations "
@@ -10470,6 +11111,8 @@ def test_recovery_race_with_resume_intent_has_one_valid_winner(db_path: Path) ->
                 "LAUNCH_RESERVATION",
                 reservation_id,
                 "CLASSIFY_PRE_RESUME_READY",
+                operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+                operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
             )
             success = True
         except (ValueError, sqlite3.IntegrityError):
@@ -10479,8 +11122,8 @@ def test_recovery_race_with_resume_intent_has_one_valid_winner(db_path: Path) ->
         connection.close()
 
     threads = [
-        threading.Thread(target=intent_worker),
-        threading.Thread(target=recovery_worker),
+        threading.Thread(target=_inherit_harness_thread(intent_worker)),
+        threading.Thread(target=_inherit_harness_thread(recovery_worker)),
     ]
     for thread in threads:
         thread.start()
@@ -10499,8 +11142,7 @@ def test_recovery_race_with_resume_intent_has_one_valid_winner(db_path: Path) ->
             0,
         )
         assert intent_outcome[2] is not None
-        with _ISSUED_RESUME_PERMITS_LOCK:
-            _ISSUED_RESUME_PERMITS.pop(intent_outcome[2]._permit, None)
+        _consume_capability_for_test(intent_outcome[2])
     else:
         assert verify.execute(
             "SELECT reservation_state FROM launch_reservations "
@@ -10537,15 +11179,16 @@ def test_recovery_race_with_resume_dispatch_is_serialized(
         try:
             if first:
                 _require_no_active_transaction(connection)
-                with lifecycle_lock:
+                with _test_service(connection).lifecycle_lease(reservation_id) as lease:
                     winner_has_lock.set()
-                    _record_recovery_locked(
-                        connection,
+                    lease.record_recovery(
                         session_id,
                         "LAUNCH_RESERVATION",
                         reservation_id,
                         "CLASSIFY_RESUME_OUTCOME_UNKNOWN",
                         None,
+                        operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+                        operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
                     )
             else:
                 winner_has_lock.wait()
@@ -10555,6 +11198,8 @@ def test_recovery_race_with_resume_dispatch_is_serialized(
                     "LAUNCH_RESERVATION",
                     reservation_id,
                     "CLASSIFY_RESUME_OUTCOME_UNKNOWN",
+                    operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+                    operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
                 )
             outcome = "recovery"
         except (ValueError, sqlite3.IntegrityError):
@@ -10583,8 +11228,10 @@ def test_recovery_race_with_resume_dispatch_is_serialized(
         connection.close()
 
     threads = [
-        threading.Thread(target=run_recovery, args=(winner == "recovery",)),
-        threading.Thread(target=run_hook, args=(winner == "hook",)),
+        threading.Thread(
+            target=_inherit_harness_thread(run_recovery, winner == "recovery")
+        ),
+        threading.Thread(target=_inherit_harness_thread(run_hook, winner == "hook")),
     ]
     for thread in threads:
         thread.start()
@@ -10593,8 +11240,7 @@ def test_recovery_race_with_resume_dispatch_is_serialized(
     if winner == "recovery":
         assert sorted(outcomes) == ["hook-rejected", "recovery"]
         assert events == []
-        with _ISSUED_RESUME_PERMITS_LOCK:
-            _ISSUED_RESUME_PERMITS.pop(intent._permit, None)
+        _consume_capability_for_test(intent)
     else:
         assert sorted(outcomes) == ["hook", "recovery"]
         assert events == ["resume-intent-committed", "resume-thread"]
@@ -10620,7 +11266,6 @@ def test_recovery_race_with_receipt_persistence_is_serialized(
     intent = commit_resume_intent(setup, execution_id, reservation_id)
     receipt = FakeSideEffects(setup).resume_thread(intent)
     setup.close()
-    lifecycle_lock = InterprocessLifecycleArbiter(reservation_id)
     winner_has_lock = threading.Event()
     outcomes: list[str] = []
     outcomes_lock = threading.Lock()
@@ -10630,15 +11275,16 @@ def test_recovery_race_with_receipt_persistence_is_serialized(
         try:
             if first:
                 _require_no_active_transaction(connection)
-                with lifecycle_lock:
+                with _test_service(connection).lifecycle_lease(reservation_id) as lease:
                     winner_has_lock.set()
-                    _record_recovery_locked(
-                        connection,
+                    lease.record_recovery(
                         session_id,
                         "LAUNCH_RESERVATION",
                         reservation_id,
                         "CLASSIFY_RESUME_OUTCOME_UNKNOWN",
                         None,
+                        operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+                        operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
                     )
             else:
                 winner_has_lock.wait()
@@ -10648,6 +11294,8 @@ def test_recovery_race_with_receipt_persistence_is_serialized(
                     "LAUNCH_RESERVATION",
                     reservation_id,
                     "CLASSIFY_RESUME_OUTCOME_UNKNOWN",
+                    operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+                    operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
                 )
             outcome = "recovery"
         except (ValueError, sqlite3.IntegrityError):
@@ -10661,11 +11309,10 @@ def test_recovery_race_with_receipt_persistence_is_serialized(
         try:
             if first:
                 _require_no_active_transaction(connection)
-                with lifecycle_lock:
+                with _test_service(connection).lifecycle_lease(reservation_id) as lease:
                     winner_has_lock.set()
-                    _record_post_resume_evidence_locked(
-                        connection, execution_id, receipt
-                    )
+                    lease.bind_execution(execution_id)
+                    lease.record_post_resume_evidence(execution_id, receipt)
             else:
                 winner_has_lock.wait()
                 record_post_resume_evidence(connection, execution_id, receipt)
@@ -10677,8 +11324,12 @@ def test_recovery_race_with_receipt_persistence_is_serialized(
         connection.close()
 
     threads = [
-        threading.Thread(target=run_recovery, args=(winner == "recovery",)),
-        threading.Thread(target=run_receipt, args=(winner == "receipt",)),
+        threading.Thread(
+            target=_inherit_harness_thread(run_recovery, winner == "recovery")
+        ),
+        threading.Thread(
+            target=_inherit_harness_thread(run_receipt, winner == "receipt")
+        ),
     ]
     for thread in threads:
         thread.start()
@@ -10729,14 +11380,15 @@ def test_process_receipt_cannot_persist_after_process_recovery(db_path: Path) ->
         "LAUNCH_RESERVATION",
         reservation_id,
         "CLASSIFY_PROCESS_OUTCOME_UNKNOWN",
+        operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+        operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
     )
     with pytest.raises(ValueError, match="PROCESS_INTENT_COMMITTED"):
         record_execution(connection, reservation_id, process_receipt)
     assert connection.execute("SELECT count(*) FROM launch_executions").fetchone() == (
         0,
     )
-    with _ISSUED_PROCESS_RESULTS_LOCK:
-        _ISSUED_PROCESS_RESULTS.pop(process_receipt._permit, None)
+    _consume_capability_for_test(process_receipt)
     connection.close()
 
 
@@ -10763,7 +11415,9 @@ def test_resume_boundary_requires_pre_resume_and_receipt(db_path: Path) -> None:
     with pytest.raises(TypeError, match="fake resume receipt"):
         record_post_resume_evidence(connection, execution_id, None)  # type: ignore[arg-type]
     with pytest.raises(sqlite3.IntegrityError):
-        record_terminal(connection, reservation_id)
+        record_terminal(
+            connection, reservation_id, snapshot_digest=TEST_SNAPSHOT_DIGEST
+        )
     assert connection.execute(
         "SELECT phase FROM launch_executions WHERE launch_execution_id = ?",
         (execution_id,),
@@ -10800,7 +11454,9 @@ def test_resume_intent_race_grants_exactly_one_hook_authority(db_path: Path) -> 
             results.append(outcome)
         connection.close()
 
-    threads = [threading.Thread(target=worker) for _ in range(2)]
+    threads = [
+        threading.Thread(target=_inherit_harness_thread(worker)) for _ in range(2)
+    ]
     for thread in threads:
         thread.start()
     for thread in threads:
@@ -10835,8 +11491,7 @@ def test_crash_around_resume_leaves_same_unretryable_intent_state(
     if invoke_resume_thread:
         hooks.resume_thread(intent)
     connection.close()
-    with _ISSUED_RESUME_PERMITS_LOCK:
-        _ISSUED_RESUME_PERMITS.pop(intent._permit, None)
+    _consume_capability_for_test(intent)
 
     recovered = _connect(db_path)
     assert recovered.execute(
@@ -10857,7 +11512,7 @@ def test_crash_around_resume_leaves_same_unretryable_intent_state(
         (str(reservation_id),),
     ).fetchone() == ("PROCESS_CREATED",)
     with pytest.raises(sqlite3.IntegrityError):
-        record_terminal(recovered, reservation_id)
+        record_terminal(recovered, reservation_id, snapshot_digest=TEST_SNAPSHOT_DIGEST)
     with pytest.raises(ValueError, match="PRE_RESUME_READY"):
         commit_resume_intent(recovered, execution_id, reservation_id)
     with pytest.raises(ValueError, match="already consumed|not issued"):
@@ -10871,6 +11526,8 @@ def test_crash_around_resume_leaves_same_unretryable_intent_state(
             "ATTEMPT",
             attempt_id,
             "RECORD_ATTEMPT_AMBIGUITY",
+            operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+            operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
         )
 
     second_attempt = allocate_attempt(recovered, session_id)
@@ -10896,8 +11553,6 @@ def test_resume_hook_failure_returns_no_receipt_and_consumes_permit(
     execution_id = _record_successful_process(connection, reservation_id)
     intent = commit_resume_intent(connection, execution_id, reservation_id)
     hooks = FakeSideEffects(connection)
-    with _ISSUED_RESUME_RESULTS_LOCK:
-        results_before = dict(_ISSUED_RESUME_RESULTS)
     with pytest.raises(RuntimeError, match="modeled ResumeThread failure"):
         hooks.resume_thread(intent, fail=True)
     with pytest.raises(ValueError, match="already consumed"):
@@ -10907,8 +11562,6 @@ def test_resume_hook_failure_returns_no_receipt_and_consumes_permit(
         "WHERE launch_execution_id = ?",
         (execution_id,),
     ).fetchone() == ("RESUME_INTENT_COMMITTED", None, None)
-    with _ISSUED_RESUME_RESULTS_LOCK:
-        assert _ISSUED_RESUME_RESULTS == results_before
     connection.close()
 
 
@@ -10924,38 +11577,32 @@ def test_resume_receipt_requires_adapter_provenance_and_one_shot_permit(
     intent = commit_resume_intent(connection, execution_id, reservation_id)
     receipt = FakeSideEffects(connection).resume_thread(intent)
 
-    with pytest.raises(TypeError, match="only come from the adapter"):
-        FakeResumeReceipt(
-            execution_id=receipt.execution_id,
-            reservation_id=receipt.reservation_id,
-            resume_intent_digest=receipt.resume_intent_digest,
-            result_json=receipt.result_json,
-            result_digest=receipt.result_digest,
-            _issuer=object(),
-            _permit=_ResumeResultPermit(),
-        )
-    reconstructed = FakeResumeReceipt(
+    reconstructed = _forged_capability(
+        type(receipt),
         execution_id=receipt.execution_id,
         reservation_id=receipt.reservation_id,
         resume_intent_digest=receipt.resume_intent_digest,
         result_json=receipt.result_json,
         result_digest=receipt.result_digest,
-        _issuer=_RESUME_RESULT_ISSUER,
-        _permit=_ResumeResultPermit(),
+        _issuer=object(),
+        _permit=object(),
     )
-    for fabricated in (
-        reconstructed,
-        replace(receipt),
-        replace(receipt, _permit=_ResumeResultPermit()),
-    ):
-        with pytest.raises(ValueError, match="not issued"):
-            record_post_resume_evidence(connection, execution_id, fabricated)
+    with pytest.raises(TypeError, match="invalid test service provenance issuer"):
+        record_post_resume_evidence(connection, execution_id, reconstructed)
+    with pytest.raises(ValueError, match="registry binding mismatch"):
+        record_post_resume_evidence(connection, execution_id, replace(receipt))
+    with pytest.raises(ValueError, match="registry binding mismatch"):
+        record_post_resume_evidence(
+            connection,
+            execution_id,
+            replace(receipt, result_digest=_digest(b"replacement")),
+        )
     with _mutated_frozen_object_for_test(receipt, _issuer=object()):
         with pytest.raises(TypeError, match="issuer"):
             record_post_resume_evidence(connection, execution_id, receipt)
 
     record_post_resume_evidence(connection, execution_id, receipt)
-    assert receipt._permit.consumed
+    _assert_capability_consumed(receipt)
     with pytest.raises(ValueError, match="already consumed|not issued"):
         record_post_resume_evidence(connection, execution_id, receipt)
     connection.close()
@@ -10984,10 +11631,7 @@ def test_resume_receipt_survives_transient_database_rollback(db_path: Path) -> N
 
     with pytest.raises(sqlite3.IntegrityError, match="transient resume"):
         record_post_resume_evidence(connection, execution_id, receipt)
-    assert not receipt._permit.consumed
-    with _ISSUED_RESUME_RESULTS_LOCK:
-        issuance = _ISSUED_RESUME_RESULTS.get(receipt._permit)
-        assert issuance is not None and issuance.result is receipt
+    _assert_capability_available(receipt)
     assert connection.execute(
         "SELECT phase, post_resume_json, cleanup_json FROM launch_executions "
         "WHERE launch_execution_id = ?",
@@ -10997,7 +11641,7 @@ def test_resume_receipt_survives_transient_database_rollback(db_path: Path) -> N
     connection.execute("DROP TRIGGER fail_resume_persistence_for_test")
     connection.commit()
     record_post_resume_evidence(connection, execution_id, receipt)
-    assert receipt._permit.consumed
+    _assert_capability_consumed(receipt)
     connection.close()
 
 
@@ -11069,12 +11713,10 @@ def test_post_resume_evidence_requires_exact_canonical_success_receipt(
         "WHERE launch_execution_id = ?",
         (execution_id,),
     ).fetchone() == ("RESUME_INTENT_COMMITTED", None, None)
-    with _ISSUED_RESUME_RESULTS_LOCK:
-        issuance = _ISSUED_RESUME_RESULTS.get(valid._permit)
-        assert issuance is not None and issuance.result is valid
-    assert not valid._permit.consumed
+    _assert_capability_available(valid)
+    _assert_capability_available(valid)
     record_post_resume_evidence(connection, execution_id, valid)
-    assert valid._permit.consumed
+    _assert_capability_consumed(valid)
     connection.close()
 
 
@@ -11103,13 +11745,10 @@ def test_fake_resume_receipt_cannot_be_reused_for_another_execution(
         commit_resume_intent(connection, execution, reservation)
         for execution, reservation in zip(executions, reservations, strict=True)
     ]
-    reused_intent = FakeResumeIntent(
+    reused_intent = replace(
+        intents[0],
         execution_id=executions[1],
         reservation_id=str(reservations[1]),
-        intent_json=intents[0].intent_json,
-        intent_digest=intents[0].intent_digest,
-        _issuer=_RESUME_INTENT_ISSUER,
-        _permit=intents[0]._permit,
     )
     with pytest.raises(ValueError, match="registry binding mismatch"):
         hooks.resume_thread(reused_intent)
@@ -11190,18 +11829,17 @@ def test_launch_execution_evidence_is_append_only(db_path: Path) -> None:
         )
 
     resume_intent = commit_resume_intent(connection, execution_id, reservation_id)
-    reconstructed_intent = FakeResumeIntent(
+    reconstructed_intent = _forged_capability(
+        type(resume_intent),
         execution_id=execution_id,
         reservation_id=str(reservation_id),
         intent_json=resume_intent.intent_json,
         intent_digest=resume_intent.intent_digest,
-        _issuer=_RESUME_INTENT_ISSUER,
-        _permit=_ResumePermit(),
+        _issuer=object(),
+        _permit=object(),
     )
-    with pytest.raises(ValueError, match="not issued"):
+    with pytest.raises((TypeError, ValueError), match="invalid|not issued"):
         FakeSideEffects(connection).resume_thread(reconstructed_intent)
-    with pytest.raises(TypeError, match="only be issued after commit"):
-        replace(resume_intent, _issuer=object())
     with pytest.raises(ValueError, match="not issued"):
         FakeSideEffects(connection).resume_thread(replace(resume_intent))
     for sql, params in (
@@ -11287,7 +11925,7 @@ def test_launch_execution_evidence_is_append_only(db_path: Path) -> None:
         with pytest.raises(sqlite3.IntegrityError):
             connection.execute(sql, params)
 
-    record_terminal(connection, reservation_id)
+    record_terminal(connection, reservation_id, snapshot_digest=TEST_SNAPSHOT_DIGEST)
     with pytest.raises(sqlite3.IntegrityError):
         connection.execute(
             "UPDATE launch_executions SET post_resume_json = ? "
@@ -11387,6 +12025,8 @@ def test_direct_sql_state_projection_requires_normalized_durable_facts(
         "ATTEMPT",
         attempt_id,
         "RECORD_ATTEMPT_AMBIGUITY",
+        operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+        operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
     )
     connection.execute(
         "UPDATE launch_executions SET phase = 'POST_RESUME_AMBIGUOUS' "
@@ -11397,7 +12037,13 @@ def test_direct_sql_state_projection_requires_normalized_durable_facts(
         "UPDATE attempts SET state = 'LAUNCH_MAY_HAVE_OCCURRED' WHERE attempt_id = ?",
         (attempt_id,),
     )
-    record_terminal(connection, reservation_id, "AMBIGUOUS", "MAY_HAVE_OCCURRED")
+    record_terminal(
+        connection,
+        reservation_id,
+        "AMBIGUOUS",
+        "MAY_HAVE_OCCURRED",
+        snapshot_digest=None,
+    )
 
     selected_session = create_session(connection, _request("2026-01-02"))
     selected_attempt = allocate_attempt(connection, selected_session)
@@ -11405,7 +12051,9 @@ def test_direct_sql_state_projection_requires_normalized_durable_facts(
     selected_reservation = reserve_launch(connection, selected_claim)
     selected_execution = _record_successful_process(connection, selected_reservation)
     _resume_and_persist(connection, selected_execution, selected_reservation)
-    selected_terminal = record_terminal(connection, selected_reservation)
+    selected_terminal = record_terminal(
+        connection, selected_reservation, snapshot_digest=TEST_SNAPSHOT_DIGEST
+    )
     assert_rejected(
         "UPDATE attempts SET state = 'SUCCESS_SELECTED' WHERE attempt_id = ?",
         (selected_attempt,),
@@ -11520,6 +12168,8 @@ def test_direct_sql_child_admission_requires_documented_predecessor(
             "SESSION",
             session_id,
             "CLOSE_SESSION",
+            operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+            operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
         )
     assert _database_rows(connection) == before
     connection.close()
@@ -11545,6 +12195,8 @@ def test_close_session_rejects_fabricated_terminal_looking_attempt_lineage(
             "SESSION",
             session_id,
             "CLOSE_SESSION",
+            operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+            operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
         )
     assert _database_rows(connection) == before
     assert connection.execute(
@@ -11581,6 +12233,8 @@ def test_caller_ordinal_overrides_require_exact_non_negative_int(
                 session_id,
                 "ACKNOWLEDGE_RESTORE",
                 ordinal=invalid_ordinal,  # type: ignore[arg-type]
+                operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+                operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
             )
     assert _database_rows(connection) == before
     assert connection.execute(
@@ -11613,6 +12267,8 @@ def test_exact_integer_ordinal_overrides_accept_zero_and_current_positive_value(
         recovery_session,
         "ACKNOWLEDGE_RESTORE",
         ordinal=0,
+        operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+        operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
     )
     second_recovery = record_recovery(
         connection,
@@ -11621,6 +12277,8 @@ def test_exact_integer_ordinal_overrides_accept_zero_and_current_positive_value(
         recovery_session,
         "CLOSE_SESSION",
         ordinal=1,
+        operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+        operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
     )
     assert connection.execute(
         "SELECT recovery_ordinal FROM manual_recoveries "
@@ -11657,7 +12315,9 @@ def test_recovery_insert_requires_action_to_be_currently_actionable(
         reservation_id = reserve_launch(connection, claim_id)
         execution_id = _record_successful_process(connection, reservation_id)
         _resume_and_persist(connection, execution_id, reservation_id)
-        terminal_id = record_terminal(connection, reservation_id)
+        terminal_id = record_terminal(
+            connection, reservation_id, snapshot_digest=TEST_SNAPSHOT_DIGEST
+        )
         _insert_selection_row_for_test(connection, session_id, terminal_id)
         target_kind, target_id = "SESSION", session_id
     else:
@@ -11682,8 +12342,7 @@ def test_recovery_insert_requires_action_to_be_currently_actionable(
                 resume_intent = commit_resume_intent(
                     connection, execution_id, reservation_id
                 )
-                with _ISSUED_RESUME_PERMITS_LOCK:
-                    _ISSUED_RESUME_PERMITS.pop(resume_intent._permit, None)
+                _consume_capability_for_test(resume_intent)
             elif stale_action == "CLASSIFY_RESUME_OUTCOME_UNKNOWN":
                 resume_intent = commit_resume_intent(
                     connection, execution_id, reservation_id
@@ -11737,7 +12396,13 @@ def test_recovery_insert_requires_action_to_be_currently_actionable(
     before = _database_rows(connection)
     with pytest.raises(sqlite3.IntegrityError, match="recovery action matrix"):
         _insert_recovery_fact_for_test(
-            connection, session_id, target_kind, target_id, stale_action
+            connection,
+            session_id,
+            target_kind,
+            target_id,
+            stale_action,
+            operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+            operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
         )
     assert _database_rows(connection) == before
     assert connection.execute(
@@ -11745,8 +12410,7 @@ def test_recovery_insert_requires_action_to_be_currently_actionable(
         (session_id,),
     ).fetchone() == (0,)
     if process_intent is not None:
-        with _ISSUED_PROCESS_PERMITS_LOCK:
-            _ISSUED_PROCESS_PERMITS.pop(process_intent._permit, None)
+        _consume_capability_for_test(process_intent)
     connection.close()
 
 
@@ -11773,6 +12437,8 @@ def test_recovery_projection_rechecks_mutable_current_eligibility(
             "SESSION",
             target_id,
             "CLOSE_SESSION",
+            operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+            operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
         )
         attempt_id = allocate_attempt(connection, session_id)
         update_sql = (
@@ -11799,10 +12465,11 @@ def test_recovery_projection_rechecks_mutable_current_eligibility(
                 "LAUNCH_RESERVATION",
                 target_id,
                 "CLASSIFY_PROCESS_OUTCOME_UNKNOWN",
+                operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+                operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
             )
             _insert_execution_row_for_test(connection, target_id)
-            with _ISSUED_PROCESS_PERMITS_LOCK:
-                _ISSUED_PROCESS_PERMITS.pop(process_intent._permit, None)
+            _consume_capability_for_test(process_intent)
             update_sql = (
                 "UPDATE launch_reservations SET reservation_state = "
                 "'MANUAL_REVIEW', outcome_recorded_at_utc = ? "
@@ -11818,12 +12485,13 @@ def test_recovery_projection_rechecks_mutable_current_eligibility(
                     "LAUNCH_RESERVATION",
                     target_id,
                     "CLASSIFY_PRE_RESUME_READY",
+                    operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+                    operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
                 )
                 resume_intent = commit_resume_intent(
                     connection, execution_id, reservation_id
                 )
-                with _ISSUED_RESUME_PERMITS_LOCK:
-                    _ISSUED_RESUME_PERMITS.pop(resume_intent._permit, None)
+                _consume_capability_for_test(resume_intent)
             else:
                 assert stale_case == "resume-unknown-new-receipt"
                 resume_intent = commit_resume_intent(
@@ -11835,6 +12503,8 @@ def test_recovery_projection_rechecks_mutable_current_eligibility(
                     "LAUNCH_RESERVATION",
                     target_id,
                     "CLASSIFY_RESUME_OUTCOME_UNKNOWN",
+                    operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+                    operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
                 )
                 resume_receipt = FakeSideEffects(connection).resume_thread(
                     resume_intent
@@ -11881,6 +12551,8 @@ def test_ambiguity_recovery_projection_rechecks_current_terminal_absence(
         "ATTEMPT",
         attempt_id,
         "RECORD_ATTEMPT_AMBIGUITY",
+        operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+        operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
     )
     request_digest = connection.execute(
         "SELECT request_digest FROM attempts WHERE attempt_id = ?",
@@ -12005,7 +12677,9 @@ def test_invalid_lifecycle_transitions_are_rejected(
         reservation_id = reserve_launch(connection, claim_id)
         execution_id = _record_successful_process(connection, reservation_id)
         _resume_and_persist(connection, execution_id, reservation_id)
-        terminal_id = record_terminal(connection, reservation_id)
+        terminal_id = record_terminal(
+            connection, reservation_id, snapshot_digest=TEST_SNAPSHOT_DIGEST
+        )
         mutation = (
             "UPDATE terminals SET terminal_state = 'FAILED' WHERE terminal_id = ?",
             (terminal_id,),
@@ -12015,7 +12689,9 @@ def test_invalid_lifecycle_transitions_are_rejected(
         reservation_id = reserve_launch(connection, claim_id)
         execution_id = _record_successful_process(connection, reservation_id)
         _resume_and_persist(connection, execution_id, reservation_id)
-        terminal_id = record_terminal(connection, reservation_id)
+        terminal_id = record_terminal(
+            connection, reservation_id, snapshot_digest=TEST_SNAPSHOT_DIGEST
+        )
         selection_id = select_terminal(connection, session_id, terminal_id)
         mutation = (
             "UPDATE session_selections SET selection_policy_version = 'bad' "
@@ -12036,6 +12712,8 @@ def test_invalid_lifecycle_transitions_are_rejected(
                 "ATTEMPT",
                 attempt_id,
                 "RECORD_ATTEMPT_AMBIGUITY",
+                operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+                operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
             )
     connection.close()
 
@@ -12064,6 +12742,8 @@ def test_recovery_race_produces_consecutive_ordinals(db_path: Path) -> None:
                 target_kind,
                 target_id,
                 action,
+                operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+                operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
             )
             with lock:
                 results.append(recovery_id)
@@ -12075,12 +12755,14 @@ def test_recovery_race_produces_consecutive_ordinals(db_path: Path) -> None:
 
     threads = [
         threading.Thread(
-            target=worker,
-            args=("ATTEMPT", target_attempt, "RECORD_ATTEMPT_AMBIGUITY"),
+            target=_inherit_harness_thread(
+                worker, "ATTEMPT", target_attempt, "RECORD_ATTEMPT_AMBIGUITY"
+            )
         ),
         threading.Thread(
-            target=worker,
-            args=("SESSION", session_id, "ACKNOWLEDGE_RESTORE"),
+            target=_inherit_harness_thread(
+                worker, "SESSION", session_id, "ACKNOWLEDGE_RESTORE"
+            )
         ),
     ]
     for thread in threads:
@@ -12277,6 +12959,8 @@ def test_invalid_gregorian_nullable_timestamp_update_is_atomic(db_path: Path) ->
         "SESSION",
         session_id,
         "CLOSE_SESSION",
+        operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+        operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
     )
     before = _database_rows(connection)
 
@@ -12467,8 +13151,7 @@ def test_creation_chain_timestamps_are_non_decreasing_at_direct_sql_boundaries(
     if accepted:
         inserted = insert_child()
         if type(inserted) is FakeProviderConstructionPermit:
-            with _ISSUED_PROVIDER_CONSTRUCTION_PERMITS_LOCK:
-                _ISSUED_PROVIDER_CONSTRUCTION_PERMITS.pop(inserted._permit, None)
+            _consume_capability_for_test(inserted)
     else:
         with pytest.raises(sqlite3.IntegrityError):
             insert_child()
@@ -12524,7 +13207,9 @@ def test_selection_chronology_cannot_be_satisfied_by_wrong_session_terminal(
     second_reservation = reserve_launch(connection, second_claim)
     second_execution = _record_successful_process(connection, second_reservation)
     _resume_and_persist(connection, second_execution, second_reservation)
-    second_terminal = record_terminal(connection, second_reservation)
+    second_terminal = record_terminal(
+        connection, second_reservation, snapshot_digest=TEST_SNAPSHOT_DIGEST
+    )
     before = _database_rows(connection)
     with pytest.raises(sqlite3.IntegrityError, match="selection terminal"):
         _insert_selection_row_for_test(
@@ -12605,6 +13290,8 @@ def test_terminal_chronology_uses_state_specific_durable_predecessor(
             "LAUNCH_RESERVATION",
             reservation_id,
             "CLASSIFY_LAUNCH_RESERVATION",
+            operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+            operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
         )
     recorded_at_utc = {
         "earlier": earlier,
@@ -12665,6 +13352,8 @@ def test_session_close_timestamp_uses_exact_close_predecessor(
             session_id,
             "CLOSE_SESSION",
             created_at_utc=MANUAL_REVIEW_TIMESTAMP,
+            operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+            operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
         )
         predecessor = MANUAL_REVIEW_TIMESTAMP
         earlier = "2026-01-01T00:02:59Z"
@@ -12740,8 +13429,7 @@ def test_process_intent_timestamp_is_non_decreasing_from_reservation(
         with pytest.raises(sqlite3.IntegrityError, match="process intent"):
             connection.execute(*mutation)
         assert _database_rows(connection) == before
-    with _ISSUED_PROVIDER_CONSTRUCTION_PERMITS_LOCK:
-        _ISSUED_PROVIDER_CONSTRUCTION_PERMITS.pop(permit._permit, None)
+    _consume_capability_for_test(permit)
     connection.close()
 
 
@@ -12786,8 +13474,7 @@ def test_execution_timestamp_is_non_decreasing_from_process_intent(
             )
         assert _database_rows(connection) == before
     connection.rollback()
-    with _ISSUED_PROCESS_PERMITS_LOCK:
-        _ISSUED_PROCESS_PERMITS.pop(process_intent._permit, None)
+    _consume_capability_for_test(process_intent)
     connection.close()
 
 
@@ -12901,8 +13588,7 @@ def test_process_outcome_timestamp_uses_exact_durable_predecessor(
             (str(reservation_id),),
         ).fetchone() == (outcome_at_utc,)
         connection.rollback()
-    with _ISSUED_PROCESS_PERMITS_LOCK:
-        _ISSUED_PROCESS_PERMITS.pop(process_intent._permit, None)
+    _consume_capability_for_test(process_intent)
     connection.close()
 
 
@@ -12928,8 +13614,7 @@ def _prepare_recovery_chronology_case(
         process_intent = _construct_provider_and_commit_process_intent(
             connection, reservation_id
         )
-        with _ISSUED_PROCESS_PERMITS_LOCK:
-            _ISSUED_PROCESS_PERMITS.pop(process_intent._permit, None)
+        _consume_capability_for_test(process_intent)
         return (
             session_id,
             "LAUNCH_RESERVATION",
@@ -12949,8 +13634,7 @@ def _prepare_recovery_chronology_case(
         )
     if action == "CLASSIFY_RESUME_OUTCOME_UNKNOWN":
         resume_intent = commit_resume_intent(connection, execution_id, reservation_id)
-        with _ISSUED_RESUME_PERMITS_LOCK:
-            _ISSUED_RESUME_PERMITS.pop(resume_intent._permit, None)
+        _consume_capability_for_test(resume_intent)
         return (
             session_id,
             "LAUNCH_RESERVATION",
@@ -12977,7 +13661,9 @@ def _prepare_recovery_chronology_case(
             "2026-01-01T00:01:29Z",
         )
     assert action == "SELECT_COMMITTED_SUCCESS"
-    terminal_id = record_terminal(connection, reservation_id)
+    terminal_id = record_terminal(
+        connection, reservation_id, snapshot_digest=TEST_SNAPSHOT_DIGEST
+    )
     return (
         session_id,
         "TERMINAL",
@@ -13014,6 +13700,8 @@ def test_recovery_timestamp_uses_action_specific_durable_predecessor(
                 target_id,
                 action,
                 created_at_utc=recovery_created_at_utc,
+                operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+                operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
             )
         connection.rollback()
         assert _database_rows(connection) == before
@@ -13025,6 +13713,8 @@ def test_recovery_timestamp_uses_action_specific_durable_predecessor(
             target_id,
             action,
             created_at_utc=recovery_created_at_utc,
+            operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+            operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
         )
         assert connection.execute(
             "SELECT created_at_utc FROM manual_recoveries WHERE recovery_id = ?",
@@ -13053,6 +13743,8 @@ def test_recovery_chronology_cannot_use_wrong_session_lineage(
             target_id,
             action,
             created_at_utc="9999-12-31T23:59:59Z",
+            operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+            operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
         )
     connection.rollback()
     assert _database_rows(connection) == before
@@ -13079,6 +13771,8 @@ def test_manual_review_outcome_timestamp_does_not_predate_classification_recover
         target_id,
         action,
         created_at_utc=MANUAL_REVIEW_TIMESTAMP,
+        operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+        operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
     )
     outcome_at_utc = {
         "earlier": "2026-01-01T00:02:59Z",
@@ -13215,10 +13909,35 @@ def test_recovery_target_evidence_mapping_has_exact_twelve_dependencies() -> Non
         "ACKNOWLEDGE_RESTORE": (),
     }
     assert len(_RECOVERY_TARGET_EVIDENCE_CORRUPTION_CASES) == 12
-    assert "_validate_recovery_target_evidence" in inspect.getsource(
-        _record_recovery_locked
-    )
-    assert "_require_evidence_pair" in inspect.getsource(_record_recovery_locked)
+
+
+def test_harness_imports_only_the_supported_transactional_core() -> None:
+    tree = ast.parse(_HARNESS_MODULE_PATH.read_text(encoding="utf-8"))
+    private_imports = [
+        alias.name
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ImportFrom)
+        and node.module == "trading_bot.runtime.windows_transactional_authority"
+        for alias in node.names
+        if alias.name.startswith("_")
+    ]
+    supported_imports = [
+        alias.name
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ImportFrom)
+        and node.module == "trading_bot.runtime.windows_transactional_authority"
+        for alias in node.names
+        if alias.name
+        in {
+            "TransactionalAuthorityCore",
+            "TransactionalAuthorityCoreBinding",
+        }
+    ]
+    assert private_imports == []
+    assert supported_imports == [
+        "TransactionalAuthorityCore",
+        "TransactionalAuthorityCoreBinding",
+    ]
 
 
 @pytest.mark.parametrize(
@@ -13240,7 +13959,15 @@ def test_corrupt_recovery_target_evidence_blocks_without_mutation(
     target_state = _target_state(connection, target_kind, target_id)
 
     with pytest.raises(SchemaValidationError, match="does not match evidence bytes"):
-        record_recovery(connection, session_id, target_kind, target_id, action)
+        record_recovery(
+            connection,
+            session_id,
+            target_kind,
+            target_id,
+            action,
+            operator_evidence_json=TEST_OPERATOR_EVIDENCE_JSON,
+            operator_evidence_digest=TEST_OPERATOR_EVIDENCE_DIGEST,
+        )
 
     assert not connection.in_transaction
     assert _database_rows(connection) == before

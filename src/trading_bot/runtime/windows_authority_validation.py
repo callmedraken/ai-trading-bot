@@ -8,6 +8,7 @@ read-only executable-authority acquisition path.
 from __future__ import annotations
 
 import os
+import sqlite3
 from collections.abc import Iterator
 from dataclasses import dataclass
 from enum import StrEnum
@@ -821,6 +822,72 @@ def require_validated_production_authority(
                 f"validated production authority field {field} is invalid"
             )
     return authority
+
+
+def require_open_connection_matches_validated_authority(
+    authority: ValidatedProductionAuthority,
+    connection: sqlite3.Connection,
+) -> ProductionAuthorityEvidence:
+    """Revalidate one retained writable connection against C1 authority."""
+
+    require_validated_production_authority(authority)
+    if type(connection) is not sqlite3.Connection:
+        raise WindowsAuthorityError("production authority connection type is invalid")
+
+    release_manifest = load_approved_release_manifest()
+    sqlite_build = load_approved_sqlite_authority_build()
+    if release_manifest.digest.hex() != authority.release_manifest_digest:
+        raise WindowsAuthorityError(
+            "approved release manifest does not match validated authority"
+        )
+    if sqlite_build.digest.hex() != authority.sqlite_build_manifest_digest:
+        raise WindowsAuthorityError(
+            "approved SQLite build does not match validated authority"
+        )
+
+    bootstrap = WindowsAuthorityBootstrap(
+        bootstrap_schema=authority.bootstrap_schema,
+        bootstrap_generation=authority.bootstrap_generation,
+        machine_authority_id=authority.machine_authority_id,
+        authority_epoch_id=authority.authority_epoch_id,
+        signing_key_id=authority.signing_key_id,
+        approved_account_sid=authority.approved_account_sid,
+        database_path=authority.database_path,
+        output_root=str(PRODUCTION_AUTHORITY_PATHS.capture_output),
+        provider_id=authority.provider_id,
+        permitted_provider_operation=authority.permitted_provider_operation,
+        authority_policy_version=authority.authority_policy_version,
+        claim_policy_version=authority.claim_policy_version,
+        database_identity_digest=authority.database_identity_digest,
+    )
+    if bootstrap.digest != authority.bootstrap_digest:
+        raise WindowsAuthorityError(
+            "validated authority bootstrap identity is inconsistent"
+        )
+
+    observed = validate_production_authority_database_connection(
+        connection,
+        database_path=authority.database_path,
+        bootstrap=bootstrap,
+        bootstrap_digest=authority.bootstrap_digest,
+        release_manifest=release_manifest,
+        sqlite_build=sqlite_build,
+    )
+    expected = ProductionAuthorityEvidence(
+        database_path=authority.database_path,
+        schema_id=authority.schema_id,
+        schema_version=authority.schema_version,
+        schema_digest=authority.schema_digest,
+        metadata_digest=authority.metadata_digest,
+        migration_id=authority.migration_id,
+        release_manifest_digest=authority.release_manifest_digest,
+        sqlite_build_manifest_digest=authority.sqlite_build_manifest_digest,
+    )
+    if observed != expected:
+        raise WindowsAuthorityError(
+            "opened production connection does not match validated authority"
+        )
+    return observed
 
 
 def acquire_validated_production_authority_for_test(

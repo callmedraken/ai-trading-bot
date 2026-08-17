@@ -1,0 +1,108 @@
+from pathlib import Path
+
+
+def replace_once(text: str, old: str, new: str, label: str) -> str:
+    count = text.count(old)
+    if count != 1:
+        raise RuntimeError(f"{label}: expected one match, found {count}")
+    return text.replace(old, new, 1)
+
+
+runtime_path = Path("src/trading_bot/runtime/windows_transactional_authority.py")
+runtime = runtime_path.read_text(encoding="utf-8")
+
+runtime = replace_once(
+    runtime,
+    '''        "_lifecycle_error",\n        "_release_complete",\n        "_release_exception",\n        "_state",''',
+    '''        "_lifecycle_error",\n        "_operation_count",\n        "_operations_drained",\n        "_release_complete",\n        "_release_exception",\n        "_state",''',
+    "lease slots",
+)
+runtime = replace_once(
+    runtime,
+    '''        self._lifecycle_error: BaseException | None = None\n        self._release_complete = threading.Event()''',
+    '''        self._lifecycle_error: BaseException | None = None\n        self._operation_count = 0\n        self._operations_drained = threading.Event()\n        self._operations_drained.set()\n        self._release_complete = threading.Event()''',
+    "lease operation state",
+)
+runtime = replace_once(
+    runtime,
+    '''    def __enter__(self) -> Self:\n        self._require_active_witness()\n        return self\n''',
+    '''    @contextmanager\n    def admit_operation(\n        self,\n        core: TransactionalAuthorityCore,\n        service_token: object | None,\n        reservation_id: str | None = None,\n    ) -> Iterator[_TransactionalLeaseWitness]:\n        """Pin this lease and its arbiter for one complete while-held operation."""\n\n        with self._binding._lifecycle_state_lock:\n            if self._state != "ACTIVE" or not self.active or not self._witness.active:\n                if self._release_exception is not None:\n                    raise self._release_exception\n                if self._lifecycle_error is not None:\n                    raise self._lifecycle_error\n                raise ExternalAuthorityBoundaryUnavailable(\n                    "transactional lifecycle lease is closed"\n                )\n            witness = self._witness\n            if (\n                witness.core is not core\n                or witness.service_token is not service_token\n                or (\n                    reservation_id is not None\n                    and witness.reservation_id != str(reservation_id)\n                )\n            ):\n                raise ValueError("lifecycle lease witness is invalid or mismatched")\n            self._operation_count += 1\n            if self._operation_count == 1:\n                self._operations_drained.clear()\n        try:\n            yield witness\n        finally:\n            with self._binding._lifecycle_state_lock:\n                self._operation_count -= 1\n                if self._operation_count == 0:\n                    self._operations_drained.set()\n\n    def __enter__(self) -> Self:\n        self._require_active_witness()\n        return self\n''',
+    "lease operation admission",
+)
+runtime = replace_once(
+    runtime,
+    '''        self._release_arbiter(*args)\n\n    def invalidate_for_harness_close''',
+    '''        self._operations_drained.wait()\n        self._release_arbiter(*args)\n\n    def invalidate_for_harness_close''',
+    "lease release drain",
+)
+runtime = replace_once(
+    runtime,
+    '''        self._release_arbiter(None, None, None)\n\n    def _release_arbiter''',
+    '''        self._operations_drained.wait()\n        self._release_arbiter(None, None, None)\n\n    def _release_arbiter''',
+    "harness invalidation drain",
+)
+
+old_acquire = '''        with core._bound_context(wait_for_close=False):\n            _require_no_active_transaction(self._connection)\n            arbiter = self._lifecycle_arbiter_factory(str(reservation_id))\n            arbiter.__enter__()\n            try:\n                with self._lifecycle_state_lock:\n                    if not self._active:\n                        if self._lifecycle_error is not None:\n                            raise self._lifecycle_error\n                        raise ExternalAuthorityBoundaryUnavailable(\n                            "transactional core binding lifecycle is closed"\n                        )\n                    witness = _TransactionalLeaseWitness(\n                        core, self._service_token, str(reservation_id)\n                    )\n                    lease = _TransactionalLease(self, arbiter, witness)\n                    self._active_leases.add(lease)\n                    return lease\n            except BaseException:\n                arbiter.__exit__(None, None, None)\n                raise\n'''
+new_acquire = '''        with core._bound_context():\n            _require_no_active_transaction(self._connection)\n            arbiter = self._lifecycle_arbiter_factory(str(reservation_id))\n            arbiter.__enter__()\n            try:\n                self._lifecycle.require_open()\n                with self._lifecycle_state_lock:\n                    if not self._active:\n                        if self._lifecycle_error is not None:\n                            raise self._lifecycle_error\n                        raise ExternalAuthorityBoundaryUnavailable(\n                            "transactional core binding lifecycle is closed"\n                        )\n                    witness = _TransactionalLeaseWitness(\n                        core, self._service_token, str(reservation_id)\n                    )\n                    lease = _TransactionalLease(self, arbiter, witness)\n                    self._active_leases.add(lease)\n                    return lease\n            except BaseException:\n                arbiter.__exit__(None, None, None)\n                raise\n'''
+runtime = replace_once(runtime, old_acquire, new_acquire, "lease acquisition quiescence")
+
+old_witness = '''    def _require_lifecycle_lease_witness(\n        self, witness: object, reservation_id: str | None = None\n    ) -> _TransactionalLeaseWitness:\n        self._require_binding_active()\n        if type(witness) is not _TransactionalLease:\n            raise TypeError(\n                "already-held operation requires a reviewed lifecycle lease"\n            )\n        lease_witness = witness._require_active_witness()\n        if (\n            lease_witness.core is not self\n            or lease_witness.service_token is not self._context.test_service_token\n            or (\n                reservation_id is not None\n                and lease_witness.reservation_id != str(reservation_id)\n            )\n        ):\n            raise ValueError("lifecycle lease witness is invalid or mismatched")\n        return lease_witness\n'''
+new_witness = '''    @contextmanager\n    def _held_lifecycle_operation(\n        self, lease: object, reservation_id: str | None = None\n    ) -> Iterator[_TransactionalLeaseWitness]:\n        """Admit one operation while its exact lifecycle lease remains held."""\n\n        with self._bound_context():\n            if type(lease) is not _TransactionalLease:\n                raise TypeError(\n                    "already-held operation requires a reviewed lifecycle lease"\n                )\n            if self._harness_binding is None or lease._binding is not self._harness_binding:\n                raise ValueError("lifecycle lease witness is invalid or mismatched")\n            with lease.admit_operation(\n                self, self._context.test_service_token, reservation_id\n            ) as witness:\n                yield witness\n'''
+runtime = replace_once(runtime, old_witness, new_witness, "held operation boundary")
+
+old_execution_binding = '''        self._require_lifecycle_lease_witness(lease_witness, reservation_id)\n        with self._bound_context():\n            with _connection_operation(self._connection):\n                _require_no_active_transaction(self._connection)\n                row = self._connection.execute(\n                    "SELECT launch_reservation_id FROM launch_executions "\n                    "WHERE launch_execution_id = ?",\n                    (str(execution_id),),\n                ).fetchone()\n        if row is None or row[0] != str(reservation_id):\n            raise ValueError("execution does not belong to the held reservation")\n'''
+new_execution_binding = '''        with self._held_lifecycle_operation(lease_witness, reservation_id):\n            with _connection_operation(self._connection):\n                _require_no_active_transaction(self._connection)\n                row = self._connection.execute(\n                    "SELECT launch_reservation_id FROM launch_executions "\n                    "WHERE launch_execution_id = ?",\n                    (str(execution_id),),\n                ).fetchone()\n            if row is None or row[0] != str(reservation_id):\n                raise ValueError("execution does not belong to the held reservation")\n'''
+runtime = replace_once(
+    runtime,
+    old_execution_binding,
+    new_execution_binding,
+    "execution binding held operation",
+)
+
+old_reservation_entry = '''        self._require_lifecycle_lease_witness(lease_witness, reservation_id)\n        with self._bound_context():\n'''
+count = runtime.count(old_reservation_entry)
+if count != 5:
+    raise RuntimeError(f"reservation held operations: expected 5 matches, found {count}")
+runtime = runtime.replace(
+    old_reservation_entry,
+    '''        with self._held_lifecycle_operation(lease_witness, reservation_id):\n''',
+)
+
+old_witness_entry = '''        witness = self._require_lifecycle_lease_witness(lease_witness)\n        with self._bound_context():\n'''
+count = runtime.count(old_witness_entry)
+if count != 2:
+    raise RuntimeError(f"witness held operations: expected 2 matches, found {count}")
+runtime = runtime.replace(
+    old_witness_entry,
+    '''        with self._held_lifecycle_operation(lease_witness) as witness:\n''',
+)
+
+if "_require_lifecycle_lease_witness(" in runtime:
+    raise RuntimeError("legacy racy lease witness validation remains")
+if "_bound_context(wait_for_close=False)" in runtime:
+    raise RuntimeError("non-quiescing lifecycle acquisition remains")
+
+runtime_path.write_text(runtime, encoding="utf-8")
+
+tests_path = Path("tests/runtime/test_windows_transactional_capture_authority.py")
+tests = tests_path.read_text(encoding="utf-8")
+
+old_post_enter = '''def test_lifecycle_lease_post_enter_setup_failure_releases_once() -> None:\n    events: list[str] = []\n    harness: Architecture77HarnessAuthority | None = None\n\n    class ArbiterProbe:\n        def __enter__(self) -> ArbiterProbe:\n            events.append("enter")\n            assert harness is not None\n            harness.close()\n            return self\n\n        def __exit__(self, *args: object) -> None:\n            del args\n            events.append("exit")\n\n    harness = Architecture77HarnessAuthority.create(\n        lifecycle_arbiter_factory=lambda reservation_id: ArbiterProbe()\n    )\n    try:\n        with pytest.raises(HarnessLifecycleError, match="closed"):\n            with harness.lifecycle_lease("reservation"):\n                pass\n        assert events == ["enter", "exit"]\n    finally:\n        harness.close()\n'''
+new_post_enter = '''def test_lifecycle_lease_post_enter_setup_failure_releases_once() -> None:\n    events: list[str] = []\n    harness: Architecture77HarnessAuthority | None = None\n    sentinel = HarnessLifecycleError("forced binding closure")\n\n    class ArbiterProbe:\n        def __enter__(self) -> ArbiterProbe:\n            events.append("enter")\n            assert harness is not None\n            harness._core_binding.invalidate_for_harness_close(sentinel)\n            return self\n\n        def __exit__(self, *args: object) -> None:\n            del args\n            events.append("exit")\n\n    harness = Architecture77HarnessAuthority.create(\n        lifecycle_arbiter_factory=lambda reservation_id: ArbiterProbe()\n    )\n    try:\n        with pytest.raises(HarnessLifecycleError, match="forced binding closure"):\n            with harness.lifecycle_lease("reservation"):\n                pass\n        assert events == ["enter", "exit"]\n    finally:\n        harness.close()\n'''
+tests = replace_once(tests, old_post_enter, new_post_enter, "post-enter failure test")
+
+old_blocked = '''def test_lifecycle_lease_close_wins_against_blocked_arbiter_entry() -> None:\n    entered = threading.Event()\n    release_entry = threading.Event()\n    exited = threading.Event()\n    events: list[str] = []\n\n    class BlockingArbiter:\n        def __enter__(self) -> BlockingArbiter:\n            events.append("enter")\n            entered.set()\n            assert release_entry.wait(10)\n            return self\n\n        def __exit__(self, *args: object) -> None:\n            del args\n            events.append("exit")\n            exited.set()\n\n    harness = Architecture77HarnessAuthority.create(\n        lifecycle_arbiter_factory=lambda reservation_id: BlockingArbiter()\n    )\n    reservation_id = "blocked-reservation"\n    outcomes: list[BaseException | str] = []\n\n    def acquire() -> None:\n        try:\n            with harness.lifecycle_lease(reservation_id):\n                outcomes.append("acquired")\n        except BaseException as exc:\n            outcomes.append(exc)\n\n    worker = threading.Thread(target=acquire)\n    worker.start()\n    try:\n        assert entered.wait(10)\n        harness.close()\n        release_entry.set()\n        worker.join(10)\n        assert not worker.is_alive()\n        assert len(outcomes) == 1\n        assert isinstance(outcomes[0], HarnessLifecycleError)\n        assert events == ["enter", "exit"]\n        assert exited.is_set()\n    finally:\n        release_entry.set()\n        worker.join(10)\n        harness.close()\n'''
+new_blocked = '''def test_lifecycle_lease_close_wins_against_blocked_arbiter_entry() -> None:\n    entered = threading.Event()\n    release_entry = threading.Event()\n    exited = threading.Event()\n    close_finished = threading.Event()\n    events: list[str] = []\n\n    class BlockingArbiter:\n        def __enter__(self) -> BlockingArbiter:\n            events.append("enter")\n            entered.set()\n            assert release_entry.wait(10)\n            return self\n\n        def __exit__(self, *args: object) -> None:\n            del args\n            events.append("exit")\n            exited.set()\n\n    harness = Architecture77HarnessAuthority.create(\n        lifecycle_arbiter_factory=lambda reservation_id: BlockingArbiter()\n    )\n    root = harness._root\n    reservation_id = "blocked-reservation"\n    outcomes: list[BaseException | str] = []\n    close_errors: list[BaseException] = []\n\n    def acquire() -> None:\n        try:\n            with harness.lifecycle_lease(reservation_id):\n                outcomes.append("acquired")\n        except BaseException as exc:\n            outcomes.append(exc)\n\n    def close_harness() -> None:\n        try:\n            harness.close()\n        except BaseException as exc:\n            close_errors.append(exc)\n        finally:\n            close_finished.set()\n\n    worker = threading.Thread(target=acquire)\n    closer = threading.Thread(target=close_harness)\n    worker.start()\n    try:\n        assert entered.wait(10)\n        closer.start()\n        assert not close_finished.wait(0.1)\n        assert root.exists()\n        assert events == ["enter"]\n        release_entry.set()\n        worker.join(10)\n        closer.join(10)\n        assert not worker.is_alive()\n        assert not closer.is_alive()\n        assert close_errors == []\n        assert len(outcomes) == 1\n        assert isinstance(outcomes[0], HarnessLifecycleError)\n        assert events == ["enter", "exit"]\n        assert exited.is_set()\n        assert not root.exists()\n    finally:\n        release_entry.set()\n        worker.join(10)\n        closer.join(10)\n        harness.close()\n'''
+tests = replace_once(tests, old_blocked, new_blocked, "blocked acquisition close test")
+
+insert_marker = '''\n\n@pytest.mark.parametrize(\n    "transaction_entry",\n    ["BEGIN IMMEDIATE", "SAVEPOINT caller_work"],\n    ids=["begin-immediate", "savepoint"],\n)\ndef test_lifecycle_lease_rejects_active_transaction_before_arbiter(\n'''
+new_test = '''\n\ndef test_lifecycle_lease_release_waits_for_in_flight_held_operation() -> None:\n    sql_blocked = threading.Event()\n    release_sql = threading.Event()\n    release_finished = threading.Event()\n    operation_errors: list[BaseException] = []\n    release_errors: list[BaseException] = []\n    arbiters: list[object] = []\n\n    class ArbiterProbe:\n        def __init__(self) -> None:\n            self.exited = threading.Event()\n            self.exit_calls = 0\n\n        def __enter__(self) -> ArbiterProbe:\n            return self\n\n        def __exit__(self, *args: object) -> None:\n            del args\n            self.exit_calls += 1\n            self.exited.set()\n\n    def arbiter_factory(reservation_id: str) -> ArbiterProbe:\n        del reservation_id\n        arbiter = ArbiterProbe()\n        arbiters.append(arbiter)\n        return arbiter\n\n    harness = Architecture77HarnessAuthority.create(\n        lifecycle_arbiter_factory=arbiter_factory\n    )\n    lease: TestLifecycleLease | None = None\n    worker: threading.Thread | None = None\n    releaser: threading.Thread | None = None\n    try:\n        _, reservation_id, execution_id, _ = _prepare_lease_resume_case(\n            harness, "2026-01-01"\n        )\n        lease = harness.lifecycle_lease(reservation_id)\n        lease.__enter__()\n        lease_arbiter = arbiters[-1]\n\n        def trace(statement: str) -> None:\n            normalized = " ".join(statement.split())\n            if (\n                "SELECT launch_reservation_id FROM launch_executions" in normalized\n                and "WHERE launch_execution_id" in normalized\n                and not sql_blocked.is_set()\n            ):\n                sql_blocked.set()\n                assert release_sql.wait(10)\n\n        harness._connection.set_trace_callback(trace)\n\n        def bind_execution() -> None:\n            try:\n                assert lease is not None\n                lease.bind_execution(execution_id)\n            except BaseException as exc:\n                operation_errors.append(exc)\n\n        def release_lease() -> None:\n            try:\n                assert lease is not None\n                lease.__exit__(None, None, None)\n            except BaseException as exc:\n                release_errors.append(exc)\n            finally:\n                release_finished.set()\n\n        worker = threading.Thread(target=bind_execution)\n        worker.start()\n        assert sql_blocked.wait(10)\n        releaser = threading.Thread(target=release_lease)\n        releaser.start()\n\n        assert not release_finished.wait(0.1)\n        assert not lease_arbiter.exited.is_set()\n        assert lease_arbiter.exit_calls == 0\n\n        release_sql.set()\n        worker.join(10)\n        releaser.join(10)\n        assert not worker.is_alive()\n        assert not releaser.is_alive()\n        assert operation_errors == []\n        assert release_errors == []\n        assert lease_arbiter.exit_calls == 1\n        assert lease_arbiter.exited.is_set()\n    finally:\n        harness._connection.set_trace_callback(None)\n        release_sql.set()\n        if worker is not None:\n            worker.join(10)\n        if releaser is not None:\n            releaser.join(10)\n        if lease is not None and not lease._exited:\n            lease.__exit__(None, None, None)\n        harness.close()\n'''
+tests = replace_once(tests, insert_marker, new_test + insert_marker, "held-operation regression insertion")
+tests_path.write_text(tests, encoding="utf-8")
+
+doc_path = Path("docs/architecture/81-windows-production-transactional-authority-service.md")
+doc = doc_path.read_text(encoding="utf-8")
+old_doc = '''Named while-held operations require that witness and reject reservation,\nexecution, recovery-target, re-entry, post-exit, and closed-lifecycle\nmismatches before durable mutation. The witness is invalidated on exit, is not\nserialized, and is not production authority.\n'''
+new_doc = '''Named while-held operations require that witness and reject reservation,\nexecution, recovery-target, re-entry, post-exit, and closed-lifecycle\nmismatches before durable mutation. Admission of a while-held operation pins\nthe exact lease and its already-entered arbiter through the complete operation;\nrelease stops new held-operation admission and waits for admitted held work\nbefore invoking arbiter exit. Lease acquisition itself participates in harness\nlifecycle quiescence, so close cannot finish storage or root cleanup while an\nadmitted arbiter entry is still in progress. The witness is invalidated when\nrelease begins, is not serialized, and is not production authority.\n'''
+doc = replace_once(doc, old_doc, new_doc, "Architecture 81 quiescence contract")
+doc_path.write_text(doc, encoding="utf-8")

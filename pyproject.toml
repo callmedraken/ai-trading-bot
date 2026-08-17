@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "ai-trading-bot"
 version = "0.1.0"
-description = "A conservative algorithmic trading research platform"
+description = "A conservative algorithmic trading platform"
 readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "Proprietary" }

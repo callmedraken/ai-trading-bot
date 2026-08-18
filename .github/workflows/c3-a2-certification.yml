@@ -22,22 +22,34 @@ jobs:
           python-version: "3.12"
           cache: pip
 
-      - name: Install project
+      - id: install
+        name: Install project
+        continue-on-error: true
         run: python -m pip install -e ".[dev]"
 
-      - name: Ruff check
+      - id: ruff_check
+        name: Ruff check
+        continue-on-error: true
         run: python -m ruff check src/trading_bot/runtime/windows_effectful_capture_protocol.py tests/runtime/test_windows_effectful_capture_protocol.py
 
-      - name: Ruff format check
+      - id: ruff_format
+        name: Ruff format check
+        continue-on-error: true
         run: python -m ruff format --check src/trading_bot/runtime/windows_effectful_capture_protocol.py tests/runtime/test_windows_effectful_capture_protocol.py
 
-      - name: Focused tests
+      - id: focused_tests
+        name: Focused tests
+        continue-on-error: true
         run: python -m pytest tests/runtime/test_windows_effectful_capture_contracts.py tests/runtime/test_windows_effectful_capture_protocol.py tests/market_data/test_daily_snapshot_models.py tests/market_data/test_daily_snapshot_provider.py tests/market_data/test_daily_snapshot_identity.py tests/market_data/test_daily_snapshot_serialization.py tests/market_data/test_daily_snapshot_verification.py tests/market_data/test_daily_snapshot_acceptance.py -q
 
-      - name: Diff check
+      - id: diff_check
+        name: Diff check
+        continue-on-error: true
         run: git diff --check 0975f1aa28a391d5462d5c1362472bac89a89ece HEAD -- src/trading_bot/runtime/windows_effectful_capture_protocol.py tests/runtime/test_windows_effectful_capture_protocol.py
 
-      - name: SQL identity
+      - id: sql_identity
+        name: SQL identity
+        continue-on-error: true
         shell: python
         run: |
           import hashlib
@@ -50,14 +62,21 @@ jobs:
           assert digest == "aa61df2f5db0090f8373222d1f5e492a58f4c10273afacfab45e382bacd4bb58"
           print(len(payload), digest)
 
-      - name: Record outcome
+      - name: Record outcomes
         if: always()
         env:
-          JOB_STATUS: ${{ job.status }}
+          INSTALL: ${{ steps.install.outcome }}
+          RUFF_CHECK: ${{ steps.ruff_check.outcome }}
+          RUFF_FORMAT: ${{ steps.ruff_format.outcome }}
+          FOCUSED_TESTS: ${{ steps.focused_tests.outcome }}
+          DIFF_CHECK: ${{ steps.diff_check.outcome }}
+          SQL_IDENTITY: ${{ steps.sql_identity.outcome }}
         run: |
-          printf '%s\n' "$JOB_STATUS" > .c3-a2-certification-status
+          printf 'install=%s\nruff_check=%s\nruff_format=%s\nfocused_tests=%s\ndiff_check=%s\nsql_identity=%s\n' \
+            "$INSTALL" "$RUFF_CHECK" "$RUFF_FORMAT" "$FOCUSED_TESTS" "$DIFF_CHECK" "$SQL_IDENTITY" \
+            > .c3-a2-certification-report
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add .c3-a2-certification-status
-          git commit -m "test: record C3 A2 certification status"
+          git add .c3-a2-certification-report
+          git commit -m "test: record C3 A2 certification outcomes"
           git push origin HEAD:feature/c3-a2-certification

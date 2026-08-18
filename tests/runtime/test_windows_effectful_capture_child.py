@@ -302,7 +302,11 @@ def test_post_admission_reparse_failure_is_request_invalid_after_fence(
     def fail_parse(_payload: bytes):
         raise WindowsEffectfulCaptureProtocolError("tampered request")
 
-    monkeypatch.setattr(child_module, "parse_isolated_capture_child_request", fail_parse)
+    monkeypatch.setattr(
+        child_module,
+        "parse_isolated_capture_child_request",
+        fail_parse,
+    )
     result = attempt.run()
 
     assert result.classification is ChildResultClassification.REQUEST_INVALID
@@ -362,7 +366,11 @@ def test_transport_failure_has_no_fabricated_http_evidence() -> None:
 
 def test_http_failure_retains_only_sanitized_response_evidence() -> None:
     transport = FakeTransport(
-        error=AlpacaHttpStatusError(429, request_id="request-429", provider_code=42910000)
+        error=AlpacaHttpStatusError(
+            429,
+            request_id="request-429",
+            provider_code=42910000,
+        )
     )
     attempt, _api, _transport, writer = _attempt(transport=transport)
 

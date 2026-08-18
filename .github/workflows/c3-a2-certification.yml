@@ -22,12 +22,29 @@ jobs:
           python-version: "3.12"
           cache: pip
 
-      - name: Install project
-        run: python -m pip install -e ".[dev]"
-
-      - name: Apply reviewed pre-certification corrections
-        shell: python
+      - name: Run diagnostic certification
+        shell: bash
         run: |
+          set +e
+          report=.c3-a2-certification-report.txt
+          : > "$report"
+          status=0
+
+          record() {
+            label="$1"
+            shift
+            printf '\n===== %s =====\n' "$label" >> "$report"
+            "$@" >> "$report" 2>&1
+            code=$?
+            printf '\nexit=%s\n' "$code" >> "$report"
+            if [ "$code" -ne 0 ]; then
+              status="$code"
+            fi
+          }
+
+          record "install" python -m pip install -e ".[dev]"
+
+          python - <<'PY' >> "$report" 2>&1
           from pathlib import Path
 
           source = Path("src/trading_bot/runtime/windows_effectful_capture_protocol.py")
@@ -54,62 +71,68 @@ jobs:
               "        )\n",
           )
           tests.write_text(text, encoding="utf-8")
+          print("pre-cert corrections applied")
+          PY
+          patch_code=$?
+          printf '\n===== patch =====\nexit=%s\n' "$patch_code" >> "$report"
+          if [ "$patch_code" -ne 0 ]; then status="$patch_code"; fi
 
-      - name: Ruff autofix imports
-        run: >-
-          python -m ruff check --fix
-          src/trading_bot/runtime/windows_effectful_capture_protocol.py
-          tests/runtime/test_windows_effectful_capture_protocol.py
+          record "ruff-fix" python -m ruff check --fix \
+            src/trading_bot/runtime/windows_effectful_capture_protocol.py \
+            tests/runtime/test_windows_effectful_capture_protocol.py
 
-      - name: Format A2 files
-        run: >-
-          python -m ruff format
-          src/trading_bot/runtime/windows_effectful_capture_protocol.py
-          tests/runtime/test_windows_effectful_capture_protocol.py
+          record "ruff-format" python -m ruff format \
+            src/trading_bot/runtime/windows_effectful_capture_protocol.py \
+            tests/runtime/test_windows_effectful_capture_protocol.py
 
-      - name: Ruff check
-        run: >-
-          python -m ruff check
-          src/trading_bot/runtime/windows_effectful_capture_protocol.py
-          tests/runtime/test_windows_effectful_capture_protocol.py
+          record "ruff-check" python -m ruff check \
+            src/trading_bot/runtime/windows_effectful_capture_protocol.py \
+            tests/runtime/test_windows_effectful_capture_protocol.py
 
-      - name: C3 A1 and A2 focused tests
-        run: >-
-          python -m pytest
-          tests/runtime/test_windows_effectful_capture_contracts.py
-          tests/runtime/test_windows_effectful_capture_protocol.py
-          tests/market_data/test_daily_snapshot_models.py
-          tests/market_data/test_daily_snapshot_provider.py
-          tests/market_data/test_daily_snapshot_identity.py
-          tests/market_data/test_daily_snapshot_serialization.py
-          tests/market_data/test_daily_snapshot_verification.py
-          tests/market_data/test_daily_snapshot_acceptance.py
-          -q
+          record "focused-tests" python -m pytest \
+            tests/runtime/test_windows_effectful_capture_contracts.py \
+            tests/runtime/test_windows_effectful_capture_protocol.py \
+            tests/market_data/test_daily_snapshot_models.py \
+            tests/market_data/test_daily_snapshot_provider.py \
+            tests/market_data/test_daily_snapshot_identity.py \
+            tests/market_data/test_daily_snapshot_serialization.py \
+            tests/market_data/test_daily_snapshot_verification.py \
+            tests/market_data/test_daily_snapshot_acceptance.py \
+            -q
 
-      - name: Diff check
-        run: git diff --check
+          record "diff-check" git diff --check
 
-      - name: SQL identity
-        shell: python
-        run: |
+          printf '\n===== sql-identity =====\n' >> "$report"
+          python - <<'PY' >> "$report" 2>&1
           import hashlib
           from pathlib import Path
 
           path = Path("src/trading_bot/runtime/schema/windows_transactional_authority_v1.sql")
           payload = path.read_bytes()
-          assert len(payload) == 118896, len(payload)
           digest = hashlib.sha256(payload).hexdigest()
-          assert digest == "aa61df2f5db0090f8373222d1f5e492a58f4c10273afacfab45e382bacd4bb58"
           print(len(payload), digest)
+          assert len(payload) == 118896, len(payload)
+          assert digest == "aa61df2f5db0090f8373222d1f5e492a58f4c10273afacfab45e382bacd4bb58"
+          PY
+          sql_code=$?
+          printf 'exit=%s\n' "$sql_code" >> "$report"
+          if [ "$sql_code" -ne 0 ]; then status="$sql_code"; fi
 
-      - name: Publish certified temporary tree
-        run: |
-          printf '%s\n' 'C3-A2 certification passed' > .c3-a2-certification-success
+          rm -f .c3-a2-certification-success .c3-a2-certification-failure
+          if [ "$status" -eq 0 ]; then
+            printf '%s\n' 'C3-A2 certification passed' > .c3-a2-certification-success
+          else
+            printf '%s\n' "C3-A2 certification failed: exit $status" > .c3-a2-certification-failure
+          fi
+
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add \
             src/trading_bot/runtime/windows_effectful_capture_protocol.py \
             tests/runtime/test_windows_effectful_capture_protocol.py \
-            .c3-a2-certification-success
-          git commit -m "test: record C3 A2 certification"
+            .c3-a2-certification-report.txt \
+            .c3-a2-certification-success \
+            .c3-a2-certification-failure 2>/dev/null || true
+          git commit -m "test: record C3 A2 diagnostic certification"
           git push origin HEAD:feature/c3-a2-certification
+          exit "$status"

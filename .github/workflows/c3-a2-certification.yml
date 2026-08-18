@@ -22,117 +22,42 @@ jobs:
           python-version: "3.12"
           cache: pip
 
-      - name: Run diagnostic certification
-        shell: bash
+      - name: Install project
+        run: python -m pip install -e ".[dev]"
+
+      - name: Ruff check
+        run: python -m ruff check src/trading_bot/runtime/windows_effectful_capture_protocol.py tests/runtime/test_windows_effectful_capture_protocol.py
+
+      - name: Ruff format check
+        run: python -m ruff format --check src/trading_bot/runtime/windows_effectful_capture_protocol.py tests/runtime/test_windows_effectful_capture_protocol.py
+
+      - name: Focused tests
+        run: python -m pytest tests/runtime/test_windows_effectful_capture_contracts.py tests/runtime/test_windows_effectful_capture_protocol.py tests/market_data/test_daily_snapshot_models.py tests/market_data/test_daily_snapshot_provider.py tests/market_data/test_daily_snapshot_identity.py tests/market_data/test_daily_snapshot_serialization.py tests/market_data/test_daily_snapshot_verification.py tests/market_data/test_daily_snapshot_acceptance.py -q
+
+      - name: Diff check
+        run: git diff --check 0975f1aa28a391d5462d5c1362472bac89a89ece HEAD -- src/trading_bot/runtime/windows_effectful_capture_protocol.py tests/runtime/test_windows_effectful_capture_protocol.py
+
+      - name: SQL identity
+        shell: python
         run: |
-          set +e
-          report=.c3-a2-certification-report.txt
-          : > "$report"
-          status=0
-
-          record() {
-            label="$1"
-            shift
-            printf '\n===== %s =====\n' "$label" >> "$report"
-            "$@" >> "$report" 2>&1
-            code=$?
-            printf '\nexit=%s\n' "$code" >> "$report"
-            if [ "$code" -ne 0 ]; then
-              status="$code"
-            fi
-          }
-
-          record "install" python -m pip install -e ".[dev]"
-
-          python - <<'PY' >> "$report" 2>&1
-          from pathlib import Path
-
-          source = Path("src/trading_bot/runtime/windows_effectful_capture_protocol.py")
-          text = source.read_text(encoding="utf-8")
-          text = text.replace(
-              "    MAX_DAILY_SNAPSHOT_ARTIFACT_BYTES,\n    ProviderDescriptor,\n",
-              "    MAX_DAILY_SNAPSHOT_ARTIFACT_BYTES,\n    MAX_DAILY_SNAPSHOT_SYMBOLS,\n    ProviderDescriptor,\n",
-          )
-          text = text.replace(
-              "        if not universe or any(type(symbol) is not Symbol for symbol in universe):\n",
-              "        if not 1 <= len(universe) <= MAX_DAILY_SNAPSHOT_SYMBOLS or any(\n"
-              "            type(symbol) is not Symbol for symbol in universe\n"
-              "        ):\n",
-          )
-          source.write_text(text, encoding="utf-8")
-
-          tests = Path("tests/runtime/test_windows_effectful_capture_protocol.py")
-          text = tests.read_text(encoding="utf-8")
-          text = text.replace(
-              "        replace(request, execution_id=_EXECUTION.upper())\n",
-              "        replace(\n"
-              "            request,\n"
-              "            execution_id=\"AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA\",\n"
-              "        )\n",
-          )
-          tests.write_text(text, encoding="utf-8")
-          print("pre-cert corrections applied")
-          PY
-          patch_code=$?
-          printf '\n===== patch =====\nexit=%s\n' "$patch_code" >> "$report"
-          if [ "$patch_code" -ne 0 ]; then status="$patch_code"; fi
-
-          record "ruff-fix" python -m ruff check --fix \
-            src/trading_bot/runtime/windows_effectful_capture_protocol.py \
-            tests/runtime/test_windows_effectful_capture_protocol.py
-
-          record "ruff-format" python -m ruff format \
-            src/trading_bot/runtime/windows_effectful_capture_protocol.py \
-            tests/runtime/test_windows_effectful_capture_protocol.py
-
-          record "ruff-check" python -m ruff check \
-            src/trading_bot/runtime/windows_effectful_capture_protocol.py \
-            tests/runtime/test_windows_effectful_capture_protocol.py
-
-          record "focused-tests" python -m pytest \
-            tests/runtime/test_windows_effectful_capture_contracts.py \
-            tests/runtime/test_windows_effectful_capture_protocol.py \
-            tests/market_data/test_daily_snapshot_models.py \
-            tests/market_data/test_daily_snapshot_provider.py \
-            tests/market_data/test_daily_snapshot_identity.py \
-            tests/market_data/test_daily_snapshot_serialization.py \
-            tests/market_data/test_daily_snapshot_verification.py \
-            tests/market_data/test_daily_snapshot_acceptance.py \
-            -q
-
-          record "diff-check" git diff --check
-
-          printf '\n===== sql-identity =====\n' >> "$report"
-          python - <<'PY' >> "$report" 2>&1
           import hashlib
           from pathlib import Path
 
           path = Path("src/trading_bot/runtime/schema/windows_transactional_authority_v1.sql")
           payload = path.read_bytes()
           digest = hashlib.sha256(payload).hexdigest()
-          print(len(payload), digest)
           assert len(payload) == 118896, len(payload)
           assert digest == "aa61df2f5db0090f8373222d1f5e492a58f4c10273afacfab45e382bacd4bb58"
-          PY
-          sql_code=$?
-          printf 'exit=%s\n' "$sql_code" >> "$report"
-          if [ "$sql_code" -ne 0 ]; then status="$sql_code"; fi
+          print(len(payload), digest)
 
-          rm -f .c3-a2-certification-success .c3-a2-certification-failure
-          if [ "$status" -eq 0 ]; then
-            printf '%s\n' 'C3-A2 certification passed' > .c3-a2-certification-success
-          else
-            printf '%s\n' "C3-A2 certification failed: exit $status" > .c3-a2-certification-failure
-          fi
-
+      - name: Record outcome
+        if: always()
+        env:
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          printf '%s\n' "$JOB_STATUS" > .c3-a2-certification-status
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add \
-            src/trading_bot/runtime/windows_effectful_capture_protocol.py \
-            tests/runtime/test_windows_effectful_capture_protocol.py \
-            .c3-a2-certification-report.txt \
-            .c3-a2-certification-success \
-            .c3-a2-certification-failure 2>/dev/null || true
-          git commit -m "test: record C3 A2 diagnostic certification"
+          git add .c3-a2-certification-status
+          git commit -m "test: record C3 A2 certification status"
           git push origin HEAD:feature/c3-a2-certification
-          exit "$status"

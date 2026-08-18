@@ -50,8 +50,9 @@ Events are recorded deterministically. Expected success ordering is:
 ```text
 fence
 -> SID
--> key read/release
--> secret read/release
+-> API-key read/validate
+-> secret read/validate
+-> native Credential Manager entry cleanup
 -> provider transport
 -> credential scope close
 -> serialize
@@ -61,10 +62,10 @@ fence
 -> result
 ```
 
-Native Credential Manager entries may be released before provider transport once
-B1 has copied the bounded values into the scoped holder; the scoped Python secret
-references remain live only through provider execution and are closed before
-serialization/staging.
+B1 releases the acquired native Credential Manager entries after both bounded
+values have been validated/copied and before it returns the scoped Python secret
+holder to B2. The scoped Python secret references remain live only through
+provider execution and are closed before serialization/staging.
 
 ## Regression gate
 

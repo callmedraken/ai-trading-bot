@@ -20,64 +20,84 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-      - name: Install project
-        run: python -m pip install -e ".[dev]"
-      - name: Format B2 files
-        run: >-
-          python -m ruff format
-          src/trading_bot/runtime/windows_effectful_capture_child.py
-          tests/runtime/test_windows_effectful_capture_child.py
-      - name: Ruff check
-        run: >-
-          python -m ruff check
-          src/trading_bot/runtime/windows_effectful_capture_child.py
-          src/trading_bot/runtime/windows_effectful_capture_credentials.py
-          src/trading_bot/runtime/windows_effectful_capture_protocol.py
-          tests/runtime/test_windows_effectful_capture_child.py
-          tests/runtime/test_windows_effectful_capture_credentials.py
-          tests/runtime/test_windows_effectful_capture_credentials_security.py
-      - name: Focused B2 tests
-        run: >-
-          python -m pytest
-          tests/runtime/test_windows_effectful_capture_child.py
-          tests/runtime/test_windows_effectful_capture_credentials.py
-          tests/runtime/test_windows_effectful_capture_credentials_security.py
-          tests/runtime/test_windows_effectful_capture_contracts.py
-          tests/runtime/test_windows_effectful_capture_protocol.py
-          tests/runtime/test_windows_effectful_capture_service.py
-          tests/market_data/test_alpaca_daily_snapshot.py
-          tests/market_data/test_alpaca_http.py
-          tests/market_data/test_daily_snapshot_provider.py
-          tests/market_data/test_daily_snapshot_acceptance.py
-          tests/market_data/test_daily_snapshot_serialization.py
-          tests/market_data/test_daily_snapshot_identity.py
-          tests/market_data/test_daily_snapshot_verification.py
-          -q
-      - name: Ruff format check
-        run: >-
-          python -m ruff format --check
-          src/trading_bot/runtime/windows_effectful_capture_child.py
-          tests/runtime/test_windows_effectful_capture_child.py
-      - name: Diff check
-        run: git diff --check
-      - name: SQL identity
-        shell: python
+      - name: Diagnose B2 gate
+        shell: bash
         run: |
+          set +e
+          report=.c3-b2-certification-report
+          : > "$report"
+          status=0
+
+          record() {
+            label="$1"
+            shift
+            "$@" > ".c3-b2-${label}.txt" 2>&1
+            code=$?
+            printf '%s=%s\n' "$label" "$code" >> "$report"
+            if [ "$code" -ne 0 ]; then status=1; fi
+          }
+
+          record install python -m pip install -e ".[dev]"
+          record format python -m ruff format \
+            src/trading_bot/runtime/windows_effectful_capture_child.py \
+            tests/runtime/test_windows_effectful_capture_child.py
+          record ruff python -m ruff check \
+            src/trading_bot/runtime/windows_effectful_capture_child.py \
+            src/trading_bot/runtime/windows_effectful_capture_credentials.py \
+            src/trading_bot/runtime/windows_effectful_capture_protocol.py \
+            tests/runtime/test_windows_effectful_capture_child.py \
+            tests/runtime/test_windows_effectful_capture_credentials.py \
+            tests/runtime/test_windows_effectful_capture_credentials_security.py
+          record tests python -m pytest \
+            tests/runtime/test_windows_effectful_capture_child.py \
+            tests/runtime/test_windows_effectful_capture_credentials.py \
+            tests/runtime/test_windows_effectful_capture_credentials_security.py \
+            tests/runtime/test_windows_effectful_capture_contracts.py \
+            tests/runtime/test_windows_effectful_capture_protocol.py \
+            tests/runtime/test_windows_effectful_capture_service.py \
+            tests/market_data/test_alpaca_daily_snapshot.py \
+            tests/market_data/test_alpaca_http.py \
+            tests/market_data/test_daily_snapshot_provider.py \
+            tests/market_data/test_daily_snapshot_acceptance.py \
+            tests/market_data/test_daily_snapshot_serialization.py \
+            tests/market_data/test_daily_snapshot_identity.py \
+            tests/market_data/test_daily_snapshot_verification.py \
+            -q
+          record format_check python -m ruff format --check \
+            src/trading_bot/runtime/windows_effectful_capture_child.py \
+            tests/runtime/test_windows_effectful_capture_child.py
+          record diff_check git diff --check
+
+          python - <<'PY' > .c3-b2-sql.txt 2>&1
           import hashlib
           from pathlib import Path
           path = Path("src/trading_bot/runtime/schema/windows_transactional_authority_v1.sql")
           payload = path.read_bytes()
           digest = hashlib.sha256(payload).hexdigest()
+          print(len(payload), digest)
           assert len(payload) == 118896, len(payload)
           assert digest == "aa61df2f5db0090f8373222d1f5e492a58f4c10273afacfab45e382bacd4bb58"
-      - name: Publish certified B2 blobs
-        run: |
-          printf '%s\n' 'C3-B2 certification passed' > .c3-b2-certification-success
+          PY
+          code=$?
+          printf 'sql=%s\n' "$code" >> "$report"
+          if [ "$code" -ne 0 ]; then status=1; fi
+
+          rm -f .c3-b2-certification-success .c3-b2-certification-failure
+          if [ "$status" -eq 0 ]; then
+            printf '%s\n' 'C3-B2 certification passed' > .c3-b2-certification-success
+          else
+            printf '%s\n' 'C3-B2 certification failed' > .c3-b2-certification-failure
+          fi
+
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add \
             src/trading_bot/runtime/windows_effectful_capture_child.py \
             tests/runtime/test_windows_effectful_capture_child.py \
-            .c3-b2-certification-success
-          git commit -m "test: record C3 B2 certification"
+            .c3-b2-certification-report \
+            .c3-b2-*.txt \
+            .c3-b2-certification-success \
+            .c3-b2-certification-failure 2>/dev/null || true
+          git commit -m "test: record C3 B2 diagnostic certification" || true
           git push origin HEAD:feature/c3-b2-certification
+          exit "$status"

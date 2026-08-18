@@ -145,7 +145,9 @@ class WindowsAlpacaCredentialManagerReader:
     __slots__ = ("_native_api", "_sid_resolver")
 
     def __init__(self) -> None:
-        self._native_api: WindowsCredentialNativeApi = CtypesWindowsCredentialNativeApi()
+        self._native_api: WindowsCredentialNativeApi = (
+            CtypesWindowsCredentialNativeApi()
+        )
         self._sid_resolver: Callable[[], str] = resolve_current_token_sid
 
     @classmethod

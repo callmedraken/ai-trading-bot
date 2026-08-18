@@ -82,7 +82,9 @@ def _reader(
     )
 
 
-def test_success_reads_only_fixed_targets_after_sid_and_releases_native_entries() -> None:
+def test_success_reads_only_fixed_targets_after_sid_and_releases_native_entries() -> (
+    None
+):
     api = FakeNativeCredentialApi()
     reader = _reader(api)
 
@@ -266,7 +268,9 @@ def test_cleanup_failure_fails_closed_and_does_not_expose_secret() -> None:
     assert len(api.releases) == 2
 
 
-def test_scoped_secrets_are_redacted_idempotently_closed_and_unusable_after_close() -> None:
+def test_scoped_secrets_are_redacted_idempotently_closed_and_unusable_after_close() -> (
+    None
+):
     scope = ScopedAlpacaSecrets(_KEY, _SECRET)
     assert _KEY not in repr(scope)
     assert _SECRET not in str(scope)

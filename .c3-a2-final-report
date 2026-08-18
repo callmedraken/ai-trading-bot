@@ -1,0 +1,8 @@
+install=success
+correct=success
+format=success
+ruff_check=failure
+ruff_format=success
+focused_tests=success
+diff_check=success
+sql_identity=success

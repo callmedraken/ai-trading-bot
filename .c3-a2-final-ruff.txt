@@ -1,0 +1,23 @@
+E501 Line too long (104 > 88)
+   --> src/trading_bot/runtime/windows_effectful_capture_protocol.py:301:89
+    |
+299 |         {
+300 |             "approved_account_sid": request.approved_account_sid,
+301 |             "authorized_snapshot_session": request.authorized_snapshot_session.session_date.isoformat(),
+    |                                                                                         ^^^^^^^^^^^^^^^^
+302 |             "c2_request": request.capture_request.to_c2_request_dict(),
+303 |             "c2_request_sha256": request.c2_request_sha256,
+    |
+
+E501 Line too long (89 > 88)
+   --> src/trading_bot/runtime/windows_effectful_capture_protocol.py:484:89
+    |
+482 | @dataclass(frozen=True, slots=True, weakref_slot=True)
+483 | class VerifiedCapturedSnapshot:
+484 |     """Opaque process-local proof that parent-side final artifact verification passed."""
+    |                                                                                         ^
+485 |
+486 |     reservation_id: str
+    |
+
+Found 2 errors.

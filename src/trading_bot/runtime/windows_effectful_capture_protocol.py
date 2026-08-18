@@ -156,7 +156,9 @@ class IsolatedCaptureChildRequest:
             raise WindowsEffectfulCaptureProtocolError(
                 "daily_snapshot_request_id must be an exact UUID"
             )
-        requested_at = _canonical_utc_datetime(self.requested_at_utc, "requested_at_utc")
+        requested_at = _canonical_utc_datetime(
+            self.requested_at_utc, "requested_at_utc"
+        )
         if type(self.authorized_snapshot_session) is not TradingSession:
             raise WindowsEffectfulCaptureProtocolError(
                 "authorized_snapshot_session must be TradingSession"
@@ -192,7 +194,9 @@ class IsolatedCaptureChildRequest:
 
     @property
     def sha256(self) -> str:
-        return hashlib.sha256(serialize_isolated_capture_child_request(self)).hexdigest()
+        return hashlib.sha256(
+            serialize_isolated_capture_child_request(self)
+        ).hexdigest()
 
 
 @dataclass(frozen=True, slots=True)
@@ -319,7 +323,9 @@ def serialize_isolated_capture_child_request(
         }
     )
     if len(payload) > MAX_C3_CHILD_REQUEST_BYTES:
-        raise WindowsEffectfulCaptureProtocolError("child request exceeds its byte bound")
+        raise WindowsEffectfulCaptureProtocolError(
+            "child request exceeds its byte bound"
+        )
     return payload
 
 
@@ -329,10 +335,17 @@ def parse_isolated_capture_child_request(payload: bytes) -> IsolatedCaptureChild
         raise WindowsEffectfulCaptureProtocolError(
             "child request has a missing or unknown field"
         )
-    if type(root["schema"]) is not int or root["schema"] != C3_CHILD_REQUEST_SCHEMA_VERSION:
-        raise WindowsEffectfulCaptureProtocolError("child request schema is unsupported")
+    if (
+        type(root["schema"]) is not int
+        or root["schema"] != C3_CHILD_REQUEST_SCHEMA_VERSION
+    ):
+        raise WindowsEffectfulCaptureProtocolError(
+            "child request schema is unsupported"
+        )
     if root["protocol"] != C3_CHILD_OPERATION_VERSION:
-        raise WindowsEffectfulCaptureProtocolError("child request protocol is unsupported")
+        raise WindowsEffectfulCaptureProtocolError(
+            "child request protocol is unsupported"
+        )
     capture_request = _capture_request_from_object(root["c2_request"])
     provider = _provider_from_object(root["provider"])
     targets = root["credential_targets"]
@@ -363,11 +376,15 @@ def parse_isolated_capture_child_request(payload: bytes) -> IsolatedCaptureChild
         api_secret_key_credential_target=targets["api_secret_key"],
     )
     if serialize_isolated_capture_child_request(request) != payload:
-        raise WindowsEffectfulCaptureProtocolError("child request bytes are not canonical")
+        raise WindowsEffectfulCaptureProtocolError(
+            "child request bytes are not canonical"
+        )
     return request
 
 
-def serialize_isolated_capture_child_result(result: IsolatedCaptureChildResult) -> bytes:
+def serialize_isolated_capture_child_result(
+    result: IsolatedCaptureChildResult,
+) -> bytes:
     if type(result) is not IsolatedCaptureChildResult:
         raise WindowsEffectfulCaptureProtocolError(
             "child result serializer requires IsolatedCaptureChildResult"
@@ -386,11 +403,15 @@ def serialize_isolated_capture_child_result(result: IsolatedCaptureChildResult) 
             "provider_request_id": result.provider_request_id,
             "reservation_id": result.reservation_id,
             "schema": C3_CHILD_RESULT_SCHEMA_VERSION,
-            "snapshot_id": None if result.snapshot_id is None else str(result.snapshot_id),
+            "snapshot_id": None
+            if result.snapshot_id is None
+            else str(result.snapshot_id),
         }
     )
     if len(payload) > MAX_C3_CHILD_RESULT_BYTES:
-        raise WindowsEffectfulCaptureProtocolError("child result exceeds its byte bound")
+        raise WindowsEffectfulCaptureProtocolError(
+            "child result exceeds its byte bound"
+        )
     return payload
 
 
@@ -400,10 +421,15 @@ def parse_isolated_capture_child_result(payload: bytes) -> IsolatedCaptureChildR
         raise WindowsEffectfulCaptureProtocolError(
             "child result has a missing or unknown field"
         )
-    if type(root["schema"]) is not int or root["schema"] != C3_CHILD_RESULT_SCHEMA_VERSION:
+    if (
+        type(root["schema"]) is not int
+        or root["schema"] != C3_CHILD_RESULT_SCHEMA_VERSION
+    ):
         raise WindowsEffectfulCaptureProtocolError("child result schema is unsupported")
     if root["protocol"] != C3_CHILD_OPERATION_VERSION:
-        raise WindowsEffectfulCaptureProtocolError("child result protocol is unsupported")
+        raise WindowsEffectfulCaptureProtocolError(
+            "child result protocol is unsupported"
+        )
     try:
         fence_state = ProviderAttemptFenceState(root["fence_state"])
         classification = ChildResultClassification(root["classification"])
@@ -431,7 +457,9 @@ def parse_isolated_capture_child_result(payload: bytes) -> IsolatedCaptureChildR
         provider_request_id=root["provider_request_id"],
     )
     if serialize_isolated_capture_child_result(result) != payload:
-        raise WindowsEffectfulCaptureProtocolError("child result bytes are not canonical")
+        raise WindowsEffectfulCaptureProtocolError(
+            "child result bytes are not canonical"
+        )
     return result
 
 
@@ -476,7 +504,9 @@ class VerifiedCapturedSnapshot:
         _canonical_uuid_text(self.reservation_id, "reservation_id")
         _canonical_uuid_text(self.execution_id, "execution_id")
         if type(self.snapshot_id) is not UUID:
-            raise WindowsEffectfulCaptureProtocolError("snapshot_id must be an exact UUID")
+            raise WindowsEffectfulCaptureProtocolError(
+                "snapshot_id must be an exact UUID"
+            )
         _require_sha256(self.artifact_sha256, "artifact_sha256")
         _require_snapshot_byte_length(self.artifact_byte_length)
         _require_sha256(self.artifact_identity_sha256, "artifact_identity_sha256")
@@ -644,7 +674,9 @@ def _validate_result_snapshot_fields(result: IsolatedCaptureChildResult) -> None
                 "successful child result requires snapshot_id"
             )
         if type(result.snapshot_id) is not UUID:
-            raise WindowsEffectfulCaptureProtocolError("snapshot_id must be an exact UUID")
+            raise WindowsEffectfulCaptureProtocolError(
+                "snapshot_id must be an exact UUID"
+            )
         _require_sha256(result.artifact_sha256, "artifact_sha256")
         _require_snapshot_byte_length(result.artifact_byte_length)
     elif any(value is not None for value in fields):
@@ -858,7 +890,11 @@ def _require_snapshot_byte_length(value: object) -> None:
 
 
 def _require_canonical_sid(value: object) -> None:
-    if type(value) is not str or len(value) > 184 or _SID_PATTERN.fullmatch(value) is None:
+    if (
+        type(value) is not str
+        or len(value) > 184
+        or _SID_PATTERN.fullmatch(value) is None
+    ):
         raise WindowsEffectfulCaptureProtocolError(
             "approved_account_sid must be canonical SID text"
         )

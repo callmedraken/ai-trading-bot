@@ -488,7 +488,10 @@ def _reconcile_runtime_request(
         raise WindowsEffectfulCaptureProtocolError(
             "child runtime target session disagrees with authorized session"
         )
-    if provider_request.capture_request.request_id != request.daily_snapshot_request_id:
+    if (
+        provider_request.capture_request.request_id
+        != request.daily_snapshot_request_id
+    ):
         raise WindowsEffectfulCaptureProtocolError(
             "child runtime daily snapshot request identity changed"
         )

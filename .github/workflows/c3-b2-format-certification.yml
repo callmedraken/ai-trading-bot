@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 jobs:
-  certify:
+  certify-and-publish:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -46,8 +46,6 @@ jobs:
           tests/runtime/test_windows_effectful_capture_child.py
           tests/runtime/test_windows_effectful_capture_child_security.py
           -q
-      - name: Diff check
-        run: git diff --check
       - name: SQL identity
         shell: python
         run: |
@@ -58,15 +56,38 @@ jobs:
           digest = hashlib.sha256(payload).hexdigest()
           assert len(payload) == 118896, len(payload)
           assert digest == "aa61df2f5db0090f8373222d1f5e492a58f4c10273afacfab45e382bacd4bb58"
-      - name: Publish exact formatted blobs
+      - name: Save exact formatted blobs
         run: |
-          printf '%s\n' 'C3-B2 format certification passed' > .c3-b2-format-certification-success
+          mkdir -p /tmp/c3-b2/src/trading_bot/runtime /tmp/c3-b2/tests/runtime
+          cp src/trading_bot/runtime/windows_effectful_capture_child.py /tmp/c3-b2/src/trading_bot/runtime/
+          cp tests/runtime/test_windows_effectful_capture_child.py /tmp/c3-b2/tests/runtime/
+          cp tests/runtime/test_windows_effectful_capture_child_security.py /tmp/c3-b2/tests/runtime/
+      - name: Publish to real C3 branch
+        run: |
+          set -euo pipefail
+          git fetch origin feature/windows-effectful-market-data-capture
+          git checkout -B c3-b2-publish origin/feature/windows-effectful-market-data-capture
+          test "$(git rev-parse HEAD)" = "e63094325ca3b7caa573e3b8dd036e8d977fcd38"
+          cp /tmp/c3-b2/src/trading_bot/runtime/windows_effectful_capture_child.py src/trading_bot/runtime/
+          cp /tmp/c3-b2/tests/runtime/windows_effectful_capture_child.py tests/runtime/
+          cp /tmp/c3-b2/tests/runtime/windows_effectful_capture_child_security.py tests/runtime/
+          git diff --check
+          python -m ruff check \
+            src/trading_bot/runtime/windows_effectful_capture_child.py \
+            tests/runtime/test_windows_effectful_capture_child.py \
+            tests/runtime/test_windows_effectful_capture_child_security.py
+          python -m ruff format --check \
+            src/trading_bot/runtime/windows_effectful_capture_child.py \
+            tests/runtime/test_windows_effectful_capture_child.py \
+            tests/runtime/test_windows_effectful_capture_child_security.py
+          changed="$(git diff --name-only)"
+          printf '%s\n' "$changed"
+          test -n "$changed"
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add \
             src/trading_bot/runtime/windows_effectful_capture_child.py \
             tests/runtime/test_windows_effectful_capture_child.py \
-            tests/runtime/test_windows_effectful_capture_child_security.py \
-            .c3-b2-format-certification-success
-          git commit -m "test: record C3 B2 format certification"
-          git push origin HEAD:feature/c3-b2-format-certification
+            tests/runtime/test_windows_effectful_capture_child_security.py
+          git commit -m "style: apply Ruff formatting to C3 B2"
+          git push origin HEAD:feature/windows-effectful-market-data-capture

@@ -170,8 +170,6 @@ class WindowsAlpacaCredentialManagerReader:
         _require_canonical_sid(approved_account_sid)
         try:
             observed_sid = self._sid_resolver()
-        except WindowsCredentialReadError:
-            raise
         except Exception:
             raise WindowsCredentialInvalidError(
                 "current process SID inspection failed"
@@ -210,9 +208,7 @@ class WindowsAlpacaCredentialManagerReader:
         try:
             entry = self._native_api.read_generic(target_name)
         except WindowsCredentialNotFoundError:
-            raise
-        except WindowsCredentialReadError:
-            raise
+            raise WindowsCredentialNotFoundError("credential was not found") from None
         except Exception:
             raise WindowsCredentialInvalidError("credential read failed") from None
         if type(entry) is not NativeCredentialEntry:
@@ -255,17 +251,20 @@ def _validate_entry(entry: NativeCredentialEntry, target_name: str) -> None:
         return
     if any(value is None for value in native_metadata):
         raise WindowsCredentialInvalidError("native credential blob range is invalid")
+    native_size = entry.native_blob_size
+    if type(native_size) is not int:
+        raise WindowsCredentialInvalidError("native credential blob range is invalid")
     native_range = _validate_native_blob_range(
         entry.native_blob_address,
-        entry.native_blob_size,  # type: ignore[arg-type]
+        native_size,
     )
     if native_range is None:
         raise WindowsCredentialInvalidError("credential value is invalid")
-    if entry.native_blob_size > MAX_WINDOWS_CREDENTIAL_BLOB_BYTES:  # type: ignore[operator]
+    if native_size > MAX_WINDOWS_CREDENTIAL_BLOB_BYTES:
         raise WindowsCredentialInvalidError(
             "credential value exceeds the approved copy bound"
         )
-    if len(entry.blob) != entry.native_blob_size:
+    if len(entry.blob) != native_size:
         raise WindowsCredentialInvalidError("credential value is invalid")
 
 

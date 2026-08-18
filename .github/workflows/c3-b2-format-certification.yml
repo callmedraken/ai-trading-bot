@@ -65,6 +65,7 @@ jobs:
       - name: Publish to real C3 branch
         run: |
           set -euo pipefail
+          git reset --hard HEAD
           git fetch origin feature/windows-effectful-market-data-capture
           git checkout -B c3-b2-publish origin/feature/windows-effectful-market-data-capture
           test "$(git rev-parse HEAD)" = "e63094325ca3b7caa573e3b8dd036e8d977fcd38"

@@ -26,7 +26,11 @@ from trading_bot.runtime.windows_effectful_capture import (
     C3_CHILD_OPERATION_VERSION,
     C3_CREDENTIAL_POLICY_VERSION,
     C3_OUTPUT_POLICY_VERSION,
+    ProductionCaptureRequest,
     ProductionProviderLaunchPlan,
+    WindowsEffectfulCapturePlanError,
+    derive_daily_snapshot_request_id,
+    prepare_production_capture_plan,
 )
 
 C3_CHILD_REQUEST_SCHEMA_VERSION = 1
@@ -41,12 +45,12 @@ _CHILD_REQUEST_FIELDS = frozenset(
     {
         "approved_account_sid",
         "authorized_snapshot_session",
+        "c2_request",
         "c2_request_sha256",
         "credential_policy_version",
         "credential_targets",
         "daily_snapshot_request_id",
         "execution_id",
-        "ordered_universe",
         "output_policy_version",
         "protocol",
         "provider",
@@ -54,6 +58,20 @@ _CHILD_REQUEST_FIELDS = frozenset(
         "requested_at_utc",
         "reservation_id",
         "schema",
+    }
+)
+_C2_REQUEST_FIELDS = frozenset(
+    {
+        "bar_interval",
+        "child_operation_version",
+        "ordered_universe",
+        "output_policy_version",
+        "permitted_provider_operation",
+        "provider_id",
+        "request_limit",
+        "request_window_end_date",
+        "request_window_start_date",
+        "target_session_date",
     }
 )
 _PROVIDER_FIELDS = frozenset({"adapter_version", "feed", "operation", "provider_id"})
@@ -113,11 +131,11 @@ class IsolatedCaptureChildRequest:
 
     reservation_id: str
     execution_id: str
+    capture_request: ProductionCaptureRequest
     c2_request_sha256: str
     daily_snapshot_request_id: UUID
     requested_at_utc: datetime
     authorized_snapshot_session: TradingSession
-    ordered_universe: tuple[Symbol, ...]
     approved_account_sid: str
     release_manifest_sha256: str
     provider: ProviderDescriptor = ALPACA_DAILY_SNAPSHOT_DESCRIPTOR
@@ -129,6 +147,10 @@ class IsolatedCaptureChildRequest:
     def __post_init__(self) -> None:
         reservation_id = _canonical_uuid_text(self.reservation_id, "reservation_id")
         execution_id = _canonical_uuid_text(self.execution_id, "execution_id")
+        if type(self.capture_request) is not ProductionCaptureRequest:
+            raise WindowsEffectfulCaptureProtocolError(
+                "capture_request must be ProductionCaptureRequest"
+            )
         _require_sha256(self.c2_request_sha256, "c2_request_sha256")
         if type(self.daily_snapshot_request_id) is not UUID:
             raise WindowsEffectfulCaptureProtocolError(
@@ -138,20 +160,6 @@ class IsolatedCaptureChildRequest:
         if type(self.authorized_snapshot_session) is not TradingSession:
             raise WindowsEffectfulCaptureProtocolError(
                 "authorized_snapshot_session must be TradingSession"
-            )
-        try:
-            universe = tuple(self.ordered_universe)
-        except TypeError as error:
-            raise WindowsEffectfulCaptureProtocolError(
-                "ordered_universe must be iterable"
-            ) from error
-        if not universe or any(type(symbol) is not Symbol for symbol in universe):
-            raise WindowsEffectfulCaptureProtocolError(
-                "ordered_universe must contain exact Symbol values"
-            )
-        if len(set(universe)) != len(universe):
-            raise WindowsEffectfulCaptureProtocolError(
-                "ordered_universe must be duplicate-free"
             )
         _require_canonical_sid(self.approved_account_sid)
         _require_sha256(self.release_manifest_sha256, "release_manifest_sha256")
@@ -170,10 +178,17 @@ class IsolatedCaptureChildRequest:
                 raise WindowsEffectfulCaptureProtocolError(
                     f"child request {field_name} is not fixed"
                 )
+        _reconcile_child_request_semantics(
+            capture_request=self.capture_request,
+            reservation_id=reservation_id,
+            requested_at_utc=requested_at,
+            c2_request_sha256=self.c2_request_sha256,
+            authorized_snapshot_session=self.authorized_snapshot_session,
+            daily_snapshot_request_id=self.daily_snapshot_request_id,
+        )
         object.__setattr__(self, "reservation_id", reservation_id)
         object.__setattr__(self, "execution_id", execution_id)
         object.__setattr__(self, "requested_at_utc", requested_at)
-        object.__setattr__(self, "ordered_universe", universe)
 
     @property
     def sha256(self) -> str:
@@ -227,20 +242,7 @@ class IsolatedCaptureChildResult:
             raise WindowsEffectfulCaptureProtocolError(
                 "pre-fence child result cannot contain provider transport evidence"
             )
-        if (
-            self.classification is ChildResultClassification.TRANSPORT_FAILED
-            and self.http_status is not None
-        ):
-            raise WindowsEffectfulCaptureProtocolError(
-                "transport failure cannot claim an HTTP response status"
-            )
-        if (
-            self.classification is ChildResultClassification.HTTP_FAILED
-            and self.http_status is None
-        ):
-            raise WindowsEffectfulCaptureProtocolError(
-                "HTTP failure requires a sanitized HTTP status"
-            )
+        _validate_result_classification_transport(self)
         object.__setattr__(self, "reservation_id", reservation_id)
         object.__setattr__(self, "execution_id", execution_id)
 
@@ -267,11 +269,11 @@ def build_isolated_capture_child_request(
     return IsolatedCaptureChildRequest(
         reservation_id=launch_plan.reservation_id,
         execution_id=execution_id,
+        capture_request=bound.plan.request,
         c2_request_sha256=launch_plan.c2_request_digest,
         daily_snapshot_request_id=capture_request.request_id,
         requested_at_utc=capture_request.requested_at,
         authorized_snapshot_session=launch_plan.authorized_snapshot_session,
-        ordered_universe=capture_request.symbols,
         approved_account_sid=approved_account_sid,
         release_manifest_sha256=release_manifest_sha256,
         provider=launch_plan.provider,
@@ -293,6 +295,7 @@ def serialize_isolated_capture_child_request(
         {
             "approved_account_sid": request.approved_account_sid,
             "authorized_snapshot_session": request.authorized_snapshot_session.session_date.isoformat(),
+            "c2_request": request.capture_request.to_c2_request_dict(),
             "c2_request_sha256": request.c2_request_sha256,
             "credential_policy_version": request.credential_policy_version,
             "credential_targets": {
@@ -301,7 +304,6 @@ def serialize_isolated_capture_child_request(
             },
             "daily_snapshot_request_id": str(request.daily_snapshot_request_id),
             "execution_id": request.execution_id,
-            "ordered_universe": [str(symbol) for symbol in request.ordered_universe],
             "output_policy_version": request.output_policy_version,
             "protocol": C3_CHILD_OPERATION_VERSION,
             "provider": {
@@ -327,27 +329,31 @@ def parse_isolated_capture_child_request(payload: bytes) -> IsolatedCaptureChild
         raise WindowsEffectfulCaptureProtocolError(
             "child request has a missing or unknown field"
         )
-    if root["schema"] != C3_CHILD_REQUEST_SCHEMA_VERSION:
+    if type(root["schema"]) is not int or root["schema"] != C3_CHILD_REQUEST_SCHEMA_VERSION:
         raise WindowsEffectfulCaptureProtocolError("child request schema is unsupported")
     if root["protocol"] != C3_CHILD_OPERATION_VERSION:
         raise WindowsEffectfulCaptureProtocolError("child request protocol is unsupported")
+    capture_request = _capture_request_from_object(root["c2_request"])
     provider = _provider_from_object(root["provider"])
     targets = root["credential_targets"]
     if type(targets) is not dict or frozenset(targets) != _CREDENTIAL_TARGET_FIELDS:
         raise WindowsEffectfulCaptureProtocolError(
             "child request credential targets are invalid"
         )
-    universe = _symbols_from_object(root["ordered_universe"])
     request = IsolatedCaptureChildRequest(
         reservation_id=root["reservation_id"],
         execution_id=root["execution_id"],
+        capture_request=capture_request,
         c2_request_sha256=root["c2_request_sha256"],
-        daily_snapshot_request_id=_canonical_uuid(root["daily_snapshot_request_id"], "daily_snapshot_request_id"),
+        daily_snapshot_request_id=_canonical_uuid(
+            root["daily_snapshot_request_id"], "daily_snapshot_request_id"
+        ),
         requested_at_utc=_parse_canonical_timestamp(root["requested_at_utc"]),
         authorized_snapshot_session=TradingSession(
-            _parse_canonical_date(root["authorized_snapshot_session"], "authorized_snapshot_session")
+            _parse_canonical_date(
+                root["authorized_snapshot_session"], "authorized_snapshot_session"
+            )
         ),
-        ordered_universe=universe,
         approved_account_sid=root["approved_account_sid"],
         release_manifest_sha256=root["release_manifest_sha256"],
         provider=provider,
@@ -357,9 +363,7 @@ def parse_isolated_capture_child_request(payload: bytes) -> IsolatedCaptureChild
         api_secret_key_credential_target=targets["api_secret_key"],
     )
     if serialize_isolated_capture_child_request(request) != payload:
-        raise WindowsEffectfulCaptureProtocolError(
-            "child request bytes are not canonical"
-        )
+        raise WindowsEffectfulCaptureProtocolError("child request bytes are not canonical")
     return request
 
 
@@ -396,7 +400,7 @@ def parse_isolated_capture_child_result(payload: bytes) -> IsolatedCaptureChildR
         raise WindowsEffectfulCaptureProtocolError(
             "child result has a missing or unknown field"
         )
-    if root["schema"] != C3_CHILD_RESULT_SCHEMA_VERSION:
+    if type(root["schema"]) is not int or root["schema"] != C3_CHILD_RESULT_SCHEMA_VERSION:
         raise WindowsEffectfulCaptureProtocolError("child result schema is unsupported")
     if root["protocol"] != C3_CHILD_OPERATION_VERSION:
         raise WindowsEffectfulCaptureProtocolError("child result protocol is unsupported")
@@ -580,6 +584,36 @@ def consume_verified_captured_snapshot_for_test(
     return bytes.fromhex(capability.artifact_sha256)
 
 
+def _reconcile_child_request_semantics(
+    *,
+    capture_request: ProductionCaptureRequest,
+    reservation_id: str,
+    requested_at_utc: datetime,
+    c2_request_sha256: str,
+    authorized_snapshot_session: TradingSession,
+    daily_snapshot_request_id: UUID,
+) -> None:
+    try:
+        plan = prepare_production_capture_plan(capture_request, requested_at_utc)
+        expected_request_id = derive_daily_snapshot_request_id(plan, reservation_id)
+    except WindowsEffectfulCapturePlanError as error:
+        raise WindowsEffectfulCaptureProtocolError(
+            "child request C2-to-snapshot bridge is inconsistent"
+        ) from error
+    if plan.c2_request_digest != c2_request_sha256:
+        raise WindowsEffectfulCaptureProtocolError(
+            "child request C2 request digest is inconsistent"
+        )
+    if plan.authorized_snapshot_session != authorized_snapshot_session:
+        raise WindowsEffectfulCaptureProtocolError(
+            "child request authorized snapshot session is inconsistent"
+        )
+    if expected_request_id != daily_snapshot_request_id:
+        raise WindowsEffectfulCaptureProtocolError(
+            "child request daily snapshot identity is inconsistent"
+        )
+
+
 def _verified_snapshot_visible_values(
     capability: VerifiedCapturedSnapshot,
 ) -> tuple[object, ...]:
@@ -633,6 +667,69 @@ def _validate_result_transport_fields(result: IsolatedCaptureChildResult) -> Non
         raise WindowsEffectfulCaptureProtocolError(
             "provider_request_id must be bounded printable ASCII or None"
         )
+
+
+def _validate_result_classification_transport(
+    result: IsolatedCaptureChildResult,
+) -> None:
+    no_http = {
+        ChildResultClassification.REQUEST_INVALID,
+        ChildResultClassification.SID_REJECTED,
+        ChildResultClassification.CREDENTIAL_FAILED,
+        ChildResultClassification.TRANSPORT_FAILED,
+    }
+    if result.classification in no_http and (
+        result.http_status is not None or result.provider_request_id is not None
+    ):
+        raise WindowsEffectfulCaptureProtocolError(
+            "pre-HTTP child classification cannot claim provider response evidence"
+        )
+    if result.classification is ChildResultClassification.HTTP_FAILED:
+        if result.http_status is None or result.http_status == 200:
+            raise WindowsEffectfulCaptureProtocolError(
+                "HTTP failure requires a non-200 sanitized HTTP status"
+            )
+    post_http_success = {
+        ChildResultClassification.PROVIDER_RESPONSE_INVALID,
+        ChildResultClassification.SNAPSHOT_REJECTED,
+        ChildResultClassification.SERIALIZATION_FAILED,
+        ChildResultClassification.STAGING_FAILED,
+        ChildResultClassification.SUCCEEDED,
+    }
+    if result.classification in post_http_success and result.http_status != 200:
+        raise WindowsEffectfulCaptureProtocolError(
+            "post-HTTP child classification requires HTTP status 200"
+        )
+
+
+def _capture_request_from_object(value: object) -> ProductionCaptureRequest:
+    if type(value) is not dict or frozenset(value) != _C2_REQUEST_FIELDS:
+        raise WindowsEffectfulCaptureProtocolError(
+            "child request c2_request is not the exact capture_request/v2 object"
+        )
+    try:
+        symbols = _symbols_from_object(value["ordered_universe"])
+        capture_request = ProductionCaptureRequest(
+            ordered_universe=symbols,
+            request_window_start_date=_parse_canonical_date(
+                value["request_window_start_date"], "request_window_start_date"
+            ),
+            request_window_end_date=_parse_canonical_date(
+                value["request_window_end_date"], "request_window_end_date"
+            ),
+            target_session_date=_parse_canonical_date(
+                value["target_session_date"], "target_session_date"
+            ),
+        )
+    except WindowsEffectfulCapturePlanError as error:
+        raise WindowsEffectfulCaptureProtocolError(
+            "child request c2_request violates the C3 capture contract"
+        ) from error
+    if _canonical_json(value) != capture_request.canonical_c2_request_json():
+        raise WindowsEffectfulCaptureProtocolError(
+            "child request c2_request fixed semantics are inconsistent"
+        )
+    return capture_request
 
 
 def _provider_from_object(value: object) -> ProviderDescriptor:

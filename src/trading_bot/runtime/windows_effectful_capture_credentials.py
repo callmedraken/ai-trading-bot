@@ -167,10 +167,16 @@ class WindowsAlpacaCredentialManagerReader:
         return instance
 
     def read(self, approved_account_sid: str) -> ScopedAlpacaSecrets:
-        _require_canonical_sid(approved_account_sid)
+        _require_canonical_sid(approved_account_sid, "approved Trading SID")
         try:
             observed_sid = self._sid_resolver()
         except Exception:
+            raise WindowsCredentialInvalidError(
+                "current process SID inspection failed"
+            ) from None
+        try:
+            _require_canonical_sid(observed_sid, "current process SID")
+        except WindowsCredentialInvalidError:
             raise WindowsCredentialInvalidError(
                 "current process SID inspection failed"
             ) from None
@@ -185,8 +191,8 @@ class WindowsAlpacaCredentialManagerReader:
         cleanup_failed = False
         try:
             key_entry = self._read_one(ALPACA_API_KEY_ID_CREDENTIAL_TARGET)
-            secret_entry = self._read_one(ALPACA_API_SECRET_KEY_CREDENTIAL_TARGET)
             key = _decode_credential(key_entry)
+            secret_entry = self._read_one(ALPACA_API_SECRET_KEY_CREDENTIAL_TARGET)
             secret = _decode_credential(secret_entry)
             scoped = ScopedAlpacaSecrets(key, secret)
         finally:
@@ -268,13 +274,13 @@ def _validate_entry(entry: NativeCredentialEntry, target_name: str) -> None:
         raise WindowsCredentialInvalidError("credential value is invalid")
 
 
-def _require_canonical_sid(value: object) -> None:
+def _require_canonical_sid(value: object, label: str) -> None:
     if (
         type(value) is not str
         or len(value) > 184
         or _SID_PATTERN.fullmatch(value) is None
     ):
-        raise WindowsCredentialInvalidError("approved Trading SID is invalid")
+        raise WindowsCredentialInvalidError(f"{label} is invalid")
 
 
 def _decode_credential(entry: NativeCredentialEntry) -> str:
@@ -393,10 +399,11 @@ class CtypesWindowsCredentialNativeApi:
             finally:
                 for index in range(len(blob)):
                     blob[index] = 0
-                try:
-                    self._advapi32.CredFree(pointer)
-                except Exception:
-                    cleanup_failed = True
+                if bool(pointer):
+                    try:
+                        self._advapi32.CredFree(pointer)
+                    except Exception:
+                        cleanup_failed = True
             if cleanup_failed:
                 raise WindowsCredentialInvalidError(
                     "credential read cleanup failed"

@@ -4,6 +4,10 @@ on:
   push:
     branches:
       - feature/c3-a2-certification
+    paths:
+      - src/trading_bot/runtime/windows_effectful_capture_protocol.py
+      - tests/runtime/test_windows_effectful_capture_protocol.py
+      - .github/workflows/c3-a2-certification.yml
 
 permissions:
   contents: write
@@ -22,48 +26,61 @@ jobs:
           python-version: "3.12"
           cache: pip
 
-      - id: install
-        continue-on-error: true
+      - name: Install project
         run: python -m pip install -e ".[dev]"
 
-      - id: correct
-        continue-on-error: true
+      - name: Apply final reviewed corrections
         shell: python
         run: |
           from pathlib import Path
 
-          path = Path("tests/runtime/test_windows_effectful_capture_protocol.py")
-          text = path.read_text(encoding="utf-8")
+          source = Path("src/trading_bot/runtime/windows_effectful_capture_protocol.py")
+          text = source.read_text(encoding="utf-8")
+          old = '            "authorized_snapshot_session": request.authorized_snapshot_session.session_date.isoformat(),\n'
+          new = (
+              '            "authorized_snapshot_session": (\n'
+              '                request.authorized_snapshot_session.session_date.isoformat()\n'
+              '            ),\n'
+          )
+          if text.count(old) not in (0, 1):
+              raise SystemExit(f"unexpected session-format anchor count: {text.count(old)}")
+          if old in text:
+              text = text.replace(old, new)
+          old = '    """Opaque process-local proof that parent-side final artifact verification passed."""\n'
+          new = (
+              '    """Opaque process-local proof of successful parent artifact verification."""\n'
+          )
+          if text.count(old) not in (0, 1):
+              raise SystemExit(f"unexpected verifier-doc anchor count: {text.count(old)}")
+          if old in text:
+              text = text.replace(old, new)
+          source.write_text(text, encoding="utf-8")
+
+          tests = Path("tests/runtime/test_windows_effectful_capture_protocol.py")
+          text = tests.read_text(encoding="utf-8")
           old = 'with pytest.raises(WindowsEffectfulCaptureProtocolError, match="response evidence"):'
           new = 'with pytest.raises(WindowsEffectfulCaptureProtocolError, match="(?:transport|response) evidence"):'
-          count = text.count(old)
-          if count not in (0, 1):
-              raise SystemExit(f"unexpected correction anchor count: {count}")
-          if count == 1:
-              path.write_text(text.replace(old, new), encoding="utf-8")
+          if text.count(old) not in (0, 1):
+              raise SystemExit(f"unexpected expectation anchor count: {text.count(old)}")
+          if old in text:
+              tests.write_text(text.replace(old, new), encoding="utf-8")
 
-      - id: format
-        continue-on-error: true
+      - name: Ruff format
         run: python -m ruff format src/trading_bot/runtime/windows_effectful_capture_protocol.py tests/runtime/test_windows_effectful_capture_protocol.py
 
-      - id: ruff_check
-        continue-on-error: true
-        run: python -m ruff check src/trading_bot/runtime/windows_effectful_capture_protocol.py tests/runtime/test_windows_effectful_capture_protocol.py > .c3-a2-final-ruff.txt 2>&1
+      - name: Ruff check
+        run: python -m ruff check src/trading_bot/runtime/windows_effectful_capture_protocol.py tests/runtime/test_windows_effectful_capture_protocol.py
 
-      - id: ruff_format
-        continue-on-error: true
-        run: python -m ruff format --check src/trading_bot/runtime/windows_effectful_capture_protocol.py tests/runtime/test_windows_effectful_capture_protocol.py > .c3-a2-final-format.txt 2>&1
+      - name: Ruff format check
+        run: python -m ruff format --check src/trading_bot/runtime/windows_effectful_capture_protocol.py tests/runtime/test_windows_effectful_capture_protocol.py
 
-      - id: focused_tests
-        continue-on-error: true
-        run: python -m pytest tests/runtime/test_windows_effectful_capture_contracts.py tests/runtime/test_windows_effectful_capture_protocol.py tests/market_data/test_daily_snapshot_models.py tests/market_data/test_daily_snapshot_provider.py tests/market_data/test_daily_snapshot_identity.py tests/market_data/test_daily_snapshot_serialization.py tests/market_data/test_daily_snapshot_verification.py tests/market_data/test_daily_snapshot_acceptance.py -q > .c3-a2-final-tests.txt 2>&1
+      - name: Focused tests
+        run: python -m pytest tests/runtime/test_windows_effectful_capture_contracts.py tests/runtime/test_windows_effectful_capture_protocol.py tests/market_data/test_daily_snapshot_models.py tests/market_data/test_daily_snapshot_provider.py tests/market_data/test_daily_snapshot_identity.py tests/market_data/test_daily_snapshot_serialization.py tests/market_data/test_daily_snapshot_verification.py tests/market_data/test_daily_snapshot_acceptance.py -q
 
-      - id: diff_check
-        continue-on-error: true
+      - name: Diff check
         run: git diff --check
 
-      - id: sql_identity
-        continue-on-error: true
+      - name: SQL identity
         shell: python
         run: |
           import hashlib
@@ -74,35 +91,16 @@ jobs:
           digest = hashlib.sha256(payload).hexdigest()
           assert len(payload) == 118896, len(payload)
           assert digest == "aa61df2f5db0090f8373222d1f5e492a58f4c10273afacfab45e382bacd4bb58"
+          print(len(payload), digest)
 
-      - name: Publish outcomes
-        if: always()
-        env:
-          INSTALL: ${{ steps.install.outcome }}
-          CORRECT: ${{ steps.correct.outcome }}
-          FORMAT: ${{ steps.format.outcome }}
-          RUFF_CHECK: ${{ steps.ruff_check.outcome }}
-          RUFF_FORMAT: ${{ steps.ruff_format.outcome }}
-          FOCUSED_TESTS: ${{ steps.focused_tests.outcome }}
-          DIFF_CHECK: ${{ steps.diff_check.outcome }}
-          SQL_IDENTITY: ${{ steps.sql_identity.outcome }}
+      - name: Publish certified exact files
         run: |
-          printf 'install=%s\ncorrect=%s\nformat=%s\nruff_check=%s\nruff_format=%s\nfocused_tests=%s\ndiff_check=%s\nsql_identity=%s\n' \
-            "$INSTALL" "$CORRECT" "$FORMAT" "$RUFF_CHECK" "$RUFF_FORMAT" "$FOCUSED_TESTS" "$DIFF_CHECK" "$SQL_IDENTITY" \
-            > .c3-a2-final-report
-          rm -f .c3-a2-certification-success
-          if [ "$INSTALL" = success ] && [ "$CORRECT" = success ] && [ "$FORMAT" = success ] && \
-             [ "$RUFF_CHECK" = success ] && [ "$RUFF_FORMAT" = success ] && \
-             [ "$FOCUSED_TESTS" = success ] && [ "$DIFF_CHECK" = success ] && \
-             [ "$SQL_IDENTITY" = success ]; then
-            printf '%s\n' 'C3-A2 certification passed' > .c3-a2-certification-success
-          fi
+          printf '%s\n' 'C3-A2 certification passed' > .c3-a2-certification-success
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add \
             src/trading_bot/runtime/windows_effectful_capture_protocol.py \
             tests/runtime/test_windows_effectful_capture_protocol.py \
-            .c3-a2-final-report .c3-a2-final-ruff.txt .c3-a2-final-format.txt .c3-a2-final-tests.txt
-          if [ -f .c3-a2-certification-success ]; then git add .c3-a2-certification-success; fi
-          git commit -m "test: record corrected C3 A2 gate outcomes"
+            .c3-a2-certification-success
+          git commit -m "test: record final C3 A2 certification"
           git push origin HEAD:feature/c3-a2-certification

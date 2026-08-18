@@ -1,0 +1,108 @@
+name: C3 B2 certification v2
+
+on:
+  push:
+    branches:
+      - feature/c3-b2-certification-v2
+
+permissions:
+  contents: write
+
+jobs:
+  certify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Diagnose and certify exact B2 tree
+        shell: bash
+        run: |
+          set +e
+          report=.c3-b2-v2-report
+          : > "$report"
+          status=0
+
+          record() {
+            label="$1"
+            shift
+            "$@" > ".c3-b2-v2-${label}.txt" 2>&1
+            code=$?
+            printf '%s=%s\n' "$label" "$code" >> "$report"
+            if [ "$code" -ne 0 ]; then status=1; fi
+          }
+
+          record install python -m pip install -e ".[dev]"
+          record format python -m ruff format \
+            src/trading_bot/runtime/windows_effectful_capture_child.py \
+            tests/runtime/test_windows_effectful_capture_child.py \
+            tests/runtime/test_windows_effectful_capture_child_security.py
+          record ruff python -m ruff check \
+            src/trading_bot/runtime/windows_effectful_capture_child.py \
+            src/trading_bot/runtime/windows_effectful_capture_credentials.py \
+            src/trading_bot/runtime/windows_effectful_capture_protocol.py \
+            tests/runtime/test_windows_effectful_capture_child.py \
+            tests/runtime/test_windows_effectful_capture_child_security.py \
+            tests/runtime/test_windows_effectful_capture_credentials.py \
+            tests/runtime/test_windows_effectful_capture_credentials_security.py
+          record tests python -m pytest \
+            tests/runtime/test_windows_effectful_capture_child.py \
+            tests/runtime/test_windows_effectful_capture_child_security.py \
+            tests/runtime/test_windows_effectful_capture_credentials.py \
+            tests/runtime/test_windows_effectful_capture_credentials_security.py \
+            tests/runtime/test_windows_effectful_capture_contracts.py \
+            tests/runtime/test_windows_effectful_capture_protocol.py \
+            tests/runtime/test_windows_effectful_capture_service.py \
+            tests/market_data/test_alpaca_daily_snapshot.py \
+            tests/market_data/test_alpaca_http.py \
+            tests/market_data/test_daily_snapshot_provider.py \
+            tests/market_data/test_daily_snapshot_acceptance.py \
+            tests/market_data/test_daily_snapshot_serialization.py \
+            tests/market_data/test_daily_snapshot_identity.py \
+            tests/market_data/test_daily_snapshot_verification.py \
+            -q
+          record format_check python -m ruff format --check \
+            src/trading_bot/runtime/windows_effectful_capture_child.py \
+            tests/runtime/test_windows_effectful_capture_child.py \
+            tests/runtime/test_windows_effectful_capture_child_security.py
+          record diff_check git diff --check
+
+          python - <<'PY' > .c3-b2-v2-sql.txt 2>&1
+          import hashlib
+          from pathlib import Path
+          path = Path("src/trading_bot/runtime/schema/windows_transactional_authority_v1.sql")
+          payload = path.read_bytes()
+          digest = hashlib.sha256(payload).hexdigest()
+          print(len(payload), digest)
+          assert len(payload) == 118896, len(payload)
+          assert digest == "aa61df2f5db0090f8373222d1f5e492a58f4c10273afacfab45e382bacd4bb58"
+          PY
+          code=$?
+          printf 'sql=%s\n' "$code" >> "$report"
+          if [ "$code" -ne 0 ]; then status=1; fi
+
+          rm -f .c3-b2-v2-success .c3-b2-v2-failure
+          if [ "$status" -eq 0 ]; then
+            printf '%s\n' 'C3-B2 v2 certification passed' > .c3-b2-v2-success
+          else
+            printf '%s\n' 'C3-B2 v2 certification failed' > .c3-b2-v2-failure
+          fi
+
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add \
+            src/trading_bot/runtime/windows_effectful_capture_child.py \
+            tests/runtime/test_windows_effectful_capture_child.py \
+            tests/runtime/test_windows_effectful_capture_child_security.py \
+            .c3-b2-v2-report \
+            .c3-b2-v2-*.txt \
+            .c3-b2-v2-success \
+            .c3-b2-v2-failure 2>/dev/null || true
+          git commit -m "test: record C3 B2 v2 certification" || true
+          git push origin HEAD:feature/c3-b2-certification-v2
+          exit "$status"

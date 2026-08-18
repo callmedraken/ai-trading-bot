@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import ctypes
 import os
-from dataclasses import replace
 
 import pytest
 
@@ -167,8 +166,25 @@ def test_missing_first_credential_is_sanitized() -> None:
     with pytest.raises(WindowsCredentialNotFoundError) as caught:
         reader.read(_OWNER_SID)
 
+    assert str(caught.value) == "credential was not found"
     assert _KEY not in str(caught.value)
-    assert _SECRET in str(caught.value)
+    assert _SECRET not in str(caught.value)
+    assert ALPACA_API_KEY_ID_CREDENTIAL_TARGET not in str(caught.value)
+    assert api.releases == []
+
+
+def test_native_read_error_is_sanitized() -> None:
+    api = FakeNativeCredentialApi()
+    api.entries[ALPACA_API_KEY_ID_CREDENTIAL_TARGET] = WindowsCredentialInvalidError(
+        f"native read exposed {_SECRET}"
+    )
+    reader = _reader(api)
+
+    with pytest.raises(WindowsCredentialInvalidError) as caught:
+        reader.read(_OWNER_SID)
+
+    assert str(caught.value) == "credential read failed"
+    assert _SECRET not in str(caught.value)
     assert api.releases == []
 
 

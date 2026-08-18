@@ -14,6 +14,7 @@ from trading_bot.market_data import (
     XNYS_CALENDAR_DESCRIPTOR,
     AlpacaDailySnapshotProvider,
     AlpacaHistoricalBarsTransport,
+    AlpacaHttpResponse,
     AlpacaHttpStatusError,
     AlpacaResponseError,
     AlpacaTransportError,
@@ -74,7 +75,7 @@ class _ObservedSingleAttemptTransport:
         self._inner = inner
         self._lock = threading.Lock()
         self._called = False
-        self.response = None
+        self.response: AlpacaHttpResponse | None = None
 
     @property
     def call_count(self) -> int:
@@ -99,7 +100,8 @@ class _ObservedSingleAttemptTransport:
             api_key_id=api_key_id,
             api_secret_key=api_secret_key,
         )
-        self.response = response
+        if type(response) is AlpacaHttpResponse:
+            self.response = response
         return response
 
 
@@ -173,14 +175,24 @@ class IsolatedCaptureChildAttempt:
                 ChildResultClassification.REQUEST_INVALID,
                 cleanup_status=ChildCleanupStatus.COMPLETE,
             )
+        except Exception:
+            return self._result(
+                ChildResultClassification.INTERNAL_FAILED,
+                cleanup_status=ChildCleanupStatus.COMPLETE,
+            )
 
         try:
             daily_request, provider_request, calendar = _reconcile_runtime_request(
                 request
             )
-        except Exception:
+        except (WindowsEffectfulCaptureProtocolError, DailySnapshotError):
             return self._result(
                 ChildResultClassification.REQUEST_INVALID,
+                cleanup_status=ChildCleanupStatus.COMPLETE,
+            )
+        except Exception:
+            return self._result(
+                ChildResultClassification.INTERNAL_FAILED,
                 cleanup_status=ChildCleanupStatus.COMPLETE,
             )
 
@@ -337,10 +349,16 @@ class IsolatedCaptureChildAttempt:
         observed_transport: _ObservedSingleAttemptTransport,
     ) -> IsolatedCaptureChildResult:
         if isinstance(error, AlpacaHttpStatusError):
+            status = _safe_failure_http_status(error.status)
+            if status is None:
+                return self._result(
+                    ChildResultClassification.TRANSPORT_FAILED,
+                    cleanup_status=ChildCleanupStatus.COMPLETE,
+                )
             return self._result(
                 ChildResultClassification.HTTP_FAILED,
                 cleanup_status=ChildCleanupStatus.COMPLETE,
-                http_status=error.status,
+                http_status=status,
                 provider_request_id=_safe_provider_request_id(error.request_id),
             )
         if isinstance(error, AlpacaTransportError):
@@ -349,10 +367,20 @@ class IsolatedCaptureChildAttempt:
                 cleanup_status=ChildCleanupStatus.COMPLETE,
             )
         if isinstance(error, (AlpacaResponseError, InvalidDailySnapshotResponseError)):
+            if observed_transport.response is not None:
+                return self._result(
+                    ChildResultClassification.PROVIDER_RESPONSE_INVALID,
+                    cleanup_status=ChildCleanupStatus.COMPLETE,
+                    observed_transport=observed_transport,
+                )
+            if observed_transport.call_count:
+                return self._result(
+                    ChildResultClassification.TRANSPORT_FAILED,
+                    cleanup_status=ChildCleanupStatus.COMPLETE,
+                )
             return self._result(
-                ChildResultClassification.PROVIDER_RESPONSE_INVALID,
+                ChildResultClassification.INTERNAL_FAILED,
                 cleanup_status=ChildCleanupStatus.COMPLETE,
-                observed_transport=observed_transport,
             )
         if isinstance(error, DailySnapshotError):
             return self._result(
@@ -483,6 +511,12 @@ def _fetch_and_accept(
     )
     response = provider.fetch(provider_request)
     return accept_daily_provider_response(provider_request, response, calendar)
+
+
+def _safe_failure_http_status(value: object) -> int | None:
+    if type(value) is not int or value == 200 or not 100 <= value <= 599:
+        return None
+    return value
 
 
 def _safe_provider_request_id(value: object) -> str | None:

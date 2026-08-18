@@ -298,7 +298,9 @@ def serialize_isolated_capture_child_request(
     payload = _canonical_json(
         {
             "approved_account_sid": request.approved_account_sid,
-            "authorized_snapshot_session": request.authorized_snapshot_session.session_date.isoformat(),
+            "authorized_snapshot_session": (
+                request.authorized_snapshot_session.session_date.isoformat()
+            ),
             "c2_request": request.capture_request.to_c2_request_dict(),
             "c2_request_sha256": request.c2_request_sha256,
             "credential_policy_version": request.credential_policy_version,
@@ -481,7 +483,7 @@ _TEST_VERIFIED_SNAPSHOT_ISSUER = _VerifiedSnapshotIssuer()
 
 @dataclass(frozen=True, slots=True, weakref_slot=True)
 class VerifiedCapturedSnapshot:
-    """Opaque process-local proof that parent-side final artifact verification passed."""
+    """Opaque process-local proof of successful parent artifact verification."""
 
     reservation_id: str
     execution_id: str

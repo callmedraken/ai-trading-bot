@@ -1,0 +1,97 @@
+...........................F............................................ [ 81%]
+................                                                         [100%]
+=================================== FAILURES ===================================
+_________ test_pre_http_classifications_cannot_claim_response_evidence _________
+
+    def test_pre_http_classifications_cannot_claim_response_evidence() -> None:
+        for classification in (
+            ChildResultClassification.REQUEST_INVALID,
+            ChildResultClassification.SID_REJECTED,
+            ChildResultClassification.CREDENTIAL_FAILED,
+            ChildResultClassification.TRANSPORT_FAILED,
+        ):
+            fence = (
+                ProviderAttemptFenceState.NOT_ENTERED
+                if classification is ChildResultClassification.REQUEST_INVALID
+                else ProviderAttemptFenceState.ENTERED
+            )
+            with pytest.raises(WindowsEffectfulCaptureProtocolError, match="response evidence"):
+>               IsolatedCaptureChildResult(
+                    reservation_id=_RESERVATION,
+                    execution_id=_EXECUTION,
+                    child_request_sha256=_CHILD_REQUEST_DIGEST,
+                    fence_state=fence,
+                    classification=classification,
+                    cleanup_status=ChildCleanupStatus.COMPLETE,
+                    provider_request_id="req-not-allowed",
+                )
+
+tests/runtime/test_windows_effectful_capture_protocol.py:283: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+<string>:14: in __init__
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = IsolatedCaptureChildResult(reservation_id='11111111-1111-4111-8111-111111111111', execution_id='33333333-3333-4333-833...shot_id=None, artifact_sha256=None, artifact_byte_length=None, http_status=None, provider_request_id='req-not-allowed')
+
+    def __post_init__(self) -> None:
+        reservation_id = _canonical_uuid_text(self.reservation_id, "reservation_id")
+        execution_id = _canonical_uuid_text(self.execution_id, "execution_id")
+        _require_sha256(self.child_request_sha256, "child_request_sha256")
+        if type(self.fence_state) is not ProviderAttemptFenceState:
+            raise WindowsEffectfulCaptureProtocolError(
+                "fence_state must be ProviderAttemptFenceState"
+            )
+        if type(self.classification) is not ChildResultClassification:
+            raise WindowsEffectfulCaptureProtocolError(
+                "classification must be ChildResultClassification"
+            )
+        if type(self.cleanup_status) is not ChildCleanupStatus:
+            raise WindowsEffectfulCaptureProtocolError(
+                "cleanup_status must be ChildCleanupStatus"
+            )
+        _validate_result_snapshot_fields(self)
+        _validate_result_transport_fields(self)
+        if (
+            self.classification is not ChildResultClassification.REQUEST_INVALID
+            and self.fence_state is not ProviderAttemptFenceState.ENTERED
+        ):
+            raise WindowsEffectfulCaptureProtocolError(
+                "post-request child classifications require an entered provider fence"
+            )
+        if self.fence_state is ProviderAttemptFenceState.NOT_ENTERED and (
+            self.http_status is not None or self.provider_request_id is not None
+        ):
+>           raise WindowsEffectfulCaptureProtocolError(
+                "pre-fence child result cannot contain provider transport evidence"
+            )
+E           trading_bot.runtime.windows_effectful_capture_protocol.WindowsEffectfulCaptureProtocolError: pre-fence child result cannot contain provider transport evidence
+
+src/trading_bot/runtime/windows_effectful_capture_protocol.py:242: WindowsEffectfulCaptureProtocolError
+
+During handling of the above exception, another exception occurred:
+
+    def test_pre_http_classifications_cannot_claim_response_evidence() -> None:
+        for classification in (
+            ChildResultClassification.REQUEST_INVALID,
+            ChildResultClassification.SID_REJECTED,
+            ChildResultClassification.CREDENTIAL_FAILED,
+            ChildResultClassification.TRANSPORT_FAILED,
+        ):
+            fence = (
+                ProviderAttemptFenceState.NOT_ENTERED
+                if classification is ChildResultClassification.REQUEST_INVALID
+                else ProviderAttemptFenceState.ENTERED
+            )
+>           with pytest.raises(WindowsEffectfulCaptureProtocolError, match="response evidence"):
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E           AssertionError: Regex pattern did not match.
+E            Regex: 'response evidence'
+E            Input: 'pre-fence child result cannot contain provider transport evidence'
+
+tests/runtime/test_windows_effectful_capture_protocol.py:282: AssertionError
+=========================== short test summary info ============================
+FAILED tests/runtime/test_windows_effectful_capture_protocol.py::test_pre_http_classifications_cannot_claim_response_evidence - AssertionError: Regex pattern did not match.
+ Regex: 'response evidence'
+ Input: 'pre-fence child result cannot contain provider transport evidence'
+1 failed, 87 passed in 1.50s

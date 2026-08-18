@@ -1,0 +1,204 @@
+unformatted: File would be reformatted
+   --> src/trading_bot/runtime/windows_effectful_capture_protocol.py:159:48
+    |
+158 |             )
+    -         requested_at = _canonical_utc_datetime(self.requested_at_utc, "requested_at_utc")
+159 +         requested_at = _canonical_utc_datetime(
+160 +             self.requested_at_utc, "requested_at_utc"
+161 +         )
+162 |         if type(self.authorized_snapshot_session) is not TradingSession:
+--------------------------------------------------------------------------------
+196 |     def sha256(self) -> str:
+    -         return hashlib.sha256(serialize_isolated_capture_child_request(self)).hexdigest()
+197 +         return hashlib.sha256(
+198 +             serialize_isolated_capture_child_request(self)
+199 +         ).hexdigest()
+200 |
+--------------------------------------------------------------------------------
+325 |     if len(payload) > MAX_C3_CHILD_REQUEST_BYTES:
+    -         raise WindowsEffectfulCaptureProtocolError("child request exceeds its byte bound")
+326 +         raise WindowsEffectfulCaptureProtocolError(
+327 +             "child request exceeds its byte bound"
+328 +         )
+329 |     return payload
+--------------------------------------------------------------------------------
+337 |         )
+    -     if type(root["schema"]) is not int or root["schema"] != C3_CHILD_REQUEST_SCHEMA_VERSION:
+    -         raise WindowsEffectfulCaptureProtocolError("child request schema is unsupported")
+338 +     if (
+339 +         type(root["schema"]) is not int
+340 +         or root["schema"] != C3_CHILD_REQUEST_SCHEMA_VERSION
+341 +     ):
+342 +         raise WindowsEffectfulCaptureProtocolError(
+343 +             "child request schema is unsupported"
+344 +         )
+345 |     if root["protocol"] != C3_CHILD_OPERATION_VERSION:
+    -         raise WindowsEffectfulCaptureProtocolError("child request protocol is unsupported")
+346 +         raise WindowsEffectfulCaptureProtocolError(
+347 +             "child request protocol is unsupported"
+348 +         )
+349 |     capture_request = _capture_request_from_object(root["c2_request"])
+--------------------------------------------------------------------------------
+378 |     if serialize_isolated_capture_child_request(request) != payload:
+    -         raise WindowsEffectfulCaptureProtocolError("child request bytes are not canonical")
+379 +         raise WindowsEffectfulCaptureProtocolError(
+380 +             "child request bytes are not canonical"
+381 +         )
+382 |     return request
+383 |
+384 |
+    - def serialize_isolated_capture_child_result(result: IsolatedCaptureChildResult) -> bytes:
+385 + def serialize_isolated_capture_child_result(
+386 +     result: IsolatedCaptureChildResult,
+387 + ) -> bytes:
+388 |     if type(result) is not IsolatedCaptureChildResult:
+--------------------------------------------------------------------------------
+405 |             "schema": C3_CHILD_RESULT_SCHEMA_VERSION,
+    -             "snapshot_id": None if result.snapshot_id is None else str(result.snapshot_id),
+406 +             "snapshot_id": None
+407 +             if result.snapshot_id is None
+408 +             else str(result.snapshot_id),
+409 |         }
+410 |     )
+411 |     if len(payload) > MAX_C3_CHILD_RESULT_BYTES:
+    -         raise WindowsEffectfulCaptureProtocolError("child result exceeds its byte bound")
+412 +         raise WindowsEffectfulCaptureProtocolError(
+413 +             "child result exceeds its byte bound"
+414 +         )
+415 |     return payload
+--------------------------------------------------------------------------------
+423 |         )
+    -     if type(root["schema"]) is not int or root["schema"] != C3_CHILD_RESULT_SCHEMA_VERSION:
+424 +     if (
+425 +         type(root["schema"]) is not int
+426 +         or root["schema"] != C3_CHILD_RESULT_SCHEMA_VERSION
+427 +     ):
+428 |         raise WindowsEffectfulCaptureProtocolError("child result schema is unsupported")
+429 |     if root["protocol"] != C3_CHILD_OPERATION_VERSION:
+    -         raise WindowsEffectfulCaptureProtocolError("child result protocol is unsupported")
+430 +         raise WindowsEffectfulCaptureProtocolError(
+431 +             "child result protocol is unsupported"
+432 +         )
+433 |     try:
+--------------------------------------------------------------------------------
+459 |     if serialize_isolated_capture_child_result(result) != payload:
+    -         raise WindowsEffectfulCaptureProtocolError("child result bytes are not canonical")
+460 +         raise WindowsEffectfulCaptureProtocolError(
+461 +             "child result bytes are not canonical"
+462 +         )
+463 |     return result
+--------------------------------------------------------------------------------
+506 |         if type(self.snapshot_id) is not UUID:
+    -             raise WindowsEffectfulCaptureProtocolError("snapshot_id must be an exact UUID")
+507 +             raise WindowsEffectfulCaptureProtocolError(
+508 +                 "snapshot_id must be an exact UUID"
+509 +             )
+510 |         _require_sha256(self.artifact_sha256, "artifact_sha256")
+--------------------------------------------------------------------------------
+676 |         if type(result.snapshot_id) is not UUID:
+    -             raise WindowsEffectfulCaptureProtocolError("snapshot_id must be an exact UUID")
+677 +             raise WindowsEffectfulCaptureProtocolError(
+678 +                 "snapshot_id must be an exact UUID"
+679 +             )
+680 |         _require_sha256(result.artifact_sha256, "artifact_sha256")
+--------------------------------------------------------------------------------
+892 | def _require_canonical_sid(value: object) -> None:
+    -     if type(value) is not str or len(value) > 184 or _SID_PATTERN.fullmatch(value) is None:
+893 +     if (
+894 +         type(value) is not str
+895 +         or len(value) > 184
+896 +         or _SID_PATTERN.fullmatch(value) is None
+897 +     ):
+898 |         raise WindowsEffectfulCaptureProtocolError(
+    |
+
+unformatted: File would be reformatted
+   --> tests/runtime/test_windows_effectful_capture_protocol.py:48:25
+    |
+47  | _ARTIFACT_IDENTITY_DIGEST = "ef" * 32
+    - _CHILD_REQUEST_DIGEST = "1ceb4e1ce722c95a2da0a5dd49ece1d572a851c95ea98ad2d794837a4769d704"
+    - _CHILD_RESULT_DIGEST = "0d3fb6ef159a0e4653aeec573ed9f6cbe2513e5a77662cfee88b4c422ee69d59"
+48  + _CHILD_REQUEST_DIGEST = (
+49  +     "1ceb4e1ce722c95a2da0a5dd49ece1d572a851c95ea98ad2d794837a4769d704"
+50  + )
+51  + _CHILD_RESULT_DIGEST = (
+52  +     "0d3fb6ef159a0e4653aeec573ed9f6cbe2513e5a77662cfee88b4c422ee69d59"
+53  + )
+54  |
+--------------------------------------------------------------------------------
+119 |     assert request.c2_request_sha256 == launch.c2_request_digest
+    -     assert request.daily_snapshot_request_id == launch.provider_request.capture_request.request_id
+120 +     assert (
+121 +         request.daily_snapshot_request_id
+122 +         == launch.provider_request.capture_request.request_id
+123 +     )
+124 |     assert request.requested_at_utc == datetime(2026, 8, 17, 14, tzinfo=UTC)
+--------------------------------------------------------------------------------
+185 |     root["unknown"] = 1
+    -     with pytest.raises(WindowsEffectfulCaptureProtocolError, match="missing or unknown"):
+186 +     with pytest.raises(
+187 +         WindowsEffectfulCaptureProtocolError, match="missing or unknown"
+188 +     ):
+189 |         parse_isolated_capture_child_request(
+--------------------------------------------------------------------------------
+216 |
+    - def test_child_request_parser_rejects_alternate_provider_and_credential_targets() -> None:
+217 + def test_child_request_parser_rejects_alternate_provider_and_credential_targets() -> (
+218 +     None
+219 + ):
+220 |     root = json.loads(serialize_isolated_capture_child_request(_child_request()))
+--------------------------------------------------------------------------------
+242 |
+    - def test_success_result_requires_entered_fence_cleanup_snapshot_and_http_success() -> None:
+243 + def test_success_result_requires_entered_fence_cleanup_snapshot_and_http_success() -> (
+244 +     None
+245 + ):
+246 |     with pytest.raises(WindowsEffectfulCaptureProtocolError, match="entered"):
+--------------------------------------------------------------------------------
+272 |     )
+    -     assert parse_isolated_capture_child_result(
+    -         serialize_isolated_capture_child_result(result)
+    -     ) == result
+273 +     assert (
+274 +         parse_isolated_capture_child_result(
+275 +             serialize_isolated_capture_child_result(result)
+276 +         )
+277 +         == result
+278 +     )
+279 |
+280 |     with pytest.raises(WindowsEffectfulCaptureProtocolError, match="entered"):
+281 |         replace(result, classification=ChildResultClassification.SID_REJECTED)
+    -     with pytest.raises(WindowsEffectfulCaptureProtocolError, match="transport evidence"):
+282 +     with pytest.raises(
+283 +         WindowsEffectfulCaptureProtocolError, match="transport evidence"
+284 +     ):
+285 |         replace(result, http_status=400)
+--------------------------------------------------------------------------------
+299 |         )
+    -         with pytest.raises(WindowsEffectfulCaptureProtocolError, match="response evidence"):
+300 +         with pytest.raises(
+301 +             WindowsEffectfulCaptureProtocolError, match="response evidence"
+302 +         ):
+303 |             IsolatedCaptureChildResult(
+--------------------------------------------------------------------------------
+338 |     )
+    -     assert parse_isolated_capture_child_result(
+    -         serialize_isolated_capture_child_result(http_failure)
+    -     ) == http_failure
+339 +     assert (
+340 +         parse_isolated_capture_child_result(
+341 +             serialize_isolated_capture_child_result(http_failure)
+342 +         )
+343 +         == http_failure
+344 +     )
+345 |
+--------------------------------------------------------------------------------
+431 |
+    -     with pytest.raises(WindowsEffectfulCaptureProtocolError, match="another C2 lineage"):
+432 +     with pytest.raises(
+433 +         WindowsEffectfulCaptureProtocolError, match="another C2 lineage"
+434 +     ):
+435 |         consume_verified_captured_snapshot_for_test(
+    |
+
+2 files would be reformatted

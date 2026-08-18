@@ -1,0 +1,278 @@
+E501 Line too long (89 > 88)
+   --> src/trading_bot/runtime/windows_effectful_capture_protocol.py:159:89
+    |
+157 |                 "daily_snapshot_request_id must be an exact UUID"
+158 |             )
+159 |         requested_at = _canonical_utc_datetime(self.requested_at_utc, "requested_at_utc")
+    |                                                                                         ^
+160 |         if type(self.authorized_snapshot_session) is not TradingSession:
+161 |             raise WindowsEffectfulCaptureProtocolError(
+    |
+
+E501 Line too long (89 > 88)
+   --> src/trading_bot/runtime/windows_effectful_capture_protocol.py:195:89
+    |
+193 |     @property
+194 |     def sha256(self) -> str:
+195 |         return hashlib.sha256(serialize_isolated_capture_child_request(self)).hexdigest()
+    |                                                                                         ^
+
+E501 Line too long (104 > 88)
+   --> src/trading_bot/runtime/windows_effectful_capture_protocol.py:297:89
+    |
+295 |         {
+296 |             "approved_account_sid": request.approved_account_sid,
+297 |             "authorized_snapshot_session": request.authorized_snapshot_session.session_date.isoformat(),
+    |                                                                                         ^^^^^^^^^^^^^^^^
+298 |             "c2_request": request.capture_request.to_c2_request_dict(),
+299 |             "c2_request_sha256": request.c2_request_sha256,
+    |
+
+E501 Line too long (90 > 88)
+   --> src/trading_bot/runtime/windows_effectful_capture_protocol.py:322:89
+    |
+320 |     )
+321 |     if len(payload) > MAX_C3_CHILD_REQUEST_BYTES:
+322 |         raise WindowsEffectfulCaptureProtocolError("child request exceeds its byte bound")
+    |                                                                                         ^^
+323 |     return payload
+    |
+
+E501 Line too long (92 > 88)
+   --> src/trading_bot/runtime/windows_effectful_capture_protocol.py:332:89
+    |
+330 |             "child request has a missing or unknown field"
+331 |         )
+332 |     if type(root["schema"]) is not int or root["schema"] != C3_CHILD_REQUEST_SCHEMA_VERSION:
+    |                                                                                         ^^^^
+333 |         raise WindowsEffectfulCaptureProtocolError("child request schema is unsupported")
+334 |     if root["protocol"] != C3_CHILD_OPERATION_VERSION:
+    |
+
+E501 Line too long (89 > 88)
+   --> src/trading_bot/runtime/windows_effectful_capture_protocol.py:333:89
+    |
+331 |         )
+332 |     if type(root["schema"]) is not int or root["schema"] != C3_CHILD_REQUEST_SCHEMA_VERSION:
+333 |         raise WindowsEffectfulCaptureProtocolError("child request schema is unsupported")
+    |                                                                                         ^
+334 |     if root["protocol"] != C3_CHILD_OPERATION_VERSION:
+335 |         raise WindowsEffectfulCaptureProtocolError("child request protocol is unsupported")
+    |
+
+E501 Line too long (91 > 88)
+   --> src/trading_bot/runtime/windows_effectful_capture_protocol.py:335:89
+    |
+333 |         raise WindowsEffectfulCaptureProtocolError("child request schema is unsupported")
+334 |     if root["protocol"] != C3_CHILD_OPERATION_VERSION:
+335 |         raise WindowsEffectfulCaptureProtocolError("child request protocol is unsupported")
+    |                                                                                         ^^^
+336 |     capture_request = _capture_request_from_object(root["c2_request"])
+337 |     provider = _provider_from_object(root["provider"])
+    |
+
+E501 Line too long (91 > 88)
+   --> src/trading_bot/runtime/windows_effectful_capture_protocol.py:366:89
+    |
+364 |     )
+365 |     if serialize_isolated_capture_child_request(request) != payload:
+366 |         raise WindowsEffectfulCaptureProtocolError("child request bytes are not canonical")
+    |                                                                                         ^^^
+367 |     return request
+    |
+
+E501 Line too long (89 > 88)
+   --> src/trading_bot/runtime/windows_effectful_capture_protocol.py:370:89
+    |
+370 | def serialize_isolated_capture_child_result(result: IsolatedCaptureChildResult) -> bytes:
+    |                                                                                         ^
+371 |     if type(result) is not IsolatedCaptureChildResult:
+372 |         raise WindowsEffectfulCaptureProtocolError(
+    |
+
+E501 Line too long (91 > 88)
+   --> src/trading_bot/runtime/windows_effectful_capture_protocol.py:389:89
+    |
+387 |             "reservation_id": result.reservation_id,
+388 |             "schema": C3_CHILD_RESULT_SCHEMA_VERSION,
+389 |             "snapshot_id": None if result.snapshot_id is None else str(result.snapshot_id),
+    |                                                                                         ^^^
+390 |         }
+391 |     )
+    |
+
+E501 Line too long (89 > 88)
+   --> src/trading_bot/runtime/windows_effectful_capture_protocol.py:393:89
+    |
+391 |     )
+392 |     if len(payload) > MAX_C3_CHILD_RESULT_BYTES:
+393 |         raise WindowsEffectfulCaptureProtocolError("child result exceeds its byte bound")
+    |                                                                                         ^
+394 |     return payload
+    |
+
+E501 Line too long (91 > 88)
+   --> src/trading_bot/runtime/windows_effectful_capture_protocol.py:403:89
+    |
+401 |             "child result has a missing or unknown field"
+402 |         )
+403 |     if type(root["schema"]) is not int or root["schema"] != C3_CHILD_RESULT_SCHEMA_VERSION:
+    |                                                                                         ^^^
+404 |         raise WindowsEffectfulCaptureProtocolError("child result schema is unsupported")
+405 |     if root["protocol"] != C3_CHILD_OPERATION_VERSION:
+    |
+
+E501 Line too long (90 > 88)
+   --> src/trading_bot/runtime/windows_effectful_capture_protocol.py:406:89
+    |
+404 |         raise WindowsEffectfulCaptureProtocolError("child result schema is unsupported")
+405 |     if root["protocol"] != C3_CHILD_OPERATION_VERSION:
+406 |         raise WindowsEffectfulCaptureProtocolError("child result protocol is unsupported")
+    |                                                                                         ^^
+407 |     try:
+408 |         fence_state = ProviderAttemptFenceState(root["fence_state"])
+    |
+
+E501 Line too long (90 > 88)
+   --> src/trading_bot/runtime/windows_effectful_capture_protocol.py:434:89
+    |
+432 |     )
+433 |     if serialize_isolated_capture_child_result(result) != payload:
+434 |         raise WindowsEffectfulCaptureProtocolError("child result bytes are not canonical")
+    |                                                                                         ^^
+435 |     return result
+    |
+
+E501 Line too long (89 > 88)
+   --> src/trading_bot/runtime/windows_effectful_capture_protocol.py:456:89
+    |
+454 | @dataclass(frozen=True, slots=True, weakref_slot=True)
+455 | class VerifiedCapturedSnapshot:
+456 |     """Opaque process-local proof that parent-side final artifact verification passed."""
+    |                                                                                         ^
+457 |
+458 |     reservation_id: str
+    |
+
+E501 Line too long (91 > 88)
+   --> src/trading_bot/runtime/windows_effectful_capture_protocol.py:479:89
+    |
+477 |         _canonical_uuid_text(self.execution_id, "execution_id")
+478 |         if type(self.snapshot_id) is not UUID:
+479 |             raise WindowsEffectfulCaptureProtocolError("snapshot_id must be an exact UUID")
+    |                                                                                         ^^^
+480 |         _require_sha256(self.artifact_sha256, "artifact_sha256")
+481 |         _require_snapshot_byte_length(self.artifact_byte_length)
+    |
+
+E501 Line too long (91 > 88)
+   --> src/trading_bot/runtime/windows_effectful_capture_protocol.py:647:89
+    |
+645 |             )
+646 |         if type(result.snapshot_id) is not UUID:
+647 |             raise WindowsEffectfulCaptureProtocolError("snapshot_id must be an exact UUID")
+    |                                                                                         ^^^
+648 |         _require_sha256(result.artifact_sha256, "artifact_sha256")
+649 |         _require_snapshot_byte_length(result.artifact_byte_length)
+    |
+
+E501 Line too long (91 > 88)
+   --> src/trading_bot/runtime/windows_effectful_capture_protocol.py:861:89
+    |
+860 | def _require_canonical_sid(value: object) -> None:
+861 |     if type(value) is not str or len(value) > 184 or _SID_PATTERN.fullmatch(value) is None:
+    |                                                                                         ^^^
+862 |         raise WindowsEffectfulCaptureProtocolError(
+863 |             "approved_account_sid must be canonical SID text"
+    |
+
+E501 Line too long (90 > 88)
+  --> tests/runtime/test_windows_effectful_capture_protocol.py:48:89
+   |
+46 | _ARTIFACT_DIGEST = "cd" * 32
+47 | _ARTIFACT_IDENTITY_DIGEST = "ef" * 32
+48 | _CHILD_REQUEST_DIGEST = "1ceb4e1ce722c95a2da0a5dd49ece1d572a851c95ea98ad2d794837a4769d704"
+   |                                                                                         ^^
+49 | _CHILD_RESULT_DIGEST = "0d3fb6ef159a0e4653aeec573ed9f6cbe2513e5a77662cfee88b4c422ee69d59"
+   |
+
+E501 Line too long (89 > 88)
+  --> tests/runtime/test_windows_effectful_capture_protocol.py:49:89
+   |
+47 | _ARTIFACT_IDENTITY_DIGEST = "ef" * 32
+48 | _CHILD_REQUEST_DIGEST = "1ceb4e1ce722c95a2da0a5dd49ece1d572a851c95ea98ad2d794837a4769d704"
+49 | _CHILD_RESULT_DIGEST = "0d3fb6ef159a0e4653aeec573ed9f6cbe2513e5a77662cfee88b4c422ee69d59"
+   |                                                                                         ^
+
+E501 Line too long (98 > 88)
+   --> tests/runtime/test_windows_effectful_capture_protocol.py:116:89
+    |
+114 |     assert request.capture_request == launch.bound_capture.plan.request
+115 |     assert request.c2_request_sha256 == launch.c2_request_digest
+116 |     assert request.daily_snapshot_request_id == launch.provider_request.capture_request.request_id
+    |                                                                                         ^^^^^^^^^^
+117 |     assert request.requested_at_utc == datetime(2026, 8, 17, 14, tzinfo=UTC)
+118 |     assert request.authorized_snapshot_session == launch.authorized_snapshot_session
+    |
+
+E501 Line too long (89 > 88)
+   --> tests/runtime/test_windows_effectful_capture_protocol.py:179:89
+    |
+178 |     root["unknown"] = 1
+179 |     with pytest.raises(WindowsEffectfulCaptureProtocolError, match="missing or unknown"):
+    |                                                                                         ^
+180 |         parse_isolated_capture_child_request(
+181 |             json.dumps(root, sort_keys=True, separators=(",", ":")).encode()
+    |
+
+E501 Line too long (90 > 88)
+   --> tests/runtime/test_windows_effectful_capture_protocol.py:208:89
+    |
+208 | def test_child_request_parser_rejects_alternate_provider_and_credential_targets() -> None:
+    |                                                                                         ^^
+209 |     root = json.loads(serialize_isolated_capture_child_request(_child_request()))
+210 |     root["provider"]["provider_id"] = "alternate-provider"
+    |
+
+E501 Line too long (91 > 88)
+   --> tests/runtime/test_windows_effectful_capture_protocol.py:232:89
+    |
+232 | def test_success_result_requires_entered_fence_cleanup_snapshot_and_http_success() -> None:
+    |                                                                                         ^^^
+233 |     with pytest.raises(WindowsEffectfulCaptureProtocolError, match="entered"):
+234 |         replace(_success_result(), fence_state=ProviderAttemptFenceState.NOT_ENTERED)
+    |
+
+E501 Line too long (89 > 88)
+   --> tests/runtime/test_windows_effectful_capture_protocol.py:266:89
+    |
+264 |     with pytest.raises(WindowsEffectfulCaptureProtocolError, match="entered"):
+265 |         replace(result, classification=ChildResultClassification.SID_REJECTED)
+266 |     with pytest.raises(WindowsEffectfulCaptureProtocolError, match="transport evidence"):
+    |                                                                                         ^
+267 |         replace(result, http_status=400)
+    |
+
+E501 Line too long (92 > 88)
+   --> tests/runtime/test_windows_effectful_capture_protocol.py:282:89
+    |
+280 |             else ProviderAttemptFenceState.ENTERED
+281 |         )
+282 |         with pytest.raises(WindowsEffectfulCaptureProtocolError, match="response evidence"):
+    |                                                                                         ^^^^
+283 |             IsolatedCaptureChildResult(
+284 |                 reservation_id=_RESERVATION,
+    |
+
+E501 Line too long (89 > 88)
+   --> tests/runtime/test_windows_effectful_capture_protocol.py:409:89
+    |
+407 |     capability = _verified_capability()
+408 |
+409 |     with pytest.raises(WindowsEffectfulCaptureProtocolError, match="another C2 lineage"):
+    |                                                                                         ^
+410 |         consume_verified_captured_snapshot_for_test(
+411 |             capability,
+    |
+
+Found 27 errors.

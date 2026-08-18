@@ -1,4 +1,3 @@
-install=success
 ruff_check=failure
 ruff_format=failure
 focused_tests=failure

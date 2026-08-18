@@ -36,6 +36,7 @@ from trading_bot.runtime.windows_transactional_authority import (
 
 _RESERVATION = "11111111-1111-4111-8111-111111111111"
 _EXECUTION = "33333333-3333-4333-8333-333333333333"
+_OTHER_RESERVATION = "44444444-4444-4444-8444-444444444444"
 
 
 def _authority() -> ValidatedProductionAuthority:
@@ -208,15 +209,15 @@ def test_prepared_execution_rejects_cross_bound_child_request(
         reservation_id=_RESERVATION,
         execution_id=_EXECUTION,
     )
+    other = prepare_production_execution_for_test(
+        capture,
+        plan,
+        reservation_id=_OTHER_RESERVATION,
+        execution_id=_EXECUTION,
+    )
 
     with pytest.raises(
         WindowsEffectfulCaptureCompositionError,
         match="child reservation",
     ):
-        replace(
-            prepared,
-            child_request=replace(
-                prepared.child_request,
-                reservation_id="44444444-4444-4444-8444-444444444444",
-            ),
-        )
+        replace(prepared, child_request=other.child_request)

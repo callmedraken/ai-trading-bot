@@ -348,9 +348,7 @@ def test_credential_failure_is_sanitized_and_never_calls_transport() -> None:
 
 
 def test_transport_failure_has_no_fabricated_http_evidence() -> None:
-    transport = FakeTransport(
-        error=AlpacaTransportError(f"transport failed {_SECRET}")
-    )
+    transport = FakeTransport(error=AlpacaTransportError(f"transport failed {_SECRET}"))
     attempt, _api, _transport, writer = _attempt(transport=transport)
 
     result = attempt.run()

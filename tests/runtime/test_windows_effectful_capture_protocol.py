@@ -45,8 +45,12 @@ _APPROVED_SID = "S-1-5-21-1000-1001-1002-1009"
 _RELEASE_DIGEST = "ab" * 32
 _ARTIFACT_DIGEST = "cd" * 32
 _ARTIFACT_IDENTITY_DIGEST = "ef" * 32
-_CHILD_REQUEST_DIGEST = "1ceb4e1ce722c95a2da0a5dd49ece1d572a851c95ea98ad2d794837a4769d704"
-_CHILD_RESULT_DIGEST = "0d3fb6ef159a0e4653aeec573ed9f6cbe2513e5a77662cfee88b4c422ee69d59"
+_CHILD_REQUEST_DIGEST = (
+    "1ceb4e1ce722c95a2da0a5dd49ece1d572a851c95ea98ad2d794837a4769d704"
+)
+_CHILD_RESULT_DIGEST = (
+    "0d3fb6ef159a0e4653aeec573ed9f6cbe2513e5a77662cfee88b4c422ee69d59"
+)
 
 
 def _capture_request() -> ProductionCaptureRequest:
@@ -113,7 +117,10 @@ def test_child_request_binds_complete_c2_request_and_exact_a1_plan() -> None:
     assert request.execution_id == _EXECUTION
     assert request.capture_request == launch.bound_capture.plan.request
     assert request.c2_request_sha256 == launch.c2_request_digest
-    assert request.daily_snapshot_request_id == launch.provider_request.capture_request.request_id
+    assert (
+        request.daily_snapshot_request_id
+        == launch.provider_request.capture_request.request_id
+    )
     assert request.requested_at_utc == datetime(2026, 8, 17, 14, tzinfo=UTC)
     assert request.authorized_snapshot_session == launch.authorized_snapshot_session
     assert request.capture_request.ordered_universe == (Symbol("AAPL"), Symbol("MSFT"))
@@ -176,7 +183,9 @@ def test_child_request_parser_rejects_unknown_duplicate_and_noncanonical_json() 
     root = json.loads(payload)
 
     root["unknown"] = 1
-    with pytest.raises(WindowsEffectfulCaptureProtocolError, match="missing or unknown"):
+    with pytest.raises(
+        WindowsEffectfulCaptureProtocolError, match="missing or unknown"
+    ):
         parse_isolated_capture_child_request(
             json.dumps(root, sort_keys=True, separators=(",", ":")).encode()
         )
@@ -205,7 +214,9 @@ def test_child_request_parser_rejects_boolean_schema_bom_and_oversize() -> None:
         parse_isolated_capture_child_request(b"{" + b"x" * MAX_C3_CHILD_REQUEST_BYTES)
 
 
-def test_child_request_parser_rejects_alternate_provider_and_credential_targets() -> None:
+def test_child_request_parser_rejects_alternate_provider_and_credential_targets() -> (
+    None
+):
     root = json.loads(serialize_isolated_capture_child_request(_child_request()))
     root["provider"]["provider_id"] = "alternate-provider"
     payload = json.dumps(root, sort_keys=True, separators=(",", ":")).encode()
@@ -229,7 +240,9 @@ def test_success_result_has_frozen_golden_hash_and_round_trip() -> None:
     assert parse_isolated_capture_child_result(payload) == result
 
 
-def test_success_result_requires_entered_fence_cleanup_snapshot_and_http_success() -> None:
+def test_success_result_requires_entered_fence_cleanup_snapshot_and_http_success() -> (
+    None
+):
     with pytest.raises(WindowsEffectfulCaptureProtocolError, match="entered"):
         replace(_success_result(), fence_state=ProviderAttemptFenceState.NOT_ENTERED)
     with pytest.raises(WindowsEffectfulCaptureProtocolError, match="cleanup"):
@@ -257,13 +270,18 @@ def test_request_invalid_is_only_structured_pre_fence_classification() -> None:
         classification=ChildResultClassification.REQUEST_INVALID,
         cleanup_status=ChildCleanupStatus.COMPLETE,
     )
-    assert parse_isolated_capture_child_result(
-        serialize_isolated_capture_child_result(result)
-    ) == result
+    assert (
+        parse_isolated_capture_child_result(
+            serialize_isolated_capture_child_result(result)
+        )
+        == result
+    )
 
     with pytest.raises(WindowsEffectfulCaptureProtocolError, match="entered"):
         replace(result, classification=ChildResultClassification.SID_REJECTED)
-    with pytest.raises(WindowsEffectfulCaptureProtocolError, match="transport evidence"):
+    with pytest.raises(
+        WindowsEffectfulCaptureProtocolError, match="transport evidence"
+    ):
         replace(result, http_status=400)
 
 
@@ -279,7 +297,10 @@ def test_pre_http_classifications_cannot_claim_response_evidence() -> None:
             if classification is ChildResultClassification.REQUEST_INVALID
             else ProviderAttemptFenceState.ENTERED
         )
-        with pytest.raises(WindowsEffectfulCaptureProtocolError, match="response evidence"):
+        with pytest.raises(
+            WindowsEffectfulCaptureProtocolError,
+            match="(?:transport|response) evidence",
+        ):
             IsolatedCaptureChildResult(
                 reservation_id=_RESERVATION,
                 execution_id=_EXECUTION,
@@ -316,9 +337,12 @@ def test_http_failure_requires_non_200_status() -> None:
         http_status=403,
         provider_request_id="req-safe",
     )
-    assert parse_isolated_capture_child_result(
-        serialize_isolated_capture_child_result(http_failure)
-    ) == http_failure
+    assert (
+        parse_isolated_capture_child_result(
+            serialize_isolated_capture_child_result(http_failure)
+        )
+        == http_failure
+    )
 
 
 def test_post_http_classifications_require_status_200() -> None:
@@ -406,7 +430,9 @@ def _verified_capability() -> VerifiedCapturedSnapshot:
 def test_verified_snapshot_capability_is_exact_lineage_bound_and_one_shot() -> None:
     capability = _verified_capability()
 
-    with pytest.raises(WindowsEffectfulCaptureProtocolError, match="another C2 lineage"):
+    with pytest.raises(
+        WindowsEffectfulCaptureProtocolError, match="another C2 lineage"
+    ):
         consume_verified_captured_snapshot_for_test(
             capability,
             reservation_id="22222222-2222-4222-8222-222222222222",

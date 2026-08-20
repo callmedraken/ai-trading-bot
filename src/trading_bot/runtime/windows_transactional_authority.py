@@ -3173,6 +3173,104 @@ def _record_c3_post_resume_evidence_locked(
     )
 
 
+def _require_c3_artifact_verification_lineage(
+    connection: sqlite3.Connection,
+    execution_id: str,
+    reservation_id: str,
+) -> tuple[str, str, str, str, str]:
+    row = connection.execute(
+        """
+        SELECT s.session_id, a.attempt_id, c.claim_id,
+               r.launch_reservation_id, e.launch_execution_id,
+               e.post_resume_json, e.post_resume_digest,
+               e.cleanup_json, e.cleanup_digest
+        FROM launch_executions e
+        JOIN launch_reservations r
+          ON r.launch_reservation_id = e.launch_reservation_id
+        JOIN provider_call_claims c ON c.claim_id = r.claim_id
+        JOIN attempts a ON a.attempt_id = c.attempt_id
+        JOIN sessions s ON s.session_id = a.session_id
+        WHERE e.launch_execution_id = ?
+          AND e.launch_reservation_id = ?
+          AND e.phase = 'RESUME_RECORDED'
+          AND r.reservation_state = 'PROCESS_CREATED'
+          AND c.state = 'COMMITTED'
+          AND a.state = 'LAUNCH_RESERVED'
+          AND s.state = 'OPEN'
+          AND NOT EXISTS (
+              SELECT 1 FROM terminals t
+              WHERE t.launch_reservation_id = r.launch_reservation_id
+          )
+          AND NOT EXISTS (
+              SELECT 1 FROM session_selections ss
+              WHERE ss.session_id = s.session_id
+          )
+          AND NOT EXISTS (
+              SELECT 1 FROM manual_recoveries mr
+              WHERE mr.session_id = s.session_id
+          )
+        """,
+        (str(execution_id), str(reservation_id)),
+    ).fetchone()
+    if row is None:
+        raise ValueError("C3 artifact verification active lineage is unavailable")
+    if any(value is None for value in row[5:]):
+        raise ValueError("C3 artifact verification evidence is incomplete")
+    if _digest(row[5]) != row[6] or _digest(row[7]) != row[8]:
+        raise ValueError("C3 artifact verification evidence digest is invalid")
+    return (row[0], row[1], row[2], row[3], row[4])
+
+
+def _core_verify_c3_captured_snapshot(
+    connection: sqlite3.Connection,
+    execution_id: str,
+    reservation_id: str,
+) -> object:
+    context = _require_service_context()
+    _require_no_active_transaction(connection)
+    adapter = context.external_adapter
+    verify = getattr(adapter, "verify_c3_captured_snapshot", None)
+    if adapter is None or not callable(verify):
+        raise ExternalAuthorityBoundaryUnavailable(
+            "transactional authority has no reviewed C3 artifact verifier"
+        )
+    reservation_id = str(reservation_id)
+    execution_id = str(execution_id)
+    with _lifecycle_arbiter(reservation_id):
+        with _connection_operation(connection):
+            lineage = _require_c3_artifact_verification_lineage(
+                connection, execution_id, reservation_id
+            )
+        return verify(lineage)
+
+
+def _core_validate_c3_verified_snapshot(
+    connection: sqlite3.Connection, capability: object
+) -> None:
+    context = _require_service_context()
+    _require_no_active_transaction(connection)
+    adapter = context.external_adapter
+    binding = getattr(adapter, "c3_verified_snapshot_lineage", None)
+    validate = getattr(adapter, "validate_c3_verified_snapshot", None)
+    if adapter is None or not callable(binding) or not callable(validate):
+        raise ExternalAuthorityBoundaryUnavailable(
+            "transactional authority has no reviewed C3 snapshot validator"
+        )
+    lineage = binding(capability)
+    if type(lineage) is not tuple or len(lineage) != 5:
+        raise ValueError("C3 verified snapshot lineage is invalid")
+    reservation_id = lineage[3]
+    execution_id = lineage[4]
+    with _lifecycle_arbiter(reservation_id):
+        with _connection_operation(connection):
+            current = _require_c3_artifact_verification_lineage(
+                connection, execution_id, reservation_id
+            )
+        if current != lineage:
+            raise ValueError("C3 verified snapshot durable lineage changed")
+        validate(capability, current)
+
+
 def _core_record_terminal(
     connection: sqlite3.Connection,
     reservation_id: str,
@@ -4728,6 +4826,20 @@ class TransactionalAuthorityCore:
                 self._connection, execution_id, receipt, evidence
             )
 
+    def verify_c3_captured_snapshot(
+        self, execution_id: str, reservation_id: str
+    ) -> object:
+        with self._bound_context():
+            _require_no_active_transaction(self._connection)
+            return _core_verify_c3_captured_snapshot(
+                self._connection, execution_id, reservation_id
+            )
+
+    def validate_c3_verified_snapshot(self, capability: object) -> None:
+        with self._bound_context():
+            _require_no_active_transaction(self._connection)
+            return _core_validate_c3_verified_snapshot(self._connection, capability)
+
     def record_terminal(
         self,
         reservation_id: str,
@@ -5299,6 +5411,26 @@ class WindowsTransactionalAuthority:
         return self._core_for_operation().record_c3_post_resume_evidence(
             execution_id, receipt, evidence
         )
+
+    def verify_c3_captured_snapshot(
+        self, execution_id: str, reservation_id: str
+    ) -> object:
+        self._require_service_open()
+        if self._context.external_adapter is None:
+            raise ExternalAuthorityBoundaryUnavailable(
+                "transactional authority has no reviewed C3 artifact adapter"
+            )
+        return self._core_for_operation().verify_c3_captured_snapshot(
+            execution_id, reservation_id
+        )
+
+    def validate_c3_verified_snapshot(self, capability: object) -> None:
+        self._require_service_open()
+        if self._context.external_adapter is None:
+            raise ExternalAuthorityBoundaryUnavailable(
+                "transactional authority has no reviewed C3 artifact adapter"
+            )
+        return self._core_for_operation().validate_c3_verified_snapshot(capability)
 
     def record_terminal(
         self,

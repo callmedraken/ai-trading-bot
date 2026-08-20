@@ -23,8 +23,10 @@ from trading_bot.runtime.windows_effectful_capture_native import (
     C3NativeWaitStatus,
     CtypesWindowsEffectfulCaptureNativeApi,
     NativeCreatedProcess,
+    NativeFileIdentity,
     NativeOverlappedCompletion,
     NativePipePair,
+    NativeStagingObject,
     SuspendedCaptureChild,
     WindowsEffectfulCaptureNativeError,
     WindowsEffectfulCaptureNativeUnsupportedError,
@@ -70,6 +72,7 @@ class FakeNativeApi:
         self.events: list[str] = []
         self.written = bytearray()
         self.process_call: dict[str, object] | None = None
+        self.staging_object: NativeStagingObject | None = None
         self._pipe_count = 0
 
     def _event(self, value: str) -> None:
@@ -98,10 +101,33 @@ class FakeNativeApi:
     def set_handle_inheritable(self, handle: int, inheritable: bool) -> None:
         self._event(f"inherit:{handle}:{inheritable}")
 
-    def create_staging_file(self, path: str) -> int:
+    def create_staging_file(self, path: str) -> NativeStagingObject:
         assert path == _STAGING
         self._event("create_staging")
-        return 105
+        self.staging_object = NativeStagingObject(
+            105, 108, NativeFileIdentity(7, b"i" * 16), path
+        )
+        return self.staging_object
+
+    def get_file_identity(self, handle: int) -> NativeFileIdentity:
+        return NativeFileIdentity(7, b"i" * 16)
+
+    def read_artifact_file(self, handle: int, max_bytes: int) -> bytes:
+        raise AssertionError("artifact verification was not expected")
+
+    def reject_casefold_collisions(
+        self, directory: str, names: tuple[str, ...]
+    ) -> None:
+        raise AssertionError("artifact verification was not expected")
+
+    def publish_staging_link(self, staging_handle: int, final_path: str) -> None:
+        raise AssertionError("artifact verification was not expected")
+
+    def open_final_artifact(self, path: str):
+        raise AssertionError("artifact verification was not expected")
+
+    def delete_staging_link(self, staging_handle: int) -> None:
+        raise AssertionError("artifact verification was not expected")
 
     def create_suspended_process(self, **kwargs: object) -> NativeCreatedProcess:
         self.process_call = dict(kwargs)
@@ -204,14 +230,14 @@ def test_containment_prepares_job_channels_staging_and_suspended_process() -> No
         "create_process",
         "close:101",
         "close:104",
-        "inherit:105:False",
+        "close:108",
     ]
 
     call = api.process_call
     assert call is not None
     assert call["application_name"] == _APPLICATION
     assert call["current_directory"] == _CURRENT
-    assert call["inherited_handles"] == (101, 104, 105)
+    assert call["inherited_handles"] == (101, 104, 108)
     assert call["job_handle"] == 100
     assert call["creation_flags"] == C3_CREATE_PROCESS_FLAGS
     assert call["inherit_handles"] is True
@@ -224,8 +250,12 @@ def test_containment_prepares_job_channels_staging_and_suspended_process() -> No
         C3_RESULT_HANDLE_ARGUMENT,
         "104",
         C3_STAGING_HANDLE_ARGUMENT,
-        "105",
+        "108",
     )
+    assert api.staging_object is not None
+    assert api.staging_object.parent_inheritable is False
+    assert api.staging_object.child_access_mask == 0x40000000
+    assert api.staging_object.identity == NativeFileIdentity(7, b"i" * 16)
 
 
 def test_flags_are_exact_and_have_no_breakaway_bits() -> None:
@@ -337,6 +367,22 @@ def test_named_pipe_hardening_flags_are_fixed() -> None:
     assert C3_OVERLAPPED_CANCEL_SETTLEMENT_TIMEOUT_MS == 1_000
 
 
+def test_casefold_collision_check_rejects_exact_and_windows_folded_names(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    api = object.__new__(CtypesWindowsEffectfulCaptureNativeApi)
+    monkeypatch.setattr(
+        "trading_bot.runtime.windows_effectful_capture_native.os.listdir",
+        lambda _directory: ["DAILY-MARKET-DATA-SNAPSHOT-X.JSON"],
+    )
+
+    with pytest.raises(WindowsEffectfulCaptureNativeError, match="collision"):
+        api.reject_casefold_collisions(
+            r"F:\AITradingBot\Authority\capture-output",
+            ("daily-market-data-snapshot-x.json",),
+        )
+
+
 def test_live_resource_is_not_copyable_or_serializable() -> None:
     child = _create(FakeNativeApi())
 
@@ -354,13 +400,10 @@ def test_live_resource_is_not_copyable_or_serializable() -> None:
     "fail_at,expected_closed",
     [
         ("set_job_limits", [100]),
+        ("create_staging", [104, 103, 102, 101, 100]),
         (
             "create_process",
-            [105, 104, 103, 102, 101, 100],
-        ),
-        (
-            "inherit:105:False",
-            [101, 104, 107, 106, 105, 103, 102, 100],
+            [108, 105, 104, 103, 102, 101, 100],
         ),
     ],
 )

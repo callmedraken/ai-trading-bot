@@ -8,8 +8,19 @@ import threading
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
+from enum import StrEnum
+from pathlib import PureWindowsPath
+from uuid import UUID
 
-from trading_bot.market_data import ALPACA_DAILY_SNAPSHOT_DESCRIPTOR
+from trading_bot.market_calendar import NYSEMarketCalendar
+from trading_bot.market_data import (
+    ALPACA_DAILY_SNAPSHOT_DESCRIPTOR,
+    MAX_DAILY_SNAPSHOT_ARTIFACT_BYTES,
+    XNYS_CALENDAR_DESCRIPTOR,
+    BoundMarketCalendar,
+    serialize_daily_snapshot,
+    verify_daily_snapshot,
+)
 from trading_bot.runtime.windows_authority import WindowsAuthorityError
 from trading_bot.runtime.windows_authority_validation import (
     ValidatedProductionAuthority,
@@ -28,6 +39,8 @@ from trading_bot.runtime.windows_effectful_capture_native import (
     C3ParentCleanupStatus,
     C3ProcessOutcomeStatus,
     C3ResultTransportStatus,
+    NativeFileIdentity,
+    NativeOpenedArtifact,
     SuspendedCaptureChild,
     WindowsEffectfulCaptureNativeApi,
     create_suspended_capture_child_for_test,
@@ -36,11 +49,17 @@ from trading_bot.runtime.windows_effectful_capture_native import (
     resume_suspended_capture_child,
 )
 from trading_bot.runtime.windows_effectful_capture_protocol import (
+    ChildCleanupStatus,
+    ChildResultClassification,
     IsolatedCaptureChildRequest,
     IsolatedCaptureChildResult,
     ProviderAttemptFenceState,
+    VerifiedCapturedSnapshot,
     WindowsEffectfulCaptureProtocolError,
+    _issue_production_verified_captured_snapshot,
+    _validate_production_verified_captured_snapshot,
     build_isolated_capture_child_request,
+    parse_isolated_capture_child_request,
     parse_isolated_capture_child_result,
     serialize_isolated_capture_child_request,
     serialize_isolated_capture_child_result,
@@ -69,7 +88,7 @@ class C3C2NativeLaunchConfigurationForTest:
     arguments: tuple[str, ...]
     current_directory: str
     controlled_temp_directory: str
-    staging_path: str
+    storage_root: str
     parent_environment: Mapping[str, str]
 
 
@@ -174,12 +193,99 @@ class _C3LiveProcessEntry:
     execution_id: str | None = None
     request_delivery_attempted: bool = False
     request_sha256: str | None = None
+    child_request: IsolatedCaptureChildRequest | None = None
     resume_receipt: ResumeReceipt | None = None
     observed: bool = False
     observation: C3C3BObservationForTest | None = None
     observation_snapshot: _C3ObservationSnapshot | None = None
     evidence_issuance: _C3PostResumeEvidenceIssuance | None = None
     evidence_consumed: bool = False
+    verified_snapshot: VerifiedCapturedSnapshot | None = None
+    verification_failure: str | None = None
+    verification_started: bool = False
+
+
+class C3ArtifactVerificationFailure(StrEnum):
+    INELIGIBLE_CHILD_RESULT = "INELIGIBLE_CHILD_RESULT"
+    STAGING_IDENTITY_MISMATCH = "STAGING_IDENTITY_MISMATCH"
+    STAGING_BYTES_INVALID = "STAGING_BYTES_INVALID"
+    CHILD_CLAIM_MISMATCH = "CHILD_CLAIM_MISMATCH"
+    OFFLINE_VERIFICATION_FAILED = "OFFLINE_VERIFICATION_FAILED"
+    REQUEST_RECONCILIATION_FAILED = "REQUEST_RECONCILIATION_FAILED"
+    PUBLICATION_FAILED = "PUBLICATION_FAILED"
+    FINAL_REVERIFICATION_FAILED = "FINAL_REVERIFICATION_FAILED"
+    STAGING_CLEANUP_FAILED = "STAGING_CLEANUP_FAILED"
+
+
+@dataclass(frozen=True, slots=True)
+class C3ArtifactIdentityEvidence:
+    """Bounded canonical identity evidence derived only from parent observations."""
+
+    snapshot_id: UUID
+    final_canonical_filename: str
+    artifact_sha256: str
+    artifact_byte_length: int
+    native_file_identity: NativeFileIdentity
+    schema: int = 1
+
+    def __post_init__(self) -> None:
+        if type(self.snapshot_id) is not UUID:
+            raise WindowsEffectfulCaptureCompositionError(
+                "artifact identity snapshot ID is invalid"
+            )
+        expected_name = f"daily-market-data-snapshot-{self.snapshot_id}.json"
+        if self.final_canonical_filename != expected_name:
+            raise WindowsEffectfulCaptureCompositionError(
+                "artifact identity filename is not canonical"
+            )
+        if (
+            type(self.artifact_sha256) is not str
+            or len(self.artifact_sha256) != 64
+            or any(
+                character not in "0123456789abcdef"
+                for character in self.artifact_sha256
+            )
+        ):
+            raise WindowsEffectfulCaptureCompositionError(
+                "artifact identity SHA-256 is invalid"
+            )
+        if (
+            type(self.artifact_byte_length) is not int
+            or not 1 <= self.artifact_byte_length <= MAX_DAILY_SNAPSHOT_ARTIFACT_BYTES
+        ):
+            raise WindowsEffectfulCaptureCompositionError(
+                "artifact identity byte length is invalid"
+            )
+        if type(self.native_file_identity) is not NativeFileIdentity:
+            raise WindowsEffectfulCaptureCompositionError(
+                "artifact native identity is invalid"
+            )
+        if self.schema != 1:
+            raise WindowsEffectfulCaptureCompositionError(
+                "artifact identity schema is unsupported"
+            )
+
+    @property
+    def canonical_bytes(self) -> bytes:
+        payload = _canonical_json(
+            {
+                "artifact_byte_length": self.artifact_byte_length,
+                "artifact_sha256": self.artifact_sha256,
+                "final_canonical_filename": self.final_canonical_filename,
+                "native_file_identity": self.native_file_identity.canonical_evidence(),
+                "schema": self.schema,
+                "snapshot_id": str(self.snapshot_id),
+            }
+        )
+        if len(payload) > 1024:
+            raise WindowsEffectfulCaptureCompositionError(
+                "artifact identity evidence exceeds its reviewed byte bound"
+            )
+        return payload
+
+    @property
+    def sha256(self) -> str:
+        return hashlib.sha256(self.canonical_bytes).hexdigest()
 
 
 class _C3LiveProcessRegistry:
@@ -254,6 +360,14 @@ class _C3LiveProcessRegistry:
                 )
             entry.request_delivery_attempted = True
             child = entry.child
+            child_request = parse_isolated_capture_child_request(payload)
+            if (
+                child_request.reservation_id != reservation_id
+                or child_request.execution_id != execution_id
+            ):
+                raise WindowsEffectfulCaptureCompositionError(
+                    "C3 child request lineage is mismatched"
+                )
         deliver_canonical_child_request(child, payload)
         with self._lock:
             entry = self._find_bound(reservation_id, execution_id)
@@ -262,6 +376,7 @@ class _C3LiveProcessRegistry:
                     "C3 child request delivery provenance changed"
                 )
             entry.request_sha256 = hashlib.sha256(payload).hexdigest()
+            entry.child_request = child_request
 
     def resume(self, intent: ResumeIntent) -> None:
         with self._lock:
@@ -451,6 +566,282 @@ class _C3LiveProcessRegistry:
             )
             entry.evidence_consumed = True
 
+    def verify_captured_snapshot(
+        self, lineage: tuple[str, str, str, str, str]
+    ) -> VerifiedCapturedSnapshot:
+        """Verify and publish while C2 holds the exact reservation arbiter."""
+
+        if (
+            type(lineage) is not tuple
+            or len(lineage) != 5
+            or any(type(value) is not str for value in lineage)
+        ):
+            raise TypeError("C3 verification lineage is invalid")
+        session_id, attempt_id, claim_id, reservation_id, execution_id = lineage
+        with self._lock:
+            entry = self._find_bound(reservation_id, execution_id)
+            if (
+                entry.verified_snapshot is not None
+                or entry.verification_failure is not None
+                or entry.verification_started
+            ):
+                raise WindowsEffectfulCaptureCompositionError(
+                    "C3 artifact verification was already attempted"
+                )
+            entry.verification_started = True
+            snapshot = self._require_observation_snapshot_unchanged(entry)
+            child_request = entry.child_request
+            trusted = entry.observation.trusted_result if entry.observation else None
+            if not entry.evidence_consumed or child_request is None:
+                raise WindowsEffectfulCaptureCompositionError(
+                    "C3 artifact verification requires persisted post-resume evidence"
+                )
+            child = entry.child
+
+        failure = C3ArtifactVerificationFailure.STAGING_BYTES_INVALID
+        final_handle: int | None = None
+        staging_handle: int | None = None
+        cleanup_attempted = False
+        try:
+            if (
+                trusted is None
+                or trusted.classification is not ChildResultClassification.SUCCEEDED
+                or trusted.fence_state is not ProviderAttemptFenceState.ENTERED
+                or trusted.cleanup_status is not ChildCleanupStatus.COMPLETE
+                or trusted.snapshot_id is None
+                or trusted.artifact_sha256 is None
+                or trusted.artifact_byte_length is None
+            ):
+                failure = C3ArtifactVerificationFailure.INELIGIBLE_CHILD_RESULT
+                raise WindowsEffectfulCaptureCompositionError(
+                    "child result is not eligible for artifact verification"
+                )
+
+            staging_handle, retained_identity, staging_path = child._retained_staging()
+            api = child._api
+            if api.get_file_identity(staging_handle) != retained_identity:
+                failure = C3ArtifactVerificationFailure.STAGING_IDENTITY_MISMATCH
+                raise WindowsEffectfulCaptureCompositionError(
+                    "staging native identity changed"
+                )
+            staged_bytes = api.read_artifact_file(
+                staging_handle, MAX_DAILY_SNAPSHOT_ARTIFACT_BYTES
+            )
+            if (
+                not staged_bytes
+                or len(staged_bytes) > MAX_DAILY_SNAPSHOT_ARTIFACT_BYTES
+            ):
+                raise WindowsEffectfulCaptureCompositionError(
+                    "staging artifact bytes are empty or oversized"
+                )
+            artifact_sha256 = hashlib.sha256(staged_bytes).hexdigest()
+            artifact_length = len(staged_bytes)
+            if (
+                trusted.artifact_sha256 != artifact_sha256
+                or trusted.artifact_byte_length != artifact_length
+            ):
+                failure = C3ArtifactVerificationFailure.CHILD_CLAIM_MISMATCH
+                raise WindowsEffectfulCaptureCompositionError(
+                    "child artifact claims do not match parent-observed bytes"
+                )
+            calendar = BoundMarketCalendar(
+                XNYS_CALENDAR_DESCRIPTOR, NYSEMarketCalendar()
+            )
+            verification = verify_daily_snapshot(
+                staged_bytes,
+                calendar,
+                expected_sha256=artifact_sha256,
+                expected_byte_length=artifact_length,
+            )
+            if not verification.passed or verification.snapshot is None:
+                failure = C3ArtifactVerificationFailure.OFFLINE_VERIFICATION_FAILED
+                raise WindowsEffectfulCaptureCompositionError(
+                    "staging artifact failed offline verification"
+                )
+            verified = verification.snapshot
+            if serialize_daily_snapshot(verified) != staged_bytes:
+                failure = C3ArtifactVerificationFailure.OFFLINE_VERIFICATION_FAILED
+                raise WindowsEffectfulCaptureCompositionError(
+                    "staging artifact is not canonical"
+                )
+            if trusted.snapshot_id != verified.snapshot_id:
+                failure = C3ArtifactVerificationFailure.CHILD_CLAIM_MISMATCH
+                raise WindowsEffectfulCaptureCompositionError(
+                    "child snapshot identity does not match verified bytes"
+                )
+            if not _snapshot_matches_child_request(verified, child_request):
+                failure = C3ArtifactVerificationFailure.REQUEST_RECONCILIATION_FAILED
+                raise WindowsEffectfulCaptureCompositionError(
+                    "verified snapshot does not match the exact C3 request"
+                )
+
+            staging = PureWindowsPath(staging_path)
+            expected_staging_name = f".c3-capture-{reservation_id}.staging"
+            if staging.name != expected_staging_name:
+                failure = C3ArtifactVerificationFailure.STAGING_IDENTITY_MISMATCH
+                raise WindowsEffectfulCaptureCompositionError(
+                    "staging name is not the exact reservation-derived name"
+                )
+            final_name = f"daily-market-data-snapshot-{verified.snapshot_id}.json"
+            final_path = str(staging.parent / final_name)
+            failure = C3ArtifactVerificationFailure.PUBLICATION_FAILED
+            api.reject_casefold_collisions(str(staging.parent), (final_name,))
+            if api.get_file_identity(staging_handle) != retained_identity:
+                raise WindowsEffectfulCaptureCompositionError(
+                    "staging identity changed before publication"
+                )
+            api.publish_staging_link(staging_handle, final_path)
+
+            failure = C3ArtifactVerificationFailure.FINAL_REVERIFICATION_FAILED
+            opened = api.open_final_artifact(final_path)
+            if type(opened) is not NativeOpenedArtifact:
+                raise WindowsEffectfulCaptureCompositionError(
+                    "final artifact reopen result is invalid"
+                )
+            final_handle = opened.handle
+            if opened.identity != retained_identity:
+                raise WindowsEffectfulCaptureCompositionError(
+                    "final artifact native identity does not match staging"
+                )
+            final_bytes = api.read_artifact_file(
+                final_handle, MAX_DAILY_SNAPSHOT_ARTIFACT_BYTES
+            )
+            if (
+                final_bytes != staged_bytes
+                or len(final_bytes) != artifact_length
+                or hashlib.sha256(final_bytes).hexdigest() != artifact_sha256
+            ):
+                raise WindowsEffectfulCaptureCompositionError(
+                    "final artifact bytes changed after publication"
+                )
+            final_verification = verify_daily_snapshot(
+                final_bytes,
+                calendar,
+                expected_sha256=artifact_sha256,
+                expected_byte_length=artifact_length,
+            )
+            if (
+                not final_verification.passed
+                or final_verification.snapshot != verified
+                or final_verification.snapshot is None
+                or serialize_daily_snapshot(final_verification.snapshot) != final_bytes
+            ):
+                raise WindowsEffectfulCaptureCompositionError(
+                    "final artifact failed independent reverification"
+                )
+            closing_final_handle = final_handle
+            final_handle = None
+            api.close_handle(closing_final_handle)
+
+            identity_evidence = C3ArtifactIdentityEvidence(
+                snapshot_id=verified.snapshot_id,
+                final_canonical_filename=final_name,
+                artifact_sha256=artifact_sha256,
+                artifact_byte_length=artifact_length,
+                native_file_identity=retained_identity,
+            )
+            child_result_sha256 = hashlib.sha256(snapshot.child_result_json).hexdigest()
+
+            failure = C3ArtifactVerificationFailure.STAGING_CLEANUP_FAILED
+            if api.get_file_identity(staging_handle) != retained_identity:
+                raise WindowsEffectfulCaptureCompositionError(
+                    "staging identity changed before cleanup"
+                )
+            cleanup_attempted = True
+            api.delete_staging_link(staging_handle)
+            released = child._release_staging_handle()
+            if released != staging_handle:
+                raise WindowsEffectfulCaptureCompositionError(
+                    "staging cleanup handle provenance changed"
+                )
+            staging_handle = None
+            api.close_handle(released)
+
+            capability = _issue_production_verified_captured_snapshot(
+                session_id=session_id,
+                attempt_id=attempt_id,
+                claim_id=claim_id,
+                reservation_id=reservation_id,
+                execution_id=execution_id,
+                snapshot_id=verified.snapshot_id,
+                artifact_sha256=artifact_sha256,
+                artifact_byte_length=artifact_length,
+                artifact_identity_sha256=identity_evidence.sha256,
+                child_result_sha256=child_result_sha256,
+            )
+            with self._lock:
+                current = self._find_bound(reservation_id, execution_id)
+                if current is not entry or current.verified_snapshot is not None:
+                    raise WindowsEffectfulCaptureCompositionError(
+                        "C3 verifier registry provenance changed"
+                    )
+                current.verified_snapshot = capability
+            return capability
+        except BaseException:
+            if final_handle is not None:
+                try:
+                    child._api.close_handle(final_handle)
+                except Exception:
+                    pass
+            if staging_handle is not None:
+                try:
+                    if (
+                        not cleanup_attempted
+                        and child._api.get_file_identity(staging_handle)
+                        == child._staging_identity
+                    ):
+                        cleanup_attempted = True
+                        child._api.delete_staging_link(staging_handle)
+                except Exception:
+                    pass
+                try:
+                    if child._staging_handle == staging_handle:
+                        child._release_staging_handle()
+                    child._api.close_handle(staging_handle)
+                except Exception:
+                    pass
+            with self._lock:
+                current = self._find_bound(reservation_id, execution_id)
+                current.verification_failure = failure.value
+            raise WindowsEffectfulCaptureCompositionError(
+                "C3 parent artifact verification failed"
+            ) from None
+
+    def validate_verified_snapshot(
+        self,
+        capability: VerifiedCapturedSnapshot,
+        lineage: tuple[str, str, str, str, str],
+    ) -> None:
+        values = _validate_production_verified_captured_snapshot(capability)
+        if values[:5] != lineage:
+            raise WindowsEffectfulCaptureCompositionError(
+                "verified snapshot complete C2 lineage is mismatched"
+            )
+        with self._lock:
+            entry = self._find_bound(lineage[3], lineage[4])
+            if entry.verified_snapshot is not capability:
+                raise WindowsEffectfulCaptureCompositionError(
+                    "verified snapshot is stale or unregistered"
+                )
+
+    def verified_snapshot_lineage(
+        self, capability: VerifiedCapturedSnapshot
+    ) -> tuple[str, str, str, str, str]:
+        values = _validate_production_verified_captured_snapshot(capability)
+        lineage = values[:5]
+        if any(type(value) is not str for value in lineage):
+            raise WindowsEffectfulCaptureCompositionError(
+                "verified snapshot registry lineage is invalid"
+            )
+        typed = (lineage[0], lineage[1], lineage[2], lineage[3], lineage[4])
+        with self._lock:
+            entry = self._find_bound(typed[3], typed[4])
+            if entry.verified_snapshot is not capability:
+                raise WindowsEffectfulCaptureCompositionError(
+                    "verified snapshot is stale or unregistered"
+                )
+        return typed
+
     def _validate_post_resume_evidence_locked(
         self,
         evidence: object,
@@ -635,6 +1026,23 @@ def _build_c3_cleanup_json(
     ).encode("utf-8")
 
 
+def _snapshot_matches_child_request(
+    snapshot: object, request: IsolatedCaptureChildRequest
+) -> bool:
+    retained = getattr(snapshot, "request", None)
+    return bool(
+        retained is not None
+        and retained.request_id == request.daily_snapshot_request_id
+        and retained.requested_at == request.requested_at_utc
+        and retained.symbols == request.capture_request.ordered_universe
+        and retained.calendar == XNYS_CALENDAR_DESCRIPTOR
+        and getattr(snapshot, "target_session", None)
+        == request.authorized_snapshot_session
+        and getattr(snapshot, "provider", None) == request.provider
+        and request.provider == ALPACA_DAILY_SNAPSHOT_DESCRIPTOR
+    )
+
+
 class C3C2TransactionalAdapterForTest:
     """C3-specific C2 adapter used only with the disposable authority seam."""
 
@@ -704,12 +1112,16 @@ class C3C2TransactionalAdapterForTest:
                 "C3 process creation has no exact provider launch plan"
             )
         launch = self._launch
+        staging_path = str(
+            PureWindowsPath(launch.storage_root)
+            / f".c3-capture-{reservation_id}.staging"
+        )
         child = create_suspended_capture_child_for_test(
             application_name=launch.application_name,
             arguments=launch.arguments,
             current_directory=launch.current_directory,
             controlled_temp_directory=launch.controlled_temp_directory,
-            staging_path=launch.staging_path,
+            staging_path=staging_path,
             parent_environment=launch.parent_environment,
             native_api=self._native_api,
         )
@@ -857,6 +1269,23 @@ class C3C2TransactionalAdapterForTest:
             reservation_id=reservation_id,
             resume_receipt=resume_receipt,
         )
+
+    def verify_c3_captured_snapshot(
+        self, lineage: tuple[str, str, str, str, str]
+    ) -> VerifiedCapturedSnapshot:
+        return self._registry.verify_captured_snapshot(lineage)
+
+    def validate_c3_verified_snapshot(
+        self,
+        capability: VerifiedCapturedSnapshot,
+        lineage: tuple[str, str, str, str, str],
+    ) -> None:
+        self._registry.validate_verified_snapshot(capability, lineage)
+
+    def c3_verified_snapshot_lineage(
+        self, capability: VerifiedCapturedSnapshot
+    ) -> tuple[str, str, str, str, str]:
+        return self._registry.verified_snapshot_lineage(capability)
 
     def close(self) -> None:
         try:

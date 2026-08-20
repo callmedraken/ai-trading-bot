@@ -485,6 +485,9 @@ _TEST_VERIFIED_SNAPSHOT_ISSUER = _VerifiedSnapshotIssuer()
 class VerifiedCapturedSnapshot:
     """Opaque process-local proof of successful parent artifact verification."""
 
+    session_id: str
+    attempt_id: str
+    claim_id: str
     reservation_id: str
     execution_id: str
     snapshot_id: UUID
@@ -503,6 +506,9 @@ class VerifiedCapturedSnapshot:
             raise TypeError(
                 "VerifiedCapturedSnapshot can only be issued by the parent verifier"
             )
+        _canonical_uuid_text(self.session_id, "session_id")
+        _canonical_uuid_text(self.attempt_id, "attempt_id")
+        _canonical_uuid_text(self.claim_id, "claim_id")
         _canonical_uuid_text(self.reservation_id, "reservation_id")
         _canonical_uuid_text(self.execution_id, "execution_id")
         if type(self.snapshot_id) is not UUID:
@@ -538,6 +544,9 @@ _VERIFIED_SNAPSHOT_REGISTRY: weakref.WeakKeyDictionary[
 
 def issue_verified_captured_snapshot_for_test(
     *,
+    session_id: str | None = None,
+    attempt_id: str | None = None,
+    claim_id: str | None = None,
     reservation_id: str,
     execution_id: str,
     snapshot_id: UUID,
@@ -546,10 +555,15 @@ def issue_verified_captured_snapshot_for_test(
     artifact_identity_sha256: str,
     child_result_sha256: str,
 ) -> VerifiedCapturedSnapshot:
-    """Explicit test seam; production issuance remains unavailable in C3-A2."""
+    """Explicit test seam isolated from the C3-D1 production verifier issuer."""
 
-    permit = _VerifiedSnapshotPermit()
-    capability = VerifiedCapturedSnapshot(
+    session_id = reservation_id if session_id is None else session_id
+    attempt_id = reservation_id if attempt_id is None else attempt_id
+    claim_id = reservation_id if claim_id is None else claim_id
+    return _issue_verified_captured_snapshot(
+        session_id=session_id,
+        attempt_id=attempt_id,
+        claim_id=claim_id,
         reservation_id=reservation_id,
         execution_id=execution_id,
         snapshot_id=snapshot_id,
@@ -557,17 +571,106 @@ def issue_verified_captured_snapshot_for_test(
         artifact_byte_length=artifact_byte_length,
         artifact_identity_sha256=artifact_identity_sha256,
         child_result_sha256=child_result_sha256,
-        _issuer=_TEST_VERIFIED_SNAPSHOT_ISSUER,
+        issuer=_TEST_VERIFIED_SNAPSHOT_ISSUER,
+    )
+
+
+def _issue_production_verified_captured_snapshot(
+    *,
+    session_id: str,
+    attempt_id: str,
+    claim_id: str,
+    reservation_id: str,
+    execution_id: str,
+    snapshot_id: UUID,
+    artifact_sha256: str,
+    artifact_byte_length: int,
+    artifact_identity_sha256: str,
+    child_result_sha256: str,
+) -> VerifiedCapturedSnapshot:
+    return _issue_verified_captured_snapshot(
+        session_id=session_id,
+        attempt_id=attempt_id,
+        claim_id=claim_id,
+        reservation_id=reservation_id,
+        execution_id=execution_id,
+        snapshot_id=snapshot_id,
+        artifact_sha256=artifact_sha256,
+        artifact_byte_length=artifact_byte_length,
+        artifact_identity_sha256=artifact_identity_sha256,
+        child_result_sha256=child_result_sha256,
+        issuer=_PRODUCTION_VERIFIED_SNAPSHOT_ISSUER,
+    )
+
+
+def _issue_verified_captured_snapshot(
+    *,
+    session_id: str,
+    attempt_id: str,
+    claim_id: str,
+    reservation_id: str,
+    execution_id: str,
+    snapshot_id: UUID,
+    artifact_sha256: str,
+    artifact_byte_length: int,
+    artifact_identity_sha256: str,
+    child_result_sha256: str,
+    issuer: _VerifiedSnapshotIssuer,
+) -> VerifiedCapturedSnapshot:
+    permit = _VerifiedSnapshotPermit()
+    capability = VerifiedCapturedSnapshot(
+        session_id=session_id,
+        attempt_id=attempt_id,
+        claim_id=claim_id,
+        reservation_id=reservation_id,
+        execution_id=execution_id,
+        snapshot_id=snapshot_id,
+        artifact_sha256=artifact_sha256,
+        artifact_byte_length=artifact_byte_length,
+        artifact_identity_sha256=artifact_identity_sha256,
+        child_result_sha256=child_result_sha256,
+        _issuer=issuer,
         _permit=permit,
     )
     issuance = _VerifiedSnapshotIssuance(
         capability=weakref.ref(capability),
         values=_verified_snapshot_visible_values(capability),
-        issuer=_TEST_VERIFIED_SNAPSHOT_ISSUER,
+        issuer=issuer,
     )
     with _VERIFIED_SNAPSHOT_REGISTRY_LOCK:
         _VERIFIED_SNAPSHOT_REGISTRY[permit] = issuance
     return capability
+
+
+def _validate_production_verified_captured_snapshot(
+    capability: VerifiedCapturedSnapshot,
+) -> tuple[object, ...]:
+    """Validate exact production issuance without consuming terminal authority."""
+
+    if type(capability) is not VerifiedCapturedSnapshot:
+        raise TypeError("verified snapshot validation requires exact capability")
+    if capability._issuer is not _PRODUCTION_VERIFIED_SNAPSHOT_ISSUER:
+        raise TypeError("production verifier requires a production-issued capability")
+    permit = capability._permit
+    if type(permit) is not _VerifiedSnapshotPermit:
+        raise WindowsEffectfulCaptureProtocolError(
+            "verified snapshot registry binding is invalid"
+        )
+    with permit.lock:
+        with _VERIFIED_SNAPSHOT_REGISTRY_LOCK:
+            issuance = _VERIFIED_SNAPSHOT_REGISTRY.get(permit)
+            values = _verified_snapshot_visible_values(capability)
+            if (
+                permit.consumed
+                or issuance is None
+                or issuance.capability() is not capability
+                or issuance.issuer is not _PRODUCTION_VERIFIED_SNAPSHOT_ISSUER
+                or issuance.values != values
+            ):
+                raise WindowsEffectfulCaptureProtocolError(
+                    "verified snapshot exact-object registry binding mismatch"
+                )
+            return issuance.values
 
 
 def consume_verified_captured_snapshot_for_test(
@@ -650,6 +753,9 @@ def _verified_snapshot_visible_values(
     capability: VerifiedCapturedSnapshot,
 ) -> tuple[object, ...]:
     return (
+        capability.session_id,
+        capability.attempt_id,
+        capability.claim_id,
         capability.reservation_id,
         capability.execution_id,
         capability.snapshot_id,

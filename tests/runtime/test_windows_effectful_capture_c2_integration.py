@@ -7,13 +7,28 @@ from collections import deque
 from contextlib import nullcontext
 from copy import copy, deepcopy
 from dataclasses import replace
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
+from decimal import Decimal
 from inspect import signature
+from uuid import UUID
 
 import pytest
 
 from trading_bot.domain import Symbol
-from trading_bot.market_data import ALPACA_DAILY_SNAPSHOT_DESCRIPTOR
+from trading_bot.market_calendar import NYSEMarketCalendar
+from trading_bot.market_data import (
+    ALPACA_DAILY_SNAPSHOT_DESCRIPTOR,
+    XNYS_CALENDAR_DESCRIPTOR,
+    BoundMarketCalendar,
+    DailyBarCandidate,
+    DailyProviderResponse,
+    DailySnapshotCaptureRequest,
+    ProviderDescriptor,
+    SourcePayloadEvidence,
+    accept_daily_provider_response,
+    build_daily_provider_request,
+    serialize_daily_snapshot,
+)
 from trading_bot.runtime.windows_authority import (
     PRODUCTION_AUTHORITY_PATHS,
     WindowsAuthorityBootstrap,
@@ -35,8 +50,11 @@ from trading_bot.runtime.windows_effectful_capture_native import (
     C3ProcessOutcomeStatus,
     C3ResultTransportStatus,
     NativeCreatedProcess,
+    NativeFileIdentity,
+    NativeOpenedArtifact,
     NativeOverlappedCompletion,
     NativePipePair,
+    NativeStagingObject,
     WindowsEffectfulCaptureNativeError,
 )
 from trading_bot.runtime.windows_effectful_capture_protocol import (
@@ -46,6 +64,8 @@ from trading_bot.runtime.windows_effectful_capture_protocol import (
     ChildResultClassification,
     IsolatedCaptureChildResult,
     ProviderAttemptFenceState,
+    VerifiedCapturedSnapshot,
+    WindowsEffectfulCaptureProtocolError,
     parse_isolated_capture_child_request,
     serialize_isolated_capture_child_result,
 )
@@ -68,7 +88,7 @@ from trading_bot.runtime.windows_transactional_authority import (
 _APPLICATION = r"F:\AITradingBot\runtime\python.exe"
 _CURRENT = r"F:\AITradingBot\runtime"
 _TEMP = r"F:\AITradingBot\temp"
-_STAGING = r"F:\AITradingBot\Authority\capture-output\.c3-c2.staging"
+_STORAGE_ROOT = r"F:\AITradingBot\Authority\capture-output"
 _PARENT_ENV = {"SystemRoot": r"C:\Windows", "WINDIR": r"C:\Windows"}
 
 
@@ -96,6 +116,14 @@ class _FakeNativeApi:
         self.process_wait_events: deque[C3NativeWaitStatus] = deque()
         self.exit_code = 0
         self.cancel_settles = True
+        self.file_identity = NativeFileIdentity(7, b"i" * 16)
+        self.staging_bytes = b""
+        self.final_bytes: bytes | None = None
+        self.final_identity: NativeFileIdentity | None = None
+        self.casefold_collision = False
+        self.identity_results: deque[NativeFileIdentity] = deque()
+        self.fail_publish = False
+        self.fail_cleanup = False
 
     def create_job_object(self) -> int:
         self.events.append("create_job")
@@ -118,10 +146,49 @@ class _FakeNativeApi:
     def set_handle_inheritable(self, handle: int, inheritable: bool) -> None:
         self.events.append(f"inherit:{handle}:{inheritable}")
 
-    def create_staging_file(self, path: str) -> int:
-        assert path == _STAGING
+    def create_staging_file(self, path: str) -> NativeStagingObject:
+        assert path.startswith(_STORAGE_ROOT + "\\.c3-capture-")
+        assert path.endswith(".staging")
         self.events.append("create_staging")
-        return 105
+        return NativeStagingObject(105, 108, self.file_identity, path)
+
+    def get_file_identity(self, handle: int) -> NativeFileIdentity:
+        self.events.append(f"identity:{handle}")
+        return (
+            self.identity_results.popleft()
+            if self.identity_results
+            else self.file_identity
+        )
+
+    def read_artifact_file(self, handle: int, max_bytes: int) -> bytes:
+        self.events.append(f"read_artifact:{handle}")
+        payload = self.staging_bytes if handle == 105 else self.final_bytes
+        return b"" if payload is None else payload
+
+    def reject_casefold_collisions(
+        self, directory: str, names: tuple[str, ...]
+    ) -> None:
+        self.events.append("casefold_check")
+        if self.casefold_collision:
+            raise RuntimeError("collision")
+
+    def publish_staging_link(self, staging_handle: int, final_path: str) -> None:
+        assert staging_handle == 105
+        self.events.append("publish")
+        if self.fail_publish:
+            raise RuntimeError("publication failure")
+        if self.final_bytes is None:
+            self.final_bytes = self.staging_bytes
+
+    def open_final_artifact(self, path: str) -> NativeOpenedArtifact:
+        self.events.append("open_final")
+        return NativeOpenedArtifact(109, self.final_identity or self.file_identity)
+
+    def delete_staging_link(self, staging_handle: int) -> None:
+        assert staging_handle == 105
+        self.events.append("delete_staging")
+        if self.fail_cleanup:
+            raise RuntimeError("cleanup failure")
 
     def create_suspended_process(self, **kwargs: object) -> NativeCreatedProcess:
         assert kwargs["application_name"] == _APPLICATION
@@ -313,7 +380,7 @@ def _case(api: _FakeNativeApi):
         arguments=("-m", "trading_bot.runtime.c3_child"),
         current_directory=_CURRENT,
         controlled_temp_directory=_TEMP,
-        staging_path=_STAGING,
+        storage_root=_STORAGE_ROOT,
         parent_environment=_PARENT_ENV,
     )
     adapter = create_c3_c2_transactional_adapter_for_test(capture, plan, launch, api)
@@ -872,6 +939,388 @@ def _observe_c3c_case(
         api.wait_events.append(C3NativeWaitStatus.IO_COMPLETED)
     api.process_wait_events.append(C3NativeWaitStatus.PROCESS_EXITED)
     return observe_c3_c3b_for_test(adapter, resumed)
+
+
+def _canonical_c3_snapshot(
+    api: _FakeNativeApi,
+    *,
+    request_id: UUID | None = None,
+    requested_at: datetime | None = None,
+    symbols: tuple[Symbol, ...] | None = None,
+    provider: ProviderDescriptor = ALPACA_DAILY_SNAPSHOT_DESCRIPTOR,
+) -> bytes:
+    child = parse_isolated_capture_child_request(bytes(api.written))
+    requested_at = child.requested_at_utc if requested_at is None else requested_at
+    request = DailySnapshotCaptureRequest(
+        request_id=child.daily_snapshot_request_id
+        if request_id is None
+        else request_id,
+        symbols=child.capture_request.ordered_universe if symbols is None else symbols,
+        requested_at=requested_at,
+        calendar=XNYS_CALENDAR_DESCRIPTOR,
+    )
+    calendar = BoundMarketCalendar(XNYS_CALENDAR_DESCRIPTOR, NYSEMarketCalendar())
+    provider_request = build_daily_provider_request(request, provider, calendar)
+    candidates = tuple(
+        DailyBarCandidate(
+            response_ordinal=ordinal,
+            symbol=symbol,
+            session=provider_request.target_session,
+            timestamp=datetime.combine(
+                provider_request.target_session.session_date,
+                datetime.min.time(),
+                tzinfo=UTC,
+            )
+            + timedelta(hours=20),
+            open=Decimal("100"),
+            high=Decimal("103"),
+            low=Decimal("99"),
+            close=Decimal("102"),
+            volume=1000 + ordinal,
+        )
+        for ordinal, symbol in enumerate(request.symbols)
+    )
+    source = b"deterministic C3 parent verification response"
+    response = DailyProviderResponse(
+        request=provider_request,
+        candidates=candidates,
+        captured_at=requested_at + timedelta(seconds=1),
+        provider_as_of=requested_at,
+        provider_request_id="c3-parent-verification",
+        source_payload=SourcePayloadEvidence(
+            sha256=hashlib.sha256(source).hexdigest(),
+            byte_length=len(source),
+            media_type="application/json",
+        ),
+        pagination_complete=True,
+    )
+    accepted = accept_daily_provider_response(provider_request, response, calendar)
+    assert accepted.snapshot is not None
+    return serialize_daily_snapshot(accepted.snapshot)
+
+
+def _persist_successful_c3_observation(
+    api: _FakeNativeApi,
+    adapter,
+    transactional,
+    resumed,
+    payload: bytes,
+    *,
+    child_changes: dict[str, object] | None = None,
+    snapshot_id: UUID | None = None,
+):
+    api.staging_bytes = payload
+    if snapshot_id is None:
+        snapshot_id = UUID(json.loads(payload)["snapshot_id"])
+    changes: dict[str, object] = {
+        "classification": ChildResultClassification.SUCCEEDED,
+        "snapshot_id": snapshot_id,
+        "artifact_sha256": hashlib.sha256(payload).hexdigest(),
+        "artifact_byte_length": len(payload),
+        "http_status": 200,
+        "provider_request_id": "c3-parent-verification",
+    }
+    changes.update(child_changes or {})
+    child_payload = _trusted_result_bytes(
+        resumed,
+        **changes,
+    )
+    api.result_chunks.extend((child_payload, None))
+    api.wait_events.extend(
+        (C3NativeWaitStatus.IO_COMPLETED, C3NativeWaitStatus.IO_COMPLETED)
+    )
+    api.process_wait_events.append(C3NativeWaitStatus.PROCESS_EXITED)
+    observation = observe_c3_c3b_for_test(adapter, resumed)
+    evidence = issue_c3_post_resume_evidence_for_test(adapter, resumed, observation)
+    transactional.record_c3_post_resume_evidence(
+        resumed.execution_id, resumed.resume_receipt, evidence
+    )
+    return observation
+
+
+def test_c3_d1_parent_verifies_publishes_reopens_and_issues_exact_capability() -> None:
+    api = _FakeNativeApi()
+    capture, adapter, transactional, connection, resumed = _resume_case(api)
+    payload = _canonical_c3_snapshot(api)
+    try:
+        observation = _persist_successful_c3_observation(
+            api, adapter, transactional, resumed, payload
+        )
+        capability = transactional.verify_c3_captured_snapshot(
+            resumed.execution_id, resumed.reservation_id
+        )
+
+        assert type(capability) is VerifiedCapturedSnapshot
+        lineage = connection.execute(
+            """
+            SELECT s.session_id, a.attempt_id, c.claim_id
+            FROM launch_reservations r
+            JOIN provider_call_claims c ON c.claim_id = r.claim_id
+            JOIN attempts a ON a.attempt_id = c.attempt_id
+            JOIN sessions s ON s.session_id = a.session_id
+            """
+        ).fetchone()
+        assert (
+            capability.session_id,
+            capability.attempt_id,
+            capability.claim_id,
+        ) == lineage
+        assert capability.reservation_id == resumed.reservation_id
+        assert capability.execution_id == resumed.execution_id
+        assert capability.artifact_sha256 == hashlib.sha256(payload).hexdigest()
+        assert capability.artifact_byte_length == len(payload)
+        assert (
+            capability.child_result_sha256
+            == hashlib.sha256(
+                serialize_isolated_capture_child_result(observation.trusted_result)
+            ).hexdigest()
+        )
+        expected_name = f"daily-market-data-snapshot-{capability.snapshot_id}.json"
+        expected_evidence = json.dumps(
+            {
+                "artifact_byte_length": len(payload),
+                "artifact_sha256": hashlib.sha256(payload).hexdigest(),
+                "final_canonical_filename": expected_name,
+                "native_file_identity": api.file_identity.canonical_evidence(),
+                "schema": 1,
+                "snapshot_id": str(capability.snapshot_id),
+            },
+            ensure_ascii=True,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        ).encode("ascii")
+        assert (
+            capability.artifact_identity_sha256
+            == hashlib.sha256(expected_evidence).hexdigest()
+        )
+        transactional.validate_c3_verified_snapshot(capability)
+        with pytest.raises(WindowsEffectfulCaptureProtocolError, match="binding"):
+            transactional.validate_c3_verified_snapshot(replace(capability))
+        assert api.events.index("publish") < api.events.index("open_final")
+        assert api.events.index("open_final") < api.events.index("delete_staging")
+        assert api.events.count("close:105") == 1
+        assert connection.execute("SELECT count(*) FROM terminals").fetchone() == (0,)
+        assert connection.execute(
+            "SELECT count(*) FROM session_selections"
+        ).fetchone() == (0,)
+    finally:
+        _close(adapter, transactional)
+        capture._closed = True
+
+
+def test_c3_d1_recovery_before_verification_prevents_publication() -> None:
+    api = _FakeNativeApi()
+    capture, adapter, transactional, connection, resumed = _resume_case(api)
+    payload = _canonical_c3_snapshot(api)
+    try:
+        _persist_successful_c3_observation(
+            api, adapter, transactional, resumed, payload
+        )
+        session_id, attempt_id = connection.execute(
+            "SELECT session_id, attempt_id FROM attempts"
+        ).fetchone()
+        operator = b'{"evidence":"recovery-first-c3-d1","schema":1}'
+        transactional.record_recovery(
+            session_id,
+            "ATTEMPT",
+            attempt_id,
+            "RECORD_ATTEMPT_AMBIGUITY",
+            operator_evidence_json=operator,
+            operator_evidence_digest=hashlib.sha256(operator).digest(),
+        )
+        with pytest.raises(ValueError, match="unavailable"):
+            transactional.verify_c3_captured_snapshot(
+                resumed.execution_id, resumed.reservation_id
+            )
+        assert "publish" not in api.events
+    finally:
+        _close(adapter, transactional)
+        capture._closed = True
+
+
+def test_c3_d1_verified_capability_is_revoked_by_later_recovery() -> None:
+    api = _FakeNativeApi()
+    capture, adapter, transactional, connection, resumed = _resume_case(api)
+    payload = _canonical_c3_snapshot(api)
+    try:
+        _persist_successful_c3_observation(
+            api, adapter, transactional, resumed, payload
+        )
+        capability = transactional.verify_c3_captured_snapshot(
+            resumed.execution_id, resumed.reservation_id
+        )
+        session_id, attempt_id = connection.execute(
+            "SELECT session_id, attempt_id FROM attempts"
+        ).fetchone()
+        operator = b'{"evidence":"delayed-c3-d1","schema":1}'
+        transactional.record_recovery(
+            session_id,
+            "ATTEMPT",
+            attempt_id,
+            "RECORD_ATTEMPT_AMBIGUITY",
+            operator_evidence_json=operator,
+            operator_evidence_digest=hashlib.sha256(operator).digest(),
+        )
+        with pytest.raises(ValueError, match="unavailable"):
+            transactional.validate_c3_verified_snapshot(capability)
+    finally:
+        _close(adapter, transactional)
+        capture._closed = True
+
+
+@pytest.mark.parametrize(
+    "case",
+    [
+        "staging_identity",
+        "oversize",
+        "truncated",
+        "appended",
+        "noncanonical",
+        "invalid_utf8",
+        "wrong_request_uuid",
+        "wrong_requested_at",
+        "wrong_session",
+        "wrong_universe",
+        "wrong_provider",
+        "child_digest",
+        "child_length",
+        "final_collision",
+        "publication_failure",
+        "final_identity",
+        "final_bytes",
+        "cleanup_failure",
+    ],
+)
+def test_c3_d1_parent_verification_failures_never_issue_authority(case: str) -> None:
+    api = _FakeNativeApi()
+    capture, adapter, transactional, connection, resumed = _resume_case(api)
+    canonical = _canonical_c3_snapshot(api)
+    original_id = UUID(json.loads(canonical)["snapshot_id"])
+    payload = canonical
+    child_changes: dict[str, object] = {}
+    if case == "truncated":
+        payload = canonical[:-8]
+    elif case == "appended":
+        payload = canonical + b"x"
+    elif case == "noncanonical":
+        payload = b" " + canonical
+    elif case == "invalid_utf8":
+        payload = b"\xff\n"
+    elif case == "wrong_request_uuid":
+        payload = _canonical_c3_snapshot(
+            api, request_id=UUID("11111111-1111-4111-8111-111111111111")
+        )
+    elif case == "wrong_requested_at":
+        payload = _canonical_c3_snapshot(
+            api, requested_at=datetime(2026, 8, 18, 15, tzinfo=UTC)
+        )
+    elif case == "wrong_session":
+        payload = _canonical_c3_snapshot(
+            api, requested_at=datetime(2026, 8, 19, 14, tzinfo=UTC)
+        )
+    elif case == "wrong_universe":
+        payload = _canonical_c3_snapshot(api, symbols=(Symbol("AAPL"),))
+    elif case == "wrong_provider":
+        payload = _canonical_c3_snapshot(
+            api, provider=ProviderDescriptor("other", 1, "daily-bars", "sip")
+        )
+    elif case == "child_digest":
+        child_changes["artifact_sha256"] = "12" * 32
+    elif case == "child_length":
+        child_changes["artifact_byte_length"] = len(canonical) + 1
+
+    try:
+        _persist_successful_c3_observation(
+            api,
+            adapter,
+            transactional,
+            resumed,
+            payload,
+            child_changes=child_changes,
+            snapshot_id=(
+                original_id
+                if case in {"truncated", "appended", "noncanonical", "invalid_utf8"}
+                else None
+            ),
+        )
+        if case == "staging_identity":
+            api.file_identity = NativeFileIdentity(8, b"x" * 16)
+        elif case == "oversize":
+            api.staging_bytes = b"x" * (4 * 1024 * 1024 + 1)
+        elif case == "final_collision":
+            api.casefold_collision = True
+        elif case == "publication_failure":
+            api.fail_publish = True
+        elif case == "final_identity":
+            api.final_identity = NativeFileIdentity(9, b"f" * 16)
+        elif case == "final_bytes":
+            api.final_bytes = b"changed\n"
+        elif case == "cleanup_failure":
+            api.fail_cleanup = True
+
+        with pytest.raises(
+            WindowsEffectfulCaptureCompositionError,
+            match="parent artifact verification failed",
+        ):
+            transactional.verify_c3_captured_snapshot(
+                resumed.execution_id, resumed.reservation_id
+            )
+        assert connection.execute("SELECT count(*) FROM terminals").fetchone() == (0,)
+        assert connection.execute(
+            "SELECT count(*) FROM session_selections"
+        ).fetchone() == (0,)
+        if case == "staging_identity":
+            assert "delete_staging" not in api.events
+        if case == "cleanup_failure":
+            assert api.events.count("delete_staging") == 1
+    finally:
+        _close(adapter, transactional)
+        capture._closed = True
+
+
+def test_c3_d1_non_success_child_result_cannot_verify() -> None:
+    api = _FakeNativeApi()
+    capture, adapter, transactional, connection, resumed = _resume_case(api)
+    try:
+        observation = _observe_c3c_case(api, adapter, resumed)
+        evidence = issue_c3_post_resume_evidence_for_test(adapter, resumed, observation)
+        transactional.record_c3_post_resume_evidence(
+            resumed.execution_id, resumed.resume_receipt, evidence
+        )
+        with pytest.raises(WindowsEffectfulCaptureCompositionError):
+            transactional.verify_c3_captured_snapshot(
+                resumed.execution_id, resumed.reservation_id
+            )
+        assert "publish" not in api.events
+        assert connection.execute("SELECT count(*) FROM terminals").fetchone() == (0,)
+    finally:
+        _close(adapter, transactional)
+        capture._closed = True
+
+
+def test_c3_d1_cleanup_identity_mismatch_is_not_blindly_deleted() -> None:
+    api = _FakeNativeApi()
+    capture, adapter, transactional, connection, resumed = _resume_case(api)
+    payload = _canonical_c3_snapshot(api)
+    try:
+        _persist_successful_c3_observation(
+            api, adapter, transactional, resumed, payload
+        )
+        changed = NativeFileIdentity(10, b"z" * 16)
+        api.identity_results.extend(
+            (api.file_identity, api.file_identity, changed, changed)
+        )
+        with pytest.raises(WindowsEffectfulCaptureCompositionError):
+            transactional.verify_c3_captured_snapshot(
+                resumed.execution_id, resumed.reservation_id
+            )
+        assert "publish" in api.events
+        assert "delete_staging" not in api.events
+        assert connection.execute("SELECT count(*) FROM terminals").fetchone() == (0,)
+    finally:
+        _close(adapter, transactional)
+        capture._closed = True
 
 
 @pytest.mark.parametrize(

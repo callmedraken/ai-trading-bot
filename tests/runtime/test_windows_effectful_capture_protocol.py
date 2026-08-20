@@ -403,6 +403,9 @@ def test_child_success_result_is_evidence_not_verifier_authority() -> None:
 
     with pytest.raises(TypeError, match="parent verifier"):
         VerifiedCapturedSnapshot(
+            session_id=_RESERVATION,
+            attempt_id=_RESERVATION,
+            claim_id=_RESERVATION,
             reservation_id=_RESERVATION,
             execution_id=_EXECUTION,
             snapshot_id=_SNAPSHOT,

@@ -1,9 +1,4 @@
-"""C3 Windows containment, bounded IPC, resume, and parent observation.
-
-C3-C3B adds only private named-pipe overlapped transport, bounded process
-observation/containment, and parent-handle cleanup. It does not persist C2
-post-resume evidence, verify or publish staging artifacts, or issue snapshots.
-"""
+"""C3 Windows containment, IPC, and exact parent-owned artifact handles."""
 
 from __future__ import annotations
 
@@ -45,9 +40,14 @@ C3_CREATE_PROCESS_FLAGS = (
 HANDLE_FLAG_INHERIT = 0x00000001
 GENERIC_READ = 0x80000000
 GENERIC_WRITE = 0x40000000
+DELETE = 0x00010000
+FILE_SHARE_READ = 0x00000001
+FILE_SHARE_DELETE = 0x00000004
 CREATE_NEW = 1
 OPEN_EXISTING = 3
 FILE_ATTRIBUTE_NORMAL = 0x00000080
+FILE_ATTRIBUTE_REPARSE_POINT = 0x00000400
+FILE_FLAG_OPEN_REPARSE_POINT = 0x00200000
 FILE_FLAG_OVERLAPPED = 0x40000000
 FILE_FLAG_FIRST_PIPE_INSTANCE = 0x00080000
 PIPE_ACCESS_INBOUND = 0x00000001
@@ -70,6 +70,11 @@ WAIT_OBJECT_0 = 0x00000000
 WAIT_TIMEOUT = 0x00000102
 WAIT_FAILED = 0xFFFFFFFF
 INFINITE = 0xFFFFFFFF
+DUPLICATE_SAME_ACCESS = 0x00000002
+FILE_ID_INFO_CLASS = 18
+FILE_ATTRIBUTE_TAG_INFO_CLASS = 9
+FILE_LINK_INFO_CLASS = 11
+FILE_DISPOSITION_INFO_CLASS = 4
 
 C3_CHILD_REQUEST_DELIVERY_TIMEOUT_MS = 10_000
 C3_CHILD_COMPLETION_TIMEOUT_MS = 120_000
@@ -113,6 +118,70 @@ class C3ParentCleanupStatus(StrEnum):
     COMPLETE = "COMPLETE"
     FAILED = "FAILED"
     UNRESOLVED = "UNRESOLVED"
+
+
+@dataclass(frozen=True, slots=True)
+class NativeFileIdentity:
+    """Stable sanitized Windows file identity; never a raw HANDLE."""
+
+    volume_serial_number: int
+    file_id: bytes
+
+    def __post_init__(self) -> None:
+        if type(self.volume_serial_number) is not int or not (
+            0 <= self.volume_serial_number < 1 << 64
+        ):
+            raise WindowsEffectfulCaptureNativeError("file volume identity is invalid")
+        if type(self.file_id) is not bytes or len(self.file_id) != 16:
+            raise WindowsEffectfulCaptureNativeError("native file identity is invalid")
+
+    def canonical_evidence(self) -> dict[str, str]:
+        return {
+            "file_id": self.file_id.hex(),
+            "volume_serial_number": f"{self.volume_serial_number:016x}",
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class NativeStagingObject:
+    """Private master/child handle set for one exclusively created staging file."""
+
+    parent_handle: int
+    child_write_handle: int
+    identity: NativeFileIdentity
+    path: str
+    child_access_mask: int = GENERIC_WRITE
+    parent_inheritable: bool = False
+
+    def __post_init__(self) -> None:
+        _handle(self.parent_handle, "parent staging handle")
+        _handle(self.child_write_handle, "child staging handle")
+        if self.parent_handle == self.child_write_handle:
+            raise WindowsEffectfulCaptureNativeError(
+                "parent and child staging handles must be distinct"
+            )
+        if type(self.identity) is not NativeFileIdentity:
+            raise WindowsEffectfulCaptureNativeError("staging identity is invalid")
+        _windows_path(self.path, "staging path")
+        if self.child_access_mask != GENERIC_WRITE:
+            raise WindowsEffectfulCaptureNativeError(
+                "child staging authority must be write-only"
+            )
+        if self.parent_inheritable is not False:
+            raise WindowsEffectfulCaptureNativeError(
+                "parent staging authority must be noninheritable"
+            )
+
+
+@dataclass(frozen=True, slots=True)
+class NativeOpenedArtifact:
+    handle: int
+    identity: NativeFileIdentity
+
+    def __post_init__(self) -> None:
+        _handle(self.handle, "opened artifact handle")
+        if type(self.identity) is not NativeFileIdentity:
+            raise WindowsEffectfulCaptureNativeError("opened identity is invalid")
 
 
 @dataclass(frozen=True, slots=True)
@@ -179,7 +248,15 @@ class WindowsEffectfulCaptureNativeApi(Protocol):
     def create_request_pipe(self, buffer_size: int) -> NativePipePair: ...
     def create_result_pipe(self, buffer_size: int) -> NativePipePair: ...
     def set_handle_inheritable(self, handle: int, inheritable: bool) -> None: ...
-    def create_staging_file(self, path: str) -> int: ...
+    def create_staging_file(self, path: str) -> NativeStagingObject: ...
+    def get_file_identity(self, handle: int) -> NativeFileIdentity: ...
+    def read_artifact_file(self, handle: int, max_bytes: int) -> bytes: ...
+    def reject_casefold_collisions(
+        self, directory: str, names: tuple[str, ...]
+    ) -> None: ...
+    def publish_staging_link(self, staging_handle: int, final_path: str) -> None: ...
+    def open_final_artifact(self, path: str) -> NativeOpenedArtifact: ...
+    def delete_staging_link(self, staging_handle: int) -> None: ...
 
     def create_suspended_process(
         self,
@@ -241,6 +318,8 @@ class SuspendedCaptureChild:
         "_result_reader",
         "_resume_attempted",
         "_staging_handle",
+        "_staging_identity",
+        "_staging_path",
         "process_id",
         "thread_id",
     )
@@ -251,6 +330,8 @@ class SuspendedCaptureChild:
         process: NativeCreatedProcess,
         handles: tuple[int, int, int, int],
         *,
+        staging_identity: NativeFileIdentity,
+        staging_path: str,
         _issuer: object,
     ) -> None:
         if _issuer is not _SUSPENDED_CHILD_ISSUER:
@@ -276,6 +357,8 @@ class SuspendedCaptureChild:
         self._request_writer = request_writer
         self._result_reader = result_reader
         self._staging_handle = staging_handle
+        self._staging_identity = staging_identity
+        self._staging_path = _windows_path(staging_path, "staging path")
         self._primary_thread_handle = process.primary_thread_handle
         self._process_handle = process.process_handle
         self._job_handle = job_handle
@@ -309,6 +392,23 @@ class SuspendedCaptureChild:
     @property
     def closed(self) -> bool:
         return self._closed
+
+    def _retained_staging(self) -> tuple[int, NativeFileIdentity, str]:
+        handle = self._staging_handle
+        if handle is None or self._closed:
+            raise WindowsEffectfulCaptureNativeError(
+                "parent staging authority is unavailable"
+            )
+        return handle, self._staging_identity, self._staging_path
+
+    def _release_staging_handle(self) -> int:
+        handle = self._staging_handle
+        if handle is None:
+            raise WindowsEffectfulCaptureNativeError(
+                "parent staging authority is unavailable"
+            )
+        self._staging_handle = None
+        return handle
 
     def _write_request_and_close(self, payload: bytes) -> None:
         if self._closed:
@@ -730,6 +830,12 @@ def create_suspended_capture_child_for_test(
         "create_result_pipe",
         "set_handle_inheritable",
         "create_staging_file",
+        "get_file_identity",
+        "read_artifact_file",
+        "reject_casefold_collisions",
+        "publish_staging_link",
+        "open_final_artifact",
+        "delete_staging_link",
         "create_suspended_process",
         "begin_overlapped_write",
         "begin_overlapped_read",
@@ -791,11 +897,17 @@ def _create_suspended_capture_child(
             raise WindowsEffectfulCaptureNativeError("result pipe result is invalid")
         acquired.extend((result.read_handle, result.write_handle))
 
-        staging_handle = _handle(
-            native_api.create_staging_file(staging), "staging handle"
+        staging_object = native_api.create_staging_file(staging)
+        if type(staging_object) is not NativeStagingObject:
+            raise WindowsEffectfulCaptureNativeError("staging object result is invalid")
+        staging_handle = staging_object.parent_handle
+        child_staging_handle = staging_object.child_write_handle
+        acquired.extend((staging_handle, child_staging_handle))
+        child_handles = (
+            request.read_handle,
+            result.write_handle,
+            child_staging_handle,
         )
-        acquired.append(staging_handle)
-        child_handles = (request.read_handle, result.write_handle, staging_handle)
         if len(set(child_handles)) != 3:
             raise WindowsEffectfulCaptureNativeError("child handles must be distinct")
 
@@ -819,12 +931,15 @@ def _create_suspended_capture_child(
         for child_pipe_handle in (request.read_handle, result.write_handle):
             native_api.close_handle(child_pipe_handle)
             acquired.remove(child_pipe_handle)
-        native_api.set_handle_inheritable(staging_handle, False)
+        native_api.close_handle(child_staging_handle)
+        acquired.remove(child_staging_handle)
 
         child = SuspendedCaptureChild(
             native_api,
             process,
             (request.write_handle, result.read_handle, staging_handle, job),
+            staging_identity=staging_object.identity,
+            staging_path=staging_object.path,
             _issuer=_SUSPENDED_CHILD_ISSUER,
         )
         for transferred in (
@@ -991,6 +1106,24 @@ class CtypesWindowsEffectfulCaptureNativeApi:
                 ("PeakJobMemoryUsed", ctypes.c_size_t),
             ]
 
+        class FILE_ID_128(ctypes.Structure):
+            _fields_ = [("Identifier", ctypes.c_ubyte * 16)]
+
+        class FILE_ID_INFO(ctypes.Structure):
+            _fields_ = [
+                ("VolumeSerialNumber", ctypes.c_ulonglong),
+                ("FileId", FILE_ID_128),
+            ]
+
+        class FILE_ATTRIBUTE_TAG_INFO(ctypes.Structure):
+            _fields_ = [
+                ("FileAttributes", wintypes.DWORD),
+                ("ReparseTag", wintypes.DWORD),
+            ]
+
+        class FILE_DISPOSITION_INFO(ctypes.Structure):
+            _fields_ = [("DeleteFile", wintypes.BOOL)]
+
         k32 = ctypes.WinDLL("kernel32", use_last_error=True)
         advapi32 = ctypes.WinDLL("advapi32", use_last_error=True)
         k32.CreateJobObjectW.argtypes = [ctypes.c_void_p, wintypes.LPCWSTR]
@@ -1034,6 +1167,39 @@ class CtypesWindowsEffectfulCaptureNativeApi:
             wintypes.HANDLE,
         ]
         k32.CreateFileW.restype = wintypes.HANDLE
+        k32.GetCurrentProcess.argtypes = []
+        k32.GetCurrentProcess.restype = wintypes.HANDLE
+        k32.DuplicateHandle.argtypes = [
+            wintypes.HANDLE,
+            wintypes.HANDLE,
+            wintypes.HANDLE,
+            ctypes.POINTER(wintypes.HANDLE),
+            wintypes.DWORD,
+            wintypes.BOOL,
+            wintypes.DWORD,
+        ]
+        k32.DuplicateHandle.restype = wintypes.BOOL
+        k32.GetFileInformationByHandleEx.argtypes = [
+            wintypes.HANDLE,
+            ctypes.c_int,
+            ctypes.c_void_p,
+            wintypes.DWORD,
+        ]
+        k32.GetFileInformationByHandleEx.restype = wintypes.BOOL
+        k32.SetFilePointerEx.argtypes = [
+            wintypes.HANDLE,
+            ctypes.c_longlong,
+            ctypes.POINTER(ctypes.c_longlong),
+            wintypes.DWORD,
+        ]
+        k32.SetFilePointerEx.restype = wintypes.BOOL
+        k32.SetFileInformationByHandle.argtypes = [
+            wintypes.HANDLE,
+            ctypes.c_int,
+            ctypes.c_void_p,
+            wintypes.DWORD,
+        ]
+        k32.SetFileInformationByHandle.restype = wintypes.BOOL
         k32.InitializeProcThreadAttributeList.argtypes = [
             ctypes.c_void_p,
             wintypes.DWORD,
@@ -1140,6 +1306,9 @@ class CtypesWindowsEffectfulCaptureNativeApi:
         self._pi = PROCESS_INFORMATION
         self._limits = EXTENDED_LIMIT
         self._overlapped = OVERLAPPED
+        self._file_id_info = FILE_ID_INFO
+        self._file_attribute_tag_info = FILE_ATTRIBUTE_TAG_INFO
+        self._file_disposition_info = FILE_DISPOSITION_INFO
 
     def create_job_object(self) -> int:
         value = self._k32.CreateJobObjectW(None, None)
@@ -1299,12 +1468,15 @@ class CtypesWindowsEffectfulCaptureNativeApi:
         ):
             raise _native_error("SetHandleInformation")
 
-    def create_staging_file(self, path: str) -> int:
-        sa = self._sa(ctypes.sizeof(self._sa), None, True)
+    def create_staging_file(self, path: str) -> NativeStagingObject:
+        path = _windows_path(path, "staging path")
+        parsed = PureWindowsPath(path)
+        self.reject_casefold_collisions(str(parsed.parent), (parsed.name,))
+        sa = self._sa(ctypes.sizeof(self._sa), None, False)
         value = self._k32.CreateFileW(
-            _windows_path(path, "staging path"),
-            GENERIC_WRITE,
-            0,
+            path,
+            GENERIC_READ | GENERIC_WRITE | DELETE,
+            FILE_SHARE_READ | FILE_SHARE_DELETE,
             ctypes.byref(sa),
             CREATE_NEW,
             FILE_ATTRIBUTE_NORMAL,
@@ -1313,7 +1485,166 @@ class CtypesWindowsEffectfulCaptureNativeApi:
         raw = _native_handle(value, "staging handle", allow_invalid=True)
         if raw == ctypes.c_void_p(-1).value:
             raise _native_error("CreateFileW")
-        return _handle(raw, "staging handle")
+        master = _handle(raw, "staging handle")
+        duplicate = self._w.HANDLE()
+        process = self._k32.GetCurrentProcess()
+        if not self._k32.DuplicateHandle(
+            process,
+            self._w.HANDLE(master),
+            process,
+            ctypes.byref(duplicate),
+            GENERIC_WRITE,
+            True,
+            0,
+        ):
+            try:
+                self.close_handle(master)
+            finally:
+                raise _native_error("DuplicateHandle") from None
+        child = _handle(
+            _native_handle(duplicate, "child staging handle"),
+            "child staging handle",
+        )
+        try:
+            identity = self.get_file_identity(master)
+            return NativeStagingObject(master, child, identity, path)
+        except BaseException:
+            self.close_handle(child)
+            self.close_handle(master)
+            raise
+
+    def get_file_identity(self, handle: int) -> NativeFileIdentity:
+        info = self._file_id_info()
+        if not self._k32.GetFileInformationByHandleEx(
+            self._w.HANDLE(_handle(handle, "identity handle")),
+            FILE_ID_INFO_CLASS,
+            ctypes.byref(info),
+            ctypes.sizeof(info),
+        ):
+            raise _native_error("GetFileInformationByHandleEx")
+        return NativeFileIdentity(
+            int(info.VolumeSerialNumber), bytes(info.FileId.Identifier)
+        )
+
+    def read_artifact_file(self, handle: int, max_bytes: int) -> bytes:
+        if type(max_bytes) is not int or max_bytes <= 0:
+            raise WindowsEffectfulCaptureNativeError("artifact byte bound is invalid")
+        handle = _handle(handle, "artifact read handle")
+        if not self._k32.SetFilePointerEx(self._w.HANDLE(handle), 0, None, 0):
+            raise _native_error("SetFilePointerEx")
+        payload = bytearray()
+        while len(payload) <= max_bytes:
+            requested = min(65536, max_bytes + 1 - len(payload))
+            buffer = ctypes.create_string_buffer(requested)
+            transferred = self._w.DWORD()
+            if not self._k32.ReadFile(
+                self._w.HANDLE(handle),
+                buffer,
+                requested,
+                ctypes.byref(transferred),
+                None,
+            ):
+                raise _native_error("ReadFile")
+            count = int(transferred.value)
+            if count == 0:
+                break
+            payload.extend(buffer.raw[:count])
+        return bytes(payload)
+
+    def reject_casefold_collisions(
+        self, directory: str, names: tuple[str, ...]
+    ) -> None:
+        directory = _windows_path(directory, "artifact directory")
+        if (
+            type(names) is not tuple
+            or not names
+            or any(type(name) is not str or not name for name in names)
+        ):
+            raise WindowsEffectfulCaptureNativeError("artifact names are invalid")
+        wanted = {name.casefold() for name in names}
+        try:
+            entries = os.listdir(directory)
+        except OSError:
+            raise WindowsEffectfulCaptureNativeError(
+                "artifact directory enumeration failed"
+            ) from None
+        if any(entry.casefold() in wanted for entry in entries):
+            raise WindowsEffectfulCaptureNativeError(
+                "artifact name collision prevents no-clobber publication"
+            )
+
+    def publish_staging_link(self, staging_handle: int, final_path: str) -> None:
+        final_path = _windows_path(final_path, "final artifact path")
+        encoded = final_path.encode("utf-16-le")
+
+        # Native alignment places RootDirectory after one byte plus pointer padding.
+        class FILE_LINK_INFO_HEADER(ctypes.Structure):
+            _fields_ = [
+                ("ReplaceIfExists", self._w.BOOLEAN),
+                ("RootDirectory", self._w.HANDLE),
+                ("FileNameLength", self._w.DWORD),
+                ("FileName", self._w.WCHAR * 1),
+            ]
+
+        filename_offset = FILE_LINK_INFO_HEADER.FileName.offset
+        buffer = ctypes.create_string_buffer(filename_offset + len(encoded))
+        header = FILE_LINK_INFO_HEADER.from_buffer(buffer)
+        header.ReplaceIfExists = False
+        header.RootDirectory = None
+        header.FileNameLength = len(encoded)
+        ctypes.memmove(
+            ctypes.addressof(buffer) + filename_offset, encoded, len(encoded)
+        )
+        if not self._k32.SetFileInformationByHandle(
+            self._w.HANDLE(_handle(staging_handle, "publication staging handle")),
+            FILE_LINK_INFO_CLASS,
+            buffer,
+            len(buffer),
+        ):
+            raise _native_error("SetFileInformationByHandle")
+
+    def open_final_artifact(self, path: str) -> NativeOpenedArtifact:
+        path = _windows_path(path, "final artifact path")
+        value = self._k32.CreateFileW(
+            path,
+            GENERIC_READ,
+            FILE_SHARE_READ | FILE_SHARE_DELETE,
+            None,
+            OPEN_EXISTING,
+            FILE_FLAG_OPEN_REPARSE_POINT,
+            None,
+        )
+        raw = _native_handle(value, "final artifact handle", allow_invalid=True)
+        if raw == ctypes.c_void_p(-1).value:
+            raise _native_error("CreateFileW")
+        handle = _handle(raw, "final artifact handle")
+        try:
+            attributes = self._file_attribute_tag_info()
+            if not self._k32.GetFileInformationByHandleEx(
+                self._w.HANDLE(handle),
+                FILE_ATTRIBUTE_TAG_INFO_CLASS,
+                ctypes.byref(attributes),
+                ctypes.sizeof(attributes),
+            ):
+                raise _native_error("GetFileInformationByHandleEx")
+            if int(attributes.FileAttributes) & FILE_ATTRIBUTE_REPARSE_POINT:
+                raise WindowsEffectfulCaptureNativeError(
+                    "final artifact is a reparse point"
+                )
+            return NativeOpenedArtifact(handle, self.get_file_identity(handle))
+        except BaseException:
+            self.close_handle(handle)
+            raise
+
+    def delete_staging_link(self, staging_handle: int) -> None:
+        info = self._file_disposition_info(True)
+        if not self._k32.SetFileInformationByHandle(
+            self._w.HANDLE(_handle(staging_handle, "staging cleanup handle")),
+            FILE_DISPOSITION_INFO_CLASS,
+            ctypes.byref(info),
+            ctypes.sizeof(info),
+        ):
+            raise _native_error("SetFileInformationByHandle")
 
     def create_suspended_process(
         self,

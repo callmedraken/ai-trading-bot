@@ -702,6 +702,8 @@ def test_c2_external_effect_boundary_fails_closed(
     with pytest.raises(ExternalAuthorityBoundaryUnavailable):
         service.create_process(object())  # type: ignore[arg-type]
     with pytest.raises(ExternalAuthorityBoundaryUnavailable):
+        service.deliver_c3_child_request("execution", "reservation", b"request")
+    with pytest.raises(ExternalAuthorityBoundaryUnavailable):
         service.resume_thread(object())  # type: ignore[arg-type]
 
 

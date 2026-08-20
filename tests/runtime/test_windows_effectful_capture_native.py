@@ -22,6 +22,8 @@ from trading_bot.runtime.windows_effectful_capture_native import (
     WindowsEffectfulCaptureNativeUnsupportedError,
     build_c3_child_environment,
     create_suspended_capture_child_for_test,
+    deliver_canonical_child_request,
+    resume_suspended_capture_child,
 )
 from trading_bot.runtime.windows_effectful_capture_protocol import (
     MAX_C3_CHILD_REQUEST_BYTES,
@@ -43,9 +45,18 @@ _PARENT_ENV = {
 
 
 class FakeNativeApi:
-    def __init__(self, *, fail_at: str | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        fail_at: str | None = None,
+        write_chunk: int | None = None,
+        resume_result: int = 1,
+    ) -> None:
         self.fail_at = fail_at
+        self.write_chunk = write_chunk
+        self.resume_result = resume_result
         self.events: list[str] = []
+        self.written = bytearray()
         self.process_call: dict[str, object] | None = None
         self._pipe_count = 0
 
@@ -84,6 +95,22 @@ class FakeNativeApi:
 
     def close_handle(self, handle: int) -> None:
         self._event(f"close:{handle}")
+
+    def write_file(self, handle: int, payload: bytes) -> int:
+        assert handle == 102
+        self._event(f"write:{len(payload)}")
+        count = (
+            len(payload)
+            if self.write_chunk is None
+            else min(self.write_chunk, len(payload))
+        )
+        self.written.extend(payload[:count])
+        return count
+
+    def resume_thread(self, thread_handle: int) -> int:
+        assert thread_handle == 107
+        self._event("resume:107")
+        return self.resume_result
 
 
 def _create(api: FakeNativeApi) -> SuspendedCaptureChild:
@@ -185,6 +212,59 @@ def test_parent_retains_only_parent_endpoints_and_job_closes_last() -> None:
         "close:100",
     ]
     assert api.events.count("close:100") == 1
+
+
+def test_request_is_completely_written_before_writer_close_and_resume_once() -> None:
+    api = FakeNativeApi(write_chunk=3)
+    child = _create(api)
+
+    deliver_canonical_child_request(child, b"canonical-request")
+    resume_suspended_capture_child(child)
+
+    assert bytes(api.written) == b"canonical-request"
+    assert api.events[-8:] == [
+        "write:17",
+        "write:14",
+        "write:11",
+        "write:8",
+        "write:5",
+        "write:2",
+        "close:102",
+        "resume:107",
+    ]
+    with pytest.raises(WindowsEffectfulCaptureNativeError, match="already attempted"):
+        resume_suspended_capture_child(child)
+    assert api.events.count("resume:107") == 1
+    child.close()
+
+
+@pytest.mark.parametrize("resume_result", [0xFFFFFFFF, 0, 2])
+def test_failed_or_unexpected_resume_return_is_one_shot(resume_result: int) -> None:
+    api = FakeNativeApi(resume_result=resume_result)
+    child = _create(api)
+    deliver_canonical_child_request(child, b"request")
+
+    with pytest.raises(WindowsEffectfulCaptureNativeError):
+        resume_suspended_capture_child(child)
+    with pytest.raises(WindowsEffectfulCaptureNativeError, match="already attempted"):
+        resume_suspended_capture_child(child)
+
+    assert api.events.count("resume:107") == 1
+    child.close()
+
+
+def test_request_failure_closes_writer_and_cannot_resume() -> None:
+    api = FakeNativeApi(fail_at="write:7")
+    child = _create(api)
+
+    with pytest.raises(WindowsEffectfulCaptureNativeError, match="delivery failed"):
+        deliver_canonical_child_request(child, b"request")
+    with pytest.raises(WindowsEffectfulCaptureNativeError, match="not completely"):
+        resume_suspended_capture_child(child)
+
+    assert "close:102" in api.events
+    assert "resume:107" not in api.events
+    child.close()
 
 
 def test_live_resource_is_not_copyable_or_serializable() -> None:

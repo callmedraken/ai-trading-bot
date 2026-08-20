@@ -225,6 +225,9 @@ class TransactionalAuthorityAdapter(Protocol):
     def resume_thread(
         self, resume_intent: ResumeIntent, *, fail: bool = False
     ) -> ResumeReceipt: ...
+    def deliver_c3_child_request(
+        self, execution_id: str, reservation_id: str, payload: bytes
+    ) -> None: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -2477,6 +2480,52 @@ def _core_commit_resume_intent(
         return _commit_resume_intent_locked(connection, execution_id, reservation_id)
 
 
+def _require_pre_resume_ready_lineage(
+    connection: sqlite3.Connection, execution_id: str, reservation_id: str
+) -> None:
+    row = connection.execute(
+        """
+        SELECT e.phase, e.process_creation_json, e.process_creation_digest,
+               e.job_object_json, e.job_object_digest,
+               e.resume_authorization_json, e.resume_authorization_digest,
+               r.reservation_state, s.state, e.launch_reservation_id
+        FROM launch_executions e
+        JOIN launch_reservations r
+          ON r.launch_reservation_id = e.launch_reservation_id
+        JOIN provider_call_claims c ON c.claim_id = r.claim_id
+        JOIN attempts a ON a.attempt_id = c.attempt_id
+        JOIN sessions s ON s.session_id = a.session_id
+        WHERE e.launch_execution_id = ?
+          AND NOT EXISTS (
+              SELECT 1 FROM terminals t
+              WHERE t.launch_reservation_id = r.launch_reservation_id
+          )
+          AND NOT EXISTS (
+              SELECT 1 FROM session_selections ss
+              WHERE ss.session_id = s.session_id
+          )
+        """,
+        (execution_id,),
+    ).fetchone()
+    if row is None:
+        raise ValueError(
+            "unknown execution or resume intent active lineage is unavailable"
+        )
+    if row[9] != reservation_id:
+        raise ValueError("resume execution belongs to another reservation")
+    if row[0] != "PRE_RESUME_READY":
+        raise ValueError("resume intent requires PRE_RESUME_READY")
+    if row[7] != "PROCESS_CREATED" or row[8] != "OPEN":
+        raise ValueError("resume intent active parent lineage is revoked")
+    for evidence_json, evidence_digest in (
+        (row[1], row[2]),
+        (row[3], row[4]),
+        (row[5], row[6]),
+    ):
+        if evidence_json is None or _digest(evidence_json) != evidence_digest:
+            raise ValueError("resume intent requires exact pre-resume evidence")
+
+
 @_serialized_connection_operation
 def _commit_resume_intent_locked(
     connection: sqlite3.Connection, execution_id: str, reservation_id: str
@@ -2492,47 +2541,7 @@ def _commit_resume_intent_locked(
     intent_digest = _digest(intent_json)
     _begin(connection)
     try:
-        row = connection.execute(
-            """
-            SELECT e.phase, e.process_creation_json, e.process_creation_digest,
-                   e.job_object_json, e.job_object_digest,
-                   e.resume_authorization_json, e.resume_authorization_digest,
-                   r.reservation_state, s.state, e.launch_reservation_id
-            FROM launch_executions e
-            JOIN launch_reservations r
-              ON r.launch_reservation_id = e.launch_reservation_id
-            JOIN provider_call_claims c ON c.claim_id = r.claim_id
-            JOIN attempts a ON a.attempt_id = c.attempt_id
-            JOIN sessions s ON s.session_id = a.session_id
-            WHERE e.launch_execution_id = ?
-              AND NOT EXISTS (
-                  SELECT 1 FROM terminals t
-                  WHERE t.launch_reservation_id = r.launch_reservation_id
-              )
-              AND NOT EXISTS (
-                  SELECT 1 FROM session_selections ss
-                  WHERE ss.session_id = s.session_id
-              )
-            """,
-            (execution_id,),
-        ).fetchone()
-        if row is None:
-            raise ValueError(
-                "unknown execution or resume intent active lineage is unavailable"
-            )
-        if row[9] != reservation_id:
-            raise ValueError("resume execution belongs to another reservation")
-        if row[0] != "PRE_RESUME_READY":
-            raise ValueError("resume intent requires PRE_RESUME_READY")
-        if row[7] != "PROCESS_CREATED" or row[8] != "OPEN":
-            raise ValueError("resume intent active parent lineage is revoked")
-        for evidence_json, evidence_digest in (
-            (row[1], row[2]),
-            (row[3], row[4]),
-            (row[5], row[6]),
-        ):
-            if evidence_json is None or _digest(evidence_json) != evidence_digest:
-                raise ValueError("resume intent requires exact pre-resume evidence")
+        _require_pre_resume_ready_lineage(connection, execution_id, reservation_id)
         cursor = connection.execute(
             """
             UPDATE launch_executions
@@ -4097,6 +4106,30 @@ class TransactionalAuthorityCore:
         with self._bound_context():
             yield
 
+    def _dispatch_c3_child_request(
+        self, execution_id: str, reservation_id: str, payload: bytes
+    ) -> None:
+        """Deliver one C3 request only while exact PRE_RESUME_READY is active."""
+
+        with self._bound_context():
+            _require_no_active_transaction(self._connection)
+            adapter = self._context.external_adapter
+            deliver = getattr(adapter, "deliver_c3_child_request", None)
+            if adapter is None or not callable(deliver):
+                raise ExternalAuthorityBoundaryUnavailable(
+                    "C2 production has no C3 child-request adapter"
+                )
+            if type(payload) is not bytes or not payload:
+                raise TypeError("C3 child request requires nonempty bytes")
+            reservation_id = str(reservation_id)
+            execution_id = str(execution_id)
+            with _lifecycle_arbiter(reservation_id):
+                with _connection_operation(self._connection):
+                    _require_pre_resume_ready_lineage(
+                        self._connection, execution_id, reservation_id
+                    )
+                deliver(execution_id, reservation_id, payload)
+
     def _dispatch_external_effect(
         self,
         operation: str,
@@ -5045,6 +5078,20 @@ class WindowsTransactionalAuthority:
         return self._core_for_operation()._dispatch_external_effect(
             "process", process_intent, fail=fail
         )  # type: ignore[return-value]
+
+    def deliver_c3_child_request(
+        self, execution_id: str, reservation_id: str, payload: bytes
+    ) -> None:
+        """C3-only request delivery; a bare production authority stays inert."""
+
+        self._require_service_open()
+        if self._context.external_adapter is None:
+            raise ExternalAuthorityBoundaryUnavailable(
+                "C2 production has no C3 child-request adapter"
+            )
+        return self._core_for_operation()._dispatch_c3_child_request(
+            execution_id, reservation_id, payload
+        )
 
     def resume_thread(
         self, resume_intent: ResumeIntent, *, fail: bool = False

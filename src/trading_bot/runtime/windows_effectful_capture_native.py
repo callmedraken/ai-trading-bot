@@ -1,9 +1,10 @@
-"""C3-C1 Windows containment for one not-yet-resumed capture child.
+"""C3 Windows containment and one-shot pre-resume child operations.
 
-C3-C1 owns only native containment. It does not bind C2 execution IDs, write
-A2 request bytes, resume/wait/terminate the child, parse results, or publish a
-snapshot. Production executable/entrypoint/TEMP bindings are intentionally
-left to the later C3 composition checkpoint.
+C3-C1 owns native containment. C3-C2 adds only bounded request delivery and the
+one-shot ``ResumeThread`` operation. This module still does not bind C2
+execution IDs, wait/terminate the child, parse results, or publish a snapshot.
+Production executable/entrypoint/TEMP bindings remain outside this low-level
+native boundary.
 """
 
 from __future__ import annotations
@@ -43,6 +44,7 @@ GENERIC_WRITE = 0x40000000
 CREATE_NEW = 1
 FILE_ATTRIBUTE_NORMAL = 0x00000080
 ERROR_INSUFFICIENT_BUFFER = 122
+INVALID_SUSPEND_COUNT = 0xFFFFFFFF
 
 
 class WindowsEffectfulCaptureNativeError(RuntimeError):
@@ -103,13 +105,24 @@ class WindowsEffectfulCaptureNativeApi(Protocol):
         inherit_handles: bool,
     ) -> NativeCreatedProcess: ...
 
+    def write_file(self, handle: int, payload: bytes) -> int: ...
+    def resume_thread(self, thread_handle: int) -> int: ...
     def close_handle(self, handle: int) -> None: ...
 
 
 class SuspendedCaptureChild:
     """Private live handles for one contained process still suspended at entry."""
 
-    __slots__ = ("_api", "_closed", "_handles", "process_id", "thread_id")
+    __slots__ = (
+        "_api",
+        "_closed",
+        "_handles",
+        "_request_attempted",
+        "_request_delivered",
+        "_resume_attempted",
+        "process_id",
+        "thread_id",
+    )
 
     def __init__(
         self,
@@ -143,6 +156,9 @@ class SuspendedCaptureChild:
         self.process_id = process.process_id
         self.thread_id = process.thread_id
         self._closed = False
+        self._request_attempted = False
+        self._request_delivered = False
+        self._resume_attempted = False
 
     def __repr__(self) -> str:
         return (
@@ -168,6 +184,77 @@ class SuspendedCaptureChild:
     def closed(self) -> bool:
         return self._closed
 
+    def _write_request_and_close(self, payload: bytes) -> None:
+        if self._closed:
+            raise WindowsEffectfulCaptureNativeError("suspended child is closed")
+        if self._request_attempted:
+            raise WindowsEffectfulCaptureNativeError(
+                "child request delivery was already attempted"
+            )
+        if type(payload) is not bytes or not payload:
+            raise WindowsEffectfulCaptureNativeError("child request payload is invalid")
+        if len(payload) > MAX_C3_CHILD_REQUEST_BYTES:
+            raise WindowsEffectfulCaptureNativeError(
+                "child request exceeds its byte bound"
+            )
+        self._request_attempted = True
+        request_writer = self._handles[0]
+        write_failed = False
+        offset = 0
+        try:
+            while offset < len(payload):
+                written = self._api.write_file(request_writer, payload[offset:])
+                if (
+                    type(written) is not int
+                    or written <= 0
+                    or written > len(payload) - offset
+                ):
+                    raise WindowsEffectfulCaptureNativeError(
+                        "child request write result is invalid"
+                    )
+                offset += written
+        except Exception:
+            write_failed = True
+        close_failed = False
+        try:
+            self._api.close_handle(request_writer)
+        except Exception:
+            close_failed = True
+        self._handles = self._handles[1:]
+        if write_failed or close_failed:
+            raise WindowsEffectfulCaptureNativeError(
+                "child request delivery failed"
+            ) from None
+        self._request_delivered = True
+
+    def _resume_once(self) -> None:
+        if self._closed:
+            raise WindowsEffectfulCaptureNativeError("suspended child is closed")
+        if self._resume_attempted:
+            raise WindowsEffectfulCaptureNativeError(
+                "child resume was already attempted"
+            )
+        if not self._request_delivered:
+            raise WindowsEffectfulCaptureNativeError(
+                "child request was not completely delivered"
+            )
+        self._resume_attempted = True
+        thread_handle = self._handles[2]
+        try:
+            previous_suspend_count = self._api.resume_thread(thread_handle)
+        except Exception:
+            raise WindowsEffectfulCaptureNativeError("ResumeThread failed") from None
+        if type(previous_suspend_count) is not int:
+            raise WindowsEffectfulCaptureNativeError(
+                "ResumeThread returned an invalid suspend count"
+            )
+        if previous_suspend_count == INVALID_SUSPEND_COUNT:
+            raise WindowsEffectfulCaptureNativeError("ResumeThread failed")
+        if previous_suspend_count != 1:
+            raise WindowsEffectfulCaptureNativeError(
+                "ResumeThread previous suspend count was not one"
+            )
+
     def close(self) -> None:
         if self._closed:
             return
@@ -185,6 +272,24 @@ class SuspendedCaptureChild:
 
 
 _SUSPENDED_CHILD_ISSUER = object()
+
+
+def deliver_canonical_child_request(
+    child: SuspendedCaptureChild, payload: bytes
+) -> None:
+    """Completely write one bounded request and close the parent writer."""
+
+    if type(child) is not SuspendedCaptureChild:
+        raise TypeError("child request delivery requires SuspendedCaptureChild")
+    child._write_request_and_close(payload)
+
+
+def resume_suspended_capture_child(child: SuspendedCaptureChild) -> None:
+    """Attempt exactly one resume and require previous suspend count one."""
+
+    if type(child) is not SuspendedCaptureChild:
+        raise TypeError("resume requires SuspendedCaptureChild")
+    child._resume_once()
 
 
 def build_c3_child_environment(
@@ -241,6 +346,8 @@ def create_suspended_capture_child_for_test(
         "set_handle_inheritable",
         "create_staging_file",
         "create_suspended_process",
+        "write_file",
+        "resume_thread",
         "close_handle",
     )
     if not all(callable(getattr(native_api, name, None)) for name in required):
@@ -509,6 +616,16 @@ class CtypesWindowsEffectfulCaptureNativeApi:
             ctypes.POINTER(PROCESS_INFORMATION),
         ]
         k32.CreateProcessW.restype = wintypes.BOOL
+        k32.WriteFile.argtypes = [
+            wintypes.HANDLE,
+            ctypes.c_void_p,
+            wintypes.DWORD,
+            ctypes.POINTER(wintypes.DWORD),
+            ctypes.c_void_p,
+        ]
+        k32.WriteFile.restype = wintypes.BOOL
+        k32.ResumeThread.argtypes = [wintypes.HANDLE]
+        k32.ResumeThread.restype = wintypes.DWORD
         k32.CloseHandle.argtypes = [wintypes.HANDLE]
         k32.CloseHandle.restype = wintypes.BOOL
         self._k32 = k32
@@ -691,6 +808,30 @@ class CtypesWindowsEffectfulCaptureNativeApi:
     def close_handle(self, handle: int) -> None:
         if not self._k32.CloseHandle(self._w.HANDLE(_handle(handle, "close handle"))):
             raise _native_error("CloseHandle")
+
+    def write_file(self, handle: int, payload: bytes) -> int:
+        if type(payload) is not bytes or not payload:
+            raise WindowsEffectfulCaptureNativeError("WriteFile payload is invalid")
+        if len(payload) > MAX_C3_CHILD_REQUEST_BYTES:
+            raise WindowsEffectfulCaptureNativeError("WriteFile payload exceeds bound")
+        buffer = ctypes.create_string_buffer(payload, len(payload))
+        written = self._w.DWORD()
+        if not self._k32.WriteFile(
+            self._w.HANDLE(_handle(handle, "request writer handle")),
+            ctypes.cast(buffer, ctypes.c_void_p),
+            len(payload),
+            ctypes.byref(written),
+            None,
+        ):
+            raise _native_error("WriteFile")
+        return int(written.value)
+
+    def resume_thread(self, thread_handle: int) -> int:
+        return int(
+            self._k32.ResumeThread(
+                self._w.HANDLE(_handle(thread_handle, "primary thread handle"))
+            )
+        )
 
 
 def _handle_bootstrap_arguments(handles: tuple[int, int, int]) -> tuple[str, ...]:

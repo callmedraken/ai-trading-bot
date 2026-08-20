@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import pickle
 from collections import deque
 from contextlib import nullcontext
+from copy import copy, deepcopy
 from dataclasses import replace
 from datetime import UTC, date, datetime
 from inspect import signature
@@ -54,6 +56,7 @@ from trading_bot.runtime.windows_effectful_capture_service import (
     c3_c2_registry_snapshot_for_test,
     create_c3_c2_transactional_adapter_for_test,
     execute_c3_c2_resume_for_test,
+    issue_c3_post_resume_evidence_for_test,
     observe_c3_c3b_for_test,
 )
 from trading_bot.runtime.windows_transactional_authority import (
@@ -847,4 +850,416 @@ def test_c3_c3b_rejects_substituted_resume_receipt_and_is_one_shot() -> None:
             observe_c3_c3b_for_test(adapter, resumed)
     finally:
         _close(adapter, transactional)
+        capture._closed = True
+
+
+def _observe_c3c_case(
+    api: _FakeNativeApi,
+    adapter,
+    resumed,
+    *,
+    result_changes: dict[str, object] | None = None,
+    trusted_result: bool = True,
+):
+    if trusted_result:
+        payload = _trusted_result_bytes(resumed, **(result_changes or {}))
+        api.result_chunks.extend((payload, None))
+        api.wait_events.extend(
+            (C3NativeWaitStatus.IO_COMPLETED, C3NativeWaitStatus.IO_COMPLETED)
+        )
+    else:
+        api.result_chunks.append(None)
+        api.wait_events.append(C3NativeWaitStatus.IO_COMPLETED)
+    api.process_wait_events.append(C3NativeWaitStatus.PROCESS_EXITED)
+    return observe_c3_c3b_for_test(adapter, resumed)
+
+
+@pytest.mark.parametrize(
+    ("result_changes", "trusted_result", "expected_disposition"),
+    [
+        ({}, True, "CONFIRMED"),
+        (
+            {
+                "fence_state": ProviderAttemptFenceState.NOT_ENTERED,
+                "classification": ChildResultClassification.REQUEST_INVALID,
+            },
+            True,
+            "MAY_HAVE_OCCURRED",
+        ),
+        ({}, False, "MAY_HAVE_OCCURRED"),
+    ],
+)
+def test_c3_c3c_cleanup_disposition_and_exact_persistence(
+    result_changes: dict[str, object],
+    trusted_result: bool,
+    expected_disposition: str,
+) -> None:
+    api = _FakeNativeApi()
+    capture, adapter, transactional, connection, resumed = _resume_case(api)
+    try:
+        observation = _observe_c3c_case(
+            api,
+            adapter,
+            resumed,
+            result_changes=result_changes,
+            trusted_result=trusted_result,
+        )
+        evidence = issue_c3_post_resume_evidence_for_test(adapter, resumed, observation)
+        cleanup_json, cleanup_digest = adapter.validate_c3_post_resume_evidence(
+            evidence,
+            execution_id=resumed.execution_id,
+            reservation_id=resumed.reservation_id,
+            resume_receipt=resumed.resume_receipt,
+        )
+        cleanup = json.loads(cleanup_json)
+        trusted = observation.trusted_result
+        expected_child_sha = (
+            None
+            if trusted is None
+            else hashlib.sha256(
+                serialize_isolated_capture_child_result(trusted)
+            ).hexdigest()
+        )
+        assert cleanup == {
+            "child_fence_state": (
+                None if trusted is None else trusted.fence_state.value
+            ),
+            "child_request_sha256": resumed.child_request_sha256,
+            "child_result_classification": (
+                None if trusted is None else trusted.classification.value
+            ),
+            "child_result_sha256": expected_child_sha,
+            "execution_id": resumed.execution_id,
+            "parent_cleanup": observation.parent_cleanup.value,
+            "process_outcome": observation.process_outcome.value,
+            "provider_call_disposition": expected_disposition,
+            "reservation_id": resumed.reservation_id,
+            "result_transport": observation.result_transport.value,
+            "schema": 1,
+        }
+        assert cleanup_json == json.dumps(
+            cleanup,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        ).encode("utf-8")
+        assert cleanup_digest == hashlib.sha256(cleanup_json).digest()
+        assert cleanup["provider_call_disposition"] != "NOT_STARTED"
+
+        transactional.record_c3_post_resume_evidence(
+            resumed.execution_id, resumed.resume_receipt, evidence
+        )
+
+        assert connection.execute(
+            "SELECT phase, post_resume_json, post_resume_digest, cleanup_json, "
+            "cleanup_digest FROM launch_executions"
+        ).fetchone() == (
+            "RESUME_RECORDED",
+            resumed.resume_receipt.result_json,
+            resumed.resume_receipt.result_digest,
+            cleanup_json,
+            cleanup_digest,
+        )
+        assert connection.execute("SELECT count(*) FROM terminals").fetchone() == (0,)
+        assert "close:105" not in api.events
+    finally:
+        _close(adapter, transactional)
+        capture._closed = True
+
+
+def test_c3_c3c_failed_parent_cleanup_is_eligible() -> None:
+    api = _FakeNativeApi(fail_close=107)
+    capture, adapter, transactional, connection, resumed = _resume_case(api)
+    try:
+        observation = _observe_c3c_case(api, adapter, resumed)
+        assert observation.parent_cleanup is C3ParentCleanupStatus.FAILED
+        evidence = issue_c3_post_resume_evidence_for_test(adapter, resumed, observation)
+
+        transactional.record_c3_post_resume_evidence(
+            resumed.execution_id, resumed.resume_receipt, evidence
+        )
+
+        cleanup_json = connection.execute(
+            "SELECT cleanup_json FROM launch_executions"
+        ).fetchone()[0]
+        assert json.loads(cleanup_json)["parent_cleanup"] == "FAILED"
+    finally:
+        _close(adapter, transactional)
+        capture._closed = True
+
+
+def test_c3_c3c_unresolved_cleanup_and_unconfirmed_termination_are_ineligible() -> None:
+    api = _FakeNativeApi()
+    api.cancel_settles = False
+    capture, adapter, transactional, connection, resumed = _resume_case(api)
+    api.wait_events.append(C3NativeWaitStatus.FAILED)
+    api.process_wait_events.append(C3NativeWaitStatus.TIMEOUT)
+    try:
+        observation = observe_c3_c3b_for_test(adapter, resumed)
+        assert observation.parent_cleanup is C3ParentCleanupStatus.UNRESOLVED
+        assert observation.process_outcome is (
+            C3ProcessOutcomeStatus.TERMINATION_UNCONFIRMED
+        )
+
+        with pytest.raises(WindowsEffectfulCaptureCompositionError, match="unresolved"):
+            issue_c3_post_resume_evidence_for_test(adapter, resumed, observation)
+
+        assert connection.execute(
+            "SELECT phase, post_resume_json, cleanup_json FROM launch_executions"
+        ).fetchone() == ("RESUME_INTENT_COMMITTED", None, None)
+    finally:
+        _close(adapter, transactional)
+        capture._closed = True
+
+
+def test_c3_c3c_exact_provenance_private_capability_and_one_shot() -> None:
+    api = _FakeNativeApi()
+    capture, adapter, transactional, connection, resumed = _resume_case(api)
+    try:
+        observation = _observe_c3c_case(api, adapter, resumed)
+        with pytest.raises(WindowsEffectfulCaptureCompositionError, match="provenance"):
+            issue_c3_post_resume_evidence_for_test(
+                adapter, resumed, replace(observation)
+            )
+        with pytest.raises(WindowsEffectfulCaptureCompositionError, match="provenance"):
+            issue_c3_post_resume_evidence_for_test(
+                adapter,
+                replace(resumed, resume_receipt=replace(resumed.resume_receipt)),
+                observation,
+            )
+
+        evidence = issue_c3_post_resume_evidence_for_test(adapter, resumed, observation)
+        for operation in (copy, deepcopy, pickle.dumps):
+            with pytest.raises(TypeError):
+                operation(evidence)
+        with pytest.raises(TypeError):
+            type(evidence)(object(), object(), object())
+        for execution_id, reservation_id, receipt in (
+            ("wrong-execution", resumed.reservation_id, resumed.resume_receipt),
+            (resumed.execution_id, "wrong-reservation", resumed.resume_receipt),
+            (
+                resumed.execution_id,
+                resumed.reservation_id,
+                replace(resumed.resume_receipt),
+            ),
+        ):
+            with pytest.raises(WindowsEffectfulCaptureCompositionError):
+                adapter.validate_c3_post_resume_evidence(
+                    evidence,
+                    execution_id=execution_id,
+                    reservation_id=reservation_id,
+                    resume_receipt=receipt,
+                )
+        with pytest.raises(TypeError):
+            adapter.validate_c3_post_resume_evidence(
+                object(),
+                execution_id=resumed.execution_id,
+                reservation_id=resumed.reservation_id,
+                resume_receipt=resumed.resume_receipt,
+            )
+        with pytest.raises(Exception, match="C3 post-resume evidence operation"):
+            transactional.record_post_resume_evidence(
+                resumed.execution_id, resumed.resume_receipt
+            )
+
+        transactional.record_c3_post_resume_evidence(
+            resumed.execution_id, resumed.resume_receipt, evidence
+        )
+        with pytest.raises((ValueError, WindowsEffectfulCaptureCompositionError)):
+            transactional.record_c3_post_resume_evidence(
+                resumed.execution_id, resumed.resume_receipt, evidence
+            )
+        assert connection.execute("SELECT phase FROM launch_executions").fetchone() == (
+            "RESUME_RECORDED",
+        )
+    finally:
+        _close(adapter, transactional)
+        capture._closed = True
+
+
+@pytest.mark.parametrize("attribute", ["_issuer", "_permit"])
+def test_c3_c3c_reflectively_mutated_capability_fails_closed(attribute: str) -> None:
+    api = _FakeNativeApi()
+    capture, adapter, transactional, connection, resumed = _resume_case(api)
+    try:
+        observation = _observe_c3c_case(api, adapter, resumed)
+        evidence = issue_c3_post_resume_evidence_for_test(adapter, resumed, observation)
+        object.__setattr__(evidence, attribute, object())
+
+        with pytest.raises(
+            WindowsEffectfulCaptureCompositionError, match="binding mismatch"
+        ):
+            transactional.record_c3_post_resume_evidence(
+                resumed.execution_id, resumed.resume_receipt, evidence
+            )
+        assert connection.execute(
+            "SELECT phase, post_resume_json, cleanup_json FROM launch_executions"
+        ).fetchone() == ("RESUME_INTENT_COMMITTED", None, None)
+    finally:
+        _close(adapter, transactional)
+        capture._closed = True
+
+
+def test_c3_c3c_registry_close_revokes_stale_capability() -> None:
+    api = _FakeNativeApi()
+    capture, adapter, transactional, connection, resumed = _resume_case(api)
+    try:
+        observation = _observe_c3c_case(api, adapter, resumed)
+        evidence = issue_c3_post_resume_evidence_for_test(adapter, resumed, observation)
+        adapter.close()
+
+        with pytest.raises(
+            WindowsEffectfulCaptureCompositionError, match="stale or mismatched"
+        ):
+            transactional.record_c3_post_resume_evidence(
+                resumed.execution_id, resumed.resume_receipt, evidence
+            )
+        assert connection.execute(
+            "SELECT phase, post_resume_json, cleanup_json FROM launch_executions"
+        ).fetchone() == ("RESUME_INTENT_COMMITTED", None, None)
+    finally:
+        _close(adapter, transactional)
+        capture._closed = True
+
+
+@pytest.mark.parametrize("tamper", ["bytes", "digest"])
+def test_c3_c3c_tampered_adapter_pair_fails_without_consuming(
+    monkeypatch: pytest.MonkeyPatch, tamper: str
+) -> None:
+    api = _FakeNativeApi()
+    capture, adapter, transactional, connection, resumed = _resume_case(api)
+    try:
+        observation = _observe_c3c_case(api, adapter, resumed)
+        evidence = issue_c3_post_resume_evidence_for_test(adapter, resumed, observation)
+        adapter_type = type(adapter)
+        original = adapter_type.validate_c3_post_resume_evidence
+
+        def tampered_validate(self, candidate, **kwargs):
+            cleanup_json, cleanup_digest = original(self, candidate, **kwargs)
+            if tamper == "bytes":
+                return cleanup_json + b" ", cleanup_digest
+            return cleanup_json, b"x" * 32
+
+        monkeypatch.setattr(
+            adapter_type, "validate_c3_post_resume_evidence", tampered_validate
+        )
+        with pytest.raises(ValueError, match="digest"):
+            transactional.record_c3_post_resume_evidence(
+                resumed.execution_id, resumed.resume_receipt, evidence
+            )
+        assert connection.execute(
+            "SELECT phase, post_resume_json, cleanup_json FROM launch_executions"
+        ).fetchone() == ("RESUME_INTENT_COMMITTED", None, None)
+
+        monkeypatch.setattr(adapter_type, "validate_c3_post_resume_evidence", original)
+        transactional.record_c3_post_resume_evidence(
+            resumed.execution_id, resumed.resume_receipt, evidence
+        )
+    finally:
+        _close(adapter, transactional)
+        capture._closed = True
+
+
+def test_c3_c3c_database_rollback_preserves_both_capabilities_for_retry() -> None:
+    api = _FakeNativeApi()
+    capture, adapter, transactional, connection, resumed = _resume_case(api)
+    try:
+        observation = _observe_c3c_case(api, adapter, resumed)
+        evidence = issue_c3_post_resume_evidence_for_test(adapter, resumed, observation)
+        connection.execute(
+            """
+            CREATE TRIGGER fail_c3_post_resume
+            BEFORE UPDATE ON launch_executions
+            WHEN NEW.phase = 'RESUME_RECORDED'
+            BEGIN
+                SELECT RAISE(ABORT, 'injected C3 rollback');
+            END
+            """
+        )
+        with pytest.raises(Exception, match="injected C3 rollback"):
+            transactional.record_c3_post_resume_evidence(
+                resumed.execution_id, resumed.resume_receipt, evidence
+            )
+        assert connection.execute(
+            "SELECT phase, post_resume_json, cleanup_json FROM launch_executions"
+        ).fetchone() == ("RESUME_INTENT_COMMITTED", None, None)
+        adapter.validate_c3_post_resume_evidence(
+            evidence,
+            execution_id=resumed.execution_id,
+            reservation_id=resumed.reservation_id,
+            resume_receipt=resumed.resume_receipt,
+        )
+
+        connection.execute("DROP TRIGGER fail_c3_post_resume")
+        transactional.record_c3_post_resume_evidence(
+            resumed.execution_id, resumed.resume_receipt, evidence
+        )
+        assert connection.execute("SELECT phase FROM launch_executions").fetchone() == (
+            "RESUME_RECORDED",
+        )
+        assert api.events.count("resume_thread") == 1
+    finally:
+        _close(adapter, transactional)
+        capture._closed = True
+
+
+def test_c3_c3c_recovery_and_service_close_revoke_delayed_evidence() -> None:
+    api = _FakeNativeApi()
+    capture, adapter, transactional, connection, resumed = _resume_case(api)
+    observation = _observe_c3c_case(api, adapter, resumed)
+    evidence = issue_c3_post_resume_evidence_for_test(adapter, resumed, observation)
+    session_id = connection.execute("SELECT session_id FROM sessions").fetchone()[0]
+    operator_json = b'{"evidence":"c3-c3c-recovery","schema":1}'
+    try:
+        transactional.record_recovery(
+            session_id,
+            "LAUNCH_RESERVATION",
+            resumed.reservation_id,
+            "CLASSIFY_RESUME_OUTCOME_UNKNOWN",
+            operator_evidence_json=operator_json,
+            operator_evidence_digest=hashlib.sha256(operator_json).digest(),
+        )
+        with pytest.raises(ValueError, match="revoked|unavailable"):
+            transactional.record_c3_post_resume_evidence(
+                resumed.execution_id, resumed.resume_receipt, evidence
+            )
+        assert connection.execute(
+            "SELECT phase, post_resume_json, cleanup_json FROM launch_executions"
+        ).fetchone() == ("RESUME_INTENT_COMMITTED", None, None)
+        assert connection.execute(
+            "SELECT reservation_state FROM launch_reservations"
+        ).fetchone() == ("MANUAL_REVIEW",)
+
+        transactional.record_terminal(
+            resumed.reservation_id,
+            "CLOSED",
+            "MAY_HAVE_OCCURRED",
+            snapshot_digest=None,
+        )
+        with pytest.raises(ValueError, match="revoked|unavailable"):
+            transactional.record_c3_post_resume_evidence(
+                resumed.execution_id, resumed.resume_receipt, evidence
+            )
+        transactional.record_recovery(
+            session_id,
+            "SESSION",
+            session_id,
+            "CLOSE_SESSION",
+            operator_evidence_json=operator_json,
+            operator_evidence_digest=hashlib.sha256(operator_json).digest(),
+        )
+        with pytest.raises(ValueError, match="revoked|unavailable"):
+            transactional.record_c3_post_resume_evidence(
+                resumed.execution_id, resumed.resume_receipt, evidence
+            )
+
+        transactional.close()
+        with pytest.raises(Exception, match="closed"):
+            transactional.record_c3_post_resume_evidence(
+                resumed.execution_id, resumed.resume_receipt, evidence
+            )
+    finally:
+        adapter.close()
+        transactional.close()
         capture._closed = True

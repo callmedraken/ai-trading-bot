@@ -38,10 +38,12 @@ from trading_bot.runtime.windows_effectful_capture_native import (
 from trading_bot.runtime.windows_effectful_capture_protocol import (
     IsolatedCaptureChildRequest,
     IsolatedCaptureChildResult,
+    ProviderAttemptFenceState,
     WindowsEffectfulCaptureProtocolError,
     build_isolated_capture_child_request,
     parse_isolated_capture_child_result,
     serialize_isolated_capture_child_request,
+    serialize_isolated_capture_child_result,
 )
 from trading_bot.runtime.windows_transactional_authority import (
     ConstructedProvider,
@@ -89,6 +91,8 @@ class C3C2ResumedCaptureForTest:
 
 
 _C3_C3B_OBSERVATION_ISSUER = object()
+_C3_POST_RESUME_EVIDENCE_CONSTRUCTOR = object()
+_MAX_C3_CLEANUP_EVIDENCE_BYTES = 1024
 
 
 @dataclass(frozen=True, slots=True)
@@ -115,6 +119,52 @@ class C3C3BObservationForTest:
         raise TypeError("C3-C3B observation cannot be pickled")
 
 
+class _C3PostResumeEvidence:
+    """Opaque one-shot capability issued only from an exact live C3 observation."""
+
+    __slots__ = ("_issuer", "_permit")
+
+    def __init__(self, constructor: object, issuer: object, permit: object) -> None:
+        if constructor is not _C3_POST_RESUME_EVIDENCE_CONSTRUCTOR:
+            raise TypeError("C3 post-resume evidence must be issued by the registry")
+        self._issuer = issuer
+        self._permit = permit
+
+    def __copy__(self) -> object:
+        raise TypeError("C3 post-resume evidence cannot be copied")
+
+    def __deepcopy__(self, memo: object) -> object:
+        del memo
+        raise TypeError("C3 post-resume evidence cannot be deep-copied")
+
+    def __reduce__(self) -> object:
+        raise TypeError("C3 post-resume evidence cannot be serialized")
+
+    def __reduce_ex__(self, protocol: int) -> object:
+        del protocol
+        raise TypeError("C3 post-resume evidence cannot be pickled")
+
+
+@dataclass(frozen=True, slots=True)
+class _C3PostResumeEvidenceIssuance:
+    capability: _C3PostResumeEvidence
+    permit: object
+    issuer: object
+    resume_receipt: ResumeReceipt
+    observation: C3C3BObservationForTest
+    child_request_sha256: str
+    cleanup_json: bytes
+    cleanup_digest: bytes
+
+
+@dataclass(frozen=True, slots=True)
+class _C3ObservationSnapshot:
+    visible_values: tuple[object, ...]
+    child_fence_state: str | None
+    child_result_classification: str | None
+    child_result_json: bytes | None
+
+
 @dataclass(slots=True)
 class _C3LiveProcessEntry:
     reservation_id: str
@@ -127,15 +177,19 @@ class _C3LiveProcessEntry:
     resume_receipt: ResumeReceipt | None = None
     observed: bool = False
     observation: C3C3BObservationForTest | None = None
+    observation_snapshot: _C3ObservationSnapshot | None = None
+    evidence_issuance: _C3PostResumeEvidenceIssuance | None = None
+    evidence_consumed: bool = False
 
 
 class _C3LiveProcessRegistry:
     """Private, process-local native authority with no durable reconstruction."""
 
-    __slots__ = ("_entries", "_lock")
+    __slots__ = ("_entries", "_issuer", "_lock")
 
     def __init__(self) -> None:
         self._entries: list[_C3LiveProcessEntry] = []
+        self._issuer = object()
         self._lock = threading.Lock()
 
     def register_created(
@@ -265,6 +319,11 @@ class _C3LiveProcessRegistry:
                     and parsed.child_request_sha256 == request_sha256
                 ):
                     trusted = parsed
+        trusted_json = (
+            None
+            if trusted is None
+            else serialize_isolated_capture_child_result(trusted)
+        )
         observation = C3C3BObservationForTest(
             reservation_id=resumed.reservation_id,
             execution_id=resumed.execution_id,
@@ -276,12 +335,180 @@ class _C3LiveProcessRegistry:
         )
         with self._lock:
             entry = self._find_bound(resumed.reservation_id, resumed.execution_id)
-            if entry.child is not child or entry.observation is not None:
+            if (
+                entry.child is not child
+                or entry.observation is not None
+                or entry.observation_snapshot is not None
+            ):
                 raise WindowsEffectfulCaptureCompositionError(
                     "C3 observation registration provenance changed"
                 )
             entry.observation = observation
+            entry.observation_snapshot = _C3ObservationSnapshot(
+                visible_values=_c3_observation_visible_values(observation),
+                child_fence_state=(
+                    None if trusted is None else trusted.fence_state.value
+                ),
+                child_result_classification=(
+                    None if trusted is None else trusted.classification.value
+                ),
+                child_result_json=trusted_json,
+            )
         return observation
+
+    def issue_post_resume_evidence(
+        self,
+        resumed: C3C2ResumedCaptureForTest,
+        observation: C3C3BObservationForTest,
+    ) -> object:
+        with self._lock:
+            entry = self._find_bound(resumed.reservation_id, resumed.execution_id)
+            if (
+                entry.resume_receipt is not resumed.resume_receipt
+                or entry.request_sha256 != resumed.child_request_sha256
+                or entry.observation is not observation
+                or entry.evidence_issuance is not None
+                or entry.evidence_consumed
+            ):
+                raise WindowsEffectfulCaptureCompositionError(
+                    "C3 evidence issuance provenance is stale or mismatched"
+                )
+            snapshot = self._require_observation_snapshot_unchanged(entry)
+            if entry.observation is None:
+                raise WindowsEffectfulCaptureCompositionError(
+                    "C3 evidence requires one exact observation"
+                )
+            if entry.observation.parent_cleanup not in {
+                C3ParentCleanupStatus.COMPLETE,
+                C3ParentCleanupStatus.FAILED,
+            }:
+                raise WindowsEffectfulCaptureCompositionError(
+                    "unresolved C3 cleanup cannot issue durable evidence"
+                )
+            if (
+                entry.observation.process_outcome
+                is C3ProcessOutcomeStatus.TERMINATION_UNCONFIRMED
+            ):
+                raise WindowsEffectfulCaptureCompositionError(
+                    "unconfirmed termination cannot issue durable C3 evidence"
+                )
+            cleanup_json = _build_c3_cleanup_json(entry, snapshot)
+            if len(cleanup_json) > _MAX_C3_CLEANUP_EVIDENCE_BYTES:
+                raise WindowsEffectfulCaptureCompositionError(
+                    "C3 cleanup evidence exceeds its reviewed byte bound"
+                )
+            cleanup_digest = hashlib.sha256(cleanup_json).digest()
+            permit = object()
+            capability = _C3PostResumeEvidence(
+                _C3_POST_RESUME_EVIDENCE_CONSTRUCTOR,
+                self._issuer,
+                permit,
+            )
+            entry.evidence_issuance = _C3PostResumeEvidenceIssuance(
+                capability=capability,
+                permit=permit,
+                issuer=self._issuer,
+                resume_receipt=resumed.resume_receipt,
+                observation=observation,
+                child_request_sha256=resumed.child_request_sha256,
+                cleanup_json=cleanup_json,
+                cleanup_digest=cleanup_digest,
+            )
+            return capability
+
+    def validate_post_resume_evidence(
+        self,
+        evidence: object,
+        *,
+        execution_id: str,
+        reservation_id: str,
+        resume_receipt: ResumeReceipt,
+    ) -> tuple[bytes, bytes]:
+        with self._lock:
+            entry, issuance = self._validate_post_resume_evidence_locked(
+                evidence,
+                execution_id=execution_id,
+                reservation_id=reservation_id,
+                resume_receipt=resume_receipt,
+            )
+            del entry
+            return issuance.cleanup_json, issuance.cleanup_digest
+
+    def consume_post_resume_evidence(
+        self,
+        evidence: object,
+        *,
+        execution_id: str,
+        reservation_id: str,
+        resume_receipt: ResumeReceipt,
+    ) -> None:
+        with self._lock:
+            entry, _issuance = self._validate_post_resume_evidence_locked(
+                evidence,
+                execution_id=execution_id,
+                reservation_id=reservation_id,
+                resume_receipt=resume_receipt,
+            )
+            entry.evidence_consumed = True
+
+    def _validate_post_resume_evidence_locked(
+        self,
+        evidence: object,
+        *,
+        execution_id: str,
+        reservation_id: str,
+        resume_receipt: ResumeReceipt,
+    ) -> tuple[_C3LiveProcessEntry, _C3PostResumeEvidenceIssuance]:
+        if type(evidence) is not _C3PostResumeEvidence:
+            raise TypeError("C3 post-resume persistence requires exact evidence")
+        entry = self._find_bound(reservation_id, execution_id)
+        issuance = entry.evidence_issuance
+        if issuance is None or entry.evidence_consumed:
+            raise WindowsEffectfulCaptureCompositionError(
+                "C3 post-resume evidence was consumed or not issued"
+            )
+        snapshot = self._require_observation_snapshot_unchanged(entry)
+        if (
+            issuance.capability is not evidence
+            or evidence._issuer is not self._issuer
+            or evidence._issuer is not issuance.issuer
+            or evidence._permit is not issuance.permit
+            or entry.resume_receipt is not resume_receipt
+            or issuance.resume_receipt is not resume_receipt
+            or entry.observation is not issuance.observation
+            or entry.request_sha256 != issuance.child_request_sha256
+            or issuance.cleanup_json != _build_c3_cleanup_json(entry, snapshot)
+            or hashlib.sha256(issuance.cleanup_json).digest() != issuance.cleanup_digest
+        ):
+            raise WindowsEffectfulCaptureCompositionError(
+                "C3 post-resume evidence exact-object binding mismatch"
+            )
+        return entry, issuance
+
+    def _require_observation_snapshot_unchanged(
+        self, entry: _C3LiveProcessEntry
+    ) -> _C3ObservationSnapshot:
+        observation = entry.observation
+        snapshot = entry.observation_snapshot
+        if observation is None or snapshot is None:
+            raise WindowsEffectfulCaptureCompositionError(
+                "C3 evidence requires a registered observation"
+            )
+        if snapshot.visible_values != _c3_observation_visible_values(observation):
+            raise WindowsEffectfulCaptureCompositionError(
+                "C3 observation fields changed after registration"
+            )
+        trusted = observation.trusted_result
+        trusted_json = (
+            None
+            if trusted is None
+            else serialize_isolated_capture_child_result(trusted)
+        )
+        if trusted_json != snapshot.child_result_json:
+            raise WindowsEffectfulCaptureCompositionError(
+                "C3 trusted child result changed after observation"
+            )
+        return snapshot
 
     def request_sha256(self, reservation_id: str, execution_id: str) -> str:
         with self._lock:
@@ -350,6 +577,62 @@ class _C3LiveProcessRegistry:
                 "C3 live process provenance is stale or mismatched"
             )
         return matches[0]
+
+
+def _c3_observation_visible_values(
+    observation: C3C3BObservationForTest,
+) -> tuple[object, ...]:
+    return (
+        observation.reservation_id,
+        observation.execution_id,
+        observation.result_transport,
+        observation.process_outcome,
+        observation.parent_cleanup,
+        observation.trusted_result,
+        observation._issuer,
+    )
+
+
+def _build_c3_cleanup_json(
+    entry: _C3LiveProcessEntry,
+    snapshot: _C3ObservationSnapshot,
+) -> bytes:
+    observation = entry.observation
+    request_sha256 = entry.request_sha256
+    execution_id = entry.execution_id
+    if observation is None or request_sha256 is None or execution_id is None:
+        raise WindowsEffectfulCaptureCompositionError(
+            "C3 cleanup evidence lineage is incomplete"
+        )
+    child_result_sha256 = (
+        None
+        if snapshot.child_result_json is None
+        else hashlib.sha256(snapshot.child_result_json).hexdigest()
+    )
+    disposition = (
+        "CONFIRMED"
+        if snapshot.child_fence_state == ProviderAttemptFenceState.ENTERED.value
+        else "MAY_HAVE_OCCURRED"
+    )
+    return json.dumps(
+        {
+            "child_fence_state": snapshot.child_fence_state,
+            "child_request_sha256": request_sha256,
+            "child_result_classification": snapshot.child_result_classification,
+            "child_result_sha256": child_result_sha256,
+            "execution_id": execution_id,
+            "parent_cleanup": observation.parent_cleanup.value,
+            "process_outcome": observation.process_outcome.value,
+            "provider_call_disposition": disposition,
+            "reservation_id": entry.reservation_id,
+            "result_transport": observation.result_transport.value,
+            "schema": 1,
+        },
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    ).encode("utf-8")
 
 
 class C3C2TransactionalAdapterForTest:
@@ -544,6 +827,36 @@ class C3C2TransactionalAdapterForTest:
 
     def request_sha256(self, reservation_id: str, execution_id: str) -> str:
         return self._registry.request_sha256(reservation_id, execution_id)
+
+    def validate_c3_post_resume_evidence(
+        self,
+        evidence: object,
+        *,
+        execution_id: str,
+        reservation_id: str,
+        resume_receipt: ResumeReceipt,
+    ) -> tuple[bytes, bytes]:
+        return self._registry.validate_post_resume_evidence(
+            evidence,
+            execution_id=execution_id,
+            reservation_id=reservation_id,
+            resume_receipt=resume_receipt,
+        )
+
+    def consume_c3_post_resume_evidence(
+        self,
+        evidence: object,
+        *,
+        execution_id: str,
+        reservation_id: str,
+        resume_receipt: ResumeReceipt,
+    ) -> None:
+        self._registry.consume_post_resume_evidence(
+            evidence,
+            execution_id=execution_id,
+            reservation_id=reservation_id,
+            resume_receipt=resume_receipt,
+        )
 
     def close(self) -> None:
         try:
@@ -789,6 +1102,22 @@ def observe_c3_c3b_for_test(
     if type(resumed) is not C3C2ResumedCaptureForTest:
         raise TypeError("C3-C3B observation requires its exact resumed receipt")
     return adapter._registry.observe(resumed)
+
+
+def issue_c3_post_resume_evidence_for_test(
+    adapter: C3C2TransactionalAdapterForTest,
+    resumed: C3C2ResumedCaptureForTest,
+    observation: C3C3BObservationForTest,
+) -> object:
+    """Issue one opaque durable-evidence permit from an exact C3-C3B result."""
+
+    if type(adapter) is not C3C2TransactionalAdapterForTest:
+        raise TypeError("C3 evidence issuance requires its exact adapter")
+    if type(resumed) is not C3C2ResumedCaptureForTest:
+        raise TypeError("C3 evidence issuance requires its exact resumed capture")
+    if type(observation) is not C3C3BObservationForTest:
+        raise TypeError("C3 evidence issuance requires its exact observation")
+    return adapter._registry.issue_post_resume_evidence(resumed, observation)
 
 
 def _canonical_json(value: object) -> bytes:

@@ -228,6 +228,22 @@ class TransactionalAuthorityAdapter(Protocol):
     def deliver_c3_child_request(
         self, execution_id: str, reservation_id: str, payload: bytes
     ) -> None: ...
+    def validate_c3_post_resume_evidence(
+        self,
+        evidence: object,
+        *,
+        execution_id: str,
+        reservation_id: str,
+        resume_receipt: ResumeReceipt,
+    ) -> tuple[bytes, bytes]: ...
+    def consume_c3_post_resume_evidence(
+        self,
+        evidence: object,
+        *,
+        execution_id: str,
+        reservation_id: str,
+        resume_receipt: ResumeReceipt,
+    ) -> None: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -866,6 +882,55 @@ def _json(value: Any) -> bytes:
     return json.dumps(
         value, ensure_ascii=False, sort_keys=True, separators=(",", ":")
     ).encode("utf-8")
+
+
+_MAX_C3_CLEANUP_EVIDENCE_BYTES = 1024
+
+
+def _reject_duplicate_evidence_keys(
+    pairs: list[tuple[str, Any]],
+) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("C3 cleanup evidence contains a duplicate JSON key")
+        result[key] = value
+    return result
+
+
+def _reject_nonstandard_evidence_constant(value: str) -> None:
+    raise ValueError(f"C3 cleanup evidence contains unsupported constant {value!r}")
+
+
+def _require_canonical_c3_cleanup_evidence(
+    cleanup_json: object, cleanup_digest: object
+) -> tuple[bytes, bytes]:
+    """Validate only the generic canonical pair; C3 semantics stay adapter-owned."""
+
+    if (
+        type(cleanup_json) is not bytes
+        or not cleanup_json
+        or len(cleanup_json) > _MAX_C3_CLEANUP_EVIDENCE_BYTES
+    ):
+        raise ValueError("C3 cleanup evidence bytes are invalid")
+    if type(cleanup_digest) is not bytes or len(cleanup_digest) != 32:
+        raise ValueError("C3 cleanup evidence digest must be exact SHA-256 bytes")
+    if _digest(cleanup_json) != cleanup_digest:
+        raise ValueError("C3 cleanup evidence digest is invalid")
+    if cleanup_json.startswith(b"\xef\xbb\xbf"):
+        raise ValueError("C3 cleanup evidence must not contain a UTF-8 BOM")
+    try:
+        text = cleanup_json.decode("utf-8")
+        parsed = json.loads(
+            text,
+            object_pairs_hook=_reject_duplicate_evidence_keys,
+            parse_constant=_reject_nonstandard_evidence_constant,
+        )
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise ValueError("C3 cleanup evidence must be strict UTF-8 JSON") from error
+    if type(parsed) is not dict or _json(parsed) != cleanup_json:
+        raise ValueError("C3 cleanup evidence must be one canonical JSON object")
+    return cleanup_json, cleanup_digest
 
 
 def _evidence(label: str) -> tuple[bytes, bytes]:
@@ -2818,8 +2883,16 @@ def _core_record_post_resume_evidence(
     execution_id: str,
     resume_receipt: ResumeReceipt,
 ) -> None:
-    _require_service_context()
+    context = _require_service_context()
     _require_no_active_transaction(connection)
+    adapter = context.external_adapter
+    if adapter is not None and (
+        callable(getattr(adapter, "validate_c3_post_resume_evidence", None))
+        or callable(getattr(adapter, "consume_c3_post_resume_evidence", None))
+    ):
+        raise ExternalAuthorityBoundaryUnavailable(
+            "C3 composition requires the C3 post-resume evidence operation"
+        )
     if type(resume_receipt) is not ResumeReceipt:
         raise TypeError("post-resume evidence requires a fake resume receipt")
     _require_service_provenance(
@@ -2922,6 +2995,182 @@ def _record_post_resume_evidence_locked(
         _finish(connection, False)
         raise
     _consume_resume_result(resume_receipt, execution_id, reservation_id)
+
+
+def _require_c3_post_resume_lineage(
+    connection: sqlite3.Connection,
+    execution_id: str,
+    reservation_id: str,
+    resume_intent_digest: bytes,
+) -> _ResumeThreadLineage:
+    lineage = _require_resume_thread_lineage(
+        connection,
+        execution_id,
+        reservation_id,
+        resume_intent_digest,
+    )
+    row = connection.execute(
+        """
+        SELECT c.state, a.state
+        FROM launch_executions e
+        JOIN launch_reservations r
+          ON r.launch_reservation_id = e.launch_reservation_id
+        JOIN provider_call_claims c ON c.claim_id = r.claim_id
+        JOIN attempts a ON a.attempt_id = c.attempt_id
+        WHERE e.launch_execution_id = ?
+          AND e.launch_reservation_id = ?
+        """,
+        (str(execution_id), str(reservation_id)),
+    ).fetchone()
+    if row != ("COMMITTED", "LAUNCH_RESERVED"):
+        raise ValueError("C3 post-resume complete active lineage is unavailable")
+    return lineage
+
+
+def _core_record_c3_post_resume_evidence(
+    connection: sqlite3.Connection,
+    execution_id: str,
+    resume_receipt: ResumeReceipt,
+    evidence: object,
+) -> None:
+    context = _require_service_context()
+    _require_no_active_transaction(connection)
+    if type(resume_receipt) is not ResumeReceipt:
+        raise TypeError("C3 post-resume evidence requires a resume receipt")
+    _require_service_provenance(
+        resume_receipt,
+        production_issuer=_RESUME_RESULT_ISSUER,
+        test_issuer=_TEST_RESUME_RESULT_ISSUER,
+        label="resume receipt",
+    )
+    registered_execution_id, registered_reservation_id = (
+        _registered_resume_result_binding(resume_receipt)
+    )
+    if registered_execution_id != str(execution_id):
+        raise ValueError("resume receipt belongs to another execution")
+    adapter = context.external_adapter
+    validate = getattr(adapter, "validate_c3_post_resume_evidence", None)
+    consume = getattr(adapter, "consume_c3_post_resume_evidence", None)
+    if adapter is None or not callable(validate) or not callable(consume):
+        raise ExternalAuthorityBoundaryUnavailable(
+            "transactional authority has no reviewed C3 evidence adapter"
+        )
+    with _lifecycle_arbiter(registered_reservation_id):
+        _record_c3_post_resume_evidence_locked(
+            connection,
+            registered_execution_id,
+            registered_reservation_id,
+            resume_receipt,
+            evidence,
+            validate=validate,
+            consume=consume,
+        )
+
+
+@_serialized_connection_operation
+def _record_c3_post_resume_evidence_locked(
+    connection: sqlite3.Connection,
+    execution_id: str,
+    reservation_id: str,
+    resume_receipt: ResumeReceipt,
+    evidence: object,
+    *,
+    validate: Callable[..., object],
+    consume: Callable[..., object],
+) -> None:
+    lineage = _require_c3_post_resume_lineage(
+        connection,
+        execution_id,
+        reservation_id,
+        resume_receipt.resume_intent_digest,
+    )
+    registered_execution_id, registered_reservation_id = (
+        _registered_resume_result_binding(resume_receipt)
+    )
+    if (
+        registered_execution_id != execution_id
+        or registered_reservation_id != reservation_id
+    ):
+        raise ValueError("resume receipt registry binding changed")
+    pair = validate(
+        evidence,
+        execution_id=execution_id,
+        reservation_id=reservation_id,
+        resume_receipt=resume_receipt,
+    )
+    if type(pair) is not tuple or len(pair) != 2:
+        raise ValueError("C3 evidence adapter returned an invalid evidence pair")
+    cleanup_json, cleanup_digest = _require_canonical_c3_cleanup_evidence(*pair)
+    expected_result = _json(
+        {
+            "execution_id": execution_id,
+            "resume_intent_digest": lineage.resume_intent_digest.hex(),
+            "resume_result": "RESUMED",
+            "schema": 1,
+        }
+    )
+    if resume_receipt.result_json != expected_result:
+        raise ValueError("resume receipt is not the exact canonical success")
+    if resume_receipt.result_digest != _digest(expected_result):
+        raise ValueError("resume receipt digest is invalid")
+
+    _begin(connection)
+    try:
+        cursor = connection.execute(
+            """
+            UPDATE launch_executions
+            SET phase = 'RESUME_RECORDED', post_resume_json = ?,
+                post_resume_digest = ?, cleanup_json = ?, cleanup_digest = ?
+            WHERE launch_execution_id = ?
+              AND launch_reservation_id = ?
+              AND phase = 'RESUME_INTENT_COMMITTED'
+              AND resume_intent_digest IS ?
+              AND EXISTS (
+                  SELECT 1
+                  FROM launch_reservations r
+                  JOIN provider_call_claims c ON c.claim_id = r.claim_id
+                  JOIN attempts a ON a.attempt_id = c.attempt_id
+                  JOIN sessions s ON s.session_id = a.session_id
+                  WHERE r.launch_reservation_id =
+                        launch_executions.launch_reservation_id
+                    AND r.reservation_state = 'PROCESS_CREATED'
+                    AND c.state = 'COMMITTED'
+                    AND a.state = 'LAUNCH_RESERVED'
+                    AND s.state = 'OPEN'
+                    AND NOT EXISTS (
+                        SELECT 1 FROM terminals t
+                        WHERE t.launch_reservation_id = r.launch_reservation_id
+                    )
+                    AND NOT EXISTS (
+                        SELECT 1 FROM session_selections ss
+                        WHERE ss.session_id = s.session_id
+                    )
+              )
+            """,
+            (
+                resume_receipt.result_json,
+                resume_receipt.result_digest,
+                cleanup_json,
+                cleanup_digest,
+                execution_id,
+                reservation_id,
+                lineage.resume_intent_digest,
+            ),
+        )
+        if cursor.rowcount != 1:
+            raise ValueError("C3 post-resume active lineage changed before persistence")
+        _finish(connection, True)
+    except BaseException:
+        _finish(connection, False)
+        raise
+
+    _consume_resume_result(resume_receipt, execution_id, reservation_id)
+    consume(
+        evidence,
+        execution_id=execution_id,
+        reservation_id=reservation_id,
+        resume_receipt=resume_receipt,
+    )
 
 
 def _core_record_terminal(
@@ -4462,6 +4711,23 @@ class TransactionalAuthorityCore:
                 self._connection, execution_id, receipt
             )
 
+    def record_c3_post_resume_evidence(
+        self, execution_id: str, receipt: ResumeReceipt, evidence: object
+    ) -> None:
+        with self._bound_context():
+            if type(receipt) is not ResumeReceipt:
+                raise TypeError("C3 post-resume evidence requires a resume receipt")
+            _require_service_provenance(
+                receipt,
+                production_issuer=_RESUME_RESULT_ISSUER,
+                test_issuer=_TEST_RESUME_RESULT_ISSUER,
+                label="resume receipt",
+            )
+            _require_no_active_transaction(self._connection)
+            return _core_record_c3_post_resume_evidence(
+                self._connection, execution_id, receipt, evidence
+            )
+
     def record_terminal(
         self,
         reservation_id: str,
@@ -5012,6 +5278,26 @@ class WindowsTransactionalAuthority:
         )
         return self._core_for_operation().record_post_resume_evidence(
             execution_id, receipt
+        )
+
+    def record_c3_post_resume_evidence(
+        self, execution_id: str, receipt: ResumeReceipt, evidence: object
+    ) -> None:
+        self._require_service_open()
+        _require_service_provenance(
+            receipt,
+            production_issuer=_RESUME_RESULT_ISSUER,
+            test_issuer=_TEST_RESUME_RESULT_ISSUER,
+            label="resume receipt",
+            test_only=self._context.test_only,
+            service_token=self._context.test_service_token,
+        )
+        if self._context.external_adapter is None:
+            raise ExternalAuthorityBoundaryUnavailable(
+                "transactional authority has no reviewed C3 evidence adapter"
+            )
+        return self._core_for_operation().record_c3_post_resume_evidence(
+            execution_id, receipt, evidence
         )
 
     def record_terminal(

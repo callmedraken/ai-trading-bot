@@ -689,9 +689,7 @@ class CtypesWindowsEffectfulCaptureNativeApi:
                 self._k32.DeleteProcThreadAttributeList(attrs)
 
     def close_handle(self, handle: int) -> None:
-        if not self._k32.CloseHandle(
-            self._w.HANDLE(_handle(handle, "close handle"))
-        ):
+        if not self._k32.CloseHandle(self._w.HANDLE(_handle(handle, "close handle"))):
             raise _native_error("CloseHandle")
 
 

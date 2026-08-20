@@ -1,16 +1,19 @@
-"""C3-B2 isolated child provider-execution core."""
+"""C3-B2 provider core and C3-C3A contained-child bootstrap."""
 
 from __future__ import annotations
 
 import hashlib
+import struct
+import sys
 import threading
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from datetime import UTC, datetime
 from typing import Protocol
 
 from trading_bot.market_calendar import NYSEMarketCalendar
 from trading_bot.market_data import (
     ALPACA_DAILY_SNAPSHOT_DESCRIPTOR,
+    MAX_DAILY_SNAPSHOT_ARTIFACT_BYTES,
     XNYS_CALENDAR_DESCRIPTOR,
     AlpacaDailySnapshotProvider,
     AlpacaHistoricalBarsTransport,
@@ -40,7 +43,16 @@ from trading_bot.runtime.windows_effectful_capture_credentials import (
     WindowsCredentialReadError,
     WindowsCredentialSidMismatchError,
 )
+from trading_bot.runtime.windows_effectful_capture_native import (
+    C3_REQUEST_HANDLE_ARGUMENT,
+    C3_RESULT_HANDLE_ARGUMENT,
+    C3_STAGING_HANDLE_ARGUMENT,
+    CtypesWindowsEffectfulCaptureChildIoApi,
+    WindowsEffectfulCaptureChildIoApi,
+)
 from trading_bot.runtime.windows_effectful_capture_protocol import (
+    MAX_C3_CHILD_REQUEST_BYTES,
+    MAX_C3_CHILD_RESULT_BYTES,
     ChildCleanupStatus,
     ChildResultClassification,
     IsolatedCaptureChildRequest,
@@ -49,7 +61,13 @@ from trading_bot.runtime.windows_effectful_capture_protocol import (
     WindowsEffectfulCaptureProtocolError,
     parse_isolated_capture_child_request,
     serialize_isolated_capture_child_request,
+    serialize_isolated_capture_child_result,
 )
+
+C3_CHILD_BOOTSTRAP_EXIT_SUCCESS = 0
+C3_CHILD_BOOTSTRAP_EXIT_FAILED = 1
+_C3_CHILD_READ_CHUNK_BYTES = 4096
+_MAX_UINT_PTR = (1 << (struct.calcsize("P") * 8)) - 1
 
 
 class WindowsEffectfulCaptureChildError(RuntimeError):
@@ -62,6 +80,108 @@ class ChildSnapshotStagingWriter(Protocol):
     def write(self, payload: bytes) -> None: ...
 
     def flush(self) -> None: ...
+
+
+class _ChildAttempt(Protocol):
+    def run(self) -> IsolatedCaptureChildResult: ...
+
+
+class _ChildBootstrapHandles:
+    __slots__ = ("request_read", "result_write", "staging_write")
+
+    def __init__(
+        self, request_read: int, result_write: int, staging_write: int
+    ) -> None:
+        handles = (request_read, result_write, staging_write)
+        if any(type(handle) is not int or handle <= 0 for handle in handles):
+            raise WindowsEffectfulCaptureChildError("child bootstrap handle is invalid")
+        if len(set(handles)) != 3:
+            raise WindowsEffectfulCaptureChildError(
+                "child bootstrap handles must be distinct"
+            )
+        self.request_read = request_read
+        self.result_write = result_write
+        self.staging_write = staging_write
+
+
+class _ChildHandleOwner:
+    __slots__ = ("_handles", "_native_io")
+
+    def __init__(
+        self,
+        handles: _ChildBootstrapHandles,
+        native_io: WindowsEffectfulCaptureChildIoApi,
+    ) -> None:
+        self._handles = [
+            handles.request_read,
+            handles.result_write,
+            handles.staging_write,
+        ]
+        self._native_io = native_io
+
+    def close_owned(self, handle: int) -> None:
+        try:
+            index = self._handles.index(handle)
+        except ValueError:
+            raise WindowsEffectfulCaptureChildError(
+                "child handle cleanup was already attempted"
+            ) from None
+        # An uncertain CloseHandle outcome must not permit a second close attempt.
+        self._handles.pop(index)
+        self._native_io.close_handle(handle)
+
+    def cleanup_remaining(self) -> bool:
+        failed = False
+        for handle in tuple(self._handles):
+            try:
+                self.close_owned(handle)
+            except BaseException:
+                failed = True
+        return not failed
+
+
+class _InheritedHandleSnapshotStagingWriter:
+    """Bounded B2 writer over only the inherited staging HANDLE."""
+
+    __slots__ = (
+        "_flush_attempted",
+        "_handle",
+        "_native_io",
+        "_write_attempted",
+        "_write_complete",
+    )
+
+    def __init__(
+        self, handle: int, native_io: WindowsEffectfulCaptureChildIoApi
+    ) -> None:
+        if type(handle) is not int or handle <= 0:
+            raise WindowsEffectfulCaptureChildError("staging handle is invalid")
+        self._handle = handle
+        self._native_io = native_io
+        self._write_attempted = False
+        self._write_complete = False
+        self._flush_attempted = False
+
+    def write(self, payload: bytes) -> None:
+        if self._write_attempted:
+            raise WindowsEffectfulCaptureChildError(
+                "staging payload write was already attempted"
+            )
+        self._write_attempted = True
+        _complete_bounded_write(
+            self._native_io,
+            self._handle,
+            payload,
+            MAX_DAILY_SNAPSHOT_ARTIFACT_BYTES,
+            "staging payload",
+        )
+        self._write_complete = True
+
+    def flush(self) -> None:
+        if not self._write_complete or self._flush_attempted:
+            raise WindowsEffectfulCaptureChildError("staging flush ordering is invalid")
+        self._flush_attempted = True
+        self._native_io.flush_file_buffers(self._handle)
 
 
 class _ObservedSingleAttemptTransport:
@@ -469,6 +589,157 @@ def _build_production_isolated_capture_child_attempt(
     )
 
 
+def _parse_child_bootstrap_handles(
+    arguments: Sequence[str],
+) -> _ChildBootstrapHandles:
+    if isinstance(arguments, (str, bytes)) or not isinstance(arguments, Sequence):
+        raise WindowsEffectfulCaptureChildError("child bootstrap arguments are invalid")
+    values = tuple(arguments)
+    if len(values) != 6 or any(type(value) is not str for value in values):
+        raise WindowsEffectfulCaptureChildError("child bootstrap arguments are invalid")
+    supported = {
+        C3_REQUEST_HANDLE_ARGUMENT: "request_read",
+        C3_RESULT_HANDLE_ARGUMENT: "result_write",
+        C3_STAGING_HANDLE_ARGUMENT: "staging_write",
+    }
+    parsed: dict[str, int] = {}
+    for index in range(0, len(values), 2):
+        flag = values[index]
+        text = values[index + 1]
+        field = supported.get(flag)
+        if field is None or field in parsed:
+            raise WindowsEffectfulCaptureChildError(
+                "child bootstrap arguments are invalid"
+            )
+        if not text or not text.isascii() or not text.isdecimal() or text[0] == "0":
+            raise WindowsEffectfulCaptureChildError(
+                "child bootstrap handle text is invalid"
+            )
+        value = int(text)
+        if value > _MAX_UINT_PTR:
+            raise WindowsEffectfulCaptureChildError(
+                "child bootstrap handle text is invalid"
+            )
+        parsed[field] = value
+    if set(parsed) != set(supported.values()):
+        raise WindowsEffectfulCaptureChildError("child bootstrap arguments are invalid")
+    return _ChildBootstrapHandles(
+        parsed["request_read"], parsed["result_write"], parsed["staging_write"]
+    )
+
+
+def run_isolated_capture_child_bootstrap_for_test(
+    arguments: Sequence[str],
+    *,
+    native_io: WindowsEffectfulCaptureChildIoApi,
+    attempt_factory: Callable[..., _ChildAttempt],
+) -> int:
+    """Explicit C3-C3A test seam with no production composition authority."""
+
+    try:
+        handles = _parse_child_bootstrap_handles(arguments)
+        return _run_isolated_capture_child_bootstrap(
+            handles,
+            native_io=native_io,
+            attempt_factory=attempt_factory,
+        )
+    except BaseException:
+        return C3_CHILD_BOOTSTRAP_EXIT_FAILED
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    """Run only the reviewed real contained-child bindings without diagnostics."""
+
+    try:
+        arguments = tuple(sys.argv[1:] if argv is None else argv)
+        handles = _parse_child_bootstrap_handles(arguments)
+        native_io = CtypesWindowsEffectfulCaptureChildIoApi()
+        return _run_isolated_capture_child_bootstrap(
+            handles,
+            native_io=native_io,
+            attempt_factory=_build_production_isolated_capture_child_attempt,
+        )
+    except BaseException:
+        return C3_CHILD_BOOTSTRAP_EXIT_FAILED
+
+
+def _run_isolated_capture_child_bootstrap(
+    handles: _ChildBootstrapHandles,
+    *,
+    native_io: WindowsEffectfulCaptureChildIoApi,
+    attempt_factory: Callable[..., _ChildAttempt],
+) -> int:
+    owner = _ChildHandleOwner(handles, native_io)
+    exit_code = C3_CHILD_BOOTSTRAP_EXIT_FAILED
+    try:
+        request_bytes = _read_canonical_child_request(native_io, handles.request_read)
+        owner.close_owned(handles.request_read)
+        staging_writer = _InheritedHandleSnapshotStagingWriter(
+            handles.staging_write, native_io
+        )
+        attempt = attempt_factory(request_bytes, staging_writer=staging_writer)
+        result = attempt.run()
+        result_bytes = serialize_isolated_capture_child_result(result)
+        _complete_bounded_write(
+            native_io,
+            handles.result_write,
+            result_bytes,
+            MAX_C3_CHILD_RESULT_BYTES,
+            "child result",
+        )
+        exit_code = C3_CHILD_BOOTSTRAP_EXIT_SUCCESS
+    except BaseException:
+        exit_code = C3_CHILD_BOOTSTRAP_EXIT_FAILED
+    if not owner.cleanup_remaining():
+        exit_code = C3_CHILD_BOOTSTRAP_EXIT_FAILED
+    return exit_code
+
+
+def _read_canonical_child_request(
+    native_io: WindowsEffectfulCaptureChildIoApi, request_handle: int
+) -> bytes:
+    payload = bytearray()
+    while True:
+        read_bound = min(
+            _C3_CHILD_READ_CHUNK_BYTES,
+            MAX_C3_CHILD_REQUEST_BYTES + 1 - len(payload),
+        )
+        chunk = native_io.read_file(request_handle, read_bound)
+        if type(chunk) is not bytes or len(chunk) > read_bound:
+            raise WindowsEffectfulCaptureChildError(
+                "child request read result is invalid"
+            )
+        if not chunk:
+            break
+        payload.extend(chunk)
+        if len(payload) > MAX_C3_CHILD_REQUEST_BYTES:
+            raise WindowsEffectfulCaptureChildError(
+                "child request exceeds its byte bound"
+            )
+    request_bytes = bytes(payload)
+    if not request_bytes:
+        raise WindowsEffectfulCaptureChildError("child request is empty")
+    parse_isolated_capture_child_request(request_bytes)
+    return request_bytes
+
+
+def _complete_bounded_write(
+    native_io: WindowsEffectfulCaptureChildIoApi,
+    handle: int,
+    payload: bytes,
+    byte_bound: int,
+    label: str,
+) -> None:
+    if type(payload) is not bytes or not payload or len(payload) > byte_bound:
+        raise WindowsEffectfulCaptureChildError(f"{label} byte length is invalid")
+    offset = 0
+    while offset < len(payload):
+        written = native_io.write_file(handle, payload[offset:])
+        if type(written) is not int or written <= 0 or written > len(payload) - offset:
+            raise WindowsEffectfulCaptureChildError(f"{label} write result is invalid")
+        offset += written
+
+
 def _reconcile_runtime_request(
     request: IsolatedCaptureChildRequest,
 ) -> tuple[DailySnapshotCaptureRequest, DailyProviderRequest, BoundMarketCalendar]:
@@ -527,3 +798,7 @@ def _safe_provider_request_id(value: object) -> str | None:
     ):
         return None
     return value
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -406,6 +406,50 @@ def test_recovery_first_revokes_request_delivery_before_native_write() -> None:
         _close(adapter, transactional)
 
 
+def test_delivered_request_then_recovery_wins_before_resume_intent_never_resumes() -> (
+    None
+):
+    api = _FakeNativeApi()
+    capture, _plan, adapter, transactional, connection, intent = _case(api)
+    try:
+        receipt = transactional.create_process(intent)
+        execution_id = transactional.record_execution(intent.reservation_id, receipt)
+        adapter.bind_execution(receipt, intent.reservation_id, execution_id)
+        payload = adapter.child_request_payload(intent.reservation_id, execution_id)
+
+        transactional.deliver_c3_child_request(
+            execution_id, intent.reservation_id, payload
+        )
+
+        assert bytes(api.written) == payload
+        assert api.events.count("close:102") == 1
+        assert connection.execute("SELECT phase FROM launch_executions").fetchone() == (
+            "PRE_RESUME_READY",
+        )
+
+        session_id = connection.execute("SELECT session_id FROM sessions").fetchone()[0]
+        evidence = b'{"evidence":"explicit-test-operator-evidence","schema":1}'
+        transactional.record_recovery(
+            session_id,
+            "LAUNCH_RESERVATION",
+            intent.reservation_id,
+            "CLASSIFY_PRE_RESUME_READY",
+            operator_evidence_json=evidence,
+            operator_evidence_digest=hashlib.sha256(evidence).digest(),
+        )
+
+        with pytest.raises(ValueError, match="revoked"):
+            transactional.commit_resume_intent(execution_id, intent.reservation_id)
+
+        assert connection.execute(
+            "SELECT resume_intent_json, resume_intent_digest, "
+            "resume_intent_committed_at_utc FROM launch_executions"
+        ).fetchone() == (None, None, None)
+        assert "resume_thread" not in api.events
+    finally:
+        _close(adapter, transactional)
+
+
 def test_public_production_facade_still_has_no_native_or_resume_injection() -> None:
     forbidden = {
         "application_name",

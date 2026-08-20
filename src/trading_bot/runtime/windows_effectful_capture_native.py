@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from pathlib import PureWindowsPath
 from typing import Protocol
 
+from trading_bot.market_data import MAX_DAILY_SNAPSHOT_ARTIFACT_BYTES
 from trading_bot.runtime.windows_effectful_capture_protocol import (
     MAX_C3_CHILD_REQUEST_BYTES,
     MAX_C3_CHILD_RESULT_BYTES,
@@ -44,6 +45,7 @@ GENERIC_WRITE = 0x40000000
 CREATE_NEW = 1
 FILE_ATTRIBUTE_NORMAL = 0x00000080
 ERROR_INSUFFICIENT_BUFFER = 122
+ERROR_BROKEN_PIPE = 109
 INVALID_SUSPEND_COUNT = 0xFFFFFFFF
 
 
@@ -107,6 +109,15 @@ class WindowsEffectfulCaptureNativeApi(Protocol):
 
     def write_file(self, handle: int, payload: bytes) -> int: ...
     def resume_thread(self, thread_handle: int) -> int: ...
+    def close_handle(self, handle: int) -> None: ...
+
+
+class WindowsEffectfulCaptureChildIoApi(Protocol):
+    """Exact synchronous Win32 I/O used by the contained C3 child."""
+
+    def read_file(self, handle: int, max_bytes: int) -> bytes: ...
+    def write_file(self, handle: int, payload: bytes) -> int: ...
+    def flush_file_buffers(self, handle: int) -> None: ...
     def close_handle(self, handle: int) -> None: ...
 
 
@@ -832,6 +843,98 @@ class CtypesWindowsEffectfulCaptureNativeApi:
                 self._w.HANDLE(_handle(thread_handle, "primary thread handle"))
             )
         )
+
+
+class CtypesWindowsEffectfulCaptureChildIoApi:
+    """ctypes binding for the three inherited handles owned by the C3 child."""
+
+    def __init__(self) -> None:
+        if os.name != "nt":
+            raise WindowsEffectfulCaptureNativeUnsupportedError(
+                "C3 child I/O is supported only on Windows"
+            )
+        from ctypes import wintypes
+
+        k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        k32.ReadFile.argtypes = [
+            wintypes.HANDLE,
+            ctypes.c_void_p,
+            wintypes.DWORD,
+            ctypes.POINTER(wintypes.DWORD),
+            ctypes.c_void_p,
+        ]
+        k32.ReadFile.restype = wintypes.BOOL
+        k32.WriteFile.argtypes = [
+            wintypes.HANDLE,
+            ctypes.c_void_p,
+            wintypes.DWORD,
+            ctypes.POINTER(wintypes.DWORD),
+            ctypes.c_void_p,
+        ]
+        k32.WriteFile.restype = wintypes.BOOL
+        k32.FlushFileBuffers.argtypes = [wintypes.HANDLE]
+        k32.FlushFileBuffers.restype = wintypes.BOOL
+        k32.CloseHandle.argtypes = [wintypes.HANDLE]
+        k32.CloseHandle.restype = wintypes.BOOL
+        self._k32 = k32
+        self._w = wintypes
+
+    def read_file(self, handle: int, max_bytes: int) -> bytes:
+        if (
+            type(max_bytes) is not int
+            or max_bytes <= 0
+            or max_bytes > MAX_C3_CHILD_REQUEST_BYTES
+        ):
+            raise WindowsEffectfulCaptureNativeError("ReadFile bound is invalid")
+        buffer = ctypes.create_string_buffer(max_bytes)
+        read = self._w.DWORD()
+        ctypes.set_last_error(0)
+        if not self._k32.ReadFile(
+            self._w.HANDLE(_handle(handle, "request reader handle")),
+            ctypes.cast(buffer, ctypes.c_void_p),
+            max_bytes,
+            ctypes.byref(read),
+            None,
+        ):
+            error = ctypes.get_last_error()
+            if error == ERROR_BROKEN_PIPE:
+                return b""
+            raise _native_error("ReadFile", error)
+        count = int(read.value)
+        if count > max_bytes:
+            raise WindowsEffectfulCaptureNativeError(
+                "ReadFile returned an invalid byte count"
+            )
+        return bytes(buffer.raw[:count])
+
+    def write_file(self, handle: int, payload: bytes) -> int:
+        if type(payload) is not bytes or not payload:
+            raise WindowsEffectfulCaptureNativeError("WriteFile payload is invalid")
+        if len(payload) > MAX_DAILY_SNAPSHOT_ARTIFACT_BYTES:
+            raise WindowsEffectfulCaptureNativeError("WriteFile payload exceeds bound")
+        buffer = ctypes.create_string_buffer(payload, len(payload))
+        written = self._w.DWORD()
+        if not self._k32.WriteFile(
+            self._w.HANDLE(_handle(handle, "child writer handle")),
+            ctypes.cast(buffer, ctypes.c_void_p),
+            len(payload),
+            ctypes.byref(written),
+            None,
+        ):
+            raise _native_error("WriteFile")
+        return int(written.value)
+
+    def flush_file_buffers(self, handle: int) -> None:
+        if not self._k32.FlushFileBuffers(
+            self._w.HANDLE(_handle(handle, "staging writer handle"))
+        ):
+            raise _native_error("FlushFileBuffers")
+
+    def close_handle(self, handle: int) -> None:
+        if not self._k32.CloseHandle(
+            self._w.HANDLE(_handle(handle, "child-owned handle"))
+        ):
+            raise _native_error("CloseHandle")
 
 
 def _handle_bootstrap_arguments(handles: tuple[int, int, int]) -> tuple[str, ...]:

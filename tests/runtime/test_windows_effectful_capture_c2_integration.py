@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import hashlib
 import pickle
+from collections import deque
 from contextlib import nullcontext
+from dataclasses import replace
 from datetime import UTC, date, datetime
 from inspect import signature
 
@@ -26,14 +28,24 @@ from trading_bot.runtime.windows_authority_validation import (
 )
 from trading_bot.runtime.windows_effectful_capture import ProductionCaptureRequest
 from trading_bot.runtime.windows_effectful_capture_native import (
+    C3NativeWaitStatus,
+    C3ParentCleanupStatus,
+    C3ProcessOutcomeStatus,
+    C3ResultTransportStatus,
     NativeCreatedProcess,
+    NativeOverlappedCompletion,
     NativePipePair,
     WindowsEffectfulCaptureNativeError,
 )
 from trading_bot.runtime.windows_effectful_capture_protocol import (
     MAX_C3_CHILD_REQUEST_BYTES,
     MAX_C3_CHILD_RESULT_BYTES,
+    ChildCleanupStatus,
+    ChildResultClassification,
+    IsolatedCaptureChildResult,
+    ProviderAttemptFenceState,
     parse_isolated_capture_child_request,
+    serialize_isolated_capture_child_result,
 )
 from trading_bot.runtime.windows_effectful_capture_service import (
     C3C2NativeLaunchConfigurationForTest,
@@ -42,6 +54,7 @@ from trading_bot.runtime.windows_effectful_capture_service import (
     c3_c2_registry_snapshot_for_test,
     create_c3_c2_transactional_adapter_for_test,
     execute_c3_c2_resume_for_test,
+    observe_c3_c3b_for_test,
 )
 from trading_bot.runtime.windows_transactional_authority import (
     ProcessIntent,
@@ -62,13 +75,24 @@ class _FakeNativeApi:
         *,
         resume_result: int | BaseException = 1,
         fail_write: bool = False,
+        fail_close: int | None = None,
+        fail_terminate: bool = False,
+        request_wait_status: C3NativeWaitStatus = C3NativeWaitStatus.IO_COMPLETED,
     ) -> None:
         self.resume_result = resume_result
         self.fail_write = fail_write
+        self.fail_close = fail_close
+        self.fail_terminate = fail_terminate
+        self.request_wait_status = request_wait_status
         self.events: list[str] = []
         self.written = bytearray()
         self.connection = None
         self._pipe_count = 0
+        self.result_chunks: deque[bytes | None] = deque()
+        self.wait_events: deque[C3NativeWaitStatus] = deque()
+        self.process_wait_events: deque[C3NativeWaitStatus] = deque()
+        self.exit_code = 0
+        self.cancel_settles = True
 
     def create_job_object(self) -> int:
         self.events.append("create_job")
@@ -78,11 +102,14 @@ class _FakeNativeApi:
         assert job_handle == 100
         self.events.append("set_job_limits")
 
-    def create_pipe(self, buffer_size: int) -> NativePipePair:
+    def create_request_pipe(self, buffer_size: int) -> NativePipePair:
         self._pipe_count += 1
-        self.events.append(f"create_pipe:{buffer_size}")
-        if self._pipe_count == 1:
-            return NativePipePair(101, 102)
+        self.events.append(f"create_request_pipe:{buffer_size}")
+        return NativePipePair(101, 102)
+
+    def create_result_pipe(self, buffer_size: int) -> NativePipePair:
+        self._pipe_count += 1
+        self.events.append(f"create_result_pipe:{buffer_size}")
         return NativePipePair(103, 104)
 
     def set_handle_inheritable(self, handle: int, inheritable: bool) -> None:
@@ -99,7 +126,7 @@ class _FakeNativeApi:
         self.events.append("create_process")
         return NativeCreatedProcess(1234, 5678, 106, 107)
 
-    def write_file(self, handle: int, payload: bytes) -> int:
+    def begin_overlapped_write(self, handle: int, payload: bytes) -> object:
         assert handle == 102
         assert self.connection is not None
         phase = self.connection.execute(
@@ -109,9 +136,65 @@ class _FakeNativeApi:
         self.events.append("write_request")
         if self.fail_write:
             raise RuntimeError("injected request failure")
-        count = min(7, len(payload))
-        self.written.extend(payload[:count])
-        return count
+        return payload
+
+    def begin_overlapped_read(self, handle: int, max_bytes: int) -> object:
+        assert handle == 103
+        self.events.append(f"begin_read:{max_bytes}")
+        return {"kind": "read", "max_bytes": max_bytes}
+
+    def wait_overlapped_or_process(
+        self, operation: object, process_handle: int | None, timeout_ms: int
+    ) -> C3NativeWaitStatus:
+        if type(operation) is bytes:
+            assert process_handle is None
+            return self.request_wait_status
+        self.events.append(f"wait_observation:{timeout_ms}")
+        return (
+            self.wait_events.popleft()
+            if self.wait_events
+            else C3NativeWaitStatus.FAILED
+        )
+
+    def complete_overlapped(self, operation: object) -> NativeOverlappedCompletion:
+        if type(operation) is bytes:
+            payload = operation
+            count = min(7, len(payload))
+            self.written.extend(payload[:count])
+            return NativeOverlappedCompletion(count, b"", False)
+        assert type(operation) is dict
+        chunk = self.result_chunks.popleft()
+        if chunk is None:
+            return NativeOverlappedCompletion(0, b"", True)
+        assert len(chunk) <= operation["max_bytes"]
+        return NativeOverlappedCompletion(len(chunk), chunk, False)
+
+    def cancel_and_settle_overlapped(self, operation: object, timeout_ms: int) -> bool:
+        self.events.append("cancel")
+        return self.cancel_settles
+
+    def quarantine_overlapped(self, operation: object) -> None:
+        self.events.append("quarantine")
+
+    def wait_process(self, process_handle: int, timeout_ms: int) -> C3NativeWaitStatus:
+        assert process_handle == 106
+        self.events.append(f"wait_process:{timeout_ms}")
+        return (
+            self.process_wait_events.popleft()
+            if self.process_wait_events
+            else C3NativeWaitStatus.FAILED
+        )
+
+    def get_exit_code_process(self, process_handle: int) -> int:
+        assert process_handle == 106
+        self.events.append("get_exit_code")
+        return self.exit_code
+
+    def terminate_job_object(self, job_handle: int) -> None:
+        assert job_handle == 100
+        self.events.append(f"terminate:{job_handle}")
+        if self.fail_terminate:
+            raise RuntimeError("injected termination failure")
 
     def resume_thread(self, thread_handle: int) -> int:
         assert thread_handle == 107
@@ -127,6 +210,8 @@ class _FakeNativeApi:
 
     def close_handle(self, handle: int) -> None:
         self.events.append(f"close:{handle}")
+        if handle == self.fail_close:
+            raise RuntimeError("injected close failure")
 
 
 def _authority():
@@ -274,7 +359,7 @@ def test_exact_c3_c2_order_builds_bound_request_then_resumes_once() -> None:
         assert api.events.index("close:102") < api.events.index("resume_thread")
         assert api.events.count("resume_thread") == 1
         assert c3_c2_registry_snapshot_for_test(adapter) == (
-            (result.reservation_id, result.execution_id, True),
+            (result.reservation_id, result.execution_id, True, True, False),
         )
         with pytest.raises(TypeError):
             pickle.dumps(result)
@@ -309,6 +394,28 @@ def test_request_delivery_failure_stays_pre_resume_and_closes_writer() -> None:
             operator_evidence_json=evidence,
             operator_evidence_digest=hashlib.sha256(evidence).digest(),
         )
+    finally:
+        _close(adapter, transactional)
+
+
+def test_request_delivery_timeout_quarantines_without_resume_intent() -> None:
+    api = _FakeNativeApi(request_wait_status=C3NativeWaitStatus.TIMEOUT)
+    api.cancel_settles = False
+    capture, plan, adapter, transactional, connection, intent = _case(api)
+    try:
+        with pytest.raises(WindowsEffectfulCaptureNativeError, match="delivery failed"):
+            execute_c3_c2_resume_for_test(capture, transactional, adapter, plan, intent)
+
+        assert connection.execute("SELECT phase FROM launch_executions").fetchone() == (
+            "PRE_RESUME_READY",
+        )
+        assert connection.execute(
+            "SELECT resume_intent_json, resume_intent_digest FROM launch_executions"
+        ).fetchone() == (None, None)
+        assert api.events.count("cancel") == 1
+        assert api.events.count("quarantine") == 1
+        assert "close:102" not in api.events
+        assert "resume_thread" not in api.events
     finally:
         _close(adapter, transactional)
 
@@ -468,3 +575,276 @@ def test_public_production_facade_still_has_no_native_or_resume_injection() -> N
     )
     assert MAX_C3_CHILD_REQUEST_BYTES > 0
     assert MAX_C3_CHILD_RESULT_BYTES > 0
+
+
+def _trusted_result_bytes(resumed, **changes: object) -> bytes:
+    result = IsolatedCaptureChildResult(
+        reservation_id=resumed.reservation_id,
+        execution_id=resumed.execution_id,
+        child_request_sha256=resumed.child_request_sha256,
+        fence_state=ProviderAttemptFenceState.ENTERED,
+        classification=ChildResultClassification.TRANSPORT_FAILED,
+        cleanup_status=ChildCleanupStatus.COMPLETE,
+    )
+    if changes:
+        result = replace(result, **changes)
+    return serialize_isolated_capture_child_result(result)
+
+
+def _resume_case(api: _FakeNativeApi):
+    capture, plan, adapter, transactional, connection, intent = _case(api)
+    resumed = execute_c3_c2_resume_for_test(
+        capture, transactional, adapter, plan, intent
+    )
+    return capture, adapter, transactional, connection, resumed
+
+
+def test_c3_c3b_result_before_exit_is_drained_reconciled_and_cleaned_once() -> None:
+    api = _FakeNativeApi()
+    capture, adapter, transactional, connection, resumed = _resume_case(api)
+    payload = _trusted_result_bytes(resumed)
+    api.result_chunks.extend((payload[:11], payload[11:], None))
+    api.wait_events.extend(
+        (
+            C3NativeWaitStatus.IO_COMPLETED,
+            C3NativeWaitStatus.IO_COMPLETED,
+            C3NativeWaitStatus.IO_COMPLETED,
+        )
+    )
+    api.process_wait_events.append(C3NativeWaitStatus.PROCESS_EXITED)
+    try:
+        observation = observe_c3_c3b_for_test(adapter, resumed)
+
+        assert observation.result_transport is C3ResultTransportStatus.COMPLETE
+        assert observation.process_outcome is C3ProcessOutcomeStatus.EXITED_ZERO
+        assert observation.parent_cleanup is C3ParentCleanupStatus.COMPLETE
+        assert observation.trusted_result is not None
+        assert observation.trusted_result.child_request_sha256 == (
+            resumed.child_request_sha256
+        )
+        assert c3_c2_registry_snapshot_for_test(adapter) == (
+            (resumed.reservation_id, resumed.execution_id, True, True, True),
+        )
+        assert "close:105" not in api.events
+        for handle in (103, 107, 106, 100):
+            assert api.events.count(f"close:{handle}") == 1
+        assert connection.execute(
+            "SELECT phase, post_resume_json, post_resume_digest, cleanup_json, "
+            "cleanup_digest FROM launch_executions"
+        ).fetchone() == ("RESUME_INTENT_COMMITTED", None, None, None, None)
+        with pytest.raises(TypeError):
+            pickle.dumps(observation)
+    finally:
+        _close(adapter, transactional)
+        capture._closed = True
+
+
+def test_c3_c3b_process_exit_before_partial_result_still_requires_eof() -> None:
+    api = _FakeNativeApi()
+    capture, adapter, transactional, _connection, resumed = _resume_case(api)
+    payload = _trusted_result_bytes(resumed)
+    api.exit_code = 259
+    api.result_chunks.extend((payload[:7], payload[7:], None))
+    api.wait_events.extend(
+        (
+            C3NativeWaitStatus.PROCESS_EXITED,
+            C3NativeWaitStatus.IO_COMPLETED,
+            C3NativeWaitStatus.IO_COMPLETED,
+            C3NativeWaitStatus.IO_COMPLETED,
+        )
+    )
+    try:
+        observation = observe_c3_c3b_for_test(adapter, resumed)
+
+        assert observation.result_transport is C3ResultTransportStatus.COMPLETE
+        assert observation.process_outcome is C3ProcessOutcomeStatus.EXITED_NONZERO
+        assert observation.trusted_result is not None
+        assert api.events.index("get_exit_code") < api.events.index("close:103")
+    finally:
+        _close(adapter, transactional)
+        capture._closed = True
+
+
+@pytest.mark.parametrize(
+    "payload,expected",
+    [
+        (b"", C3ResultTransportStatus.EMPTY),
+        (b"not-json", C3ResultTransportStatus.COMPLETE),
+        (b"x" * MAX_C3_CHILD_RESULT_BYTES, C3ResultTransportStatus.COMPLETE),
+    ],
+)
+def test_c3_c3b_empty_malformed_and_exact_bound_are_untrusted(
+    payload: bytes, expected: C3ResultTransportStatus
+) -> None:
+    api = _FakeNativeApi()
+    capture, adapter, transactional, _connection, resumed = _resume_case(api)
+    api.result_chunks.extend(((payload,) if payload else ()) + (None,))
+    api.wait_events.extend(
+        C3NativeWaitStatus.IO_COMPLETED for _ in range(2 if payload else 1)
+    )
+    api.process_wait_events.append(C3NativeWaitStatus.PROCESS_EXITED)
+    try:
+        observation = observe_c3_c3b_for_test(adapter, resumed)
+
+        assert observation.result_transport is expected
+        assert observation.trusted_result is None
+    finally:
+        _close(adapter, transactional)
+        capture._closed = True
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("reservation_id", "11111111-1111-4111-8111-111111111111"),
+        ("execution_id", "22222222-2222-4222-8222-222222222222"),
+        ("child_request_sha256", "ab" * 32),
+    ],
+)
+def test_c3_c3b_wrong_result_lineage_is_untrusted(field: str, value: str) -> None:
+    api = _FakeNativeApi()
+    capture, adapter, transactional, _connection, resumed = _resume_case(api)
+    payload = _trusted_result_bytes(resumed, **{field: value})
+    api.result_chunks.extend((payload, None))
+    api.wait_events.extend(
+        (C3NativeWaitStatus.IO_COMPLETED, C3NativeWaitStatus.IO_COMPLETED)
+    )
+    api.process_wait_events.append(C3NativeWaitStatus.PROCESS_EXITED)
+    try:
+        observation = observe_c3_c3b_for_test(adapter, resumed)
+
+        assert observation.result_transport is C3ResultTransportStatus.COMPLETE
+        assert observation.trusted_result is None
+    finally:
+        _close(adapter, transactional)
+        capture._closed = True
+
+
+def test_c3_c3b_oversized_result_is_never_parsed_and_is_contained() -> None:
+    api = _FakeNativeApi()
+    capture, adapter, transactional, _connection, resumed = _resume_case(api)
+    api.result_chunks.append(b"x" * (MAX_C3_CHILD_RESULT_BYTES + 1))
+    api.wait_events.append(C3NativeWaitStatus.IO_COMPLETED)
+    api.process_wait_events.append(C3NativeWaitStatus.PROCESS_EXITED)
+    try:
+        observation = observe_c3_c3b_for_test(adapter, resumed)
+
+        assert observation.result_transport is C3ResultTransportStatus.OVERSIZED
+        assert observation.process_outcome is (
+            C3ProcessOutcomeStatus.OBSERVATION_FAILED_TERMINATED
+        )
+        assert observation.trusted_result is None
+        assert api.events.count("terminate:100") == 1
+    finally:
+        _close(adapter, transactional)
+        capture._closed = True
+
+
+def test_c3_c3b_wait_failure_cancels_contains_and_cleans_independently() -> None:
+    api = _FakeNativeApi(fail_close=107)
+    capture, adapter, transactional, _connection, resumed = _resume_case(api)
+    api.wait_events.append(C3NativeWaitStatus.FAILED)
+    api.process_wait_events.append(C3NativeWaitStatus.PROCESS_EXITED)
+    try:
+        observation = observe_c3_c3b_for_test(adapter, resumed)
+
+        assert observation.result_transport is C3ResultTransportStatus.READ_FAILED
+        assert observation.process_outcome is (
+            C3ProcessOutcomeStatus.WAIT_FAILED_TERMINATED
+        )
+        assert observation.parent_cleanup is C3ParentCleanupStatus.FAILED
+        assert api.events.count("cancel") == 1
+        assert api.events.count("terminate:100") == 1
+        for handle in (103, 107, 106, 100):
+            assert api.events.count(f"close:{handle}") == 1
+    finally:
+        _close(adapter, transactional)
+        capture._closed = True
+
+
+def test_c3_c3b_timeout_terminates_once_under_bounded_termination_wait(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    api = _FakeNativeApi()
+    capture, adapter, transactional, _connection, resumed = _resume_case(api)
+    api.wait_events.append(C3NativeWaitStatus.TIMEOUT)
+    api.process_wait_events.append(C3NativeWaitStatus.PROCESS_EXITED)
+    remaining = iter((100, 0, 0))
+    monkeypatch.setattr(
+        "trading_bot.runtime.windows_effectful_capture_native._remaining_timeout_ms",
+        lambda _deadline: next(remaining, 0),
+    )
+    try:
+        observation = observe_c3_c3b_for_test(adapter, resumed)
+
+        assert observation.process_outcome is (
+            C3ProcessOutcomeStatus.TIMED_OUT_TERMINATED
+        )
+        assert api.events.count("terminate:100") == 1
+        assert api.events.count("cancel") == 1
+    finally:
+        _close(adapter, transactional)
+        capture._closed = True
+
+
+def test_c3_c3b_unsettled_result_is_quarantined_and_cleanup_unresolved() -> None:
+    api = _FakeNativeApi()
+    api.cancel_settles = False
+    capture, adapter, transactional, _connection, resumed = _resume_case(api)
+    api.wait_events.append(C3NativeWaitStatus.FAILED)
+    api.process_wait_events.append(C3NativeWaitStatus.TIMEOUT)
+    try:
+        observation = observe_c3_c3b_for_test(adapter, resumed)
+
+        assert observation.parent_cleanup is C3ParentCleanupStatus.UNRESOLVED
+        assert observation.process_outcome is (
+            C3ProcessOutcomeStatus.TERMINATION_UNCONFIRMED
+        )
+        assert api.events.count("quarantine") == 1
+        assert "close:103" not in api.events
+        assert api.events.count("terminate:100") == 1
+    finally:
+        _close(adapter, transactional)
+        capture._closed = True
+
+
+def test_c3_c3b_termination_failure_is_unconfirmed_without_retry_authority() -> None:
+    api = _FakeNativeApi(fail_terminate=True)
+    capture, adapter, transactional, connection, resumed = _resume_case(api)
+    api.wait_events.append(C3NativeWaitStatus.FAILED)
+    try:
+        observation = observe_c3_c3b_for_test(adapter, resumed)
+
+        assert observation.process_outcome is (
+            C3ProcessOutcomeStatus.TERMINATION_UNCONFIRMED
+        )
+        assert observation.parent_cleanup is C3ParentCleanupStatus.UNRESOLVED
+        assert api.events.count("terminate:100") == 1
+        assert connection.execute("SELECT phase FROM launch_executions").fetchone() == (
+            "RESUME_INTENT_COMMITTED",
+        )
+    finally:
+        _close(adapter, transactional)
+        capture._closed = True
+
+
+def test_c3_c3b_rejects_substituted_resume_receipt_and_is_one_shot() -> None:
+    api = _FakeNativeApi()
+    capture, adapter, transactional, _connection, resumed = _resume_case(api)
+    substituted = replace(resumed, resume_receipt=replace(resumed.resume_receipt))
+    try:
+        with pytest.raises(WindowsEffectfulCaptureCompositionError, match="provenance"):
+            observe_c3_c3b_for_test(adapter, substituted)
+
+        payload = _trusted_result_bytes(resumed)
+        api.result_chunks.extend((payload, None))
+        api.wait_events.extend(
+            (C3NativeWaitStatus.IO_COMPLETED, C3NativeWaitStatus.IO_COMPLETED)
+        )
+        api.process_wait_events.append(C3NativeWaitStatus.PROCESS_EXITED)
+        observe_c3_c3b_for_test(adapter, resumed)
+        with pytest.raises(WindowsEffectfulCaptureCompositionError, match="provenance"):
+            observe_c3_c3b_for_test(adapter, resumed)
+    finally:
+        _close(adapter, transactional)
+        capture._closed = True

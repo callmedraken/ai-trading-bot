@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import ctypes
 import os
 import pickle
 
@@ -8,6 +9,7 @@ import pytest
 
 from trading_bot.runtime.windows_effectful_capture_native import (
     C3_CREATE_PROCESS_FLAGS,
+    C3_OVERLAPPED_CANCEL_SETTLEMENT_TIMEOUT_MS,
     C3_REQUEST_HANDLE_ARGUMENT,
     C3_RESULT_HANDLE_ARGUMENT,
     C3_STAGING_HANDLE_ARGUMENT,
@@ -15,7 +17,13 @@ from trading_bot.runtime.windows_effectful_capture_native import (
     CREATE_SUSPENDED,
     CREATE_UNICODE_ENVIRONMENT,
     EXTENDED_STARTUPINFO_PRESENT,
+    FILE_FLAG_FIRST_PIPE_INSTANCE,
+    FILE_FLAG_OVERLAPPED,
+    PIPE_REJECT_REMOTE_CLIENTS,
+    C3NativeWaitStatus,
+    CtypesWindowsEffectfulCaptureNativeApi,
     NativeCreatedProcess,
+    NativeOverlappedCompletion,
     NativePipePair,
     SuspendedCaptureChild,
     WindowsEffectfulCaptureNativeError,
@@ -50,10 +58,14 @@ class FakeNativeApi:
         *,
         fail_at: str | None = None,
         write_chunk: int | None = None,
+        write_wait_status: C3NativeWaitStatus = C3NativeWaitStatus.IO_COMPLETED,
+        cancel_settles: bool = True,
         resume_result: int = 1,
     ) -> None:
         self.fail_at = fail_at
         self.write_chunk = write_chunk
+        self.write_wait_status = write_wait_status
+        self.cancel_settles = cancel_settles
         self.resume_result = resume_result
         self.events: list[str] = []
         self.written = bytearray()
@@ -73,11 +85,14 @@ class FakeNativeApi:
         assert job_handle == 100
         self._event("set_job_limits")
 
-    def create_pipe(self, buffer_size: int) -> NativePipePair:
+    def create_request_pipe(self, buffer_size: int) -> NativePipePair:
         self._pipe_count += 1
-        self._event(f"create_pipe:{buffer_size}")
-        if self._pipe_count == 1:
-            return NativePipePair(101, 102)
+        self._event(f"create_request_pipe:{buffer_size}")
+        return NativePipePair(101, 102)
+
+    def create_result_pipe(self, buffer_size: int) -> NativePipePair:
+        self._pipe_count += 1
+        self._event(f"create_result_pipe:{buffer_size}")
         return NativePipePair(103, 104)
 
     def set_handle_inheritable(self, handle: int, inheritable: bool) -> None:
@@ -96,16 +111,47 @@ class FakeNativeApi:
     def close_handle(self, handle: int) -> None:
         self._event(f"close:{handle}")
 
-    def write_file(self, handle: int, payload: bytes) -> int:
+    def begin_overlapped_write(self, handle: int, payload: bytes) -> object:
         assert handle == 102
         self._event(f"write:{len(payload)}")
+        return payload
+
+    def begin_overlapped_read(self, handle: int, max_bytes: int) -> object:
+        raise AssertionError("result observation was not expected")
+
+    def wait_overlapped_or_process(
+        self, operation: object, process_handle: int | None, timeout_ms: int
+    ) -> C3NativeWaitStatus:
+        assert process_handle is None
+        assert timeout_ms > 0
+        return self.write_wait_status
+
+    def complete_overlapped(self, operation: object) -> NativeOverlappedCompletion:
+        assert type(operation) is bytes
+        payload = operation
         count = (
             len(payload)
             if self.write_chunk is None
             else min(self.write_chunk, len(payload))
         )
         self.written.extend(payload[:count])
-        return count
+        return NativeOverlappedCompletion(count, b"", False)
+
+    def cancel_and_settle_overlapped(self, operation: object, timeout_ms: int) -> bool:
+        self._event(f"cancel:{timeout_ms}")
+        return self.cancel_settles
+
+    def quarantine_overlapped(self, operation: object) -> None:
+        self._event("quarantine")
+
+    def wait_process(self, process_handle: int, timeout_ms: int) -> C3NativeWaitStatus:
+        raise AssertionError("process wait was not expected")
+
+    def get_exit_code_process(self, process_handle: int) -> int:
+        raise AssertionError("process exit was not expected")
+
+    def terminate_job_object(self, job_handle: int) -> None:
+        self._event(f"terminate:{job_handle}")
 
     def resume_thread(self, thread_handle: int) -> int:
         assert thread_handle == 107
@@ -152,10 +198,8 @@ def test_containment_prepares_job_channels_staging_and_suspended_process() -> No
     assert api.events == [
         "create_job",
         "set_job_limits",
-        f"create_pipe:{MAX_C3_CHILD_REQUEST_BYTES}",
-        "inherit:102:False",
-        f"create_pipe:{MAX_C3_CHILD_RESULT_BYTES}",
-        "inherit:103:False",
+        f"create_request_pipe:{MAX_C3_CHILD_REQUEST_BYTES}",
+        f"create_result_pipe:{MAX_C3_CHILD_RESULT_BYTES}",
         "create_staging",
         "create_process",
         "close:101",
@@ -259,12 +303,38 @@ def test_request_failure_closes_writer_and_cannot_resume() -> None:
 
     with pytest.raises(WindowsEffectfulCaptureNativeError, match="delivery failed"):
         deliver_canonical_child_request(child, b"request")
-    with pytest.raises(WindowsEffectfulCaptureNativeError, match="not completely"):
+    with pytest.raises(WindowsEffectfulCaptureNativeError, match="closed"):
         resume_suspended_capture_child(child)
 
     assert "close:102" in api.events
+    assert api.events[-1] == "close:100"
     assert "resume:107" not in api.events
     child.close()
+
+
+def test_timed_out_request_is_quarantined_and_suspended_child_is_contained() -> None:
+    api = FakeNativeApi(
+        write_wait_status=C3NativeWaitStatus.TIMEOUT,
+        cancel_settles=False,
+    )
+    child = _create(api)
+
+    with pytest.raises(WindowsEffectfulCaptureNativeError, match="delivery failed"):
+        deliver_canonical_child_request(child, b"request")
+
+    assert child.closed
+    assert api.events.count(f"cancel:{C3_OVERLAPPED_CANCEL_SETTLEMENT_TIMEOUT_MS}") == 1
+    assert api.events.count("quarantine") == 1
+    assert "close:102" not in api.events
+    assert api.events[-1] == "close:100"
+    assert "resume:107" not in api.events
+
+
+def test_named_pipe_hardening_flags_are_fixed() -> None:
+    assert FILE_FLAG_OVERLAPPED == 0x40000000
+    assert FILE_FLAG_FIRST_PIPE_INSTANCE == 0x00080000
+    assert PIPE_REJECT_REMOTE_CLIENTS == 0x00000008
+    assert C3_OVERLAPPED_CANCEL_SETTLEMENT_TIMEOUT_MS == 1_000
 
 
 def test_live_resource_is_not_copyable_or_serializable() -> None:
@@ -353,9 +423,59 @@ def test_case_insensitive_ambiguous_parent_environment_fails_closed() -> None:
 def test_ctypes_adapter_is_import_safe_off_windows() -> None:
     if os.name == "nt":
         pytest.skip("non-Windows import-safety assertion")
-    from trading_bot.runtime.windows_effectful_capture_native import (
-        CtypesWindowsEffectfulCaptureNativeApi,
-    )
-
     with pytest.raises(WindowsEffectfulCaptureNativeUnsupportedError):
         CtypesWindowsEffectfulCaptureNativeApi()
+
+
+def test_ctypes_parent_overlapped_bindings_are_exact_on_windows() -> None:
+    if os.name != "nt":
+        pytest.skip("Windows ctypes binding assertion")
+    from ctypes import wintypes
+
+    api = CtypesWindowsEffectfulCaptureNativeApi()
+    overlapped_pointer = ctypes.POINTER(api._overlapped)
+
+    assert len(api._k32.CreateNamedPipeW.argtypes) == 8
+    assert api._k32.CreateNamedPipeW.restype is wintypes.HANDLE
+    assert api._k32.ConnectNamedPipe.argtypes == [wintypes.HANDLE, overlapped_pointer]
+    assert api._k32.ReadFile.argtypes[-1] == overlapped_pointer
+    assert api._k32.WriteFile.argtypes[-1] == overlapped_pointer
+    assert api._k32.GetOverlappedResult.argtypes[1] == overlapped_pointer
+    assert api._k32.CancelIoEx.argtypes[1] == overlapped_pointer
+    assert api._k32.WaitForSingleObject.restype is wintypes.DWORD
+    assert api._k32.WaitForMultipleObjects.restype is wintypes.DWORD
+    assert api._k32.GetExitCodeProcess.restype is wintypes.BOOL
+    assert api._k32.TerminateJobObject.restype is wintypes.BOOL
+
+
+def test_real_named_pipe_pairs_have_exact_endpoint_inheritance_on_windows() -> None:
+    if os.name != "nt":
+        pytest.skip("Windows named-pipe inheritance assertion")
+    from ctypes import wintypes
+
+    api = CtypesWindowsEffectfulCaptureNativeApi()
+    request = api.create_request_pipe(MAX_C3_CHILD_REQUEST_BYTES)
+    result = api.create_result_pipe(MAX_C3_CHILD_RESULT_BYTES)
+    get_flags = ctypes.WinDLL("kernel32", use_last_error=True).GetHandleInformation
+    get_flags.argtypes = [wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD)]
+    get_flags.restype = wintypes.BOOL
+
+    try:
+        inherited = {request.read_handle, result.write_handle}
+        for handle in (
+            request.read_handle,
+            request.write_handle,
+            result.read_handle,
+            result.write_handle,
+        ):
+            flags = wintypes.DWORD()
+            assert get_flags(wintypes.HANDLE(handle), ctypes.byref(flags))
+            assert bool(flags.value & 1) is (handle in inherited)
+    finally:
+        for handle in (
+            request.read_handle,
+            request.write_handle,
+            result.read_handle,
+            result.write_handle,
+        ):
+            api.close_handle(handle)

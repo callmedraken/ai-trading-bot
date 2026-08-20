@@ -1,18 +1,20 @@
-"""C3 Windows containment and one-shot pre-resume child operations.
+"""C3 Windows containment, bounded IPC, resume, and parent observation.
 
-C3-C1 owns native containment. C3-C2 adds only bounded request delivery and the
-one-shot ``ResumeThread`` operation. This module still does not bind C2
-execution IDs, wait/terminate the child, parse results, or publish a snapshot.
-Production executable/entrypoint/TEMP bindings remain outside this low-level
-native boundary.
+C3-C3B adds only private named-pipe overlapped transport, bounded process
+observation/containment, and parent-handle cleanup. It does not persist C2
+post-resume evidence, verify or publish staging artifacts, or issue snapshots.
 """
 
 from __future__ import annotations
 
 import ctypes
 import os
+import secrets
+import threading
+import time
 from collections.abc import Mapping
 from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import PureWindowsPath
 from typing import Protocol
 
@@ -41,12 +43,39 @@ C3_CREATE_PROCESS_FLAGS = (
     | CREATE_NO_WINDOW
 )
 HANDLE_FLAG_INHERIT = 0x00000001
+GENERIC_READ = 0x80000000
 GENERIC_WRITE = 0x40000000
 CREATE_NEW = 1
+OPEN_EXISTING = 3
 FILE_ATTRIBUTE_NORMAL = 0x00000080
+FILE_FLAG_OVERLAPPED = 0x40000000
+FILE_FLAG_FIRST_PIPE_INSTANCE = 0x00080000
+PIPE_ACCESS_INBOUND = 0x00000001
+PIPE_ACCESS_OUTBOUND = 0x00000002
+PIPE_TYPE_BYTE = 0x00000000
+PIPE_READMODE_BYTE = 0x00000000
+PIPE_WAIT = 0x00000000
+PIPE_REJECT_REMOTE_CLIENTS = 0x00000008
+SECURITY_DESCRIPTOR_REVISION = 1
+_C3_PIPE_SECURITY_SDDL = "D:P(A;;GA;;;SY)(A;;GA;;;BA)(A;;GA;;;OW)"
 ERROR_INSUFFICIENT_BUFFER = 122
 ERROR_BROKEN_PIPE = 109
+ERROR_PIPE_CONNECTED = 535
+ERROR_IO_PENDING = 997
+ERROR_IO_INCOMPLETE = 996
+ERROR_OPERATION_ABORTED = 995
+ERROR_NOT_FOUND = 1168
 INVALID_SUSPEND_COUNT = 0xFFFFFFFF
+WAIT_OBJECT_0 = 0x00000000
+WAIT_TIMEOUT = 0x00000102
+WAIT_FAILED = 0xFFFFFFFF
+INFINITE = 0xFFFFFFFF
+
+C3_CHILD_REQUEST_DELIVERY_TIMEOUT_MS = 10_000
+C3_CHILD_COMPLETION_TIMEOUT_MS = 120_000
+C3_CHILD_OBSERVATION_SLICE_MS = 100
+C3_CHILD_TERMINATION_TIMEOUT_MS = 10_000
+C3_OVERLAPPED_CANCEL_SETTLEMENT_TIMEOUT_MS = 1_000
 
 
 class WindowsEffectfulCaptureNativeError(RuntimeError):
@@ -55,6 +84,63 @@ class WindowsEffectfulCaptureNativeError(RuntimeError):
 
 class WindowsEffectfulCaptureNativeUnsupportedError(WindowsEffectfulCaptureNativeError):
     """The C3 native boundary is unavailable on this platform."""
+
+
+class C3NativeWaitStatus(StrEnum):
+    IO_COMPLETED = "IO_COMPLETED"
+    PROCESS_EXITED = "PROCESS_EXITED"
+    TIMEOUT = "TIMEOUT"
+    FAILED = "FAILED"
+
+
+class C3ResultTransportStatus(StrEnum):
+    COMPLETE = "COMPLETE"
+    EMPTY = "EMPTY"
+    OVERSIZED = "OVERSIZED"
+    READ_FAILED = "READ_FAILED"
+
+
+class C3ProcessOutcomeStatus(StrEnum):
+    EXITED_ZERO = "EXITED_ZERO"
+    EXITED_NONZERO = "EXITED_NONZERO"
+    TIMED_OUT_TERMINATED = "TIMED_OUT_TERMINATED"
+    WAIT_FAILED_TERMINATED = "WAIT_FAILED_TERMINATED"
+    OBSERVATION_FAILED_TERMINATED = "OBSERVATION_FAILED_TERMINATED"
+    TERMINATION_UNCONFIRMED = "TERMINATION_UNCONFIRMED"
+
+
+class C3ParentCleanupStatus(StrEnum):
+    COMPLETE = "COMPLETE"
+    FAILED = "FAILED"
+    UNRESOLVED = "UNRESOLVED"
+
+
+@dataclass(frozen=True, slots=True)
+class NativeOverlappedCompletion:
+    transferred: int
+    payload: bytes
+    eof: bool
+
+
+@dataclass(frozen=True, slots=True)
+class NativeC3ChildObservation:
+    result_transport: C3ResultTransportStatus
+    process_outcome: C3ProcessOutcomeStatus
+    parent_cleanup: C3ParentCleanupStatus
+    result_payload: bytes | None
+
+    def __post_init__(self) -> None:
+        if type(self.result_transport) is not C3ResultTransportStatus:
+            raise TypeError("result transport status is invalid")
+        if type(self.process_outcome) is not C3ProcessOutcomeStatus:
+            raise TypeError("process outcome status is invalid")
+        if type(self.parent_cleanup) is not C3ParentCleanupStatus:
+            raise TypeError("parent cleanup status is invalid")
+        if self.result_transport is C3ResultTransportStatus.COMPLETE:
+            if type(self.result_payload) is not bytes or not self.result_payload:
+                raise TypeError("complete result payload is invalid")
+        elif self.result_payload is not None:
+            raise TypeError("untrusted result transport cannot retain payload")
 
 
 @dataclass(frozen=True, slots=True)
@@ -90,7 +176,8 @@ class NativeCreatedProcess:
 class WindowsEffectfulCaptureNativeApi(Protocol):
     def create_job_object(self) -> int: ...
     def set_job_limits(self, job_handle: int) -> None: ...
-    def create_pipe(self, buffer_size: int) -> NativePipePair: ...
+    def create_request_pipe(self, buffer_size: int) -> NativePipePair: ...
+    def create_result_pipe(self, buffer_size: int) -> NativePipePair: ...
     def set_handle_inheritable(self, handle: int, inheritable: bool) -> None: ...
     def create_staging_file(self, path: str) -> int: ...
 
@@ -107,7 +194,25 @@ class WindowsEffectfulCaptureNativeApi(Protocol):
         inherit_handles: bool,
     ) -> NativeCreatedProcess: ...
 
-    def write_file(self, handle: int, payload: bytes) -> int: ...
+    def begin_overlapped_write(self, handle: int, payload: bytes) -> object: ...
+    def begin_overlapped_read(self, handle: int, max_bytes: int) -> object: ...
+
+    def wait_overlapped_or_process(
+        self, operation: object, process_handle: int | None, timeout_ms: int
+    ) -> C3NativeWaitStatus: ...
+
+    def complete_overlapped(self, operation: object) -> NativeOverlappedCompletion: ...
+
+    def cancel_and_settle_overlapped(
+        self, operation: object, timeout_ms: int
+    ) -> bool: ...
+
+    def quarantine_overlapped(self, operation: object) -> None: ...
+    def wait_process(
+        self, process_handle: int, timeout_ms: int
+    ) -> C3NativeWaitStatus: ...
+    def get_exit_code_process(self, process_handle: int) -> int: ...
+    def terminate_job_object(self, job_handle: int) -> None: ...
     def resume_thread(self, thread_handle: int) -> int: ...
     def close_handle(self, handle: int) -> None: ...
 
@@ -127,10 +232,15 @@ class SuspendedCaptureChild:
     __slots__ = (
         "_api",
         "_closed",
-        "_handles",
+        "_job_handle",
+        "_primary_thread_handle",
+        "_process_handle",
         "_request_attempted",
         "_request_delivered",
+        "_request_writer",
+        "_result_reader",
         "_resume_attempted",
+        "_staging_handle",
         "process_id",
         "thread_id",
     )
@@ -163,7 +273,12 @@ class SuspendedCaptureChild:
                 "retained handles must be distinct"
             )
         self._api = api
-        self._handles = retained
+        self._request_writer = request_writer
+        self._result_reader = result_reader
+        self._staging_handle = staging_handle
+        self._primary_thread_handle = process.primary_thread_handle
+        self._process_handle = process.process_handle
+        self._job_handle = job_handle
         self.process_id = process.process_id
         self.thread_id = process.thread_id
         self._closed = False
@@ -209,30 +324,88 @@ class SuspendedCaptureChild:
                 "child request exceeds its byte bound"
             )
         self._request_attempted = True
-        request_writer = self._handles[0]
-        write_failed = False
+        request_writer = self._request_writer
+        if request_writer is None:
+            raise WindowsEffectfulCaptureNativeError(
+                "child request writer is unavailable"
+            )
         offset = 0
+        deadline_ns = time.monotonic_ns() + (
+            C3_CHILD_REQUEST_DELIVERY_TIMEOUT_MS * 1_000_000
+        )
+        operation: object | None = None
+        quarantined = False
         try:
             while offset < len(payload):
-                written = self._api.write_file(request_writer, payload[offset:])
+                operation = self._api.begin_overlapped_write(
+                    request_writer, payload[offset:]
+                )
+                remaining_ms = _remaining_timeout_ms(deadline_ns)
+                if remaining_ms <= 0:
+                    raise WindowsEffectfulCaptureNativeError(
+                        "child request delivery timed out"
+                    )
+                status = self._api.wait_overlapped_or_process(
+                    operation, None, remaining_ms
+                )
+                if status is not C3NativeWaitStatus.IO_COMPLETED:
+                    raise WindowsEffectfulCaptureNativeError(
+                        "child request delivery timed out"
+                        if status is C3NativeWaitStatus.TIMEOUT
+                        else "child request delivery failed"
+                    )
+                completion = self._api.complete_overlapped(operation)
+                operation = None
+                written = completion.transferred
                 if (
                     type(written) is not int
                     or written <= 0
                     or written > len(payload) - offset
+                    or completion.payload
+                    or completion.eof
                 ):
                     raise WindowsEffectfulCaptureNativeError(
                         "child request write result is invalid"
                     )
                 offset += written
         except Exception:
-            write_failed = True
-        close_failed = False
+            if operation is not None:
+                try:
+                    settled = self._api.cancel_and_settle_overlapped(
+                        operation, C3_OVERLAPPED_CANCEL_SETTLEMENT_TIMEOUT_MS
+                    )
+                except Exception:
+                    settled = False
+                if not settled:
+                    try:
+                        self._api.quarantine_overlapped(operation)
+                    except Exception:
+                        pass
+                    finally:
+                        quarantined = True
+                        self._request_writer = None
+            if not quarantined:
+                self._request_writer = None
+                try:
+                    self._api.close_handle(request_writer)
+                except Exception:
+                    pass
+            try:
+                self._close_all_retained()
+            except Exception:
+                pass
+            raise WindowsEffectfulCaptureNativeError(
+                "child request delivery failed"
+            ) from None
+
+        self._request_writer = None
         try:
             self._api.close_handle(request_writer)
         except Exception:
-            close_failed = True
-        self._handles = self._handles[1:]
-        if write_failed or close_failed:
+            try:
+                self._close_all_retained()
+            except Exception:
+                pass
             raise WindowsEffectfulCaptureNativeError(
                 "child request delivery failed"
             ) from None
@@ -250,7 +423,11 @@ class SuspendedCaptureChild:
                 "child request was not completely delivered"
             )
         self._resume_attempted = True
-        thread_handle = self._handles[2]
+        thread_handle = self._primary_thread_handle
+        if thread_handle is None:
+            raise WindowsEffectfulCaptureNativeError(
+                "primary thread handle is unavailable"
+            )
         try:
             previous_suspend_count = self._api.resume_thread(thread_handle)
         except Exception:
@@ -266,12 +443,198 @@ class SuspendedCaptureChild:
                 "ResumeThread previous suspend count was not one"
             )
 
+    def _observe_after_resume(self) -> NativeC3ChildObservation:
+        if self._closed:
+            raise WindowsEffectfulCaptureNativeError("suspended child is closed")
+        if not self._resume_attempted:
+            raise WindowsEffectfulCaptureNativeError("child was not resumed")
+        result_handle = self._result_reader
+        process_handle = self._process_handle
+        job_handle = self._job_handle
+        if result_handle is None or process_handle is None or job_handle is None:
+            raise WindowsEffectfulCaptureNativeError(
+                "child observation handles are unavailable"
+            )
+
+        payload = bytearray()
+        transport: C3ResultTransportStatus | None = None
+        process_outcome: C3ProcessOutcomeStatus | None = None
+        process_exited = False
+        operation: object | None = None
+        quarantined = False
+        observation_failed = False
+        wait_failed = False
+        deadline_ns = time.monotonic_ns() + C3_CHILD_COMPLETION_TIMEOUT_MS * 1_000_000
+
+        try:
+            while transport is None or not process_exited:
+                if transport is None and operation is None:
+                    operation = self._api.begin_overlapped_read(
+                        result_handle,
+                        MAX_C3_CHILD_RESULT_BYTES + 1 - len(payload),
+                    )
+                remaining_ms = _remaining_timeout_ms(deadline_ns)
+                if remaining_ms <= 0:
+                    break
+                wait_ms = min(C3_CHILD_OBSERVATION_SLICE_MS, remaining_ms)
+                if operation is not None:
+                    status = self._api.wait_overlapped_or_process(
+                        operation,
+                        None if process_exited else process_handle,
+                        wait_ms,
+                    )
+                else:
+                    status = self._api.wait_process(process_handle, wait_ms)
+
+                if status is C3NativeWaitStatus.IO_COMPLETED:
+                    if operation is None:
+                        observation_failed = True
+                        break
+                    completion = self._api.complete_overlapped(operation)
+                    operation = None
+                    if completion.payload:
+                        payload.extend(completion.payload)
+                    if len(payload) > MAX_C3_CHILD_RESULT_BYTES:
+                        transport = C3ResultTransportStatus.OVERSIZED
+                        break
+                    if completion.eof:
+                        transport = (
+                            C3ResultTransportStatus.COMPLETE
+                            if payload
+                            else C3ResultTransportStatus.EMPTY
+                        )
+                elif status is C3NativeWaitStatus.PROCESS_EXITED:
+                    exit_code = self._api.get_exit_code_process(process_handle)
+                    process_exited = True
+                    process_outcome = (
+                        C3ProcessOutcomeStatus.EXITED_ZERO
+                        if exit_code == 0
+                        else C3ProcessOutcomeStatus.EXITED_NONZERO
+                    )
+                elif status is C3NativeWaitStatus.FAILED:
+                    observation_failed = True
+                    wait_failed = True
+                    break
+                elif status is not C3NativeWaitStatus.TIMEOUT:
+                    observation_failed = True
+                    wait_failed = True
+                    break
+        except Exception:
+            observation_failed = True
+
+        timed_out = (
+            not observation_failed
+            and (transport is None or not process_exited)
+            and _remaining_timeout_ms(deadline_ns) <= 0
+        )
+        if operation is not None:
+            try:
+                settled = self._api.cancel_and_settle_overlapped(
+                    operation, C3_OVERLAPPED_CANCEL_SETTLEMENT_TIMEOUT_MS
+                )
+            except Exception:
+                settled = False
+            if not settled:
+                try:
+                    self._api.quarantine_overlapped(operation)
+                except Exception:
+                    pass
+                quarantined = True
+                self._result_reader = None
+
+        if transport is None:
+            transport = C3ResultTransportStatus.READ_FAILED
+        if transport in (
+            C3ResultTransportStatus.OVERSIZED,
+            C3ResultTransportStatus.READ_FAILED,
+        ):
+            observation_failed = True
+
+        if not process_exited:
+            terminated = False
+            try:
+                self._api.terminate_job_object(job_handle)
+                terminated = True
+            except Exception:
+                terminated = False
+            if terminated:
+                try:
+                    termination_wait = self._api.wait_process(
+                        process_handle, C3_CHILD_TERMINATION_TIMEOUT_MS
+                    )
+                except Exception:
+                    termination_wait = C3NativeWaitStatus.FAILED
+                if termination_wait is C3NativeWaitStatus.PROCESS_EXITED:
+                    process_exited = True
+                    if timed_out:
+                        process_outcome = C3ProcessOutcomeStatus.TIMED_OUT_TERMINATED
+                    elif observation_failed:
+                        process_outcome = (
+                            C3ProcessOutcomeStatus.WAIT_FAILED_TERMINATED
+                            if wait_failed
+                            else C3ProcessOutcomeStatus.OBSERVATION_FAILED_TERMINATED
+                        )
+            if not process_exited:
+                process_outcome = C3ProcessOutcomeStatus.TERMINATION_UNCONFIRMED
+
+        if process_outcome is None:
+            process_outcome = C3ProcessOutcomeStatus.TERMINATION_UNCONFIRMED
+
+        cleanup_failed = False
+        for attribute in (
+            "_result_reader",
+            "_primary_thread_handle",
+            "_process_handle",
+            "_job_handle",
+        ):
+            handle = getattr(self, attribute)
+            if handle is None:
+                continue
+            setattr(self, attribute, None)
+            try:
+                self._api.close_handle(handle)
+            except Exception:
+                cleanup_failed = True
+        parent_cleanup = (
+            C3ParentCleanupStatus.UNRESOLVED
+            if quarantined
+            or process_outcome is C3ProcessOutcomeStatus.TERMINATION_UNCONFIRMED
+            else C3ParentCleanupStatus.FAILED
+            if cleanup_failed
+            else C3ParentCleanupStatus.COMPLETE
+        )
+        trusted_payload = (
+            bytes(payload) if transport is C3ResultTransportStatus.COMPLETE else None
+        )
+        return NativeC3ChildObservation(
+            result_transport=transport,
+            process_outcome=process_outcome,
+            parent_cleanup=parent_cleanup,
+            result_payload=trusted_payload,
+        )
+
     def close(self) -> None:
+        if self._closed:
+            return
+        self._close_all_retained()
+
+    def _close_all_retained(self) -> None:
         if self._closed:
             return
         self._closed = True
         failed = False
-        for handle in self._handles:
+        for attribute in (
+            "_request_writer",
+            "_result_reader",
+            "_staging_handle",
+            "_primary_thread_handle",
+            "_process_handle",
+            "_job_handle",
+        ):
+            handle = getattr(self, attribute)
+            if handle is None:
+                continue
+            setattr(self, attribute, None)
             try:
                 self._api.close_handle(handle)
             except Exception:
@@ -301,6 +664,16 @@ def resume_suspended_capture_child(child: SuspendedCaptureChild) -> None:
     if type(child) is not SuspendedCaptureChild:
         raise TypeError("resume requires SuspendedCaptureChild")
     child._resume_once()
+
+
+def observe_resumed_capture_child(
+    child: SuspendedCaptureChild,
+) -> NativeC3ChildObservation:
+    """Perform the fixed bounded C3-C3B parent observation and cleanup."""
+
+    if type(child) is not SuspendedCaptureChild:
+        raise TypeError("observation requires SuspendedCaptureChild")
+    return child._observe_after_resume()
 
 
 def build_c3_child_environment(
@@ -353,11 +726,20 @@ def create_suspended_capture_child_for_test(
     required = (
         "create_job_object",
         "set_job_limits",
-        "create_pipe",
+        "create_request_pipe",
+        "create_result_pipe",
         "set_handle_inheritable",
         "create_staging_file",
         "create_suspended_process",
-        "write_file",
+        "begin_overlapped_write",
+        "begin_overlapped_read",
+        "wait_overlapped_or_process",
+        "complete_overlapped",
+        "cancel_and_settle_overlapped",
+        "quarantine_overlapped",
+        "wait_process",
+        "get_exit_code_process",
+        "terminate_job_object",
         "resume_thread",
         "close_handle",
     )
@@ -399,17 +781,15 @@ def _create_suspended_capture_child(
         acquired.append(job)
         native_api.set_job_limits(job)
 
-        request = native_api.create_pipe(MAX_C3_CHILD_REQUEST_BYTES)
+        request = native_api.create_request_pipe(MAX_C3_CHILD_REQUEST_BYTES)
         if type(request) is not NativePipePair:
             raise WindowsEffectfulCaptureNativeError("request pipe result is invalid")
         acquired.extend((request.read_handle, request.write_handle))
-        native_api.set_handle_inheritable(request.write_handle, False)
 
-        result = native_api.create_pipe(MAX_C3_CHILD_RESULT_BYTES)
+        result = native_api.create_result_pipe(MAX_C3_CHILD_RESULT_BYTES)
         if type(result) is not NativePipePair:
             raise WindowsEffectfulCaptureNativeError("result pipe result is invalid")
         acquired.extend((result.read_handle, result.write_handle))
-        native_api.set_handle_inheritable(result.read_handle, False)
 
         staging_handle = _handle(
             native_api.create_staging_file(staging), "staging handle"
@@ -476,8 +856,36 @@ def _create_suspended_capture_child(
         raise WindowsEffectfulCaptureNativeError("native containment failed") from None
 
 
+@dataclass(slots=True, repr=False)
+class _C3OverlappedOperation:
+    owner: CtypesWindowsEffectfulCaptureNativeApi
+    handle: int
+    event_handle: int
+    overlapped: object
+    buffer: object
+    operation_type: str
+    requested: int
+    immediate_eof: bool = False
+    settled: bool = False
+    quarantined: bool = False
+
+    def __repr__(self) -> str:
+        return "C3OverlappedOperation(<private>)"
+
+    def __reduce__(self) -> object:
+        raise TypeError("C3 overlapped operation cannot be serialized")
+
+    def __reduce_ex__(self, protocol: int) -> object:
+        del protocol
+        raise TypeError("C3 overlapped operation cannot be pickled")
+
+
+_C3_OVERLAPPED_QUARANTINE: list[_C3OverlappedOperation] = []
+_C3_OVERLAPPED_QUARANTINE_LOCK = threading.Lock()
+
+
 class CtypesWindowsEffectfulCaptureNativeApi:
-    """ctypes implementation of the exact C3-C1 process topology."""
+    """ctypes implementation of the exact C3-specific process topology."""
 
     def __init__(self) -> None:
         if os.name != "nt":
@@ -529,6 +937,27 @@ class CtypesWindowsEffectfulCaptureNativeApi:
                 ("dwThreadId", wintypes.DWORD),
             ]
 
+        class OVERLAPPED_OFFSET(ctypes.Structure):
+            _fields_ = [
+                ("Offset", wintypes.DWORD),
+                ("OffsetHigh", wintypes.DWORD),
+            ]
+
+        class OVERLAPPED_UNION(ctypes.Union):
+            _fields_ = [
+                ("offset", OVERLAPPED_OFFSET),
+                ("Pointer", ctypes.c_void_p),
+            ]
+
+        class OVERLAPPED(ctypes.Structure):
+            _anonymous_ = ("union",)
+            _fields_ = [
+                ("Internal", ctypes.c_size_t),
+                ("InternalHigh", ctypes.c_size_t),
+                ("union", OVERLAPPED_UNION),
+                ("hEvent", wintypes.HANDLE),
+            ]
+
         class BASIC_LIMIT(ctypes.Structure):
             _fields_ = [
                 ("PerProcessUserTimeLimit", ctypes.c_longlong),
@@ -563,6 +992,7 @@ class CtypesWindowsEffectfulCaptureNativeApi:
             ]
 
         k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        advapi32 = ctypes.WinDLL("advapi32", use_last_error=True)
         k32.CreateJobObjectW.argtypes = [ctypes.c_void_p, wintypes.LPCWSTR]
         k32.CreateJobObjectW.restype = wintypes.HANDLE
         k32.SetInformationJobObject.argtypes = [
@@ -572,13 +1002,22 @@ class CtypesWindowsEffectfulCaptureNativeApi:
             wintypes.DWORD,
         ]
         k32.SetInformationJobObject.restype = wintypes.BOOL
-        k32.CreatePipe.argtypes = [
-            ctypes.POINTER(wintypes.HANDLE),
-            ctypes.POINTER(wintypes.HANDLE),
-            ctypes.POINTER(SECURITY_ATTRIBUTES),
+        k32.CreateNamedPipeW.argtypes = [
+            wintypes.LPCWSTR,
             wintypes.DWORD,
+            wintypes.DWORD,
+            wintypes.DWORD,
+            wintypes.DWORD,
+            wintypes.DWORD,
+            wintypes.DWORD,
+            ctypes.POINTER(SECURITY_ATTRIBUTES),
         ]
-        k32.CreatePipe.restype = wintypes.BOOL
+        k32.CreateNamedPipeW.restype = wintypes.HANDLE
+        k32.ConnectNamedPipe.argtypes = [
+            wintypes.HANDLE,
+            ctypes.POINTER(OVERLAPPED),
+        ]
+        k32.ConnectNamedPipe.restype = wintypes.BOOL
         k32.SetHandleInformation.argtypes = [
             wintypes.HANDLE,
             wintypes.DWORD,
@@ -632,19 +1071,75 @@ class CtypesWindowsEffectfulCaptureNativeApi:
             ctypes.c_void_p,
             wintypes.DWORD,
             ctypes.POINTER(wintypes.DWORD),
-            ctypes.c_void_p,
+            ctypes.POINTER(OVERLAPPED),
         ]
         k32.WriteFile.restype = wintypes.BOOL
+        k32.ReadFile.argtypes = [
+            wintypes.HANDLE,
+            ctypes.c_void_p,
+            wintypes.DWORD,
+            ctypes.POINTER(wintypes.DWORD),
+            ctypes.POINTER(OVERLAPPED),
+        ]
+        k32.ReadFile.restype = wintypes.BOOL
+        k32.CreateEventW.argtypes = [
+            ctypes.c_void_p,
+            wintypes.BOOL,
+            wintypes.BOOL,
+            wintypes.LPCWSTR,
+        ]
+        k32.CreateEventW.restype = wintypes.HANDLE
+        k32.WaitForSingleObject.argtypes = [wintypes.HANDLE, wintypes.DWORD]
+        k32.WaitForSingleObject.restype = wintypes.DWORD
+        k32.WaitForMultipleObjects.argtypes = [
+            wintypes.DWORD,
+            ctypes.POINTER(wintypes.HANDLE),
+            wintypes.BOOL,
+            wintypes.DWORD,
+        ]
+        k32.WaitForMultipleObjects.restype = wintypes.DWORD
+        k32.GetOverlappedResult.argtypes = [
+            wintypes.HANDLE,
+            ctypes.POINTER(OVERLAPPED),
+            ctypes.POINTER(wintypes.DWORD),
+            wintypes.BOOL,
+        ]
+        k32.GetOverlappedResult.restype = wintypes.BOOL
+        k32.CancelIoEx.argtypes = [
+            wintypes.HANDLE,
+            ctypes.POINTER(OVERLAPPED),
+        ]
+        k32.CancelIoEx.restype = wintypes.BOOL
+        k32.GetExitCodeProcess.argtypes = [
+            wintypes.HANDLE,
+            ctypes.POINTER(wintypes.DWORD),
+        ]
+        k32.GetExitCodeProcess.restype = wintypes.BOOL
+        k32.TerminateJobObject.argtypes = [wintypes.HANDLE, wintypes.UINT]
+        k32.TerminateJobObject.restype = wintypes.BOOL
         k32.ResumeThread.argtypes = [wintypes.HANDLE]
         k32.ResumeThread.restype = wintypes.DWORD
         k32.CloseHandle.argtypes = [wintypes.HANDLE]
         k32.CloseHandle.restype = wintypes.BOOL
+        k32.LocalFree.argtypes = [ctypes.c_void_p]
+        k32.LocalFree.restype = ctypes.c_void_p
+        advapi32.ConvertStringSecurityDescriptorToSecurityDescriptorW.argtypes = [
+            wintypes.LPCWSTR,
+            wintypes.DWORD,
+            ctypes.POINTER(ctypes.c_void_p),
+            ctypes.POINTER(wintypes.DWORD),
+        ]
+        advapi32.ConvertStringSecurityDescriptorToSecurityDescriptorW.restype = (
+            wintypes.BOOL
+        )
         self._k32 = k32
+        self._advapi32 = advapi32
         self._w = wintypes
         self._sa = SECURITY_ATTRIBUTES
         self._startup = STARTUPINFOEXW
         self._pi = PROCESS_INFORMATION
         self._limits = EXTENDED_LIMIT
+        self._overlapped = OVERLAPPED
 
     def create_job_object(self) -> int:
         value = self._k32.CreateJobObjectW(None, None)
@@ -666,23 +1161,132 @@ class CtypesWindowsEffectfulCaptureNativeApi:
         ):
             raise _native_error("SetInformationJobObject")
 
-    def create_pipe(self, buffer_size: int) -> NativePipePair:
+    def create_request_pipe(self, buffer_size: int) -> NativePipePair:
+        return self._create_named_pipe_pair(
+            buffer_size=buffer_size,
+            server_access=PIPE_ACCESS_OUTBOUND,
+            client_access=GENERIC_READ,
+        )
+
+    def create_result_pipe(self, buffer_size: int) -> NativePipePair:
+        return self._create_named_pipe_pair(
+            buffer_size=buffer_size,
+            server_access=PIPE_ACCESS_INBOUND,
+            client_access=GENERIC_WRITE,
+        )
+
+    def _create_named_pipe_pair(
+        self, *, buffer_size: int, server_access: int, client_access: int
+    ) -> NativePipePair:
         if type(buffer_size) is not int or buffer_size <= 0:
             raise WindowsEffectfulCaptureNativeError("pipe bound is invalid")
-        sa = self._sa(ctypes.sizeof(self._sa), None, True)
-        read = self._w.HANDLE()
-        write = self._w.HANDLE()
-        if not self._k32.CreatePipe(
-            ctypes.byref(read),
-            ctypes.byref(write),
-            ctypes.byref(sa),
-            buffer_size,
+        if server_access not in (PIPE_ACCESS_INBOUND, PIPE_ACCESS_OUTBOUND):
+            raise WindowsEffectfulCaptureNativeError("pipe direction is invalid")
+        name = rf"\\.\pipe\ai-trading-bot-c3-{secrets.token_hex(32)}"
+        descriptor = ctypes.c_void_p()
+        if not self._advapi32.ConvertStringSecurityDescriptorToSecurityDescriptorW(
+            _C3_PIPE_SECURITY_SDDL,
+            SECURITY_DESCRIPTOR_REVISION,
+            ctypes.byref(descriptor),
+            None,
         ):
-            raise _native_error("CreatePipe")
-        return NativePipePair(
-            _native_handle(read, "pipe read handle"),
-            _native_handle(write, "pipe write handle"),
+            raise _native_error("ConvertStringSecurityDescriptorToSecurityDescriptorW")
+        try:
+            server_sa = self._sa(ctypes.sizeof(self._sa), descriptor.value, False)
+            server_value = self._k32.CreateNamedPipeW(
+                name,
+                server_access | FILE_FLAG_OVERLAPPED | FILE_FLAG_FIRST_PIPE_INSTANCE,
+                PIPE_TYPE_BYTE
+                | PIPE_READMODE_BYTE
+                | PIPE_WAIT
+                | PIPE_REJECT_REMOTE_CLIENTS,
+                1,
+                buffer_size if server_access == PIPE_ACCESS_OUTBOUND else 0,
+                buffer_size if server_access == PIPE_ACCESS_INBOUND else 0,
+                0,
+                ctypes.byref(server_sa),
+            )
+            create_error = ctypes.get_last_error()
+        finally:
+            self._k32.LocalFree(descriptor)
+        server = _native_handle(server_value, "named pipe server", allow_invalid=True)
+        if server == ctypes.c_void_p(-1).value:
+            raise _native_error("CreateNamedPipeW", create_error)
+        client_sa = self._sa(ctypes.sizeof(self._sa), None, True)
+        client_value = self._k32.CreateFileW(
+            name,
+            client_access,
+            0,
+            ctypes.byref(client_sa),
+            OPEN_EXISTING,
+            FILE_ATTRIBUTE_NORMAL,
+            None,
         )
+        client = _native_handle(client_value, "named pipe client", allow_invalid=True)
+        if client == ctypes.c_void_p(-1).value:
+            client_error = ctypes.get_last_error()
+            try:
+                self.close_handle(server)
+            finally:
+                raise _native_error("CreateFileW(named pipe)", client_error)
+        event_value = self._k32.CreateEventW(None, True, False, None)
+        event_handle = _native_handle(event_value, "pipe connection event")
+        connect_overlapped = self._overlapped()
+        connect_overlapped.hEvent = self._w.HANDLE(event_handle)
+        ctypes.set_last_error(0)
+        connected = self._k32.ConnectNamedPipe(
+            self._w.HANDLE(server), ctypes.byref(connect_overlapped)
+        )
+        connect_error = ctypes.get_last_error()
+        if connected or connect_error == ERROR_PIPE_CONNECTED:
+            self.close_handle(event_handle)
+        elif connect_error == ERROR_IO_PENDING:
+            operation = _C3OverlappedOperation(
+                owner=self,
+                handle=server,
+                event_handle=event_handle,
+                overlapped=connect_overlapped,
+                buffer=ctypes.create_string_buffer(1),
+                operation_type="CONNECT",
+                requested=0,
+            )
+            try:
+                settled = self.cancel_and_settle_overlapped(
+                    operation, C3_OVERLAPPED_CANCEL_SETTLEMENT_TIMEOUT_MS
+                )
+            except Exception:
+                settled = False
+            if not settled:
+                try:
+                    self.quarantine_overlapped(operation)
+                except Exception:
+                    pass
+            try:
+                self.close_handle(client)
+            finally:
+                if settled:
+                    self.close_handle(server)
+            raise WindowsEffectfulCaptureNativeError(
+                "named pipe connection did not complete synchronously"
+            ) from None
+        else:
+            self.close_handle(event_handle)
+            failed = False
+            for handle in (client, server):
+                try:
+                    self.close_handle(handle)
+                except Exception:
+                    failed = True
+            if failed:
+                raise WindowsEffectfulCaptureNativeError(
+                    "named pipe connection and cleanup failed"
+                ) from None
+            raise _native_error("ConnectNamedPipe", connect_error)
+        if server_access == PIPE_ACCESS_OUTBOUND:
+            read_handle, write_handle = client, server
+        else:
+            read_handle, write_handle = server, client
+        return NativePipePair(read_handle, write_handle)
 
     def set_handle_inheritable(self, handle: int, inheritable: bool) -> None:
         if type(inheritable) is not bool:
@@ -820,22 +1424,262 @@ class CtypesWindowsEffectfulCaptureNativeApi:
         if not self._k32.CloseHandle(self._w.HANDLE(_handle(handle, "close handle"))):
             raise _native_error("CloseHandle")
 
-    def write_file(self, handle: int, payload: bytes) -> int:
+    def begin_overlapped_write(self, handle: int, payload: bytes) -> object:
         if type(payload) is not bytes or not payload:
             raise WindowsEffectfulCaptureNativeError("WriteFile payload is invalid")
         if len(payload) > MAX_C3_CHILD_REQUEST_BYTES:
             raise WindowsEffectfulCaptureNativeError("WriteFile payload exceeds bound")
-        buffer = ctypes.create_string_buffer(payload, len(payload))
-        written = self._w.DWORD()
-        if not self._k32.WriteFile(
-            self._w.HANDLE(_handle(handle, "request writer handle")),
-            ctypes.cast(buffer, ctypes.c_void_p),
-            len(payload),
-            ctypes.byref(written),
-            None,
+        return self._begin_overlapped("WRITE", handle, payload, len(payload))
+
+    def begin_overlapped_read(self, handle: int, max_bytes: int) -> object:
+        if (
+            type(max_bytes) is not int
+            or max_bytes <= 0
+            or max_bytes > MAX_C3_CHILD_RESULT_BYTES + 1
         ):
-            raise _native_error("WriteFile")
-        return int(written.value)
+            raise WindowsEffectfulCaptureNativeError("ReadFile bound is invalid")
+        return self._begin_overlapped("READ", handle, None, max_bytes)
+
+    def _begin_overlapped(
+        self, operation_type: str, handle: int, payload: bytes | None, size: int
+    ) -> _C3OverlappedOperation:
+        self._reap_quarantine()
+        handle = _handle(handle, "overlapped pipe handle")
+        event_value = self._k32.CreateEventW(None, True, False, None)
+        event_handle = _native_handle(event_value, "overlapped event handle")
+        overlapped = self._overlapped()
+        overlapped.hEvent = self._w.HANDLE(event_handle)
+        buffer = (
+            ctypes.create_string_buffer(size)
+            if payload is None
+            else ctypes.create_string_buffer(payload, size)
+        )
+        operation = _C3OverlappedOperation(
+            owner=self,
+            handle=handle,
+            event_handle=event_handle,
+            overlapped=overlapped,
+            buffer=buffer,
+            operation_type=operation_type,
+            requested=size,
+        )
+        ctypes.set_last_error(0)
+        if operation_type == "WRITE":
+            succeeded = self._k32.WriteFile(
+                self._w.HANDLE(handle),
+                ctypes.cast(buffer, ctypes.c_void_p),
+                size,
+                None,
+                ctypes.byref(overlapped),
+            )
+        else:
+            succeeded = self._k32.ReadFile(
+                self._w.HANDLE(handle),
+                ctypes.cast(buffer, ctypes.c_void_p),
+                size,
+                None,
+                ctypes.byref(overlapped),
+            )
+        error = ctypes.get_last_error()
+        if succeeded:
+            operation.settled = True
+        elif operation_type == "READ" and error == ERROR_BROKEN_PIPE:
+            operation.immediate_eof = True
+            operation.settled = True
+        elif error != ERROR_IO_PENDING:
+            try:
+                self.close_handle(event_handle)
+            finally:
+                raise _native_error(f"{operation_type.title()}File", error)
+        return operation
+
+    def wait_overlapped_or_process(
+        self, operation: object, process_handle: int | None, timeout_ms: int
+    ) -> C3NativeWaitStatus:
+        item = self._operation(operation)
+        if type(timeout_ms) is not int or timeout_ms < 0 or timeout_ms >= INFINITE:
+            raise WindowsEffectfulCaptureNativeError("wait timeout is invalid")
+        if item.settled:
+            return C3NativeWaitStatus.IO_COMPLETED
+        if process_handle is None:
+            result = int(
+                self._k32.WaitForSingleObject(
+                    self._w.HANDLE(item.event_handle), timeout_ms
+                )
+            )
+            if result == WAIT_OBJECT_0:
+                return C3NativeWaitStatus.IO_COMPLETED
+        else:
+            handles = (self._w.HANDLE * 2)(
+                self._w.HANDLE(item.event_handle),
+                self._w.HANDLE(_handle(process_handle, "process wait handle")),
+            )
+            result = int(
+                self._k32.WaitForMultipleObjects(2, handles, False, timeout_ms)
+            )
+            if result == WAIT_OBJECT_0:
+                return C3NativeWaitStatus.IO_COMPLETED
+            if result == WAIT_OBJECT_0 + 1:
+                return C3NativeWaitStatus.PROCESS_EXITED
+        if result == WAIT_TIMEOUT:
+            return C3NativeWaitStatus.TIMEOUT
+        return C3NativeWaitStatus.FAILED
+
+    def complete_overlapped(self, operation: object) -> NativeOverlappedCompletion:
+        item = self._operation(operation)
+        if item.quarantined:
+            raise WindowsEffectfulCaptureNativeError(
+                "quarantined operation cannot be completed by its former owner"
+            )
+        if item.immediate_eof:
+            item.settled = True
+            self._close_operation_event(item)
+            return NativeOverlappedCompletion(0, b"", True)
+        transferred = self._w.DWORD()
+        ctypes.set_last_error(0)
+        if not self._k32.GetOverlappedResult(
+            self._w.HANDLE(item.handle),
+            ctypes.byref(item.overlapped),
+            ctypes.byref(transferred),
+            False,
+        ):
+            error = ctypes.get_last_error()
+            if item.operation_type == "READ" and error == ERROR_BROKEN_PIPE:
+                item.settled = True
+                self._close_operation_event(item)
+                return NativeOverlappedCompletion(0, b"", True)
+            raise _native_error("GetOverlappedResult", error)
+        item.settled = True
+        count = int(transferred.value)
+        if count < 0 or count > item.requested:
+            raise WindowsEffectfulCaptureNativeError(
+                "overlapped transfer count is invalid"
+            )
+        data = bytes(item.buffer.raw[:count]) if item.operation_type == "READ" else b""
+        self._close_operation_event(item)
+        return NativeOverlappedCompletion(
+            transferred=count,
+            payload=data,
+            eof=item.operation_type == "READ" and count == 0,
+        )
+
+    def cancel_and_settle_overlapped(self, operation: object, timeout_ms: int) -> bool:
+        item = self._operation(operation)
+        if item.settled:
+            self._close_operation_event(item)
+            return True
+        if type(timeout_ms) is not int or timeout_ms < 0 or timeout_ms >= INFINITE:
+            raise WindowsEffectfulCaptureNativeError(
+                "cancellation settlement timeout is invalid"
+            )
+        ctypes.set_last_error(0)
+        cancelled = self._k32.CancelIoEx(
+            self._w.HANDLE(item.handle), ctypes.byref(item.overlapped)
+        )
+        cancel_error = ctypes.get_last_error()
+        if not cancelled and cancel_error != ERROR_NOT_FOUND:
+            return False
+        wait = int(
+            self._k32.WaitForSingleObject(self._w.HANDLE(item.event_handle), timeout_ms)
+        )
+        if wait != WAIT_OBJECT_0:
+            return False
+        if not self._definitively_settled(item):
+            return False
+        self._close_operation_event(item)
+        return True
+
+    def quarantine_overlapped(self, operation: object) -> None:
+        item = self._operation(operation)
+        if item.quarantined:
+            raise WindowsEffectfulCaptureNativeError(
+                "overlapped operation is already quarantined"
+            )
+        item.quarantined = True
+        with _C3_OVERLAPPED_QUARANTINE_LOCK:
+            _C3_OVERLAPPED_QUARANTINE.append(item)
+        self._reap_quarantine()
+
+    def _reap_quarantine(self) -> None:
+        with _C3_OVERLAPPED_QUARANTINE_LOCK:
+            retained: list[_C3OverlappedOperation] = []
+            for item in _C3_OVERLAPPED_QUARANTINE:
+                owner = item.owner
+                wait = int(
+                    owner._k32.WaitForSingleObject(
+                        owner._w.HANDLE(item.event_handle), 0
+                    )
+                )
+                if wait != WAIT_OBJECT_0 or not owner._definitively_settled(item):
+                    retained.append(item)
+                    continue
+                owner._close_operation_event(item)
+                try:
+                    owner.close_handle(item.handle)
+                except Exception:
+                    pass
+            _C3_OVERLAPPED_QUARANTINE[:] = retained
+
+    def _definitively_settled(self, item: _C3OverlappedOperation) -> bool:
+        transferred = self._w.DWORD()
+        ctypes.set_last_error(0)
+        if self._k32.GetOverlappedResult(
+            self._w.HANDLE(item.handle),
+            ctypes.byref(item.overlapped),
+            ctypes.byref(transferred),
+            False,
+        ):
+            item.settled = True
+            return True
+        error = ctypes.get_last_error()
+        if error in (ERROR_OPERATION_ABORTED, ERROR_BROKEN_PIPE):
+            item.settled = True
+            return True
+        return False
+
+    def _close_operation_event(self, item: _C3OverlappedOperation) -> None:
+        event_handle = item.event_handle
+        if event_handle == 0:
+            return
+        item.event_handle = 0
+        self.close_handle(event_handle)
+
+    def _operation(self, operation: object) -> _C3OverlappedOperation:
+        if type(operation) is not _C3OverlappedOperation or operation.owner is not self:
+            raise WindowsEffectfulCaptureNativeError(
+                "overlapped operation provenance is invalid"
+            )
+        return operation
+
+    def wait_process(self, process_handle: int, timeout_ms: int) -> C3NativeWaitStatus:
+        if type(timeout_ms) is not int or timeout_ms < 0 or timeout_ms >= INFINITE:
+            raise WindowsEffectfulCaptureNativeError("process wait timeout is invalid")
+        result = int(
+            self._k32.WaitForSingleObject(
+                self._w.HANDLE(_handle(process_handle, "process wait handle")),
+                timeout_ms,
+            )
+        )
+        if result == WAIT_OBJECT_0:
+            return C3NativeWaitStatus.PROCESS_EXITED
+        if result == WAIT_TIMEOUT:
+            return C3NativeWaitStatus.TIMEOUT
+        return C3NativeWaitStatus.FAILED
+
+    def get_exit_code_process(self, process_handle: int) -> int:
+        exit_code = self._w.DWORD()
+        if not self._k32.GetExitCodeProcess(
+            self._w.HANDLE(_handle(process_handle, "process exit handle")),
+            ctypes.byref(exit_code),
+        ):
+            raise _native_error("GetExitCodeProcess")
+        return int(exit_code.value)
+
+    def terminate_job_object(self, job_handle: int) -> None:
+        if not self._k32.TerminateJobObject(
+            self._w.HANDLE(_handle(job_handle, "termination job handle")), 1
+        ):
+            raise _native_error("TerminateJobObject")
 
     def resume_thread(self, thread_handle: int) -> int:
         return int(
@@ -947,6 +1791,13 @@ def _handle_bootstrap_arguments(handles: tuple[int, int, int]) -> tuple[str, ...
         C3_STAGING_HANDLE_ARGUMENT,
         str(_handle(staging_write, "staging write handle")),
     )
+
+
+def _remaining_timeout_ms(deadline_ns: int) -> int:
+    remaining_ns = deadline_ns - time.monotonic_ns()
+    if remaining_ns <= 0:
+        return 0
+    return min((remaining_ns + 999_999) // 1_000_000, INFINITE - 1)
 
 
 def _handle(value: object, label: str) -> int:

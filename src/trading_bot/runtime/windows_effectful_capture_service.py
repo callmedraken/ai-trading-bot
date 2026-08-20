@@ -1,4 +1,4 @@
-"""C3 production composition and focused C3-C2 orchestration seam."""
+"""C3 production composition with focused C3-C2/C3-C3B test seams."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import hashlib
 import json
 import threading
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 
 from trading_bot.market_data import ALPACA_DAILY_SNAPSHOT_DESCRIPTOR
@@ -25,15 +25,22 @@ from trading_bot.runtime.windows_effectful_capture import (
     prepare_production_capture_plan,
 )
 from trading_bot.runtime.windows_effectful_capture_native import (
+    C3ParentCleanupStatus,
+    C3ProcessOutcomeStatus,
+    C3ResultTransportStatus,
     SuspendedCaptureChild,
     WindowsEffectfulCaptureNativeApi,
     create_suspended_capture_child_for_test,
     deliver_canonical_child_request,
+    observe_resumed_capture_child,
     resume_suspended_capture_child,
 )
 from trading_bot.runtime.windows_effectful_capture_protocol import (
     IsolatedCaptureChildRequest,
+    IsolatedCaptureChildResult,
+    WindowsEffectfulCaptureProtocolError,
     build_isolated_capture_child_request,
+    parse_isolated_capture_child_result,
     serialize_isolated_capture_child_request,
 )
 from trading_bot.runtime.windows_transactional_authority import (
@@ -81,6 +88,33 @@ class C3C2ResumedCaptureForTest:
         raise TypeError("C3-C2 resumed capture cannot be pickled")
 
 
+_C3_C3B_OBSERVATION_ISSUER = object()
+
+
+@dataclass(frozen=True, slots=True)
+class C3C3BObservationForTest:
+    """Sanitized process-local C3-C3B observation with no durable authority."""
+
+    reservation_id: str
+    execution_id: str
+    result_transport: C3ResultTransportStatus
+    process_outcome: C3ProcessOutcomeStatus
+    parent_cleanup: C3ParentCleanupStatus
+    trusted_result: IsolatedCaptureChildResult | None
+    _issuer: object = field(repr=False, compare=False)
+
+    def __post_init__(self) -> None:
+        if self._issuer is not _C3_C3B_OBSERVATION_ISSUER:
+            raise TypeError("C3-C3B observations are issued only by the live registry")
+
+    def __reduce__(self) -> object:
+        raise TypeError("C3-C3B observation cannot be serialized")
+
+    def __reduce_ex__(self, protocol: int) -> object:
+        del protocol
+        raise TypeError("C3-C3B observation cannot be pickled")
+
+
 @dataclass(slots=True)
 class _C3LiveProcessEntry:
     reservation_id: str
@@ -88,7 +122,11 @@ class _C3LiveProcessEntry:
     receipt: ProcessCreationReceipt
     child: SuspendedCaptureChild
     execution_id: str | None = None
+    request_delivery_attempted: bool = False
     request_sha256: str | None = None
+    resume_receipt: ResumeReceipt | None = None
+    observed: bool = False
+    observation: C3C3BObservationForTest | None = None
 
 
 class _C3LiveProcessRegistry:
@@ -156,11 +194,19 @@ class _C3LiveProcessRegistry:
     ) -> None:
         with self._lock:
             entry = self._find_bound(reservation_id, execution_id)
-            if entry.request_sha256 is not None:
+            if entry.request_delivery_attempted:
                 raise WindowsEffectfulCaptureCompositionError(
-                    "C3 child request delivery was already completed"
+                    "C3 child request delivery was already attempted"
                 )
-            deliver_canonical_child_request(entry.child, payload)
+            entry.request_delivery_attempted = True
+            child = entry.child
+        deliver_canonical_child_request(child, payload)
+        with self._lock:
+            entry = self._find_bound(reservation_id, execution_id)
+            if entry.child is not child or entry.request_sha256 is not None:
+                raise WindowsEffectfulCaptureCompositionError(
+                    "C3 child request delivery provenance changed"
+                )
             entry.request_sha256 = hashlib.sha256(payload).hexdigest()
 
     def resume(self, intent: ResumeIntent) -> None:
@@ -171,6 +217,71 @@ class _C3LiveProcessRegistry:
                     "C3 child request is not completely delivered"
                 )
             resume_suspended_capture_child(entry.child)
+
+    def retain_resume_receipt(
+        self, intent: ResumeIntent, receipt: ResumeReceipt
+    ) -> None:
+        with self._lock:
+            entry = self._find_bound(intent.reservation_id, intent.execution_id)
+            if (
+                entry.resume_receipt is not None
+                or receipt.reservation_id != intent.reservation_id
+                or receipt.execution_id != intent.execution_id
+                or receipt.resume_intent_digest != intent.intent_digest
+            ):
+                raise WindowsEffectfulCaptureCompositionError(
+                    "C3 resume receipt binding is invalid"
+                )
+            entry.resume_receipt = receipt
+
+    def observe(self, resumed: C3C2ResumedCaptureForTest) -> C3C3BObservationForTest:
+        with self._lock:
+            entry = self._find_bound(resumed.reservation_id, resumed.execution_id)
+            if (
+                entry.resume_receipt is not resumed.resume_receipt
+                or entry.request_sha256 != resumed.child_request_sha256
+                or entry.observed
+            ):
+                raise WindowsEffectfulCaptureCompositionError(
+                    "C3 resumed child observation provenance is stale or mismatched"
+                )
+            entry.observed = True
+            child = entry.child
+            request_sha256 = entry.request_sha256
+
+        native = observe_resumed_capture_child(child)
+        trusted: IsolatedCaptureChildResult | None = None
+        if native.result_transport is C3ResultTransportStatus.COMPLETE:
+            payload = native.result_payload
+            if payload is not None:
+                try:
+                    parsed = parse_isolated_capture_child_result(payload)
+                except WindowsEffectfulCaptureProtocolError:
+                    parsed = None
+                if (
+                    parsed is not None
+                    and parsed.reservation_id == resumed.reservation_id
+                    and parsed.execution_id == resumed.execution_id
+                    and parsed.child_request_sha256 == request_sha256
+                ):
+                    trusted = parsed
+        observation = C3C3BObservationForTest(
+            reservation_id=resumed.reservation_id,
+            execution_id=resumed.execution_id,
+            result_transport=native.result_transport,
+            process_outcome=native.process_outcome,
+            parent_cleanup=native.parent_cleanup,
+            trusted_result=trusted,
+            _issuer=_C3_C3B_OBSERVATION_ISSUER,
+        )
+        with self._lock:
+            entry = self._find_bound(resumed.reservation_id, resumed.execution_id)
+            if entry.child is not child or entry.observation is not None:
+                raise WindowsEffectfulCaptureCompositionError(
+                    "C3 observation registration provenance changed"
+                )
+            entry.observation = observation
+        return observation
 
     def request_sha256(self, reservation_id: str, execution_id: str) -> str:
         with self._lock:
@@ -202,13 +313,17 @@ class _C3LiveProcessRegistry:
                 "C3 live process registry cleanup failed"
             ) from None
 
-    def semantic_snapshot(self) -> tuple[tuple[str, str | None, bool], ...]:
+    def semantic_snapshot(
+        self,
+    ) -> tuple[tuple[str, str | None, bool, bool, bool], ...]:
         with self._lock:
             return tuple(
                 (
                     entry.reservation_id,
                     entry.execution_id,
                     entry.request_sha256 is not None,
+                    entry.resume_receipt is not None,
+                    entry.observation is not None,
                 )
                 for entry in self._entries
             )
@@ -363,13 +478,15 @@ class C3C2TransactionalAdapterForTest:
             issue_resume_receipt_for_test,
         )
 
-        return issue_resume_receipt_for_test(
+        receipt = issue_resume_receipt_for_test(
             resume_intent.execution_id,
             resume_intent.reservation_id,
             resume_intent.intent_digest,
             result_json,
             hashlib.sha256(result_json).digest(),
         )
+        self._registry.retain_resume_receipt(resume_intent, receipt)
+        return receipt
 
     def bind_execution(
         self,
@@ -653,12 +770,25 @@ def execute_c3_c2_resume_for_test(
 
 def c3_c2_registry_snapshot_for_test(
     adapter: C3C2TransactionalAdapterForTest,
-) -> tuple[tuple[str, str | None, bool], ...]:
+) -> tuple[tuple[str, str | None, bool, bool, bool], ...]:
     """Return semantic registry state without exposing any native handle value."""
 
     if type(adapter) is not C3C2TransactionalAdapterForTest:
         raise TypeError("registry inspection requires the exact C3-C2 test adapter")
     return adapter._registry.semantic_snapshot()
+
+
+def observe_c3_c3b_for_test(
+    adapter: C3C2TransactionalAdapterForTest,
+    resumed: C3C2ResumedCaptureForTest,
+) -> C3C3BObservationForTest:
+    """Run the exact process-local C3-C3B observation test seam once."""
+
+    if type(adapter) is not C3C2TransactionalAdapterForTest:
+        raise TypeError("C3-C3B observation requires its exact adapter")
+    if type(resumed) is not C3C2ResumedCaptureForTest:
+        raise TypeError("C3-C3B observation requires its exact resumed receipt")
+    return adapter._registry.observe(resumed)
 
 
 def _canonical_json(value: object) -> bytes:

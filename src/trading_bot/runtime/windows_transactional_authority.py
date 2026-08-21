@@ -3946,6 +3946,70 @@ def _core_select_terminal(
     return selection_id
 
 
+def _require_c3_success_selection_session(
+    connection: sqlite3.Connection, terminal_id: str
+) -> str:
+    row = connection.execute(
+        """
+        SELECT s.session_id, a.attempt_id, c.claim_id,
+               r.launch_reservation_id, e.launch_execution_id,
+               t.terminal_policy_version, t.snapshot_digest
+        FROM terminals t
+        JOIN launch_reservations r
+          ON r.launch_reservation_id = t.launch_reservation_id
+        JOIN provider_call_claims c ON c.claim_id = r.claim_id
+        JOIN attempts a ON a.attempt_id = c.attempt_id
+        JOIN sessions s ON s.session_id = a.session_id
+        JOIN launch_executions e
+          ON e.launch_reservation_id = r.launch_reservation_id
+        WHERE t.terminal_id = ?
+          AND t.terminal_schema = 1
+          AND t.terminal_policy_version = ?
+          AND t.terminal_state = 'SUCCEEDED'
+          AND t.provider_call_disposition = 'CONFIRMED'
+          AND typeof(t.snapshot_digest) = 'blob'
+          AND length(t.snapshot_digest) = 32
+          AND r.reservation_state = 'TERMINAL_RECORDED'
+          AND c.state = 'COMMITTED'
+          AND a.state = 'TERMINAL_RECORDED'
+          AND s.state = 'OPEN'
+          AND e.phase = 'TERMINAL_RECORDED'
+          AND NOT EXISTS (
+              SELECT 1 FROM session_selections ss
+              WHERE ss.session_id = s.session_id
+                 OR ss.terminal_id = t.terminal_id
+          )
+        """,
+        (str(terminal_id), TERMINAL_POLICY),
+    ).fetchone()
+    if row is None:
+        raise ValueError("C3 successful terminal is unavailable for selection")
+    reservation_id = row[3]
+    if _terminal_id(reservation_id, row[5]) != str(terminal_id):
+        raise ValueError("C3 terminal identity is not canonical")
+    if type(row[6]) is not bytes or len(row[6]) != 32:
+        raise ValueError("C3 successful terminal snapshot digest is invalid")
+    return row[0]
+
+
+@_serialized_connection_operation
+def _core_select_c3_terminal(connection: sqlite3.Connection, terminal_id: str) -> str:
+    _require_service_context()
+    _require_no_active_transaction(connection)
+    terminal_id = str(terminal_id)
+    _begin(connection)
+    try:
+        session_id = _require_c3_success_selection_session(connection, terminal_id)
+        selection_id = _insert_selection_in_transaction(
+            connection, session_id, terminal_id
+        )
+        _finish(connection, True)
+    except BaseException:
+        _finish(connection, False)
+        raise
+    return selection_id
+
+
 def _target_state(
     connection: sqlite3.Connection, target_kind: str, target_id: str
 ) -> str:
@@ -5357,6 +5421,11 @@ class TransactionalAuthorityCore:
             _require_no_active_transaction(self._connection)
             return _core_select_terminal(self._connection, session_id, terminal_id)
 
+    def select_c3_terminal(self, terminal_id: str) -> str:
+        with self._bound_context():
+            _require_no_active_transaction(self._connection)
+            return _core_select_c3_terminal(self._connection, terminal_id)
+
     def record_recovery(
         self,
         session_id: str,
@@ -5965,6 +6034,10 @@ class WindowsTransactionalAuthority:
 
     def select_terminal(self, session_id: str, terminal_id: str) -> str:
         return self._core_for_operation().select_terminal(session_id, terminal_id)
+
+    def select_c3_terminal(self, terminal_id: str) -> str:
+        self._require_service_open()
+        return self._core_for_operation().select_c3_terminal(terminal_id)
 
     def record_recovery(
         self,

@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import pickle
+import sqlite3
 from collections import deque
 from contextlib import nullcontext
 from copy import copy, deepcopy
@@ -2176,6 +2177,240 @@ def test_c3_d2_recovery_first_revokes_delayed_terminal_authority() -> None:
             )
         assert connection.execute("SELECT count(*) FROM terminals").fetchone() == (0,)
         assert "delete_staging" not in api.events
+    finally:
+        _close(adapter, transactional)
+        capture._closed = True
+
+
+def _record_c3_success_terminal(
+    api: _FakeNativeApi, adapter, transactional, resumed
+) -> tuple[bytes, str]:
+    payload = _canonical_c3_snapshot(api)
+    _persist_successful_c3_observation(api, adapter, transactional, resumed, payload)
+    capability = transactional.verify_c3_captured_snapshot(
+        resumed.execution_id, resumed.reservation_id
+    )
+    terminal_id = transactional.record_c3_terminal(
+        resumed.execution_id, resumed.reservation_id, capability
+    )
+    return payload, terminal_id
+
+
+def test_c3_d3_complete_deterministic_success_selects_exact_terminal() -> None:
+    api = _FakeNativeApi()
+    capture, adapter, transactional, connection, resumed = _resume_case(api)
+    try:
+        payload, terminal_id = _record_c3_success_terminal(
+            api, adapter, transactional, resumed
+        )
+        session_id, attempt_id, claim_id, reservation_id, execution_id = _c3_lineage(
+            connection
+        )
+        terminal = connection.execute(
+            "SELECT terminal_state, provider_call_disposition, snapshot_digest "
+            "FROM terminals WHERE terminal_id = ?",
+            (terminal_id,),
+        ).fetchone()
+        events_after_terminal = tuple(api.events)
+        assert terminal == (
+            "SUCCEEDED",
+            "CONFIRMED",
+            hashlib.sha256(payload).digest(),
+        )
+        assert api.final_bytes == payload
+        assert c3_c2_registry_snapshot_for_test(adapter) == ()
+
+        with pytest.raises(
+            sqlite3.IntegrityError, match="session is not open|does not belong"
+        ):
+            transactional.select_terminal(
+                "11111111-1111-4111-8111-111111111111", terminal_id
+            )
+        with pytest.raises(ValueError, match="unavailable"):
+            transactional.select_c3_terminal("22222222-2222-4222-8222-222222222222")
+
+        selection_id = transactional.select_c3_terminal(terminal_id)
+
+        selection = connection.execute(
+            "SELECT selection_id, session_id, terminal_id, snapshot_digest "
+            "FROM session_selections"
+        ).fetchone()
+        assert selection == (
+            selection_id,
+            session_id,
+            terminal_id,
+            terminal[2],
+        )
+        assert terminal[2] == hashlib.sha256(payload).digest()
+        assert connection.execute(
+            "SELECT state FROM sessions WHERE session_id = ?", (session_id,)
+        ).fetchone() == ("SUCCESS_SELECTED",)
+        assert connection.execute(
+            "SELECT state FROM attempts WHERE attempt_id = ?", (attempt_id,)
+        ).fetchone() == ("SUCCESS_SELECTED",)
+        assert connection.execute(
+            "SELECT state FROM provider_call_claims WHERE claim_id = ?", (claim_id,)
+        ).fetchone() == ("COMMITTED",)
+        assert connection.execute(
+            "SELECT reservation_state FROM launch_reservations "
+            "WHERE launch_reservation_id = ?",
+            (reservation_id,),
+        ).fetchone() == ("TERMINAL_RECORDED",)
+        assert connection.execute(
+            "SELECT phase FROM launch_executions WHERE launch_execution_id = ?",
+            (execution_id,),
+        ).fetchone() == ("TERMINAL_RECORDED",)
+        assert connection.execute("SELECT count(*) FROM terminals").fetchone() == (1,)
+        assert connection.execute(
+            "SELECT count(*) FROM session_selections"
+        ).fetchone() == (1,)
+        assert tuple(api.events) == events_after_terminal
+        assert api.events.count("create_process") == 1
+        assert api.events.count("resume_thread") == 1
+        assert api.events.count("publish") == 1
+        assert api.events.count("delete_staging") == 1
+
+        with pytest.raises(ValueError, match="unavailable"):
+            transactional.select_c3_terminal(terminal_id)
+        assert tuple(api.events) == events_after_terminal
+    finally:
+        _close(adapter, transactional)
+        capture._closed = True
+
+
+def test_c3_d3_selection_rollback_is_atomic_and_retry_has_no_effects() -> None:
+    api = _FakeNativeApi()
+    capture, adapter, transactional, connection, resumed = _resume_case(api)
+    try:
+        payload, terminal_id = _record_c3_success_terminal(
+            api, adapter, transactional, resumed
+        )
+        session_id, attempt_id, _claim_id, _reservation_id, _execution_id = _c3_lineage(
+            connection
+        )
+        events_after_terminal = tuple(api.events)
+        connection.execute(
+            """
+            CREATE TRIGGER fail_c3_selection_projection
+            BEFORE UPDATE OF state ON sessions
+            WHEN NEW.state = 'SUCCESS_SELECTED'
+            BEGIN
+                SELECT RAISE(ABORT, 'injected C3 selection rollback');
+            END
+            """
+        )
+
+        with pytest.raises(
+            sqlite3.IntegrityError, match="injected C3 selection rollback"
+        ):
+            transactional.select_c3_terminal(terminal_id)
+
+        assert connection.execute(
+            "SELECT terminal_state, provider_call_disposition, snapshot_digest "
+            "FROM terminals WHERE terminal_id = ?",
+            (terminal_id,),
+        ).fetchone() == (
+            "SUCCEEDED",
+            "CONFIRMED",
+            hashlib.sha256(payload).digest(),
+        )
+        assert connection.execute(
+            "SELECT count(*) FROM session_selections"
+        ).fetchone() == (0,)
+        assert connection.execute(
+            "SELECT state FROM sessions WHERE session_id = ?", (session_id,)
+        ).fetchone() == ("OPEN",)
+        assert connection.execute(
+            "SELECT state FROM attempts WHERE attempt_id = ?", (attempt_id,)
+        ).fetchone() == ("TERMINAL_RECORDED",)
+        assert tuple(api.events) == events_after_terminal
+        assert c3_c2_registry_snapshot_for_test(adapter) == ()
+
+        connection.execute("DROP TRIGGER fail_c3_selection_projection")
+        transactional.select_c3_terminal(terminal_id)
+        assert connection.execute(
+            "SELECT snapshot_digest FROM session_selections"
+        ).fetchone() == (hashlib.sha256(payload).digest(),)
+        assert tuple(api.events) == events_after_terminal
+        assert api.events.count("create_process") == 1
+        assert api.events.count("resume_thread") == 1
+        assert api.events.count("publish") == 1
+    finally:
+        _close(adapter, transactional)
+        capture._closed = True
+
+
+def test_c3_d3_select_committed_success_recovery_remains_compatible() -> None:
+    api = _FakeNativeApi()
+    capture, adapter, transactional, connection, resumed = _resume_case(api)
+    try:
+        payload, terminal_id = _record_c3_success_terminal(
+            api, adapter, transactional, resumed
+        )
+        session_id = connection.execute("SELECT session_id FROM sessions").fetchone()[0]
+        events_after_terminal = tuple(api.events)
+        operator = b'{"evidence":"c3-d3-select-recovery","schema":1}'
+
+        recovery_id = transactional.record_recovery(
+            session_id,
+            "TERMINAL",
+            terminal_id,
+            "SELECT_COMMITTED_SUCCESS",
+            operator_evidence_json=operator,
+            operator_evidence_digest=hashlib.sha256(operator).digest(),
+        )
+
+        assert recovery_id
+        assert connection.execute(
+            "SELECT terminal_id, snapshot_digest FROM session_selections"
+        ).fetchone() == (terminal_id, hashlib.sha256(payload).digest())
+        assert connection.execute("SELECT state FROM sessions").fetchone() == (
+            "SUCCESS_SELECTED",
+        )
+        assert tuple(api.events) == events_after_terminal
+        assert c3_c2_registry_snapshot_for_test(adapter) == ()
+    finally:
+        _close(adapter, transactional)
+        capture._closed = True
+
+
+@pytest.mark.parametrize(
+    ("result_changes", "trusted_result", "expected_state"),
+    [({}, True, "FAILED"), ({}, False, "AMBIGUOUS")],
+)
+def test_c3_d3_non_success_terminal_is_not_selectable(
+    result_changes: dict[str, object], trusted_result: bool, expected_state: str
+) -> None:
+    api = _FakeNativeApi()
+    capture, adapter, transactional, connection, resumed = _resume_case(api)
+    try:
+        _persist_c3_terminal_observation(
+            api,
+            adapter,
+            transactional,
+            resumed,
+            result_changes=result_changes,
+            trusted_result=trusted_result,
+        )
+        terminal_id = transactional.record_c3_terminal(
+            resumed.execution_id, resumed.reservation_id
+        )
+        session_id = connection.execute("SELECT session_id FROM sessions").fetchone()[0]
+        events_after_terminal = tuple(api.events)
+
+        with pytest.raises(ValueError, match="unavailable"):
+            transactional.select_c3_terminal(terminal_id)
+        with pytest.raises(ValueError, match="has no snapshot"):
+            transactional.select_terminal(session_id, terminal_id)
+
+        assert connection.execute(
+            "SELECT terminal_state, snapshot_digest FROM terminals"
+        ).fetchone() == (expected_state, None)
+        assert connection.execute(
+            "SELECT count(*) FROM session_selections"
+        ).fetchone() == (0,)
+        assert connection.execute("SELECT state FROM sessions").fetchone() == ("OPEN",)
+        assert tuple(api.events) == events_after_terminal
     finally:
         _close(adapter, transactional)
         capture._closed = True

@@ -12,8 +12,10 @@ from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import PureWindowsPath
 from typing import Protocol
+from uuid import UUID
 
 from trading_bot.market_data import MAX_DAILY_SNAPSHOT_ARTIFACT_BYTES
+from trading_bot.runtime.windows_authority import PRODUCTION_CAPTURE_OUTPUT_ROOT
 from trading_bot.runtime.windows_effectful_capture_protocol import (
     MAX_C3_CHILD_REQUEST_BYTES,
     MAX_C3_CHILD_RESULT_BYTES,
@@ -82,6 +84,12 @@ C3_CHILD_OBSERVATION_SLICE_MS = 100
 C3_CHILD_TERMINATION_TIMEOUT_MS = 10_000
 C3_OVERLAPPED_CANCEL_SETTLEMENT_TIMEOUT_MS = 1_000
 
+PRODUCTION_C3_RUNTIME_ROOT = r"F:\AITradingBot\runtime"
+PRODUCTION_C3_PYTHON_EXECUTABLE = r"F:\AITradingBot\runtime\python.exe"
+PRODUCTION_C3_CONTROLLED_TEMP_ROOT = r"F:\AITradingBot\temp"
+PRODUCTION_C3_CHILD_MODULE = "trading_bot.runtime.windows_effectful_capture_child"
+PRODUCTION_C3_CHILD_BASE_ARGUMENTS = ("-m", PRODUCTION_C3_CHILD_MODULE)
+
 
 class WindowsEffectfulCaptureNativeError(RuntimeError):
     """C3 native containment failed without exposing native error text."""
@@ -89,6 +97,16 @@ class WindowsEffectfulCaptureNativeError(RuntimeError):
 
 class WindowsEffectfulCaptureNativeUnsupportedError(WindowsEffectfulCaptureNativeError):
     """The C3 native boundary is unavailable on this platform."""
+
+
+class WindowsEffectfulCaptureProcessNotCreatedError(WindowsEffectfulCaptureNativeError):
+    """Native state proves that no child process was created."""
+
+
+class WindowsEffectfulCaptureProcessOutcomeUnknownError(
+    WindowsEffectfulCaptureNativeError
+):
+    """Native state cannot support a definitive NOT_CREATED result."""
 
 
 class C3NativeWaitStatus(StrEnum):
@@ -862,6 +880,35 @@ def create_suspended_capture_child_for_test(
     )
 
 
+def create_production_suspended_capture_child(
+    reservation_id: str,
+    native_api: CtypesWindowsEffectfulCaptureNativeApi,
+) -> SuspendedCaptureChild:
+    """Create the fixed deployed C3 child through the exact ctypes adapter."""
+
+    if type(native_api) is not CtypesWindowsEffectfulCaptureNativeApi:
+        raise TypeError("production C3 containment requires the exact ctypes adapter")
+    try:
+        reservation_id = str(UUID(str(reservation_id)))
+    except (AttributeError, TypeError, ValueError):
+        raise WindowsEffectfulCaptureNativeError(
+            "production C3 reservation identity is invalid"
+        ) from None
+    staging_path = str(
+        PureWindowsPath(str(PRODUCTION_CAPTURE_OUTPUT_ROOT))
+        / f".c3-capture-{reservation_id}.staging"
+    )
+    return _create_suspended_capture_child(
+        application_name=PRODUCTION_C3_PYTHON_EXECUTABLE,
+        arguments=PRODUCTION_C3_CHILD_BASE_ARGUMENTS,
+        current_directory=PRODUCTION_C3_RUNTIME_ROOT,
+        controlled_temp_directory=PRODUCTION_C3_CONTROLLED_TEMP_ROOT,
+        staging_path=staging_path,
+        parent_environment=os.environ,
+        native_api=native_api,
+    )
+
+
 def _create_suspended_capture_child(
     *,
     application_name: str,
@@ -882,6 +929,8 @@ def _create_suspended_capture_child(
 
     acquired: list[int] = []
     job: int | None = None
+    process_creation_entered = False
+    process_created = False
     try:
         job = _handle(native_api.create_job_object(), "job handle")
         acquired.append(job)
@@ -912,6 +961,7 @@ def _create_suspended_capture_child(
             raise WindowsEffectfulCaptureNativeError("child handles must be distinct")
 
         bootstrap_args = (*args, *_handle_bootstrap_arguments(child_handles))
+        process_creation_entered = True
         process = native_api.create_suspended_process(
             application_name=application,
             arguments=bootstrap_args,
@@ -926,6 +976,7 @@ def _create_suspended_capture_child(
             raise WindowsEffectfulCaptureNativeError(
                 "process creation result is invalid"
             )
+        process_created = True
         acquired.extend((process.process_handle, process.primary_thread_handle))
 
         for child_pipe_handle in (request.read_handle, result.write_handle):
@@ -962,13 +1013,27 @@ def _create_suspended_capture_child(
                 native_api.close_handle(handle)
             except Exception:
                 cleanup_failed = True
-        if cleanup_failed:
-            raise WindowsEffectfulCaptureNativeError(
-                "native containment failed and cleanup was incomplete"
+        if process_created or (
+            process_creation_entered
+            and not isinstance(error, WindowsEffectfulCaptureProcessNotCreatedError)
+        ):
+            raise WindowsEffectfulCaptureProcessOutcomeUnknownError(
+                "native process creation outcome is not safely persistable"
             ) from None
-        if isinstance(error, WindowsEffectfulCaptureNativeError):
+        if cleanup_failed:
+            raise WindowsEffectfulCaptureProcessNotCreatedError(
+                "native containment failed before child creation; "
+                "cleanup was incomplete"
+            ) from None
+        if isinstance(error, WindowsEffectfulCaptureProcessNotCreatedError):
             raise
-        raise WindowsEffectfulCaptureNativeError("native containment failed") from None
+        if isinstance(error, WindowsEffectfulCaptureNativeError):
+            raise WindowsEffectfulCaptureProcessNotCreatedError(
+                "native containment failed before child creation"
+            ) from None
+        raise WindowsEffectfulCaptureProcessNotCreatedError(
+            "native containment failed before child creation"
+        ) from None
 
 
 @dataclass(slots=True, repr=False)
@@ -1740,13 +1805,30 @@ class CtypesWindowsEffectfulCaptureNativeApi:
                 ctypes.byref(startup),
                 ctypes.byref(pi),
             ):
-                raise _native_error("CreateProcessW")
-            return NativeCreatedProcess(
-                int(pi.dwProcessId),
-                int(pi.dwThreadId),
-                _native_handle(pi.hProcess, "process handle"),
-                _native_handle(pi.hThread, "primary thread handle"),
-            )
+                error = ctypes.get_last_error()
+                raise WindowsEffectfulCaptureProcessNotCreatedError(
+                    f"CreateProcessW failed with Win32 error {error}"
+                ) from None
+            try:
+                return NativeCreatedProcess(
+                    int(pi.dwProcessId),
+                    int(pi.dwThreadId),
+                    _native_handle(pi.hProcess, "process handle"),
+                    _native_handle(pi.hThread, "primary thread handle"),
+                )
+            except BaseException:
+                cleanup_failed = False
+                for raw_handle in (pi.hThread, pi.hProcess):
+                    try:
+                        self.close_handle(_native_handle(raw_handle, "created handle"))
+                    except BaseException:
+                        cleanup_failed = True
+                message = "created process result could not be retained"
+                if cleanup_failed:
+                    message = "created process result cleanup was incomplete"
+                raise WindowsEffectfulCaptureProcessOutcomeUnknownError(
+                    message
+                ) from None
         finally:
             if initialized:
                 self._k32.DeleteProcThreadAttributeList(attrs)

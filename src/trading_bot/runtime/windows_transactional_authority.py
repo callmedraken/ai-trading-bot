@@ -836,6 +836,129 @@ _ISSUED_PROCESS_RESULTS = _WeakIssuanceRegistry(_ISSUED_PROCESS_RESULTS_LOCK)
 _ISSUED_RESUME_PERMITS = _WeakIssuanceRegistry(_ISSUED_RESUME_PERMITS_LOCK)
 _ISSUED_RESUME_RESULTS = _WeakIssuanceRegistry(_ISSUED_RESUME_RESULTS_LOCK)
 
+_PRODUCTION_C3_RESULT_ISSUER_CONSTRUCTOR = object()
+
+
+class _ProductionC3ResultIssuer:
+    """Exact production C2 issuer privately retained by one bound C3 adapter."""
+
+    __slots__ = ("_active", "_adapter", "_lock")
+
+    def __init__(self, constructor: object, adapter: object) -> None:
+        if constructor is not _PRODUCTION_C3_RESULT_ISSUER_CONSTRUCTOR:
+            raise TypeError("production C3 result issuers are composition-owned")
+        self._adapter: object | None = adapter
+        self._active = True
+        self._lock = threading.Lock()
+
+    def _require_active_adapter(self) -> object:
+        with self._lock:
+            adapter = self._adapter
+            if not self._active or adapter is None:
+                raise ExternalAuthorityBoundaryUnavailable(
+                    "production C3 result issuer is revoked"
+                )
+        context = _require_service_context()
+        if context.test_only or context.external_adapter is not adapter:
+            raise ExternalAuthorityBoundaryUnavailable(
+                "production C3 result issuance is outside its exact service binding"
+            )
+        return adapter
+
+    def issue_constructed_provider(self, reservation_id: str) -> ConstructedProvider:
+        self._require_active_adapter()
+        return _issue_constructed_provider(
+            reservation_id,
+            issuer=_CONSTRUCTED_PROVIDER_ISSUER,
+            service_token=None,
+        )
+
+    def issue_process_creation_receipt(
+        self,
+        reservation_id: str,
+        process_intent_digest: bytes,
+        *,
+        application_name: str,
+        child_base_arguments: tuple[str, ...],
+    ) -> ProcessCreationReceipt:
+        self._require_active_adapter()
+        process_json, job_json, resume_json = _production_process_success_evidence(
+            reservation_id,
+            process_intent_digest,
+            application_name=application_name,
+            child_base_arguments=child_base_arguments,
+        )
+        return _issue_process_creation_receipt(
+            reservation_id,
+            process_intent_digest,
+            process_json,
+            _digest(process_json),
+            job_json,
+            _digest(job_json),
+            resume_json,
+            _digest(resume_json),
+            issuer=_PROCESS_RESULT_ISSUER,
+            service_token=None,
+        )
+
+    def issue_process_creation_failure(
+        self, reservation_id: str, process_intent_digest: bytes
+    ) -> ProcessCreationFailure:
+        self._require_active_adapter()
+        result_json = _process_failure_json(reservation_id, process_intent_digest)
+        return _issue_process_creation_failure(
+            reservation_id,
+            process_intent_digest,
+            result_json,
+            _digest(result_json),
+            issuer=_PROCESS_RESULT_ISSUER,
+            service_token=None,
+        )
+
+    def issue_resume_receipt(
+        self,
+        execution_id: str,
+        reservation_id: str,
+        resume_intent_digest: bytes,
+    ) -> ResumeReceipt:
+        self._require_active_adapter()
+        result_json = _json(
+            {
+                "execution_id": execution_id,
+                "resume_intent_digest": resume_intent_digest.hex(),
+                "resume_result": "RESUMED",
+                "schema": 1,
+            }
+        )
+        return _issue_resume_receipt(
+            execution_id,
+            reservation_id,
+            resume_intent_digest,
+            result_json,
+            _digest(result_json),
+            issuer=_RESUME_RESULT_ISSUER,
+            service_token=None,
+        )
+
+    def close(self) -> None:
+        with self._lock:
+            self._active = False
+            self._adapter = None
+
+    def __copy__(self) -> object:
+        raise TypeError("production C3 result issuers cannot be copied")
+
+    def __deepcopy__(self, memo: object) -> object:
+        del memo
+        raise TypeError("production C3 result issuers cannot be deep-copied")
+
+    def __reduce__(self) -> object:
+        raise TypeError("production C3 result issuers cannot be serialized")
+
+    def __reduce_ex__(self, protocol: int) -> object:
+        del protocol
+        raise TypeError("production C3 result issuers cannot be pickled")
+
 
 def _weak_reference(value: object, label: str) -> weakref.ReferenceType[Any]:
     try:
@@ -2373,6 +2496,138 @@ def _process_success_evidence(
     )
 
 
+def _production_process_success_evidence(
+    reservation_id: str,
+    process_intent_digest: bytes,
+    *,
+    application_name: str,
+    child_base_arguments: tuple[str, ...],
+) -> tuple[bytes, bytes, bytes]:
+    """Canonical sanitized evidence issued only after real native creation."""
+
+    reservation_id = str(reservation_id)
+    if type(application_name) is not str or not application_name:
+        raise TypeError("production process evidence application is invalid")
+    if (
+        type(child_base_arguments) is not tuple
+        or len(child_base_arguments) != 2
+        or not all(type(value) is str and value for value in child_base_arguments)
+    ):
+        raise TypeError("production child base arguments are invalid")
+    common = {
+        "process_intent_digest": process_intent_digest.hex(),
+        "reservation_id": reservation_id,
+        "schema": 1,
+    }
+    return (
+        _json(
+            {
+                **common,
+                "application_name": application_name,
+                "child_base_arguments": list(child_base_arguments),
+                "creation_flags_policy": "C3_EXACT_SUSPENDED_NO_WINDOW_V1",
+                "creation_result": "SUSPENDED_CHILD_CREATED",
+                "environment_policy": "C3_EXACT_FIVE_ENTRY_V1",
+                "handle_list_count": 3,
+                "handle_list_policy": "C3_EXACT_REQUEST_RESULT_STAGING_V1",
+                "shell_or_path_resolution": False,
+            }
+        ),
+        _json(
+            {
+                **common,
+                "active_process_limit": 1,
+                "breakaway_allowed": False,
+                "job_assignment": "AT_PROCESS_CREATION",
+                "job_object_result": "ASSIGNED",
+                "kill_on_job_close": True,
+            }
+        ),
+        _json(
+            {
+                **common,
+                "previous_suspend_count_required": 1,
+                "resume_authorization": "EXACT_PRIMARY_THREAD_RETAINED",
+            }
+        ),
+    )
+
+
+def _require_production_process_success_evidence(
+    receipt: ProcessCreationReceipt,
+) -> tuple[bytes, bytes, bytes]:
+    common = {
+        "process_intent_digest": receipt.process_intent_digest.hex(),
+        "reservation_id": receipt.reservation_id,
+        "schema": 1,
+    }
+    try:
+        process = json.loads(receipt.process_json)
+        job = json.loads(receipt.job_json)
+        resume = json.loads(receipt.resume_authorization_json)
+    except (UnicodeDecodeError, json.JSONDecodeError, TypeError):
+        raise ValueError("production process evidence is not canonical JSON") from None
+    if (
+        type(process) is not dict
+        or set(process)
+        != {
+            *common,
+            "application_name",
+            "child_base_arguments",
+            "creation_flags_policy",
+            "creation_result",
+            "environment_policy",
+            "handle_list_count",
+            "handle_list_policy",
+            "shell_or_path_resolution",
+        }
+        or any(process.get(key) != value for key, value in common.items())
+        or type(process.get("application_name")) is not str
+        or not process["application_name"]
+        or type(process.get("child_base_arguments")) is not list
+        or len(process["child_base_arguments"]) != 2
+        or not all(
+            type(value) is str and value for value in process["child_base_arguments"]
+        )
+        or process.get("creation_flags_policy") != "C3_EXACT_SUSPENDED_NO_WINDOW_V1"
+        or process.get("creation_result") != "SUSPENDED_CHILD_CREATED"
+        or process.get("environment_policy") != "C3_EXACT_FIVE_ENTRY_V1"
+        or process.get("handle_list_count") != 3
+        or process.get("handle_list_policy") != "C3_EXACT_REQUEST_RESULT_STAGING_V1"
+        or process.get("shell_or_path_resolution") is not False
+    ):
+        raise ValueError("production process evidence is invalid")
+    if type(job) is not dict or job != {
+        **common,
+        "active_process_limit": 1,
+        "breakaway_allowed": False,
+        "job_assignment": "AT_PROCESS_CREATION",
+        "job_object_result": "ASSIGNED",
+        "kill_on_job_close": True,
+    }:
+        raise ValueError("production Job Object evidence is invalid")
+    if type(resume) is not dict or resume != {
+        **common,
+        "previous_suspend_count_required": 1,
+        "resume_authorization": "EXACT_PRIMARY_THREAD_RETAINED",
+    }:
+        raise ValueError("production resume authorization evidence is invalid")
+    expected = (_json(process), _json(job), _json(resume))
+    if expected != (
+        receipt.process_json,
+        receipt.job_json,
+        receipt.resume_authorization_json,
+    ):
+        raise ValueError("production process evidence is not canonical")
+    if (
+        receipt.process_digest != _digest(expected[0])
+        or receipt.job_digest != _digest(expected[1])
+        or receipt.resume_authorization_digest != _digest(expected[2])
+    ):
+        raise ValueError("production process evidence digest is invalid")
+    return expected
+
+
 def _process_failure_json(reservation_id: str, process_intent_digest: bytes) -> bytes:
     reservation_id = str(reservation_id)
     return _json(
@@ -2763,9 +3018,12 @@ def _record_execution_locked(
     reservation_id = str(reservation_id)
     if _registered_process_result_reservation_id(receipt) != reservation_id:
         raise ValueError("process result registry binding mismatch")
-    process, job, resume = _process_success_evidence(
-        reservation_id, receipt.process_intent_digest
-    )
+    if receipt._issuer is _PROCESS_RESULT_ISSUER:
+        process, job, resume = _require_production_process_success_evidence(receipt)
+    else:
+        process, job, resume = _process_success_evidence(
+            reservation_id, receipt.process_intent_digest
+        )
     if (
         receipt.process_json != process
         or receipt.process_digest != _digest(process)
@@ -5725,8 +5983,9 @@ class WindowsTransactionalAuthority:
     """Production owner of the reviewed durable transactional authority.
 
     Production construction accepts only the genuine C1 capability.  It never
-    accepts a path, SQLite connection, schema identity, or side-effect
-    adapter.  The disposable `for_test` factory is the only injected seam.
+    accepts a path, SQLite connection, schema identity, or public side-effect
+    adapter.  The private C3 composition factory and disposable `for_test`
+    factory are the only adapter-binding seams.
     """
 
     def __init__(self, authority: ValidatedProductionAuthority) -> None:
@@ -5734,6 +5993,7 @@ class WindowsTransactionalAuthority:
         self._connection: sqlite3.Connection | None = None
         self._core: TransactionalAuthorityCore | None = None
         self._test_database: DisposableAuthorityDatabaseForTest | None = None
+        self._production_c3_issuer: _ProductionC3ResultIssuer | None = None
         self._context = _ServiceContext(
             authority=self._authority,
             lifecycle_arbiter_factory=_production_lifecycle_arbiter_factory(
@@ -5743,6 +6003,41 @@ class WindowsTransactionalAuthority:
             capture_request_provider=_snapshot_capture_request,
             test_only=False,
         )
+
+    @classmethod
+    def _for_production_c3(
+        cls,
+        authority: ValidatedProductionAuthority,
+        adapter: TransactionalAuthorityAdapter,
+    ) -> Self:
+        """Privately bind one reviewed production C3 adapter to production C2."""
+
+        bind_issuer = getattr(adapter, "_bind_production_c2_issuer", None)
+        if not callable(bind_issuer):
+            raise TypeError("production C3 adapter binding is invalid")
+        instance = cls(authority)
+        issuer = _ProductionC3ResultIssuer(
+            _PRODUCTION_C3_RESULT_ISSUER_CONSTRUCTOR, adapter
+        )
+        instance._context = _ServiceContext(
+            authority=instance._authority,
+            lifecycle_arbiter_factory=_production_lifecycle_arbiter_factory(
+                instance._authority
+            ),
+            timestamp_provider=_production_timestamp,
+            capture_request_provider=_snapshot_capture_request,
+            test_only=False,
+            external_adapter=adapter,
+        )
+        instance._production_c3_issuer = issuer
+        try:
+            bind_issuer(issuer)
+        except BaseException:
+            issuer.close()
+            instance._production_c3_issuer = None
+            instance.close()
+            raise
+        return instance
 
     @classmethod
     def for_test(
@@ -5766,6 +6061,7 @@ class WindowsTransactionalAuthority:
         instance._connection = database._connection
         instance._core = None
         instance._test_database = database
+        instance._production_c3_issuer = None
         lifecycle = TransactionalAuthorityLifecycle()
         instance._context = _ServiceContext(
             authority=None,
@@ -5830,6 +6126,10 @@ class WindowsTransactionalAuthority:
             lifecycle.require_open()
 
     def close(self) -> None:
+        production_c3_issuer = self._production_c3_issuer
+        self._production_c3_issuer = None
+        if production_c3_issuer is not None:
+            production_c3_issuer.close()
         lifecycle = self._context.lifecycle
         if lifecycle is not None:
             lifecycle.close(
@@ -6265,25 +6565,153 @@ def process_result_visible_evidence_for_test(
     return _process_result_visible_evidence(result)
 
 
-def issue_constructed_provider_for_test(reservation_id: str) -> ConstructedProvider:
+def _issue_constructed_provider(
+    reservation_id: str, *, issuer: object, service_token: object | None
+) -> ConstructedProvider:
     permit = _ConstructedProviderOneShot()
     provider = ConstructedProvider(
         reservation_id,
-        _issuer=_TEST_CONSTRUCTED_PROVIDER_ISSUER,
+        _issuer=issuer,
         _permit=permit,
-        _service_token=_active_test_service_token(),
+        _service_token=service_token,
     )
     with _ISSUED_CONSTRUCTED_PROVIDERS_LOCK:
         _ISSUED_CONSTRUCTED_PROVIDERS[permit] = _ConstructedProviderIssuance(
             provider=_weak_reference(provider, "constructed provider"),
             reservation_id=reservation_id,
-            issuer=_TEST_CONSTRUCTED_PROVIDER_ISSUER,
+            issuer=issuer,
             permit=_weak_reference(permit, "constructed provider permit"),
             service_token=_optional_weak_reference(
                 provider._service_token, "constructed provider service token"
             ),
         )
     return provider
+
+
+def _issue_process_creation_receipt(
+    reservation_id: str,
+    process_intent_digest: bytes,
+    process_json: bytes,
+    process_digest: bytes,
+    job_json: bytes,
+    job_digest: bytes,
+    resume_authorization_json: bytes,
+    resume_authorization_digest: bytes,
+    *,
+    issuer: object,
+    service_token: object | None,
+) -> ProcessCreationReceipt:
+    permit = _ProcessResultPermit()
+    result = ProcessCreationReceipt(
+        reservation_id=reservation_id,
+        process_intent_digest=process_intent_digest,
+        process_json=process_json,
+        process_digest=process_digest,
+        job_json=job_json,
+        job_digest=job_digest,
+        resume_authorization_json=resume_authorization_json,
+        resume_authorization_digest=resume_authorization_digest,
+        _issuer=issuer,
+        _permit=permit,
+        _service_token=service_token,
+    )
+    evidence, digests = _process_result_visible_evidence(result)
+    with _ISSUED_PROCESS_RESULTS_LOCK:
+        _ISSUED_PROCESS_RESULTS[permit] = _ProcessResultIssuance(
+            result=_weak_reference(result, "process result"),
+            reservation_id=reservation_id,
+            process_intent_digest=process_intent_digest,
+            evidence=evidence,
+            digests=digests,
+            issuer=issuer,
+            permit=_weak_reference(permit, "process result permit"),
+            service_token=_optional_weak_reference(
+                result._service_token, "process result service token"
+            ),
+        )
+    return result
+
+
+def _issue_process_creation_failure(
+    reservation_id: str,
+    process_intent_digest: bytes,
+    result_json: bytes,
+    result_digest: bytes,
+    *,
+    issuer: object,
+    service_token: object | None,
+) -> ProcessCreationFailure:
+    permit = _ProcessResultPermit()
+    result = ProcessCreationFailure(
+        reservation_id=reservation_id,
+        process_intent_digest=process_intent_digest,
+        result_json=result_json,
+        result_digest=result_digest,
+        _issuer=issuer,
+        _permit=permit,
+        _service_token=service_token,
+    )
+    evidence, digests = _process_result_visible_evidence(result)
+    with _ISSUED_PROCESS_RESULTS_LOCK:
+        _ISSUED_PROCESS_RESULTS[permit] = _ProcessResultIssuance(
+            result=_weak_reference(result, "process failure"),
+            reservation_id=reservation_id,
+            process_intent_digest=process_intent_digest,
+            evidence=evidence,
+            digests=digests,
+            issuer=issuer,
+            permit=_weak_reference(permit, "process failure permit"),
+            service_token=_optional_weak_reference(
+                result._service_token, "process failure service token"
+            ),
+        )
+    return result
+
+
+def _issue_resume_receipt(
+    execution_id: str,
+    reservation_id: str,
+    resume_intent_digest: bytes,
+    result_json: bytes,
+    result_digest: bytes,
+    *,
+    issuer: object,
+    service_token: object | None,
+) -> ResumeReceipt:
+    permit = _ResumeResultPermit()
+    result = ResumeReceipt(
+        execution_id=execution_id,
+        reservation_id=reservation_id,
+        resume_intent_digest=resume_intent_digest,
+        result_json=result_json,
+        result_digest=result_digest,
+        _issuer=issuer,
+        _permit=permit,
+        _service_token=service_token,
+    )
+    with _ISSUED_RESUME_RESULTS_LOCK:
+        _ISSUED_RESUME_RESULTS[permit] = _ResumeResultIssuance(
+            result=_weak_reference(result, "resume result"),
+            execution_id=execution_id,
+            reservation_id=reservation_id,
+            resume_intent_digest=resume_intent_digest,
+            result_json=result_json,
+            result_digest=result_digest,
+            issuer=issuer,
+            permit=_weak_reference(permit, "resume result permit"),
+            service_token=_optional_weak_reference(
+                result._service_token, "resume result service token"
+            ),
+        )
+    return result
+
+
+def issue_constructed_provider_for_test(reservation_id: str) -> ConstructedProvider:
+    return _issue_constructed_provider(
+        reservation_id,
+        issuer=_TEST_CONSTRUCTED_PROVIDER_ISSUER,
+        service_token=_active_test_service_token(),
+    )
 
 
 def issue_process_creation_receipt_for_test(
@@ -6296,35 +6724,18 @@ def issue_process_creation_receipt_for_test(
     resume_authorization_json: bytes,
     resume_authorization_digest: bytes,
 ) -> ProcessCreationReceipt:
-    permit = _ProcessResultPermit()
-    result = ProcessCreationReceipt(
-        reservation_id=reservation_id,
-        process_intent_digest=process_intent_digest,
-        process_json=process_json,
-        process_digest=process_digest,
-        job_json=job_json,
-        job_digest=job_digest,
-        resume_authorization_json=resume_authorization_json,
-        resume_authorization_digest=resume_authorization_digest,
-        _issuer=_TEST_PROCESS_RESULT_ISSUER,
-        _permit=permit,
-        _service_token=_active_test_service_token(),
+    return _issue_process_creation_receipt(
+        reservation_id,
+        process_intent_digest,
+        process_json,
+        process_digest,
+        job_json,
+        job_digest,
+        resume_authorization_json,
+        resume_authorization_digest,
+        issuer=_TEST_PROCESS_RESULT_ISSUER,
+        service_token=_active_test_service_token(),
     )
-    evidence, digests = _process_result_visible_evidence(result)
-    with _ISSUED_PROCESS_RESULTS_LOCK:
-        _ISSUED_PROCESS_RESULTS[permit] = _ProcessResultIssuance(
-            result=_weak_reference(result, "process result"),
-            reservation_id=reservation_id,
-            process_intent_digest=process_intent_digest,
-            evidence=evidence,
-            digests=digests,
-            issuer=_TEST_PROCESS_RESULT_ISSUER,
-            permit=_weak_reference(permit, "process result permit"),
-            service_token=_optional_weak_reference(
-                result._service_token, "process result service token"
-            ),
-        )
-    return result
 
 
 def issue_process_creation_failure_for_test(
@@ -6333,31 +6744,14 @@ def issue_process_creation_failure_for_test(
     result_json: bytes,
     result_digest: bytes,
 ) -> ProcessCreationFailure:
-    permit = _ProcessResultPermit()
-    result = ProcessCreationFailure(
-        reservation_id=reservation_id,
-        process_intent_digest=process_intent_digest,
-        result_json=result_json,
-        result_digest=result_digest,
-        _issuer=_TEST_PROCESS_RESULT_ISSUER,
-        _permit=permit,
-        _service_token=_active_test_service_token(),
+    return _issue_process_creation_failure(
+        reservation_id,
+        process_intent_digest,
+        result_json,
+        result_digest,
+        issuer=_TEST_PROCESS_RESULT_ISSUER,
+        service_token=_active_test_service_token(),
     )
-    evidence, digests = _process_result_visible_evidence(result)
-    with _ISSUED_PROCESS_RESULTS_LOCK:
-        _ISSUED_PROCESS_RESULTS[permit] = _ProcessResultIssuance(
-            result=_weak_reference(result, "process failure"),
-            reservation_id=reservation_id,
-            process_intent_digest=process_intent_digest,
-            evidence=evidence,
-            digests=digests,
-            issuer=_TEST_PROCESS_RESULT_ISSUER,
-            permit=_weak_reference(permit, "process failure permit"),
-            service_token=_optional_weak_reference(
-                result._service_token, "process failure service token"
-            ),
-        )
-    return result
 
 
 def issue_resume_receipt_for_test(
@@ -6367,29 +6761,12 @@ def issue_resume_receipt_for_test(
     result_json: bytes,
     result_digest: bytes,
 ) -> ResumeReceipt:
-    permit = _ResumeResultPermit()
-    result = ResumeReceipt(
-        execution_id=execution_id,
-        reservation_id=reservation_id,
-        resume_intent_digest=resume_intent_digest,
-        result_json=result_json,
-        result_digest=result_digest,
-        _issuer=_TEST_RESUME_RESULT_ISSUER,
-        _permit=permit,
-        _service_token=_active_test_service_token(),
+    return _issue_resume_receipt(
+        execution_id,
+        reservation_id,
+        resume_intent_digest,
+        result_json,
+        result_digest,
+        issuer=_TEST_RESUME_RESULT_ISSUER,
+        service_token=_active_test_service_token(),
     )
-    with _ISSUED_RESUME_RESULTS_LOCK:
-        _ISSUED_RESUME_RESULTS[permit] = _ResumeResultIssuance(
-            result=_weak_reference(result, "resume result"),
-            execution_id=execution_id,
-            reservation_id=reservation_id,
-            resume_intent_digest=resume_intent_digest,
-            result_json=result_json,
-            result_digest=result_digest,
-            issuer=_TEST_RESUME_RESULT_ISSUER,
-            permit=_weak_reference(permit, "resume result permit"),
-            service_token=_optional_weak_reference(
-                result._service_token, "resume result service token"
-            ),
-        )
-    return result

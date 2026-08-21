@@ -21,7 +21,9 @@ from trading_bot.market_data import (
     serialize_daily_snapshot,
     verify_daily_snapshot,
 )
-from trading_bot.runtime.windows_authority import WindowsAuthorityError
+from trading_bot.runtime.windows_authority import (
+    WindowsAuthorityError,
+)
 from trading_bot.runtime.windows_authority_validation import (
     ValidatedProductionAuthority,
     require_validated_production_authority,
@@ -36,13 +38,18 @@ from trading_bot.runtime.windows_effectful_capture import (
     prepare_production_capture_plan,
 )
 from trading_bot.runtime.windows_effectful_capture_native import (
+    PRODUCTION_C3_CHILD_BASE_ARGUMENTS,
+    PRODUCTION_C3_PYTHON_EXECUTABLE,
     C3ParentCleanupStatus,
     C3ProcessOutcomeStatus,
     C3ResultTransportStatus,
+    CtypesWindowsEffectfulCaptureNativeApi,
     NativeFileIdentity,
     NativeOpenedArtifact,
     SuspendedCaptureChild,
     WindowsEffectfulCaptureNativeApi,
+    WindowsEffectfulCaptureProcessNotCreatedError,
+    create_production_suspended_capture_child,
     create_suspended_capture_child_for_test,
     deliver_canonical_child_request,
     observe_resumed_capture_child,
@@ -1758,6 +1765,221 @@ class C3C2TransactionalAdapterForTest:
         raise TypeError("C3-C2 adapter cannot be pickled")
 
 
+class _ProductionC3TransactionalAdapter(C3C2TransactionalAdapterForTest):
+    """Fixed production C3 adapter; no deployment or native input is injectable."""
+
+    __slots__ = (
+        "_active_plans",
+        "_closed",
+        "_issuer",
+        "_pending_plan",
+        "__weakref__",
+    )
+
+    def __init__(
+        self,
+        capture: WindowsEffectfulDailySnapshotCapture,
+        native_api: CtypesWindowsEffectfulCaptureNativeApi,
+    ) -> None:
+        if type(capture) is not WindowsEffectfulDailySnapshotCapture:
+            raise TypeError("production C3 adapter requires its composition root")
+        if type(native_api) is not CtypesWindowsEffectfulCaptureNativeApi:
+            raise TypeError("production C3 adapter requires the exact ctypes API")
+        self._capture = capture
+        self._native_api = native_api
+        self._registry = _C3LiveProcessRegistry()
+        self._launch_plans = {}
+        self._expected_requests = {}
+        self._active_plans: dict[str, ProductionCapturePlan] = {}
+        self._pending_plan: ProductionCapturePlan | None = None
+        self._issuer: object | None = None
+        self._closed = False
+
+    def _bind_production_c2_issuer(self, issuer: object) -> None:
+        self._require_open()
+        required = (
+            "issue_constructed_provider",
+            "issue_process_creation_receipt",
+            "issue_process_creation_failure",
+            "issue_resume_receipt",
+        )
+        if self._issuer is not None or not all(
+            callable(getattr(issuer, name, None)) for name in required
+        ):
+            raise WindowsEffectfulCaptureCompositionError(
+                "production C2 issuer binding is invalid"
+            )
+        self._issuer = issuer
+
+    def register_capture_plan(self, plan: ProductionCapturePlan) -> None:
+        self._require_open()
+        if type(plan) is not ProductionCapturePlan:
+            raise TypeError("production C3 adapter requires ProductionCapturePlan")
+        if self._pending_plan is not None:
+            raise WindowsEffectfulCaptureCompositionError(
+                "production C3 already has a pending capture plan"
+            )
+        self._pending_plan = plan
+
+    def construct_provider(
+        self, capability: ProviderConstructionPermit, *, fail: bool = False
+    ) -> ConstructedProvider:
+        self._require_open()
+        if fail:
+            raise WindowsEffectfulCaptureCompositionError(
+                "injected production C3 provider-plan failure"
+            )
+        reservation_id = capability.reservation_id
+        plan = self._pending_plan
+        if plan is None or reservation_id in self._launch_plans:
+            raise WindowsEffectfulCaptureCompositionError(
+                "production C3 has no unique pending plan for this reservation"
+            )
+        bound = bind_production_capture_plan(plan, reservation_id)
+        self._launch_plans[reservation_id] = build_production_provider_launch_plan(
+            bound
+        )
+        self._active_plans[reservation_id] = plan
+        self._pending_plan = None
+        issuer = self._require_issuer()
+        return issuer.issue_constructed_provider(reservation_id)
+
+    def create_process(
+        self, process_intent: ProcessIntent, *, fail: bool = False
+    ) -> ProcessCreationReceipt | ProcessCreationFailure:
+        self._require_open()
+        if fail:
+            raise WindowsEffectfulCaptureCompositionError(
+                "injected production C3 process creation failure"
+            )
+        reservation_id = process_intent.reservation_id
+        if reservation_id not in self._launch_plans:
+            raise WindowsEffectfulCaptureCompositionError(
+                "production C3 process creation has no exact provider launch plan"
+            )
+        issuer = self._require_issuer()
+        try:
+            child = create_production_suspended_capture_child(
+                reservation_id, self._native_api
+            )
+        except WindowsEffectfulCaptureProcessNotCreatedError:
+            return issuer.issue_process_creation_failure(
+                reservation_id, process_intent.intent_digest
+            )
+        try:
+            receipt = issuer.issue_process_creation_receipt(
+                reservation_id,
+                process_intent.intent_digest,
+                application_name=PRODUCTION_C3_PYTHON_EXECUTABLE,
+                child_base_arguments=PRODUCTION_C3_CHILD_BASE_ARGUMENTS,
+            )
+            self._registry.register_created(
+                reservation_id=reservation_id,
+                process_intent_digest=process_intent.intent_digest,
+                receipt=receipt,
+                child=child,
+            )
+            return receipt
+        except BaseException:
+            child.close()
+            raise
+
+    def resume_thread(
+        self, resume_intent: ResumeIntent, *, fail: bool = False
+    ) -> ResumeReceipt:
+        self._require_open()
+        if fail:
+            raise WindowsEffectfulCaptureCompositionError(
+                "injected production C3 resume failure"
+            )
+        self._registry.resume(resume_intent)
+        issuer = self._require_issuer()
+        receipt = issuer.issue_resume_receipt(
+            resume_intent.execution_id,
+            resume_intent.reservation_id,
+            resume_intent.intent_digest,
+        )
+        self._registry.retain_resume_receipt(resume_intent, receipt)
+        return receipt
+
+    def bind_execution(
+        self,
+        receipt: ProcessCreationReceipt,
+        reservation_id: str,
+        execution_id: str,
+    ) -> None:
+        self._require_open()
+        self._registry.bind_execution(
+            receipt=receipt,
+            reservation_id=reservation_id,
+            execution_id=execution_id,
+        )
+        try:
+            plan = self._active_plans[reservation_id]
+        except KeyError:
+            raise WindowsEffectfulCaptureCompositionError(
+                "production C3 execution has no exact capture plan"
+            ) from None
+        prepared = self._capture._prepare_execution(
+            plan,
+            reservation_id=reservation_id,
+            execution_id=execution_id,
+        )
+        launch = self._launch_plans.get(reservation_id)
+        if launch is None or launch != prepared.provider_launch_plan:
+            raise WindowsEffectfulCaptureCompositionError(
+                "production C3 request does not match its provider launch plan"
+            )
+        binding = (reservation_id, execution_id)
+        if binding in self._expected_requests:
+            raise WindowsEffectfulCaptureCompositionError(
+                "production C3 child request binding is duplicate"
+            )
+        self._expected_requests[binding] = serialize_isolated_capture_child_request(
+            prepared.child_request
+        )
+
+    def consume_c3_terminal(
+        self,
+        authorization: object,
+        lineage: tuple[str, str, str, str, str],
+    ) -> None:
+        super().consume_c3_terminal(authorization, lineage)
+        self._active_plans.pop(lineage[3], None)
+
+    def close(self) -> None:
+        if self._closed:
+            return
+        self._closed = True
+        try:
+            super().close()
+        finally:
+            self._active_plans.clear()
+            self._pending_plan = None
+            self._issuer = None
+
+    def _require_issuer(self):
+        issuer = self._issuer
+        if issuer is None:
+            raise WindowsEffectfulCaptureCompositionError(
+                "production C3 adapter has no exact C2 issuer"
+            )
+        return issuer
+
+    def _require_open(self) -> None:
+        if self._closed:
+            raise WindowsEffectfulCaptureCompositionError(
+                "production C3 adapter is closed"
+            )
+
+    def __copy__(self) -> object:
+        raise TypeError("production C3 adapter cannot be copied")
+
+    def __deepcopy__(self, memo: object) -> object:
+        del memo
+        raise TypeError("production C3 adapter cannot be deep-copied")
+
+
 @dataclass(frozen=True, slots=True)
 class PreparedProductionCaptureExecution:
     """Nonsecret C3 material bound to one exact C2 reservation/execution pair."""
@@ -1807,9 +2029,9 @@ class PreparedProductionCaptureExecution:
 
 
 class WindowsEffectfulDailySnapshotCapture:
-    """C3 production composition root with no external effects in A3."""
+    """C3 production composition root for the fixed reviewed deployment."""
 
-    __slots__ = ("_authority", "_closed", "_transactional")
+    __slots__ = ("_adapter", "_authority", "_closed", "_transactional")
 
     def __init__(self, authority: ValidatedProductionAuthority) -> None:
         validated = require_validated_production_authority(authority)
@@ -1822,8 +2044,17 @@ class WindowsEffectfulDailySnapshotCapture:
                 "C3 authority is not bound to the exact Alpaca daily snapshot operation"
             )
         self._authority = validated
-        self._transactional = WindowsTransactionalAuthority(validated)
         self._closed = False
+        native_api = CtypesWindowsEffectfulCaptureNativeApi()
+        adapter = _ProductionC3TransactionalAdapter(self, native_api)
+        self._adapter = adapter
+        try:
+            self._transactional = WindowsTransactionalAuthority._for_production_c3(
+                validated, adapter
+            )
+        except BaseException:
+            adapter.close()
+            raise
 
     @property
     def authority(self) -> ValidatedProductionAuthority:
@@ -1843,13 +2074,26 @@ class WindowsEffectfulDailySnapshotCapture:
         requested_at_utc: datetime,
     ) -> ProductionCapturePlan:
         self._require_open()
-        return prepare_production_capture_plan(request, requested_at_utc)
+        plan = prepare_production_capture_plan(request, requested_at_utc)
+        adapter = getattr(self, "_adapter", None)
+        if type(adapter) is _ProductionC3TransactionalAdapter:
+            adapter.register_capture_plan(plan)
+        return plan
 
     def close(self) -> None:
         if self._closed:
             return
         self._closed = True
-        self._transactional.close()
+        failures: list[BaseException] = []
+        for resource in (self._adapter, self._transactional):
+            try:
+                resource.close()
+            except BaseException as error:
+                failures.append(error)
+        if failures:
+            raise WindowsEffectfulCaptureCompositionError(
+                "C3 production composition cleanup was incomplete"
+            ) from failures[0]
 
     def _prepare_execution(
         self,

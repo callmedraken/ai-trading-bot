@@ -7,6 +7,7 @@ import pickle
 
 import pytest
 
+import trading_bot.runtime.windows_effectful_capture_native as native_module
 from trading_bot.runtime.windows_effectful_capture_native import (
     C3_CREATE_PROCESS_FLAGS,
     C3_OVERLAPPED_CANCEL_SETTLEMENT_TIMEOUT_MS,
@@ -20,6 +21,10 @@ from trading_bot.runtime.windows_effectful_capture_native import (
     FILE_FLAG_FIRST_PIPE_INSTANCE,
     FILE_FLAG_OVERLAPPED,
     PIPE_REJECT_REMOTE_CLIENTS,
+    PRODUCTION_C3_CHILD_BASE_ARGUMENTS,
+    PRODUCTION_C3_CONTROLLED_TEMP_ROOT,
+    PRODUCTION_C3_PYTHON_EXECUTABLE,
+    PRODUCTION_C3_RUNTIME_ROOT,
     C3NativeWaitStatus,
     CtypesWindowsEffectfulCaptureNativeApi,
     NativeCreatedProcess,
@@ -30,7 +35,10 @@ from trading_bot.runtime.windows_effectful_capture_native import (
     SuspendedCaptureChild,
     WindowsEffectfulCaptureNativeError,
     WindowsEffectfulCaptureNativeUnsupportedError,
+    WindowsEffectfulCaptureProcessNotCreatedError,
+    WindowsEffectfulCaptureProcessOutcomeUnknownError,
     build_c3_child_environment,
+    create_production_suspended_capture_child,
     create_suspended_capture_child_for_test,
     deliver_canonical_child_request,
     resume_suspended_capture_child,
@@ -73,6 +81,7 @@ class FakeNativeApi:
         self.written = bytearray()
         self.process_call: dict[str, object] | None = None
         self.staging_object: NativeStagingObject | None = None
+        self.expected_staging = _STAGING
         self._pipe_count = 0
 
     def _event(self, value: str) -> None:
@@ -102,7 +111,7 @@ class FakeNativeApi:
         self._event(f"inherit:{handle}:{inheritable}")
 
     def create_staging_file(self, path: str) -> NativeStagingObject:
-        assert path == _STAGING
+        assert path == self.expected_staging
         self._event("create_staging")
         self.staging_object = NativeStagingObject(
             105, 108, NativeFileIdentity(7, b"i" * 16), path
@@ -256,6 +265,40 @@ def test_containment_prepares_job_channels_staging_and_suspended_process() -> No
     assert api.staging_object.parent_inheritable is False
     assert api.staging_object.child_access_mask == 0x40000000
     assert api.staging_object.identity == NativeFileIdentity(7, b"i" * 16)
+
+
+def test_production_containment_uses_only_fixed_deployment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    reservation_id = "11111111-1111-4111-8111-111111111111"
+    api = FakeNativeApi()
+    api.expected_staging = (
+        r"F:\AITradingBot\Authority\capture-output\.c3-capture-"
+        f"{reservation_id}.staging"
+    )
+    monkeypatch.setattr(
+        native_module, "CtypesWindowsEffectfulCaptureNativeApi", FakeNativeApi
+    )
+    monkeypatch.setattr(native_module.os, "environ", _PARENT_ENV)
+
+    child = create_production_suspended_capture_child(reservation_id, api)
+
+    call = api.process_call
+    assert call is not None
+    assert call["application_name"] == PRODUCTION_C3_PYTHON_EXECUTABLE
+    assert call["current_directory"] == PRODUCTION_C3_RUNTIME_ROOT
+    assert call["arguments"][:2] == PRODUCTION_C3_CHILD_BASE_ARGUMENTS
+    assert call["environment"] == {
+        "SystemRoot": r"C:\Windows",
+        "WINDIR": r"C:\Windows",
+        "TEMP": PRODUCTION_C3_CONTROLLED_TEMP_ROOT,
+        "TMP": PRODUCTION_C3_CONTROLLED_TEMP_ROOT,
+        "PYTHONUTF8": "1",
+    }
+    assert call["inherited_handles"] == (101, 104, 108)
+    assert api.staging_object is not None
+    assert api.staging_object.path == api.expected_staging
+    child.close()
 
 
 def test_flags_are_exact_and_have_no_breakaway_bits() -> None:
@@ -423,6 +466,14 @@ def test_partial_failure_cleans_acquired_handles_with_job_last(
     ]
     assert closed == expected_closed
     assert not closed or closed[-1] == 100
+
+
+def test_native_failure_classification_never_fabricates_not_created() -> None:
+    with pytest.raises(WindowsEffectfulCaptureProcessNotCreatedError):
+        _create(FakeNativeApi(fail_at="set_job_limits"))
+
+    with pytest.raises(WindowsEffectfulCaptureProcessOutcomeUnknownError):
+        _create(FakeNativeApi(fail_at="create_process"))
 
 
 @pytest.mark.parametrize(

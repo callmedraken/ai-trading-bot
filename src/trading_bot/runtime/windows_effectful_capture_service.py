@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import threading
+import weakref
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -73,6 +74,7 @@ from trading_bot.runtime.windows_effectful_capture_protocol import (
     serialize_isolated_capture_child_result,
 )
 from trading_bot.runtime.windows_transactional_authority import (
+    _PRODUCTION_C3_COMPOSITION_BINDING_CONSTRUCTOR,
     ConstructedProvider,
     ProcessCreationFailure,
     ProcessCreationReceipt,
@@ -81,6 +83,8 @@ from trading_bot.runtime.windows_transactional_authority import (
     ResumeIntent,
     ResumeReceipt,
     WindowsTransactionalAuthority,
+    _create_production_c3_composition_binding_issuer,
+    _issue_production_c3_composition_binding,
 )
 
 
@@ -119,6 +123,146 @@ class C3C2ResumedCaptureForTest:
 
 _C3_C3B_OBSERVATION_ISSUER = object()
 _C3_POST_RESUME_EVIDENCE_CONSTRUCTOR = object()
+_PRODUCTION_C3_COMPOSITION_ISSUANCE_CONSTRUCTOR = object()
+_PRODUCTION_C3_ROOT_CONSTRUCTOR = object()
+_PRODUCTION_C3_ROOT_CONSTRUCTIONS_LOCK = threading.Lock()
+_PRODUCTION_C3_ROOT_CONSTRUCTIONS: weakref.WeakKeyDictionary[
+    WindowsEffectfulDailySnapshotCapture,
+    object,
+] = weakref.WeakKeyDictionary()
+
+
+@dataclass(slots=True)
+class _ProductionC3CompositionIssuanceRecord:
+    root: WindowsEffectfulDailySnapshotCapture
+    authority: ValidatedProductionAuthority
+    adapter: _ProductionC3TransactionalAdapter
+    issuer: object
+
+
+_PRODUCTION_C3_COMPOSITION_ISSUANCES_LOCK = threading.Lock()
+_PRODUCTION_C3_COMPOSITION_ISSUANCES: weakref.WeakKeyDictionary[
+    _ProductionC3CompositionIssuance,
+    _ProductionC3CompositionIssuanceRecord,
+] = weakref.WeakKeyDictionary()
+
+
+class _ProductionC3CompositionIssuance:
+    """Exact one-shot issuance retained only by one genuine production root."""
+
+    __slots__ = ("_issuance_provenance", "__weakref__")
+
+    def __init_subclass__(cls, **kwargs: object) -> None:
+        del kwargs
+        raise TypeError("production C3 composition issuances cannot be subclassed")
+
+    def __new__(cls, *args: object) -> object:
+        del args
+        raise TypeError("production C3 composition issuance requires its root")
+
+    def __init__(self, *args: object) -> None:
+        del args
+        raise TypeError("production C3 composition issuance requires its root")
+
+    def issue_binding(self, root: WindowsEffectfulDailySnapshotCapture) -> object:
+        if (
+            type(self) is not _ProductionC3CompositionIssuance
+            or self._issuance_provenance
+            is not _PRODUCTION_C3_COMPOSITION_ISSUANCE_CONSTRUCTOR
+        ):
+            raise TypeError("production C3 composition issuance is invalid")
+        with _PRODUCTION_C3_COMPOSITION_ISSUANCES_LOCK:
+            record = _PRODUCTION_C3_COMPOSITION_ISSUANCES.get(self)
+            if (
+                type(record) is not _ProductionC3CompositionIssuanceRecord
+                or record.issuer is not _PRODUCTION_C3_COMPOSITION_ISSUANCE_CONSTRUCTOR
+            ):
+                raise WindowsEffectfulCaptureCompositionError(
+                    "production C3 composition issuance is unavailable"
+                )
+            adapter = record.adapter
+            authority = record.authority
+            if (
+                type(root) is not WindowsEffectfulDailySnapshotCapture
+                or root is not record.root
+                or type(adapter) is not _ProductionC3TransactionalAdapter
+                or root._adapter is not adapter
+                or root._authority is not authority
+                or root._production_c2_binding_issuance is not self
+                or root._production_c2_binding_issued
+                or adapter._capture is not root
+                or adapter._authority is not authority
+                or type(adapter._native_api)
+                is not CtypesWindowsEffectfulCaptureNativeApi
+                or adapter._closed
+                or adapter._issuer is not None
+            ):
+                raise WindowsEffectfulCaptureCompositionError(
+                    "production C3 composition binding is inconsistent"
+                )
+            del _PRODUCTION_C3_COMPOSITION_ISSUANCES[self]
+            root._production_c2_binding_issued = True
+        binding_issuer = _create_production_c3_composition_binding_issuer(
+            _PRODUCTION_C3_COMPOSITION_BINDING_CONSTRUCTOR,
+            authority=authority,
+            adapter=adapter,
+            composition_root=root,
+            composition_issuance=self,
+        )
+        return _issue_production_c3_composition_binding(binding_issuer)
+
+    def __copy__(self) -> object:
+        raise TypeError("production C3 composition issuances cannot be copied")
+
+    def __deepcopy__(self, memo: object) -> object:
+        del memo
+        raise TypeError("production C3 composition issuances cannot be deep-copied")
+
+    def __reduce__(self) -> object:
+        raise TypeError("production C3 composition issuances cannot be serialized")
+
+    def __reduce_ex__(self, protocol: int) -> object:
+        del protocol
+        raise TypeError("production C3 composition issuances cannot be pickled")
+
+
+def _create_production_c3_composition_issuance(
+    root: WindowsEffectfulDailySnapshotCapture,
+    authority: ValidatedProductionAuthority,
+    adapter: _ProductionC3TransactionalAdapter,
+) -> _ProductionC3CompositionIssuance:
+    with _PRODUCTION_C3_ROOT_CONSTRUCTIONS_LOCK:
+        construction = _PRODUCTION_C3_ROOT_CONSTRUCTIONS.pop(root, None)
+    if (
+        construction is not _PRODUCTION_C3_ROOT_CONSTRUCTOR
+        or type(root) is not WindowsEffectfulDailySnapshotCapture
+        or type(adapter) is not _ProductionC3TransactionalAdapter
+        or root._adapter is not adapter
+        or root._authority is not authority
+        or adapter._capture is not root
+        or adapter._authority is not authority
+        or type(adapter._native_api) is not CtypesWindowsEffectfulCaptureNativeApi
+        or adapter._closed
+        or adapter._issuer is not None
+        or root._production_c2_binding_issued
+    ):
+        raise WindowsEffectfulCaptureCompositionError(
+            "production C3 composition cannot issue its binding"
+        )
+    issuance = object.__new__(_ProductionC3CompositionIssuance)
+    issuance._issuance_provenance = _PRODUCTION_C3_COMPOSITION_ISSUANCE_CONSTRUCTOR
+    with _PRODUCTION_C3_COMPOSITION_ISSUANCES_LOCK:
+        _PRODUCTION_C3_COMPOSITION_ISSUANCES[issuance] = (
+            _ProductionC3CompositionIssuanceRecord(
+                root=root,
+                authority=authority,
+                adapter=adapter,
+                issuer=_PRODUCTION_C3_COMPOSITION_ISSUANCE_CONSTRUCTOR,
+            )
+        )
+    return issuance
+
+
 _C3_TERMINAL_AUTHORIZATION_CONSTRUCTOR = object()
 _MAX_C3_CLEANUP_EVIDENCE_BYTES = 1024
 _MAX_C3_TERMINAL_EVIDENCE_BYTES = 2048
@@ -1770,6 +1914,7 @@ class _ProductionC3TransactionalAdapter(C3C2TransactionalAdapterForTest):
 
     __slots__ = (
         "_active_plans",
+        "_authority",
         "_closed",
         "_issuer",
         "_pending_plan",
@@ -1779,13 +1924,17 @@ class _ProductionC3TransactionalAdapter(C3C2TransactionalAdapterForTest):
     def __init__(
         self,
         capture: WindowsEffectfulDailySnapshotCapture,
+        authority: ValidatedProductionAuthority,
         native_api: CtypesWindowsEffectfulCaptureNativeApi,
     ) -> None:
         if type(capture) is not WindowsEffectfulDailySnapshotCapture:
             raise TypeError("production C3 adapter requires its composition root")
         if type(native_api) is not CtypesWindowsEffectfulCaptureNativeApi:
             raise TypeError("production C3 adapter requires the exact ctypes API")
+        if capture._authority is not authority:
+            raise TypeError("production C3 adapter requires its root authority")
         self._capture = capture
+        self._authority = authority
         self._native_api = native_api
         self._registry = _C3LiveProcessRegistry()
         self._launch_plans = {}
@@ -1810,6 +1959,10 @@ class _ProductionC3TransactionalAdapter(C3C2TransactionalAdapterForTest):
                 "production C2 issuer binding is invalid"
             )
         self._issuer = issuer
+
+    def _revoke_production_c2_issuer(self, issuer: object) -> None:
+        if self._issuer is issuer:
+            self._issuer = None
 
     def register_capture_plan(self, plan: ProductionCapturePlan) -> None:
         self._require_open()
@@ -2031,7 +2184,26 @@ class PreparedProductionCaptureExecution:
 class WindowsEffectfulDailySnapshotCapture:
     """C3 production composition root for the fixed reviewed deployment."""
 
-    __slots__ = ("_adapter", "_authority", "_closed", "_transactional")
+    __slots__ = (
+        "_adapter",
+        "_authority",
+        "_closed",
+        "_production_c2_binding_issuance",
+        "_production_c2_binding_issued",
+        "_transactional",
+        "__weakref__",
+    )
+
+    def __new__(
+        cls, authority: ValidatedProductionAuthority
+    ) -> WindowsEffectfulDailySnapshotCapture:
+        del authority
+        if cls is not WindowsEffectfulDailySnapshotCapture:
+            raise TypeError("production C3 composition root cannot be subclassed")
+        root = super().__new__(cls)
+        with _PRODUCTION_C3_ROOT_CONSTRUCTIONS_LOCK:
+            _PRODUCTION_C3_ROOT_CONSTRUCTIONS[root] = _PRODUCTION_C3_ROOT_CONSTRUCTOR
+        return root
 
     def __init__(self, authority: ValidatedProductionAuthority) -> None:
         validated = require_validated_production_authority(authority)
@@ -2045,12 +2217,16 @@ class WindowsEffectfulDailySnapshotCapture:
             )
         self._authority = validated
         self._closed = False
+        self._production_c2_binding_issued = False
         native_api = CtypesWindowsEffectfulCaptureNativeApi()
-        adapter = _ProductionC3TransactionalAdapter(self, native_api)
+        adapter = _ProductionC3TransactionalAdapter(self, validated, native_api)
         self._adapter = adapter
+        issuance = _create_production_c3_composition_issuance(self, validated, adapter)
+        self._production_c2_binding_issuance = issuance
         try:
+            binding = issuance.issue_binding(self)
             self._transactional = WindowsTransactionalAuthority._for_production_c3(
-                validated, adapter
+                binding
             )
         except BaseException:
             adapter.close()

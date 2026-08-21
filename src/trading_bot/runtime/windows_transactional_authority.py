@@ -837,6 +837,212 @@ _ISSUED_RESUME_PERMITS = _WeakIssuanceRegistry(_ISSUED_RESUME_PERMITS_LOCK)
 _ISSUED_RESUME_RESULTS = _WeakIssuanceRegistry(_ISSUED_RESUME_RESULTS_LOCK)
 
 _PRODUCTION_C3_RESULT_ISSUER_CONSTRUCTOR = object()
+_PRODUCTION_C3_COMPOSITION_BINDING_CONSTRUCTOR = object()
+
+
+class _ProductionC3CompositionBindingIssuer:
+    """Sealed one-shot issuer populated only after exact C3-root validation."""
+
+    __slots__ = (
+        "_active",
+        "_adapter",
+        "_authority",
+        "_composition_issuance",
+        "_composition_root",
+        "_issuance_provenance",
+        "_lock",
+    )
+
+    def __init_subclass__(cls, **kwargs: object) -> None:
+        del kwargs
+        raise TypeError("production C3 binding issuers cannot be subclassed")
+
+    def __new__(cls, *args: object) -> Self:
+        del args
+        raise TypeError("production C3 binding issuers require their factory")
+
+    def __init__(self, *args: object) -> None:
+        del args
+        raise TypeError("production C3 binding issuers require their factory")
+
+    def _claim(
+        self,
+    ) -> tuple[
+        ValidatedProductionAuthority,
+        TransactionalAuthorityAdapter,
+        object,
+        object,
+    ]:
+        if (
+            type(self) is not _ProductionC3CompositionBindingIssuer
+            or self._issuance_provenance
+            is not _PRODUCTION_C3_COMPOSITION_BINDING_CONSTRUCTOR
+        ):
+            raise TypeError("production C3 composition binding issuer is invalid")
+        with self._lock:
+            if not self._active:
+                raise TypeError(
+                    "production C3 composition binding issuer is already consumed"
+                )
+            self._active = False
+            authority = self._authority
+            adapter = self._adapter
+            composition_root = self._composition_root
+            composition_issuance = self._composition_issuance
+            self._authority = None
+            self._adapter = None
+            self._composition_root = None
+            self._composition_issuance = None
+        if type(authority) is not ValidatedProductionAuthority or adapter is None:
+            raise TypeError("production C3 composition binding issuer is invalid")
+        return authority, adapter, composition_root, composition_issuance
+
+    def __copy__(self) -> object:
+        raise TypeError("production C3 binding issuers cannot be copied")
+
+    def __deepcopy__(self, memo: object) -> object:
+        del memo
+        raise TypeError("production C3 binding issuers cannot be deep-copied")
+
+    def __reduce__(self) -> object:
+        raise TypeError("production C3 binding issuers cannot be serialized")
+
+    def __reduce_ex__(self, protocol: int) -> object:
+        del protocol
+        raise TypeError("production C3 binding issuers cannot be pickled")
+
+
+def _create_production_c3_composition_binding_issuer(
+    constructor: object,
+    *,
+    authority: ValidatedProductionAuthority,
+    adapter: TransactionalAuthorityAdapter,
+    composition_root: object,
+    composition_issuance: object,
+) -> _ProductionC3CompositionBindingIssuer:
+    if constructor is not _PRODUCTION_C3_COMPOSITION_BINDING_CONSTRUCTOR:
+        raise TypeError("production C3 composition binding issuer is unavailable")
+    if (
+        type(authority) is not ValidatedProductionAuthority
+        or adapter is None
+        or composition_root is None
+        or composition_issuance is None
+    ):
+        raise TypeError("production C3 composition binding issuer is invalid")
+    issuer = object.__new__(_ProductionC3CompositionBindingIssuer)
+    issuer._active = True
+    issuer._adapter = adapter
+    issuer._authority = authority
+    issuer._composition_issuance = composition_issuance
+    issuer._composition_root = composition_root
+    issuer._issuance_provenance = _PRODUCTION_C3_COMPOSITION_BINDING_CONSTRUCTOR
+    issuer._lock = threading.Lock()
+    return issuer
+
+
+@dataclass(slots=True)
+class _ProductionC3CompositionBindingRecord:
+    binding: weakref.ReferenceType[_ProductionC3CompositionBinding]
+    authority: ValidatedProductionAuthority
+    adapter: TransactionalAuthorityAdapter
+    composition_root: object
+    composition_issuance: object
+    issuer: _ProductionC3CompositionBindingIssuer
+
+
+_PRODUCTION_C3_COMPOSITION_BINDINGS_LOCK = threading.Lock()
+_PRODUCTION_C3_COMPOSITION_BINDINGS: weakref.WeakKeyDictionary[
+    _ProductionC3CompositionBinding,
+    _ProductionC3CompositionBindingRecord,
+] = weakref.WeakKeyDictionary()
+
+
+class _ProductionC3CompositionBinding:
+    """Sealed one-shot binding issued by the reviewed C3 composition root."""
+
+    __slots__ = ("_issuance_provenance", "__weakref__")
+
+    def __init_subclass__(cls, **kwargs: object) -> None:
+        del kwargs
+        raise TypeError("production C3 composition bindings cannot be subclassed")
+
+    def __new__(cls, *args: object) -> Self:
+        del args
+        raise TypeError("production C3 composition bindings require their issuer")
+
+    def __init__(self, *args: object) -> None:
+        del args
+        raise TypeError("production C3 composition bindings require their issuer")
+
+    def __copy__(self) -> object:
+        raise TypeError("production C3 composition bindings cannot be copied")
+
+    def __deepcopy__(self, memo: object) -> object:
+        del memo
+        raise TypeError("production C3 composition bindings cannot be deep-copied")
+
+    def __reduce__(self) -> object:
+        raise TypeError("production C3 composition bindings cannot be serialized")
+
+    def __reduce_ex__(self, protocol: int) -> object:
+        del protocol
+        raise TypeError("production C3 composition bindings cannot be pickled")
+
+
+def _issue_production_c3_composition_binding(
+    issuer: _ProductionC3CompositionBindingIssuer,
+) -> _ProductionC3CompositionBinding:
+    if type(issuer) is not _ProductionC3CompositionBindingIssuer:
+        raise TypeError("production C3 composition binding requires its exact issuer")
+    authority, adapter, composition_root, composition_issuance = issuer._claim()
+    binding = object.__new__(_ProductionC3CompositionBinding)
+    binding._issuance_provenance = _PRODUCTION_C3_COMPOSITION_BINDING_CONSTRUCTOR
+    record = _ProductionC3CompositionBindingRecord(
+        binding=weakref.ref(binding),
+        authority=authority,
+        adapter=adapter,
+        composition_root=composition_root,
+        composition_issuance=composition_issuance,
+        issuer=issuer,
+    )
+    with _PRODUCTION_C3_COMPOSITION_BINDINGS_LOCK:
+        _PRODUCTION_C3_COMPOSITION_BINDINGS[binding] = record
+    return binding
+
+
+def _claim_production_c3_composition_binding(
+    binding: object,
+) -> tuple[
+    ValidatedProductionAuthority,
+    TransactionalAuthorityAdapter,
+    object,
+    object,
+]:
+    if (
+        type(binding) is not _ProductionC3CompositionBinding
+        or binding._issuance_provenance
+        is not _PRODUCTION_C3_COMPOSITION_BINDING_CONSTRUCTOR
+    ):
+        raise TypeError("production C3 requires its exact composition binding")
+    with _PRODUCTION_C3_COMPOSITION_BINDINGS_LOCK:
+        record = _PRODUCTION_C3_COMPOSITION_BINDINGS.pop(binding, None)
+        if (
+            type(record) is not _ProductionC3CompositionBindingRecord
+            or type(record.issuer) is not _ProductionC3CompositionBindingIssuer
+            or record.issuer._issuance_provenance
+            is not _PRODUCTION_C3_COMPOSITION_BINDING_CONSTRUCTOR
+            or record.issuer._active
+            or record.binding() is not binding
+        ):
+            raise TypeError(
+                "production C3 composition binding is invalid or already consumed"
+            )
+    return (
+        record.authority,
+        record.adapter,
+        record.composition_root,
+        record.composition_issuance,
+    )
 
 
 class _ProductionC3ResultIssuer:
@@ -5984,8 +6190,8 @@ class WindowsTransactionalAuthority:
 
     Production construction accepts only the genuine C1 capability.  It never
     accepts a path, SQLite connection, schema identity, or public side-effect
-    adapter.  The private C3 composition factory and disposable `for_test`
-    factory are the only adapter-binding seams.
+    adapter.  The private C3 composition-binding factory and disposable
+    `for_test` factory are the only adapter-binding seams.
     """
 
     def __init__(self, authority: ValidatedProductionAuthority) -> None:
@@ -6007,36 +6213,66 @@ class WindowsTransactionalAuthority:
     @classmethod
     def _for_production_c3(
         cls,
-        authority: ValidatedProductionAuthority,
-        adapter: TransactionalAuthorityAdapter,
+        binding: _ProductionC3CompositionBinding,
     ) -> Self:
-        """Privately bind one reviewed production C3 adapter to production C2."""
+        """Consume one exact reviewed production-C3 composition binding."""
 
-        bind_issuer = getattr(adapter, "_bind_production_c2_issuer", None)
-        if not callable(bind_issuer):
-            raise TypeError("production C3 adapter binding is invalid")
-        instance = cls(authority)
-        issuer = _ProductionC3ResultIssuer(
-            _PRODUCTION_C3_RESULT_ISSUER_CONSTRUCTOR, adapter
+        authority, adapter, _composition_root, _composition_issuance = (
+            _claim_production_c3_composition_binding(binding)
         )
-        instance._context = _ServiceContext(
-            authority=instance._authority,
-            lifecycle_arbiter_factory=_production_lifecycle_arbiter_factory(
-                instance._authority
-            ),
-            timestamp_provider=_production_timestamp,
-            capture_request_provider=_snapshot_capture_request,
-            test_only=False,
-            external_adapter=adapter,
-        )
-        instance._production_c3_issuer = issuer
+        instance: Self | None = None
+        issuer: _ProductionC3ResultIssuer | None = None
         try:
+            validated = require_validated_production_authority(authority)
+            if validated is not authority:
+                raise TypeError(
+                    "production C3 binding changed its authority capability"
+                )
+            instance = cls(authority)
+            issuer = _ProductionC3ResultIssuer(
+                _PRODUCTION_C3_RESULT_ISSUER_CONSTRUCTOR, adapter
+            )
+            instance._context = _ServiceContext(
+                authority=instance._authority,
+                lifecycle_arbiter_factory=_production_lifecycle_arbiter_factory(
+                    instance._authority
+                ),
+                timestamp_provider=_production_timestamp,
+                capture_request_provider=_snapshot_capture_request,
+                test_only=False,
+                external_adapter=adapter,
+            )
+            instance._production_c3_issuer = issuer
+            bind_issuer = getattr(adapter, "_bind_production_c2_issuer", None)
+            if not callable(bind_issuer):
+                raise TypeError("production C3 adapter binding is invalid")
             bind_issuer(issuer)
         except BaseException:
-            issuer.close()
-            instance._production_c3_issuer = None
-            instance.close()
+            if issuer is not None:
+                issuer.close()
+            revoke_issuer = getattr(adapter, "_revoke_production_c2_issuer", None)
+            if callable(revoke_issuer) and issuer is not None:
+                try:
+                    revoke_issuer(issuer)
+                except BaseException:
+                    pass
+            if instance is not None:
+                instance._production_c3_issuer = None
+                instance._context = _ServiceContext(
+                    authority=instance._authority,
+                    lifecycle_arbiter_factory=_production_lifecycle_arbiter_factory(
+                        instance._authority
+                    ),
+                    timestamp_provider=_production_timestamp,
+                    capture_request_provider=_snapshot_capture_request,
+                    test_only=False,
+                )
+                instance.close()
             raise
+        if instance is None:
+            raise ExternalAuthorityBoundaryUnavailable(
+                "production C3 composition did not create its service"
+            )
         return instance
 
     @classmethod

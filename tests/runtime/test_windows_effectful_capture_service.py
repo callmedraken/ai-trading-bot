@@ -94,38 +94,94 @@ def _request() -> ProductionCaptureRequest:
     )
 
 
-class _FakeTransactionalAuthority:
-    def __init__(
-        self, authority: ValidatedProductionAuthority, adapter: object | None = None
-    ) -> None:
-        self.authority = authority
-        self.adapter = adapter
-        self.close_count = 0
+class _ExploitShapeAdapter:
+    """Structurally compatible fake that reproduced the original defect."""
 
-    @classmethod
-    def _for_production_c3(
-        cls, authority: ValidatedProductionAuthority, adapter: object
-    ) -> _FakeTransactionalAuthority:
-        instance = cls(authority, adapter)
-        adapter._bind_production_c2_issuer(_FakeProductionIssuer())
-        return instance
+    def __init__(self) -> None:
+        self.delivered_issuer: object | None = None
+
+    def _bind_production_c2_issuer(self, issuer: object) -> None:
+        self.delivered_issuer = issuer
+
+    def construct_provider(self, *args: object, **kwargs: object) -> object:
+        raise AssertionError((args, kwargs))
+
+    def create_process(self, *args: object, **kwargs: object) -> object:
+        raise AssertionError((args, kwargs))
+
+    def resume_thread(self, *args: object, **kwargs: object) -> object:
+        raise AssertionError((args, kwargs))
+
+    def deliver_c3_child_request(self, *args: object, **kwargs: object) -> None:
+        raise AssertionError((args, kwargs))
+
+    def validate_c3_post_resume_evidence(
+        self, *args: object, **kwargs: object
+    ) -> object:
+        raise AssertionError((args, kwargs))
+
+    def consume_c3_post_resume_evidence(self, *args: object, **kwargs: object) -> None:
+        raise AssertionError((args, kwargs))
+
+    def prepare_c3_terminal(self, *args: object, **kwargs: object) -> object:
+        raise AssertionError((args, kwargs))
+
+    def validate_c3_terminal(self, *args: object, **kwargs: object) -> object:
+        raise AssertionError((args, kwargs))
+
+    def consume_c3_terminal(self, *args: object, **kwargs: object) -> None:
+        raise AssertionError((args, kwargs))
+
+
+class _CapturedTransactionalAuthority:
+    def __init__(self, authority: ValidatedProductionAuthority) -> None:
+        self.authority = authority
+        self.close_count = 0
 
     def close(self) -> None:
         self.close_count += 1
 
 
-class _FakeProductionIssuer:
-    def issue_constructed_provider(self, reservation_id: str) -> object:
-        raise AssertionError(reservation_id)
+def _capture_with_unconsumed_binding(
+    monkeypatch: pytest.MonkeyPatch,
+) -> tuple[
+    WindowsEffectfulDailySnapshotCapture,
+    object,
+    object,
+]:
+    authority = _authority()
+    monkeypatch.setattr(
+        service_module,
+        "require_validated_production_authority",
+        lambda candidate: candidate,
+    )
+    monkeypatch.setattr(
+        authority_module,
+        "require_validated_production_authority",
+        lambda candidate: candidate,
+    )
+    monkeypatch.setattr(
+        CtypesWindowsEffectfulCaptureNativeApi,
+        "__init__",
+        lambda self: None,
+    )
+    captured: list[object] = []
+    original_factory = WindowsTransactionalAuthority._for_production_c3
 
-    def issue_process_creation_receipt(self, *args: object, **kwargs: object) -> object:
-        raise AssertionError((args, kwargs))
+    def intercept_factory(cls: type[object], binding: object) -> object:
+        del cls
+        captured.append(binding)
+        return _CapturedTransactionalAuthority(authority)
 
-    def issue_process_creation_failure(self, *args: object) -> object:
-        raise AssertionError(args)
-
-    def issue_resume_receipt(self, *args: object) -> object:
-        raise AssertionError(args)
+    with monkeypatch.context() as intercept:
+        intercept.setattr(
+            WindowsTransactionalAuthority,
+            "_for_production_c3",
+            classmethod(intercept_factory),
+        )
+        capture = WindowsEffectfulDailySnapshotCapture(authority)
+    assert len(captured) == 1
+    return capture, captured[0], original_factory
 
 
 def _capture(
@@ -138,9 +194,9 @@ def _capture(
         lambda candidate: candidate,
     )
     monkeypatch.setattr(
-        service_module,
-        "WindowsTransactionalAuthority",
-        _FakeTransactionalAuthority,
+        authority_module,
+        "require_validated_production_authority",
+        lambda candidate: candidate,
     )
     monkeypatch.setattr(
         CtypesWindowsEffectfulCaptureNativeApi,
@@ -148,6 +204,130 @@ def _capture(
         lambda self: None,
     )
     return WindowsEffectfulDailySnapshotCapture(authority), authority
+
+
+def test_original_arbitrary_adapter_exploit_cannot_acquire_production_issuer(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    authority = _authority()
+    monkeypatch.setattr(
+        authority_module,
+        "require_validated_production_authority",
+        lambda candidate: candidate,
+    )
+    adapter = _ExploitShapeAdapter()
+
+    with pytest.raises(TypeError):
+        WindowsTransactionalAuthority._for_production_c3(authority, adapter)
+    with pytest.raises(TypeError, match="exact composition binding"):
+        WindowsTransactionalAuthority._for_production_c3(adapter)
+    with pytest.raises(TypeError, match="requires its exact issuer"):
+        authority_module._issue_production_c3_composition_binding(object())
+
+    assert adapter.delivered_issuer is None
+
+
+def test_binding_rejects_lookalikes_copy_pickle_and_visible_reconstruction(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    capture, binding, factory = _capture_with_unconsumed_binding(monkeypatch)
+    binding_type = authority_module._ProductionC3CompositionBinding
+
+    class LookalikeBinding:
+        _issuance_provenance = binding._issuance_provenance
+
+    reconstructed = object.__new__(binding_type)
+    reconstructed._issuance_provenance = binding._issuance_provenance
+    try:
+        with pytest.raises(TypeError, match="require their issuer"):
+            binding_type()
+        with pytest.raises(TypeError, match="cannot be copied"):
+            copy(binding)
+        with pytest.raises(TypeError, match="cannot be deep-copied"):
+            deepcopy(binding)
+        with pytest.raises(TypeError, match="cannot be (serialized|pickled)"):
+            pickle.dumps(binding)
+        with pytest.raises(TypeError, match="exact composition binding"):
+            factory(LookalikeBinding())
+        with pytest.raises(TypeError, match="invalid or already consumed"):
+            factory(reconstructed)
+    finally:
+        capture.close()
+
+
+def test_exact_binding_is_one_shot_and_cannot_cross_root_authority_or_adapter(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    capture_a, binding_a, factory = _capture_with_unconsumed_binding(monkeypatch)
+    capture_b, binding_b, _factory_b = _capture_with_unconsumed_binding(monkeypatch)
+    assert capture_a.authority is not capture_b.authority
+    assert capture_a._adapter is not capture_b._adapter
+    assert capture_a._production_c2_binding_issuance is not (
+        capture_b._production_c2_binding_issuance
+    )
+    with authority_module._PRODUCTION_C3_COMPOSITION_BINDINGS_LOCK:
+        issuance_a = authority_module._PRODUCTION_C3_COMPOSITION_BINDINGS[binding_a]
+        issuance_b = authority_module._PRODUCTION_C3_COMPOSITION_BINDINGS[binding_b]
+        assert issuance_a.authority is capture_a.authority
+        assert issuance_a.adapter is capture_a._adapter
+        assert issuance_a.composition_root is capture_a
+        assert (
+            issuance_a.composition_issuance is capture_a._production_c2_binding_issuance
+        )
+        assert issuance_b.authority is capture_b.authority
+        assert issuance_b.adapter is capture_b._adapter
+        assert issuance_b.composition_root is capture_b
+
+    transactional_a = factory(binding_a)
+    transactional_b = factory(binding_b)
+    capture_a._transactional = transactional_a
+    capture_b._transactional = transactional_b
+    try:
+        assert transactional_a.authority is capture_a.authority
+        assert transactional_a._context.external_adapter is capture_a._adapter
+        assert transactional_a._context.external_adapter is not capture_b._adapter
+        assert transactional_b.authority is capture_b.authority
+        assert transactional_b._context.external_adapter is capture_b._adapter
+        with pytest.raises(TypeError, match="invalid or already consumed"):
+            factory(binding_a)
+        with pytest.raises(
+            WindowsEffectfulCaptureCompositionError,
+            match="issuance is unavailable",
+        ):
+            capture_a._production_c2_binding_issuance.issue_binding(capture_b)
+    finally:
+        capture_a.close()
+        capture_b.close()
+
+
+def test_post_claim_binding_failure_revokes_issuer_and_never_restores_binding(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    capture, binding, factory = _capture_with_unconsumed_binding(monkeypatch)
+    adapter = capture._adapter
+    delivered: list[object] = []
+    original_bind = type(adapter)._bind_production_c2_issuer
+
+    def fail_after_delivery(self: object, issuer: object) -> None:
+        original_bind(self, issuer)
+        delivered.append(issuer)
+        raise RuntimeError("injected post-claim binding failure")
+
+    monkeypatch.setattr(
+        type(adapter),
+        "_bind_production_c2_issuer",
+        fail_after_delivery,
+    )
+    try:
+        with pytest.raises(RuntimeError, match="post-claim"):
+            factory(binding)
+        assert len(delivered) == 1
+        assert delivered[0]._active is False
+        assert adapter._issuer is None
+        with pytest.raises(TypeError, match="invalid or already consumed"):
+            factory(binding)
+    finally:
+        capture.close()
 
 
 def test_production_composition_rejects_test_c1_capability() -> None:
@@ -189,7 +369,9 @@ def test_composition_retains_exact_c1_facts_and_owns_c2(
     assert capture.approved_account_sid == authority.approved_account_sid
     assert capture.release_manifest_sha256 == authority.release_manifest_digest
     assert capture._transactional.authority is authority
-    assert capture._transactional.adapter is capture._adapter
+    assert capture._transactional._context.external_adapter is capture._adapter
+    assert capture._adapter._authority is authority
+    assert capture._adapter._capture is capture
     assert type(capture._adapter._native_api) is CtypesWindowsEffectfulCaptureNativeApi
 
 
@@ -363,11 +545,14 @@ def test_close_is_idempotent_and_blocks_future_planning(
 ) -> None:
     capture, _authority_value = _capture(monkeypatch)
     transactional = capture._transactional
+    issuer = transactional._production_c3_issuer
+    assert issuer is not None
 
     capture.close()
     capture.close()
 
-    assert transactional.close_count == 1
+    assert issuer._active is False
+    assert transactional._production_c3_issuer is None
     assert capture._adapter._closed is True
     assert capture._adapter._registry.semantic_snapshot() == ()
     with pytest.raises(WindowsEffectfulCaptureCompositionError, match="closed"):

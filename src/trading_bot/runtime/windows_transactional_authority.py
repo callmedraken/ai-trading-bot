@@ -244,6 +244,21 @@ class TransactionalAuthorityAdapter(Protocol):
         reservation_id: str,
         resume_receipt: ResumeReceipt,
     ) -> None: ...
+    def prepare_c3_terminal(
+        self,
+        lineage: tuple[str, str, str, str, str],
+        verified_snapshot: object | None,
+    ) -> object: ...
+    def validate_c3_terminal(
+        self,
+        authorization: object,
+        lineage: tuple[str, str, str, str, str],
+    ) -> tuple[str, str, bytes | None, bytes, bytes, bytes, bytes]: ...
+    def consume_c3_terminal(
+        self,
+        authorization: object,
+        lineage: tuple[str, str, str, str, str],
+    ) -> None: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -885,6 +900,60 @@ def _json(value: Any) -> bytes:
 
 
 _MAX_C3_CLEANUP_EVIDENCE_BYTES = 1024
+_MAX_C3_TERMINAL_EVIDENCE_BYTES = 2048
+_MAX_C3_TERMINAL_DIAGNOSTICS_BYTES = 512
+_C3_TERMINAL_EVIDENCE_FIELDS = frozenset(
+    {
+        "artifact_identity_sha256",
+        "artifact_sha256",
+        "artifact_verification",
+        "attempt_id",
+        "child_fence_state",
+        "child_request_sha256",
+        "child_result_classification",
+        "child_result_sha256",
+        "claim_id",
+        "execution_id",
+        "parent_cleanup",
+        "process_outcome",
+        "provider_call_disposition",
+        "reservation_id",
+        "result_transport",
+        "schema",
+        "session_id",
+        "snapshot_id",
+        "staging_cleanup",
+        "terminal_state",
+    }
+)
+_C3_CHILD_CLASSIFICATIONS = frozenset(
+    {
+        "SUCCEEDED",
+        "REQUEST_INVALID",
+        "SID_REJECTED",
+        "CREDENTIAL_FAILED",
+        "TRANSPORT_FAILED",
+        "HTTP_FAILED",
+        "PROVIDER_RESPONSE_INVALID",
+        "SNAPSHOT_REJECTED",
+        "SERIALIZATION_FAILED",
+        "STAGING_FAILED",
+        "INTERNAL_FAILED",
+    }
+)
+_C3_ARTIFACT_FAILURES = frozenset(
+    {
+        "INELIGIBLE_CHILD_RESULT",
+        "STAGING_IDENTITY_MISMATCH",
+        "STAGING_BYTES_INVALID",
+        "CHILD_CLAIM_MISMATCH",
+        "OFFLINE_VERIFICATION_FAILED",
+        "REQUEST_RECONCILIATION_FAILED",
+        "PUBLICATION_FAILED",
+        "FINAL_REVERIFICATION_FAILED",
+        "STAGING_CLEANUP_FAILED",
+    }
+)
 
 
 def _reject_duplicate_evidence_keys(
@@ -931,6 +1000,259 @@ def _require_canonical_c3_cleanup_evidence(
     if type(parsed) is not dict or _json(parsed) != cleanup_json:
         raise ValueError("C3 cleanup evidence must be one canonical JSON object")
     return cleanup_json, cleanup_digest
+
+
+def _require_canonical_c3_json_pair(
+    value: object,
+    digest: object,
+    *,
+    field: str,
+    byte_limit: int,
+) -> tuple[bytes, bytes, dict[str, Any]]:
+    if type(value) is not bytes or not value or len(value) > byte_limit:
+        raise ValueError(f"{field} bytes are invalid")
+    if type(digest) is not bytes or len(digest) != 32 or _digest(value) != digest:
+        raise ValueError(f"{field} digest is invalid")
+    if value.startswith(b"\xef\xbb\xbf"):
+        raise ValueError(f"{field} must not contain a UTF-8 BOM")
+    try:
+        parsed = json.loads(
+            value.decode("utf-8"),
+            object_pairs_hook=_reject_duplicate_evidence_keys,
+            parse_constant=_reject_nonstandard_evidence_constant,
+        )
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise ValueError(f"{field} must be strict UTF-8 JSON") from error
+    if type(parsed) is not dict or _json(parsed) != value:
+        raise ValueError(f"{field} must be one canonical JSON object")
+    return value, digest, parsed
+
+
+def _is_canonical_sha256(value: object) -> bool:
+    return bool(
+        type(value) is str
+        and len(value) == 64
+        and all(character in "0123456789abcdef" for character in value)
+    )
+
+
+def _require_c3_terminal_material(
+    material: object,
+    lineage: tuple[str, str, str, str, str],
+) -> tuple[str, str, bytes | None, bytes, bytes, bytes, bytes]:
+    if type(material) is not tuple or len(material) != 7:
+        raise ValueError("C3 terminal adapter returned invalid material")
+    (
+        state,
+        disposition,
+        snapshot_digest,
+        evidence_json,
+        evidence_digest,
+        diagnostics_json,
+        diagnostics_digest,
+    ) = material
+    if type(state) is not str or type(disposition) is not str:
+        raise ValueError("C3 terminal state material is invalid")
+    _require_terminal_snapshot_digest(state, snapshot_digest)
+    evidence_json, evidence_digest, evidence = _require_canonical_c3_json_pair(
+        evidence_json,
+        evidence_digest,
+        field="C3 terminal evidence",
+        byte_limit=_MAX_C3_TERMINAL_EVIDENCE_BYTES,
+    )
+    diagnostics_json, diagnostics_digest, diagnostics = _require_canonical_c3_json_pair(
+        diagnostics_json,
+        diagnostics_digest,
+        field="C3 terminal diagnostics",
+        byte_limit=_MAX_C3_TERMINAL_DIAGNOSTICS_BYTES,
+    )
+    if set(evidence) != _C3_TERMINAL_EVIDENCE_FIELDS or evidence["schema"] != 1:
+        raise ValueError("C3 terminal evidence schema is invalid")
+    if (
+        set(diagnostics)
+        != {
+            "artifact_verification",
+            "parent_cleanup",
+            "reason",
+            "result_transport",
+            "schema",
+            "staging_cleanup",
+        }
+        or diagnostics["schema"] != 1
+    ):
+        raise ValueError("C3 terminal diagnostics schema is invalid")
+    if (
+        tuple(
+            evidence[field]
+            for field in (
+                "session_id",
+                "attempt_id",
+                "claim_id",
+                "reservation_id",
+                "execution_id",
+            )
+        )
+        != lineage
+    ):
+        raise ValueError("C3 terminal evidence lineage is mismatched")
+    if (
+        evidence["terminal_state"] != state
+        or evidence["provider_call_disposition"] != disposition
+        or not _is_canonical_sha256(evidence["child_request_sha256"])
+    ):
+        raise ValueError("C3 terminal evidence outcome binding is invalid")
+    if evidence["result_transport"] not in {
+        "COMPLETE",
+        "EMPTY",
+        "OVERSIZED",
+        "READ_FAILED",
+    } or evidence["process_outcome"] not in {
+        "EXITED_ZERO",
+        "EXITED_NONZERO",
+        "TIMED_OUT_TERMINATED",
+        "WAIT_FAILED_TERMINATED",
+        "OBSERVATION_FAILED_TERMINATED",
+        "TERMINATION_UNCONFIRMED",
+    }:
+        raise ValueError("C3 terminal process classification is invalid")
+    if evidence["parent_cleanup"] not in {"COMPLETE", "FAILED"}:
+        raise ValueError("C3 terminal parent cleanup is invalid")
+    if evidence["staging_cleanup"] not in {
+        "COMPLETE",
+        "FAILED",
+        "IDENTITY_MISMATCH",
+        "ALREADY_RELEASED",
+    }:
+        raise ValueError("C3 terminal staging cleanup is invalid")
+    fence = evidence["child_fence_state"]
+    classification = evidence["child_result_classification"]
+    child_result_sha256 = evidence["child_result_sha256"]
+    child_result_absent = (
+        fence is None and classification is None and child_result_sha256 is None
+    )
+    child_result_present = (
+        fence in {"ENTERED", "NOT_ENTERED"}
+        and classification in _C3_CHILD_CLASSIFICATIONS
+        and _is_canonical_sha256(child_result_sha256)
+        and evidence["result_transport"] == "COMPLETE"
+    )
+    if not (child_result_absent or child_result_present):
+        raise ValueError("C3 terminal child result classification is invalid")
+    artifact_verification = evidence["artifact_verification"]
+    if artifact_verification not in {
+        "VERIFIED",
+        "NOT_ATTEMPTED",
+        *_C3_ARTIFACT_FAILURES,
+    }:
+        raise ValueError("C3 terminal artifact classification is invalid")
+    artifact_fields = (
+        evidence["snapshot_id"],
+        evidence["artifact_sha256"],
+        evidence["artifact_identity_sha256"],
+    )
+    reason = diagnostics["reason"]
+    if state == "SUCCEEDED":
+        if (
+            disposition != "CONFIRMED"
+            or fence != "ENTERED"
+            or classification != "SUCCEEDED"
+            or artifact_verification != "VERIFIED"
+            or type(evidence["snapshot_id"]) is not str
+            or not _is_canonical_sha256(evidence["artifact_sha256"])
+            or not _is_canonical_sha256(evidence["artifact_identity_sha256"])
+            or bytes.fromhex(evidence["artifact_sha256"]) != snapshot_digest
+            or reason != "VERIFIED_SNAPSHOT"
+            or evidence["staging_cleanup"] != "COMPLETE"
+        ):
+            raise ValueError("C3 successful terminal material is invalid")
+        try:
+            if str(uuid.UUID(evidence["snapshot_id"])) != evidence["snapshot_id"]:
+                raise ValueError
+        except (TypeError, ValueError, AttributeError) as error:
+            raise ValueError("C3 terminal snapshot identity is invalid") from error
+    elif state == "FAILED":
+        if (
+            disposition != "CONFIRMED"
+            or any(value is not None for value in artifact_fields)
+            or artifact_verification == "VERIFIED"
+        ):
+            raise ValueError("C3 failed terminal material is invalid")
+        child_failure = (
+            fence == "ENTERED"
+            and classification in _C3_CHILD_CLASSIFICATIONS - {"SUCCEEDED"}
+            and reason == "POST_FENCE_CHILD_FAILURE"
+        )
+        parent_failure = (
+            fence == "ENTERED"
+            and classification == "SUCCEEDED"
+            and artifact_verification in _C3_ARTIFACT_FAILURES
+            and reason == "PARENT_ARTIFACT_VERIFICATION_FAILED"
+        )
+        if not (child_failure or parent_failure):
+            raise ValueError("C3 failed terminal mapping is invalid")
+    elif state == "AMBIGUOUS":
+        if (
+            disposition != "MAY_HAVE_OCCURRED"
+            or any(value is not None for value in artifact_fields)
+            or artifact_verification == "VERIFIED"
+            or reason != "POST_RESUME_OUTCOME_AMBIGUOUS"
+            or not (child_result_absent or fence == "NOT_ENTERED")
+        ):
+            raise ValueError("C3 ambiguous terminal mapping is invalid")
+    else:
+        raise ValueError("C3 post-resume terminal state is unsupported")
+    for diagnostic_field in (
+        "artifact_verification",
+        "parent_cleanup",
+        "result_transport",
+        "staging_cleanup",
+    ):
+        if diagnostics[diagnostic_field] != evidence[diagnostic_field]:
+            raise ValueError("C3 terminal diagnostics binding is invalid")
+    return (
+        state,
+        disposition,
+        snapshot_digest,
+        evidence_json,
+        evidence_digest,
+        diagnostics_json,
+        diagnostics_digest,
+    )
+
+
+def _require_c3_terminal_matches_durable_cleanup(
+    connection: sqlite3.Connection,
+    execution_id: str,
+    reservation_id: str,
+    evidence_json: bytes,
+) -> None:
+    row = connection.execute(
+        "SELECT cleanup_json, cleanup_digest FROM launch_executions "
+        "WHERE launch_execution_id = ? AND launch_reservation_id = ?",
+        (execution_id, reservation_id),
+    ).fetchone()
+    if row is None:
+        raise ValueError("C3 terminal durable cleanup lineage is unavailable")
+    cleanup_json, _cleanup_digest = _require_canonical_c3_cleanup_evidence(*row)
+    cleanup = json.loads(cleanup_json)
+    evidence = json.loads(evidence_json)
+    fields = (
+        "child_fence_state",
+        "child_request_sha256",
+        "child_result_classification",
+        "child_result_sha256",
+        "execution_id",
+        "parent_cleanup",
+        "process_outcome",
+        "provider_call_disposition",
+        "reservation_id",
+        "result_transport",
+        "schema",
+    )
+    if set(cleanup) != set(fields) or any(
+        cleanup[field] != evidence[field] for field in fields
+    ):
+        raise ValueError("C3 terminal evidence differs from durable cleanup evidence")
 
 
 def _evidence(label: str) -> tuple[bytes, bytes]:
@@ -3271,6 +3593,159 @@ def _core_validate_c3_verified_snapshot(
         validate(capability, current)
 
 
+def _c3_terminal_adapter_methods(
+    adapter: object,
+) -> tuple[Callable[..., object], Callable[..., object], Callable[..., object]]:
+    prepare = getattr(adapter, "prepare_c3_terminal", None)
+    validate = getattr(adapter, "validate_c3_terminal", None)
+    consume = getattr(adapter, "consume_c3_terminal", None)
+    if not all(callable(method) for method in (prepare, validate, consume)):
+        raise ExternalAuthorityBoundaryUnavailable(
+            "transactional authority has no reviewed C3 terminal adapter"
+        )
+    return prepare, validate, consume
+
+
+def _adapter_exposes_c3_terminal_interface(adapter: object | None) -> bool:
+    if adapter is None:
+        return False
+    return any(
+        callable(getattr(adapter, name, None))
+        for name in (
+            "prepare_c3_terminal",
+            "validate_c3_terminal",
+            "consume_c3_terminal",
+        )
+    )
+
+
+def _core_record_c3_terminal(
+    connection: sqlite3.Connection,
+    execution_id: str,
+    reservation_id: str,
+    verified_snapshot: object | None,
+) -> str:
+    context = _require_service_context()
+    _require_no_active_transaction(connection)
+    adapter = context.external_adapter
+    if adapter is None:
+        raise ExternalAuthorityBoundaryUnavailable(
+            "transactional authority has no reviewed C3 terminal adapter"
+        )
+    prepare, validate, consume = _c3_terminal_adapter_methods(adapter)
+    execution_id = str(execution_id)
+    reservation_id = str(reservation_id)
+    with _lifecycle_arbiter(reservation_id):
+        with _connection_operation(connection):
+            lineage = _require_c3_artifact_verification_lineage(
+                connection, execution_id, reservation_id
+            )
+        authorization = prepare(lineage, verified_snapshot)
+        material = _require_c3_terminal_material(
+            validate(authorization, lineage), lineage
+        )
+        with _connection_operation(connection):
+            _require_c3_terminal_matches_durable_cleanup(
+                connection, execution_id, reservation_id, material[3]
+            )
+        terminal_id = _record_c3_terminal_locked(
+            connection,
+            execution_id,
+            reservation_id,
+            lineage,
+            material,
+        )
+        consume(authorization, lineage)
+        return terminal_id
+
+
+@_serialized_connection_operation
+def _record_c3_terminal_locked(
+    connection: sqlite3.Connection,
+    execution_id: str,
+    reservation_id: str,
+    lineage: tuple[str, str, str, str, str],
+    material: tuple[str, str, bytes | None, bytes, bytes, bytes, bytes],
+) -> str:
+    (
+        state,
+        disposition,
+        snapshot_digest,
+        evidence,
+        evidence_digest,
+        diagnostics,
+        diagnostics_digest,
+    ) = _require_c3_terminal_material(material, lineage)
+    terminal_id = _terminal_id(reservation_id, TERMINAL_POLICY)
+    _begin(connection)
+    try:
+        current = _require_c3_artifact_verification_lineage(
+            connection, execution_id, reservation_id
+        )
+        if current != lineage:
+            raise ValueError("C3 terminal active lineage changed before persistence")
+        _require_c3_terminal_matches_durable_cleanup(
+            connection, execution_id, reservation_id, evidence
+        )
+        request_digest = connection.execute(
+            "SELECT request_digest FROM launch_reservations "
+            "WHERE launch_reservation_id = ?",
+            (reservation_id,),
+        ).fetchone()[0]
+        connection.execute(
+            """
+            INSERT INTO terminals (
+                terminal_id, launch_reservation_id, terminal_schema,
+                terminal_policy_version, terminal_state,
+                provider_call_disposition, request_digest, evidence_json,
+                evidence_digest, snapshot_digest, sanitized_diagnostics_json,
+                sanitized_diagnostics_digest, recorded_at_utc
+            ) VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                terminal_id,
+                reservation_id,
+                TERMINAL_POLICY,
+                state,
+                disposition,
+                request_digest,
+                evidence,
+                evidence_digest,
+                snapshot_digest,
+                diagnostics,
+                diagnostics_digest,
+                _timestamp(TERMINAL_TIMESTAMP),
+            ),
+        )
+        execution_update = connection.execute(
+            "UPDATE launch_executions SET phase = 'TERMINAL_RECORDED' "
+            "WHERE launch_execution_id = ? AND launch_reservation_id = ? "
+            "AND phase = 'RESUME_RECORDED'",
+            (execution_id, reservation_id),
+        )
+        reservation_update = connection.execute(
+            "UPDATE launch_reservations SET reservation_state = 'TERMINAL_RECORDED' "
+            "WHERE launch_reservation_id = ? AND reservation_state = 'PROCESS_CREATED'",
+            (reservation_id,),
+        )
+        attempt_update = connection.execute(
+            "UPDATE attempts SET state = 'TERMINAL_RECORDED' "
+            "WHERE attempt_id = ? AND state = 'LAUNCH_RESERVED'",
+            (lineage[1],),
+        )
+        if (
+            execution_update.rowcount != 1
+            or reservation_update.rowcount != 1
+            or attempt_update.rowcount != 1
+        ):
+            raise ValueError("C3 terminal active lineage changed during persistence")
+        _finish(connection, True)
+    except BaseException:
+        _finish(connection, False)
+        raise
+    return terminal_id
+
+
 def _core_record_terminal(
     connection: sqlite3.Connection,
     reservation_id: str,
@@ -3279,8 +3754,12 @@ def _core_record_terminal(
     *,
     snapshot_digest: bytes | None,
 ) -> str:
-    _require_service_context()
+    context = _require_service_context()
     _require_no_active_transaction(connection)
+    if _adapter_exposes_c3_terminal_interface(context.external_adapter):
+        raise ExternalAuthorityBoundaryUnavailable(
+            "legacy terminal recording is unavailable under C3 composition"
+        )
     _require_terminal_snapshot_digest(state, snapshot_digest)
     reservation_id = str(reservation_id)
     with _lifecycle_arbiter(reservation_id):
@@ -4840,6 +5319,21 @@ class TransactionalAuthorityCore:
             _require_no_active_transaction(self._connection)
             return _core_validate_c3_verified_snapshot(self._connection, capability)
 
+    def record_c3_terminal(
+        self,
+        execution_id: str,
+        reservation_id: str,
+        verified_snapshot: object | None = None,
+    ) -> str:
+        with self._bound_context():
+            _require_no_active_transaction(self._connection)
+            return _core_record_c3_terminal(
+                self._connection,
+                execution_id,
+                reservation_id,
+                verified_snapshot,
+            )
+
     def record_terminal(
         self,
         reservation_id: str,
@@ -5004,6 +5498,11 @@ class TransactionalAuthorityCore:
     ) -> str:
         with self._held_lifecycle_operation(lease_witness, reservation_id):
             _require_no_active_transaction(self._connection)
+            context = _require_service_context()
+            if _adapter_exposes_c3_terminal_interface(context.external_adapter):
+                raise ExternalAuthorityBoundaryUnavailable(
+                    "legacy terminal recording is unavailable under C3 composition"
+                )
             return _record_terminal_locked(
                 self._connection,
                 reservation_id,
@@ -5431,6 +5930,23 @@ class WindowsTransactionalAuthority:
                 "transactional authority has no reviewed C3 artifact adapter"
             )
         return self._core_for_operation().validate_c3_verified_snapshot(capability)
+
+    def record_c3_terminal(
+        self,
+        execution_id: str,
+        reservation_id: str,
+        verified_snapshot: object | None = None,
+    ) -> str:
+        self._require_service_open()
+        if self._context.external_adapter is None:
+            raise ExternalAuthorityBoundaryUnavailable(
+                "transactional authority has no reviewed C3 terminal adapter"
+            )
+        return self._core_for_operation().record_c3_terminal(
+            execution_id,
+            reservation_id,
+            verified_snapshot,
+        )
 
     def record_terminal(
         self,

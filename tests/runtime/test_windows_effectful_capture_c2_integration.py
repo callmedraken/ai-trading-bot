@@ -80,6 +80,7 @@ from trading_bot.runtime.windows_effectful_capture_service import (
     observe_c3_c3b_for_test,
 )
 from trading_bot.runtime.windows_transactional_authority import (
+    ExternalAuthorityBoundaryUnavailable,
     ProcessIntent,
     WindowsTransactionalAuthority,
     open_disposable_authority_database_for_test,
@@ -186,6 +187,8 @@ class _FakeNativeApi:
 
     def delete_staging_link(self, staging_handle: int) -> None:
         assert staging_handle == 105
+        assert self.connection is not None
+        assert not self.connection.in_transaction
         self.events.append("delete_staging")
         if self.fail_cleanup:
             raise RuntimeError("cleanup failure")
@@ -1164,6 +1167,10 @@ def test_c3_d1_verified_capability_is_revoked_by_later_recovery() -> None:
         )
         with pytest.raises(ValueError, match="unavailable"):
             transactional.validate_c3_verified_snapshot(capability)
+        with pytest.raises(ValueError, match="unavailable"):
+            transactional.record_c3_terminal(
+                resumed.execution_id, resumed.reservation_id, capability
+            )
     finally:
         _close(adapter, transactional)
         capture._closed = True
@@ -1680,24 +1687,16 @@ def test_c3_c3c_recovery_and_service_close_revoke_delayed_evidence() -> None:
             "SELECT reservation_state FROM launch_reservations"
         ).fetchone() == ("MANUAL_REVIEW",)
 
-        transactional.record_terminal(
-            resumed.reservation_id,
-            "CLOSED",
-            "MAY_HAVE_OCCURRED",
-            snapshot_digest=None,
-        )
-        with pytest.raises(ValueError, match="revoked|unavailable"):
-            transactional.record_c3_post_resume_evidence(
-                resumed.execution_id, resumed.resume_receipt, evidence
+        with pytest.raises(
+            ExternalAuthorityBoundaryUnavailable,
+            match="legacy terminal recording is unavailable",
+        ):
+            transactional.record_terminal(
+                resumed.reservation_id,
+                "CLOSED",
+                "MAY_HAVE_OCCURRED",
+                snapshot_digest=None,
             )
-        transactional.record_recovery(
-            session_id,
-            "SESSION",
-            session_id,
-            "CLOSE_SESSION",
-            operator_evidence_json=operator_json,
-            operator_evidence_digest=hashlib.sha256(operator_json).digest(),
-        )
         with pytest.raises(ValueError, match="revoked|unavailable"):
             transactional.record_c3_post_resume_evidence(
                 resumed.execution_id, resumed.resume_receipt, evidence
@@ -1711,4 +1710,472 @@ def test_c3_c3c_recovery_and_service_close_revoke_delayed_evidence() -> None:
     finally:
         adapter.close()
         transactional.close()
+        capture._closed = True
+
+
+def _c3_lineage(connection) -> tuple[str, str, str, str, str]:
+    return connection.execute(
+        """
+        SELECT s.session_id, a.attempt_id, c.claim_id,
+               r.launch_reservation_id, e.launch_execution_id
+        FROM launch_executions e
+        JOIN launch_reservations r
+          ON r.launch_reservation_id = e.launch_reservation_id
+        JOIN provider_call_claims c ON c.claim_id = r.claim_id
+        JOIN attempts a ON a.attempt_id = c.attempt_id
+        JOIN sessions s ON s.session_id = a.session_id
+        """
+    ).fetchone()
+
+
+def _persist_c3_terminal_observation(
+    api: _FakeNativeApi,
+    adapter,
+    transactional,
+    resumed,
+    *,
+    result_changes: dict[str, object] | None = None,
+    trusted_result: bool = True,
+):
+    observation = _observe_c3c_case(
+        api,
+        adapter,
+        resumed,
+        result_changes=result_changes,
+        trusted_result=trusted_result,
+    )
+    evidence = issue_c3_post_resume_evidence_for_test(adapter, resumed, observation)
+    transactional.record_c3_post_resume_evidence(
+        resumed.execution_id, resumed.resume_receipt, evidence
+    )
+    return observation
+
+
+def _terminal_row(connection):
+    return connection.execute(
+        "SELECT terminal_state, provider_call_disposition, snapshot_digest, "
+        "evidence_json, evidence_digest, sanitized_diagnostics_json, "
+        "sanitized_diagnostics_digest FROM terminals"
+    ).fetchone()
+
+
+def test_c3_d2_verified_snapshot_records_exact_success_without_selection() -> None:
+    api = _FakeNativeApi()
+    capture, adapter, transactional, connection, resumed = _resume_case(api)
+    payload = _canonical_c3_snapshot(api)
+    try:
+        _persist_successful_c3_observation(
+            api, adapter, transactional, resumed, payload
+        )
+        capability = transactional.verify_c3_captured_snapshot(
+            resumed.execution_id, resumed.reservation_id
+        )
+        with pytest.raises(
+            ExternalAuthorityBoundaryUnavailable,
+            match="legacy terminal recording is unavailable",
+        ):
+            transactional.record_terminal(
+                resumed.reservation_id,
+                snapshot_digest=b"x" * 32,
+            )
+
+        terminal_id = transactional.record_c3_terminal(
+            resumed.execution_id, resumed.reservation_id, capability
+        )
+
+        row = _terminal_row(connection)
+        expected_digest = hashlib.sha256(payload).digest()
+        assert row[:3] == ("SUCCEEDED", "CONFIRMED", expected_digest)
+        evidence = json.loads(row[3])
+        diagnostics = json.loads(row[5])
+        assert row[4] == hashlib.sha256(row[3]).digest()
+        assert row[6] == hashlib.sha256(row[5]).digest()
+        assert len(row[3]) <= 2048
+        assert evidence["terminal_state"] == "SUCCEEDED"
+        assert evidence["provider_call_disposition"] == "CONFIRMED"
+        assert evidence["artifact_sha256"] == hashlib.sha256(payload).hexdigest()
+        assert evidence["snapshot_id"] == str(capability.snapshot_id)
+        assert evidence["artifact_identity_sha256"] == (
+            capability.artifact_identity_sha256
+        )
+        assert evidence["staging_cleanup"] == "COMPLETE"
+        assert diagnostics == {
+            "artifact_verification": "VERIFIED",
+            "parent_cleanup": evidence["parent_cleanup"],
+            "reason": "VERIFIED_SNAPSHOT",
+            "result_transport": evidence["result_transport"],
+            "schema": 1,
+            "staging_cleanup": "COMPLETE",
+        }
+        assert connection.execute("SELECT state FROM sessions").fetchone() == ("OPEN",)
+        assert connection.execute("SELECT state FROM attempts").fetchone() == (
+            "TERMINAL_RECORDED",
+        )
+        assert connection.execute(
+            "SELECT reservation_state FROM launch_reservations"
+        ).fetchone() == ("TERMINAL_RECORDED",)
+        assert connection.execute("SELECT phase FROM launch_executions").fetchone() == (
+            "TERMINAL_RECORDED",
+        )
+        assert connection.execute(
+            "SELECT count(*) FROM session_selections"
+        ).fetchone() == (0,)
+        assert c3_c2_registry_snapshot_for_test(adapter) == ()
+        with pytest.raises(
+            (
+                WindowsEffectfulCaptureCompositionError,
+                WindowsEffectfulCaptureProtocolError,
+            )
+        ):
+            transactional.validate_c3_verified_snapshot(capability)
+        with pytest.raises(ValueError, match="unavailable"):
+            transactional.record_c3_terminal(
+                resumed.execution_id, resumed.reservation_id, capability
+            )
+        assert connection.execute("SELECT terminal_id FROM terminals").fetchone() == (
+            terminal_id,
+        )
+    finally:
+        _close(adapter, transactional)
+        capture._closed = True
+
+
+def test_c3_d2_copied_or_reconstructed_verified_snapshot_cannot_authorize() -> None:
+    api = _FakeNativeApi()
+    capture, adapter, transactional, connection, resumed = _resume_case(api)
+    payload = _canonical_c3_snapshot(api)
+    try:
+        _persist_successful_c3_observation(
+            api, adapter, transactional, resumed, payload
+        )
+        capability = transactional.verify_c3_captured_snapshot(
+            resumed.execution_id, resumed.reservation_id
+        )
+        with pytest.raises(TypeError):
+            copy(capability)
+        for candidate in (
+            replace(capability),
+            replace(capability, artifact_sha256="12" * 32),
+        ):
+            with pytest.raises(
+                (
+                    WindowsEffectfulCaptureCompositionError,
+                    WindowsEffectfulCaptureProtocolError,
+                )
+            ):
+                transactional.record_c3_terminal(
+                    resumed.execution_id, resumed.reservation_id, candidate
+                )
+        assert connection.execute("SELECT count(*) FROM terminals").fetchone() == (0,)
+
+        transactional.record_c3_terminal(
+            resumed.execution_id, resumed.reservation_id, capability
+        )
+    finally:
+        _close(adapter, transactional)
+        capture._closed = True
+
+
+def test_c3_d2_success_rollback_preserves_exact_capability_for_retry() -> None:
+    api = _FakeNativeApi()
+    capture, adapter, transactional, connection, resumed = _resume_case(api)
+    payload = _canonical_c3_snapshot(api)
+    try:
+        _persist_successful_c3_observation(
+            api, adapter, transactional, resumed, payload
+        )
+        capability = transactional.verify_c3_captured_snapshot(
+            resumed.execution_id, resumed.reservation_id
+        )
+        connection.execute(
+            """
+            CREATE TRIGGER fail_c3_terminal
+            BEFORE INSERT ON terminals
+            BEGIN
+                SELECT RAISE(ABORT, 'injected C3 terminal rollback');
+            END
+            """
+        )
+        with pytest.raises(Exception, match="injected C3 terminal rollback"):
+            transactional.record_c3_terminal(
+                resumed.execution_id, resumed.reservation_id, capability
+            )
+        assert connection.execute("SELECT count(*) FROM terminals").fetchone() == (0,)
+        transactional.validate_c3_verified_snapshot(capability)
+
+        connection.execute("DROP TRIGGER fail_c3_terminal")
+        transactional.record_c3_terminal(
+            resumed.execution_id, resumed.reservation_id, capability
+        )
+        assert api.events.count("delete_staging") == 1
+        assert api.events.count("close:105") == 1
+    finally:
+        _close(adapter, transactional)
+        capture._closed = True
+
+
+@pytest.mark.parametrize(
+    ("result_changes", "trusted_result", "expected_state", "expected_disposition"),
+    [
+        ({}, True, "FAILED", "CONFIRMED"),
+        (
+            {
+                "fence_state": ProviderAttemptFenceState.NOT_ENTERED,
+                "classification": ChildResultClassification.REQUEST_INVALID,
+            },
+            True,
+            "AMBIGUOUS",
+            "MAY_HAVE_OCCURRED",
+        ),
+        ({}, False, "AMBIGUOUS", "MAY_HAVE_OCCURRED"),
+    ],
+)
+def test_c3_d2_non_success_mapping_and_safe_staging_cleanup(
+    result_changes: dict[str, object],
+    trusted_result: bool,
+    expected_state: str,
+    expected_disposition: str,
+) -> None:
+    api = _FakeNativeApi()
+    capture, adapter, transactional, connection, resumed = _resume_case(api)
+    try:
+        _persist_c3_terminal_observation(
+            api,
+            adapter,
+            transactional,
+            resumed,
+            result_changes=result_changes,
+            trusted_result=trusted_result,
+        )
+        transactional.record_c3_terminal(resumed.execution_id, resumed.reservation_id)
+
+        row = _terminal_row(connection)
+        evidence = json.loads(row[3])
+        diagnostics = json.loads(row[5])
+        assert row[:3] == (expected_state, expected_disposition, None)
+        assert evidence["terminal_state"] != "NOT_STARTED"
+        assert evidence["snapshot_id"] is None
+        assert evidence["artifact_sha256"] is None
+        assert evidence["artifact_identity_sha256"] is None
+        assert evidence["staging_cleanup"] == "COMPLETE"
+        assert evidence["artifact_verification"] == "NOT_ATTEMPTED"
+        assert diagnostics["reason"] == (
+            "POST_FENCE_CHILD_FAILURE"
+            if expected_state == "FAILED"
+            else "POST_RESUME_OUTCOME_AMBIGUOUS"
+        )
+        assert row[4] == hashlib.sha256(row[3]).digest()
+        assert row[6] == hashlib.sha256(row[5]).digest()
+        assert api.events.count("delete_staging") == 1
+        assert api.events.count("close:105") == 1
+        assert not any(event.startswith("read_artifact") for event in api.events)
+        assert "publish" not in api.events
+        assert connection.execute(
+            "SELECT count(*) FROM session_selections"
+        ).fetchone() == (0,)
+    finally:
+        _close(adapter, transactional)
+        capture._closed = True
+
+
+@pytest.mark.parametrize(
+    ("failure_mode", "expected_cleanup"),
+    [("identity", "IDENTITY_MISMATCH"), ("delete", "FAILED")],
+)
+def test_c3_d2_staging_cleanup_failure_is_sanitized_without_remapping(
+    failure_mode: str, expected_cleanup: str
+) -> None:
+    api = _FakeNativeApi()
+    capture, adapter, transactional, connection, resumed = _resume_case(api)
+    try:
+        _persist_c3_terminal_observation(api, adapter, transactional, resumed)
+        if failure_mode == "identity":
+            api.file_identity = NativeFileIdentity(42, b"q" * 16)
+        else:
+            api.fail_cleanup = True
+        transactional.record_c3_terminal(resumed.execution_id, resumed.reservation_id)
+
+        row = _terminal_row(connection)
+        evidence = json.loads(row[3])
+        assert row[:3] == ("FAILED", "CONFIRMED", None)
+        assert evidence["staging_cleanup"] == expected_cleanup
+        assert "RuntimeError" not in row[3].decode("utf-8")
+        assert _STORAGE_ROOT not in row[3].decode("utf-8")
+        if failure_mode == "identity":
+            assert "delete_staging" not in api.events
+        else:
+            assert api.events.count("delete_staging") == 1
+        assert api.events.count("close:105") == 1
+    finally:
+        _close(adapter, transactional)
+        capture._closed = True
+
+
+def test_c3_d2_non_success_rollback_reuses_issuance_and_cleanup_observation() -> None:
+    api = _FakeNativeApi()
+    capture, adapter, transactional, connection, resumed = _resume_case(api)
+    try:
+        _persist_c3_terminal_observation(api, adapter, transactional, resumed)
+        lineage = _c3_lineage(connection)
+        authorization = adapter.prepare_c3_terminal(lineage, None)
+        for operation in (copy, deepcopy, pickle.dumps):
+            with pytest.raises(TypeError):
+                operation(authorization)
+        connection.execute(
+            """
+            CREATE TRIGGER fail_c3_terminal_non_success
+            BEFORE INSERT ON terminals
+            BEGIN
+                SELECT RAISE(ABORT, 'injected C3 non-success rollback');
+            END
+            """
+        )
+        with pytest.raises(Exception, match="injected C3 non-success rollback"):
+            transactional.record_c3_terminal(
+                resumed.execution_id, resumed.reservation_id
+            )
+        assert api.events.count("delete_staging") == 1
+        assert api.events.count("close:105") == 1
+
+        connection.execute("DROP TRIGGER fail_c3_terminal_non_success")
+        transactional.record_c3_terminal(resumed.execution_id, resumed.reservation_id)
+        assert api.events.count("delete_staging") == 1
+        assert api.events.count("close:105") == 1
+    finally:
+        _close(adapter, transactional)
+        capture._closed = True
+
+
+def test_c3_d2_parent_verification_failure_maps_to_confirmed_failure() -> None:
+    api = _FakeNativeApi()
+    capture, adapter, transactional, connection, resumed = _resume_case(api)
+    payload = _canonical_c3_snapshot(api)
+    try:
+        _persist_successful_c3_observation(
+            api, adapter, transactional, resumed, payload
+        )
+        api.fail_publish = True
+        with pytest.raises(WindowsEffectfulCaptureCompositionError):
+            transactional.verify_c3_captured_snapshot(
+                resumed.execution_id, resumed.reservation_id
+            )
+        transactional.record_c3_terminal(resumed.execution_id, resumed.reservation_id)
+
+        row = _terminal_row(connection)
+        evidence = json.loads(row[3])
+        diagnostics = json.loads(row[5])
+        assert row[:3] == ("FAILED", "CONFIRMED", None)
+        assert evidence["child_result_classification"] == "SUCCEEDED"
+        assert evidence["artifact_verification"] == "PUBLICATION_FAILED"
+        assert diagnostics["reason"] == "PARENT_ARTIFACT_VERIFICATION_FAILED"
+    finally:
+        _close(adapter, transactional)
+        capture._closed = True
+
+
+def test_c3_d2_successful_child_requires_d1_before_terminal() -> None:
+    api = _FakeNativeApi()
+    capture, adapter, transactional, connection, resumed = _resume_case(api)
+    payload = _canonical_c3_snapshot(api)
+    try:
+        _persist_successful_c3_observation(
+            api, adapter, transactional, resumed, payload
+        )
+        with pytest.raises(
+            WindowsEffectfulCaptureCompositionError,
+            match="requires D1 verification first",
+        ):
+            transactional.record_c3_terminal(
+                resumed.execution_id, resumed.reservation_id
+            )
+        assert connection.execute("SELECT count(*) FROM terminals").fetchone() == (0,)
+        assert "delete_staging" not in api.events
+    finally:
+        _close(adapter, transactional)
+        capture._closed = True
+
+
+@pytest.mark.parametrize(
+    "tamper", ["digest", "raw_field", "diagnostic_raw", "durable_mismatch"]
+)
+def test_c3_d2_c2_rejects_tampered_terminal_material_without_consuming(
+    monkeypatch: pytest.MonkeyPatch, tamper: str
+) -> None:
+    api = _FakeNativeApi()
+    capture, adapter, transactional, connection, resumed = _resume_case(api)
+    try:
+        _persist_c3_terminal_observation(api, adapter, transactional, resumed)
+        adapter_type = type(adapter)
+        original = adapter_type.validate_c3_terminal
+
+        def tampered_validate(self, authorization, lineage):
+            material = list(original(self, authorization, lineage))
+            if tamper == "digest":
+                material[4] = b"x" * 32
+            elif tamper == "diagnostic_raw":
+                diagnostics = json.loads(material[5])
+                diagnostics["raw_error"] = "native provider failure"
+                material[5] = json.dumps(
+                    diagnostics,
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ).encode("utf-8")
+                material[6] = hashlib.sha256(material[5]).digest()
+            else:
+                evidence = json.loads(material[3])
+                if tamper == "raw_field":
+                    evidence["raw_error"] = _STORAGE_ROOT + r"\secret-provider-body"
+                else:
+                    evidence["process_outcome"] = "TIMED_OUT_TERMINATED"
+                material[3] = json.dumps(
+                    evidence,
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ).encode("utf-8")
+                material[4] = hashlib.sha256(material[3]).digest()
+            return tuple(material)
+
+        monkeypatch.setattr(adapter_type, "validate_c3_terminal", tampered_validate)
+        with pytest.raises(ValueError, match="digest|schema|durable cleanup"):
+            transactional.record_c3_terminal(
+                resumed.execution_id, resumed.reservation_id
+            )
+        assert connection.execute("SELECT count(*) FROM terminals").fetchone() == (0,)
+
+        monkeypatch.setattr(adapter_type, "validate_c3_terminal", original)
+        transactional.record_c3_terminal(resumed.execution_id, resumed.reservation_id)
+        assert api.events.count("delete_staging") == 1
+        assert api.events.count("close:105") == 1
+    finally:
+        _close(adapter, transactional)
+        capture._closed = True
+
+
+def test_c3_d2_recovery_first_revokes_delayed_terminal_authority() -> None:
+    api = _FakeNativeApi()
+    capture, adapter, transactional, connection, resumed = _resume_case(api)
+    try:
+        _persist_c3_terminal_observation(api, adapter, transactional, resumed)
+        session_id, attempt_id = connection.execute(
+            "SELECT session_id, attempt_id FROM attempts"
+        ).fetchone()
+        operator = b'{"evidence":"c3-d2-recovery-first","schema":1}'
+        transactional.record_recovery(
+            session_id,
+            "ATTEMPT",
+            attempt_id,
+            "RECORD_ATTEMPT_AMBIGUITY",
+            operator_evidence_json=operator,
+            operator_evidence_digest=hashlib.sha256(operator).digest(),
+        )
+        with pytest.raises(ValueError, match="unavailable"):
+            transactional.record_c3_terminal(
+                resumed.execution_id, resumed.reservation_id
+            )
+        assert connection.execute("SELECT count(*) FROM terminals").fetchone() == (0,)
+        assert "delete_staging" not in api.events
+    finally:
+        _close(adapter, transactional)
         capture._closed = True

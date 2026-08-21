@@ -673,6 +673,38 @@ def _validate_production_verified_captured_snapshot(
             return issuance.values
 
 
+def _consume_production_verified_captured_snapshot(
+    capability: VerifiedCapturedSnapshot,
+) -> bytes:
+    """Consume one exact production verifier capability after terminal commit."""
+
+    if type(capability) is not VerifiedCapturedSnapshot:
+        raise TypeError("verified snapshot consumption requires exact capability")
+    if capability._issuer is not _PRODUCTION_VERIFIED_SNAPSHOT_ISSUER:
+        raise TypeError("production consumer requires a production-issued capability")
+    permit = capability._permit
+    if type(permit) is not _VerifiedSnapshotPermit:
+        raise WindowsEffectfulCaptureProtocolError(
+            "verified snapshot registry binding is invalid"
+        )
+    with permit.lock:
+        with _VERIFIED_SNAPSHOT_REGISTRY_LOCK:
+            issuance = _VERIFIED_SNAPSHOT_REGISTRY.get(permit)
+            if (
+                permit.consumed
+                or issuance is None
+                or issuance.capability() is not capability
+                or issuance.issuer is not _PRODUCTION_VERIFIED_SNAPSHOT_ISSUER
+                or issuance.values != _verified_snapshot_visible_values(capability)
+            ):
+                raise WindowsEffectfulCaptureProtocolError(
+                    "verified snapshot exact-object registry binding mismatch"
+                )
+            del _VERIFIED_SNAPSHOT_REGISTRY[permit]
+            permit.consumed = True
+    return bytes.fromhex(capability.artifact_sha256)
+
+
 def consume_verified_captured_snapshot_for_test(
     capability: VerifiedCapturedSnapshot,
     *,

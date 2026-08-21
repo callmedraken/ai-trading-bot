@@ -56,6 +56,7 @@ from trading_bot.runtime.windows_effectful_capture_protocol import (
     ProviderAttemptFenceState,
     VerifiedCapturedSnapshot,
     WindowsEffectfulCaptureProtocolError,
+    _consume_production_verified_captured_snapshot,
     _issue_production_verified_captured_snapshot,
     _validate_production_verified_captured_snapshot,
     build_isolated_capture_child_request,
@@ -111,7 +112,10 @@ class C3C2ResumedCaptureForTest:
 
 _C3_C3B_OBSERVATION_ISSUER = object()
 _C3_POST_RESUME_EVIDENCE_CONSTRUCTOR = object()
+_C3_TERMINAL_AUTHORIZATION_CONSTRUCTOR = object()
 _MAX_C3_CLEANUP_EVIDENCE_BYTES = 1024
+_MAX_C3_TERMINAL_EVIDENCE_BYTES = 2048
+_MAX_C3_TERMINAL_DIAGNOSTICS_BYTES = 512
 
 
 @dataclass(frozen=True, slots=True)
@@ -184,6 +188,66 @@ class _C3ObservationSnapshot:
     child_result_json: bytes | None
 
 
+class C3StagingCleanupStatus(StrEnum):
+    COMPLETE = "COMPLETE"
+    FAILED = "FAILED"
+    IDENTITY_MISMATCH = "IDENTITY_MISMATCH"
+    ALREADY_RELEASED = "ALREADY_RELEASED"
+
+
+class C3TerminalReason(StrEnum):
+    VERIFIED_SNAPSHOT = "VERIFIED_SNAPSHOT"
+    POST_FENCE_CHILD_FAILURE = "POST_FENCE_CHILD_FAILURE"
+    PARENT_ARTIFACT_VERIFICATION_FAILED = "PARENT_ARTIFACT_VERIFICATION_FAILED"
+    POST_RESUME_OUTCOME_AMBIGUOUS = "POST_RESUME_OUTCOME_AMBIGUOUS"
+
+
+class _C3TerminalAuthorization:
+    """Private one-shot authority for a deterministic non-success terminal."""
+
+    __slots__ = ("_issuer", "_permit")
+
+    def __init__(self, constructor: object, issuer: object, permit: object) -> None:
+        if constructor is not _C3_TERMINAL_AUTHORIZATION_CONSTRUCTOR:
+            raise TypeError("C3 terminal authority must be issued by the registry")
+        self._issuer = issuer
+        self._permit = permit
+
+    def __copy__(self) -> object:
+        raise TypeError("C3 terminal authority cannot be copied")
+
+    def __deepcopy__(self, memo: object) -> object:
+        del memo
+        raise TypeError("C3 terminal authority cannot be deep-copied")
+
+    def __reduce__(self) -> object:
+        raise TypeError("C3 terminal authority cannot be serialized")
+
+    def __reduce_ex__(self, protocol: int) -> object:
+        del protocol
+        raise TypeError("C3 terminal authority cannot be pickled")
+
+
+@dataclass(frozen=True, slots=True)
+class _C3TerminalIssuance:
+    authorization: object
+    permit: object
+    issuer: object
+    lineage: tuple[str, str, str, str, str]
+    observation: C3C3BObservationForTest
+    observation_snapshot: _C3ObservationSnapshot
+    child_request_sha256: str
+    verification_failure: str | None
+    state: str
+    disposition: str
+    snapshot_digest: bytes | None
+    evidence_json: bytes
+    evidence_digest: bytes
+    diagnostics_json: bytes
+    diagnostics_digest: bytes
+    staging_cleanup: C3StagingCleanupStatus
+
+
 @dataclass(slots=True)
 class _C3LiveProcessEntry:
     reservation_id: str
@@ -202,7 +266,9 @@ class _C3LiveProcessEntry:
     evidence_consumed: bool = False
     verified_snapshot: VerifiedCapturedSnapshot | None = None
     verification_failure: str | None = None
+    verification_staging_cleanup: C3StagingCleanupStatus | None = None
     verification_started: bool = False
+    terminal_issuance: _C3TerminalIssuance | None = None
 
 
 class C3ArtifactVerificationFailure(StrEnum):
@@ -602,6 +668,7 @@ class _C3LiveProcessRegistry:
         final_handle: int | None = None
         staging_handle: int | None = None
         cleanup_attempted = False
+        staging_cleanup = C3StagingCleanupStatus.FAILED
         try:
             if (
                 trusted is None
@@ -756,6 +823,7 @@ class _C3LiveProcessRegistry:
                 )
             staging_handle = None
             api.close_handle(released)
+            staging_cleanup = C3StagingCleanupStatus.COMPLETE
 
             capability = _issue_production_verified_captured_snapshot(
                 session_id=session_id,
@@ -776,6 +844,7 @@ class _C3LiveProcessRegistry:
                         "C3 verifier registry provenance changed"
                     )
                 current.verified_snapshot = capability
+                current.verification_staging_cleanup = staging_cleanup
             return capability
         except BaseException:
             if final_handle is not None:
@@ -783,26 +852,37 @@ class _C3LiveProcessRegistry:
                     child._api.close_handle(final_handle)
                 except Exception:
                     pass
+            if staging_handle is None:
+                try:
+                    staging_handle, _retained_identity, _staging_path = (
+                        child._retained_staging()
+                    )
+                except Exception:
+                    staging_cleanup = C3StagingCleanupStatus.ALREADY_RELEASED
             if staging_handle is not None:
                 try:
-                    if (
-                        not cleanup_attempted
-                        and child._api.get_file_identity(staging_handle)
-                        == child._staging_identity
-                    ):
-                        cleanup_attempted = True
-                        child._api.delete_staging_link(staging_handle)
+                    if not cleanup_attempted:
+                        if (
+                            child._api.get_file_identity(staging_handle)
+                            != child._staging_identity
+                        ):
+                            staging_cleanup = C3StagingCleanupStatus.IDENTITY_MISMATCH
+                        else:
+                            cleanup_attempted = True
+                            child._api.delete_staging_link(staging_handle)
+                            staging_cleanup = C3StagingCleanupStatus.COMPLETE
                 except Exception:
-                    pass
+                    staging_cleanup = C3StagingCleanupStatus.FAILED
                 try:
                     if child._staging_handle == staging_handle:
                         child._release_staging_handle()
                     child._api.close_handle(staging_handle)
                 except Exception:
-                    pass
+                    staging_cleanup = C3StagingCleanupStatus.FAILED
             with self._lock:
                 current = self._find_bound(reservation_id, execution_id)
                 current.verification_failure = failure.value
+                current.verification_staging_cleanup = staging_cleanup
             raise WindowsEffectfulCaptureCompositionError(
                 "C3 parent artifact verification failed"
             ) from None
@@ -812,35 +892,301 @@ class _C3LiveProcessRegistry:
         capability: VerifiedCapturedSnapshot,
         lineage: tuple[str, str, str, str, str],
     ) -> None:
-        values = _validate_production_verified_captured_snapshot(capability)
-        if values[:5] != lineage:
-            raise WindowsEffectfulCaptureCompositionError(
-                "verified snapshot complete C2 lineage is mismatched"
-            )
         with self._lock:
             entry = self._find_bound(lineage[3], lineage[4])
             if entry.verified_snapshot is not capability:
                 raise WindowsEffectfulCaptureCompositionError(
                     "verified snapshot is stale or unregistered"
                 )
+            values = _validate_production_verified_captured_snapshot(capability)
+            if values[:5] != lineage:
+                raise WindowsEffectfulCaptureCompositionError(
+                    "verified snapshot complete C2 lineage is mismatched"
+                )
 
     def verified_snapshot_lineage(
         self, capability: VerifiedCapturedSnapshot
     ) -> tuple[str, str, str, str, str]:
-        values = _validate_production_verified_captured_snapshot(capability)
-        lineage = values[:5]
-        if any(type(value) is not str for value in lineage):
-            raise WindowsEffectfulCaptureCompositionError(
-                "verified snapshot registry lineage is invalid"
-            )
-        typed = (lineage[0], lineage[1], lineage[2], lineage[3], lineage[4])
         with self._lock:
+            values = _validate_production_verified_captured_snapshot(capability)
+            lineage = values[:5]
+            if any(type(value) is not str for value in lineage):
+                raise WindowsEffectfulCaptureCompositionError(
+                    "verified snapshot registry lineage is invalid"
+                )
+            typed = (lineage[0], lineage[1], lineage[2], lineage[3], lineage[4])
             entry = self._find_bound(typed[3], typed[4])
             if entry.verified_snapshot is not capability:
                 raise WindowsEffectfulCaptureCompositionError(
                     "verified snapshot is stale or unregistered"
                 )
         return typed
+
+    def prepare_terminal(
+        self,
+        lineage: tuple[str, str, str, str, str],
+        verified_snapshot: object | None,
+    ) -> object:
+        """Derive one terminal issuance while C2 holds the lifecycle arbiter."""
+
+        if (
+            type(lineage) is not tuple
+            or len(lineage) != 5
+            or any(type(value) is not str for value in lineage)
+        ):
+            raise TypeError("C3 terminal lineage is invalid")
+        with self._lock:
+            entry = self._find_bound(lineage[3], lineage[4])
+            snapshot = self._require_observation_snapshot_unchanged(entry)
+            if not entry.evidence_consumed or entry.observation is None:
+                raise WindowsEffectfulCaptureCompositionError(
+                    "C3 terminal requires persisted post-resume evidence"
+                )
+            existing = entry.terminal_issuance
+            if existing is not None:
+                expected = (
+                    existing.authorization if existing.state == "SUCCEEDED" else None
+                )
+                if verified_snapshot is not expected:
+                    raise WindowsEffectfulCaptureCompositionError(
+                        "C3 terminal retry authority is mismatched"
+                    )
+                self._validate_terminal_issuance_locked(
+                    entry, existing.authorization, lineage
+                )
+                return existing.authorization
+
+            trusted = entry.observation.trusted_result
+            if verified_snapshot is not None:
+                if entry.verified_snapshot is not verified_snapshot:
+                    raise WindowsEffectfulCaptureCompositionError(
+                        "verified snapshot is stale or unregistered"
+                    )
+                if type(verified_snapshot) is not VerifiedCapturedSnapshot:
+                    raise TypeError("C3 success requires exact verified snapshot")
+                values = _validate_production_verified_captured_snapshot(
+                    verified_snapshot
+                )
+                if values[:5] != lineage:
+                    raise WindowsEffectfulCaptureCompositionError(
+                        "verified snapshot complete C2 lineage is mismatched"
+                    )
+                if (
+                    trusted is None
+                    or snapshot.child_fence_state
+                    != ProviderAttemptFenceState.ENTERED.value
+                    or snapshot.child_result_classification
+                    != ChildResultClassification.SUCCEEDED.value
+                    or snapshot.child_result_json is None
+                    or hashlib.sha256(snapshot.child_result_json).hexdigest()
+                    != verified_snapshot.child_result_sha256
+                ):
+                    raise WindowsEffectfulCaptureCompositionError(
+                        "verified snapshot child result binding is inconsistent"
+                    )
+                state = "SUCCEEDED"
+                disposition = "CONFIRMED"
+                reason = C3TerminalReason.VERIFIED_SNAPSHOT
+                snapshot_digest = bytes.fromhex(verified_snapshot.artifact_sha256)
+                staging_cleanup = C3StagingCleanupStatus.COMPLETE
+                artifact_verification = "VERIFIED"
+                authorization: object = verified_snapshot
+                permit = object()
+            else:
+                if entry.verified_snapshot is not None:
+                    raise WindowsEffectfulCaptureCompositionError(
+                        "C3 success requires the exact verified snapshot capability"
+                    )
+                if trusted is None:
+                    state = "AMBIGUOUS"
+                    disposition = "MAY_HAVE_OCCURRED"
+                    reason = C3TerminalReason.POST_RESUME_OUTCOME_AMBIGUOUS
+                elif trusted.fence_state is ProviderAttemptFenceState.NOT_ENTERED:
+                    state = "AMBIGUOUS"
+                    disposition = "MAY_HAVE_OCCURRED"
+                    reason = C3TerminalReason.POST_RESUME_OUTCOME_AMBIGUOUS
+                elif trusted.classification is not ChildResultClassification.SUCCEEDED:
+                    state = "FAILED"
+                    disposition = "CONFIRMED"
+                    reason = C3TerminalReason.POST_FENCE_CHILD_FAILURE
+                elif entry.verification_failure is not None:
+                    state = "FAILED"
+                    disposition = "CONFIRMED"
+                    reason = C3TerminalReason.PARENT_ARTIFACT_VERIFICATION_FAILED
+                else:
+                    raise WindowsEffectfulCaptureCompositionError(
+                        "successful child result requires D1 verification first"
+                    )
+                snapshot_digest = None
+                artifact_verification = (
+                    "NOT_ATTEMPTED"
+                    if entry.verification_failure is None
+                    else entry.verification_failure
+                )
+                if entry.verification_started:
+                    staging_cleanup = (
+                        entry.verification_staging_cleanup
+                        or C3StagingCleanupStatus.FAILED
+                    )
+                else:
+                    staging_cleanup = self._settle_staging_locked(entry)
+                permit = object()
+                authorization = _C3TerminalAuthorization(
+                    _C3_TERMINAL_AUTHORIZATION_CONSTRUCTOR,
+                    self._issuer,
+                    permit,
+                )
+
+            evidence_json = _build_c3_terminal_evidence(
+                entry=entry,
+                snapshot=snapshot,
+                lineage=lineage,
+                state=state,
+                disposition=disposition,
+                artifact_verification=artifact_verification,
+                verified_snapshot=(
+                    verified_snapshot
+                    if type(verified_snapshot) is VerifiedCapturedSnapshot
+                    else None
+                ),
+                staging_cleanup=staging_cleanup,
+            )
+            diagnostics_json = _build_c3_terminal_diagnostics(
+                entry.observation,
+                reason=reason,
+                artifact_verification=artifact_verification,
+                staging_cleanup=staging_cleanup,
+            )
+            issuance = _C3TerminalIssuance(
+                authorization=authorization,
+                permit=permit,
+                issuer=self._issuer,
+                lineage=lineage,
+                observation=entry.observation,
+                observation_snapshot=snapshot,
+                child_request_sha256=entry.request_sha256 or "",
+                verification_failure=entry.verification_failure,
+                state=state,
+                disposition=disposition,
+                snapshot_digest=snapshot_digest,
+                evidence_json=evidence_json,
+                evidence_digest=hashlib.sha256(evidence_json).digest(),
+                diagnostics_json=diagnostics_json,
+                diagnostics_digest=hashlib.sha256(diagnostics_json).digest(),
+                staging_cleanup=staging_cleanup,
+            )
+            entry.terminal_issuance = issuance
+            return authorization
+
+    def validate_terminal(
+        self,
+        authorization: object,
+        lineage: tuple[str, str, str, str, str],
+    ) -> tuple[str, str, bytes | None, bytes, bytes, bytes, bytes]:
+        with self._lock:
+            entry = self._find_bound(lineage[3], lineage[4])
+            issuance = self._validate_terminal_issuance_locked(
+                entry, authorization, lineage
+            )
+            return (
+                issuance.state,
+                issuance.disposition,
+                issuance.snapshot_digest,
+                issuance.evidence_json,
+                issuance.evidence_digest,
+                issuance.diagnostics_json,
+                issuance.diagnostics_digest,
+            )
+
+    def consume_terminal(
+        self, authorization: object, lineage: tuple[str, str, str, str, str]
+    ) -> None:
+        with self._lock:
+            entry = self._find_bound(lineage[3], lineage[4])
+            issuance = self._validate_terminal_issuance_locked(
+                entry, authorization, lineage
+            )
+            if issuance.state == "SUCCEEDED":
+                if type(authorization) is not VerifiedCapturedSnapshot:
+                    raise TypeError("C3 success requires exact verified snapshot")
+                digest = _consume_production_verified_captured_snapshot(authorization)
+                if digest != issuance.snapshot_digest:
+                    raise WindowsEffectfulCaptureCompositionError(
+                        "verified snapshot terminal digest changed"
+                    )
+            self._entries.remove(entry)
+        try:
+            entry.child.close()
+        except Exception:
+            pass
+
+    def _validate_terminal_issuance_locked(
+        self,
+        entry: _C3LiveProcessEntry,
+        authorization: object,
+        lineage: tuple[str, str, str, str, str],
+    ) -> _C3TerminalIssuance:
+        issuance = entry.terminal_issuance
+        if issuance is None or issuance.authorization is not authorization:
+            raise WindowsEffectfulCaptureCompositionError(
+                "C3 terminal authority was consumed or not issued"
+            )
+        snapshot = self._require_observation_snapshot_unchanged(entry)
+        if (
+            issuance.issuer is not self._issuer
+            or issuance.lineage != lineage
+            or issuance.observation is not entry.observation
+            or issuance.observation_snapshot != snapshot
+            or issuance.child_request_sha256 != entry.request_sha256
+            or issuance.verification_failure != entry.verification_failure
+        ):
+            raise WindowsEffectfulCaptureCompositionError(
+                "C3 terminal authority exact-object binding mismatch"
+            )
+        if issuance.state == "SUCCEEDED":
+            if entry.verified_snapshot is not authorization:
+                raise WindowsEffectfulCaptureCompositionError(
+                    "verified snapshot is stale or unregistered"
+                )
+            _validate_production_verified_captured_snapshot(authorization)
+        elif (
+            type(authorization) is not _C3TerminalAuthorization
+            or authorization._issuer is not self._issuer
+            or authorization._permit is not issuance.permit
+        ):
+            raise WindowsEffectfulCaptureCompositionError(
+                "C3 non-success terminal authority binding mismatch"
+            )
+        return issuance
+
+    @staticmethod
+    def _settle_staging_locked(
+        entry: _C3LiveProcessEntry,
+    ) -> C3StagingCleanupStatus:
+        child = entry.child
+        if child.closed:
+            return C3StagingCleanupStatus.ALREADY_RELEASED
+        try:
+            staging_handle, retained_identity, _staging_path = child._retained_staging()
+        except Exception:
+            return C3StagingCleanupStatus.ALREADY_RELEASED
+        status = C3StagingCleanupStatus.FAILED
+        try:
+            if child._api.get_file_identity(staging_handle) != retained_identity:
+                status = C3StagingCleanupStatus.IDENTITY_MISMATCH
+            else:
+                child._api.delete_staging_link(staging_handle)
+                status = C3StagingCleanupStatus.COMPLETE
+        except Exception:
+            status = C3StagingCleanupStatus.FAILED
+        try:
+            released = child._release_staging_handle()
+            if released != staging_handle:
+                status = C3StagingCleanupStatus.FAILED
+            child._api.close_handle(released)
+        except Exception:
+            status = C3StagingCleanupStatus.FAILED
+        return status
 
     def _validate_post_resume_evidence_locked(
         self,
@@ -1024,6 +1370,93 @@ def _build_c3_cleanup_json(
         separators=(",", ":"),
         allow_nan=False,
     ).encode("utf-8")
+
+
+def _build_c3_terminal_evidence(
+    *,
+    entry: _C3LiveProcessEntry,
+    snapshot: _C3ObservationSnapshot,
+    lineage: tuple[str, str, str, str, str],
+    state: str,
+    disposition: str,
+    artifact_verification: str,
+    verified_snapshot: VerifiedCapturedSnapshot | None,
+    staging_cleanup: C3StagingCleanupStatus,
+) -> bytes:
+    observation = entry.observation
+    request_sha256 = entry.request_sha256
+    if observation is None or request_sha256 is None:
+        raise WindowsEffectfulCaptureCompositionError(
+            "C3 terminal evidence lineage is incomplete"
+        )
+    child_result_sha256 = (
+        None
+        if snapshot.child_result_json is None
+        else hashlib.sha256(snapshot.child_result_json).hexdigest()
+    )
+    payload = _canonical_json(
+        {
+            "artifact_identity_sha256": (
+                None
+                if verified_snapshot is None
+                else verified_snapshot.artifact_identity_sha256
+            ),
+            "artifact_sha256": (
+                None if verified_snapshot is None else verified_snapshot.artifact_sha256
+            ),
+            "artifact_verification": artifact_verification,
+            "attempt_id": lineage[1],
+            "child_fence_state": snapshot.child_fence_state,
+            "child_request_sha256": request_sha256,
+            "child_result_classification": snapshot.child_result_classification,
+            "child_result_sha256": child_result_sha256,
+            "claim_id": lineage[2],
+            "execution_id": lineage[4],
+            "parent_cleanup": observation.parent_cleanup.value,
+            "process_outcome": observation.process_outcome.value,
+            "provider_call_disposition": disposition,
+            "reservation_id": lineage[3],
+            "result_transport": observation.result_transport.value,
+            "schema": 1,
+            "session_id": lineage[0],
+            "snapshot_id": (
+                None
+                if verified_snapshot is None
+                else str(verified_snapshot.snapshot_id)
+            ),
+            "staging_cleanup": staging_cleanup.value,
+            "terminal_state": state,
+        }
+    )
+    if len(payload) > _MAX_C3_TERMINAL_EVIDENCE_BYTES:
+        raise WindowsEffectfulCaptureCompositionError(
+            "C3 terminal evidence exceeds its reviewed byte bound"
+        )
+    return payload
+
+
+def _build_c3_terminal_diagnostics(
+    observation: C3C3BObservationForTest,
+    *,
+    reason: C3TerminalReason,
+    artifact_verification: str,
+    staging_cleanup: C3StagingCleanupStatus,
+) -> bytes:
+    payload = _canonical_json(
+        {
+            "artifact_verification": artifact_verification,
+            "parent_cleanup": observation.parent_cleanup.value,
+            "reason": reason.value,
+            "result_transport": observation.result_transport.value,
+            "schema": 1,
+            "staging_cleanup": staging_cleanup.value,
+        }
+    )
+    if len(payload) > _MAX_C3_TERMINAL_DIAGNOSTICS_BYTES:
+        raise WindowsEffectfulCaptureCompositionError(
+            "C3 terminal diagnostics exceed their reviewed byte bound"
+        )
+    return payload
 
 
 def _snapshot_matches_child_request(
@@ -1286,6 +1719,29 @@ class C3C2TransactionalAdapterForTest:
         self, capability: VerifiedCapturedSnapshot
     ) -> tuple[str, str, str, str, str]:
         return self._registry.verified_snapshot_lineage(capability)
+
+    def prepare_c3_terminal(
+        self,
+        lineage: tuple[str, str, str, str, str],
+        verified_snapshot: object | None,
+    ) -> object:
+        return self._registry.prepare_terminal(lineage, verified_snapshot)
+
+    def validate_c3_terminal(
+        self,
+        authorization: object,
+        lineage: tuple[str, str, str, str, str],
+    ) -> tuple[str, str, bytes | None, bytes, bytes, bytes, bytes]:
+        return self._registry.validate_terminal(authorization, lineage)
+
+    def consume_c3_terminal(
+        self,
+        authorization: object,
+        lineage: tuple[str, str, str, str, str],
+    ) -> None:
+        self._registry.consume_terminal(authorization, lineage)
+        self._expected_requests.pop((lineage[3], lineage[4]), None)
+        self._launch_plans.pop(lineage[3], None)
 
     def close(self) -> None:
         try:

@@ -607,7 +607,18 @@ def test_file_rename_info_is_pointer_width_safe_and_no_replace() -> None:
     assert info.root_directory is None
     assert info.file_name_length == len(encoded)
     assert ctypes.string_at(ctypes.addressof(buffer) + offset, len(encoded)) == encoded
-    assert ctypes.sizeof(buffer) >= offset + len(encoded)
+    assert ctypes.sizeof(buffer) == (
+        ctypes.sizeof(security._FileRenameInfo) + len(encoded) + len(b"\x00\x00")
+    )
+    assert (
+        ctypes.string_at(ctypes.addressof(buffer) + offset + len(encoded), 2)
+        == b"\x00\x00"
+    )
+    tail = ctypes.string_at(
+        ctypes.addressof(buffer) + offset + len(encoded) + 2,
+        ctypes.sizeof(buffer) - offset - len(encoded) - 2,
+    )
+    assert tail == b"\x00" * len(tail)
     with pytest.raises(AuthorityPathError):
         security._build_file_rename_info(PRODUCTION_AUTHORITY_PATHS.bootstrap_temporary)
 
@@ -666,6 +677,16 @@ def test_publish_unpublished_file_uses_handle_rename_without_replacement(
     assert info.root_directory is None
     assert info.file_name_length == len(
         str(PRODUCTION_AUTHORITY_PATHS.bootstrap).encode("utf-16-le")
+    )
+    encoded = str(PRODUCTION_AUTHORITY_PATHS.bootstrap).encode("utf-16-le")
+    offset = security._FileRenameInfo.file_name.offset
+    assert fake_set.args[3] == (
+        ctypes.sizeof(security._FileRenameInfo) + len(encoded) + len(b"\x00\x00")
+    )
+    assert raw[offset : offset + len(encoded)] == encoded
+    assert raw[offset + len(encoded) : offset + len(encoded) + 2] == b"\x00\x00"
+    assert raw[offset + len(encoded) + 2 :] == b"\x00" * (
+        len(raw) - offset - len(encoded) - 2
     )
     assert "MoveFileEx" not in str(fake_set.args)
 

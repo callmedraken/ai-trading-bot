@@ -414,7 +414,11 @@ def _build_file_rename_info(destination: PureWindowsPath) -> ctypes.Array:
     require_fixed_authority_tree_path(destination)
     file_name = str(destination).encode("utf-16-le")
     file_name_offset = _FileRenameInfo.file_name.offset
-    buffer = ctypes.create_string_buffer(file_name_offset + len(file_name))
+    file_name_terminator = b"\x00\x00"
+    buffer_size = (
+        ctypes.sizeof(_FileRenameInfo) + len(file_name) + len(file_name_terminator)
+    )
+    buffer = ctypes.create_string_buffer(buffer_size)
     info = _FileRenameInfo.from_buffer(buffer)
     info.replace_if_exists = 0
     info.root_directory = None
@@ -423,6 +427,11 @@ def _build_file_rename_info(destination: PureWindowsPath) -> ctypes.Array:
         ctypes.addressof(buffer) + file_name_offset,
         file_name,
         len(file_name),
+    )
+    ctypes.memmove(
+        ctypes.addressof(buffer) + file_name_offset + len(file_name),
+        file_name_terminator,
+        len(file_name_terminator),
     )
     return buffer
 

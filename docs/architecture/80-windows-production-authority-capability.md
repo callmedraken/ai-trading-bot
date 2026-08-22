@@ -16,9 +16,13 @@ Trading-runtime provenance. It means that the exact consuming Trading process
 has passed the reviewed runtime-visible Windows and SQLite authority proof and
 may enter the future reviewed production transactional service. It does not
 enable provider execution, child launch, scheduling, credentials, or live
-orders. Production remains NO-GO until the approved production trust anchors,
-release material, SQLite build/VFS material, and native Windows acceptance are
-published.
+orders. The approved production P-256 trust anchor v1 is now source-pinned.
+Only its public key is embedded; private signing material remains external and
+non-exportable. Production remains NO-GO for administrator fixed-tree/database
+provisioning, Trading ACL acceptance, approved release/build material, SQLite
+VFS/locking acceptance, reparse/substitution acceptance, native trust
+publication/rename acceptance, cross-session mutex acceptance, and other
+existing native acceptance requirements.
 
 ## Corrected trust boundary
 
@@ -238,10 +242,13 @@ production/test provenance separation, and deletion immutability.
 
 ## Production NO-GO conditions and C2
 
-Production remains NO-GO pending the approved production P-256 trust anchor,
-administrator provisioning, real Trading ACL acceptance, native SQLite VFS
-and locking acceptance, reparse/substitution acceptance, native trust
-publication acceptance, and cross-session lifecycle-mutex acceptance.
+The approved production P-256 trust anchor v1 is now source-pinned. Only its
+public key is embedded; private signing material remains external and
+non-exportable. Production remains NO-GO for administrator fixed-tree/database
+provisioning, real Trading ACL acceptance, approved release/build material,
+SQLite VFS/locking acceptance, reparse/substitution acceptance, native trust
+publication/rename acceptance, cross-session mutex acceptance, and other
+existing native acceptance requirements.
 
 C2 still requires `ValidatedProductionAuthority` directly at the future
 reviewed Architecture-77 transactional-service boundary. C1 does not enable

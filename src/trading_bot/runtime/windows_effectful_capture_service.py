@@ -84,6 +84,7 @@ from trading_bot.runtime.windows_transactional_authority import (
     ResumeReceipt,
     WindowsTransactionalAuthority,
     _create_production_c3_composition_binding_issuer,
+    _discard_unconsumed_production_c3_composition_bindings,
     _issue_production_c3_composition_binding,
 )
 
@@ -125,11 +126,35 @@ _C3_C3B_OBSERVATION_ISSUER = object()
 _C3_POST_RESUME_EVIDENCE_CONSTRUCTOR = object()
 _PRODUCTION_C3_COMPOSITION_ISSUANCE_CONSTRUCTOR = object()
 _PRODUCTION_C3_ROOT_CONSTRUCTOR = object()
+_PRODUCTION_C3_ROOT_INITIALIZING = object()
 _PRODUCTION_C3_ROOT_CONSTRUCTIONS_LOCK = threading.Lock()
 _PRODUCTION_C3_ROOT_CONSTRUCTIONS: weakref.WeakKeyDictionary[
     WindowsEffectfulDailySnapshotCapture,
     object,
 ] = weakref.WeakKeyDictionary()
+
+
+def _admit_production_c3_root_initialization(
+    root: WindowsEffectfulDailySnapshotCapture,
+) -> None:
+    if type(root) is not WindowsEffectfulDailySnapshotCapture:
+        raise TypeError("production C3 composition root cannot be subclassed")
+    with _PRODUCTION_C3_ROOT_CONSTRUCTIONS_LOCK:
+        if (
+            _PRODUCTION_C3_ROOT_CONSTRUCTIONS.get(root)
+            is not _PRODUCTION_C3_ROOT_CONSTRUCTOR
+        ):
+            raise WindowsEffectfulCaptureCompositionError(
+                "production C3 composition root initialization is unavailable"
+            )
+        _PRODUCTION_C3_ROOT_CONSTRUCTIONS[root] = _PRODUCTION_C3_ROOT_INITIALIZING
+
+
+def _discard_production_c3_root_construction(
+    root: WindowsEffectfulDailySnapshotCapture,
+) -> None:
+    with _PRODUCTION_C3_ROOT_CONSTRUCTIONS_LOCK:
+        _PRODUCTION_C3_ROOT_CONSTRUCTIONS.pop(root, None)
 
 
 @dataclass(slots=True)
@@ -145,6 +170,22 @@ _PRODUCTION_C3_COMPOSITION_ISSUANCES: weakref.WeakKeyDictionary[
     _ProductionC3CompositionIssuance,
     _ProductionC3CompositionIssuanceRecord,
 ] = weakref.WeakKeyDictionary()
+
+
+def _discard_production_c3_composition_issuances(
+    root: WindowsEffectfulDailySnapshotCapture,
+    adapter: _ProductionC3TransactionalAdapter,
+) -> None:
+    with _PRODUCTION_C3_COMPOSITION_ISSUANCES_LOCK:
+        failed_issuances = tuple(
+            issuance
+            for issuance, record in _PRODUCTION_C3_COMPOSITION_ISSUANCES.items()
+            if type(record) is _ProductionC3CompositionIssuanceRecord
+            and record.root is root
+            and record.adapter is adapter
+        )
+        for issuance in failed_issuances:
+            _PRODUCTION_C3_COMPOSITION_ISSUANCES.pop(issuance, None)
 
 
 class _ProductionC3CompositionIssuance:
@@ -234,7 +275,7 @@ def _create_production_c3_composition_issuance(
     with _PRODUCTION_C3_ROOT_CONSTRUCTIONS_LOCK:
         construction = _PRODUCTION_C3_ROOT_CONSTRUCTIONS.pop(root, None)
     if (
-        construction is not _PRODUCTION_C3_ROOT_CONSTRUCTOR
+        construction is not _PRODUCTION_C3_ROOT_INITIALIZING
         or type(root) is not WindowsEffectfulDailySnapshotCapture
         or type(adapter) is not _ProductionC3TransactionalAdapter
         or root._adapter is not adapter
@@ -2206,30 +2247,55 @@ class WindowsEffectfulDailySnapshotCapture:
         return root
 
     def __init__(self, authority: ValidatedProductionAuthority) -> None:
-        validated = require_validated_production_authority(authority)
-        if (
-            validated.provider_id != ALPACA_DAILY_SNAPSHOT_DESCRIPTOR.provider_id
-            or validated.permitted_provider_operation
-            != ALPACA_DAILY_SNAPSHOT_DESCRIPTOR.operation
-        ):
-            raise WindowsEffectfulCaptureCompositionError(
-                "C3 authority is not bound to the exact Alpaca daily snapshot operation"
-            )
-        self._authority = validated
-        self._closed = False
-        self._production_c2_binding_issued = False
-        native_api = CtypesWindowsEffectfulCaptureNativeApi()
-        adapter = _ProductionC3TransactionalAdapter(self, validated, native_api)
-        self._adapter = adapter
-        issuance = _create_production_c3_composition_issuance(self, validated, adapter)
-        self._production_c2_binding_issuance = issuance
+        _admit_production_c3_root_initialization(self)
+        adapter: _ProductionC3TransactionalAdapter | None = None
+        transactional: WindowsTransactionalAuthority | None = None
         try:
-            binding = issuance.issue_binding(self)
-            self._transactional = WindowsTransactionalAuthority._for_production_c3(
-                binding
+            validated = require_validated_production_authority(authority)
+            if (
+                validated.provider_id != ALPACA_DAILY_SNAPSHOT_DESCRIPTOR.provider_id
+                or validated.permitted_provider_operation
+                != ALPACA_DAILY_SNAPSHOT_DESCRIPTOR.operation
+            ):
+                raise WindowsEffectfulCaptureCompositionError(
+                    "C3 authority is not bound to the exact Alpaca daily "
+                    "snapshot operation"
+                )
+            self._authority = validated
+            native_api = CtypesWindowsEffectfulCaptureNativeApi()
+            adapter = _ProductionC3TransactionalAdapter(self, validated, native_api)
+            self._closed = False
+            self._production_c2_binding_issued = False
+            self._adapter = adapter
+            issuance = _create_production_c3_composition_issuance(
+                self, validated, adapter
             )
+            self._production_c2_binding_issuance = issuance
+            binding = issuance.issue_binding(self)
+            transactional = WindowsTransactionalAuthority._for_production_c3(binding)
+            self._transactional = transactional
         except BaseException:
-            adapter.close()
+            _discard_production_c3_root_construction(self)
+            if adapter is not None:
+                try:
+                    _discard_production_c3_composition_issuances(self, adapter)
+                except BaseException:
+                    pass
+                try:
+                    _discard_unconsumed_production_c3_composition_bindings(
+                        self, adapter
+                    )
+                except BaseException:
+                    pass
+                try:
+                    adapter.close()
+                except BaseException:
+                    pass
+            if transactional is not None:
+                try:
+                    transactional.close()
+                except BaseException:
+                    pass
             raise
 
     @property

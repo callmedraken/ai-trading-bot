@@ -1010,6 +1010,24 @@ def _issue_production_c3_composition_binding(
     return binding
 
 
+def _discard_unconsumed_production_c3_composition_bindings(
+    composition_root: object,
+    adapter: TransactionalAuthorityAdapter,
+) -> None:
+    """Revoke failed-root bindings without making them reusable."""
+
+    with _PRODUCTION_C3_COMPOSITION_BINDINGS_LOCK:
+        failed_bindings = tuple(
+            binding
+            for binding, record in _PRODUCTION_C3_COMPOSITION_BINDINGS.items()
+            if type(record) is _ProductionC3CompositionBindingRecord
+            and record.composition_root is composition_root
+            and record.adapter is adapter
+        )
+        for binding in failed_bindings:
+            _PRODUCTION_C3_COMPOSITION_BINDINGS.pop(binding, None)
+
+
 def _claim_production_c3_composition_binding(
     binding: object,
 ) -> tuple[

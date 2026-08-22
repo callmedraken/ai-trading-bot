@@ -375,6 +375,233 @@ def test_composition_retains_exact_c1_facts_and_owns_c2(
     assert type(capture._adapter._native_api) is CtypesWindowsEffectfulCaptureNativeApi
 
 
+def test_reinitialization_is_rejected_before_mutation_and_original_close_owns_adapter(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    capture, authority = _capture(monkeypatch)
+    adapter = capture._adapter
+    transactional = capture._transactional
+    issuance = capture._production_c2_binding_issuance
+    result_issuer = transactional._production_c3_issuer
+    assert result_issuer is not None
+    adapter_issuer = adapter._issuer
+    initial_state = (
+        capture._authority,
+        capture._adapter,
+        capture._transactional,
+        capture._production_c2_binding_issuance,
+        capture._production_c2_binding_issued,
+        capture._closed,
+        transactional._production_c3_issuer,
+        adapter._issuer,
+    )
+    closed_adapters: list[object] = []
+    original_close = type(adapter).close
+
+    def observe_close(self: object) -> None:
+        closed_adapters.append(self)
+        original_close(self)
+
+    monkeypatch.setattr(type(adapter), "close", observe_close)
+    revalidation_calls = 0
+
+    def reject_revalidation(_candidate: object) -> object:
+        nonlocal revalidation_calls
+        revalidation_calls += 1
+        raise AssertionError("reinitialization reached authority validation")
+
+    monkeypatch.setattr(
+        service_module,
+        "require_validated_production_authority",
+        reject_revalidation,
+    )
+
+    for candidate in (authority, _authority()):
+        with pytest.raises(
+            WindowsEffectfulCaptureCompositionError,
+            match="root initialization is unavailable",
+        ):
+            capture.__init__(candidate)
+        assert (
+            capture._authority,
+            capture._adapter,
+            capture._transactional,
+            capture._production_c2_binding_issuance,
+            capture._production_c2_binding_issued,
+            capture._closed,
+            transactional._production_c3_issuer,
+            adapter._issuer,
+        ) == initial_state
+        assert capture._authority is authority
+        assert capture._adapter is adapter
+        assert capture._transactional is transactional
+        assert capture._production_c2_binding_issuance is issuance
+        assert capture._production_c2_binding_issued is True
+        assert capture._closed is False
+        assert transactional._production_c3_issuer is result_issuer
+        assert result_issuer._active is True
+        assert adapter._issuer is adapter_issuer
+
+    assert revalidation_calls == 0
+    plan = capture.prepare_capture_plan(
+        _request(), datetime(2026, 8, 18, 14, tzinfo=UTC)
+    )
+    assert adapter._pending_plan is plan
+
+    capture.close()
+    capture.close()
+
+    assert closed_adapters == [adapter]
+    assert adapter._closed is True
+    assert adapter._pending_plan is None
+    assert result_issuer._active is False
+
+
+def _assert_failed_root_is_not_retained(
+    root: WindowsEffectfulDailySnapshotCapture,
+    adapter: object,
+) -> None:
+    with service_module._PRODUCTION_C3_ROOT_CONSTRUCTIONS_LOCK:
+        assert root not in service_module._PRODUCTION_C3_ROOT_CONSTRUCTIONS
+    with service_module._PRODUCTION_C3_COMPOSITION_ISSUANCES_LOCK:
+        assert all(
+            record.root is not root and record.adapter is not adapter
+            for record in service_module._PRODUCTION_C3_COMPOSITION_ISSUANCES.values()
+        )
+    with authority_module._PRODUCTION_C3_COMPOSITION_BINDINGS_LOCK:
+        assert all(
+            record.composition_root is not root and record.adapter is not adapter
+            for record in authority_module._PRODUCTION_C3_COMPOSITION_BINDINGS.values()
+        )
+
+
+def test_composition_issuance_failure_closes_adapter_and_is_not_retryable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    authority = _authority()
+    monkeypatch.setattr(
+        service_module,
+        "require_validated_production_authority",
+        lambda candidate: candidate,
+    )
+    monkeypatch.setattr(
+        CtypesWindowsEffectfulCaptureNativeApi,
+        "__init__",
+        lambda self: None,
+    )
+    closed_adapters: list[object] = []
+    created_issuances: list[object] = []
+    adapter_type = service_module._ProductionC3TransactionalAdapter
+    original_close = adapter_type.close
+    original_issuance = service_module._create_production_c3_composition_issuance
+
+    def observe_close(self: object) -> None:
+        closed_adapters.append(self)
+        original_close(self)
+
+    def fail_issuance(*args: object) -> object:
+        issuance = original_issuance(*args)
+        created_issuances.append(issuance)
+        raise RuntimeError("injected composition issuance failure")
+
+    monkeypatch.setattr(adapter_type, "close", observe_close)
+    monkeypatch.setattr(
+        service_module,
+        "_create_production_c3_composition_issuance",
+        fail_issuance,
+    )
+    root = WindowsEffectfulDailySnapshotCapture.__new__(
+        WindowsEffectfulDailySnapshotCapture, authority
+    )
+
+    with pytest.raises(RuntimeError, match="composition issuance failure"):
+        root.__init__(authority)
+
+    assert len(closed_adapters) == 1
+    adapter = closed_adapters[0]
+    assert adapter is root._adapter
+    assert adapter._closed is True
+    assert adapter._issuer is None
+    assert len(created_issuances) == 1
+    with service_module._PRODUCTION_C3_COMPOSITION_ISSUANCES_LOCK:
+        assert (
+            created_issuances[0]
+            not in service_module._PRODUCTION_C3_COMPOSITION_ISSUANCES
+        )
+    _assert_failed_root_is_not_retained(root, adapter)
+    with pytest.raises(
+        WindowsEffectfulCaptureCompositionError,
+        match="root initialization is unavailable",
+    ):
+        root.__init__(authority)
+    assert closed_adapters == [adapter]
+
+
+def test_binding_creation_failure_closes_adapter_and_clears_registries(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    authority = _authority()
+    monkeypatch.setattr(
+        service_module,
+        "require_validated_production_authority",
+        lambda candidate: candidate,
+    )
+    monkeypatch.setattr(
+        CtypesWindowsEffectfulCaptureNativeApi,
+        "__init__",
+        lambda self: None,
+    )
+    closed_adapters: list[object] = []
+    created_bindings: list[object] = []
+    adapter_type = service_module._ProductionC3TransactionalAdapter
+    original_close = adapter_type.close
+    original_binding = service_module._issue_production_c3_composition_binding
+
+    def observe_close(self: object) -> None:
+        closed_adapters.append(self)
+        original_close(self)
+
+    def fail_binding(issuer: object) -> object:
+        binding = original_binding(issuer)
+        created_bindings.append(binding)
+        raise RuntimeError("injected composition binding failure")
+
+    monkeypatch.setattr(adapter_type, "close", observe_close)
+    monkeypatch.setattr(
+        service_module,
+        "_issue_production_c3_composition_binding",
+        fail_binding,
+    )
+    root = WindowsEffectfulDailySnapshotCapture.__new__(
+        WindowsEffectfulDailySnapshotCapture, authority
+    )
+
+    with pytest.raises(RuntimeError, match="composition binding failure"):
+        root.__init__(authority)
+
+    assert len(closed_adapters) == 1
+    adapter = closed_adapters[0]
+    assert adapter is root._adapter
+    assert adapter._closed is True
+    assert adapter._issuer is None
+    assert root._production_c2_binding_issued is True
+    assert len(created_bindings) == 1
+    with authority_module._PRODUCTION_C3_COMPOSITION_BINDINGS_LOCK:
+        assert (
+            created_bindings[0]
+            not in authority_module._PRODUCTION_C3_COMPOSITION_BINDINGS
+        )
+    with pytest.raises(TypeError, match="invalid or already consumed"):
+        WindowsTransactionalAuthority._for_production_c3(created_bindings[0])
+    _assert_failed_root_is_not_retained(root, adapter)
+    with pytest.raises(
+        WindowsEffectfulCaptureCompositionError,
+        match="root initialization is unavailable",
+    ):
+        root.__init__(authority)
+    assert closed_adapters == [adapter]
+
+
 def test_fixed_production_deployment_and_private_adapter_are_exact(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

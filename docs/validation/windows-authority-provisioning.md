@@ -19,9 +19,9 @@ Run the portable unit layer from the repository root:
 These tests do not open the production root, use credentials, call Alpaca,
 create a production mutex, or mutate Windows security state. They cover
 deterministic canonicalization, fixed-path invariance under `TEMP`/`TMP`/`TMPDIR`
-and cwd changes, unsupported bootstrap shapes, the empty production trust-anchor
-registry, P1363 envelope length, mutex digest/name, exact policy masks, and
-mocked acceptance dispatch/evidence semantics.
+and cwd changes, unsupported bootstrap shapes, the exact one-key production
+trust-anchor registry, P1363 envelope length, mutex digest/name, exact policy
+masks, and mocked acceptance dispatch/evidence semantics.
 
 ## Evidence classification matrix
 
@@ -103,8 +103,8 @@ the existing same-handle validator and a repeated read-only validation:
 The phase also performs disposable in-memory negative material checks for bad
 signature, unsupported signing-key ID, wrong Trading SID, wrong fixed path,
 wrong provider/operation, and unsupported policy. It never overwrites or
-renames installed trust files. Missing fixed artifacts, an absent production
-trust anchor, or an invalid installed state is a failure/blocker, never PASS.
+renames installed trust files. Missing fixed artifacts, a trust-anchor mismatch,
+or an invalid installed state is a failure/blocker, never PASS.
 
 The administrator run also checks the reserved same-directory trust-material
 temporary names
@@ -255,7 +255,6 @@ power-loss test is inferred from ordinary pytest.
 
 Production remains NO-GO until all of the following are separately satisfied:
 
-- an approved production P-256 public trust anchor/key-ID record is installed;
 - the fixed parent, root, bootstrap/signature, database, and journal are
   administrator provisioned and accepted;
 - the Trading allow/deny phase runs under the real standard account;
@@ -263,7 +262,10 @@ Production remains NO-GO until all of the following are separately satisfied:
 - reparse/substitution evidence is obtained in a disposable maintenance window;
 - cross-session `Global\\` mutex evidence is obtained from distinct sessions.
 
-Database initialization, migrations, unattended scheduling, Credential Manager,
-provider transport, child process orchestration, live trading, and real-money
-orders remain outside this milestone. Architecture 77 and its fixture remain
-unchanged.
+The approved production trust anchor v1 is pinned in source as public-key
+material only; the non-exportable private signing material remains external.
+Production database/journal initialization and acceptance, approved
+release/build material, and the native Windows gates above remain separately
+required. Migrations, unattended scheduling, Credential Manager, provider
+transport, child process orchestration, live trading, and real-money orders
+remain outside this milestone. Architecture 77 and its fixture remain unchanged.

@@ -1555,16 +1555,67 @@ def test_bootstrap_rejects_unknown_fields_and_noncanonical_types() -> None:
         )
 
 
-def test_production_trust_anchor_is_explicitly_not_provisioned() -> None:
-    assert PRODUCTION_PINNED_BOOTSTRAP_KEYS.keys == ()
-    if os.name != "nt":
-        with pytest.raises(UnsupportedWindowsPlatformError):
-            verify_bootstrap_signature(_bootstrap().canonical_bytes(), b"x" * 64)
-        return
+def test_production_trust_anchor_is_exactly_the_approved_p256_public_key() -> None:
+    approved_key_id = "AITradingBot/Authority/Bootstrap/v1"
+    approved_public_key = bytes.fromhex(
+        "04a73d90064e8b97e4a8373f48cac44718eb375ca52581233d614365294164efba"
+        "40c6758f0f4cc455f6b2bf9b222696f9bc83c91ddf625fd01de46a6e7cd9c52e"
+    )
+
+    assert type(PRODUCTION_PINNED_BOOTSTRAP_KEYS) is PinnedBootstrapKeyRegistry
+    assert type(PRODUCTION_PINNED_BOOTSTRAP_KEYS.keys) is tuple
+    assert len(PRODUCTION_PINNED_BOOTSTRAP_KEYS.keys) == 1
+    approved_key = PRODUCTION_PINNED_BOOTSTRAP_KEYS.keys[0]
+    assert type(approved_key) is PinnedBootstrapKey
+    assert approved_key.key_id == approved_key_id
+    assert approved_key.public_key == approved_public_key
+    assert len(approved_key.public_key) == 65
+    assert approved_key.public_key[0] == 0x04
+    assert (
+        hashlib.sha256(approved_key.public_key).hexdigest()
+        == "72234cbe62bf0f82f8783b2a17854b263489cfc7f4bacbbcb3c8b04c74d6dbb4"
+    )
+    assert PRODUCTION_PINNED_BOOTSTRAP_KEYS.get(approved_key_id) is approved_key
+
+
+@pytest.mark.parametrize(
+    "unapproved_key_id",
+    [
+        "other/v1",
+        "aitradingbot/Authority/Bootstrap/v1",
+        "AITradingBot/Authority/Bootstrap/V1",
+        "xAITradingBot/Authority/Bootstrap/v1",
+        "AITradingBot/Authority/Bootstrap/v1x",
+    ],
+)
+def test_production_trust_anchor_rejects_every_unapproved_key_id(
+    unapproved_key_id: str,
+) -> None:
     with pytest.raises(BootstrapTrustAnchorError):
-        verify_bootstrap_signature(_bootstrap().canonical_bytes(), b"x" * 64)
-    with pytest.raises(BootstrapSignatureError):
-        verify_bootstrap_signature(_bootstrap().canonical_bytes(), b"x")
+        PRODUCTION_PINNED_BOOTSTRAP_KEYS.get(unapproved_key_id)
+
+
+def test_pinned_key_registry_remains_immutable_and_rejects_duplicate_ids() -> None:
+    approved_key = PRODUCTION_PINNED_BOOTSTRAP_KEYS.keys[0]
+    with pytest.raises(AttributeError):
+        PRODUCTION_PINNED_BOOTSTRAP_KEYS.keys = ()
+    with pytest.raises(BootstrapTrustAnchorError):
+        PinnedBootstrapKeyRegistry((approved_key, approved_key))
+
+
+@pytest.mark.parametrize(
+    "malformed_public_key",
+    [
+        b"\x04" + b"\x00" * 63,
+        b"\x04" + b"\x00" * 65,
+        b"\x03" + b"\x00" * 64,
+    ],
+)
+def test_pinned_key_rejects_malformed_p256_public_key(
+    malformed_public_key: bytes,
+) -> None:
+    with pytest.raises(BootstrapTrustAnchorError):
+        PinnedBootstrapKey("test/v1", malformed_public_key)
 
 
 def test_test_only_key_registry_validates_shape_without_production_material() -> None:

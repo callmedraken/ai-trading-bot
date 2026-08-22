@@ -501,7 +501,7 @@ class PinnedBootstrapKey:
 
 @dataclass(frozen=True, slots=True)
 class PinnedBootstrapKeyRegistry:
-    """Immutable key-ID registry; production is intentionally unprovisioned."""
+    """Immutable registry of approved bootstrap-signing public keys by exact ID."""
 
     keys: tuple[PinnedBootstrapKey, ...] = ()
 
@@ -521,7 +521,17 @@ class PinnedBootstrapKeyRegistry:
         raise BootstrapTrustAnchorError("bootstrap key ID is not pinned")
 
 
-PRODUCTION_PINNED_BOOTSTRAP_KEYS = PinnedBootstrapKeyRegistry()
+PRODUCTION_PINNED_BOOTSTRAP_KEYS = PinnedBootstrapKeyRegistry(
+    (
+        PinnedBootstrapKey(
+            key_id="AITradingBot/Authority/Bootstrap/v1",
+            public_key=bytes.fromhex(
+                "04a73d90064e8b97e4a8373f48cac44718eb375ca52581233d614365294164efba"
+                "40c6758f0f4cc455f6b2bf9b222696f9bc83c91ddf625fd01de46a6e7cd9c52e"
+            ),
+        ),
+    )
+)
 
 
 def require_windows_platform() -> None:

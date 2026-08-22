@@ -39,7 +39,10 @@ Native acceptance remains required before GO:
 5. Keep acceptance roots temporary or explicitly opt-in; do not use the fixed
    production root unless the existing native acceptance opt-in selects it.
 
-The reviewed release/build manifest, production trust anchor, Windows SQLite
-VFS/locking behavior, NTFS durability, reparse/substitution controls, and
-cross-session mutex acceptance remain external blockers.  A custom SQL UDF is
-not a blocker or a production dependency.
+The production trust anchor v1 is now pinned in source as public-key material
+only; its non-exportable private signing material remains external. The reviewed
+release/build manifest, fixed-tree and production database/journal
+initialization and acceptance, Windows SQLite VFS/locking behavior, NTFS
+durability, reparse/substitution controls, and cross-session mutex acceptance
+remain external blockers. A custom SQL UDF is not a blocker or a production
+dependency.

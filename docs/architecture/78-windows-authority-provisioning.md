@@ -110,10 +110,12 @@ must equal `ALPACA_DAILY_SNAPSHOT_DESCRIPTOR` exactly.
 The detached signature is exactly 64 bytes of IEEE P1363 `r || s`. Windows
 CNG verifies SHA-256 over the exact canonical bytes with a P-256 public key.
 DER, alternate curves, alternate hashes, and bootstrap-selected keys are not
-accepted. `PRODUCTION_PINNED_BOOTSTRAP_KEYS` is intentionally empty until an
-approved production public key, key ID, and trust-anchor record are supplied;
-therefore production validation currently fails closed as not provisioned.
-Test-only registries may be used by non-production vector tests.
+accepted. `PRODUCTION_PINNED_BOOTSTRAP_KEYS` contains exactly the approved
+`AITradingBot/Authority/Bootstrap/v1` public trust anchor. Only the uncompressed
+SEC1 P-256 public key is embedded in source; the non-exportable private signing
+material remains external. Production trust-anchor selection is entirely
+code-owned and exact-key-ID based. Test-only registries may be used by
+non-production vector tests.
 
 Before the bootstrap is accepted, the administrator workflow resolves the
 local `Trading` account through `LookupAccountNameW` and compares its SID to
@@ -271,8 +273,9 @@ cross-session `Global\` mutex behavior. The disposable probe is acceptance
 evidence only; it is never the fixed production database and is never passed
 to installed authority validation.
 
-Production remains NO-GO until the approved P-256 public trust anchor is
-provided and the administrator-provisioned database/journal artifact boundary
-is accepted. Unattended scheduling, trusted exchange time, Credential Manager,
-provider transport, `CreateProcessW`, Job Objects, live trading, and real-money
-orders remain outside this milestone.
+The production P-256 public trust anchor v1 is now pinned, but production
+remains NO-GO until the fixed tree and paired database/journal are administrator
+provisioned and accepted. Database initialization and its separate production
+acceptance also remain pending. Unattended scheduling, trusted exchange time,
+Credential Manager, provider transport, `CreateProcessW`, Job Objects, live
+trading, and real-money orders remain outside this milestone.

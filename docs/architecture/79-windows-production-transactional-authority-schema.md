@@ -810,13 +810,16 @@ vector changes from the current fixture's `3` to production v1's `1`.
 
 Milestone B does not make production GO. Existing blockers remain:
 
-- approved production P-256 trust anchor;
 - administrator provisioning of the fixed tree and paired database/journal;
 - real Trading-account ACL acceptance;
 - SQLite native VFS/locking acceptance;
 - reparse/substitution acceptance;
 - native trust publication/rename acceptance; and
 - cross-session `Global` mutex acceptance.
+
+The approved `AITradingBot/Authority/Bootstrap/v1` P-256 public trust anchor is
+now pinned in source. Only its public key is embedded; the non-exportable
+private signing material remains external.
 
 The following schema-initialization acceptance is additionally required:
 
@@ -884,9 +887,10 @@ scheduling acceptance requirement.
   byte-equality regression against the public package resource.
 
 No security-relevant schema choice is intentionally left ambiguous. The
-approved native SQLite/VFS/trusted-schema build, production trust anchor, and
-release manifest are external acceptance inputs that must be supplied before
-GO; a production UDF build is not required.
+approved native SQLite/VFS/trusted-schema build and release manifest are
+external acceptance inputs that must be supplied before GO; the production
+trust anchor v1 is already source-pinned, and a production UDF build is not
+required.
 
 ## 16. Out of scope
 

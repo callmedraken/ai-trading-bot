@@ -12,9 +12,11 @@ import ctypes
 import json
 import os
 import sqlite3
+import struct
 import sys
 import uuid
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Iterable, Iterator, Mapping
+from contextlib import contextmanager
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path, PureWindowsPath
@@ -27,6 +29,8 @@ from trading_bot.market_data import ALPACA_DAILY_SNAPSHOT_DESCRIPTOR
 from trading_bot.runtime.windows_authority import (
     PRODUCTION_AUTHORITY_PATHS,
     PRODUCTION_PINNED_BOOTSTRAP_KEYS,
+    AuthorityObjectError,
+    AuthorityPathError,
     AuthorityPrincipalError,
     BootstrapError,
     BootstrapSchemaError,
@@ -39,6 +43,7 @@ from trading_bot.runtime.windows_authority import (
     WindowsAuthorityError,
     WindowsNativeError,
     parse_bootstrap_bytes,
+    require_fixed_authority_tree_path,
     verify_bootstrap_signature,
 )
 from trading_bot.runtime.windows_authority_provisioning import (
@@ -54,15 +59,19 @@ from trading_bot.runtime.windows_authority_security import (
     FILE_ATTRIBUTE_NORMAL,
     FILE_FLAG_BACKUP_SEMANTICS,
     FILE_FLAG_OPEN_REPARSE_POINT,
+    FILE_READ_ATTRIBUTES,
+    FILE_READ_DATA,
     FILE_SHARE_DELETE,
     FILE_SHARE_READ,
     FILE_SHARE_WRITE,
     GENERIC_WRITE,
     INVALID_HANDLE_VALUE,
     OPEN_EXISTING,
+    READ_CONTROL,
     WRITE_DAC,
     WRITE_OWNER,
     AuthorityObjectKind,
+    SecurityPolicy,
     authority_security_policy,
     inspect_open_authority_object,
     is_current_token_administrator,
@@ -88,6 +97,7 @@ ACCEPTANCE_SQLITE_VFS_JOURNAL = (
 ACCEPTANCE_SQLITE_VFS_TABLE = "windows_authority_acceptance_probe"
 ACCEPTANCE_SQLITE_VFS_PROBE_ID = 1
 ACCEPTANCE_SQLITE_VFS_MARKER = "milestone-a-rollback-probe"
+ACCEPTANCE_REPARSE_ROOT = Path(r"F:\AITradingBot\AuthorityAcceptance\Reparse")
 
 
 class AcceptancePhase(StrEnum):
@@ -118,6 +128,15 @@ class AcceptanceConfigurationError(RuntimeError):
 
 class AcceptanceBlockedError(RuntimeError):
     """Raised when an external Windows acceptance prerequisite is unavailable."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        scenario_names: tuple[str, ...] = (),
+    ) -> None:
+        super().__init__(message)
+        self.scenario_names = scenario_names
 
 
 @dataclass(frozen=True, slots=True)
@@ -784,6 +803,792 @@ def _native_handle_value(handle: object) -> int:
     if normalized in (INVALID_HANDLE_VALUE, _POINTER_INVALID_HANDLE_VALUE):
         return INVALID_HANDLE_VALUE
     return normalized
+
+
+FSCTL_SET_REPARSE_POINT = 0x000900A4
+IO_REPARSE_TAG_MOUNT_POINT = 0xA0000003
+
+
+@dataclass(frozen=True, slots=True)
+class _AcceptanceInspectionTarget:
+    """One acceptance-only object and the rejection expected from its inspection."""
+
+    open_path: str | Path
+    expected_path: Path
+    kind: AuthorityObjectKind
+    expected_reason: str | None
+    policy: SecurityPolicy | None = None
+
+
+@dataclass(slots=True)
+class _OwnedAcceptanceScenario:
+    """Track only objects created by one disposable hostile substitution."""
+
+    directory: Path
+    files: list[Path]
+    links: list[Path]
+    directories: list[Path]
+
+    @classmethod
+    def create(cls, root: Path, name: str) -> _OwnedAcceptanceScenario:
+        directory = root / name
+        try:
+            directory.mkdir()
+        except OSError as error:
+            raise AcceptanceBlockedError(
+                "acceptance scenario directory could not be created"
+            ) from error
+        return cls(directory, [], [], [directory])
+
+    def new_file(self, name: str, contents: bytes = b"acceptance\n") -> Path:
+        path = self.directory / name
+        try:
+            with path.open("xb") as stream:
+                self.files.append(path)
+                stream.write(contents)
+        except OSError as error:
+            if path.exists() and path not in self.files:
+                self.files.append(path)
+            raise AcceptanceBlockedError(
+                "acceptance scenario file could not be created"
+            ) from error
+        return path
+
+    def new_directory(self, name: str) -> Path:
+        path = self.directory / name
+        try:
+            path.mkdir()
+        except OSError as error:
+            raise AcceptanceBlockedError(
+                "acceptance scenario directory object could not be created"
+            ) from error
+        self.directories.append(path)
+        return path
+
+    def cleanup(self) -> None:
+        """Remove known entries without recursive deletion or repair."""
+
+        try:
+            for path in reversed(self.links):
+                path.unlink()
+            for path in reversed(self.files):
+                path.unlink()
+            for path in reversed(self.directories):
+                path.rmdir()
+        except OSError as error:
+            raise AcceptanceBlockedError(
+                "acceptance scenario cleanup failed; remove only the named "
+                "scenario-owned entries after inspection"
+            ) from error
+
+
+@dataclass(frozen=True, slots=True)
+class _ReparseScenario:
+    name: str
+    build: Callable[[_OwnedAcceptanceScenario], _AcceptanceInspectionTarget]
+
+
+def _windows_path_is_under(path: str | PureWindowsPath, root: Path) -> bool:
+    candidate = PureWindowsPath(str(path))
+    base = PureWindowsPath(str(root))
+    if ".." in candidate.parts:
+        return False
+    try:
+        candidate.relative_to(base)
+    except ValueError:
+        return False
+    return True
+
+
+def _reject_production_acceptance_path(path: str | PureWindowsPath) -> None:
+    candidate = PureWindowsPath(str(path))
+    production = PureWindowsPath(str(PRODUCTION_AUTHORITY_PATHS.root))
+    if candidate == production or production in candidate.parents:
+        raise AcceptanceBlockedError(
+            "acceptance-native inspection cannot target the production authority tree"
+        )
+
+
+def _require_acceptance_expected_path(path: str | PureWindowsPath) -> None:
+    _reject_production_acceptance_path(path)
+    if not _windows_path_is_under(path, ACCEPTANCE_REPARSE_ROOT):
+        raise AcceptanceBlockedError(
+            "reparse inspection expected path is outside the fixed acceptance root"
+        )
+
+
+def _require_acceptance_open_path(path: str | PureWindowsPath) -> None:
+    _reject_production_acceptance_path(path)
+    raw = str(path)
+    folded = raw.casefold()
+    if _windows_path_is_under(path, ACCEPTANCE_REPARSE_ROOT):
+        return
+    unc_root = (
+        "\\\\localhost\\f$" + str(PureWindowsPath(str(ACCEPTANCE_REPARSE_ROOT)))[2:]
+    )
+    if folded.startswith(unc_root.casefold() + "\\"):
+        return
+    if folded == r"\\.\nul":
+        return
+    raise AcceptanceBlockedError(
+        "reparse inspection open path is not an approved acceptance-only candidate"
+    )
+
+
+def _acceptance_create_file_function(kernel32: object) -> object:
+    create = kernel32.CreateFileW
+    create.argtypes = [
+        ctypes.c_wchar_p,
+        ctypes.c_ulong,
+        ctypes.c_ulong,
+        ctypes.c_void_p,
+        ctypes.c_ulong,
+        ctypes.c_ulong,
+        ctypes.c_void_p,
+    ]
+    create.restype = ctypes.c_void_p
+    return create
+
+
+@contextmanager
+def _open_acceptance_native_object(
+    path: str | PureWindowsPath,
+    expected_path: str | PureWindowsPath,
+    kind: AuthorityObjectKind,
+) -> Iterator[int]:
+    """Open one disposable candidate directly, with no production path helper."""
+
+    if os.name != "nt":
+        raise AcceptanceBlockedError("native Windows inspection is unavailable")
+    if type(kind) is not AuthorityObjectKind:
+        raise AcceptanceBlockedError("acceptance object kind must be explicit")
+    _require_acceptance_expected_path(expected_path)
+    _require_acceptance_open_path(path)
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    create = _acceptance_create_file_function(kernel32)
+    flags = FILE_FLAG_OPEN_REPARSE_POINT
+    if kind is AuthorityObjectKind.DIRECTORY:
+        flags |= FILE_FLAG_BACKUP_SEMANTICS
+    handle = create(
+        str(path),
+        FILE_READ_DATA | FILE_READ_ATTRIBUTES | READ_CONTROL,
+        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+        None,
+        OPEN_EXISTING,
+        flags,
+        None,
+    )
+    value = _native_handle_value(handle)
+    if value in (0, INVALID_HANDLE_VALUE):
+        raise AcceptanceBlockedError(
+            "acceptance hostile-substitution candidate could not be opened"
+        )
+    close = kernel32.CloseHandle
+    close.argtypes = [ctypes.c_void_p]
+    close.restype = ctypes.c_int
+    try:
+        yield value
+    finally:
+        if not close(value):
+            raise AcceptanceBlockedError(
+                "acceptance hostile-substitution handle could not be closed"
+            )
+
+
+def _inspect_acceptance_target(target: _AcceptanceInspectionTarget) -> object:
+    """Inspect through the direct acceptance handle and preserve validator errors."""
+
+    with _open_acceptance_native_object(
+        target.open_path, target.expected_path, target.kind
+    ) as handle:
+        inspection = inspect_open_authority_object(
+            handle, target.expected_path, target.kind
+        )
+        if target.policy is not None:
+            require_security_policy(inspection, target.policy)
+        return inspection
+
+
+def _rejection_matches(error: WindowsAuthorityError, expected_reason: str) -> bool:
+    message = str(error).casefold()
+    if expected_reason == "reparse":
+        return "reparse point" in message
+    if expected_reason == "final-path":
+        return "final path" in message
+    if expected_reason == "object-kind":
+        return "object type" in message or "fixed layout" in message
+    if expected_reason == "security":
+        return "security" in message or "owner" in message or "dacl" in message
+    if expected_reason == "non-local":
+        return any(
+            marker in message
+            for marker in ("unc", "device", "namespace", "globalroot", "volume")
+        )
+    return False
+
+
+def _expect_acceptance_rejection(
+    scenario: _ReparseScenario,
+    target: _AcceptanceInspectionTarget,
+) -> None:
+    """Require the reviewed validator to reject for this scenario's exact reason."""
+
+    try:
+        _inspect_acceptance_target(target)
+    except AcceptanceBlockedError:
+        raise
+    except WindowsAuthorityError as error:
+        if target.expected_reason is not None and _rejection_matches(
+            error, target.expected_reason
+        ):
+            return
+        raise AcceptanceBlockedError(
+            f"{scenario.name} did not reach its reviewed rejection"
+        ) from error
+    except OSError as error:
+        raise AcceptanceBlockedError(
+            f"{scenario.name} native inspection could not complete"
+        ) from error
+    raise AssertionError(
+        f"acceptance hostile substitution unexpectedly passed: {scenario.name}"
+    )
+
+
+def _expect_clean_acceptance_control(
+    scenario: _ReparseScenario,
+    target: _AcceptanceInspectionTarget,
+) -> None:
+    """Confirm a clean ordinary object is not mistaken for hostile evidence."""
+
+    try:
+        _inspect_acceptance_target(target)
+    except AcceptanceBlockedError:
+        raise
+    except WindowsAuthorityError as error:
+        raise AcceptanceBlockedError(
+            f"{scenario.name} clean control was unexpectedly rejected"
+        ) from error
+    except OSError as error:
+        raise AcceptanceBlockedError(
+            f"{scenario.name} clean control could not complete"
+        ) from error
+
+
+def _create_acceptance_symbolic_link(
+    scenario: _OwnedAcceptanceScenario,
+    link: Path,
+    target: Path,
+    *,
+    target_is_directory: bool,
+) -> None:
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    create_link = kernel32.CreateSymbolicLinkW
+    create_link.argtypes = [ctypes.c_wchar_p, ctypes.c_wchar_p, ctypes.c_ulong]
+    create_link.restype = ctypes.c_ubyte
+    flags = 1 if target_is_directory else 0
+    if not create_link(str(link), str(target), flags):
+        raise AcceptanceBlockedError(
+            "symbolic-link construction is unavailable on this Windows host"
+        )
+    scenario.links.append(link)
+
+
+def _create_acceptance_mount_point(
+    scenario: _OwnedAcceptanceScenario,
+    link: Path,
+    target: Path,
+) -> None:
+    """Create a disposable IO_REPARSE_TAG_MOUNT_POINT directory reparse."""
+
+    scenario.new_directory(link.name)
+    substitute = ("\\??\\" + str(target)).encode("utf-16-le")
+    printed = str(target).encode("utf-16-le")
+    path_buffer = substitute + b"\x00\x00" + printed + b"\x00\x00"
+    payload = (
+        struct.pack(
+            "<IHHHHHH",
+            IO_REPARSE_TAG_MOUNT_POINT,
+            8 + len(path_buffer),
+            0,
+            0,
+            len(substitute),
+            len(substitute) + 2,
+            len(printed),
+        )
+        + path_buffer
+    )
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    create = _acceptance_create_file_function(kernel32)
+    handle = create(
+        str(link),
+        GENERIC_WRITE | READ_CONTROL,
+        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+        None,
+        OPEN_EXISTING,
+        FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_BACKUP_SEMANTICS,
+        None,
+    )
+    value = _native_handle_value(handle)
+    if value in (0, INVALID_HANDLE_VALUE):
+        raise AcceptanceBlockedError(
+            "mount-point reparse construction is unavailable on this host"
+        )
+    close = kernel32.CloseHandle
+    close.argtypes = [ctypes.c_void_p]
+    close.restype = ctypes.c_int
+    device_io = kernel32.DeviceIoControl
+    device_io.argtypes = [
+        ctypes.c_void_p,
+        ctypes.c_ulong,
+        ctypes.c_void_p,
+        ctypes.c_ulong,
+        ctypes.c_void_p,
+        ctypes.c_ulong,
+        ctypes.POINTER(ctypes.c_ulong),
+        ctypes.c_void_p,
+    ]
+    device_io.restype = ctypes.c_int
+    buffer = ctypes.create_string_buffer(payload)
+    returned = ctypes.c_ulong()
+    try:
+        if not device_io(
+            value,
+            FSCTL_SET_REPARSE_POINT,
+            ctypes.byref(buffer),
+            len(payload),
+            None,
+            0,
+            ctypes.byref(returned),
+            None,
+        ):
+            raise AcceptanceBlockedError(
+                "mount-point reparse construction is unavailable on this host"
+            )
+    finally:
+        if not close(value):
+            raise AcceptanceBlockedError(
+                "mount-point reparse construction handle could not be closed"
+            )
+
+
+def _unc_acceptance_path(path: Path) -> str:
+    local = str(PureWindowsPath(str(path)))
+    return r"\\localhost\F$" + local[2:]
+
+
+def _build_symbolic_link_scenario(
+    scenario: _OwnedAcceptanceScenario,
+) -> _AcceptanceInspectionTarget:
+    target = scenario.new_file("symbolic-link-target.bin")
+    link = scenario.directory / "symbolic-link-substitution.bin"
+    _create_acceptance_symbolic_link(scenario, link, target, target_is_directory=False)
+    return _AcceptanceInspectionTarget(link, link, AuthorityObjectKind.FILE, "reparse")
+
+
+def _build_junction_scenario(
+    scenario: _OwnedAcceptanceScenario,
+) -> _AcceptanceInspectionTarget:
+    target = scenario.new_directory("junction-target")
+    link = scenario.directory / "junction-substitution"
+    _create_acceptance_mount_point(scenario, link, target)
+    return _AcceptanceInspectionTarget(
+        link, link, AuthorityObjectKind.DIRECTORY, "reparse"
+    )
+
+
+def _build_mount_point_scenario(
+    scenario: _OwnedAcceptanceScenario,
+) -> _AcceptanceInspectionTarget:
+    target = scenario.new_directory("mount-point-target")
+    link = scenario.directory / "mount-point-substitution"
+    _create_acceptance_mount_point(scenario, link, target)
+    return _AcceptanceInspectionTarget(
+        link, link, AuthorityObjectKind.DIRECTORY, "reparse"
+    )
+
+
+def _build_wrong_final_path_scenario(
+    scenario: _OwnedAcceptanceScenario,
+) -> _AcceptanceInspectionTarget:
+    actual = scenario.new_file("wrong-final-object.bin")
+    expected = scenario.directory / "reviewed-final-object.bin"
+    return _AcceptanceInspectionTarget(
+        actual, expected, AuthorityObjectKind.FILE, "final-path"
+    )
+
+
+def _build_unc_scenario(
+    scenario: _OwnedAcceptanceScenario,
+) -> _AcceptanceInspectionTarget:
+    local = scenario.new_file("unc-substitution-target.bin")
+    return _AcceptanceInspectionTarget(
+        _unc_acceptance_path(local), local, AuthorityObjectKind.FILE, "non-local"
+    )
+
+
+def _build_device_scenario(
+    scenario: _OwnedAcceptanceScenario,
+) -> _AcceptanceInspectionTarget:
+    expected = scenario.new_file("device-substitution-target.bin")
+    return _AcceptanceInspectionTarget(
+        r"\\.\NUL", expected, AuthorityObjectKind.FILE, "non-local"
+    )
+
+
+def _build_wrong_object_kind_scenario(
+    scenario: _OwnedAcceptanceScenario,
+) -> _AcceptanceInspectionTarget:
+    actual = scenario.new_file("wrong-kind-object.bin")
+    return _AcceptanceInspectionTarget(
+        actual, actual, AuthorityObjectKind.DIRECTORY, "object-kind"
+    )
+
+
+def _build_security_scenario(
+    scenario: _OwnedAcceptanceScenario,
+) -> _AcceptanceInspectionTarget:
+    actual = scenario.new_file("wrong-security-object.bin")
+    return _AcceptanceInspectionTarget(
+        actual,
+        actual,
+        AuthorityObjectKind.FILE,
+        "security",
+        SecurityPolicy(
+            owner_sid="S-1-5-21-999-999-999-999",
+            aces=(),
+            dacl_protected=True,
+        ),
+    )
+
+
+def _build_clean_control_scenario(
+    scenario: _OwnedAcceptanceScenario,
+) -> _AcceptanceInspectionTarget:
+    actual = scenario.new_file("ordinary-clean-object.bin")
+    return _AcceptanceInspectionTarget(actual, actual, AuthorityObjectKind.FILE, None)
+
+
+_REPARSE_SCENARIOS = (
+    _ReparseScenario("symbolic-link-substitution", _build_symbolic_link_scenario),
+    _ReparseScenario(
+        "directory-junction-reparse-substitution", _build_junction_scenario
+    ),
+    _ReparseScenario("mount-point-reparse-substitution", _build_mount_point_scenario),
+    _ReparseScenario("wrong-final-path-substitution", _build_wrong_final_path_scenario),
+    _ReparseScenario("unc-substitution", _build_unc_scenario),
+    _ReparseScenario("device-substitution", _build_device_scenario),
+    _ReparseScenario("wrong-object-kind", _build_wrong_object_kind_scenario),
+    _ReparseScenario("wrong-security", _build_security_scenario),
+)
+_REQUIRED_REPARSE_SCENARIO_NAMES = (
+    "symbolic-link-substitution",
+    "directory-junction-reparse-substitution",
+    "mount-point-reparse-substitution",
+    "wrong-final-path-substitution",
+    "unc-substitution",
+    "device-substitution",
+    "wrong-object-kind",
+    "wrong-security",
+)
+_CLEAN_CONTROL_SCENARIO = _ReparseScenario(
+    "ordinary-clean-non-reparse-control", _build_clean_control_scenario
+)
+
+
+def _create_reparse_acceptance_root() -> Path:
+    """Create a new root only; never repair or recursively remove stale state."""
+
+    root = Path(str(ACCEPTANCE_REPARSE_ROOT))
+    if os.path.lexists(root):
+        raise AcceptanceBlockedError(
+            "reparse acceptance root already exists; inspect stale state and "
+            "remove only known acceptance objects before retrying",
+            scenario_names=("stale-disposable-state",),
+        )
+    if not root.parent.is_dir() or root.parent.is_symlink():
+        raise AcceptanceBlockedError(
+            "reparse acceptance parent is absent or is an unexpected reparse object",
+            scenario_names=("acceptance-parent-prerequisite-blocked",),
+        )
+    try:
+        root.mkdir()
+    except OSError as error:
+        raise AcceptanceBlockedError(
+            "reparse acceptance root could not be created",
+            scenario_names=("acceptance-root-creation-blocked",),
+        ) from error
+    return root
+
+
+def _cleanup_reparse_acceptance_root(root: Path) -> None:
+    try:
+        root.rmdir()
+    except OSError as error:
+        raise AcceptanceBlockedError(
+            "reparse acceptance root cleanup failed; remove only the empty "
+            "acceptance root after inspecting scenario-owned state"
+        ) from error
+
+
+def test_reparse_acceptance_root_cannot_enter_production_path_contract() -> None:
+    assert str(ACCEPTANCE_REPARSE_ROOT) not in {
+        str(path) for path in PRODUCTION_AUTHORITY_PATHS.protected_objects
+    }
+    with pytest.raises(AuthorityPathError):
+        require_fixed_authority_tree_path(ACCEPTANCE_REPARSE_ROOT)
+    with pytest.raises(AuthorityPathError):
+        open_authority_object(ACCEPTANCE_REPARSE_ROOT, AuthorityObjectKind.DIRECTORY)
+
+
+def test_acceptance_native_open_uses_no_follow_reparse_flag(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[object, ...]] = []
+    closed: list[object] = []
+
+    class FakeCreateFile:
+        argtypes: object
+        restype: object
+
+        def __call__(self, *args: object) -> object:
+            calls.append(args)
+            return ctypes.c_void_p(123)
+
+    class FakeCloseHandle:
+        argtypes: object
+        restype: object
+
+        def __call__(self, value: object) -> bool:
+            closed.append(value)
+            return True
+
+    class FakeKernel32:
+        CreateFileW = FakeCreateFile()
+        CloseHandle = FakeCloseHandle()
+
+    module = sys.modules[__name__]
+    monkeypatch.setattr(os, "name", "nt")
+    monkeypatch.setattr(
+        ctypes,
+        "WinDLL",
+        lambda name, use_last_error: FakeKernel32(),
+        raising=False,
+    )
+    target = Path(r"F:\AITradingBot\AuthorityAcceptance\Reparse\scenario\target.bin")
+    monkeypatch.setattr(
+        module,
+        "open_authority_object",
+        lambda *args, **kwargs: pytest.fail("production open helper was used"),
+    )
+
+    with _open_acceptance_native_object(target, target, AuthorityObjectKind.FILE):
+        pass
+
+    assert calls[0][5] & FILE_FLAG_OPEN_REPARSE_POINT
+    assert closed == [123]
+
+
+@pytest.mark.parametrize(
+    "rejection",
+    (
+        AuthorityObjectError("authority handle final path is not the fixed target"),
+        AuthorityObjectError("authority object is a reparse point"),
+        AuthorityObjectError("authority object type does not match the fixed layout"),
+        WindowsAuthorityError(
+            "authority object security does not match reviewed policy"
+        ),
+    ),
+)
+def test_acceptance_inspection_preserves_exact_validator_rejections(
+    monkeypatch: pytest.MonkeyPatch,
+    rejection: WindowsAuthorityError,
+) -> None:
+    module = sys.modules[__name__]
+    monkeypatch.setattr(os, "name", "nt")
+
+    class FakeCreateFile:
+        argtypes: object
+        restype: object
+
+        def __call__(self, *args: object) -> object:
+            return ctypes.c_void_p(123)
+
+    class FakeCloseHandle:
+        argtypes: object
+        restype: object
+
+        def __call__(self, value: object) -> bool:
+            return True
+
+    class FakeKernel32:
+        CreateFileW = FakeCreateFile()
+        CloseHandle = FakeCloseHandle()
+
+    monkeypatch.setattr(
+        ctypes,
+        "WinDLL",
+        lambda name, use_last_error: FakeKernel32(),
+        raising=False,
+    )
+
+    def reject(*args: object, **kwargs: object) -> NoReturn:
+        raise rejection
+
+    monkeypatch.setattr(module, "inspect_open_authority_object", reject)
+    target_path = Path(
+        r"F:\AITradingBot\AuthorityAcceptance\Reparse\scenario\target.bin"
+    )
+    target = _AcceptanceInspectionTarget(
+        target_path, target_path, AuthorityObjectKind.FILE, "reparse"
+    )
+
+    with pytest.raises(type(rejection), match=str(rejection)):
+        _inspect_acceptance_target(target)
+
+
+def test_unrelated_native_rejection_blocks_instead_of_passing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    unrelated = WindowsNativeError("GetVolumeInformationW", 1234)
+    monkeypatch.setattr(
+        sys.modules[__name__],
+        "_inspect_acceptance_target",
+        lambda target: (_ for _ in ()).throw(unrelated),
+    )
+    scenario = _ReparseScenario(
+        "symbolic-link-substitution", _build_symbolic_link_scenario
+    )
+    target = _AcceptanceInspectionTarget(
+        Path(r"F:\AITradingBot\AuthorityAcceptance\Reparse\x"),
+        Path(r"F:\AITradingBot\AuthorityAcceptance\Reparse\x"),
+        AuthorityObjectKind.FILE,
+        "reparse",
+    )
+    with pytest.raises(AcceptanceBlockedError, match="did not reach"):
+        _expect_acceptance_rejection(scenario, target)
+
+
+def test_successful_hostile_substitution_is_a_hard_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        sys.modules[__name__], "_inspect_acceptance_target", lambda target: object()
+    )
+    scenario = _ReparseScenario(
+        "symbolic-link-substitution", _build_symbolic_link_scenario
+    )
+    target = _AcceptanceInspectionTarget(
+        Path(r"F:\AITradingBot\AuthorityAcceptance\Reparse\x"),
+        Path(r"F:\AITradingBot\AuthorityAcceptance\Reparse\x"),
+        AuthorityObjectKind.FILE,
+        "reparse",
+    )
+    with pytest.raises(AssertionError, match="unexpectedly passed"):
+        _expect_acceptance_rejection(scenario, target)
+
+
+def test_stale_reparse_acceptance_root_blocks_without_repair(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "Reparse"
+    root.mkdir()
+    marker = root / "unexpected.txt"
+    marker.write_text("leave me", encoding="utf-8")
+    monkeypatch.setattr(sys.modules[__name__], "ACCEPTANCE_REPARSE_ROOT", root)
+
+    with pytest.raises(AcceptanceBlockedError, match="already exists"):
+        _create_reparse_acceptance_root()
+    assert marker.read_text(encoding="utf-8") == "leave me"
+
+
+def test_scenario_cleanup_is_limited_to_owned_objects(tmp_path: Path) -> None:
+    root = tmp_path / "Reparse"
+    root.mkdir()
+    scenario = _OwnedAcceptanceScenario.create(root, "scenario")
+    owned = scenario.new_file("owned.bin")
+    unexpected = scenario.directory / "unexpected.bin"
+    unexpected.write_bytes(b"leave me")
+
+    with pytest.raises(AcceptanceBlockedError, match="cleanup failed"):
+        scenario.cleanup()
+    assert not owned.exists()
+    assert unexpected.exists()
+    assert scenario.directory.exists()
+
+
+def test_scenario_cleanup_failure_blocks(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    root = tmp_path / "Reparse"
+    root.mkdir()
+    scenario = _OwnedAcceptanceScenario.create(root, "scenario")
+    scenario.new_file("owned.bin")
+
+    def fail_unlink(self: Path) -> None:
+        raise OSError("cleanup failure")
+
+    monkeypatch.setattr(Path, "unlink", fail_unlink)
+    with pytest.raises(AcceptanceBlockedError, match="cleanup failed"):
+        scenario.cleanup()
+
+
+def test_clean_non_reparse_control_cannot_satisfy_hostile_scenario(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        sys.modules[__name__], "_inspect_acceptance_target", lambda target: object()
+    )
+    scenario = _ReparseScenario(
+        "ordinary-clean-non-reparse-control", _build_clean_control_scenario
+    )
+    target = _AcceptanceInspectionTarget(
+        Path(r"F:\AITradingBot\AuthorityAcceptance\Reparse\x"),
+        Path(r"F:\AITradingBot\AuthorityAcceptance\Reparse\x"),
+        AuthorityObjectKind.FILE,
+        "reparse",
+    )
+    with pytest.raises(AssertionError, match="unexpectedly passed"):
+        _expect_acceptance_rejection(scenario, target)
+
+
+def test_reparse_phase_cannot_pass_from_clean_objects(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    module = sys.modules[__name__]
+    root = tmp_path / "Reparse"
+    root.mkdir()
+    monkeypatch.setattr(module, "_require_windows_acceptance", lambda: None)
+    monkeypatch.setattr(module, "is_current_token_elevated", lambda: True)
+    monkeypatch.setattr(module, "is_current_token_administrator", lambda: True)
+    monkeypatch.setenv(ACCEPTANCE_MAINTENANCE_ENV, "1")
+    monkeypatch.setattr(module, "_create_reparse_acceptance_root", lambda: root)
+    monkeypatch.setattr(module, "_inspect_acceptance_target", lambda target: object())
+
+    def clean_builder(state: _OwnedAcceptanceScenario) -> _AcceptanceInspectionTarget:
+        target = state.directory / "clean-object.bin"
+        return _AcceptanceInspectionTarget(
+            target, target, AuthorityObjectKind.FILE, "reparse"
+        )
+
+    monkeypatch.setattr(
+        module,
+        "_REPARSE_SCENARIOS",
+        tuple(
+            _ReparseScenario(name, clean_builder)
+            for name in _REQUIRED_REPARSE_SCENARIO_NAMES
+        ),
+    )
+    monkeypatch.setattr(
+        module,
+        "_CLEAN_CONTROL_SCENARIO",
+        _ReparseScenario("ordinary-clean-non-reparse-control", clean_builder),
+    )
+
+    with pytest.raises(AssertionError, match="unexpectedly passed"):
+        _run_reparse_and_substitution_phase()
+    assert not root.exists()
 
 
 def _native_access_probe(
@@ -1477,20 +2282,66 @@ def _run_sqlite_windows_vfs_phase() -> AcceptanceEvidence:
     )
 
 
-def _run_reparse_and_substitution_phase() -> NoReturn:
+def _run_reparse_and_substitution_phase() -> AcceptanceEvidence:
     _require_windows_acceptance()
-    if not is_current_token_elevated() or not is_current_token_administrator():
-        raise AcceptanceBlockedError(
-            "reparse acceptance requires an elevated administrator maintenance session"
-        )
+    require_administrator_phase_facts(
+        token_is_elevated=is_current_token_elevated(),
+        token_is_administrator=is_current_token_administrator(),
+    )
     if os.environ.get(ACCEPTANCE_MAINTENANCE_ENV) != "1":
         raise AcceptanceBlockedError(
             f"{ACCEPTANCE_MAINTENANCE_ENV}=1 and a disposable authority-tree "
             "maintenance window are required"
         )
-    raise AcceptanceBlockedError(
-        "reparse phase requires the documented disposable maintenance "
-        "procedure; pytest does not mutate the fixed authority tree"
+    if (
+        tuple(scenario.name for scenario in _REPARSE_SCENARIOS)
+        != _REQUIRED_REPARSE_SCENARIO_NAMES
+    ):
+        raise AssertionError("reparse phase scenario coverage is incomplete")
+    root = _create_reparse_acceptance_root()
+    passed: list[str] = []
+    blocked: list[str] = []
+    try:
+        for scenario in _REPARSE_SCENARIOS:
+            state: _OwnedAcceptanceScenario | None = None
+            try:
+                state = _OwnedAcceptanceScenario.create(root, scenario.name)
+                target = scenario.build(state)
+                _expect_acceptance_rejection(scenario, target)
+                passed.append(scenario.name)
+            except AcceptanceBlockedError:
+                blocked.append(f"{scenario.name}-blocked")
+            finally:
+                if state is not None:
+                    state.cleanup()
+
+        clean_state: _OwnedAcceptanceScenario | None = None
+        try:
+            clean_state = _OwnedAcceptanceScenario.create(
+                root, _CLEAN_CONTROL_SCENARIO.name
+            )
+            clean_target = _CLEAN_CONTROL_SCENARIO.build(clean_state)
+            _expect_clean_acceptance_control(_CLEAN_CONTROL_SCENARIO, clean_target)
+            passed.append(_CLEAN_CONTROL_SCENARIO.name)
+        except AcceptanceBlockedError:
+            blocked.append(f"{_CLEAN_CONTROL_SCENARIO.name}-blocked")
+        finally:
+            if clean_state is not None:
+                clean_state.cleanup()
+    finally:
+        _cleanup_reparse_acceptance_root(root)
+
+    if blocked:
+        raise AcceptanceBlockedError(
+            "one or more disposable reparse scenarios were blocked by host "
+            "prerequisites",
+            scenario_names=tuple(blocked),
+        )
+    return AcceptanceEvidence(
+        phase=AcceptancePhase.REPARSE_AND_SUBSTITUTION,
+        status=AcceptanceEvidenceStatus.PASS,
+        account_classification="elevated-administrator",
+        scenario_names=tuple(passed),
     )
 
 
@@ -1525,7 +2376,7 @@ def _execute_selected_phase(expected: AcceptancePhase) -> None:
             phase=expected,
             status=AcceptanceEvidenceStatus.BLOCKED,
             account_classification="unverified",
-            scenario_names=("external-prerequisite-blocked",),
+            scenario_names=error.scenario_names or ("external-prerequisite-blocked",),
         )
         print(json.dumps(blocked.to_dict(), sort_keys=True))
         pytest.skip(f"BLOCKED prerequisite: {error}")

@@ -207,19 +207,69 @@ validator, and leaves no semantic acceptance data.
 
 ## Phase D: `REPARSE_AND_SUBSTITUTION`
 
-This phase is an explicit maintenance gate, not a normal pytest mutation. The
-harness reports `BLOCKED` until an operator has a disposable authority tree and
-maintenance window; it never turns an ordinary non-reparse tree into PASS.
+This phase is an explicit elevated maintenance gate. It operates only in the
+acceptance-only root
+`F:\AITradingBot\AuthorityAcceptance\Reparse`; it never opens, repairs,
+deletes, or validates an object below
+`F:\AITradingBot\Authority`. The acceptance root is deliberately outside the
+production fixed-path contract and is not passed to
+`validate_installed_authority()` or any installed authority validator.
 
-For the manual procedure, under an elevated maintenance account and only on a
-disposable tree, construct one substitution at a time where the host permits
-it: symbolic link, junction, mount/reparse substitution, wrong final path, and
-UNC/device substitution. Open the affected fixed target with the reviewed
-`FILE_FLAG_OPEN_REPARSE_POINT`/final-handle validator and retain only the
-scenario name plus `PASS` or `BLOCKED`. Remove only substitutions created by
-that maintenance procedure and restore the disposable tree. If a Windows
-privilege or filesystem prerequisite prevents construction, record `BLOCKED`
-with the prerequisite; do not weaken the assertion or call it PASS.
+Run the executable procedure from an elevated Administrator PowerShell. The
+`AuthorityAcceptance` parent must already exist, and the exact `Reparse`
+directory must not exist. A present directory, file, link, junction, or other
+ambiguous object is stale state and blocks; the harness does not recursively
+delete or repair it.
+
+```powershell
+$env:AI_TRADING_BOT_RUN_WINDOWS_AUTHORITY_ACCEPTANCE = "1"
+$env:AI_TRADING_BOT_WINDOWS_AUTHORITY_ACCEPTANCE_PHASE = "reparse"
+$env:AI_TRADING_BOT_WINDOWS_AUTHORITY_ACCEPTANCE_MAINTENANCE = "1"
+$acceptanceBase = Join-Path $env:TEMP "ai-trading-bot-windows-authority-reparse-basetemp"
+.venv\Scripts\python.exe -m pytest tests/acceptance/test_windows_authority_provisioning_acceptance.py -q --basetemp $acceptanceBase
+```
+
+The phase creates the empty acceptance root, then creates and removes one fresh
+scenario directory at a time. Each candidate is opened directly with native
+`CreateFileW` and `FILE_FLAG_OPEN_REPARSE_POINT`, and the opened handle is passed
+to the reviewed `inspect_open_authority_object()` validator. The scenario set
+is:
+
+- `symbolic-link-substitution`;
+- `directory-junction-reparse-substitution`;
+- `mount-point-reparse-substitution` using the native
+  `IO_REPARSE_TAG_MOUNT_POINT` directory-reparse form;
+- `wrong-final-path-substitution`;
+- `unc-substitution` through the local administrative share, where available;
+- `device-substitution` using the harmless `\\.\NUL` candidate;
+- `wrong-object-kind`; and
+- `wrong-security`.
+
+The harness also runs an ordinary clean non-reparse control object. Its
+successful inspection is control evidence only; it cannot satisfy any hostile
+scenario. A hostile scenario is `PASS` only when inspection rejects for its
+expected final-path, reparse, object-kind, security, or non-local reason. An
+unexpected successful acceptance is a hard test failure. A missing privilege,
+unsupported filesystem/reparse operation, unavailable administrative share,
+or unrelated native error is `BLOCKED`, never `PASS`. The phase emits `PASS`
+only after every listed hostile scenario and the clean control have completed.
+
+Cleanup is deterministic and non-recursive. The harness removes only files,
+links, directories, and scenario roots it created, then removes the empty
+acceptance root it created. Cleanup failure is `BLOCKED`; leave the reported
+acceptance state for administrator inspection and remove only known
+scenario-owned objects after confirming that no production path is involved.
+Evidence retains only sanitized scenario names and `PASS`/`BLOCKED` status; it
+does not retain native exception text, security descriptors, credentials, or
+environment data.
+
+After the run, clear the maintenance gate and phase selection:
+
+```powershell
+Remove-Item Env:AI_TRADING_BOT_WINDOWS_AUTHORITY_ACCEPTANCE_PHASE
+Remove-Item Env:AI_TRADING_BOT_RUN_WINDOWS_AUTHORITY_ACCEPTANCE
+Remove-Item Env:AI_TRADING_BOT_WINDOWS_AUTHORITY_ACCEPTANCE_MAINTENANCE
+```
 
 ## Phase E: `CROSS_SESSION_GLOBAL_MUTEX`
 

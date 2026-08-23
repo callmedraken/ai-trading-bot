@@ -255,6 +255,15 @@ scenario set is:
 - `wrong-object-kind`; and
 - `wrong-security`.
 
+The harmless `\\.\NUL` device candidate is expected to open successfully with
+the acceptance-native helper. On the reviewed Windows path, the subsequent
+`inspect_open_authority_object()` call fails closed at
+`GetFinalPathNameByHandleW` with typed `WindowsNativeError` error code `87`
+(`ERROR_INVALID_PARAMETER`). Only that exact operation/error-code pair is
+device-substitution rejection evidence. A CreateFileW failure, a different
+native operation, or any other Win32 error remains `BLOCKED`; the generic
+scenario matchers are not broadened.
+
 The harness also runs an ordinary clean non-reparse control object. Its
 successful inspection is control evidence only; it cannot satisfy any hostile
 scenario. A hostile scenario is `PASS` only when inspection rejects for its

@@ -808,6 +808,7 @@ def _native_handle_value(handle: object) -> int:
 
 FSCTL_SET_REPARSE_POINT = 0x000900A4
 IO_REPARSE_TAG_MOUNT_POINT = 0xA0000003
+ERROR_INVALID_PARAMETER = 87
 
 
 @dataclass(frozen=True, slots=True)
@@ -1014,7 +1015,19 @@ def _inspect_acceptance_target(target: _AcceptanceInspectionTarget) -> object:
         return inspection
 
 
+def _is_device_substitution_rejection(error: WindowsAuthorityError) -> bool:
+    """Match only the reviewed NUL-device final-path failure."""
+
+    return (
+        isinstance(error, WindowsNativeError)
+        and error.operation == "GetFinalPathNameByHandleW"
+        and error.error_code == ERROR_INVALID_PARAMETER
+    )
+
+
 def _rejection_matches(error: WindowsAuthorityError, expected_reason: str) -> bool:
+    if expected_reason == "device":
+        return _is_device_substitution_rejection(error)
     message = str(error).casefold()
     if expected_reason == "reparse":
         return "reparse point" in message
@@ -1236,7 +1249,7 @@ def _build_device_scenario(
 ) -> _AcceptanceInspectionTarget:
     expected = scenario.new_file("device-substitution-target.bin")
     return _AcceptanceInspectionTarget(
-        r"\\.\NUL", expected, AuthorityObjectKind.FILE, "non-local"
+        r"\\.\NUL", expected, AuthorityObjectKind.FILE, "device"
     )
 
 
@@ -1505,6 +1518,153 @@ def test_unrelated_native_rejection_blocks_instead_of_passing(
     )
     with pytest.raises(AcceptanceBlockedError, match="did not reach"):
         _expect_acceptance_rejection(scenario, target)
+
+
+def _device_test_target() -> _AcceptanceInspectionTarget:
+    path = Path(r"F:\AITradingBot\AuthorityAcceptance\Reparse\device\target")
+    return _AcceptanceInspectionTarget(
+        r"\\.\NUL", path, AuthorityObjectKind.FILE, "device"
+    )
+
+
+def test_exact_typed_nul_device_rejection_passes_only_device_scenario(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    error = WindowsNativeError("GetFinalPathNameByHandleW", ERROR_INVALID_PARAMETER)
+
+    def reject(_target: _AcceptanceInspectionTarget) -> object:
+        raise error
+
+    monkeypatch.setattr(sys.modules[__name__], "_inspect_acceptance_target", reject)
+    scenario = _ReparseScenario("device-substitution", _build_device_scenario)
+
+    _expect_acceptance_rejection(scenario, _device_test_target())
+
+
+@pytest.mark.parametrize(
+    "error",
+    (
+        WindowsNativeError("GetFinalPathNameByHandleW", ERROR_INVALID_PARAMETER + 1),
+        WindowsNativeError("GetFileInformationByHandleEx", ERROR_INVALID_PARAMETER),
+    ),
+)
+def test_device_rejection_requires_exact_operation_and_error(
+    monkeypatch: pytest.MonkeyPatch,
+    error: WindowsNativeError,
+) -> None:
+    def reject(_target: _AcceptanceInspectionTarget) -> object:
+        raise error
+
+    monkeypatch.setattr(sys.modules[__name__], "_inspect_acceptance_target", reject)
+    scenario = _ReparseScenario("device-substitution", _build_device_scenario)
+
+    with pytest.raises(AcceptanceBlockedError, match="did not reach"):
+        _expect_acceptance_rejection(scenario, _device_test_target())
+
+
+def test_invalid_parameter_does_not_satisfy_another_scenario(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    error = WindowsNativeError("GetFinalPathNameByHandleW", ERROR_INVALID_PARAMETER)
+
+    def reject(_target: _AcceptanceInspectionTarget) -> object:
+        raise error
+
+    monkeypatch.setattr(sys.modules[__name__], "_inspect_acceptance_target", reject)
+    scenario = _ReparseScenario(
+        "symbolic-link-substitution", _build_symbolic_link_scenario
+    )
+    target = _AcceptanceInspectionTarget(
+        Path(r"F:\AITradingBot\AuthorityAcceptance\Reparse\link"),
+        Path(r"F:\AITradingBot\AuthorityAcceptance\Reparse\link"),
+        AuthorityObjectKind.FILE,
+        "reparse",
+    )
+
+    with pytest.raises(AcceptanceBlockedError, match="did not reach"):
+        _expect_acceptance_rejection(scenario, target)
+
+
+def test_device_create_file_failure_blocks(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class FakeCreateFile:
+        argtypes: object
+        restype: object
+
+        def __call__(self, *args: object) -> object:
+            return ctypes.c_void_p(-1)
+
+    class FakeKernel32:
+        CreateFileW = FakeCreateFile()
+
+    monkeypatch.setattr(os, "name", "nt")
+    monkeypatch.setattr(
+        ctypes,
+        "WinDLL",
+        lambda name, use_last_error: FakeKernel32(),
+        raising=False,
+    )
+    scenario = _ReparseScenario("device-substitution", _build_device_scenario)
+
+    with pytest.raises(AcceptanceBlockedError):
+        _expect_acceptance_rejection(scenario, _device_test_target())
+
+
+def test_unexpected_nul_device_acceptance_is_a_hard_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        sys.modules[__name__], "_inspect_acceptance_target", lambda target: object()
+    )
+    scenario = _ReparseScenario("device-substitution", _build_device_scenario)
+
+    with pytest.raises(AssertionError, match="unexpectedly passed"):
+        _expect_acceptance_rejection(scenario, _device_test_target())
+
+
+@pytest.mark.parametrize(
+    ("expected_reason", "error"),
+    (
+        ("reparse", AuthorityObjectError("authority object is a reparse point")),
+        (
+            "final-path",
+            AuthorityObjectError("authority handle final path is not the fixed target"),
+        ),
+        (
+            "object-kind",
+            AuthorityObjectError(
+                "authority object type does not match the fixed layout"
+            ),
+        ),
+        (
+            "non-local",
+            AuthorityObjectError("authority object resolved to a UNC path"),
+        ),
+        (
+            "security",
+            WindowsAuthorityError(
+                "authority object security does not match reviewed policy"
+            ),
+        ),
+    ),
+)
+def test_existing_reparse_rejection_classifications_remain_unchanged(
+    monkeypatch: pytest.MonkeyPatch,
+    expected_reason: str,
+    error: WindowsAuthorityError,
+) -> None:
+    def reject(_target: _AcceptanceInspectionTarget) -> object:
+        raise error
+
+    monkeypatch.setattr(sys.modules[__name__], "_inspect_acceptance_target", reject)
+    scenario = _ReparseScenario("existing-scenario", _build_device_scenario)
+    path = Path(r"F:\AITradingBot\AuthorityAcceptance\Reparse\existing\target")
+    target = _AcceptanceInspectionTarget(
+        path, path, AuthorityObjectKind.FILE, expected_reason
+    )
+
+    _expect_acceptance_rejection(scenario, target)
 
 
 def test_successful_hostile_substitution_is_a_hard_failure(

@@ -1,10 +1,11 @@
 # Milestone B production validation boundary
 
-Milestone B production status is **NO-GO** until the separately reviewed
+Milestone B production status remains **NO-GO** pending native Windows
+acceptance and the remaining external gates.  The separately reviewed
 `authority-initializer-release-manifest/v1` and `sqlite-authority/v1` build
-manifest are published.  The code therefore fails closed when either input is
-absent; test evidence must be supplied explicitly to disposable database
-tests.
+manifest are published as exact package resources; production loaders fail
+closed when either resource is missing, unreadable, or malformed.  Test-only
+evidence injection remains available for disposable database tests.
 
 The production artifact is the packaged
 `trading_bot/runtime/schema/windows_transactional_authority_v1.sql`.  Its
@@ -40,8 +41,8 @@ Native acceptance remains required before GO:
    production root unless the existing native acceptance opt-in selects it.
 
 The production trust anchor v1 is now pinned in source as public-key material
-only; its non-exportable private signing material remains external. The reviewed
-release/build manifest, fixed-tree and production database/journal
+only; its non-exportable private signing material remains external. The published
+release/build resources, fixed-tree and production database/journal
 initialization and acceptance, Windows SQLite VFS/locking behavior, NTFS
 durability, reparse/substitution controls, and cross-session mutex acceptance
 remain external blockers. A custom SQL UDF is not a blocker or a production

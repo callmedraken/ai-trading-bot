@@ -10,8 +10,8 @@ recognizable as an executable production authority. It implements production
 schema v1, immutable metadata and migration evidence, administrator-only
 database initialization, and initialized read-only validation.
 
-It still does not implement approved production trust, release, or SQLite
-build material; native Windows acceptance; credentials; provider execution;
+The approved release and SQLite build material is now packaged as exact
+code-owned resources; native Windows acceptance; credentials; provider execution;
 child execution; live orders; or unattended scheduling.
 
 The fixed security boundary remains unchanged:
@@ -284,9 +284,9 @@ version/build, compile options, VFS, and successful `trusted_schema=OFF`
 behavior. A build that cannot establish or read back `trusted_schema=OFF`, or
 that cannot execute the production artifact under that setting, is
 `INITIALIZED_UNSUPPORTED`/runtime-invalid and fails closed. There is no
-fallback to `trusted_schema=ON`. Until that reviewed Windows build manifest
-is published, production remains NO-GO; a broad “any SQLite 3.x” claim is not
-made.
+fallback to `trusted_schema=ON`. The reviewed Windows build manifest is now
+published as a code-owned package resource. Production remains NO-GO until
+native acceptance is complete; a broad “any SQLite 3.x” claim is not made.
 
 `trusted_schema=OFF` does not make a hostile database safe by itself. Exact
 filesystem/bootstrap trust, exact schema materialization, immutable metadata,
@@ -823,8 +823,8 @@ private signing material remains external.
 
 The following schema-initialization acceptance is additionally required:
 
-1. the exact packaged SQL artifact and expected digest are published through
-   the reviewed release process;
+1. the exact packaged SQL artifact, release manifest, and approved build manifest
+   are published through the reviewed release process;
 2. the native SQLite build, version, compile options, VFS, and
    `trusted_schema=OFF` behavior are approved and stable;
 3. Windows acceptance proves `BEGIN EXCLUSIVE` DDL/row atomicity, concurrent
@@ -887,8 +887,8 @@ scheduling acceptance requirement.
   byte-equality regression against the public package resource.
 
 No security-relevant schema choice is intentionally left ambiguous. The
-approved native SQLite/VFS/trusted-schema build and release manifest are
-external acceptance inputs that must be supplied before GO; the production
+approved release and SQLite build manifests are now packaged code-owned
+inputs; native SQLite/VFS/trusted-schema acceptance and the production
 trust anchor v1 is already source-pinned, and a production UDF build is not
 required.
 

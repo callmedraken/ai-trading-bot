@@ -5,6 +5,7 @@ import json
 import os
 import sqlite3
 import threading
+from importlib import resources
 from pathlib import Path
 
 import pytest
@@ -42,6 +43,8 @@ from trading_bot.runtime.windows_authority_schema import (
     configure_trusted_schema_off,
     create_schema_migration_v1,
     execute_schema_artifact,
+    load_approved_release_manifest,
+    load_approved_sqlite_authority_build,
     parse_authority_metadata_bytes,
     parse_release_manifest_bytes,
     parse_sqlite_authority_build_manifest,
@@ -639,6 +642,83 @@ def test_packaged_artifact_has_stable_identity_and_no_sql_udf() -> None:
     assert b"sha256(" not in PRODUCTION_SCHEMA_ARTIFACT_BYTES.lower()
     assert PRODUCTION_SCHEMA_ID.endswith("/v1")
     assert PRODUCTION_SCHEMA_MANIFEST_BYTES
+
+
+def test_approved_manifest_resources_are_exact_and_loadable() -> None:
+    package = resources.files("trading_bot.runtime.schema")
+    release_bytes = package.joinpath(
+        "authority_initializer_release_manifest_v1.json"
+    ).read_bytes()
+    sqlite_build_bytes = package.joinpath(
+        "sqlite_authority_build_manifest_v1.json"
+    ).read_bytes()
+
+    assert len(release_bytes) == 308
+    assert hashlib.sha256(release_bytes).hexdigest() == (
+        "6c5293d5b04f8f752d26c5cea10e1d146bbb6a65aacbfe729704fdef2278eb3f"
+    )
+    assert not release_bytes.startswith(b"\xef\xbb\xbf")
+    assert not release_bytes.endswith(b"\n")
+    release = load_approved_release_manifest()
+    assert release.manifest_bytes == release_bytes
+    assert release.application_version == "0.1.0"
+
+    assert len(sqlite_build_bytes) == 1220
+    assert hashlib.sha256(sqlite_build_bytes).hexdigest() == (
+        "58cbd4cf228131a8c1894700760c95f4f76aa006c8b64ff29215bc92d8691dd3"
+    )
+    assert not sqlite_build_bytes.startswith(b"\xef\xbb\xbf")
+    assert not sqlite_build_bytes.endswith(b"\n")
+    sqlite_build = load_approved_sqlite_authority_build()
+    assert sqlite_build.manifest_bytes == sqlite_build_bytes
+    assert sqlite_build.sqlite_version == "3.50.4"
+    assert sqlite_build.sqlite_source_id == (
+        "2025-07-30 19:33:53 "
+        "4d8adfb30e03f9cf27f800a2c1ba3c48fb4ca1b08b0f5ed59a4d5ecbf45e20a3"
+    )
+    assert sqlite_build.vfs == "win32"
+    assert sqlite_build.trusted_schema_off is True
+    assert len(sqlite_build.compile_options) == 43
+
+
+def test_approved_manifest_resource_read_failures_fail_closed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import trading_bot.runtime.windows_authority_schema as schema
+
+    def inaccessible(_package: str) -> object:
+        raise OSError("resource access denied")
+
+    monkeypatch.setattr(schema.resources, "files", inaccessible)
+    with pytest.raises(
+        InitializationBlockedError,
+        match="approved release manifest resource is unavailable",
+    ):
+        load_approved_release_manifest()
+    with pytest.raises(
+        InitializationBlockedError,
+        match="approved SQLite build manifest resource is unavailable",
+    ):
+        load_approved_sqlite_authority_build()
+
+
+def test_approved_manifest_resource_malformed_data_fails_closed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import trading_bot.runtime.windows_authority_schema as schema
+
+    class MalformedResource:
+        def joinpath(self, _name: str) -> MalformedResource:
+            return self
+
+        def read_bytes(self) -> bytes:
+            return b"{}"
+
+    monkeypatch.setattr(schema.resources, "files", lambda _package: MalformedResource())
+    with pytest.raises(InitializationBlockedError, match="field set is not exact"):
+        load_approved_release_manifest()
+    with pytest.raises(InitializationBlockedError, match="field set is not exact"):
+        load_approved_sqlite_authority_build()
 
 
 def test_release_manifest_binds_the_pinned_artifact_digest() -> None:

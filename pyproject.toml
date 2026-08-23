@@ -31,7 +31,7 @@ where = ["src"]
 include = ["trading_bot*"]
 
 [tool.setuptools.package-data]
-trading_bot = ["runtime/schema/*.sql"]
+trading_bot = ["runtime/schema/*.json", "runtime/schema/*.sql"]
 
 [tool.pytest.ini_options]
 addopts = "-ra"

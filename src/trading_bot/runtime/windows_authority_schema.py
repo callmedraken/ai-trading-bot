@@ -59,6 +59,8 @@ AUTHORITY_IDENTITY_NAMESPACE = UUID("7c2d5a44-3b2e-5f8f-9a1c-6d4e7b8f9012")
 
 _ARTIFACT_NAME = "windows_transactional_authority_v1.sql"
 _ARTIFACT_SHA256 = "aa61df2f5db0090f8373222d1f5e492a58f4c10273afacfab45e382bacd4bb58"
+_RELEASE_MANIFEST_NAME = "authority_initializer_release_manifest_v1.json"
+_SQLITE_BUILD_MANIFEST_NAME = "sqlite_authority_build_manifest_v1.json"
 _HEX_DIGEST = re.compile(r"^[0-9a-f]{64}$")
 _SID = re.compile(r"^S-(?:0|[1-9][0-9]*)(?:-(?:0|[1-9][0-9]*))+$")
 _KEY_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$")
@@ -84,6 +86,25 @@ def _artifact_bytes() -> bytes:
             "production SQL artifact contains a custom hash call"
         )
     return data
+
+
+def _approved_manifest_bytes(resource_name: str, description: str) -> bytes:
+    try:
+        return (
+            resources.files("trading_bot.runtime.schema")
+            .joinpath(resource_name)
+            .read_bytes()
+        )
+    except (
+        FileNotFoundError,
+        ModuleNotFoundError,
+        OSError,
+        TypeError,
+        ValueError,
+    ) as error:
+        raise InitializationBlockedError(
+            f"approved {description} manifest resource is unavailable"
+        ) from error
 
 
 PRODUCTION_SCHEMA_ARTIFACT_BYTES = _artifact_bytes()
@@ -703,10 +724,10 @@ def parse_release_manifest_bytes(data: bytes) -> ReleaseManifestEvidence:
 
 
 def load_approved_release_manifest() -> ReleaseManifestEvidence:
-    """Fail closed until the separately reviewed production manifest is published."""
+    """Load and parse the code-owned approved release manifest resource."""
 
-    raise InitializationBlockedError(
-        "no approved production release manifest is published"
+    return parse_release_manifest_bytes(
+        _approved_manifest_bytes(_RELEASE_MANIFEST_NAME, "release")
     )
 
 
@@ -800,10 +821,10 @@ def parse_sqlite_authority_build_manifest(data: bytes) -> SqliteAuthorityBuildEv
 
 
 def load_approved_sqlite_authority_build() -> SqliteAuthorityBuildEvidence:
-    """Fail closed until the separately reviewed native build is published."""
+    """Load and parse the code-owned approved SQLite build resource."""
 
-    raise InitializationBlockedError(
-        "no approved sqlite-authority/v1 build is published"
+    return parse_sqlite_authority_build_manifest(
+        _approved_manifest_bytes(_SQLITE_BUILD_MANIFEST_NAME, "SQLite build")
     )
 
 

@@ -231,15 +231,35 @@ def _require_windows_acceptance() -> None:
 
 
 def _read_verified_fixed_file(
-    path: object,
+    path: str | PureWindowsPath,
     role: str,
     trading_sid: str,
 ) -> bytes:
-    """Read trust material only from the handle whose path/security was checked."""
+    """Read administrator-validated trust material from its inspected handle."""
 
-    validate_fixed_parent_chain(path, trading_sid=trading_sid)  # type: ignore[arg-type]
+    validate_fixed_parent_chain(path, trading_sid=trading_sid)
+    return _read_inspected_fixed_file(path, role, trading_sid)
+
+
+def _read_trading_verified_fixed_file(
+    path: str | PureWindowsPath,
+    role: str,
+    trading_sid: str,
+) -> bytes:
+    """Read a Trading-visible trust file without opening its protected parent."""
+
+    return _read_inspected_fixed_file(path, role, trading_sid)
+
+
+def _read_inspected_fixed_file(
+    path: str | PureWindowsPath,
+    role: str,
+    trading_sid: str,
+) -> bytes:
+    """Read bytes only from the no-follow handle whose fixed target was inspected."""
+
     policy = authority_security_policy(role, trading_sid)
-    with open_authority_object(path, AuthorityObjectKind.FILE) as handle:  # type: ignore[arg-type]
+    with open_authority_object(path, AuthorityObjectKind.FILE) as handle:
         inspection = inspect_open_authority_object(
             handle, path, AuthorityObjectKind.FILE
         )
@@ -253,10 +273,9 @@ def _validate_fixed_object_for_capability(
     kind: AuthorityObjectKind,
     trading_sid: str,
 ) -> None:
-    """Validate a production object before an acceptance capability probe uses it."""
+    """Validate one Trading-visible target before an acceptance capability probe."""
 
     try:
-        validate_fixed_parent_chain(path, trading_sid=trading_sid)
         policy = authority_security_policy(role, trading_sid)
         with open_authority_object(path, kind) as handle:
             inspection = inspect_open_authority_object(handle, path, kind)
@@ -454,22 +473,22 @@ def _run_administrator_fixed_root_phase() -> AcceptanceEvidence:
 
 def _require_trading_context() -> tuple[object, str]:
     _require_windows_acceptance()
-    bootstrap_bytes = _read_verified_fixed_file(
+    current_sid = resolve_current_token_sid()
+    bootstrap_bytes = _read_trading_verified_fixed_file(
         PRODUCTION_AUTHORITY_PATHS.bootstrap,
         "bootstrap",
-        resolve_current_token_sid(),
+        current_sid,
     )
-    signature_bytes = _read_verified_fixed_file(
+    signature_bytes = _read_trading_verified_fixed_file(
         PRODUCTION_AUTHORITY_PATHS.signature,
         "signature",
-        resolve_current_token_sid(),
+        current_sid,
     )
     verification = verify_bootstrap_signature(
         bootstrap_bytes,
         signature_bytes,
         key_registry=PRODUCTION_PINNED_BOOTSTRAP_KEYS,
     )
-    current_sid = resolve_current_token_sid()
     require_trading_phase_facts(
         current_sid=current_sid,
         expected_sid=verification.bootstrap.approved_account_sid,
@@ -477,6 +496,254 @@ def _require_trading_context() -> tuple[object, str]:
         token_is_administrator=is_current_token_administrator(),
     )
     return verification, current_sid
+
+
+def test_administrator_trust_read_still_validates_parent_chain(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    events: list[tuple[str, object]] = []
+    module = sys.modules[__name__]
+
+    class FakeHandle:
+        def __enter__(self) -> FakeHandle:
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+    handle = FakeHandle()
+    monkeypatch.setattr(
+        module,
+        "validate_fixed_parent_chain",
+        lambda path, *, trading_sid: events.append(("parent", path)),
+    )
+    monkeypatch.setattr(
+        module,
+        "authority_security_policy",
+        lambda role, trading_sid: (role, trading_sid),
+    )
+    monkeypatch.setattr(
+        module,
+        "open_authority_object",
+        lambda path, kind: events.append(("open", handle)) or handle,
+    )
+    monkeypatch.setattr(
+        module,
+        "inspect_open_authority_object",
+        lambda inspected, path, kind: events.append(("inspect", inspected)) or object(),
+    )
+    monkeypatch.setattr(
+        module,
+        "require_security_policy",
+        lambda inspection, policy: events.append(("policy", inspection)),
+    )
+    monkeypatch.setattr(
+        module,
+        "read_open_authority_file",
+        lambda inspected: events.append(("read", inspected)) or b"bootstrap",
+    )
+
+    assert (
+        _read_verified_fixed_file(
+            PRODUCTION_AUTHORITY_PATHS.bootstrap,
+            "bootstrap",
+            "S-1-5-21-100-200-300-400",
+        )
+        == b"bootstrap"
+    )
+    assert [name for name, _value in events] == [
+        "parent",
+        "open",
+        "inspect",
+        "policy",
+        "read",
+    ]
+    assert events[1][1] is handle
+    assert events[2][1] is handle
+    assert events[4][1] is handle
+
+
+def test_trading_context_reads_inspected_handles_without_parent_access(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = sys.modules[__name__]
+    trading_sid = "S-1-5-21-100-200-300-400"
+    events: list[tuple[str, object]] = []
+
+    class FakeHandle:
+        def __init__(self, label: str) -> None:
+            self.label = label
+
+        def __enter__(self) -> FakeHandle:
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+    handles: dict[str, FakeHandle] = {}
+
+    def fake_open(path: str | PureWindowsPath, kind: AuthorityObjectKind) -> FakeHandle:
+        handle = FakeHandle(str(path))
+        handles[str(path)] = handle
+        events.append(("open", handle))
+        return handle
+
+    def reject_parent(*args: object, **kwargs: object) -> NoReturn:
+        raise AssertionError("Trading acceptance must not open the sealed parent")
+
+    monkeypatch.setattr(module, "_require_windows_acceptance", lambda: None)
+    monkeypatch.setattr(module, "resolve_current_token_sid", lambda: trading_sid)
+    monkeypatch.setattr(module, "validate_fixed_parent_chain", reject_parent)
+    monkeypatch.setattr(
+        module,
+        "authority_security_policy",
+        lambda role, sid: (role, sid),
+    )
+    monkeypatch.setattr(module, "open_authority_object", fake_open)
+    monkeypatch.setattr(
+        module,
+        "inspect_open_authority_object",
+        lambda handle, path, kind: events.append(("inspect", handle)) or object(),
+    )
+    monkeypatch.setattr(
+        module,
+        "require_security_policy",
+        lambda inspection, policy: events.append(("policy", inspection)),
+    )
+    monkeypatch.setattr(
+        module,
+        "read_open_authority_file",
+        lambda handle: events.append(("read", handle)) or handle.label.encode(),
+    )
+    monkeypatch.setattr(
+        module,
+        "verify_bootstrap_signature",
+        lambda bootstrap_bytes, signature_bytes, *, key_registry: SimpleNamespace(
+            bootstrap=SimpleNamespace(approved_account_sid=trading_sid),
+            bootstrap_digest="digest",
+        ),
+    )
+    monkeypatch.setattr(module, "is_current_token_elevated", lambda: False)
+    monkeypatch.setattr(module, "is_current_token_administrator", lambda: False)
+
+    verification, current_sid = _require_trading_context()
+
+    assert current_sid == trading_sid
+    assert verification.bootstrap_digest == "digest"
+    assert handles[str(PRODUCTION_AUTHORITY_PATHS.bootstrap)] is not None
+    assert handles[str(PRODUCTION_AUTHORITY_PATHS.signature)] is not None
+    for name, value in events:
+        if name == "read":
+            assert any(
+                other_name == "inspect" and other_value is value
+                for other_name, other_value in events
+            )
+
+
+def test_trading_fixed_object_validation_does_not_open_parent(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = sys.modules[__name__]
+    trading_sid = "S-1-5-21-100-200-300-400"
+    events: list[str] = []
+
+    class FakeHandle:
+        def __enter__(self) -> FakeHandle:
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+    def reject_parent(*args: object, **kwargs: object) -> NoReturn:
+        raise AssertionError("Trading acceptance must not open the sealed parent")
+
+    monkeypatch.setattr(module, "validate_fixed_parent_chain", reject_parent)
+    monkeypatch.setattr(
+        module,
+        "authority_security_policy",
+        lambda role, sid: events.append("policy-build") or (role, sid),
+    )
+    monkeypatch.setattr(
+        module,
+        "open_authority_object",
+        lambda path, kind: events.append("open") or FakeHandle(),
+    )
+    monkeypatch.setattr(
+        module,
+        "inspect_open_authority_object",
+        lambda handle, path, kind: events.append("inspect") or object(),
+    )
+    monkeypatch.setattr(
+        module,
+        "require_security_policy",
+        lambda inspection, policy: events.append("policy-check"),
+    )
+
+    _validate_fixed_object_for_capability(
+        PRODUCTION_AUTHORITY_PATHS.root,
+        "root",
+        AuthorityObjectKind.DIRECTORY,
+        trading_sid,
+    )
+
+    assert events == ["policy-build", "open", "inspect", "policy-check"]
+
+
+def test_trading_fixed_object_validation_propagates_target_and_policy_failures(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = sys.modules[__name__]
+    trading_sid = "S-1-5-21-100-200-300-400"
+
+    class FakeHandle:
+        def __enter__(self) -> FakeHandle:
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+    monkeypatch.setattr(
+        module,
+        "authority_security_policy",
+        lambda role, sid: (role, sid),
+    )
+    monkeypatch.setattr(
+        module,
+        "open_authority_object",
+        lambda path, kind: FakeHandle(),
+    )
+    target_failure = WindowsAuthorityError("inspected target rejected")
+
+    def fail_inspection(*args: object, **kwargs: object) -> NoReturn:
+        raise target_failure
+
+    monkeypatch.setattr(module, "inspect_open_authority_object", fail_inspection)
+    with pytest.raises(WindowsAuthorityError, match="inspected target rejected"):
+        _validate_fixed_object_for_capability(
+            PRODUCTION_AUTHORITY_PATHS.root,
+            "root",
+            AuthorityObjectKind.DIRECTORY,
+            trading_sid,
+        )
+
+    monkeypatch.setattr(
+        module,
+        "inspect_open_authority_object",
+        lambda handle, path, kind: object(),
+    )
+    security_failure = WindowsAuthorityError("security policy rejected")
+
+    def fail_policy(*args: object, **kwargs: object) -> NoReturn:
+        raise security_failure
+
+    monkeypatch.setattr(module, "require_security_policy", fail_policy)
+    with pytest.raises(WindowsAuthorityError, match="security policy rejected"):
+        _validate_fixed_object_for_capability(
+            PRODUCTION_AUTHORITY_PATHS.root,
+            "root",
+            AuthorityObjectKind.DIRECTORY,
+            trading_sid,
+        )
 
 
 def _expect_access_denied(scenario: str, operation: Callable[[], object]) -> None:

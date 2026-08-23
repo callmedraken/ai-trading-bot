@@ -130,10 +130,15 @@ the database is readable through Python SQLite, the persistent journal is
 present for normal VFS access, and a uniquely named capture-output artifact can
 be created and cleaned up.
 
-Before those operations, the harness revalidates the fixed root,
-`capture-output`, database, and journal through no-follow handles, exact final
-paths, and their role-specific security policies. Path-based existence checks
-are not used to establish trust for a production object.
+Before those operations, the harness directly opens and revalidates each
+Trading-visible fixed target—root, `capture-output`, database, and journal—
+through a no-follow handle, exact final path, object-kind/reparse/volume
+checks, and its role-specific security policy. This deliberately does not
+open the sealed `F:\AITradingBot` deployment parent, whose ACL is
+Administrators/SYSTEM-only and grants Trading no parent-directory rights.
+Bootstrap and signature bytes are read from the same inspected target handles.
+Path-based existence checks are not used to establish trust for a production
+object.
 
 It proves the negative boundary with non-mutating access probes and uniquely
 named harmless probes: backup access, arbitrary authority-root creation,

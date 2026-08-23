@@ -1120,6 +1120,22 @@ def test_c3_e31_complete_success_orders_evidence_verification_terminal_selection
     ("classification", "expected_state", "expected_disposition"),
     [
         (ChildResultClassification.TRANSPORT_FAILED, "FAILED", "CONFIRMED"),
+        (ChildResultClassification.TRANSPORT_REQUEST_FAILED, "FAILED", "CONFIRMED"),
+        (
+            ChildResultClassification.TRANSPORT_RESPONSE_START_FAILED,
+            "FAILED",
+            "CONFIRMED",
+        ),
+        (
+            ChildResultClassification.TRANSPORT_RESPONSE_METADATA_FAILED,
+            "FAILED",
+            "CONFIRMED",
+        ),
+        (
+            ChildResultClassification.TRANSPORT_RESPONSE_BODY_FAILED,
+            "FAILED",
+            "CONFIRMED",
+        ),
         (None, "AMBIGUOUS", "MAY_HAVE_OCCURRED"),
     ],
 )

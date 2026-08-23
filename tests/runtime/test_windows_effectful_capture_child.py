@@ -12,6 +12,7 @@ from trading_bot.market_data import (
     AlpacaHttpResponse,
     AlpacaHttpStatusError,
     AlpacaTransportError,
+    AlpacaTransportFailureStage,
     DailySnapshotSerializationError,
     verify_daily_snapshot,
 )
@@ -347,13 +348,41 @@ def test_credential_failure_is_sanitized_and_never_calls_transport() -> None:
     assert _SECRET.encode() not in serialized
 
 
-def test_transport_failure_has_no_fabricated_http_evidence() -> None:
-    transport = FakeTransport(error=AlpacaTransportError(f"transport failed {_SECRET}"))
+@pytest.mark.parametrize(
+    ("stage", "classification"),
+    [
+        (
+            AlpacaTransportFailureStage.REQUEST,
+            ChildResultClassification.TRANSPORT_REQUEST_FAILED,
+        ),
+        (
+            AlpacaTransportFailureStage.RESPONSE_START,
+            ChildResultClassification.TRANSPORT_RESPONSE_START_FAILED,
+        ),
+        (
+            AlpacaTransportFailureStage.RESPONSE_METADATA,
+            ChildResultClassification.TRANSPORT_RESPONSE_METADATA_FAILED,
+        ),
+        (
+            AlpacaTransportFailureStage.RESPONSE_BODY,
+            ChildResultClassification.TRANSPORT_RESPONSE_BODY_FAILED,
+        ),
+        (
+            AlpacaTransportFailureStage.UNKNOWN,
+            ChildResultClassification.TRANSPORT_FAILED,
+        ),
+    ],
+)
+def test_transport_failure_stage_maps_without_fabricated_http_evidence(
+    stage: AlpacaTransportFailureStage,
+    classification: ChildResultClassification,
+) -> None:
+    transport = FakeTransport(error=AlpacaTransportError(stage))
     attempt, _api, _transport, writer = _attempt(transport=transport)
 
     result = attempt.run()
 
-    assert result.classification is ChildResultClassification.TRANSPORT_FAILED
+    assert result.classification is classification
     assert result.cleanup_status is ChildCleanupStatus.COMPLETE
     assert result.http_status is None
     assert result.provider_request_id is None

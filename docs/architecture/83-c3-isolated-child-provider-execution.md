@@ -133,7 +133,11 @@ B2 emits only the existing A2 `IsolatedCaptureChildResult` vocabulary.
 | retained canonical request fails post-fence reconciliation | `REQUEST_INVALID` |
 | exact Trading SID mismatch | `SID_REJECTED` |
 | Credential Manager/read/cleanup failure | `CREDENTIAL_FAILED` |
-| no safe HTTP response | `TRANSPORT_FAILED` |
+| request/connect/write path fails before a response is obtained | `TRANSPORT_REQUEST_FAILED` |
+| response/status-line acquisition fails | `TRANSPORT_RESPONSE_START_FAILED` |
+| response header/framing/metadata validation fails | `TRANSPORT_RESPONSE_METADATA_FAILED` |
+| bounded response body read or entity-length reconciliation fails | `TRANSPORT_RESPONSE_BODY_FAILED` |
+| sanitized transport failure has no assignable stage | `TRANSPORT_FAILED` |
 | sanitized non-200 response | `HTTP_FAILED` |
 | HTTP 200 entity violates fixed Alpaca schema | `PROVIDER_RESPONSE_INVALID` |
 | deterministic daily-snapshot acceptance rejects | `SNAPSHOT_REJECTED` |
@@ -146,9 +150,10 @@ Provider request IDs are retained only when they satisfy the stricter A2 child
 result bound. Unsafe/oversized IDs are omitted rather than copied into result
 evidence.
 
-Raw exception text, provider body bytes, credentials, paths, tracebacks,
-environment data, and native handle values are never placed in the structured
-result.
+The transport classifications persist only a closed sanitized stage. Raw
+transport exception text, errno or TLS strings, host-derived details, headers,
+provider body bytes, credentials, paths, tracebacks, environment data, and
+native handle values are never placed in the structured result.
 
 `SUCCEEDED` requires credential cleanup to be complete and contains only the
 claimed snapshot UUID plus SHA-256/byte length of the exact staged canonical

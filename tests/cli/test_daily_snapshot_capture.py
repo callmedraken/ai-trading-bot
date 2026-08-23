@@ -495,6 +495,7 @@ def test_cli_provider_failure_is_sanitized(
     captured = capsys.readouterr()
 
     assert exit_code == 5
-    assert "sanitized provider failure" in captured.err
+    assert "sanitized provider failure" not in captured.err
+    assert "stage UNKNOWN" in captured.err
     assert KEY not in captured.out + captured.err
     assert SECRET not in captured.out + captured.err

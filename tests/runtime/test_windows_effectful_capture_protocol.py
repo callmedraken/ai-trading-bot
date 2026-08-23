@@ -51,6 +51,12 @@ _CHILD_REQUEST_DIGEST = (
 _CHILD_RESULT_DIGEST = (
     "0d3fb6ef159a0e4653aeec573ed9f6cbe2513e5a77662cfee88b4c422ee69d59"
 )
+_STAGED_TRANSPORT_CLASSIFICATIONS = (
+    ChildResultClassification.TRANSPORT_REQUEST_FAILED,
+    ChildResultClassification.TRANSPORT_RESPONSE_START_FAILED,
+    ChildResultClassification.TRANSPORT_RESPONSE_METADATA_FAILED,
+    ChildResultClassification.TRANSPORT_RESPONSE_BODY_FAILED,
+)
 
 
 def _capture_request() -> ProductionCaptureRequest:
@@ -290,6 +296,7 @@ def test_pre_http_classifications_cannot_claim_response_evidence() -> None:
         ChildResultClassification.REQUEST_INVALID,
         ChildResultClassification.SID_REJECTED,
         ChildResultClassification.CREDENTIAL_FAILED,
+        *_STAGED_TRANSPORT_CLASSIFICATIONS,
         ChildResultClassification.TRANSPORT_FAILED,
     ):
         fence = (
@@ -310,6 +317,46 @@ def test_pre_http_classifications_cannot_claim_response_evidence() -> None:
                 cleanup_status=ChildCleanupStatus.COMPLETE,
                 provider_request_id="req-not-allowed",
             )
+
+
+@pytest.mark.parametrize(
+    "classification",
+    (*_STAGED_TRANSPORT_CLASSIFICATIONS, ChildResultClassification.TRANSPORT_FAILED),
+)
+def test_transport_classifications_round_trip_without_response_evidence(
+    classification: ChildResultClassification,
+) -> None:
+    result = IsolatedCaptureChildResult(
+        reservation_id=_RESERVATION,
+        execution_id=_EXECUTION,
+        child_request_sha256=_CHILD_REQUEST_DIGEST,
+        fence_state=ProviderAttemptFenceState.ENTERED,
+        classification=classification,
+        cleanup_status=ChildCleanupStatus.COMPLETE,
+    )
+
+    assert result.snapshot_id is None
+    assert result.artifact_sha256 is None
+    assert result.artifact_byte_length is None
+    assert result.http_status is None
+    assert result.provider_request_id is None
+    assert (
+        parse_isolated_capture_child_result(
+            serialize_isolated_capture_child_result(result)
+        )
+        == result
+    )
+
+    with pytest.raises(WindowsEffectfulCaptureProtocolError, match="entered"):
+        replace(result, fence_state=ProviderAttemptFenceState.NOT_ENTERED)
+    for field, value in (
+        ("http_status", 503),
+        ("provider_request_id", "req-not-allowed"),
+    ):
+        with pytest.raises(
+            WindowsEffectfulCaptureProtocolError, match="response evidence"
+        ):
+            replace(result, **{field: value})
 
 
 def test_http_failure_requires_non_200_status() -> None:

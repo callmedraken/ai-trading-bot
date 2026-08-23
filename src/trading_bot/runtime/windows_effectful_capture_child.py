@@ -21,6 +21,7 @@ from trading_bot.market_data import (
     AlpacaHttpStatusError,
     AlpacaResponseError,
     AlpacaTransportError,
+    AlpacaTransportFailureStage,
     BoundMarketCalendar,
     DailyMarketDataSnapshot,
     DailyProviderRequest,
@@ -482,8 +483,25 @@ class IsolatedCaptureChildAttempt:
                 provider_request_id=_safe_provider_request_id(error.request_id),
             )
         if isinstance(error, AlpacaTransportError):
+            classification = {
+                AlpacaTransportFailureStage.REQUEST: (
+                    ChildResultClassification.TRANSPORT_REQUEST_FAILED
+                ),
+                AlpacaTransportFailureStage.RESPONSE_START: (
+                    ChildResultClassification.TRANSPORT_RESPONSE_START_FAILED
+                ),
+                AlpacaTransportFailureStage.RESPONSE_METADATA: (
+                    ChildResultClassification.TRANSPORT_RESPONSE_METADATA_FAILED
+                ),
+                AlpacaTransportFailureStage.RESPONSE_BODY: (
+                    ChildResultClassification.TRANSPORT_RESPONSE_BODY_FAILED
+                ),
+                AlpacaTransportFailureStage.UNKNOWN: (
+                    ChildResultClassification.TRANSPORT_FAILED
+                ),
+            }[error.stage]
             return self._result(
-                ChildResultClassification.TRANSPORT_FAILED,
+                classification,
                 cleanup_status=ChildCleanupStatus.COMPLETE,
             )
         if isinstance(error, (AlpacaResponseError, InvalidDailySnapshotResponseError)):

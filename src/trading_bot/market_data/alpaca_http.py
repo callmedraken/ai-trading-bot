@@ -14,6 +14,7 @@ from typing import Protocol
 from trading_bot.market_data.exceptions import (
     AlpacaHttpStatusError,
     AlpacaTransportError,
+    AlpacaTransportFailureStage,
 )
 
 ALPACA_DATA_HOST = "data.alpaca.markets"
@@ -189,36 +190,76 @@ class StdlibAlpacaHistoricalBarsTransport:
         _validate_runtime_credential(api_secret_key)
         connection: _HttpsConnectionLike | None = None
         try:
-            context = self._tls_context_factory()
-            if not isinstance(context, ssl.SSLContext):
-                raise AlpacaTransportError(
-                    "TLS context factory returned an invalid context"
+            request_failed = False
+            try:
+                context = self._tls_context_factory()
+                if not isinstance(context, ssl.SSLContext):
+                    raise AlpacaTransportError
+                connection = self._connection_factory(
+                    ALPACA_DATA_HOST,
+                    ALPACA_HTTPS_PORT,
+                    timeout=ALPACA_SOCKET_TIMEOUT_SECONDS,
+                    context=context,
                 )
-            connection = self._connection_factory(
-                ALPACA_DATA_HOST,
-                ALPACA_HTTPS_PORT,
-                timeout=ALPACA_SOCKET_TIMEOUT_SECONDS,
-                context=context,
-            )
-            headers = dict(request.public_headers)
-            headers["APCA-API-KEY-ID"] = api_key_id
-            headers["APCA-API-SECRET-KEY"] = api_secret_key
-            connection.request("GET", request.target, body=None, headers=headers)
-            response = connection.getresponse()
-            raw_headers = tuple(response.getheaders())
-            metadata = _validated_response_headers(
-                raw_headers,
-                require_success_fields=response.status == 200,
-            )
-            body, body_hash, body_length = _read_bounded_entity(response)
-            declared_length = metadata["content_length"]
-            if declared_length is not None and declared_length != body_length:
-                raise AlpacaTransportError(
-                    "Alpaca response Content-Length does not match entity bytes"
+                headers = dict(request.public_headers)
+                headers["APCA-API-KEY-ID"] = api_key_id
+                headers["APCA-API-SECRET-KEY"] = api_secret_key
+                connection.request("GET", request.target, body=None, headers=headers)
+            except Exception:
+                request_failed = True
+            if request_failed:
+                raise AlpacaTransportError(AlpacaTransportFailureStage.REQUEST)
+
+            response: _HttpResponseLike | None = None
+            status: int | None = None
+            response_start_failed = False
+            try:
+                response = connection.getresponse()
+                status = response.status
+                if type(status) is not int or not 100 <= status <= 599:
+                    raise AlpacaTransportError
+            except Exception:
+                response_start_failed = True
+            if response_start_failed or response is None or status is None:
+                raise AlpacaTransportError(AlpacaTransportFailureStage.RESPONSE_START)
+
+            metadata: dict[str, object] | None = None
+            response_metadata_failed = False
+            try:
+                raw_headers = tuple(response.getheaders())
+                metadata = _validated_response_headers(
+                    raw_headers,
+                    require_success_fields=status == 200,
                 )
-            if response.status != 200:
+            except Exception:
+                response_metadata_failed = True
+            if response_metadata_failed or metadata is None:
+                raise AlpacaTransportError(
+                    AlpacaTransportFailureStage.RESPONSE_METADATA
+                )
+
+            body: bytes | None = None
+            body_hash: str | None = None
+            body_length: int | None = None
+            response_body_failed = False
+            try:
+                body, body_hash, body_length = _read_bounded_entity(response)
+                declared_length = metadata["content_length"]
+                if declared_length is not None and declared_length != body_length:
+                    raise AlpacaTransportError
+            except Exception:
+                response_body_failed = True
+            if (
+                response_body_failed
+                or body is None
+                or body_hash is None
+                or body_length is None
+            ):
+                raise AlpacaTransportError(AlpacaTransportFailureStage.RESPONSE_BODY)
+
+            if status != 200:
                 raise AlpacaHttpStatusError(
-                    response.status,
+                    status,
                     request_id=metadata["request_id"],
                     provider_code=_safe_provider_code(body),
                 )
@@ -226,7 +267,7 @@ class StdlibAlpacaHistoricalBarsTransport:
             media_type = metadata["media_type"]
             if request_id is None or media_type is None:
                 raise AlpacaTransportError(
-                    "successful Alpaca response metadata is incomplete"
+                    AlpacaTransportFailureStage.RESPONSE_METADATA
                 )
             return AlpacaHttpResponse(
                 status=200,
@@ -240,12 +281,6 @@ class StdlibAlpacaHistoricalBarsTransport:
                 request_id=request_id,
                 media_type=media_type,
             )
-        except (AlpacaHttpStatusError, AlpacaTransportError):
-            raise
-        except (OSError, TimeoutError, ssl.SSLError, http.client.HTTPException):
-            raise AlpacaTransportError(
-                "Alpaca HTTPS request failed before a safe response was obtained"
-            ) from None
         finally:
             if connection is not None:
                 try:

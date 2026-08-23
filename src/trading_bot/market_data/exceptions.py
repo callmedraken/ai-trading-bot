@@ -1,5 +1,7 @@
 """Expected failures raised by historical market-data providers."""
 
+from enum import StrEnum
+
 
 class HistoricalDataError(Exception):
     """Base class for historical market-data failures."""
@@ -109,8 +111,30 @@ class AlpacaCredentialError(AlpacaDailySnapshotError, ValueError):
     """Raised when runtime Alpaca credentials are absent or invalid."""
 
 
+class AlpacaTransportFailureStage(StrEnum):
+    """Closed sanitized location of an Alpaca HTTPS transport failure."""
+
+    REQUEST = "REQUEST"
+    RESPONSE_START = "RESPONSE_START"
+    RESPONSE_METADATA = "RESPONSE_METADATA"
+    RESPONSE_BODY = "RESPONSE_BODY"
+    UNKNOWN = "UNKNOWN"
+
+
 class AlpacaTransportError(AlpacaDailySnapshotError):
     """Raised when the one permitted HTTPS attempt cannot complete safely."""
+
+    def __init__(
+        self,
+        stage: AlpacaTransportFailureStage
+        | object = AlpacaTransportFailureStage.UNKNOWN,
+    ) -> None:
+        # Legacy callers may still pass a sanitized message. Discard all such
+        # caller-provided material rather than retaining it in args/repr.
+        if type(stage) is not AlpacaTransportFailureStage:
+            stage = AlpacaTransportFailureStage.UNKNOWN
+        self.stage = stage
+        super().__init__(f"Alpaca HTTPS transport failed at stage {stage.value}")
 
 
 class AlpacaHttpStatusError(AlpacaTransportError):
@@ -131,7 +155,9 @@ class AlpacaHttpStatusError(AlpacaTransportError):
             message += f" and provider code {provider_code}"
         if request_id is not None:
             message += f" (request ID {request_id})"
-        super().__init__(message)
+        # This remains a distinct sanitized HTTP-response path. It deliberately
+        # does not acquire an AlpacaTransportFailureStage from its base class.
+        AlpacaDailySnapshotError.__init__(self, message)
 
 
 class AlpacaResponseError(AlpacaDailySnapshotError, ValueError):

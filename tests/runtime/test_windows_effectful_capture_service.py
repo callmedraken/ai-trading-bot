@@ -767,6 +767,54 @@ def test_public_planning_api_does_not_accept_authority_overrides() -> None:
     assert forbidden.isdisjoint(parameters)
 
 
+def test_public_capture_once_accepts_only_nonsecret_request() -> None:
+    parameters = signature(WindowsEffectfulDailySnapshotCapture.capture_once).parameters
+    assert tuple(parameters) == ("self", "request")
+    forbidden = {
+        "clock",
+        "requested_at",
+        "adapter",
+        "provider",
+        "credential_target",
+        "credentials",
+        "native_api",
+        "executable",
+        "child_entrypoint",
+        "database_path",
+        "output_path",
+        "retry_policy",
+        "snapshot_digest",
+    }
+    assert forbidden.isdisjoint(parameters)
+
+
+def test_capture_once_owns_current_utc_clock_before_orchestration(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    requested_at = datetime(2026, 8, 18, 14, tzinfo=UTC)
+
+    class FixedDatetime:
+        @classmethod
+        def now(cls, timezone):
+            del cls
+            assert timezone is UTC
+            return requested_at
+
+    capture = object.__new__(WindowsEffectfulDailySnapshotCapture)
+    capture._closed = False
+    monkeypatch.setattr(service_module, "datetime", FixedDatetime)
+    monkeypatch.setattr(
+        WindowsEffectfulDailySnapshotCapture,
+        "_capture_prepared_once",
+        lambda self, plan: plan,
+    )
+
+    plan = capture.capture_once(_request())
+
+    assert plan.requested_at_utc == requested_at
+    assert plan.request == _request()
+
+
 def test_close_is_idempotent_and_blocks_future_planning(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

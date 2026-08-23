@@ -8,7 +8,7 @@ import threading
 import weakref
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import PureWindowsPath
 from uuid import UUID
@@ -91,6 +91,96 @@ from trading_bot.runtime.windows_transactional_authority import (
 
 class WindowsEffectfulCaptureCompositionError(WindowsAuthorityError):
     """C1/C2/C3 production composition is inconsistent or already closed."""
+
+
+class ProductionCaptureInvocationError(WindowsEffectfulCaptureCompositionError):
+    """One production invocation could not safely advance without recovery."""
+
+
+@dataclass(frozen=True, slots=True)
+class ProductionCaptureInvocationResult:
+    """Minimal nonsecret operator evidence for one completed C3 invocation."""
+
+    session_id: str
+    attempt_id: str
+    claim_id: str
+    reservation_id: str
+    execution_id: str | None
+    terminal_id: str
+    selection_id: str | None
+    terminal_state: str
+    provider_call_disposition: str
+    snapshot_id: UUID | None = None
+    artifact_sha256: str | None = None
+    artifact_byte_length: int | None = None
+
+    def __post_init__(self) -> None:
+        for field_name in (
+            "session_id",
+            "attempt_id",
+            "claim_id",
+            "reservation_id",
+            "terminal_id",
+        ):
+            _require_canonical_uuid(getattr(self, field_name), field_name)
+        if self.execution_id is not None:
+            _require_canonical_uuid(self.execution_id, "execution_id")
+        if self.selection_id is not None:
+            _require_canonical_uuid(self.selection_id, "selection_id")
+        if self.terminal_state not in {"SUCCEEDED", "FAILED", "AMBIGUOUS"}:
+            raise WindowsEffectfulCaptureCompositionError(
+                "production invocation terminal state is invalid"
+            )
+        if self.provider_call_disposition not in {
+            "CONFIRMED",
+            "MAY_HAVE_OCCURRED",
+            "NOT_STARTED",
+        }:
+            raise WindowsEffectfulCaptureCompositionError(
+                "production invocation disposition is invalid"
+            )
+        success = self.terminal_state == "SUCCEEDED"
+        success_fields = (
+            self.selection_id,
+            self.snapshot_id,
+            self.artifact_sha256,
+            self.artifact_byte_length,
+        )
+        if success:
+            if (
+                self.provider_call_disposition != "CONFIRMED"
+                or self.execution_id is None
+                or any(value is None for value in success_fields)
+            ):
+                raise WindowsEffectfulCaptureCompositionError(
+                    "successful production invocation evidence is incomplete"
+                )
+            if type(self.snapshot_id) is not UUID:
+                raise WindowsEffectfulCaptureCompositionError(
+                    "successful production invocation snapshot ID is invalid"
+                )
+            if (
+                type(self.artifact_sha256) is not str
+                or len(self.artifact_sha256) != 64
+                or any(
+                    character not in "0123456789abcdef"
+                    for character in self.artifact_sha256
+                )
+            ):
+                raise WindowsEffectfulCaptureCompositionError(
+                    "successful production invocation artifact digest is invalid"
+                )
+            if (
+                type(self.artifact_byte_length) is not int
+                or self.artifact_byte_length < 1
+            ):
+                raise WindowsEffectfulCaptureCompositionError(
+                    "successful production invocation artifact length is invalid"
+                )
+        elif any(value is not None for value in success_fields):
+            raise WindowsEffectfulCaptureCompositionError(
+                "non-success production invocation cannot expose snapshot evidence"
+            )
 
 
 @dataclass(frozen=True, slots=True)
@@ -438,6 +528,12 @@ class _C3TerminalIssuance:
     diagnostics_json: bytes
     diagnostics_digest: bytes
     staging_cleanup: C3StagingCleanupStatus
+
+
+@dataclass(frozen=True, slots=True)
+class _CompletedC3TerminalOutcome:
+    state: str
+    disposition: str
 
 
 @dataclass(slots=True)
@@ -1673,6 +1769,7 @@ class C3C2TransactionalAdapterForTest:
 
     __slots__ = (
         "_capture",
+        "_completed_terminal_outcomes",
         "_expected_requests",
         "_launch",
         "_launch_plans",
@@ -1699,6 +1796,9 @@ class C3C2TransactionalAdapterForTest:
         self._launch = launch
         self._native_api = native_api
         self._registry = _C3LiveProcessRegistry()
+        self._completed_terminal_outcomes: dict[
+            tuple[str, str], _CompletedC3TerminalOutcome
+        ] = {}
         self._launch_plans: dict[str, ProductionProviderLaunchPlan] = {}
         self._expected_requests: dict[tuple[str, str], bytes] = {}
 
@@ -1741,15 +1841,35 @@ class C3C2TransactionalAdapterForTest:
             PureWindowsPath(launch.storage_root)
             / f".c3-capture-{reservation_id}.staging"
         )
-        child = create_suspended_capture_child_for_test(
-            application_name=launch.application_name,
-            arguments=launch.arguments,
-            current_directory=launch.current_directory,
-            controlled_temp_directory=launch.controlled_temp_directory,
-            staging_path=staging_path,
-            parent_environment=launch.parent_environment,
-            native_api=self._native_api,
-        )
+        try:
+            child = create_suspended_capture_child_for_test(
+                application_name=launch.application_name,
+                arguments=launch.arguments,
+                current_directory=launch.current_directory,
+                controlled_temp_directory=launch.controlled_temp_directory,
+                staging_path=staging_path,
+                parent_environment=launch.parent_environment,
+                native_api=self._native_api,
+            )
+        except WindowsEffectfulCaptureProcessNotCreatedError:
+            from trading_bot.runtime.windows_transactional_authority import (
+                issue_process_creation_failure_for_test,
+            )
+
+            result_json = _canonical_json(
+                {
+                    "creation_result": "NOT_CREATED",
+                    "process_intent_digest": process_intent.intent_digest.hex(),
+                    "reservation_id": reservation_id,
+                    "schema": 1,
+                }
+            )
+            return issue_process_creation_failure_for_test(
+                reservation_id,
+                process_intent.intent_digest,
+                result_json,
+                hashlib.sha256(result_json).digest(),
+            )
         try:
             from trading_bot.runtime.windows_transactional_authority import (
                 issue_process_creation_receipt_for_test,
@@ -1865,6 +1985,18 @@ class C3C2TransactionalAdapterForTest:
     def request_sha256(self, reservation_id: str, execution_id: str) -> str:
         return self._registry.request_sha256(reservation_id, execution_id)
 
+    def observe_c3_capture(
+        self, resumed: C3C2ResumedCaptureForTest
+    ) -> C3C3BObservationForTest:
+        return self._registry.observe(resumed)
+
+    def issue_c3_post_resume_evidence(
+        self,
+        resumed: C3C2ResumedCaptureForTest,
+        observation: C3C3BObservationForTest,
+    ) -> object:
+        return self._registry.issue_post_resume_evidence(resumed, observation)
+
     def validate_c3_post_resume_evidence(
         self,
         evidence: object,
@@ -1931,9 +2063,23 @@ class C3C2TransactionalAdapterForTest:
         authorization: object,
         lineage: tuple[str, str, str, str, str],
     ) -> None:
+        material = self._registry.validate_terminal(authorization, lineage)
         self._registry.consume_terminal(authorization, lineage)
+        self._completed_terminal_outcomes[(lineage[3], lineage[4])] = (
+            _CompletedC3TerminalOutcome(material[0], material[1])
+        )
         self._expected_requests.pop((lineage[3], lineage[4]), None)
         self._launch_plans.pop(lineage[3], None)
+
+    def take_completed_terminal_outcome(
+        self, reservation_id: str, execution_id: str
+    ) -> _CompletedC3TerminalOutcome:
+        try:
+            return self._completed_terminal_outcomes.pop((reservation_id, execution_id))
+        except KeyError:
+            raise WindowsEffectfulCaptureCompositionError(
+                "C3 completed terminal outcome is unavailable"
+            ) from None
 
     def close(self) -> None:
         try:
@@ -1941,6 +2087,7 @@ class C3C2TransactionalAdapterForTest:
         finally:
             self._expected_requests.clear()
             self._launch_plans.clear()
+            self._completed_terminal_outcomes.clear()
 
     def __reduce__(self) -> object:
         raise TypeError("C3-C2 adapter cannot be serialized")
@@ -1978,6 +2125,7 @@ class _ProductionC3TransactionalAdapter(C3C2TransactionalAdapterForTest):
         self._authority = authority
         self._native_api = native_api
         self._registry = _C3LiveProcessRegistry()
+        self._completed_terminal_outcomes = {}
         self._launch_plans = {}
         self._expected_requests = {}
         self._active_plans: dict[str, ProductionCapturePlan] = {}
@@ -2322,6 +2470,17 @@ class WindowsEffectfulDailySnapshotCapture:
             adapter.register_capture_plan(plan)
         return plan
 
+    def capture_once(
+        self, request: ProductionCaptureRequest
+    ) -> ProductionCaptureInvocationResult:
+        """Run one fixed production capture using only caller-safe intent."""
+
+        self._require_open()
+        if type(request) is not ProductionCaptureRequest:
+            raise TypeError("capture_once requires ProductionCaptureRequest")
+        plan = self.prepare_capture_plan(request, datetime.now(UTC))
+        return self._capture_prepared_once(plan)
+
     def close(self) -> None:
         if self._closed:
             return
@@ -2360,6 +2519,136 @@ class WindowsEffectfulDailySnapshotCapture:
             child_request=child_request,
         )
 
+    def _capture_prepared_once(
+        self, plan: ProductionCapturePlan
+    ) -> ProductionCaptureInvocationResult:
+        """Internal deterministic seam for the frozen one-shot orchestration."""
+
+        self._require_open()
+        if type(plan) is not ProductionCapturePlan:
+            raise TypeError("production invocation requires ProductionCapturePlan")
+        transactional = self._transactional
+        adapter = self._adapter
+        try:
+            session_id = transactional.create_session(plan.request.to_c2_request_dict())
+            attempt_id = transactional.allocate_attempt(session_id)
+            claim_id = transactional.commit_claim(attempt_id)
+            permit = transactional.reserve_launch(claim_id)
+            provider = transactional.construct_provider(permit)
+            process_intent = transactional.commit_process_intent(
+                permit.reservation_id, provider
+            )
+            process_result = transactional.create_process(process_intent)
+            if type(process_result) is ProcessCreationFailure:
+                transactional.record_process_creation_failure(
+                    permit.reservation_id, process_result
+                )
+                terminal_id = transactional.record_terminal(
+                    permit.reservation_id,
+                    "FAILED",
+                    "NOT_STARTED",
+                    snapshot_digest=None,
+                )
+                return ProductionCaptureInvocationResult(
+                    session_id=session_id,
+                    attempt_id=attempt_id,
+                    claim_id=claim_id,
+                    reservation_id=permit.reservation_id,
+                    execution_id=None,
+                    terminal_id=terminal_id,
+                    selection_id=None,
+                    terminal_state="FAILED",
+                    provider_call_disposition="NOT_STARTED",
+                )
+            if type(process_result) is not ProcessCreationReceipt:
+                raise WindowsEffectfulCaptureCompositionError(
+                    "production process outcome is unresolved"
+                )
+            try:
+                execution_id = transactional.record_execution(
+                    permit.reservation_id, process_result
+                )
+            except Exception:
+                adapter.discard_receipt(process_result)
+                raise
+            adapter.bind_execution(process_result, permit.reservation_id, execution_id)
+            payload = adapter.child_request_payload(permit.reservation_id, execution_id)
+            transactional.deliver_c3_child_request(
+                execution_id, permit.reservation_id, payload
+            )
+            resume_intent = transactional.commit_resume_intent(
+                execution_id, permit.reservation_id
+            )
+            resume_receipt = transactional.resume_thread(resume_intent)
+            resumed = C3C2ResumedCaptureForTest(
+                reservation_id=permit.reservation_id,
+                execution_id=execution_id,
+                child_request_sha256=adapter.request_sha256(
+                    permit.reservation_id, execution_id
+                ),
+                resume_receipt=resume_receipt,
+            )
+            observation = adapter.observe_c3_capture(resumed)
+            evidence = adapter.issue_c3_post_resume_evidence(resumed, observation)
+            transactional.record_c3_post_resume_evidence(
+                execution_id, resume_receipt, evidence
+            )
+
+            verified_snapshot: VerifiedCapturedSnapshot | None = None
+            trusted = observation.trusted_result
+            if (
+                trusted is not None
+                and trusted.classification is ChildResultClassification.SUCCEEDED
+            ):
+                try:
+                    verified_snapshot = transactional.verify_c3_captured_snapshot(
+                        execution_id, permit.reservation_id
+                    )
+                except WindowsEffectfulCaptureCompositionError:
+                    verified_snapshot = None
+
+            terminal_id = transactional.record_c3_terminal(
+                execution_id,
+                permit.reservation_id,
+                verified_snapshot,
+            )
+            outcome = adapter.take_completed_terminal_outcome(
+                permit.reservation_id, execution_id
+            )
+            selection_id = None
+            if outcome.state == "SUCCEEDED":
+                selection_id = transactional.select_c3_terminal(terminal_id)
+            return ProductionCaptureInvocationResult(
+                session_id=session_id,
+                attempt_id=attempt_id,
+                claim_id=claim_id,
+                reservation_id=permit.reservation_id,
+                execution_id=execution_id,
+                terminal_id=terminal_id,
+                selection_id=selection_id,
+                terminal_state=outcome.state,
+                provider_call_disposition=outcome.disposition,
+                snapshot_id=(
+                    None if verified_snapshot is None else verified_snapshot.snapshot_id
+                ),
+                artifact_sha256=(
+                    None
+                    if verified_snapshot is None
+                    else verified_snapshot.artifact_sha256
+                ),
+                artifact_byte_length=(
+                    None
+                    if verified_snapshot is None
+                    else verified_snapshot.artifact_byte_length
+                ),
+            )
+        except ProductionCaptureInvocationError:
+            raise
+        except Exception:
+            raise ProductionCaptureInvocationError(
+                "production capture could not safely advance; use C2/C3 recovery"
+            ) from None
+
     def _require_open(self) -> None:
         if self._closed:
             raise WindowsEffectfulCaptureCompositionError(
@@ -2385,6 +2674,19 @@ def prepare_production_execution_for_test(
         reservation_id=reservation_id,
         execution_id=execution_id,
     )
+
+
+def _capture_prepared_once_for_test(
+    capture: WindowsEffectfulDailySnapshotCapture,
+    plan: ProductionCapturePlan,
+) -> ProductionCaptureInvocationResult:
+    """Exercise the internal orchestration with disposable C2/C3 authorities."""
+
+    if type(capture) is not WindowsEffectfulDailySnapshotCapture:
+        raise TypeError("test invocation requires the exact C3 capture root")
+    if type(capture._adapter) is not C3C2TransactionalAdapterForTest:
+        raise TypeError("test invocation requires the disposable C3 adapter")
+    return capture._capture_prepared_once(plan)
 
 
 def create_c3_c2_transactional_adapter_for_test(
@@ -2472,7 +2774,7 @@ def observe_c3_c3b_for_test(
         raise TypeError("C3-C3B observation requires its exact adapter")
     if type(resumed) is not C3C2ResumedCaptureForTest:
         raise TypeError("C3-C3B observation requires its exact resumed receipt")
-    return adapter._registry.observe(resumed)
+    return adapter.observe_c3_capture(resumed)
 
 
 def issue_c3_post_resume_evidence_for_test(
@@ -2488,7 +2790,7 @@ def issue_c3_post_resume_evidence_for_test(
         raise TypeError("C3 evidence issuance requires its exact resumed capture")
     if type(observation) is not C3C3BObservationForTest:
         raise TypeError("C3 evidence issuance requires its exact observation")
-    return adapter._registry.issue_post_resume_evidence(resumed, observation)
+    return adapter.issue_c3_post_resume_evidence(resumed, observation)
 
 
 def _canonical_json(value: object) -> bytes:
@@ -2499,3 +2801,20 @@ def _canonical_json(value: object) -> bytes:
         ensure_ascii=True,
         allow_nan=False,
     ).encode("ascii")
+
+
+def _require_canonical_uuid(value: object, field_name: str) -> None:
+    if type(value) is not str:
+        raise WindowsEffectfulCaptureCompositionError(
+            f"production invocation {field_name} is invalid"
+        )
+    try:
+        parsed = UUID(value)
+    except ValueError:
+        raise WindowsEffectfulCaptureCompositionError(
+            f"production invocation {field_name} is invalid"
+        ) from None
+    if str(parsed) != value:
+        raise WindowsEffectfulCaptureCompositionError(
+            f"production invocation {field_name} is invalid"
+        )

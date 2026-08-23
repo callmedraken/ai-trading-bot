@@ -15,6 +15,7 @@ from uuid import UUID
 
 import pytest
 
+import trading_bot.runtime.windows_effectful_capture_service as service_module
 from trading_bot.domain import Symbol
 from trading_bot.market_calendar import NYSEMarketCalendar
 from trading_bot.market_data import (
@@ -57,6 +58,7 @@ from trading_bot.runtime.windows_effectful_capture_native import (
     NativePipePair,
     NativeStagingObject,
     WindowsEffectfulCaptureNativeError,
+    WindowsEffectfulCaptureProcessNotCreatedError,
 )
 from trading_bot.runtime.windows_effectful_capture_protocol import (
     MAX_C3_CHILD_REQUEST_BYTES,
@@ -103,12 +105,14 @@ class _FakeNativeApi:
         fail_close: int | None = None,
         fail_terminate: bool = False,
         request_wait_status: C3NativeWaitStatus = C3NativeWaitStatus.IO_COMPLETED,
+        fail_create: bool = False,
     ) -> None:
         self.resume_result = resume_result
         self.fail_write = fail_write
         self.fail_close = fail_close
         self.fail_terminate = fail_terminate
         self.request_wait_status = request_wait_status
+        self.fail_create = fail_create
         self.events: list[str] = []
         self.written = bytearray()
         self.connection = None
@@ -126,6 +130,7 @@ class _FakeNativeApi:
         self.identity_results: deque[NativeFileIdentity] = deque()
         self.fail_publish = False
         self.fail_cleanup = False
+        self.result_factory = None
 
     def create_job_object(self) -> int:
         self.events.append("create_job")
@@ -164,6 +169,9 @@ class _FakeNativeApi:
 
     def read_artifact_file(self, handle: int, max_bytes: int) -> bytes:
         self.events.append(f"read_artifact:{handle}")
+        assert self.connection.execute(
+            "SELECT phase FROM launch_executions"
+        ).fetchone() == ("RESUME_RECORDED",)
         payload = self.staging_bytes if handle == 105 else self.final_bytes
         return b"" if payload is None else payload
 
@@ -198,6 +206,10 @@ class _FakeNativeApi:
         assert kwargs["application_name"] == _APPLICATION
         assert kwargs["current_directory"] == _CURRENT
         self.events.append("create_process")
+        if self.fail_create:
+            raise WindowsEffectfulCaptureProcessNotCreatedError(
+                "sanitized not-created test result"
+            )
         return NativeCreatedProcess(1234, 5678, 106, 107)
 
     def begin_overlapped_write(self, handle: int, payload: bytes) -> object:
@@ -237,6 +249,10 @@ class _FakeNativeApi:
             self.written.extend(payload[:count])
             return NativeOverlappedCompletion(count, b"", False)
         assert type(operation) is dict
+        if not self.result_chunks and self.result_factory is not None:
+            factory = self.result_factory
+            self.result_factory = None
+            self.result_chunks.extend((factory(), None))
         chunk = self.result_chunks.popleft()
         if chunk is None:
             return NativeOverlappedCompletion(0, b"", True)
@@ -371,7 +387,7 @@ def _initialize_database(connection) -> None:
     )
 
 
-def _case(api: _FakeNativeApi):
+def _orchestration_case(api: _FakeNativeApi):
     capture = object.__new__(WindowsEffectfulDailySnapshotCapture)
     capture._authority = _authority()
     capture._closed = False
@@ -396,8 +412,14 @@ def _case(api: _FakeNativeApi):
         lifecycle_arbiter_factory=lambda _reservation_id: nullcontext(),
         external_adapter=adapter,
     )
+    capture._adapter = adapter
     capture._transactional = transactional
     api.connection = connection
+    return capture, plan, adapter, transactional, connection
+
+
+def _case(api: _FakeNativeApi):
+    capture, plan, adapter, transactional, connection = _orchestration_case(api)
 
     session_id = transactional.create_session(plan.request.to_c2_request_dict())
     attempt_id = transactional.allocate_attempt(session_id)
@@ -1001,6 +1023,182 @@ def _canonical_c3_snapshot(
     accepted = accept_daily_provider_response(provider_request, response, calendar)
     assert accepted.snapshot is not None
     return serialize_daily_snapshot(accepted.snapshot)
+
+
+def _automatic_child_result(
+    api: _FakeNativeApi,
+    classification: ChildResultClassification,
+) -> bytes:
+    request_bytes = bytes(api.written)
+    child = parse_isolated_capture_child_request(request_bytes)
+    values: dict[str, object] = {}
+    if classification is ChildResultClassification.SUCCEEDED:
+        payload = _canonical_c3_snapshot(api)
+        api.staging_bytes = payload
+        values = {
+            "artifact_byte_length": len(payload),
+            "artifact_sha256": hashlib.sha256(payload).hexdigest(),
+            "http_status": 200,
+            "provider_request_id": "c3-parent-verification",
+            "snapshot_id": UUID(json.loads(payload)["snapshot_id"]),
+        }
+    result = IsolatedCaptureChildResult(
+        reservation_id=child.reservation_id,
+        execution_id=child.execution_id,
+        child_request_sha256=hashlib.sha256(request_bytes).hexdigest(),
+        fence_state=ProviderAttemptFenceState.ENTERED,
+        classification=classification,
+        cleanup_status=ChildCleanupStatus.COMPLETE,
+        **values,
+    )
+    return serialize_isolated_capture_child_result(result)
+
+
+def _run_complete_invocation(
+    api: _FakeNativeApi,
+    classification: ChildResultClassification | None,
+):
+    capture, plan, adapter, transactional, connection = _orchestration_case(api)
+    if classification is None:
+        api.result_factory = lambda: b"not-canonical-child-result"
+    else:
+        api.result_factory = lambda: _automatic_child_result(api, classification)
+    api.wait_events.extend(
+        (C3NativeWaitStatus.IO_COMPLETED, C3NativeWaitStatus.IO_COMPLETED)
+    )
+    api.process_wait_events.append(C3NativeWaitStatus.PROCESS_EXITED)
+    result = service_module._capture_prepared_once_for_test(capture, plan)
+    return capture, adapter, transactional, connection, result
+
+
+def test_c3_e31_complete_success_orders_evidence_verification_terminal_selection() -> (
+    None
+):
+    api = _FakeNativeApi()
+    capture, adapter, transactional, connection, result = _run_complete_invocation(
+        api, ChildResultClassification.SUCCEEDED
+    )
+    try:
+        assert result.terminal_state == "SUCCEEDED"
+        assert result.provider_call_disposition == "CONFIRMED"
+        assert result.selection_id is not None
+        assert result.snapshot_id is not None
+        assert result.artifact_sha256 == hashlib.sha256(api.staging_bytes).hexdigest()
+        assert result.artifact_byte_length == len(api.staging_bytes)
+        assert connection.execute("SELECT count(*) FROM sessions").fetchone() == (1,)
+        assert connection.execute("SELECT count(*) FROM attempts").fetchone() == (1,)
+        assert connection.execute(
+            "SELECT count(*) FROM provider_call_claims"
+        ).fetchone() == (1,)
+        assert connection.execute(
+            "SELECT count(*) FROM launch_reservations"
+        ).fetchone() == (1,)
+        assert connection.execute(
+            "SELECT count(*) FROM launch_executions"
+        ).fetchone() == (1,)
+        assert connection.execute("SELECT count(*) FROM terminals").fetchone() == (1,)
+        assert connection.execute(
+            "SELECT count(*) FROM session_selections"
+        ).fetchone() == (1,)
+        assert connection.execute(
+            "SELECT snapshot_digest FROM terminals WHERE terminal_id = ?",
+            (result.terminal_id,),
+        ).fetchone() == (bytes.fromhex(result.artifact_sha256),)
+        assert connection.execute(
+            "SELECT terminal_id FROM session_selections"
+        ).fetchone() == (result.terminal_id,)
+        assert api.events.count("create_process") == 1
+        assert api.events.count("resume_thread") == 1
+        assert api.events.count("publish") == 1
+        assert api.events.index("resume_thread") < api.events.index("read_artifact:105")
+    finally:
+        _close(adapter, transactional)
+        capture._closed = True
+
+
+@pytest.mark.parametrize(
+    ("classification", "expected_state", "expected_disposition"),
+    [
+        (ChildResultClassification.TRANSPORT_FAILED, "FAILED", "CONFIRMED"),
+        (None, "AMBIGUOUS", "MAY_HAVE_OCCURRED"),
+    ],
+)
+def test_c3_e31_non_success_is_terminal_unselected_and_never_retried(
+    classification: ChildResultClassification | None,
+    expected_state: str,
+    expected_disposition: str,
+) -> None:
+    api = _FakeNativeApi()
+    capture, adapter, transactional, connection, result = _run_complete_invocation(
+        api, classification
+    )
+    try:
+        assert result.terminal_state == expected_state
+        assert result.provider_call_disposition == expected_disposition
+        assert result.selection_id is None
+        assert result.snapshot_id is None
+        assert result.artifact_sha256 is None
+        assert connection.execute(
+            "SELECT terminal_state, provider_call_disposition, snapshot_digest "
+            "FROM terminals"
+        ).fetchone() == (expected_state, expected_disposition, None)
+        assert connection.execute(
+            "SELECT count(*) FROM session_selections"
+        ).fetchone() == (0,)
+        assert api.events.count("create_process") == 1
+        assert api.events.count("resume_thread") == 1
+        assert "publish" not in api.events
+    finally:
+        _close(adapter, transactional)
+        capture._closed = True
+
+
+def test_c3_e31_parent_verification_failure_uses_c3_terminal_mapping() -> None:
+    api = _FakeNativeApi()
+    api.fail_publish = True
+    capture, adapter, transactional, connection, result = _run_complete_invocation(
+        api, ChildResultClassification.SUCCEEDED
+    )
+    try:
+        assert result.terminal_state == "FAILED"
+        assert result.provider_call_disposition == "CONFIRMED"
+        assert result.selection_id is None
+        diagnostics = json.loads(
+            connection.execute(
+                "SELECT sanitized_diagnostics_json FROM terminals"
+            ).fetchone()[0]
+        )
+        assert diagnostics["reason"] == "PARENT_ARTIFACT_VERIFICATION_FAILED"
+        assert api.events.count("create_process") == 1
+        assert api.events.count("resume_thread") == 1
+        assert api.events.count("publish") == 1
+    finally:
+        _close(adapter, transactional)
+        capture._closed = True
+
+
+def test_c3_e31_definitive_not_created_is_failed_terminal_without_resume() -> None:
+    api = _FakeNativeApi(fail_create=True)
+    capture, plan, adapter, transactional, connection = _orchestration_case(api)
+    try:
+        result = service_module._capture_prepared_once_for_test(capture, plan)
+
+        assert result.terminal_state == "FAILED"
+        assert result.provider_call_disposition == "NOT_STARTED"
+        assert result.execution_id is None
+        assert result.selection_id is None
+        assert connection.execute(
+            "SELECT terminal_state, provider_call_disposition, snapshot_digest "
+            "FROM terminals"
+        ).fetchone() == ("FAILED", "NOT_STARTED", None)
+        assert api.events.count("create_process") == 1
+        assert "resume_thread" not in api.events
+        assert connection.execute(
+            "SELECT count(*) FROM session_selections"
+        ).fetchone() == (0,)
+    finally:
+        _close(adapter, transactional)
+        capture._closed = True
 
 
 def _persist_successful_c3_observation(

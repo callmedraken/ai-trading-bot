@@ -4238,7 +4238,9 @@ def _core_record_terminal(
 ) -> str:
     context = _require_service_context()
     _require_no_active_transaction(connection)
-    if _adapter_exposes_c3_terminal_interface(context.external_adapter):
+    if _adapter_exposes_c3_terminal_interface(context.external_adapter) and not (
+        state == "FAILED" and disposition == "NOT_STARTED" and snapshot_digest is None
+    ):
         raise ExternalAuthorityBoundaryUnavailable(
             "legacy terminal recording is unavailable under C3 composition"
         )

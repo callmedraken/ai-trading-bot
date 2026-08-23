@@ -73,9 +73,15 @@ def _main_database(
         )
     except (sqlite3.Error, TypeError, ValueError, IndexError) as error:
         raise SqliteDurabilityError("SQLite database list could not be read") from error
-    if len(databases) != 1 or databases[0][1] != "main":
+    schema_names = tuple(row[1] for row in databases)
+    if (
+        schema_names.count("main") != 1
+        or schema_names.count("temp") > 1
+        or any(name not in {"main", "temp"} for name in schema_names)
+    ):
         raise SqliteDurabilityError("SQLite connection has an attached database")
-    actual_database = str(databases[0][2] or "")
+    main_database = next(row for row in databases if row[1] == "main")
+    actual_database = str(main_database[2] or "")
     if os.path.normcase(actual_database) != os.path.normcase(expected_database):
         raise SqliteDurabilityError("SQLite main database path is not the fixed target")
     return databases
@@ -274,7 +280,9 @@ def validate_installed_sqlite_prerequisites(
         journal_path=expected_journal,
         database_openable=True,
         database_state=database_state,
-        attached_database_count=len(databases),
+        attached_database_count=(
+            len(databases) - sum(row[1] == "temp" for row in databases)
+        ),
         persistent_journal_present=True,
         trusted_schema_off=True,
     )
@@ -335,7 +343,9 @@ def configure_and_validate_authority_sqlite_connection(
         foreign_keys=True,
         journal_mode=journal_mode,
         synchronous=synchronous,
-        attached_database_count=len(databases),
+        attached_database_count=(
+            len(databases) - sum(row[1] == "temp" for row in databases)
+        ),
         persistent_journal_present=True,
         trusted_schema_off=True,
     )

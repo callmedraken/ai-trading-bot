@@ -53,6 +53,7 @@ from trading_bot.runtime.windows_authority_schema import (
 )
 from trading_bot.runtime.windows_authority_sqlite import (
     open_read_only_sqlite_connection,
+    validate_installed_sqlite_prerequisites,
 )
 
 
@@ -342,6 +343,78 @@ def test_production_validator_accepts_complete_populated_evidence(
     # exact (NULL, NULL) states in the optional append-only columns.
     database, _, bootstrap, release, build = _populated_authority(tmp_path)
     _validate_populated(database, bootstrap, release, build)
+
+
+def test_production_validator_accepts_builtin_temp_after_installed_prerequisites(
+    tmp_path: Path,
+) -> None:
+    database, journal, bootstrap, release, build = _initialized_authority(tmp_path)
+    connection = open_read_only_sqlite_connection(database, vfs=build.vfs)
+    try:
+        installed = validate_installed_sqlite_prerequisites(
+            connection, database_path=database, journal_path=journal
+        )
+        assert installed.database_state.value == "INITIALIZED_SUPPORTED"
+        assert installed.attached_database_count == 1
+        connection.execute("CREATE TEMP TABLE temp_probe(value TEXT NOT NULL)")
+        assert {row[1] for row in connection.execute("PRAGMA database_list")} == {
+            "main",
+            "temp",
+        }
+        validated = validate_production_authority_database_for_test(
+            connection,
+            database_path=database,
+            bootstrap=bootstrap,
+            bootstrap_digest=bootstrap.digest,
+            release_manifest=release,  # type: ignore[arg-type]
+            sqlite_build=build,
+        )
+        assert validated.schema_id == PRODUCTION_SCHEMA_ID
+    finally:
+        connection.close()
+
+
+def test_production_validator_rejects_extra_attach_with_builtin_temp(
+    tmp_path: Path,
+) -> None:
+    database, _, bootstrap, release, build = _initialized_authority(tmp_path)
+    connection = open_read_only_sqlite_connection(database, vfs=build.vfs)
+    try:
+        connection.execute("CREATE TEMP TABLE temp_probe(value TEXT NOT NULL)")
+        connection.execute("ATTACH DATABASE ':memory:' AS extra")
+        with pytest.raises(SchemaValidationError, match="attachment"):
+            validate_production_authority_database_for_test(
+                connection,
+                database_path=database,
+                bootstrap=bootstrap,
+                bootstrap_digest=bootstrap.digest,
+                release_manifest=release,  # type: ignore[arg-type]
+                sqlite_build=build,
+            )
+    finally:
+        connection.close()
+
+
+def test_production_validator_rejects_wrong_main_database_path(
+    tmp_path: Path,
+) -> None:
+    database, _, bootstrap, release, build = _initialized_authority(tmp_path)
+    expected_database = tmp_path / "different.sqlite3"
+    sqlite3.connect(expected_database).close()
+    Path(f"{expected_database}-journal").touch()
+    connection = open_read_only_sqlite_connection(database, vfs=build.vfs)
+    try:
+        with pytest.raises(SchemaValidationError, match="fixed target"):
+            validate_production_authority_database_for_test(
+                connection,
+                database_path=expected_database,
+                bootstrap=bootstrap,
+                bootstrap_digest=bootstrap.digest,
+                release_manifest=release,  # type: ignore[arg-type]
+                sqlite_build=build,
+            )
+    finally:
+        connection.close()
 
 
 _SUCCESS_POPULATED_PERSISTED_PAIRS = tuple(

@@ -1258,9 +1258,15 @@ def _validate_production_authority_database_connection(
         )
     except (sqlite3.Error, TypeError, ValueError) as error:
         raise SchemaValidationError("SQLite database list could not be read") from error
-    if len(databases) != 1 or databases[0][1] != "main":
+    schema_names = tuple(row[1] for row in databases)
+    if (
+        schema_names.count("main") != 1
+        or schema_names.count("temp") > 1
+        or any(name not in {"main", "temp"} for name in schema_names)
+    ):
         raise SchemaValidationError("SQLite database contains an attachment")
-    actual_path = str(databases[0][2] or "")
+    main_database = next(row for row in databases if row[1] == "main")
+    actual_path = str(main_database[2] or "")
     if actual_path.casefold() != str(database_path).casefold():
         raise SchemaValidationError("SQLite database path is not the fixed target")
     journal_path = Path(f"{database_path}-journal")

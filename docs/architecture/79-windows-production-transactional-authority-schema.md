@@ -237,8 +237,10 @@ is opened, installed validation performs, in order:
 2. open the exact database with SQLite `mode=ro`, with no URI fallback;
 3. establish and read back `trusted_schema=OFF` before reading or executing
    any persistent schema-controlled SQL;
-4. require one `main` database and no attachments, and compare the exact
-   final database path;
+4. require exactly one `main` database at the exact final database path;
+   SQLite's built-in connection-local `temp` schema is permitted when
+   materialized and is not an `ATTACH`ed database; every other schema is
+   prohibited;
 5. read `sqlite_schema`, the manifest PRAGMAs, `PRAGMA integrity_check`, and
    `PRAGMA foreign_key_check`;
 6. compare the exact materialized schema manifest and artifact digest;
@@ -606,7 +608,9 @@ The sequence is:
    journal handles before opening SQLite.
 2. Open the exact fixed database with `mode=rw&vfs=<approved-vfs>` and
    `uri=True`; there is no URI fallback or create fallback. Immediately
-   require one `main` database at the exact fixed path, no attachments, and
+   require exactly one `main` database at the exact fixed path. SQLite's
+   built-in connection-local `temp` schema is permitted when materialized and
+   is not an `ATTACH`ed database; every other schema is prohibited. Require
    the pre-created persistent journal.
 3. Establish `trusted_schema=OFF` using the public Python 3.12+ standard
    library configuration path where available, then read back
@@ -709,7 +713,7 @@ The production state model is:
 | `PRECREATED_UNINITIALIZED` | Paired, structurally valid database/journal with no application objects. | Report only. | Preserve and report. | Accept as the only new-initialization input. | Reject. |
 | `INITIALIZED_SUPPORTED` | Exact v1 schema, exact immutable evidence, exact bootstrap binding, and integrity all pass. | Accept read-only. | Accept only as an exact idempotent installed state. | Accept only as an exact no-op. | Accept after the future runtime setup gate. |
 | `INITIALIZED_UNSUPPORTED` | Valid SQLite with application objects, but exact approved v1 schema/identity cannot be proven: old/future/partial schema, copied Architecture-77 fixture, metadata-only state, extra object, missing object, or changed trigger/constraint. | Fail closed. | Fail closed. | Reject without mutation. | Reject. |
-| `INVALID_MISMATCHED` | Incomplete pair, corrupt pages, failed integrity/foreign-key/path/attachment checks, or production-looking metadata that does not reconcile with the verified bootstrap or canonical bytes. | Fail closed. | Fail closed. | Reject without mutation. | Reject. |
+| `INVALID_MISMATCHED` | Incomplete pair, corrupt pages, failed integrity/foreign-key/path/schema checks, or production-looking metadata that does not reconcile with the verified bootstrap or canonical bytes. | Fail closed. | Fail closed. | Reject without mutation. | Reject. |
 
 The state is evidence, not a caller-selected mode. A database is never
 promoted from unsupported or mismatched to supported by deleting rows, adding
@@ -786,7 +790,7 @@ boundary:
 - metadata byte/digest tampering, duplicate metadata, metadata UPDATE/DELETE,
   migration UPDATE/DELETE/duplicate, and migration evidence mutation cases;
 - corrupt pages, incomplete pair, persistent-journal absence, unexpected
-  attachments, active caller transaction, unavailable `trusted_schema=OFF`,
+  attachments or schemas other than `main`/`temp`, active caller transaction, unavailable `trusted_schema=OFF`,
   and rejected runtime PRAGMA readback;
 - production artifact execution with no application-defined `sha256()` SQL
   function, `trusted_schema=OFF` readback on initializer/runtime/read-only

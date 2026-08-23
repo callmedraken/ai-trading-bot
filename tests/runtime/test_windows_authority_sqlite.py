@@ -271,6 +271,28 @@ def test_installed_validation_is_read_only_and_does_not_claim_runtime_pragmas(
         connection.close()
 
 
+@pytest.mark.parametrize("validation_kind", ["installed", "runtime"])
+def test_sqlite_validation_accepts_builtin_temp_schema(
+    tmp_path: Path, validation_kind: str
+) -> None:
+    connection, database, journal = _fresh_database(tmp_path)
+    try:
+        connection.execute("CREATE TEMP TABLE temp_probe(value TEXT NOT NULL)")
+        assert {row[1] for row in connection.execute("PRAGMA database_list")} == {
+            "main",
+            "temp",
+        }
+        validator = (
+            validate_installed_sqlite_prerequisites
+            if validation_kind == "installed"
+            else configure_and_validate_authority_sqlite_connection
+        )
+        evidence = validator(connection, database_path=database, journal_path=journal)
+        assert evidence.attached_database_count == 1
+    finally:
+        connection.close()
+
+
 def test_empty_database_is_precreated_uninitialized(tmp_path: Path) -> None:
     connection, database, journal = _fresh_database(tmp_path)
     try:
@@ -646,6 +668,41 @@ def test_installed_validation_rejects_attached_database(
                 connection, database_path=database, journal_path=journal
             )
         connection.execute("DETACH DATABASE extra")
+    finally:
+        connection.close()
+
+
+def test_sqlite_validation_rejects_extra_attach_with_builtin_temp(
+    tmp_path: Path,
+) -> None:
+    connection, database, journal = _fresh_database(tmp_path)
+    attached = tmp_path / "attached.sqlite3"
+    try:
+        connection.execute("CREATE TEMP TABLE temp_probe(value TEXT NOT NULL)")
+        connection.execute("ATTACH DATABASE ? AS extra", (str(attached),))
+        with pytest.raises(SqliteDurabilityError, match="attached database"):
+            validate_installed_sqlite_prerequisites(
+                connection, database_path=database, journal_path=journal
+            )
+    finally:
+        connection.close()
+
+
+def test_sqlite_validation_rejects_wrong_main_database_path(
+    tmp_path: Path,
+) -> None:
+    connection, database, journal = _fresh_database(tmp_path)
+    expected_database = tmp_path / "different.sqlite3"
+    expected_journal = tmp_path / "different.sqlite3-journal"
+    sqlite3.connect(expected_database).close()
+    expected_journal.touch()
+    try:
+        with pytest.raises(SqliteDurabilityError, match="fixed target"):
+            validate_installed_sqlite_prerequisites(
+                connection,
+                database_path=expected_database,
+                journal_path=expected_journal,
+            )
     finally:
         connection.close()
 

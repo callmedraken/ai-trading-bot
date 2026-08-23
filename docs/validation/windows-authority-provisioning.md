@@ -143,9 +143,12 @@ object.
 It proves the negative boundary with non-mutating access probes and uniquely
 named harmless probes: backup access, arbitrary authority-root creation,
 bootstrap/signature replacement capability, database/journal delete and
-rename/replace capability, `WRITE_DAC`, and `WRITE_OWNER` are all denied. A
-probe is recorded as denied only for the expected Windows access-denied result;
-an unrelated setup or operating-system error is blocked/failing evidence.
+rename/replace capability, `WRITE_DAC`, and `WRITE_OWNER` are all denied. The
+arbitrary authority-root creation probe uses a direct native `CreateFileW`
+`CREATE_NEW` attempt; only native `ERROR_ACCESS_DENIED` is the expected denial.
+A probe is recorded as denied only for the expected Windows access-denied
+result; an unrelated setup or operating-system error is blocked/failing
+evidence.
 
 ## Phase C: `SQLITE_WINDOWS_VFS`
 

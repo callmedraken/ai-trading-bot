@@ -46,15 +46,18 @@ from trading_bot.runtime.windows_authority_provisioning import (
     validate_installed_authority,
 )
 from trading_bot.runtime.windows_authority_security import (
+    CREATE_NEW,
     DELETE,
     ERROR_ACCESS_DENIED,
     ERROR_FILE_NOT_FOUND,
     ERROR_PATH_NOT_FOUND,
+    FILE_ATTRIBUTE_NORMAL,
     FILE_FLAG_BACKUP_SEMANTICS,
     FILE_FLAG_OPEN_REPARSE_POINT,
     FILE_SHARE_DELETE,
     FILE_SHARE_READ,
     FILE_SHARE_WRITE,
+    GENERIC_WRITE,
     INVALID_HANDLE_VALUE,
     OPEN_EXISTING,
     WRITE_DAC,
@@ -966,6 +969,137 @@ def test_native_access_probe_blocks_valid_handle_close_failure(
     assert closed == [123]
 
 
+def _install_native_root_create_probe_kernel(
+    monkeypatch: pytest.MonkeyPatch,
+    root: Path,
+    *,
+    handle: object,
+    error_code: int,
+    close_result: bool = True,
+) -> tuple[list[tuple[object, ...]], list[object]]:
+    create_calls: list[tuple[object, ...]] = []
+    closed: list[object] = []
+
+    class FakeCreateFile:
+        argtypes: object
+        restype: object
+
+        def __call__(self, *args: object) -> object:
+            create_calls.append(args)
+            value = _native_handle_value(handle)
+            if value not in (0, INVALID_HANDLE_VALUE):
+                Path(args[0]).touch(exist_ok=False)  # type: ignore[arg-type]
+            return handle
+
+    class FakeCloseHandle:
+        argtypes: object
+        restype: object
+
+        def __call__(self, value: object) -> bool:
+            closed.append(value)
+            return close_result
+
+    class FakeKernel32:
+        CreateFileW = FakeCreateFile()
+        CloseHandle = FakeCloseHandle()
+
+    module = sys.modules[__name__]
+    monkeypatch.setattr(
+        module, "PRODUCTION_AUTHORITY_PATHS", SimpleNamespace(root=root)
+    )
+    monkeypatch.setattr(os, "name", "nt")
+    monkeypatch.setattr(
+        ctypes,
+        "WinDLL",
+        lambda name, use_last_error: FakeKernel32(),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        ctypes,
+        "get_last_error",
+        lambda: error_code,
+        raising=False,
+    )
+    return create_calls, closed
+
+
+def test_native_root_create_probe_counts_only_access_denied(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    create_calls, closed = _install_native_root_create_probe_kernel(
+        monkeypatch,
+        tmp_path,
+        handle=ctypes.c_void_p(-1),
+        error_code=ERROR_ACCESS_DENIED,
+    )
+
+    assert _native_root_create_probe() is False
+    assert closed == []
+    assert len(create_calls) == 1
+    assert create_calls[0][1] == GENERIC_WRITE
+    assert create_calls[0][2] == FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE
+    assert create_calls[0][4] == CREATE_NEW
+    assert create_calls[0][5] == FILE_ATTRIBUTE_NORMAL
+
+
+def test_native_root_create_probe_blocks_unrelated_native_failure(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    _install_native_root_create_probe_kernel(
+        monkeypatch,
+        tmp_path,
+        handle=ctypes.c_void_p(-1),
+        error_code=ERROR_FILE_NOT_FOUND,
+    )
+
+    with pytest.raises(AcceptanceBlockedError, match="unrelated Windows failure"):
+        _native_root_create_probe()
+
+
+def test_native_root_create_probe_success_fails_policy_after_cleanup(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    create_calls, closed = _install_native_root_create_probe_kernel(
+        monkeypatch,
+        tmp_path,
+        handle=ctypes.c_void_p(123),
+        error_code=0,
+    )
+
+    with pytest.raises(pytest.fail.Exception, match="authority-root-arbitrary-create"):
+        _expect_access_denied(
+            "authority-root-arbitrary-create", _native_root_create_probe
+        )
+
+    assert closed == [123]
+    assert not Path(create_calls[0][0]).exists()  # type: ignore[arg-type]
+
+
+def test_native_root_create_probe_cleanup_failure_blocks(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    create_calls, closed = _install_native_root_create_probe_kernel(
+        monkeypatch,
+        tmp_path,
+        handle=ctypes.c_void_p(123),
+        error_code=0,
+    )
+
+    def fail_unlink(self: Path) -> None:
+        raise OSError("cleanup failure")
+
+    monkeypatch.setattr(Path, "unlink", fail_unlink)
+    with pytest.raises(AcceptanceBlockedError, match="could not be cleaned"):
+        _native_root_create_probe()
+
+    assert closed == [123]
+    assert Path(create_calls[0][0]).is_file()  # type: ignore[arg-type]
+
+
 def _create_capture_artifact(capture_root: Path) -> None:
     artifact = capture_root / (
         f".windows-authority-acceptance-{os.getpid()}-{uuid.uuid4().hex}.bin"
@@ -983,22 +1117,69 @@ def _create_capture_artifact(capture_root: Path) -> None:
                 ) from error
 
 
-def _create_root_probe() -> bool:
+def _native_root_create_probe() -> bool:
+    """Probe authority-root file creation with exact native error evidence."""
+
+    if os.name != "nt":
+        raise AcceptanceBlockedError(
+            "native Windows root-create probing is unavailable"
+        )
     probe = Path(str(PRODUCTION_AUTHORITY_PATHS.root)) / (
         f".windows-authority-root-probe-{os.getpid()}-{uuid.uuid4().hex}"
     )
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    create = kernel32.CreateFileW
+    create.argtypes = [
+        ctypes.c_wchar_p,
+        ctypes.c_ulong,
+        ctypes.c_ulong,
+        ctypes.c_void_p,
+        ctypes.c_ulong,
+        ctypes.c_ulong,
+        ctypes.c_void_p,
+    ]
+    create.restype = ctypes.c_void_p
+    handle = create(
+        str(probe),
+        GENERIC_WRITE,
+        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+        None,
+        CREATE_NEW,
+        FILE_ATTRIBUTE_NORMAL,
+        None,
+    )
+    value = _native_handle_value(handle)
+    if value in (0, INVALID_HANDLE_VALUE):
+        error_code = ctypes.get_last_error()
+        if error_code == ERROR_ACCESS_DENIED:
+            return False
+        raise AcceptanceBlockedError(
+            "native authority-root create probe returned an unrelated Windows failure"
+        )
+
+    close = kernel32.CloseHandle
+    close.argtypes = [ctypes.c_void_p]
+    close.restype = ctypes.c_int
+    close_failure: AcceptanceBlockedError | None = None
     try:
-        with probe.open("xb"):
-            pass
-    finally:
-        if probe.exists():
-            try:
-                probe.unlink()
-            except OSError as error:
-                raise AcceptanceBlockedError(
-                    "root capability probe created an artifact that could not "
-                    "be cleaned"
-                ) from error
+        if not close(value):
+            close_failure = AcceptanceBlockedError(
+                "native authority-root create probe handle could not close"
+            )
+    except Exception as error:
+        close_failure = AcceptanceBlockedError(
+            "native authority-root create probe handle could not close"
+        )
+        close_failure.__cause__ = error
+
+    try:
+        probe.unlink()
+    except OSError as error:
+        raise AcceptanceBlockedError(
+            "native authority-root create probe artifact could not be cleaned"
+        ) from error
+    if close_failure is not None:
+        raise close_failure
     return True
 
 
@@ -1047,7 +1228,7 @@ def _run_trading_allow_deny_phase() -> AcceptanceEvidence:
             or True
         ),
     )
-    _expect_access_denied("authority-root-arbitrary-create", _create_root_probe)
+    _expect_access_denied("authority-root-arbitrary-create", _native_root_create_probe)
     for path, label in (
         (PRODUCTION_AUTHORITY_PATHS.bootstrap, "bootstrap"),
         (PRODUCTION_AUTHORITY_PATHS.signature, "signature"),
@@ -1525,8 +1706,16 @@ def test_trading_phase_validates_fixed_objects_before_capability_use(
         lambda _path: events.append("capture-artifact"),
     )
     monkeypatch.setattr(
-        module, "_expect_access_denied", lambda _scenario, _operation: None
+        module,
+        "_native_root_create_probe",
+        lambda: events.append("native-root-create") or False,
     )
+
+    def record_access_denied(scenario: str, operation: Callable[[], object]) -> None:
+        if scenario == "authority-root-arbitrary-create":
+            assert operation() is False
+
+    monkeypatch.setattr(module, "_expect_access_denied", record_access_denied)
 
     _run_trading_allow_deny_phase()
 
@@ -1537,7 +1726,12 @@ def test_trading_phase_validates_fixed_objects_before_capability_use(
         "journal",
         "sqlite-connect",
     ]
-    assert events[5:] == ["sqlite-open", "sqlite-close", "capture-artifact"]
+    assert events[5:] == [
+        "sqlite-open",
+        "sqlite-close",
+        "capture-artifact",
+        "native-root-create",
+    ]
 
 
 def test_phase_evidence_identifies_exact_phase() -> None:

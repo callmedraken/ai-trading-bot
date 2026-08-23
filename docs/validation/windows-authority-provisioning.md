@@ -229,11 +229,21 @@ $acceptanceBase = Join-Path $env:TEMP "ai-trading-bot-windows-authority-reparse-
 .venv\Scripts\python.exe -m pytest tests/acceptance/test_windows_authority_provisioning_acceptance.py -q --basetemp $acceptanceBase
 ```
 
-The phase creates the empty acceptance root, then creates and removes one fresh
-scenario directory at a time. Each candidate is opened directly with native
-`CreateFileW` and `FILE_FLAG_OPEN_REPARSE_POINT`, and the opened handle is passed
-to the reviewed `inspect_open_authority_object()` validator. The scenario set
-is:
+Before creating `Reparse`, the phase directly opens the existing exact
+`F:\AITradingBot\AuthorityAcceptance` parent with a no-follow native directory
+handle and validates that handle with the reviewed final-path, object-kind,
+reparse, local-`F:`, and NTFS checks. After `Reparse` is created, it is
+immediately reopened through the same no-follow native directory path and
+validated before any scenario directory, file, or link is created. Any native
+open or inspection failure, final-path mismatch, reparse, wrong type, wrong
+volume, or wrong filesystem is `BLOCKED`; neither object is repaired or
+silently removed.
+
+After both parent and root validation pass, the phase creates and removes one
+fresh scenario directory at a time. Each candidate is opened directly with
+native `CreateFileW` and `FILE_FLAG_OPEN_REPARSE_POINT`, and the opened handle
+is passed to the reviewed `inspect_open_authority_object()` validator. The
+scenario set is:
 
 - `symbolic-link-substitution`;
 - `directory-junction-reparse-substitution`;

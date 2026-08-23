@@ -98,6 +98,7 @@ ACCEPTANCE_SQLITE_VFS_TABLE = "windows_authority_acceptance_probe"
 ACCEPTANCE_SQLITE_VFS_PROBE_ID = 1
 ACCEPTANCE_SQLITE_VFS_MARKER = "milestone-a-rollback-probe"
 ACCEPTANCE_REPARSE_ROOT = Path(r"F:\AITradingBot\AuthorityAcceptance\Reparse")
+ACCEPTANCE_REPARSE_PARENT = Path(r"F:\AITradingBot\AuthorityAcceptance")
 
 
 class AcceptancePhase(StrEnum):
@@ -911,6 +912,8 @@ def _reject_production_acceptance_path(path: str | PureWindowsPath) -> None:
 
 def _require_acceptance_expected_path(path: str | PureWindowsPath) -> None:
     _reject_production_acceptance_path(path)
+    if PureWindowsPath(str(path)) == PureWindowsPath(str(ACCEPTANCE_REPARSE_PARENT)):
+        return
     if not _windows_path_is_under(path, ACCEPTANCE_REPARSE_ROOT):
         raise AcceptanceBlockedError(
             "reparse inspection expected path is outside the fixed acceptance root"
@@ -919,6 +922,8 @@ def _require_acceptance_expected_path(path: str | PureWindowsPath) -> None:
 
 def _require_acceptance_open_path(path: str | PureWindowsPath) -> None:
     _reject_production_acceptance_path(path)
+    if PureWindowsPath(str(path)) == PureWindowsPath(str(ACCEPTANCE_REPARSE_PARENT)):
+        return
     raw = str(path)
     folded = raw.casefold()
     if _windows_path_is_under(path, ACCEPTANCE_REPARSE_ROOT):
@@ -1305,17 +1310,46 @@ def _create_reparse_acceptance_root() -> Path:
             "remove only known acceptance objects before retrying",
             scenario_names=("stale-disposable-state",),
         )
-    if not root.parent.is_dir() or root.parent.is_symlink():
+    parent = Path(str(ACCEPTANCE_REPARSE_PARENT))
+    parent_target = _AcceptanceInspectionTarget(
+        parent, parent, AuthorityObjectKind.DIRECTORY, None
+    )
+    try:
+        _inspect_acceptance_target(parent_target)
+    except AcceptanceBlockedError as error:
         raise AcceptanceBlockedError(
-            "reparse acceptance parent is absent or is an unexpected reparse object",
+            "acceptance parent native open or inspection is blocked",
+            scenario_names=("acceptance-parent-validation-blocked",),
+        ) from error
+    except (WindowsAuthorityError, OSError) as error:
+        raise AcceptanceBlockedError(
+            "acceptance parent final-path, type, reparse, volume, or filesystem "
+            "validation is blocked",
             scenario_names=("acceptance-parent-prerequisite-blocked",),
-        )
+        ) from error
     try:
         root.mkdir()
     except OSError as error:
         raise AcceptanceBlockedError(
             "reparse acceptance root could not be created",
             scenario_names=("acceptance-root-creation-blocked",),
+        ) from error
+
+    root_target = _AcceptanceInspectionTarget(
+        root, root, AuthorityObjectKind.DIRECTORY, None
+    )
+    try:
+        _inspect_acceptance_target(root_target)
+    except AcceptanceBlockedError as error:
+        raise AcceptanceBlockedError(
+            "new acceptance root native open or inspection is blocked",
+            scenario_names=("acceptance-root-validation-blocked",),
+        ) from error
+    except (WindowsAuthorityError, OSError) as error:
+        raise AcceptanceBlockedError(
+            "new acceptance root final-path, type, reparse, volume, or "
+            "filesystem validation is blocked",
+            scenario_names=("acceptance-root-prerequisite-blocked",),
         ) from error
     return root
 
@@ -1338,6 +1372,10 @@ def test_reparse_acceptance_root_cannot_enter_production_path_contract() -> None
         require_fixed_authority_tree_path(ACCEPTANCE_REPARSE_ROOT)
     with pytest.raises(AuthorityPathError):
         open_authority_object(ACCEPTANCE_REPARSE_ROOT, AuthorityObjectKind.DIRECTORY)
+    with pytest.raises(AcceptanceBlockedError):
+        _require_acceptance_expected_path(PRODUCTION_AUTHORITY_PATHS.root)
+    with pytest.raises(AcceptanceBlockedError):
+        _require_acceptance_open_path(PRODUCTION_AUTHORITY_PATHS.root)
 
 
 def test_acceptance_native_open_uses_no_follow_reparse_flag(
@@ -1374,17 +1412,18 @@ def test_acceptance_native_open_uses_no_follow_reparse_flag(
         lambda name, use_last_error: FakeKernel32(),
         raising=False,
     )
-    target = Path(r"F:\AITradingBot\AuthorityAcceptance\Reparse\scenario\target.bin")
+    target = Path(r"F:\AITradingBot\AuthorityAcceptance\Reparse\scenario")
     monkeypatch.setattr(
         module,
         "open_authority_object",
         lambda *args, **kwargs: pytest.fail("production open helper was used"),
     )
 
-    with _open_acceptance_native_object(target, target, AuthorityObjectKind.FILE):
+    with _open_acceptance_native_object(target, target, AuthorityObjectKind.DIRECTORY):
         pass
 
     assert calls[0][5] & FILE_FLAG_OPEN_REPARSE_POINT
+    assert calls[0][5] & FILE_FLAG_BACKUP_SEMANTICS
     assert closed == [123]
 
 
@@ -1500,6 +1539,113 @@ def test_stale_reparse_acceptance_root_blocks_without_repair(
     with pytest.raises(AcceptanceBlockedError, match="already exists"):
         _create_reparse_acceptance_root()
     assert marker.read_text(encoding="utf-8") == "leave me"
+
+
+def test_reparse_acceptance_parent_reparse_blocks_before_root_creation(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "Reparse"
+    parent = root.parent
+    monkeypatch.setattr(sys.modules[__name__], "ACCEPTANCE_REPARSE_ROOT", root)
+    monkeypatch.setattr(sys.modules[__name__], "ACCEPTANCE_REPARSE_PARENT", parent)
+    inspected: list[Path] = []
+
+    def reject_parent(target: _AcceptanceInspectionTarget) -> object:
+        inspected.append(target.expected_path)
+        raise AuthorityObjectError("authority object is a reparse point")
+
+    monkeypatch.setattr(
+        sys.modules[__name__], "_inspect_acceptance_target", reject_parent
+    )
+
+    with pytest.raises(AcceptanceBlockedError, match="parent"):
+        _create_reparse_acceptance_root()
+    assert inspected == [parent]
+    assert not root.exists()
+
+
+def test_reparse_acceptance_parent_final_path_mismatch_blocks_before_mutation(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "Reparse"
+    monkeypatch.setattr(sys.modules[__name__], "ACCEPTANCE_REPARSE_ROOT", root)
+    monkeypatch.setattr(sys.modules[__name__], "ACCEPTANCE_REPARSE_PARENT", root.parent)
+
+    def reject_parent(target: _AcceptanceInspectionTarget) -> object:
+        raise AuthorityObjectError(
+            "authority handle final path is not the fixed target"
+        )
+
+    monkeypatch.setattr(
+        sys.modules[__name__], "_inspect_acceptance_target", reject_parent
+    )
+
+    with pytest.raises(AcceptanceBlockedError, match="parent"):
+        _create_reparse_acceptance_root()
+    assert not root.exists()
+
+
+def test_new_reparse_root_is_reopened_before_use(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "Reparse"
+    monkeypatch.setattr(sys.modules[__name__], "ACCEPTANCE_REPARSE_ROOT", root)
+    monkeypatch.setattr(sys.modules[__name__], "ACCEPTANCE_REPARSE_PARENT", root.parent)
+    inspected: list[Path] = []
+
+    def record_inspection(target: _AcceptanceInspectionTarget) -> object:
+        inspected.append(target.expected_path)
+        return object()
+
+    monkeypatch.setattr(
+        sys.modules[__name__], "_inspect_acceptance_target", record_inspection
+    )
+
+    created = _create_reparse_acceptance_root()
+    try:
+        assert created == root
+        assert inspected == [root.parent, root]
+    finally:
+        created.rmdir()
+
+
+@pytest.mark.parametrize(
+    "rejection",
+    (
+        "authority object is a reparse point",
+        "authority handle final path is not the fixed target",
+        "authority object type does not match the fixed layout",
+        "authority is not on the approved local NTFS volume",
+    ),
+)
+def test_new_reparse_root_rejection_blocks_before_scenarios(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    rejection: str,
+) -> None:
+    root = tmp_path / "Reparse"
+    monkeypatch.setattr(sys.modules[__name__], "ACCEPTANCE_REPARSE_ROOT", root)
+    monkeypatch.setattr(sys.modules[__name__], "ACCEPTANCE_REPARSE_PARENT", root.parent)
+    inspected: list[Path] = []
+
+    def reject_root(target: _AcceptanceInspectionTarget) -> object:
+        inspected.append(target.expected_path)
+        if target.expected_path == root:
+            raise AuthorityObjectError(rejection)
+        return object()
+
+    monkeypatch.setattr(
+        sys.modules[__name__], "_inspect_acceptance_target", reject_root
+    )
+
+    with pytest.raises(AcceptanceBlockedError, match="root"):
+        _create_reparse_acceptance_root()
+    assert inspected == [root.parent, root]
+    assert root.exists()
+    root.rmdir()
 
 
 def test_scenario_cleanup_is_limited_to_owned_objects(tmp_path: Path) -> None:

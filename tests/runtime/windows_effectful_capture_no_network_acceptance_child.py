@@ -11,17 +11,11 @@ import sys
 from ctypes import wintypes
 
 
-def _handle_is_valid(value: int) -> bool:
-    flags = wintypes.DWORD()
-    get_handle_information = ctypes.WinDLL(
-        "kernel32", use_last_error=True
-    ).GetHandleInformation
-    get_handle_information.argtypes = [
-        wintypes.HANDLE,
-        ctypes.POINTER(wintypes.DWORD),
-    ]
-    get_handle_information.restype = wintypes.BOOL
-    return bool(get_handle_information(wintypes.HANDLE(value), ctypes.byref(flags)))
+def _try_set_event(value: int) -> bool:
+    set_event = ctypes.WinDLL("kernel32", use_last_error=True).SetEvent
+    set_event.argtypes = [wintypes.HANDLE]
+    set_event.restype = wintypes.BOOL
+    return bool(set_event(wintypes.HANDLE(value)))
 
 
 def _read_all(handle: int) -> bytes:
@@ -64,12 +58,13 @@ def main() -> int:
         descendant_blocked = False
     else:
         descendant_blocked = False
+    sentinel_set_event_succeeded = _try_set_event(arguments.sentinel_handle)
     result = json.dumps(
         {
             "descendant_blocked": descendant_blocked,
             "environment": dict(sorted(os.environ.items(), key=lambda item: item[0])),
             "request": request.decode("ascii", "strict"),
-            "sentinel_absent": not _handle_is_valid(arguments.sentinel_handle),
+            "sentinel_set_event_succeeded": sentinel_set_event_succeeded,
         },
         sort_keys=True,
         separators=(",", ":"),

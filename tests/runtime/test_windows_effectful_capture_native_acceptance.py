@@ -3,6 +3,7 @@ from __future__ import annotations
 import ctypes
 import json
 import os
+from collections.abc import Mapping
 from ctypes import wintypes
 from pathlib import Path
 
@@ -23,6 +24,104 @@ from trading_bot.runtime.windows_effectful_capture_native import (
 )
 
 _ACCEPTANCE_ENV = "AI_TRADING_BOT_RUN_C3_E1_NATIVE_ACCEPTANCE"
+_WAIT_OBJECT_0 = 0x00000000
+_WAIT_TIMEOUT = 0x00000102
+
+
+def _assert_exact_environment(actual: object, expected: Mapping[str, str]) -> None:
+    assert type(actual) is dict
+    assert len(actual) == len(expected) == 5
+    normalized_actual: dict[str, str] = {}
+    for name, value in actual.items():
+        assert type(name) is str
+        assert type(value) is str
+        normalized_name = name.casefold()
+        assert normalized_name not in normalized_actual
+        normalized_actual[normalized_name] = value
+    normalized_expected = {name.casefold(): value for name, value in expected.items()}
+    assert normalized_actual == normalized_expected
+
+
+def _assert_sentinel_not_inherited(
+    *, parent_wait_result: int, child_set_event_succeeded: object
+) -> None:
+    assert type(child_set_event_succeeded) is bool
+    assert parent_wait_result in {_WAIT_OBJECT_0, _WAIT_TIMEOUT}
+    assert parent_wait_result == _WAIT_TIMEOUT
+
+
+def test_exact_environment_accepts_case_insensitive_names() -> None:
+    expected = {
+        "SystemRoot": r"C:\Windows",
+        "WINDIR": r"C:\Windows",
+        "TEMP": r"F:\AITradingBot\temp",
+        "TMP": r"F:\AITradingBot\temp",
+        "PYTHONUTF8": "1",
+    }
+
+    _assert_exact_environment(
+        {
+            "SYSTEMROOT": r"C:\Windows",
+            "windir": r"C:\Windows",
+            "Temp": r"F:\AITradingBot\temp",
+            "tmp": r"F:\AITradingBot\temp",
+            "pythonutf8": "1",
+        },
+        expected,
+    )
+
+
+@pytest.mark.parametrize(
+    "environment",
+    [
+        {
+            "SystemRoot": r"C:\Windows",
+            "WINDIR": r"C:\Windows",
+            "TEMP": r"F:\AITradingBot\temp",
+            "TMP": r"F:\AITradingBot\temp",
+        },
+        {
+            "SystemRoot": r"C:\Windows",
+            "WINDIR": r"C:\Windows",
+            "TEMP": r"F:\AITradingBot\temp",
+            "TMP": r"F:\AITradingBot\temp",
+            "PYTHONUTF8": "1",
+            "EXTRA": "rejected",
+        },
+    ],
+    ids=["missing", "additional"],
+)
+def test_exact_environment_rejects_missing_or_additional_entries(
+    environment: dict[str, str],
+) -> None:
+    expected = {
+        "SystemRoot": r"C:\Windows",
+        "WINDIR": r"C:\Windows",
+        "TEMP": r"F:\AITradingBot\temp",
+        "TMP": r"F:\AITradingBot\temp",
+        "PYTHONUTF8": "1",
+    }
+
+    with pytest.raises(AssertionError):
+        _assert_exact_environment(environment, expected)
+
+
+@pytest.mark.parametrize("child_set_event_succeeded", [False, True])
+def test_parent_nonsignaled_sentinel_proves_no_identity_inheritance(
+    child_set_event_succeeded: bool,
+) -> None:
+    _assert_sentinel_not_inherited(
+        parent_wait_result=_WAIT_TIMEOUT,
+        child_set_event_succeeded=child_set_event_succeeded,
+    )
+
+
+def test_parent_signaled_sentinel_fails_identity_acceptance() -> None:
+    with pytest.raises(AssertionError):
+        _assert_sentinel_not_inherited(
+            parent_wait_result=_WAIT_OBJECT_0,
+            child_set_event_succeeded=True,
+        )
 
 
 @pytest.mark.skipif(os.name != "nt", reason="requires real Windows Job Objects")
@@ -52,6 +151,11 @@ def test_opt_in_real_windows_no_network_process_topology() -> None:
         wintypes.LPCWSTR,
     ]
     create_event.restype = wintypes.HANDLE
+    wait_for_single_object = ctypes.WinDLL(
+        "kernel32", use_last_error=True
+    ).WaitForSingleObject
+    wait_for_single_object.argtypes = [wintypes.HANDLE, wintypes.DWORD]
+    wait_for_single_object.restype = wintypes.DWORD
     sentinel = int(create_event(None, True, False, None))
     assert sentinel > 0
     api.set_handle_inheritable(sentinel, True)
@@ -83,17 +187,37 @@ def test_opt_in_real_windows_no_network_process_topology() -> None:
         assert observation.process_outcome is C3ProcessOutcomeStatus.EXITED_ZERO
         assert observation.result_payload is not None
         result = json.loads(observation.result_payload)
-        assert result == {
-            "descendant_blocked": True,
-            "environment": {
+        assert type(result) is dict
+        assert set(result) == {
+            "descendant_blocked",
+            "environment",
+            "request",
+            "sentinel_set_event_succeeded",
+        }
+        assert result["descendant_blocked"] is True
+        assert result["request"] == "c3-e1-acceptance-request-v1"
+        _assert_exact_environment(
+            result["environment"],
+            {
                 "PYTHONUTF8": "1",
                 "SystemRoot": os.environ["SystemRoot"],
                 "TEMP": PRODUCTION_C3_CONTROLLED_TEMP_ROOT,
                 "TMP": PRODUCTION_C3_CONTROLLED_TEMP_ROOT,
                 "WINDIR": os.environ["WINDIR"],
             },
+        )
+        _assert_sentinel_not_inherited(
+            parent_wait_result=int(
+                wait_for_single_object(wintypes.HANDLE(sentinel), 0)
+            ),
+            child_set_event_succeeded=result["sentinel_set_event_succeeded"],
+        )
+        assert {
+            "descendant_blocked": result["descendant_blocked"],
+            "request": result["request"],
+        } == {
+            "descendant_blocked": True,
             "request": "c3-e1-acceptance-request-v1",
-            "sentinel_absent": True,
         }
         staging_handle, _identity, _path = child._retained_staging()
         assert api.read_artifact_file(staging_handle, 128) == (

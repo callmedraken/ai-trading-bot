@@ -34,9 +34,13 @@ real Alpaca provider effect path.
 C3 is **not yet certified complete**. The first real-provider E3 lineage reached
 one real provider effect but ended `FAILED / CONFIRMED` with child classification
 `TRANSPORT_FAILED`; no production snapshot was selected. A repeated identical CLI
-request was safely blocked before a new attempt or provider effect. E3.2 now
-retains only sanitized transport-stage diagnostics so future real acceptance
-failures can be classified without exposing raw transport details.
+request was safely blocked before a new attempt or provider effect. E3.2 introduced
+closed sanitized transport-stage diagnostics; C3-E3.3 has now been source-certified
+so known transport/protocol failures retain truthful sanitized stages while
+unexpected programming defects escape the transport boundary and are sanitized by
+the isolated child as `INTERNAL_FAILED`. The currently deployed fixed runtime
+predates E3.3 and must be rebuilt, inspected, and redeployed before the next real
+provider acceptance attempt.
 
 There is still no unattended production scheduler, brokerage live-order
 transport, or authorization to place real-money orders.
@@ -97,6 +101,22 @@ Completed/implemented C3 areas include:
 9. Manual one-shot `production_daily_snapshot_capture` operator boundary.
 10. E3.2 sanitized transport-stage classifications, including request,
     response-start, response-metadata, and response-body failure classes.
+11. E3.3 truthful transport-stage classification: expected transport/protocol
+    failures retain the closed sanitized stage, unexpected programming defects
+    remain internal failures, and sanitized non-200 HTTP status errors remain a
+    distinct HTTP-response path.
+
+C3-E3.3 source certification completed on commit
+`bf88890d87ed1734a4634e4b8069ff5232a20994` after implementation commits
+`7fdbd185b4cae1d8392bb7473f40ad69a4fb967d` and
+`bf88890d87ed1734a4634e4b8069ff5232a20994`:
+
+- complete repository suite: 3,094 passed, 16 skipped, 0 failed;
+- Ruff check: passed;
+- Ruff format check across Git-tracked Python sources: passed.
+
+This certifies the accepted source tree. It does **not** certify the older deployed
+fixed runtime, which still requires an E3.3 rebuild and sealed-runtime redeployment.
 
 The native ordering continues to preserve the core rule:
 
@@ -144,6 +164,11 @@ Do not manufacture a different digest for the consumed August 21 intent by
 changing an irrelevant request field. The next real provider attempt must use a
 genuinely new completed XNYS session.
 
+Before any new real-provider attempt, build a new fixed-runtime artifact from the
+accepted E3.3 source tree, inspect its contents/hash, redeploy it through the
+established sealed-runtime procedure, and complete a zero-provider runtime
+verification. The older deployed runtime must not be used for the next E3 effect.
+
 For the August 24, 2026 session, first run only the no-effect planning preflight
 after regular close plus the planned buffer. It must prove the authorized session
 is `2026-08-24`, emit `PROVIDER_CALL_PERFORMED=False`, and produce a request digest
@@ -151,36 +176,29 @@ distinct from the consumed August 21 digest:
 
 `823e9bee88de07bbd6d3384559dd6207ad216e69d46443594f8664fff49854a7`
 
-Only after that preflight is reviewed should exactly one new-session provider
-call be authorized. A failure must be handled from its sanitized E3.2 stage and
-durable disposition; the same consumed lineage must not be automatically retried.
+Only after the updated runtime is deployed and that preflight is reviewed should
+exactly one new-session provider call be authorized. A failure must be handled
+from its E3.3 sanitized stage or `INTERNAL_FAILED` distinction plus durable
+disposition; the same consumed lineage must not be automatically retried.
 
-## Immediate deep-review priorities
+## Immediate deep-review status
 
-The latest real Windows runs identified two architecture-level reviews worth doing
-before or alongside the next E3 acceptance attempt:
+The first Sol High recovery/crash review is complete. It found no unsafe automatic
+retry path, but identified two follow-up architecture concerns before unattended
+operation: operator diagnosis/recovery routing is too opaque, and some proven
+pre-effect/safe-continuation durable states are not directly resumable through the
+one-shot production facade. Any future diagnostic interface must remain read-only,
+durable-state-derived, sanitized, and incapable of granting retry authority.
 
-1. **C3 recovery and diagnostic authority.** Build an exception/crash matrix for
-   `_capture_prepared_once()` covering durable predecessor/successor, whether an
-   external effect may have occurred, operator visibility, permitted recovery,
-   and retry permission. The current CLI is intentionally fail-closed but too
-   opaque for efficient diagnosis; any future diagnostic interface must be
-   read-only, durable-state-derived, sanitized, and incapable of granting retry
-   authority.
-2. **Crash-window / ambiguity analysis.** Prove every death window across process
-   intent, process creation, receipt persistence, request delivery, resume intent,
-   `ResumeThread`, result observation, cleanup, terminal write, and selection lands
-   in a conservative `NOT_STARTED`, `CONFIRMED`, or `MAY_HAVE_OCCURRED` outcome
-   without creating an unsafe automatic retry.
+The Alpaca HTTP interoperability/security review is also complete for the E3.3
+checkpoint. It found that E3.2's broad stage-local `except Exception` blocks could
+misclassify programming defects as network-stage failures. E3.3 corrected that
+without weakening one-shot/no-retry behavior.
 
-These are **Sol High, review-only first** tasks. If a real gap is found, freeze a
-small architecture checkpoint before implementation.
-
-Secondary reviews before unattended operation include Alpaca HTTP
-interoperability/security policy, production `close()` and concurrent admission,
-secret/transport-object lifetime, artifact publication TOCTOU, SQL invariant
-mutation testing, clock/calendar authority, and the selected-snapshot to
-paper-operation bridge.
+Remaining secondary reviews before unattended operation include production
+`close()` and concurrent admission/drain behavior, secret/transport-object
+lifetime, artifact publication TOCTOU, SQL invariant mutation testing,
+clock/calendar authority, and the selected-snapshot to paper-operation bridge.
 
 ## Roadmap after C3
 

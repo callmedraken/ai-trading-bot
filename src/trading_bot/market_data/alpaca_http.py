@@ -205,7 +205,7 @@ class StdlibAlpacaHistoricalBarsTransport:
                 headers["APCA-API-KEY-ID"] = api_key_id
                 headers["APCA-API-SECRET-KEY"] = api_secret_key
                 connection.request("GET", request.target, body=None, headers=headers)
-            except Exception:
+            except (AlpacaTransportError, OSError, http.client.HTTPException):
                 request_failed = True
             if request_failed:
                 raise AlpacaTransportError(AlpacaTransportFailureStage.REQUEST)
@@ -218,7 +218,7 @@ class StdlibAlpacaHistoricalBarsTransport:
                 status = response.status
                 if type(status) is not int or not 100 <= status <= 599:
                     raise AlpacaTransportError
-            except Exception:
+            except (AlpacaTransportError, OSError, http.client.HTTPException):
                 response_start_failed = True
             if response_start_failed or response is None or status is None:
                 raise AlpacaTransportError(AlpacaTransportFailureStage.RESPONSE_START)
@@ -231,7 +231,7 @@ class StdlibAlpacaHistoricalBarsTransport:
                     raw_headers,
                     require_success_fields=status == 200,
                 )
-            except Exception:
+            except (AlpacaTransportError, OSError, http.client.HTTPException):
                 response_metadata_failed = True
             if response_metadata_failed or metadata is None:
                 raise AlpacaTransportError(
@@ -247,7 +247,7 @@ class StdlibAlpacaHistoricalBarsTransport:
                 declared_length = metadata["content_length"]
                 if declared_length is not None and declared_length != body_length:
                     raise AlpacaTransportError
-            except Exception:
+            except (AlpacaTransportError, OSError, http.client.HTTPException):
                 response_body_failed = True
             if (
                 response_body_failed
@@ -285,7 +285,7 @@ class StdlibAlpacaHistoricalBarsTransport:
             if connection is not None:
                 try:
                     connection.close()
-                except Exception:
+                except (OSError, http.client.HTTPException):
                     pass
 
 
@@ -353,7 +353,10 @@ def _validated_response_headers(
     if content_length_text is not None:
         if not content_length_text.isascii() or not content_length_text.isdecimal():
             raise AlpacaTransportError("Alpaca Content-Length is invalid")
-        content_length = int(content_length_text)
+        try:
+            content_length = int(content_length_text)
+        except ValueError:
+            raise AlpacaTransportError("Alpaca Content-Length is invalid") from None
         if content_length > MAX_ALPACA_RESPONSE_BYTES:
             raise AlpacaTransportError("Alpaca response exceeds the 4 MiB limit")
 

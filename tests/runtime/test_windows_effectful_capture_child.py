@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import ssl
 from datetime import UTC, date, datetime
 
 import pytest
@@ -14,6 +15,7 @@ from trading_bot.market_data import (
     AlpacaTransportError,
     AlpacaTransportFailureStage,
     DailySnapshotSerializationError,
+    StdlibAlpacaHistoricalBarsTransport,
     verify_daily_snapshot,
 )
 from trading_bot.runtime.windows_effectful_capture import (
@@ -391,6 +393,42 @@ def test_transport_failure_stage_maps_without_fabricated_http_evidence(
     assert _SECRET.encode() not in serialize_isolated_capture_child_result(result)
 
 
+def test_unexpected_transport_internal_defect_becomes_internal_failed() -> None:
+    class ProgrammingDefectConnection:
+        def __init__(self) -> None:
+            self.requests = 0
+            self.closed = False
+
+        def request(self, *args, **kwargs) -> None:
+            self.requests += 1
+            raise RuntimeError(f"unexpected transport internal defect {_SECRET}")
+
+        def getresponse(self):
+            raise AssertionError("response acquisition must not be reached")
+
+        def close(self) -> None:
+            self.closed = True
+
+    connection = ProgrammingDefectConnection()
+    transport = StdlibAlpacaHistoricalBarsTransport(
+        connection_factory=lambda *args, **kwargs: connection,
+        tls_context_factory=ssl.create_default_context,
+    )
+    attempt, _api, _transport, writer = _attempt(transport=transport)
+
+    result = attempt.run()
+
+    assert result.classification is ChildResultClassification.INTERNAL_FAILED
+    assert result.fence_state is ProviderAttemptFenceState.ENTERED
+    assert result.cleanup_status is ChildCleanupStatus.COMPLETE
+    assert connection.requests == 1
+    assert connection.closed
+    assert writer.payloads == []
+    serialized = serialize_isolated_capture_child_result(result)
+    assert _SECRET.encode() not in serialized
+    assert b"unexpected transport internal defect" not in serialized
+
+
 def test_http_failure_retains_only_sanitized_response_evidence() -> None:
     transport = FakeTransport(
         error=AlpacaHttpStatusError(
@@ -409,6 +447,10 @@ def test_http_failure_retains_only_sanitized_response_evidence() -> None:
     assert result.provider_request_id == "request-429"
     assert transport.calls == 1
     assert writer.payloads == []
+    serialized = serialize_isolated_capture_child_result(result)
+    assert b"request-429" in serialized
+    assert b"42910000" not in serialized
+    assert _SECRET.encode() not in serialized
 
 
 def test_http_200_malformed_provider_entity_is_provider_response_invalid() -> None:

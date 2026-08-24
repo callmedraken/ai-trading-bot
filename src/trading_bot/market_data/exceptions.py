@@ -137,7 +137,7 @@ class AlpacaTransportError(AlpacaDailySnapshotError):
         super().__init__(f"Alpaca HTTPS transport failed at stage {stage.value}")
 
 
-class AlpacaHttpStatusError(AlpacaTransportError):
+class AlpacaHttpStatusError(AlpacaDailySnapshotError):
     """Raised for a sanitized non-200 Alpaca response."""
 
     def __init__(
@@ -155,9 +155,7 @@ class AlpacaHttpStatusError(AlpacaTransportError):
             message += f" and provider code {provider_code}"
         if request_id is not None:
             message += f" (request ID {request_id})"
-        # This remains a distinct sanitized HTTP-response path. It deliberately
-        # does not acquire an AlpacaTransportFailureStage from its base class.
-        AlpacaDailySnapshotError.__init__(self, message)
+        super().__init__(message)
 
 
 class AlpacaResponseError(AlpacaDailySnapshotError, ValueError):

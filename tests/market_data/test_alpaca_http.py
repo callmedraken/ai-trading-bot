@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import http.client
 import socket
 import ssl
 
@@ -8,6 +9,7 @@ import pytest
 
 from trading_bot.market_data import (
     MAX_ALPACA_RESPONSE_BYTES,
+    AlpacaDailySnapshotError,
     AlpacaHistoricalBarsRequest,
     AlpacaHttpStatusError,
     AlpacaTransportError,
@@ -70,9 +72,11 @@ class FakeConnection:
         response: FakeResponse | Exception,
         *,
         request_error: Exception | None = None,
+        close_error: Exception | None = None,
     ) -> None:
         self.response = response
         self.request_error = request_error
+        self.close_error = close_error
         self.requests = []
         self.closed = False
 
@@ -88,6 +92,8 @@ class FakeConnection:
 
     def close(self):
         self.closed = True
+        if self.close_error is not None:
+            raise self.close_error
 
 
 def _request() -> AlpacaHistoricalBarsRequest:
@@ -136,6 +142,21 @@ def test_transport_failure_stages_are_closed_and_retain_no_caller_text() -> None
     assert legacy.stage is AlpacaTransportFailureStage.UNKNOWN
     assert SECRET not in str(legacy)
     assert SECRET not in repr(legacy)
+
+
+def test_http_status_error_is_distinct_from_transport_stage_failures() -> None:
+    error = AlpacaHttpStatusError(
+        429,
+        request_id="safe-request-id",
+        provider_code=42910000,
+    )
+
+    assert isinstance(error, AlpacaDailySnapshotError)
+    assert not isinstance(error, AlpacaTransportError)
+    assert error.status == 429
+    assert error.request_id == "safe-request-id"
+    assert error.provider_code == 42910000
+    assert not hasattr(error, "stage")
 
 
 def test_transport_uses_fake_connection_once_and_streams_evidence(
@@ -211,10 +232,20 @@ def test_403_is_sanitized_and_never_retried_or_fallen_back() -> None:
     assert SECRET not in repr(caught.value)
 
 
-def test_request_write_failure_is_classified_and_attempted_once() -> None:
+@pytest.mark.parametrize(
+    "error",
+    [
+        OSError(f"request write leaked {SECRET}"),
+        ssl.SSLError(f"request TLS leaked {SECRET}"),
+        http.client.CannotSendRequest(f"request state leaked {SECRET}"),
+    ],
+)
+def test_request_write_failure_is_classified_and_attempted_once(
+    error: Exception,
+) -> None:
     connection = FakeConnection(
         FakeResponse(b"{}"),
-        request_error=OSError(f"request write leaked {SECRET}"),
+        request_error=error,
     )
     transport, factory_calls = _transport(connection)
 
@@ -229,12 +260,35 @@ def test_request_write_failure_is_classified_and_attempted_once() -> None:
     assert SECRET not in repr(caught.value)
 
 
+def test_connection_factory_failure_is_request_stage_and_attempted_once() -> None:
+    factory_calls = 0
+
+    def fail_connect(*args, **kwargs):
+        nonlocal factory_calls
+        factory_calls += 1
+        raise OSError(f"connect leaked {SECRET}")
+
+    transport = StdlibAlpacaHistoricalBarsTransport(
+        connection_factory=fail_connect,
+        tls_context_factory=ssl.create_default_context,
+    )
+
+    with pytest.raises(AlpacaTransportError) as caught:
+        transport.execute(_request(), api_key_id=KEY, api_secret_key=SECRET)
+
+    assert caught.value.stage is AlpacaTransportFailureStage.REQUEST
+    assert caught.value.__context__ is None
+    assert factory_calls == 1
+    assert SECRET not in repr(caught.value)
+
+
 @pytest.mark.parametrize(
     "error",
     [
         TimeoutError("timeout leaked transport-test-secret"),
         ssl.SSLError("tls leaked transport-test-secret"),
         OSError("socket leaked transport-test-secret"),
+        http.client.BadStatusLine("status line leaked transport-test-secret"),
     ],
 )
 def test_lower_transport_failures_are_sanitized(error: Exception) -> None:
@@ -252,6 +306,17 @@ def test_lower_transport_failures_are_sanitized(error: Exception) -> None:
     assert caught.value.__context__ is None
     assert SECRET not in str(caught.value)
     assert SECRET not in repr(caught.value)
+
+
+def test_invalid_response_status_is_response_start() -> None:
+    connection = FakeConnection(FakeResponse(b"{}", status=99))
+    transport, _ = _transport(connection)
+
+    with pytest.raises(AlpacaTransportError) as caught:
+        transport.execute(_request(), api_key_id=KEY, api_secret_key=SECRET)
+
+    assert caught.value.stage is AlpacaTransportFailureStage.RESPONSE_START
+    assert caught.value.__context__ is None
 
 
 def test_tls_factory_failure_is_sanitized() -> None:
@@ -299,6 +364,11 @@ def test_tls_factory_failure_is_sanitized() -> None:
             ("Transfer-Encoding", "chunked"),
             ("X-Request-ID", "request-1"),
         ),
+        (
+            ("Content-Type", "application/json"),
+            ("Content-Length", "9" * 5000),
+            ("X-Request-ID", "request-1"),
+        ),
     ],
 )
 def test_security_relevant_response_headers_fail_closed(headers) -> None:
@@ -330,8 +400,17 @@ def test_response_header_acquisition_failure_is_response_metadata() -> None:
     assert SECRET not in repr(caught.value)
 
 
-def test_bounded_response_body_read_failure_is_response_body() -> None:
-    response = FakeResponse(b"{}", read_error=OSError(f"body read leaked {SECRET}"))
+@pytest.mark.parametrize(
+    "error",
+    [
+        OSError(f"body read leaked {SECRET}"),
+        http.client.IncompleteRead(SECRET.encode(), 1024),
+    ],
+)
+def test_bounded_response_body_read_failure_is_response_body(
+    error: Exception,
+) -> None:
+    response = FakeResponse(b"{}", read_error=error)
     transport, _ = _transport(FakeConnection(response))
 
     with pytest.raises(AlpacaTransportError) as caught:
@@ -382,6 +461,60 @@ def test_response_body_limit_is_enforced_during_chunked_read() -> None:
 
     assert caught.value.stage is AlpacaTransportFailureStage.RESPONSE_BODY
     assert caught.value.__context__ is None
+
+
+@pytest.mark.parametrize(
+    "defect_type",
+    [
+        AttributeError,
+        KeyError,
+        TypeError,
+        AssertionError,
+        RuntimeError,
+    ],
+)
+@pytest.mark.parametrize("stage", ["request", "response_start", "metadata", "body"])
+def test_unexpected_programming_defects_escape_transport_boundary(
+    stage: str,
+    defect_type: type[Exception],
+) -> None:
+    error = defect_type(f"unexpected programming defect {SECRET}")
+    if stage == "request":
+        connection = FakeConnection(FakeResponse(b"{}"), request_error=error)
+    elif stage == "response_start":
+        connection = FakeConnection(error)
+    elif stage == "metadata":
+        connection = FakeConnection(FakeResponse(b"{}", headers_error=error))
+    else:
+        connection = FakeConnection(FakeResponse(b"{}", read_error=error))
+    transport, _ = _transport(connection)
+
+    with pytest.raises(defect_type) as caught:
+        transport.execute(_request(), api_key_id=KEY, api_secret_key=SECRET)
+
+    assert caught.value is error
+    assert not isinstance(caught.value, AlpacaTransportError)
+    assert len(connection.requests) <= 1
+
+
+def test_unexpected_close_programming_defect_escapes_transport_boundary() -> None:
+    error = RuntimeError(f"unexpected close defect {SECRET}")
+    connection = FakeConnection(
+        FakeResponse(b"{}"),
+        close_error=error,
+    )
+    transport, _ = _transport(connection)
+
+    with pytest.raises(RuntimeError) as caught:
+        transport.execute(
+            _request(),
+            api_key_id=KEY,
+            api_secret_key=SECRET,
+        )
+
+    assert caught.value is error
+    assert not isinstance(caught.value, AlpacaTransportError)
+    assert len(connection.requests) == 1
 
 
 def test_public_request_rejects_authentication_headers() -> None:

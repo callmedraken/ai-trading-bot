@@ -208,10 +208,17 @@ initial product constraints remain:
 
 ## Documentation workflow
 
-At each major milestone boundary:
+Documentation closeout is part of **every completed and accepted development checkpoint**, not only major milestone boundaries. It should happen automatically before the checkpoint is treated as closed or work moves to the next checkpoint.
 
-1. Update this document's current/completed milestone status.
-2. Keep detailed architecture documents as historical and subsystem records rather than rewriting prior decisions to look current.
-3. Update the README only when the public project description or broad product status changes.
-4. Keep `AGENTS.md` focused on stable development, safety, architecture, testing, and AI-workflow rules.
-5. Start implementation tasks by reading `AGENTS.md`, this status document, and the architecture documents directly relevant to the milestone.
+At each checkpoint closeout:
+
+1. Update this document's current/completed checkpoint or milestone status and roadmap where the checkpoint materially changes them.
+2. Update the project's handoff document with the completed checkpoint, material architecture/workflow changes, verification or certification evidence, active branch/HEAD when known, and the next recommended checkpoint.
+3. Review both documents even for small checkpoints. If one requires no wording change, explicitly record in the checkpoint report that it was reviewed and remains current.
+4. Treat these documentation updates/reviews as a checkpoint completion gate: the checkpoint is not fully closed until both documents have been brought current or explicitly confirmed current.
+5. Keep detailed architecture documents as historical and subsystem records rather than rewriting prior decisions to look current.
+6. Update the README only when the public project description or broad product status changes.
+7. Keep `AGENTS.md` focused on stable development, safety, architecture, testing, and AI-workflow rules.
+8. Start implementation tasks by reading `AGENTS.md`, this status document, the handoff document, and the architecture documents directly relevant to the milestone.
+
+The standing checkpoint workflow authorizes narrowly scoped documentation edits/commits needed to keep this file and the handoff current at checkpoint closeout. It does not authorize merging, rebasing, force-pushing, amending unrelated commits, resolving review threads, changing PR metadata, or modifying unrelated files.

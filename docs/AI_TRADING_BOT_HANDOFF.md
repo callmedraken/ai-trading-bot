@@ -5,7 +5,7 @@
 **Local repository:** `F:\AI\ai-trading-bot`  
 **Integration branch:** `develop`  
 **Current architecture branch:** `feature/windows-effectful-market-data-capture`  
-**Handoff status:** August 23, 2026 — updated through C3 E3.2 real-provider acceptance diagnostics
+**Handoff status:** August 24, 2026 — updated through C3-E3.3 source certification; fixed-runtime rebuild/redeployment pending
 
 > **Source-of-truth rule:** the Git-tracked `docs/AI_TRADING_BOT_HANDOFF.md` is the authoritative handoff. Any copy uploaded to the ChatGPT Trading Bot Project is a context mirror for easier cross-chat continuity. When the two differ, use the Git version and refresh the Project mirror from it.
 
@@ -353,6 +353,43 @@ HTTP_FAILED
 
 This diagnostic refinement does **not** weaken the one-shot rule or permit retry of a consumed provider attempt.
 
+### C3-E3.3 — Truthful sanitized transport-stage classification — source-certified
+
+A Sol High review of the E3.2 transport boundary found that broad stage-local
+`except Exception` handling could incorrectly label programming defects as genuine
+network/transport-stage failures. E3.3 narrows those boundaries so known
+transport/protocol failures retain their existing sanitized stage, while
+unexpected programming defects escape the transport layer and are converted by the
+isolated child to sanitized `INTERNAL_FAILED` evidence.
+
+E3.3 also makes `AlpacaHttpStatusError` a sibling of `AlpacaTransportError` under
+`AlpacaDailySnapshotError`; the C3 child continues to map sanitized non-200
+responses to `HTTP_FAILED`, and the standalone daily-snapshot CLI explicitly
+preserves its Architecture-57 exit-code-5 HTTP handling.
+
+Accepted implementation commits:
+
+```text
+7fdbd185b4cae1d8392bb7473f40ad69a4fb967d
+fix: preserve truthful Alpaca transport stages
+
+bf88890d87ed1734a4634e4b8069ff5232a20994
+fix: preserve Alpaca HTTP CLI handling
+```
+
+Full local source certification at `bf88890d87ed1734a4634e4b8069ff5232a20994`:
+
+```text
+pytest: 3094 passed, 16 skipped, 0 failed
+Ruff check: passed
+Ruff format --check over Git-tracked Python files: passed
+```
+
+The currently deployed fixed runtime predates E3.3. Source certification does not
+authorize using that older runtime for the next real-provider acceptance; a new
+fixed-runtime artifact must first be built, inspected, and redeployed through the
+established sealed-runtime procedure.
+
 ---
 
 # 6. Current Acceptance Checkpoint — C3 E3 Real-Provider Acceptance
@@ -407,7 +444,14 @@ target-session-date:   2026-08-25
 authorized snapshot:   2026-08-24
 ```
 
-After regular NYSE close plus a small operational buffer, first run **only the pure planning preflight**. It must establish:
+Before any new provider effect, the accepted E3.3 source must be converted into a
+new fixed-runtime artifact, the wheel must be inspected and hash/length recorded,
+the runtime must be redeployed through the established sealed-runtime procedure,
+and a zero-provider runtime verification must pass. The older deployed runtime is
+not eligible for the next E3 attempt.
+
+After regular NYSE close plus a small operational buffer, run **only the pure
+planning preflight** against the updated runtime. It must establish:
 
 ```text
 AUTHORIZED_SESSION_DATE=2026-08-24
@@ -419,7 +463,9 @@ and produce a new `C2_REQUEST_SHA256` distinct from the consumed August 21 diges
 
 Only after that preflight is reviewed should exactly **one** real provider request be authorized for the new session.
 
-If it fails, record the E3.2 sanitized transport stage and durable disposition. Do not retry a consumed `CONFIRMED` or `MAY_HAVE_OCCURRED` lineage.
+If it fails, record the truthful E3.3 sanitized transport stage or
+`INTERNAL_FAILED` distinction plus durable disposition. Do not retry a consumed
+`CONFIRMED` or `MAY_HAVE_OCCURRED` lineage.
 
 ---
 
@@ -441,18 +487,27 @@ validated production authority
 
 C3 still does **not** authorize unattended scheduling, brokerage execution, or live trading.
 
-## Highest-value review work while E3 waits on a fresh market session
+## Completed deep-review findings
 
-The latest real Windows runs exposed review areas worth addressing before unattended operation. Highest priority:
+The first Sol High recovery/crash-window review found no unsafe automatic retry
+path. It identified two follow-up architecture concerns before unattended
+operation:
 
-1. **C3 recovery and diagnostic authority.** Audit every exception/crash point in `_capture_prepared_once()` and map durable predecessor, external-effect possibility, durable successor, operator visibility, permitted recovery, and retry permission. The current production CLI is safe but intentionally opaque; a future read-only diagnostic/classification interface may be useful if it is derived from durable state and cannot become retry authority.
-2. **Crash-window / ambiguity analysis.** Build a formal matrix across process intent, `CreateProcessW`, process receipt, request delivery, resume intent, `ResumeThread`, child result, cleanup, terminal write, and selection. Prove each death window lands conservatively in `NOT_STARTED`, `CONFIRMED`, or `MAY_HAVE_OCCURRED` with no unsafe retry.
+1. **Operator diagnosis/recovery routing is too opaque.** The production CLI fails
+   closed but collapses many safe recovery states into a generic block; a future
+   diagnostic/classification interface should be read-only, derived from durable
+   C2/C3 state, sanitized, and incapable of granting retry authority.
+2. **Some proven pre-effect/safe-continuation states are not directly resumable
+   through the one-shot facade.** Any continuation design must distinguish exact
+   proven-safe durable reuse from a retry of a consumed `CONFIRMED` lineage.
 
-Use **Sol High, review-only first** for these. If a real gap is found, freeze a small architecture checkpoint before implementation.
+The Alpaca HTTP interoperability/security review found the E3.2 broad-catch
+classification issue. C3-E3.3 corrected that without changing C1/C2 durable
+authority semantics, retry policy, production SQL, endpoint/feed policy, or the
+one-shot provider limit.
 
-Additional deep reviews before unattended operation:
+Additional deep reviews before unattended operation remain:
 
-- Alpaca HTTP interoperability/security policy;
 - production `close()` and concurrent admission/drain behavior;
 - secret lifetime from Credential Manager through transport construction/use/cleanup;
 - artifact verification/publication TOCTOU;
@@ -908,26 +963,23 @@ Current development branch:
 feature/windows-effectful-market-data-capture
 ```
 
-The branch has advanced well beyond the old C3-B2 handoff point `581711698c5527885cc6e1945efa1ab219674b97`. Important recent repository checkpoints include native production composition/acceptance work, the manual production capture boundary, and E3.2 sanitized transport diagnostics.
+The branch has advanced well beyond the old C3-B2 handoff point `581711698c5527885cc6e1945efa1ab219674b97`. Important recent repository checkpoints include native production composition/acceptance work, the manual production capture boundary, E3.2 sanitized transport diagnostics, and the accepted E3.3 truthful-classification correction.
 
-Latest implementation checkpoint before the documentation-only closeout commit:
-
-```text
-bd1bb79a77d280813e8b307e3a735d1382ace3c8
-fix: add sanitized Alpaca transport diagnostics
-```
-
-Recent documentation checkpoints include:
+Latest accepted implementation checkpoint before documentation closeout:
 
 ```text
-4552950ad992ab3ce373b2e06ec098449693ffb8
-docs: require checkpoint handoff updates
-
-35921f0bddfe2670e4d721305de4f2e68a08c12a
-docs: refresh status for C3 E3 acceptance
+bf88890d87ed1734a4634e4b8069ff5232a20994
+fix: preserve Alpaca HTTP CLI handling
 ```
 
-The handoff is now Git-tracked at `docs/AI_TRADING_BOT_HANDOFF.md`. Because every documentation closeout creates new commits, **do not treat a SHA written inside this document as the live branch HEAD**. Verify the current local/remote branch HEAD when resuming, while using the latest implementation checkpoint and current document contents to establish substantive state.
+Companion E3.3 implementation commit:
+
+```text
+7fdbd185b4cae1d8392bb7473f40ad69a4fb967d
+fix: preserve truthful Alpaca transport stages
+```
+
+The handoff is Git-tracked at `docs/AI_TRADING_BOT_HANDOFF.md`. Because every documentation closeout creates new commits, **do not treat a SHA written inside this document as the live branch HEAD**. Verify the current local/remote branch HEAD when resuming, while using the latest implementation checkpoint and current document contents to establish substantive state.
 
 ### Current operational state
 
@@ -935,9 +987,12 @@ The handoff is now Git-tracked at `docs/AI_TRADING_BOT_HANDOFF.md`. Because ever
 - A manual one-shot production capture command exists.
 - One real Alpaca provider effect occurred on the August 21 E3 lineage and ended `FAILED / CONFIRMED`, child classification `TRANSPORT_FAILED`.
 - Repeating the identical deterministic request was safely blocked before a new attempt/effect.
-- E3.2 stage-specific sanitized transport diagnostics are now implemented.
+- E3.2 stage-specific sanitized transport diagnostics are implemented.
+- C3-E3.3 truthful transport-stage classification is source-certified at `bf88890d87ed1734a4634e4b8069ff5232a20994`: 3,094 passed, 16 skipped; Ruff check and tracked-source format check passed.
+- The currently deployed fixed runtime predates E3.3 and must be rebuilt/inspected/redeployed before another real provider effect.
 - No verified production market-data snapshot has yet been selected from E3.
-- The next legitimate real-provider attempt must use the next genuinely completed XNYS session, beginning with a no-effect planning preflight.
+- Actual real-provider call count remains exactly 1.
+- The next legitimate real-provider attempt must use the next genuinely completed XNYS session, beginning only after updated-runtime deployment and a no-effect planning preflight.
 - Production/live trading remains **NO-GO**.
 
 Relevant architecture/status material to read when resuming:
@@ -958,32 +1013,37 @@ Also review the latest validation evidence and recent E3 diagnostic results befo
 
 # 21. Recommended Next Development Sequence
 
-The previous `C3-C1 → C3-C2 → C3-C3` implementation sequence is historical; those native-process concerns have already been integrated into the current branch. Resume from the **E3 acceptance state**, not from B2.
+The previous `C3-C1 → C3-C2 → C3-C3` implementation sequence is historical; those native-process concerns have already been integrated into the current branch. Resume from the **E3.3-certified source / stale deployed runtime** state, not from B2 or E3.2.
 
 Recommended sequence:
 
 ```text
-NOW / while waiting on a fresh completed session
-Sol High review-only:
-C3 recovery + diagnostic-authority matrix
-plus crash-window / ambiguity matrix
+NOW
+build a new fixed-runtime wheel from the accepted E3.3 source checkpoint
 
-→ after August 24 XNYS close + buffer
-pure E3 new-session planning preflight
+→ inspect exact wheel contents + source commit + SHA-256 + byte length
+
+→ redeploy through the established sealed-runtime procedure
 (no provider effect)
 
-→ confirm authorized session + fresh request digest
+→ zero-provider updated-runtime verification
 
-→ exactly one real E3 provider call
+→ August 24 new-session pure planning preflight
+(no provider effect)
+
+→ confirm AUTHORIZED_SESSION_DATE=2026-08-24
++ fresh C2 request digest distinct from the consumed August 21 digest
+
+→ only after review, exactly one real E3 provider call
 
 → if successful
 parent verification / publication / selection evidence
-C3 native acceptance closeout
+remaining C3 acceptance closeout
 C3 final certification
 checkpoint documentation closeout
 
 → if failed
-record exact sanitized E3.2 stage + durable disposition
+record exact truthful E3.3 stage or INTERNAL_FAILED + durable disposition
 do not retry a consumed CONFIRMED/MAY_HAVE_OCCURRED lineage
 diagnose/fix only the proven failure class
 run focused regression verification
@@ -993,7 +1053,13 @@ use a genuinely new eligible session for any later real effect
 selected verified snapshot → reliable manual paper-cycle bridge
 ```
 
-The first architectural review after successful C3 acceptance should be the **selected-snapshot → paper-operation bridge**, including exactly-once paper-cycle identity and restart behavior. Unattended scheduling remains later and should not be introduced until manual production-style paper operation and its recovery semantics are trustworthy.
+Before unattended operation, continue the remaining deep reviews for production
+close/admission, secret lifetime, artifact TOCTOU, SQL invariant mutation tests,
+and clock/calendar authority. The first product-level architecture review after
+successful C3 acceptance should be the **selected-snapshot → paper-operation
+bridge**, including exactly-once paper-cycle identity and restart behavior.
+Unattended scheduling remains later and should not be introduced until manual
+production-style paper operation and its recovery semantics are trustworthy.
 
 Any change involving native Windows process authority, credential lifetime, external-effect ordering, crash/recovery ambiguity, publication/selection authority, or retry semantics should continue to receive **Sol High** architecture review. Localized changes under an already-frozen contract may be delegated according to the standing Luna/Sol model-selection rules.
 

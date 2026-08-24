@@ -21,6 +21,7 @@ from trading_bot.cli.exceptions import (
 )
 from trading_bot.market_data import (
     AlpacaHttpResponse,
+    AlpacaHttpStatusError,
     AlpacaTransportError,
 )
 
@@ -499,3 +500,46 @@ def test_cli_provider_failure_is_sanitized(
     assert "stage UNKNOWN" in captured.err
     assert KEY not in captured.out + captured.err
     assert SECRET not in captured.out + captured.err
+
+
+def test_cli_http_failure_preserves_sanitized_exit_contract(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config = _write_config(tmp_path / "capture.json")
+    destination = tmp_path / "snapshots"
+    destination.mkdir()
+    provider_body = f"rate-limit response body containing {SECRET}"
+
+    def fail_capture(**kwargs):
+        raise AlpacaHttpStatusError(
+            429,
+            request_id="request-429",
+            provider_code=42910000,
+        )
+
+    monkeypatch.setattr(
+        "trading_bot.cli.daily_snapshot_capture.capture_daily_snapshot_artifact",
+        fail_capture,
+    )
+    exit_code = main(
+        [
+            "--config",
+            str(config),
+            "--destination-directory",
+            str(destination),
+        ]
+    )
+    captured = capsys.readouterr()
+    evidence = captured.out + captured.err
+
+    assert exit_code == 5
+    assert captured.out == ""
+    assert "Traceback" not in evidence
+    assert "HTTP status 429" in captured.err
+    assert "request ID request-429" in captured.err
+    assert "provider code 42910000" in captured.err
+    assert provider_body not in evidence
+    assert KEY not in evidence
+    assert SECRET not in evidence

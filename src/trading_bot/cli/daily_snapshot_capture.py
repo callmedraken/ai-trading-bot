@@ -51,6 +51,7 @@ from trading_bot.market_data.alpaca_http import (
 from trading_bot.market_data.daily_snapshot_provider import capture_daily_snapshot
 from trading_bot.market_data.exceptions import (
     AlpacaCredentialError,
+    AlpacaHttpStatusError,
     AlpacaResponseError,
     AlpacaTransportError,
 )
@@ -151,6 +152,7 @@ def main(argv: list[str] | None = None) -> int:
         return 4
     except (
         AlpacaCredentialError,
+        AlpacaHttpStatusError,
         AlpacaTransportError,
     ) as error:
         print(f"error: {error}", file=sys.stderr)

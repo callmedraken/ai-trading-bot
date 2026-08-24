@@ -1,8 +1,13 @@
 # Project Status and Roadmap
 
 This document is the canonical high-level status/roadmap for AI Trading Bot.
+The canonical cross-chat/development handoff is `docs/AI_TRADING_BOT_HANDOFF.md`.
 Detailed architecture documents remain authoritative for their individual
 subsystems, security contracts, and historical decisions.
+
+A copy of the handoff may also be uploaded to the ChatGPT Trading Bot Project for
+convenient context sharing, but that Project file is a mirror rather than an
+independent source of truth. When copies differ, use the Git-tracked handoff.
 
 ## Long-term objective
 
@@ -266,31 +271,46 @@ Documentation closeout is part of **every completed and accepted development
 checkpoint**, not only major milestone boundaries. It should happen automatically
 before the checkpoint is treated as closed or work moves to the next checkpoint.
 
+The authoritative checkpoint-documentation pair is:
+
+```text
+docs/PROJECT_STATUS.md
+docs/AI_TRADING_BOT_HANDOFF.md
+```
+
 At each checkpoint closeout:
 
 1. Update this document's current/completed checkpoint or milestone status and
    roadmap where the checkpoint materially changes them.
-2. Update the project's handoff document with the completed checkpoint, material
+2. Update `docs/AI_TRADING_BOT_HANDOFF.md` with the completed checkpoint, material
    architecture/workflow changes, verification or certification evidence, active
-   branch/HEAD when known, and the next recommended checkpoint.
-3. Review both documents even for small checkpoints. If one requires no wording
-   change, explicitly record in the checkpoint report that it was reviewed and
-   remains current.
-4. Treat these documentation updates/reviews as a checkpoint completion gate: the
-   checkpoint is not fully closed until both documents have been brought current
-   or explicitly confirmed current.
-5. Keep detailed architecture documents as historical/subsystem records rather
+   branch and latest implementation checkpoint when known, and the next
+   recommended checkpoint. Avoid self-referential attempts to record the handoff
+   commit as the live branch HEAD; verify live HEAD when resuming.
+3. Review both Git documents even for small checkpoints. If one requires no
+   wording change, explicitly record in the checkpoint report that it was reviewed
+   and remains current.
+4. Treat the Git-tracked pair as the source of truth. A handoff copy uploaded to
+   the ChatGPT Trading Bot Project is a context mirror only.
+5. After material checkpoints, refresh the ChatGPT Project mirror from the
+   canonical Git handoff when tooling permits. If direct Project-file replacement
+   is unavailable, provide/export the current Markdown for manual replacement and
+   call out any known mirror staleness when starting a new chat.
+6. Treat the two Git-document updates/reviews as a checkpoint completion gate: the
+   checkpoint is not fully closed until both have been brought current or
+   explicitly confirmed current.
+7. Keep detailed architecture documents as historical/subsystem records rather
    than rewriting prior decisions to look current.
-6. Update the README only when the public project description or broad product
+8. Update the README only when the public project description or broad product
    status changes.
-7. Keep `AGENTS.md` focused on stable development, safety, architecture, testing,
+9. Keep `AGENTS.md` focused on stable development, safety, architecture, testing,
    and AI-workflow rules.
-8. Start implementation tasks by reading `AGENTS.md`, this status document, the
-   handoff document, and the architecture documents directly relevant to the
-   milestone.
+10. Start implementation tasks by reading `AGENTS.md`, this status document, the
+    canonical handoff, and the architecture documents directly relevant to the
+    milestone.
 
 The standing checkpoint workflow authorizes narrowly scoped documentation
-edits/commits needed to keep this file and the handoff current at checkpoint
-closeout. It does not authorize merging, rebasing, force-pushing, amending
-unrelated commits, resolving review threads, changing PR metadata, or modifying
-unrelated files.
+edits/commits needed to keep this Git-tracked pair current at checkpoint closeout.
+It does not authorize merging, rebasing, force-pushing, amending unrelated
+commits, resolving review threads, changing PR metadata, or modifying unrelated
+files.

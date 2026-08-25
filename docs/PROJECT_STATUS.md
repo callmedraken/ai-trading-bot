@@ -165,6 +165,30 @@ The non-admin Trading E3.4 preflight passed:
 
 **The E3.4 deployment checkpoint is accepted.**
 
+## Parallel GUI track: GUI-A1 certified
+
+GUI-A1 is complete on isolated branch `feature/gui-foundation`, based on `develop` and intentionally separate from the frozen C3 production branch.
+
+Accepted GUI checkpoint:
+
+- GUI branch HEAD: `9d41485fb4edc39ac5fc643a4ee4a3ea610c35b2`;
+- Architecture 90 defines the GUI application foundation;
+- PySide6/Qt is an optional GUI dependency rather than a core runtime dependency;
+- the GUI-facing service boundary uses plain Python presentation contracts and does not grant production authority;
+- Overview, Research, Paper, Market Data, and System navigation is implemented;
+- GUI-A1 is deterministic/mock-backed and read-only;
+- no production action buttons, credentials, provider transport, brokerage, scheduler, recovery, or authority database access are connected;
+- visual smoke testing of the native shell passed after style cleanup;
+- focused GUI suite: 5 passed;
+- full repository regression: 2,731 passed, 13 skipped, 0 failed;
+- Ruff check passed;
+- Ruff format check passed across 347 tracked Python files;
+- `git diff --check` passed.
+
+The GUI branch is 10 commits ahead of `develop`, 0 behind, and its diff is confined to Architecture 90, the optional GUI dependency, `trading_bot.gui`, and GUI tests. C1/C2/C3, Credential Manager, production transport, authority, and brokerage files are unchanged.
+
+The next GUI checkpoint is **GUI-A2: real read-only research/backtest results**. It should add a reviewed plain-Python research service/adapter boundary first, then replace the Research placeholder with actual existing research/backtest data without introducing production or external effects.
+
 ## Consumed real-provider lineages
 
 ### August 21, 2026

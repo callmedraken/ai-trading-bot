@@ -182,3 +182,60 @@ class ResearchPageState:
                 raise ValueError("loaded research state requires a report")
         elif self.report is not None:
             raise ValueError("unavailable research state must not contain a report")
+
+
+MAX_RESEARCH_COMPARISON_VARIANTS = 4
+MIN_RESEARCH_COMPARISON_VARIANTS = 2
+
+
+@dataclass(frozen=True, slots=True)
+class ResearchComparisonState:
+    """Bounded GUI-only identities selected for read-only comparison."""
+
+    caller_ordinals: tuple[int, ...] = ()
+
+    def __post_init__(self) -> None:
+        ordinals = tuple(self.caller_ordinals)
+        if len(ordinals) > MAX_RESEARCH_COMPARISON_VARIANTS:
+            raise ValueError("comparison selection exceeds four variants")
+        if any(type(item) is not int or item < 0 for item in ordinals):
+            raise ValueError("comparison ordinals must be nonnegative integers")
+        if len(set(ordinals)) != len(ordinals):
+            raise ValueError("comparison ordinals must be unique")
+        if ordinals != tuple(sorted(ordinals)):
+            raise ValueError("comparison ordinals must use caller order")
+        object.__setattr__(self, "caller_ordinals", ordinals)
+
+    @property
+    def count(self) -> int:
+        """Return the number of selected comparison identities."""
+        return len(self.caller_ordinals)
+
+    @property
+    def is_ready(self) -> bool:
+        """Return whether the selection can be visualized."""
+        return self.count >= MIN_RESEARCH_COMPARISON_VARIANTS
+
+    def select(self, caller_ordinal: int) -> "ResearchComparisonState":
+        """Select one identity, bounded to four and canonical caller order."""
+        if type(caller_ordinal) is not int or caller_ordinal < 0:
+            raise ValueError("caller_ordinal must be a nonnegative integer")
+        if caller_ordinal in self.caller_ordinals:
+            return self
+        if self.count >= MAX_RESEARCH_COMPARISON_VARIANTS:
+            return self
+        return ResearchComparisonState(
+            tuple(sorted((*self.caller_ordinals, caller_ordinal)))
+        )
+
+    def remove(self, caller_ordinal: int) -> "ResearchComparisonState":
+        """Remove one comparison identity if present."""
+        if type(caller_ordinal) is not int or caller_ordinal < 0:
+            raise ValueError("caller_ordinal must be a nonnegative integer")
+        return ResearchComparisonState(
+            tuple(item for item in self.caller_ordinals if item != caller_ordinal)
+        )
+
+    def clear(self) -> "ResearchComparisonState":
+        """Clear all comparison identities."""
+        return ResearchComparisonState()

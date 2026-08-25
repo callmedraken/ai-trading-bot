@@ -296,7 +296,10 @@ class MainWindow(QMainWindow):
                 border-radius: 7px;
                 padding: 8px 10px;
             }
-            QPushButton#openResearchReportButton {
+            QPushButton#openResearchReportButton,
+            QPushButton#addResearchComparisonButton,
+            QPushButton#removeResearchComparisonButton,
+            QPushButton#clearResearchComparisonButton {
                 background: #2563eb;
                 color: #f8fafc;
                 border: 0;
@@ -304,15 +307,27 @@ class MainWindow(QMainWindow):
                 padding: 8px 14px;
                 font-weight: 600;
             }
-            QPushButton#openResearchReportButton:hover {
+            QPushButton#openResearchReportButton:hover,
+            QPushButton#addResearchComparisonButton:hover,
+            QPushButton#removeResearchComparisonButton:hover,
+            QPushButton#clearResearchComparisonButton:hover {
                 background: #1d4ed8;
             }
-            QFrame#researchDetailPanel {
+            QFrame#researchDetailPanel, QFrame#researchComparisonPanel {
                 background: #182235;
                 border: 1px solid #2a3950;
                 border-radius: 8px;
             }
-            QTableWidget#researchResultsTable {
+            QLabel#researchComparisonTitle {
+                font-size: 16px;
+                font-weight: 700;
+                color: #f8fafc;
+            }
+            QLabel#researchComparisonCount, QLabel#researchComparisonNotice {
+                color: #94a3b8;
+            }
+            QTableWidget#researchResultsTable,
+            QTableWidget#researchComparisonTable {
                 background: #111827;
                 alternate-background-color: #162033;
                 color: #e5e7eb;
@@ -321,7 +336,8 @@ class MainWindow(QMainWindow):
                 selection-background-color: #25344a;
                 selection-color: #f9fafb;
             }
-            QTableWidget#researchResultsTable::item {
+            QTableWidget#researchResultsTable::item,
+            QTableWidget#researchComparisonTable::item {
                 padding: 6px;
             }
             QHeaderView::section {

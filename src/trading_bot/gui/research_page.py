@@ -20,7 +20,11 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from trading_bot.gui.comparison_chart import ResearchComparisonChart
 from trading_bot.gui.models import (
+    MAX_RESEARCH_COMPARISON_VARIANTS,
+    MIN_RESEARCH_COMPARISON_VARIANTS,
+    ResearchComparisonState,
     ResearchPageState,
     ResearchReportStatus,
     ResearchResultRow,
@@ -43,6 +47,7 @@ _HEADERS = (
     "Return / drawdown",
 )
 _SORTABLE_COLUMN_COUNT = 7
+_COMPARISON_HEADERS = _HEADERS[:_SORTABLE_COLUMN_COUNT]
 
 
 class _SortableTableItem(QTableWidgetItem):
@@ -65,6 +70,7 @@ class ResearchPage(QWidget):
         super().__init__(parent)
         self._state = state
         self._report = state.report
+        self._comparison_state = ResearchComparisonState()
         self.setObjectName("researchPage")
 
         layout = QVBoxLayout(self)
@@ -168,6 +174,72 @@ class ResearchPage(QWidget):
             self._detail_values[key] = value
             detail_layout.addRow(label, value)
         layout.addWidget(self._detail)
+        self._comparison = QFrame(self)
+        self._comparison.setObjectName("researchComparisonPanel")
+        comparison_layout = QVBoxLayout(self._comparison)
+        comparison_layout.setContentsMargins(14, 12, 14, 12)
+        comparison_heading = QHBoxLayout()
+        comparison_title = QLabel("Variant comparison", self._comparison)
+        comparison_title.setObjectName("researchComparisonTitle")
+        comparison_heading.addWidget(comparison_title)
+        comparison_heading.addStretch(1)
+        self._comparison_count = QLabel(self._comparison)
+        self._comparison_count.setObjectName("researchComparisonCount")
+        comparison_heading.addWidget(self._comparison_count)
+        comparison_layout.addLayout(comparison_heading)
+
+        comparison_actions = QHBoxLayout()
+        self._add_comparison_button = QPushButton(
+            "Add selected result", self._comparison
+        )
+        self._add_comparison_button.setObjectName("addResearchComparisonButton")
+        self._add_comparison_button.clicked.connect(self.add_selected_to_comparison)
+        comparison_actions.addWidget(self._add_comparison_button)
+        self._remove_comparison_button = QPushButton(
+            "Remove comparison", self._comparison
+        )
+        self._remove_comparison_button.setObjectName("removeResearchComparisonButton")
+        self._remove_comparison_button.clicked.connect(self.remove_selected_comparison)
+        comparison_actions.addWidget(self._remove_comparison_button)
+        self._clear_comparison_button = QPushButton(
+            "Clear comparison", self._comparison
+        )
+        self._clear_comparison_button.setObjectName("clearResearchComparisonButton")
+        self._clear_comparison_button.clicked.connect(self.clear_comparison)
+        comparison_actions.addWidget(self._clear_comparison_button)
+        comparison_actions.addStretch(1)
+        comparison_layout.addLayout(comparison_actions)
+
+        self._comparison_notice = QLabel(self._comparison)
+        self._comparison_notice.setObjectName("researchComparisonNotice")
+        self._comparison_notice.setWordWrap(True)
+        comparison_layout.addWidget(self._comparison_notice)
+
+        self._comparison_table = QTableWidget(
+            0, len(_COMPARISON_HEADERS), self._comparison
+        )
+        self._comparison_table.setObjectName("researchComparisonTable")
+        self._comparison_table.setHorizontalHeaderLabels(_COMPARISON_HEADERS)
+        self._comparison_table.setEditTriggers(
+            QAbstractItemView.EditTrigger.NoEditTriggers
+        )
+        self._comparison_table.setSelectionBehavior(
+            QAbstractItemView.SelectionBehavior.SelectRows
+        )
+        self._comparison_table.setSelectionMode(
+            QAbstractItemView.SelectionMode.SingleSelection
+        )
+        self._comparison_table.setAlternatingRowColors(True)
+        self._comparison_table.verticalHeader().setVisible(False)
+        self._comparison_table.horizontalHeader().setSectionResizeMode(
+            QHeaderView.ResizeMode.ResizeToContents
+        )
+        self._comparison_table.horizontalHeader().setStretchLastSection(True)
+        comparison_layout.addWidget(self._comparison_table)
+
+        self._comparison_chart = ResearchComparisonChart(self._comparison)
+        comparison_layout.addWidget(self._comparison_chart)
+        layout.addWidget(self._comparison)
 
         self.set_research_state(state)
 
@@ -175,6 +247,11 @@ class ResearchPage(QWidget):
     def research_state(self) -> ResearchPageState:
         """Return the current immutable research presentation state."""
         return self._state
+
+    @property
+    def comparison_state(self) -> ResearchComparisonState:
+        """Return the bounded GUI-only comparison selection."""
+        return self._comparison_state
 
     def open_report(self) -> None:
         """Select and load one local compact JSON report through the adapter."""
@@ -196,6 +273,7 @@ class ResearchPage(QWidget):
             raise TypeError("state must be exactly ResearchPageState")
         self._state = state
         self._report = state.report
+        self._comparison_state = ResearchComparisonState()
         self._status.setText(state.message)
         self._filter.clear()
         self._reset_sort_state()
@@ -221,7 +299,9 @@ class ResearchPage(QWidget):
         self._filter.setVisible(loaded)
         self._table.setVisible(loaded)
         self._detail.setVisible(loaded)
+        self._comparison.setVisible(loaded)
         self._empty.setVisible(not loaded)
+        self._refresh_comparison()
 
         if not loaded or report is None:
             self._identity.clear()
@@ -245,6 +325,35 @@ class ResearchPage(QWidget):
         self._populate_table(report.rows)
         if self._table.rowCount():
             self._table.selectRow(0)
+
+    def add_selected_to_comparison(self) -> None:
+        """Add the selected result identity to the bounded comparison."""
+        selected = self._table.selectedItems()
+        if not selected or self._report is None:
+            return
+        ordinal = selected[0].data(Qt.ItemDataRole.UserRole)
+        previous = self._comparison_state
+        self._comparison_state = previous.select(ordinal)
+        if self._comparison_state is previous and previous.count >= 4:
+            self._comparison_notice.setText(
+                "Comparison is limited to 4 variants. Remove one before adding another."
+            )
+            return
+        self._refresh_comparison()
+
+    def remove_selected_comparison(self) -> None:
+        """Remove the explicitly selected row from the comparison."""
+        selected = self._comparison_table.selectedItems()
+        if not selected:
+            return
+        ordinal = selected[0].data(Qt.ItemDataRole.UserRole)
+        self._comparison_state = self._comparison_state.remove(ordinal)
+        self._refresh_comparison()
+
+    def clear_comparison(self) -> None:
+        """Clear all GUI-only comparison identities."""
+        self._comparison_state = self._comparison_state.clear()
+        self._refresh_comparison()
 
     def _populate_table(self, rows: tuple[ResearchResultRow, ...]) -> None:
         self._table.setRowCount(len(rows))
@@ -358,6 +467,60 @@ class ResearchPage(QWidget):
         }
         for key, value in values.items():
             self._detail_values[key].setText(value)
+
+    def _refresh_comparison(self) -> None:
+        report = self._report
+        rows_by_ordinal = (
+            {} if report is None else {row.caller_ordinal: row for row in report.rows}
+        )
+        selected_rows = tuple(
+            rows_by_ordinal[ordinal]
+            for ordinal in self._comparison_state.caller_ordinals
+            if ordinal in rows_by_ordinal
+        )
+        if len(selected_rows) != self._comparison_state.count:
+            self._comparison_state = ResearchComparisonState(
+                tuple(row.caller_ordinal for row in selected_rows)
+            )
+
+        count = self._comparison_state.count
+        self._comparison_count.setText(
+            f"{count} / {MAX_RESEARCH_COMPARISON_VARIANTS} slots selected"
+        )
+        if count < MIN_RESEARCH_COMPARISON_VARIANTS:
+            self._comparison_notice.setText(
+                "Select a result above, then add 2 to 4 variants for comparison."
+            )
+        else:
+            self._comparison_notice.setText(
+                f"Comparing {count} variants in stable report order."
+            )
+
+        self._comparison_table.clearContents()
+        self._comparison_table.setRowCount(len(selected_rows))
+        for row_index, row in enumerate(selected_rows):
+            values = (
+                "—" if row.rank is None else str(row.rank),
+                row.variant_label,
+                row.parameter_label,
+                _percentage(row.total_return),
+                _percentage(row.maximum_drawdown_percentage),
+                _decimal_text(row.turnover),
+                str(row.trade_count),
+            )
+            for column, value in enumerate(values):
+                item = QTableWidgetItem(value)
+                item.setData(Qt.ItemDataRole.UserRole, row.caller_ordinal)
+                item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                self._comparison_table.setItem(row_index, column, item)
+        self._remove_comparison_button.setEnabled(bool(selected_rows))
+        self._clear_comparison_button.setEnabled(bool(selected_rows))
+        self._add_comparison_button.setEnabled(
+            report is not None and count < MAX_RESEARCH_COMPARISON_VARIANTS
+        )
+        self._comparison_chart.set_rows(
+            selected_rows if self._comparison_state.is_ready else ()
+        )
 
 
 def _decimal_text(value: Decimal) -> str:

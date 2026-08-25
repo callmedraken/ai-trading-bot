@@ -165,35 +165,37 @@ The non-admin Trading E3.4 preflight passed:
 
 **The E3.4 deployment checkpoint is accepted.**
 
-## Parallel GUI track: GUI-A2 certified
+## Parallel GUI track: GUI-A3 certified
 
-GUI-A1 and GUI-A2 are complete on isolated branch `feature/gui-foundation`, based on `develop` and intentionally separate from the frozen C3 production branch.
+GUI-A1 through GUI-A3 are complete on isolated branch `feature/gui-foundation`, based on `develop` and intentionally separate from the frozen C3 production branch.
 
-Accepted GUI-A2 checkpoint:
+Accepted GUI-A3 checkpoint:
 
-- GUI branch HEAD: `70a57519ed522c4c14de623350ccaca8ee201123`;
-- Architecture 90 continues to define the GUI application foundation and dependency direction;
-- PySide6/Qt remains an optional GUI dependency rather than a core runtime dependency;
-- GUI-facing service contracts and presentation models remain plain Python and grant no production authority;
-- the Research page now consumes a bounded read-only adapter over the existing compact historical-experiment report v1 contract;
-- canonical compact-report JSON deserialization was added to the existing serializer module rather than duplicating parsing logic in Qt;
-- deserialization preserves exact-key/schema validation, strict canonical UUID/decimal reconstruction, report `__post_init__` consistency checks, and exact schema-version type checking;
-- malformed decimal data, unsupported/malformed input, missing files, and oversized artifacts fail into one bounded GUI unavailable state without leaking parser/detail text;
-- artifact reading is bounded to 10 MB + 1 byte, with at most 500 result rows accepted;
-- normal startup supports an explicit read-only report via `python -m trading_bot.gui --research-report PATH`;
-- the Qt Research page displays report/experiment identity, ranking summary, metadata, and a read-only table of rank, variant, parameters, total return, maximum drawdown, turnover, and trade count;
-- compact-report v1 does not define exposure or return-over-drawdown, so those columns intentionally render `—` rather than deriving unapproved values;
+- GUI branch HEAD: `9076ca4b4be125e42c14460c35b2d1ce677e5a82`;
+- Architecture 90 continues to define the GUI dependency direction and no-effect boundary;
+- PySide6/Qt remains optional and presentation-only;
+- the existing bounded compact-report service remains authoritative for report loading, including exact canonical deserialization, a 10 MB + 1 byte read bound, a 500-row result bound, and one sanitized unavailable state;
+- GUI-A3 adds a native `Open Report…` flow for explicit local `.json` report selection without scanning directories or persisting recent-file state;
+- report replacement updates only the Research presentation state and does not rebuild unrelated application state or mutate the source artifact;
+- the current report path is operator-visible but bounded to 512 presentation characters;
+- filtering is case-insensitive over displayed variant/parameter labels and bounded to 200 characters;
+- the results table remains non-editable, single-row-selection, and supports deterministic presentation-only sorting over rank, variant, parameters, total return, maximum drawdown, turnover, and trades;
+- sortable keys safely handle unranked rows and use `caller_ordinal` as the deterministic tie-breaker for equal primary values;
+- supported header clicks explicitly start ascending and then toggle direction; unsupported Exposure and Return/drawdown columns do not reorder the table;
+- sorting/filtering never mutates the underlying immutable `ResearchReportView.rows` sequence;
+- selected-row detail displays only approved report fields: rank, variant, parameters, total return, maximum drawdown, turnover, and trade count;
+- Exposure and Return/drawdown remain explicitly `Unavailable` because compact-report v1 supplies no approved source or derivation policy;
+- existing CLI startup via `python -m trading_bot.gui --research-report PATH` remains operational;
 - no research execution, optimization, strategy mutation, network access, Credential Manager access, C1/C2/C3 authority access, production child launch, provider transport, brokerage, scheduler, recovery, or live controls are connected;
-- GUI-A2 visual smoke testing passed with the tracked deterministic compact-report fixture after the research table was aligned to the dark theme;
-- focused GUI-A2 implementation gate before visual cleanup: 23 passed;
-- full repository regression on the complete GUI-A2 behavioral implementation: 2,741 passed, 13 skipped, 0 failed;
-- final style-only HEAD focused GUI gate: 15 passed;
+- focused GUI-A3 implementation verification passed before commit, and the deterministic-sorting follow-up gate passed with 18 GUI-A3 tests;
+- full repository regression at final GUI-A3 HEAD: 2,759 passed, 13 skipped, 0 failed;
 - Ruff check passed;
 - Ruff format check passed across 351 tracked Python files;
 - final `git diff --check` passed;
+- interactive visual smoke passed using the tracked compact-report fixture: Open Report, bounded filtering, deterministic table ordering, row selection, detail-panel updates, and unavailable metrics all rendered correctly in the dark theme;
 - final tracked working tree was clean; unrelated generated/untracked artifacts remained untouched.
 
-The next GUI checkpoint is **GUI-A3: read-only research usability and visualization**. It should improve interpretation of loaded research results through bounded sorting/filtering and selected-result detail/visualization while preserving the same no-effect architecture boundary. Any GUI control that can invoke production capture, modify trading state, access credentials, recover/retry authority, or submit brokerage actions remains out of scope.
+The GUI branch is 15 commits ahead of `develop`, 0 behind. GUI-A4 should remain read-only and focus on research visualization/comparison over already-reviewed report data rather than adding trading or production effects. Any control that can invoke production capture, modify trading state, access credentials, recover/retry authority, or submit brokerage actions remains out of scope.
 
 ## Consumed real-provider lineages
 

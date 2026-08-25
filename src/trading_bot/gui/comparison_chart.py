@@ -196,9 +196,7 @@ def _metric_value(row: ResearchResultRow, key: str) -> Decimal:
     return value
 
 
-def _metric_header_positions(
-    font_metrics: QFontMetrics, title: str
-) -> tuple[int, int]:
+def _metric_header_positions(font_metrics: QFontMetrics, title: str) -> tuple[int, int]:
     """Return non-overlapping title and context x-positions."""
     title_x = _HEADER_LEFT
     context_x = title_x + font_metrics.horizontalAdvance(title) + _HEADER_GAP

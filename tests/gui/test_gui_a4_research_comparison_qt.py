@@ -130,9 +130,13 @@ def test_gui_a4_chart_header_context_follows_measured_title_width() -> None:
     title_x, context_x = _metric_header_positions(metrics, "Maximum drawdown")
 
     assert context_x >= title_x + metrics.horizontalAdvance("Maximum drawdown") + 12
-    assert context_x + metrics.horizontalAdvance(
-        "Lower drawdown is better • larger bars mean more drawdown"
-    ) <= 900
+    assert (
+        context_x
+        + metrics.horizontalAdvance(
+            "Lower drawdown is better • larger bars mean more drawdown"
+        )
+        <= 900
+    )
 
 
 def test_gui_a4_selects_two_to_four_variants_in_stable_report_order() -> None:

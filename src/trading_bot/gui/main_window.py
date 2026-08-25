@@ -73,7 +73,10 @@ class MainWindow(QMainWindow):
         self._stack.addWidget(
             self._build_placeholder_page(
                 "Research",
-                "GUI-A2 can connect reviewed offline research and backtest results here.",
+                (
+                    "GUI-A2 can connect reviewed offline research and backtest "
+                    "results here."
+                ),
             )
         )
         self._stack.addWidget(
@@ -217,7 +220,10 @@ class MainWindow(QMainWindow):
     def _build_system_page(self, overview: ApplicationOverview) -> QWidget:
         page = self._build_placeholder_page(
             "System",
-            "GUI-A1 reports presentation state only; it grants no production authority.",
+            (
+                "GUI-A1 reports presentation state only; it grants no production "
+                "authority."
+            ),
         )
         layout = page.layout()
         if layout is None:

@@ -13,6 +13,7 @@ from trading_bot.experiments import (
     HistoricalExperimentReport,
 )
 from trading_bot.gui.models import (
+    MAX_RESEARCH_SOURCE_PATH_CHARACTERS,
     ResearchPageState,
     ResearchReportStatus,
     ResearchReportView,
@@ -21,6 +22,7 @@ from trading_bot.gui.models import (
 
 MAX_RESEARCH_RESULT_ROWS = 500
 MAX_RESEARCH_ARTIFACT_BYTES = 10_000_000
+MAX_RESEARCH_FILTER_CHARACTERS = 200
 _UNAVAILABLE_MESSAGE = "No supported compact historical experiment report is available."
 
 
@@ -35,6 +37,8 @@ class CompactReportResearchService:
     def get_research_state(self) -> ResearchPageState:
         """Return loaded presentation state or one bounded unavailable state."""
         try:
+            if not _is_supported_local_json_path(self._artifact_path):
+                return unavailable_research_state()
             payload = _read_bounded_payload(self._artifact_path)
             if len(payload) > MAX_RESEARCH_ARTIFACT_BYTES:
                 return unavailable_research_state()
@@ -44,10 +48,17 @@ class CompactReportResearchService:
             return ResearchPageState(
                 status=ResearchReportStatus.LOADED,
                 message="Compact historical experiment report loaded read-only.",
-                report=_to_view(report),
+                report=_to_view(report, self._artifact_path),
             )
         except (OSError, UnicodeError, HistoricalExperimentReportOutputError):
             return unavailable_research_state()
+
+
+def _is_supported_local_json_path(artifact_path: Path) -> bool:
+    return (
+        artifact_path.suffix.casefold() == ".json"
+        and not artifact_path.anchor.startswith("\\\\")
+    )
 
 
 def _read_bounded_payload(artifact_path: Path) -> bytes:
@@ -64,7 +75,10 @@ def unavailable_research_state() -> ResearchPageState:
     )
 
 
-def _to_view(report: HistoricalExperimentReport) -> ResearchReportView:
+def _to_view(
+    report: HistoricalExperimentReport,
+    artifact_path: Path,
+) -> ResearchReportView:
     ranking = report.ranking
     if ranking is None:
         ranking_summary = "Unranked"
@@ -102,6 +116,7 @@ def _to_view(report: HistoricalExperimentReport) -> ResearchReportView:
         ranking_summary=ranking_summary,
         metadata_summary=metadata_summary,
         rows=rows,
+        source_path=_bounded_source_path(artifact_path),
     )
 
 
@@ -123,3 +138,28 @@ def _scalar_label(value: Decimal | int | bool | None) -> str:
     if type(value) is int:
         return str(value)
     return canonical_decimal(value)
+
+
+def filter_research_rows(
+    rows: tuple[ResearchResultRow, ...],
+    query: str,
+) -> tuple[ResearchResultRow, ...]:
+    """Filter bounded presentation rows by variant or parameter label."""
+    if type(query) is not str:
+        raise TypeError("query must be a string")
+    bounded_query = query[:MAX_RESEARCH_FILTER_CHARACTERS].strip().casefold()
+    if not bounded_query:
+        return rows
+    return tuple(
+        row
+        for row in rows
+        if bounded_query in row.variant_label.casefold()
+        or bounded_query in row.parameter_label.casefold()
+    )
+
+
+def _bounded_source_path(artifact_path: Path) -> str:
+    display = str(artifact_path.resolve(strict=False))
+    if len(display) <= MAX_RESEARCH_SOURCE_PATH_CHARACTERS:
+        return display
+    return "…" + display[-(MAX_RESEARCH_SOURCE_PATH_CHARACTERS - 1) :]

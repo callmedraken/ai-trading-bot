@@ -75,6 +75,9 @@ class ApplicationOverview:
         object.__setattr__(self, "components", components)
 
 
+MAX_RESEARCH_SOURCE_PATH_CHARACTERS = 512
+
+
 class ResearchReportStatus(Enum):
     """Bounded availability state for the read-only Research page."""
 
@@ -132,6 +135,7 @@ class ResearchReportView:
     ranking_summary: str
     metadata_summary: str
     rows: tuple[ResearchResultRow, ...]
+    source_path: str | None = None
 
     def __post_init__(self) -> None:
         for name in (
@@ -142,6 +146,10 @@ class ResearchReportView:
             "metadata_summary",
         ):
             _require_text(getattr(self, name), name)
+        if self.source_path is not None:
+            _require_text(self.source_path, "source_path")
+            if len(self.source_path) > MAX_RESEARCH_SOURCE_PATH_CHARACTERS:
+                raise ValueError("source_path exceeds the presentation bound")
         rows = tuple(self.rows)
         if not rows:
             raise ValueError("rows must not be empty")

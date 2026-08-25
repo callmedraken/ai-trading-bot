@@ -14,7 +14,12 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from trading_bot.gui.models import ApplicationOverview, OperatingMode, PresentationStatus
+from trading_bot.gui.models import (
+    ApplicationOverview,
+    ComponentStatus,
+    OperatingMode,
+    PresentationStatus,
+)
 from trading_bot.gui.services import GuiApplicationService
 
 PAGE_IDS = ("home", "research", "paper", "market-data", "system")
@@ -47,7 +52,9 @@ class MainWindow(QMainWindow):
     def __init__(self, service: GuiApplicationService) -> None:
         super().__init__()
         self._overview = service.get_overview()
-        self._page_index = {page_id: index for index, page_id in enumerate(PAGE_IDS)}
+        self._page_index = {
+            page_id: index for index, page_id in enumerate(PAGE_IDS)
+        }
 
         self.setWindowTitle("AI Trading Bot")
         self.resize(1180, 760)
@@ -156,12 +163,16 @@ class MainWindow(QMainWindow):
         cards.setHorizontalSpacing(14)
         cards.setVerticalSpacing(14)
         for index, component in enumerate(overview.components):
-            cards.addWidget(self._build_status_card(component), index // 2, index % 2)
+            cards.addWidget(
+                self._build_status_card(component),
+                index // 2,
+                index % 2,
+            )
         layout.addLayout(cards)
         layout.addStretch(1)
         return page
 
-    def _build_status_card(self, component) -> QFrame:
+    def _build_status_card(self, component: ComponentStatus) -> QFrame:
         card = QFrame(self)
         card.setObjectName("statusCard")
         card.setProperty("status", _STATUS_PROPERTIES[component.status])

@@ -9,6 +9,7 @@ pytest.importorskip("PySide6")
 
 from PySide6.QtWidgets import QApplication  # noqa: E402
 
+from trading_bot.gui import ApplicationOverview  # noqa: E402
 from trading_bot.gui.main_window import MainWindow, PAGE_IDS  # noqa: E402
 from trading_bot.gui.mock_service import MockGuiApplicationService  # noqa: E402
 
@@ -17,7 +18,7 @@ class _RecordingService:
     def __init__(self) -> None:
         self.calls = 0
 
-    def get_overview(self):
+    def get_overview(self) -> ApplicationOverview:
         self.calls += 1
         return MockGuiApplicationService().get_overview()
 
@@ -30,10 +31,11 @@ def _application() -> QApplication:
 
 
 def test_main_window_has_stable_pages_and_navigation_is_presentation_only() -> None:
-    _application()
+    application = _application()
     service = _RecordingService()
     window = MainWindow(service)
 
+    assert application.applicationName() is not None
     assert window.page_ids == PAGE_IDS
     assert window.current_page_id == "home"
     assert service.calls == 1
@@ -46,9 +48,10 @@ def test_main_window_has_stable_pages_and_navigation_is_presentation_only() -> N
 
 
 def test_main_window_rejects_unknown_page() -> None:
-    _application()
+    application = _application()
     window = MainWindow(MockGuiApplicationService())
 
+    assert application.applicationName() is not None
     with pytest.raises(ValueError, match="unknown GUI page"):
         window.select_page("credentials")
 

@@ -48,7 +48,7 @@ _SORTABLE_COLUMN_COUNT = 7
 class _SortableTableItem(QTableWidgetItem):
     def __init__(self, text: str, sort_value: object, caller_ordinal: int) -> None:
         super().__init__(text)
-        self._sort_value = sort_value
+        self._sort_value = (sort_value, caller_ordinal)
         self.setData(Qt.ItemDataRole.UserRole, caller_ordinal)
         self.setFlags(self.flags() & ~Qt.ItemFlag.ItemIsEditable)
 
@@ -138,6 +138,9 @@ class ResearchPage(QWidget):
         )
         self._table.horizontalHeader().setStretchLastSection(True)
         self._table.horizontalHeader().setSectionsClickable(True)
+        self._sort_column: int | None = None
+        self._sort_order: Qt.SortOrder | None = None
+        self._table.horizontalHeader().setSortIndicatorShown(False)
         self._table.horizontalHeader().sectionClicked.connect(self._sort_table)
         self._table.itemSelectionChanged.connect(self._update_selected_detail)
         layout.addWidget(self._table, 1)
@@ -195,6 +198,7 @@ class ResearchPage(QWidget):
         self._report = state.report
         self._status.setText(state.message)
         self._filter.clear()
+        self._reset_sort_state()
         self._table.setRowCount(0)
         self._set_detail(None)
 
@@ -248,7 +252,7 @@ class ResearchPage(QWidget):
             values = (
                 (
                     "—" if row.rank is None else str(row.rank),
-                    (row.rank is None, row.rank),
+                    (row.rank is None, 0 if row.rank is None else row.rank),
                 ),
                 (row.variant_label, row.variant_label.casefold()),
                 (row.parameter_label, row.parameter_label.casefold()),
@@ -259,10 +263,23 @@ class ResearchPage(QWidget):
                 ),
                 (_decimal_text(row.turnover), row.turnover),
                 (str(row.trade_count), row.trade_count),
-                (_optional_decimal(row.exposure), (row.exposure is None, row.exposure)),
+                (
+                    _optional_decimal(row.exposure),
+                    (
+                        row.exposure is None,
+                        Decimal("0") if row.exposure is None else row.exposure,
+                    ),
+                ),
                 (
                     _optional_decimal(row.return_over_drawdown),
-                    (row.return_over_drawdown is None, row.return_over_drawdown),
+                    (
+                        row.return_over_drawdown is None,
+                        (
+                            Decimal("0")
+                            if row.return_over_drawdown is None
+                            else row.return_over_drawdown
+                        ),
+                    ),
                 ),
             )
             for column, (text, sort_value) in enumerate(values):
@@ -273,10 +290,27 @@ class ResearchPage(QWidget):
                 )
 
     def _sort_table(self, column: int) -> None:
-        if 0 <= column < _SORTABLE_COLUMN_COUNT:
-            self._table.sortItems(
-                column, self._table.horizontalHeader().sortIndicatorOrder()
+        if not 0 <= column < _SORTABLE_COLUMN_COUNT:
+            return
+        if self._sort_column == column:
+            order = (
+                Qt.SortOrder.DescendingOrder
+                if self._sort_order == Qt.SortOrder.AscendingOrder
+                else Qt.SortOrder.AscendingOrder
             )
+        else:
+            order = Qt.SortOrder.AscendingOrder
+        self._sort_column = column
+        self._sort_order = order
+        self._table.sortItems(column, order)
+        header = self._table.horizontalHeader()
+        header.setSortIndicator(column, order)
+        header.setSortIndicatorShown(True)
+
+    def _reset_sort_state(self) -> None:
+        self._sort_column = None
+        self._sort_order = None
+        self._table.horizontalHeader().setSortIndicatorShown(False)
 
     def _apply_filter(self, query: str) -> None:
         report = self._report

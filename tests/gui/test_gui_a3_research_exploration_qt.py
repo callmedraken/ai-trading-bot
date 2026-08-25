@@ -2,6 +2,7 @@
 # ruff: noqa: E402
 
 import os
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
@@ -19,7 +20,12 @@ from PySide6.QtWidgets import (
     QTableWidget,
 )
 
-from trading_bot.gui import ResearchReportStatus
+from trading_bot.gui import (
+    ResearchPageState,
+    ResearchReportStatus,
+    ResearchReportView,
+    ResearchResultRow,
+)
 from trading_bot.gui.main_window import MainWindow
 from trading_bot.gui.mock_service import (
     MockGuiApplicationService,
@@ -53,6 +59,51 @@ def _loaded_window() -> tuple[MainWindow, ResearchPage]:
 
 def _visible_rows(table: QTableWidget) -> list[int]:
     return [row for row in range(table.rowCount()) if not table.isRowHidden(row)]
+
+
+def _table_ordinals(table: QTableWidget) -> list[int]:
+    return [
+        table.item(row, 0).data(Qt.ItemDataRole.UserRole)
+        for row in range(table.rowCount())
+    ]
+
+
+def _in_memory_state(rows: tuple[ResearchResultRow, ...]) -> ResearchPageState:
+    return ResearchPageState(
+        status=ResearchReportStatus.LOADED,
+        message="In-memory report loaded.",
+        report=ResearchReportView(
+            report_id="gui-a3-report",
+            experiment_result_id="gui-a3-experiment",
+            variant_source="EXPLICIT",
+            ranking_summary="No ranking policy",
+            metadata_summary="No report metadata",
+            rows=rows,
+        ),
+    )
+
+
+def _row(
+    caller_ordinal: int,
+    *,
+    rank: int | None = 1,
+    turnover: Decimal | None = None,
+    trade_count: int | None = None,
+) -> ResearchResultRow:
+    return ResearchResultRow(
+        caller_ordinal=caller_ordinal,
+        rank=rank,
+        variant_label="Same variant",
+        parameter_label="Same parameters",
+        total_return=Decimal("0"),
+        maximum_drawdown_percentage=Decimal("0"),
+        turnover=(
+            Decimal(caller_ordinal) if turnover is None else turnover
+        ),
+        trade_count=caller_ordinal if trade_count is None else trade_count,
+        exposure=None,
+        return_over_drawdown=None,
+    )
 
 
 def test_gui_a3_cancel_open_report_is_effect_free(
@@ -166,10 +217,21 @@ def test_gui_a3_sorting_preserves_model_and_selection_updates_detail() -> None:
     original_rows = report.rows
 
     header = table.horizontalHeader()
-    header.setSortIndicator(0, Qt.SortOrder.DescendingOrder)
+    header.sectionClicked.emit(0)
+    assert header.isSortIndicatorShown()
+    assert header.sortIndicatorSection() == 0
+    assert header.sortIndicatorOrder() == Qt.SortOrder.AscendingOrder
+    assert [table.item(row, 0).text() for row in range(4)] == [
+        "1",
+        "2",
+        "3",
+        "4",
+    ]
+
     header.sectionClicked.emit(0)
 
     assert [table.item(row, 0).text() for row in range(4)] == ["4", "3", "2", "1"]
+    assert header.sortIndicatorOrder() == Qt.SortOrder.DescendingOrder
     assert page.research_state.report is report
     assert report.rows is original_rows
     assert [row.rank for row in report.rows] == [1, 2, 3, 4]
@@ -177,6 +239,73 @@ def test_gui_a3_sorting_preserves_model_and_selection_updates_detail() -> None:
     table.selectRow(0)
     assert detail_rank.text() == "4"
     assert detail_variant.text() == report.rows[3].variant_label
+    window.close()
+
+
+def test_gui_a3_rank_sort_handles_multiple_unranked_rows_without_mutation() -> None:
+    rows = (
+        _row(0, rank=None),
+        _row(1, rank=None),
+        _row(2, rank=1),
+    )
+    page = ResearchPage(_in_memory_state(rows))
+    table = page.findChild(QTableWidget, "researchResultsTable")
+    assert table is not None
+    report = page.research_state.report
+    assert report is not None
+    original_rows = report.rows
+
+    table.horizontalHeader().sectionClicked.emit(0)
+
+    assert _table_ordinals(table) == [2, 0, 1]
+    assert report.rows is original_rows
+    assert report.rows == rows
+    page.close()
+
+
+@pytest.mark.parametrize("column", range(7))
+def test_gui_a3_equal_primary_values_use_caller_ordinal(column: int) -> None:
+    rows = tuple(
+        _row(
+            ordinal,
+            rank=None,
+            turnover=Decimal("0") if column == 5 else Decimal(ordinal),
+            trade_count=0 if column == 6 else ordinal,
+        )
+        for ordinal in range(3)
+    )
+    page = ResearchPage(_in_memory_state(rows))
+    table = page.findChild(QTableWidget, "researchResultsTable")
+    assert table is not None
+    auxiliary_column = 6 if column != 6 else 5
+
+    header = table.horizontalHeader()
+    header.sectionClicked.emit(auxiliary_column)
+    header.sectionClicked.emit(auxiliary_column)
+    assert _table_ordinals(table) == [2, 1, 0]
+    header.sectionClicked.emit(column)
+
+    assert _table_ordinals(table) == [0, 1, 2]
+    page.close()
+
+
+@pytest.mark.parametrize("unsupported_column", (7, 8))
+def test_gui_a3_unsupported_header_click_does_not_reorder(
+    unsupported_column: int,
+) -> None:
+    window, page = _loaded_window()
+    table = page.findChild(QTableWidget, "researchResultsTable")
+    assert table is not None
+    header = table.horizontalHeader()
+    header.sectionClicked.emit(0)
+    header.sectionClicked.emit(0)
+    before = _table_ordinals(table)
+
+    header.sectionClicked.emit(unsupported_column)
+
+    assert _table_ordinals(table) == before
+    assert header.sortIndicatorSection() == 0
+    assert header.sortIndicatorOrder() == Qt.SortOrder.DescendingOrder
     window.close()
 
 

@@ -20,6 +20,7 @@ from trading_bot.market_data import (
     AlpacaHttpResponse,
     AlpacaHttpStatusError,
     AlpacaResponseError,
+    AlpacaResponseMetadataFailureReason,
     AlpacaTransportError,
     AlpacaTransportFailureStage,
     BoundMarketCalendar,
@@ -69,6 +70,38 @@ C3_CHILD_BOOTSTRAP_EXIT_SUCCESS = 0
 C3_CHILD_BOOTSTRAP_EXIT_FAILED = 1
 _C3_CHILD_READ_CHUNK_BYTES = 4096
 _MAX_UINT_PTR = (1 << (struct.calcsize("P") * 8)) - 1
+_METADATA_FAILURE_CLASSIFICATIONS = {
+    AlpacaResponseMetadataFailureReason.ACQUISITION: (
+        ChildResultClassification.TRANSPORT_RESPONSE_METADATA_ACQUISITION_FAILED
+    ),
+    AlpacaResponseMetadataFailureReason.MALFORMED: (
+        ChildResultClassification.TRANSPORT_RESPONSE_METADATA_MALFORMED_FAILED
+    ),
+    AlpacaResponseMetadataFailureReason.DUPLICATE_RELEVANT_HEADER: (
+        ChildResultClassification.TRANSPORT_RESPONSE_METADATA_DUPLICATE_FAILED
+    ),
+    AlpacaResponseMetadataFailureReason.UNSUPPORTED_CONTENT_ENCODING: (
+        ChildResultClassification.TRANSPORT_RESPONSE_METADATA_CONTENT_ENCODING_FAILED
+    ),
+    AlpacaResponseMetadataFailureReason.UNSUPPORTED_TRANSFER_ENCODING: (
+        ChildResultClassification.TRANSPORT_RESPONSE_METADATA_TRANSFER_ENCODING_FAILED
+    ),
+    AlpacaResponseMetadataFailureReason.TRANSFER_LENGTH_CONFLICT: (
+        ChildResultClassification.TRANSPORT_RESPONSE_METADATA_LENGTH_CONFLICT_FAILED
+    ),
+    AlpacaResponseMetadataFailureReason.INVALID_CONTENT_LENGTH: (
+        ChildResultClassification.TRANSPORT_RESPONSE_METADATA_CONTENT_LENGTH_FAILED
+    ),
+    AlpacaResponseMetadataFailureReason.INVALID_REQUEST_ID: (
+        ChildResultClassification.TRANSPORT_RESPONSE_METADATA_REQUEST_ID_FAILED
+    ),
+    AlpacaResponseMetadataFailureReason.UNSUPPORTED_CONTENT_TYPE: (
+        ChildResultClassification.TRANSPORT_RESPONSE_METADATA_CONTENT_TYPE_FAILED
+    ),
+    AlpacaResponseMetadataFailureReason.GENERIC: (
+        ChildResultClassification.TRANSPORT_RESPONSE_METADATA_FAILED
+    ),
+}
 
 
 class WindowsEffectfulCaptureChildError(RuntimeError):
@@ -483,23 +516,26 @@ class IsolatedCaptureChildAttempt:
                 provider_request_id=_safe_provider_request_id(error.request_id),
             )
         if isinstance(error, AlpacaTransportError):
-            classification = {
-                AlpacaTransportFailureStage.REQUEST: (
-                    ChildResultClassification.TRANSPORT_REQUEST_FAILED
-                ),
-                AlpacaTransportFailureStage.RESPONSE_START: (
-                    ChildResultClassification.TRANSPORT_RESPONSE_START_FAILED
-                ),
-                AlpacaTransportFailureStage.RESPONSE_METADATA: (
-                    ChildResultClassification.TRANSPORT_RESPONSE_METADATA_FAILED
-                ),
-                AlpacaTransportFailureStage.RESPONSE_BODY: (
-                    ChildResultClassification.TRANSPORT_RESPONSE_BODY_FAILED
-                ),
-                AlpacaTransportFailureStage.UNKNOWN: (
-                    ChildResultClassification.TRANSPORT_FAILED
-                ),
-            }[error.stage]
+            if error.stage is AlpacaTransportFailureStage.RESPONSE_METADATA:
+                classification = _METADATA_FAILURE_CLASSIFICATIONS.get(
+                    error.metadata_reason,
+                    ChildResultClassification.TRANSPORT_RESPONSE_METADATA_FAILED,
+                )
+            else:
+                classification = {
+                    AlpacaTransportFailureStage.REQUEST: (
+                        ChildResultClassification.TRANSPORT_REQUEST_FAILED
+                    ),
+                    AlpacaTransportFailureStage.RESPONSE_START: (
+                        ChildResultClassification.TRANSPORT_RESPONSE_START_FAILED
+                    ),
+                    AlpacaTransportFailureStage.RESPONSE_BODY: (
+                        ChildResultClassification.TRANSPORT_RESPONSE_BODY_FAILED
+                    ),
+                    AlpacaTransportFailureStage.UNKNOWN: (
+                        ChildResultClassification.TRANSPORT_FAILED
+                    ),
+                }[error.stage]
             return self._result(
                 classification,
                 cleanup_status=ChildCleanupStatus.COMPLETE,

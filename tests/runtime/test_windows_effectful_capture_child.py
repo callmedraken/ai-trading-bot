@@ -12,6 +12,7 @@ from trading_bot.domain import Symbol
 from trading_bot.market_data import (
     AlpacaHttpResponse,
     AlpacaHttpStatusError,
+    AlpacaResponseMetadataFailureReason,
     AlpacaTransportError,
     AlpacaTransportFailureStage,
     DailySnapshotSerializationError,
@@ -594,3 +595,118 @@ def test_success_does_not_issue_parent_verified_snapshot_authority() -> None:
     assert result.classification is ChildResultClassification.SUCCEEDED
     assert not hasattr(child_module, "issue_verified_captured_snapshot")
     assert not hasattr(result, "_permit")
+
+
+@pytest.mark.parametrize(
+    ("reason", "classification"),
+    [
+        (
+            AlpacaResponseMetadataFailureReason.ACQUISITION,
+            ChildResultClassification.TRANSPORT_RESPONSE_METADATA_ACQUISITION_FAILED,
+        ),
+        (
+            AlpacaResponseMetadataFailureReason.MALFORMED,
+            ChildResultClassification.TRANSPORT_RESPONSE_METADATA_MALFORMED_FAILED,
+        ),
+        (
+            AlpacaResponseMetadataFailureReason.DUPLICATE_RELEVANT_HEADER,
+            ChildResultClassification.TRANSPORT_RESPONSE_METADATA_DUPLICATE_FAILED,
+        ),
+        (
+            AlpacaResponseMetadataFailureReason.UNSUPPORTED_CONTENT_ENCODING,
+            ChildResultClassification.TRANSPORT_RESPONSE_METADATA_CONTENT_ENCODING_FAILED,
+        ),
+        (
+            AlpacaResponseMetadataFailureReason.UNSUPPORTED_TRANSFER_ENCODING,
+            ChildResultClassification.TRANSPORT_RESPONSE_METADATA_TRANSFER_ENCODING_FAILED,
+        ),
+        (
+            AlpacaResponseMetadataFailureReason.TRANSFER_LENGTH_CONFLICT,
+            ChildResultClassification.TRANSPORT_RESPONSE_METADATA_LENGTH_CONFLICT_FAILED,
+        ),
+        (
+            AlpacaResponseMetadataFailureReason.INVALID_CONTENT_LENGTH,
+            ChildResultClassification.TRANSPORT_RESPONSE_METADATA_CONTENT_LENGTH_FAILED,
+        ),
+        (
+            AlpacaResponseMetadataFailureReason.INVALID_REQUEST_ID,
+            ChildResultClassification.TRANSPORT_RESPONSE_METADATA_REQUEST_ID_FAILED,
+        ),
+        (
+            AlpacaResponseMetadataFailureReason.UNSUPPORTED_CONTENT_TYPE,
+            ChildResultClassification.TRANSPORT_RESPONSE_METADATA_CONTENT_TYPE_FAILED,
+        ),
+        (
+            AlpacaResponseMetadataFailureReason.GENERIC,
+            ChildResultClassification.TRANSPORT_RESPONSE_METADATA_FAILED,
+        ),
+    ],
+)
+def test_metadata_failure_reason_maps_to_exact_closed_child_classification(
+    reason: AlpacaResponseMetadataFailureReason,
+    classification: ChildResultClassification,
+) -> None:
+    transport = FakeTransport(
+        error=AlpacaTransportError(
+            AlpacaTransportFailureStage.RESPONSE_METADATA,
+            metadata_reason=reason,
+        )
+    )
+    attempt, _api, _transport, writer = _attempt(transport=transport)
+
+    result = attempt.run()
+
+    assert result.classification is classification
+    assert result.http_status is None
+    assert result.provider_request_id is None
+    assert transport.calls == 1
+    assert writer.payloads == []
+    serialized = serialize_isolated_capture_child_result(result)
+    assert _SECRET.encode() not in serialized
+    assert b"Alpaca HTTPS transport failed" not in serialized
+
+
+def test_unexpected_metadata_processing_defect_becomes_internal_failed() -> None:
+    raw_error = f"unexpected metadata defect {_SECRET}"
+
+    class MetadataDefectResponse:
+        status = 200
+
+        def getheaders(self):
+            raise RuntimeError(raw_error)
+
+        def read(self, _amount=None):
+            raise AssertionError("body acquisition must not be reached")
+
+    class MetadataDefectConnection:
+        def __init__(self) -> None:
+            self.requests = 0
+            self.closed = False
+
+        def request(self, *args, **kwargs) -> None:
+            self.requests += 1
+
+        def getresponse(self):
+            return MetadataDefectResponse()
+
+        def close(self) -> None:
+            self.closed = True
+
+    connection = MetadataDefectConnection()
+    transport = StdlibAlpacaHistoricalBarsTransport(
+        connection_factory=lambda *args, **kwargs: connection,
+        tls_context_factory=ssl.create_default_context,
+    )
+    attempt, _api, _transport, writer = _attempt(transport=transport)
+
+    result = attempt.run()
+
+    assert result.classification is ChildResultClassification.INTERNAL_FAILED
+    assert result.fence_state is ProviderAttemptFenceState.ENTERED
+    assert result.cleanup_status is ChildCleanupStatus.COMPLETE
+    assert connection.requests == 1
+    assert connection.closed
+    assert writer.payloads == []
+    serialized = serialize_isolated_capture_child_result(result)
+    assert _SECRET.encode() not in serialized
+    assert raw_error.encode() not in serialized

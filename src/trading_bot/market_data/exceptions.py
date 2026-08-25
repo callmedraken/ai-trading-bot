@@ -121,6 +121,21 @@ class AlpacaTransportFailureStage(StrEnum):
     UNKNOWN = "UNKNOWN"
 
 
+class AlpacaResponseMetadataFailureReason(StrEnum):
+    """Closed sanitized reason for response-metadata transport failure."""
+
+    ACQUISITION = "ACQUISITION"
+    MALFORMED = "MALFORMED"
+    DUPLICATE_RELEVANT_HEADER = "DUPLICATE_RELEVANT_HEADER"
+    UNSUPPORTED_CONTENT_ENCODING = "UNSUPPORTED_CONTENT_ENCODING"
+    UNSUPPORTED_TRANSFER_ENCODING = "UNSUPPORTED_TRANSFER_ENCODING"
+    TRANSFER_LENGTH_CONFLICT = "TRANSFER_LENGTH_CONFLICT"
+    INVALID_CONTENT_LENGTH = "INVALID_CONTENT_LENGTH"
+    INVALID_REQUEST_ID = "INVALID_REQUEST_ID"
+    UNSUPPORTED_CONTENT_TYPE = "UNSUPPORTED_CONTENT_TYPE"
+    GENERIC = "GENERIC"
+
+
 class AlpacaTransportError(AlpacaDailySnapshotError):
     """Raised when the one permitted HTTPS attempt cannot complete safely."""
 
@@ -128,13 +143,24 @@ class AlpacaTransportError(AlpacaDailySnapshotError):
         self,
         stage: AlpacaTransportFailureStage
         | object = AlpacaTransportFailureStage.UNKNOWN,
+        *,
+        metadata_reason: AlpacaResponseMetadataFailureReason | object = None,
     ) -> None:
         # Legacy callers may still pass a sanitized message. Discard all such
         # caller-provided material rather than retaining it in args/repr.
         if type(stage) is not AlpacaTransportFailureStage:
             stage = AlpacaTransportFailureStage.UNKNOWN
+        if stage is AlpacaTransportFailureStage.RESPONSE_METADATA:
+            if type(metadata_reason) is not AlpacaResponseMetadataFailureReason:
+                metadata_reason = AlpacaResponseMetadataFailureReason.GENERIC
+        else:
+            metadata_reason = None
         self.stage = stage
-        super().__init__(f"Alpaca HTTPS transport failed at stage {stage.value}")
+        self.metadata_reason = metadata_reason
+        message = f"Alpaca HTTPS transport failed at stage {stage.value}"
+        if metadata_reason is not None:
+            message += f" ({metadata_reason.value})"
+        super().__init__(message)
 
 
 class AlpacaHttpStatusError(AlpacaDailySnapshotError):

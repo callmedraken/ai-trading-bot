@@ -13,6 +13,7 @@ from typing import Protocol
 
 from trading_bot.market_data.exceptions import (
     AlpacaHttpStatusError,
+    AlpacaResponseMetadataFailureReason,
     AlpacaTransportError,
     AlpacaTransportFailureStage,
 )
@@ -163,6 +164,14 @@ ConnectionFactory = Callable[..., _HttpsConnectionLike]
 TlsContextFactory = Callable[[], ssl.SSLContext]
 
 
+class _ResponseMetadataValidationError(Exception):
+    """Internal carrier for one closed response-metadata failure reason."""
+
+    def __init__(self, reason: AlpacaResponseMetadataFailureReason) -> None:
+        self.reason = reason
+        super().__init__(reason.value)
+
+
 class StdlibAlpacaHistoricalBarsTransport:
     """Perform one fixed-host GET with bounded entity reading."""
 
@@ -223,19 +232,32 @@ class StdlibAlpacaHistoricalBarsTransport:
             if response_start_failed or response is None or status is None:
                 raise AlpacaTransportError(AlpacaTransportFailureStage.RESPONSE_START)
 
-            metadata: dict[str, object] | None = None
-            response_metadata_failed = False
+            raw_headers: tuple[tuple[str, str], ...] | None = None
+            metadata_reason: AlpacaResponseMetadataFailureReason | None = None
             try:
                 raw_headers = tuple(response.getheaders())
+            except (AlpacaTransportError, OSError, http.client.HTTPException):
+                metadata_reason = AlpacaResponseMetadataFailureReason.ACQUISITION
+            if metadata_reason is not None or raw_headers is None:
+                raise AlpacaTransportError(
+                    AlpacaTransportFailureStage.RESPONSE_METADATA,
+                    metadata_reason=metadata_reason,
+                )
+
+            metadata: dict[str, object] | None = None
+            try:
                 metadata = _validated_response_headers(
                     raw_headers,
                     require_success_fields=status == 200,
                 )
-            except (AlpacaTransportError, OSError, http.client.HTTPException):
-                response_metadata_failed = True
-            if response_metadata_failed or metadata is None:
+            except _ResponseMetadataValidationError as error:
+                metadata_reason = error.reason
+            except AlpacaTransportError:
+                metadata_reason = AlpacaResponseMetadataFailureReason.GENERIC
+            if metadata_reason is not None or metadata is None:
                 raise AlpacaTransportError(
-                    AlpacaTransportFailureStage.RESPONSE_METADATA
+                    AlpacaTransportFailureStage.RESPONSE_METADATA,
+                    metadata_reason=metadata_reason,
                 )
 
             body: bytes | None = None
@@ -319,67 +341,87 @@ def _validated_response_headers(
             or type(item[0]) is not str
             or type(item[1]) is not str
         ):
-            raise AlpacaTransportError("Alpaca response headers are malformed")
+            raise _ResponseMetadataValidationError(
+                AlpacaResponseMetadataFailureReason.MALFORMED
+            )
         name, value = item
         folded = name.casefold()
         if folded in relevant:
             if any(character in value for character in ("\r", "\n", "\0")):
-                raise AlpacaTransportError(
-                    "Alpaca response contains an unsafe header value"
+                raise _ResponseMetadataValidationError(
+                    AlpacaResponseMetadataFailureReason.MALFORMED
                 )
             selected.setdefault(folded, []).append(value)
-    for name, values in selected.items():
+    for values in selected.values():
         if len(values) != 1:
-            raise AlpacaTransportError(
-                f"Alpaca response has conflicting {name} headers"
+            raise _ResponseMetadataValidationError(
+                AlpacaResponseMetadataFailureReason.DUPLICATE_RELEVANT_HEADER
             )
 
     encoding = _single(selected, "content-encoding")
     if encoding is not None and encoding.strip().casefold() != "identity":
-        raise AlpacaTransportError("compressed Alpaca responses are unsupported")
+        raise _ResponseMetadataValidationError(
+            AlpacaResponseMetadataFailureReason.UNSUPPORTED_CONTENT_ENCODING
+        )
 
     transfer_encoding = _single(selected, "transfer-encoding")
     if (
         transfer_encoding is not None
         and transfer_encoding.strip().casefold() != "chunked"
     ):
-        raise AlpacaTransportError("unsupported Alpaca response transfer encoding")
+        raise _ResponseMetadataValidationError(
+            AlpacaResponseMetadataFailureReason.UNSUPPORTED_TRANSFER_ENCODING
+        )
     content_length_text = _single(selected, "content-length")
     if transfer_encoding is not None and content_length_text is not None:
-        raise AlpacaTransportError(
-            "Alpaca response has conflicting transfer-length headers"
+        raise _ResponseMetadataValidationError(
+            AlpacaResponseMetadataFailureReason.TRANSFER_LENGTH_CONFLICT
         )
     content_length: int | None = None
     if content_length_text is not None:
         if not content_length_text.isascii() or not content_length_text.isdecimal():
-            raise AlpacaTransportError("Alpaca Content-Length is invalid")
+            raise _ResponseMetadataValidationError(
+                AlpacaResponseMetadataFailureReason.INVALID_CONTENT_LENGTH
+            )
         try:
             content_length = int(content_length_text)
         except ValueError:
-            raise AlpacaTransportError("Alpaca Content-Length is invalid") from None
+            raise _ResponseMetadataValidationError(
+                AlpacaResponseMetadataFailureReason.INVALID_CONTENT_LENGTH
+            ) from None
         if content_length > MAX_ALPACA_RESPONSE_BYTES:
-            raise AlpacaTransportError("Alpaca response exceeds the 4 MiB limit")
+            raise _ResponseMetadataValidationError(
+                AlpacaResponseMetadataFailureReason.INVALID_CONTENT_LENGTH
+            )
 
     request_id = _single(selected, "x-request-id")
     if request_id is not None and _REQUEST_ID_PATTERN.fullmatch(request_id) is None:
-        raise AlpacaTransportError("Alpaca X-Request-ID is invalid")
+        raise _ResponseMetadataValidationError(
+            AlpacaResponseMetadataFailureReason.INVALID_REQUEST_ID
+        )
     if require_success_fields and request_id is None:
-        raise AlpacaTransportError("successful Alpaca response is missing X-Request-ID")
+        raise _ResponseMetadataValidationError(
+            AlpacaResponseMetadataFailureReason.INVALID_REQUEST_ID
+        )
 
     content_type = _single(selected, "content-type")
     media_type: str | None = None
     if content_type is not None:
         parts = [part.strip() for part in content_type.split(";")]
         if parts[0].casefold() != "application/json":
-            raise AlpacaTransportError("Alpaca response media type is unsupported")
+            raise _ResponseMetadataValidationError(
+                AlpacaResponseMetadataFailureReason.UNSUPPORTED_CONTENT_TYPE
+            )
         for parameter in parts[1:]:
             if parameter.casefold() != "charset=utf-8":
-                raise AlpacaTransportError(
-                    "Alpaca response Content-Type parameters are unsupported"
+                raise _ResponseMetadataValidationError(
+                    AlpacaResponseMetadataFailureReason.UNSUPPORTED_CONTENT_TYPE
                 )
         media_type = "application/json"
     if require_success_fields and media_type is None:
-        raise AlpacaTransportError("successful Alpaca response is missing Content-Type")
+        raise _ResponseMetadataValidationError(
+            AlpacaResponseMetadataFailureReason.UNSUPPORTED_CONTENT_TYPE
+        )
     return {
         "content_length": content_length,
         "request_id": request_id,

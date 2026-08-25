@@ -7,11 +7,13 @@ import ssl
 
 import pytest
 
+import trading_bot.market_data.alpaca_http as alpaca_http_module
 from trading_bot.market_data import (
     MAX_ALPACA_RESPONSE_BYTES,
     AlpacaDailySnapshotError,
     AlpacaHistoricalBarsRequest,
     AlpacaHttpStatusError,
+    AlpacaResponseMetadataFailureReason,
     AlpacaTransportError,
     AlpacaTransportFailureStage,
     StdlibAlpacaHistoricalBarsTransport,
@@ -525,3 +527,199 @@ def test_public_request_rejects_authentication_headers() -> None:
             target=TARGET,
             public_headers=(("APCA-API-KEY-ID", KEY),),
         )
+
+
+@pytest.mark.parametrize(
+    ("headers", "reason", "raw_marker"),
+    [
+        (
+            ((SECRET, "value", "extra"),),
+            AlpacaResponseMetadataFailureReason.MALFORMED,
+            SECRET,
+        ),
+        (
+            (
+                ("Content-Type", "application/json"),
+                ("Content-Type", SECRET),
+                ("X-Request-ID", "request-1"),
+            ),
+            AlpacaResponseMetadataFailureReason.DUPLICATE_RELEVANT_HEADER,
+            SECRET,
+        ),
+        (
+            (
+                ("Content-Type", "application/json"),
+                ("Content-Encoding", SECRET),
+                ("X-Request-ID", "request-1"),
+            ),
+            AlpacaResponseMetadataFailureReason.UNSUPPORTED_CONTENT_ENCODING,
+            SECRET,
+        ),
+        (
+            (
+                ("Content-Type", "application/json"),
+                ("Transfer-Encoding", SECRET),
+                ("X-Request-ID", "request-1"),
+            ),
+            AlpacaResponseMetadataFailureReason.UNSUPPORTED_TRANSFER_ENCODING,
+            SECRET,
+        ),
+        (
+            (
+                ("Content-Type", "application/json"),
+                ("Content-Length", SECRET),
+                ("Transfer-Encoding", "chunked"),
+                ("X-Request-ID", "request-1"),
+            ),
+            AlpacaResponseMetadataFailureReason.TRANSFER_LENGTH_CONFLICT,
+            SECRET,
+        ),
+        (
+            (
+                ("Content-Type", "application/json"),
+                ("Content-Length", SECRET),
+                ("X-Request-ID", "request-1"),
+            ),
+            AlpacaResponseMetadataFailureReason.INVALID_CONTENT_LENGTH,
+            SECRET,
+        ),
+        (
+            (
+                ("Content-Type", "application/json"),
+                ("X-Request-ID", SECRET + "x" * 257),
+            ),
+            AlpacaResponseMetadataFailureReason.INVALID_REQUEST_ID,
+            SECRET,
+        ),
+        (
+            (
+                ("Content-Type", SECRET),
+                ("X-Request-ID", "request-1"),
+            ),
+            AlpacaResponseMetadataFailureReason.UNSUPPORTED_CONTENT_TYPE,
+            SECRET,
+        ),
+    ],
+)
+def test_response_metadata_validation_has_closed_sanitized_reason(
+    headers,
+    reason: AlpacaResponseMetadataFailureReason,
+    raw_marker: str,
+) -> None:
+    connection = FakeConnection(FakeResponse(b"{}", headers=headers))
+    transport, _ = _transport(connection)
+
+    with pytest.raises(AlpacaTransportError) as caught:
+        transport.execute(_request(), api_key_id=KEY, api_secret_key=SECRET)
+
+    assert caught.value.stage is AlpacaTransportFailureStage.RESPONSE_METADATA
+    assert caught.value.metadata_reason is reason
+    assert caught.value.__context__ is None
+    assert raw_marker not in str(caught.value)
+    assert raw_marker not in repr(caught.value)
+    assert len(connection.requests) == 1
+
+
+def test_response_metadata_acquisition_reason_is_closed_and_sanitized() -> None:
+    raw_error = f"header acquisition leaked {SECRET}"
+    response = FakeResponse(b"{}", headers_error=OSError(raw_error))
+    connection = FakeConnection(response)
+    transport, _ = _transport(connection)
+
+    with pytest.raises(AlpacaTransportError) as caught:
+        transport.execute(_request(), api_key_id=KEY, api_secret_key=SECRET)
+
+    assert (
+        caught.value.metadata_reason is AlpacaResponseMetadataFailureReason.ACQUISITION
+    )
+    assert caught.value.__context__ is None
+    assert raw_error not in str(caught.value)
+    assert raw_error not in repr(caught.value)
+    assert len(connection.requests) == 1
+
+
+def test_response_metadata_validator_programming_error_escapes_transport(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    raw_error = RuntimeError(f"validator programming defect leaked {SECRET}")
+    validator_calls = []
+
+    def fail_metadata(*_args, **_kwargs):
+        validator_calls.append(True)
+        raise raw_error
+
+    monkeypatch.setattr(
+        alpaca_http_module,
+        "_validated_response_headers",
+        fail_metadata,
+    )
+    response = FakeResponse(b"{}")
+    connection = FakeConnection(response)
+    transport, factory_calls = _transport(connection)
+
+    with pytest.raises(RuntimeError) as caught:
+        transport.execute(_request(), api_key_id=KEY, api_secret_key=SECRET)
+
+    assert caught.value is raw_error
+    assert not isinstance(caught.value, AlpacaTransportError)
+    assert validator_calls == [True]
+    assert len(factory_calls) == 1
+    assert len(connection.requests) == 1
+    assert response.read_sizes == []
+
+
+def test_response_metadata_failure_reasons_are_exactly_closed() -> None:
+    assert tuple(AlpacaResponseMetadataFailureReason) == (
+        AlpacaResponseMetadataFailureReason.ACQUISITION,
+        AlpacaResponseMetadataFailureReason.MALFORMED,
+        AlpacaResponseMetadataFailureReason.DUPLICATE_RELEVANT_HEADER,
+        AlpacaResponseMetadataFailureReason.UNSUPPORTED_CONTENT_ENCODING,
+        AlpacaResponseMetadataFailureReason.UNSUPPORTED_TRANSFER_ENCODING,
+        AlpacaResponseMetadataFailureReason.TRANSFER_LENGTH_CONFLICT,
+        AlpacaResponseMetadataFailureReason.INVALID_CONTENT_LENGTH,
+        AlpacaResponseMetadataFailureReason.INVALID_REQUEST_ID,
+        AlpacaResponseMetadataFailureReason.UNSUPPORTED_CONTENT_TYPE,
+        AlpacaResponseMetadataFailureReason.GENERIC,
+    )
+
+    with pytest.raises(ValueError):
+        AlpacaResponseMetadataFailureReason("UNRECOGNIZED_METADATA_REASON")
+
+
+def test_response_metadata_error_sanitizes_arbitrary_reason() -> None:
+    raw_reason = f"arbitrary metadata reason leaked {SECRET}"
+
+    error = AlpacaTransportError(
+        AlpacaTransportFailureStage.RESPONSE_METADATA,
+        metadata_reason=raw_reason,
+    )
+
+    assert error.metadata_reason is AlpacaResponseMetadataFailureReason.GENERIC
+    assert raw_reason not in str(error)
+    assert raw_reason not in repr(error)
+
+
+def test_response_metadata_generic_fallback_is_closed_and_sanitized(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    raw_error = f"generic metadata leaked {SECRET}"
+
+    def fail_metadata(*_args, **_kwargs):
+        raise AlpacaTransportError(raw_error)
+
+    monkeypatch.setattr(
+        alpaca_http_module,
+        "_validated_response_headers",
+        fail_metadata,
+    )
+    connection = FakeConnection(FakeResponse(b"{}"))
+    transport, _ = _transport(connection)
+
+    with pytest.raises(AlpacaTransportError) as caught:
+        transport.execute(_request(), api_key_id=KEY, api_secret_key=SECRET)
+
+    assert caught.value.metadata_reason is AlpacaResponseMetadataFailureReason.GENERIC
+    assert caught.value.__context__ is None
+    assert raw_error not in str(caught.value)
+    assert raw_error not in repr(caught.value)
+    assert len(connection.requests) == 1

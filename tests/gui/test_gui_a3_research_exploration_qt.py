@@ -97,9 +97,7 @@ def _row(
         parameter_label="Same parameters",
         total_return=Decimal("0"),
         maximum_drawdown_percentage=Decimal("0"),
-        turnover=(
-            Decimal(caller_ordinal) if turnover is None else turnover
-        ),
+        turnover=(Decimal(caller_ordinal) if turnover is None else turnover),
         trade_count=caller_ordinal if trade_count is None else trade_count,
         exposure=None,
         return_over_drawdown=None,

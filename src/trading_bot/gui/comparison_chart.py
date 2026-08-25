@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from decimal import Context, Decimal, localcontext
 
 from PySide6.QtCore import QRectF, Qt
-from PySide6.QtGui import QColor, QPainter, QPaintEvent
+from PySide6.QtGui import QColor, QFontMetrics, QPainter, QPaintEvent
 from PySide6.QtWidgets import QWidget
 
 from trading_bot.gui.models import ResearchResultRow
@@ -57,6 +57,8 @@ _METRICS = (
         "Count only • no preference inferred",
     ),
 )
+_HEADER_LEFT = 8
+_HEADER_GAP = 12
 
 
 class ResearchComparisonChart(QWidget):
@@ -154,10 +156,13 @@ class ResearchComparisonChart(QWidget):
         y = 8
         colors = ("#60a5fa", "#34d399", "#f59e0b", "#c084fc")
         for metric in _METRICS:
+            title_x, context_x = _metric_header_positions(
+                painter.fontMetrics(), metric.title
+            )
             painter.setPen(QColor("#f8fafc"))
-            painter.drawText(8, y + 12, metric.title)
+            painter.drawText(title_x, y + 12, metric.title)
             painter.setPen(QColor("#94a3b8"))
-            painter.drawText(112, y + 12, metric.context)
+            painter.drawText(context_x, y + 12, metric.context)
             y += 22
             for color_index, row in enumerate(self._rows):
                 item = layout_lookup[(metric.key, row.caller_ordinal)]
@@ -189,6 +194,15 @@ def _metric_value(row: ResearchResultRow, key: str) -> Decimal:
     if type(value) is not Decimal:
         raise TypeError("comparison chart metric must be a Decimal")
     return value
+
+
+def _metric_header_positions(
+    font_metrics: QFontMetrics, title: str
+) -> tuple[int, int]:
+    """Return non-overlapping title and context x-positions."""
+    title_x = _HEADER_LEFT
+    context_x = title_x + font_metrics.horizontalAdvance(title) + _HEADER_GAP
+    return title_x, context_x
 
 
 def _scaled_length(value: Decimal, scale: Decimal, width: int) -> int:

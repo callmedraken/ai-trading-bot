@@ -10,6 +10,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 pytest.importorskip("PySide6")
 
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QFontMetrics
 from PySide6.QtWidgets import (
     QApplication,
     QLabel,
@@ -18,7 +19,10 @@ from PySide6.QtWidgets import (
     QTableWidget,
 )
 
-from trading_bot.gui.comparison_chart import ResearchComparisonChart
+from trading_bot.gui.comparison_chart import (
+    ResearchComparisonChart,
+    _metric_header_positions,
+)
 from trading_bot.gui.main_window import MainWindow
 from trading_bot.gui.mock_service import MockGuiApplicationService
 from trading_bot.gui.models import (
@@ -118,6 +122,19 @@ def _add_ordinal(page: ResearchPage, ordinal: int) -> None:
     page.add_selected_to_comparison()
 
 
+def test_gui_a4_chart_header_context_follows_measured_title_width() -> None:
+    _application()
+    chart = ResearchComparisonChart()
+    metrics = QFontMetrics(chart.font())
+
+    title_x, context_x = _metric_header_positions(metrics, "Maximum drawdown")
+
+    assert context_x >= title_x + metrics.horizontalAdvance("Maximum drawdown") + 12
+    assert context_x + metrics.horizontalAdvance(
+        "Lower drawdown is better • larger bars mean more drawdown"
+    ) <= 900
+
+
 def test_gui_a4_selects_two_to_four_variants_in_stable_report_order() -> None:
     rows = tuple(_row(index) for index in range(4))
     page = _page(rows)
@@ -152,8 +169,7 @@ def test_gui_a4_four_variant_research_content_scrolls_in_main_window() -> None:
     assert window.current_page_id == "research"
     assert scroll_area.verticalScrollBarPolicy() == Qt.ScrollBarPolicy.ScrollBarAsNeeded
     assert (
-        scroll_area.horizontalScrollBarPolicy()
-        == Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        scroll_area.horizontalScrollBarPolicy() == Qt.ScrollBarPolicy.ScrollBarAlwaysOff
     )
     assert scroll_area.viewport().objectName() == "researchScrollViewport"
     assert "#111827" in scroll_area.viewport().styleSheet()
@@ -169,9 +185,7 @@ def test_gui_a4_four_variant_research_content_scrolls_in_main_window() -> None:
     assert chart.rows == rows
     assert scroll_area.verticalScrollBar().maximum() > 0
 
-    scroll_area.verticalScrollBar().setValue(
-        scroll_area.verticalScrollBar().maximum()
-    )
+    scroll_area.verticalScrollBar().setValue(scroll_area.verticalScrollBar().maximum())
     assert (
         scroll_area.verticalScrollBar().value()
         == scroll_area.verticalScrollBar().maximum()

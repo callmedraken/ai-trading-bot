@@ -11,7 +11,7 @@ pytest.importorskip("PySide6")
 from PySide6.QtWidgets import QApplication
 
 from trading_bot.gui import ApplicationOverview
-from trading_bot.gui.main_window import MainWindow, PAGE_IDS
+from trading_bot.gui.main_window import PAGE_IDS, MainWindow
 from trading_bot.gui.mock_service import MockGuiApplicationService
 
 

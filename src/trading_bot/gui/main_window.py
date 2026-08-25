@@ -52,9 +52,7 @@ class MainWindow(QMainWindow):
     def __init__(self, service: GuiApplicationService) -> None:
         super().__init__()
         self._overview = service.get_overview()
-        self._page_index = {
-            page_id: index for index, page_id in enumerate(PAGE_IDS)
-        }
+        self._page_index = {page_id: index for index, page_id in enumerate(PAGE_IDS)}
 
         self.setWindowTitle("AI Trading Bot")
         self.resize(1180, 760)

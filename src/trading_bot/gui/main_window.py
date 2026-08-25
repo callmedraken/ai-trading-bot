@@ -243,6 +243,9 @@ class MainWindow(QMainWindow):
                 color: #e5e7eb;
                 font-size: 14px;
             }
+            QLabel {
+                background: transparent;
+            }
             QListWidget#navigation {
                 background: #0b1220;
                 border: 0;

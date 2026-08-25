@@ -385,6 +385,27 @@ class MainWindow(QMainWindow):
                 font-weight: 700;
                 color: #93c5fd;
             }
+            QTableWidget#researchResultsTable {
+                background: #111827;
+                alternate-background-color: #162033;
+                color: #e5e7eb;
+                gridline-color: #2a3950;
+                border: 1px solid #2a3950;
+                selection-background-color: #25344a;
+                selection-color: #f9fafb;
+            }
+            QTableWidget#researchResultsTable::item {
+                padding: 6px;
+            }
+            QHeaderView::section {
+                background: #182235;
+                color: #cbd5e1;
+                border: 0;
+                border-right: 1px solid #2a3950;
+                border-bottom: 1px solid #2a3950;
+                padding: 7px 8px;
+                font-weight: 600;
+            }
             """
         )
 

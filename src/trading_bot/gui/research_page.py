@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QPushButton,
+    QScrollArea,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
@@ -74,8 +75,28 @@ class ResearchPage(QWidget):
         self.setObjectName("researchPage")
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(28, 26, 28, 26)
-        layout.setSpacing(12)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+
+        self._scroll_area = QScrollArea(self)
+        self._scroll_area.setObjectName("researchScrollArea")
+        self._scroll_area.setFrameShape(QFrame.Shape.NoFrame)
+        self._scroll_area.setWidgetResizable(True)
+        self._scroll_area.setVerticalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAsNeeded
+        )
+        self._scroll_area.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
+        self._scroll_area.viewport().setObjectName("researchScrollViewport")
+        self._scroll_area.viewport().setStyleSheet("background: #111827;")
+
+        content = QWidget(self._scroll_area)
+        content.setObjectName("researchScrollContent")
+        content.setStyleSheet("background: #111827;")
+        content_layout = QVBoxLayout(content)
+        content_layout.setContentsMargins(28, 26, 28, 26)
+        content_layout.setSpacing(12)
 
         heading = QHBoxLayout()
         title = QLabel("Historical Research", self)
@@ -86,18 +107,18 @@ class ResearchPage(QWidget):
         self._open_button.setObjectName("openResearchReportButton")
         self._open_button.clicked.connect(self.open_report)
         heading.addWidget(self._open_button)
-        layout.addLayout(heading)
+        content_layout.addLayout(heading)
 
         self._status = QLabel(self)
         self._status.setObjectName("summaryLabel")
         self._status.setWordWrap(True)
-        layout.addWidget(self._status)
+        content_layout.addWidget(self._status)
 
         self._path = QLabel(self)
         self._path.setObjectName("researchPath")
         self._path.setWordWrap(True)
         self._path.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        layout.addWidget(self._path)
+        content_layout.addWidget(self._path)
 
         self._identity = QLabel(self)
         self._identity.setObjectName("researchIdentity")
@@ -105,23 +126,23 @@ class ResearchPage(QWidget):
         self._identity.setTextInteractionFlags(
             Qt.TextInteractionFlag.TextSelectableByMouse
         )
-        layout.addWidget(self._identity)
+        content_layout.addWidget(self._identity)
 
         self._summary = QLabel(self)
         self._summary.setObjectName("researchSummary")
         self._summary.setWordWrap(True)
-        layout.addWidget(self._summary)
+        content_layout.addWidget(self._summary)
 
         self._metadata = QLabel(self)
         self._metadata.setObjectName("researchMetadata")
         self._metadata.setWordWrap(True)
-        layout.addWidget(self._metadata)
+        content_layout.addWidget(self._metadata)
 
         self._empty = QLabel(self)
         self._empty.setObjectName("researchEmptyState")
         self._empty.setWordWrap(True)
         self._empty.setAlignment(Qt.AlignmentFlag.AlignTop)
-        layout.addWidget(self._empty)
+        content_layout.addWidget(self._empty)
 
         self._filter = QLineEdit(self)
         self._filter.setObjectName("researchFilter")
@@ -129,7 +150,7 @@ class ResearchPage(QWidget):
         self._filter.setClearButtonEnabled(True)
         self._filter.setMaxLength(MAX_RESEARCH_FILTER_CHARACTERS)
         self._filter.textChanged.connect(self._apply_filter)
-        layout.addWidget(self._filter)
+        content_layout.addWidget(self._filter)
 
         self._table = QTableWidget(0, len(_HEADERS), self)
         self._table.setObjectName("researchResultsTable")
@@ -149,7 +170,7 @@ class ResearchPage(QWidget):
         self._table.horizontalHeader().setSortIndicatorShown(False)
         self._table.horizontalHeader().sectionClicked.connect(self._sort_table)
         self._table.itemSelectionChanged.connect(self._update_selected_detail)
-        layout.addWidget(self._table, 1)
+        content_layout.addWidget(self._table, 1)
 
         self._detail = QFrame(self)
         self._detail.setObjectName("researchDetailPanel")
@@ -173,7 +194,7 @@ class ResearchPage(QWidget):
             value.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
             self._detail_values[key] = value
             detail_layout.addRow(label, value)
-        layout.addWidget(self._detail)
+        content_layout.addWidget(self._detail)
         self._comparison = QFrame(self)
         self._comparison.setObjectName("researchComparisonPanel")
         comparison_layout = QVBoxLayout(self._comparison)
@@ -239,7 +260,9 @@ class ResearchPage(QWidget):
 
         self._comparison_chart = ResearchComparisonChart(self._comparison)
         comparison_layout.addWidget(self._comparison_chart)
-        layout.addWidget(self._comparison)
+        content_layout.addWidget(self._comparison)
+        self._scroll_area.setWidget(content)
+        layout.addWidget(self._scroll_area, 1)
 
         self.set_research_state(state)
 

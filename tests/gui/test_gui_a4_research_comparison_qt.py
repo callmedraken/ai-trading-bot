@@ -10,10 +10,19 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 pytest.importorskip("PySide6")
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QApplication, QLabel, QPushButton, QTableWidget
+from PySide6.QtWidgets import (
+    QApplication,
+    QLabel,
+    QPushButton,
+    QScrollArea,
+    QTableWidget,
+)
 
 from trading_bot.gui.comparison_chart import ResearchComparisonChart
+from trading_bot.gui.main_window import MainWindow
+from trading_bot.gui.mock_service import MockGuiApplicationService
 from trading_bot.gui.models import (
+    ApplicationOverview,
     ResearchPageState,
     ResearchReportStatus,
     ResearchReportView,
@@ -71,6 +80,17 @@ def _page(rows: tuple[ResearchResultRow, ...]) -> ResearchPage:
     return ResearchPage(_state(rows))
 
 
+class _WindowResearchService:
+    def __init__(self, state: ResearchPageState) -> None:
+        self._state = state
+
+    def get_overview(self) -> ApplicationOverview:
+        return MockGuiApplicationService().get_overview()
+
+    def get_research_state(self) -> ResearchPageState:
+        return self._state
+
+
 def _main_table(page: ResearchPage) -> QTableWidget:
     table = page.findChild(QTableWidget, "researchResultsTable")
     assert table is not None
@@ -116,6 +136,49 @@ def test_gui_a4_selects_two_to_four_variants_in_stable_report_order() -> None:
     assert chart is not None
     assert chart.rows == rows
     page.close()
+
+
+def test_gui_a4_four_variant_research_content_scrolls_in_main_window() -> None:
+    rows = tuple(_row(index) for index in range(4))
+    window = MainWindow(_WindowResearchService(_state(rows)))
+    window.select_page("research")
+    window.show()
+    _application().processEvents()
+
+    page = window.findChild(ResearchPage, "researchPage")
+    scroll_area = window.findChild(QScrollArea, "researchScrollArea")
+    assert page is not None
+    assert scroll_area is not None
+    assert window.current_page_id == "research"
+    assert scroll_area.verticalScrollBarPolicy() == Qt.ScrollBarPolicy.ScrollBarAsNeeded
+    assert (
+        scroll_area.horizontalScrollBarPolicy()
+        == Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+    )
+    assert scroll_area.viewport().objectName() == "researchScrollViewport"
+    assert "#111827" in scroll_area.viewport().styleSheet()
+
+    for ordinal in range(4):
+        _add_ordinal(page, ordinal)
+    _application().processEvents()
+
+    comparison_table = _comparison_table(page)
+    chart = page.findChild(ResearchComparisonChart, "researchComparisonChart")
+    assert chart is not None
+    assert comparison_table.rowCount() == 4
+    assert chart.rows == rows
+    assert scroll_area.verticalScrollBar().maximum() > 0
+
+    scroll_area.verticalScrollBar().setValue(
+        scroll_area.verticalScrollBar().maximum()
+    )
+    assert (
+        scroll_area.verticalScrollBar().value()
+        == scroll_area.verticalScrollBar().maximum()
+    )
+    scroll_area.verticalScrollBar().setValue(0)
+    assert scroll_area.verticalScrollBar().value() == 0
+    window.close()
 
 
 def test_gui_a4_fifth_variant_is_bounded_without_replacing_selection() -> None:

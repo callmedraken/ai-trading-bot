@@ -36,7 +36,10 @@ class MockGuiApplicationService:
                     key="market-data",
                     title="Market Data",
                     status=PresentationStatus.UNAVAILABLE,
-                    detail="Production capture is intentionally not connected to GUI-A1.",
+                    detail=(
+                        "Production capture is intentionally not connected to "
+                        "GUI-A1."
+                    ),
                 ),
                 ComponentStatus(
                     key="system",

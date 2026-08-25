@@ -165,29 +165,35 @@ The non-admin Trading E3.4 preflight passed:
 
 **The E3.4 deployment checkpoint is accepted.**
 
-## Parallel GUI track: GUI-A1 certified
+## Parallel GUI track: GUI-A2 certified
 
-GUI-A1 is complete on isolated branch `feature/gui-foundation`, based on `develop` and intentionally separate from the frozen C3 production branch.
+GUI-A1 and GUI-A2 are complete on isolated branch `feature/gui-foundation`, based on `develop` and intentionally separate from the frozen C3 production branch.
 
-Accepted GUI checkpoint:
+Accepted GUI-A2 checkpoint:
 
-- GUI branch HEAD: `9d41485fb4edc39ac5fc643a4ee4a3ea610c35b2`;
-- Architecture 90 defines the GUI application foundation;
-- PySide6/Qt is an optional GUI dependency rather than a core runtime dependency;
-- the GUI-facing service boundary uses plain Python presentation contracts and does not grant production authority;
-- Overview, Research, Paper, Market Data, and System navigation is implemented;
-- GUI-A1 is deterministic/mock-backed and read-only;
-- no production action buttons, credentials, provider transport, brokerage, scheduler, recovery, or authority database access are connected;
-- visual smoke testing of the native shell passed after style cleanup;
-- focused GUI suite: 5 passed;
-- full repository regression: 2,731 passed, 13 skipped, 0 failed;
+- GUI branch HEAD: `70a57519ed522c4c14de623350ccaca8ee201123`;
+- Architecture 90 continues to define the GUI application foundation and dependency direction;
+- PySide6/Qt remains an optional GUI dependency rather than a core runtime dependency;
+- GUI-facing service contracts and presentation models remain plain Python and grant no production authority;
+- the Research page now consumes a bounded read-only adapter over the existing compact historical-experiment report v1 contract;
+- canonical compact-report JSON deserialization was added to the existing serializer module rather than duplicating parsing logic in Qt;
+- deserialization preserves exact-key/schema validation, strict canonical UUID/decimal reconstruction, report `__post_init__` consistency checks, and exact schema-version type checking;
+- malformed decimal data, unsupported/malformed input, missing files, and oversized artifacts fail into one bounded GUI unavailable state without leaking parser/detail text;
+- artifact reading is bounded to 10 MB + 1 byte, with at most 500 result rows accepted;
+- normal startup supports an explicit read-only report via `python -m trading_bot.gui --research-report PATH`;
+- the Qt Research page displays report/experiment identity, ranking summary, metadata, and a read-only table of rank, variant, parameters, total return, maximum drawdown, turnover, and trade count;
+- compact-report v1 does not define exposure or return-over-drawdown, so those columns intentionally render `—` rather than deriving unapproved values;
+- no research execution, optimization, strategy mutation, network access, Credential Manager access, C1/C2/C3 authority access, production child launch, provider transport, brokerage, scheduler, recovery, or live controls are connected;
+- GUI-A2 visual smoke testing passed with the tracked deterministic compact-report fixture after the research table was aligned to the dark theme;
+- focused GUI-A2 implementation gate before visual cleanup: 23 passed;
+- full repository regression on the complete GUI-A2 behavioral implementation: 2,741 passed, 13 skipped, 0 failed;
+- final style-only HEAD focused GUI gate: 15 passed;
 - Ruff check passed;
-- Ruff format check passed across 347 tracked Python files;
-- `git diff --check` passed.
+- Ruff format check passed across 351 tracked Python files;
+- final `git diff --check` passed;
+- final tracked working tree was clean; unrelated generated/untracked artifacts remained untouched.
 
-The GUI branch is 10 commits ahead of `develop`, 0 behind, and its diff is confined to Architecture 90, the optional GUI dependency, `trading_bot.gui`, and GUI tests. C1/C2/C3, Credential Manager, production transport, authority, and brokerage files are unchanged.
-
-The next GUI checkpoint is **GUI-A2: real read-only research/backtest results**. It should add a reviewed plain-Python research service/adapter boundary first, then replace the Research placeholder with actual existing research/backtest data without introducing production or external effects.
+The next GUI checkpoint is **GUI-A3: read-only research usability and visualization**. It should improve interpretation of loaded research results through bounded sorting/filtering and selected-result detail/visualization while preserving the same no-effect architecture boundary. Any GUI control that can invoke production capture, modify trading state, access credentials, recover/retry authority, or submit brokerage actions remains out of scope.
 
 ## Consumed real-provider lineages
 

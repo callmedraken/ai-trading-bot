@@ -26,21 +26,31 @@ are complete.
 **Production/live trading: NO-GO.**
 
 C1 `ValidatedProductionAuthority` and C2 `WindowsTransactionalAuthority` are
-reviewed foundations. C3 has now advanced beyond the previously inert effect
-boundary: the branch contains the native Windows process/containment path, C1/C2/C3
-production composition, the manual one-shot production capture command, and a
-real Alpaca provider effect path.
+reviewed foundations. C3 has advanced through the native Windows
+process/containment path, C1/C2/C3 production composition, the manual one-shot
+production capture command, and two controlled real Alpaca provider effects.
 
-C3 is **not yet certified complete**. The first real-provider E3 lineage reached
-one real provider effect but ended `FAILED / CONFIRMED` with child classification
-`TRANSPORT_FAILED`; no production snapshot was selected. A repeated identical CLI
-request was safely blocked before a new attempt or provider effect. E3.2 introduced
-closed sanitized transport-stage diagnostics; C3-E3.3 has now been source-certified
-so known transport/protocol failures retain truthful sanitized stages while
-unexpected programming defects escape the transport boundary and are sanitized by
-the isolated child as `INTERNAL_FAILED`. The currently deployed fixed runtime
-predates E3.3 and must be rebuilt, inspected, and redeployed before the next real
-provider acceptance attempt.
+C3 is **not yet certified complete** because no real provider lineage has produced
+a parent-verified selected production snapshot. The August 21 lineage ended
+`FAILED / CONFIRMED` with the original broad child classification
+`TRANSPORT_FAILED`. E3.2 then added closed stage diagnostics and E3.3 corrected
+truthfulness so programming defects are not mislabeled as transport failures.
+The E3.3 fixed runtime was subsequently built, inspected, deployed through the
+sealed-runtime procedure, Trading read/execute access was republished, and the
+non-admin Trading zero-provider preflight passed.
+
+A fresh August 24 planning preflight then passed with authorized snapshot date
+`2026-08-24` and a digest distinct from the consumed August 21 request. Exactly one
+new provider effect was authorized. That August 24 lineage also ended
+`FAILED / CONFIRMED`, but E3.3 correctly narrowed the child classification to
+`TRANSPORT_RESPONSE_METADATA_FAILED`. Durable read-only inspection verified
+entered provider fence, complete result transport, clean child exit, complete
+parent/staging cleanup, valid evidence hashes, and no snapshot/artifact authority.
+
+C3-E3.4 is now source-certified. It preserves every existing metadata validation
+rule while replacing the broad response-metadata classification with a closed,
+sanitized sub-classification set. The E3.4 source has **not yet been deployed** to
+the fixed production runtime, so no further real provider effect is authorized.
 
 There is still no unattended production scheduler, brokerage live-order
 transport, or authorization to place real-money orders.
@@ -105,6 +115,12 @@ Completed/implemented C3 areas include:
     failures retain the closed sanitized stage, unexpected programming defects
     remain internal failures, and sanitized non-200 HTTP status errors remain a
     distinct HTTP-response path.
+12. E3.4 closed sanitized response-metadata reasons and child classifications for
+    acquisition, malformed headers, duplicate relevant headers, content encoding,
+    transfer encoding, transfer-length conflict, content length, request ID,
+    content type, and generic fallback.
+
+### E3.3 certification and deployment
 
 C3-E3.3 source certification completed on commit
 `bf88890d87ed1734a4634e4b8069ff5232a20994` after implementation commits
@@ -115,8 +131,43 @@ C3-E3.3 source certification completed on commit
 - Ruff check: passed;
 - Ruff format check across Git-tracked Python sources: passed.
 
-This certifies the accepted source tree. It does **not** certify the older deployed
-fixed runtime, which still requires an E3.3 rebuild and sealed-runtime redeployment.
+The accepted E3.3 production wheel was built from the certified implementation
+checkpoint and inspected before deployment:
+
+- wheel length: 672,104 bytes;
+- wheel SHA-256:
+  `ed87fcce586a3b2f2477f2b99e6c404d7c42f5cc2ef29e230b12cd8ca7640b3b`;
+- 192 wheel entries / 191 RECORD hashes verified;
+- production SQL remained 118,896 bytes with the frozen SHA-256 above;
+- installed semantic checks proved the E3.3 HTTP hierarchy and narrowed stage
+  behavior.
+
+The sealed-runtime deployment passed with runtime quiescence, temporary Trading
+access revocation, offline install, installed RECORD reconciliation, C1 validation,
+Administrator ownership, Administrator/SYSTEM sealing, Trading RX republication,
+and a non-admin Trading zero-provider preflight. No provider request occurred
+through that deployment/preflight sequence.
+
+### E3.4 source certification
+
+C3-E3.4 is source-certified at implementation commit
+`134467ecda1ffbb39f48cf68a2d3e9017d1d2f61` (`fix: classify Alpaca response
+metadata failures`). The certified diff survived the E3.3 docs-only fast-forward
+byte-for-byte with SHA-256
+`6d9232fef1f5dfaf8b1df329e28db20646d108a81b0e1410e2d2d9cd82cdbca6`.
+
+Final broad certification:
+
+- complete repository suite: 3,136 passed, 16 skipped, 0 failed;
+- Ruff check over Git-tracked Python: passed;
+- Ruff format check over 358 Git-tracked Python files: passed;
+- final `git diff --check`: passed.
+
+E3.4 changes diagnostic precision only. It does not change C1/C2 authority,
+production SQL, provider-call budget, endpoint/feed/query semantics, Credential
+Manager behavior, native process ordering, or retry authority. Unexpected
+programming defects still escape expected transport catches and become sanitized
+`INTERNAL_FAILED` child results.
 
 The native ordering continues to preserve the core rule:
 
@@ -151,35 +202,89 @@ child classification: TRANSPORT_FAILED
 
 A second invocation using the exact same deterministic request was blocked before
 attempt allocation. It created no new attempt, claim, reservation, child,
-provider request, or durable mutation. Actual provider-call count therefore
-remains 1.
+provider request, or durable mutation.
 
-That behavior is required: a prior executed `FAILED / CONFIRMED` lineage is not
-retry-safe. The same-session retry exception remains limited to the narrowly
-proven `FAILED / NOT_STARTED` process-creation-failure case with no execution.
-
-### Next legitimate acceptance attempt
-
-Do not manufacture a different digest for the consumed August 21 intent by
-changing an irrelevant request field. The next real provider attempt must use a
-genuinely new completed XNYS session.
-
-Before any new real-provider attempt, build a new fixed-runtime artifact from the
-accepted E3.3 source tree, inspect its contents/hash, redeploy it through the
-established sealed-runtime procedure, and complete a zero-provider runtime
-verification. The older deployed runtime must not be used for the next E3 effect.
-
-For the August 24, 2026 session, first run only the no-effect planning preflight
-after regular close plus the planned buffer. It must prove the authorized session
-is `2026-08-24`, emit `PROVIDER_CALL_PERFORMED=False`, and produce a request digest
-distinct from the consumed August 21 digest:
+The consumed August 21 C2 request digest is:
 
 `823e9bee88de07bbd6d3384559dd6207ad216e69d46443594f8664fff49854a7`
 
-Only after the updated runtime is deployed and that preflight is reviewed should
-exactly one new-session provider call be authorized. A failure must be handled
-from its E3.3 sanitized stage or `INTERNAL_FAILED` distinction plus durable
-disposition; the same consumed lineage must not be automatically retried.
+### Consumed August 24 lineage
+
+After E3.3 deployment and zero-provider verification, the pure planner authorized
+snapshot `2026-08-24` with a fresh digest:
+
+`ed4cc49dc385486ac5ca623f64e99766247e371c90f29f1ff8fd585841d6b651`
+
+The freshness guard proved no existing durable session for that digest. Exactly
+one real provider invocation then produced:
+
+```text
+session: c78b94a4-963f-5197-9a03-16017ea2203b
+attempt: e1a74104-150c-5ef9-96f3-f9d6d0c8aee0
+terminal: b4c34eec-81d4-5dad-b01a-34d88fca05d4
+terminal outcome: FAILED
+provider disposition: CONFIRMED
+child classification: TRANSPORT_RESPONSE_METADATA_FAILED
+selection: none
+snapshot: none
+```
+
+Read-only durable inspection confirmed:
+
+```text
+child fence state: ENTERED
+result transport: COMPLETE
+process outcome: EXITED_ZERO
+parent cleanup: COMPLETE
+artifact verification: NOT_ATTEMPTED
+staging cleanup: COMPLETE
+terminal reason: POST_FENCE_CHILD_FAILURE
+terminal evidence digest: valid
+terminal diagnostics digest: valid
+```
+
+This lineage is consumed and must not be retried. Actual real-provider call count
+is now exactly **2**.
+
+### Planner clock contract
+
+The first August 24 pure-plan attempt failed safely before any durable/provider
+effect because the exchange-local calendar date was still August 24. The current
+planner reconciles by calling `previous_session(requested_at_utc)`, which first
+moves back from the **New York calendar date**. Therefore a request for completed
+session date `D` reconciles only once the New York calendar date has advanced to
+`D + 1`; it is not enough merely to wait until regular market close plus a buffer.
+
+For the August 24 request this meant waiting until midnight EDT on August 25
+(9:00 PM PDT on August 24). The subsequent pure planner passed at
+`2026-08-25T04:08:44.675052+00:00`.
+
+Treat that exchange-date rule as the current acceptance contract. Changing the
+planner to a different close-time semantic would be separate clock/authority
+architecture work and requires Sol High review.
+
+### Next legitimate acceptance attempt
+
+Do not retry either consumed lineage and do not manufacture a new digest by
+changing irrelevant fields. A future provider effect must use a genuinely new
+completed XNYS session.
+
+Before provider call #3 can even be considered:
+
+1. Build a new fixed-runtime artifact from the E3.4 implementation checkpoint
+   `134467ecda1ffbb39f48cf68a2d3e9017d1d2f61`.
+2. Inspect exact wheel contents, source binding, SHA-256, byte length, RECORD, SQL
+   digest, and the E3.4 classification behavior.
+3. Redeploy through the established sealed-runtime procedure with no provider
+   effect.
+4. Restore exact Trading RX and complete the non-admin zero-provider preflight.
+5. Use the next genuinely completed XNYS session and wait until the New York
+   calendar date advances to the following day before the pure planning preflight.
+6. Review the fresh authorized session and request digest.
+7. Only then make an explicit decision whether to authorize exactly one provider
+   effect.
+
+**Provider call #3 is currently unauthorized.**
 
 ## Immediate deep-review status
 
@@ -190,10 +295,10 @@ pre-effect/safe-continuation durable states are not directly resumable through t
 one-shot production facade. Any future diagnostic interface must remain read-only,
 durable-state-derived, sanitized, and incapable of granting retry authority.
 
-The Alpaca HTTP interoperability/security review is also complete for the E3.3
-checkpoint. It found that E3.2's broad stage-local `except Exception` blocks could
-misclassify programming defects as network-stage failures. E3.3 corrected that
-without weakening one-shot/no-retry behavior.
+The Alpaca HTTP interoperability/security review led to E3.3 and E3.4. E3.3 fixed
+misclassification of unexpected programming defects. E3.4 now makes known
+response-metadata validation failures precise without persisting raw headers,
+provider/server text, response bodies, credentials, or arbitrary exception text.
 
 Remaining secondary reviews before unattended operation include production
 `close()` and concurrent admission/drain behavior, secret/transport-object
@@ -324,8 +429,8 @@ At each checkpoint closeout:
 9. Keep `AGENTS.md` focused on stable development, safety, architecture, testing,
    and AI-workflow rules.
 10. Start implementation tasks by reading `AGENTS.md`, this status document, the
-    canonical handoff, and the architecture documents directly relevant to the
-    milestone.
+   canonical handoff, and the architecture documents directly relevant to the
+   milestone.
 
 The standing checkpoint workflow authorizes narrowly scoped documentation
 edits/commits needed to keep this Git-tracked pair current at checkpoint closeout.

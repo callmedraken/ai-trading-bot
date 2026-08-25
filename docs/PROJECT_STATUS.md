@@ -165,37 +165,41 @@ The non-admin Trading E3.4 preflight passed:
 
 **The E3.4 deployment checkpoint is accepted.**
 
-## Parallel GUI track: GUI-A3 certified
+## Parallel GUI track: GUI-A4 certified
 
-GUI-A1 through GUI-A3 are complete on isolated branch `feature/gui-foundation`, based on `develop` and intentionally separate from the frozen C3 production branch.
+GUI-A1 through GUI-A4 are complete on isolated branch `feature/gui-foundation`, based on `develop` and intentionally separate from the frozen C3 production branch.
 
-Accepted GUI-A3 checkpoint:
+Accepted GUI-A4 checkpoint:
 
-- GUI branch HEAD: `9076ca4b4be125e42c14460c35b2d1ce677e5a82`;
+- GUI branch HEAD: `bc3ba7aacb41668ff36196afb307849a2f33b803`;
 - Architecture 90 continues to define the GUI dependency direction and no-effect boundary;
 - PySide6/Qt remains optional and presentation-only;
-- the existing bounded compact-report service remains authoritative for report loading, including exact canonical deserialization, a 10 MB + 1 byte read bound, a 500-row result bound, and one sanitized unavailable state;
-- GUI-A3 adds a native `Open Report…` flow for explicit local `.json` report selection without scanning directories or persisting recent-file state;
-- report replacement updates only the Research presentation state and does not rebuild unrelated application state or mutate the source artifact;
-- the current report path is operator-visible but bounded to 512 presentation characters;
-- filtering is case-insensitive over displayed variant/parameter labels and bounded to 200 characters;
-- the results table remains non-editable, single-row-selection, and supports deterministic presentation-only sorting over rank, variant, parameters, total return, maximum drawdown, turnover, and trades;
-- sortable keys safely handle unranked rows and use `caller_ordinal` as the deterministic tie-breaker for equal primary values;
-- supported header clicks explicitly start ascending and then toggle direction; unsupported Exposure and Return/drawdown columns do not reorder the table;
-- sorting/filtering never mutates the underlying immutable `ResearchReportView.rows` sequence;
-- selected-row detail displays only approved report fields: rank, variant, parameters, total return, maximum drawdown, turnover, and trade count;
-- Exposure and Return/drawdown remain explicitly `Unavailable` because compact-report v1 supplies no approved source or derivation policy;
-- existing CLI startup via `python -m trading_bot.gui --research-report PATH` remains operational;
-- no research execution, optimization, strategy mutation, network access, Credential Manager access, C1/C2/C3 authority access, production child launch, provider transport, brokerage, scheduler, recovery, or live controls are connected;
-- focused GUI-A3 implementation verification passed before commit, and the deterministic-sorting follow-up gate passed with 18 GUI-A3 tests;
-- full repository regression at final GUI-A3 HEAD: 2,759 passed, 13 skipped, 0 failed;
+- the bounded compact-report service remains authoritative for local report loading, canonical deserialization, a 10 MB + 1 byte read bound, a 500-row result bound, and one sanitized unavailable state;
+- GUI-A3 Open Report, explicit path startup, bounded filtering, deterministic sorting, selected-result detail, and immutable report handling remain intact;
+- GUI-A4 adds immutable GUI-only comparison state for 2–4 variants using stable `caller_ordinal` identities rather than visual table indexes;
+- comparison identities survive presentation sorting/filtering and are resolved back against immutable report rows; report replacement clears incompatible comparison state;
+- comparison selection is bounded to four unique variants in deterministic caller order, with explicit add/remove/clear actions and operator-visible slot count;
+- the comparison table is read-only and displays only approved compact-report fields: rank, variant, parameters, total return, maximum drawdown, turnover, and trade count;
+- compact-report v1 still supplies no approved exposure or return-over-drawdown source, so no new derived financial metrics were introduced;
+- a Qt-native comparison chart visualizes total return, maximum drawdown, turnover, and trade count without adding a plotting dependency or composite score;
+- total return uses a centered zero axis with truthful negative/zero/positive geometry;
+- maximum drawdown explicitly states that lower is better and larger bars represent more drawdown; turnover and trade count are presented without preference inference;
+- comparison ties and ordering remain deterministic;
+- Research-page content is wrapped in a vertical `QScrollArea`, horizontal page-level scrolling is disabled, and all four-variant comparison content remains reachable at the normal application size without reducing/clipping chart height;
+- chart title/context placement uses measured Qt font metrics plus a fixed gap, eliminating heading overlap without changing comparison values or semantics;
+- no research execution, optimization, strategy mutation, network access, Credential Manager access, C1/C2/C3 authority access, production child launch, provider transport, brokerage, scheduler, recovery, paper/live controls, or other external-effect path is connected;
+- focused GUI + compact-report regression before final certification passed with 51 tests;
+- A4 layout follow-up passed 36 GUI tests;
+- A4 chart-presentation follow-up passed 9 focused tests;
+- full repository regression on the complete GUI-A4 behavioral implementation: 2,770 passed, 13 skipped, 0 failed;
+- final certified-head GUI gate: 45 passed;
 - Ruff check passed;
-- Ruff format check passed across 351 tracked Python files;
+- Ruff format check passed across 356 tracked Python files;
 - final `git diff --check` passed;
-- interactive visual smoke passed using the tracked compact-report fixture: Open Report, bounded filtering, deterministic table ordering, row selection, detail-panel updates, and unavailable metrics all rendered correctly in the dark theme;
+- interactive visual smoke passed with four comparison variants, working vertical scrolling, readable comparison table/chart, and non-overlapping maximum-drawdown explanatory text;
 - final tracked working tree was clean; unrelated generated/untracked artifacts remained untouched.
 
-The GUI branch is 15 commits ahead of `develop`, 0 behind. GUI-A4 should remain read-only and focus on research visualization/comparison over already-reviewed report data rather than adding trading or production effects. Any control that can invoke production capture, modify trading state, access credentials, recover/retry authority, or submit brokerage actions remains out of scope.
+At GUI-A4 certification, `feature/gui-foundation` is 19 commits ahead of `develop` and 0 behind. Further Research-page feature expansion is paused. The next GUI milestone is **GUI integration readiness**: perform one branch-level integration review, prepare/review a pull request targeting `develop`, and merge only with explicit approval. Production authority, provider, credential, brokerage, paper/live, and C3 controls remain outside the GUI integration scope.
 
 ## Consumed real-provider lineages
 

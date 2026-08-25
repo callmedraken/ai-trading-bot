@@ -1,4 +1,5 @@
 """Optional offscreen smoke tests for the GUI-A1 Qt shell."""
+# ruff: noqa: E402
 
 import os
 
@@ -7,11 +8,11 @@ import pytest
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 pytest.importorskip("PySide6")
 
-from PySide6.QtWidgets import QApplication  # noqa: E402
+from PySide6.QtWidgets import QApplication
 
-from trading_bot.gui import ApplicationOverview  # noqa: E402
-from trading_bot.gui.main_window import MainWindow, PAGE_IDS  # noqa: E402
-from trading_bot.gui.mock_service import MockGuiApplicationService  # noqa: E402
+from trading_bot.gui import ApplicationOverview
+from trading_bot.gui.main_window import MainWindow, PAGE_IDS
+from trading_bot.gui.mock_service import MockGuiApplicationService
 
 
 class _RecordingService:

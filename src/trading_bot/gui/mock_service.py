@@ -5,40 +5,38 @@ from trading_bot.gui.models import (
     ComponentStatus,
     OperatingMode,
     PresentationStatus,
+    ResearchPageState,
 )
+from trading_bot.gui.research_service import unavailable_research_state
 
 
 class MockGuiApplicationService:
     """Return static presentation data without invoking application effects."""
 
     def get_overview(self) -> ApplicationOverview:
-        """Return deterministic GUI-A1 preview state."""
+        """Return deterministic GUI-A2 preview state."""
         return ApplicationOverview(
             mode=OperatingMode.RESEARCH,
             environment="GUI preview",
-            summary=(
-                "Read-only GUI foundation using deterministic mock application state."
-            ),
+            summary="Read-only GUI using bounded application presentation state.",
             components=(
                 ComponentStatus(
                     key="research",
                     title="Research",
-                    status=PresentationStatus.HEALTHY,
-                    detail="Offline research and backtesting views can be added next.",
+                    status=PresentationStatus.INFO,
+                    detail="Compact historical reports are presented read-only.",
                 ),
                 ComponentStatus(
                     key="paper",
                     title="Paper Operation",
                     status=PresentationStatus.INFO,
-                    detail="GUI-A1 exposes no paper-operation actions.",
+                    detail="GUI-A2 exposes no paper-operation actions.",
                 ),
                 ComponentStatus(
                     key="market-data",
                     title="Market Data",
                     status=PresentationStatus.UNAVAILABLE,
-                    detail=(
-                        "Production capture is intentionally not connected to GUI-A1."
-                    ),
+                    detail="Production capture is intentionally not connected.",
                 ),
                 ComponentStatus(
                     key="system",
@@ -48,3 +46,7 @@ class MockGuiApplicationService:
                 ),
             ),
         )
+
+    def get_research_state(self) -> ResearchPageState:
+        """Return the deterministic GUI-A2 empty research state."""
+        return unavailable_research_state()

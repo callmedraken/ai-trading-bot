@@ -10,7 +10,7 @@ pytest.importorskip("PySide6")
 
 from PySide6.QtWidgets import QApplication
 
-from trading_bot.gui import ApplicationOverview
+from trading_bot.gui import ApplicationOverview, ResearchPageState
 from trading_bot.gui.main_window import PAGE_IDS, MainWindow
 from trading_bot.gui.mock_service import MockGuiApplicationService
 
@@ -22,6 +22,10 @@ class _RecordingService:
     def get_overview(self) -> ApplicationOverview:
         self.calls += 1
         return MockGuiApplicationService().get_overview()
+
+    def get_research_state(self) -> ResearchPageState:
+        self.calls += 1
+        return MockGuiApplicationService().get_research_state()
 
 
 def _application() -> QApplication:
@@ -39,12 +43,12 @@ def test_main_window_has_stable_pages_and_navigation_is_presentation_only() -> N
     assert application.applicationName() is not None
     assert window.page_ids == PAGE_IDS
     assert window.current_page_id == "home"
-    assert service.calls == 1
+    assert service.calls == 2
 
     window.select_page("system")
 
     assert window.current_page_id == "system"
-    assert service.calls == 1
+    assert service.calls == 2
     window.close()
 
 

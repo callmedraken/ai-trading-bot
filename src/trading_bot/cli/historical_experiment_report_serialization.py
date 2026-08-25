@@ -4,18 +4,27 @@ import csv
 import io
 import json
 from decimal import Context, Decimal, localcontext
+from uuid import UUID
 
 from trading_bot.cli.exceptions import HistoricalExperimentReportOutputError
 from trading_bot.execution.state_fingerprints import canonical_decimal
 from trading_bot.experiments import (
+    HistoricalExperimentGridAssignment,
     HistoricalExperimentGridParameter,
+    HistoricalExperimentMetrics,
+    HistoricalExperimentRankingCriterion,
+    HistoricalExperimentRankingDirection,
     HistoricalExperimentRankingMetric,
     HistoricalExperimentReport,
     HistoricalExperimentReportError,
+    HistoricalExperimentReportRanking,
+    HistoricalExperimentReportVariant,
+    HistoricalExperimentReportVariantSource,
+    HistoricalExperimentTieBreaker,
 )
+from trading_bot.portfolio import MetadataEntry
 
 COMPACT_EXPERIMENT_REPORT_SCHEMA_VERSION = 1
-
 _METRIC_FIELDS = (
     "initial_equity",
     "final_equity",
@@ -43,6 +52,18 @@ _METRIC_FIELDS = (
     "maximum_target_cash_weight",
     "applied_cycle_count",
     "no_action_cycle_count",
+)
+
+_INTEGER_METRIC_FIELDS = frozenset(
+    {
+        "total_orders",
+        "total_fills",
+        "approved_decisions",
+        "resized_decisions",
+        "rejected_decisions",
+        "applied_cycle_count",
+        "no_action_cycle_count",
+    }
 )
 
 _RANKING_METRIC_FIELDS = (
@@ -246,6 +267,285 @@ def build_compact_report_json(
             ],
         },
     }
+
+
+def deserialize_compact_report_json(
+    payload: str | bytes,
+) -> HistoricalExperimentReport:
+    """Deserialize and validate one version-one compact JSON report."""
+    if not isinstance(payload, str | bytes):
+        raise HistoricalExperimentReportOutputError(
+            "compact report JSON payload must be text or bytes"
+        )
+    try:
+        tree = json.loads(payload)
+        root = _object(tree, "root")
+        _exact_keys(root, {"schema_version", "report"}, "root")
+        if root["schema_version"] != COMPACT_EXPERIMENT_REPORT_SCHEMA_VERSION:
+            raise ValueError("unsupported compact report schema version")
+        section = _object(root["report"], "report")
+        _exact_keys(
+            section,
+            {
+                "report_id",
+                "experiment_request_id",
+                "experiment_result_id",
+                "historical_fingerprint",
+                "schedule_fingerprint",
+                "initial_state_fingerprint",
+                "variant_source",
+                "grid_specification_id",
+                "grid_result_id",
+                "ranking",
+                "variants",
+                "metadata",
+            },
+            "report",
+        )
+        ranking = _parse_ranking(section["ranking"])
+        variants = tuple(
+            _parse_variant(item, ranking, index)
+            for index, item in enumerate(_array(section["variants"], "report.variants"))
+        )
+        metadata = tuple(
+            _parse_metadata(item, index)
+            for index, item in enumerate(_array(section["metadata"], "report.metadata"))
+        )
+        return HistoricalExperimentReport(
+            report_id=_uuid(section["report_id"], "report.report_id"),
+            experiment_request_id=_uuid(
+                section["experiment_request_id"], "report.experiment_request_id"
+            ),
+            experiment_result_id=_uuid(
+                section["experiment_result_id"], "report.experiment_result_id"
+            ),
+            historical_fingerprint=_uuid(
+                section["historical_fingerprint"], "report.historical_fingerprint"
+            ),
+            schedule_fingerprint=_uuid(
+                section["schedule_fingerprint"], "report.schedule_fingerprint"
+            ),
+            initial_state_fingerprint=_uuid(
+                section["initial_state_fingerprint"],
+                "report.initial_state_fingerprint",
+            ),
+            variant_source=HistoricalExperimentReportVariantSource(
+                section["variant_source"]
+            ),
+            grid_specification_id=_parse_optional_uuid(
+                section["grid_specification_id"], "report.grid_specification_id"
+            ),
+            grid_result_id=_parse_optional_uuid(
+                section["grid_result_id"], "report.grid_result_id"
+            ),
+            ranking=ranking,
+            variants=variants,
+            metadata=metadata,
+        )
+    except HistoricalExperimentReportOutputError:
+        raise
+    except (HistoricalExperimentReportError, TypeError, ValueError) as error:
+        raise HistoricalExperimentReportOutputError(
+            f"invalid compact report JSON: {error}"
+        ) from error
+
+
+def _parse_ranking(value: object) -> HistoricalExperimentReportRanking | None:
+    if value is None:
+        return None
+    item = _object(value, "report.ranking")
+    _exact_keys(
+        item,
+        {
+            "policy_id",
+            "policy_fingerprint",
+            "comparison_result_id",
+            "criteria",
+            "tie_breaker",
+        },
+        "report.ranking",
+    )
+    criteria = []
+    for index, criterion_value in enumerate(
+        _array(item["criteria"], "report.ranking.criteria")
+    ):
+        path = f"report.ranking.criteria[{index}]"
+        criterion = _object(criterion_value, path)
+        _exact_keys(criterion, {"metric", "direction"}, path)
+        criteria.append(
+            HistoricalExperimentRankingCriterion(
+                metric=HistoricalExperimentRankingMetric(criterion["metric"]),
+                direction=HistoricalExperimentRankingDirection(criterion["direction"]),
+            )
+        )
+    return HistoricalExperimentReportRanking(
+        policy_id=_uuid(item["policy_id"], "report.ranking.policy_id"),
+        policy_fingerprint=_uuid(
+            item["policy_fingerprint"], "report.ranking.policy_fingerprint"
+        ),
+        comparison_result_id=_uuid(
+            item["comparison_result_id"], "report.ranking.comparison_result_id"
+        ),
+        criteria=tuple(criteria),
+        tie_breaker=HistoricalExperimentTieBreaker(item["tie_breaker"]),
+    )
+
+
+def _parse_variant(
+    value: object,
+    ranking: HistoricalExperimentReportRanking | None,
+    index: int,
+) -> HistoricalExperimentReportVariant:
+    path = f"report.variants[{index}]"
+    item = _object(value, path)
+    _exact_keys(
+        item,
+        {
+            "caller_ordinal",
+            "experiment_run_id",
+            "rolling_result_id",
+            "variant_id",
+            "variant_name",
+            "grid_ordinal",
+            "grid_assignments",
+            "rank",
+            "comparison_values",
+            "metrics",
+        },
+        path,
+    )
+    assignments = tuple(
+        _parse_assignment(assignment, f"{path}.grid_assignments[{ordinal}]")
+        for ordinal, assignment in enumerate(
+            _array(item["grid_assignments"], f"{path}.grid_assignments")
+        )
+    )
+    comparison_items = _array(item["comparison_values"], f"{path}.comparison_values")
+    criteria = () if ranking is None else ranking.criteria
+    if len(comparison_items) != len(criteria):
+        raise ValueError(f"{path}.comparison_values do not match ranking criteria")
+    comparison_values = []
+    ranking_fields = dict(_RANKING_METRIC_FIELDS)
+    for ordinal, (comparison_value, criterion) in enumerate(
+        zip(comparison_items, criteria, strict=True)
+    ):
+        comparison_path = f"{path}.comparison_values[{ordinal}]"
+        comparison = _object(comparison_value, comparison_path)
+        _exact_keys(comparison, {"metric", "value"}, comparison_path)
+        if comparison["metric"] != criterion.metric.value:
+            raise ValueError(f"{comparison_path}.metric does not match ranking")
+        comparison_values.append(
+            _metric_scalar(comparison["value"], ranking_fields[criterion.metric])
+        )
+    metrics_item = _object(item["metrics"], f"{path}.metrics")
+    _exact_keys(metrics_item, set(_METRIC_FIELDS), f"{path}.metrics")
+    metrics = HistoricalExperimentMetrics(
+        **{
+            field: _metric_scalar(metrics_item[field], field)
+            for field in _METRIC_FIELDS
+        }
+    )
+    return HistoricalExperimentReportVariant(
+        caller_ordinal=_integer(item["caller_ordinal"], f"{path}.caller_ordinal"),
+        experiment_run_id=_uuid(item["experiment_run_id"], f"{path}.experiment_run_id"),
+        rolling_result_id=_uuid(item["rolling_result_id"], f"{path}.rolling_result_id"),
+        variant_id=_uuid(item["variant_id"], f"{path}.variant_id"),
+        variant_name=_text(item["variant_name"], f"{path}.variant_name"),
+        grid_ordinal=_optional_integer(item["grid_ordinal"], f"{path}.grid_ordinal"),
+        grid_assignments=assignments,
+        rank=_optional_integer(item["rank"], f"{path}.rank"),
+        comparison_values=tuple(comparison_values),
+        metrics=metrics,
+    )
+
+
+def _parse_assignment(value: object, path: str) -> HistoricalExperimentGridAssignment:
+    item = _object(value, path)
+    _exact_keys(item, {"parameter", "value"}, path)
+    parameter = HistoricalExperimentGridParameter(item["parameter"])
+    raw = item["value"]
+    if parameter is HistoricalExperimentGridParameter.WINDOW_OBSERVATION_COUNT:
+        parsed = _integer(raw, f"{path}.value")
+    elif parameter is HistoricalExperimentGridParameter.TRADING_ENABLED:
+        if type(raw) is not bool:
+            raise ValueError(f"{path}.value must be a boolean")
+        parsed = raw
+    elif raw is None:
+        parsed = None
+    else:
+        parsed = _decimal_value(raw, f"{path}.value")
+    return HistoricalExperimentGridAssignment(parameter=parameter, value=parsed)
+
+
+def _parse_metadata(value: object, index: int) -> MetadataEntry:
+    path = f"report.metadata[{index}]"
+    item = _object(value, path)
+    _exact_keys(item, {"key", "value"}, path)
+    return MetadataEntry(
+        key=_text(item["key"], f"{path}.key"),
+        value=_text(item["value"], f"{path}.value"),
+    )
+
+
+def _metric_scalar(value: object, name: str) -> Decimal | int:
+    if name in _INTEGER_METRIC_FIELDS:
+        return _integer(value, name)
+    return _decimal_value(value, name)
+
+
+def _object(value: object, path: str) -> dict[str, object]:
+    if type(value) is not dict or not all(type(key) is str for key in value):
+        raise ValueError(f"{path} must be an object with string keys")
+    return value
+
+
+def _array(value: object, path: str) -> list[object]:
+    if type(value) is not list:
+        raise ValueError(f"{path} must be an array")
+    return value
+
+
+def _exact_keys(value: dict[str, object], expected: set[str], path: str) -> None:
+    if set(value) != expected:
+        raise ValueError(f"{path} has unsupported fields")
+
+
+def _text(value: object, path: str) -> str:
+    if type(value) is not str or not value.strip():
+        raise ValueError(f"{path} must be nonblank text")
+    return value
+
+
+def _integer(value: object, path: str) -> int:
+    if type(value) is not int:
+        raise ValueError(f"{path} must be an integer")
+    return value
+
+
+def _optional_integer(value: object, path: str) -> int | None:
+    return None if value is None else _integer(value, path)
+
+
+def _decimal_value(value: object, path: str) -> Decimal:
+    if type(value) is not str:
+        raise ValueError(f"{path} must be canonical decimal text")
+    parsed = Decimal(value)
+    if not parsed.is_finite() or _decimal(parsed) != value:
+        raise ValueError(f"{path} must be canonical finite decimal text")
+    return parsed
+
+
+def _uuid(value: object, path: str) -> UUID:
+    if type(value) is not str:
+        raise ValueError(f"{path} must be a UUID string")
+    parsed = UUID(value)
+    if str(parsed) != value:
+        raise ValueError(f"{path} must be a canonical UUID string")
+    return parsed
+
+
+def _parse_optional_uuid(value: object, path: str) -> UUID | None:
+    return None if value is None else _uuid(value, path)
 
 
 def serialize_compact_report_json(

@@ -1,15 +1,21 @@
-"""Qt presentation shell for the GUI-A1 application foundation."""
+"""Qt presentation shell for the GUI application foundation."""
+
+from decimal import Decimal
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
+    QAbstractItemView,
     QFrame,
     QGridLayout,
     QHBoxLayout,
+    QHeaderView,
     QLabel,
     QListWidget,
     QListWidgetItem,
     QMainWindow,
     QStackedWidget,
+    QTableWidget,
+    QTableWidgetItem,
     QVBoxLayout,
     QWidget,
 )
@@ -19,6 +25,8 @@ from trading_bot.gui.models import (
     ComponentStatus,
     OperatingMode,
     PresentationStatus,
+    ResearchPageState,
+    ResearchReportStatus,
 )
 from trading_bot.gui.services import GuiApplicationService
 
@@ -52,6 +60,7 @@ class MainWindow(QMainWindow):
     def __init__(self, service: GuiApplicationService) -> None:
         super().__init__()
         self._overview = service.get_overview()
+        self._research_state = service.get_research_state()
         self._page_index = {page_id: index for index, page_id in enumerate(PAGE_IDS)}
 
         self.setWindowTitle("AI Trading Bot")
@@ -68,15 +77,7 @@ class MainWindow(QMainWindow):
         self._stack.setObjectName("pageStack")
 
         self._stack.addWidget(self._build_home_page(self._overview))
-        self._stack.addWidget(
-            self._build_placeholder_page(
-                "Research",
-                (
-                    "GUI-A2 can connect reviewed offline research and backtest "
-                    "results here."
-                ),
-            )
-        )
+        self._stack.addWidget(self._build_research_page(self._research_state))
         self._stack.addWidget(
             self._build_placeholder_page(
                 "Paper Operation",
@@ -197,6 +198,99 @@ class MainWindow(QMainWindow):
 
         return card
 
+    def _build_research_page(self, state: ResearchPageState) -> QWidget:
+        page = QWidget(self)
+        page.setObjectName("researchPage")
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(28, 26, 28, 26)
+        layout.setSpacing(12)
+
+        title = QLabel("Historical Research", page)
+        title.setObjectName("pageTitle")
+        layout.addWidget(title)
+
+        status = QLabel(state.message, page)
+        status.setObjectName("summaryLabel")
+        status.setWordWrap(True)
+        layout.addWidget(status)
+
+        if state.status is ResearchReportStatus.UNAVAILABLE:
+            empty = QLabel(
+                "Generate a compact JSON report with the existing historical "
+                "experiment CLI, then provide it through the GUI research service.",
+                page,
+            )
+            empty.setObjectName("researchEmptyState")
+            empty.setWordWrap(True)
+            empty.setAlignment(Qt.AlignmentFlag.AlignTop)
+            layout.addWidget(empty)
+            layout.addStretch(1)
+            return page
+
+        report = state.report
+        if report is None:
+            raise RuntimeError("loaded research state is missing its report")
+        identity = QLabel(
+            f"Report {report.report_id}  •  Experiment {report.experiment_result_id}",
+            page,
+        )
+        identity.setObjectName("researchIdentity")
+        identity.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        layout.addWidget(identity)
+
+        summary = QLabel(
+            f"{report.variant_source}  •  {report.row_count} result(s)  •  "
+            f"{report.ranking_summary}",
+            page,
+        )
+        summary.setObjectName("researchSummary")
+        summary.setWordWrap(True)
+        layout.addWidget(summary)
+
+        metadata = QLabel(report.metadata_summary, page)
+        metadata.setObjectName("researchMetadata")
+        metadata.setWordWrap(True)
+        layout.addWidget(metadata)
+
+        headers = (
+            "Rank",
+            "Variant",
+            "Parameters",
+            "Total return",
+            "Max drawdown",
+            "Turnover",
+            "Trades",
+            "Exposure",
+            "Return / drawdown",
+        )
+        table = QTableWidget(report.row_count, len(headers), page)
+        table.setObjectName("researchResultsTable")
+        table.setHorizontalHeaderLabels(headers)
+        table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        table.setAlternatingRowColors(True)
+        table.verticalHeader().setVisible(False)
+        table.horizontalHeader().setSectionResizeMode(
+            QHeaderView.ResizeMode.ResizeToContents
+        )
+        table.horizontalHeader().setStretchLastSection(True)
+        for row_index, row in enumerate(report.rows):
+            values = (
+                "—" if row.rank is None else str(row.rank),
+                row.variant_label,
+                row.parameter_label,
+                _percentage(row.total_return),
+                _percentage(row.maximum_drawdown_percentage),
+                _decimal_text(row.turnover),
+                str(row.trade_count),
+                _optional_decimal(row.exposure),
+                _optional_decimal(row.return_over_drawdown),
+            )
+            for column, value in enumerate(values):
+                table.setItem(row_index, column, QTableWidgetItem(value))
+        layout.addWidget(table, 1)
+        return page
+
     def _build_placeholder_page(self, title_text: str, body_text: str) -> QWidget:
         page = QWidget(self)
         layout = QVBoxLayout(page)
@@ -293,3 +387,15 @@ class MainWindow(QMainWindow):
             }
             """
         )
+
+
+def _decimal_text(value: Decimal) -> str:
+    return format(value, "f")
+
+
+def _percentage(value: Decimal) -> str:
+    return f"{format(value * 100, 'f')}%"
+
+
+def _optional_decimal(value: Decimal | None) -> str:
+    return "—" if value is None else _decimal_text(value)

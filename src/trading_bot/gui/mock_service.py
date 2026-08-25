@@ -1,4 +1,6 @@
-"""Deterministic mock application service for the GUI-A1 shell."""
+"""Deterministic read-only application services for the GUI shell."""
+
+from pathlib import Path
 
 from trading_bot.gui.models import (
     ApplicationOverview,
@@ -7,7 +9,10 @@ from trading_bot.gui.models import (
     PresentationStatus,
     ResearchPageState,
 )
-from trading_bot.gui.research_service import unavailable_research_state
+from trading_bot.gui.research_service import (
+    CompactReportResearchService,
+    unavailable_research_state,
+)
 
 
 class MockGuiApplicationService:
@@ -50,3 +55,19 @@ class MockGuiApplicationService:
     def get_research_state(self) -> ResearchPageState:
         """Return the deterministic GUI-A2 empty research state."""
         return unavailable_research_state()
+
+
+class ResearchReportGuiApplicationService:
+    """Compose the normal overview with one explicit read-only report adapter."""
+
+    def __init__(self, artifact_path: Path) -> None:
+        self._overview_service = MockGuiApplicationService()
+        self._research_service = CompactReportResearchService(artifact_path)
+
+    def get_overview(self) -> ApplicationOverview:
+        """Return the existing deterministic read-only overview."""
+        return self._overview_service.get_overview()
+
+    def get_research_state(self) -> ResearchPageState:
+        """Return the bounded state for the explicit compact report path."""
+        return self._research_service.get_research_state()

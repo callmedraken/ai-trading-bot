@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from trading_bot.cli.exceptions import HistoricalExperimentReportOutputError
 from trading_bot.cli.historical_experiment_report_serialization import (
     deserialize_compact_report_json,
     serialize_compact_report_json,
@@ -17,6 +18,7 @@ from trading_bot.gui import (
     ResearchReportView,
     ResearchResultRow,
 )
+from trading_bot.gui.research_service import MAX_RESEARCH_ARTIFACT_BYTES
 
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURE = (
@@ -131,3 +133,72 @@ def test_gui_a2_presentation_models_reject_invalid_relationships() -> None:
             exposure=None,
             return_over_drawdown=None,
         )
+
+
+def test_gui_a2_malformed_decimal_is_bounded_without_detail(tmp_path: Path) -> None:
+    tree = json.loads(FIXTURE.read_text(encoding="utf-8"))
+    tree["report"]["variants"][0]["metrics"]["simulation_return"] = "not-a-decimal"
+    payload = json.dumps(tree)
+    artifact = tmp_path / "gui-a2-malformed-decimal.json"
+    artifact.write_text(payload, encoding="utf-8")
+
+    with pytest.raises(HistoricalExperimentReportOutputError):
+        deserialize_compact_report_json(payload)
+
+    state = CompactReportResearchService(artifact).get_research_state()
+
+    assert state.status is ResearchReportStatus.UNAVAILABLE
+    assert state.report is None
+    assert state.message == (
+        "No supported compact historical experiment report is available."
+    )
+    assert "decimal" not in state.message.casefold()
+    assert "parser" not in state.message.casefold()
+
+
+def test_gui_a2_schema_version_bool_is_rejected_and_bounded(tmp_path: Path) -> None:
+    tree = json.loads(FIXTURE.read_text(encoding="utf-8"))
+    tree["schema_version"] = True
+    payload = json.dumps(tree)
+    artifact = tmp_path / "gui-a2-bool-schema-version.json"
+    artifact.write_text(payload, encoding="utf-8")
+
+    with pytest.raises(HistoricalExperimentReportOutputError):
+        deserialize_compact_report_json(payload)
+
+    state = CompactReportResearchService(artifact).get_research_state()
+    assert state.status is ResearchReportStatus.UNAVAILABLE
+    assert state.report is None
+    assert state.message == (
+        "No supported compact historical experiment report is available."
+    )
+
+
+def test_gui_a2_artifact_reader_requests_only_bound_plus_one_bytes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    requested_sizes: list[int] = []
+
+    class _OversizedStream:
+        def __enter__(self):  # type: ignore[no-untyped-def]
+            return self
+
+        def __exit__(self, *args):  # type: ignore[no-untyped-def]
+            return None
+
+        def read(self, size: int) -> bytes:
+            requested_sizes.append(size)
+            return b"x" * size
+
+    def _open(path: Path, mode: str):  # type: ignore[no-untyped-def]
+        assert path == FIXTURE
+        assert mode == "rb"
+        return _OversizedStream()
+
+    monkeypatch.setattr(Path, "open", _open)
+
+    state = CompactReportResearchService(FIXTURE).get_research_state()
+
+    assert requested_sizes == [MAX_RESEARCH_ARTIFACT_BYTES + 1]
+    assert state.status is ResearchReportStatus.UNAVAILABLE
+    assert state.report is None

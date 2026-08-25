@@ -3,7 +3,7 @@
 import csv
 import io
 import json
-from decimal import Context, Decimal, localcontext
+from decimal import Context, Decimal, DecimalException, localcontext
 from uuid import UUID
 
 from trading_bot.cli.exceptions import HistoricalExperimentReportOutputError
@@ -281,7 +281,10 @@ def deserialize_compact_report_json(
         tree = json.loads(payload)
         root = _object(tree, "root")
         _exact_keys(root, {"schema_version", "report"}, "root")
-        if root["schema_version"] != COMPACT_EXPERIMENT_REPORT_SCHEMA_VERSION:
+        if (
+            type(root["schema_version"]) is not int
+            or root["schema_version"] != COMPACT_EXPERIMENT_REPORT_SCHEMA_VERSION
+        ):
             raise ValueError("unsupported compact report schema version")
         section = _object(root["report"], "report")
         _exact_keys(
@@ -344,7 +347,12 @@ def deserialize_compact_report_json(
         )
     except HistoricalExperimentReportOutputError:
         raise
-    except (HistoricalExperimentReportError, TypeError, ValueError) as error:
+    except (
+        DecimalException,
+        HistoricalExperimentReportError,
+        TypeError,
+        ValueError,
+    ) as error:
         raise HistoricalExperimentReportOutputError(
             f"invalid compact report JSON: {error}"
         ) from error

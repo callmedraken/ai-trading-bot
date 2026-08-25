@@ -35,9 +35,10 @@ class CompactReportResearchService:
     def get_research_state(self) -> ResearchPageState:
         """Return loaded presentation state or one bounded unavailable state."""
         try:
-            if self._artifact_path.stat().st_size > MAX_RESEARCH_ARTIFACT_BYTES:
+            payload = _read_bounded_payload(self._artifact_path)
+            if len(payload) > MAX_RESEARCH_ARTIFACT_BYTES:
                 return unavailable_research_state()
-            report = deserialize_compact_report_json(self._artifact_path.read_bytes())
+            report = deserialize_compact_report_json(payload)
             if len(report.variants) > MAX_RESEARCH_RESULT_ROWS:
                 return unavailable_research_state()
             return ResearchPageState(
@@ -47,6 +48,11 @@ class CompactReportResearchService:
             )
         except (OSError, UnicodeError, HistoricalExperimentReportOutputError):
             return unavailable_research_state()
+
+
+def _read_bounded_payload(artifact_path: Path) -> bytes:
+    with artifact_path.open("rb") as artifact:
+        return artifact.read(MAX_RESEARCH_ARTIFACT_BYTES + 1)
 
 
 def unavailable_research_state() -> ResearchPageState:

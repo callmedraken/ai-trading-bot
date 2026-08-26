@@ -56,6 +56,10 @@ class MockGuiApplicationService:
         """Return the deterministic GUI-A2 empty research state."""
         return unavailable_research_state()
 
+    def load_research_report(self, artifact_path: Path) -> ResearchPageState:
+        """Load one operator-selected report through the application boundary."""
+        return CompactReportResearchService(artifact_path).get_research_state()
+
 
 class ResearchReportGuiApplicationService:
     """Compose the normal overview with one explicit read-only report adapter."""
@@ -71,3 +75,7 @@ class ResearchReportGuiApplicationService:
     def get_research_state(self) -> ResearchPageState:
         """Return the bounded state for the explicit compact report path."""
         return self._research_service.get_research_state()
+
+    def load_research_report(self, artifact_path: Path) -> ResearchPageState:
+        """Load one operator-selected report through the application boundary."""
+        return CompactReportResearchService(artifact_path).get_research_state()

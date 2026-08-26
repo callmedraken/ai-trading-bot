@@ -1,7 +1,7 @@
 """Immutable presentation-only records for the desktop GUI."""
 
 from dataclasses import dataclass
-from decimal import Decimal
+from decimal import Context, Decimal, localcontext
 from enum import Enum
 
 
@@ -76,6 +76,10 @@ class ApplicationOverview:
 
 
 MAX_RESEARCH_SOURCE_PATH_CHARACTERS = 512
+MAX_RESEARCH_VARIANT_LABEL_CHARACTERS = 160
+MAX_RESEARCH_PARAMETER_LABEL_CHARACTERS = 320
+MAX_RESEARCH_RANKING_SUMMARY_CHARACTERS = 640
+MAX_RESEARCH_METADATA_SUMMARY_CHARACTERS = 1_000
 
 
 class ResearchReportStatus(Enum):
@@ -95,8 +99,8 @@ class ResearchResultRow:
     parameter_label: str
     total_return: Decimal
     maximum_drawdown_percentage: Decimal
-    turnover: Decimal
-    trade_count: int
+    aggregate_one_way_turnover: Decimal
+    total_fills: int
     exposure: Decimal | None
     return_over_drawdown: Decimal | None
 
@@ -110,13 +114,17 @@ class ResearchResultRow:
         for name in (
             "total_return",
             "maximum_drawdown_percentage",
-            "turnover",
+            "aggregate_one_way_turnover",
         ):
             value = getattr(self, name)
             if type(value) is not Decimal or not value.is_finite():
                 raise TypeError(f"{name} must be a finite Decimal")
-        if type(self.trade_count) is not int or self.trade_count < 0:
-            raise ValueError("trade_count must be a nonnegative integer")
+        if type(self.total_fills) is not int or self.total_fills < 0:
+            raise ValueError("total_fills must be a nonnegative integer")
+        if len(self.variant_label) > MAX_RESEARCH_VARIANT_LABEL_CHARACTERS:
+            raise ValueError("variant_label exceeds the presentation bound")
+        if len(self.parameter_label) > MAX_RESEARCH_PARAMETER_LABEL_CHARACTERS:
+            raise ValueError("parameter_label exceeds the presentation bound")
         for name in ("exposure", "return_over_drawdown"):
             value = getattr(self, name)
             if value is not None and (
@@ -146,6 +154,10 @@ class ResearchReportView:
             "metadata_summary",
         ):
             _require_text(getattr(self, name), name)
+        if len(self.ranking_summary) > MAX_RESEARCH_RANKING_SUMMARY_CHARACTERS:
+            raise ValueError("ranking_summary exceeds the presentation bound")
+        if len(self.metadata_summary) > MAX_RESEARCH_METADATA_SUMMARY_CHARACTERS:
+            raise ValueError("metadata_summary exceeds the presentation bound")
         if self.source_path is not None:
             _require_text(self.source_path, "source_path")
             if len(self.source_path) > MAX_RESEARCH_SOURCE_PATH_CHARACTERS:
@@ -239,3 +251,19 @@ class ResearchComparisonState:
     def clear(self) -> "ResearchComparisonState":
         """Clear all comparison identities."""
         return ResearchComparisonState()
+
+
+def format_decimal_for_display(value: Decimal) -> str:
+    """Render one finite Decimal exactly without using ambient precision."""
+    if type(value) is not Decimal or not value.is_finite():
+        raise TypeError("value must be a finite Decimal")
+    return format(value, "f")
+
+
+def format_percentage_for_display(value: Decimal) -> str:
+    """Render an exact percentage without using ambient Decimal precision."""
+    if type(value) is not Decimal or not value.is_finite():
+        raise TypeError("value must be a finite Decimal")
+    digits = max(len(value.as_tuple().digits), 1)
+    with localcontext(Context(prec=digits + 2, Emax=999_999_999, Emin=-999_999_999)):
+        return f"{format(value * Decimal(100), 'f')}%"

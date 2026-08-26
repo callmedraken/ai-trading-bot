@@ -70,7 +70,7 @@ class MainWindow(QMainWindow):
         self._stack.setObjectName("pageStack")
 
         self._stack.addWidget(self._build_home_page(self._overview))
-        self._research_page = ResearchPage(research_state, self)
+        self._research_page = ResearchPage(research_state, service, self)
         self._stack.addWidget(self._research_page)
         self._stack.addWidget(
             self._build_placeholder_page(
@@ -148,10 +148,12 @@ class MainWindow(QMainWindow):
             page,
         )
         mode.setObjectName("modeLabel")
+        mode.setTextFormat(Qt.TextFormat.PlainText)
         layout.addWidget(mode)
 
         summary = QLabel(overview.summary, page)
         summary.setObjectName("summaryLabel")
+        summary.setTextFormat(Qt.TextFormat.PlainText)
         summary.setWordWrap(True)
         layout.addWidget(summary)
 
@@ -179,14 +181,17 @@ class MainWindow(QMainWindow):
 
         heading = QLabel(component.title, card)
         heading.setObjectName("cardTitle")
+        heading.setTextFormat(Qt.TextFormat.PlainText)
         layout.addWidget(heading)
 
         status = QLabel(_STATUS_LABELS[component.status], card)
         status.setObjectName("cardStatus")
+        status.setTextFormat(Qt.TextFormat.PlainText)
         layout.addWidget(status)
 
         detail = QLabel(component.detail, card)
         detail.setObjectName("cardDetail")
+        detail.setTextFormat(Qt.TextFormat.PlainText)
         detail.setWordWrap(True)
         layout.addWidget(detail)
 
@@ -204,6 +209,7 @@ class MainWindow(QMainWindow):
 
         body = QLabel(body_text, page)
         body.setObjectName("summaryLabel")
+        body.setTextFormat(Qt.TextFormat.PlainText)
         body.setWordWrap(True)
         body.setAlignment(Qt.AlignmentFlag.AlignTop)
         layout.addWidget(body)
@@ -224,8 +230,10 @@ class MainWindow(QMainWindow):
 
         environment = QLabel(f"Environment: {overview.environment}", page)
         environment.setObjectName("systemDetail")
+        environment.setTextFormat(Qt.TextFormat.PlainText)
         mode = QLabel(f"Displayed mode: {_MODE_LABELS[overview.mode]}", page)
         mode.setObjectName("systemDetail")
+        mode.setTextFormat(Qt.TextFormat.PlainText)
         layout.insertWidget(2, environment)
         layout.insertWidget(3, mode)
         return page

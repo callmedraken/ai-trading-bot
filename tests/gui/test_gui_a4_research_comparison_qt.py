@@ -45,7 +45,7 @@ def _row(
     *,
     total_return: str = "0",
     drawdown: str = "0.1",
-    turnover: str = "1",
+    one_way_turnover: str = "1",
     variant: str | None = None,
 ) -> ResearchResultRow:
     return ResearchResultRow(
@@ -55,8 +55,8 @@ def _row(
         parameter_label=f"window={ordinal + 2}",
         total_return=Decimal(total_return),
         maximum_drawdown_percentage=Decimal(drawdown),
-        turnover=Decimal(turnover),
-        trade_count=ordinal + 3,
+        aggregate_one_way_turnover=Decimal(one_way_turnover),
+        total_fills=ordinal + 3,
         exposure=None,
         return_over_drawdown=None,
     )
@@ -81,7 +81,7 @@ def _state(
 
 def _page(rows: tuple[ResearchResultRow, ...]) -> ResearchPage:
     _application()
-    return ResearchPage(_state(rows))
+    return ResearchPage(_state(rows), MockGuiApplicationService())
 
 
 class _WindowResearchService:
@@ -285,9 +285,9 @@ def test_gui_a4_return_chart_handles_negative_zero_and_positive_truthfully() -> 
 
 def test_gui_a4_drawdown_direction_and_ties_are_explicit_and_deterministic() -> None:
     rows = (
-        _row(0, drawdown="0.1", turnover="2"),
-        _row(1, drawdown="0.2", turnover="2"),
-        _row(2, drawdown="0.1", turnover="1"),
+        _row(0, drawdown="0.1", one_way_turnover="2"),
+        _row(1, drawdown="0.2", one_way_turnover="2"),
+        _row(2, drawdown="0.1", one_way_turnover="1"),
     )
     page = _page(rows)
     for ordinal in (2, 1, 0):
@@ -295,13 +295,15 @@ def test_gui_a4_drawdown_direction_and_ties_are_explicit_and_deterministic() -> 
 
     layout = page._comparison_chart.bar_layout(600)
     drawdowns = [bar for bar in layout if bar.metric == "maximum_drawdown_percentage"]
-    turnovers = [bar for bar in layout if bar.metric == "turnover"]
+    one_way_turnovers = [
+        bar for bar in layout if bar.metric == "aggregate_one_way_turnover"
+    ]
 
     assert "Lower drawdown is better" in drawdowns[0].context
     assert drawdowns[1].end_x > drawdowns[0].end_x
-    assert [bar.caller_ordinal for bar in turnovers] == [0, 1, 2]
-    assert turnovers[0].value == turnovers[1].value
-    assert turnovers[0].end_x == turnovers[1].end_x
+    assert [bar.caller_ordinal for bar in one_way_turnovers] == [0, 1, 2]
+    assert one_way_turnovers[0].value == one_way_turnovers[1].value
+    assert one_way_turnovers[0].end_x == one_way_turnovers[1].end_x
     page.close()
 
 

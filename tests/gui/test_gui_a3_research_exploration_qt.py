@@ -2,7 +2,7 @@
 # ruff: noqa: E402
 
 import os
-from decimal import Decimal
+from decimal import Context, Decimal, localcontext
 from pathlib import Path
 
 import pytest
@@ -87,8 +87,8 @@ def _row(
     caller_ordinal: int,
     *,
     rank: int | None = 1,
-    turnover: Decimal | None = None,
-    trade_count: int | None = None,
+    one_way_turnover: Decimal | None = None,
+    total_fills: int | None = None,
 ) -> ResearchResultRow:
     return ResearchResultRow(
         caller_ordinal=caller_ordinal,
@@ -97,8 +97,10 @@ def _row(
         parameter_label="Same parameters",
         total_return=Decimal("0"),
         maximum_drawdown_percentage=Decimal("0"),
-        turnover=(Decimal(caller_ordinal) if turnover is None else turnover),
-        trade_count=caller_ordinal if trade_count is None else trade_count,
+        aggregate_one_way_turnover=(
+            Decimal(caller_ordinal) if one_way_turnover is None else one_way_turnover
+        ),
+        total_fills=caller_ordinal if total_fills is None else total_fills,
         exposure=None,
         return_over_drawdown=None,
     )
@@ -246,7 +248,7 @@ def test_gui_a3_rank_sort_handles_multiple_unranked_rows_without_mutation() -> N
         _row(1, rank=None),
         _row(2, rank=1),
     )
-    page = ResearchPage(_in_memory_state(rows))
+    page = ResearchPage(_in_memory_state(rows), MockGuiApplicationService())
     table = page.findChild(QTableWidget, "researchResultsTable")
     assert table is not None
     report = page.research_state.report
@@ -267,12 +269,12 @@ def test_gui_a3_equal_primary_values_use_caller_ordinal(column: int) -> None:
         _row(
             ordinal,
             rank=None,
-            turnover=Decimal("0") if column == 5 else Decimal(ordinal),
-            trade_count=0 if column == 6 else ordinal,
+            one_way_turnover=Decimal("0") if column == 5 else Decimal(ordinal),
+            total_fills=0 if column == 6 else ordinal,
         )
         for ordinal in range(3)
     )
-    page = ResearchPage(_in_memory_state(rows))
+    page = ResearchPage(_in_memory_state(rows), MockGuiApplicationService())
     table = page.findChild(QTableWidget, "researchResultsTable")
     assert table is not None
     auxiliary_column = 6 if column != 6 else 5
@@ -326,8 +328,8 @@ def test_gui_a3_table_and_selected_detail_remain_read_only() -> None:
         "researchDetailParameters": row.parameter_label,
         "researchDetailReturn": "0%",
         "researchDetailDrawdown": "0%",
-        "researchDetailTurnover": "0.599994",
-        "researchDetailTrades": "1",
+        "researchDetailOneWayTurnover": "0.599994",
+        "researchDetailFills": "1",
         "researchDetailExposure": "Unavailable",
         "researchDetailReturnDrawdown": "Unavailable",
     }
@@ -369,3 +371,114 @@ def test_gui_a3_open_rejects_non_json_artifact(
         "No supported compact historical experiment report is available."
     )
     window.close()
+
+
+def test_gui_a3_open_report_uses_injected_loader_boundary(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class _Loader:
+        def __init__(self) -> None:
+            self.paths: list[Path] = []
+
+        def load_research_report(self, artifact_path: Path) -> ResearchPageState:
+            self.paths.append(artifact_path)
+            return _in_memory_state((_row(0),))
+
+    loader = _Loader()
+    page = ResearchPage(
+        MockGuiApplicationService().get_research_state(),
+        loader,
+    )
+    monkeypatch.setattr(
+        QFileDialog,
+        "getOpenFileName",
+        lambda *args: (str(FIXTURE), "Compact reports (*.json)"),
+    )
+
+    page.open_report()
+
+    assert loader.paths == [FIXTURE]
+    assert page.research_state.status is ResearchReportStatus.LOADED
+    page.close()
+
+
+def test_gui_a3_artifact_labels_are_explicit_plain_text() -> None:
+    row = ResearchResultRow(
+        caller_ordinal=0,
+        rank=1,
+        variant_label="<b>literal variant</b>",
+        parameter_label="<i>literal parameter</i>",
+        total_return=Decimal("0"),
+        maximum_drawdown_percentage=Decimal("0"),
+        aggregate_one_way_turnover=Decimal("0"),
+        total_fills=0,
+        exposure=None,
+        return_over_drawdown=None,
+    )
+    state = ResearchPageState(
+        status=ResearchReportStatus.LOADED,
+        message="<b>literal status</b>",
+        report=ResearchReportView(
+            report_id="report",
+            experiment_result_id="experiment",
+            variant_source="EXPLICIT",
+            ranking_summary="<em>literal ranking</em>",
+            metadata_summary='<img src="artifact">',
+            rows=(row,),
+        ),
+    )
+    page = ResearchPage(state, MockGuiApplicationService())
+
+    labels = {
+        "summaryLabel": "<b>literal status</b>",
+        "researchMetadata": '<img src="artifact">',
+        "researchDetailVariant": "<b>literal variant</b>",
+        "researchDetailParameters": "<i>literal parameter</i>",
+    }
+    for object_name, literal_text in labels.items():
+        label = page.findChild(QLabel, object_name)
+        assert label is not None
+        assert label.textFormat() is Qt.TextFormat.PlainText
+        assert label.text() == literal_text
+    page.close()
+
+
+def test_gui_a3_percentage_display_and_sort_are_context_independent() -> None:
+    rows = (
+        ResearchResultRow(
+            caller_ordinal=0,
+            rank=1,
+            variant_label="Higher",
+            parameter_label="Explicit variant",
+            total_return=Decimal("0.12345678901234567890123456789"),
+            maximum_drawdown_percentage=Decimal("0.98765432109876543210987654321"),
+            aggregate_one_way_turnover=Decimal("0"),
+            total_fills=0,
+            exposure=None,
+            return_over_drawdown=None,
+        ),
+        ResearchResultRow(
+            caller_ordinal=1,
+            rank=2,
+            variant_label="Lower",
+            parameter_label="Explicit variant",
+            total_return=Decimal("0.12345678901234567890123456788"),
+            maximum_drawdown_percentage=Decimal("0.98765432109876543210987654320"),
+            aggregate_one_way_turnover=Decimal("0"),
+            total_fills=0,
+            exposure=None,
+            return_over_drawdown=None,
+        ),
+    )
+    with localcontext(Context(prec=5)):
+        page = ResearchPage(_in_memory_state(rows), MockGuiApplicationService())
+        table = page.findChild(QTableWidget, "researchResultsTable")
+        assert table is not None
+        assert table.item(0, 3).text() == ("12.34567890123456789012345678900%")
+        assert table.item(0, 4).text() == ("98.76543210987654321098765432100%")
+        table.horizontalHeader().sectionClicked.emit(3)
+
+    assert _table_ordinals(table) == [1, 0]
+    assert page.research_state.report is not None
+    assert page.research_state.report.rows == rows
+    page.close()

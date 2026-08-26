@@ -7,7 +7,11 @@ from PySide6.QtCore import QRectF, Qt
 from PySide6.QtGui import QColor, QFontMetrics, QPainter, QPaintEvent
 from PySide6.QtWidgets import QWidget
 
-from trading_bot.gui.models import ResearchResultRow
+from trading_bot.gui.models import (
+    ResearchResultRow,
+    format_decimal_for_display,
+    format_percentage_for_display,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,13 +51,13 @@ _METRICS = (
         percentage=True,
     ),
     _MetricDefinition(
-        "turnover",
-        "Turnover",
+        "aggregate_one_way_turnover",
+        "One-way turnover",
         "Magnitude only • no preference inferred",
     ),
     _MetricDefinition(
-        "trade_count",
-        "Trade count",
+        "total_fills",
+        "Total fills",
         "Count only • no preference inferred",
     ),
 )
@@ -188,8 +192,8 @@ class ResearchComparisonChart(QWidget):
 
 
 def _metric_value(row: ResearchResultRow, key: str) -> Decimal:
-    if key == "trade_count":
-        return Decimal(row.trade_count)
+    if key == "total_fills":
+        return Decimal(row.total_fills)
     value = getattr(row, key)
     if type(value) is not Decimal:
         raise TypeError("comparison chart metric must be a Decimal")
@@ -216,5 +220,6 @@ def _bounded_label(value: str) -> str:
 
 
 def _format_metric(value: Decimal, metric: _MetricDefinition) -> str:
-    rendered = format(value * 100 if metric.percentage else value, "f")
-    return rendered + ("%" if metric.percentage else "")
+    if metric.percentage:
+        return format_percentage_for_display(value)
+    return format_decimal_for_display(value)

@@ -29,12 +29,14 @@ from trading_bot.gui.models import (
     ResearchPageState,
     ResearchReportStatus,
     ResearchResultRow,
+    format_decimal_for_display,
+    format_percentage_for_display,
 )
 from trading_bot.gui.research_service import (
     MAX_RESEARCH_FILTER_CHARACTERS,
-    CompactReportResearchService,
     filter_research_rows,
 )
+from trading_bot.gui.services import ResearchReportLoader
 
 _HEADERS = (
     "Rank",
@@ -42,8 +44,8 @@ _HEADERS = (
     "Parameters",
     "Total return",
     "Max drawdown",
-    "Turnover",
-    "Trades",
+    "One-way turnover",
+    "Fills",
     "Exposure",
     "Return / drawdown",
 )
@@ -67,8 +69,14 @@ class _SortableTableItem(QTableWidgetItem):
 class ResearchPage(QWidget):
     """Explore one bounded compact report without mutating source or domain state."""
 
-    def __init__(self, state: ResearchPageState, parent: QWidget | None = None) -> None:
+    def __init__(
+        self,
+        state: ResearchPageState,
+        loader: ResearchReportLoader,
+        parent: QWidget | None = None,
+    ) -> None:
         super().__init__(parent)
+        self._loader = loader
         self._state = state
         self._report = state.report
         self._comparison_state = ResearchComparisonState()
@@ -183,8 +191,8 @@ class ResearchPage(QWidget):
             ("parameters", "Parameters"),
             ("return", "Total return"),
             ("drawdown", "Maximum drawdown"),
-            ("turnover", "Turnover"),
-            ("trades", "Trade count"),
+            ("one_way_turnover", "One-way turnover"),
+            ("fills", "Total fills"),
             ("exposure", "Exposure"),
             ("return_drawdown", "Return / drawdown"),
         ):
@@ -264,6 +272,21 @@ class ResearchPage(QWidget):
         self._scroll_area.setWidget(content)
         layout.addWidget(self._scroll_area, 1)
 
+        for label in (
+            title,
+            self._status,
+            self._path,
+            self._identity,
+            self._summary,
+            self._metadata,
+            self._empty,
+            *self._detail_values.values(),
+            comparison_title,
+            self._comparison_count,
+            self._comparison_notice,
+        ):
+            label.setTextFormat(Qt.TextFormat.PlainText)
+
         self.set_research_state(state)
 
     @property
@@ -286,9 +309,7 @@ class ResearchPage(QWidget):
         )
         if not selected:
             return
-        self.set_research_state(
-            CompactReportResearchService(Path(selected)).get_research_state()
-        )
+        self.set_research_state(self._loader.load_research_report(Path(selected)))
 
     def set_research_state(self, state: ResearchPageState) -> None:
         """Replace only the displayed bounded research state."""
@@ -393,8 +414,11 @@ class ResearchPage(QWidget):
                     _percentage(row.maximum_drawdown_percentage),
                     row.maximum_drawdown_percentage,
                 ),
-                (_decimal_text(row.turnover), row.turnover),
-                (str(row.trade_count), row.trade_count),
+                (
+                    _decimal_text(row.aggregate_one_way_turnover),
+                    row.aggregate_one_way_turnover,
+                ),
+                (str(row.total_fills), row.total_fills),
                 (
                     _optional_decimal(row.exposure),
                     (
@@ -483,8 +507,8 @@ class ResearchPage(QWidget):
             "parameters": row.parameter_label,
             "return": _percentage(row.total_return),
             "drawdown": _percentage(row.maximum_drawdown_percentage),
-            "turnover": _decimal_text(row.turnover),
-            "trades": str(row.trade_count),
+            "one_way_turnover": _decimal_text(row.aggregate_one_way_turnover),
+            "fills": str(row.total_fills),
             "exposure": _optional_decimal(row.exposure),
             "return_drawdown": _optional_decimal(row.return_over_drawdown),
         }
@@ -528,8 +552,8 @@ class ResearchPage(QWidget):
                 row.parameter_label,
                 _percentage(row.total_return),
                 _percentage(row.maximum_drawdown_percentage),
-                _decimal_text(row.turnover),
-                str(row.trade_count),
+                _decimal_text(row.aggregate_one_way_turnover),
+                str(row.total_fills),
             )
             for column, value in enumerate(values):
                 item = QTableWidgetItem(value)
@@ -547,11 +571,11 @@ class ResearchPage(QWidget):
 
 
 def _decimal_text(value: Decimal) -> str:
-    return format(value, "f")
+    return format_decimal_for_display(value)
 
 
 def _percentage(value: Decimal) -> str:
-    return f"{format(value * 100, 'f')}%"
+    return format_percentage_for_display(value)
 
 
 def _optional_decimal(value: Decimal | None) -> str:

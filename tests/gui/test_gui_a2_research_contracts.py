@@ -3,6 +3,7 @@
 import json
 from decimal import Decimal
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -17,6 +18,13 @@ from trading_bot.gui import (
     ResearchReportStatus,
     ResearchReportView,
     ResearchResultRow,
+    research_service,
+)
+from trading_bot.gui.models import (
+    MAX_RESEARCH_METADATA_SUMMARY_CHARACTERS,
+    MAX_RESEARCH_PARAMETER_LABEL_CHARACTERS,
+    MAX_RESEARCH_RANKING_SUMMARY_CHARACTERS,
+    MAX_RESEARCH_VARIANT_LABEL_CHARACTERS,
 )
 from trading_bot.gui.research_service import MAX_RESEARCH_ARTIFACT_BYTES
 
@@ -49,8 +57,8 @@ def test_gui_a2_compact_fixture_converts_deterministically() -> None:
     )
     assert first.report.rows[0].total_return == Decimal("0")
     assert first.report.rows[0].maximum_drawdown_percentage == Decimal("0")
-    assert first.report.rows[0].turnover == Decimal("0.599994")
-    assert first.report.rows[0].trade_count == 1
+    assert first.report.rows[0].aggregate_one_way_turnover == Decimal("0.599994")
+    assert first.report.rows[0].total_fills == 1
     assert first.report.rows[0].exposure is None
     assert first.report.rows[0].return_over_drawdown is None
 
@@ -94,8 +102,8 @@ def test_gui_a2_presentation_models_reject_invalid_relationships() -> None:
         parameter_label="Explicit variant",
         total_return=Decimal("0.1"),
         maximum_drawdown_percentage=Decimal("0.02"),
-        turnover=Decimal("0.4"),
-        trade_count=2,
+        aggregate_one_way_turnover=Decimal("0.4"),
+        total_fills=2,
         exposure=None,
         return_over_drawdown=None,
     )
@@ -128,8 +136,8 @@ def test_gui_a2_presentation_models_reject_invalid_relationships() -> None:
             parameter_label="Explicit variant",
             total_return=Decimal("NaN"),
             maximum_drawdown_percentage=Decimal("0"),
-            turnover=Decimal("0"),
-            trade_count=0,
+            aggregate_one_way_turnover=Decimal("0"),
+            total_fills=0,
             exposure=None,
             return_over_drawdown=None,
         )
@@ -202,3 +210,83 @@ def test_gui_a2_artifact_reader_requests_only_bound_plus_one_bytes(
     assert requested_sizes == [MAX_RESEARCH_ARTIFACT_BYTES + 1]
     assert state.status is ResearchReportStatus.UNAVAILABLE
     assert state.report is None
+
+
+def test_gui_a2_deep_malformed_json_uses_fixed_unavailable_state(
+    tmp_path: Path,
+) -> None:
+    artifact = tmp_path / "deep.json"
+    artifact.write_text("[" * 2_000 + "0" + "]" * 2_000, encoding="utf-8")
+
+    state = CompactReportResearchService(artifact).get_research_state()
+
+    assert (
+        state
+        == CompactReportResearchService(tmp_path / "missing.json").get_research_state()
+    )
+
+
+def test_gui_a2_reports_above_display_row_bound_are_rejected(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    oversized = SimpleNamespace(variants=(object(),) * 501)
+    monkeypatch.setattr(
+        research_service,
+        "deserialize_compact_report_json",
+        lambda payload: oversized,
+    )
+
+    state = CompactReportResearchService(FIXTURE).get_research_state()
+
+    assert state.status is ResearchReportStatus.UNAVAILABLE
+    assert state.report is None
+
+
+def test_gui_a2_artifact_presentation_strings_are_markedly_bounded() -> None:
+    long_text = "x" * 2_000
+    assignment = SimpleNamespace(
+        parameter=SimpleNamespace(value=long_text),
+        value=Decimal("1"),
+    )
+    metrics = SimpleNamespace(
+        simulation_return=Decimal("0.1"),
+        maximum_drawdown_percentage=Decimal("0.2"),
+        aggregate_one_way_turnover=Decimal("3"),
+        total_fills=4,
+    )
+    row = SimpleNamespace(
+        caller_ordinal=0,
+        rank=1,
+        variant_name=long_text,
+        grid_assignments=(assignment,),
+        metrics=metrics,
+    )
+    criterion = SimpleNamespace(
+        metric=SimpleNamespace(value=long_text),
+        direction=SimpleNamespace(value=long_text),
+    )
+    ranking = SimpleNamespace(
+        policy_id="policy",
+        criteria=(criterion,),
+        tie_breaker=SimpleNamespace(value=long_text),
+    )
+    report = SimpleNamespace(
+        ranking=ranking,
+        metadata=(SimpleNamespace(key=long_text, value=long_text),),
+        variants=(row,),
+        report_id="report",
+        experiment_result_id="experiment",
+        variant_source=SimpleNamespace(value="GRID"),
+    )
+
+    view = research_service._to_view(report, FIXTURE)
+
+    assert len(view.rows[0].variant_label) == MAX_RESEARCH_VARIANT_LABEL_CHARACTERS
+    assert len(view.rows[0].parameter_label) == MAX_RESEARCH_PARAMETER_LABEL_CHARACTERS
+    assert len(view.ranking_summary) == MAX_RESEARCH_RANKING_SUMMARY_CHARACTERS
+    assert len(view.metadata_summary) == MAX_RESEARCH_METADATA_SUMMARY_CHARACTERS
+    assert view.rows[0].variant_label.endswith("…")
+    assert view.rows[0].parameter_label.endswith("…")
+    assert view.ranking_summary.endswith("…")
+    assert view.metadata_summary.endswith("…")
+    assert row.variant_name == long_text

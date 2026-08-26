@@ -10,9 +10,11 @@ from trading_bot.gui.models import (
     ResearchReportStatus,
     ResearchReportView,
     ResearchResultRow,
+    format_decimal_for_display,
+    format_percentage_for_display,
 )
 from trading_bot.gui.research_service import CompactReportResearchService
-from trading_bot.gui.services import GuiApplicationService
+from trading_bot.gui.services import GuiApplicationService, ResearchReportLoader
 
 __all__ = [
     "ApplicationOverview",
@@ -26,4 +28,7 @@ __all__ = [
     "ResearchReportStatus",
     "ResearchReportView",
     "ResearchResultRow",
+    "ResearchReportLoader",
+    "format_decimal_for_display",
+    "format_percentage_for_display",
 ]

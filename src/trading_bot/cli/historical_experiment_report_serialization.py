@@ -3,6 +3,7 @@
 import csv
 import io
 import json
+import re
 from decimal import Context, Decimal, DecimalException, localcontext
 from uuid import UUID
 
@@ -25,6 +26,7 @@ from trading_bot.experiments import (
 from trading_bot.portfolio import MetadataEntry
 
 COMPACT_EXPERIMENT_REPORT_SCHEMA_VERSION = 1
+_CANONICAL_DECIMAL_TEXT = re.compile(r"-?(?:0|[1-9][0-9]*)(?:\.[0-9]*[1-9])?")
 _METRIC_FIELDS = (
     "initial_equity",
     "final_equity",
@@ -278,7 +280,12 @@ def deserialize_compact_report_json(
             "compact report JSON payload must be text or bytes"
         )
     try:
-        tree = json.loads(payload)
+        try:
+            tree = json.loads(payload, object_pairs_hook=_unique_object)
+        except RecursionError as error:
+            raise HistoricalExperimentReportOutputError(
+                "invalid compact report JSON: excessive object nesting"
+            ) from error
         root = _object(tree, "root")
         _exact_keys(root, {"schema_version", "report"}, "root")
         if (
@@ -507,6 +514,15 @@ def _object(value: object, path: str) -> dict[str, object]:
     return value
 
 
+def _unique_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    value: dict[str, object] = {}
+    for key, item in pairs:
+        if key in value:
+            raise ValueError(f"duplicate compact report JSON object name: {key}")
+        value[key] = item
+    return value
+
+
 def _array(value: object, path: str) -> list[object]:
     if type(value) is not list:
         raise ValueError(f"{path} must be an array")
@@ -537,6 +553,8 @@ def _optional_integer(value: object, path: str) -> int | None:
 def _decimal_value(value: object, path: str) -> Decimal:
     if type(value) is not str:
         raise ValueError(f"{path} must be canonical decimal text")
+    if _CANONICAL_DECIMAL_TEXT.fullmatch(value) is None:
+        raise ValueError(f"{path} must be canonical finite decimal text")
     parsed = Decimal(value)
     if not parsed.is_finite() or _decimal(parsed) != value:
         raise ValueError(f"{path} must be canonical finite decimal text")

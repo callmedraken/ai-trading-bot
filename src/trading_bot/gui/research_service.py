@@ -13,7 +13,11 @@ from trading_bot.experiments import (
     HistoricalExperimentReport,
 )
 from trading_bot.gui.models import (
+    MAX_RESEARCH_METADATA_SUMMARY_CHARACTERS,
+    MAX_RESEARCH_PARAMETER_LABEL_CHARACTERS,
+    MAX_RESEARCH_RANKING_SUMMARY_CHARACTERS,
     MAX_RESEARCH_SOURCE_PATH_CHARACTERS,
+    MAX_RESEARCH_VARIANT_LABEL_CHARACTERS,
     ResearchPageState,
     ResearchReportStatus,
     ResearchReportView,
@@ -86,24 +90,31 @@ def _to_view(
         criteria = ", ".join(
             f"{item.metric.value} {item.direction.value}" for item in ranking.criteria
         )
-        ranking_summary = (
+        ranking_summary = _bounded_text(
             f"Policy {ranking.policy_id}: {criteria}; "
-            f"tie breaker {ranking.tie_breaker.value}"
+            f"tie breaker {ranking.tie_breaker.value}",
+            MAX_RESEARCH_RANKING_SUMMARY_CHARACTERS,
         )
-    metadata_summary = (
+    metadata_summary = _bounded_text(
         "; ".join(f"{item.key}={item.value}" for item in report.metadata)
-        or "No report metadata"
+        or "No report metadata",
+        MAX_RESEARCH_METADATA_SUMMARY_CHARACTERS,
     )
     rows = tuple(
         ResearchResultRow(
             caller_ordinal=row.caller_ordinal,
             rank=row.rank,
-            variant_label=row.variant_name,
-            parameter_label=_parameter_label(row.grid_assignments),
+            variant_label=_bounded_text(
+                row.variant_name, MAX_RESEARCH_VARIANT_LABEL_CHARACTERS
+            ),
+            parameter_label=_bounded_text(
+                _parameter_label(row.grid_assignments),
+                MAX_RESEARCH_PARAMETER_LABEL_CHARACTERS,
+            ),
             total_return=row.metrics.simulation_return,
             maximum_drawdown_percentage=(row.metrics.maximum_drawdown_percentage),
-            turnover=row.metrics.aggregate_one_way_turnover,
-            trade_count=row.metrics.total_fills,
+            aggregate_one_way_turnover=row.metrics.aggregate_one_way_turnover,
+            total_fills=row.metrics.total_fills,
             exposure=None,
             return_over_drawdown=None,
         )
@@ -163,3 +174,7 @@ def _bounded_source_path(artifact_path: Path) -> str:
     if len(display) <= MAX_RESEARCH_SOURCE_PATH_CHARACTERS:
         return display
     return "…" + display[-(MAX_RESEARCH_SOURCE_PATH_CHARACTERS - 1) :]
+
+
+def _bounded_text(value: str, limit: int) -> str:
+    return value if len(value) <= limit else value[: limit - 1] + "…"

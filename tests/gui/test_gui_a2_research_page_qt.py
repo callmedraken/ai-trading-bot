@@ -60,6 +60,8 @@ def test_gui_a2_research_page_constructs_bounded_read_only_table() -> None:
     assert table.columnCount() == 9
     assert table.item(0, 0).text() == "1"
     assert table.item(0, 1).text().startswith("Grid Base")
+    assert table.horizontalHeaderItem(5).text() == "One-way turnover"
+    assert table.horizontalHeaderItem(6).text() == "Fills"
     assert service.overview_calls == 1
     assert service.research_calls == 1
 

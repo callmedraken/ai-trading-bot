@@ -92,6 +92,24 @@ null remains JSON null, UUIDs are canonical strings, and enums use their
 values. Object keys are sorted. Compact JSON uses compact separators; pretty
 JSON uses two-space indentation. Both end in exactly one newline.
 
+## Public version-one deserializer used by the GUI
+
+The public `deserialize_compact_report_json` API is the strict, read-only
+version-one compact JSON loader used by the GUI. It returns an independently
+validated `HistoricalExperimentReport` and does not return a partially parsed
+or presentation-only object.
+
+The deserializer accepts only an exact integer `schema_version` of 1 and
+requires the exact supported object fields at every supported object level.
+Duplicate JSON object names are rejected. Decimal fields must use canonical
+fixed-point decimal text; exponent notation and other noncanonical forms are
+rejected before fixed-point normalization. Malformed or excessively deep JSON
+is converted to `HistoricalExperimentReportOutputError`.
+
+Deserialization performs no filesystem, network, experiment, optimization, or
+trading work. It does not change the compact export schema or its deterministic
+fixture and byte-level contract.
+
 ## Stable CSV schema
 
 CSV uses one immutable explicit 81-column header and one caller-order row per

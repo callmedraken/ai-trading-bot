@@ -2,9 +2,10 @@
 
 ## Status
 
-GUI-A1 architecture contract. This document defines the first graphical application
-boundary without changing trading, risk, authority, credentials, brokerage,
-reconciliation, deterministic identities, or production capture semantics.
+GUI-A1 architecture contract and historical foundation. This document defines the
+graphical application boundary without changing trading, risk, authority,
+credentials, brokerage, reconciliation, deterministic identities, or production
+capture semantics.
 
 ## Goal
 
@@ -151,6 +152,25 @@ python -m trading_bot.gui
 
 No console-script entry point is required in this checkpoint.
 
+## Reviewed extensions
+
+The original GUI-A1 contract above remains the historical foundation. The
+following reviewed extensions preserve its presentation-only boundary:
+
+- GUI-A2 provides strict read-only loading of local compact historical experiment
+  reports through the reviewed serializer/service boundary.
+- GUI-A3 provides explicit Open Report, bounded filtering and sorting, and
+  read-only selected-result detail exploration.
+- GUI-A4 provides bounded two-to-four variant comparison and a Qt-native
+  visualization of exact comparison metrics.
+- GUI-I1 provides an injected Qt-free loader boundary, parser and input
+  hardening, plain-text rendering, bounded presentation strings, and exact
+  financial labels.
+
+None of GUI-A1 through GUI-I1 grants production authority or connects the GUI to
+provider transport, Credential Manager, paper execution, brokerage, or live
+trading authority. Local research artifacts remain presentation inputs only.
+
 ## Explicit non-goals
 
 GUI-A1 does not:
@@ -167,14 +187,10 @@ GUI-A1 does not:
 
 ## Follow-up checkpoints
 
-Recommended progression after GUI-A1:
-
-- GUI-A2: read-only research/backtest result browser over existing reviewed
-  serializers/services;
-- GUI-A3: paper-account and paper-operation read-only views;
-- GUI-A4: charts/analytics and audit/lineage inspection;
-- later operator controls only after each underlying action has a reviewed service
-  boundary suitable for GUI use.
+The completed GUI-A1 through GUI-I1 foundation may be extended with additional
+read-only views or operator controls only after each underlying action has a
+reviewed service boundary suitable for GUI use. Such work must preserve the
+same fail-closed production, credential, brokerage, and execution boundaries.
 
 Production/recovery/live controls require their own architecture reviews and are
 not implied by this foundation.

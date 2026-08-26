@@ -19,11 +19,11 @@ class MockGuiApplicationService:
     """Return static presentation data without invoking application effects."""
 
     def get_overview(self) -> ApplicationOverview:
-        """Return deterministic GUI-A2 preview state."""
+        """Return deterministic read-only overview state."""
         return ApplicationOverview(
             mode=OperatingMode.RESEARCH,
-            environment="GUI preview",
-            summary="Read-only GUI using bounded application presentation state.",
+            environment="Local read-only GUI",
+            summary="Read-only GUI; local compact research reports may be displayed.",
             components=(
                 ComponentStatus(
                     key="research",
@@ -35,25 +35,28 @@ class MockGuiApplicationService:
                     key="paper",
                     title="Paper Operation",
                     status=PresentationStatus.INFO,
-                    detail="GUI-A2 exposes no paper-operation actions.",
+                    detail=(
+                        "Paper Operation is read-only; execution controls are not "
+                        "connected."
+                    ),
                 ),
                 ComponentStatus(
                     key="market-data",
                     title="Market Data",
                     status=PresentationStatus.UNAVAILABLE,
-                    detail="Production capture is intentionally not connected.",
+                    detail="Production market-data capture is not connected.",
                 ),
                 ComponentStatus(
                     key="system",
                     title="System",
                     status=PresentationStatus.INFO,
-                    detail="The shell is running against deterministic mock data.",
+                    detail="The GUI is read-only; no production authority is granted.",
                 ),
             ),
         )
 
     def get_research_state(self) -> ResearchPageState:
-        """Return the deterministic GUI-A2 empty research state."""
+        """Return the deterministic empty research state."""
         return unavailable_research_state()
 
     def load_research_report(self, artifact_path: Path) -> ResearchPageState:

@@ -2,17 +2,30 @@
 # ruff: noqa: E402
 
 import os
+from pathlib import Path
 
 import pytest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 pytest.importorskip("PySide6")
 
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QLabel
 
 from trading_bot.gui import ApplicationOverview, ResearchPageState
 from trading_bot.gui.main_window import PAGE_IDS, MainWindow
-from trading_bot.gui.mock_service import MockGuiApplicationService
+from trading_bot.gui.mock_service import (
+    MockGuiApplicationService,
+    ResearchReportGuiApplicationService,
+)
+
+ROOT = Path(__file__).resolve().parents[2]
+FIXTURE = (
+    ROOT
+    / "tests"
+    / "fixtures"
+    / "cli"
+    / "historical-experiment-compact-report-v1-compact.json"
+)
 
 
 class _RecordingService:
@@ -60,4 +73,31 @@ def test_main_window_rejects_unknown_page() -> None:
     with pytest.raises(ValueError, match="unknown GUI page"):
         window.select_page("credentials")
 
+    window.close()
+
+
+def test_main_window_default_operator_text_is_current_and_read_only() -> None:
+    window = MainWindow(MockGuiApplicationService())
+    texts = [label.text() for label in window.findChildren(QLabel)]
+
+    assert all("gui-a1" not in text.casefold() for text in texts)
+    assert all("gui-a2" not in text.casefold() for text in texts)
+    assert all("mock data" not in text.casefold() for text in texts)
+    assert any("read-only" in text.casefold() for text in texts)
+    assert any("no production authority" in text.casefold() for text in texts)
+    window.close()
+
+
+def test_main_window_real_report_operator_text_does_not_claim_mock_shell() -> None:
+    window = MainWindow(ResearchReportGuiApplicationService(FIXTURE))
+    texts = [label.text() for label in window.findChildren(QLabel)]
+
+    assert all("gui-a1" not in text.casefold() for text in texts)
+    assert all("gui-a2" not in text.casefold() for text in texts)
+    assert all("mock" not in text.casefold() for text in texts)
+    assert any(
+        "local compact research reports may be displayed" in text for text in texts
+    )
+    assert any("read-only" in text.casefold() for text in texts)
+    assert any("no production authority" in text.casefold() for text in texts)
     window.close()

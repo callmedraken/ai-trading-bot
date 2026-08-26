@@ -74,6 +74,30 @@ On macOS or Linux, activate the environment with:
 source .venv/bin/activate
 ```
 
+## GUI
+
+Install the development and GUI dependencies with:
+
+```powershell
+python -m pip install -e ".[dev,gui]"
+```
+
+Launch the native GUI with:
+
+```powershell
+python -m trading_bot.gui
+```
+
+Optionally open one local compact report at startup:
+
+```powershell
+python -m trading_bot.gui --research-report PATH
+```
+
+The current GUI scope is local, read-only research presentation and bounded
+variant comparison. It does not connect to production authority, credentials,
+Alpaca or other provider transport, brokerage, or paper/live execution.
+
 Project commands should run inside the project virtual environment. On Windows,
 you can also invoke its interpreter explicitly:
 

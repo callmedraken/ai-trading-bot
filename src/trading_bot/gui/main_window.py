@@ -75,7 +75,7 @@ class MainWindow(QMainWindow):
         self._stack.addWidget(
             self._build_placeholder_page(
                 "Paper Operation",
-                "GUI-A1 is read-only and exposes no paper execution controls.",
+                "Paper Operation is read-only; no execution controls are connected.",
             )
         )
         self._stack.addWidget(
@@ -96,7 +96,7 @@ class MainWindow(QMainWindow):
 
     @property
     def page_ids(self) -> tuple[str, ...]:
-        """Return the stable GUI-A1 page identifiers."""
+        """Return the stable GUI page identifiers."""
         return PAGE_IDS
 
     @property
@@ -220,7 +220,7 @@ class MainWindow(QMainWindow):
         page = self._build_placeholder_page(
             "System",
             (
-                "GUI-A1 reports presentation state only; it grants no production "
+                "The GUI is a presentation layer only; it grants no production "
                 "authority."
             ),
         )

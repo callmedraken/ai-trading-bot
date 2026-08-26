@@ -235,6 +235,42 @@ def test_403_is_sanitized_and_never_retried_or_fallen_back() -> None:
 
 
 @pytest.mark.parametrize(
+    ("status", "body"),
+    [
+        (403, b'{"code":' + b"9" * 5000 + b"}"),
+        (403, b'{"code":9223372036854775808}'),
+        (429, b"[" * 2000 + b"{}" + b"]" * 2000),
+        (403, b'{"code":'),
+    ],
+)
+def test_optional_provider_code_extraction_never_masks_http_status(
+    status: int,
+    body: bytes,
+) -> None:
+    response = FakeResponse(
+        body,
+        status=status,
+        headers=(
+            ("Content-Type", "application/json"),
+            ("Content-Length", str(len(body))),
+            ("X-Request-ID", "adversarial-json-request"),
+        ),
+    )
+    connection = FakeConnection(response)
+    transport, factory_calls = _transport(connection)
+
+    with pytest.raises(AlpacaHttpStatusError) as caught:
+        transport.execute(_request(), api_key_id=KEY, api_secret_key=SECRET)
+
+    assert caught.value.status == status
+    assert caught.value.provider_code is None
+    assert caught.value.request_id == "adversarial-json-request"
+    assert len(factory_calls) == 1
+    assert len(connection.requests) == 1
+    assert body not in repr(caught.value).encode("utf-8")
+
+
+@pytest.mark.parametrize(
     ("status", "content_type"),
     [(403, "text/plain"), (429, "text/html"), (404, None)],
 )

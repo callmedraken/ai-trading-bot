@@ -1261,9 +1261,11 @@ _C3_TERMINAL_EVIDENCE_FIELDS = frozenset(
         "child_result_sha256",
         "claim_id",
         "execution_id",
+        "http_status",
         "parent_cleanup",
         "process_outcome",
         "provider_call_disposition",
+        "provider_request_id",
         "reservation_id",
         "result_transport",
         "schema",
@@ -1430,7 +1432,7 @@ def _require_c3_terminal_material(
         field="C3 terminal diagnostics",
         byte_limit=_MAX_C3_TERMINAL_DIAGNOSTICS_BYTES,
     )
-    if set(evidence) != _C3_TERMINAL_EVIDENCE_FIELDS or evidence["schema"] != 1:
+    if set(evidence) != _C3_TERMINAL_EVIDENCE_FIELDS or evidence["schema"] != 2:
         raise ValueError("C3 terminal evidence schema is invalid")
     if (
         set(diagnostics)
@@ -1491,6 +1493,8 @@ def _require_c3_terminal_material(
     fence = evidence["child_fence_state"]
     classification = evidence["child_result_classification"]
     child_result_sha256 = evidence["child_result_sha256"]
+    http_status = evidence["http_status"]
+    provider_request_id = evidence["provider_request_id"]
     child_result_absent = (
         fence is None and classification is None and child_result_sha256 is None
     )
@@ -1502,6 +1506,28 @@ def _require_c3_terminal_material(
     )
     if not (child_result_absent or child_result_present):
         raise ValueError("C3 terminal child result classification is invalid")
+    http_evidence_absent = http_status is None and provider_request_id is None
+    http_evidence_present = (
+        classification == "HTTP_FAILED"
+        and type(http_status) is int
+        and 100 <= http_status <= 599
+        and http_status != 200
+        and (
+            provider_request_id is None
+            or (
+                type(provider_request_id) is str
+                and 1 <= len(provider_request_id) <= 128
+                and all(
+                    33 <= ord(character) <= 126 for character in provider_request_id
+                )
+            )
+        )
+    )
+    if classification == "HTTP_FAILED":
+        if not http_evidence_present:
+            raise ValueError("C3 terminal HTTP evidence is invalid")
+    elif not http_evidence_absent:
+        raise ValueError("non-HTTP C3 terminal cannot claim HTTP evidence")
     artifact_verification = evidence["artifact_verification"]
     if artifact_verification not in {
         "VERIFIED",
@@ -1606,9 +1632,11 @@ def _require_c3_terminal_matches_durable_cleanup(
         "child_result_classification",
         "child_result_sha256",
         "execution_id",
+        "http_status",
         "parent_cleanup",
         "process_outcome",
         "provider_call_disposition",
+        "provider_request_id",
         "reservation_id",
         "result_transport",
         "schema",

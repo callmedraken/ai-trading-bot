@@ -113,6 +113,8 @@ class ProductionCaptureInvocationResult:
     snapshot_id: UUID | None = None
     artifact_sha256: str | None = None
     artifact_byte_length: int | None = None
+    http_status: int | None = None
+    provider_request_id: str | None = None
 
     def __post_init__(self) -> None:
         for field_name in (
@@ -180,6 +182,27 @@ class ProductionCaptureInvocationResult:
         elif any(value is not None for value in success_fields):
             raise WindowsEffectfulCaptureCompositionError(
                 "non-success production invocation cannot expose snapshot evidence"
+            )
+        if self.http_status is None:
+            if self.provider_request_id is not None:
+                raise WindowsEffectfulCaptureCompositionError(
+                    "provider request ID requires a known HTTP failure"
+                )
+        elif (
+            type(self.http_status) is not int
+            or not 100 <= self.http_status <= 599
+            or self.http_status == 200
+            or self.terminal_state != "FAILED"
+            or self.provider_call_disposition != "CONFIRMED"
+        ):
+            raise WindowsEffectfulCaptureCompositionError(
+                "production invocation HTTP failure evidence is invalid"
+            )
+        if self.provider_request_id is not None and not _is_safe_provider_request_id(
+            self.provider_request_id
+        ):
+            raise WindowsEffectfulCaptureCompositionError(
+                "production invocation provider request ID is invalid"
             )
 
 
@@ -468,6 +491,8 @@ class _C3ObservationSnapshot:
     child_fence_state: str | None
     child_result_classification: str | None
     child_result_json: bytes | None
+    http_status: int | None
+    provider_request_id: str | None
 
 
 class C3StagingCleanupStatus(StrEnum):
@@ -534,6 +559,8 @@ class _C3TerminalIssuance:
 class _CompletedC3TerminalOutcome:
     state: str
     disposition: str
+    http_status: int | None
+    provider_request_id: str | None
 
 
 @dataclass(slots=True)
@@ -793,6 +820,7 @@ class _C3LiveProcessRegistry:
             if trusted is None
             else serialize_isolated_capture_child_result(trusted)
         )
+        http_status, provider_request_id = _child_http_evidence(trusted)
         observation = C3C3BObservationForTest(
             reservation_id=resumed.reservation_id,
             execution_id=resumed.execution_id,
@@ -822,6 +850,8 @@ class _C3LiveProcessRegistry:
                     None if trusted is None else trusted.classification.value
                 ),
                 child_result_json=trusted_json,
+                http_status=http_status,
+                provider_request_id=provider_request_id,
             )
         return observation
 
@@ -1533,6 +1563,18 @@ class _C3LiveProcessRegistry:
             raise WindowsEffectfulCaptureCompositionError(
                 "C3 trusted child result changed after observation"
             )
+        http_status, provider_request_id = _child_http_evidence(trusted)
+        if (
+            snapshot.child_fence_state
+            != (None if trusted is None else trusted.fence_state.value)
+            or snapshot.child_result_classification
+            != (None if trusted is None else trusted.classification.value)
+            or snapshot.http_status != http_status
+            or snapshot.provider_request_id != provider_request_id
+        ):
+            raise WindowsEffectfulCaptureCompositionError(
+                "C3 trusted child evidence binding changed after observation"
+            )
         return snapshot
 
     def request_sha256(self, reservation_id: str, execution_id: str) -> str:
@@ -1618,6 +1660,17 @@ def _c3_observation_visible_values(
     )
 
 
+def _child_http_evidence(
+    trusted: IsolatedCaptureChildResult | None,
+) -> tuple[int | None, str | None]:
+    if (
+        trusted is not None
+        and trusted.classification is ChildResultClassification.HTTP_FAILED
+    ):
+        return trusted.http_status, trusted.provider_request_id
+    return None, None
+
+
 def _build_c3_cleanup_json(
     entry: _C3LiveProcessEntry,
     snapshot: _C3ObservationSnapshot,
@@ -1646,12 +1699,14 @@ def _build_c3_cleanup_json(
             "child_result_classification": snapshot.child_result_classification,
             "child_result_sha256": child_result_sha256,
             "execution_id": execution_id,
+            "http_status": snapshot.http_status,
             "parent_cleanup": observation.parent_cleanup.value,
             "process_outcome": observation.process_outcome.value,
             "provider_call_disposition": disposition,
+            "provider_request_id": snapshot.provider_request_id,
             "reservation_id": entry.reservation_id,
             "result_transport": observation.result_transport.value,
-            "schema": 1,
+            "schema": 2,
         },
         ensure_ascii=False,
         sort_keys=True,
@@ -1700,12 +1755,14 @@ def _build_c3_terminal_evidence(
             "child_result_sha256": child_result_sha256,
             "claim_id": lineage[2],
             "execution_id": lineage[4],
+            "http_status": snapshot.http_status,
             "parent_cleanup": observation.parent_cleanup.value,
             "process_outcome": observation.process_outcome.value,
             "provider_call_disposition": disposition,
+            "provider_request_id": snapshot.provider_request_id,
             "reservation_id": lineage[3],
             "result_transport": observation.result_transport.value,
-            "schema": 1,
+            "schema": 2,
             "session_id": lineage[0],
             "snapshot_id": (
                 None
@@ -2065,8 +2122,14 @@ class C3C2TransactionalAdapterForTest:
     ) -> None:
         material = self._registry.validate_terminal(authorization, lineage)
         self._registry.consume_terminal(authorization, lineage)
+        evidence = json.loads(material[3])
         self._completed_terminal_outcomes[(lineage[3], lineage[4])] = (
-            _CompletedC3TerminalOutcome(material[0], material[1])
+            _CompletedC3TerminalOutcome(
+                material[0],
+                material[1],
+                evidence["http_status"],
+                evidence["provider_request_id"],
+            )
         )
         self._expected_requests.pop((lineage[3], lineage[4]), None)
         self._launch_plans.pop(lineage[3], None)
@@ -2641,6 +2704,8 @@ class WindowsEffectfulDailySnapshotCapture:
                     if verified_snapshot is None
                     else verified_snapshot.artifact_byte_length
                 ),
+                http_status=outcome.http_status,
+                provider_request_id=outcome.provider_request_id,
             )
         except ProductionCaptureInvocationError:
             raise
@@ -2818,3 +2883,11 @@ def _require_canonical_uuid(value: object, field_name: str) -> None:
         raise WindowsEffectfulCaptureCompositionError(
             f"production invocation {field_name} is invalid"
         )
+
+
+def _is_safe_provider_request_id(value: object) -> bool:
+    return bool(
+        type(value) is str
+        and 1 <= len(value) <= 128
+        and all(33 <= ord(character) <= 126 for character in value)
+    )

@@ -91,6 +91,8 @@ def test_cli_acquires_c1_delegates_to_capture_once_and_always_closes(
     assert record["status"] == "COMPLETED"
     assert record["terminal_state"] == "SUCCEEDED"
     assert record["artifact_sha256"] == "ab" * 32
+    assert record["http_status"] is None
+    assert record["provider_request_id"] is None
 
 
 def test_cli_failure_output_is_one_sanitized_record(monkeypatch, capsys) -> None:
@@ -122,3 +124,25 @@ def test_cli_failure_output_is_one_sanitized_record(monkeypatch, capsys) -> None
         "status": "BLOCKED",
     }
     assert "secret native detail" not in output.out
+
+
+def test_cli_result_record_exposes_only_sanitized_http_evidence() -> None:
+    result = ProductionCaptureInvocationResult(
+        session_id="11111111-1111-4111-8111-111111111111",
+        attempt_id="22222222-2222-4222-8222-222222222222",
+        claim_id="33333333-3333-4333-8333-333333333333",
+        reservation_id="44444444-4444-4444-8444-444444444444",
+        execution_id="55555555-5555-4555-8555-555555555555",
+        terminal_id="66666666-6666-4666-8666-666666666666",
+        selection_id=None,
+        terminal_state="FAILED",
+        provider_call_disposition="CONFIRMED",
+        http_status=403,
+        provider_request_id="safe-request-403",
+    )
+
+    record = cli_module._result_record(result)
+
+    assert record["http_status"] == 403
+    assert record["provider_request_id"] == "safe-request-403"
+    assert "provider_code" not in record

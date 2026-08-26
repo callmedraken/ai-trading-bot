@@ -26,6 +26,7 @@ MAX_ALPACA_RESPONSE_BYTES = 4 * 1024 * 1024
 
 _SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 _REQUEST_ID_PATTERN = re.compile(r"^[!-~]{1,256}$")
+_MAX_SAFE_PROVIDER_CODE = (1 << 63) - 1
 
 
 @dataclass(frozen=True, slots=True)
@@ -494,9 +495,9 @@ def _read_bounded_entity(
 def _safe_provider_code(body: bytes) -> int | None:
     try:
         value = json.loads(body.decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError):
+    except (UnicodeDecodeError, ValueError, RecursionError):
         return None
     if type(value) is not dict:
         return None
     code = value.get("code")
-    return code if type(code) is int and code >= 0 else None
+    return code if type(code) is int and 0 <= code <= _MAX_SAFE_PROVIDER_CODE else None

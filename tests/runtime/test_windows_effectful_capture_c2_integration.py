@@ -1028,6 +1028,9 @@ def _canonical_c3_snapshot(
 def _automatic_child_result(
     api: _FakeNativeApi,
     classification: ChildResultClassification,
+    *,
+    http_status: int = 403,
+    provider_request_id: str | None = "c3-http-failure",
 ) -> bytes:
     request_bytes = bytes(api.written)
     child = parse_isolated_capture_child_request(request_bytes)
@@ -1041,6 +1044,11 @@ def _automatic_child_result(
             "http_status": 200,
             "provider_request_id": "c3-parent-verification",
             "snapshot_id": UUID(json.loads(payload)["snapshot_id"]),
+        }
+    elif classification is ChildResultClassification.HTTP_FAILED:
+        values = {
+            "http_status": http_status,
+            "provider_request_id": provider_request_id,
         }
     result = IsolatedCaptureChildResult(
         reservation_id=child.reservation_id,
@@ -1057,12 +1065,20 @@ def _automatic_child_result(
 def _run_complete_invocation(
     api: _FakeNativeApi,
     classification: ChildResultClassification | None,
+    *,
+    http_status: int = 403,
+    provider_request_id: str | None = "c3-http-failure",
 ):
     capture, plan, adapter, transactional, connection = _orchestration_case(api)
     if classification is None:
         api.result_factory = lambda: b"not-canonical-child-result"
     else:
-        api.result_factory = lambda: _automatic_child_result(api, classification)
+        api.result_factory = lambda: _automatic_child_result(
+            api,
+            classification,
+            http_status=http_status,
+            provider_request_id=provider_request_id,
+        )
     api.wait_events.extend(
         (C3NativeWaitStatus.IO_COMPLETED, C3NativeWaitStatus.IO_COMPLETED)
     )
@@ -1201,6 +1217,7 @@ def test_c3_e31_complete_success_orders_evidence_verification_terminal_selection
             "FAILED",
             "CONFIRMED",
         ),
+        (ChildResultClassification.HTTP_FAILED, "FAILED", "CONFIRMED"),
         (None, "AMBIGUOUS", "MAY_HAVE_OCCURRED"),
     ],
 )
@@ -1229,6 +1246,48 @@ def test_c3_e31_non_success_is_terminal_unselected_and_never_retried(
         assert api.events.count("create_process") == 1
         assert api.events.count("resume_thread") == 1
         assert "publish" not in api.events
+    finally:
+        _close(adapter, transactional)
+        capture._closed = True
+
+
+@pytest.mark.parametrize(
+    ("status", "request_id"),
+    [(403, "durable-request-403"), (429, None)],
+)
+def test_c3_e35_http_failure_is_exact_durable_operator_evidence(
+    status: int,
+    request_id: str | None,
+) -> None:
+    api = _FakeNativeApi()
+    capture, adapter, transactional, connection, result = _run_complete_invocation(
+        api,
+        ChildResultClassification.HTTP_FAILED,
+        http_status=status,
+        provider_request_id=request_id,
+    )
+    try:
+        row = connection.execute(
+            "SELECT evidence_json, evidence_digest FROM terminals"
+        ).fetchone()
+        evidence = json.loads(row[0])
+
+        assert result.terminal_state == "FAILED"
+        assert result.provider_call_disposition == "CONFIRMED"
+        assert result.http_status == status
+        assert result.provider_request_id == request_id
+        assert result.selection_id is None
+        assert evidence["schema"] == 2
+        assert evidence["child_result_classification"] == "HTTP_FAILED"
+        assert evidence["http_status"] == status
+        assert evidence["provider_request_id"] == request_id
+        assert row[1] == hashlib.sha256(row[0]).digest()
+        assert len(row[0]) <= 2048
+        assert connection.execute(
+            "SELECT count(*) FROM session_selections"
+        ).fetchone() == (0,)
+        assert api.events.count("create_process") == 1
+        assert api.events.count("resume_thread") == 1
     finally:
         _close(adapter, transactional)
         capture._closed = True
@@ -1666,12 +1725,14 @@ def test_c3_c3c_cleanup_disposition_and_exact_persistence(
             ),
             "child_result_sha256": expected_child_sha,
             "execution_id": resumed.execution_id,
+            "http_status": None,
             "parent_cleanup": observation.parent_cleanup.value,
             "process_outcome": observation.process_outcome.value,
             "provider_call_disposition": expected_disposition,
+            "provider_request_id": None,
             "reservation_id": resumed.reservation_id,
             "result_transport": observation.result_transport.value,
-            "schema": 1,
+            "schema": 2,
         }
         assert cleanup_json == json.dumps(
             cleanup,
@@ -2376,7 +2437,14 @@ def test_c3_d2_successful_child_requires_d1_before_terminal() -> None:
 
 
 @pytest.mark.parametrize(
-    "tamper", ["digest", "raw_field", "diagnostic_raw", "durable_mismatch"]
+    "tamper",
+    [
+        "digest",
+        "raw_field",
+        "diagnostic_raw",
+        "durable_mismatch",
+        "non_http_status",
+    ],
 )
 def test_c3_d2_c2_rejects_tampered_terminal_material_without_consuming(
     monkeypatch: pytest.MonkeyPatch, tamper: str
@@ -2406,6 +2474,9 @@ def test_c3_d2_c2_rejects_tampered_terminal_material_without_consuming(
                 evidence = json.loads(material[3])
                 if tamper == "raw_field":
                     evidence["raw_error"] = _STORAGE_ROOT + r"\secret-provider-body"
+                elif tamper == "non_http_status":
+                    evidence["http_status"] = 403
+                    evidence["provider_request_id"] = "not-permitted"
                 else:
                     evidence["process_outcome"] = "TIMED_OUT_TERMINATED"
                 material[3] = json.dumps(
@@ -2418,7 +2489,10 @@ def test_c3_d2_c2_rejects_tampered_terminal_material_without_consuming(
             return tuple(material)
 
         monkeypatch.setattr(adapter_type, "validate_c3_terminal", tampered_validate)
-        with pytest.raises(ValueError, match="digest|schema|durable cleanup"):
+        with pytest.raises(
+            ValueError,
+            match="digest|schema|durable cleanup|non-HTTP",
+        ):
             transactional.record_c3_terminal(
                 resumed.execution_id, resumed.reservation_id
             )

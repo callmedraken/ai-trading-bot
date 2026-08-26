@@ -28,7 +28,8 @@ Completed C3 foundations include:
 10. manual `production_daily_snapshot_capture` operator boundary;
 11. E3.2 closed transport-stage diagnostics;
 12. E3.3 truthful transport-stage handling and separate HTTP-status semantics;
-13. E3.4 closed sanitized response-metadata sub-classifications.
+13. E3.4 closed sanitized response-metadata sub-classifications;
+14. E3.5 preservation of non-success HTTP status across safe Content-Type variation, durable sanitized HTTP evidence, and stricter successful-response Content-Type diagnostics.
 
 The native ordering remains:
 
@@ -165,6 +166,38 @@ The non-admin Trading E3.4 preflight passed:
 
 **The E3.4 deployment checkpoint is accepted.**
 
+## E3.5 source certification
+
+Provider call #3 exposed a specific real-provider failure: `TRANSPORT_RESPONSE_METADATA_CONTENT_TYPE_FAILED`. Review showed that a safe non-200 response carrying a non-JSON Content-Type could be rejected as metadata failure before preserving its HTTP status. E3.5 hardens that boundary without weakening successful-response parsing or retry authority.
+
+Accepted E3.5 source sequence:
+
+- `8913baf9fd56b2aa921781ab8e837ed10b63c25f` — preserve Alpaca HTTP failure status across safe non-200 Content-Type variation and add closed successful-response Content-Type sub-classifications;
+- `034ed9bedfda698936c51e2560d79bb59694929a` — persist sanitized `http_status` / `provider_request_id` in canonical durable C3 evidence-v2 and expose them only after terminal persistence; harden optional provider-code extraction;
+- `b0e94240291e59ee22114d639d096b4dc5cf7e094` — regression proving historical schema-1 C3 evidence remains accepted and byte-for-byte unchanged by current read-only authority validation.
+
+E3.5 behavior:
+
+- safe non-200 responses with missing, `text/plain`, or `text/html` Content-Type proceed to `AlpacaHttpStatusError` while retaining bounded framing/header protections;
+- provider error codes are parsed only from recognized supported JSON media types and remain optional sanitized diagnostics;
+- successful HTTP 200 responses still require supported JSON Content-Type and strict UTF-8 JSON parsing;
+- new closed successful-response classifications are `...CONTENT_TYPE_MISSING_FAILED`, `...CONTENT_TYPE_MEDIA_TYPE_FAILED`, `...CONTENT_TYPE_CHARSET_FAILED`, and `...CONTENT_TYPE_PARAMETER_FAILED`;
+- the prior broad Content-Type classification remains accepted for compatibility;
+- `HTTP_FAILED` durable evidence requires exact non-200 integer status and optional bounded printable-ASCII request ID; non-HTTP classifications store those fields as null;
+- cleanup/terminal evidence-v2 is stored in the existing opaque JSON+digest columns; production SQL is unchanged;
+- historical schema-1 cleanup/terminal/diagnostic evidence remains valid immutable evidence under current read-only authority validation.
+
+Final E3.5 source certification at `b0e94240291e59ee22114d639d096b4dc5cf7e094`:
+
+- 3,171 passed, 16 skipped, 0 failed;
+- Ruff check passed on `src tests`;
+- Ruff format check passed across 338 tracked source/test Python files;
+- final `git diff --check` passed;
+- tracked working tree clean;
+- frozen production SQL remains 118,896 bytes with SHA-256 `aa61df2f5db0090f8373222d1f5e492a58f4c10273afacfab45e382bacd4bb58`.
+
+**E3.5 source certification is accepted.** No E3.5 production wheel has yet been accepted or deployed; the fixed production runtime still reflects the accepted E3.4 deployment until the next supervised release procedure completes.
+
 ## Parallel GUI track: GUI-I1 integration-certified
 
 GUI-A1 through GUI-A4 and the GUI-I1 integration-hardening/review checkpoint are complete on isolated branch `feature/gui-foundation`, based on `develop` and intentionally separate from the frozen C3 production branch.
@@ -234,28 +267,46 @@ Lineage:
 
 Read-only diagnostics confirmed provider fence entered, complete result transport, process exited zero, complete parent/staging cleanup, valid evidence/diagnostics digests, and `POST_FENCE_CHILD_FAILURE`. The exact rejected metadata condition is not recoverable from the consumed E3.3 lineage. This lineage must never be retried.
 
-Total real Alpaca provider effects: **exactly 2**.
+### August 25, 2026
+
+Pure planning after the New York-date rollover authorized session `2026-08-25` with fresh request digest:
+
+`b41a85c7b907ccd2a687d9f832d72a85cf152db46c85eaf9665809635ce9674b`
+
+Pre-effect durable freshness was zero. Exactly one real provider effect then produced:
+
+- session: `2420ce3f-4395-504a-8bd6-995fe87055db`
+- attempt: `0cebdb94-0a83-5b46-ac43-979dfc98b168`
+- claim: `7e57b5ee-5ce8-55e6-93f9-62e8f6ab4b4d`
+- reservation: `2dfc0505-f1ad-5b07-b455-c47364e82bf7`
+- execution: `33d5ec52-1bae-5cdb-bb20-7e707cdcf039`
+- terminal: `96dc59fb-f393-5033-beba-ea78470d12ea`
+- terminal state: `FAILED`
+- provider disposition: `CONFIRMED`
+- child classification: `TRANSPORT_RESPONSE_METADATA_CONTENT_TYPE_FAILED`
+- selection/snapshot/artifact: none
+
+Read-only durable diagnostics confirmed provider fence entered, child request/result transport complete, process exited zero, parent/staging cleanup complete, artifact verification not attempted, evidence/diagnostics digests valid, and terminal reason `POST_FENCE_CHILD_FAILURE`. E3.4 therefore succeeded in narrowing the prior broad metadata failure to Content-Type validation. This lineage is permanently consumed and must never be retried.
+
+Total real Alpaca provider effects: **exactly 3**.
 
 ## Planner clock contract and next eligible session
 
-The current planner contract is exchange-local **calendar-date** based. For completed session date `D`, planning reconciles only after the New York calendar date has advanced to `D + 1`. Merely waiting until market close plus a buffer is insufficient.
+The planner contract is exchange-local **calendar-date** based. For completed session date `D`, planning reconciles only after the New York calendar date has advanced to `D + 1`. Merely waiting until market close plus a buffer is insufficient.
 
-Both August 21 and August 24 are consumed. The next genuinely new XNYS session is **August 25, 2026**, but it is not yet a completed eligible session at the current checkpoint. Under the current planner contract, the earliest pure planning gate for the August 25 session is after:
+August 21, August 24, and August 25 are consumed. The next genuinely new XNYS session is **August 26, 2026**. Under the current planner contract, the earliest pure planning gate for that session is after:
 
-- `2026-08-26 00:00 EDT`, equivalently
-- `2026-08-25 21:00 PDT`.
+- `2026-08-27 00:00 EDT`, equivalently
+- `2026-08-26 21:00 PDT`.
 
-Until that exchange-date rollover, do not manufacture a new digest and do not invoke the production capture command.
+Clock eligibility alone is not sufficient for another provider effect. Before any provider call #4 is considered, E3.5 must first be frozen into an accepted wheel, deployed through the sealed-runtime procedure, Trading RX republished, and the zero-provider production preflight accepted. After both deployment acceptance and exchange-date rollover, perform pure planning and durable freshness validation for the genuinely fresh session/digest.
 
-After rollover, the next step is **pure planning only** for the August 25 session. Review the authorized session date, fresh request digest, and durable freshness before considering any real provider effect.
-
-**Provider call #3 is NOT authorized.**
+**Provider call #4 is NOT authorized.**
 
 ## Immediate deep-review status
 
-Completed deep reviews found no unsafe automatic retry path, but identified follow-up work before unattended operation:
+Completed deep reviews found no unsafe automatic retry path. E3.5 improves operator diagnosis for future HTTP failures by durably preserving sanitized non-200 status/request ID after terminal persistence. Follow-up work before unattended operation remains:
 
-- operator diagnosis/recovery routing remains too opaque;
 - some proven pre-effect continuation states are not directly resumable through the one-shot facade;
 - production `close()` / concurrent admission-drain behavior;
 - secret/transport-object lifetime;

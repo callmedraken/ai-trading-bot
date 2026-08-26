@@ -123,48 +123,7 @@ Accepted frozen E3.4 wheel:
 - exact E3.4 source-file comparisons passed;
 - E3.4 metadata classifications and E3.3 HTTP hierarchy checks passed.
 
-Administrator deployment is accepted:
-
-- runtime quiescent before replacement;
-- Trading RX revoked before install;
-- offline uninstall/install succeeded;
-- all 191 accepted-wheel payload files matched after installation;
-- installed RECORD contained 380 rows: the 192 accepted wheel rows plus 188 accepted installer extras (185 `.pyc`, `INSTALLER`, `REQUESTED`, `direct_url.json`);
-- installed E3.4 metadata mappings passed;
-- E3.3 HTTP hierarchy and CLI handling remained correct;
-- production SQL remained 118,896 bytes / frozen SHA-256;
-- SQLite version 3.50.4;
-- read-only authority validation returned `VALIDATED` with the exact Trading SID;
-- runtime owner normalized to Administrators;
-- Administrator/SYSTEM-only sealed topology passed with 12,453 descendants and zero ACL anomalies.
-
-Trading RX republication is also accepted:
-
-- root owner: Administrators SID `S-1-5-32-544`;
-- root ACE count: 3;
-- SYSTEM: Full Control;
-- Administrators: Full Control;
-- Trading: inheritable Read & Execute only;
-- 12,453 descendants;
-- zero RX topology anomalies.
-
-The non-admin Trading E3.4 preflight passed:
-
-- exact Trading SID and non-admin token;
-- fixed runtime Python and package location verified;
-- exact E3.4 metadata reason/classification mapping verified;
-- arbitrary metadata reason sanitizes to `GENERIC` without retaining raw text;
-- E3.3 HTTP hierarchy verified;
-- production capture module importable without invocation;
-- runtime write blocked under Trading;
-- production temp write/read/delete probe passed and cleaned;
-- no Credential Manager read;
-- no network operation;
-- no production child launch;
-- no authority database mutation;
-- no provider request.
-
-**The E3.4 deployment checkpoint is accepted.**
+Administrator deployment, Trading RX republication, and the non-admin E3.4 zero-provider preflight were accepted. This is now historical; the fixed runtime has been replaced by the accepted E3.5 artifact described below.
 
 ## E3.5 source certification
 
@@ -174,7 +133,7 @@ Accepted E3.5 source sequence:
 
 - `8913baf9fd56b2aa921781ab8e837ed10b63c25f` — preserve Alpaca HTTP failure status across safe non-200 Content-Type variation and add closed successful-response Content-Type sub-classifications;
 - `034ed9bedfda698936c51e2560d79bb59694929a` — persist sanitized `http_status` / `provider_request_id` in canonical durable C3 evidence-v2 and expose them only after terminal persistence; harden optional provider-code extraction;
-- `b0e94240291e59ee22114d639d096b4dc5cf7e094` — regression proving historical schema-1 C3 evidence remains accepted and byte-for-byte unchanged by current read-only authority validation.
+- `b0e94240291e59ee2214d639d096b4dc5cf7e094` — regression proving historical schema-1 C3 evidence remains accepted and byte-for-byte unchanged by current read-only authority validation.
 
 E3.5 behavior:
 
@@ -187,7 +146,7 @@ E3.5 behavior:
 - cleanup/terminal evidence-v2 is stored in the existing opaque JSON+digest columns; production SQL is unchanged;
 - historical schema-1 cleanup/terminal/diagnostic evidence remains valid immutable evidence under current read-only authority validation.
 
-Final E3.5 source certification at `b0e94240291e59ee22114d639d096b4dc5cf7e094`:
+Final E3.5 source certification at `b0e94240291e59ee2214d639d096b4dc5cf7e094`:
 
 - 3,171 passed, 16 skipped, 0 failed;
 - Ruff check passed on `src tests`;
@@ -196,7 +155,48 @@ Final E3.5 source certification at `b0e94240291e59ee22114d639d096b4dc5cf7e094`:
 - tracked working tree clean;
 - frozen production SQL remains 118,896 bytes with SHA-256 `aa61df2f5db0090f8373222d1f5e492a58f4c10273afacfab45e382bacd4bb58`.
 
-**E3.5 source certification is accepted.** No E3.5 production wheel has yet been accepted or deployed; the fixed production runtime still reflects the accepted E3.4 deployment until the next supervised release procedure completes.
+**E3.5 source certification is accepted.**
+
+## E3.5 accepted artifact and Administrator deployment
+
+The first attempted artifact path (`c3-e35-production-*-v1`) is rejected and must never be used. It was created after an invalid mistyped source SHA prevented a valid export; no valid v1 wheel was produced.
+
+Accepted frozen E3.5 artifact:
+
+- source commit: `b0e94240291e59ee2214d639d096b4dc5cf7e094`;
+- source tree: `8c8d360f944077a777eea529051b0bce1d7de707`;
+- source export: `F:\AI\c3-e35-production-source-v2`;
+- wheel: `F:\AI\c3-e35-production-wheelhouse-v2\ai_trading_bot-0.1.0-py3-none-any.whl`;
+- length: 674,463 bytes;
+- SHA-256: `7c5f44bd2ef28992334094ef46e8b2f5ddd8c502d7086bb4a44d66bf8133edb9`;
+- 192 wheel entries / 191 hashed RECORD payloads;
+- exact `trading_bot` package payload matched the certified Git export byte-for-byte;
+- wheel path/topology checks passed with zero forbidden entries;
+- distribution metadata verified as `ai-trading-bot` 0.1.0, Python `>=3.12`, `py3-none-any`, runtime dependency `tzdata<2027.0,>=2024.1`, optional extras `dev` and `optimization-cpu`;
+- production SQL remained 118,896 bytes with the frozen SHA-256.
+
+Administrator deployment is accepted:
+
+- elevated identity `DESKTOP-I4DOKM7\John` confirmed administrator;
+- exact accepted wheel length/SHA re-proved immediately before install;
+- production runtime quiescent: zero fixed-runtime Python processes;
+- runtime root owner remained Administrators and the prior exact Trading RX publication was present;
+- Trading RX was removed and no Trading ACE remained anywhere in the runtime during replacement;
+- offline/no-index/no-deps/no-cache force-reinstall succeeded;
+- all 191 hashed wheel payloads matched the accepted wheel after installation;
+- installed RECORD topology remained 380 rows: 192 wheel rows plus 188 pip extras, consisting of 185 `.pyc`, `INSTALLER`, `REQUESTED`, and `direct_url.json`;
+- package imported from `F:\AITradingBot\runtime\Lib\site-packages\trading_bot`;
+- E3.3 HTTP exception hierarchy, E3.5 safe provider-code extraction, E3.5 operator HTTP evidence fields, and `HTTP_FAILED` child classification passed installed-runtime smoke checks;
+- production SQL remained frozen at 118,896 bytes / `aa61df2f5db0090f8373222d1f5e492a58f4c10273afacfab45e382bacd4bb58`;
+- SQLite remained 3.50.4;
+- read-only production authority validation returned `VALIDATED`, `INITIALIZED_SUPPORTED`, and exact Trading SID `S-1-5-21-1397534616-3988210162-180023805-1009`;
+- owner normalization processed 12,454 files with zero failures;
+- final runtime root owner is Administrators SID `S-1-5-32-544`;
+- final sealed root ACL contains only SYSTEM and Administrators, both inheritable Full Control;
+- 12,453 descendants inspected with zero ACL anomalies and no Trading ACE remaining;
+- no network operation, Credential Manager read, production child launch, or provider request occurred.
+
+**The E3.5 Administrator deployment checkpoint is accepted.** The runtime is intentionally still sealed to SYSTEM + Administrators only. Trading RX republication and the non-admin E3.5 zero-provider preflight remain required before any pure planner/provider gate.
 
 ## Parallel GUI track: GUI-I1 integration-certified
 
@@ -299,7 +299,7 @@ August 21, August 24, and August 25 are consumed. The next genuinely new XNYS se
 - `2026-08-27 00:00 EDT`, equivalently
 - `2026-08-26 21:00 PDT`.
 
-Clock eligibility alone is not sufficient for another provider effect. Before any provider call #4 is considered, E3.5 must first be frozen into an accepted wheel, deployed through the sealed-runtime procedure, Trading RX republished, and the zero-provider production preflight accepted. After both deployment acceptance and exchange-date rollover, perform pure planning and durable freshness validation for the genuinely fresh session/digest.
+Before any provider call #4 is considered, Trading RX must be republished over the accepted E3.5 runtime and the non-admin zero-provider production preflight must pass. After both that deployment gate and the exchange-date rollover, perform pure planning and durable freshness validation for a genuinely fresh session/digest.
 
 **Provider call #4 is NOT authorized.**
 

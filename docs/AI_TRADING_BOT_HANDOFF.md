@@ -4,8 +4,8 @@
 **Local repository:** `F:\AI\ai-trading-bot`  
 **Integration branch:** `develop`  
 **Current architecture branch:** `feature/windows-effectful-market-data-capture`  
-**Current release-source checkpoint:** `b0e94240291e59ee22114d639d096b4dc5cf7e094`  
-**Handoff status:** August 26, 2026 — C3-E3.5 source-certified after three consumed real-provider lineages; E3.5 wheel/deployment not yet accepted; provider call #4 remains blocked
+**Current release-source checkpoint:** `b0e94240291e59ee2214d639d096b4dc5cf7e094`  
+**Handoff status:** August 26, 2026 — C3-E3.5 source and frozen artifact accepted; Administrator deployment accepted and runtime sealed; Trading RX republication + non-admin zero-provider preflight pending; provider call #4 remains blocked
 
 > The Git-tracked `docs/AI_TRADING_BOT_HANDOFF.md` is the canonical handoff. Uploaded Project copies are mirrors only. Documentation closeout creates later docs-only commits, so always verify the live branch and use the release-source SHA above for artifact work.
 
@@ -84,8 +84,6 @@ length: 118896 bytes
 SHA-256: aa61df2f5db0090f8373222d1f5e492a58f4c10273afacfab45e382bacd4bb58
 ```
 
-Do not change production SQL during E3.5 deployment.
-
 ---
 
 ## 4. C3 status
@@ -96,7 +94,7 @@ C3 is **not complete** because no real provider lineage has yet produced a paren
 
 ---
 
-## 5. Accepted E3.4 deployed runtime
+## 5. Historical E3.4 deployed runtime
 
 Accepted E3.4 source:
 
@@ -113,9 +111,7 @@ length: 673212 bytes
 SHA-256: b7fdbabeb936c311eeae3509635ec57d40fa999e421dc4e9cd5afb8bbe0848db
 ```
 
-Deployment was accepted: runtime quiesced, Trading RX revoked before offline replacement, wheel payloads verified, SQL/SQLite/authority revalidated, Administrator/SYSTEM topology resealed, Trading RX republished, and non-admin zero-provider preflight passed.
-
-The fixed production runtime still contains this E3.4 release until E3.5 deployment is explicitly completed and accepted.
+Its deployment, Trading RX republication, and non-admin zero-provider preflight were accepted. It has now been replaced by the accepted E3.5 runtime described below.
 
 ---
 
@@ -194,7 +190,7 @@ fix: preserve Alpaca HTTP failure status
 034ed9bedfda698936c51e2560d79bb59694929a
 fix: persist Alpaca HTTP failure evidence
 
-b0e94240291e59ee22114d639d096b4dc5cf7e094
+b0e94240291e59ee2214d639d096b4dc5cf7e094
 test: preserve historical C3 evidence compatibility
 ```
 
@@ -211,7 +207,7 @@ E3.5 contract:
 - production SQL, provider host/query/feed, credentials, provider-call budget, native process ordering, and retry authority are unchanged;
 - historical schema-1 C3 cleanup/terminal/diagnostic evidence remains accepted by current read-only production validation and is not rewritten.
 
-Final source certification at `b0e94240291e59ee22114d639d096b4dc5cf7e094`:
+Final source certification at `b0e94240291e59ee2214d639d096b4dc5cf7e094`:
 
 ```text
 3171 passed, 16 skipped, 0 failed
@@ -222,11 +218,60 @@ tracked working tree: clean
 production SQL: unchanged
 ```
 
-**E3.5 source certification is accepted.** No E3.5 production wheel has yet been accepted or deployed.
+**E3.5 source certification is accepted.**
 
 ---
 
-## 8. Planner clock contract
+## 8. E3.5 frozen artifact and Administrator deployment — accepted
+
+The failed `c3-e35-production-*-v1` attempt is permanently rejected. It followed an invalid mistyped SHA and never produced a valid wheel.
+
+Accepted artifact:
+
+```text
+source commit: b0e94240291e59ee2214d639d096b4dc5cf7e094
+source tree: 8c8d360f944077a777eea529051b0bce1d7de707
+source export: F:\AI\c3-e35-production-source-v2
+wheel: F:\AI\c3-e35-production-wheelhouse-v2\ai_trading_bot-0.1.0-py3-none-any.whl
+length: 674463 bytes
+SHA-256: 7c5f44bd2ef28992334094ef46e8b2f5ddd8c502d7086bb4a44d66bf8133edb9
+wheel entries: 192
+RECORD rows / hashed payloads: 192 / 191
+```
+
+Offline artifact inspection accepted:
+
+- exact `trading_bot` package payload matched the certified source export byte-for-byte;
+- zero forbidden wheel entries;
+- production SQL retained exact frozen bytes/digest;
+- metadata verified as package `ai-trading-bot` version 0.1.0, Python `>=3.12`, `py3-none-any`, runtime dependency `tzdata<2027.0,>=2024.1`, optional extras `dev` / `optimization-cpu`.
+
+Administrator deployment accepted:
+
+- elevated administrator identity confirmed;
+- exact accepted wheel length/SHA rechecked before installation;
+- fixed runtime quiescent;
+- exact prior Trading RX publication found, then fully revoked before install;
+- zero Trading ACEs remained anywhere under the runtime during replacement;
+- offline/no-index/no-deps/no-cache force-reinstall succeeded;
+- all 191 accepted wheel payloads reconciled after installation;
+- installed RECORD: 380 rows total, 188 accepted pip extras, 185 `.pyc`, plus `INSTALLER`, `REQUESTED`, `direct_url.json`;
+- installed package imported from the fixed runtime;
+- E3.3 HTTP hierarchy, E3.5 safe provider-code behavior, operator HTTP evidence fields, and `HTTP_FAILED` classification verified;
+- production SQL remained 118896 bytes / frozen SHA-256;
+- SQLite remained 3.50.4;
+- read-only production authority validation returned `VALIDATED`, `INITIALIZED_SUPPORTED`, exact Trading SID;
+- ownership normalization processed 12,454 files with zero failures;
+- runtime owner is Administrators SID `S-1-5-32-544`;
+- sealed root ACL contains only SYSTEM + Administrators, both inheritable Full Control;
+- 12,453 descendants inspected with zero ACL anomalies;
+- no network operation, Credential Manager read, production child launch, authority mutation, or provider request occurred.
+
+**E3.5 Administrator deployment is accepted.** The runtime is intentionally still sealed to SYSTEM + Administrators. Trading RX must now be republished and independently verified before switching to the non-admin Trading account for the zero-provider preflight.
+
+---
+
+## 9. Planner clock contract
 
 The planner uses exchange-local **calendar-date** reconciliation. For completed session date `D`, planning passes only once New York date has advanced to `D + 1`; market close plus an arbitrary buffer is not enough.
 
@@ -241,31 +286,26 @@ Changing this clock semantic requires Sol High architecture review.
 
 ---
 
-## 9. Current resume point / next acceptance gate
+## 10. Current resume point / next acceptance gate
 
-The immediate next milestone is **E3.5 frozen artifact + fixed-runtime deployment**, not another provider call:
+Immediate sequence:
 
 ```text
-source-certified b0e94240291e59ee22114d639d096b4dc5cf7e094
-→ build one frozen wheel from exact source
-→ offline wheel identity/RECORD/source/SQL inspection
-→ accept exact wheel
-→ supervised Administrator runtime replacement
-→ verify installed payload + SQL + SQLite + authority
-→ reseal Administrator/SYSTEM topology
-→ republish Trading RX
-→ Trading non-admin zero-provider preflight
+accepted E3.5 Administrator deployment
+→ republish exact Trading inheritable Read & Execute
+→ verify root + all descendants, zero ACL anomalies
+→ switch to DESKTOP-I4DOKM7\Trading non-admin session
+→ E3.5 zero-provider preflight
+→ after 2026-08-26 21:00 PDT, pure planner only for August 26
+→ durable freshness review
+→ only then consider provider call #4
 ```
 
-Only after that deployment checkpoint is accepted **and** the exchange-date rollover has occurred may a pure planner + durable freshness check be performed for the new session/digest.
-
-**Provider call #4 is NOT authorized.**
-
-No provider effect should be attempted merely because the clock gate is open.
+**Provider call #4 is NOT authorized.** No provider effect should be attempted merely because the clock gate becomes open.
 
 ---
 
-## 10. Crash/recovery posture
+## 11. Crash/recovery posture
 
 No unsafe automatic retry path has been found. Conservative categories remain:
 
@@ -281,7 +321,7 @@ E3.5 ensures a future `HTTP_FAILED` terminal retains sanitized non-200 status/re
 
 ---
 
-## 11. Remaining C3 / pre-unattended reviews
+## 12. Remaining C3 / pre-unattended reviews
 
 Before unattended production operation, continue review of:
 
@@ -297,7 +337,7 @@ Native Windows authority, credential lifetime, external-effect ordering, crash/r
 
 ---
 
-## 12. Roadmap after successful C3 acceptance
+## 13. Roadmap after successful C3 acceptance
 
 1. Reliable manual paper cycle — selected parent-verified snapshot → strategy → proposal → deterministic risk → paper execution → durable result.
 2. Unattended paper operation — XNYS scheduling, startup reconciliation, recovery, health/alerts, stale/missing-data handling.
@@ -311,7 +351,7 @@ Stable initial live constraints: US stocks/ETFs, long-only, no margin/leverage/o
 
 ---
 
-## 13. Development workflow
+## 14. Development workflow
 
 Use ChatGPT/Sol for architecture, debugging strategy, GitHub/diff review, test-gate decisions, release gating, and next-step planning.
 
@@ -337,7 +377,7 @@ docs/AI_TRADING_BOT_HANDOFF.md
 
 ---
 
-## 14. Files to read when resuming
+## 15. Files to read when resuming
 
 ```text
 AGENTS.md
@@ -355,7 +395,7 @@ Before any future provider effect, inspect the latest durable E3 lineage evidenc
 
 ---
 
-## 15. Definition of project success
+## 16. Definition of project success
 
 The project succeeds when it can research deterministically, acquire trusted market data safely, make portfolio decisions under deterministic risk, interact safely with a brokerage, reconcile ambiguous outcomes, run unattended for long periods, fail closed on uncertainty, expose durable evidence and operator controls, operate under strict live limits, and present the same reviewed capabilities through a polished GUI.
 

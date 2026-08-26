@@ -49,6 +49,7 @@ from trading_bot.runtime.windows_authority_schema import (
     parse_release_manifest_bytes,
     parse_sqlite_authority_build_manifest,
     validate_persisted_evidence_digests,
+    validate_production_authority_database,
     validate_production_authority_database_for_test,
 )
 from trading_bot.runtime.windows_authority_sqlite import (
@@ -254,6 +255,7 @@ def _corrupt_evidence_pair(
     digest_column: str,
     *,
     field: str = "evidence",
+    replacement: bytes | None = None,
 ) -> None:
     """Use direct test SQL, then restore the exact trigger rows."""
 
@@ -277,7 +279,13 @@ def _corrupt_evidence_pair(
         ).fetchone()
         if row is None:
             raise AssertionError(f"{table} has no row for evidence corruption")
-        if field == "evidence":
+        if replacement is not None:
+            connection.execute(
+                f'UPDATE "{table}" SET "{evidence_column}" = ?, '
+                f'"{digest_column}" = ? WHERE rowid = ?',
+                (replacement, hashlib.sha256(replacement).digest(), row[0]),
+            )
+        elif field == "evidence":
             connection.execute(
                 f'UPDATE "{table}" SET "{evidence_column}" = ? WHERE rowid = ?',
                 (row[1] + b"corruption", row[0]),
@@ -979,3 +987,171 @@ def test_initializer_rejects_active_transaction_before_schema_ddl(
         assert connection.execute("SELECT name FROM sqlite_schema").fetchall() == []
     finally:
         connection.close()
+
+
+def test_production_validator_accepts_historical_c3_schema1_evidence_without_rewrite(
+    tmp_path: Path,
+) -> None:
+    database, _, bootstrap, release, build = _populated_authority(tmp_path)
+    connection = sqlite3.connect(database)
+    try:
+        lineage = connection.execute(
+            """
+            SELECT s.session_id, a.attempt_id, c.claim_id,
+                   r.launch_reservation_id, e.launch_execution_id,
+                   t.snapshot_digest, s.request_digest
+            FROM sessions AS s
+            JOIN attempts AS a ON a.session_id = s.session_id
+            JOIN provider_call_claims AS c ON c.attempt_id = a.attempt_id
+            JOIN launch_reservations AS r ON r.claim_id = c.claim_id
+            JOIN launch_executions AS e
+              ON e.launch_reservation_id = r.launch_reservation_id
+            JOIN terminals AS t
+              ON t.launch_reservation_id = r.launch_reservation_id
+            WHERE t.terminal_state = 'SUCCEEDED'
+            """
+        ).fetchone()
+    finally:
+        connection.close()
+    assert lineage is not None
+    (
+        session_id,
+        attempt_id,
+        claim_id,
+        reservation_id,
+        execution_id,
+        snapshot_digest,
+        request_digest,
+    ) = lineage
+    assert type(snapshot_digest) is bytes and len(snapshot_digest) == 32
+    assert type(request_digest) is bytes and len(request_digest) == 32
+
+    def canonical(value: object) -> bytes:
+        return json.dumps(
+            value, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+        ).encode("utf-8")
+
+    child_result_sha256 = hashlib.sha256(b"historical-c3-child-result").hexdigest()
+    cleanup_json = canonical(
+        {
+            "child_fence_state": "ENTERED",
+            "child_request_sha256": request_digest.hex(),
+            "child_result_classification": "SUCCEEDED",
+            "child_result_sha256": child_result_sha256,
+            "execution_id": execution_id,
+            "parent_cleanup": "COMPLETE",
+            "process_outcome": "EXITED_ZERO",
+            "provider_call_disposition": "CONFIRMED",
+            "reservation_id": reservation_id,
+            "result_transport": "COMPLETE",
+            "schema": 1,
+        }
+    )
+    terminal_json = canonical(
+        {
+            "artifact_identity_sha256": snapshot_digest.hex(),
+            "artifact_sha256": snapshot_digest.hex(),
+            "artifact_verification": "VERIFIED",
+            "attempt_id": attempt_id,
+            "child_fence_state": "ENTERED",
+            "child_request_sha256": request_digest.hex(),
+            "child_result_classification": "SUCCEEDED",
+            "child_result_sha256": child_result_sha256,
+            "claim_id": claim_id,
+            "execution_id": execution_id,
+            "parent_cleanup": "COMPLETE",
+            "process_outcome": "EXITED_ZERO",
+            "provider_call_disposition": "CONFIRMED",
+            "reservation_id": reservation_id,
+            "result_transport": "COMPLETE",
+            "schema": 1,
+            "session_id": session_id,
+            "snapshot_id": "00000000-0000-0000-0000-000000000001",
+            "staging_cleanup": "COMPLETE",
+            "terminal_state": "SUCCEEDED",
+        }
+    )
+    diagnostics_json = canonical(
+        {
+            "artifact_verification": "VERIFIED",
+            "parent_cleanup": "COMPLETE",
+            "reason": "VERIFIED_SNAPSHOT",
+            "result_transport": "COMPLETE",
+            "schema": 1,
+            "staging_cleanup": "COMPLETE",
+        }
+    )
+    cleanup_digest = hashlib.sha256(cleanup_json).digest()
+    terminal_digest = hashlib.sha256(terminal_json).digest()
+    diagnostics_digest = hashlib.sha256(diagnostics_json).digest()
+    _corrupt_evidence_pair(
+        database,
+        "launch_executions",
+        "cleanup_json",
+        "cleanup_digest",
+        replacement=cleanup_json,
+    )
+    _corrupt_evidence_pair(
+        database,
+        "terminals",
+        "evidence_json",
+        "evidence_digest",
+        replacement=terminal_json,
+    )
+    _corrupt_evidence_pair(
+        database,
+        "terminals",
+        "sanitized_diagnostics_json",
+        "sanitized_diagnostics_digest",
+        replacement=diagnostics_json,
+    )
+
+    connection = open_read_only_sqlite_connection(database, vfs=build.vfs)
+    try:
+        before = connection.execute(
+            """
+            SELECT e.cleanup_json, e.cleanup_digest,
+                   t.evidence_json, t.evidence_digest,
+                   t.sanitized_diagnostics_json,
+                   t.sanitized_diagnostics_digest
+            FROM launch_executions AS e
+            JOIN terminals AS t
+              ON t.launch_reservation_id = e.launch_reservation_id
+            """
+        ).fetchone()
+    finally:
+        connection.close()
+    assert before == (
+        cleanup_json,
+        cleanup_digest,
+        terminal_json,
+        terminal_digest,
+        diagnostics_json,
+        diagnostics_digest,
+    )
+
+    validated = validate_production_authority_database(
+        database_path=database,
+        bootstrap=bootstrap,
+        bootstrap_digest=bootstrap.digest,
+        release_manifest=release,  # type: ignore[arg-type]
+        sqlite_build=build,
+    )
+    assert validated.schema_id == PRODUCTION_SCHEMA_ID
+
+    connection = open_read_only_sqlite_connection(database, vfs=build.vfs)
+    try:
+        after = connection.execute(
+            """
+            SELECT e.cleanup_json, e.cleanup_digest,
+                   t.evidence_json, t.evidence_digest,
+                   t.sanitized_diagnostics_json,
+                   t.sanitized_diagnostics_digest
+            FROM launch_executions AS e
+            JOIN terminals AS t
+              ON t.launch_reservation_id = e.launch_reservation_id
+            """
+        ).fetchone()
+    finally:
+        connection.close()
+    assert after == before

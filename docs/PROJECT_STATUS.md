@@ -165,41 +165,40 @@ The non-admin Trading E3.4 preflight passed:
 
 **The E3.4 deployment checkpoint is accepted.**
 
-## Parallel GUI track: GUI-A4 certified
+## Parallel GUI track: GUI-I1 integration-certified
 
-GUI-A1 through GUI-A4 are complete on isolated branch `feature/gui-foundation`, based on `develop` and intentionally separate from the frozen C3 production branch.
+GUI-A1 through GUI-A4 and the GUI-I1 integration-hardening/review checkpoint are complete on isolated branch `feature/gui-foundation`, based on `develop` and intentionally separate from the frozen C3 production branch.
 
-Accepted GUI-A4 checkpoint:
+Accepted GUI integration checkpoint:
 
-- GUI branch HEAD: `bc3ba7aacb41668ff36196afb307849a2f33b803`;
-- Architecture 90 continues to define the GUI dependency direction and no-effect boundary;
-- PySide6/Qt remains optional and presentation-only;
-- the bounded compact-report service remains authoritative for local report loading, canonical deserialization, a 10 MB + 1 byte read bound, a 500-row result bound, and one sanitized unavailable state;
-- GUI-A3 Open Report, explicit path startup, bounded filtering, deterministic sorting, selected-result detail, and immutable report handling remain intact;
-- GUI-A4 adds immutable GUI-only comparison state for 2–4 variants using stable `caller_ordinal` identities rather than visual table indexes;
-- comparison identities survive presentation sorting/filtering and are resolved back against immutable report rows; report replacement clears incompatible comparison state;
-- comparison selection is bounded to four unique variants in deterministic caller order, with explicit add/remove/clear actions and operator-visible slot count;
-- the comparison table is read-only and displays only approved compact-report fields: rank, variant, parameters, total return, maximum drawdown, turnover, and trade count;
-- compact-report v1 still supplies no approved exposure or return-over-drawdown source, so no new derived financial metrics were introduced;
-- a Qt-native comparison chart visualizes total return, maximum drawdown, turnover, and trade count without adding a plotting dependency or composite score;
-- total return uses a centered zero axis with truthful negative/zero/positive geometry;
-- maximum drawdown explicitly states that lower is better and larger bars represent more drawdown; turnover and trade count are presented without preference inference;
-- comparison ties and ordering remain deterministic;
-- Research-page content is wrapped in a vertical `QScrollArea`, horizontal page-level scrolling is disabled, and all four-variant comparison content remains reachable at the normal application size without reducing/clipping chart height;
-- chart title/context placement uses measured Qt font metrics plus a fixed gap, eliminating heading overlap without changing comparison values or semantics;
+- GUI branch HEAD: `a722acc406c291f1aa487c8665dfbed3e123e788`;
+- `feature/gui-foundation` is 21 commits ahead of `develop` and 0 behind;
+- Architecture 90 records the GUI-A1 historical foundation plus reviewed A2–A4/I1 extensions while preserving the Qt -> GUI controller -> Qt-free service -> reviewed application/service dependency direction;
+- PySide6/Qt remains optional and presentation-only, with the reviewed optional dependency bounded to `PySide6>=6.10.1,<6.11`;
+- the compact-report v1 importer is strict and independently validating: exact schema version/type and object fields, duplicate-key rejection, lexical canonical-decimal rejection before fixed-point normalization, and bounded deep/malformed JSON handling;
+- local report loading retains the 10 MB + 1 byte actual read cap, 500-row display bound, bounded presentation strings, sanitized unavailable state, and no directory scanning or persistence;
+- Open Report routes through an injected Qt-free `ResearchReportLoader` service boundary rather than constructing the concrete adapter inside the Qt widget;
+- artifact- and service-derived `QLabel` values are forced to plain text so HTML-looking report content remains literal presentation data;
+- financial presentation now names the exact compact-report metrics: `aggregate_one_way_turnover` is shown as One-way turnover and `total_fills` is shown as Fills/Total fills; no trade-count metric is invented;
+- percentage display uses isolated sufficient-precision Decimal formatting so high-precision source values remain exact and sorting continues to use the original immutable Decimals;
+- GUI-A3 explicit-path startup, Open Report, bounded filtering, deterministic sorting/tie-breaking, selected-result detail, and immutable report handling remain intact;
+- GUI-A4 comparison remains bounded to 2–4 stable `caller_ordinal` identities, survives presentation sorting/filtering, clears on report replacement, and exposes explicit add/remove/clear actions;
+- the read-only comparison table/chart display approved metrics only, use a centered bipolar return axis, state drawdown semantics explicitly, infer no turnover/fill preference, introduce no composite score, and retain the accepted scrollable four-variant layout;
+- runtime Overview/System wording is milestone-neutral and truthful for both empty startup and real local-report startup; it does not claim a mock-data shell when actual local research data is displayed;
+- README now documents optional GUI installation and launch without changing the core dependency set;
 - no research execution, optimization, strategy mutation, network access, Credential Manager access, C1/C2/C3 authority access, production child launch, provider transport, brokerage, scheduler, recovery, paper/live controls, or other external-effect path is connected;
-- focused GUI + compact-report regression before final certification passed with 51 tests;
-- A4 layout follow-up passed 36 GUI tests;
-- A4 chart-presentation follow-up passed 9 focused tests;
-- full repository regression on the complete GUI-A4 behavioral implementation: 2,770 passed, 13 skipped, 0 failed;
-- final certified-head GUI gate: 45 passed;
+- focused GUI-I1a regression: 62 passed;
+- GUI-I1b focused GUI regression: 53 passed;
+- final full repository integration regression: 2,782 passed, 13 skipped, 0 failed;
+- final-head GUI regression: 53 passed;
 - Ruff check passed;
 - Ruff format check passed across 356 tracked Python files;
 - final `git diff --check` passed;
-- interactive visual smoke passed with four comparison variants, working vertical scrolling, readable comparison table/chart, and non-overlapping maximum-drawdown explanatory text;
+- visual smoke passed with corrected One-way turnover / Fills terminology and intact Research/comparison presentation;
+- Ruff formatting rewrote two working-tree files but produced no Git-visible content delta, so no follow-up commit was required and certified HEAD remained `a722acc406c291f1aa487c8665dfbed3e123e788`;
 - final tracked working tree was clean; unrelated generated/untracked artifacts remained untouched.
 
-At GUI-A4 certification, `feature/gui-foundation` is 19 commits ahead of `develop` and 0 behind. Further Research-page feature expansion is paused. The next GUI milestone is **GUI integration readiness**: perform one branch-level integration review, prepare/review a pull request targeting `develop`, and merge only with explicit approval. Production authority, provider, credential, brokerage, paper/live, and C3 controls remain outside the GUI integration scope.
+**GUI-I1 integration certification is accepted.** The branch is ready for a pull request targeting `develop`, but no PR has been opened or merged and merge remains subject to explicit approval. Further GUI feature expansion remains paused while the core C3 path resumes. Production authority, provider, credential, brokerage, paper/live, and C3 controls remain outside the GUI integration scope.
 
 ## Consumed real-provider lineages
 

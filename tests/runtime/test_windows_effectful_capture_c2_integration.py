@@ -1172,6 +1172,26 @@ def test_c3_e31_complete_success_orders_evidence_verification_terminal_selection
             "CONFIRMED",
         ),
         (
+            ChildResultClassification.TRANSPORT_RESPONSE_METADATA_CONTENT_TYPE_MISSING_FAILED,
+            "FAILED",
+            "CONFIRMED",
+        ),
+        (
+            ChildResultClassification.TRANSPORT_RESPONSE_METADATA_CONTENT_TYPE_MEDIA_TYPE_FAILED,
+            "FAILED",
+            "CONFIRMED",
+        ),
+        (
+            ChildResultClassification.TRANSPORT_RESPONSE_METADATA_CONTENT_TYPE_CHARSET_FAILED,
+            "FAILED",
+            "CONFIRMED",
+        ),
+        (
+            ChildResultClassification.TRANSPORT_RESPONSE_METADATA_CONTENT_TYPE_PARAMETER_FAILED,
+            "FAILED",
+            "CONFIRMED",
+        ),
+        (
             ChildResultClassification.TRANSPORT_RESPONSE_METADATA_CONTENT_TYPE_FAILED,
             "FAILED",
             "CONFIRMED",

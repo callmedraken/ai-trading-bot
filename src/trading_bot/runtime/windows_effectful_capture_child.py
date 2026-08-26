@@ -95,6 +95,18 @@ _METADATA_FAILURE_CLASSIFICATIONS = {
     AlpacaResponseMetadataFailureReason.INVALID_REQUEST_ID: (
         ChildResultClassification.TRANSPORT_RESPONSE_METADATA_REQUEST_ID_FAILED
     ),
+    AlpacaResponseMetadataFailureReason.MISSING_CONTENT_TYPE: (
+        ChildResultClassification.TRANSPORT_RESPONSE_METADATA_CONTENT_TYPE_MISSING_FAILED
+    ),
+    AlpacaResponseMetadataFailureReason.UNSUPPORTED_MEDIA_TYPE: (
+        ChildResultClassification.TRANSPORT_RESPONSE_METADATA_CONTENT_TYPE_MEDIA_TYPE_FAILED
+    ),
+    AlpacaResponseMetadataFailureReason.UNSUPPORTED_CHARSET: (
+        ChildResultClassification.TRANSPORT_RESPONSE_METADATA_CONTENT_TYPE_CHARSET_FAILED
+    ),
+    AlpacaResponseMetadataFailureReason.INVALID_CONTENT_TYPE_PARAMETERS: (
+        ChildResultClassification.TRANSPORT_RESPONSE_METADATA_CONTENT_TYPE_PARAMETER_FAILED
+    ),
     AlpacaResponseMetadataFailureReason.UNSUPPORTED_CONTENT_TYPE: (
         ChildResultClassification.TRANSPORT_RESPONSE_METADATA_CONTENT_TYPE_FAILED
     ),

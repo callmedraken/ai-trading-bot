@@ -283,7 +283,11 @@ class StdlibAlpacaHistoricalBarsTransport:
                 raise AlpacaHttpStatusError(
                     status,
                     request_id=metadata["request_id"],
-                    provider_code=_safe_provider_code(body),
+                    provider_code=(
+                        _safe_provider_code(body)
+                        if metadata["media_type"] == "application/json"
+                        else None
+                    ),
                 )
             request_id = metadata["request_id"]
             media_type = metadata["media_type"]
@@ -405,28 +409,61 @@ def _validated_response_headers(
         )
 
     content_type = _single(selected, "content-type")
-    media_type: str | None = None
-    if content_type is not None:
-        parts = [part.strip() for part in content_type.split(";")]
-        if parts[0].casefold() != "application/json":
-            raise _ResponseMetadataValidationError(
-                AlpacaResponseMetadataFailureReason.UNSUPPORTED_CONTENT_TYPE
-            )
-        for parameter in parts[1:]:
-            if parameter.casefold() != "charset=utf-8":
-                raise _ResponseMetadataValidationError(
-                    AlpacaResponseMetadataFailureReason.UNSUPPORTED_CONTENT_TYPE
-                )
-        media_type = "application/json"
-    if require_success_fields and media_type is None:
-        raise _ResponseMetadataValidationError(
-            AlpacaResponseMetadataFailureReason.UNSUPPORTED_CONTENT_TYPE
-        )
+    media_type = _supported_json_media_type(
+        content_type,
+        required=require_success_fields,
+    )
     return {
         "content_length": content_length,
         "request_id": request_id,
         "media_type": media_type,
     }
+
+
+def _supported_json_media_type(
+    content_type: str | None,
+    *,
+    required: bool,
+) -> str | None:
+    if content_type is None:
+        if required:
+            raise _ResponseMetadataValidationError(
+                AlpacaResponseMetadataFailureReason.MISSING_CONTENT_TYPE
+            )
+        return None
+
+    parts = [part.strip() for part in content_type.split(";")]
+    if parts[0].casefold() != "application/json":
+        if required:
+            raise _ResponseMetadataValidationError(
+                AlpacaResponseMetadataFailureReason.UNSUPPORTED_MEDIA_TYPE
+            )
+        return None
+
+    seen_charset = False
+    for parameter in parts[1:]:
+        folded = parameter.casefold()
+        if not folded.startswith("charset="):
+            if required:
+                raise _ResponseMetadataValidationError(
+                    AlpacaResponseMetadataFailureReason.INVALID_CONTENT_TYPE_PARAMETERS
+                )
+            return None
+        charset = parameter[len("charset=") :]
+        if seen_charset or not charset:
+            if required:
+                raise _ResponseMetadataValidationError(
+                    AlpacaResponseMetadataFailureReason.INVALID_CONTENT_TYPE_PARAMETERS
+                )
+            return None
+        if charset.casefold() != "utf-8":
+            if required:
+                raise _ResponseMetadataValidationError(
+                    AlpacaResponseMetadataFailureReason.UNSUPPORTED_CHARSET
+                )
+            return None
+        seen_charset = True
+    return "application/json"
 
 
 def _single(values: dict[str, list[str]], name: str) -> str | None:

@@ -235,6 +235,98 @@ def test_403_is_sanitized_and_never_retried_or_fallen_back() -> None:
 
 
 @pytest.mark.parametrize(
+    ("status", "content_type"),
+    [(403, "text/plain"), (429, "text/html"), (404, None)],
+)
+def test_non_200_non_json_content_type_preserves_http_failure(
+    status: int,
+    content_type: str | None,
+) -> None:
+    body = b'{"code":42910000,"message":"not a supported JSON response"}'
+    headers = [
+        ("Content-Length", str(len(body))),
+        ("X-Request-ID", "safe-error-request"),
+    ]
+    if content_type is not None:
+        headers.append(("Content-Type", content_type))
+    response = FakeResponse(
+        body,
+        status=status,
+        headers=tuple(headers),
+    )
+    connection = FakeConnection(response)
+    transport, factory_calls = _transport(connection)
+
+    with pytest.raises(AlpacaHttpStatusError) as caught:
+        transport.execute(_request(), api_key_id=KEY, api_secret_key=SECRET)
+
+    assert caught.value.status == status
+    assert caught.value.request_id == "safe-error-request"
+    assert caught.value.provider_code is None
+    assert len(factory_calls) == 1
+    assert len(connection.requests) == 1
+    assert set(response.read_sizes) == {64 * 1024}
+
+
+def test_non_200_non_json_body_remains_bounded() -> None:
+    response = FakeResponse(
+        b"x" * (MAX_ALPACA_RESPONSE_BYTES + 1),
+        status=429,
+        headers=(
+            ("Content-Type", "text/html"),
+            ("X-Request-ID", "safe-error-request"),
+        ),
+    )
+    connection = FakeConnection(response)
+    transport, _ = _transport(connection)
+
+    with pytest.raises(AlpacaTransportError) as caught:
+        transport.execute(_request(), api_key_id=KEY, api_secret_key=SECRET)
+
+    assert caught.value.stage is AlpacaTransportFailureStage.RESPONSE_BODY
+    assert len(connection.requests) == 1
+    assert response.read_sizes
+    assert set(response.read_sizes) == {64 * 1024}
+
+
+@pytest.mark.parametrize(
+    "headers",
+    [
+        (
+            ("Content-Type", "text/plain"),
+            ("Content-Type", "text/html"),
+            ("X-Request-ID", "request-1"),
+        ),
+        (
+            ("Content-Type", "text/plain"),
+            ("Content-Encoding", "gzip"),
+            ("X-Request-ID", "request-1"),
+        ),
+        (
+            ("Content-Type", "text/plain"),
+            ("Transfer-Encoding", "compress"),
+            ("X-Request-ID", "request-1"),
+        ),
+        (
+            ("Content-Type", "text/plain"),
+            ("Content-Length", "2"),
+            ("Transfer-Encoding", "chunked"),
+            ("X-Request-ID", "request-1"),
+        ),
+    ],
+)
+def test_non_200_still_rejects_unsafe_framing_and_duplicate_headers(headers) -> None:
+    connection = FakeConnection(FakeResponse(b"{}", status=403, headers=headers))
+    transport, _ = _transport(connection)
+
+    with pytest.raises(AlpacaTransportError) as caught:
+        transport.execute(_request(), api_key_id=KEY, api_secret_key=SECRET)
+
+    assert caught.value.stage is AlpacaTransportFailureStage.RESPONSE_METADATA
+    assert len(connection.requests) == 1
+
+
+@pytest.mark.parametrize(
     "error",
     [
         OSError(f"request write leaked {SECRET}"),
@@ -596,7 +688,7 @@ def test_public_request_rejects_authentication_headers() -> None:
                 ("Content-Type", SECRET),
                 ("X-Request-ID", "request-1"),
             ),
-            AlpacaResponseMetadataFailureReason.UNSUPPORTED_CONTENT_TYPE,
+            AlpacaResponseMetadataFailureReason.UNSUPPORTED_MEDIA_TYPE,
             SECRET,
         ),
     ],
@@ -678,12 +770,56 @@ def test_response_metadata_failure_reasons_are_exactly_closed() -> None:
         AlpacaResponseMetadataFailureReason.TRANSFER_LENGTH_CONFLICT,
         AlpacaResponseMetadataFailureReason.INVALID_CONTENT_LENGTH,
         AlpacaResponseMetadataFailureReason.INVALID_REQUEST_ID,
+        AlpacaResponseMetadataFailureReason.MISSING_CONTENT_TYPE,
+        AlpacaResponseMetadataFailureReason.UNSUPPORTED_MEDIA_TYPE,
+        AlpacaResponseMetadataFailureReason.UNSUPPORTED_CHARSET,
+        AlpacaResponseMetadataFailureReason.INVALID_CONTENT_TYPE_PARAMETERS,
         AlpacaResponseMetadataFailureReason.UNSUPPORTED_CONTENT_TYPE,
         AlpacaResponseMetadataFailureReason.GENERIC,
     )
 
     with pytest.raises(ValueError):
         AlpacaResponseMetadataFailureReason("UNRECOGNIZED_METADATA_REASON")
+
+
+@pytest.mark.parametrize(
+    ("content_type", "reason"),
+    [
+        (None, AlpacaResponseMetadataFailureReason.MISSING_CONTENT_TYPE),
+        ("text/plain", AlpacaResponseMetadataFailureReason.UNSUPPORTED_MEDIA_TYPE),
+        (
+            "application/json;charset=latin-1",
+            AlpacaResponseMetadataFailureReason.UNSUPPORTED_CHARSET,
+        ),
+        (
+            "application/json;profile=private-secret",
+            AlpacaResponseMetadataFailureReason.INVALID_CONTENT_TYPE_PARAMETERS,
+        ),
+        (
+            "application/json;charset=utf-8;charset=utf-8",
+            AlpacaResponseMetadataFailureReason.INVALID_CONTENT_TYPE_PARAMETERS,
+        ),
+    ],
+)
+def test_success_content_type_failure_is_exact_and_sanitized(
+    content_type: str | None,
+    reason: AlpacaResponseMetadataFailureReason,
+) -> None:
+    headers = [("Content-Length", "2"), ("X-Request-ID", "request-1")]
+    if content_type is not None:
+        headers.append(("Content-Type", content_type))
+    connection = FakeConnection(FakeResponse(b"{}", headers=tuple(headers)))
+    transport, _ = _transport(connection)
+
+    with pytest.raises(AlpacaTransportError) as caught:
+        transport.execute(_request(), api_key_id=KEY, api_secret_key=SECRET)
+
+    assert caught.value.stage is AlpacaTransportFailureStage.RESPONSE_METADATA
+    assert caught.value.metadata_reason is reason
+    assert caught.value.__context__ is None
+    assert content_type is None or content_type not in repr(caught.value)
+    assert "private-secret" not in repr(caught.value)
+    assert len(connection.requests) == 1
 
 
 def test_response_metadata_error_sanitizes_arbitrary_reason() -> None:

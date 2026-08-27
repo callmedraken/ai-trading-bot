@@ -91,8 +91,7 @@ class VerifiedMarketSnapshotView:
             or symbol != symbol.strip()
             or len(symbol) > MAX_MARKET_DATA_SYMBOL_CHARACTERS
             or any(
-                ord(character) < 0x21 or ord(character) > 0x7E
-                for character in symbol
+                ord(character) < 0x21 or ord(character) > 0x7E for character in symbol
             )
             for symbol in symbols
         ):

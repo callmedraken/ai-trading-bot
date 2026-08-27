@@ -35,6 +35,9 @@ from trading_bot.gui.paper_models import (
 )
 from trading_bot.gui.research_service import CompactReportResearchService
 from trading_bot.gui.services import GuiApplicationService, ResearchReportLoader
+from trading_bot.gui.verified_snapshot_inspection_service import (
+    VerifiedSnapshotInspectionService,
+)
 
 __all__ = [
     "ApplicationOverview",
@@ -63,6 +66,7 @@ __all__ = [
     "ResearchResultRow",
     "ResearchReportLoader",
     "VerifiedMarketSnapshotView",
+    "VerifiedSnapshotInspectionService",
     "format_decimal_for_display",
     "format_percentage_for_display",
     "unavailable_market_data_state",

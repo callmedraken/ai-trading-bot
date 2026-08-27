@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Protocol
 
 from trading_bot.gui.models import ApplicationOverview, ResearchPageState
+from trading_bot.gui.paper_models import PaperPageState
 
 
 class ResearchReportLoader(Protocol):
@@ -23,4 +24,8 @@ class GuiApplicationService(ResearchReportLoader, Protocol):
 
     def get_research_state(self) -> ResearchPageState:
         """Return bounded read-only historical research presentation state."""
+        ...
+
+    def get_paper_state(self) -> PaperPageState:
+        """Return bounded read-only paper-operation presentation state."""
         ...

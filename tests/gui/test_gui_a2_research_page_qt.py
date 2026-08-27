@@ -15,6 +15,7 @@ from trading_bot.gui import ApplicationOverview, CompactReportResearchService
 from trading_bot.gui.main_window import MainWindow
 from trading_bot.gui.mock_service import MockGuiApplicationService
 from trading_bot.gui.models import ResearchPageState
+from trading_bot.gui.paper_models import PaperPageState, unavailable_paper_state
 
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURE = (
@@ -38,6 +39,9 @@ class _GuiA2RecordingService:
     def get_research_state(self) -> ResearchPageState:
         self.research_calls += 1
         return CompactReportResearchService(FIXTURE).get_research_state()
+
+    def get_paper_state(self) -> PaperPageState:
+        return unavailable_paper_state()
 
 
 def _application() -> QApplication:

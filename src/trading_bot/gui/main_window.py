@@ -20,6 +20,7 @@ from trading_bot.gui.models import (
     OperatingMode,
     PresentationStatus,
 )
+from trading_bot.gui.paper_page import PaperPage
 from trading_bot.gui.research_page import ResearchPage
 from trading_bot.gui.services import GuiApplicationService
 
@@ -54,6 +55,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self._overview = service.get_overview()
         research_state = service.get_research_state()
+        paper_state = service.get_paper_state()
         self._page_index = {page_id: index for index, page_id in enumerate(PAGE_IDS)}
 
         self.setWindowTitle("AI Trading Bot")
@@ -72,12 +74,8 @@ class MainWindow(QMainWindow):
         self._stack.addWidget(self._build_home_page(self._overview))
         self._research_page = ResearchPage(research_state, service, self)
         self._stack.addWidget(self._research_page)
-        self._stack.addWidget(
-            self._build_placeholder_page(
-                "Paper Operation",
-                "Paper Operation is read-only; no execution controls are connected.",
-            )
-        )
+        self._paper_page = PaperPage(paper_state, self)
+        self._stack.addWidget(self._paper_page)
         self._stack.addWidget(
             self._build_placeholder_page(
                 "Market Data",
@@ -296,6 +294,24 @@ class MainWindow(QMainWindow):
             }
             QLabel#researchPath, QLabel#researchMetadata {
                 color: #94a3b8;
+            }
+            QLabel#paperStatus {
+                color: #fbbf24;
+                font-weight: 700;
+            }
+            QLabel#paperFieldLabel {
+                color: #94a3b8;
+                font-weight: 600;
+            }
+            QLabel#paperClassification, QLabel#paperDiagnostic,
+            QLabel#paperOperationId, QLabel#paperTerminalCheckpointId,
+            QLabel#paperApplicationId, QLabel#paperReceiptPath {
+                color: #e5e7eb;
+            }
+            QFrame#paperDetailPanel {
+                background: #182235;
+                border: 1px solid #2a3950;
+                border-radius: 8px;
             }
             QLineEdit#researchFilter {
                 background: #0b1220;

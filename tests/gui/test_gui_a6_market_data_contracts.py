@@ -114,9 +114,7 @@ def test_verified_snapshot_rejects_invalid_symbols_and_bounds() -> None:
 
     with pytest.raises(ValueError, match="between 1 and 100"):
         _snapshot(
-            symbols=tuple(
-                f"S{index}" for index in range(MAX_MARKET_DATA_SYMBOLS + 1)
-            )
+            symbols=tuple(f"S{index}" for index in range(MAX_MARKET_DATA_SYMBOLS + 1))
         )
 
     with pytest.raises(ValueError, match="must be unique"):

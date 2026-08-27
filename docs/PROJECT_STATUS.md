@@ -228,17 +228,18 @@ The non-admin Trading E3.5 zero-provider preflight is accepted:
 
 **The complete E3.5 deployment + Trading zero-provider preflight checkpoint is accepted.**
 
-## Parallel GUI track: GUI-A5b1 paper inspection accepted
+## Parallel GUI track: GUI-A5b2 paper inspection rendering accepted
 
-The GUI remains isolated on `feature/gui-foundation` and separate from the frozen C3 production branch. GUI-A1 through GUI-A4 and GUI-I1 remain integration-certified; GUI-A5 now extends the Paper page through a strictly read-only inspection boundary.
+The GUI remains isolated on `feature/gui-foundation` and separate from the frozen C3 production branch. GUI-A1 through GUI-A4 and GUI-I1 remain integration-certified; GUI-A5 extends the Paper page through a strictly read-only inspection boundary and bounded native Qt rendering.
 
 Accepted GUI-A5 sequence:
 
 - `26833e8326f6cffef2c638543fb3174f1984e85f` — define Architecture 91 and the Qt-free paper-operation presentation/service contracts;
 - `b3cdce458a1f884f6d25b6fa82039cc1b31e1015` — Ruff-only formatting correction for GUI-A5a;
-- `bb057bc6864c4f340fa05651a4a63245ee491854` — add the Qt-free concrete `PaperOperationInspectionService` adapter.
+- `bb057bc6864c4f340fa05651a4a63245ee491854` — add the Qt-free concrete `PaperOperationInspectionService` adapter;
+- `fbf8fcb8068fff394bb1b144d1fdddbf3c50e06f` — render the bounded Paper inspection state in the native Qt page.
 
-GUI-A5a/A5b1 acceptance facts:
+GUI-A5 acceptance facts:
 
 - Architecture 91 preserves the existing reviewed `inspect_paper_operation_root(...)` scope: one exact operation only, not history/account/fill/order discovery;
 - presentation classification is limited to `PENDING`, `ALREADY_APPLIED`, `CONFLICTING`, or `BLOCKED`, and mirrors the closed reviewed diagnostic vocabulary exactly;
@@ -246,12 +247,17 @@ GUI-A5a/A5b1 acceptance facts:
 - the concrete adapter receives one explicit operation-root `Path` and already-verified `VerifiedPaperOperationInputs`; GUI code does not construct or derive those inputs;
 - the adapter calls the reviewed inspector exactly once, preserves operation/checkpoint/application UUIDs and optional receipt path, and maps classification/diagnostic by exact enum value;
 - unexpected result types, unknown future enum values, oversized receipt-path presentation, and inspection/adaptation exceptions fail to a bounded sanitized `UNAVAILABLE` state without raw exception text;
-- no paper execution, retry/resume/recovery control, filesystem history scan, production SQLite, C1/C2/C3, Credential Manager, Alpaca, brokerage, scheduler, or production-child path is connected;
+- the Qt Paper page obtains one bounded state during `MainWindow` construction; navigation away/back performs no reinspection or other effect;
+- inspected fields render classification, diagnostic, operation/checkpoint/application UUIDs, and optional receipt path only; absent receipt path is represented neutrally as `Not retained`;
+- all service/model-derived labels are forced to `Qt.TextFormat.PlainText`, including HTML-looking message/path values;
+- the Paper page contains no execute/run/retry/resume/recover/cancel/refresh/open-receipt or other mutation/effect controls;
+- no paper execution, filesystem history scan, production SQLite, C1/C2/C3, Credential Manager, Alpaca, brokerage, scheduler, or production-child path is connected;
 - GUI-A5a focused gate: 9 passed; Ruff check/format and `git diff --check` passed after the formatting-only follow-up;
 - GUI-A5b1 focused GUI-A5a/A5b1 gate: 35 passed; Ruff check/format and `git diff --check` passed;
-- GitHub exact-diff review confirmed A5b1 changed only `src/trading_bot/gui/paper_inspection_service.py`, the GUI public export, and its focused tests.
+- GUI-A5b2 final focused gate: 47 passed; Ruff check/format and `git diff --check` passed;
+- GitHub exact-diff review confirmed the A5b2 four-file Qt change including the inspected-detail panel construction.
 
-**GUI-A5a and GUI-A5b1 are accepted.** The next GUI checkpoint is GUI-A5b2: render the already-bounded `PaperPageState` in the existing Qt Paper page, plain-text/read-only, with no execution or recovery controls. Full repository regression remains deferred until the GUI-A5 integration checkpoint.
+**GUI-A5a, GUI-A5b1, and GUI-A5b2 are accepted.** The next GUI checkpoint is the GUI-A5 integration/visual gate, followed by the full repository regression. That broader GUI certification remains deferred while C3 resumes.
 
 ## Consumed real-provider lineages
 
@@ -310,18 +316,19 @@ Read-only durable diagnostics confirmed provider fence entered, child request/re
 
 Total real Alpaca provider effects: **exactly 3**.
 
-## Planner clock contract and next eligible session
+## Planner clock contract and August 26 pre-effect gate
 
 The planner contract is exchange-local **calendar-date** based. For completed session date `D`, planning reconciles only after the New York calendar date has advanced to `D + 1`. Merely waiting until market close plus a buffer is insufficient.
 
-August 21, August 24, and August 25 are consumed. The next genuinely new XNYS session is **August 26, 2026**. Under the current planner contract, the earliest pure planning gate for that session is after:
+The August 26 pure-planning gate was run from the exact non-administrator Trading account after rollover at `2026-08-27T00:46:09.792299-04:00` New York time. It reproduced the consumed August 25 request digest exactly, then authorized the August 26 XNYS session and produced the fresh deterministic request digest:
 
-- `2026-08-27 00:00 EDT`, equivalently
-- `2026-08-26 21:00 PDT`.
+`cccf56d1361ee4df8cf34745f68b32b29c52efdaaa80d2a02d4a32323dedce7f`
 
-The E3.5 deployment, Trading RX publication, and non-admin zero-provider preflight are now accepted. After the exchange-date rollover, the next action is **pure planning only** for August 26, followed by a durable freshness validation for the resulting genuinely fresh session/digest.
+Independent read-only durable freshness validation found zero rows for that digest in `sessions`, `attempts`, `provider_call_claims`, `launch_reservations`, and `terminals`. Each of the three consumed request digests appeared exactly once in `sessions`, total durable session count remained 3, and SQLite `total_changes` remained 0. No Credential Manager read, network operation, production child launch, authority mutation, or provider request occurred.
 
-**Provider call #4 is NOT authorized.** Clock eligibility alone never authorizes an effect.
+**The August 26 pure planner + durable freshness gate is accepted.** The candidate digest is genuinely fresh relative to all three consumed lineages.
+
+**Provider call #4 is still NOT authorized.** The pre-effect planner/freshness prerequisite is satisfied, but the external effect requires a separate explicit authorization decision.
 
 ## Immediate deep-review status
 

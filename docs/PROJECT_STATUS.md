@@ -314,26 +314,50 @@ Pre-effect durable freshness was zero. Exactly one real provider effect then pro
 
 Read-only durable diagnostics confirmed provider fence entered, child request/result transport complete, process exited zero, parent/staging cleanup complete, artifact verification not attempted, evidence/diagnostics digests valid, and terminal reason `POST_FENCE_CHILD_FAILURE`. E3.4 therefore succeeded in narrowing the prior broad metadata failure to Content-Type validation. This lineage is permanently consumed and must never be retried.
 
-Total real Alpaca provider effects: **exactly 3**.
+### August 26, 2026
+
+Pure planning after the New York-date rollover authorized session `2026-08-26` with fresh request digest:
+
+`cccf56d1361ee4df8cf34745f68b32b29c52efdaaa80d2a02d4a32323dedce7f`
+
+Pre-effect durable freshness was zero across `sessions`, `attempts`, `provider_call_claims`, `launch_reservations`, and `terminals`. Exactly one explicitly authorized provider effect then produced:
+
+- session: `32b6765f-d1ae-5d11-81df-b95e82178edf`
+- attempt: `c19975b6-10b4-5893-93a2-aca92e606229`
+- claim: `fa184f7f-85bd-5830-bb96-70ae334a2d2e`
+- reservation: `995883d2-bdc4-5909-9e35-b4e8343beab7`
+- execution: `71ebf7dc-aaf4-504c-a15c-33c7b2afd6bb`
+- terminal: `67defd53-e6b2-5f6e-945e-de51b5846962`
+- terminal state: `FAILED`
+- provider disposition: `CONFIRMED`
+- child classification: `HTTP_FAILED`
+- HTTP status: `401`
+- provider request ID: `1a57fe61031771fc4b0f818c84f9e6e0`
+- selection/snapshot/artifact: none
+
+Read-only durable inspection verified the exact lineage and request digest, attempt/reservation/execution terminal states, provider-call budget 1, provider fence `ENTERED`, complete result transport, `EXITED_ZERO`, complete parent and staging cleanup, valid post-resume/cleanup/terminal evidence digests, terminal evidence schema 2, `artifact_verification=NOT_ATTEMPTED`, terminal reason `POST_FENCE_CHILD_FAILURE`, zero selection rows, exactly four durable sessions total, and SQLite `total_changes=0` during inspection. E3.5 therefore succeeded in preserving the concrete provider HTTP failure that E3.4 previously exposed only as a Content-Type metadata classification. This lineage is permanently consumed and must never be retried.
+
+Total real Alpaca provider effects: **exactly 4**.
 
 ## Planner clock contract and August 26 pre-effect gate
 
 The planner contract is exchange-local **calendar-date** based. For completed session date `D`, planning reconciles only after the New York calendar date has advanced to `D + 1`. Merely waiting until market close plus a buffer is insufficient.
 
-The August 26 pure-planning gate was run from the exact non-administrator Trading account after rollover at `2026-08-27T00:46:09.792299-04:00` New York time. It reproduced the consumed August 25 request digest exactly, then authorized the August 26 XNYS session and produced the fresh deterministic request digest:
+The August 26 pure-planning gate was run from the exact non-administrator Trading account after rollover at `2026-08-27T00:46:09.792299-04:00` New York time. It reproduced the consumed August 25 request digest exactly, then authorized the August 26 XNYS session and produced the deterministic request digest:
 
 `cccf56d1361ee4df8cf34745f68b32b29c52efdaaa80d2a02d4a32323dedce7f`
 
-Independent read-only durable freshness validation found zero rows for that digest in `sessions`, `attempts`, `provider_call_claims`, `launch_reservations`, and `terminals`. Each of the three consumed request digests appeared exactly once in `sessions`, total durable session count remained 3, and SQLite `total_changes` remained 0. No Credential Manager read, network operation, production child launch, authority mutation, or provider request occurred.
+Independent read-only durable freshness validation found zero rows for that digest in `sessions`, `attempts`, `provider_call_claims`, `launch_reservations`, and `terminals` before call #4. Each of the three earlier consumed request digests appeared exactly once in `sessions`, total durable session count remained 3, and SQLite `total_changes` remained 0. No Credential Manager read, network operation, production child launch, authority mutation, or provider request occurred during the planner/freshness gate.
 
-**The August 26 pure planner + durable freshness gate is accepted.** The candidate digest is genuinely fresh relative to all three consumed lineages.
+**The August 26 pure planner + durable freshness gate is accepted. Provider call #4 was subsequently explicitly authorized once, consumed once, and durably classified `FAILED / CONFIRMED / HTTP_FAILED / 401`.**
 
-**Provider call #4 is still NOT authorized.** The pre-effect planner/freshness prerequisite is satisfied, but the external effect requires a separate explicit authorization decision.
+The immediate C3 task is now **credential/authentication diagnosis without another provider effect**. The existing `/v1` Credential Manager references are not to be overwritten in place; if the Alpaca key pair is stale, revoked, mismatched, or otherwise uncertain, the next security milestone is a reviewed versioned credential-reference rotation/cutover. **Provider call #5 is NOT authorized.**
 
 ## Immediate deep-review status
 
-Completed deep reviews found no unsafe automatic retry path. E3.5 improves operator diagnosis for future HTTP failures by durably preserving sanitized non-200 status/request ID after terminal persistence. Follow-up work before unattended operation remains:
+Completed deep reviews found no unsafe automatic retry path. E3.5 has now demonstrated its intended diagnostic behavior in production by preserving sanitized HTTP status/request ID for call #4 after terminal persistence. Follow-up work before unattended operation remains:
 
+- credential/authentication diagnosis after the confirmed HTTP 401;
 - some proven pre-effect continuation states are not directly resumable through the one-shot facade;
 - production `close()` / concurrent admission-drain behavior;
 - secret/transport-object lifetime;
@@ -342,7 +366,7 @@ Completed deep reviews found no unsafe automatic retry path. E3.5 improves opera
 - clock/calendar authority for unattended scheduling;
 - selected-snapshot to paper-operation bridge.
 
-Any change to native Windows authority, credential lifetime, external-effect ordering, crash/recovery ambiguity, publication/selection authority, retry semantics, or planner clock semantics requires Sol High architecture review.
+Any change to native Windows authority, credential lifetime/reference version, external-effect ordering, crash/recovery ambiguity, publication/selection authority, retry semantics, or planner clock semantics requires Sol High architecture review.
 
 ## Roadmap after C3
 

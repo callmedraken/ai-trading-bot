@@ -22,7 +22,6 @@ from trading_bot.gui.mock_service import (
     ResearchReportGuiApplicationService,
 )
 
-
 _OPERATION_ID = UUID("00000000-0000-0000-0000-000000000001")
 _CHECKPOINT_ID = UUID("00000000-0000-0000-0000-000000000002")
 _APPLICATION_ID = UUID("00000000-0000-0000-0000-000000000003")
@@ -50,11 +49,14 @@ def test_presentation_vocabulary_matches_reviewed_inspection_vocabulary() -> Non
 def test_paper_page_state_requires_exact_payload_for_status() -> None:
     inspected = _inspection()
 
-    assert PaperPageState(
-        status=PaperPageStatus.INSPECTED,
-        message="One operation inspected.",
-        inspection=inspected,
-    ).inspection is inspected
+    assert (
+        PaperPageState(
+            status=PaperPageStatus.INSPECTED,
+            message="One operation inspected.",
+            inspection=inspected,
+        ).inspection
+        is inspected
+    )
 
     with pytest.raises(ValueError, match="requires one inspection"):
         PaperPageState(

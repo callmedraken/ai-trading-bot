@@ -1,5 +1,15 @@
 """Public, Qt-free presentation contracts for the desktop GUI."""
 
+from trading_bot.gui.market_data_models import (
+    MAX_MARKET_DATA_MESSAGE_CHARACTERS,
+    MAX_MARKET_DATA_PRESENTATION_TEXT_CHARACTERS,
+    MAX_MARKET_DATA_SYMBOL_CHARACTERS,
+    MAX_MARKET_DATA_SYMBOLS,
+    MarketDataPageState,
+    MarketDataPageStatus,
+    VerifiedMarketSnapshotView,
+    unavailable_market_data_state,
+)
 from trading_bot.gui.models import (
     ApplicationOverview,
     ComponentStatus,
@@ -31,7 +41,13 @@ __all__ = [
     "ComponentStatus",
     "CompactReportResearchService",
     "GuiApplicationService",
+    "MAX_MARKET_DATA_MESSAGE_CHARACTERS",
+    "MAX_MARKET_DATA_PRESENTATION_TEXT_CHARACTERS",
+    "MAX_MARKET_DATA_SYMBOL_CHARACTERS",
+    "MAX_MARKET_DATA_SYMBOLS",
     "MAX_PAPER_RECEIPT_PATH_CHARACTERS",
+    "MarketDataPageState",
+    "MarketDataPageStatus",
     "OperatingMode",
     "PaperInspectionClassification",
     "PaperInspectionDiagnostic",
@@ -46,7 +62,9 @@ __all__ = [
     "ResearchReportView",
     "ResearchResultRow",
     "ResearchReportLoader",
+    "VerifiedMarketSnapshotView",
     "format_decimal_for_display",
     "format_percentage_for_display",
+    "unavailable_market_data_state",
     "unavailable_paper_state",
 ]

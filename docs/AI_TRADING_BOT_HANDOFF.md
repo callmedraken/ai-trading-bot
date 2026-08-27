@@ -5,7 +5,7 @@
 **Integration branch:** `develop`  
 **Current architecture branch:** `feature/windows-effectful-market-data-capture`  
 **Current release-source checkpoint:** `b0e94240291e59ee2214d639d096b4dc5cf7e094`  
-**Handoff status:** August 26, 2026 — C3-E3.5 source, frozen artifact, fixed-runtime deployment, Trading RX, and non-admin zero-provider preflight accepted; provider call #4 remains blocked pending August 26 pure planning + durable freshness after exchange-date rollover
+**Handoff status:** August 27, 2026 — C3-E3.5 source, frozen artifact, fixed-runtime deployment, Trading RX, non-admin zero-provider preflight, and August 26 pure planner + durable freshness accepted; provider call #4 remains blocked pending separate explicit authorization; parallel GUI-A5b2 read-only Paper rendering is accepted
 
 > The Git-tracked `docs/AI_TRADING_BOT_HANDOFF.md` is the canonical handoff. Uploaded Project copies are mirrors only. Documentation closeout creates later docs-only commits, so always verify the live branch and use the release-source SHA above for artifact work.
 
@@ -301,35 +301,63 @@ Non-admin Trading E3.5 zero-provider preflight accepted:
 
 ---
 
-## 9. Planner clock contract
+## 9. Planner clock contract and August 26 pre-effect gate
 
 The planner uses exchange-local **calendar-date** reconciliation. For completed session date `D`, planning passes only once New York date has advanced to `D + 1`; market close plus an arbitrary buffer is not enough.
 
-August 21, August 24, and August 25 are consumed. The next genuinely new XNYS session is **August 26, 2026**. Its earliest pure planning gate is:
+The August 26 pure-planning gate was executed from the exact non-administrator Trading account at:
 
 ```text
-2026-08-27 00:00 EDT
-2026-08-26 21:00 PDT
+requested UTC:      2026-08-27T04:46:09.792299+00:00
+requested New York: 2026-08-27T00:46:09.792299-04:00
+authorized session: 2026-08-26
 ```
 
-Changing this clock semantic requires Sol High architecture review.
+The historical August 25 request shape reproduced its consumed digest exactly:
+
+```text
+b41a85c7b907ccd2a687d9f832d72a85cf152db46c85eaf9665809635ce9674b
+```
+
+The fresh August 26 request digest is:
+
+```text
+cccf56d1361ee4df8cf34745f68b32b29c52efdaaa80d2a02d4a32323dedce7f
+```
+
+Independent read-only durable freshness validation found zero rows for that digest in all five lineage tables: `sessions`, `attempts`, `provider_call_claims`, `launch_reservations`, and `terminals`. Each of the three consumed request digests appeared exactly once in `sessions`; total durable session count remained 3; SQLite `total_changes` was 0.
+
+No Credential Manager read, network operation, production child launch, authority database mutation, or provider request occurred.
+
+**The August 26 pure planner + durable freshness gate is accepted.** Changing the planner clock semantic still requires Sol High architecture review.
 
 ---
 
 ## 10. Current resume point / next acceptance gate
 
-The E3.5 source/artifact/deployment/preflight sequence is complete. The immediate next sequence is:
+The E3.5 source/artifact/deployment/preflight sequence and August 26 pre-effect planner/freshness sequence are complete.
+
+The candidate provider-call-#4 request is now proven to target the new August 26 XNYS session and to have no existing durable C2/C3 lineage:
 
 ```text
-wait until 2026-08-26 21:00 PDT / 2026-08-27 00:00 EDT
-→ pure planner only for August 26
-→ verify authorized session date and fresh deterministic request digest
-→ read-only durable freshness validation
-→ explicit review of the planner/freshness evidence
-→ only then consider provider call #4
+authorized session: 2026-08-26
+fresh request digest: cccf56d1361ee4df8cf34745f68b32b29c52efdaaa80d2a02d4a32323dedce7f
+existing durable rows for digest: 0
+actual real-provider effects so far: exactly 3
 ```
 
-**Provider call #4 is NOT authorized.** Clock eligibility alone never authorizes an effect, and the production capture command must not be run before the pure planner/freshness result is reviewed.
+The immediate next sequence is:
+
+```text
+explicit review/authorization decision for provider call #4
+→ if and only if explicitly authorized, perform exactly one supervised production capture
+→ stop immediately after the result
+→ inspect terminal/effect evidence before any further action
+```
+
+**Provider call #4 is NOT authorized yet.** The planner/freshness prerequisite is satisfied, but no effect may occur without a separate explicit authorization.
+
+Parallel GUI status: GUI-A5a/A5b1/A5b2 are accepted through `fbf8fcb8068fff394bb1b144d1fdddbf3c50e06f`. The native Paper page renders only the bounded read-only inspection state, uses plain-text presentation for service-derived data, contains no mutation/recovery controls, and does not re-inspect on navigation. The next GUI checkpoint is the GUI-A5 integration/visual gate followed by the full repository regression; it is deferred while C3 resumes.
 
 ---
 

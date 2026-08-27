@@ -42,12 +42,10 @@ def test_verified_snapshot_adapter_maps_complete_pass_exactly(tmp_path: Path) ->
     assert snapshot.provider_as_of == expected.audit.provider_as_of
     assert snapshot.source_payload_sha256 == expected.audit.source_payload.sha256
     assert (
-        snapshot.source_payload_byte_length
-        == expected.audit.source_payload.byte_length
+        snapshot.source_payload_byte_length == expected.audit.source_payload.byte_length
     )
     assert (
-        snapshot.source_payload_media_type
-        == expected.audit.source_payload.media_type
+        snapshot.source_payload_media_type == expected.audit.source_payload.media_type
     )
 
 

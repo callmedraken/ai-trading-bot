@@ -90,7 +90,10 @@ class VerifiedMarketSnapshotView:
             not symbol
             or symbol != symbol.strip()
             or len(symbol) > MAX_MARKET_DATA_SYMBOL_CHARACTERS
-            or any(ord(character) < 0x21 or ord(character) > 0x7E for character in symbol)
+            or any(
+                ord(character) < 0x21 or ord(character) > 0x7E
+                for character in symbol
+            )
             for symbol in symbols
         ):
             raise ValueError("symbols contain invalid presentation text")
@@ -135,7 +138,9 @@ class MarketDataPageState:
             if type(self.snapshot) is not VerifiedMarketSnapshotView:
                 raise ValueError("verified market-data state requires one snapshot")
         elif self.snapshot is not None:
-            raise ValueError("unavailable market-data state must not contain a snapshot")
+            raise ValueError(
+                "unavailable market-data state must not contain a snapshot"
+            )
 
 
 def unavailable_market_data_state() -> MarketDataPageState:

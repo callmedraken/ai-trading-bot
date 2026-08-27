@@ -5,7 +5,7 @@
 **Integration branch:** `develop`  
 **Current architecture branch:** `feature/windows-effectful-market-data-capture`  
 **Current release-source checkpoint:** `b0e94240291e59ee2214d639d096b4dc5cf7e094`  
-**Handoff status:** August 26, 2026 — C3-E3.5 source and frozen artifact accepted; Administrator deployment accepted and runtime sealed; Trading RX republication + non-admin zero-provider preflight pending; provider call #4 remains blocked
+**Handoff status:** August 26, 2026 — C3-E3.5 source, frozen artifact, fixed-runtime deployment, Trading RX, and non-admin zero-provider preflight accepted; provider call #4 remains blocked pending August 26 pure planning + durable freshness after exchange-date rollover
 
 > The Git-tracked `docs/AI_TRADING_BOT_HANDOFF.md` is the canonical handoff. Uploaded Project copies are mirrors only. Documentation closeout creates later docs-only commits, so always verify the live branch and use the release-source SHA above for artifact work.
 
@@ -222,7 +222,7 @@ production SQL: unchanged
 
 ---
 
-## 8. E3.5 frozen artifact and Administrator deployment — accepted
+## 8. E3.5 frozen artifact and full deployment — accepted
 
 The failed `c3-e35-production-*-v1` attempt is permanently rejected. It followed an invalid mistyped SHA and never produced a valid wheel.
 
@@ -263,11 +263,41 @@ Administrator deployment accepted:
 - read-only production authority validation returned `VALIDATED`, `INITIALIZED_SUPPORTED`, exact Trading SID;
 - ownership normalization processed 12,454 files with zero failures;
 - runtime owner is Administrators SID `S-1-5-32-544`;
-- sealed root ACL contains only SYSTEM + Administrators, both inheritable Full Control;
+- sealed root ACL initially contained only SYSTEM + Administrators, both inheritable Full Control;
 - 12,453 descendants inspected with zero ACL anomalies;
 - no network operation, Credential Manager read, production child launch, authority mutation, or provider request occurred.
 
-**E3.5 Administrator deployment is accepted.** The runtime is intentionally still sealed to SYSTEM + Administrators. Trading RX must now be republished and independently verified before switching to the non-admin Trading account for the zero-provider preflight.
+Trading RX republication accepted:
+
+- fixed runtime remained quiescent;
+- pre-publication root remained protected and owned by Administrators;
+- exact pre-publication ACE set was SYSTEM + Administrators only;
+- final root ACL contains exactly SYSTEM Full Control, Administrators Full Control, and Trading inheritable Read & Execute;
+- root owner remained Administrators SID `S-1-5-32-544`;
+- all 12,453 descendants inherited exactly one Trading RX ACE;
+- zero RX topology anomalies;
+- no provider request occurred.
+
+Non-admin Trading E3.5 zero-provider preflight accepted:
+
+- identity exactly `DESKTOP-I4DOKM7\Trading` / SID `S-1-5-21-1397534616-3988210162-180023805-1009`;
+- token non-administrator;
+- fixed runtime Python and installed package location verified;
+- E3.3 HTTP exception hierarchy preserved;
+- E3.5 non-200 missing/`text/plain`/`text/html` Content-Type handling passed;
+- successful-response Content-Type reason checks passed for missing Content-Type, unsupported media type, unsupported charset, and invalid parameters, with a valid JSON positive control;
+- safe provider-code extraction passed bounded, malformed, type, and range cases;
+- operator `http_status` / `provider_request_id` fields and `HTTP_FAILED` classification verified;
+- production SQL remained exactly 118896 bytes with the frozen SHA-256;
+- Trading runtime write probe was blocked;
+- production temp write/read/delete probe passed and cleaned;
+- Credential Manager read: false;
+- network operation: false;
+- production child launch: false;
+- authority database mutation: false;
+- provider request: false.
+
+**The complete E3.5 deployment + Trading zero-provider preflight checkpoint is accepted.**
 
 ---
 
@@ -288,20 +318,18 @@ Changing this clock semantic requires Sol High architecture review.
 
 ## 10. Current resume point / next acceptance gate
 
-Immediate sequence:
+The E3.5 source/artifact/deployment/preflight sequence is complete. The immediate next sequence is:
 
 ```text
-accepted E3.5 Administrator deployment
-→ republish exact Trading inheritable Read & Execute
-→ verify root + all descendants, zero ACL anomalies
-→ switch to DESKTOP-I4DOKM7\Trading non-admin session
-→ E3.5 zero-provider preflight
-→ after 2026-08-26 21:00 PDT, pure planner only for August 26
-→ durable freshness review
+wait until 2026-08-26 21:00 PDT / 2026-08-27 00:00 EDT
+→ pure planner only for August 26
+→ verify authorized session date and fresh deterministic request digest
+→ read-only durable freshness validation
+→ explicit review of the planner/freshness evidence
 → only then consider provider call #4
 ```
 
-**Provider call #4 is NOT authorized.** No provider effect should be attempted merely because the clock gate becomes open.
+**Provider call #4 is NOT authorized.** Clock eligibility alone never authorizes an effect, and the production capture command must not be run before the pure planner/freshness result is reviewed.
 
 ---
 
@@ -333,7 +361,7 @@ Before unattended production operation, continue review of:
 - selected-snapshot → paper-operation bridge;
 - systematic top-level crash/fault matrix.
 
-Native Windows authority, credential lifetime, external-effect ordering, crash/recovery ambiguity, publication/selection authority, retry semantics, and clock semantics require Sol High review. Localized frozen-contract implementation may use Luna Extra High; subtle bounded implementation may use Sol Medium.
+Native Windows authority, credential lifetime, external-effect ordering, crash/recovery ambiguity, publication/selection authority, retry semantics, and clock semantics require Sol High architecture review. Localized frozen-contract implementation may use Luna Extra High; subtle bounded implementation may use Sol Medium.
 
 ---
 

@@ -228,40 +228,30 @@ The non-admin Trading E3.5 zero-provider preflight is accepted:
 
 **The complete E3.5 deployment + Trading zero-provider preflight checkpoint is accepted.**
 
-## Parallel GUI track: GUI-I1 integration-certified
+## Parallel GUI track: GUI-A5b1 paper inspection accepted
 
-GUI-A1 through GUI-A4 and the GUI-I1 integration-hardening/review checkpoint are complete on isolated branch `feature/gui-foundation`, based on `develop` and intentionally separate from the frozen C3 production branch.
+The GUI remains isolated on `feature/gui-foundation` and separate from the frozen C3 production branch. GUI-A1 through GUI-A4 and GUI-I1 remain integration-certified; GUI-A5 now extends the Paper page through a strictly read-only inspection boundary.
 
-Accepted GUI integration checkpoint:
+Accepted GUI-A5 sequence:
 
-- GUI branch HEAD: `a722acc406c291f1aa487c8665dfbed3e123e788`;
-- `feature/gui-foundation` is 21 commits ahead of `develop` and 0 behind;
-- Architecture 90 records the GUI-A1 historical foundation plus reviewed A2–A4/I1 extensions while preserving the Qt -> GUI controller -> Qt-free service -> reviewed application/service dependency direction;
-- PySide6/Qt remains optional and presentation-only, with the reviewed optional dependency bounded to `PySide6>=6.10.1,<6.11`;
-- the compact-report v1 importer is strict and independently validating: exact schema version/type and object fields, duplicate-key rejection, lexical canonical-decimal rejection before fixed-point normalization, and bounded deep/malformed JSON handling;
-- local report loading retains the 10 MB + 1 byte actual read cap, 500-row display bound, bounded presentation strings, sanitized unavailable state, and no directory scanning or persistence;
-- Open Report routes through an injected Qt-free `ResearchReportLoader` service boundary rather than constructing the concrete adapter inside the Qt widget;
-- artifact- and service-derived `QLabel` values are forced to plain text so HTML-looking report content remains literal presentation data;
-- financial presentation now names the exact compact-report metrics: `aggregate_one_way_turnover` is shown as One-way turnover and `total_fills` is shown as Fills/Total fills; no trade-count metric is invented;
-- percentage display uses isolated sufficient-precision Decimal formatting so high-precision source values remain exact and sorting continues to use the original immutable Decimals;
-- GUI-A3 explicit-path startup, Open Report, bounded filtering, deterministic sorting/tie-breaking, selected-result detail, and immutable report handling remain intact;
-- GUI-A4 comparison remains bounded to 2–4 stable `caller_ordinal` identities, survives presentation sorting/filtering, clears on report replacement, and exposes explicit add/remove/clear actions;
-- the read-only comparison table/chart display approved metrics only, use a centered bipolar return axis, state drawdown semantics explicitly, infer no turnover/fill preference, introduce no composite score, and retain the accepted scrollable four-variant layout;
-- runtime Overview/System wording is milestone-neutral and truthful for both empty startup and real local-report startup; it does not claim a mock-data shell when actual local research data is displayed;
-- README now documents optional GUI installation and launch without changing the core dependency set;
-- no research execution, optimization, strategy mutation, network access, Credential Manager access, C1/C2/C3 authority access, production child launch, provider transport, brokerage, scheduler, recovery, paper/live controls, or other external-effect path is connected;
-- focused GUI-I1a regression: 62 passed;
-- GUI-I1b focused GUI regression: 53 passed;
-- final full repository integration regression: 2,782 passed, 13 skipped, 0 failed;
-- final-head GUI regression: 53 passed;
-- Ruff check passed;
-- Ruff format check passed across 356 tracked Python files;
-- final `git diff --check` passed;
-- visual smoke passed with corrected One-way turnover / Fills terminology and intact Research/comparison presentation;
-- Ruff formatting rewrote two working-tree files but produced no Git-visible content delta, so no follow-up commit was required and certified HEAD remained `a722acc406c291f1aa487c8665dfbed3e123e788`;
-- final tracked working tree was clean; unrelated generated/untracked artifacts remained untouched.
+- `26833e8326f6cffef2c638543fb3174f1984e85f` — define Architecture 91 and the Qt-free paper-operation presentation/service contracts;
+- `b3cdce458a1f884f6d25b6fa82039cc1b31e1015` — Ruff-only formatting correction for GUI-A5a;
+- `bb057bc6864c4f340fa05651a4a63245ee491854` — add the Qt-free concrete `PaperOperationInspectionService` adapter.
 
-**GUI-I1 integration certification is accepted.** The branch is ready for a pull request targeting `develop`, but no PR has been opened or merged and merge remains subject to explicit approval. Further GUI feature expansion remains paused while the core C3 path resumes. Production authority, provider, credential, brokerage, paper/live, and C3 controls remain outside the GUI integration scope.
+GUI-A5a/A5b1 acceptance facts:
+
+- Architecture 91 preserves the existing reviewed `inspect_paper_operation_root(...)` scope: one exact operation only, not history/account/fill/order discovery;
+- presentation classification is limited to `PENDING`, `ALREADY_APPLIED`, `CONFLICTING`, or `BLOCKED`, and mirrors the closed reviewed diagnostic vocabulary exactly;
+- `GuiApplicationService.get_paper_state()` is Qt-free and presentation-only;
+- the concrete adapter receives one explicit operation-root `Path` and already-verified `VerifiedPaperOperationInputs`; GUI code does not construct or derive those inputs;
+- the adapter calls the reviewed inspector exactly once, preserves operation/checkpoint/application UUIDs and optional receipt path, and maps classification/diagnostic by exact enum value;
+- unexpected result types, unknown future enum values, oversized receipt-path presentation, and inspection/adaptation exceptions fail to a bounded sanitized `UNAVAILABLE` state without raw exception text;
+- no paper execution, retry/resume/recovery control, filesystem history scan, production SQLite, C1/C2/C3, Credential Manager, Alpaca, brokerage, scheduler, or production-child path is connected;
+- GUI-A5a focused gate: 9 passed; Ruff check/format and `git diff --check` passed after the formatting-only follow-up;
+- GUI-A5b1 focused GUI-A5a/A5b1 gate: 35 passed; Ruff check/format and `git diff --check` passed;
+- GitHub exact-diff review confirmed A5b1 changed only `src/trading_bot/gui/paper_inspection_service.py`, the GUI public export, and its focused tests.
+
+**GUI-A5a and GUI-A5b1 are accepted.** The next GUI checkpoint is GUI-A5b2: render the already-bounded `PaperPageState` in the existing Qt Paper page, plain-text/read-only, with no execution or recovery controls. Full repository regression remains deferred until the GUI-A5 integration checkpoint.
 
 ## Consumed real-provider lineages
 

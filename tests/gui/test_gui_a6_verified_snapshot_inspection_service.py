@@ -46,7 +46,8 @@ def test_verified_snapshot_adapter_maps_complete_pass_exactly(tmp_path: Path) ->
         == expected.audit.source_payload.byte_length
     )
     assert (
-        snapshot.source_payload_media_type == expected.audit.source_payload.media_type
+        snapshot.source_payload_media_type
+        == expected.audit.source_payload.media_type
     )
 
 

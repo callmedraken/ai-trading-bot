@@ -32,6 +32,7 @@ from trading_bot.gui.models import (
     ResearchReportView,
     ResearchResultRow,
 )
+from trading_bot.gui.paper_models import PaperPageState, unavailable_paper_state
 from trading_bot.gui.research_page import ResearchPage
 
 
@@ -93,6 +94,9 @@ class _WindowResearchService:
 
     def get_research_state(self) -> ResearchPageState:
         return self._state
+
+    def get_paper_state(self) -> PaperPageState:
+        return unavailable_paper_state()
 
 
 def _main_table(page: ResearchPage) -> QTableWidget:

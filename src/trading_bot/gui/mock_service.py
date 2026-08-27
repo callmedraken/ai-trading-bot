@@ -2,6 +2,10 @@
 
 from pathlib import Path
 
+from trading_bot.gui.market_data_models import (
+    MarketDataPageState,
+    unavailable_market_data_state,
+)
 from trading_bot.gui.models import (
     ApplicationOverview,
     ComponentStatus,
@@ -64,6 +68,10 @@ class MockGuiApplicationService:
         """Return the deterministic unavailable paper-inspection state."""
         return unavailable_paper_state()
 
+    def get_market_data_state(self) -> MarketDataPageState:
+        """Return the deterministic unavailable market-data state."""
+        return unavailable_market_data_state()
+
     def load_research_report(self, artifact_path: Path) -> ResearchPageState:
         """Load one operator-selected report through the application boundary."""
         return CompactReportResearchService(artifact_path).get_research_state()
@@ -87,6 +95,10 @@ class ResearchReportGuiApplicationService:
     def get_paper_state(self) -> PaperPageState:
         """Return the deterministic unavailable paper-inspection state."""
         return self._overview_service.get_paper_state()
+
+    def get_market_data_state(self) -> MarketDataPageState:
+        """Return the deterministic unavailable market-data state."""
+        return self._overview_service.get_market_data_state()
 
     def load_research_report(self, artifact_path: Path) -> ResearchPageState:
         """Load one operator-selected report through the application boundary."""

@@ -5,7 +5,7 @@
 **Integration branch:** `develop`  
 **Current architecture branch:** `feature/windows-effectful-market-data-capture`  
 **Current release-source checkpoint:** `b0e94240291e59ee2214d639d096b4dc5cf7e094`  
-**Handoff status:** August 27, 2026 — C3-E3.5 source, frozen artifact, fixed-runtime deployment, Trading RX, non-admin zero-provider preflight, and August 26 pure planner + durable freshness accepted; provider call #4 remains blocked pending separate explicit authorization; parallel GUI-A5b2 read-only Paper rendering is accepted
+**Handoff status:** August 27, 2026 — C3-E3.5 deployment and August 26 planner/freshness accepted; provider call #4 consumed as `FAILED / CONFIRMED / HTTP_FAILED / 401` with durable evidence; next C3 task is zero-provider credential/authentication diagnosis; provider call #5 is not authorized; parallel GUI-A5b2 read-only Paper rendering is accepted
 
 > The Git-tracked `docs/AI_TRADING_BOT_HANDOFF.md` is the canonical handoff. Uploaded Project copies are mirrors only. Documentation closeout creates later docs-only commits, so always verify the live branch and use the release-source SHA above for artifact work.
 
@@ -92,6 +92,8 @@ Completed foundations include immutable planning/identity, bounded parent/child 
 
 C3 is **not complete** because no real provider lineage has yet produced a parent-verified selected production snapshot.
 
+E3.5 has now been exercised by a real provider failure and successfully converted the prior opaque Content-Type failure into durable sanitized HTTP evidence (`401` plus provider request ID) without creating a snapshot or selection.
+
 ---
 
 ## 5. Historical E3.4 deployed runtime
@@ -173,7 +175,36 @@ selection/snapshot/artifact: none
 
 Durable inspection verified fence entered, request/result transport complete, process exited zero, parent/staging cleanup complete, artifact verification not attempted, evidence/diagnostic digests valid, and `POST_FENCE_CHILD_FAILURE`. E3.4 therefore narrowed the earlier broad metadata failure to Content-Type validation. Permanently consumed.
 
-**Total actual real-provider effects: exactly 3.**
+### August 26, 2026
+
+After New York-date rollover, pure planning authorized session `2026-08-26` with fresh digest:
+
+```text
+cccf56d1361ee4df8cf34745f68b32b29c52efdaaa80d2a02d4a32323dedce7f
+```
+
+Read-only durable freshness before the effect was zero across all five lineage tables. Provider call #4 was then explicitly authorized for one supervised effect and produced:
+
+```text
+session: 32b6765f-d1ae-5d11-81df-b95e82178edf
+attempt: c19975b6-10b4-5893-93a2-aca92e606229
+claim: fa184f7f-85bd-5830-bb96-70ae334a2d2e
+reservation: 995883d2-bdc4-5909-9e35-b4e8343beab7
+execution: 71ebf7dc-aaf4-504c-a15c-33c7b2afd6bb
+terminal: 67defd53-e6b2-5f6e-945e-de51b5846962
+terminal state: FAILED
+provider disposition: CONFIRMED
+child classification: HTTP_FAILED
+http status: 401
+provider request ID: 1a57fe61031771fc4b0f818c84f9e6e0
+selection/snapshot/artifact: none
+```
+
+Durable inspection verified exact request/lineage binding, provider-call budget 1, provider fence `ENTERED`, complete result transport, child process `EXITED_ZERO`, complete parent cleanup, complete staging cleanup, valid post-resume/cleanup/terminal evidence digests, terminal evidence schema 2, `artifact_verification=NOT_ATTEMPTED`, terminal reason `POST_FENCE_CHILD_FAILURE`, zero selection rows, exactly four durable sessions total, and SQLite `total_changes=0` during the inspection.
+
+E3.5 therefore worked as intended diagnostically: the prior Content-Type symptom is now resolved to a concrete provider authentication response. This lineage is permanently consumed. Never retry it.
+
+**Total actual real-provider effects: exactly 4.**
 
 ---
 
@@ -319,15 +350,15 @@ The historical August 25 request shape reproduced its consumed digest exactly:
 b41a85c7b907ccd2a687d9f832d72a85cf152db46c85eaf9665809635ce9674b
 ```
 
-The fresh August 26 request digest is:
+The fresh August 26 request digest was:
 
 ```text
 cccf56d1361ee4df8cf34745f68b32b29c52efdaaa80d2a02d4a32323dedce7f
 ```
 
-Independent read-only durable freshness validation found zero rows for that digest in all five lineage tables: `sessions`, `attempts`, `provider_call_claims`, `launch_reservations`, and `terminals`. Each of the three consumed request digests appeared exactly once in `sessions`; total durable session count remained 3; SQLite `total_changes` was 0.
+Independent read-only durable freshness validation found zero rows for that digest in all five lineage tables before call #4: `sessions`, `attempts`, `provider_call_claims`, `launch_reservations`, and `terminals`. Each of the three earlier consumed request digests appeared exactly once in `sessions`; total durable session count remained 3; SQLite `total_changes` was 0.
 
-No Credential Manager read, network operation, production child launch, authority database mutation, or provider request occurred.
+No Credential Manager read, network operation, production child launch, authority database mutation, or provider request occurred during the planner/freshness gate.
 
 **The August 26 pure planner + durable freshness gate is accepted.** Changing the planner clock semantic still requires Sol High architecture review.
 
@@ -335,29 +366,38 @@ No Credential Manager read, network operation, production child launch, authorit
 
 ## 10. Current resume point / next acceptance gate
 
-The E3.5 source/artifact/deployment/preflight sequence and August 26 pre-effect planner/freshness sequence are complete.
+Provider call #4 is consumed and its durable inspection is accepted.
 
-The candidate provider-call-#4 request is now proven to target the new August 26 XNYS session and to have no existing durable C2/C3 lineage:
+Current exact C3 effect state:
 
 ```text
-authorized session: 2026-08-26
-fresh request digest: cccf56d1361ee4df8cf34745f68b32b29c52efdaaa80d2a02d4a32323dedce7f
-existing durable rows for digest: 0
-actual real-provider effects so far: exactly 3
+actual real-provider effects: exactly 4
+latest request digest: cccf56d1361ee4df8cf34745f68b32b29c52efdaaa80d2a02d4a32323dedce7f
+latest terminal: FAILED
+latest provider disposition: CONFIRMED
+latest child classification: HTTP_FAILED
+latest HTTP status: 401
+latest provider request ID: 1a57fe61031771fc4b0f818c84f9e6e0
+latest selection/snapshot/artifact: none
 ```
+
+The durable evidence proves this was not ambiguous: provider fence entered, result transport completed, child process exited zero, parent/staging cleanup completed, evidence digests validated, and no selection exists.
 
 The immediate next sequence is:
 
 ```text
-explicit review/authorization decision for provider call #4
-→ if and only if explicitly authorized, perform exactly one supervised production capture
-→ stop immediately after the result
-→ inspect terminal/effect evidence before any further action
+zero-provider credential/authentication diagnosis
+→ determine whether the provisioned Alpaca key pair is stale/revoked/mismatched or whether account/provider authorization is the issue
+→ do not overwrite the existing /v1 Credential Manager entries in place
+→ if rotation is required, review a versioned credential-reference/cutover design under Sol High
+→ only after a reviewed cutover and a genuinely new session/digest may another provider effect be considered
 ```
 
-**Provider call #4 is NOT authorized yet.** The planner/freshness prerequisite is satisfied, but no effect may occur without a separate explicit authorization.
+The child credential reader already proved the two fixed `/v1` entries exist, are readable by the exact approved Trading SID, decode as accepted UTF-8 credential strings, and can be passed to the transport. The transport sent them in the exact `APCA-API-KEY-ID` / `APCA-API-SECRET-KEY` request headers to `data.alpaca.markets`; Alpaca then returned 401. This shifts the active investigation from transport framing/Content-Type to credential/account authorization.
 
-Parallel GUI status: GUI-A5a/A5b1/A5b2 are accepted through `fbf8fcb8068fff394bb1b144d1fdddbf3c50e06f`. The native Paper page renders only the bounded read-only inspection state, uses plain-text presentation for service-derived data, contains no mutation/recovery controls, and does not re-inspect on navigation. The next GUI checkpoint is the GUI-A5 integration/visual gate followed by the full repository regression; it is deferred while C3 resumes.
+**Provider call #5 is NOT authorized.** Do not retry the August 26 lineage.
+
+Parallel GUI status: GUI-A5a/A5b1/A5b2 are accepted through `fbf8fcb8068fff394bb1b144d1fdddbf3c50e06f`. The native Paper page renders only the bounded read-only inspection state, uses plain-text presentation for service-derived data, contains no mutation/recovery controls, and does not re-inspect on navigation. The next GUI checkpoint is the GUI-A5 integration/visual gate followed by the full repository regression; it remains deferred while C3 authentication diagnosis is active.
 
 ---
 
@@ -373,7 +413,9 @@ No unsafe automatic retry path has been found. Conservative categories remain:
 - post-resume durable states: manual durable recovery only;
 - verified snapshot before terminal / terminal before selection: recover from durable authority without repeating provider effect.
 
-E3.5 ensures a future `HTTP_FAILED` terminal retains sanitized non-200 status/request ID durably after terminal commit. These fields are diagnostic only and never grant retry authority.
+E3.5 has now demonstrated in the real call #4 lineage that an `HTTP_FAILED` terminal retains sanitized non-200 status/request ID durably after terminal commit. These fields are diagnostic only and never grant retry authority.
+
+The August 26 session remains `OPEN` with `next_attempt_ordinal=1`, but this is not provider-effect authorization. The normal one-shot CLI starts by creating the deterministic session; a same-request rerun encounters the already-existing deterministic session before normal attempt allocation. Any explicit recovery/continuation path remains separately reviewed authority and is not authorized here.
 
 ---
 
@@ -381,6 +423,7 @@ E3.5 ensures a future `HTTP_FAILED` terminal retains sanitized non-200 status/re
 
 Before unattended production operation, continue review of:
 
+- credential/account authorization and, if required, versioned credential rotation/cutover;
 - production `close()` / concurrent admission and drain;
 - secret and transport-object lifetime;
 - artifact verification/publication TOCTOU;
@@ -389,7 +432,7 @@ Before unattended production operation, continue review of:
 - selected-snapshot → paper-operation bridge;
 - systematic top-level crash/fault matrix.
 
-Native Windows authority, credential lifetime, external-effect ordering, crash/recovery ambiguity, publication/selection authority, retry semantics, and clock semantics require Sol High architecture review. Localized frozen-contract implementation may use Luna Extra High; subtle bounded implementation may use Sol Medium.
+Native Windows authority, credential lifetime/reference version, external-effect ordering, crash/recovery ambiguity, publication/selection authority, retry semantics, and clock semantics require Sol High architecture review. Localized frozen-contract implementation may use Luna Extra High; subtle bounded implementation may use Sol Medium.
 
 ---
 

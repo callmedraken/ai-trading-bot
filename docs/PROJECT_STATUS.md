@@ -22,10 +22,10 @@ are complete.
 
 C2 is complete and merged. The Windows transactional authority is available as
 a reviewed runtime boundary behind the C1 `ValidatedProductionAuthority`
-capability, but the production effect boundary is intentionally still inert.
-There is no approved production provider transport, real child-process capture
-path, unattended scheduler, brokerage live-order transport, or authorization to
-place real-money orders.
+capability, but the production effect boundary is intentionally still inert on
+this GUI branch. The active C3 production-security work continues separately on
+`feature/windows-effectful-market-data-capture`; GUI work must not bypass or
+reimplement those authority boundaries.
 
 ## Implemented foundations
 
@@ -38,7 +38,8 @@ The repository currently includes:
 - simulated paper-account and paper-operation/recovery infrastructure;
 - durable evidence, deterministic UUID5/canonical serialization contracts, and historical-evaluation integrity rules;
 - Windows authority provisioning, schema, validation, capability, and transactional-authority milestones through C2;
-- a canonical production transactional SQLite artifact and reviewed lifecycle/recovery/concurrency boundaries.
+- a canonical production transactional SQLite artifact and reviewed lifecycle/recovery/concurrency boundaries;
+- a native PySide6 GUI foundation with read-only research exploration/comparison and one bounded read-only paper-operation inspection view.
 
 ## Completed Windows authority milestones
 
@@ -62,29 +63,119 @@ C2 final certification completed with:
 - production SQL unchanged at 118,896 bytes with SHA-256
   `aa61df2f5db0090f8373222d1f5e492a58f4c10273afacfab45e382bacd4bb58`.
 
-## Current milestone: C3 effectful market-data capture
+## Current production milestone: C3 effectful market-data capture
 
 C3 converts the intentionally inert C2 external-effect boundary into a reviewed,
-contained production market-data capture path.
-
-C3 should implement and validate:
-
-1. Approved market-data provider construction and transport.
-2. Reviewed credential retrieval through Windows Credential Manager or the approved OS secret-store boundary.
-3. An isolated child process for effectful capture work.
-4. `CreateProcessW` with the child initially suspended.
-5. Job Object containment established before execution proceeds.
-6. `ResumeThread` only after the reviewed durable authority/evidence ordering is satisfied.
-7. Process lifecycle, exit, cleanup, and containment evidence.
-8. Actual captured snapshot/content verification rather than caller-supplied digest trust.
-9. Authorization of verified captured content before it becomes selectable market data.
-10. Native Windows acceptance covering the real provider/process/credential/containment boundary.
-
-C3 must preserve the durable intent/receipt, lifecycle arbitration,
-one-shot-capability, recovery, crash-ambiguity, and fail-closed semantics already
-established by C1/C2.
+contained production market-data capture path. That work is isolated on its own
+branch and remains authoritative for any production provider, credential,
+process, publication, or selection boundary.
 
 C3 does **not** add brokerage order execution or live trading.
+
+## GUI track status
+
+The GUI remains an isolated presentation/operator track on
+`feature/gui-foundation`. It must consume reviewed application/service
+boundaries rather than becoming an alternative trading, authority, credential,
+or recovery engine.
+
+### GUI-A1 through GUI-A4
+
+Accepted GUI foundations include:
+
+- native PySide6 application shell and stable navigation;
+- Qt-free presentation/service contracts;
+- explicit read-only local research-report loading;
+- bounded research result table presentation;
+- deterministic sorting/filtering and report replacement behavior;
+- read-only comparison of two to four research variants;
+- bounded comparison tables/charts with truthful return/drawdown/turnover semantics.
+
+### GUI-A5 — paper-operation inspection: ACCEPTED
+
+Architecture 91 defines a strictly read-only GUI boundary for one exact
+paper-operation inspection result.
+
+Accepted implementation sequence:
+
+- `26833e8326f6cffef2c638543fb3174f1984e85f` — define Architecture 91 and Qt-free paper presentation/service contracts;
+- `b3cdce458a1f884f6d25b6fa82039cc1b31e1015` — formatting-only follow-up;
+- `bb057bc6864c4f340fa05651a4a63245ee491854` — add the concrete Qt-free read-only paper inspection adapter;
+- `fbf8fcb8068fff394bb1b144d1fdddbf3c50e06f` — render the bounded Paper page in Qt;
+- `86f1308dad98e763856fcf5c8504bff26804baf9` — update the older GUI-A2 research test fixture for the expanded GUI service contract;
+- `6f1945172a6e8dad46327a0212c6bce0fac68256` — update the older GUI-A4 comparison test fixture for the expanded GUI service contract.
+
+GUI-A5 accepted behavior:
+
+- presentation scope is exactly one explicit inspected paper-operation root, not history/account/fill/order discovery;
+- classifications are limited to `PENDING`, `ALREADY_APPLIED`, `CONFLICTING`, and `BLOCKED`;
+- the presentation diagnostic vocabulary mirrors the reviewed closed inspection codes;
+- the concrete adapter receives one explicit operation root and already-verified `VerifiedPaperOperationInputs`;
+- GUI widgets do not construct paper-operation authority or enumerate arbitrary roots;
+- inspection/adaptation failures collapse to bounded sanitized `UNAVAILABLE` state without raw exception text;
+- `MainWindow` obtains the paper state once during construction; navigation does not reinspect;
+- the Paper page renders classification, diagnostic, operation/checkpoint/application UUIDs, and optional bounded receipt path only;
+- service-derived text is forced to literal Qt plain text;
+- there are no execute/run/retry/resume/recover/cancel/refresh/open-receipt or other mutation/effect controls;
+- no paper execution, filesystem history scan, production SQLite, C1/C2/C3, Credential Manager, Alpaca, brokerage, scheduler, or production-child path is connected.
+
+Final GUI-A5 acceptance evidence at
+`6f1945172a6e8dad46327a0212c6bce0fac68256`:
+
+- targeted compatibility regression: 2 passed;
+- complete GUI suite: 93 passed;
+- manual visual gate: PASSED for both unavailable and populated read-only Paper presentation;
+- complete repository regression: 2,822 passed, 13 skipped, 0 failed;
+- Ruff check on `src tests`: passed;
+- Ruff format check on `src tests`: 342 files already formatted;
+- `git diff --check`: clean;
+- final GitHub compare from A5b2 to accepted head: exactly 2 commits, 2 test files, 8 added lines, zero production-source changes;
+- known unrelated generated/untracked artifacts and historical permission-warning directories remained untouched.
+
+**GUI-A5 is fully ACCEPTED.**
+
+## Next GUI milestone: GUI-A6 read-only selected market-snapshot status
+
+The next recommended GUI checkpoint is a read-only Market Data presentation
+boundary. Its purpose is to expose already-reviewed market-snapshot/session
+state without introducing capture controls or direct production authority access.
+
+Initial GUI-A6 architecture should determine the smallest existing reviewed
+source boundary that can truthfully provide, when available:
+
+- snapshot/session identity and date;
+- provider identity and operation;
+- selected/available/unavailable presentation status;
+- bounded artifact identity/digest/size metadata if already part of reviewed
+  nonsecret state;
+- bounded human-readable diagnostics when no selected snapshot is available.
+
+GUI-A6 must not:
+
+- launch or retry a C3 capture;
+- read Windows Credential Manager;
+- open production SQLite directly from Qt widgets;
+- infer selection authority from files or directory enumeration;
+- expose raw provider responses, credentials, native errors, or arbitrary paths;
+- add refresh/recovery/capture controls unless a later architecture checkpoint
+  explicitly defines their authority and lifecycle.
+
+The dependency direction should remain:
+
+```text
+Qt Market Data page
+    -> Qt-free GUI market-data presentation models
+    -> GuiApplicationService.get_market_data_state()
+    -> reviewed/injected read-only selected-snapshot adapter
+    -> existing reviewed domain/application inspection boundary
+```
+
+The initial boundary/adapter design is a **Sol Medium** task because the data
+contract must be selected carefully across existing market-data and authority
+interfaces. Once that contract is frozen, mechanical Qt rendering and focused
+presentation tests should be suitable for **Luna Extra High**. Any proposal that
+would directly traverse C3 production authority, credentials, or effect ordering
+requires **Sol High** review instead.
 
 ## Roadmap after C3
 

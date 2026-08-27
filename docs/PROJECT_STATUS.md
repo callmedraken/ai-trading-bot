@@ -157,7 +157,7 @@ Final E3.5 source certification at `b0e94240291e59ee2214d639d096b4dc5cf7e094`:
 
 **E3.5 source certification is accepted.**
 
-## E3.5 accepted artifact and Administrator deployment
+## E3.5 accepted artifact and deployment
 
 The first attempted artifact path (`c3-e35-production-*-v1`) is rejected and must never be used. It was created after an invalid mistyped source SHA prevented a valid export; no valid v1 wheel was produced.
 
@@ -196,7 +196,37 @@ Administrator deployment is accepted:
 - 12,453 descendants inspected with zero ACL anomalies and no Trading ACE remaining;
 - no network operation, Credential Manager read, production child launch, or provider request occurred.
 
-**The E3.5 Administrator deployment checkpoint is accepted.** The runtime is intentionally still sealed to SYSTEM + Administrators only. Trading RX republication and the non-admin E3.5 zero-provider preflight remain required before any pure planner/provider gate.
+Trading RX republication is accepted:
+
+- runtime remained quiescent with zero fixed-runtime Python processes;
+- pre-publication root remained protected and owned by Administrators;
+- exact pre-publication root ACE set was SYSTEM + Administrators only;
+- root publication became exactly three ACEs: SYSTEM Full Control, Administrators Full Control, Trading inheritable Read & Execute;
+- root owner remained Administrators SID `S-1-5-32-544`;
+- all 12,453 descendants inherited exactly one Trading RX ACE;
+- zero RX topology anomalies were found;
+- no provider request occurred.
+
+The non-admin Trading E3.5 zero-provider preflight is accepted:
+
+- identity exactly `DESKTOP-I4DOKM7\Trading` / expected SID;
+- token non-administrator;
+- fixed runtime Python and installed package location verified;
+- E3.3 HTTP exception hierarchy preserved;
+- non-200 missing/`text/plain`/`text/html` Content-Type handling accepted without losing the known HTTP-status path;
+- HTTP 200 Content-Type diagnostics verified for missing Content-Type, unsupported media type, unsupported charset, invalid parameter form, plus a valid JSON positive control;
+- safe optional provider-code extraction passed malformed/type/range cases;
+- operator `http_status` / `provider_request_id` fields and `HTTP_FAILED` classification verified;
+- production SQL remained frozen at 118,896 bytes / exact SHA-256;
+- runtime write was blocked under Trading;
+- production temp write/read/delete probe passed and cleaned;
+- no Credential Manager read;
+- no network operation;
+- no production child launch;
+- no authority database mutation;
+- no provider request.
+
+**The complete E3.5 deployment + Trading zero-provider preflight checkpoint is accepted.**
 
 ## Parallel GUI track: GUI-I1 integration-certified
 
@@ -299,9 +329,9 @@ August 21, August 24, and August 25 are consumed. The next genuinely new XNYS se
 - `2026-08-27 00:00 EDT`, equivalently
 - `2026-08-26 21:00 PDT`.
 
-Before any provider call #4 is considered, Trading RX must be republished over the accepted E3.5 runtime and the non-admin zero-provider production preflight must pass. After both that deployment gate and the exchange-date rollover, perform pure planning and durable freshness validation for a genuinely fresh session/digest.
+The E3.5 deployment, Trading RX publication, and non-admin zero-provider preflight are now accepted. After the exchange-date rollover, the next action is **pure planning only** for August 26, followed by a durable freshness validation for the resulting genuinely fresh session/digest.
 
-**Provider call #4 is NOT authorized.**
+**Provider call #4 is NOT authorized.** Clock eligibility alone never authorizes an effect.
 
 ## Immediate deep-review status
 

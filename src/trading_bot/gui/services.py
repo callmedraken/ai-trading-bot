@@ -3,6 +3,7 @@
 from pathlib import Path
 from typing import Protocol
 
+from trading_bot.gui.market_data_models import MarketDataPageState
 from trading_bot.gui.models import ApplicationOverview, ResearchPageState
 from trading_bot.gui.paper_models import PaperPageState
 
@@ -28,4 +29,8 @@ class GuiApplicationService(ResearchReportLoader, Protocol):
 
     def get_paper_state(self) -> PaperPageState:
         """Return bounded read-only paper-operation presentation state."""
+        ...
+
+    def get_market_data_state(self) -> MarketDataPageState:
+        """Return bounded read-only verified market-data presentation state."""
         ...

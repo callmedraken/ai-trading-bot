@@ -29,7 +29,8 @@ Completed C3 foundations include:
 11. E3.2 closed transport-stage diagnostics;
 12. E3.3 truthful transport-stage handling and separate HTTP-status semantics;
 13. E3.4 closed sanitized response-metadata sub-classifications;
-14. E3.5 preservation of non-success HTTP status across safe Content-Type variation, durable sanitized HTTP evidence, and stricter successful-response Content-Type diagnostics.
+14. E3.5 preservation of non-success HTTP status across safe Content-Type variation, durable sanitized HTTP evidence, and stricter successful-response Content-Type diagnostics;
+15. E3.6 fixed `/v2` credential-reference rotation, certified/deployed runtime, and accepted pre-first-effect credential restaging under Architecture 84A.
 
 The native ordering remains:
 
@@ -55,9 +56,10 @@ CreateProcessW suspended
 - Runtime directory: `F:\AITradingBot\runtime`
 - Production temp: `F:\AITradingBot\temp`
 - Capture output: `F:\AITradingBot\Authority\capture-output`
+- Credential policy: `windows-credential-manager-alpaca-market-data/v2`
 - Credential targets:
-  - `AITradingBot/MarketData/Alpaca/ApiKeyId/v1`
-  - `AITradingBot/MarketData/Alpaca/ApiSecretKey/v1`
+  - `AITradingBot/MarketData/Alpaca/ApiKeyId/v2`
+  - `AITradingBot/MarketData/Alpaca/ApiSecretKey/v2`
 - Frozen production SQL: 118,896 bytes
 - SQL SHA-256: `aa61df2f5db0090f8373222d1f5e492a58f4c10273afacfab45e382bacd4bb58`
 
@@ -228,6 +230,62 @@ The non-admin Trading E3.5 zero-provider preflight is accepted:
 
 **The complete E3.5 deployment + Trading zero-provider preflight checkpoint is accepted.**
 
+## E3.6 `/v2` credential-reference rotation — accepted through local credential proof
+
+Architecture 84 moved new C3 production credential references from `/v1` to fixed `/v2` targets with no runtime selector or fallback. Architecture 84A narrowly permits pairwise `/v2` restaging only before the first `/v2` provider effect; after the first `/v2` provider effect, `/v2` becomes immutable and later rotation requires a new credential-reference version.
+
+Accepted E3.6 source:
+
+- commit: `41de33d3ef8ca22a6418146a6302969e11bbacc1`;
+- tree: `44946d941f698c7290f43e47792e667443668055`;
+- final regression: 3,177 passed, 16 skipped, 0 failed;
+- Ruff check passed on `src tests`;
+- Ruff format check passed across 338 source/test Python files;
+- `git diff --check` passed;
+- production `/v1` credential references under `src/trading_bot` were absent;
+- frozen production SQL remained exact.
+
+Accepted E3.6 artifact:
+
+- source export: `F:\AI\c3-e36-production-source-v1`;
+- rejected failed build wheelhouse: `F:\AI\c3-e36-production-wheelhouse-v1` with zero wheel files;
+- accepted wheel: `F:\AI\c3-e36-production-wheelhouse-v2\ai_trading_bot-0.1.0-py3-none-any.whl`;
+- length: 674,468 bytes;
+- SHA-256: `98971acb4809fc7c5b4286771f64dee55349f083a188086ba5d2c78cd5301a21`;
+- 192 wheel entries / 192 RECORD rows / 191 hashed payloads;
+- 188 package source files matched the certified export exactly;
+- zero forbidden entries;
+- installed production credential contract contains only `/v2` values.
+
+Administrator deployment, Trading RX republication, and corrected non-admin zero-provider preflight are accepted:
+
+- fixed runtime now contains `windows-credential-manager-alpaca-market-data/v2` and the exact two `/v2` targets;
+- `/v1` production fallback is absent and public credential override parameters are absent;
+- production SQL remains 118,896 bytes with the frozen SHA-256;
+- SQLite remains 3.50.4;
+- authority validation remained `VALIDATED / INITIALIZED_SUPPORTED` under the administrator gate;
+- Trading RX topology is exact across all 12,453 descendants;
+- Trading-side signed bootstrap verification binds the exact approved SID;
+- Trading-side production database inspection was read-only with `total_changes=0`;
+- runtime writes were blocked under Trading and production temp remained usable;
+- no Credential Manager read, network request, production child launch, authority mutation, or provider request occurred during deployment/preflight.
+
+Credential staging under the exact non-admin Trading SID then produced one superseded `/v2` pair before any `/v2` provider effect. Architecture 84A classified that first pair `SUPERSEDED_BEFORE_FIRST_PROVIDER_EFFECT`, required both targets to be deleted together, and required all witness gates to be repeated. Restaging subsequently passed:
+
+- superseded key and secret fingerprints matched the known abandoned pair before deletion;
+- both `/v2` targets were deleted and independently proved absent;
+- one replacement Alpaca **Paper** key generation was captured through interactive hidden input;
+- replacement key ID and secret readback reproduced the dashboard-side domain-separated fingerprints and UTF-8 lengths exactly;
+- credential type `Generic` and persistence `LOCAL_MACHINE` passed;
+- dashboard was refreshed/revisited and the replacement key remained current;
+- `FRESH_GENERATED=PASSED`;
+- `LOCAL_EXACT_MATCH=PASSED`;
+- `DASHBOARD_CURRENT=PASSED`;
+- `/v2` real-provider effect count remains zero;
+- no provider/network request occurred during staging/restaging.
+
+**The E3.6 source/artifact/deployment/zero-provider/credential-local-proof checkpoint is accepted. The current `/v2` pair is frozen for the first future `/v2` provider effect; do not modify it.** Remote Alpaca acceptance is still unproven and may only be established by a separately authorized C3 provider effect.
+
 ## Parallel GUI track: GUI-A5b2 paper inspection rendering accepted
 
 The GUI remains isolated on `feature/gui-foundation` and separate from the frozen C3 production branch. GUI-A1 through GUI-A4 and GUI-I1 remain integration-certified; GUI-A5 extends the Paper page through a strictly read-only inspection boundary and bounded native Qt rendering.
@@ -351,13 +409,13 @@ Independent read-only durable freshness validation found zero rows for that dige
 
 **The August 26 pure planner + durable freshness gate is accepted. Provider call #4 was subsequently explicitly authorized once, consumed once, and durably classified `FAILED / CONFIRMED / HTTP_FAILED / 401`.**
 
-The immediate C3 task is now **credential/authentication diagnosis without another provider effect**. The existing `/v1` Credential Manager references are not to be overwritten in place; if the Alpaca key pair is stale, revoked, mismatched, or otherwise uncertain, the next security milestone is a reviewed versioned credential-reference rotation/cutover. **Provider call #5 is NOT authorized.**
+The immediate C3 task is now **the pure planner + durable freshness gate for the next genuinely new XNYS session**. The accepted `/v2` Paper credential pair must not be modified. Under the calendar-date contract, session `2026-08-27` cannot be reconciled until the New York calendar date has advanced to `2026-08-28`; only after that rollover should the candidate request/digest be constructed and checked for zero durable lineage. The planning/freshness gate itself must perform no Credential Manager read, network/provider request, production child launch, or authority mutation. **Provider call #5 is NOT authorized.**
 
 ## Immediate deep-review status
 
-Completed deep reviews found no unsafe automatic retry path. E3.5 has now demonstrated its intended diagnostic behavior in production by preserving sanitized HTTP status/request ID for call #4 after terminal persistence. Follow-up work before unattended operation remains:
+Completed deep reviews found no unsafe automatic retry path. E3.5 demonstrated its intended diagnostic behavior in production by preserving sanitized HTTP status/request ID for call #4 after terminal persistence. E3.6 has now removed the local credential-pair ambiguity by proving the exact current `/v2` Paper pair under the Trading account without contacting Alpaca. Follow-up work before unattended operation remains:
 
-- credential/authentication diagnosis after the confirmed HTTP 401;
+- remote `/v2` Alpaca acceptance remains unproven until a separately authorized provider effect;
 - some proven pre-effect continuation states are not directly resumable through the one-shot facade;
 - production `close()` / concurrent admission-drain behavior;
 - secret/transport-object lifetime;

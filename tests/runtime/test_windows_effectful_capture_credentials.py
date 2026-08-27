@@ -28,6 +28,8 @@ _OWNER_SID = "S-1-5-21-111-222-333-1001"
 _OTHER_SID = "S-1-5-21-999-888-777-1001"
 _KEY = "TEST-KEY-ID-VALUE"
 _SECRET = "TEST-SECRET-VALUE"
+_V1_KEY_TARGET = "AITradingBot/MarketData/Alpaca/ApiKeyId/v1"
+_V1_SECRET_TARGET = "AITradingBot/MarketData/Alpaca/ApiSecretKey/v1"
 
 
 class FakeNativeCredentialApi:
@@ -173,6 +175,38 @@ def test_missing_first_credential_is_sanitized() -> None:
     assert _SECRET not in str(caught.value)
     assert ALPACA_API_KEY_ID_CREDENTIAL_TARGET not in str(caught.value)
     assert api.releases == []
+
+
+@pytest.mark.parametrize(
+    ("missing_target", "error"),
+    [
+        (
+            ALPACA_API_KEY_ID_CREDENTIAL_TARGET,
+            WindowsCredentialNotFoundError("credential was not found"),
+        ),
+        (
+            ALPACA_API_SECRET_KEY_CREDENTIAL_TARGET,
+            WindowsCredentialInvalidError("credential value is malformed"),
+        ),
+    ],
+)
+def test_missing_or_malformed_v2_never_falls_back_to_v1(
+    missing_target: str,
+    error: Exception,
+) -> None:
+    api = FakeNativeCredentialApi()
+    api.entries[_V1_KEY_TARGET] = _entry(_V1_KEY_TARGET, "QUARANTINED-V1-KEY")
+    api.entries[_V1_SECRET_TARGET] = _entry(_V1_SECRET_TARGET, "QUARANTINED-V1-SECRET")
+    api.entries[missing_target] = error
+    reader = _reader(api)
+
+    with pytest.raises((WindowsCredentialNotFoundError, WindowsCredentialInvalidError)):
+        reader.read(_OWNER_SID)
+
+    assert _V1_KEY_TARGET not in api.reads
+    assert _V1_SECRET_TARGET not in api.reads
+    assert api.reads[0] == ALPACA_API_KEY_ID_CREDENTIAL_TARGET
+    assert all(target.endswith("/v2") for target in api.reads)
 
 
 def test_native_read_error_is_sanitized() -> None:

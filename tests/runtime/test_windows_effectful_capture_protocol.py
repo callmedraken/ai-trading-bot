@@ -14,6 +14,9 @@ import trading_bot.runtime.windows_effectful_capture_protocol as protocol
 from trading_bot.domain import Symbol
 from trading_bot.market_data import ALPACA_DAILY_SNAPSHOT_DESCRIPTOR
 from trading_bot.runtime.windows_effectful_capture import (
+    ALPACA_API_KEY_ID_CREDENTIAL_TARGET,
+    ALPACA_API_SECRET_KEY_CREDENTIAL_TARGET,
+    C3_CREDENTIAL_POLICY_VERSION,
     ProductionCaptureRequest,
     bind_production_capture_plan,
     build_production_provider_launch_plan,
@@ -46,10 +49,10 @@ _RELEASE_DIGEST = "ab" * 32
 _ARTIFACT_DIGEST = "cd" * 32
 _ARTIFACT_IDENTITY_DIGEST = "ef" * 32
 _CHILD_REQUEST_DIGEST = (
-    "1ceb4e1ce722c95a2da0a5dd49ece1d572a851c95ea98ad2d794837a4769d704"
+    "fe7dc6d938872591970d70d830dae7cb4ba45f65b8832e86fa447e175d3f3e95"
 )
 _CHILD_RESULT_DIGEST = (
-    "0d3fb6ef159a0e4653aeec573ed9f6cbe2513e5a77662cfee88b4c422ee69d59"
+    "895f58da8ac1e7de938d8386876afc80ff6916e0895a2455011c0bc0da21b678"
 )
 _STAGED_TRANSPORT_CLASSIFICATIONS = (
     ChildResultClassification.TRANSPORT_REQUEST_FAILED,
@@ -124,6 +127,25 @@ def test_child_request_has_frozen_golden_bytes_hash_and_round_trip() -> None:
     assert hashlib.sha256(payload).hexdigest() == _CHILD_REQUEST_DIGEST
     assert request.sha256 == _CHILD_REQUEST_DIGEST
     assert parse_isolated_capture_child_request(payload) == request
+    assert request.credential_policy_version == C3_CREDENTIAL_POLICY_VERSION
+    assert (
+        request.api_key_id_credential_target
+        == ALPACA_API_KEY_ID_CREDENTIAL_TARGET
+        == "AITradingBot/MarketData/Alpaca/ApiKeyId/v2"
+    )
+    assert (
+        request.api_secret_key_credential_target
+        == ALPACA_API_SECRET_KEY_CREDENTIAL_TARGET
+        == "AITradingBot/MarketData/Alpaca/ApiSecretKey/v2"
+    )
+    assert (
+        b'"credential_policy_version":'
+        b'"windows-credential-manager-alpaca-market-data/v2"' in payload
+    )
+    assert b'"api_key_id":"AITradingBot/MarketData/Alpaca/ApiKeyId/v2"' in payload
+    assert (
+        b'"api_secret_key":"AITradingBot/MarketData/Alpaca/ApiSecretKey/v2"' in payload
+    )
     assert b"APCA_API_KEY_ID" not in payload
     assert b"APCA_API_SECRET_KEY" not in payload
 
@@ -233,17 +255,38 @@ def test_child_request_parser_rejects_boolean_schema_bom_and_oversize() -> None:
         parse_isolated_capture_child_request(b"{" + b"x" * MAX_C3_CHILD_REQUEST_BYTES)
 
 
-def test_child_request_parser_rejects_alternate_provider_and_credential_targets() -> (
-    None
-):
+def test_child_request_parser_rejects_alternate_provider() -> None:
     root = json.loads(serialize_isolated_capture_child_request(_child_request()))
     root["provider"]["provider_id"] = "alternate-provider"
     payload = json.dumps(root, sort_keys=True, separators=(",", ":")).encode()
     with pytest.raises(WindowsEffectfulCaptureProtocolError, match="Alpaca"):
         parse_isolated_capture_child_request(payload)
 
+
+@pytest.mark.parametrize(
+    ("key_target", "secret_target"),
+    [
+        (
+            "AITradingBot/MarketData/Alpaca/ApiKeyId/v1",
+            "AITradingBot/MarketData/Alpaca/ApiSecretKey/v2",
+        ),
+        (
+            "AITradingBot/MarketData/Alpaca/ApiKeyId/v2",
+            "AITradingBot/MarketData/Alpaca/ApiSecretKey/v1",
+        ),
+        (
+            "AITradingBot/MarketData/Alpaca/ApiKeyId/v1",
+            "AITradingBot/MarketData/Alpaca/ApiSecretKey/v1",
+        ),
+    ],
+)
+def test_child_request_parser_rejects_v1_and_mixed_generation_targets(
+    key_target: str,
+    secret_target: str,
+) -> None:
     root = json.loads(serialize_isolated_capture_child_request(_child_request()))
-    root["credential_targets"]["api_key_id"] = "alternate/key"
+    root["credential_targets"]["api_key_id"] = key_target
+    root["credential_targets"]["api_secret_key"] = secret_target
     payload = json.dumps(root, sort_keys=True, separators=(",", ":")).encode()
     with pytest.raises(WindowsEffectfulCaptureProtocolError, match="not fixed"):
         parse_isolated_capture_child_request(payload)

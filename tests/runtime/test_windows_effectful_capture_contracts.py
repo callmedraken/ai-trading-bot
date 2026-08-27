@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import inspect
 from datetime import UTC, date, datetime
 
 import pytest
@@ -39,7 +40,7 @@ _REQUEST_JSON = (
     b'"target_session_date":"2026-08-17"}'
 )
 _REQUEST_DIGEST = "24a16ab9924dd76b36db8304af128741bd539e9e7238b114981db116eef73394"
-_REQUEST_ID = "2db7da0e-e78b-5928-abb1-a8659705f414"
+_REQUEST_ID = "d0f90fc4-1e26-5bb2-a0a3-99db758efd38"
 
 
 def _request(
@@ -239,12 +240,21 @@ def test_provider_launch_plan_is_secret_free_and_fixed() -> None:
     assert launch.provider_request == bound.provider_request
     assert launch.provider == ALPACA_DAILY_SNAPSHOT_DESCRIPTOR
     assert launch.child_operation_version == C3_CHILD_OPERATION_VERSION
-    assert launch.credential_policy_version == C3_CREDENTIAL_POLICY_VERSION
+    assert (
+        launch.credential_policy_version
+        == C3_CREDENTIAL_POLICY_VERSION
+        == "windows-credential-manager-alpaca-market-data/v2"
+    )
     assert launch.output_policy_version == C3_OUTPUT_POLICY_VERSION
-    assert launch.api_key_id_credential_target == ALPACA_API_KEY_ID_CREDENTIAL_TARGET
+    assert (
+        launch.api_key_id_credential_target
+        == ALPACA_API_KEY_ID_CREDENTIAL_TARGET
+        == "AITradingBot/MarketData/Alpaca/ApiKeyId/v2"
+    )
     assert (
         launch.api_secret_key_credential_target
         == ALPACA_API_SECRET_KEY_CREDENTIAL_TARGET
+        == "AITradingBot/MarketData/Alpaca/ApiSecretKey/v2"
     )
     assert not hasattr(launch, "api_key_id")
     assert not hasattr(launch, "api_secret_key")
@@ -269,3 +279,35 @@ def test_provider_launch_plan_rejects_caller_override() -> None:
             bound_capture=bound,
             credential_policy_version="alternate/v1",
         )
+
+    with pytest.raises(WindowsEffectfulCapturePlanError, match="not fixed"):
+        ProductionProviderLaunchPlan(
+            bound_capture=bound,
+            api_key_id_credential_target=("AITradingBot/MarketData/Alpaca/ApiKeyId/v1"),
+        )
+
+    with pytest.raises(WindowsEffectfulCapturePlanError, match="not fixed"):
+        ProductionProviderLaunchPlan(
+            bound_capture=bound,
+            api_secret_key_credential_target=(
+                "AITradingBot/MarketData/Alpaca/ApiSecretKey/v1"
+            ),
+        )
+
+
+def test_public_planners_do_not_accept_credential_target_overrides() -> None:
+    forbidden = {
+        "credential_policy_version",
+        "api_key_id_credential_target",
+        "api_secret_key_credential_target",
+    }
+
+    assert forbidden.isdisjoint(
+        inspect.signature(prepare_production_capture_plan).parameters
+    )
+    assert forbidden.isdisjoint(
+        inspect.signature(bind_production_capture_plan).parameters
+    )
+    assert forbidden.isdisjoint(
+        inspect.signature(build_production_provider_launch_plan).parameters
+    )

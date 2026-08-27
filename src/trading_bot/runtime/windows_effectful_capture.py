@@ -35,16 +35,16 @@ from trading_bot.market_data import (
 C3_DAILY_SNAPSHOT_REQUEST_NAMESPACE = UUID("fc8fa4ea-4286-5a50-adae-7ba30a8ebfa1")
 C3_DAILY_SNAPSHOT_REQUEST_MATERIAL_VERSION = "c3-daily-snapshot-request-v1"
 C3_CHILD_OPERATION_VERSION = "c3-isolated-alpaca-daily-capture/v1"
-C3_CREDENTIAL_POLICY_VERSION = "windows-credential-manager-alpaca-market-data/v1"
+C3_CREDENTIAL_POLICY_VERSION = "windows-credential-manager-alpaca-market-data/v2"
 C3_OUTPUT_POLICY_VERSION = "fixed-c1-capture-output/v1"
 
 C2_BAR_INTERVAL = "1d"
 C2_CHILD_OPERATION_VERSION = "child/v1"
 C2_OUTPUT_POLICY_VERSION = "output/v1"
 
-ALPACA_API_KEY_ID_CREDENTIAL_TARGET = "AITradingBot/MarketData/Alpaca/ApiKeyId/v1"
+ALPACA_API_KEY_ID_CREDENTIAL_TARGET = "AITradingBot/MarketData/Alpaca/ApiKeyId/v2"
 ALPACA_API_SECRET_KEY_CREDENTIAL_TARGET = (
-    "AITradingBot/MarketData/Alpaca/ApiSecretKey/v1"
+    "AITradingBot/MarketData/Alpaca/ApiSecretKey/v2"
 )
 
 _C2_REQUEST_FIELDS = frozenset(

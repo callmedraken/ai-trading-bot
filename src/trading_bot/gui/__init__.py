@@ -13,6 +13,7 @@ from trading_bot.gui.models import (
     format_decimal_for_display,
     format_percentage_for_display,
 )
+from trading_bot.gui.paper_inspection_service import PaperOperationInspectionService
 from trading_bot.gui.paper_models import (
     MAX_PAPER_RECEIPT_PATH_CHARACTERS,
     PaperInspectionClassification,
@@ -35,6 +36,7 @@ __all__ = [
     "PaperInspectionClassification",
     "PaperInspectionDiagnostic",
     "PaperOperationInspectionView",
+    "PaperOperationInspectionService",
     "PaperPageState",
     "PaperPageStatus",
     "PresentationStatus",

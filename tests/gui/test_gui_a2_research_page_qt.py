@@ -11,7 +11,12 @@ pytest.importorskip("PySide6")
 
 from PySide6.QtWidgets import QApplication, QTableWidget
 
-from trading_bot.gui import ApplicationOverview, CompactReportResearchService
+from trading_bot.gui import (
+    ApplicationOverview,
+    CompactReportResearchService,
+    MarketDataPageState,
+    unavailable_market_data_state,
+)
 from trading_bot.gui.main_window import MainWindow
 from trading_bot.gui.mock_service import MockGuiApplicationService
 from trading_bot.gui.models import ResearchPageState
@@ -42,6 +47,9 @@ class _GuiA2RecordingService:
 
     def get_paper_state(self) -> PaperPageState:
         return unavailable_paper_state()
+
+    def get_market_data_state(self) -> MarketDataPageState:
+        return unavailable_market_data_state()
 
 
 def _application() -> QApplication:

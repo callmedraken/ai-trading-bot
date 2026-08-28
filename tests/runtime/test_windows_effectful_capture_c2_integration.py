@@ -131,6 +131,7 @@ class _FakeNativeApi:
         self.fail_publish = False
         self.fail_cleanup = False
         self.result_factory = None
+        self.staging_path: str | None = None
 
     def create_job_object(self) -> int:
         self.events.append("create_job")
@@ -157,6 +158,7 @@ class _FakeNativeApi:
         assert path.startswith(_STORAGE_ROOT + "\\.c3-capture-")
         assert path.endswith(".staging")
         self.events.append("create_staging")
+        self.staging_path = path
         return NativeStagingObject(105, 108, self.file_identity, path)
 
     def get_file_identity(self, handle: int) -> NativeFileIdentity:
@@ -182,8 +184,11 @@ class _FakeNativeApi:
         if self.casefold_collision:
             raise RuntimeError("collision")
 
-    def publish_staging_link(self, staging_handle: int, final_path: str) -> None:
+    def publish_staging_link(
+        self, staging_handle: int, staging_path: str, final_path: str
+    ) -> None:
         assert staging_handle == 105
+        assert staging_path == self.staging_path
         self.events.append("publish")
         if self.fail_publish:
             raise RuntimeError("publication failure")
@@ -1441,6 +1446,11 @@ def test_c3_d1_parent_verifies_publishes_reopens_and_issues_exact_capability() -
             transactional.validate_c3_verified_snapshot(replace(capability))
         assert api.events.index("publish") < api.events.index("open_final")
         assert api.events.index("open_final") < api.events.index("delete_staging")
+        publication_index = api.events.index("publish")
+        assert (
+            sum(event == "identity:105" for event in api.events[:publication_index])
+            == 2
+        )
         assert api.events.count("close:105") == 1
         assert connection.execute("SELECT count(*) FROM terminals").fetchone() == (0,)
         assert connection.execute(
@@ -1519,6 +1529,7 @@ def test_c3_d1_verified_capability_is_revoked_by_later_recovery() -> None:
     "case",
     [
         "staging_identity",
+        "prepublication_staging_identity",
         "oversize",
         "truncated",
         "appended",
@@ -1592,6 +1603,10 @@ def test_c3_d1_parent_verification_failures_never_issue_authority(case: str) -> 
         )
         if case == "staging_identity":
             api.file_identity = NativeFileIdentity(8, b"x" * 16)
+        elif case == "prepublication_staging_identity":
+            api.identity_results.extend(
+                (api.file_identity, NativeFileIdentity(8, b"x" * 16))
+            )
         elif case == "oversize":
             api.staging_bytes = b"x" * (4 * 1024 * 1024 + 1)
         elif case == "final_collision":
@@ -1618,6 +1633,8 @@ def test_c3_d1_parent_verification_failures_never_issue_authority(case: str) -> 
         ).fetchone() == (0,)
         if case == "staging_identity":
             assert "delete_staging" not in api.events
+        if case == "prepublication_staging_identity":
+            assert "publish" not in api.events
         if case == "cleanup_failure":
             assert api.events.count("delete_staging") == 1
     finally:

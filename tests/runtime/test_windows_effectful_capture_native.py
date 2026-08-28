@@ -4,6 +4,7 @@ import copy
 import ctypes
 import os
 import pickle
+from ctypes import wintypes
 
 import pytest
 
@@ -14,12 +15,22 @@ from trading_bot.runtime.windows_effectful_capture_native import (
     C3_REQUEST_HANDLE_ARGUMENT,
     C3_RESULT_HANDLE_ARGUMENT,
     C3_STAGING_HANDLE_ARGUMENT,
+    CREATE_NEW,
     CREATE_NO_WINDOW,
     CREATE_SUSPENDED,
     CREATE_UNICODE_ENVIRONMENT,
+    DELETE,
     EXTENDED_STARTUPINFO_PRESENT,
+    FILE_ATTRIBUTE_NORMAL,
     FILE_FLAG_FIRST_PIPE_INSTANCE,
+    FILE_FLAG_OPEN_REPARSE_POINT,
     FILE_FLAG_OVERLAPPED,
+    FILE_SHARE_DELETE,
+    FILE_SHARE_READ,
+    FILE_SHARE_WRITE,
+    GENERIC_READ,
+    GENERIC_WRITE,
+    OPEN_EXISTING,
     PIPE_REJECT_REMOTE_CLIENTS,
     PRODUCTION_C3_CHILD_BASE_ARGUMENTS,
     PRODUCTION_C3_CONTROLLED_TEMP_ROOT,
@@ -129,7 +140,9 @@ class FakeNativeApi:
     ) -> None:
         raise AssertionError("artifact verification was not expected")
 
-    def publish_staging_link(self, staging_handle: int, final_path: str) -> None:
+    def publish_staging_link(
+        self, staging_handle: int, staging_path: str, final_path: str
+    ) -> None:
         raise AssertionError("artifact verification was not expected")
 
     def open_final_artifact(self, path: str):
@@ -426,6 +439,194 @@ def test_casefold_collision_check_rejects_exact_and_windows_folded_names(
         )
 
 
+def test_publication_uses_create_hard_link_no_clobber_primitive() -> None:
+    calls: list[tuple[object, ...]] = []
+
+    class FakeKernel32:
+        def CreateHardLinkW(self, *args: object) -> bool:
+            calls.append(args)
+            return True
+
+    api = object.__new__(CtypesWindowsEffectfulCaptureNativeApi)
+    api._k32 = FakeKernel32()
+    staging_path = r"F:\AITradingBot\Authority\capture-output\.c3-capture-test.staging"
+    final_path = (
+        r"F:\AITradingBot\Authority\capture-output\daily-market-data-snapshot-x.json"
+    )
+
+    api.publish_staging_link(105, staging_path, final_path)
+
+    assert calls == [(final_path, staging_path, None)]
+    assert not hasattr(native_module, "FILE_LINK_INFO_CLASS")
+
+
+@pytest.mark.parametrize(
+    "staging_handle,staging_path,final_path,error",
+    [
+        (
+            105,
+            r"relative\.c3-capture-test.staging",
+            r"F:\AITradingBot\temp\snapshot.json",
+            "staging path must be absolute Windows text",
+        ),
+        (
+            105,
+            r"F:\AITradingBot\temp\.c3-capture-test.staging",
+            r"relative\snapshot.json",
+            "final artifact path must be absolute Windows text",
+        ),
+        (
+            105,
+            r"F:\AITradingBot\temp\.c3-capture-test.staging",
+            r"F:\AITradingBot\other\snapshot.json",
+            "same parent directory",
+        ),
+        (
+            0,
+            r"F:\AITradingBot\temp\.c3-capture-test.staging",
+            r"F:\AITradingBot\temp\snapshot.json",
+            "publication staging handle",
+        ),
+    ],
+)
+def test_publication_validates_source_destination_and_retained_handle(
+    staging_handle: int,
+    staging_path: str,
+    final_path: str,
+    error: str,
+) -> None:
+    class UnexpectedKernel32:
+        def CreateHardLinkW(self, *_args: object) -> bool:
+            raise AssertionError("invalid publication reached the native effect")
+
+    api = object.__new__(CtypesWindowsEffectfulCaptureNativeApi)
+    api._k32 = UnexpectedKernel32()
+
+    with pytest.raises(WindowsEffectfulCaptureNativeError, match=error):
+        api.publish_staging_link(staging_handle, staging_path, final_path)
+
+
+def test_create_hard_link_failure_is_sanitized_and_fail_closed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class FailingKernel32:
+        def CreateHardLinkW(self, *_args: object) -> bool:
+            return False
+
+    api = object.__new__(CtypesWindowsEffectfulCaptureNativeApi)
+    api._k32 = FailingKernel32()
+    monkeypatch.setattr(native_module.ctypes, "get_last_error", lambda: 183)
+    staging_path = r"F:\AITradingBot\temp\.c3-private-source.staging"
+    final_path = r"F:\AITradingBot\temp\final-private-name.json"
+
+    with pytest.raises(WindowsEffectfulCaptureNativeError) as raised:
+        api.publish_staging_link(105, staging_path, final_path)
+
+    assert str(raised.value) == (
+        "Windows operation failed: CreateHardLinkW (win32=183)"
+    )
+    assert staging_path not in str(raised.value)
+    assert final_path not in str(raised.value)
+
+
+def test_open_final_artifact_shares_with_retained_writable_master() -> None:
+    calls: list[tuple[object, ...]] = []
+
+    class FileAttributeTagInfo(ctypes.Structure):
+        _fields_ = [
+            ("FileAttributes", wintypes.DWORD),
+            ("ReparseTag", wintypes.DWORD),
+        ]
+
+    class FakeKernel32:
+        def CreateFileW(self, *args: object) -> int:
+            calls.append(args)
+            return 201
+
+        def GetFileInformationByHandleEx(self, *_args: object) -> bool:
+            return True
+
+    api = object.__new__(CtypesWindowsEffectfulCaptureNativeApi)
+    api._k32 = FakeKernel32()
+    api._w = wintypes
+    api._file_attribute_tag_info = FileAttributeTagInfo
+    identity = NativeFileIdentity(7, b"i" * 16)
+    api.get_file_identity = lambda handle: identity
+    api.close_handle = lambda handle: None
+    final_path = r"F:\AITradingBot\temp\snapshot.json"
+
+    opened = api.open_final_artifact(final_path)
+
+    assert opened == native_module.NativeOpenedArtifact(201, identity)
+    assert calls == [
+        (
+            final_path,
+            GENERIC_READ,
+            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+            None,
+            OPEN_EXISTING,
+            FILE_FLAG_OPEN_REPARSE_POINT,
+            None,
+        )
+    ]
+
+
+def test_staging_master_still_does_not_share_writes() -> None:
+    calls: list[tuple[object, ...]] = []
+
+    class SecurityAttributes(ctypes.Structure):
+        _fields_ = [
+            ("length", wintypes.DWORD),
+            ("security_descriptor", ctypes.c_void_p),
+            ("inherit_handle", wintypes.BOOL),
+        ]
+
+    class FakeKernel32:
+        def CreateFileW(self, *args: object) -> int:
+            calls.append(args)
+            return 201
+
+        def GetCurrentProcess(self) -> int:
+            return 1
+
+        def DuplicateHandle(
+            self,
+            _source_process: object,
+            _source_handle: object,
+            _target_process: object,
+            target_handle: object,
+            _desired_access: object,
+            _inherit: object,
+            _options: object,
+        ) -> bool:
+            ctypes.cast(target_handle, ctypes.POINTER(wintypes.HANDLE))[0] = 202
+            return True
+
+    api = object.__new__(CtypesWindowsEffectfulCaptureNativeApi)
+    api._k32 = FakeKernel32()
+    api._w = wintypes
+    api._sa = SecurityAttributes
+    api.reject_casefold_collisions = lambda directory, names: None
+    identity = NativeFileIdentity(7, b"i" * 16)
+    api.get_file_identity = lambda handle: identity
+    api.close_handle = lambda handle: None
+    staging_path = r"F:\AITradingBot\temp\.c3-capture-test.staging"
+
+    staging = api.create_staging_file(staging_path)
+
+    assert staging == NativeStagingObject(201, 202, identity, staging_path)
+    assert len(calls) == 1
+    call = calls[0]
+    assert call[:3] == (
+        staging_path,
+        GENERIC_READ | GENERIC_WRITE | DELETE,
+        FILE_SHARE_READ | FILE_SHARE_DELETE,
+    )
+    assert call[3] is not None
+    assert call[4:] == (CREATE_NEW, FILE_ATTRIBUTE_NORMAL, None)
+    assert not (int(call[2]) & FILE_SHARE_WRITE)
+
+
 def test_live_resource_is_not_copyable_or_serializable() -> None:
     child = _create(FakeNativeApi())
 
@@ -540,6 +741,12 @@ def test_ctypes_parent_overlapped_bindings_are_exact_on_windows() -> None:
     assert api._k32.WaitForMultipleObjects.restype is wintypes.DWORD
     assert api._k32.GetExitCodeProcess.restype is wintypes.BOOL
     assert api._k32.TerminateJobObject.restype is wintypes.BOOL
+    assert api._k32.CreateHardLinkW.argtypes == [
+        wintypes.LPCWSTR,
+        wintypes.LPCWSTR,
+        ctypes.POINTER(api._sa),
+    ]
+    assert api._k32.CreateHardLinkW.restype is wintypes.BOOL
 
 
 def test_real_named_pipe_pairs_have_exact_endpoint_inheritance_on_windows() -> None:

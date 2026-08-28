@@ -1075,7 +1075,7 @@ class _C3LiveProcessRegistry:
                 raise WindowsEffectfulCaptureCompositionError(
                     "staging identity changed before publication"
                 )
-            api.publish_staging_link(staging_handle, final_path)
+            api.publish_staging_link(staging_handle, staging_path, final_path)
 
             failure = C3ArtifactVerificationFailure.FINAL_REVERIFICATION_FAILED
             opened = api.open_final_artifact(final_path)

@@ -3,6 +3,7 @@ from __future__ import annotations
 import ctypes
 import json
 import os
+import secrets
 from collections.abc import Mapping
 from ctypes import wintypes
 from pathlib import Path
@@ -24,6 +25,7 @@ from trading_bot.runtime.windows_effectful_capture_native import (
 )
 
 _ACCEPTANCE_ENV = "AI_TRADING_BOT_RUN_C3_E1_NATIVE_ACCEPTANCE"
+_PUBLICATION_ACCEPTANCE_ENV = "AI_TRADING_BOT_RUN_C3_E37_PUBLICATION_ACCEPTANCE"
 _WAIT_OBJECT_0 = 0x00000000
 _WAIT_TIMEOUT = 0x00000102
 
@@ -122,6 +124,62 @@ def test_parent_signaled_sentinel_fails_identity_acceptance() -> None:
             parent_wait_result=_WAIT_OBJECT_0,
             child_set_event_succeeded=True,
         )
+
+
+@pytest.mark.skipif(os.name != "nt", reason="requires real Windows file primitives")
+def test_opt_in_real_windows_zero_network_artifact_publication() -> None:
+    if os.environ.get(_PUBLICATION_ACCEPTANCE_ENV) != "1":
+        pytest.skip(f"set {_PUBLICATION_ACCEPTANCE_ENV}=1 on the intended Windows host")
+    production_temp_root = Path(PRODUCTION_C3_CONTROLLED_TEMP_ROOT)
+    temp_root = (
+        production_temp_root
+        if production_temp_root.is_dir()
+        else Path(__file__).resolve().parents[2]
+    )
+
+    token = secrets.token_hex(12)
+    staging_path = temp_root / f".c3-e37-publication-{token}.staging"
+    final_path = temp_root / f"c3-e37-publication-{token}.json"
+    api = CtypesWindowsEffectfulCaptureNativeApi()
+    staging = None
+    opened = None
+    child_handle_closed = False
+    master_handle_closed = False
+    final_handle_closed = False
+    try:
+        staging = api.create_staging_file(str(staging_path))
+        retained_identity = staging.identity
+        assert api.get_file_identity(staging.parent_handle) == retained_identity
+
+        api.close_handle(staging.child_write_handle)
+        child_handle_closed = True
+        api.publish_staging_link(
+            staging.parent_handle, str(staging_path), str(final_path)
+        )
+        opened = api.open_final_artifact(str(final_path))
+
+        assert opened.identity == retained_identity
+        assert api.get_file_identity(staging.parent_handle) == retained_identity
+    finally:
+        if opened is not None and not final_handle_closed:
+            api.close_handle(opened.handle)
+            final_handle_closed = True
+        if staging is not None:
+            if not child_handle_closed:
+                api.close_handle(staging.child_write_handle)
+                child_handle_closed = True
+            if not master_handle_closed:
+                api.close_handle(staging.parent_handle)
+                master_handle_closed = True
+        for path in (final_path, staging_path):
+            if path.exists():
+                path.unlink()
+
+    assert child_handle_closed
+    assert master_handle_closed
+    assert final_handle_closed
+    assert not staging_path.exists()
+    assert not final_path.exists()
 
 
 @pytest.mark.skipif(os.name != "nt", reason="requires real Windows Job Objects")

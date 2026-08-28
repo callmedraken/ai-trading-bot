@@ -44,6 +44,7 @@ GENERIC_READ = 0x80000000
 GENERIC_WRITE = 0x40000000
 DELETE = 0x00010000
 FILE_SHARE_READ = 0x00000001
+FILE_SHARE_WRITE = 0x00000002
 FILE_SHARE_DELETE = 0x00000004
 CREATE_NEW = 1
 OPEN_EXISTING = 3
@@ -75,7 +76,6 @@ INFINITE = 0xFFFFFFFF
 DUPLICATE_SAME_ACCESS = 0x00000002
 FILE_ID_INFO_CLASS = 18
 FILE_ATTRIBUTE_TAG_INFO_CLASS = 9
-FILE_LINK_INFO_CLASS = 11
 FILE_DISPOSITION_INFO_CLASS = 4
 
 C3_CHILD_REQUEST_DELIVERY_TIMEOUT_MS = 10_000
@@ -272,7 +272,9 @@ class WindowsEffectfulCaptureNativeApi(Protocol):
     def reject_casefold_collisions(
         self, directory: str, names: tuple[str, ...]
     ) -> None: ...
-    def publish_staging_link(self, staging_handle: int, final_path: str) -> None: ...
+    def publish_staging_link(
+        self, staging_handle: int, staging_path: str, final_path: str
+    ) -> None: ...
     def open_final_artifact(self, path: str) -> NativeOpenedArtifact: ...
     def delete_staging_link(self, staging_handle: int) -> None: ...
 
@@ -1232,6 +1234,12 @@ class CtypesWindowsEffectfulCaptureNativeApi:
             wintypes.HANDLE,
         ]
         k32.CreateFileW.restype = wintypes.HANDLE
+        k32.CreateHardLinkW.argtypes = [
+            wintypes.LPCWSTR,
+            wintypes.LPCWSTR,
+            ctypes.POINTER(SECURITY_ATTRIBUTES),
+        ]
+        k32.CreateHardLinkW.restype = wintypes.BOOL
         k32.GetCurrentProcess.argtypes = []
         k32.GetCurrentProcess.restype = wintypes.HANDLE
         k32.DuplicateHandle.argtypes = [
@@ -1638,42 +1646,27 @@ class CtypesWindowsEffectfulCaptureNativeApi:
                 "artifact name collision prevents no-clobber publication"
             )
 
-    def publish_staging_link(self, staging_handle: int, final_path: str) -> None:
+    def publish_staging_link(
+        self, staging_handle: int, staging_path: str, final_path: str
+    ) -> None:
+        staging_path = _windows_path(staging_path, "staging path")
         final_path = _windows_path(final_path, "final artifact path")
-        encoded = final_path.encode("utf-16-le")
-
-        # Native alignment places RootDirectory after one byte plus pointer padding.
-        class FILE_LINK_INFO_HEADER(ctypes.Structure):
-            _fields_ = [
-                ("ReplaceIfExists", self._w.BOOLEAN),
-                ("RootDirectory", self._w.HANDLE),
-                ("FileNameLength", self._w.DWORD),
-                ("FileName", self._w.WCHAR * 1),
-            ]
-
-        filename_offset = FILE_LINK_INFO_HEADER.FileName.offset
-        buffer = ctypes.create_string_buffer(filename_offset + len(encoded))
-        header = FILE_LINK_INFO_HEADER.from_buffer(buffer)
-        header.ReplaceIfExists = False
-        header.RootDirectory = None
-        header.FileNameLength = len(encoded)
-        ctypes.memmove(
-            ctypes.addressof(buffer) + filename_offset, encoded, len(encoded)
-        )
-        if not self._k32.SetFileInformationByHandle(
-            self._w.HANDLE(_handle(staging_handle, "publication staging handle")),
-            FILE_LINK_INFO_CLASS,
-            buffer,
-            len(buffer),
-        ):
-            raise _native_error("SetFileInformationByHandle")
+        staging = PureWindowsPath(staging_path)
+        final = PureWindowsPath(final_path)
+        if staging.parent != final.parent:
+            raise WindowsEffectfulCaptureNativeError(
+                "publication paths must share the same parent directory"
+            )
+        _handle(staging_handle, "publication staging handle")
+        if not self._k32.CreateHardLinkW(final_path, staging_path, None):
+            raise _native_error("CreateHardLinkW")
 
     def open_final_artifact(self, path: str) -> NativeOpenedArtifact:
         path = _windows_path(path, "final artifact path")
         value = self._k32.CreateFileW(
             path,
             GENERIC_READ,
-            FILE_SHARE_READ | FILE_SHARE_DELETE,
+            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
             None,
             OPEN_EXISTING,
             FILE_FLAG_OPEN_REPARSE_POINT,

@@ -89,13 +89,27 @@ def test_paper_account_page_state_requires_exact_payload_for_status() -> None:
             account=account,
         )
 
+    with pytest.raises(TypeError, match="PaperAccountPageStatus"):
+        PaperAccountPageState(
+            status="verified",  # type: ignore[arg-type]
+            message="Wrong status type.",
+            account=None,
+        )
 
-def test_paper_account_page_message_is_bounded() -> None:
+
+def test_paper_account_page_message_is_nonblank_and_bounded() -> None:
     PaperAccountPageState(
         status=PaperAccountPageStatus.UNAVAILABLE,
         message="x" * MAX_PAPER_ACCOUNT_MESSAGE_CHARACTERS,
         account=None,
     )
+
+    with pytest.raises(ValueError, match="non-empty text"):
+        PaperAccountPageState(
+            status=PaperAccountPageStatus.UNAVAILABLE,
+            message="   ",
+            account=None,
+        )
 
     with pytest.raises(ValueError, match="exceeds the presentation bound"):
         PaperAccountPageState(
@@ -115,6 +129,15 @@ def test_verified_account_enforces_checkpoint_kind_and_sequence() -> None:
     assert genesis.sequence == 0
     assert successor.sequence == 1
 
+    with pytest.raises(TypeError, match="checkpoint_kind"):
+        _account(checkpoint_kind="GENESIS")
+
+    with pytest.raises(ValueError, match="nonnegative exact integer"):
+        _account(sequence=-1)
+
+    with pytest.raises(ValueError, match="nonnegative exact integer"):
+        _account(sequence=True)
+
     with pytest.raises(ValueError, match="GENESIS sequence must be zero"):
         _account(sequence=1)
 
@@ -125,10 +148,16 @@ def test_verified_account_enforces_checkpoint_kind_and_sequence() -> None:
         )
 
 
-def test_verified_account_enforces_identity_and_as_of_types() -> None:
-    with pytest.raises(TypeError, match="checkpoint_id"):
-        _account(checkpoint_id=str(_CHECKPOINT_ID))
+@pytest.mark.parametrize(
+    "field_name",
+    ("checkpoint_id", "lineage_id", "account_state_id", "compact_state_id"),
+)
+def test_verified_account_enforces_exact_identity_types(field_name: str) -> None:
+    with pytest.raises(TypeError, match=field_name):
+        _account(**{field_name: str(_CHECKPOINT_ID)})
 
+
+def test_verified_account_enforces_exact_as_of_type() -> None:
     with pytest.raises(TypeError, match="as_of"):
         _account(as_of="2026-08-27T22:00:00Z")
 
@@ -181,6 +210,32 @@ def test_position_contract_preserves_order_and_exact_accounting() -> None:
         _position(symbol="X" * (MAX_PAPER_ACCOUNT_SYMBOL_CHARACTERS + 1))
 
 
+def test_position_contract_enforces_exact_finite_decimals() -> None:
+    with pytest.raises(TypeError, match="quantity"):
+        PaperAccountPositionView(
+            symbol="SPY",
+            quantity=2,  # type: ignore[arg-type]
+            total_cost_basis=Decimal("20"),
+            average_cost=Decimal("10"),
+        )
+
+    with pytest.raises(ValueError, match="total_cost_basis must be finite"):
+        PaperAccountPositionView(
+            symbol="SPY",
+            quantity=Decimal("2"),
+            total_cost_basis=Decimal("NaN"),
+            average_cost=Decimal("10"),
+        )
+
+    with pytest.raises(ValueError, match="average_cost must be finite"):
+        PaperAccountPositionView(
+            symbol="SPY",
+            quantity=Decimal("2"),
+            total_cost_basis=Decimal("20"),
+            average_cost=Decimal("Infinity"),
+        )
+
+
 def test_position_count_uses_existing_compact_ledger_bound() -> None:
     positions = tuple(
         _position(symbol=f"S{index}") for index in range(MAX_PAPER_ACCOUNT_POSITIONS)
@@ -202,6 +257,9 @@ def test_verified_account_enforces_artifact_evidence() -> None:
 
     with pytest.raises(ValueError, match="artifact_byte_length"):
         _account(artifact_byte_length=-1)
+
+    with pytest.raises(ValueError, match="artifact_byte_length"):
+        _account(artifact_byte_length=True)
 
 
 def test_default_services_return_deterministic_unavailable_paper_account_state(

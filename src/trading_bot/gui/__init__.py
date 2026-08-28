@@ -46,6 +46,9 @@ from trading_bot.gui.paper_models import (
 )
 from trading_bot.gui.research_service import CompactReportResearchService
 from trading_bot.gui.services import GuiApplicationService, ResearchReportLoader
+from trading_bot.gui.verified_genesis_paper_account_inspection_service import (
+    VerifiedGenesisPaperAccountInspectionService,
+)
 from trading_bot.gui.verified_snapshot_inspection_service import (
     VerifiedSnapshotInspectionService,
 )
@@ -85,6 +88,7 @@ __all__ = [
     "ResearchReportLoader",
     "VerifiedMarketSnapshotView",
     "VerifiedPaperAccountView",
+    "VerifiedGenesisPaperAccountInspectionService",
     "VerifiedSnapshotInspectionService",
     "format_decimal_for_display",
     "format_percentage_for_display",

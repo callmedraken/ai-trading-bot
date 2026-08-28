@@ -52,6 +52,9 @@ from trading_bot.gui.verified_genesis_paper_account_inspection_service import (
 from trading_bot.gui.verified_snapshot_inspection_service import (
     VerifiedSnapshotInspectionService,
 )
+from trading_bot.gui.verified_successor_paper_account_inspection_service import (
+    VerifiedSuccessorPaperAccountInspectionService,
+)
 
 __all__ = [
     "ApplicationOverview",
@@ -90,6 +93,7 @@ __all__ = [
     "VerifiedPaperAccountView",
     "VerifiedGenesisPaperAccountInspectionService",
     "VerifiedSnapshotInspectionService",
+    "VerifiedSuccessorPaperAccountInspectionService",
     "format_decimal_for_display",
     "format_percentage_for_display",
     "unavailable_market_data_state",

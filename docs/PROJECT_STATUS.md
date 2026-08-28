@@ -562,7 +562,7 @@ child launch, or authority mutation. Provider call #6 is NOT authorized.
 
 Completed deep reviews found no unsafe automatic retry path. E3.5 demonstrated its intended diagnostic behavior in production by preserving sanitized HTTP status/request ID for call #4 after terminal persistence. E3.6 has now removed the local credential-pair ambiguity by proving the exact current `/v2` Paper pair under the Trading account without contacting Alpaca. Follow-up work before unattended operation remains:
 
-- parent-independent artifact publication/selection remains incomplete after the confirmed `/v2` provider effect;
+- parent-verified artifact publication/selection remains incomplete after the confirmed `/v2` provider effect;
 - some proven pre-effect continuation states are not directly resumable through the one-shot facade;
 - production `close()` / concurrent admission-drain behavior;
 - secret/transport-object lifetime;

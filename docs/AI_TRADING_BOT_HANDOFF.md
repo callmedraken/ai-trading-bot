@@ -507,7 +507,7 @@ authorized.
 
 ---
 
-## 11. Current resume point / next acceptance gate
+## 12. Current resume point / next acceptance gate
 
 Current exact C3 effect state:
 
@@ -534,7 +534,7 @@ LOCAL_EXACT_MATCH: PASSED
 DASHBOARD_CURRENT: PASSED
 credential environment: Paper
 V1_FALLBACK_PRESENT: False
-PROVIDER_CALL_5_AUTHORIZED: True
+PROVIDER_CALL_5_WAS_AUTHORIZED: True
 PROVIDER_CALL_5_CONSUMED: True
 PROVIDER_CALL_6_AUTHORIZED: False
 ```
@@ -560,7 +560,7 @@ Parallel GUI status: GUI-A5a/A5b1/A5b2 are accepted through `fbf8fcb8068fff394bb
 
 ---
 
-## 12. Crash/recovery posture
+## 13. Crash/recovery posture
 
 No unsafe automatic retry path has been found. Conservative categories remain:
 
@@ -581,7 +581,7 @@ reviewed authority and cannot reuse the consumed call-#5 lineage.
 
 ---
 
-## 13. Remaining C3 / pre-unattended reviews
+## 14. Remaining C3 / pre-unattended reviews
 
 Before unattended production operation, continue review of:
 
@@ -598,7 +598,7 @@ Native Windows authority, credential lifetime/reference version, external-effect
 
 ---
 
-## 14. Roadmap after successful C3 acceptance
+## 15. Roadmap after successful C3 acceptance
 
 1. Reliable manual paper cycle — selected parent-verified snapshot → strategy → proposal → deterministic risk → paper execution → durable result.
 2. Unattended paper operation — XNYS scheduling, startup reconciliation, recovery, health/alerts, stale/missing-data handling.
@@ -612,7 +612,7 @@ Stable initial live constraints: US stocks/ETFs, long-only, no margin/leverage/o
 
 ---
 
-## 15. Development workflow
+## 16. Development workflow
 
 Use ChatGPT/Sol for architecture, debugging strategy, GitHub/diff review, test-gate decisions, release gating, and next-step planning.
 
@@ -638,7 +638,7 @@ docs/AI_TRADING_BOT_HANDOFF.md
 
 ---
 
-## 16. Files to read when resuming
+## 17. Files to read when resuming
 
 ```text
 AGENTS.md
@@ -660,7 +660,7 @@ Before any future provider effect, inspect the latest durable E3 lineage evidenc
 
 ---
 
-## 17. Definition of project success
+## 18. Definition of project success
 
 The project succeeds when it can research deterministically, acquire trusted market data safely, make portfolio decisions under deterministic risk, interact safely with a brokerage, reconcile ambiguous outcomes, run unattended for long periods, fail closed on uncertainty, expose durable evidence and operator controls, operate under strict live limits, and present the same reviewed capabilities through a polished GUI.
 

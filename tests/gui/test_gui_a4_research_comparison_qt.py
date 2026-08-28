@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
     QTableWidget,
 )
 
+from trading_bot.gui import MarketDataPageState, unavailable_market_data_state
 from trading_bot.gui.comparison_chart import (
     ResearchComparisonChart,
     _metric_header_positions,
@@ -97,6 +98,9 @@ class _WindowResearchService:
 
     def get_paper_state(self) -> PaperPageState:
         return unavailable_paper_state()
+
+    def get_market_data_state(self) -> MarketDataPageState:
+        return unavailable_market_data_state()
 
 
 def _main_table(page: ResearchPage) -> QTableWidget:

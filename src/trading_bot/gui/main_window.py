@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from trading_bot.gui.market_data_page import MarketDataPage
 from trading_bot.gui.models import (
     ApplicationOverview,
     ComponentStatus,
@@ -56,6 +57,7 @@ class MainWindow(QMainWindow):
         self._overview = service.get_overview()
         research_state = service.get_research_state()
         paper_state = service.get_paper_state()
+        market_data_state = service.get_market_data_state()
         self._page_index = {page_id: index for index, page_id in enumerate(PAGE_IDS)}
 
         self.setWindowTitle("AI Trading Bot")
@@ -76,12 +78,8 @@ class MainWindow(QMainWindow):
         self._stack.addWidget(self._research_page)
         self._paper_page = PaperPage(paper_state, self)
         self._stack.addWidget(self._paper_page)
-        self._stack.addWidget(
-            self._build_placeholder_page(
-                "Market Data",
-                "Production capture and credentials are intentionally not connected.",
-            )
-        )
+        self._market_data_page = MarketDataPage(market_data_state, self)
+        self._stack.addWidget(self._market_data_page)
         self._stack.addWidget(self._build_system_page(self._overview))
 
         layout.addWidget(self._navigation)
@@ -309,6 +307,33 @@ class MainWindow(QMainWindow):
                 color: #e5e7eb;
             }
             QFrame#paperDetailPanel {
+                background: #182235;
+                border: 1px solid #2a3950;
+                border-radius: 8px;
+            }
+            QLabel#marketDataStatus[status="verified"] {
+                color: #86efac;
+                font-weight: 700;
+            }
+            QLabel#marketDataStatus[status="unavailable"] {
+                color: #fbbf24;
+                font-weight: 700;
+            }
+            QLabel#marketDataFieldLabel {
+                color: #94a3b8;
+                font-weight: 600;
+            }
+            QLabel#marketDataSnapshotId, QLabel#marketDataTargetSession,
+            QLabel#marketDataSymbols, QLabel#marketDataProviderId,
+            QLabel#marketDataProviderOperation, QLabel#marketDataProviderFeed,
+            QLabel#marketDataArtifactSha256, QLabel#marketDataArtifactByteLength,
+            QLabel#marketDataCapturedAt, QLabel#marketDataProviderAsOf,
+            QLabel#marketDataSourcePayloadSha256,
+            QLabel#marketDataSourcePayloadByteLength,
+            QLabel#marketDataSourcePayloadMediaType {
+                color: #e5e7eb;
+            }
+            QFrame#marketDataDetailPanel {
                 background: #182235;
                 border: 1px solid #2a3950;
                 border-radius: 8px;

@@ -171,7 +171,13 @@ def test_position_contract_preserves_order_and_exact_accounting() -> None:
     with pytest.raises(ValueError, match="must be unique"):
         _account(positions=(_position("SPY"), _position("SPY")))
 
-    with pytest.raises(ValueError, match="bounded printable ASCII"):
+    with pytest.raises(ValueError, match="domain ticker contract"):
+        _position(symbol="NOT/VALID")
+
+    with pytest.raises(ValueError, match="canonical uppercase"):
+        _position(symbol="spy")
+
+    with pytest.raises(ValueError, match="domain ticker contract"):
         _position(symbol="X" * (MAX_PAPER_ACCOUNT_SYMBOL_CHARACTERS + 1))
 
 

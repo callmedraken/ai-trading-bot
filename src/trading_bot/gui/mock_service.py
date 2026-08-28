@@ -13,6 +13,10 @@ from trading_bot.gui.models import (
     PresentationStatus,
     ResearchPageState,
 )
+from trading_bot.gui.paper_account_models import (
+    PaperAccountPageState,
+    unavailable_paper_account_state,
+)
 from trading_bot.gui.paper_models import PaperPageState, unavailable_paper_state
 from trading_bot.gui.research_service import (
     CompactReportResearchService,
@@ -72,6 +76,10 @@ class MockGuiApplicationService:
         """Return the deterministic unavailable market-data state."""
         return unavailable_market_data_state()
 
+    def get_paper_account_state(self) -> PaperAccountPageState:
+        """Return the deterministic unavailable paper-account state."""
+        return unavailable_paper_account_state()
+
     def load_research_report(self, artifact_path: Path) -> ResearchPageState:
         """Load one operator-selected report through the application boundary."""
         return CompactReportResearchService(artifact_path).get_research_state()
@@ -99,6 +107,10 @@ class ResearchReportGuiApplicationService:
     def get_market_data_state(self) -> MarketDataPageState:
         """Return the deterministic unavailable market-data state."""
         return self._overview_service.get_market_data_state()
+
+    def get_paper_account_state(self) -> PaperAccountPageState:
+        """Return the deterministic unavailable paper-account state."""
+        return self._overview_service.get_paper_account_state()
 
     def load_research_report(self, artifact_path: Path) -> ResearchPageState:
         """Load one operator-selected report through the application boundary."""

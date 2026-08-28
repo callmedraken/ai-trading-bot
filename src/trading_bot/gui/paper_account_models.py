@@ -163,7 +163,9 @@ class VerifiedPaperAccountView:
         if len(positions) > MAX_PAPER_ACCOUNT_POSITIONS:
             raise ValueError("positions exceed the presentation count bound")
         if any(type(item) is not PaperAccountPositionView for item in positions):
-            raise TypeError("positions must contain exact PaperAccountPositionView values")
+            raise TypeError(
+                "positions must contain exact PaperAccountPositionView values"
+            )
         if len({item.symbol for item in positions}) != len(positions):
             raise ValueError("position symbols must be unique")
 
@@ -189,7 +191,9 @@ class PaperAccountPageState:
             if type(self.account) is not VerifiedPaperAccountView:
                 raise ValueError("verified paper-account state requires one account")
         elif self.account is not None:
-            raise ValueError("unavailable paper-account state must not contain an account")
+            raise ValueError(
+                "unavailable paper-account state must not contain an account"
+            )
 
 
 def unavailable_paper_account_state() -> PaperAccountPageState:

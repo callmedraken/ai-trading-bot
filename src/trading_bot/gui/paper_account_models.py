@@ -9,6 +9,7 @@ from decimal import Decimal
 from enum import Enum, StrEnum
 from uuid import UUID
 
+from trading_bot.domain import Symbol
 from trading_bot.ledger import (
     MAX_COMPACT_PAPER_LEDGER_POSITIONS,
     derive_compact_paper_ledger_average_cost,
@@ -88,16 +89,12 @@ class PaperAccountPositionView:
     def __post_init__(self) -> None:
         if type(self.symbol) is not str:
             raise TypeError("symbol must be an exact string")
-        if (
-            not self.symbol
-            or self.symbol != self.symbol.strip()
-            or len(self.symbol) > MAX_PAPER_ACCOUNT_SYMBOL_CHARACTERS
-            or any(
-                ord(character) < 0x21 or ord(character) > 0x7E
-                for character in self.symbol
-            )
-        ):
-            raise ValueError("symbol must be bounded printable ASCII text")
+        try:
+            canonical_symbol = Symbol(self.symbol)
+        except (TypeError, ValueError) as error:
+            raise ValueError("symbol must satisfy the domain ticker contract") from error
+        if str(canonical_symbol) != self.symbol:
+            raise ValueError("symbol must be canonical uppercase ticker text")
 
         _require_decimal(self.quantity, "quantity", positive=True)
         _require_decimal(self.total_cost_basis, "total_cost_basis", positive=True)

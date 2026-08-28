@@ -59,13 +59,24 @@ starting a new milestone or preparing a broad implementation plan.
 
 ## AI development workflow
 
-- ChatGPT is the default architecture, milestone-planning, pull-request review, broad audit, merge-readiness, and transition-planning agent.
-- Codex is primarily an implementation agent for changes already scoped and discussed.
+- ChatGPT is the default architecture, milestone-planning, debugging-strategy, GitHub/diff/pull-request review, broad-audit, test-gate, merge-readiness, certification, and transition-planning agent.
+- ChatGPT milestone, review, verification, and post-merge responses should automatically include the concrete next recommended step or exact operator instructions when the next action is known.
+- Codex is primarily a bounded implementation agent for changes already scoped and discussed.
+- Model routing for Codex work is: Luna Extra High for localized/mechanical/frozen-contract work; Sol Medium for subtle but bounded implementation; Sol High for native Windows/security, authority, ordering, crash/recovery, credential/reference-version, external-effect containment, or architecture-sensitive changes.
 - Do not ask Codex to perform a broad PR review or repository-wide audit unless the task explicitly requests one.
 - For implementation tasks, read this file, `docs/PROJECT_STATUS.md`, and only the architecture documents relevant to the requested change.
 - Do not re-investigate settled architecture decisions unless implementation exposes a concrete contradiction or blocker.
 - Keep implementation prompts narrow and avoid broad repository scans when relevant files and architecture documents are already known.
 - Keep implementation reports to files changed, verification commands/results, and deviations or unresolved concerns.
+- Codex should run focused tests/checks while implementing. Broad/full repository suites, long integration/E2E suites, release certification, deployment, and operator Windows gates are normally run locally by the user when ChatGPT supplies the exact commands.
+- If a broad local certification run fails, diagnose the affected area, make only the bounded correction needed, and run focused verification before asking the user to rerun the broad suite. Do not repeatedly rerun expensive full suites during iteration.
+- The normal review handoff for bounded implementation is: Codex implements and reports without committing; ChatGPT supplies simple explicit PowerShell/Git commands; the user stages only the intended paths, commits, and normally pushes the isolated feature branch; ChatGPT then inspects the exact GitHub commit/diff.
+- Manual patch uploads or pasted large diffs are fallback-only when GitHub/tool review is unavailable; they are not the normal review workflow.
+- Routine staging/commit/push operations are performed through the exact local PowerShell/Git commands supplied by ChatGPT rather than delegated back to Codex.
+- When exact paths are known, never use `git add .` or `git add -A` for a scoped checkpoint.
+- Preserve unrelated generated/untracked artifacts and historical permission-warning test directories.
+- When multiple worktrees are active, operate only in the explicitly named worktree/branch and never switch, clean, reset, or otherwise disturb another active worktree.
+- See `docs/AI_DEVELOPMENT_WORKFLOW.md` for the canonical review/certification cycle.
 
 ## Repository workflow
 

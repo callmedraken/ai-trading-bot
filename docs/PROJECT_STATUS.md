@@ -39,7 +39,7 @@ The repository currently includes:
 - durable evidence, deterministic UUID5/canonical serialization contracts, and historical-evaluation integrity rules;
 - Windows authority provisioning, schema, validation, capability, and transactional-authority milestones through C2;
 - a canonical production transactional SQLite artifact and reviewed lifecycle/recovery/concurrency boundaries;
-- a native PySide6 GUI foundation with read-only research exploration/comparison and one bounded read-only paper-operation inspection view.
+- a native PySide6 GUI foundation with read-only research exploration/comparison, one bounded read-only paper-operation inspection view, and one bounded offline-verified market-snapshot inspection view.
 
 ## Completed Windows authority milestones
 
@@ -134,48 +134,109 @@ Final GUI-A5 acceptance evidence at
 
 **GUI-A5 is fully ACCEPTED.**
 
-## Next GUI milestone: GUI-A6 read-only selected market-snapshot status
+### GUI-A6 — offline-verified market-snapshot inspection: ACCEPTED
 
-The next recommended GUI checkpoint is a read-only Market Data presentation
-boundary. Its purpose is to expose already-reviewed market-snapshot/session
-state without introducing capture controls or direct production authority access.
+Architecture 92 defines a strictly read-only Market Data presentation boundary
+for one exact local daily-snapshot artifact that has passed the existing offline
+snapshot verifier. The GUI does not claim that this artifact is the active
+production C3-selected snapshot.
 
-Initial GUI-A6 architecture should determine the smallest existing reviewed
-source boundary that can truthfully provide, when available:
+Accepted checkpoint sequence:
 
-- snapshot/session identity and date;
-- provider identity and operation;
-- selected/available/unavailable presentation status;
-- bounded artifact identity/digest/size metadata if already part of reviewed
-  nonsecret state;
-- bounded human-readable diagnostics when no selected snapshot is available.
+- `994fa3b6f452cb004d842aaa7f59166c6b1c4d4b` — define Architecture 92;
+- `fd04e40cb1fa9af294e8fe1181446b66f614a715` — add the GUI-A6 validation plan;
+- `3885e0c6e4e576e647e656401891c1a25e7c2d54` — accepted A6a Qt-free presentation/service contract;
+- `e98b84bdb42066ef03593f3134b42dadf520f200` — accepted A6b1 explicit-path offline verification adapter;
+- `f4015e4adefba123c7f3c1f1ee5df70158f6a9db` — accepted A6b2 native Qt Market Data rendering source.
 
-GUI-A6 must not:
+GUI-A6 accepted behavior:
 
-- launch or retry a C3 capture;
-- read Windows Credential Manager;
-- open production SQLite directly from Qt widgets;
-- infer selection authority from files or directory enumeration;
-- expose raw provider responses, credentials, native errors, or arbitrary paths;
-- add refresh/recovery/capture controls unless a later architecture checkpoint
-  explicitly defines their authority and lifecycle.
+- presentation scope is exactly one explicitly supplied local daily-snapshot artifact;
+- the adapter performs one bounded read of that exact artifact and calls the existing `verify_daily_snapshot(...)` verifier exactly once per state acquisition;
+- only a complete verifier `PASS` becomes `VERIFIED` GUI state;
+- verifier PASS proves canonical snapshot serialization, XNYS calendar/session consistency, complete requested-symbol coverage, canonical accepted-bar evidence, audit hash, deterministic snapshot identity, and optional artifact SHA-256/byte-length evidence;
+- the bounded presentation exposes only snapshot/session identity, retained symbol order, provider identity/operation/feed, artifact digest/size, capture/provider-as-of timestamps, and retained source-payload digest/size/media type;
+- read, parse, verification, model, calendar, or adaptation failures collapse to sanitized `UNAVAILABLE` state without raw exception or diagnostic-detail text;
+- the adapter does not enumerate directories or choose a "latest" artifact;
+- `MainWindow` obtains Market Data state once during construction; navigation does not reread or reverify;
+- service/model-derived Qt text is forced to literal plain text;
+- there are no Capture/Refresh/Retry/Reverify/Select/Publish/Recover/database/credential/provider controls;
+- no network, Alpaca transport, environment credential, Windows Credential Manager, production SQLite, C1/C2/C3 capability, capture, paper execution, strategy, risk, or artifact mutation path is connected;
+- `VERIFIED` means offline verification of the supplied artifact only; it does not mean C3 selected the artifact, that it is newest, or that a capture is authorized.
 
-The dependency direction should remain:
+Final GUI-A6 acceptance evidence at
+`f4015e4adefba123c7f3c1f1ee5df70158f6a9db`:
+
+- A6a contract gate: 8 passed;
+- A6a+A6b1 focused gate: 16 passed;
+- A6b2 focused Qt gate: 24 passed;
+- complete GUI integration suite: 114 passed;
+- manual visual gate: PASSED for both unavailable and populated verified Market Data presentations;
+- complete repository regression: 2,843 passed, 13 skipped, 0 failed;
+- all 13 skips are the repository's expected Windows opt-in/symlink environment skips;
+- Ruff check on `src tests`: passed;
+- Ruff format check on `src tests`: 348 files already formatted;
+- `git diff --check`: clean;
+- final GitHub compare from accepted A5 closeout `a5f5b91efe855e5b2e4e11898e950733001ff10f` to A6 source head: 24 commits, 16 files, all within Architecture 92/A6 presentation, adapter, Qt rendering, validation, and stale GUI test-fixture compatibility scope;
+- no C3/runtime authority, provider credential, production SQLite, strategy, risk, order, or brokerage source changed;
+- known unrelated generated/untracked artifacts and historical permission-warning directories remained untouched.
+
+**GUI-A6 is fully ACCEPTED.**
+
+## Next GUI milestone: GUI-A7 read-only verified paper-account state
+
+The next recommended GUI checkpoint is a read-only paper-account presentation
+boundary. Its purpose is to expose already-verified simulated account state such
+as cash, positions, realized P&L, checkpoint/account identity, and as-of time
+without adding execution controls or pretending that an arbitrary file is the
+current operational account.
+
+The branch already contains two materially different reviewed offline proof
+paths that Architecture 93 should reconcile at the presentation boundary:
+
+- `verify_genesis_paper_account_checkpoint(...)` can completely verify one exact GENESIS checkpoint and reconstruct its compact `PaperLedger` state;
+- `verify_checkpointed_paper_cycle_successor_edge(...)` can verify one successor only by replaying and reconciling the exact prior checkpoint, verified market snapshot, checkpointed-cycle report, and successor checkpoint edge.
+
+Initial GUI-A7 architecture should determine the smallest common Qt-free
+presentation contract that can truthfully represent either a completely verified
+GENESIS state or a completely verified successor state. Likely bounded facts
+include:
+
+- checkpoint kind, sequence, checkpoint ID, lineage ID, and account-state ID;
+- exact as-of timestamp;
+- exact cash and realized P&L;
+- bounded ordered positions with symbol, quantity, total cost basis, and average cost;
+- artifact SHA-256 and byte-length evidence;
+- successor-only application/cycle/snapshot references only if they are already part of the complete reviewed PASS result and can be presented without claiming history traversal.
+
+GUI-A7 must not:
+
+- discover or select a "latest" checkpoint by scanning directories;
+- traverse checkpoint lineage automatically;
+- claim an explicitly supplied checkpoint is the current operational account;
+- run or resume a paper cycle;
+- create orders/fills or call strategy/risk/execution paths;
+- mutate, repair, publish, or replace checkpoint artifacts;
+- expose raw parser/runtime exception text or arbitrary filesystem paths;
+- open production SQLite, C1/C2/C3 authority, Credential Manager, Alpaca, or brokerage paths.
+
+The intended dependency direction is:
 
 ```text
-Qt Market Data page
-    -> Qt-free GUI market-data presentation models
-    -> GuiApplicationService.get_market_data_state()
-    -> reviewed/injected read-only selected-snapshot adapter
-    -> existing reviewed domain/application inspection boundary
+Qt Paper Account page
+    -> Qt-free GUI paper-account presentation models
+    -> GuiApplicationService.get_paper_account_state()
+    -> reviewed/injected read-only checkpoint adapter
+    -> existing offline checkpoint/edge verifier
 ```
 
-The initial boundary/adapter design is a **Sol Medium** task because the data
-contract must be selected carefully across existing market-data and authority
-interfaces. Once that contract is frozen, mechanical Qt rendering and focused
-presentation tests should be suitable for **Luna Extra High**. Any proposal that
-would directly traverse C3 production authority, credentials, or effect ordering
-requires **Sol High** review instead.
+Architecture/data-boundary selection is a **Sol Medium** task because GENESIS and
+successor verification have different proof requirements and must not be
+silently conflated. Once the common presentation contract and adapter semantics
+are frozen, mechanical Qt rendering should be suitable for **Luna Extra High**.
+Any proposal to identify the operationally current account by traversing durable
+runtime state, production authority, or automatic lineage selection requires
+**Sol High** review instead.
 
 ## Roadmap after C3
 

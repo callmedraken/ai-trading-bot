@@ -15,12 +15,14 @@ from PySide6.QtWidgets import QApplication, QLabel, QPushButton
 
 from trading_bot.gui import (
     ApplicationOverview,
+    MarketDataPageState,
     PaperInspectionClassification,
     PaperInspectionDiagnostic,
     PaperOperationInspectionView,
     PaperPageState,
     PaperPageStatus,
     ResearchPageState,
+    unavailable_market_data_state,
     unavailable_paper_state,
 )
 from trading_bot.gui.main_window import MainWindow
@@ -70,6 +72,9 @@ class _RecordingService:
     def get_paper_state(self) -> PaperPageState:
         self.paper_calls += 1
         return self.paper_state
+
+    def get_market_data_state(self) -> MarketDataPageState:
+        return unavailable_market_data_state()
 
     def load_research_report(self, artifact_path: Path) -> ResearchPageState:
         return MockGuiApplicationService().load_research_report(artifact_path)

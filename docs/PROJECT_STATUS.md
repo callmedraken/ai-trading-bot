@@ -12,7 +12,7 @@ Build a conservative automated trading platform that can progress safely from de
 
 C1 `ValidatedProductionAuthority` and C2 `WindowsTransactionalAuthority` are reviewed foundations. C3 is the only reviewed bridge from C1/C2 authority into real market-data credentials, native Windows child execution, Alpaca transport, staged capture, independent parent verification, publication, and snapshot selection.
 
-C3 is **not yet complete** because no real provider lineage has produced a parent-verified selected production snapshot.
+C3 is **not yet complete** because no real provider lineage has produced a parent-verified selected production snapshot. Provider/authentication success has now been proven through call #5, and E3.7 repaired and deployed the local publication defect exposed by that call.
 
 Completed C3 foundations include:
 
@@ -30,7 +30,8 @@ Completed C3 foundations include:
 12. E3.3 truthful transport-stage handling and separate HTTP-status semantics;
 13. E3.4 closed sanitized response-metadata sub-classifications;
 14. E3.5 preservation of non-success HTTP status across safe Content-Type variation, durable sanitized HTTP evidence, and stricter successful-response Content-Type diagnostics;
-15. E3.6 fixed `/v2` credential-reference rotation, certified/deployed runtime, and accepted pre-first-effect credential restaging under Architecture 84A.
+15. E3.6 fixed `/v2` credential-reference rotation, certified/deployed runtime, and accepted pre-first-effect credential restaging under Architecture 84A;
+16. E3.7 repaired and deployed the Windows final-artifact publication path.
 
 The native ordering remains:
 
@@ -284,7 +285,146 @@ Credential staging under the exact non-admin Trading SID then produced one super
 - `/v2` real-provider effect count remains zero;
 - no provider/network request occurred during staging/restaging.
 
-**The E3.6 source/artifact/deployment/zero-provider/credential-local-proof checkpoint is accepted. The current `/v2` pair is frozen for the first future `/v2` provider effect; do not modify it.** Remote Alpaca acceptance is still unproven and may only be established by a separately authorized C3 provider effect.
+**The E3.6 source/artifact/deployment/zero-provider/credential-local-proof checkpoint is accepted.** At that checkpoint the current `/v2` pair was frozen for its first future `/v2` provider effect. Call #5 subsequently used that pair; the first `/v2` effect permanently closed the Architecture 84A staging/restaging window. The `/v2` targets are now immutable historical credential-reference state and must not be regenerated, replaced, deleted, restaged, or modified. Any later credential rotation requires `/v3` or a later explicitly reviewed version.
+
+## C3-E3.7 Windows publication repair and provider call #5 — accepted
+
+E3.7 implementation:
+
+```text
+commit: 137bbe5a83d3bfe1cb62c381026c25e7fefa739a
+message: fix: repair C3 Windows artifact publication
+```
+
+The implementation replaced the invalid `SetFileInformationByHandle` /
+`FileLinkInfo` publication path with documented `CreateHardLinkW` no-clobber
+publication while preserving retained staging identity verification, casefold
+collision rejection, final reopen identity verification, exact-byte
+reverification, and authority issuance only after successful parent
+verification. The E3.7 Windows publication acceptance gate passed: **1
+passed**.
+
+Provider call #5 was the first real `/v2` provider effect. Calls #1–#4 are
+historical `/v1` lineages. The accepted call-#5 lineage and terminal evidence
+are:
+
+```text
+target session date: 2026-08-28
+request window: 2026-08-27 through 2026-08-27
+request digest: c33949931607552c6f06503fadf818972fb4fe153dd2a65a21970e5e879a435e
+session: 7bdad286-c378-5ac9-a1be-05bb685739a8
+attempt: c70afb4c-921b-509e-9231-4d85bb334ca5
+claim: 9edd75a1-38d3-5043-a522-edb034730a24
+reservation: ff1cb0a3-b0f4-5908-812c-a1c4a8a14ed0
+execution: 67400d7e-153f-5c03-a821-4d955b291c2a
+terminal: 736c9432-d374-5cd1-a708-b2e008fa811b
+terminal state: FAILED
+provider disposition: CONFIRMED
+process exit: 6
+child provider classification: SUCCEEDED
+child provider fence: ENTERED
+child process observation: EXITED_ZERO
+result transport: complete
+parent cleanup: complete
+staging cleanup: complete
+artifact verification: PUBLICATION_FAILED
+parent terminal reason: PARENT_ARTIFACT_VERIFICATION_FAILED
+snapshot authority: none issued
+snapshot: null
+selection: none
+capture-output after failure: empty
+```
+
+The `/v2` credentials and authenticated Alpaca path were remotely accepted;
+the child successfully obtained the daily snapshot. Failure occurred after
+the confirmed provider effect during local parent artifact publication. Call
+#5 is permanently consumed and must never be retried. E3.7 repaired and
+deployed the publication defect exposed by this lineage.
+
+Final repository source certification was accepted:
+
+```text
+3186 passed
+17 skipped
+0 failed
+Ruff check src tests: passed
+Ruff format --check: 358 tracked Python files already formatted
+git diff --check: passed
+final source tree: clean
+frozen production SQL length: 118896
+frozen production SQL SHA-256: aa61df2f5db0090f8373222d1f5e492a58f4c10273afacfab45e382bacd4bb58
+```
+
+Accepted E3.7 release artifact:
+
+```text
+source export: F:\AI\c3-e37-production-source-v1
+wheel: F:\AI\c3-e37-production-wheelhouse-v1\ai_trading_bot-0.1.0-py3-none-any.whl
+wheel length: 674358
+wheel SHA-256: b35bbe0adc8f55ea96cc9f9e1852015182d07ed32b98d86cc141129395e431d2
+wheel entries: 192
+RECORD rows: 192
+hashed payloads: 191
+package source files: 188 exact matches
+package source exact-match gate: passed
+production SQL exact: passed
+offline wheel verification: passed
+```
+
+E3.7 administrator deployment was accepted after the exact wheel was
+re-proved before installation. The production runtime Python process count
+was 0; Trading RX was revoked before replacement; the offline/no-index/no-
+deps/no-cache force reinstall succeeded; all 191 hashed wheel payloads
+matched; the installed E3.7 `CreateHardLinkW` publication implementation was
+verified; the obsolete `FileLinkInfo` path was absent; production SQL
+remained exact; SQLite remained 3.50.4; and production authority validation
+returned `VALIDATED / INITIALIZED_SUPPORTED`. The bootstrap digest was
+`53b8b72ab18b1c477c5eab50857e4dc2d47efc6e74030e380ed6a53387922ae4`; the
+exact Trading SID remained approved. Ownership normalization processed
+12,454 files with 0 failures; 12,453 descendants were inspected; ACL
+anomalies were 0; and the sealed runtime before RX publication contained only
+SYSTEM and Administrators.
+
+Trading RX republication was accepted with the runtime quiescent, the root
+owner still Administrators, the root DACL protected, exact inheritable Trading
+Read & Execute restored, all 12,453 descendants passing RX topology, and
+Trading RX anomalies at 0.
+
+The non-admin Trading E3.7 zero-provider preflight was accepted:
+
+```text
+identity: DESKTOP-I4DOKM7\Trading
+SID: S-1-5-21-1397534616-3988210162-180023805-1009
+administrator: False
+credential policy: windows-credential-manager-alpaca-market-data/v2
+key target: AITradingBot/MarketData/Alpaca/ApiKeyId/v2
+secret target: AITradingBot/MarketData/Alpaca/ApiSecretKey/v2
+/v1 fallback: absent
+E3.7 publication runtime proof: passed
+signed bootstrap verification: passed
+production database inspection: read-only
+durable session count: 5
+call #5 digest mapped exactly to its expected session
+SQLite total_changes: 0
+runtime write: blocked
+production temp read/write/delete: passed
+```
+
+The deployment/preflight zero-effect proof was:
+
+```text
+CREDENTIAL_MANAGER_READ=False
+NETWORK_OPERATION_PERFORMED=False
+PRODUCTION_CHILD_LAUNCHED=False
+AUTHORITY_DATABASE_MUTATION=False
+PROVIDER_REQUEST_PERFORMED=False
+```
+
+The first `/v2` provider effect has now occurred. The `/v2` staging/restaging
+window is permanently closed, and the current `/v2` targets are immutable
+historical credential-reference state. Do not regenerate, replace, delete,
+restage, or modify `/v2`; any later credential rotation requires `/v3` or a
+later explicitly reviewed version.
 
 ## Parallel GUI track: GUI-A5b2 paper inspection rendering accepted
 
@@ -393,11 +533,11 @@ Pre-effect durable freshness was zero across `sessions`, `attempts`, `provider_c
 - provider request ID: `1a57fe61031771fc4b0f818c84f9e6e0`
 - selection/snapshot/artifact: none
 
-Read-only durable inspection verified the exact lineage and request digest, attempt/reservation/execution terminal states, provider-call budget 1, provider fence `ENTERED`, complete result transport, `EXITED_ZERO`, complete parent and staging cleanup, valid post-resume/cleanup/terminal evidence digests, terminal evidence schema 2, `artifact_verification=NOT_ATTEMPTED`, terminal reason `POST_FENCE_CHILD_FAILURE`, zero selection rows, exactly four durable sessions total, and SQLite `total_changes=0` during inspection. E3.5 therefore succeeded in preserving the concrete provider HTTP failure that E3.4 previously exposed only as a Content-Type metadata classification. This lineage is permanently consumed and must never be retried.
+Read-only durable inspection verified the exact lineage and request digest, attempt/reservation/execution terminal states, provider-call budget 1, provider fence `ENTERED`, complete result transport, `EXITED_ZERO`, complete parent and staging cleanup, valid post-resume/cleanup/terminal evidence digests, terminal evidence schema 2, `artifact_verification=NOT_ATTEMPTED`, terminal reason `POST_FENCE_CHILD_FAILURE`, zero selection rows, exactly four durable sessions total, and SQLite `total_changes=0` during inspection. E3.5 therefore succeeded in preserving the concrete provider HTTP failure that E3.4 previously exposed only as a Content-Type metadata classification. This historical lineage is permanently consumed and must never be retried.
 
-Total real Alpaca provider effects: **exactly 4**.
+Total real Alpaca provider effects through the August 26 lineage: **exactly 4**. Call #5, documented above, subsequently became the first `/v2` effect; the current total is exactly 5.
 
-## Planner clock contract and August 26 pre-effect gate
+## Post-call #5 planner and next pre-effect gate
 
 The planner contract is exchange-local **calendar-date** based. For completed session date `D`, planning reconciles only after the New York calendar date has advanced to `D + 1`. Merely waiting until market close plus a buffer is insufficient.
 
@@ -409,13 +549,20 @@ Independent read-only durable freshness validation found zero rows for that dige
 
 **The August 26 pure planner + durable freshness gate is accepted. Provider call #4 was subsequently explicitly authorized once, consumed once, and durably classified `FAILED / CONFIRMED / HTTP_FAILED / 401`.**
 
-The immediate C3 task is now **the pure planner + durable freshness gate for the next genuinely new XNYS session**. The accepted `/v2` Paper credential pair must not be modified. Under the calendar-date contract, session `2026-08-27` cannot be reconciled until the New York calendar date has advanced to `2026-08-28`; only after that rollover should the candidate request/digest be constructed and checked for zero durable lineage. The planning/freshness gate itself must perform no Credential Manager read, network/provider request, production child launch, or authority mutation. **Provider call #5 is NOT authorized.**
+Call #5 used the fresh XNYS request window `2026-08-27` and target session date
+`2026-08-28`; that lineage is consumed and is not a retry candidate. Before any
+future provider effect, require a genuinely new completed XNYS session and
+request digest, distinct from all five consumed request digests, with zero
+durable lineage across `sessions`, `attempts`, `provider_call_claims`,
+`launch_reservations`, and `terminals`. The planning/freshness gate itself
+must perform no Credential Manager read, network/provider request, production
+child launch, or authority mutation. Provider call #6 is NOT authorized.
 
 ## Immediate deep-review status
 
 Completed deep reviews found no unsafe automatic retry path. E3.5 demonstrated its intended diagnostic behavior in production by preserving sanitized HTTP status/request ID for call #4 after terminal persistence. E3.6 has now removed the local credential-pair ambiguity by proving the exact current `/v2` Paper pair under the Trading account without contacting Alpaca. Follow-up work before unattended operation remains:
 
-- remote `/v2` Alpaca acceptance remains unproven until a separately authorized provider effect;
+- parent-independent artifact publication/selection remains incomplete after the confirmed `/v2` provider effect;
 - some proven pre-effect continuation states are not directly resumable through the one-shot facade;
 - production `close()` / concurrent admission-drain behavior;
 - secret/transport-object lifetime;

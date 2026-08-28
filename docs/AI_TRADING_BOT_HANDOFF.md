@@ -4,8 +4,8 @@
 **Local repository:** `F:\AI\ai-trading-bot`  
 **Integration branch:** `develop`  
 **Current architecture branch:** `feature/windows-effectful-market-data-capture`  
-**Current release-source checkpoint:** `41de33d3ef8ca22a6418146a6302969e11bbacc1`  
-**Handoff status:** August 27, 2026 — C3-E3.6 `/v2` source/artifact/deployment and Trading zero-provider preflight accepted; replacement `/v2` Alpaca Paper credential pair passed fresh-generation, exact local readback, and dashboard-current gates under Architecture 84/84A; no `/v2` provider effect has occurred; next C3 task is the pure planner + durable freshness gate for session `2026-08-27` only after New York date advances to `2026-08-28`; provider call #5 is not authorized; parallel GUI-A5b2 read-only Paper rendering is accepted
+**Current release-source checkpoint:** `137bbe5a83d3bfe1cb62c381026c25e7fefa739a`
+**Handoff status:** August 28, 2026 — C3-E3.7 Windows artifact-publication repair, source/artifact/deployment, and Trading zero-provider preflight accepted; provider call #5 was the first real `/v2` effect and is permanently consumed as `FAILED / CONFIRMED` after the child obtained the daily snapshot but parent artifact publication failed; `/v2` is now immutable historical credential-reference state; C3 remains incomplete because no parent-verified selected production snapshot exists; provider call #6 is not authorized; parallel GUI-A5b2 read-only Paper rendering is accepted
 
 > The Git-tracked `docs/AI_TRADING_BOT_HANDOFF.md` is the canonical handoff. Uploaded Project copies are mirrors only. Documentation closeout creates later docs-only commits, so always verify the live branch and use the release-source SHA above for artifact work.
 
@@ -90,11 +90,11 @@ SHA-256: aa61df2f5db0090f8373222d1f5e492a58f4c10273afacfab45e382bacd4bb58
 
 ## 4. C3 status
 
-Completed foundations include immutable planning/identity, bounded parent/child protocol, exact Credential Manager/SID boundary, one-shot child/provider execution, suspended Windows process + Job Object containment, durable process/resume ordering, parent verification/publication/selection, manual production CLI, E3.2–E3.5 transport diagnostics/hardening, and E3.6 fixed `/v2` credential-reference rotation with accepted local fresh/current credential proof.
+Completed foundations include immutable planning/identity, bounded parent/child protocol, exact Credential Manager/SID boundary, one-shot child/provider execution, suspended Windows process + Job Object containment, durable process/resume ordering, parent verification/publication/selection, manual production CLI, E3.2–E3.5 transport diagnostics/hardening, E3.6 fixed `/v2` credential-reference rotation with accepted local fresh/current credential proof, and E3.7 repair of the Windows final-artifact publication path.
 
 C3 is **not complete** because no real provider lineage has yet produced a parent-verified selected production snapshot.
 
-E3.5 was exercised by a real provider failure and successfully converted the prior opaque Content-Type failure into durable sanitized HTTP evidence (`401` plus provider request ID) without creating a snapshot or selection. E3.6 has now removed the local key/secret-pair ambiguity: the deployed runtime uses only `/v2`, the replacement `/v2` pair belongs to the intended Alpaca **Paper** environment, the exact Trading-side readback matches the locally witnessed dashboard generation, and the dashboard still shows that replacement generation as current. Remote Alpaca acceptance remains unproven until a separately authorized C3 provider effect occurs.
+E3.5 was exercised by a real provider failure and successfully converted the prior opaque Content-Type failure into durable sanitized HTTP evidence (`401` plus provider request ID) without creating a snapshot or selection. E3.6 removed the local key/secret-pair ambiguity: the deployed runtime used only `/v2`, the replacement `/v2` pair belonged to the intended Alpaca **Paper** environment, and the exact Trading-side readback matched the locally witnessed dashboard generation. E3.7 then repaired and deployed the local publication defect exposed by the first `/v2` provider effect, call #5. The provider and authenticated child path succeeded and the child obtained the daily snapshot, but parent artifact publication failed, so no snapshot authority or selection was created. C3 remains incomplete and call #5 must never be retried.
 
 ---
 
@@ -206,7 +206,7 @@ Durable inspection verified exact request/lineage binding, provider-call budget 
 
 E3.5 therefore worked as intended diagnostically: the prior Content-Type symptom is now resolved to a concrete provider authentication response. This lineage is permanently consumed. Never retry it.
 
-**Total actual real-provider effects: exactly 4.** All four are historical `/v1` lineages. No real `/v2` provider effect has occurred.
+**Total actual real-provider effects: exactly 5.** Calls #1–#4 are historical `/v1` lineages. Call #5 is the first `/v2` lineage and is permanently consumed.
 
 ---
 
@@ -339,11 +339,142 @@ Credential local proof:
 - `/v2` real-provider effect count remains zero;
 - no network/provider request occurred during provisioning/restaging/readback.
 
-**The current `/v2` Paper pair is now frozen for the first future `/v2` provider effect. Do not regenerate or modify `/v2` again.** If any `/v2` provider effect occurs, Architecture 84A's pre-first-effect staging window closes permanently regardless of outcome.
+At the E3.6 checkpoint, the current `/v2` Paper pair was frozen for its first future `/v2` provider effect. Call #5 subsequently used that pair and permanently closed Architecture 84A's pre-first-effect staging window. The `/v2` targets are now immutable historical credential-reference state; do not regenerate, replace, delete, restage, or modify them. Any later credential rotation requires `/v3` or a later explicitly reviewed version.
 
 ---
 
-## 10. Planner clock contract and next pre-effect gate
+## 10. C3-E3.7 Windows publication repair and provider call #5 — accepted
+
+E3.7 implementation:
+
+```text
+commit: 137bbe5a83d3bfe1cb62c381026c25e7fefa739a
+message: fix: repair C3 Windows artifact publication
+```
+
+The implementation replaced the invalid `SetFileInformationByHandle` /
+`FileLinkInfo` publication path with documented `CreateHardLinkW` no-clobber
+publication. It preserved retained staging identity verification, casefold
+collision rejection, final reopen identity verification, exact-byte
+reverification, and authority issuance only after successful parent
+verification. The E3.7 Windows publication acceptance gate passed: **1
+passed**.
+
+Provider call #5 was the first real `/v2` provider effect. Calls #1–#4 are
+historical `/v1` lineages. Its accepted lineage and terminal evidence are:
+
+```text
+target session date: 2026-08-28
+request window: 2026-08-27 through 2026-08-27
+request digest: c33949931607552c6f06503fadf818972fb4fe153dd2a65a21970e5e879a435e
+session: 7bdad286-c378-5ac9-a1be-05bb685739a8
+attempt: c70afb4c-921b-509e-9231-4d85bb334ca5
+claim: 9edd75a1-38d3-5043-a522-edb034730a24
+reservation: ff1cb0a3-b0f4-5908-812c-a1c4a8a14ed0
+execution: 67400d7e-153f-5c03-a821-4d955b291c2a
+terminal: 736c9432-d374-5cd1-a708-b2e008fa811b
+terminal state: FAILED
+provider disposition: CONFIRMED
+process exit: 6
+child provider classification: SUCCEEDED
+child provider fence: ENTERED
+child process observation: EXITED_ZERO
+result transport: complete
+parent cleanup: complete
+staging cleanup: complete
+artifact verification: PUBLICATION_FAILED
+parent terminal reason: PARENT_ARTIFACT_VERIFICATION_FAILED
+snapshot authority: none issued
+snapshot: null
+selection: none
+capture-output after failure: empty
+```
+
+The `/v2` credentials and authenticated Alpaca path were remotely accepted;
+the child successfully obtained the daily snapshot. The failure occurred
+after the confirmed provider effect during local parent artifact publication.
+Call #5 is permanently consumed and must never be retried. The repaired E3.7
+publication path was then deployed and verified.
+
+E3.7 final source certification was accepted:
+
+```text
+3186 passed
+17 skipped
+0 failed
+Ruff check src tests: passed
+Ruff format --check: 358 tracked Python files already formatted
+git diff --check: passed
+final source tree: clean
+frozen production SQL length: 118896
+frozen production SQL SHA-256: aa61df2f5db0090f8373222d1f5e492a58f4c10273afacfab45e382bacd4bb58
+```
+
+Accepted E3.7 release artifact:
+
+```text
+source export: F:\AI\c3-e37-production-source-v1
+wheel: F:\AI\c3-e37-production-wheelhouse-v1\ai_trading_bot-0.1.0-py3-none-any.whl
+wheel length: 674358
+wheel SHA-256: b35bbe0adc8f55ea96cc9f9e1852015182d07ed32b98d86cc141129395e431d2
+wheel entries: 192
+RECORD rows: 192
+hashed payloads: 191
+package source files: 188 exact matches
+package source exact-match gate: passed
+production SQL exact: passed
+offline wheel verification: passed
+```
+
+E3.7 administrator deployment was accepted after the exact wheel was
+re-proved before installation. The runtime was quiescent, Trading RX was
+revoked before replacement, the offline/no-index/no-deps/no-cache force
+reinstall succeeded, all 191 hashed payloads matched, the installed
+`CreateHardLinkW` publication implementation was verified, the obsolete
+`FileLinkInfo` path was absent, production SQL remained exact, SQLite remained
+3.50.4, and production authority validation returned
+`VALIDATED / INITIALIZED_SUPPORTED`. The bootstrap digest was
+`53b8b72ab18b1c477c5eab50857e4dc2d47efc6e74030e380ed6a53387922ae4`; the
+exact Trading SID remained approved. Ownership normalization processed 12,454
+files with zero failures; 12,453 descendants were inspected; ACL anomalies
+were zero; and the sealed runtime before RX publication contained only SYSTEM
+and Administrators.
+
+Trading RX republication was accepted with the runtime quiescent, the root
+owner still Administrators, the root DACL protected, exact inheritable Trading
+Read & Execute restored, all 12,453 descendants passing RX topology, and zero
+Trading RX anomalies.
+
+The non-admin Trading E3.7 zero-provider preflight was accepted for
+`DESKTOP-I4DOKM7\Trading`, SID
+`S-1-5-21-1397534616-3988210162-180023805-1009`, with administrator `False`.
+The installed contract was exactly
+`windows-credential-manager-alpaca-market-data/v2` with the exact `/v2` key
+and secret targets; `/v1` fallback was absent; E3.7 publication runtime proof
+and signed bootstrap verification passed; the production database was
+inspected read-only; durable session count was 5; call #5's digest mapped
+exactly to its expected session; SQLite `total_changes` was 0; runtime write
+was blocked; and production temp read/write/delete passed.
+
+The deployment/preflight zero-effect proof was:
+
+```text
+CREDENTIAL_MANAGER_READ=False
+NETWORK_OPERATION_PERFORMED=False
+PRODUCTION_CHILD_LAUNCHED=False
+AUTHORITY_DATABASE_MUTATION=False
+PROVIDER_REQUEST_PERFORMED=False
+```
+
+The first `/v2` provider effect has now occurred. The `/v2` staging/restaging
+window is permanently closed, and the current `/v2` targets are immutable
+historical credential-reference state. Do not regenerate, replace, delete,
+restage, or modify `/v2`; any later credential rotation requires `/v3` or a
+later explicitly reviewed version.
+
+---
+
+## 11. Post-call #5 planner and next pre-effect gate
 
 The planner uses exchange-local **calendar-date** reconciliation. For completed session date `D`, planning passes only once New York date has advanced to `D + 1`; market close plus an arbitrary buffer is not enough.
 
@@ -363,7 +494,16 @@ cccf56d1361ee4df8cf34745f68b32b29c52efdaaa80d2a02d4a32323dedce7f
 
 Independent read-only durable freshness validation found zero rows for that digest in all five lineage tables before call #4: `sessions`, `attempts`, `provider_call_claims`, `launch_reservations`, and `terminals`. No Credential Manager read, network operation, production child launch, authority database mutation, or provider request occurred during the planner/freshness gate.
 
-The next genuinely new candidate is XNYS session `2026-08-27`. Under the frozen calendar-date contract, it must **not** be planned until the New York calendar date has advanced to `2026-08-28`. The next gate is then pure planning + read-only durable freshness only: construct the exact caller-safe candidate, obtain the deterministic C2 request digest under the deployed `/v2` release semantics, prove it differs from all four consumed request digests, and prove zero durable rows for the candidate digest before any provider authorization is considered.
+Call #5 used the fresh XNYS request window `2026-08-27` and target session date
+`2026-08-28`; that lineage is consumed and is not a retry candidate. Before any
+future provider effect, require a genuinely new completed XNYS session and
+request digest, distinct from all five consumed request digests, with zero
+durable lineage in `sessions`, `attempts`, `provider_call_claims`,
+`launch_reservations`, and `terminals`. The planner/freshness gate must remain
+pure and read-only: no Credential Manager read, network/provider request,
+production child launch, or production-authority mutation. A later provider
+effect requires separate explicit authorization; provider call #6 is not
+authorized.
 
 ---
 
@@ -372,15 +512,18 @@ The next genuinely new candidate is XNYS session `2026-08-27`. Under the frozen 
 Current exact C3 effect state:
 
 ```text
-actual real-provider effects: exactly 4
-all real-provider effects so far: historical /v1
-/v2 real-provider effect count: 0
-latest consumed request digest: cccf56d1361ee4df8cf34745f68b32b29c52efdaaa80d2a02d4a32323dedce7f
+actual real-provider effects: exactly 5
+calls #1-#4: historical /v1
+call #5: first and only real /v2 effect so far
+/v2 real-provider effect count: 1
+latest consumed request digest: c33949931607552c6f06503fadf818972fb4fe153dd2a65a21970e5e879a435e
 latest terminal: FAILED
 latest provider disposition: CONFIRMED
-latest child classification: HTTP_FAILED
-latest HTTP status: 401
-latest provider request ID: 1a57fe61031771fc4b0f818c84f9e6e0
+latest child classification: SUCCEEDED
+latest child provider fence: ENTERED
+latest process exit: 6
+latest artifact verification: PUBLICATION_FAILED
+latest parent terminal reason: PARENT_ARTIFACT_VERIFICATION_FAILED
 latest selection/snapshot/artifact: none
 V2_SOURCE_CERTIFIED: True
 V2_ARTIFACT_ACCEPTED: True
@@ -391,27 +534,29 @@ LOCAL_EXACT_MATCH: PASSED
 DASHBOARD_CURRENT: PASSED
 credential environment: Paper
 V1_FALLBACK_PRESENT: False
-PROVIDER_CALL_5_AUTHORIZED: False
+PROVIDER_CALL_5_AUTHORIZED: True
+PROVIDER_CALL_5_CONSUMED: True
+PROVIDER_CALL_6_AUTHORIZED: False
 ```
 
 The immediate next sequence is:
 
 ```text
-wait until New York date is 2026-08-28 or later
-→ run pure planner for XNYS session 2026-08-27
+→ wait for a genuinely new completed XNYS session
+→ run the pure planner for that session
 → reproduce/inspect deterministic request material
-→ prove candidate request digest differs from all four consumed lineages
+→ prove candidate request digest differs from all five consumed lineages
 → read-only durable freshness: zero rows for candidate digest in all lineage tables
 → prove no Credential Manager read/network/provider effect during gate
 → separately review the candidate
-→ only a later explicit user authorization may permit at most one provider call #5
+→ only a later explicit user authorization may permit at most one future provider effect
 ```
 
 Do not run the capture during the planner/freshness gate. Do not modify the accepted `/v2` credentials.
 
 Parallel GUI status: GUI-A5a/A5b1/A5b2 are accepted through `fbf8fcb8068fff394bb1b144d1fdddbf3c50e06f`. The native Paper page renders only the bounded read-only inspection state, uses plain-text presentation for service-derived data, contains no mutation/recovery controls, and does not re-inspect on navigation. The next GUI checkpoint is the GUI-A5 integration/visual gate followed by the full repository regression; it remains deferred while C3 completes the provider path.
 
-**Provider call #5 is NOT authorized.**
+**Provider call #5 is permanently consumed. Provider call #6 is NOT authorized.**
 
 ---
 
@@ -429,7 +574,10 @@ No unsafe automatic retry path has been found. Conservative categories remain:
 
 E3.5 demonstrated in the real call #4 lineage that an `HTTP_FAILED` terminal retains sanitized non-200 status/request ID durably after terminal commit. These fields are diagnostic only and never grant retry authority.
 
-The August 26 session remains `OPEN` with `next_attempt_ordinal=1`, but this is not provider-effect authorization. The normal one-shot CLI starts by creating the deterministic session; a same-request rerun encounters the already-existing deterministic session before normal attempt allocation. Any explicit recovery/continuation path remains separately reviewed authority and is not authorized here.
+Call #5's terminal is durably consumed as `FAILED / CONFIRMED` after the
+provider fence, with no snapshot authority and no selection. It is not
+retryable. Any future recovery or continuation path remains separately
+reviewed authority and cannot reuse the consumed call-#5 lineage.
 
 ---
 
@@ -437,7 +585,7 @@ The August 26 session remains `OPEN` with `next_attempt_ordinal=1`, but this is 
 
 Before unattended production operation, continue review of:
 
-- remote `/v2` provider authentication/acceptance once separately authorized;
+- parent-verified publication/selection after the confirmed `/v2` provider effect;
 - production `close()` / concurrent admission and drain;
 - secret and transport-object lifetime;
 - artifact verification/publication TOCTOU;

@@ -1,7 +1,7 @@
 # AI Trading Bot — Project Development Roadmap & Handoff
 
 **Repository:** `callmedraken/ai-trading-bot`  
-**Local repository:** `F:\AI\ai-trading-bot-c3`
+**Local repository:** `F:\AI\ai-trading-bot`
 **Integration branch:** `develop`  
 **Current architecture branch:** `feature/windows-effectful-market-data-capture`  
 **Current release-source checkpoint:** `82ba29ae2c2cc6bb3544077db0ee21868e6d5693`

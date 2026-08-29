@@ -39,7 +39,7 @@ The repository currently includes:
 - durable evidence, deterministic UUID5/canonical serialization contracts, and historical-evaluation integrity rules;
 - Windows authority provisioning, schema, validation, capability, and transactional-authority milestones through C2;
 - a canonical production transactional SQLite artifact and reviewed lifecycle/recovery/concurrency boundaries;
-- a native PySide6 GUI foundation with read-only research exploration/comparison, one bounded read-only paper-operation inspection view, and one bounded offline-verified market-snapshot inspection view.
+- a native PySide6 GUI foundation with read-only research exploration/comparison, one bounded read-only paper-operation inspection view, one bounded offline-verified market-snapshot inspection view, and bounded offline-verified paper-account presentation.
 
 ## Completed Windows authority milestones
 
@@ -183,60 +183,54 @@ Final GUI-A6 acceptance evidence at
 
 **GUI-A6 is fully ACCEPTED.**
 
-## Next GUI milestone: GUI-A7 read-only verified paper-account state
+### GUI-A7 — offline-verified paper-account state: ACCEPTED
 
-The next recommended GUI checkpoint is a read-only paper-account presentation
-boundary. Its purpose is to expose already-verified simulated account state such
-as cash, positions, realized P&L, checkpoint/account identity, and as-of time
-without adding execution controls or pretending that an arbitrary file is the
-current operational account.
+Architecture 93 defines a common, strictly read-only presentation boundary for one explicitly supplied, completely offline-verified simulated paper-account checkpoint. The page does not identify the operationally current account, select a latest checkpoint, or add an operational account-selection boundary. The GUI-A7 validation plan is the frozen contract at the validation checkpoint below.
 
-The branch already contains two materially different reviewed offline proof
-paths that Architecture 93 should reconcile at the presentation boundary:
+Accepted checkpoint sequence:
 
-- `verify_genesis_paper_account_checkpoint(...)` can completely verify one exact GENESIS checkpoint and reconstruct its compact `PaperLedger` state;
-- `verify_checkpointed_paper_cycle_successor_edge(...)` can verify one successor only by replaying and reconciling the exact prior checkpoint, verified market snapshot, checkpointed-cycle report, and successor checkpoint edge.
+- `7b9067d204954ceef16531cff669dee43d1c094b` - Architecture 93;
+- `17deebb5a47995629925d0890eda49b41a6ab6f7` - GUI-A7 validation plan;
+- `6a333ff16f289990bbb870d857496cec17c0e847` - A7a final common presentation contract;
+- `2bcb2d8770cbd80b801d54cb71e3013b14da4f79` - A7b1 GENESIS inspection adapter;
+- `8bb1ebab1d28d337460c41549dfaa2d757317f0a2` - A7b2 successor-edge inspection adapter;
+- `b108a039251fbd37baeb0b6931e1fdd4b1c8877c` - A7b3 Qt Paper Account page;
+- `91dad3cbe98c9d02097adba7a0cd8ab2d4736e9a` - A7b3 visual-table refinement;
+- `7fb2e0b014938215e9ab4fbdb1cddde2651fad92` - final Ruff-format-only follow-up and accepted head.
 
-Initial GUI-A7 architecture should determine the smallest common Qt-free
-presentation contract that can truthfully represent either a completely verified
-GENESIS state or a completely verified successor state. Likely bounded facts
-include:
+Accepted architecture and behavior:
 
-- checkpoint kind, sequence, checkpoint ID, lineage ID, and account-state ID;
-- exact as-of timestamp;
-- exact cash and realized P&L;
-- bounded ordered positions with symbol, quantity, total cost basis, and average cost;
-- artifact SHA-256 and byte-length evidence;
-- successor-only application/cycle/snapshot references only if they are already part of the complete reviewed PASS result and can be presented without claiming history traversal.
+- one common Qt-free paper-account presentation contract supports completely verified GENESIS and CYCLE_SUCCESSOR states;
+- the GENESIS adapter reads one explicit checkpoint artifact within its existing schema bound and calls `verify_genesis_paper_account_checkpoint(...)` exactly once per acquisition;
+- the successor adapter requires the exact explicit prior checkpoint, verified snapshot, checkpointed-cycle report, and successor checkpoint proof set and calls `verify_checkpointed_paper_cycle_successor_edge(...)` exactly once;
+- a successor checkpoint alone is never sufficient;
+- only complete diagnostic-free exact PASS results become VERIFIED, and all failures collapse to deterministic sanitized UNAVAILABLE;
+- the mapped fields are checkpoint kind/sequence, checkpoint/lineage/account/compact IDs, as-of, cash, cumulative realized P&L, ordered positions, and verifier artifact SHA/byte length;
+- positions preserve verified order and exact Decimal values;
+- Qt receives one immutable `PaperAccountPageState`; `MainWindow` acquires paper-account state exactly once during construction, and navigation does not reacquire or reverify;
+- Paper Account is a dedicated read-only navigation page; presentation states explicitly say Verified Offline and do not claim operational/current-account selection;
+- the positions table is read-only, non-sortable, four-column, uses a hidden vertical row header, and has balanced deterministic column sizing;
+- no execution, resume, retry, recover, refresh, latest-selection, repair, publication, credential, network, brokerage, production SQLite, C1/C2/C3, or artifact-mutation controls or dependencies were added.
 
-GUI-A7 must not:
+Final GUI-A7 acceptance evidence at `7fb2e0b014938215e9ab4fbdb1cddde2651fad92`:
 
-- discover or select a "latest" checkpoint by scanning directories;
-- traverse checkpoint lineage automatically;
-- claim an explicitly supplied checkpoint is the current operational account;
-- run or resume a paper cycle;
-- create orders/fills or call strategy/risk/execution paths;
-- mutate, repair, publish, or replace checkpoint artifacts;
-- expose raw parser/runtime exception text or arbitrary filesystem paths;
-- open production SQLite, C1/C2/C3 authority, Credential Manager, Alpaca, or brokerage paths.
+- combined A7a/A7b1/A7b2 focused gate: 73 passed;
+- A7b3 focused Qt/regression gate: 36 passed;
+- complete GUI suite before final visual polish: 199 passed;
+- post-polish focused Paper Account Qt gate: 12 passed;
+- manual visual gate: PASSED for verified GENESIS presentation at normal and minimum-size layouts after table refinement;
+- complete repository regression on the final semantic source tree: 2,928 passed, 13 skipped, 0 failed;
+- all full-suite skips were expected repository Windows opt-in/symlink environment skips;
+- Ruff check on `src/tests` after final formatting: passed;
+- Ruff format check on `src/tests`: 356 files already formatted;
+- `git diff --check`: clean;
+- the final formatting-only commit changed exactly one long raise statement into Ruff multiline form;
+- AST comparison of pre/post-format `paper_account_models.py`: `AST_EQUIVALENT=True`;
+- focused A7 contract after formatting with explicit basetemp: 15 passed;
+- an earlier focused rerun encountered WinError 5 only while pytest attempted to scan `C:\Users\John\AppData\Local\Temp\pytest-of-John`; this was an environment setup failure, not a source/test regression;
+- known unrelated generated/untracked artifacts and historical permission-warning directories remained untouched.
 
-The intended dependency direction is:
-
-```text
-Qt Paper Account page
-    -> Qt-free GUI paper-account presentation models
-    -> GuiApplicationService.get_paper_account_state()
-    -> reviewed/injected read-only checkpoint adapter
-    -> existing offline checkpoint/edge verifier
-```
-
-Architecture/data-boundary selection is a **Sol Medium** task because GENESIS and
-successor verification have different proof requirements and must not be
-silently conflated. Once the common presentation contract and adapter semantics
-are frozen, mechanical Qt rendering should be suitable for **Luna Extra High**.
-Any proposal to identify the operationally current account by traversing durable
-runtime state, production authority, or automatic lineage selection requires
-**Sol High** review instead.
+GUI-A7 is fully ACCEPTED at final head `7fb2e0b014938215e9ab4fbdb1cddde2651fad92`. Any subsequent GUI milestone remains a separate architecture/planning decision; this closeout selects no GUI-A8 architecture.
 
 ## Roadmap after C3
 

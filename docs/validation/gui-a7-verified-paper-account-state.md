@@ -315,3 +315,52 @@ FULL_REGRESSION=PASSED
 A7 acceptance means the GUI can truthfully present one explicitly supplied,
 completely offline-verified paper-account checkpoint state. It does not mean the
 GUI knows which checkpoint is operationally current.
+
+## 15. Final GUI-A7 acceptance and results
+
+The frozen validation contract above is fully satisfied. GUI-A7 is fully ACCEPTED at final head `7fb2e0b014938215e9ab4fbdb1cddde2651fad92`.
+
+### Accepted checkpoint sequence
+
+- `7b9067d204954ceef16531cff669dee43d1c094b` - Architecture 93;
+- `17deebb5a47995629925d0890eda49b41a6ab6f7` - GUI-A7 validation plan;
+- `6a333ff16f289990bbb870d857496cec17c0e847` - A7a final common presentation contract;
+- `2bcb2d8770cbd80b801d54cb71e3013b14da4f79` - A7b1 GENESIS inspection adapter;
+- `8bb1ebab1d28d337460c41549dfaa2d757317f0a2` - A7b2 successor-edge inspection adapter;
+- `b108a039251fbd37baeb0b6931e1fdd4b1c8877c` - A7b3 Qt Paper Account page;
+- `91dad3cbe98c9d02097adba7a0cd8ab2d4736e9a` - A7b3 visual-table refinement;
+- `7fb2e0b014938215e9ab4fbdb1cddde2651fad92` - final Ruff-format-only follow-up and accepted head.
+
+### Accepted behavior
+
+- one common Qt-free paper-account presentation contract supports completely verified GENESIS and CYCLE_SUCCESSOR states;
+- the GENESIS adapter reads one explicit checkpoint artifact within its existing schema bound and calls `verify_genesis_paper_account_checkpoint(...)` exactly once per acquisition;
+- the successor adapter requires the exact explicit prior checkpoint, verified snapshot, checkpointed-cycle report, and successor checkpoint proof set and calls `verify_checkpointed_paper_cycle_successor_edge(...)` exactly once;
+- a successor checkpoint alone is never sufficient;
+- only complete diagnostic-free exact PASS results become VERIFIED, and all failures collapse to deterministic sanitized UNAVAILABLE;
+- the mapped fields are checkpoint kind/sequence, checkpoint/lineage/account/compact IDs, as-of, cash, cumulative realized P&L, ordered positions, and verifier artifact SHA/byte length;
+- positions preserve verified order and exact Decimal values;
+- Qt receives one immutable `PaperAccountPageState`; `MainWindow` acquires paper-account state exactly once during construction, and navigation does not reacquire or reverify;
+- Paper Account is a dedicated read-only navigation page; presentation states explicitly say Verified Offline and do not claim operational/current-account selection;
+- the positions table is read-only, non-sortable, four-column, uses a hidden vertical row header, and has balanced deterministic column sizing;
+- no execution, resume, retry, recover, refresh, latest-selection, repair, publication, credential, network, brokerage, production SQLite, C1/C2/C3, or artifact-mutation controls or dependencies were added.
+
+### Final certification evidence
+
+- combined A7a/A7b1/A7b2 focused gate: 73 passed;
+- A7b3 focused Qt/regression gate: 36 passed;
+- complete GUI suite before final visual polish: 199 passed;
+- post-polish focused Paper Account Qt gate: 12 passed;
+- manual visual gate: PASSED for verified GENESIS presentation at normal and minimum-size layouts after table refinement;
+- complete repository regression on the final semantic source tree: 2,928 passed, 13 skipped, 0 failed;
+- all full-suite skips were expected repository Windows opt-in/symlink environment skips;
+- Ruff check on `src/tests` after final formatting: passed;
+- Ruff format check on `src/tests`: 356 files already formatted;
+- `git diff --check`: clean;
+- the final formatting-only commit changed exactly one long raise statement into Ruff multiline form;
+- AST comparison of pre/post-format `paper_account_models.py`: `AST_EQUIVALENT=True`;
+- focused A7 contract after formatting with explicit basetemp: 15 passed;
+- an earlier focused rerun encountered WinError 5 only while pytest attempted to scan `C:\Users\John\AppData\Local\Temp\pytest-of-John`; this was an environment setup failure, not a source/test regression;
+- known unrelated generated/untracked artifacts and historical permission-warning directories remained untouched.
+
+No GUI-A8 architecture is selected by this documentation closeout; any subsequent GUI milestone requires a separate architecture/planning decision.

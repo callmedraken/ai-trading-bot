@@ -326,7 +326,7 @@ The frozen validation contract above is fully satisfied. GUI-A7 is fully ACCEPTE
 - `17deebb5a47995629925d0890eda49b41a6ab6f7` - GUI-A7 validation plan;
 - `6a333ff16f289990bbb870d857496cec17c0e847` - A7a final common presentation contract;
 - `2bcb2d8770cbd80b801d54cb71e3013b14da4f79` - A7b1 GENESIS inspection adapter;
-- `8bb1ebab1d28d337460c41549dfaa2d757317f0a2` - A7b2 successor-edge inspection adapter;
+- `8bb1ebab1d28d337460c41549dfaa2d757317f0a` - A7b2 successor-edge inspection adapter;
 - `b108a039251fbd37baeb0b6931e1fdd4b1c8877c` - A7b3 Qt Paper Account page;
 - `91dad3cbe98c9d02097adba7a0cd8ab2d4736e9a` - A7b3 visual-table refinement;
 - `7fb2e0b014938215e9ab4fbdb1cddde2651fad92` - final Ruff-format-only follow-up and accepted head.

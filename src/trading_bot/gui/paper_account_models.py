@@ -92,7 +92,9 @@ class PaperAccountPositionView:
         try:
             canonical_symbol = Symbol(self.symbol)
         except (TypeError, ValueError) as error:
-            raise ValueError("symbol must satisfy the domain ticker contract") from error
+            raise ValueError(
+                "symbol must satisfy the domain ticker contract"
+            ) from error
         if str(canonical_symbol) != self.symbol:
             raise ValueError("symbol must be canonical uppercase ticker text")
 

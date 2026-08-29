@@ -17,7 +17,13 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 pytest.importorskip("PySide6")
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QApplication, QLabel, QPushButton, QTableWidget
+from PySide6.QtWidgets import (
+    QApplication,
+    QHeaderView,
+    QLabel,
+    QPushButton,
+    QTableWidget,
+)
 
 from trading_bot.gui import (
     ApplicationOverview,
@@ -211,6 +217,17 @@ def test_position_table_is_read_only_and_does_not_enable_sorting() -> None:
 
     assert table is not None
     assert table.editTriggers() == QTableWidget.EditTrigger.NoEditTriggers
+    assert table.verticalHeader().isHidden() is True
+    assert table.columnCount() == 4
+    assert [
+        table.horizontalHeaderItem(column).text()
+        for column in range(table.columnCount())
+    ] == ["Symbol", "Quantity", "Total Cost Basis", "Average Cost"]
+    header = table.horizontalHeader()
+    assert header.sectionResizeMode(0) == QHeaderView.ResizeMode.ResizeToContents
+    assert header.sectionResizeMode(1) == QHeaderView.ResizeMode.Stretch
+    assert header.sectionResizeMode(2) == QHeaderView.ResizeMode.Stretch
+    assert header.sectionResizeMode(3) == QHeaderView.ResizeMode.Stretch
     assert table.isSortingEnabled() is False
     assert table.horizontalHeader().sectionsClickable() is False
     for row in range(table.rowCount()):

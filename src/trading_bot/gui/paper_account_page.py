@@ -5,6 +5,7 @@ from PySide6.QtWidgets import (
     QAbstractItemView,
     QFormLayout,
     QFrame,
+    QHeaderView,
     QLabel,
     QTableWidget,
     QTableWidgetItem,
@@ -157,6 +158,15 @@ class PaperAccountPage(QWidget):
         table.setHorizontalHeaderLabels(
             ("Symbol", "Quantity", "Total Cost Basis", "Average Cost")
         )
+        table.verticalHeader().setVisible(False)
+        horizontal_header = table.horizontalHeader()
+        horizontal_header.setStretchLastSection(False)
+        horizontal_header.setSectionResizeMode(
+            0, QHeaderView.ResizeMode.ResizeToContents
+        )
+        horizontal_header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        horizontal_header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        horizontal_header.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
         table.setRowCount(len(account.positions))
         table.setAlternatingRowColors(True)
         table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)

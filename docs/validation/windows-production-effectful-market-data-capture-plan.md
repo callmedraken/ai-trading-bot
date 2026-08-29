@@ -838,3 +838,140 @@ claim:
 
 The next milestone may then consume the selected verified snapshot in the
 reliable manual paper-cycle pipeline. C3 itself does not execute that pipeline.
+
+## 38. Final C3 controlled production acceptance
+
+The frozen validation contract above is satisfied. C3 is **FULLY COMPLETE /
+ACCEPTED** at final head `82ba29ae2c2cc6bb3544077db0ee21868e6d5693`.
+
+### 38.1 Accepted source and release context
+
+- current C3 branch head before this documentation closeout:
+  `82ba29ae2c2cc6bb3544077db0ee21868e6d5693`;
+- accepted E3.7 source repair: `137bbe5a83d3bfe1cb62c381026c25e7fefa739a`;
+- frozen production SQL: 118896 bytes, SHA-256
+  `aa61df2f5db0090f8373222d1f5e492a58f4c10273afacfab45e382bacd4bb58`;
+- accepted production wheel: `ai_trading_bot-0.1.0-py3-none-any.whl`,
+  674358 bytes, SHA-256
+  `b35bbe0adc8f55ea96cc9f9e1852015182d07ed32b98d86cc141129395e431d2`;
+- broad source regression: 3186 passed, 17 skipped;
+- Ruff, format, and `git diff --check` results were accepted;
+- administrator deployment, Trading-account ACL republication, and non-admin
+  production preflight were accepted.
+
+### 38.2 Dedicated production identity and credential state
+
+```text
+identity: DESKTOP-I4DOKM7\Trading
+SID: S-1-5-21-1397534616-3988210162-180023805-1009
+administrator: False
+```
+
+The `/v2` credentials are immutable historical production inputs. They must not
+be deleted, overwritten, restaged, or rotated in place. Future credential
+rotation requires a separately reviewed `/v3` or later version.
+
+### 38.3 Historical call #5
+
+Call #5 remains permanently consumed historical evidence. Its request digest is
+`c33949931607552c6f06503fadf818972fb4fe153dd2a65a21970e5e879a435e`. Its
+durable terminal remains `FAILED / CONFIRMED` after the child/provider path
+succeeded but parent publication failed. It is not successful and is not
+retryable.
+
+### 38.4 Final call #6 production acceptance
+
+```text
+ordered universe: SPY
+request window: 2026-08-28 through 2026-08-28
+target session date: 2026-08-29
+authorized XNYS snapshot session: 2026-08-28
+request digest: 67c8e2c81da2467aa0c67328af191038d00858fe153dd0850f59ef786612efad
+session_id: f787e4f6-c3ca-58fe-802b-f068dd474b41
+attempt_id: e809f393-b557-5c6b-8665-78d66822fee8
+claim_id: 487618c1-a5a5-5dd9-971d-a1ea843194c5
+reservation_id: fa5b4538-e475-5a13-9cb2-0d7936232c84
+execution_id: d85a8085-137b-55c2-9679-cddade4a5907
+terminal_id: b4c76e5f-44bb-54ce-a917-3e3223b84107
+selection_id: 36d6fbb3-bdec-57e0-a9cf-78dc2b8f7280
+snapshot_id: eba46838-44ae-5bec-97bf-98c6639ae6a7
+artifact SHA-256: 31d82a31a3fbd909f8771820bf47e796a1503264fe0ac6ce0eff7ba163f0767d
+artifact byte length: 1291
+status: COMPLETED
+terminal_state: SUCCEEDED
+provider_call_disposition: CONFIRMED
+exit code: 0
+```
+
+The one-shot CLI result was `COMPLETED` with terminal state `SUCCEEDED`,
+provider-call disposition `CONFIRMED`, exit code 0, and durable selection and
+snapshot IDs returned.
+
+### 38.5 Final durable and offline proof
+
+```text
+DURABLE_ROW_FOUND=True
+SESSION_STATE=SUCCESS_SELECTED
+ATTEMPT_STATE=SUCCESS_SELECTED
+CLAIM_STATE=COMMITTED
+RESERVATION_STATE=TERMINAL_RECORDED
+EXECUTION_PHASE=TERMINAL_RECORDED
+TERMINAL_STATE=SUCCEEDED
+PROVIDER_DISPOSITION=CONFIRMED
+REQUEST_SHA256=67c8e2c81da2467aa0c67328af191038d00858fe153dd0850f59ef786612efad
+TERMINAL_SNAPSHOT_SHA256=31d82a31a3fbd909f8771820bf47e796a1503264fe0ac6ce0eff7ba163f0767d
+SELECTION_SNAPSHOT_SHA256=31d82a31a3fbd909f8771820bf47e796a1503264fe0ac6ce0eff7ba163f0767d
+DURABLE_MATCH=True
+```
+
+```text
+ARTIFACT_EXISTS=True
+ARTIFACT_BYTES=1291
+ARTIFACT_SHA256=31d82a31a3fbd909f8771820bf47e796a1503264fe0ac6ce0eff7ba163f0767d
+OFFLINE_VERIFY_STATUS=PASS
+SNAPSHOT_ID=eba46838-44ae-5bec-97bf-98c6639ae6a7
+SNAPSHOT_SESSION_DATE=2026-08-28
+SNAPSHOT_SYMBOLS=['SPY']
+ARTIFACT_EVIDENCE_MATCH=True
+OFFLINE_SNAPSHOT_MATCH=True
+C3_COMPLETION_EVIDENCE=True
+```
+
+Pre-effect evidence confirmed the exact production runtime, validated
+production authority and frozen schema digest, immutable `/v2` credential
+entries readable under the Trading SID, corrected E3.7 `CreateHardLinkW`
+publication, absence of obsolete `FileLinkInfo`, a passing same-filesystem
+publication canary, empty capture output, zero durable lineage, and no
+provider/network operation during preflight.
+
+### 38.6 Completion conclusion and next milestone
+
+Architecture 82's stronger completion criterion is satisfied: one C1-approved
+Trading process caused at most one C2-authorized provider attempt; secrets
+remained in the contained child on the production effect path; C2 durable
+process/resume fences governed the effect; the parent independently verified and
+published the canonical artifact; the successful terminal was durably selected;
+and independent post-run offline verification passed. C3 completion is not
+merely Alpaca HTTP success.
+
+Total actual C3 real-provider effects are **exactly 6**. All six are consumed;
+call #6 is successful and consumed; no provider call #7 is authorized.
+
+Production brokerage and live trading remain **NO-GO**. C3 does not authorize
+brokerage credentials, broker reconciliation, order submission/cancel/replace,
+real-money trading, unattended scheduling, automatic retry, automatic recovery,
+or paper-account mutation.
+
+The next product milestone is the reliable manually invoked paper cycle:
+
+```text
+verified C3 snapshot
+-> strategy
+-> proposals
+-> deterministic risk
+-> paper execution
+-> durable before/after evidence
+```
+
+This closeout does not design that milestone in detail or create a new
+architecture document.

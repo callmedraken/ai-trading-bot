@@ -1,11 +1,11 @@
 # AI Trading Bot — Project Development Roadmap & Handoff
 
 **Repository:** `callmedraken/ai-trading-bot`  
-**Local repository:** `F:\AI\ai-trading-bot`  
+**Local repository:** `F:\AI\ai-trading-bot-c3`
 **Integration branch:** `develop`  
 **Current architecture branch:** `feature/windows-effectful-market-data-capture`  
-**Current release-source checkpoint:** `137bbe5a83d3bfe1cb62c381026c25e7fefa739a`
-**Handoff status:** August 28, 2026 — C3-E3.7 Windows artifact-publication repair, source/artifact/deployment, and Trading zero-provider preflight accepted; provider call #5 was the first real `/v2` effect and is permanently consumed as `FAILED / CONFIRMED` after the child obtained the daily snapshot but parent artifact publication failed; `/v2` is now immutable historical credential-reference state; C3 remains incomplete because no parent-verified selected production snapshot exists; provider call #6 is not authorized; parallel GUI-A5b2 read-only Paper rendering is accepted
+**Current release-source checkpoint:** `82ba29ae2c2cc6bb3544077db0ee21868e6d5693`
+**Handoff status:** August 29, 2026 — C3 is FULLY COMPLETE / ACCEPTED at final source head `82ba29ae2c2cc6bb3544077db0ee21868e6d5693` after controlled production call #6; call #5 remains permanently consumed as `FAILED / CONFIRMED` after parent artifact publication failed; call #6 is `SUCCEEDED / CONFIRMED` and `SUCCESS_SELECTED`; `/v2` is immutable historical credential-reference state; parallel GUI work remains separate from C3
 
 > The Git-tracked `docs/AI_TRADING_BOT_HANDOFF.md` is the canonical handoff. Uploaded Project copies are mirrors only. Documentation closeout creates later docs-only commits, so always verify the live branch and use the release-source SHA above for artifact work.
 
@@ -88,13 +88,38 @@ SHA-256: aa61df2f5db0090f8373222d1f5e492a58f4c10273afacfab45e382bacd4bb58
 
 ---
 
-## 4. C3 status
+## 4. C3 status — FULLY COMPLETE / ACCEPTED
 
-Completed foundations include immutable planning/identity, bounded parent/child protocol, exact Credential Manager/SID boundary, one-shot child/provider execution, suspended Windows process + Job Object containment, durable process/resume ordering, parent verification/publication/selection, manual production CLI, E3.2–E3.5 transport diagnostics/hardening, E3.6 fixed `/v2` credential-reference rotation with accepted local fresh/current credential proof, and E3.7 repair of the Windows final-artifact publication path.
+C3 is **FULLY COMPLETE / ACCEPTED** at final source head
+`82ba29ae2c2cc6bb3544077db0ee21868e6d5693`. The accepted E3.7 source repair is
+`137bbe5a83d3bfe1cb62c381026c25e7fefa739a`.
 
-C3 is **not complete** because no real provider lineage has yet produced a parent-verified selected production snapshot.
+The final controlled production acceptance proved the complete Architecture 82
+chain: one C1-approved non-administrator Trading process, one C2-authorized
+provider attempt, contained-child secret isolation, durable C2 process/resume
+fences, independent parent verification and publication, durable successful
+selection, and independent post-run offline verification. C3 completion is not
+merely Alpaca HTTP success.
 
-E3.5 was exercised by a real provider failure and successfully converted the prior opaque Content-Type failure into durable sanitized HTTP evidence (`401` plus provider request ID) without creating a snapshot or selection. E3.6 removed the local key/secret-pair ambiguity: the deployed runtime used only `/v2`, the replacement `/v2` pair belonged to the intended Alpaca **Paper** environment, and the exact Trading-side readback matched the locally witnessed dashboard generation. E3.7 then repaired and deployed the local publication defect exposed by the first `/v2` provider effect, call #5. The provider and authenticated child path succeeded and the child obtained the daily snapshot, but parent artifact publication failed, so no snapshot authority or selection was created. C3 remains incomplete and call #5 must never be retried.
+C3 has exactly six consumed real-provider effects. Historical call #5 remains
+`FAILED / CONFIRMED` after parent publication failure and is permanently
+non-retryable. Final call #6 is `SUCCEEDED / CONFIRMED` with durable
+`SUCCESS_SELECTED` session and attempt state, `COMMITTED` claim, terminal
+`SUCCEEDED`, and `PROVIDER_DISPOSITION=CONFIRMED`.
+
+The frozen production SQL remains 118896 bytes with SHA-256
+`aa61df2f5db0090f8373222d1f5e492a58f4c10273afacfab45e382bacd4bb58`. The
+accepted wheel is `ai_trading_bot-0.1.0-py3-none-any.whl`, 674358 bytes, with
+SHA-256 `b35bbe0adc8f55ea96cc9f9e1852015182d07ed32b98d86cc141129395e431d2`.
+The dedicated identity is `DESKTOP-I4DOKM7\Trading`, SID
+`S-1-5-21-1397534616-3988210162-180023805-1009`, non-administrator. `/v2`
+credential references remain immutable historical inputs; later rotation
+requires a separately reviewed `/v3` or later version.
+
+Production brokerage and live trading remain **NO-GO**. C3 does not authorize
+brokerage credentials, broker reconciliation, order submission/cancel/replace,
+real-money trading, unattended scheduling, automatic retry, automatic recovery,
+or paper-account mutation.
 
 ---
 
@@ -206,7 +231,7 @@ Durable inspection verified exact request/lineage binding, provider-call budget 
 
 E3.5 therefore worked as intended diagnostically: the prior Content-Type symptom is now resolved to a concrete provider authentication response. This lineage is permanently consumed. Never retry it.
 
-**Total actual real-provider effects: exactly 5.** Calls #1–#4 are historical `/v1` lineages. Call #5 is the first `/v2` lineage and is permanently consumed.
+At that historical checkpoint, calls #1–#5 had been consumed, with call #5 the first `/v2` lineage. The final controlled call #6 is recorded in Section 12 and brings the current total to exactly 6.
 
 ---
 
@@ -474,89 +499,107 @@ later explicitly reviewed version.
 
 ---
 
-## 11. Post-call #5 planner and next pre-effect gate
+## 11. Historical pre-call #6 planner state (superseded)
 
-The planner uses exchange-local **calendar-date** reconciliation. For completed session date `D`, planning passes only once New York date has advanced to `D + 1`; market close plus an arbitrary buffer is not enough.
+The pre-call #6 planner/freshness gate was pure and read-only. It performed no
+Credential Manager read, network/provider request, production child launch, or
+authority mutation. It was superseded by the separately authorized final call
+#6 recorded below.
 
-The August 26 pure-planning gate was executed from the exact non-administrator Trading account at:
-
-```text
-requested UTC:      2026-08-27T04:46:09.792299+00:00
-requested New York: 2026-08-27T00:46:09.792299-04:00
-authorized session: 2026-08-26
-```
-
-The historical August 25 request shape reproduced its consumed digest exactly, and the fresh August 26 digest was:
-
-```text
-cccf56d1361ee4df8cf34745f68b32b29c52efdaaa80d2a02d4a32323dedce7f
-```
-
-Independent read-only durable freshness validation found zero rows for that digest in all five lineage tables before call #4: `sessions`, `attempts`, `provider_call_claims`, `launch_reservations`, and `terminals`. No Credential Manager read, network operation, production child launch, authority database mutation, or provider request occurred during the planner/freshness gate.
-
-Call #5 used the fresh XNYS request window `2026-08-27` and target session date
-`2026-08-28`; that lineage is consumed and is not a retry candidate. Before any
-future provider effect, require a genuinely new completed XNYS session and
-request digest, distinct from all five consumed request digests, with zero
-durable lineage in `sessions`, `attempts`, `provider_call_claims`,
-`launch_reservations`, and `terminals`. The planner/freshness gate must remain
-pure and read-only: no Credential Manager read, network/provider request,
-production child launch, or production-authority mutation. A later provider
-effect requires separate explicit authorization; provider call #6 is not
-authorized.
+Call #5 used request window `2026-08-27` for target session `2026-08-28`; that
+lineage remains consumed and is not retryable. Final call #6 used the distinct
+request digest and exact session mapping recorded in the controlled acceptance
+section.
 
 ---
 
-## 12. Current resume point / next acceptance gate
+## 12. Final controlled C3 acceptance
 
-Current exact C3 effect state:
-
-```text
-actual real-provider effects: exactly 5
-calls #1-#4: historical /v1
-call #5: first and only real /v2 effect so far
-/v2 real-provider effect count: 1
-latest consumed request digest: c33949931607552c6f06503fadf818972fb4fe153dd2a65a21970e5e879a435e
-latest terminal: FAILED
-latest provider disposition: CONFIRMED
-latest child classification: SUCCEEDED
-latest child provider fence: ENTERED
-latest process exit: 6
-latest artifact verification: PUBLICATION_FAILED
-latest parent terminal reason: PARENT_ARTIFACT_VERIFICATION_FAILED
-latest selection/snapshot/artifact: none
-V2_SOURCE_CERTIFIED: True
-V2_ARTIFACT_ACCEPTED: True
-V2_DEPLOYMENT_ACCEPTED: True
-V2_ZERO_PROVIDER_PREFLIGHT: PASSED
-FRESH_GENERATED: PASSED
-LOCAL_EXACT_MATCH: PASSED
-DASHBOARD_CURRENT: PASSED
-credential environment: Paper
-V1_FALLBACK_PRESENT: False
-PROVIDER_CALL_5_WAS_AUTHORIZED: True
-PROVIDER_CALL_5_CONSUMED: True
-PROVIDER_CALL_6_AUTHORIZED: False
-```
-
-The immediate next sequence is:
+Dedicated production identity:
 
 ```text
-→ wait for a genuinely new completed XNYS session
-→ run the pure planner for that session
-→ reproduce/inspect deterministic request material
-→ prove candidate request digest differs from all five consumed lineages
-→ read-only durable freshness: zero rows for candidate digest in all lineage tables
-→ prove no Credential Manager read/network/provider effect during gate
-→ separately review the candidate
-→ only a later explicit user authorization may permit at most one future provider effect
+identity: DESKTOP-I4DOKM7\Trading
+SID: S-1-5-21-1397534616-3988210162-180023805-1009
+administrator: False
 ```
 
-Do not run the capture during the planner/freshness gate. Do not modify the accepted `/v2` credentials.
+Final call #6 request and lineage:
 
-Parallel GUI status: GUI-A5a/A5b1/A5b2 are accepted through `fbf8fcb8068fff394bb1b144d1fdddbf3c50e06f`. The native Paper page renders only the bounded read-only inspection state, uses plain-text presentation for service-derived data, contains no mutation/recovery controls, and does not re-inspect on navigation. The next GUI checkpoint is the GUI-A5 integration/visual gate followed by the full repository regression; it remains deferred while C3 completes the provider path.
+```text
+ordered universe: SPY
+request window: 2026-08-28 through 2026-08-28
+target session date: 2026-08-29
+authorized XNYS snapshot session: 2026-08-28
+request digest: 67c8e2c81da2467aa0c67328af191038d00858fe153dd0850f59ef786612efad
+session_id: f787e4f6-c3ca-58fe-802b-f068dd474b41
+attempt_id: e809f393-b557-5c6b-8665-78d66822fee8
+claim_id: 487618c1-a5a5-5dd9-971d-a1ea843194c5
+reservation_id: fa5b4538-e475-5a13-9cb2-0d7936232c84
+execution_id: d85a8085-137b-55c2-9679-cddade4a5907
+terminal_id: b4c76e5f-44bb-54ce-a917-3e3223b84107
+selection_id: 36d6fbb3-bdec-57e0-a9cf-78dc2b8f7280
+snapshot_id: eba46838-44ae-5bec-97bf-98c6639ae6a7
+artifact SHA-256: 31d82a31a3fbd909f8771820bf47e796a1503264fe0ac6ce0eff7ba163f0767d
+artifact byte length: 1291
+status: COMPLETED
+terminal_state: SUCCEEDED
+provider_call_disposition: CONFIRMED
+exit code: 0
+```
 
-**Provider call #5 is permanently consumed. Provider call #6 is NOT authorized.**
+Final read-only durable proof:
+
+```text
+DURABLE_ROW_FOUND=True
+SESSION_STATE=SUCCESS_SELECTED
+ATTEMPT_STATE=SUCCESS_SELECTED
+CLAIM_STATE=COMMITTED
+RESERVATION_STATE=TERMINAL_RECORDED
+EXECUTION_PHASE=TERMINAL_RECORDED
+TERMINAL_STATE=SUCCEEDED
+PROVIDER_DISPOSITION=CONFIRMED
+REQUEST_SHA256=67c8e2c81da2467aa0c67328af191038d00858fe153dd0850f59ef786612efad
+TERMINAL_SNAPSHOT_SHA256=31d82a31a3fbd909f8771820bf47e796a1503264fe0ac6ce0eff7ba163f0767d
+SELECTION_SNAPSHOT_SHA256=31d82a31a3fbd909f8771820bf47e796a1503264fe0ac6ce0eff7ba163f0767d
+DURABLE_MATCH=True
+```
+
+Final artifact/offline proof:
+
+```text
+ARTIFACT_EXISTS=True
+ARTIFACT_BYTES=1291
+ARTIFACT_SHA256=31d82a31a3fbd909f8771820bf47e796a1503264fe0ac6ce0eff7ba163f0767d
+OFFLINE_VERIFY_STATUS=PASS
+SNAPSHOT_ID=eba46838-44ae-5bec-97bf-98c6639ae6a7
+SNAPSHOT_SESSION_DATE=2026-08-28
+SNAPSHOT_SYMBOLS=['SPY']
+ARTIFACT_EVIDENCE_MATCH=True
+OFFLINE_SNAPSHOT_MATCH=True
+C3_COMPLETION_EVIDENCE=True
+```
+
+Pre-effect evidence confirmed the exact production runtime, validated authority
+and frozen schema digest, immutable `/v2` credential entries readable under the
+Trading SID, corrected E3.7 `CreateHardLinkW` publication, absence of obsolete
+`FileLinkInfo`, a passing same-filesystem publication canary, empty capture
+output, zero durable lineage, and no provider/network operation during
+preflight.
+
+Architecture 82's stronger completion criterion is therefore satisfied. Total
+actual C3 real-provider effects are **exactly 6**, all six are consumed, call #6
+is successful and consumed, and no provider call #7 is authorized.
+
+The next product milestone is the reliable manually invoked paper cycle:
+
+```text
+verified C3 snapshot
+-> strategy
+-> proposals
+-> deterministic risk
+-> paper execution
+-> durable before/after evidence
+```
 
 ---
 
@@ -581,24 +624,22 @@ reviewed authority and cannot reuse the consumed call-#5 lineage.
 
 ---
 
-## 14. Remaining C3 / pre-unattended reviews
+## 14. Post-C3 boundaries and downstream reviews
 
-Before unattended production operation, continue review of:
+C3 is accepted, but the following downstream boundaries remain outside C3 and
+must be separately reviewed before unattended operation:
 
-- parent-verified publication/selection after the confirmed `/v2` provider effect;
-- production `close()` / concurrent admission and drain;
-- secret and transport-object lifetime;
-- artifact verification/publication TOCTOU;
-- SQL invariant mutation testing;
 - authoritative clock/calendar scheduling;
-- selected-snapshot → paper-operation bridge;
-- systematic top-level crash/fault matrix.
+- selected-snapshot to paper-operation bridge;
+- startup reconciliation, health/alerts, and stale/missing-data handling;
+- paper-operation recovery and durable before/after evidence.
 
-Native Windows authority, credential lifetime/reference version, external-effect ordering, crash/recovery ambiguity, publication/selection authority, retry semantics, and clock semantics require Sol High architecture review. Localized frozen-contract implementation may use Luna Extra High; subtle bounded implementation may use Sol Medium.
+C3 does not authorize unattended scheduling, automatic retry or recovery,
+brokerage, or paper-account mutation.
 
 ---
 
-## 15. Roadmap after successful C3 acceptance
+## 15. Next product milestone after successful C3 acceptance
 
 1. Reliable manual paper cycle — selected parent-verified snapshot → strategy → proposal → deterministic risk → paper execution → durable result.
 2. Unattended paper operation — XNYS scheduling, startup reconciliation, recovery, health/alerts, stale/missing-data handling.
@@ -656,7 +697,7 @@ docs/validation/c3-versioned-alpaca-credential-rotation.md
 docs/validation/c3-pre-first-effect-credential-staging.md
 ```
 
-Before any future provider effect, inspect the latest durable E3 lineage evidence and prove the candidate session/digest is genuinely new.
+No further provider effect is authorized. Any future change to C3 provider-effect authority requires a new reviewed milestone.
 
 ---
 

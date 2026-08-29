@@ -94,9 +94,12 @@ Optionally open one local compact report at startup:
 python -m trading_bot.gui --research-report PATH
 ```
 
-The current GUI scope is local, read-only research presentation and bounded
-variant comparison. It does not connect to production authority, credentials,
-Alpaca or other provider transport, brokerage, or paper/live execution.
+The current GUI scope is local and read-only: research exploration/comparison,
+one bounded paper-operation inspection, one explicitly supplied offline-verified
+market-snapshot view, and one explicitly supplied offline-verified paper-account
+view. It does not connect to production authority, credentials, Alpaca or other
+provider transport, brokerage, or paper/live execution, and it does not select
+operational/current artifacts or accounts.
 
 Project commands should run inside the project virtual environment. On Windows,
 you can also invoke its interpreter explicitly:

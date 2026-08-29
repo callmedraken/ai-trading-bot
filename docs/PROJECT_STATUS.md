@@ -570,19 +570,19 @@ Accepted GUI foundations include:
 - read-only comparison of two to four research variants;
 - bounded comparison tables/charts with truthful return/drawdown/turnover semantics.
 
-### GUI-A5 ΓÇö paper-operation inspection: ACCEPTED
+### GUI-A5 — paper-operation inspection: ACCEPTED
 
 Architecture 91 defines a strictly read-only GUI boundary for one exact
 paper-operation inspection result.
 
 Accepted implementation sequence:
 
-- `26833e8326f6cffef2c638543fb3174f1984e85f` ΓÇö define Architecture 91 and Qt-free paper presentation/service contracts;
-- `b3cdce458a1f884f6d25b6fa82039cc1b31e1015` ΓÇö formatting-only follow-up;
-- `bb057bc6864c4f340fa05651a4a63245ee491854` ΓÇö add the concrete Qt-free read-only paper inspection adapter;
-- `fbf8fcb8068fff394bb1b144d1fdddbf3c50e06f` ΓÇö render the bounded Paper page in Qt;
-- `86f1308dad98e763856fcf5c8504bff26804baf9` ΓÇö update the older GUI-A2 research test fixture for the expanded GUI service contract;
-- `6f1945172a6e8dad46327a0212c6bce0fac68256` ΓÇö update the older GUI-A4 comparison test fixture for the expanded GUI service contract.
+- `26833e8326f6cffef2c638543fb3174f1984e85f` — define Architecture 91 and Qt-free paper presentation/service contracts;
+- `b3cdce458a1f884f6d25b6fa82039cc1b31e1015` — formatting-only follow-up;
+- `bb057bc6864c4f340fa05651a4a63245ee491854` — add the concrete Qt-free read-only paper inspection adapter;
+- `fbf8fcb8068fff394bb1b144d1fdddbf3c50e06f` — render the bounded Paper page in Qt;
+- `86f1308dad98e763856fcf5c8504bff26804baf9` — update the older GUI-A2 research test fixture for the expanded GUI service contract;
+- `6f1945172a6e8dad46327a0212c6bce0fac68256` — update the older GUI-A4 comparison test fixture for the expanded GUI service contract.
 
 GUI-A5 accepted behavior:
 
@@ -613,7 +613,7 @@ Final GUI-A5 acceptance evidence at
 
 **GUI-A5 is fully ACCEPTED.**
 
-### GUI-A6 ΓÇö offline-verified market-snapshot inspection: ACCEPTED
+### GUI-A6 — offline-verified market-snapshot inspection: ACCEPTED
 
 Architecture 92 defines a strictly read-only Market Data presentation boundary
 for one exact local daily-snapshot artifact that has passed the existing offline
@@ -622,11 +622,11 @@ production C3-selected snapshot.
 
 Accepted checkpoint sequence:
 
-- `994fa3b6f452cb004d842aaa7f59166c6b1c4d4b` ΓÇö define Architecture 92;
-- `fd04e40cb1fa9af294e8fe1181446b66f614a715` ΓÇö add the GUI-A6 validation plan;
-- `3885e0c6e4e576e647e656401891c1a25e7c2d54` ΓÇö accepted A6a Qt-free presentation/service contract;
-- `e98b84bdb42066ef03593f3134b42dadf520f200` ΓÇö accepted A6b1 explicit-path offline verification adapter;
-- `f4015e4adefba123c7f3c1f1ee5df70158f6a9db` ΓÇö accepted A6b2 native Qt Market Data rendering source.
+- `994fa3b6f452cb004d842aaa7f59166c6b1c4d4b` — define Architecture 92;
+- `fd04e40cb1fa9af294e8fe1181446b66f614a715` — add the GUI-A6 validation plan;
+- `3885e0c6e4e576e647e656401891c1a25e7c2d54` — accepted A6a Qt-free presentation/service contract;
+- `e98b84bdb42066ef03593f3134b42dadf520f200` — accepted A6b1 explicit-path offline verification adapter;
+- `f4015e4adefba123c7f3c1f1ee5df70158f6a9db` — accepted A6b2 native Qt Market Data rendering source.
 
 GUI-A6 accepted behavior:
 
@@ -662,7 +662,7 @@ Final GUI-A6 acceptance evidence at
 
 **GUI-A6 is fully ACCEPTED.**
 
-### GUI-A7 ΓÇö offline-verified paper-account state: ACCEPTED
+### GUI-A7 — offline-verified paper-account state: ACCEPTED
 
 Architecture 93 defines a common, strictly read-only presentation boundary for one explicitly supplied, completely offline-verified simulated paper-account checkpoint. The page does not identify the operationally current account, select a latest checkpoint, or add an operational account-selection boundary. The GUI-A7 validation plan is the frozen contract at the validation checkpoint below.
 

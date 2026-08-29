@@ -9,12 +9,14 @@ import pytest
 from tests.experiments.test_historical import _Factory, _request, _variant
 
 from trading_bot.cli import historical_experiment
+from trading_bot.cli import historical_experiment_report_serialization as serialization
 from trading_bot.cli.exceptions import HistoricalExperimentReportOutputError
 from trading_bot.cli.historical_experiment_report_serialization import (
     _METRIC_FIELDS,
     COMPACT_EXPERIMENT_REPORT_CSV_HEADER,
     COMPACT_EXPERIMENT_REPORT_SCHEMA_VERSION,
     build_compact_report_json,
+    deserialize_compact_report_json,
     serialize_compact_report_csv,
     serialize_compact_report_json,
 )
@@ -178,3 +180,49 @@ def test_csv_standard_dialect_round_trips_special_variant_text() -> None:
     report = HistoricalExperimentReportBuilder().build(result)
     rows = list(csv.DictReader(io.StringIO(serialize_compact_report_csv(report))))
     assert rows[0]["variant_name"] == name
+
+
+def test_deserializer_rejects_extreme_exponent_before_fixed_point_expansion(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    payload = (
+        FIXTURES / "historical-experiment-compact-report-v1-compact.json"
+    ).read_text(encoding="utf-8")
+    payload = payload.replace(
+        '"simulation_return":"0"',
+        '"simulation_return":"1e-100000000"',
+        1,
+    )
+
+    original_decimal = serialization._decimal
+
+    def _guard_fixed_point_expansion(value):  # type: ignore[no-untyped-def]
+        if value.as_tuple().exponent < -1_000_000:
+            raise AssertionError(f"fixed-point expansion attempted for {value!r}")
+        return original_decimal(value)
+
+    monkeypatch.setattr(serialization, "_decimal", _guard_fixed_point_expansion)
+
+    with pytest.raises(HistoricalExperimentReportOutputError):
+        deserialize_compact_report_json(payload)
+
+
+def test_deserializer_rejects_duplicate_object_names() -> None:
+    payload = (
+        FIXTURES / "historical-experiment-compact-report-v1-compact.json"
+    ).read_text(encoding="utf-8")
+    payload = payload.replace(
+        ',"schema_version":1}',
+        ',"schema_version":1,"schema_version":1}',
+        1,
+    )
+
+    with pytest.raises(HistoricalExperimentReportOutputError):
+        deserialize_compact_report_json(payload)
+
+
+def test_deserializer_translates_excessive_json_nesting() -> None:
+    payload = "[" * 2_000 + "0" + "]" * 2_000
+
+    with pytest.raises(HistoricalExperimentReportOutputError):
+        deserialize_compact_report_json(payload)

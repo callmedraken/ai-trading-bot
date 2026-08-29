@@ -1,11 +1,11 @@
 # AI Trading Bot — Project Development Roadmap & Handoff
 
-**Repository:** `callmedraken/ai-trading-bot`  
+**Repository:** `callmedraken/ai-trading-bot`
 **Local repository:** `F:\AI\ai-trading-bot`
-**Integration branch:** `develop`  
-**Current architecture branch:** `feature/windows-effectful-market-data-capture`  
-**Current release-source checkpoint:** `82ba29ae2c2cc6bb3544077db0ee21868e6d5693`
-**Handoff status:** August 29, 2026 — C3 is FULLY COMPLETE / ACCEPTED at final source head `82ba29ae2c2cc6bb3544077db0ee21868e6d5693` after controlled production call #6; call #5 remains permanently consumed as `FAILED / CONFIRMED` after parent artifact publication failed; call #6 is `SUCCEEDED / CONFIRMED` and `SUCCESS_SELECTED`; `/v2` is immutable historical credential-reference state; parallel GUI work remains separate from C3
+**Integration branch:** `develop`
+**Current integration baseline:** `develop` (C3 + GUI-A7; next milestone branch not yet created)
+**C3 production release-source checkpoint:** `82ba29ae2c2cc6bb3544077db0ee21868e6d5693`
+**Handoff status:** August 29, 2026 — C3 is FULLY COMPLETE / ACCEPTED at production source head `82ba29ae2c2cc6bb3544077db0ee21868e6d5693`, with C3 closeout head `70b424491070b43fcae4bcea20565c79216989c4`; call #6 is `SUCCEEDED / CONFIRMED` and `SUCCESS_SELECTED`; all six C3 provider effects are consumed and no call #7 is authorized; `/v2` remains immutable historical credential-reference state; GUI through A7 is FULLY ACCEPTED and integrated, with accepted semantic GUI head `7fb2e0b014938215e9ab4fbdb1cddde2651fad92` and GUI closeout/reference-correction head `5c1944d19416d0fdd6c4ff681e2ebda01d83ead4`; the next product milestone is the reliable manually invoked paper cycle; production/live trading remains NO-GO
 
 > The Git-tracked `docs/AI_TRADING_BOT_HANDOFF.md` is the canonical handoff. Uploaded Project copies are mirrors only. Documentation closeout creates later docs-only commits, so always verify the live branch and use the release-source SHA above for artifact work.
 
@@ -636,6 +636,27 @@ must be separately reviewed before unattended operation:
 
 C3 does not authorize unattended scheduling, automatic retry or recovery,
 brokerage, or paper-account mutation.
+
+---
+
+## Integrated GUI baseline — GUI-A7 ACCEPTED
+
+GUI-A1 through GUI-A7 are fully accepted and integrated into this combined
+source tree. The accepted GUI semantic source head is
+`7fb2e0b014938215e9ab4fbdb1cddde2651fad92`; the final GUI
+documentation/reference-correction head is
+`5c1944d19416d0fdd6c4ff681e2ebda01d83ead4`.
+
+Accepted read-only GUI capabilities include research exploration/comparison,
+one exact paper-operation inspection, one explicit offline-verified daily
+snapshot inspection, and one explicitly supplied offline-verified paper-account
+checkpoint presentation. The final GUI-A7 semantic source tree passed 2,928
+tests with 13 expected skips, plus Ruff, formatting, diff, and visual gates.
+
+This integration does not grant the GUI production authority or paper-account
+mutation authority. It adds no capture, execute, retry, resume, recover,
+credential, brokerage, production-SQLite, latest-selection, or artifact-mutation
+control. No GUI-A8 architecture is selected by this integration.
 
 ---
 

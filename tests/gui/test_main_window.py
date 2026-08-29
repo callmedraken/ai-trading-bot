@@ -14,9 +14,11 @@ from PySide6.QtWidgets import QApplication, QLabel
 from trading_bot.gui import (
     ApplicationOverview,
     MarketDataPageState,
+    PaperAccountPageState,
     PaperPageState,
     ResearchPageState,
     unavailable_market_data_state,
+    unavailable_paper_account_state,
     unavailable_paper_state,
 )
 from trading_bot.gui.main_window import PAGE_IDS, MainWindow
@@ -55,6 +57,10 @@ class _RecordingService:
         self.calls += 1
         return unavailable_market_data_state()
 
+    def get_paper_account_state(self) -> PaperAccountPageState:
+        self.calls += 1
+        return unavailable_paper_account_state()
+
 
 def _application() -> QApplication:
     existing = QApplication.instance()
@@ -71,7 +77,7 @@ def test_main_window_has_stable_pages_and_navigation_is_presentation_only() -> N
     assert application.applicationName() is not None
     assert window.page_ids == PAGE_IDS
     assert window.current_page_id == "home"
-    assert service.calls == 4
+    assert service.calls == 5
 
     window.select_page("paper")
     assert window.current_page_id == "paper"
@@ -80,7 +86,7 @@ def test_main_window_has_stable_pages_and_navigation_is_presentation_only() -> N
     window.select_page("paper")
 
     assert window.current_page_id == "paper"
-    assert service.calls == 4
+    assert service.calls == 5
     window.close()
 
 

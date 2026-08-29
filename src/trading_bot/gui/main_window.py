@@ -21,11 +21,12 @@ from trading_bot.gui.models import (
     OperatingMode,
     PresentationStatus,
 )
+from trading_bot.gui.paper_account_page import PaperAccountPage
 from trading_bot.gui.paper_page import PaperPage
 from trading_bot.gui.research_page import ResearchPage
 from trading_bot.gui.services import GuiApplicationService
 
-PAGE_IDS = ("home", "research", "paper", "market-data", "system")
+PAGE_IDS = ("home", "research", "paper", "paper-account", "market-data", "system")
 
 _MODE_LABELS = {
     OperatingMode.RESEARCH: "Research",
@@ -57,6 +58,7 @@ class MainWindow(QMainWindow):
         self._overview = service.get_overview()
         research_state = service.get_research_state()
         paper_state = service.get_paper_state()
+        paper_account_state = service.get_paper_account_state()
         market_data_state = service.get_market_data_state()
         self._page_index = {page_id: index for index, page_id in enumerate(PAGE_IDS)}
 
@@ -78,6 +80,8 @@ class MainWindow(QMainWindow):
         self._stack.addWidget(self._research_page)
         self._paper_page = PaperPage(paper_state, self)
         self._stack.addWidget(self._paper_page)
+        self._paper_account_page = PaperAccountPage(paper_account_state, self)
+        self._stack.addWidget(self._paper_account_page)
         self._market_data_page = MarketDataPage(market_data_state, self)
         self._stack.addWidget(self._market_data_page)
         self._stack.addWidget(self._build_system_page(self._overview))
@@ -119,6 +123,7 @@ class MainWindow(QMainWindow):
             "home": "Overview",
             "research": "Research",
             "paper": "Paper",
+            "paper-account": "Paper Account",
             "market-data": "Market Data",
             "system": "System",
         }
@@ -310,6 +315,51 @@ class MainWindow(QMainWindow):
                 background: #182235;
                 border: 1px solid #2a3950;
                 border-radius: 8px;
+            }
+            QLabel#paperAccountStatus[status="verified"] {
+                color: #86efac;
+                font-weight: 700;
+            }
+            QLabel#paperAccountStatus[status="unavailable"] {
+                color: #fbbf24;
+                font-weight: 700;
+            }
+            QLabel#paperAccountMessage, QLabel#paperAccountScopeNotice {
+                color: #aebbd0;
+            }
+            QLabel#paperAccountFieldLabel {
+                color: #94a3b8;
+                font-weight: 600;
+            }
+            QLabel#paperAccountCheckpointKind,
+            QLabel#paperAccountSequence,
+            QLabel#paperAccountCheckpointId,
+            QLabel#paperAccountLineageId,
+            QLabel#paperAccountAccountStateId,
+            QLabel#paperAccountCompactStateId,
+            QLabel#paperAccountAsOf,
+            QLabel#paperAccountCash,
+            QLabel#paperAccountRealizedProfitLoss,
+            QLabel#paperAccountArtifactSha256,
+            QLabel#paperAccountArtifactByteLength {
+                color: #e5e7eb;
+            }
+            QFrame#paperAccountDetailPanel {
+                background: #182235;
+                border: 1px solid #2a3950;
+                border-radius: 8px;
+            }
+            QTableWidget#paperAccountPositionsTable {
+                background: #111827;
+                alternate-background-color: #162033;
+                color: #e5e7eb;
+                gridline-color: #2a3950;
+                border: 1px solid #2a3950;
+                selection-background-color: #25344a;
+                selection-color: #f9fafb;
+            }
+            QTableWidget#paperAccountPositionsTable::item {
+                padding: 6px;
             }
             QLabel#marketDataStatus[status="verified"] {
                 color: #86efac;

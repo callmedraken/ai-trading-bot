@@ -20,6 +20,10 @@ from trading_bot.gui import (
 from trading_bot.gui.main_window import MainWindow
 from trading_bot.gui.mock_service import MockGuiApplicationService
 from trading_bot.gui.models import ResearchPageState
+from trading_bot.gui.paper_account_models import (
+    PaperAccountPageState,
+    unavailable_paper_account_state,
+)
 from trading_bot.gui.paper_models import PaperPageState, unavailable_paper_state
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -50,6 +54,9 @@ class _GuiA2RecordingService:
 
     def get_market_data_state(self) -> MarketDataPageState:
         return unavailable_market_data_state()
+
+    def get_paper_account_state(self) -> PaperAccountPageState:
+        return unavailable_paper_account_state()
 
 
 def _application() -> QApplication:

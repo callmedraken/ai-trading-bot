@@ -8,11 +8,36 @@ Build a conservative automated trading platform that can progress safely from de
 
 **Production/live trading: NO-GO.** Live trading remains unavailable until separately reviewed safety, credential, brokerage, reconciliation, operator-control, and acceptance gates are complete.
 
-## Current milestone: reliable manually invoked paper cycle
+## Current milestone: Architecture 94 reliable manual paper cycle
 
 C1 `ValidatedProductionAuthority` and C2 `WindowsTransactionalAuthority` are reviewed foundations. C3 was the reviewed bridge from C1/C2 authority into real market-data credentials, native Windows child execution, Alpaca transport, staged capture, independent parent verification, publication, and snapshot selection.
 
 C3 is **FULLY COMPLETE / ACCEPTED** at final source head `82ba29ae2c2cc6bb3544077db0ee21868e6d5693`. Controlled production acceptance proved the complete Architecture 82 authority/effect/verification/selection chain. The next product milestone is the reliable manually invoked paper cycle, which consumes the selected verified C3 snapshot without changing C3 authority.
+
+Architecture 94 reliable manual paper-cycle authority is **FROZEN / ACCEPTED**
+at accepted documentation checkpoint
+`1b941ed708b8008a888bfb2f61b112213ae4970e` on branch
+`feature/reliable-manual-paper-cycle`, in local paper worktree
+`F:\AI\ai-trading-bot-paper`.
+
+The next implementation stage is **P1: pure strategy history and deterministic
+strategy plan**. P1 adds no production authority, provider access, broker access,
+paper-account mutation, or durable operational mutation. P1 uses an explicit
+offline strategy-history seed because the selected C3 snapshot contains one
+completed daily bar per symbol, while `MovingAverageCrossoverStrategy` requires
+`long_window + 1` bars. Existing planner/proposal/risk, paper-runtime,
+checkpoint/lineage, and Architecture-67 transition boundaries are reused rather
+than replaced.
+
+Later Architecture 94 stages are **P2** read-only selected-C3 authority,
+**P3** paper-account authority, **P4** authority/composition join, **P5** manual
+CLI, and **P6** acceptance/certification.
+
+All six C3 real-provider effects remain consumed. No provider call #7 is
+authorized. Call #5 remains `FAILED / CONFIRMED` and permanently consumed. Call
+#6 remains `SUCCEEDED / CONFIRMED` and `SUCCESS_SELECTED` and must not be rerun.
+`/v2` Alpaca credential references remain immutable historical state.
+Production/live trading remains **NO-GO**. No GUI-A8 architecture is selected.
 
 Completed C3 foundations include:
 
@@ -817,15 +842,27 @@ reviewed and does not mutate C3 authority or paper-account state in this
 closeout.
 
 ---
-## Roadmap after C3
+## Architecture 94 implementation stages
 
-1. **Reliable manual paper cycle** — selected parent-verified snapshot -> strategy -> proposals -> deterministic risk -> paper execution -> durable evidence.
-2. **Unattended paper operation** — authoritative scheduling, startup reconciliation, crash recovery, health/alerts, stale/missing-data fail-closed behavior.
-3. **Long paper soak** — extended unattended operation to expose real operational problems while consequences remain simulated.
-4. **Broker-paper integration** — account/position reads, submit/cancel/replace, broker/fill IDs, partial fills/rejects, reconciliation, idempotency, ambiguous-submit recovery.
-5. **Live-readiness certification** — explicit mode authority, separate live credentials, exact account verification, strict limits, kill switch, outage/halt handling, startup reconciliation, operator-visible state.
-6. **Tiny restricted live** — deliberately small long-only real-money deployment only after live-readiness acceptance.
-7. **Mature operations / deeper AI / polished GUI** — AI remains subordinate to deterministic validation, authority, risk, brokerage, reconciliation, and operator controls.
+Architecture 94 reliable manual paper-cycle authority is **FROZEN / ACCEPTED** at
+documentation checkpoint `1b941ed708b8008a888bfb2f61b112213ae4970e` on branch
+`feature/reliable-manual-paper-cycle` in local paper worktree
+`F:\AI\ai-trading-bot-paper`.
+
+1. **P1: pure strategy history and deterministic strategy plan** — explicit offline strategy-history seed; no production authority, provider access, broker access, paper-account mutation, or durable operational mutation.
+2. **P2: read-only selected-C3 authority**.
+3. **P3: paper-account authority**.
+4. **P4: authority/composition join**.
+5. **P5: manual CLI**.
+6. **P6: acceptance/certification**.
+
+The existing planner/proposal/risk, paper-runtime, checkpoint/lineage, and
+Architecture-67 transition boundaries are reused rather than replaced. All six
+C3 real-provider effects remain consumed; no provider call #7 is authorized;
+call #5 remains `FAILED / CONFIRMED` and permanently consumed; call #6 remains
+`SUCCEEDED / CONFIRMED` and `SUCCESS_SELECTED` and must not be rerun; and `/v2`
+Alpaca credential references remain immutable historical state. Production/live
+trading remains **NO-GO**, and no GUI-A8 architecture is selected.
 
 ## Stable product constraints
 

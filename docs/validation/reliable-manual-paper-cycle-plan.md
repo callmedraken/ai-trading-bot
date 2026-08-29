@@ -91,9 +91,25 @@ Cover:
 - planner proposal exactly reconciles symbol/side/desired quantity with a
   nonempty strategy signal before risk is permitted;
 - `NO_SIGNAL` produces no planner proposal;
-- Architecture-94 metadata binds plan semantic ID and plan artifact
-  SHA-256/length to the exact existing checkpointed-cycle request;
-- pure replay reconstructs that same request without running a paper cycle.
+- identical canonical request cores produce deterministic detached plan-artifact
+  binding evidence and the same reconstructed request;
+- the canonical plan binds the complete semantic checkpointed-cycle request core
+  without serializing its own artifact SHA-256 or byte length;
+- canonical plan serialization is followed by detached artifact SHA-256/byte
+  length computation and exact three-entry `architecture94.` metadata injection
+  in frozen order;
+- caller/base `architecture94.` metadata is rejected, while caller metadata
+  order and existing checkpointed-cycle reserved prefixes remain unchanged;
+- changing plan artifact bytes changes detached artifact evidence and the
+  reconstructed request, while semantic-equivalent canonical inputs remain
+  deterministic;
+- pure replay recomputes the plan ID, SHA-256, and byte length and reconstructs
+  the exact final existing checkpointed-cycle request without running a paper
+  cycle;
+- tampered plan bytes, plan ID, SHA-256, byte length, or injected metadata fail
+  closed;
+- no existing checkpointed-cycle, preparation, runtime, or Architecture-67
+  schema change is required.
 
 ### P1 focused gate
 

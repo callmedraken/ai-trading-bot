@@ -331,14 +331,16 @@ mutation. It binds, at minimum:
 - deterministic strategy context/run identity;
 - exact strategy proposal or explicit `NO_SIGNAL`;
 - derived explicit target portfolio;
-- exact existing checkpointed-cycle request;
+- complete semantic existing checkpointed-cycle request core;
 - caller idempotency key;
 - explicit next-session open-reference assertions and existing paper policies.
 
 The plan has no provider, credential, broker, scheduler, filesystem-mutation, or
 wall-clock authority. Its UUID5 semantic identity binds complete canonical
-semantic material; paths and serialized plan bytes do not define semantic
-identity.
+semantic material; paths, serialized plan bytes, artifact SHA-256, and artifact
+byte length do not define semantic identity. The plan's strategy-history,
+selected-snapshot, account, strategy, proposal/target, policy, operation, and
+request-core evidence remains pure and deterministic.
 
 ### Strategy context
 
@@ -388,11 +390,55 @@ bypass a rejection.
 ## Binding strategy evidence to the existing operation
 
 Architecture 94 preserves existing checkpointed-cycle and Architecture-67
-transition/receipt schemas where possible.
+transition/receipt schemas unchanged.
 
-The derived checkpointed-cycle request carries reserved Architecture-94 metadata
-binding the strategy-plan semantic ID and its artifact SHA-256/byte length. The
-strategy-plan verifier reconstructs the exact request and proves those values.
+The canonical `ManualPaperStrategyPlan` artifact binds the complete semantic
+checkpointed-cycle request core: every request field that does not depend on the
+plan artifact's own serialized SHA-256 or byte length, including the existing
+request ID, snapshot reference, target, ordered open references, policies,
+cycle timestamps, and caller/base metadata in its supplied order. The plan
+artifact MUST NOT serialize its own artifact SHA-256 or byte length, directly or
+indirectly. In particular, it MUST NOT serialize a final
+`CheckpointedVerifiedSnapshotPaperCycleRequest` that contains those
+self-referential values.
+
+Plan semantic identity remains UUID5 over complete canonical semantic material.
+Serialized bytes, path, artifact SHA-256, and artifact byte length do not define
+the semantic UUID. After canonical plan serialization, the exact plan artifact
+SHA-256 and byte length are computed. Only then is the final existing
+`CheckpointedVerifiedSnapshotPaperCycleRequest` deterministically derived from
+the request core.
+
+The derived final request injects exactly these Architecture-94-owned metadata
+entries, after the caller/base metadata and in this frozen order:
+
+1. `architecture94.strategy_plan_id` — canonical plan semantic UUID text;
+2. `architecture94.strategy_plan_sha256` — lowercase 64-character SHA-256 of
+   the exact canonical plan artifact bytes;
+3. `architecture94.strategy_plan_byte_length` — canonical base-10 positive byte
+   length text.
+
+Architecture 94 owns the `architecture94.` metadata namespace for this boundary.
+Caller/base request metadata using that prefix is rejected before derivation; it
+is never overwritten or reordered. The existing `checkpoint.`, `lineage.`, and
+`application.` reserved prefixes remain unchanged. The existing checkpointed
+caller metadata carrier is sufficient because its metadata is ordered and
+semantic, and Architecture 94 owns its additional namespace before constructing
+the existing request.
+
+The complete request core, its caller metadata order, and this deterministic
+three-entry injection rule are part of plan semantics. The artifact digest and
+length are detached artifact evidence, so they do not create a hash cycle.
+
+Pure verification/replay must parse and validate the canonical plan artifact,
+recompute its semantic plan ID, recompute the exact artifact SHA-256 and byte
+length, reconstruct the final checkpointed-cycle request using the frozen
+metadata injection, and prove that the reconstructed request is exactly the
+request handed to later Architecture-94 composition.
+
+No placeholder digest, fixed-point/self-hash search, digest-exclusion trick over
+partially serialized bytes, alternate semantic hash, or second mutable artifact
+is permitted.
 
 This creates an offline-provable chain:
 

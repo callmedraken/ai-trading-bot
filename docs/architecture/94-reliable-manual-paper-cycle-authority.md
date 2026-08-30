@@ -359,8 +359,7 @@ mutation. It binds, at minimum:
 - plan schema/version;
 - paper-account ID and exact verified prior terminal checkpoint evidence;
 - selected C3 selection/session/terminal/snapshot evidence;
-- selected snapshot digest plus P2-reread artifact SHA-256, byte length, and
-  identity evidence;
+- selected artifact SHA-256/byte length;
 - strategy-history seed ID/SHA-256/byte length;
 - exact moving-average strategy config;
 - deterministic strategy context/run identity;
@@ -443,6 +442,19 @@ the semantic UUID. After canonical plan serialization, the exact plan artifact
 SHA-256 and byte length are computed. Only then is the final existing
 `CheckpointedVerifiedSnapshotPaperCycleRequest` deterministically derived from
 the request core.
+
+### P1/P2 artifact-evidence boundary
+
+P1's selected artifact SHA-256 and byte length are pure, non-authorizing
+assertions bound into the `ManualPaperStrategyPlan`. The plan does not bind
+`artifact_identity_sha256`, `C3ArtifactIdentityEvidence`, native file identity,
+filesystem facts, or any P2 permit or authority object. P2 independently proves
+the authoritative selected C3 artifact from durable selection/terminal state,
+safe reread, and the terminal `artifact_identity_sha256` commitment. P4 later
+exact-compares the P1 selected-C3 assertion with P2's independently proven
+selected-C3 audit evidence. P2 artifact-identity evidence is not part of P1
+strategy economics or P1 authority. This clarification does not change accepted
+P1 source or identity semantics.
 
 The derived final request injects exactly these Architecture-94-owned metadata
 entries, after the caller/base metadata and in this frozen order:

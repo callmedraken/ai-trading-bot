@@ -5,6 +5,7 @@ import os
 from dataclasses import replace
 from datetime import UTC, date, datetime, time, timedelta
 from decimal import Decimal
+from uuid import UUID
 
 import pytest
 from tests.market_data.daily_snapshot_test_support import (
@@ -31,6 +32,7 @@ from trading_bot.runtime import (
     ARCHITECTURE94_STRATEGY_PLAN_SHA256_METADATA_KEY,
     CallerAssertedNextSessionOpenReference,
     CheckpointedVerifiedSnapshotPaperCycleRequest,
+    ManualPaperSelectedC3Assertion,
     ManualPaperStrategyPlanRequest,
     ManualPaperStrategyPlanSerializationError,
     ManualPaperStrategyPlanValidationError,
@@ -58,6 +60,9 @@ _NEXT_SESSION = TradingSession(date(2025, 1, 7))
 _SEED_SESSIONS = (date(2024, 12, 31), date(2025, 1, 2), date(2025, 1, 3))
 _SOURCE = StrategyHistorySeedSourceDescriptor("manual-plan-focused-test")
 _DEFAULT_CONFIG = MovingAverageCrossoverConfig(2, 3, Decimal("2"))
+_SELECTION_ID = UUID("10000000-0000-0000-0000-000000000001")
+_SESSION_ID = UUID("20000000-0000-0000-0000-000000000002")
+_TERMINAL_ID = UUID("30000000-0000-0000-0000-000000000003")
 
 
 def _snapshot(close: str = "12"):
@@ -93,6 +98,18 @@ def _seed_bar(session_date: date, close: str) -> DailySnapshotBar:
             price,
             100,
         ),
+    )
+
+
+def _c3_assertion(snapshot_verification) -> ManualPaperSelectedC3Assertion:
+    assert snapshot_verification.snapshot is not None
+    return ManualPaperSelectedC3Assertion(
+        _SELECTION_ID,
+        _SESSION_ID,
+        _TERMINAL_ID,
+        snapshot_verification.snapshot.snapshot_id,
+        snapshot_verification.sha256,
+        snapshot_verification.byte_length,
     )
 
 
@@ -143,6 +160,8 @@ def _request(
     selected_close: str = "12",
     config: MovingAverageCrossoverConfig = _DEFAULT_CONFIG,
     prior=None,
+    paper_account_id: str = "paper.account-1",
+    selected_c3_assertion: ManualPaperSelectedC3Assertion | None = None,
     caller_key: str = "manual-cycle-1",
     open_price: str = "12",
     policies=None,
@@ -151,8 +170,11 @@ def _request(
     filled_at: datetime = datetime(2025, 1, 7, 20, tzinfo=UTC),
     metadata: tuple[MetadataEntry, ...] = (MetadataEntry("source", "test"),),
 ) -> ManualPaperStrategyPlanRequest:
+    snapshot_verification = _snapshot(selected_close)
     return ManualPaperStrategyPlanRequest(
-        _snapshot(selected_close),
+        snapshot_verification,
+        paper_account_id,
+        selected_c3_assertion or _c3_assertion(snapshot_verification),
         prior or _prior(),
         _verified_seed(config, closes),
         config,
@@ -264,6 +286,79 @@ def test_deterministic_replay_and_nonsemantic_environment_independence(
     assert os.environ["ARCH94_IRRELEVANT_MODE"] == "different"
 
 
+def test_retains_canonical_paper_account_and_selected_c3_provenance() -> None:
+    bound = _binding()
+    parsed = parse_manual_paper_strategy_plan(bound.artifact_bytes)
+
+    assert parsed.paper_account_id == "paper.account-1"
+    assert parsed.selected_c3_assertion == _c3_assertion(_snapshot())
+    assert parsed == bound.plan
+    assert (
+        verify_manual_paper_strategy_plan(bound.artifact_bytes, calendar()).plan
+        == bound.plan
+    )
+
+
+@pytest.mark.parametrize(
+    "field", ("snapshot_id", "artifact_sha256", "artifact_byte_length")
+)
+def test_rejects_selected_c3_snapshot_evidence_mismatch(field: str) -> None:
+    request = _request()
+    mismatched = {
+        "snapshot_id": UUID("40000000-0000-0000-0000-000000000004"),
+        "artifact_sha256": "f" * 64,
+        "artifact_byte_length": request.selected_c3_assertion.artifact_byte_length + 1,
+    }
+    assertion = replace(request.selected_c3_assertion, **{field: mismatched[field]})
+
+    with pytest.raises(ManualPaperStrategyPlanValidationError, match="C3 assertion"):
+        build_manual_paper_strategy_plan(
+            replace(request, selected_c3_assertion=assertion), calendar()
+        )
+
+
+def test_provenance_changes_plan_and_request_identity_but_not_economic_result() -> None:
+    baseline_request = _request()
+    baseline = build_manual_paper_strategy_plan(baseline_request, calendar())
+    assertion = baseline_request.selected_c3_assertion
+    variants = (
+        replace(baseline_request, paper_account_id="paper.account-2"),
+        replace(
+            baseline_request,
+            selected_c3_assertion=replace(
+                assertion,
+                selection_id=UUID("50000000-0000-0000-0000-000000000005"),
+            ),
+        ),
+        replace(
+            baseline_request,
+            selected_c3_assertion=replace(
+                assertion,
+                session_id=UUID("60000000-0000-0000-0000-000000000006"),
+            ),
+        ),
+        replace(
+            baseline_request,
+            selected_c3_assertion=replace(
+                assertion,
+                terminal_id=UUID("70000000-0000-0000-0000-000000000007"),
+            ),
+        ),
+    )
+
+    for request in variants:
+        changed = build_manual_paper_strategy_plan(request, calendar())
+        assert changed.plan.plan_id != baseline.plan.plan_id
+        assert (
+            changed.checkpointed_request.request_id
+            != baseline.checkpointed_request.request_id
+        )
+        assert changed.plan.strategy_run_id == baseline.plan.strategy_run_id
+        assert changed.plan.signal_status is baseline.plan.signal_status
+        assert changed.plan.strategy_proposal == baseline.plan.strategy_proposal
+        assert changed.plan.target == baseline.plan.target
+
+
 def test_semantic_input_changes_change_plan_identity() -> None:
     baseline = _binding().plan.plan_id
     changed_policy = replace(_policies(), proposal_confidence=Decimal("0.5"))
@@ -332,6 +427,47 @@ def test_exact_reconstructed_existing_request_round_trips_unchanged_schema() -> 
         parse_checkpointed_verified_snapshot_paper_cycle_request(payload)
         == bound.checkpointed_request
     )
+
+
+def test_base_metadata_97_becomes_exact_final_100_and_round_trips() -> None:
+    from trading_bot.runtime import (
+        parse_checkpointed_verified_snapshot_paper_cycle_request,
+        serialize_checkpointed_verified_snapshot_paper_cycle_request,
+    )
+
+    base_metadata = tuple(MetadataEntry(f"key-{index}", "v") for index in range(97))
+    bound = _binding(metadata=base_metadata)
+    payload = serialize_checkpointed_verified_snapshot_paper_cycle_request(
+        bound.checkpointed_request
+    )
+
+    assert len(bound.plan.request_core.metadata) == 97
+    assert len(bound.checkpointed_request.metadata) == 100
+    assert bound.checkpointed_request.metadata[:97] == base_metadata
+    assert (
+        parse_checkpointed_verified_snapshot_paper_cycle_request(payload)
+        == bound.checkpointed_request
+    )
+
+
+def test_rejects_98_base_metadata_entries() -> None:
+    metadata = tuple(MetadataEntry(f"key-{index}", "v") for index in range(98))
+    with pytest.raises(ManualPaperStrategyPlanValidationError, match="base bounds"):
+        _request(metadata=metadata)
+
+
+@pytest.mark.parametrize(
+    "metadata",
+    (
+        (MetadataEntry("k" * 129, "v"),),
+        (MetadataEntry("key", "v" * 4097),),
+    ),
+)
+def test_rejects_oversized_base_metadata_key_or_value(
+    metadata: tuple[MetadataEntry, ...],
+) -> None:
+    with pytest.raises(ManualPaperStrategyPlanValidationError, match="base bounds"):
+        _request(metadata=metadata)
 
 
 def test_tampered_plan_id_semantic_field_and_noncanonical_bytes_fail() -> None:

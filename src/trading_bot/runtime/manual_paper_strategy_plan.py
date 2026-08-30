@@ -39,6 +39,9 @@ from trading_bot.rebalancing import (
     RebalanceStatus,
 )
 from trading_bot.runtime.checkpointed_paper_cycle_report import (
+    MAX_CHECKPOINTED_PAPER_CYCLE_REPORT_METADATA,
+    MAX_CHECKPOINTED_PAPER_CYCLE_REPORT_METADATA_KEY_CHARACTERS,
+    MAX_CHECKPOINTED_PAPER_CYCLE_REPORT_METADATA_VALUE_CHARACTERS,
     parse_checkpointed_verified_snapshot_paper_cycle_request,
     serialize_checkpointed_verified_snapshot_paper_cycle_request,
 )
@@ -86,6 +89,7 @@ MANUAL_PAPER_CHECKPOINTED_REQUEST_NAMESPACE = UUID(
 MANUAL_PAPER_TARGET_NAMESPACE = UUID("b10973fa-2ad9-57b0-8934-15cafdb0c04a")
 MAX_MANUAL_PAPER_STRATEGY_PLAN_BYTES = 8 * 1024 * 1024
 MAX_MANUAL_PAPER_IDEMPOTENCY_KEY_CHARACTERS = 256
+MAX_MANUAL_PAPER_BASE_METADATA = MAX_CHECKPOINTED_PAPER_CYCLE_REPORT_METADATA - 3
 
 ARCHITECTURE94_STRATEGY_PLAN_ID_METADATA_KEY = "architecture94.strategy_plan_id"
 ARCHITECTURE94_STRATEGY_PLAN_SHA256_METADATA_KEY = "architecture94.strategy_plan_sha256"
@@ -95,6 +99,7 @@ ARCHITECTURE94_STRATEGY_PLAN_BYTE_LENGTH_METADATA_KEY = (
 ARCHITECTURE94_METADATA_PREFIX = "architecture94."
 
 _SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
+_PAPER_ACCOUNT_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
 _ARITHMETIC_CONTEXT = Context(prec=1024, Emax=999_999, Emin=-999_999)
 _ZERO = Decimal("0")
 
@@ -102,16 +107,28 @@ _ROOT_FIELDS = frozenset(
     {
         "caller_idempotency_key",
         "history_seed_artifact_utf8",
+        "paper_account_id",
         "plan_id",
         "planner_result",
         "prior_checkpoint",
         "request_core_utf8",
         "schema",
         "selected_snapshot_artifact_utf8",
+        "selected_c3_assertion",
         "strategy_config",
         "strategy_context",
         "strategy_result",
         "target",
+    }
+)
+_SELECTED_C3_ASSERTION_FIELDS = frozenset(
+    {
+        "artifact_byte_length",
+        "artifact_sha256",
+        "selection_id",
+        "session_id",
+        "snapshot_id",
+        "terminal_id",
     }
 )
 _CONFIG_FIELDS = frozenset({"desired_quantity", "long_window", "short_window"})
@@ -253,10 +270,40 @@ class ManualPaperPriorCheckpointEvidence:
 
 
 @dataclass(frozen=True, slots=True)
+class ManualPaperSelectedC3Assertion:
+    """Pure non-authorizing provenance asserted for the selected C3 artifact."""
+
+    selection_id: UUID
+    session_id: UUID
+    terminal_id: UUID
+    snapshot_id: UUID
+    artifact_sha256: str
+    artifact_byte_length: int
+
+    def __post_init__(self) -> None:
+        for name in ("selection_id", "session_id", "terminal_id", "snapshot_id"):
+            if type(getattr(self, name)) is not UUID:
+                raise ManualPaperStrategyPlanValidationError(
+                    f"selected C3 {name} must be an exact UUID"
+                )
+        if (
+            type(self.artifact_sha256) is not str
+            or _SHA256_PATTERN.fullmatch(self.artifact_sha256) is None
+            or type(self.artifact_byte_length) is not int
+            or self.artifact_byte_length <= 0
+        ):
+            raise ManualPaperStrategyPlanValidationError(
+                "selected C3 artifact evidence is invalid"
+            )
+
+
+@dataclass(frozen=True, slots=True)
 class ManualPaperStrategyPlanRequest:
     """Complete explicit pure inputs for one strategy plan."""
 
     snapshot_verification: DailySnapshotVerificationResult
+    paper_account_id: str
+    selected_c3_assertion: ManualPaperSelectedC3Assertion
     prior_checkpoint: VerifiedPriorCheckpoint
     history_seed: VerifiedStrategyHistorySeed
     strategy_config: MovingAverageCrossoverConfig
@@ -272,6 +319,11 @@ class ManualPaperStrategyPlanRequest:
         if type(self.snapshot_verification) is not DailySnapshotVerificationResult:
             raise ManualPaperStrategyPlanValidationError(
                 "snapshot_verification must be exact"
+            )
+        _paper_account_id(self.paper_account_id)
+        if type(self.selected_c3_assertion) is not ManualPaperSelectedC3Assertion:
+            raise ManualPaperStrategyPlanValidationError(
+                "selected_c3_assertion must be exact non-authorizing evidence"
             )
         if type(self.prior_checkpoint) is not VerifiedPriorCheckpoint:
             raise ManualPaperStrategyPlanValidationError(
@@ -314,6 +366,8 @@ class ManualPaperStrategyPlan:
     plan_id: UUID
     selected_snapshot_artifact: bytes
     history_seed_artifact: bytes
+    paper_account_id: str
+    selected_c3_assertion: ManualPaperSelectedC3Assertion
     prior_checkpoint: ManualPaperPriorCheckpointEvidence
     strategy_config: MovingAverageCrossoverConfig
     caller_idempotency_key: str
@@ -340,6 +394,11 @@ class ManualPaperStrategyPlan:
                 raise ManualPaperStrategyPlanValidationError(
                     f"{name} must be nonempty exact bytes"
                 )
+        _paper_account_id(self.paper_account_id)
+        if type(self.selected_c3_assertion) is not ManualPaperSelectedC3Assertion:
+            raise ManualPaperStrategyPlanValidationError(
+                "selected C3 assertion is invalid"
+            )
         if type(self.prior_checkpoint) is not ManualPaperPriorCheckpointEvidence:
             raise ManualPaperStrategyPlanValidationError(
                 "prior_checkpoint evidence is invalid"
@@ -384,6 +443,7 @@ class ManualPaperStrategyPlan:
             raise ManualPaperStrategyPlanValidationError("planner_status is invalid")
         if type(self.request_core) is not CheckpointedVerifiedSnapshotPaperCycleRequest:
             raise ManualPaperStrategyPlanValidationError("request_core is invalid")
+        _metadata(self.request_core.metadata)
         if self.request_core.target != self.target:
             raise ManualPaperStrategyPlanValidationError(
                 "request core target does not match retained target"
@@ -485,6 +545,7 @@ def build_manual_paper_strategy_plan(
         raise ManualPaperStrategyPlanValidationError(
             "snapshot cannot be replayed under the supplied XNYS calendar"
         )
+    _require_c3_snapshot_match(request.selected_c3_assertion, replayed_snapshot)
     seed_payload = serialize_strategy_history_seed(request.history_seed.seed)
     if (
         sha256(seed_payload).hexdigest() != request.history_seed.artifact_sha256
@@ -499,6 +560,8 @@ def build_manual_paper_strategy_plan(
         snapshot_payload=snapshot_payload,
         snapshot_verification=replayed_snapshot,
         seed_payload=seed_payload,
+        paper_account_id=request.paper_account_id,
+        selected_c3_assertion=request.selected_c3_assertion,
         prior=prior,
         strategy_config=request.strategy_config,
         caller_idempotency_key=request.caller_idempotency_key,
@@ -533,6 +596,11 @@ def parse_manual_paper_strategy_plan(payload: bytes) -> ManualPaperStrategyPlan:
     context_raw = _object(root["strategy_context"], _CONTEXT_FIELDS, "strategy_context")
     strategy_raw = _object(root["strategy_result"], _RESULT_FIELDS, "strategy_result")
     planner_raw = _object(root["planner_result"], _PLANNER_FIELDS, "planner_result")
+    c3_raw = _object(
+        root["selected_c3_assertion"],
+        _SELECTED_C3_ASSERTION_FIELDS,
+        "selected_c3_assertion",
+    )
     try:
         config = MovingAverageCrossoverConfig(
             _integer(config_raw["short_window"], "strategy_config.short_window"),
@@ -551,6 +619,24 @@ def parse_manual_paper_strategy_plan(payload: bytes) -> ManualPaperStrategyPlan:
             _utf8_artifact(
                 root["history_seed_artifact_utf8"],
                 "history_seed_artifact_utf8",
+            ),
+            _paper_account_id(root["paper_account_id"]),
+            ManualPaperSelectedC3Assertion(
+                _uuid(
+                    c3_raw["selection_id"],
+                    "selected_c3_assertion.selection_id",
+                ),
+                _uuid(c3_raw["session_id"], "selected_c3_assertion.session_id"),
+                _uuid(c3_raw["terminal_id"], "selected_c3_assertion.terminal_id"),
+                _uuid(c3_raw["snapshot_id"], "selected_c3_assertion.snapshot_id"),
+                _sha(
+                    c3_raw["artifact_sha256"],
+                    "selected_c3_assertion.artifact_sha256",
+                ),
+                _positive_integer(
+                    c3_raw["artifact_byte_length"],
+                    "selected_c3_assertion.artifact_byte_length",
+                ),
             ),
             _prior(root["prior_checkpoint"]),
             config,
@@ -612,7 +698,12 @@ def verify_manual_paper_strategy_plan(
             "plan artifact byte length does not match expected detached evidence"
         )
     plan = parse_manual_paper_strategy_plan(payload)
-    replayed = _replay_plan(plan, calendar)
+    try:
+        replayed = _replay_plan(plan, calendar)
+    except ManualPaperStrategyPlanValidationError as error:
+        raise ManualPaperStrategyPlanVerificationError(
+            "retained strategy-plan evidence failed replay validation"
+        ) from error
     if replayed.plan != plan or replayed.artifact_bytes != payload:
         raise ManualPaperStrategyPlanVerificationError(
             "pure strategy-plan replay differs from retained semantic material"
@@ -651,6 +742,8 @@ def _replay_plan(
         snapshot_payload=plan.selected_snapshot_artifact,
         snapshot_verification=snapshot,
         seed_payload=plan.history_seed_artifact,
+        paper_account_id=plan.paper_account_id,
+        selected_c3_assertion=plan.selected_c3_assertion,
         prior=plan.prior_checkpoint,
         strategy_config=plan.strategy_config,
         caller_idempotency_key=plan.caller_idempotency_key,
@@ -670,6 +763,8 @@ def _build_from_evidence(
     snapshot_payload: bytes,
     snapshot_verification: DailySnapshotVerificationResult,
     seed_payload: bytes,
+    paper_account_id: str,
+    selected_c3_assertion: ManualPaperSelectedC3Assertion,
     prior: ManualPaperPriorCheckpointEvidence,
     strategy_config: MovingAverageCrossoverConfig,
     caller_idempotency_key: str,
@@ -681,6 +776,8 @@ def _build_from_evidence(
     metadata: tuple[MetadataEntry, ...],
     calendar: IdentifiedMarketCalendar,
 ) -> ManualPaperStrategyPlanArtifactBinding:
+    _paper_account_id(paper_account_id)
+    _require_c3_snapshot_match(selected_c3_assertion, snapshot_verification)
     try:
         replay = replay_verified_daily_snapshot(snapshot_verification)
     except Exception as error:
@@ -770,6 +867,8 @@ def _build_from_evidence(
     )
     request_id = _checkpointed_request_id(
         context_material,
+        paper_account_id,
+        selected_c3_assertion,
         target,
         open_reference,
         policies,
@@ -837,6 +936,8 @@ def _build_from_evidence(
     values = _PlanValues(
         snapshot_payload,
         seed_payload,
+        paper_account_id,
+        selected_c3_assertion,
         prior,
         strategy_config,
         caller_idempotency_key,
@@ -855,6 +956,8 @@ def _build_from_evidence(
         _plan_id(values),
         values.selected_snapshot_artifact,
         values.history_seed_artifact,
+        values.paper_account_id,
+        values.selected_c3_assertion,
         values.prior_checkpoint,
         values.strategy_config,
         values.caller_idempotency_key,
@@ -872,12 +975,18 @@ def _build_from_evidence(
     artifact = serialize_manual_paper_strategy_plan(built)
     digest = sha256(artifact).hexdigest()
     length = len(artifact)
+    final_request = _final_checkpointed_request(
+        built,
+        digest,
+        length,
+        error_type=ManualPaperStrategyPlanValidationError,
+    )
     return ManualPaperStrategyPlanArtifactBinding(
         built,
         artifact,
         digest,
         length,
-        _final_checkpointed_request(built, digest, length),
+        final_request,
     )
 
 
@@ -885,6 +994,8 @@ def _build_from_evidence(
 class _PlanValues:
     selected_snapshot_artifact: bytes
     history_seed_artifact: bytes
+    paper_account_id: str
+    selected_c3_assertion: ManualPaperSelectedC3Assertion
     prior_checkpoint: ManualPaperPriorCheckpointEvidence
     strategy_config: MovingAverageCrossoverConfig
     caller_idempotency_key: str
@@ -1082,6 +1193,8 @@ def _context_material(
 
 def _checkpointed_request_id(
     context_material: str,
+    paper_account_id: str,
+    selected_c3_assertion: ManualPaperSelectedC3Assertion,
     target: ExplicitQuantityTargetPortfolio,
     open_reference: CallerAssertedNextSessionOpenReference,
     policies: VerifiedSnapshotPaperCyclePolicies,
@@ -1107,6 +1220,10 @@ def _checkpointed_request_id(
         (
             MANUAL_PAPER_CHECKPOINTED_REQUEST_MATERIAL_VERSION,
             context_material,
+            paper_account_id,
+            _canonical_json_bytes(
+                _selected_c3_assertion_tree(selected_c3_assertion)
+            ).decode("utf-8"),
             serialize_checkpointed_verified_snapshot_paper_cycle_request(
                 provisional
             ).decode("utf-8"),
@@ -1131,15 +1248,16 @@ def _final_checkpointed_request(
     plan: ManualPaperStrategyPlan,
     artifact_sha256: str,
     artifact_byte_length: int,
+    *,
+    error_type: type[
+        ManualPaperStrategyPlanValidationError
+        | ManualPaperStrategyPlanVerificationError
+    ] = ManualPaperStrategyPlanVerificationError,
 ) -> CheckpointedVerifiedSnapshotPaperCycleRequest:
     if _SHA256_PATTERN.fullmatch(artifact_sha256) is None:
-        raise ManualPaperStrategyPlanVerificationError(
-            "plan artifact SHA-256 is invalid"
-        )
+        raise error_type("plan artifact SHA-256 is invalid")
     if type(artifact_byte_length) is not int or artifact_byte_length <= 0:
-        raise ManualPaperStrategyPlanVerificationError(
-            "plan artifact byte length must be positive"
-        )
+        raise error_type("plan artifact byte length must be positive")
     core = plan.request_core
     metadata = core.metadata + (
         MetadataEntry(ARCHITECTURE94_STRATEGY_PLAN_ID_METADATA_KEY, str(plan.plan_id)),
@@ -1151,17 +1269,29 @@ def _final_checkpointed_request(
             str(artifact_byte_length),
         ),
     )
-    return CheckpointedVerifiedSnapshotPaperCycleRequest(
-        core.request_id,
-        core.snapshot_reference,
-        core.target,
-        core.open_references,
-        core.policies,
-        core.planning_at,
-        core.submitted_at,
-        core.filled_at,
-        metadata,
-    )
+    try:
+        request = CheckpointedVerifiedSnapshotPaperCycleRequest(
+            core.request_id,
+            core.snapshot_reference,
+            core.target,
+            core.open_references,
+            core.policies,
+            core.planning_at,
+            core.submitted_at,
+            core.filled_at,
+            metadata,
+        )
+        payload = serialize_checkpointed_verified_snapshot_paper_cycle_request(request)
+        parsed = parse_checkpointed_verified_snapshot_paper_cycle_request(payload)
+    except Exception as error:
+        raise error_type(
+            "final checkpointed request is incompatible with the existing schema"
+        ) from error
+    if parsed != request:
+        raise error_type(
+            "final checkpointed request does not round-trip through the existing schema"
+        )
+    return request
 
 
 def _plan_tree(
@@ -1172,6 +1302,7 @@ def _plan_tree(
     tree: dict[str, object] = {
         "caller_idempotency_key": plan.caller_idempotency_key,
         "history_seed_artifact_utf8": plan.history_seed_artifact.decode("utf-8"),
+        "paper_account_id": plan.paper_account_id,
         "planner_result": {
             "plan_id": str(plan.planner_plan_id),
             "proposal": _proposal_tree(plan.planner_proposal),
@@ -1187,6 +1318,9 @@ def _plan_tree(
         "schema": MANUAL_PAPER_STRATEGY_PLAN_SCHEMA,
         "selected_snapshot_artifact_utf8": (
             plan.selected_snapshot_artifact.decode("utf-8")
+        ),
+        "selected_c3_assertion": _selected_c3_assertion_tree(
+            plan.selected_c3_assertion
         ),
         "strategy_config": {
             "desired_quantity": canonical_decimal(
@@ -1212,6 +1346,19 @@ def _plan_tree(
             )
         tree["plan_id"] = str(plan.plan_id)
     return tree
+
+
+def _selected_c3_assertion_tree(
+    assertion: ManualPaperSelectedC3Assertion,
+) -> dict[str, object]:
+    return {
+        "artifact_byte_length": assertion.artifact_byte_length,
+        "artifact_sha256": assertion.artifact_sha256,
+        "selection_id": str(assertion.selection_id),
+        "session_id": str(assertion.session_id),
+        "snapshot_id": str(assertion.snapshot_id),
+        "terminal_id": str(assertion.terminal_id),
+    }
 
 
 def _prior_tree(prior: ManualPaperPriorCheckpointEvidence) -> dict[str, object]:
@@ -1610,11 +1757,49 @@ def _metadata(value: object) -> tuple[MetadataEntry, ...]:
         raise ManualPaperStrategyPlanValidationError(
             "metadata must contain exact MetadataEntry values"
         )
-    if len(items) > 256 or len({item.key for item in items}) != len(items):
+    if (
+        len(items) > MAX_MANUAL_PAPER_BASE_METADATA
+        or len({item.key for item in items}) != len(items)
+        or any(
+            len(item.key) > MAX_CHECKPOINTED_PAPER_CYCLE_REPORT_METADATA_KEY_CHARACTERS
+            or len(item.value)
+            > MAX_CHECKPOINTED_PAPER_CYCLE_REPORT_METADATA_VALUE_CHARACTERS
+            for item in items
+        )
+    ):
         raise ManualPaperStrategyPlanValidationError(
-            "metadata exceeds bound or contains duplicate keys"
+            "metadata exceeds the P1 base bounds or contains duplicate keys"
         )
     return items
+
+
+def _paper_account_id(value: object) -> str:
+    if type(value) is not str or _PAPER_ACCOUNT_ID_PATTERN.fullmatch(value) is None:
+        raise ManualPaperStrategyPlanValidationError(
+            "paper_account_id must be 1..128 canonical ASCII characters"
+        )
+    return value
+
+
+def _require_c3_snapshot_match(
+    assertion: object,
+    verification: DailySnapshotVerificationResult,
+) -> None:
+    if type(assertion) is not ManualPaperSelectedC3Assertion:
+        raise ManualPaperStrategyPlanValidationError(
+            "selected_c3_assertion must be exact non-authorizing evidence"
+        )
+    if (
+        verification.status is not DailySnapshotVerificationStatus.PASS
+        or verification.snapshot is None
+        or verification.diagnostics
+        or assertion.snapshot_id != verification.snapshot.snapshot_id
+        or assertion.artifact_sha256 != verification.sha256
+        or assertion.artifact_byte_length != verification.byte_length
+    ):
+        raise ManualPaperStrategyPlanValidationError(
+            "selected C3 assertion does not match the complete PASS snapshot"
+        )
 
 
 def _idempotency_key(value: object) -> str:

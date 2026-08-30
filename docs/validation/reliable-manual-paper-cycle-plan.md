@@ -150,6 +150,9 @@ Using disposable validated authority databases, cover:
 - exactly one matching `session_selections` row;
 - exact selection/session/terminal linkage;
 - exact terminal/selection snapshot-digest agreement;
+- no independently stored selection or terminal artifact byte-length claim is
+  required; the selection commitment is its exact terminal binding plus copied
+  `snapshot_digest`;
 - absent selection;
 - wrong session/attempt state;
 - failed/ambiguous terminal;
@@ -164,12 +167,21 @@ Using disposable validated authority databases, cover:
 Cover:
 
 - explicit transport path must remain beneath fixed capture-output root;
+- exact canonical final filename/path is required;
 - safe regular-file/reparse/device/identity protections;
 - bounded read;
-- SHA mismatch;
+- selection/terminal snapshot-digest mismatch;
+- malformed or mismatched terminal `artifact_sha256`;
+- malformed or mismatched terminal `artifact_identity_sha256`;
+- reread SHA mismatch;
+- reread byte-length change causes reconstructed artifact-identity mismatch;
+- native-file-identity substitution causes reconstructed artifact-identity
+  mismatch;
 - strict daily-snapshot verification failure;
 - snapshot-ID mismatch with terminal evidence;
-- exact byte-length/digest retention;
+- independently reread byte length and native identity are used to reconstruct
+  the existing C3 artifact-identity evidence; no selection/terminal byte-length
+  column is introduced;
 - path substitution/race protections required by production file safety;
 - no directory scan, fallback filename, provider recovery, or network access.
 
@@ -186,6 +198,10 @@ artifact byte length: 1291
 terminal: SUCCEEDED / CONFIRMED
 session/attempt: SUCCESS_SELECTED
 ```
+
+The displayed artifact byte length is the independently reread fact used to
+reconstruct and verify C3 artifact-identity evidence; it is not a separately
+stored `session_selections` or `terminals` claim.
 
 The command must prove an equivalent of `PROVIDER_CALL_PERFORMED=False` from the
 Architecture-94 surface and must not invoke the production capture CLI.

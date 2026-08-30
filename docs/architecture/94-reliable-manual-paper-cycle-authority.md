@@ -178,6 +178,38 @@ Absent, duplicate, inconsistent, unsupported, malformed, or ambiguous durable
 state blocks. The service never chooses a row by newest timestamp, filename,
 directory order, UUID order, or SQLite row order.
 
+### Artifact commitment and identity evidence
+
+`session_selections` has no independent artifact byte-length claim. Its artifact
+commitment is the exact selection row, its exact terminal binding, and its copied
+`snapshot_digest`. P2 therefore does not compare the selection or terminal with
+a separately stored selection/terminal byte length. The terminal's durable C3
+evidence likewise does not require a separate artifact byte-length column.
+
+For a successful C3 terminal, the canonical terminal evidence retains the
+snapshot ID, `artifact_sha256`, and `artifact_identity_sha256`. C3 v1 fixes the
+published final filename to
+`daily-market-data-snapshot-<snapshot-id>.json` below the fixed C1
+capture-output root. The existing `C3ArtifactIdentityEvidence` commits the
+snapshot ID, final canonical filename, artifact SHA-256, artifact byte length,
+and native file identity. Its canonical evidence object is not stored in
+SQLite; the durable terminal `artifact_identity_sha256` commits all of those
+fields, including the byte length.
+
+P2 safely opens the exact candidate final object beneath the fixed root,
+performs a bounded reread, obtains its native file identity, computes its exact
+SHA-256 and byte length, and reconstructs the existing C3 artifact-identity
+evidence. The reconstructed identity digest must exactly equal the durable
+terminal `artifact_identity_sha256`; P2 compares the digest and never attempts
+to invert it. The reread SHA-256 must also equal the terminal and selection
+`snapshot_digest`, and strict daily-snapshot verification must pass with a
+matching snapshot ID. The reread length and current file identity are inputs to
+that verification, not an alternate source of authority.
+
+No C3 schema or evidence migration is required, and no accepted C1/C2/C3
+behavior changes. The Architecture-94 artifact path remains transport only:
+it cannot create authority, select another artifact, or supply a fallback.
+
 ### Published artifact reconciliation
 
 The plan may contain one explicit artifact path as a transport hint. The path
@@ -193,7 +225,9 @@ The reread bytes must satisfy all of:
 - SHA-256 equals the durable selected terminal snapshot digest;
 - strict `verify_daily_snapshot(...)` returns complete PASS;
 - parsed snapshot ID equals the terminal evidence snapshot ID;
-- byte length and digest are retained as exact artifact evidence.
+- the reread byte length and native file identity reconstruct the existing
+  canonical C3 artifact-identity evidence and its digest matches terminal
+  evidence.
 
 There is no directory scan or fallback path in v1.
 
@@ -325,7 +359,8 @@ mutation. It binds, at minimum:
 - plan schema/version;
 - paper-account ID and exact verified prior terminal checkpoint evidence;
 - selected C3 selection/session/terminal/snapshot evidence;
-- selected artifact SHA-256/byte length;
+- selected snapshot digest plus P2-reread artifact SHA-256, byte length, and
+  identity evidence;
 - strategy-history seed ID/SHA-256/byte length;
 - exact moving-average strategy config;
 - deterministic strategy context/run identity;
@@ -513,7 +548,9 @@ A completed manual cycle must be explainable offline through:
 - paper-account ID and anchored genesis evidence;
 - prior full-lineage evidence and terminal checkpoint ID;
 - C3 selection/session/terminal/snapshot IDs;
-- selected snapshot SHA-256/byte length;
+- selected snapshot digest plus independently reread artifact SHA-256,
+  byte-length, and identity evidence (not a separate selection/terminal
+  byte-length claim);
 - strategy-history seed ID/SHA-256/byte length and `OFFLINE_SEED` classification;
 - strategy config and deterministic plan ID;
 - strategy proposal or `NO_SIGNAL`;

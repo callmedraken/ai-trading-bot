@@ -219,6 +219,23 @@ class _PermitBinding:
 
 
 @dataclass(frozen=True, slots=True)
+class _SuccessfulReadBinding:
+    audit_ref: weakref.ReferenceType[SelectedC3SnapshotAuditEvidence]
+    core_ref: weakref.ReferenceType[object]
+    reader_ref: weakref.ReferenceType[object]
+    registration: _ReadCoreRegistration
+
+
+class _SuccessfulReadIssuance:
+    """Opaque one-shot proof that one exact P2 audit completed verification."""
+
+    __slots__ = ("__weakref__",)
+
+    def __init__(self) -> None:
+        raise TypeError("successful P2 read issuances are created by verification")
+
+
+@dataclass(frozen=True, slots=True)
 class _ReadCoreRegistration:
     reader_ref: weakref.ReferenceType[object]
     authority: object | None
@@ -228,6 +245,9 @@ class _ReadCoreRegistration:
 _PERMIT_ISSUER = object()
 _PERMIT_REGISTRY: weakref.WeakKeyDictionary[
     SelectedC3SnapshotPermit, _PermitBinding
+] = weakref.WeakKeyDictionary()
+_SUCCESSFUL_READ_ISSUANCES: weakref.WeakKeyDictionary[
+    _SuccessfulReadIssuance, _SuccessfulReadBinding
 ] = weakref.WeakKeyDictionary()
 _PERMIT_REGISTRY_LOCK = threading.Lock()
 _DISPOSABLE_AUTHORITY_ISSUER = object()
@@ -247,6 +267,7 @@ def _issue_permit(
     audit: SelectedC3SnapshotAuditEvidence,
     *,
     core: object,
+    issuance: _SuccessfulReadIssuance | None = None,
 ) -> SelectedC3SnapshotPermit:
     with _PERMIT_REGISTRY_LOCK:
         registration = _CORE_REGISTRY.get(core)
@@ -256,6 +277,21 @@ def _issue_permit(
             )
         reader = registration.reader_ref()
         assert reader is not None
+        successful_read = (
+            _SUCCESSFUL_READ_ISSUANCES.pop(issuance, None)
+            if type(issuance) is _SuccessfulReadIssuance
+            else None
+        )
+        if (
+            successful_read is None
+            or successful_read.audit_ref() is not audit
+            or successful_read.core_ref() is not core
+            or successful_read.reader_ref() is not reader
+            or successful_read.registration is not registration
+        ):
+            raise SelectedC3SnapshotReadError(
+                "selected C3 snapshot successful-read issuance is invalid"
+            )
         permit = SelectedC3SnapshotPermit(_issuer=_PERMIT_ISSUER)
         binding = _PermitBinding(
             weakref.ref(audit),
@@ -277,7 +313,7 @@ def _registration_is_exact(
         return bool(
             type(reader) is WindowsSelectedC3SnapshotReadAuthority
             and reader._core is core
-            and reader.authority is registration.authority
+            and reader._authority is registration.authority
             and core._authority is registration.authority
             and core._production is True
         )
@@ -490,9 +526,25 @@ class _SelectedC3SnapshotReadCore:
             provider_call_disposition=durable.provider_call_disposition,
             canonical_artifact_path=candidate_path,
         )
+        issuance = object.__new__(_SuccessfulReadIssuance)
+        with _PERMIT_REGISTRY_LOCK:
+            registration = _CORE_REGISTRY.get(self)
+            if not _registration_is_exact(self, registration):
+                raise SelectedC3SnapshotReadError(
+                    "selected C3 snapshot core provenance is invalid"
+                )
+            reader = registration.reader_ref()
+            assert reader is not None
+            _SUCCESSFUL_READ_ISSUANCES[issuance] = _SuccessfulReadBinding(
+                weakref.ref(audit),
+                weakref.ref(self),
+                weakref.ref(reader),
+                registration,
+            )
         permit = _issue_permit(
             audit,
             core=self,
+            issuance=issuance,
         )
         return SelectedC3SnapshotReadResult(audit, permit, payload, verification)
 
@@ -841,7 +893,7 @@ class _DurableSelection:
 class WindowsSelectedC3SnapshotReadAuthority:
     """Sealed production P2 authority created only from genuine C1 authority."""
 
-    __slots__ = ("_core", "authority", "__weakref__")
+    __slots__ = ("_authority", "_core", "__weakref__")
 
     def __new__(
         cls, authority: ValidatedProductionAuthority
@@ -873,7 +925,7 @@ class WindowsSelectedC3SnapshotReadAuthority:
                 raise SelectedC3SnapshotReadError(
                     "approved SQLite build does not match production authority"
                 )
-            self.authority = authority
+            self._authority = authority
             core = _SelectedC3SnapshotReadCore(
                 authority=authority,
                 database_path=str(PRODUCTION_AUTHORITY_PATHS.database),

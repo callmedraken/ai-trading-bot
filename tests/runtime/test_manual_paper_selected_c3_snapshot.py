@@ -1082,6 +1082,82 @@ def test_unregistered_core_cannot_issue_production_permit_provenance(
         p2_module._issue_permit(result.audit, core=fake_core)
 
 
+def test_successful_read_issuance_cannot_be_forged_from_registered_core(
+    monkeypatch: pytest.MonkeyPatch, selected_case
+) -> None:
+    genuine = SimpleNamespace(
+        sqlite_build_manifest_digest="55" * 32,
+        authority_epoch_id=_EPOCH,
+        provider_id=_PROVIDER,
+        permitted_provider_operation=_OPERATION,
+    )
+
+    def require_genuine(value: object) -> object:
+        if value is not genuine:
+            raise WindowsAuthorityError("not genuine")
+        return value
+
+    monkeypatch.setattr(
+        p2_module, "require_validated_production_authority", require_genuine
+    )
+    monkeypatch.setattr(
+        p2_module,
+        "load_approved_sqlite_authority_build",
+        lambda: SimpleNamespace(digest=b"U" * 32, vfs="approved-test-vfs"),
+    )
+    monkeypatch.setattr(
+        p2_module,
+        "PRODUCTION_AUTHORITY_PATHS",
+        SimpleNamespace(
+            database=selected_case.database,
+            capture_output=selected_case.output,
+        ),
+    )
+    monkeypatch.setattr(
+        p2_module, "CtypesWindowsEffectfulCaptureNativeApi", lambda: selected_case.api
+    )
+    monkeypatch.setattr(
+        p2_module,
+        "open_read_only_sqlite_connection",
+        lambda database_path, *, vfs: open_disposable_read_only_sqlite_connection(
+            database_path
+        ),
+    )
+
+    def validate_connection(
+        authority: object,
+        connection: sqlite3.Connection,
+        *,
+        allow_active_transaction: bool = False,
+    ) -> object:
+        assert authority is genuine
+        assert connection.in_transaction
+        assert allow_active_transaction is True
+        validate_production_schema(connection)
+        validate_persisted_evidence_digests(connection)
+        return object()
+
+    monkeypatch.setattr(
+        p2_module,
+        "require_open_connection_matches_validated_authority",
+        validate_connection,
+    )
+    reader = WindowsSelectedC3SnapshotReadAuthority(genuine)  # type: ignore[arg-type]
+    result = reader.read_selected_snapshot(selected_case.ids["selection_id"])
+    lookalike_audit = replace(result.audit)
+    fabricated_audit = replace(
+        result.audit,
+        selection_id=UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"),
+    )
+
+    for audit in (lookalike_audit, fabricated_audit):
+        with pytest.raises(SelectedC3SnapshotReadError, match="successful-read"):
+            p2_module._issue_permit(audit, core=reader._core)
+    assert require_selected_c3_snapshot_permit(result.permit, result.audit) is (
+        result.permit
+    )
+
+
 def test_production_constructor_rejects_test_and_lookalike_authority() -> None:
     with pytest.raises(WindowsAuthorityError):
         WindowsSelectedC3SnapshotReadAuthority(object())  # type: ignore[arg-type]
@@ -1185,6 +1261,8 @@ def test_production_p2_uses_fixed_read_only_vfs_and_one_read_transaction(
     authority = WindowsSelectedC3SnapshotReadAuthority(genuine)  # type: ignore[arg-type]
     result = authority.read_selected_snapshot(selected_case.ids["selection_id"])
 
+    assert "authority" not in dir(authority)
+    assert not hasattr(authority, "authority")
     assert opens == [(str(selected_case.database), "approved-test-vfs")]
     assert validations == [(True, True)]
     assert selected_case.database.read_bytes() == before

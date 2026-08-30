@@ -112,6 +112,17 @@ from trading_bot.runtime.exceptions import (  # noqa: F401
     VerifiedSnapshotPaperCycleTemporalError,
     VerifiedSnapshotPaperCycleUniverseError,
 )
+from trading_bot.runtime.manual_paper_selected_c3_snapshot import (  # noqa: F401
+    DisposableSelectedC3SnapshotReadAuthorityForTest,
+    SelectedC3SnapshotAuditEvidence,
+    SelectedC3SnapshotPermit,
+    SelectedC3SnapshotReadError,
+    SelectedC3SnapshotReadResult,
+    WindowsSelectedC3SnapshotReadAuthority,
+    open_disposable_selected_c3_snapshot_read_authority_for_test,
+    require_disposable_selected_c3_snapshot_permit_for_test,
+    require_selected_c3_snapshot_permit,
+)
 from trading_bot.runtime.manual_paper_strategy_plan import (  # noqa: F401
     ARCHITECTURE94_METADATA_PREFIX,
     ARCHITECTURE94_STRATEGY_PLAN_BYTE_LENGTH_METADATA_KEY,
@@ -562,6 +573,20 @@ __all__.extend(
         "serialize_strategy_history_seed",
         "verify_manual_paper_strategy_plan",
         "verify_strategy_history_seed",
+    ]
+)
+
+__all__.extend(
+    [
+        "DisposableSelectedC3SnapshotReadAuthorityForTest",
+        "SelectedC3SnapshotAuditEvidence",
+        "SelectedC3SnapshotPermit",
+        "SelectedC3SnapshotReadError",
+        "SelectedC3SnapshotReadResult",
+        "WindowsSelectedC3SnapshotReadAuthority",
+        "open_disposable_selected_c3_snapshot_read_authority_for_test",
+        "require_disposable_selected_c3_snapshot_permit_for_test",
+        "require_selected_c3_snapshot_permit",
     ]
 )
 

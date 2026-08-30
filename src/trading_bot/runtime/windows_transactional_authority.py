@@ -1653,6 +1653,180 @@ def _evidence(label: str) -> tuple[bytes, bytes]:
 
 
 @dataclass(frozen=True, slots=True)
+class SuccessfulC3TerminalReadEvidence:
+    """Exact bounded fields retained from canonical successful C3 evidence."""
+
+    snapshot_id: str
+    artifact_sha256: str
+    artifact_identity_sha256: str
+
+
+def validate_selected_c3_lineage_for_read(
+    *,
+    selection_id: str,
+    session_id: str,
+    attempt_id: str,
+    attempt_ordinal: int,
+    claim_id: str,
+    reservation_id: str,
+    execution_id: str,
+    terminal_id: str,
+    provider_id: str,
+    permitted_provider_operation: str,
+    provider_call_budget: int,
+    attempt_policy_version: str,
+    claim_policy_version: str,
+    application_release_version: str,
+    authority_policy_version: str,
+    terminal_policy_version: str,
+    selection_policy_version: str,
+    allocation_evidence_json: bytes,
+    allocation_evidence_digest: bytes,
+    attempt_evidence_json: bytes,
+    attempt_evidence_digest: bytes,
+    claim_evidence_json: bytes,
+    claim_evidence_digest: bytes,
+    reservation_evidence_json: bytes,
+    reservation_evidence_digest: bytes,
+    selection_evidence_json: bytes,
+    selection_evidence_digest: bytes,
+) -> None:
+    """Validate deterministic selected-lineage identities and generic evidence.
+
+    This is a pure read helper for later reviewed consumers.  It exposes none
+    of the C2 mutation or external-effect service.
+    """
+
+    if attempt_policy_version != claim_policy_version:
+        raise ValueError("selected C3 attempt policy lineage is mismatched")
+    if provider_call_budget != 1:
+        raise ValueError("selected C3 provider-call budget is invalid")
+    expected = (
+        _attempt_id(
+            session_id,
+            attempt_ordinal,
+            provider_id,
+            permitted_provider_operation,
+            attempt_policy_version,
+        ),
+        _claim_id(
+            attempt_id,
+            claim_policy_version,
+            provider_id,
+            permitted_provider_operation,
+            provider_call_budget,
+        ),
+        _reservation_id(
+            claim_id,
+            application_release_version,
+            authority_policy_version,
+            claim_policy_version,
+        ),
+        _execution_id(
+            reservation_id,
+            application_release_version,
+            authority_policy_version,
+        ),
+        _terminal_id(reservation_id, terminal_policy_version),
+        _selection_id(session_id, terminal_id, selection_policy_version),
+    )
+    actual = (
+        attempt_id,
+        claim_id,
+        reservation_id,
+        execution_id,
+        terminal_id,
+        selection_id,
+    )
+    if actual != expected:
+        raise ValueError("selected C3 deterministic lineage identity is invalid")
+
+    pairs = (
+        (
+            allocation_evidence_json,
+            allocation_evidence_digest,
+            f"allocation:{attempt_ordinal}",
+            "attempt allocation evidence",
+        ),
+        (
+            attempt_evidence_json,
+            attempt_evidence_digest,
+            f"attempt:{attempt_ordinal}",
+            "attempt evidence",
+        ),
+        (
+            claim_evidence_json,
+            claim_evidence_digest,
+            f"claim:{attempt_id}",
+            "provider claim evidence",
+        ),
+        (
+            reservation_evidence_json,
+            reservation_evidence_digest,
+            f"reservation:{claim_id}",
+            "launch reservation evidence",
+        ),
+        (
+            selection_evidence_json,
+            selection_evidence_digest,
+            f"selection:{terminal_id}",
+            "selection evidence",
+        ),
+    )
+    for evidence_json, evidence_digest, label, evidence_field in pairs:
+        _require_evidence_pair(evidence_json, evidence_digest, field=evidence_field)
+        if evidence_json != _json({"evidence": label, "schema": 1}):
+            raise ValueError(f"{evidence_field} material is invalid")
+
+
+def validate_successful_c3_terminal_for_read(
+    connection: sqlite3.Connection,
+    *,
+    terminal_id: str,
+    terminal_state: str,
+    provider_call_disposition: str,
+    snapshot_digest: bytes,
+    evidence_json: bytes,
+    evidence_digest: bytes,
+    diagnostics_json: bytes,
+    diagnostics_digest: bytes,
+    session_id: str,
+    attempt_id: str,
+    claim_id: str,
+    reservation_id: str,
+    execution_id: str,
+    terminal_policy_version: str,
+) -> SuccessfulC3TerminalReadEvidence:
+    """Validate exact canonical successful terminal and durable cleanup evidence."""
+
+    if type(connection) is not sqlite3.Connection:
+        raise TypeError("selected C3 terminal validation requires SQLite")
+    if terminal_id != _terminal_id(reservation_id, terminal_policy_version):
+        raise ValueError("selected C3 terminal identity is invalid")
+    material = _require_c3_terminal_material(
+        (
+            terminal_state,
+            provider_call_disposition,
+            snapshot_digest,
+            evidence_json,
+            evidence_digest,
+            diagnostics_json,
+            diagnostics_digest,
+        ),
+        (session_id, attempt_id, claim_id, reservation_id, execution_id),
+    )
+    _require_c3_terminal_matches_durable_cleanup(
+        connection, execution_id, reservation_id, material[3]
+    )
+    evidence = json.loads(material[3])
+    return SuccessfulC3TerminalReadEvidence(
+        snapshot_id=evidence["snapshot_id"],
+        artifact_sha256=evidence["artifact_sha256"],
+        artifact_identity_sha256=evidence["artifact_identity_sha256"],
+    )
+
+
+@dataclass(frozen=True, slots=True)
 class ValidatedCaptureRequest:
     bar_interval: str
     child_operation_version: str

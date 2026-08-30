@@ -1364,8 +1364,15 @@ def validate_production_authority_database_connection(
     bootstrap_digest: str,
     release_manifest: ReleaseManifestEvidence,
     sqlite_build: SqliteAuthorityBuildEvidence,
+    allow_active_transaction: bool = False,
 ) -> ProductionAuthorityEvidence:
-    """Validate one already-open production connection without reopening it."""
+    """Validate one already-open production connection without reopening it.
+
+    ``allow_active_transaction`` exists for read-only consumers that must bind
+    installed-authority validation and subsequent evidence queries to one
+    consistent SQLite snapshot.  It does not relax any schema, identity,
+    integrity, build, or evidence validation.
+    """
 
     return _validate_production_authority_database_connection(
         connection,
@@ -1374,6 +1381,7 @@ def validate_production_authority_database_connection(
         bootstrap_digest=bootstrap_digest,
         release_manifest=release_manifest,
         sqlite_build=sqlite_build,
+        allow_active_transaction=allow_active_transaction,
     )
 
 

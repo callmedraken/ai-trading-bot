@@ -5,6 +5,27 @@
 Architecture 94 freezes the first reliable manually invoked paper cycle after
 accepted C3 market-data capture and GUI-A7 integration.
 
+### Implementation status — August 30, 2026
+
+The Architecture-94 contract below remains frozen. Implementation has advanced
+through the first two stages without changing that contract:
+
+```text
+P1 pure strategy history / deterministic strategy plan: ACCEPTED
+P2 read-only selected-C3 snapshot authority: FULLY ACCEPTED
+P3 fixed-root paper-account authority / anchor / graph tip / mutex: NEXT
+```
+
+Accepted P1 head is `1028e60b99c27cef0994f40d6ce381392abfb0f8`.
+Accepted P2 head is `a810122a96b6fc90da25d71eede8da64b7272c98`.
+Detailed P2 source/local/release/deployment/production evidence is recorded in
+`docs/validation/reliable-manual-paper-cycle-p2-acceptance.md`.
+
+References below to the "missing boundaries" describe the architectural gaps at
+the time of freeze; P1/P2 have now implemented the strategy-history/plan and
+selected-C3 read portions, while the operational paper-account boundary remains
+P3 work. No provider call #7 was performed or authorized by P2.
+
 The milestone composes already-reviewed deterministic strategy, proposal, risk,
 paper-execution, checkpoint, lineage-verification, and restart-safe paper
 operation boundaries without turning C3 market-data authority into trading
@@ -599,18 +620,25 @@ Architecture 94 does not authorize or design:
 Implementation begins only after Architecture 94 and its validation plan pass
 post-write review.
 
-### P1 — Pure strategy history and strategy plan
+### P1 — Pure strategy history and strategy plan — ACCEPTED
 
 Implement only canonical history-seed models/serializer/verifier, deterministic
 moving-average context, proposal-to-target bridge, and exact plan-to-existing
 request reconciliation. No authority or mutation code.
 
-### P2 — Read-only selected-C3 snapshot authority
+Accepted head: `1028e60b99c27cef0994f40d6ce381392abfb0f8`.
+
+### P2 — Read-only selected-C3 snapshot authority — FULLY ACCEPTED
 
 Implement C1-bound read-only SQLite selection validation plus safe artifact
 reread/offline verification. No C3 effect adapter or provider path.
 
-### P3 — Manual paper-account authority
+Accepted head: `a810122a96b6fc90da25d71eede8da64b7272c98`.
+Acceptance includes local regression, frozen release artifact, sealed fixed-runtime
+deployment, non-admin Trading zero-provider preflight, and supervised read-only
+accepted-call-#6 verification with no provider effect or database mutation.
+
+### P3 — Manual paper-account authority — NEXT
 
 Implement fixed root, immutable anchor, graph-derived unique tip, account mutex,
 and read-only account preflight.

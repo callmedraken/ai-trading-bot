@@ -7,6 +7,32 @@ The gates are ordered so pure/offline behavior is proven before paper-account
 mutation can be admitted. Nothing in this plan authorizes another
 Alpaca/provider effect.
 
+## Current execution status — August 30, 2026
+
+```text
+ARCHITECTURE_94_FREEZE=ACCEPTED
+P1_PURE_STRATEGY_PLAN=ACCEPTED
+P2_SELECTED_C3_READ_AUTHORITY=FULLY_ACCEPTED
+P3_MANUAL_PAPER_ACCOUNT_AUTHORITY=NEXT
+```
+
+Accepted P1 head:
+`1028e60b99c27cef0994f40d6ce381392abfb0f8`.
+
+Accepted P2 head:
+`a810122a96b6fc90da25d71eede8da64b7272c98`.
+
+P2 passed its focused/local gates, detached release-artifact verification,
+sealed fixed-runtime deployment, non-admin Trading zero-provider preflight, and
+one supervised read-only reread of the already-consumed successful C3 call #6.
+The call-#6 provider effect was not reexecuted and provider call #7 remains
+unauthorized. Detailed evidence is recorded in
+`docs/validation/reliable-manual-paper-cycle-p2-acceptance.md`.
+
+P3 crosses authority, filesystem trust, locking/concurrency, and crash/recovery
+semantics and therefore routes to Codex Sol High after ChatGPT/Sol freezes the
+bounded implementation checkpoint.
+
 ## Global gate rules
 
 - Production/live trading remains NO-GO.
@@ -24,6 +50,26 @@ Alpaca/provider effect.
 - Disposable roots/databases are explicit test seams only. Production-style
   manual paper operation remains bound to code-owned roots and validated
   authority.
+
+### Windows test-environment execution rule
+
+When pytest fails before test logic because the user-temp hierarchy is
+inaccessible, classify the run as environment-blocked until a source assertion
+proves otherwise. Use a fresh explicit `--basetemp F:\AI\pytest-...` path for
+controlled Windows gates.
+
+Historical/malformed `.pytest_cache` and pytest-temp directories are evidence and
+must not be deleted, taken over, chmodded, or casually moved merely to make a
+test execute. If a native test harness intentionally hard-codes a worktree-local
+`.pytest_cache` scratch path that `--basetemp` cannot relocate, use a previously
+validated worktree harness only after `PYTHONPATH` plus printed module
+`__file__` provenance prove the exact reviewed source worktree is under test.
+Restore the environment afterward and re-prove the reviewed worktree exact and
+clean.
+
+Windows PowerShell 5.1 operator gates must use syntax proven compatible with
+Windows PowerShell 5.1. A shell parameter/syntax failure is an operator-command
+failure, not an application regression.
 
 ## Architecture-94 post-write gate
 
@@ -119,6 +165,17 @@ planner/proposal, and risk tests. Run Ruff on changed Python/test paths and
 
 Do not run the full repository suite.
 
+Accepted P1 execution result:
+
+```text
+P1_HEAD=1028e60b99c27cef0994f40d6ce381392abfb0f8
+198 passed
+Ruff=PASS
+format=PASS
+diff checks=PASS
+P1_PURE_STRATEGY_PLAN=ACCEPTED
+```
+
 ## P2 — Read-only selected-C3 snapshot authority
 
 P2 may read production authority state only through the reviewed read-only
@@ -207,6 +264,56 @@ The command must prove an equivalent of `PROVIDER_CALL_PERFORMED=False` from the
 Architecture-94 surface and must not invoke the production capture CLI.
 
 Do not run the full repository suite.
+
+### Accepted P2 execution result
+
+P2 source/local gate:
+
+```text
+P2_HEAD=a810122a96b6fc90da25d71eede8da64b7272c98
+P2 focused tests=48 passed
+selected C2 regression cases=77 passed
+P2_SOURCE_REVIEW=PASS
+P2_LOCAL_ACCEPTANCE_GATE=PASS
+```
+
+Frozen release artifact:
+
+```text
+source tree: 51936b0af02b2a0246dc67b2e30d11a5c5e09b31
+wheel: F:\AI\p2-production-wheelhouse-v1\ai_trading_bot-0.1.0-py3-none-any.whl
+wheel bytes: 743531
+wheel SHA-256: 3b4862eb44763bead9cf0dd826645043e7de6419a182664ed780248eae6ff0c0
+package source exact match: PASS
+RECORD verification: PASS
+```
+
+The fixed runtime was proven stale before deployment, then replaced through the
+reviewed sealed offline wheel process. Installed RECORD/source reconciliation,
+frozen SQL, ownership/ACL normalization, Trading RX publication, and non-admin
+Trading zero-provider preflight all passed.
+
+Final supervised already-consumed call-#6 read:
+
+```text
+artifact_identity_sha256:
+  c23b0c5a8cd5d4808bb18e5f5165344a8013b4c29b9930dc33f74a30846978f2
+snapshot verification: PASS
+diagnostics: ()
+production permit validation: PASS
+provider call performed: False
+database mutation performed: False
+socket connect count: 0
+authority database before/after:
+  331776 bytes
+  6a8fb988d1cb223fbb66b09e8dab1e0de4b6aafd148dfdf01df08029203f4b76
+artifact before/after:
+  1291 bytes
+  31d82a31a3fbd909f8771820bf47e796a1503264fe0ac6ce0eff7ba163f0767d
+call #6 provider effect reexecuted: False
+provider call #7 performed: False
+P2=FULLY_ACCEPTED
+```
 
 ## P3 — Manual paper-account authority
 
@@ -393,7 +500,8 @@ proves no source/test change.
 - P3 fixed paper root/anchor/tip/mutex: Codex Sol High.
 - P4 authority/composition/crash-recovery join: Codex Sol High initially.
 - P5 frozen CLI plumbing/exports/localized fixtures: Luna Extra High.
-- Mechanical formatting or frozen-contract fixture cleanup: Luna Extra High.
+- Mechanical formatting, docs-only closeout, or frozen-contract fixture cleanup:
+  Luna Extra High.
 
 Codex runs focused tests/checks only during iteration and reports exact commands
 for the user's broad/final local verification. No subagents are used unless

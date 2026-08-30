@@ -180,11 +180,26 @@ class SelectedC3SnapshotReadResult:
             )
         if (
             not self.verification.passed
+            or self.verification.diagnostics != ()
             or self.verification.snapshot is None
+            or len(self.snapshot_bytes) != self.audit.artifact_byte_length
+            or hashlib.sha256(self.snapshot_bytes).hexdigest()
+            != self.audit.artifact_sha256
             or self.verification.sha256 != self.audit.artifact_sha256
             or self.verification.byte_length != self.audit.artifact_byte_length
+            or self.verification.snapshot.snapshot_id != self.audit.snapshot_id
         ):
             raise SelectedC3SnapshotReadError("P2 result evidence is inconsistent")
+        try:
+            exact_snapshot_bytes = serialize_daily_snapshot(self.verification.snapshot)
+        except BaseException as error:
+            raise SelectedC3SnapshotReadError(
+                "P2 result verified snapshot cannot be serialized"
+            ) from error
+        if exact_snapshot_bytes != self.snapshot_bytes:
+            raise SelectedC3SnapshotReadError(
+                "P2 result snapshot bytes are inconsistent"
+            )
 
 
 class _ArtifactReadApi(Protocol):
@@ -198,8 +213,16 @@ class _ArtifactReadApi(Protocol):
 @dataclass(frozen=True, slots=True)
 class _PermitBinding:
     audit_ref: weakref.ReferenceType[SelectedC3SnapshotAuditEvidence]
-    production: bool
-    authority_token: object
+    core_ref: weakref.ReferenceType[object]
+    reader_ref: weakref.ReferenceType[object]
+    registration: _ReadCoreRegistration
+
+
+@dataclass(frozen=True, slots=True)
+class _ReadCoreRegistration:
+    reader_ref: weakref.ReferenceType[object]
+    authority: object | None
+    provenance: object
 
 
 _PERMIT_ISSUER = object()
@@ -208,19 +231,84 @@ _PERMIT_REGISTRY: weakref.WeakKeyDictionary[
 ] = weakref.WeakKeyDictionary()
 _PERMIT_REGISTRY_LOCK = threading.Lock()
 _DISPOSABLE_AUTHORITY_ISSUER = object()
+_PRODUCTION_READER_CONSTRUCTOR = object()
+_PRODUCTION_READER_INITIALIZING = object()
+_PRODUCTION_CORE_PROVENANCE = object()
+_DISPOSABLE_CORE_PROVENANCE = object()
+_PRODUCTION_READER_CONSTRUCTIONS: weakref.WeakKeyDictionary[object, object] = (
+    weakref.WeakKeyDictionary()
+)
+_CORE_REGISTRY: weakref.WeakKeyDictionary[object, _ReadCoreRegistration] = (
+    weakref.WeakKeyDictionary()
+)
 
 
 def _issue_permit(
     audit: SelectedC3SnapshotAuditEvidence,
     *,
-    production: bool,
-    authority_token: object,
+    core: object,
 ) -> SelectedC3SnapshotPermit:
-    permit = SelectedC3SnapshotPermit(_issuer=_PERMIT_ISSUER)
-    binding = _PermitBinding(weakref.ref(audit), production, authority_token)
     with _PERMIT_REGISTRY_LOCK:
+        registration = _CORE_REGISTRY.get(core)
+        if not _registration_is_exact(core, registration):
+            raise SelectedC3SnapshotReadError(
+                "selected C3 snapshot core provenance is invalid"
+            )
+        reader = registration.reader_ref()
+        assert reader is not None
+        permit = SelectedC3SnapshotPermit(_issuer=_PERMIT_ISSUER)
+        binding = _PermitBinding(
+            weakref.ref(audit),
+            weakref.ref(core),
+            weakref.ref(reader),
+            registration,
+        )
         _PERMIT_REGISTRY[permit] = binding
     return permit
+
+
+def _registration_is_exact(
+    core: object, registration: _ReadCoreRegistration | None
+) -> bool:
+    if type(core) is not _SelectedC3SnapshotReadCore or registration is None:
+        return False
+    reader = registration.reader_ref()
+    if registration.provenance is _PRODUCTION_CORE_PROVENANCE:
+        return bool(
+            type(reader) is WindowsSelectedC3SnapshotReadAuthority
+            and reader._core is core
+            and reader.authority is registration.authority
+            and core._authority is registration.authority
+            and core._production is True
+        )
+    if registration.provenance is _DISPOSABLE_CORE_PROVENANCE:
+        return bool(
+            type(reader) is DisposableSelectedC3SnapshotReadAuthorityForTest
+            and reader._core is core
+            and registration.authority is None
+            and core._authority is None
+            and core._production is False
+        )
+    return False
+
+
+def _binding_is_exact(
+    binding: _PermitBinding | None,
+    audit: SelectedC3SnapshotAuditEvidence,
+    provenance: object,
+) -> bool:
+    if binding is None or binding.audit_ref() is not audit:
+        return False
+    core = binding.core_ref()
+    reader = binding.reader_ref()
+    registration = binding.registration
+    return bool(
+        core is not None
+        and reader is registration.reader_ref()
+        and registration.provenance is provenance
+        and _CORE_REGISTRY.get(core) is registration
+        and _registration_is_exact(core, registration)
+    )
 
 
 def require_selected_c3_snapshot_permit(
@@ -235,7 +323,8 @@ def require_selected_c3_snapshot_permit(
         raise SelectedC3SnapshotReadError("selected C3 snapshot audit type is invalid")
     with _PERMIT_REGISTRY_LOCK:
         binding = _PERMIT_REGISTRY.get(permit)
-    if binding is None or not binding.production or binding.audit_ref() is not audit:
+        valid = _binding_is_exact(binding, audit, _PRODUCTION_CORE_PROVENANCE)
+    if not valid:
         raise SelectedC3SnapshotReadError(
             "selected C3 snapshot permit provenance is invalid"
         )
@@ -252,7 +341,8 @@ def require_disposable_selected_c3_snapshot_permit_for_test(
         raise SelectedC3SnapshotReadError("selected C3 snapshot permit type is invalid")
     with _PERMIT_REGISTRY_LOCK:
         binding = _PERMIT_REGISTRY.get(permit)
-    if binding is None or binding.production or binding.audit_ref() is not audit:
+        valid = _binding_is_exact(binding, audit, _DISPOSABLE_CORE_PROVENANCE)
+    if not valid:
         raise SelectedC3SnapshotReadError(
             "disposable selected C3 snapshot permit provenance is invalid"
         )
@@ -264,13 +354,13 @@ class _SelectedC3SnapshotReadCore:
         "_artifact_api",
         "_authority",
         "_authority_epoch_id",
-        "_authority_token",
         "_capture_output_root",
         "_database_path",
         "_expected_operation",
         "_expected_provider",
         "_production",
         "_sqlite_vfs",
+        "__weakref__",
     )
 
     def __init__(
@@ -295,7 +385,6 @@ class _SelectedC3SnapshotReadCore:
         self._authority_epoch_id = authority_epoch_id
         self._expected_provider = expected_provider
         self._expected_operation = expected_operation
-        self._authority_token = object()
 
     def read_selected_snapshot(
         self,
@@ -403,8 +492,7 @@ class _SelectedC3SnapshotReadCore:
         )
         permit = _issue_permit(
             audit,
-            production=self._production,
-            authority_token=self._authority_token,
+            core=self,
         )
         return SelectedC3SnapshotReadResult(audit, permit, payload, verification)
 
@@ -679,6 +767,17 @@ class _SelectedC3SnapshotReadCore:
             authority_policy_version=row["authority_policy_version"],
             terminal_policy_version=row["terminal_policy_version"],
             selection_policy_version=row["selection_policy_version"],
+            machine_authority_id=row["machine_authority_id"],
+            authority_epoch_id=row["authority_epoch_id"],
+            request_json=request_payloads[0],
+            request_digest=request_digests[0],
+            process_intent_digest=row["process_intent_digest"],
+            process_creation_json=row["process_creation_json"],
+            process_creation_digest=row["process_creation_digest"],
+            job_object_json=row["job_object_json"],
+            job_object_digest=row["job_object_digest"],
+            resume_authorization_json=row["resume_authorization_json"],
+            resume_authorization_digest=row["resume_authorization_digest"],
             allocation_evidence_json=row["allocation_evidence_json"],
             allocation_evidence_digest=row["allocation_evidence_digest"],
             attempt_evidence_json=row["attempt_evidence_json"],
@@ -742,27 +841,70 @@ class _DurableSelection:
 class WindowsSelectedC3SnapshotReadAuthority:
     """Sealed production P2 authority created only from genuine C1 authority."""
 
-    __slots__ = ("_core", "authority")
+    __slots__ = ("_core", "authority", "__weakref__")
+
+    def __new__(
+        cls, authority: ValidatedProductionAuthority
+    ) -> WindowsSelectedC3SnapshotReadAuthority:
+        del authority
+        if cls is not WindowsSelectedC3SnapshotReadAuthority:
+            raise TypeError(
+                "WindowsSelectedC3SnapshotReadAuthority cannot be subclassed"
+            )
+        reader = super().__new__(cls)
+        with _PERMIT_REGISTRY_LOCK:
+            _PRODUCTION_READER_CONSTRUCTIONS[reader] = _PRODUCTION_READER_CONSTRUCTOR
+        return reader
 
     def __init__(self, authority: ValidatedProductionAuthority) -> None:
-        authority = require_validated_production_authority(authority)
-        sqlite_build = load_approved_sqlite_authority_build()
-        if sqlite_build.digest.hex() != authority.sqlite_build_manifest_digest:
-            raise SelectedC3SnapshotReadError(
-                "approved SQLite build does not match production authority"
+        with _PERMIT_REGISTRY_LOCK:
+            if (
+                _PRODUCTION_READER_CONSTRUCTIONS.get(self)
+                is not _PRODUCTION_READER_CONSTRUCTOR
+            ):
+                raise SelectedC3SnapshotReadError(
+                    "production P2 reader construction provenance is invalid"
+                )
+            _PRODUCTION_READER_CONSTRUCTIONS[self] = _PRODUCTION_READER_INITIALIZING
+        try:
+            authority = require_validated_production_authority(authority)
+            sqlite_build = load_approved_sqlite_authority_build()
+            if sqlite_build.digest.hex() != authority.sqlite_build_manifest_digest:
+                raise SelectedC3SnapshotReadError(
+                    "approved SQLite build does not match production authority"
+                )
+            self.authority = authority
+            core = _SelectedC3SnapshotReadCore(
+                authority=authority,
+                database_path=str(PRODUCTION_AUTHORITY_PATHS.database),
+                capture_output_root=str(PRODUCTION_AUTHORITY_PATHS.capture_output),
+                artifact_api=CtypesWindowsEffectfulCaptureNativeApi(),
+                production=True,
+                sqlite_vfs=sqlite_build.vfs,
+                authority_epoch_id=authority.authority_epoch_id,
+                expected_provider=authority.provider_id,
+                expected_operation=authority.permitted_provider_operation,
             )
-        self.authority = authority
-        self._core = _SelectedC3SnapshotReadCore(
-            authority=authority,
-            database_path=str(PRODUCTION_AUTHORITY_PATHS.database),
-            capture_output_root=str(PRODUCTION_AUTHORITY_PATHS.capture_output),
-            artifact_api=CtypesWindowsEffectfulCaptureNativeApi(),
-            production=True,
-            sqlite_vfs=sqlite_build.vfs,
-            authority_epoch_id=authority.authority_epoch_id,
-            expected_provider=authority.provider_id,
-            expected_operation=authority.permitted_provider_operation,
-        )
+            self._core = core
+            registration = _ReadCoreRegistration(
+                weakref.ref(self), authority, _PRODUCTION_CORE_PROVENANCE
+            )
+            with _PERMIT_REGISTRY_LOCK:
+                if (
+                    _PRODUCTION_READER_CONSTRUCTIONS.pop(self, None)
+                    is not _PRODUCTION_READER_INITIALIZING
+                ):
+                    raise SelectedC3SnapshotReadError(
+                        "production P2 reader construction provenance changed"
+                    )
+                _CORE_REGISTRY[core] = registration
+        except BaseException:
+            with _PERMIT_REGISTRY_LOCK:
+                _PRODUCTION_READER_CONSTRUCTIONS.pop(self, None)
+                core = getattr(self, "_core", None)
+                if core is not None:
+                    _CORE_REGISTRY.pop(core, None)
+            raise
 
     def __init_subclass__(cls, **kwargs: object) -> None:
         del cls, kwargs
@@ -782,7 +924,7 @@ class WindowsSelectedC3SnapshotReadAuthority:
 class DisposableSelectedC3SnapshotReadAuthorityForTest:
     """Explicit offline disposable P2 seam that never mints production provenance."""
 
-    __slots__ = ("_core",)
+    __slots__ = ("_core", "__weakref__")
 
     def __init__(self, *, _issuer: object | None = None, core: object = None) -> None:
         if _issuer is not _DISPOSABLE_AUTHORITY_ISSUER or type(core) is not (
@@ -790,6 +932,13 @@ class DisposableSelectedC3SnapshotReadAuthorityForTest:
         ):
             raise TypeError("disposable P2 authority requires the reviewed test opener")
         self._core = core
+        registration = _ReadCoreRegistration(
+            weakref.ref(self), None, _DISPOSABLE_CORE_PROVENANCE
+        )
+        with _PERMIT_REGISTRY_LOCK:
+            if core in _CORE_REGISTRY:
+                raise TypeError("disposable P2 core is already registered")
+            _CORE_REGISTRY[core] = registration
 
     def __init_subclass__(cls, **kwargs: object) -> None:
         del cls, kwargs
@@ -887,6 +1036,7 @@ SELECT
     ss.selection_evidence_digest AS selection_evidence_digest,
     s.session_id AS session_id,
     s.authority_epoch_id AS authority_epoch_id,
+    m.machine_authority_id AS machine_authority_id,
     s.session_schema AS session_schema,
     s.authority_policy_version AS authority_policy_version,
     s.claim_policy_version AS claim_policy_version,
@@ -934,6 +1084,12 @@ SELECT
     e.application_release_version AS execution_release_version,
     e.authority_policy_version AS execution_authority_policy,
     e.phase AS execution_phase,
+    e.process_creation_json AS process_creation_json,
+    e.process_creation_digest AS process_creation_digest,
+    e.job_object_json AS job_object_json,
+    e.job_object_digest AS job_object_digest,
+    e.resume_authorization_json AS resume_authorization_json,
+    e.resume_authorization_digest AS resume_authorization_digest,
     e.resume_intent_json AS resume_intent_json,
     e.resume_intent_digest AS resume_intent_digest,
     e.post_resume_json AS post_resume_json,
@@ -954,6 +1110,9 @@ SELECT
 FROM session_selections AS ss
 JOIN sessions AS s
   ON s.session_id = ss.session_id
+JOIN authority_metadata AS m
+  ON m.authority_epoch_id = s.authority_epoch_id
+ AND m.singleton_key = 1
 JOIN terminals AS t
   ON t.terminal_id = ss.terminal_id
 JOIN launch_reservations AS r

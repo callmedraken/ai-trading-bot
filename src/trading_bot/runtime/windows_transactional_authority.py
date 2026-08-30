@@ -1680,6 +1680,17 @@ def validate_selected_c3_lineage_for_read(
     authority_policy_version: str,
     terminal_policy_version: str,
     selection_policy_version: str,
+    machine_authority_id: str,
+    authority_epoch_id: str,
+    request_json: bytes,
+    request_digest: bytes,
+    process_intent_digest: bytes,
+    process_creation_json: bytes,
+    process_creation_digest: bytes,
+    job_object_json: bytes,
+    job_object_digest: bytes,
+    resume_authorization_json: bytes,
+    resume_authorization_digest: bytes,
     allocation_evidence_json: bytes,
     allocation_evidence_digest: bytes,
     attempt_evidence_json: bytes,
@@ -1691,12 +1702,29 @@ def validate_selected_c3_lineage_for_read(
     selection_evidence_json: bytes,
     selection_evidence_digest: bytes,
 ) -> None:
-    """Validate deterministic selected-lineage identities and generic evidence.
+    """Validate deterministic selected-lineage identities and canonical evidence.
 
     This is a pure read helper for later reviewed consumers.  It exposes none
     of the C2 mutation or external-effect service.
     """
 
+    request_json, request_digest, request_material = _require_canonical_c3_json_pair(
+        request_json,
+        request_digest,
+        field="selected C3 capture request",
+        byte_limit=8192,
+    )
+    request = _snapshot_capture_request(request_material)
+    if request.canonical_json() != request_json:
+        raise ValueError("selected C3 capture request is not canonical")
+    if session_id != _session_id(
+        request,
+        machine_authority_id=machine_authority_id,
+        authority_epoch_id=authority_epoch_id,
+        authority_policy_version=authority_policy_version,
+        claim_policy_version=claim_policy_version,
+    ):
+        raise ValueError("selected C3 deterministic session identity is invalid")
     if attempt_policy_version != claim_policy_version:
         raise ValueError("selected C3 attempt policy lineage is mismatched")
     if provider_call_budget != 1:
@@ -1740,6 +1768,42 @@ def validate_selected_c3_lineage_for_read(
     )
     if actual != expected:
         raise ValueError("selected C3 deterministic lineage identity is invalid")
+
+    process_evidence = (
+        process_creation_json,
+        job_object_json,
+        resume_authorization_json,
+    )
+    process_digests = (
+        process_creation_digest,
+        job_object_digest,
+        resume_authorization_digest,
+    )
+    for evidence_json, evidence_digest, evidence_field in zip(
+        process_evidence,
+        process_digests,
+        (
+            "process creation evidence",
+            "Job Object evidence",
+            "resume authorization evidence",
+        ),
+        strict=True,
+    ):
+        _require_evidence_pair(evidence_json, evidence_digest, field=evidence_field)
+    generic_process_evidence = _process_success_evidence(
+        reservation_id, process_intent_digest
+    )
+    if process_evidence != generic_process_evidence:
+        _require_production_process_success_evidence_material(
+            reservation_id=reservation_id,
+            process_intent_digest=process_intent_digest,
+            process_json=process_creation_json,
+            process_digest=process_creation_digest,
+            job_json=job_object_json,
+            job_digest=job_object_digest,
+            resume_authorization_json=resume_authorization_json,
+            resume_authorization_digest=resume_authorization_digest,
+        )
 
     pairs = (
         (
@@ -2996,18 +3060,26 @@ def _production_process_success_evidence(
     )
 
 
-def _require_production_process_success_evidence(
-    receipt: ProcessCreationReceipt,
+def _require_production_process_success_evidence_material(
+    *,
+    reservation_id: str,
+    process_intent_digest: bytes,
+    process_json: bytes,
+    process_digest: bytes,
+    job_json: bytes,
+    job_digest: bytes,
+    resume_authorization_json: bytes,
+    resume_authorization_digest: bytes,
 ) -> tuple[bytes, bytes, bytes]:
     common = {
-        "process_intent_digest": receipt.process_intent_digest.hex(),
-        "reservation_id": receipt.reservation_id,
+        "process_intent_digest": process_intent_digest.hex(),
+        "reservation_id": reservation_id,
         "schema": 1,
     }
     try:
-        process = json.loads(receipt.process_json)
-        job = json.loads(receipt.job_json)
-        resume = json.loads(receipt.resume_authorization_json)
+        process = json.loads(process_json)
+        job = json.loads(job_json)
+        resume = json.loads(resume_authorization_json)
     except (UnicodeDecodeError, json.JSONDecodeError, TypeError):
         raise ValueError("production process evidence is not canonical JSON") from None
     if (
@@ -3057,18 +3129,33 @@ def _require_production_process_success_evidence(
         raise ValueError("production resume authorization evidence is invalid")
     expected = (_json(process), _json(job), _json(resume))
     if expected != (
-        receipt.process_json,
-        receipt.job_json,
-        receipt.resume_authorization_json,
+        process_json,
+        job_json,
+        resume_authorization_json,
     ):
         raise ValueError("production process evidence is not canonical")
     if (
-        receipt.process_digest != _digest(expected[0])
-        or receipt.job_digest != _digest(expected[1])
-        or receipt.resume_authorization_digest != _digest(expected[2])
+        process_digest != _digest(expected[0])
+        or job_digest != _digest(expected[1])
+        or resume_authorization_digest != _digest(expected[2])
     ):
         raise ValueError("production process evidence digest is invalid")
     return expected
+
+
+def _require_production_process_success_evidence(
+    receipt: ProcessCreationReceipt,
+) -> tuple[bytes, bytes, bytes]:
+    return _require_production_process_success_evidence_material(
+        reservation_id=receipt.reservation_id,
+        process_intent_digest=receipt.process_intent_digest,
+        process_json=receipt.process_json,
+        process_digest=receipt.process_digest,
+        job_json=receipt.job_json,
+        job_digest=receipt.job_digest,
+        resume_authorization_json=receipt.resume_authorization_json,
+        resume_authorization_digest=receipt.resume_authorization_digest,
+    )
 
 
 def _process_failure_json(reservation_id: str, process_intent_digest: bytes) -> bytes:

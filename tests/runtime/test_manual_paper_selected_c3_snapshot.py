@@ -83,6 +83,10 @@ def _identity(label: str, *values: str) -> str:
     return str(uuid.uuid5(_NAMESPACE, material))
 
 
+def _ordered_list(values: tuple[str, ...]) -> str:
+    return _frame(str(len(values))) + "".join(_frame(value) for value in values)
+
+
 def _json(value: object) -> bytes:
     return json.dumps(
         value, ensure_ascii=False, sort_keys=True, separators=(",", ":")
@@ -226,7 +230,38 @@ def _build_database(
                 "authority-initialization/v1",
             ),
         )
-        session_id = "44444444-4444-4444-8444-444444444444"
+        request_material = {
+            "bar_interval": "1d",
+            "child_operation_version": "child/v1",
+            "ordered_universe": ["AAPL"],
+            "output_policy_version": "output/v1",
+            "permitted_provider_operation": _OPERATION,
+            "provider_id": _PROVIDER,
+            "request_limit": 1,
+            "request_window_end_date": "2026-08-27",
+            "request_window_start_date": "2026-08-01",
+            "target_session_date": "2026-08-28",
+        }
+        request_json, request_digest = _pair(request_material)
+        session_id = _identity(
+            "session_id/v2",
+            _MACHINE,
+            _EPOCH,
+            "1",
+            "authority-policy/v1",
+            "claim-policy/v1",
+            "capture_request/v2",
+            request_material["target_session_date"],
+            _PROVIDER,
+            _OPERATION,
+            _ordered_list(("AAPL",)),
+            "1d",
+            request_material["request_window_start_date"],
+            request_material["request_window_end_date"],
+            "1",
+            "child/v1",
+            "output/v1",
+        )
         attempt_id = _identity(
             "attempt_id/v2",
             session_id,
@@ -266,7 +301,6 @@ def _build_database(
         selection_id = _identity(
             "selection_id/v2", session_id, terminal_id, "1", "selection-policy/v1"
         )
-        request_json, request_digest = _pair({"request": "fixture", "schema": 2})
         connection.execute(
             """
             INSERT INTO sessions VALUES (
@@ -357,9 +391,21 @@ def _build_database(
                 _TIMESTAMP,
             ),
         )
-        process = _generic(f"process:{reservation_id}")
-        job = _generic(f"job:{reservation_id}")
-        resume_authorization = _generic(f"resume-authorization:{reservation_id}")
+        process_common = {
+            "process_intent_digest": process_intent[1].hex(),
+            "reservation_id": reservation_id,
+            "schema": 1,
+        }
+        process = _pair(
+            {**process_common, "creation_result": "SUSPENDED_CHILD_CREATED"}
+        )
+        job = _pair({**process_common, "job_object_result": "ASSIGNED"})
+        resume_authorization = _pair(
+            {
+                **process_common,
+                "resume_authorization": "SUSPENDED_THREAD_OWNED",
+            }
+        )
         resume_intent = _pair(
             {
                 "execution_id": execution_id,
@@ -563,6 +609,70 @@ def _mutate_terminal_material(database: Path, **changes: object) -> None:
     )
 
 
+def _replace_request_lineage(database: Path, material: object) -> None:
+    request_json, request_digest = _pair(material)
+    connection = sqlite3.connect(database)
+    _disable_triggers(connection)
+    try:
+        reservation_id = connection.execute(
+            "SELECT launch_reservation_id FROM launch_reservations"
+        ).fetchone()[0]
+        process_intent = _pair(
+            {
+                "authority_policy_version": "authority-policy/v1",
+                "claim_policy_version": "claim-policy/v1",
+                "launch_reservation_id": reservation_id,
+                "process_operation": "CreateProcessW",
+                "request_digest": request_digest.hex(),
+                "schema": 1,
+            }
+        )
+        process_common = {
+            "process_intent_digest": process_intent[1].hex(),
+            "reservation_id": reservation_id,
+            "schema": 1,
+        }
+        process = _pair(
+            {**process_common, "creation_result": "SUSPENDED_CHILD_CREATED"}
+        )
+        job = _pair({**process_common, "job_object_result": "ASSIGNED"})
+        resume_authorization = _pair(
+            {
+                **process_common,
+                "resume_authorization": "SUSPENDED_THREAD_OWNED",
+            }
+        )
+        connection.execute(
+            "UPDATE sessions SET request_json = ?, request_digest = ?",
+            (request_json, request_digest),
+        )
+        connection.execute(
+            "UPDATE attempts SET request_json = ?, request_digest = ?",
+            (request_json, request_digest),
+        )
+        connection.execute(
+            "UPDATE provider_call_claims SET request_json = ?, request_digest = ?",
+            (request_json, request_digest),
+        )
+        connection.execute(
+            "UPDATE launch_reservations SET request_digest = ?, "
+            "process_intent_json = ?, process_intent_digest = ?",
+            (request_digest, *process_intent),
+        )
+        connection.execute(
+            "UPDATE launch_executions SET process_creation_json = ?, "
+            "process_creation_digest = ?, job_object_json = ?, "
+            "job_object_digest = ?, resume_authorization_json = ?, "
+            "resume_authorization_digest = ?",
+            (*process, *job, *resume_authorization),
+        )
+        connection.execute("UPDATE terminals SET request_digest = ?", (request_digest,))
+        connection.commit()
+    finally:
+        _enable_triggers(connection)
+        connection.close()
+
+
 def test_success_returns_exact_audit_and_deterministic_read_only_evidence(
     selected_case,
 ) -> None:
@@ -593,6 +703,53 @@ def test_success_returns_exact_audit_and_deterministic_read_only_evidence(
     require_disposable_selected_c3_snapshot_permit_for_test(first.permit, first.audit)
     with pytest.raises(SelectedC3SnapshotReadError, match="provenance"):
         require_selected_c3_snapshot_permit(first.permit, first.audit)
+
+
+@pytest.mark.parametrize(
+    "substituted",
+    [
+        lambda payload: payload[:-1] + bytes([payload[-1] ^ 1]),
+        lambda payload: payload + b" ",
+    ],
+    ids=("same-length-substitution", "wrong-length"),
+)
+def test_result_rejects_substituted_snapshot_bytes(selected_case, substituted) -> None:
+    result = selected_case.authority.read_selected_snapshot(
+        selected_case.ids["selection_id"]
+    )
+    with pytest.raises(SelectedC3SnapshotReadError, match="inconsistent"):
+        replace(result, snapshot_bytes=substituted(result.snapshot_bytes))
+
+
+def test_result_rejects_mismatched_verified_snapshot_id(selected_case) -> None:
+    result = selected_case.authority.read_selected_snapshot(
+        selected_case.ids["selection_id"]
+    )
+    with pytest.raises(SelectedC3SnapshotReadError, match="inconsistent"):
+        replace(
+            result,
+            audit=replace(
+                result.audit,
+                snapshot_id=UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"),
+            ),
+        )
+
+
+def test_result_rejects_verification_snapshot_byte_disagreement(selected_case) -> None:
+    result = selected_case.authority.read_selected_snapshot(
+        selected_case.ids["selection_id"]
+    )
+    substituted_id = UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+    assert result.verification.snapshot is not None
+    altered_snapshot = replace(result.verification.snapshot, snapshot_id=substituted_id)
+    altered_verification = replace(result.verification, snapshot=altered_snapshot)
+    altered_audit = replace(result.audit, snapshot_id=substituted_id)
+    with pytest.raises(SelectedC3SnapshotReadError, match="snapshot bytes"):
+        replace(
+            result,
+            audit=altered_audit,
+            verification=altered_verification,
+        )
 
 
 def test_exact_selection_lookup_has_no_fallback(selected_case) -> None:
@@ -646,6 +803,128 @@ def test_terminal_semantics_and_lineage_mismatch_fail_closed(selected_case) -> N
         selected_case.authority.read_selected_snapshot(
             selected_case.ids["selection_id"]
         )
+
+
+def test_rehashed_noncanonical_capture_request_fails_before_artifact_authority(
+    selected_case,
+) -> None:
+    _replace_request_lineage(
+        selected_case.database,
+        {"request": "internally-rehashed-but-invalid", "schema": 2},
+    )
+    with pytest.raises(SelectedC3SnapshotReadError, match="durable evidence"):
+        selected_case.authority.read_selected_snapshot(
+            selected_case.ids["selection_id"]
+        )
+    assert selected_case.api.paths == []
+
+
+def test_valid_request_inconsistent_with_deterministic_session_id_fails_closed(
+    selected_case,
+) -> None:
+    _replace_request_lineage(
+        selected_case.database,
+        {
+            "bar_interval": "1d",
+            "child_operation_version": "child/v1",
+            "ordered_universe": ["AAPL"],
+            "output_policy_version": "output/v1",
+            "permitted_provider_operation": _OPERATION,
+            "provider_id": _PROVIDER,
+            "request_limit": 1,
+            "request_window_end_date": "2026-08-26",
+            "request_window_start_date": "2026-08-01",
+            "target_session_date": "2026-08-27",
+        },
+    )
+    with pytest.raises(SelectedC3SnapshotReadError, match="durable evidence"):
+        selected_case.authority.read_selected_snapshot(
+            selected_case.ids["selection_id"]
+        )
+    assert selected_case.api.paths == []
+
+
+@pytest.mark.parametrize(
+    ("json_column", "digest_column"),
+    [
+        ("process_creation_json", "process_creation_digest"),
+        ("job_object_json", "job_object_digest"),
+        ("resume_authorization_json", "resume_authorization_digest"),
+    ],
+)
+def test_rehashed_semantically_wrong_process_evidence_fails_closed(
+    selected_case, json_column: str, digest_column: str
+) -> None:
+    evidence_json, evidence_digest = _pair(
+        {"evidence": f"wrong:{json_column}", "schema": 1}
+    )
+    _mutate(
+        selected_case.database,
+        f"UPDATE launch_executions SET {json_column} = ?, {digest_column} = ?",
+        (evidence_json, evidence_digest),
+    )
+    with pytest.raises(SelectedC3SnapshotReadError, match="durable evidence"):
+        selected_case.authority.read_selected_snapshot(
+            selected_case.ids["selection_id"]
+        )
+    assert selected_case.api.paths == []
+
+
+def test_canonical_production_process_evidence_is_accepted(selected_case) -> None:
+    connection = sqlite3.connect(selected_case.database)
+    reservation_id, process_intent_digest = connection.execute(
+        "SELECT launch_reservation_id, process_intent_digest FROM launch_reservations"
+    ).fetchone()
+    connection.close()
+    process_common = {
+        "process_intent_digest": process_intent_digest.hex(),
+        "reservation_id": reservation_id,
+        "schema": 1,
+    }
+    process = _pair(
+        {
+            **process_common,
+            "application_name": r"C:\Python312\python.exe",
+            "child_base_arguments": ["-m", "trading_bot.runtime.child"],
+            "creation_flags_policy": "C3_EXACT_SUSPENDED_NO_WINDOW_V1",
+            "creation_result": "SUSPENDED_CHILD_CREATED",
+            "environment_policy": "C3_EXACT_FIVE_ENTRY_V1",
+            "handle_list_count": 3,
+            "handle_list_policy": "C3_EXACT_REQUEST_RESULT_STAGING_V1",
+            "shell_or_path_resolution": False,
+        }
+    )
+    job = _pair(
+        {
+            **process_common,
+            "active_process_limit": 1,
+            "breakaway_allowed": False,
+            "job_assignment": "AT_PROCESS_CREATION",
+            "job_object_result": "ASSIGNED",
+            "kill_on_job_close": True,
+        }
+    )
+    resume_authorization = _pair(
+        {
+            **process_common,
+            "previous_suspend_count_required": 1,
+            "resume_authorization": "EXACT_PRIMARY_THREAD_RETAINED",
+        }
+    )
+    _mutate(
+        selected_case.database,
+        "UPDATE launch_executions SET process_creation_json = ?, "
+        "process_creation_digest = ?, job_object_json = ?, "
+        "job_object_digest = ?, resume_authorization_json = ?, "
+        "resume_authorization_digest = ?",
+        (*process, *job, *resume_authorization),
+    )
+
+    result = selected_case.authority.read_selected_snapshot(
+        selected_case.ids["selection_id"]
+    )
+
+    assert result.snapshot_bytes == selected_case.payload
 
 
 @pytest.mark.parametrize(
@@ -792,6 +1071,17 @@ def test_permit_is_sealed_noncopyable_and_bound_to_exact_audit(selected_case) ->
         require_disposable_selected_c3_snapshot_permit_for_test(forged, result.audit)
 
 
+def test_unregistered_core_cannot_issue_production_permit_provenance(
+    selected_case,
+) -> None:
+    result = selected_case.authority.read_selected_snapshot(
+        selected_case.ids["selection_id"]
+    )
+    fake_core = object.__new__(p2_module._SelectedC3SnapshotReadCore)
+    with pytest.raises(SelectedC3SnapshotReadError, match="core provenance"):
+        p2_module._issue_permit(result.audit, core=fake_core)
+
+
 def test_production_constructor_rejects_test_and_lookalike_authority() -> None:
     with pytest.raises(WindowsAuthorityError):
         WindowsSelectedC3SnapshotReadAuthority(object())  # type: ignore[arg-type]
@@ -901,6 +1191,8 @@ def test_production_p2_uses_fixed_read_only_vfs_and_one_read_transaction(
     assert require_selected_c3_snapshot_permit(result.permit, result.audit) is (
         result.permit
     )
+    with pytest.raises(SelectedC3SnapshotReadError, match="provenance"):
+        require_selected_c3_snapshot_permit(result.permit, replace(result.audit))
 
 
 def test_c1_connection_revalidation_explicitly_supports_one_read_transaction(

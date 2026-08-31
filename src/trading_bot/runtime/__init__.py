@@ -126,6 +126,19 @@ from trading_bot.runtime.manual_paper_account_authority import (  # noqa: F401
     require_locked_manual_paper_account,
     serialize_manual_paper_account_anchor,
 )
+from trading_bot.runtime.manual_paper_account_provisioning import (  # noqa: F401
+    MANUAL_PAPER_ACCOUNT_PROVISIONING_NAMESPACE,
+    MANUAL_PAPER_ACCOUNT_PROVISIONING_SCHEMA,
+    ManualPaperAccountProvisioningBundle,
+    ManualPaperAccountProvisioningError,
+    ManualPaperAccountProvisioningEvidence,
+    ManualPaperAccountProvisioningManifest,
+    build_manual_paper_account_provisioning_bundle,
+    derive_manual_paper_account_id,
+    parse_manual_paper_account_provisioning_manifest,
+    serialize_manual_paper_account_provisioning_manifest,
+    verify_manual_paper_account_provisioning_bundle,
+)
 from trading_bot.runtime.manual_paper_selected_c3_snapshot import (  # noqa: F401
     DisposableSelectedC3SnapshotReadAuthorityForTest,
     SelectedC3SnapshotAuditEvidence,
@@ -342,11 +355,36 @@ from trading_bot.runtime.windows_paper_account_mutex import (  # noqa: F401
     canonical_paper_account_mutex_material,
     paper_account_mutex_name,
 )
+from trading_bot.runtime.windows_paper_account_provisioning import (  # noqa: F401
+    PRODUCTION_PAPER_STAGING_ROOT,
+    PaperAccountPublicationState,
+    WindowsPaperAccountProvisioningError,
+    WindowsPaperAccountPublicationEvidence,
+    publish_manual_paper_account,
+    require_fixed_paper_provisioning_path,
+)
 from trading_bot.runtime.windows_paper_account_security import (  # noqa: F401
     PRODUCTION_PAPER_ROOT,
 )
 
 __all__ = [
+    "MANUAL_PAPER_ACCOUNT_PROVISIONING_NAMESPACE",
+    "MANUAL_PAPER_ACCOUNT_PROVISIONING_SCHEMA",
+    "ManualPaperAccountProvisioningBundle",
+    "ManualPaperAccountProvisioningError",
+    "ManualPaperAccountProvisioningEvidence",
+    "ManualPaperAccountProvisioningManifest",
+    "build_manual_paper_account_provisioning_bundle",
+    "derive_manual_paper_account_id",
+    "parse_manual_paper_account_provisioning_manifest",
+    "serialize_manual_paper_account_provisioning_manifest",
+    "verify_manual_paper_account_provisioning_bundle",
+    "PRODUCTION_PAPER_STAGING_ROOT",
+    "PaperAccountPublicationState",
+    "WindowsPaperAccountPublicationEvidence",
+    "WindowsPaperAccountProvisioningError",
+    "publish_manual_paper_account",
+    "require_fixed_paper_provisioning_path",
     "MANUAL_PAPER_ACCOUNT_ANCHOR_FILENAME",
     "MANUAL_PAPER_ACCOUNT_AUTHORITY_SCHEMA",
     "DisposableManualPaperAccountAuthorityForTest",

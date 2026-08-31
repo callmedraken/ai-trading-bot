@@ -54,8 +54,9 @@ The normal cycle is:
 
 ```text
 ChatGPT scopes/finalizes the contract
+-> Codex proves the exact startup gate
 -> Codex implements in the explicitly named worktree/branch
--> Codex runs focused tests/checks
+-> Codex runs focused tests/checks using the required isolated test environment
 -> Codex returns its final report without broad certification
 -> user creates/pushes a reviewable exact Git checkpoint when instructed
 -> ChatGPT reviews the exact GitHub commit/diff
@@ -72,24 +73,62 @@ For a scoped checkpoint with known paths, do not use `git add .` or
 not authorize merge, rebase, amend, force-push, PR metadata changes, review
 thread resolution, or unrelated modifications.
 
+## Non-compressible execution safeguards
+
+Token-efficient prompts may refer to architecture documents instead of repeating
+settled background. They must not compress away operational safety gates.
+
+Every bounded implementation/correction prompt must explicitly retain, when
+applicable:
+
+- exact worktree path;
+- exact branch;
+- exact expected starting HEAD;
+- mandatory stop-on-mismatch behavior;
+- prohibition on self-correcting Git state;
+- focused-test versus broad-certification ownership;
+- Windows pytest scratch isolation;
+- exact-file staging rules;
+- commit/push authorization state;
+- relevant production/provider/credential/effect prohibitions.
+
+These requirements are execution invariants, not background prose.
+
 ## Worktree and branch guard
 
 Multiple active worktrees are normal. Worktree identity is part of the task
 contract, not an incidental local detail.
 
-Before any Codex implementation, local certification, packaging, or release
-artifact build, prove the expected:
+Before any Codex implementation/correction, local certification, packaging, or
+release artifact build with a frozen checkpoint, run:
 
-- absolute worktree path;
-- branch name;
-- exact expected HEAD when a checkpoint is frozen;
-- configured upstream branch when one is expected;
-- clean tracked working tree.
+```text
+git rev-parse --show-toplevel
+git branch --show-current
+git rev-parse HEAD
+```
 
-Stop before modification on any mismatch. Do not silently switch branches,
-reuse the GUI worktree for paper-cycle work, or infer the intended branch from a
-chat/project title. A dedicated Codex project should point at the dedicated
-worktree for long-running feature tracks.
+Compare the outputs to the exact expected worktree, branch, and HEAD supplied by
+the task. When an upstream is part of the task contract, prove it separately.
+
+If any required value differs, **STOP before reading/modifying source or running
+state-changing Git commands**. Report actual versus expected. Do not attempt to
+repair the mismatch by:
+
+- checkout/switch;
+- reset;
+- rebase;
+- clean;
+- branch deletion/recreation;
+- worktree creation/move/deletion;
+- force updates;
+- copying source between worktrees.
+
+Git-state recovery is a separate operator decision.
+
+Do not infer the intended branch from a Codex chat/project title. A dedicated
+Codex project should point at the dedicated worktree for long-running feature
+tracks.
 
 Known Architecture-94 paper-cycle routing at the P2 closeout checkpoint:
 
@@ -100,6 +139,9 @@ paper upstream:       origin/feature/reliable-manual-paper-cycle
 integration worktree: F:\AI\ai-trading-bot-integration
 GUI worktree:         F:\AI\ai-trading-bot
 ```
+
+New isolated worktrees may use `F:\AI\worktrees\<name>` prospectively. Existing
+historical worktrees/evidence paths are not moved merely for tidiness.
 
 Do not clean, reset, prune, or otherwise disturb another worktree as part of a
 scoped task. Preserve unrelated generated/untracked reports and historical
@@ -121,8 +163,8 @@ At the final source-certification boundary:
 - ChatGPT supplies the exact local commands;
 - the user runs the broad/full suite once, plus required lint/format/diff and
   frozen-artifact identity checks;
-- if the environment invalidates the run, repair/isolate the environment first
-  and do not treat the resulting cascade as a source defect;
+- if the environment invalidates the run, isolate the environment first and do
+  not treat the resulting cascade as a source defect;
 - after a clean certification, do not rerun the full suite unless source code
   changes.
 
@@ -140,47 +182,63 @@ The project has repeatedly encountered an inaccessible user-temp hierarchy:
 C:\Users\John\AppData\Local\Temp\pytest-of-John
 ```
 
-For controlled local gates, prefer a fresh explicit external basetemp under
-`F:\AI`, for example:
+For this Windows development environment, controlled focused, integration, and
+certification pytest gates **must** use a fresh explicit external basetemp beneath:
+
+```text
+F:\AI\temp\pytest\
+```
+
+For example:
 
 ```powershell
-python -m pytest -q <focused-tests> --basetemp F:\AI\pytest-<milestone>-<gate>
+python -m pytest -q `
+  --basetemp "F:\AI\temp\pytest\<milestone>-<gate>-<unique-run>" `
+  -p no:cacheprovider `
+  <focused-tests>
 ```
+
+Use `-p no:cacheprovider` when pytest cache behavior is irrelevant to the gate.
+A task testing cache behavior may explicitly opt back in.
 
 Rules:
 
-- use a fresh unique `--basetemp` path for each acceptance run;
+- every controlled Windows pytest gate uses a fresh unique external
+  `--basetemp`;
+- do not fall back to the default `%TEMP%` pytest hierarchy;
+- new tests must use pytest `tmp_path`/`tmp_path_factory` or another explicitly
+  supplied disposable root rather than intentionally using the worktree
+  `.pytest_cache` as general filesystem scratch;
 - do not delete, take ownership of, chmod, repair, or casually move historical
   `.pytest_cache` or pytest temp directories merely to make a gate run;
 - preserve permission-warning pytest directories unless a separate cleanup task
   explicitly owns them;
-- a successful `--basetemp` run supersedes a prior user-temp fixture failure for
-  source classification;
-- pytest cache-provider warnings are not source failures when all requested tests
-  pass and the warning is isolated to cache persistence;
+- a successful isolated-basetemp run supersedes a prior user-temp fixture failure
+  for source classification;
+- cache-provider warnings are not source failures when cache persistence is not
+  part of the requested gate;
 - do not print a success message after a failed filesystem command; use
   `$ErrorActionPreference = 'Stop'`, `-ErrorAction Stop`, or explicit exit-code
   checks when the command is a gate.
 
-Some native/transactional test harnesses intentionally place interprocess test
-state beneath that worktree's `.pytest_cache` rather than pytest's `basetemp`.
-If that worktree cache is malformed or inaccessible, `--basetemp` alone cannot
-relocate the hard-coded harness path. In that case:
+Legacy/native harnesses may still contain hard-coded `.pytest_cache` scratch.
+That is a harness constraint, not permission to mutate retained cache state. If a
+legacy harness cannot run from the reviewed worktree:
 
-1. do **not** mutate the inaccessible cache just to satisfy the test;
-2. use a previously validated clean worktree whose harness scratch is usable;
-3. force `PYTHONPATH` to the exact reviewed source worktree;
-4. print module `__file__` provenance before the test run and require that all
-   affected modules resolve from the reviewed source worktree;
-5. run the unchanged test harness from the known-good worktree;
-6. restore `PYTHONPATH` afterward and re-prove the reviewed worktree is clean at
-   the exact HEAD.
+1. do **not** repair/delete the inaccessible cache merely for the test;
+2. when the current milestone owns the harness, prefer correcting it to use
+   pytest-managed temporary paths;
+3. otherwise use a previously validated clean harness worktree only when the
+   architecture/test contract permits it;
+4. force `PYTHONPATH` to the exact reviewed source worktree;
+5. print and require affected module `__file__` provenance before the run;
+6. restore `PYTHONPATH` afterward and re-prove the reviewed worktree/checkpoint.
 
-This pattern was required for Architecture-94 P2: its focused P2 file passed 48
-cases using an external basetemp, while the five selected C2 test nodes expanded
-to 77 cases and passed from the integration harness only after import provenance
-proved the exact P2 paper-worktree source was under test. The earlier paper
-worktree failures were environment-blocked, not source regressions.
+Architecture-94 P2 historically required the clean-harness fallback: its focused
+P2 file passed 48 cases using an external basetemp, while five selected C2 nodes
+expanded to 77 cases and passed from the integration harness only after import
+provenance proved the exact P2 source was under test. That history explains the
+fallback; it is not the default for new tests.
 
 ## PowerShell and Git checkpoint style
 

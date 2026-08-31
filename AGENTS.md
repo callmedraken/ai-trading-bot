@@ -76,6 +76,10 @@ starting a new milestone or preparing a broad implementation plan.
 - When exact paths are known, never use `git add .` or `git add -A` for a scoped checkpoint.
 - Preserve unrelated generated/untracked artifacts and historical permission-warning test directories.
 - When multiple worktrees are active, operate only in the explicitly named worktree/branch and never switch, clean, reset, or otherwise disturb another active worktree.
+- Mandatory execution safeguards are non-compressible. Token-efficient prompts may omit repeated architecture background, but must not omit exact worktree/branch/HEAD gates, stop-on-mismatch behavior, test-isolation requirements, exact-file staging rules, commit/push authorization state, or production/effect prohibitions relevant to the task.
+- Before every Codex implementation or correction task with a frozen checkpoint, run `git rev-parse --show-toplevel`, `git branch --show-current`, and `git rev-parse HEAD`, compare all three to the exact task values, and stop before reading/modifying source if any value differs. On mismatch, do not checkout/switch/reset/rebase/clean, create/move/delete a worktree, or otherwise self-correct Git state; report actual versus expected instead.
+- On this Windows development environment, every pytest invocation used for a controlled development/certification gate must use a fresh explicit external `--basetemp` under `F:\AI\temp\pytest\...`. When cache behavior itself is not under test, also use `-p no:cacheprovider`. Do not rely on the default `%TEMP%` pytest hierarchy and do not delete/repair historical pytest temp/cache directories merely to make a gate pass.
+- New tests must not intentionally use a worktree `.pytest_cache` as general filesystem scratch. Prefer pytest `tmp_path`/`tmp_path_factory` so the mandatory external basetemp controls the location. Legacy hard-coded cache scratch is an explicit harness issue to isolate or correct, never a reason to mutate retained cache evidence.
 - See `docs/AI_DEVELOPMENT_WORKFLOW.md` for the canonical review/certification cycle.
 
 ## Repository workflow

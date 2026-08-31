@@ -6,6 +6,12 @@ Validate the Architecture-95 recovery boundary for the already retained
 production staging tree created by the failed Architecture-94 Administrator
 publication attempt.
 
+**Architecture 96 and
+`docs/validation/reliable-manual-paper-cycle-p3-r1-signed-authorization.md` are
+mandatory addenda to this plan.** The first P3-R1 implementation proved the
+native rename correction but exposed a caller-asserted operator/release identity
+shape that is not accepted authority. The corrected source must pass both plans.
+
 This plan covers source/fake-native/native-disposable validation only until a
 separate production recovery authorization is issued.
 
@@ -60,10 +66,19 @@ genesis 7b7b83ba-69e2-5ed8-a033-b4306cd1ffc7
 exact frozen genesis/anchor/manifest evidence
 exact machine authority + Trading SID
 exact initialized supported C1
+valid Architecture-96 signed post-build authorization
+actual elevated Administrator SID == signed exact operator SID
+actual installed RECORD/package == signed accepted release identity
 ```
 
-Reject before mutation when:
+Reject before Paper staging access or mutation when:
 
+- the recovery authorization is absent, unsigned, tampered, wrong-purpose, or
+  signed by an untrusted key;
+- the current Administrator SID differs from the signed exact operator SID;
+- installed RECORD/package provenance differs from the signed release identity;
+- caller-created SID/digest/path/deployment objects are presented instead of the
+  process-local Architecture-96 permit;
 - final exists;
 - final and staging both exist;
 - staging is absent;
@@ -72,18 +87,20 @@ Reject before mutation when:
 - root/child native identity changes during validation;
 - inventory differs;
 - genesis/anchor bytes, hashes, lengths, IDs, or canonical verification differ;
-- installed C1/release/runtime provenance differs;
+- installed C1/runtime provenance differs;
 - authority database identity differs;
 - production runtime is not quiescent.
 
 No recovery API accepts a caller path, account ID, replacement flag, cleanup
-flag, or new-account option.
+flag, new-account option, caller-selected operator SID, caller-selected release
+digest, or generic retry/resume flag.
 
 ## D. Recovery ordering gate
 
 Instrument the recovery seam and require this ordering:
 
 ```text
+signed authorization verification + process-local permit issuance
 preconditions
 open parent/root
 open descendants
@@ -114,7 +131,9 @@ Before the rename marker:
 
 - final must remain absent;
 - existing staging remains the retained recovery state;
-- no cleanup/retry/resume is performed.
+- no cleanup/retry/resume is performed;
+- a previously valid signed authorization does not become implicit retry
+  authority after a failed invocation.
 
 At or after the rename marker:
 
@@ -153,29 +172,46 @@ P4_PRODUCTION_EXECUTION=False
 Disposable native tests operate outside `F:\AITradingBot\Paper` and
 `F:\AITradingBot\.Paper.provisioning-v1`.
 
+New disposable native tests must use pytest-managed temporary paths or another
+explicit external scratch root. They must not intentionally use the worktree
+`.pytest_cache` as general filesystem scratch.
+
 ## H. Source verification
 
 During implementation, run focused tests only, including:
 
 - `tests/runtime/test_windows_paper_account_provisioning.py`;
-- new recovery tests;
+- recovery tests;
+- Architecture-96 authorization/permit tests;
 - relevant P3 authority/security/provisioning regression tests;
 - Ruff check/format checks for changed files.
 
+Every controlled Windows pytest invocation uses a fresh explicit
+`--basetemp` beneath `F:\AI\temp\pytest\...` and normally
+`-p no:cacheprovider`. Do not use the default user-temp pytest hierarchy or
+repair retained historical cache/temp state merely to make a gate pass.
+
 Do not run broad/full-suite certification repeatedly during iteration. Reserve a
-single broad suite for the final accepted source candidate if needed.
+single broad suite for the final corrected source candidate after ChatGPT exact-
+diff acceptance.
 
 ## I. Production remains blocked
 
 Source/fake/native-disposable PASS does not authorize production recovery.
 
-After ChatGPT/Sol accepts the exact implementation diff, separately perform:
+After ChatGPT/Sol accepts the corrected exact implementation diff, separately
+perform:
 
 ```text
-new release wheel freeze
--> sealed-runtime deployment
+one broad isolated-basetemp source certification
+-> new release wheel freeze
+-> wheel/RECORD/package reconciliation
+-> collect exact elevated Administrator SID
+-> construct/sign/freeze Architecture-96 canonical recovery authorization
+-> sealed-runtime deployment of exactly authorized wheel
+-> installed RECORD/package reconciliation
 -> read-only retained-staging revalidation
--> explicit one-time recovery authorization
+-> explicit one-time operator recovery approval
 -> Administrator P3-R1 recovery
 -> non-admin Trading P3 acceptance
 ```
@@ -186,6 +222,8 @@ Until then:
 PRODUCTION_RECOVERY_RENAME=NOT_AUTHORIZED
 PUBLISHER_RERUN=FORBIDDEN
 STAGING_DELETE_OR_REPAIR=FORBIDDEN
+CALLER_ASSERTED_RECOVERY_AUTHORITY=FORBIDDEN
+UNSIGNED_RECOVERY_AUTHORIZATION=FORBIDDEN
 P3_TRADING_ACCEPTANCE=BLOCKED_PENDING_RECOVERY
 P4_PRODUCTION_EXECUTION=BLOCKED
 PROVIDER_CALL_7=NOT_AUTHORIZED

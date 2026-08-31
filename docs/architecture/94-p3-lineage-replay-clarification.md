@@ -121,6 +121,45 @@ full-lineage proof establish one unique anchored chain. Filename order, UUID
 order, directory enumeration order, mtime, timestamps, and a `latest`/`current`
 file never define the tip.
 
+## Finalized receipts are a non-authoritative audit namespace
+
+Architecture 67's finalized transition directory is the authoritative
+paper-account state commit point. A finalized receipt is a separate audit
+commitment. P3 recognizes this fixed audit layout:
+
+```text
+<paper-root>/paper-operations/
+  paper-operation-<operation-id>/
+    paper-operation-receipt-<operation-id>.json
+```
+
+P3 retains all safe-object, reparse/device, stable-identity, bounded-enumeration,
+and bounded-read protections for this namespace. Each finalized operation
+directory must contain exactly the one expected receipt file. The existing
+public `parse_paper_operation_receipt(...)` parser must accept its strict
+canonical bytes, and both the parsed receipt ID and intent operation ID must
+equal the canonical UUID represented by the directory and filename.
+
+Successful parsing establishes structural/canonical validity only. P3 must not
+call `verify_paper_operation_receipt(...)`, require cycle-configuration or
+foreign lineage/snapshot/report/successor dependencies, infer caller-idempotency
+conflicts, or treat parsed receipts as operation authority. Receipts never enter
+`PaperAccountLineageEvidence` or change the graph-derived terminal. A valid
+finalized `COMPLETED` or `FAILED` receipt with unavailable external verifier
+dependencies does not prevent an otherwise valid account preflight. Adding or
+removing such a receipt leaves account lineage, `VerifiedPriorCheckpoint`, and
+terminal-tip evidence unchanged.
+
+Any receipt staging entry, malformed/noncanonical receipt, directory/file/parsed
+operation identity mismatch, unsafe object, case-fold collision, unexpected
+contents, or enumeration overflow still blocks P3 and is never repaired.
+
+P4 and the existing Architecture-67 inspection boundary later establish exact
+operation-specific receipt authority. Architecture 67's existing
+`FOREIGN_RECEIPT_DEPENDENCIES_UNAVAILABLE` classification remains unchanged when
+those verifier dependencies are actually required. This clarification changes
+neither Architecture 67 semantics nor the account commit point.
+
 ## Fixed paper root and immutable anchor
 
 Production P3 remains bound to:

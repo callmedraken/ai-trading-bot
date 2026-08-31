@@ -112,6 +112,20 @@ from trading_bot.runtime.exceptions import (  # noqa: F401
     VerifiedSnapshotPaperCycleTemporalError,
     VerifiedSnapshotPaperCycleUniverseError,
 )
+from trading_bot.runtime.manual_paper_account_authority import (  # noqa: F401
+    MANUAL_PAPER_ACCOUNT_ANCHOR_FILENAME,
+    MANUAL_PAPER_ACCOUNT_AUTHORITY_SCHEMA,
+    DisposableManualPaperAccountAuthorityForTest,
+    DisposablePaperAccountReadSessionForTest,
+    LockedManualPaperAccount,
+    ManualPaperAccountAnchor,
+    ManualPaperAccountAuthorityError,
+    ManualPaperAccountEvidence,
+    WindowsManualPaperAccountAuthority,
+    parse_manual_paper_account_anchor,
+    require_locked_manual_paper_account,
+    serialize_manual_paper_account_anchor,
+)
 from trading_bot.runtime.manual_paper_selected_c3_snapshot import (  # noqa: F401
     DisposableSelectedC3SnapshotReadAuthorityForTest,
     SelectedC3SnapshotAuditEvidence,
@@ -320,8 +334,38 @@ from trading_bot.runtime.verified_snapshot_serialization import (
     serialize_verified_snapshot_paper_cycle_result,
     verify_verified_snapshot_paper_cycle_report,
 )
+from trading_bot.runtime.windows_paper_account_mutex import (  # noqa: F401
+    GlobalPaperAccountMutex,
+    PaperAccountMutexAcquisition,
+    PaperAccountMutexError,
+    PaperAccountMutexState,
+    canonical_paper_account_mutex_material,
+    paper_account_mutex_name,
+)
+from trading_bot.runtime.windows_paper_account_security import (  # noqa: F401
+    PRODUCTION_PAPER_ROOT,
+)
 
 __all__ = [
+    "MANUAL_PAPER_ACCOUNT_ANCHOR_FILENAME",
+    "MANUAL_PAPER_ACCOUNT_AUTHORITY_SCHEMA",
+    "DisposableManualPaperAccountAuthorityForTest",
+    "DisposablePaperAccountReadSessionForTest",
+    "LockedManualPaperAccount",
+    "ManualPaperAccountAnchor",
+    "ManualPaperAccountAuthorityError",
+    "ManualPaperAccountEvidence",
+    "WindowsManualPaperAccountAuthority",
+    "parse_manual_paper_account_anchor",
+    "require_locked_manual_paper_account",
+    "serialize_manual_paper_account_anchor",
+    "PRODUCTION_PAPER_ROOT",
+    "GlobalPaperAccountMutex",
+    "PaperAccountMutexAcquisition",
+    "PaperAccountMutexError",
+    "PaperAccountMutexState",
+    "canonical_paper_account_mutex_material",
+    "paper_account_mutex_name",
     "APPLICATION_ID_METADATA_KEY",
     "CHECKPOINTED_VERIFIED_SNAPSHOT_APPLICATION_MATERIAL_VERSION",
     "CHECKPOINTED_VERIFIED_SNAPSHOT_APPLICATION_NAMESPACE",

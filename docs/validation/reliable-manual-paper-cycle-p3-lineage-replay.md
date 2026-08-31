@@ -115,6 +115,38 @@ Cover:
 P3 must use existing public parsers/verifiers. It must not import another
 module's private helper or redefine Architecture-63/66 verification semantics.
 
+## Finalized receipt audit-namespace tests
+
+P3 structurally validates the known `paper-operations` namespace without granting
+receipt authority. Cover:
+
+- genesis-only account plus empty `paper-operations` passes;
+- a valid transition chain plus a canonical finalized `COMPLETED` receipt passes
+  with the same graph-derived tip, even without its external verifier dependencies;
+- a valid transition chain plus a canonical finalized `FAILED` receipt passes
+  with the same graph-derived tip, even without its external verifier dependencies;
+- adding/removing valid finalized receipts leaves complete lineage evidence,
+  `VerifiedPriorCheckpoint`, and terminal-tip evidence unchanged;
+- P3 never calls `verify_paper_operation_receipt(...)`, requires receipt verifier
+  dependencies, infers caller-key conflicts, or adds receipts to lineage artifacts;
+- receipt staging, malformed/noncanonical bytes, directory/file/embedded operation
+  identity mismatches, and extra receipt-directory contents block;
+- unsafe/reparse/device receipt objects, unstable identities, case-fold collisions,
+  unexpected audit-namespace contents, and enumeration overflow block.
+
+Retain the unchanged Architecture-67 inspection/recovery regression gate, including
+`FOREIGN_RECEIPT_DEPENDENCIES_UNAVAILABLE` when exact operation-specific receipt
+authority actually requires unavailable dependencies. Structural P3 acceptance
+does not establish that authority.
+
+Record these focused classifications:
+
+```text
+FINALIZED_RECEIPTS_NONAUTHORITATIVE=PASS
+RECEIPT_STAGING_FAIL_CLOSED=PASS
+GRAPH_TIP_INDEPENDENT_OF_RECEIPTS=PASS
+```
+
 ## Mutex tests
 
 The paper mutex is separate from the C2 lifecycle mutex identity.

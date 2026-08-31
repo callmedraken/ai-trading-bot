@@ -1,18 +1,25 @@
 """Administrator-only, one-way publication of the fixed P3 genesis tree.
 
-This is not an A67 output seam. No cleanup, repair, replacement, or resumption
-is provided. Native production acceptance is a separate operator gate.
+This is not an A67 output seam. Ordinary publication never resumes staging;
+P3-R1 recovery accepts only the frozen incident. Neither operation cleans up,
+repairs, or replaces state. Native production acceptance is a separate gate.
 """
 
 from __future__ import annotations
 
+import base64
+import csv
 import ctypes
+import io
+import os
+import re
 import sys
 from collections.abc import Callable
 from ctypes import wintypes
 from dataclasses import dataclass
 from enum import StrEnum
-from pathlib import PureWindowsPath
+from hashlib import sha256
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from uuid import UUID
 
 from trading_bot.runtime.manual_paper_account_authority import (
@@ -22,6 +29,7 @@ from trading_bot.runtime.manual_paper_account_authority import (
 from trading_bot.runtime.manual_paper_account_provisioning import (
     ManualPaperAccountProvisioningBundle,
     ManualPaperAccountProvisioningEvidence,
+    ManualPaperAccountProvisioningManifest,
     verify_manual_paper_account_provisioning_bundle,
 )
 from trading_bot.runtime.paper_account_checkpoint import (
@@ -29,6 +37,7 @@ from trading_bot.runtime.paper_account_checkpoint import (
     verify_genesis_paper_account_checkpoint,
 )
 from trading_bot.runtime.windows_authority import (
+    PRODUCTION_AUTHORITY_PATHS,
     WindowsAuthorityError,
     require_windows_platform,
 )
@@ -49,10 +58,12 @@ from trading_bot.runtime.windows_authority_security import (
     SecurityPolicy,
     WindowsHandle,
     authority_parent_security_policy,
+    authority_security_policy,
     build_security_attributes,
     inspect_open_authority_object,
     require_administrator_token,
     require_security_policy,
+    resolve_current_token_sid,
 )
 from trading_bot.runtime.windows_authority_validation import (
     require_initialized_supported_authority_evidence,
@@ -68,6 +79,31 @@ PRODUCTION_PAPER_STAGING_ROOT = PureWindowsPath(
     r"F:\AITradingBot\.Paper.provisioning-v1"
 )
 _PARENT = PureWindowsPath(r"F:\AITradingBot")
+_RUNTIME = _PARENT / "runtime"
+_SITE_PACKAGES = _RUNTIME / "Lib" / "site-packages"
+_RECORD_NAME = "ai_trading_bot-0.1.0.dist-info/RECORD"
+
+# Architecture 94 accepted v2 bundle / Architecture 95 incident evidence. These
+# are assertions, never a request to construct or regenerate this account.
+_P3_R1_BUNDLE = ManualPaperAccountProvisioningEvidence(
+    ManualPaperAccountProvisioningManifest(
+        UUID("d1510a4b-6ebf-58ef-92a4-e743ca91151e"),
+        "223f0d4e-36f9-4b9b-bf0e-febf16fcd3f1",
+        "S-1-5-21-1397534616-3988210162-180023805-1009",
+        UUID("7b7b83ba-69e2-5ed8-a033-b4306cd1ffc7"),
+        "b6172753ee4f30a82265ff38b341c3de42869ba6af7ccb69739234135183026d",
+        534,
+        "650b977db5ea5f5f1d89e3ed5bf52dfb5b2c5c44c3b34ccceb6d22dd492df871",
+        411,
+    ),
+    "8505eddd07be2f90d1211ee49a9cac4829d0faff9d88d0dc4c609b209a2e8801",
+    522,
+)
+_P3_R1_BOOTSTRAP = "53b8b72ab18b1c477c5eab50857e4dc2d47efc6e74030e380ed6a53387922ae4"
+_P3_R1_DATABASE = (
+    "6a8fb988d1cb223fbb66b09e8dab1e0de4b6aafd148dfdf01df08029203f4b76",
+    331776,
+)
 
 
 class PaperAccountPublicationState(StrEnum):
@@ -94,6 +130,99 @@ class WindowsPaperAccountPublicationEvidence:
     bundle: ManualPaperAccountProvisioningEvidence
     state: PaperAccountPublicationState
     final_root: str = str(PRODUCTION_PAPER_ROOT)
+
+
+@dataclass(frozen=True, slots=True)
+class P3R1RecoveryDeploymentExpectation:
+    """Reviewed operator and installed RECORD from the new release freeze.
+
+    This is deployment evidence, not a path/account override or an authority
+    capability. The new release must first pass the separate sealed deployment
+    gate; there is intentionally no default release or operator identity.
+    """
+
+    operator_sid: str
+    installed_record_sha256: str
+    installed_record_byte_length: int
+
+    def __post_init__(self) -> None:
+        if (
+            type(self.operator_sid) is not str
+            or re.fullmatch(r"S-1-5-21-(?:[0-9]+-){3}[0-9]+", self.operator_sid) is None
+            or type(self.installed_record_sha256) is not str
+            or re.fullmatch(r"[0-9a-f]{64}", self.installed_record_sha256) is None
+            or type(self.installed_record_byte_length) is not int
+            or not 0 < self.installed_record_byte_length <= 1024 * 1024
+        ):
+            raise ValueError("RECOVERY_DEPLOYMENT_EXPECTATION_INVALID")
+
+
+@dataclass(frozen=True, slots=True)
+class P3R1RecoveryEvidence:
+    publication: WindowsPaperAccountPublicationEvidence
+    # Root and descendants, in fixed layout order; identities are audit only.
+    native_identities: tuple[tuple[str, tuple[object, ...]], ...]
+    authority_database_sha256: str
+    authority_database_byte_length: int
+    first_production_mutation: str = "P3_R1_ROOT_RENAME"
+
+
+def _require_recovery_deployment(expected: P3R1RecoveryDeploymentExpectation) -> None:
+    require_administrator_token()
+    if type(expected) is not P3R1RecoveryDeploymentExpectation:
+        raise ValueError("RECOVERY_DEPLOYMENT_EXPECTATION_REQUIRED")
+    expected.__post_init__()
+    if (
+        resolve_current_token_sid() != expected.operator_sid
+        or sys.executable != str(_RUNTIME / "python.exe")
+        or str(PureWindowsPath(__file__))
+        != str(
+            _SITE_PACKAGES / "trading_bot/runtime/windows_paper_account_provisioning.py"
+        )
+    ):
+        raise ValueError("RECOVERY_RUNTIME_OR_OPERATOR_MISMATCH")
+    record = Path(str(_SITE_PACKAGES / _RECORD_NAME)).read_bytes()
+    if (sha256(record).hexdigest(), len(record)) != (
+        expected.installed_record_sha256,
+        expected.installed_record_byte_length,
+    ):
+        raise ValueError("RECOVERY_RELEASE_MISMATCH")
+    names = set()
+    hashed = set()
+    for row in csv.reader(io.StringIO(record.decode("utf-8")), strict=True):
+        if len(row) != 3:
+            raise ValueError("RECOVERY_RECORD_INVALID")
+        name, digest, length = row
+        relative = PurePosixPath(name)
+        if (
+            name in names
+            or name != relative.as_posix()
+            or relative.is_absolute()
+            or any(part in {".", ".."} for part in relative.parts)
+            or any(char in name for char in "\\:*")
+        ):
+            raise ValueError("RECOVERY_RECORD_PATH_INVALID")
+        names.add(name)
+        # pip adds un-hashed installer metadata and bytecode. Only the pinned
+        # RECORD may describe them; every source/resource payload must be hashed.
+        if not digest:
+            if name.startswith("trading_bot/") and not name.endswith(".pyc"):
+                raise ValueError("RECOVERY_UNHASHED_PACKAGE_FILE")
+            continue
+        payload = Path(str(_SITE_PACKAGES.joinpath(*relative.parts))).read_bytes()
+        actual = (
+            base64.urlsafe_b64encode(sha256(payload).digest()).rstrip(b"=").decode()
+        )
+        if digest != "sha256=" + actual or length != str(len(payload)):
+            raise ValueError("RECOVERY_INSTALLED_PAYLOAD_MISMATCH")
+        hashed.add(name)
+    for name, module in tuple(sys.modules.items()):
+        if name == "trading_bot" or name.startswith("trading_bot."):
+            source = PureWindowsPath(getattr(module, "__file__", ""))
+            if not source.is_relative_to(_SITE_PACKAGES):
+                raise ValueError("RECOVERY_IMPORT_PROVENANCE_MISMATCH")
+            if source.relative_to(_SITE_PACKAGES).as_posix() not in hashed:
+                raise ValueError("RECOVERY_IMPORT_NOT_IN_RELEASE")
 
 
 def _layout(root: PureWindowsPath, checkpoint_id: UUID) -> dict[PureWindowsPath, str]:
@@ -149,6 +278,21 @@ class _PaperRootRenameInfo(ctypes.Structure):
     ]
 
 
+class _ProcessEntry(ctypes.Structure):
+    _fields_ = [
+        ("size", wintypes.DWORD),
+        ("usage", wintypes.DWORD),
+        ("pid", wintypes.DWORD),
+        ("heap", ctypes.c_size_t),
+        ("module", wintypes.DWORD),
+        ("threads", wintypes.DWORD),
+        ("parent_pid", wintypes.DWORD),
+        ("priority", wintypes.LONG),
+        ("flags", wintypes.DWORD),
+        ("executable", wintypes.WCHAR * 260),
+    ]
+
+
 @dataclass
 class _Retained:
     handle: WindowsHandle
@@ -166,7 +310,11 @@ class _WindowsPublicationSession:
         self.sid = evidence.manifest.approved_trading_sid
         self.checkpoint_id = evidence.manifest.genesis_checkpoint_id
         self.handles: dict[PureWindowsPath, _Retained] = {}
+        self.staging_identities: dict[PureWindowsPath, tuple[object, ...]] = {}
+        self.database_handles: dict[PureWindowsPath, _Retained] = {}
         self.published = False
+        self.rename_attempted = False
+        self.final_appeared = False
         self.kernel = ctypes.WinDLL("kernel32", use_last_error=True)
 
     def __enter__(self) -> _WindowsPublicationSession:
@@ -174,12 +322,14 @@ class _WindowsPublicationSession:
 
     def __exit__(self, *args: object) -> None:
         failed = False
-        for retained in reversed(tuple(self.handles.values())):
+        retained_handles = (*self.database_handles.values(), *self.handles.values())
+        for retained in reversed(retained_handles):
             try:
                 retained.handle.close()
             except Exception:
                 failed = True
         self.handles.clear()
+        self.database_handles.clear()
         if failed:
             raise ValueError("HANDLE_CLOSE_FAILED")
 
@@ -262,6 +412,8 @@ class _WindowsPublicationSession:
             policy = (
                 authority_parent_security_policy()
                 if retained.role == "parent"
+                else authority_security_policy(retained.role, self.sid)
+                if retained.role in {"authority", "database"}
                 else paper_account_security_policy(retained.role, self.sid)
             )
             require_security_policy(inspection, policy)
@@ -286,6 +438,104 @@ class _WindowsPublicationSession:
                 share=FILE_SHARE_READ | FILE_SHARE_WRITE,
             )
             self._retain(path, handle, role, True)
+
+    def require_quiescent_runtime(self) -> None:
+        """Reject other sealed-runtime Python processes; never terminate them.
+
+        The operator must keep the runtime quiescent for the whole operation.
+        These bounded snapshots detect violations, not grant scheduling authority.
+        """
+        snapshot = self._call(
+            "CreateToolhelp32Snapshot",
+            wintypes.HANDLE,
+            [wintypes.DWORD, wintypes.DWORD],
+            2,
+            0,
+        )
+        if snapshot in (None, 0, -1, ctypes.c_void_p(-1).value):
+            raise ValueError("RECOVERY_PROCESS_SNAPSHOT_FAILED")
+        with WindowsHandle(snapshot) as snapshot_handle:
+            entry = _ProcessEntry()
+            entry.size = ctypes.sizeof(entry)
+            operation = "Process32FirstW"
+            count = 0
+            while self._call(
+                operation,
+                wintypes.BOOL,
+                [wintypes.HANDLE, ctypes.POINTER(_ProcessEntry)],
+                snapshot_handle,
+                ctypes.byref(entry),
+            ):
+                count += 1
+                if count > 65536:
+                    raise ValueError("RECOVERY_PROCESS_LIMIT")
+                operation = "Process32NextW"
+                if entry.pid == os.getpid() or entry.executable.casefold() not in {
+                    "python.exe",
+                    "pythonw.exe",
+                }:
+                    continue
+                process = self._call(
+                    "OpenProcess",
+                    wintypes.HANDLE,
+                    [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD],
+                    0x1000,
+                    False,
+                    entry.pid,  # PROCESS_QUERY_LIMITED_INFORMATION
+                )
+                if not process:
+                    raise ValueError("RECOVERY_PROCESS_IDENTITY_UNPROVEN")
+                with WindowsHandle(process) as process_handle:
+                    buffer = ctypes.create_unicode_buffer(32768)
+                    size = wintypes.DWORD(len(buffer))
+                    if not self._call(
+                        "QueryFullProcessImageNameW",
+                        wintypes.BOOL,
+                        [
+                            wintypes.HANDLE,
+                            wintypes.DWORD,
+                            ctypes.c_wchar_p,
+                            ctypes.POINTER(wintypes.DWORD),
+                        ],
+                        process_handle,
+                        0,
+                        buffer,
+                        ctypes.byref(size),
+                    ):
+                        raise ValueError("RECOVERY_PROCESS_IDENTITY_UNPROVEN")
+                    if PureWindowsPath(buffer.value).is_relative_to(_RUNTIME):
+                        raise ValueError("RECOVERY_RUNTIME_NOT_QUIESCENT")
+            if ctypes.get_last_error() != 18:  # ERROR_NO_MORE_FILES only
+                raise ValueError("RECOVERY_PROCESS_ENUMERATION_FAILED")
+
+    def open_recovery_database(self) -> None:
+        if self.evidence != _P3_R1_BUNDLE or self.database_handles:
+            raise ValueError("RECOVERY_DATABASE_BOUNDARY_INVALID")
+        for path, role, directory in (
+            (PRODUCTION_AUTHORITY_PATHS.root, "authority", True),
+            (PRODUCTION_AUTHORITY_PATHS.database, "database", False),
+        ):
+            handle = self._open(
+                path,
+                directory,
+                access=READ_CONTROL | FILE_READ_DATA | FILE_READ_ATTRIBUTES,
+                share=FILE_SHARE_READ,
+            )
+            retained = _Retained(handle, role, directory, ())
+            self.database_handles[path] = retained
+            retained.identity = self._facts(handle.value, directory)
+            self._inspect(path, retained)
+        self.validate_recovery_database()
+
+    def validate_recovery_database(self) -> None:
+        for path, retained in self.database_handles.items():
+            self._inspect(path, retained)
+        retained = self.database_handles[PRODUCTION_AUTHORITY_PATHS.database]
+        payload = self._read(retained, _P3_R1_DATABASE[1])
+        if (sha256(payload).hexdigest(), len(payload)) != _P3_R1_DATABASE:
+            raise ValueError("RECOVERY_DATABASE_MISMATCH")
+        for path, retained in self.database_handles.items():
+            self._inspect(path, retained)
 
     def exists(self, root: PureWindowsPath) -> bool:
         if (
@@ -448,12 +698,114 @@ class _WindowsPublicationSession:
         for path, retained in self.handles.items():
             self._inspect(path, retained)
 
+    def open_staging(self) -> None:
+        """Open the existing exact tree; never create, repair, or resume writes."""
+        for path, role in _layout(
+            PRODUCTION_PAPER_STAGING_ROOT, self.checkpoint_id
+        ).items():
+            self._inspect(path.parent, self.handles[path.parent])
+            directory = role in {"root", "genesis-directory"}
+            handle = self._open(
+                path,
+                directory,
+                access=READ_CONTROL
+                | FILE_READ_DATA
+                | FILE_READ_ATTRIBUTES
+                | (DELETE if role == "root" else 0),
+                share=FILE_SHARE_READ,
+            )
+            self._retain(path, handle, role, directory)
+
+    def validate_tree(
+        self, root: PureWindowsPath, bundle: ManualPaperAccountProvisioningBundle
+    ) -> None:
+        self.revalidate()
+        self.inventory(root)
+        payloads = {}
+        for path, role in _layout(root, self.checkpoint_id).items():
+            retained = self.handles[path]
+            self._inspect(path, retained)
+            if role in {"anchor", "genesis-file"}:
+                expected = (
+                    bundle.anchor_bytes if role == "anchor" else bundle.genesis_bytes
+                )
+                payloads[role] = self._read(retained, len(expected))
+                if payloads[role] != expected:
+                    raise ValueError("TREE_BYTES_MISMATCH")
+        # Verify the bytes read from the objects, not just the input bundle.
+        observed = ManualPaperAccountProvisioningBundle(
+            payloads["genesis-file"], payloads["anchor"], bundle.manifest_bytes
+        )
+        if verify_manual_paper_account_provisioning_bundle(observed) != self.evidence:
+            raise ValueError("TREE_EVIDENCE_MISMATCH")
+        self.revalidate()
+        self.inventory(root)
+
+    def prepare_rename(self, bundle: ManualPaperAccountProvisioningBundle) -> None:
+        source = PRODUCTION_PAPER_STAGING_ROOT
+        self.validate_tree(source, bundle)
+        self.staging_identities = {
+            path: self.handles[path].identity
+            for path in _layout(source, self.checkpoint_id)
+        }
+        self.revalidate()
+        self.inventory(source)
+        if self.exists(PRODUCTION_PAPER_ROOT):
+            self.final_appeared = True
+            raise ValueError("FINAL_APPEARED")
+        failed = False
+        for path in reversed(tuple(self.staging_identities)):
+            if path == source:
+                continue
+            # Remove before close: an uncertain close must never be retried,
+            # including by __exit__. Any failure blocks the root rename.
+            retained = self.handles.pop(path)
+            try:
+                retained.handle.close()
+            except Exception:
+                failed = True
+        if failed:
+            raise ValueError("DESCENDANT_CLOSE_FAILED")
+        self.require_rename_ready()
+
+    def require_rename_ready(self) -> None:
+        source = PRODUCTION_PAPER_STAGING_ROOT
+        if (
+            self.rename_attempted
+            or set(self.staging_identities) != set(_layout(source, self.checkpoint_id))
+            or set(self.handles) != {PureWindowsPath("F:/"), _PARENT, source}
+            or self.handles[source].identity != self.staging_identities[source]
+        ):
+            raise ValueError("ROOT_RENAME_NOT_READY")
+        self.revalidate()
+        self.inventory(source)
+        if self.exists(PRODUCTION_PAPER_ROOT):
+            self.final_appeared = True
+            raise ValueError("FINAL_APPEARED")
+
+    def require_exact_final_root(self) -> None:
+        """Check the raw native path, without case folding or normalization."""
+        retained = self.handles[PRODUCTION_PAPER_ROOT]
+        buffer = ctypes.create_unicode_buffer(32768)
+        count = self._call(
+            "GetFinalPathNameByHandleW",
+            wintypes.DWORD,
+            [wintypes.HANDLE, ctypes.c_wchar_p, wintypes.DWORD, wintypes.DWORD],
+            retained.handle.value,
+            buffer,
+            len(buffer),
+            0,
+        )
+        if not 0 < count < len(buffer) or buffer.value != (
+            "\\\\?\\" + str(PRODUCTION_PAPER_ROOT)
+        ):
+            raise ValueError("RETAINED_ROOT_FINAL_PATH_MISMATCH")
+        self._inspect(PRODUCTION_PAPER_ROOT, retained)
+
     def rename_root(self) -> None:
         source = PRODUCTION_PAPER_STAGING_ROOT
         retained = self.handles[source]
-        self._inspect(source, retained)
-        self._inspect(_PARENT, self.handles[_PARENT])
-        self.inventory(source)
+        self.require_rename_ready()
         # A paper-specific retained-root rename. Destination and flags are not
         # caller inputs. C1 rename/path helpers remain untouched.
         name = str(PRODUCTION_PAPER_ROOT).encode("utf-16-le")
@@ -469,6 +821,9 @@ class _WindowsPublicationSession:
         ctypes.memmove(
             ctypes.addressof(buffer) + _PaperRootRenameInfo.name.offset, name, len(name)
         )
+        # FIRST_PRODUCTION_MUTATION=P3_R1_ROOT_RENAME for recovery. No native
+        # operation intervenes between this conservative marker and the call.
+        self.rename_attempted = True
         if not self._call(
             "SetFileInformationByHandle",
             wintypes.BOOL,
@@ -486,40 +841,34 @@ class _WindowsPublicationSession:
             else path: item
             for path, item in self.handles.items()
         }
+        self.require_exact_final_root()
+        if self.exists(source) or not self.exists(PRODUCTION_PAPER_ROOT):
+            raise ValueError("PUBLICATION_NAMESPACE_MISMATCH")
 
     def validate_final(self, bundle: ManualPaperAccountProvisioningBundle) -> None:
-        self.revalidate()
         layout = _layout(PRODUCTION_PAPER_ROOT, self.checkpoint_id)
         for path, role in layout.items():
-            original = self.handles[path]
-            # Desired access is read-only. Sharing permits our retained writer;
-            # the original handle continues to deny all other writers.
-            with self._open(
+            if role == "root":
+                continue
+            directory = role == "genesis-directory"
+            handle = self._open(
                 path,
-                original.directory,
+                directory,
                 access=READ_CONTROL | FILE_READ_DATA | FILE_READ_ATTRIBUTES,
-                share=FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-            ) as handle:
-                reopened = _Retained(
-                    WindowsHandle(handle, close=False),
-                    role,
-                    original.directory,
-                    original.identity,
-                )
-                self._inspect(path, reopened)
-                if role in {"anchor", "genesis-file"}:
-                    expected = (
-                        bundle.anchor_bytes
-                        if role == "anchor"
-                        else bundle.genesis_bytes
-                    )
-                    if self._read(reopened, len(expected)) != expected:
-                        raise ValueError("FINAL_BYTES_MISMATCH")
-        self.inventory(PRODUCTION_PAPER_ROOT)
-        verify_manual_paper_account_provisioning_bundle(bundle)
-        self.revalidate()
-        if self.exists(PRODUCTION_PAPER_STAGING_ROOT):
-            raise ValueError("STAGING_PRESENT_AFTER_PUBLICATION")
+                share=FILE_SHARE_READ,
+            )
+            self._retain(path, handle, role, directory)
+            original_path = PRODUCTION_PAPER_STAGING_ROOT / path.relative_to(
+                PRODUCTION_PAPER_ROOT
+            )
+            if self.handles[path].identity != self.staging_identities[original_path]:
+                raise ValueError("DESCENDANT_IDENTITY_CHANGED")
+        self.validate_tree(PRODUCTION_PAPER_ROOT, bundle)
+        self.require_exact_final_root()
+        if self.exists(PRODUCTION_PAPER_STAGING_ROOT) or not self.exists(
+            PRODUCTION_PAPER_ROOT
+        ):
+            raise ValueError("PUBLICATION_NAMESPACE_MISMATCH")
 
 
 def _publish(
@@ -588,7 +937,7 @@ def _publish(
             if session.exists(PRODUCTION_PAPER_ROOT):
                 state = PaperAccountPublicationState.EXISTING_FINAL_AND_STAGING
                 raise ValueError("FINAL_APPEARED")
-            state = PaperAccountPublicationState.PUBLICATION_OUTCOME_UNCERTAIN
+            session.prepare_rename(bundle)
             session.rename_root()
             state = PaperAccountPublicationState.PUBLISHED_CANDIDATE
             session.validate_final(bundle)
@@ -598,6 +947,10 @@ def _publish(
     except Exception:
         if session is not None and session.published:
             state = PaperAccountPublicationState.PUBLISHED_CANDIDATE
+        elif session is not None and session.rename_attempted:
+            state = PaperAccountPublicationState.PUBLICATION_OUTCOME_UNCERTAIN
+        elif session is not None and session.final_appeared:
+            state = PaperAccountPublicationState.EXISTING_FINAL_AND_STAGING
         raise WindowsPaperAccountProvisioningError(
             "PUBLICATION_BLOCKED", state
         ) from None
@@ -642,3 +995,79 @@ def publish_manual_paper_account(
             "PRECONDITION_BLOCKED", PaperAccountPublicationState.NOT_PUBLISHED
         ) from None
     return _publish(bundle, expected, _WindowsPublicationSession)
+
+
+def recover_p3_r1_retained_staging(
+    *,
+    bundle: ManualPaperAccountProvisioningBundle,
+    deployment: P3R1RecoveryDeploymentExpectation,
+) -> P3R1RecoveryEvidence:
+    """Recover only the frozen Architecture-95 incident, once, without repair.
+
+    Caller inputs are frozen transport bytes and the separately reviewed new
+    deployment expectation. No root, account, replacement, cleanup, resume, or
+    creation option exists. Production execution requires separate authorization.
+    Failures retain the candidate state and must never be blindly rerun.
+    """
+    state = PaperAccountPublicationState.NOT_PUBLISHED
+    session = None
+    try:
+        _require_recovery_deployment(deployment)
+        evidence = verify_manual_paper_account_provisioning_bundle(bundle)
+        if evidence != _P3_R1_BUNDLE:
+            raise ValueError("RECOVERY_FROZEN_BUNDLE_MISMATCH")
+        validation = validate_installed_authority_complete()
+        require_initialized_supported_authority_evidence(validation)
+        verification = validation.bootstrap_verification
+        bootstrap = verification.bootstrap
+        if (
+            bootstrap.machine_authority_id != evidence.manifest.machine_authority_id
+            or bootstrap.approved_account_sid != evidence.manifest.approved_trading_sid
+            or verification.bootstrap_digest != _P3_R1_BOOTSTRAP
+        ):
+            raise ValueError("RECOVERY_INSTALLED_AUTHORITY_MISMATCH")
+        session = _WindowsPublicationSession(evidence)
+        with session:
+            session.require_quiescent_runtime()
+            session.validate_parent()
+            final = session.exists(PRODUCTION_PAPER_ROOT)
+            staging = session.exists(PRODUCTION_PAPER_STAGING_ROOT)
+            if final or not staging:
+                state = (
+                    PaperAccountPublicationState.EXISTING_FINAL_AND_STAGING
+                    if final and staging
+                    else PaperAccountPublicationState.EXISTING_FINAL
+                    if final
+                    else PaperAccountPublicationState.NOT_PUBLISHED
+                )
+                raise ValueError("RECOVERY_STATE_NOT_ADMITTED")
+            state = PaperAccountPublicationState.STAGING_REQUIRES_MANUAL_RECOVERY
+            session.open_recovery_database()
+            session.open_staging()
+            session.prepare_rename(bundle)
+            session.validate_recovery_database()
+            session.require_quiescent_runtime()
+            session.rename_root()
+            state = PaperAccountPublicationState.PUBLISHED_CANDIDATE
+            session.validate_final(bundle)
+            session.validate_recovery_database()
+        return P3R1RecoveryEvidence(
+            WindowsPaperAccountPublicationEvidence(
+                evidence, PaperAccountPublicationState.PUBLISHED_VALIDATED
+            ),
+            tuple(
+                (str(path.relative_to(PRODUCTION_PAPER_STAGING_ROOT)), identity)
+                for path, identity in session.staging_identities.items()
+            ),
+            *_P3_R1_DATABASE,
+        )
+    except Exception:
+        if session is not None and session.published:
+            state = PaperAccountPublicationState.PUBLISHED_CANDIDATE
+        elif session is not None and session.rename_attempted:
+            state = PaperAccountPublicationState.PUBLICATION_OUTCOME_UNCERTAIN
+        elif session is not None and session.final_appeared:
+            state = PaperAccountPublicationState.EXISTING_FINAL_AND_STAGING
+        raise WindowsPaperAccountProvisioningError(
+            "P3_R1_RECOVERY_BLOCKED", state
+        ) from None

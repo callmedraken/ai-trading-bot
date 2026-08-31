@@ -54,6 +54,7 @@ class FakeWin32:
         self.events = []
         self.opens = []
         self.creations = []
+        self.rename_handle_paths = []
         self.fault = None
         self.fault_used = False
         self.corruption = None
@@ -70,6 +71,9 @@ class FakeWin32:
             data=b"",
             identity=self.next_id,
             links=1,
+            volume=12,
+            delete_pending=False,
+            reparse=False,
         )
         self.next_id += 1
         self.nodes[path] = result
@@ -79,6 +83,10 @@ class FakeWin32:
         path = node["path"]
         if path in (PureWindowsPath("F:/"), p._PARENT):
             return "parent"
+        if path == p.PRODUCTION_AUTHORITY_PATHS.root:
+            return "authority"
+        if path == p.PRODUCTION_AUTHORITY_PATHS.database:
+            return "database"
         stage = (
             "staging"
             if path.is_relative_to(p.PRODUCTION_PAPER_STAGING_ROOT)
@@ -155,7 +163,7 @@ class FakeWin32:
         node = self.handles[handle]
         if info_class == 18:
             target = ctypes.cast(pointer, ctypes.POINTER(p._FileIdInfo)).contents
-            target.volume = 12
+            target.volume = node["volume"]
             target.identifier[:] = node["identity"].to_bytes(16, "little")
         else:
             assert info_class == 1
@@ -163,7 +171,7 @@ class FakeWin32:
             target.size = len(node["data"])
             target.links = node["links"]
             target.directory = node["directory"]
-            target.delete_pending = False
+            target.delete_pending = node["delete_pending"]
         return 1
 
     def api_GetFileAttributesW(self, path):
@@ -219,6 +227,16 @@ class FakeWin32:
         assert name == str(p.PRODUCTION_PAPER_ROOT)
         assert self.handles[handle]["path"] == p.PRODUCTION_PAPER_STAGING_ROOT
         self.event("rename", "before")
+        self.rename_handle_paths.append(
+            tuple(node["path"] for node in self.handles.values())
+        )
+        if any(
+            node["path"] != p.PRODUCTION_PAPER_STAGING_ROOT
+            and node["path"].is_relative_to(p.PRODUCTION_PAPER_STAGING_ROOT)
+            for node in self.handles.values()
+        ):
+            self.last_error = 5  # ERROR_ACCESS_DENIED, even with delete sharing.
+            return 0
         if self.corruption == "final-race":
             self.node(p.PRODUCTION_PAPER_ROOT, True, authority_parent_security_policy())
         if p.PRODUCTION_PAPER_ROOT in self.nodes:
@@ -237,11 +255,18 @@ class FakeWin32:
         self.event("rename", "after")
         return 1
 
+    def api_GetFinalPathNameByHandleW(self, handle, buffer, size, flags):
+        self.event("final-path", "before")
+        buffer.value = "\\\\?\\" + str(self.handles[handle]["path"])
+        self.event("final-path", "after")
+        return len(buffer.value)
+
     def inspect(self, handle, path, kind):
         node = self.handles[handle]
         label = self.label(node)
         self.event("inspect:" + label, "before")
         assert path == node["path"]
+        assert (kind is p.AuthorityObjectKind.DIRECTORY) == node["directory"]
         policy = node["policy"]
         if self.corruption == "security:" + label:
             policy = replace(policy, dacl_protected=False)
@@ -254,7 +279,7 @@ class FakeWin32:
             policy.owner_sid,
             policy.dacl_protected,
             policy.aces,
-            False,
+            node["reparse"],
             "F:\\",
             "NTFS",
         )
@@ -307,8 +332,11 @@ def native(monkeypatch):
 
         def close(self):
             if self.owned and self.value:
+                label = "close:" + fake.label(fake.handles[self.value])
+                fake.event(label, "before")
                 fake.handles.pop(self.value)
                 self.value = 0
+                fake.event(label, "after")
 
     monkeypatch.setattr(p, "WindowsHandle", Handle)
     monkeypatch.setattr(p, "build_security_attributes", security)
@@ -362,6 +390,8 @@ def test_exact_native_publication_sequence_and_security(native):
         "create:anchor",
         "write:anchor:staging",
         "flush:anchor:staging",
+        "read:anchor:staging",
+        "read:genesis-file:staging",
         "read:anchor:staging",
         "rename",
         "read:genesis-file:final",

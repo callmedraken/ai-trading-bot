@@ -1,19 +1,19 @@
 # AI Trading Bot — Project Development Roadmap & Handoff
 
-**Repository:** `callmedraken/ai-trading-bot`
-**Integration branch:** `develop`
-**Accepted integrated baseline:** `bd88ee966bff455f9fc897d6cfdfafdd807f27e2`
-**Current Architecture-94 worktree:** `F:\AI\ai-trading-bot-paper`
-**Current Architecture-94 branch:** `feature/reliable-manual-paper-cycle`
-**Accepted P2 source head:** `a810122a96b6fc90da25d71eede8da64b7272c98`
-**C3 production release-source checkpoint:** `82ba29ae2c2cc6bb3544077db0ee21868e6d5693`
-**Handoff status:** August 30, 2026 — C3 is FULLY COMPLETE / ACCEPTED; Architecture-94 P1 is ACCEPTED; Architecture-94 P2 read-only selected-C3 authority is FULLY ACCEPTED through source review, local regression, frozen release artifact, sealed production deployment, non-admin Trading zero-provider preflight, and one supervised read-only reread of the already-consumed successful call #6; P3 fixed-root paper-account authority is NEXT and should be implemented with Codex Sol High; all six C3 provider effects remain consumed; no provider call #7 is authorized; `/v2` credential references remain immutable historical state; GUI through A7 remains accepted; production/live trading remains NO-GO.
+**Repository:** `callmedraken/ai-trading-bot`  
+**Integration branch:** `develop`  
+**Accepted integrated baseline:** `bd88ee966bff455f9fc897d6cfdfafdd807f27e2`  
+**Current P3-R1 worktree:** `F:\AI\worktrees\ai-trading-bot-p3-r1`  
+**Current P3-R1 branch:** `feature/p3-r1-recovery-implementation`  
+**Retained P3-R1 implementation checkpoint:** `2b82222fbaee857e02519a0ea3627679d309276d`  
+**Current P3-R1 status:** correction required under Architectures 95 + 96  
+**Production/live trading:** NO-GO
 
 > This Git-tracked handoff is the canonical cross-chat resume document. Uploaded
-> Project copies are mirrors only. Always verify the live branch/head before
-> acting. Historical details remain in the architecture/validation documents and
-> Git history; this handoff intentionally prioritizes current actionable state
-> and regression-prevention rules.
+> Project copies are mirrors only. Always prove the live worktree/branch/HEAD
+> before acting. Detailed historical evidence remains in architecture,
+> validation, and Git history; this file prioritizes current actionable state and
+> regression-prevention rules.
 
 ---
 
@@ -26,86 +26,139 @@ paper → long paper soak → broker-paper → live-readiness certification → 
 restricted live → mature automated operation → polished GUI.**
 
 AI/strategy remains subordinate to deterministic risk, reviewed authority,
-credential isolation, brokerage/reconciliation, operating-mode controls, durable
-evidence, and operator emergency controls.
-
-**Production/live trading remains NO-GO.**
+credential isolation, durable evidence, brokerage/reconciliation,
+operating-mode controls, and explicit operator safety gates.
 
 ---
 
-## 2. Worktrees and branch routing
-
-Current worktree map:
+## 2. Current worktrees and branch routing
 
 ```text
-paper-cycle feature:
+P3-R1 implementation:
+  F:\AI\worktrees\ai-trading-bot-p3-r1
+  feature/p3-r1-recovery-implementation
+
+paper-cycle lineage:
   F:\AI\ai-trading-bot-paper
   feature/reliable-manual-paper-cycle
-  upstream origin/feature/reliable-manual-paper-cycle
 
 integration:
   F:\AI\ai-trading-bot-integration
   develop
 
-GUI historical/active worktree:
+GUI worktree:
   F:\AI\ai-trading-bot
   feature/gui-foundation
 
 C3 worktree:
   F:\AI\ai-trading-bot-c3
-  accepted C3 feature branch/history
+  accepted C3 feature history
 ```
 
-Do not use `F:\AI\ai-trading-bot` for Architecture-94 paper-cycle implementation.
-Before any Codex task, local certification, packaging, or release work, prove the
-absolute worktree, branch, expected HEAD, expected upstream, and clean tracked
-status. Stop on mismatch.
-
-Preserve unrelated generated/untracked reports and historical pytest directories.
-Do not prune old worktrees, clean permission-warning pytest trees, or delete
-release/quarantine directories as an incidental step.
+Do not reuse another active worktree for P3-R1. Existing historical worktrees,
+release directories, diagnostics, and pytest evidence are not moved/cleaned as
+incidental housekeeping.
 
 ---
 
-## 3. AI development workflow
+## 3. Non-compressible AI execution workflow
 
-Use ChatGPT/Sol for architecture, debugging strategy, GitHub/diff review,
-test-gate/certification decisions, production-authority review, release gating,
-and the next-step plan.
+ChatGPT/Sol owns architecture, debugging strategy, GitHub exact-diff review,
+test/certification gates, production-authority review, and next-step planning.
+Codex is a bounded implementation agent.
 
 Model routing:
 
 ```text
-localized/mechanical/docs/frozen contract  -> Luna Extra High
+localized/mechanical/docs/frozen contract   -> Luna Extra High
 subtle bounded deterministic implementation -> Sol Medium
 native Windows/security/authority/locking/
-ordering/crash-recovery/architecture        -> Sol High
+ordering/crash-recovery/architecture         -> Sol High
 ```
 
 Do not use subagents unless explicitly requested.
 
+Every bounded Codex task with a frozen checkpoint must start by running:
+
+```text
+git rev-parse --show-toplevel
+git branch --show-current
+git rev-parse HEAD
+```
+
+The outputs must equal the exact worktree, branch, and HEAD in the task. Any
+mismatch is a hard stop. Codex must not self-correct with checkout/switch,
+reset, rebase, clean, branch recreation, or worktree creation/move/deletion.
+
+These safeguards are never removed for token efficiency. Token-efficient prompts
+may omit repeated architecture background, but must retain:
+
+- exact worktree/branch/HEAD startup gate;
+- stop-on-mismatch behavior;
+- Windows test-isolation requirements;
+- exact-file staging rules;
+- commit/push authorization state;
+- relevant production/provider/credential prohibitions.
+
 Normal implementation flow:
 
 ```text
-ChatGPT freezes scope/contract
--> Codex implements in exact worktree
--> Codex runs focused tests/checks
--> exact reviewable Git checkpoint is pushed when instructed
--> ChatGPT reviews exact GitHub commit/diff
--> user runs broader/final local gate only on reviewed unchanged source
--> ChatGPT accepts/rejects and supplies next milestone
+ChatGPT freezes architecture/scope
+-> Codex proves startup gate
+-> Codex implements only bounded change
+-> Codex runs focused isolated tests/checks
+-> Codex reports without commit/push unless explicitly authorized
+-> user creates/pushes exact checkpoint when instructed
+-> ChatGPT reviews exact GitHub diff
+-> one broad local certification only after source-diff acceptance
+-> release/deployment/operator gates only after source certification
 ```
 
-Do not use `git add .`. Do not merge, rebase, amend, force-push, change PR
-metadata, resolve review threads, or modify unrelated files without explicit
-approval.
+Do not use `git add .` or `git add -A` for a scoped checkpoint. Do not merge,
+rebase, amend, force-push, change PR metadata, resolve review threads, or modify
+unrelated files without explicit approval.
 
-The expanded reusable workflow, including Windows pytest recovery and production
-runtime deployment, is canonical in `docs/AI_DEVELOPMENT_WORKFLOW.md`.
+Canonical workflow detail: `docs/AI_DEVELOPMENT_WORKFLOW.md`.
 
 ---
 
-## 4. Current production authority architecture
+## 4. Mandatory Windows pytest isolation
+
+The default user pytest temp hierarchy has repeatedly been inaccessible:
+
+```text
+C:\Users\John\AppData\Local\Temp\pytest-of-John
+```
+
+Every controlled Windows pytest gate now uses a fresh unique external basetemp
+under:
+
+```text
+F:\AI\temp\pytest\
+```
+
+and normally:
+
+```text
+-p no:cacheprovider
+```
+
+when cache behavior is irrelevant.
+
+New tests use `tmp_path`/`tmp_path_factory` or another explicitly supplied
+scratch root. Do not intentionally use worktree `.pytest_cache` as general native
+filesystem scratch. Do not delete, take ownership of, repair, or repurpose
+historical pytest/cache directories merely to make a gate pass.
+
+Legacy hard-coded harnesses may use a proven clean-harness fallback only after
+exact `PYTHONPATH`/module `__file__` provenance proves the reviewed source is
+under test.
+
+---
+
+## 5. Frozen production authority and C3 state
+
+Authority chain:
 
 ```text
 ValidatedProductionAuthority (C1)
@@ -114,472 +167,339 @@ WindowsTransactionalAuthority (C2)
         ↓
 WindowsEffectfulDailySnapshotCapture (C3)
         ↓
-isolated suspended Windows child
+isolated Windows child
         ↓
 Windows Credential Manager
         ↓
 Alpaca market-data API
 ```
 
-C2 is effectfully inert without the reviewed C3 bridge. C3 authorizes only the
-reviewed market-data capture path and never brokerage, paper mutation, or live
-trading.
-
-Core native effect ordering remains:
+Frozen runtime facts:
 
 ```text
-CreateProcessW suspended
--> durable C2 execution / PRE_RESUME_READY
--> write canonical child request
--> close request writer
--> commit ResumeIntent
--> ResumeThread exact primary thread once
--> bounded child/process observation
--> cleanup evidence
--> independent parent verification
--> terminal / publication / selection
+Trading account: DESKTOP-I4DOKM7\Trading
+Trading SID: S-1-5-21-1397534616-3988210162-180023805-1009
+Fixed runtime: F:\AITradingBot\runtime\python.exe
+Production TEMP/TMP: F:\AITradingBot\temp
+Authority DB: F:\AITradingBot\Authority\authority.sqlite3
+Capture output: F:\AITradingBot\Authority\capture-output
+Paper final root: F:\AITradingBot\Paper
+Paper staging root: F:\AITradingBot\.Paper.provisioning-v1
+Production SQL bytes: 118896
+Production SQL SHA-256: aa61df2f5db0090f8373222d1f5e492a58f4c10273afacfab45e382bacd4bb58
+SQLite: 3.50.4
+Credential policy: windows-credential-manager-alpaca-market-data/v2
 ```
 
-`RESUME_RECORDED` is lifecycle evidence, not provider-success evidence.
-Ambiguous external effects fail closed.
-
----
-
-## 5. Frozen production facts
-
-```text
-Trading account:
-  DESKTOP-I4DOKM7\Trading
-Trading SID:
-  S-1-5-21-1397534616-3988210162-180023805-1009
-Fixed runtime:
-  F:\AITradingBot\runtime\python.exe
-Runtime directory:
-  F:\AITradingBot\runtime
-Production TEMP/TMP:
-  F:\AITradingBot\temp
-Authority DB:
-  F:\AITradingBot\Authority\authority.sqlite3
-Capture output:
-  F:\AITradingBot\Authority\capture-output
-Architecture-94 paper root:
-  F:\AITradingBot\Paper
-Credential policy:
-  windows-credential-manager-alpaca-market-data/v2
-Credential targets:
-  AITradingBot/MarketData/Alpaca/ApiKeyId/v2
-  AITradingBot/MarketData/Alpaca/ApiSecretKey/v2
-Frozen production SQL bytes:
-  118896
-Frozen production SQL SHA-256:
-  aa61df2f5db0090f8373222d1f5e492a58f4c10273afacfab45e382bacd4bb58
-SQLite build observed during P2 deployment:
-  3.50.4
-```
-
-`/v2` is immutable historical credential-reference state. Do not regenerate,
-delete, replace, restage, or rotate those targets in place. A later rotation
-requires separately reviewed `/v3` or later authority.
-
----
-
-## 6. C3 status — FULLY COMPLETE / ACCEPTED
-
-C3 final source head:
+C3 final accepted source checkpoint:
 
 ```text
 82ba29ae2c2cc6bb3544077db0ee21868e6d5693
 ```
 
-All six actual C3 real-provider effects are consumed. No provider call #7 is
-authorized.
+All six real-provider C3 effects are consumed. No provider call #7 is
+authorized. Call #5 is permanently `FAILED / CONFIRMED` and non-retryable.
+Call #6 is permanently `SUCCEEDED / CONFIRMED` and `SUCCESS_SELECTED`; its
+provider effect must never be rerun.
 
-Call #5 is permanently historical:
-
-```text
-terminal: FAILED / CONFIRMED
-child/provider path: provider succeeded
-parent result: artifact publication failed
-selection: none
-retry: NEVER
-```
-
-Final successful call #6:
+Selected call #6:
 
 ```text
-ordered universe: SPY
-request window: 2026-08-28 through 2026-08-28
-authorized XNYS snapshot session: 2026-08-28
-request digest:
-  67c8e2c81da2467aa0c67328af191038d00858fe153dd0850f59ef786612efad
-session_id:
-  f787e4f6-c3ca-58fe-802b-f068dd474b41
-attempt_id:
-  e809f393-b557-5c6b-8665-78d66822fee8
-claim_id:
-  487618c1-a5a5-5dd9-971d-a1ea843194c5
-reservation_id:
-  fa5b4538-e475-5a13-9cb2-0d7936232c84
-execution_id:
-  d85a8085-137b-55c2-9679-cddade4a5907
-terminal_id:
-  b4c76e5f-44bb-54ce-a917-3e3223b84107
-selection_id:
-  36d6fbb3-bdec-57e0-a9cf-78dc2b8f7280
-snapshot_id:
-  eba46838-44ae-5bec-97bf-98c6639ae6a7
-artifact SHA-256:
-  31d82a31a3fbd909f8771820bf47e796a1503264fe0ac6ce0eff7ba163f0767d
-artifact byte length:
-  1291
-terminal:
-  SUCCEEDED / CONFIRMED
-session/attempt:
-  SUCCESS_SELECTED
+request digest: 67c8e2c81da2467aa0c67328af191038d00858fe153dd0850f59ef786612efad
+session: f787e4f6-c3ca-58fe-802b-f068dd474b41
+attempt: e809f393-b557-5c6b-8665-78d66822fee8
+claim: 487618c1-a5a5-5dd9-971d-a1ea843194c5
+reservation: fa5b4538-e475-5a13-9cb2-0d7936232c84
+execution: d85a8085-137b-55c2-9679-cddade4a5907
+terminal: b4c76e5f-44bb-54ce-a917-3e3223b84107
+selection: 36d6fbb3-bdec-57e0-a9cf-78dc2b8f7280
+snapshot: eba46838-44ae-5bec-97bf-98c6639ae6a7
+artifact SHA-256: 31d82a31a3fbd909f8771820bf47e796a1503264fe0ac6ce0eff7ba163f0767d
+artifact bytes: 1291
+artifact identity SHA-256: c23b0c5a8cd5d4808bb18e5f5165344a8013b4c29b9930dc33f74a30846978f2
 ```
 
-Call #6 is successful **and consumed**. Its durable evidence/artifact may be
-reread by a reviewed read-only boundary; its provider effect may never be rerun.
+`/v2` credential references are immutable historical state. Any future rotation
+requires separately reviewed `/v3` or later authority.
 
 ---
 
-## 7. Architecture 94 contract
+## 6. Architecture 94 paper-cycle status
 
-Architecture 94 composes the accepted deterministic paper stack without turning
-C3 selection into execution authority:
+Product flow:
 
 ```text
-selected verified C3 snapshot
-+ explicit offline strategy-history seed
-+ authoritative paper-account tip
-        ↓
-pure deterministic strategy plan
-        ↓
-existing target/planner/proposal path
-        ↓
-existing deterministic portfolio risk
-        ↓
-existing simulated paper execution
-        ↓
-verified successor checkpoint + full lineage
-        ↓
-Architecture-67 durable transition + receipt
+verified selected C3 snapshot
+-> offline deterministic strategy history/plan
+-> target/planner proposal
+-> deterministic risk
+-> simulated paper execution
+-> verified successor checkpoint/lineage
+-> durable Architecture-67 transition/receipt evidence
 ```
 
-Non-negotiable rules:
+Architecture 94 remains simulated paper. It does not authorize broker/live,
+unattended scheduling, automatic retry, GUI execution, online history fill, or
+another C3 provider effect.
 
-- durable state outranks process assumptions;
-- UUIDs, paths, filenames, digests, timestamps, reconstructed objects, and caller
-  assertions cannot create authority;
-- strategy/GUI/AI cannot bypass deterministic risk;
-- C3 capture authority cannot become paper mutation authority;
-- no provider call #7, online history fill, broker call, scheduler, automatic
-  retry, or GUI execution control is introduced by Architecture 94;
-- Architecture 67 remains the only paper transition commit/recovery algorithm.
-
-Detailed frozen contract:
-`docs/architecture/94-reliable-manual-paper-cycle-authority.md`.
-
----
-
-## 8. P1 — ACCEPTED
-
-Accepted P1 head:
+### P1 — ACCEPTED
 
 ```text
 1028e60b99c27cef0994f40d6ce381392abfb0f8
 fix: bind Architecture 94 P1 provenance
 ```
 
-P1 implements the pure strategy-history seed and deterministic
-`ManualPaperStrategyPlan` boundary.
+P1 is pure deterministic strategy-history/plan logic. Its selected-C3 assertion
+contains only non-authorizing selection/session/terminal/snapshot IDs and
+artifact SHA/length.
 
-Important accepted P1 boundary:
-
-`ManualPaperSelectedC3Assertion` carries only:
-
-- selection ID;
-- session ID;
-- terminal ID;
-- snapshot ID;
-- artifact SHA-256;
-- artifact byte length.
-
-Those are pure non-authorizing assertions. P1 does **not** bind
-`artifact_identity_sha256`, `C3ArtifactIdentityEvidence`, native file identity,
-filesystem facts, or a P2 permit. P2 independently proves those facts; P4 later
-exact-compares P1 assertions to P2 audit evidence.
-
-P1 local gate:
-
-```text
-198 passed
-Ruff: PASS
-format: PASS
-diff checks: PASS
-exact tree: clean
-```
-
----
-
-## 9. P2 — FULLY ACCEPTED
-
-Accepted P2 source head:
+### P2 — FULLY ACCEPTED
 
 ```text
 a810122a96b6fc90da25d71eede8da64b7272c98
 fix: bind Architecture 94 P2 permit issuance
 ```
 
-P2 provides a sealed production reader only from genuine
-`ValidatedProductionAuthority`. It opens the fixed authority DB read-only via
-the approved VFS, reads one exact selected lineage in one consistent query-only
-transaction, proves the exact terminal/selection semantics, safely reopens only
-the canonical artifact derived from durable snapshot ID, reconstructs C3
-artifact-identity evidence, strictly verifies the snapshot, then issues a
-process-local permit bound to the exact successful read/audit/reader/core
-provenance.
-
-Accepted source review:
+P2 performs the genuine C1-attenuated, read-only selected-C3 proof and issues a
+process-local permit. Frozen release wheel:
 
 ```text
-P2_B1_RETAINED_BYTES_BINDING=PASS
-P2_B2_PERMIT_PROVENANCE=PASS
-P2_B2_C1_ATTENUATION=PASS
-P2_B3_DURABLE_SEMANTICS=PASS
-P2_READ_ONLY_SQLITE_BOUNDARY=PASS
-P2_ARTIFACT_IDENTITY_PROOF=PASS
-P2_C1_C2_REGRESSION_REVIEW=PASS
-P1_BOUNDARY_PRESERVED=PASS
-P2_SOURCE_REVIEW=PASS
+F:\AI\p2-production-wheelhouse-v1\ai_trading_bot-0.1.0-py3-none-any.whl
+bytes: 743531
+SHA-256: 3b4862eb44763bead9cf0dd826645043e7de6419a182664ed780248eae6ff0c0
 ```
 
-Local acceptance:
-
-```text
-P2 focused file: 48 passed
-selected C2 regression cases: 77 passed
-Ruff / format / diff checks: PASS
-tracked paper worktree: clean
-```
-
-### P2 Windows pytest lesson
-
-Do not repeat the earlier environment detour.
-
-The user-temp path
-`C:\Users\John\AppData\Local\Temp\pytest-of-John` can be inaccessible. Controlled
-Windows gates should use a fresh explicit `--basetemp F:\AI\pytest-*` path.
-
-The paper worktree also has historical/malformed `.pytest_cache` state that can
-block the C2 test-only lifecycle arbiter, whose scratch path is intentionally
-worktree-local and therefore unaffected by `--basetemp`. Do not delete, take
-ownership of, chmod, or casually move that cache to make a test pass. For P2,
-the accepted solution was to run the unchanged C2 harness from the validated
-integration worktree while forcing `PYTHONPATH=F:\AI\ai-trading-bot-paper\src`
-and printing affected module `__file__` paths first. All affected imports proved
-they came from the exact reviewed P2 paper source, and 77 cases passed.
-
-### P2 release artifact
-
-P2 was built from a detached Git export after source acceptance:
-
-```text
-source commit:
-  a810122a96b6fc90da25d71eede8da64b7272c98
-source tree:
-  51936b0af02b2a0246dc67b2e30d11a5c5e09b31
-source export:
-  F:\AI\p2-production-source-v1
-wheel:
-  F:\AI\p2-production-wheelhouse-v1\ai_trading_bot-0.1.0-py3-none-any.whl
-wheel bytes:
-  743531
-wheel SHA-256:
-  3b4862eb44763bead9cf0dd826645043e7de6419a182664ed780248eae6ff0c0
-wheel entries:
-  215
-package source files:
-  211 exact matches
-RECORD rows / hashed payloads:
-  215 / 214
-```
-
-### P2 deployment and trust-context lesson
-
-The first fixed-runtime provenance probe correctly showed the runtime was stale
-for P2. The correct response was **not** to copy source into `site-packages`.
-The accepted path was detached export → frozen wheel → exact verification →
-elevated sealed replacement → installed RECORD/source reconciliation → frozen
-SQL proof → ownership/ACL normalization → exact Trading RX publication →
-non-admin Trading zero-provider preflight.
-
-Use three distinct trust contexts:
-
-```text
-normal development account -> Git/source/test/artifact work
-elevated Administrator     -> fixed-runtime install/ACL publication
-non-admin Trading           -> genuine C1/P2 production acceptance
-```
-
-An access-denied result against the protected fixed runtime from the normal
-account can be the intended ACL boundary, not a missing runtime.
-
-Installed P2-sensitive source hashes:
-
-```text
-runtime/__init__.py
-  6630a2edca0b09f850eab269f1cfe35c845a2baebac75315387b0470977295c1
-runtime/manual_paper_selected_c3_snapshot.py
-  ef49baff52712f3c5c34d760719b0fde2a5ccaf83ba0ceaccdaca15a9c694e8a
-runtime/windows_authority_schema.py
-  0784ebce1231a018e5c68f78cedf578c04d066ec549a603e098163ad0233d56f
-runtime/windows_authority_validation.py
-  1f7355e6603af9bf53a81761fd244e895c2d47c3309933abde887a1b616c0299
-runtime/windows_transactional_authority.py
-  6a847e4385f4ad516031c0c93c572ef98c45a514de41e680e4e8c3828e354874
-```
-
-Ownership normalization processed 12,502 files with zero failures; the sealed
-post-install runtime contained 12,501 descendants and zero ACL anomalies before
-Trading RX publication.
-
-### P2 non-admin zero-provider preflight
-
-Under exact non-admin `DESKTOP-I4DOKM7\Trading`:
-
-```text
-C1_AUTHORITY_ACQUIRED=PASSED
-P2_READER_CONSTRUCTED=PASSED
-P2_PUBLIC_AUTHORITY_ATTRIBUTE_PRESENT=False
-P2_SELECTED_SNAPSHOT_READ_PERFORMED=False
-P2_PERMIT_ISSUED=False
-SOCKET_CONNECT_COUNT=0
-RUNTIME_WRITE_BLOCKED=True
-TEMP_WRITE_READ_DELETE=PASSED
-NETWORK_OPERATION_PERFORMED=False
-PRODUCTION_CHILD_LAUNCHED=False
-PROVIDER_REQUEST_PERFORMED=False
-AUTHORITY_DATABASE_MUTATION=False
-```
-
-Windows PowerShell 5.1 rejected the earlier operator command
-`New-Item -LiteralPath`. The corrected write-denial/temp probe used
-`[System.IO.File]`. Treat shell incompatibility as an operator-command defect,
-not a product regression.
-
-### Final supervised P2 reread of accepted call #6
-
-The one accepted P2 reread occurred only after the zero-provider preflight. It
-reread existing durable state/artifact and did **not** execute the C3 provider
-effect again.
-
-Accepted P2 audit:
-
-```text
-selection:
-  36d6fbb3-bdec-57e0-a9cf-78dc2b8f7280
-session:
-  f787e4f6-c3ca-58fe-802b-f068dd474b41
-attempt:
-  e809f393-b557-5c6b-8665-78d66822fee8
-terminal:
-  b4c76e5f-44bb-54ce-a917-3e3223b84107
-snapshot:
-  eba46838-44ae-5bec-97bf-98c6639ae6a7
-terminal state:
-  SUCCEEDED
-provider disposition:
-  CONFIRMED
-artifact SHA-256:
-  31d82a31a3fbd909f8771820bf47e796a1503264fe0ac6ce0eff7ba163f0767d
-artifact byte length:
-  1291
-artifact identity SHA-256:
-  c23b0c5a8cd5d4808bb18e5f5165344a8013b4c29b9930dc33f74a30846978f2
-canonical artifact:
-  F:\AITradingBot\Authority\capture-output\daily-market-data-snapshot-eba46838-44ae-5bec-97bf-98c6639ae6a7.json
-```
-
-Verifier/permit result:
-
-```text
-retained bytes SHA/length: exact
-SNAPSHOT_VERIFICATION_PASSED=True
-SNAPSHOT_DIAGNOSTICS=()
-RESULT_PROVIDER_CALL_PERFORMED=False
-RESULT_DATABASE_MUTATION_PERFORMED=False
-P2_PRODUCTION_PERMIT_VALID=True
-SOCKET_CONNECT_COUNT=0
-```
-
-Authority database before/after:
-
-```text
-331776 bytes
-SHA-256:
-  6a8fb988d1cb223fbb66b09e8dab1e0de4b6aafd148dfdf01df08029203f4b76
-AUTHORITY_DATABASE_BYTE_IDENTITY=PASSED
-```
-
-Selected artifact before/after:
-
-```text
-1291 bytes
-SHA-256:
-  31d82a31a3fbd909f8771820bf47e796a1503264fe0ac6ce0eff7ba163f0767d
-CALL6_ARTIFACT_BYTE_IDENTITY=PASSED
-```
-
-Final classification:
-
-```text
-P2_SUPERVISED_CALL6_READ=PASSED
-CALL6_PROVIDER_EFFECT_REEXECUTED=False
-PROVIDER_CALL_7_PERFORMED=False
-PROVIDER_CALL_7_AUTHORIZED=False
-P2=FULLY_ACCEPTED
-```
-
-Detailed acceptance record:
-`docs/validation/reliable-manual-paper-cycle-p2-acceptance.md`.
+The one supervised P2 reread of already-durable successful call #6 passed after
+sealed deployment and a separate non-admin zero-provider preflight. It performed
+no provider call, no DB mutation, zero Python socket connects, and no provider
+call #7. **Do not rerun the supervised P2 call-#6 read.**
 
 ---
 
-## 10. Next milestone — P3 manual paper-account authority
+## 7. P3 frozen account and production provisioning state
 
-P3 is next. Route implementation to **Codex Sol High** because it crosses
-security/authority, filesystem trust, locking/concurrency, and crash/recovery
-boundaries.
+Frozen paper account:
 
-Frozen P3 scope:
+```text
+paper account ID: d1510a4b-6ebf-58ef-92a4-e743ca91151e
+genesis checkpoint ID: 7b7b83ba-69e2-5ed8-a033-b4306cd1ffc7
+starting cash: 100000
+genesis SHA-256: b6172753ee4f30a82265ff38b341c3de42869ba6af7ccb69739234135183026d
+genesis bytes: 534
+anchor SHA-256: 650b977db5ea5f5f1d89e3ed5bf52dfb5b2c5c44c3b34ccceb6d22dd492df871
+anchor bytes: 411
+manifest SHA-256: 8505eddd07be2f90d1211ee49a9cac4829d0faff9d88d0dc4c609b209a2e8801
+```
 
-- production-style root fixed in code at `F:\AITradingBot\Paper`;
-- no caller-selected operational root;
-- explicit disposable test seams only;
-- immutable account anchor binding canonical paper account ID, approved machine
-  authority identity, exact Trading SID, and exact genesis checkpoint
-  ID/SHA-256/byte length;
-- safe root/object/reparse/DACL/owner/inheritance validation;
-- bounded strict inventory of recognized durable state;
-- current tip derived only from a unique verified linear graph from anchored
-  genesis;
-- forks, cycles, competing successors, disconnected genesis, staging remnants,
-  malformed recognized state, unsafe objects, casefold collisions, overflow, or
-  unverifiable transitions block admission;
-- one account-scoped Windows lifecycle mutex;
-- complete anchor/graph/tip revalidation after mutex acquisition;
-- mutex held through complete Architecture-67 execute/recover durable
-  classification;
-- mutex never substitutes for durable transition/receipt evidence;
-- no C3/provider/credential/broker/live authority.
+Accepted bundle/release evidence:
 
-After P3: P4 exact P1↔P2↔paper-account composition, P5 explicit manual CLI,
-then P6 supervised simulated-paper acceptance/final certification.
+```text
+bundle freeze: F:\AI\p3-paper-provisioning-freeze-v2
+release wheel: F:\AI\p3-provisioning-release-v4\ai_trading_bot-0.1.0-py3-none-any.whl
+release wheel SHA-256: 86834a81dd21887fafd6efc3af1d2525ff9a37a3229dbea6e8cd7cfaba5b8a27
+release wheel bytes: 764270
+sealed deployment: P3_SEALED_RUNTIME_DEPLOYMENT_V5=ACCEPTED
+Trading zero-provider preflight: ACCEPTED
+```
+
+The first native Administrator publication attempt is retained failed evidence:
+
+```text
+P3_NATIVE_ADMIN_PROVISIONING_V1=FAILED_RETAINED
+PUBLICATION_ERROR_STATE=PUBLICATION_OUTCOME_UNCERTAIN
+```
+
+Do not rerun that publisher.
+
+Read-only ambiguity resolution and staging forensic established:
+
+```text
+FINAL_EXISTS=False
+STAGING_EXISTS=True
+PUBLICATION_STATE=STAGING_REQUIRES_MANUAL_RECOVERY
+staging exact inventory/security/bytes/native identities: PASS
+authority DB unchanged exact: PASS
+```
+
+The staging tree is valid frozen recovery evidence. Do not delete, rename,
+repair, resume, or regenerate it outside the reviewed recovery path.
 
 ---
 
-## 11. GUI track
+## 8. P3-R1 native diagnosis and Architecture 95
+
+Disposable diagnostics proved:
+
+```text
+root-only absolute FileRenameInfo rename             -> PASS
+retained child directory across root rename          -> ERROR_ACCESS_DENIED
+retained direct child file across root rename        -> ERROR_ACCESS_DENIED
+retained nested file across root rename              -> ERROR_ACCESS_DENIED
+publisher topology with retained descendants         -> ERROR_ACCESS_DENIED
+all descendants closed before same root rename       -> PASS
+adding FILE_SHARE_DELETE to retained root            -> still denied with descendant
+retained root GetFinalPathNameByHandleW after PASS   -> exact final path
+```
+
+Therefore the production failure was the retained-descendant-handle ordering,
+not the frozen account, ACLs, authority DB, or absolute destination path.
+
+Architecture 95 requires:
+
+```text
+complete staging proof with descendants retained
+-> record all native identities
+-> close every descendant successfully
+-> retain/revalidate trusted parent + staging root
+-> final still absent
+-> FIRST_PRODUCTION_MUTATION=P3_R1_ROOT_RENAME
+-> one absolute no-replace retained-root rename
+-> exact retained-root final-path proof
+-> staging absent / final present
+-> reopen final descendants read-only
+-> exact pre/post native identity equality
+-> complete final proof
+-> DB before == after
+```
+
+The ordinary publisher must use the corrected ordering for future clean-state
+publication but must continue to reject existing staging and never invoke P3-R1
+recovery implicitly.
+
+---
+
+## 9. Retained implementation checkpoint and Architecture 96 correction
+
+First P3-R1 implementation checkpoint:
+
+```text
+2b82222fbaee857e02519a0ea3627679d309276d
+fix: add P3 retained staging recovery
+```
+
+Focused final gate on that tree passed:
+
+```text
+641 passed, 7 skipped
+Ruff: PASS
+format: PASS
+git diff --check: PASS
+```
+
+Exact GitHub review accepted:
+
+- descendant close-before-rename ordering;
+- exact retained-root final-path proof;
+- exact pre/post descendant native-identity continuity;
+- conservative crash/ambiguity semantics;
+- ordinary-publisher separation;
+- fake-Win32 retained-descendant access-denied behavior.
+
+It was **not accepted as final source** because
+`P3R1RecoveryDeploymentExpectation` let the caller choose the expected elevated
+operator SID and installed RECORD digest/length. Caller-selected SIDs/digests,
+paths, manifests, reconstructed objects, or environment values cannot create
+production recovery authority.
+
+Architecture 96 resolves this non-circularly:
+
+```text
+accepted corrected source
+-> exact post-build wheel/RECORD freeze
+-> collect exact elevated Administrator SID
+-> canonical p3-r1-recovery-authorization/v1 bytes
+-> detached domain-separated signature using external production P-256 signer
+-> verify against source-pinned production public key
+-> freeze signed authorization evidence
+-> deploy exactly authorized wheel
+-> runtime verifies signed operator/release/incident facts
+-> reconcile installed RECORD/package/import provenance
+-> issue private process-local recovery permit
+-> permit required directly by native recovery mutation boundary
+```
+
+A bootstrap signature cannot authorize recovery; recovery uses a dedicated
+signed domain and verifier. Raw signed fields are evidence, not a substitute for
+the issued permit.
+
+The same correction pass must also move the opt-in native rename regression away
+from worktree `.pytest_cache` to pytest-managed/external-basetemp scratch.
+
+Authoritative docs:
+
+```text
+docs/architecture/95-p3-r1-retained-staging-recovery.md
+docs/architecture/96-p3-r1-signed-recovery-authorization.md
+docs/validation/reliable-manual-paper-cycle-p3-r1-recovery.md
+docs/validation/reliable-manual-paper-cycle-p3-r1-signed-authorization.md
+```
+
+---
+
+## 10. Next milestone
+
+**Next: Codex Sol High bounded P3-R1 Architecture-96 correction.**
+
+Before implementation, fast-forward the local P3-R1 worktree to the current
+remote docs head, then use that exact new HEAD in the mandatory startup gate.
+Do not reset/rebase/amend the retained `2b82222...` implementation checkpoint.
+
+Correction scope:
+
+- remove caller-authoritative recovery deployment/operator expectation;
+- add strict canonical signed recovery-authorization parsing/verification;
+- add private process-local recovery permit/provenance boundary;
+- require the permit directly at native recovery mutation admission;
+- preserve all accepted Architecture-95 rename/identity/crash behavior;
+- fix native disposable test scratch to use pytest-managed temp;
+- focused tests only using fresh `F:\AI\temp\pytest\... --basetemp` and normally
+  `-p no:cacheprovider`;
+- no commit/push until ChatGPT exact-diff handoff unless explicitly authorized.
+
+After corrected exact-diff acceptance:
+
+```text
+one broad isolated-basetemp source certification
+-> exact release wheel freeze
+-> wheel/package/RECORD reconciliation
+-> exact Administrator SID collection
+-> signed P3-R1 authorization freeze
+-> sealed-runtime deployment
+-> installed RECORD/package reconciliation
+-> read-only retained-staging revalidation
+-> explicit one-time production recovery approval
+-> Administrator P3-R1 recovery
+-> close Administrator shell
+-> non-admin Trading P3 acceptance
+```
+
+P4 remains blocked until P3 recovery and Trading acceptance complete.
+
+---
+
+## 11. Non-authorizations / hard stops
+
+```text
+PRODUCTION_RECOVERY_RENAME=NOT_AUTHORIZED
+PUBLISHER_RERUN=FORBIDDEN
+STAGING_DELETE_OR_REPAIR=FORBIDDEN
+CALLER_ASSERTED_RECOVERY_AUTHORITY=FORBIDDEN
+UNSIGNED_RECOVERY_AUTHORIZATION=FORBIDDEN
+P3_TRADING_ACCEPTANCE=BLOCKED_PENDING_RECOVERY
+P4_PRODUCTION_EXECUTION=BLOCKED
+PROVIDER_CALL_7=NOT_AUTHORIZED
+CALL6_PROVIDER_EFFECT_REEXECUTION=FORBIDDEN
+P2_SUPERVISED_CALL6_REREAD=DO_NOT_RERUN
+PRODUCTION_LIVE=NO-GO
+```
+
+No production/provider/Credential Manager/broker/Paper transition effect is
+authorized by source tests, documentation, release preparation, or signed
+artifact construction alone.
+
+---
+
+## 12. GUI track
 
 GUI-A1 through GUI-A7 are fully accepted and integrated. Accepted semantic GUI
 head:
@@ -596,50 +516,34 @@ Final GUI documentation/reference-correction head:
 
 The GUI remains presentation/read-only inspection. It does not own production
 authority, capture, credentials, paper mutation, retry/recovery, brokerage, or
-live execution. No GUI-A8 architecture is currently selected.
+live execution.
 
 ---
 
-## 12. Stable product constraints
+## 13. Files to read when resuming P3-R1
 
-- US stocks/ETFs initially;
-- long-only;
-- no margin/leverage;
-- no options;
-- no short selling;
-- no crypto;
-- deterministic risk approval for every order;
-- paper mode by default;
-- complete auditability;
-- production/live remains NO-GO until separately certified.
-
----
-
-## 13. Files to read when resuming
-
-Read these first:
+Read first:
 
 ```text
 AGENTS.md
 docs/PROJECT_STATUS.md
 docs/AI_TRADING_BOT_HANDOFF.md
 docs/AI_DEVELOPMENT_WORKFLOW.md
-docs/architecture/94-reliable-manual-paper-cycle-authority.md
-docs/validation/reliable-manual-paper-cycle-plan.md
-docs/validation/reliable-manual-paper-cycle-p2-acceptance.md
+docs/architecture/94-p3-production-paper-account-provisioning.md
+docs/architecture/95-p3-r1-retained-staging-recovery.md
+docs/architecture/96-p3-r1-signed-recovery-authorization.md
+docs/validation/reliable-manual-paper-cycle-p3-provisioning.md
+docs/validation/reliable-manual-paper-cycle-p3-r1-recovery.md
+docs/validation/reliable-manual-paper-cycle-p3-r1-signed-authorization.md
 ```
 
-When working near C1/C2/C3, also read the relevant Windows authority/C3
-architecture documents, especially Architectures 77, 80, 81, 82, 83, 84, and
-84A.
-
-When working on P3/P4, also read the accepted deterministic paper-account,
-checkpoint, lineage, and durable operation architecture (18, 19, 23, 62, 63,
-66, and 67) before changing authority or commit semantics.
+When changing C1 trust/signature primitives, also read the relevant C1 Windows
+authority architecture, especially Architectures 77 and 80, and preserve
+bootstrap/recovery domain separation.
 
 ---
 
-## 14. Documentation and closeout rule
+## 14. Documentation closeout rule
 
 At every accepted milestone, review/update:
 
@@ -648,27 +552,10 @@ docs/PROJECT_STATUS.md
 docs/AI_TRADING_BOT_HANDOFF.md
 ```
 
-If a milestone teaches a reusable workflow/recovery lesson, also update
-`docs/AI_DEVELOPMENT_WORKFLOW.md` and the applicable validation/acceptance record.
-This requirement exists specifically to prevent future chats from repeating
-already-diagnosed worktree, pytest, shell-compatibility, or production-deployment
-mistakes.
+If a milestone reveals a reusable workflow/recovery lesson, also update
+`AGENTS.md`, `docs/AI_DEVELOPMENT_WORKFLOW.md`, and the applicable
+validation/acceptance record.
 
-Docs-only closeout does not authorize merging, rebasing, amending, force-pushing,
-review-thread resolution, PR metadata changes, unrelated file changes, provider
-effects, credential operations, or live trading.
-
----
-
-## 15. Definition of project success
-
-The project succeeds when it can research deterministically, acquire trusted
-market data safely, make portfolio decisions under deterministic risk, interact
-safely with a brokerage, reconcile ambiguous outcomes, run unattended for long
-periods, fail closed on uncertainty, expose durable evidence/operator controls,
-operate under strict live limits, and present the same reviewed capabilities
-through a polished GUI.
-
-The final system is a **safety-oriented automated trading platform in which AI
-is one replaceable decision-making component inside a deterministic operational
-and authority framework**.
+Docs-only closeout does not authorize merge, rebase, amend, force-push,
+review-thread resolution, PR metadata changes, unrelated changes, production
+recovery, provider effects, credential operations, or live trading.

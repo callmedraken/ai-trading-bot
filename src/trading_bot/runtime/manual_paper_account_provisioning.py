@@ -33,6 +33,9 @@ from trading_bot.runtime.paper_account_checkpoint import (
     serialize_paper_account_checkpoint,
     verify_genesis_paper_account_checkpoint,
 )
+from trading_bot.runtime.verified_snapshot_preparation import (
+    VerifiedDailySnapshotReference,
+)
 
 MANUAL_PAPER_ACCOUNT_PROVISIONING_SCHEMA = "manual-paper-account-provisioning/v1"
 MANUAL_PAPER_ACCOUNT_PROVISIONING_NAMESPACE = UUID(
@@ -306,12 +309,15 @@ def build_manual_paper_account_provisioning_bundle(
     approved_trading_sid: str,
     starting_cash: Decimal,
     snapshot_verification: DailySnapshotVerificationResult,
+    expected_snapshot_reference: VerifiedDailySnapshotReference,
 ) -> ManualPaperAccountProvisioningBundle:
     """Build v1 from explicit cash and one complete, reverified XNYS snapshot.
 
     No timestamp, account ID, positions, P&L, orders, or metadata override exists.
-    The rollout's call-#6 selection and exact bundle are frozen outside this pure
-    generic API; a snapshot result grants no P2 or provider authority.
+    The required expected reference binds non-authorizing chronology provenance;
+    the rollout's accepted call-#6 reference is supplied by the bundle freeze.
+    It proves no C3 selection and grants no P2 or provider authority. It is not
+    retained in account identity, the anchor, or the provisioning manifest.
     """
     try:
         _uuid(machine_authority_id)
@@ -340,6 +346,23 @@ def build_manual_paper_account_provisioning_bundle(
             or verified.snapshot is None
         ):
             raise ManualPaperAccountProvisioningError("SNAPSHOT_REVERIFICATION_FAILED")
+        if type(expected_snapshot_reference) is not VerifiedDailySnapshotReference:
+            raise ManualPaperAccountProvisioningError(
+                "EXPECTED_SNAPSHOT_REFERENCE_INVALID"
+            )
+        expected_snapshot_reference.__post_init__()
+        if (
+            verified.snapshot.snapshot_id,
+            verified.sha256,
+            verified.byte_length,
+        ) != (
+            expected_snapshot_reference.snapshot_id,
+            expected_snapshot_reference.artifact_sha256,
+            expected_snapshot_reference.artifact_byte_length,
+        ):
+            raise ManualPaperAccountProvisioningError(
+                "EXPECTED_SNAPSHOT_REFERENCE_MISMATCH"
+            )
         checkpoint = create_genesis_paper_account_checkpoint(
             PaperAccountGenesisRequest(
                 as_of=verified.snapshot.audit.captured_at,

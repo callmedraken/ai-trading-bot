@@ -5,13 +5,22 @@ import os
 import subprocess
 import sys
 from dataclasses import FrozenInstanceError, replace
+from datetime import timedelta
 from decimal import ROUND_DOWN, ROUND_UP, Decimal, localcontext
 from hashlib import sha256
+from unittest.mock import Mock
 from uuid import UUID, uuid5
 
 import pytest
-from tests.market_data.daily_snapshot_test_support import accepted_result, calendar
+from tests.market_data.daily_snapshot_test_support import (
+    QQQ,
+    SPY,
+    accepted_result,
+    calendar,
+    candidate,
+)
 
+import trading_bot.runtime.manual_paper_account_provisioning as provisioning
 from trading_bot.market_data import serialize_daily_snapshot, verify_daily_snapshot
 from trading_bot.runtime.manual_paper_account_authority import (
     parse_manual_paper_account_anchor,
@@ -28,23 +37,34 @@ from trading_bot.runtime.manual_paper_account_provisioning import (
 from trading_bot.runtime.paper_account_checkpoint import (
     verify_genesis_paper_account_checkpoint,
 )
+from trading_bot.runtime.verified_snapshot_preparation import (
+    VerifiedDailySnapshotReference,
+)
 
 MACHINE = "22222222-2222-5222-8222-222222222222"
 SID = "S-1-5-21-1-2-3-1009"
 
 
-def snapshot_result():
+def snapshot_result(**kwargs):
     return verify_daily_snapshot(
-        serialize_daily_snapshot(accepted_result().snapshot), calendar()
+        serialize_daily_snapshot(accepted_result(**kwargs).snapshot), calendar()
+    )
+
+
+def snapshot_reference(verification):
+    return VerifiedDailySnapshotReference(
+        verification.snapshot.snapshot_id, verification.sha256, verification.byte_length
     )
 
 
 def make_bundle(**kwargs):
+    verification = snapshot_result()
     inputs = dict(
         machine_authority_id=MACHINE,
         approved_trading_sid=SID,
         starting_cash=Decimal("1234.5600000000000000000000001"),
-        snapshot_verification=snapshot_result(),
+        snapshot_verification=verification,
+        expected_snapshot_reference=snapshot_reference(verification),
     )
     inputs.update(kwargs)
     return build_manual_paper_account_provisioning_bundle(**inputs)
@@ -129,12 +149,122 @@ def test_no_opening_or_identity_overrides(field, value):
 
 
 def test_no_cash_default():
-    with pytest.raises(TypeError):
+    with pytest.raises(TypeError, match="starting_cash"):
         build_manual_paper_account_provisioning_bundle(
             machine_authority_id=MACHINE,
             approved_trading_sid=SID,
             snapshot_verification=snapshot_result(),
+            expected_snapshot_reference=snapshot_reference(snapshot_result()),
         )
+
+
+def test_expected_snapshot_reference_has_no_default():
+    with pytest.raises(TypeError, match="expected_snapshot_reference"):
+        build_manual_paper_account_provisioning_bundle(
+            machine_authority_id=MACHINE,
+            approved_trading_sid=SID,
+            starting_cash=Decimal("10"),
+            snapshot_verification=snapshot_result(),
+        )
+
+
+def test_different_valid_snapshot_rejected_before_genesis(monkeypatch):
+    verification_a = snapshot_result()
+    reference_a = snapshot_reference(verification_a)
+    bundle = make_bundle(
+        snapshot_verification=verification_a, expected_snapshot_reference=reference_a
+    )
+    assert (
+        verify_genesis_paper_account_checkpoint(bundle.genesis_bytes).status.value
+        == "PASS"
+    )
+    verification_b = snapshot_result(
+        captured_at=verification_a.snapshot.audit.captured_at + timedelta(seconds=1),
+        candidates=(candidate(QQQ, 0, volume=123456), candidate(SPY, 1)),
+    )
+    assert verification_b.passed and verification_b.diagnostics == ()
+    assert (
+        verification_b.snapshot.audit.captured_at
+        != verification_a.snapshot.audit.captured_at
+    )
+    assert verification_b.snapshot.snapshot_id != reference_a.snapshot_id
+    assert verification_b.sha256 != reference_a.artifact_sha256
+    request = Mock(side_effect=AssertionError("GENESIS request must not be created"))
+    genesis = Mock(side_effect=AssertionError("GENESIS must not be derived"))
+    monkeypatch.setattr(provisioning, "PaperAccountGenesisRequest", request)
+    monkeypatch.setattr(
+        provisioning, "create_genesis_paper_account_checkpoint", genesis
+    )
+    with pytest.raises(
+        ManualPaperAccountProvisioningError,
+        match="^EXPECTED_SNAPSHOT_REFERENCE_MISMATCH$",
+    ):
+        make_bundle(
+            snapshot_verification=verification_b,
+            expected_snapshot_reference=reference_a,
+        )
+    request.assert_not_called()
+    genesis.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("snapshot_id", UUID(int=7)),
+        ("artifact_sha256", "0" * 64),
+        ("artifact_byte_length", 1),
+    ],
+)
+def test_each_expected_snapshot_field_must_match(field, value, monkeypatch):
+    verification = snapshot_result()
+    reference = replace(snapshot_reference(verification), **{field: value})
+    derive_id = Mock(side_effect=AssertionError("Mismatch must not mint an account ID"))
+    monkeypatch.setattr(provisioning, "derive_manual_paper_account_id", derive_id)
+    with pytest.raises(
+        ManualPaperAccountProvisioningError,
+        match="^EXPECTED_SNAPSHOT_REFERENCE_MISMATCH$",
+    ):
+        make_bundle(expected_snapshot_reference=reference)
+    derive_id.assert_not_called()
+
+
+@pytest.mark.parametrize("reference", [None, object(), {}, ()])
+def test_expected_snapshot_reference_requires_exact_type(reference):
+    with pytest.raises(
+        ManualPaperAccountProvisioningError,
+        match="^EXPECTED_SNAPSHOT_REFERENCE_INVALID$",
+    ):
+        make_bundle(expected_snapshot_reference=reference)
+
+
+def test_snapshot_reference_provenance_does_not_enter_bundle_or_account_identity():
+    verification_a = snapshot_result()
+    # Different canonical snapshot evidence with the same chronology seed.
+    verification_b = snapshot_result(
+        provider_request_id="another-offline-test-response",
+        candidates=(candidate(QQQ, 0, volume=123456), candidate(SPY, 1)),
+    )
+    assert verification_a.passed and verification_b.passed
+    reference_a = snapshot_reference(verification_a)
+    reference_b = snapshot_reference(verification_b)
+    assert reference_a.snapshot_id != reference_b.snapshot_id
+    assert reference_a.artifact_sha256 != reference_b.artifact_sha256
+    assert reference_a.artifact_byte_length != reference_b.artifact_byte_length
+    assert (
+        verification_a.snapshot.audit.captured_at
+        == verification_b.snapshot.audit.captured_at
+    )
+    bundle_a = make_bundle(
+        snapshot_verification=verification_a, expected_snapshot_reference=reference_a
+    )
+    bundle_b = make_bundle(
+        snapshot_verification=verification_b, expected_snapshot_reference=reference_b
+    )
+    # Assertion changes admit/reject construction only. Identical A61 opening
+    # state still yields identical genesis, anchor, manifest and frozen UUID5.
+    assert bundle_a == bundle_b
+    manifest = verify_manual_paper_account_provisioning_bundle(bundle_b).manifest
+    assert str(manifest.paper_account_id) == "2075ac92-ab8a-5a56-b0d6-3e286d9a55d8"
 
 
 @pytest.mark.parametrize(
@@ -173,8 +303,6 @@ def test_snapshot_requires_complete_matching_pass(mode):
         object.__setattr__(result, "snapshot", None)
     else:
         # A changed timestamp without rederived identity is not verified proof.
-        from datetime import timedelta
-
         audit = replace(
             result.snapshot.audit,
             captured_at=result.snapshot.audit.captured_at + timedelta(seconds=1),

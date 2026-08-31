@@ -340,3 +340,79 @@ appears to require any of the following:
 - replacing an existing final paper root;
 - creation of A67 transition/receipt state;
 - a second P4/A67 commit algorithm.
+
+## Accepted production bundle freeze
+
+The production-v1 bundle is frozen and accepted from source commit
+`bc1536316e153048833db7a2769f811007382d0e` and tree
+`ff3428b459ebfa0ebd36e15d889efcf2d5628da7`.
+
+The first attempted release envelope is retained historical evidence only:
+
+```text
+F:\AI\p3-paper-provisioning-freeze-v1
+state = FAILED_RETAINED
+reuse = FORBIDDEN
+```
+
+It must not be deleted, repaired, overwritten, or reused. The accepted bundle is
+under the separate retained v2 envelope:
+
+```text
+F:\AI\p3-paper-provisioning-freeze-v2
+state = ACCEPTED
+regeneration = FORBIDDEN
+```
+
+The v2 bundle was created offline after independent Trading-account retention of
+the already accepted call-#6 bytes and Administrator revalidation of installed C1.
+No P2 selected read was rerun, no provider request occurred, provider call #7 was
+not authorized, and `F:\AITradingBot\Paper` remained absent.
+
+The exact frozen deployment facts are:
+
+```text
+P3_PROVISIONING_SOURCE_HEAD=bc1536316e153048833db7a2769f811007382d0e
+P3_PROVISIONING_SOURCE_TREE=ff3428b459ebfa0ebd36e15d889efcf2d5628da7
+MACHINE_AUTHORITY_ID=223f0d4e-36f9-4b9b-bf0e-febf16fcd3f1
+TRADING_SID=S-1-5-21-1397534616-3988210162-180023805-1009
+C1_BOOTSTRAP_DIGEST=53b8b72ab18b1c477c5eab50857e4dc2d47efc6e74030e380ed6a53387922ae4
+PAPER_ACCOUNT_STARTING_CASH=100000
+PAPER_ACCOUNT_GENESIS_AS_OF=2026-08-29T09:46:43.769105+00:00
+CALL6_SNAPSHOT_ID=eba46838-44ae-5bec-97bf-98c6639ae6a7
+CALL6_ARTIFACT_SHA256=31d82a31a3fbd909f8771820bf47e796a1503264fe0ac6ce0eff7ba163f0767d
+CALL6_ARTIFACT_BYTES=1291
+PAPER_ACCOUNT_ID=d1510a4b-6ebf-58ef-92a4-e743ca91151e
+GENESIS_CHECKPOINT_ID=7b7b83ba-69e2-5ed8-a033-b4306cd1ffc7
+GENESIS_SHA256=b6172753ee4f30a82265ff38b341c3de42869ba6af7ccb69739234135183026d
+GENESIS_BYTES=534
+ANCHOR_SHA256=650b977db5ea5f5f1d89e3ed5bf52dfb5b2c5c44c3b34ccceb6d22dd492df871
+ANCHOR_BYTES=411
+PROVISIONING_MANIFEST_SHA256=8505eddd07be2f90d1211ee49a9cac4829d0faff9d88d0dc4c609b209a2e8801
+PROVISIONING_MANIFEST_BYTES=522
+FREEZE_EVIDENCE_SHA256=7f2824adf5105f66e16b62aa4c6659d16669dea8208bbd2496eb96adbab0e034
+FREEZE_EVIDENCE_BYTES=1353
+P2_SELECTED_READ_RERUN=False
+PROVIDER_CALL_PERFORMED=False
+PROVIDER_CALL_7_AUTHORIZED=False
+PRODUCTION_PAPER_ROOT_CREATED=False
+```
+
+These values are immutable release evidence for this production-v1 account. A
+path, regenerated internally valid bundle, different starting cash, different
+snapshot, or different artifact bytes cannot substitute for them.
+
+The next authorized gate is release preparation only:
+
+```text
+exact bc153631 source
+-> isolated Git export
+-> offline wheel build
+-> wheel/RECORD/package exact-match certification
+-> freeze wheel SHA-256/length
+-> separately reviewed sealed-runtime deployment
+```
+
+Production publication remains a later explicit approval point. This docs
+checkpoint does not authorize creation of `F:\AITradingBot\Paper`, P4 execution,
+provider call #7, or production/live trading.

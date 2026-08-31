@@ -353,3 +353,79 @@ PROVIDER_CALL_7=NOT_AUTHORIZED
 PRODUCTION_LIVE=NO-GO
 P4_PRODUCTION_EXECUTION=BLOCKED
 ```
+
+## N. Accepted v2 production-bundle freeze evidence
+
+The production bundle checkpoint is accepted from exact source commit
+`bc1536316e153048833db7a2769f811007382d0e` and tree
+`ff3428b459ebfa0ebd36e15d889efcf2d5628da7`.
+
+The first freeze envelope remains retained failed evidence and is not reusable:
+
+```text
+F:\AI\p3-paper-provisioning-freeze-v1
+P3_FREEZE_V1=FAILED_RETAINED
+REUSE=FORBIDDEN
+```
+
+The accepted immutable bundle/evidence is retained at:
+
+```text
+F:\AI\p3-paper-provisioning-freeze-v2
+P3_FREEZE_V2_INPUT_GATE=PASS
+P3_PRODUCTION_BUNDLE_FREEZE=ACCEPTED
+REGENERATION=FORBIDDEN
+```
+
+The complete accepted release evidence is:
+
+```text
+P3_PROVISIONING_SOURCE_HEAD=bc1536316e153048833db7a2769f811007382d0e
+P3_PROVISIONING_SOURCE_TREE=ff3428b459ebfa0ebd36e15d889efcf2d5628da7
+MACHINE_AUTHORITY_ID=223f0d4e-36f9-4b9b-bf0e-febf16fcd3f1
+TRADING_SID=S-1-5-21-1397534616-3988210162-180023805-1009
+C1_BOOTSTRAP_DIGEST=53b8b72ab18b1c477c5eab50857e4dc2d47efc6e74030e380ed6a53387922ae4
+PAPER_ACCOUNT_STARTING_CASH=100000
+PAPER_ACCOUNT_GENESIS_AS_OF=2026-08-29T09:46:43.769105+00:00
+CALL6_SNAPSHOT_ID=eba46838-44ae-5bec-97bf-98c6639ae6a7
+CALL6_ARTIFACT_SHA256=31d82a31a3fbd909f8771820bf47e796a1503264fe0ac6ce0eff7ba163f0767d
+CALL6_ARTIFACT_BYTES=1291
+PAPER_ACCOUNT_ID=d1510a4b-6ebf-58ef-92a4-e743ca91151e
+GENESIS_CHECKPOINT_ID=7b7b83ba-69e2-5ed8-a033-b4306cd1ffc7
+GENESIS_SHA256=b6172753ee4f30a82265ff38b341c3de42869ba6af7ccb69739234135183026d
+GENESIS_BYTES=534
+ANCHOR_SHA256=650b977db5ea5f5f1d89e3ed5bf52dfb5b2c5c44c3b34ccceb6d22dd492df871
+ANCHOR_BYTES=411
+PROVISIONING_MANIFEST_SHA256=8505eddd07be2f90d1211ee49a9cac4829d0faff9d88d0dc4c609b209a2e8801
+PROVISIONING_MANIFEST_BYTES=522
+FREEZE_EVIDENCE_SHA256=7f2824adf5105f66e16b62aa4c6659d16669dea8208bbd2496eb96adbab0e034
+FREEZE_EVIDENCE_BYTES=1353
+STRICT_CALL6_VERIFICATION=PASS
+EXACT_CALL6_REFERENCE_BINDING=PASS
+FROZEN_BUNDLE_REREAD=PASS
+P2_SELECTED_READ_RERUN=False
+PROVIDER_CALL_PERFORMED=False
+PROVIDER_CALL_7_AUTHORIZED=False
+PRODUCTION_PAPER_ROOT_CREATED=False
+```
+
+This accepted freeze does not yet include the provisioning wheel. The wheel
+SHA-256/length fields in section I remain pending until the exact accepted source
+is exported and packaged.
+
+The next gate is release preparation only:
+
+```text
+exact bc153631 source
+-> isolated Git export
+-> offline wheel build
+-> wheel RECORD verification
+-> exact wheel/source/package byte reconciliation
+-> freeze wheel SHA-256/length
+-> separately reviewed sealed-runtime deployment
+```
+
+Do not run Administrator production publication yet. The actual one-time creation
+of `F:\AITradingBot\Paper` remains a separate approval after sealed-runtime
+certification. Provider call #7 and P4 production execution remain unauthorized;
+production/live trading remains NO-GO.

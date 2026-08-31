@@ -196,6 +196,47 @@ C1 helpers that are deliberately fixed to `F:\AITradingBot\Authority` must not
 be widened to accept the paper root. P3 may reuse public low-level Windows
 security primitives but must implement a paper-specific path/security boundary.
 
+## P4 production output-security prerequisite
+
+Production P3 validates exact reviewed Windows security on finalized transition
+and receipt output objects. The existing generic Architecture-67 output helpers
+create transition staging directories with `os.mkdir`, report/checkpoint files
+with ordinary `os.open`/`O_CREAT`, `paper-operations` with `os.mkdir`, receipt
+staging directories with `os.mkdir`, and receipt files with ordinary
+`os.open`/`O_CREAT`. These creation paths do not supply the P3 Windows security
+descriptor. The current P3 root/output policy is protected and non-inheriting;
+production P4 must not simply call those generic paths against
+`F:\AITradingBot\Paper` and assume the resulting objects satisfy P3.
+
+Before P4 production mutation is implemented, ChatGPT/Sol must freeze and
+separately review a narrow production object-creation seam for the existing A67
+output algorithm. That seam must satisfy all of these requirements:
+
+- transition/receipt staging directories and files receive the exact reviewed
+  P3 output security descriptor at creation time;
+- rename preserves that descriptor into each finalized object;
+- `paper-operations` itself is created with its reviewed descriptor;
+- generic/offline A67 callers and deterministic schemas/identities remain
+  unchanged;
+- A67 no-clobber ordering, staging/reread verification, the transition account
+  commit point, the separate receipt commitment, and recovery rules remain
+  unchanged.
+
+There must be no second A67 commit algorithm, caller-selected production root,
+reliance on process-token default DACLs, reliance on ACL inheritance under the
+non-inheriting P3 policy, or ACL normalization/repair after durable commit. No P4
+production execution may be admitted until this creation seam has been
+separately reviewed. If an at-creation security seam cannot preserve A67
+semantics, stop for ChatGPT architecture review instead of changing those
+semantics.
+
+Future P4 native Windows validation must prove the production creation seam
+establishes exact P3 ACLs on staging, finalized transitions, and
+`paper-operations`/receipts, followed by a passing P3 preflight, including
+crash/recovery windows. This P3 correction only freezes that prerequisite. It
+does not implement the P4 seam, weaken P3 security, add ACL repair, or authorize
+production mutation.
+
 ## Account-scoped Windows mutex
 
 P3 uses a separate paper-account mutex identity. It must not reuse or forge the
@@ -225,6 +266,15 @@ SYSTEM, or the exact approved Trading SID as permitted by the current token.
 not validate account state. The complete root/anchor/inventory/historical
 snapshot/full-lineage proof must run again after every acquisition, including an
 abandoned acquisition.
+
+Locked admission retains the complete pre-lock P3 evidence as `before`. If the
+caller supplies `expected`, it must exactly equal `before` before acquisition.
+The mutex is keyed from `before.paper_account_id`. After acquisition, complete
+fresh preflight evidence must always exactly equal `before`, whether or not
+`expected` was supplied. Any change in anchor, tip, lineage, historical
+dependencies, transition count, or any other retained P3 evidence blocks before
+a `LockedManualPaperAccount` is issued. `expected` is an optional additional
+caller assertion; stale-state protection is unconditional.
 
 P3 may expose read-only preflight without holding the final mutation lock. Any
 future mutation admission must use a lock-scoped revalidation object whose

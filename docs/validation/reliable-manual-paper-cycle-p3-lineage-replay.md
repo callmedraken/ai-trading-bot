@@ -166,10 +166,69 @@ Cover pure identity material and, in opt-in Windows tests, native behavior:
 - release/close occur exactly once;
 - `WAIT_ABANDONED` is retained as explicit acquisition evidence;
 - an abandoned acquisition cannot skip complete account revalidation;
+- optional `expected` must exactly equal the complete pre-lock evidence before
+  mutex acquisition;
+- acquisition uses the pre-lock evidence's paper-account ID;
+- complete post-acquisition evidence must exactly equal complete pre-lock
+  evidence even when `locked_revalidate()` is called without `expected`;
+- a valid successor published between the initial preflight and acquisition
+  blocks default admission before any live scope is issued, for both ordinary
+  and abandoned acquisition, and the mutex is released;
+- changes to anchor, tip, lineage, historical dependencies, transition count,
+  or any other retained P3 evidence block admission;
 - a lock-scoped mutation-admission proof cannot be reused after lock release.
 
 Ordinary tests must not depend on a global Windows object. Native Windows tests
 remain explicit opt-in.
+
+## Future P4 production output-security gate
+
+P3 production validation requires exact reviewed Windows security on finalized
+transition/receipt objects. Existing generic A67 helpers create transition
+staging directories with `os.mkdir`, report/checkpoint files with ordinary
+`os.open`/`O_CREAT`, `paper-operations` with `os.mkdir`, receipt staging
+directories with `os.mkdir`, and receipt files with ordinary `os.open`/`O_CREAT`.
+They do not supply the P3 Windows security descriptor. The protected,
+non-inheriting P3 root/output policy therefore does not permit production P4 to
+assume that calling those paths against `F:\AITradingBot\Paper` is sufficient.
+
+Before P4 production mutation is implemented, ChatGPT/Sol must freeze and
+separately review a narrow production object-creation seam for the existing A67
+algorithm. Future native Windows tests must establish this sequence:
+
+```text
+A67 production creation seam
+-> exact P3 ACL on staging
+-> exact P3 ACL on finalized transition
+-> exact P3 ACL on paper-operations/receipt
+-> subsequent P3 preflight PASS
+```
+
+Cover exact reviewed descriptors at creation for all transition/receipt staging
+directories and files and for `paper-operations` itself, descriptor preservation
+through rename, and crash/recovery windows. Staging remnants must continue to
+fail P3 closed; a subsequent P3 PASS requires a valid finalized state under the
+unchanged A67 recovery rules, not automatic P3 cleanup or repair.
+
+The separate review and tests must preserve generic/offline A67 callers,
+deterministic schemas/identities, no-clobber ordering, staging/reread
+verification, the transition commit point, the separate receipt commitment,
+and recovery rules. Reject a duplicated commit algorithm, caller-selected
+production root, process-token default DACL assumptions, ACL inheritance
+assumptions under the non-inheriting policy, and ACL normalization/repair after
+durable commit. No production P4 execution may be admitted before separate
+review. If the seam cannot preserve A67 semantics, stop for ChatGPT architecture
+review.
+
+This correction freezes the prerequisite only: do not implement the seam,
+change A67 source, weaken P3 object security, or run native production/P3
+acceptance as part of this gate. Record the current correction separately from
+future native acceptance:
+
+```text
+DEFAULT_LOCKED_TIP_DRIFT_BLOCKED=PASS
+P4_OUTPUT_SECURITY_PREREQUISITE_FROZEN=PASS
+```
 
 ## P3 output/evidence tests
 

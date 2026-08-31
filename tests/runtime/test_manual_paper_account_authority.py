@@ -593,6 +593,46 @@ def test_changes_between_preflight_and_lock_are_revalidated(tmp_path, one, two, 
     assert locks[0].exits == 1
 
 
+@pytest.mark.parametrize("abandoned", [False, True])
+def test_default_locked_revalidation_blocks_valid_tip_drift(
+    tmp_path, one, two, abandoned
+):
+    locks, sessions = [], []
+
+    def mutex(account):
+        lock = Mutex(
+            account,
+            abandoned=abandoned,
+            on_enter=lambda: write_transitions(root, capture, two),
+        )
+        locks.append(lock)
+        return lock
+
+    def reader():
+        sessions.append(bool(locks and locks[-1].active))
+        return p3.DisposablePaperAccountReadSessionForTest()
+
+    authority, root, capture = setup(
+        tmp_path, one, read_factory=reader, mutex_factory=mutex
+    )
+    with pytest.raises(
+        p3.ManualPaperAccountAuthorityError, match="P3_ACCOUNT_CHANGED_BEFORE_LOCK"
+    ):
+        with authority.locked_revalidate():
+            pytest.fail("a live scope was issued after valid account-tip drift")
+
+    assert sessions == [False, True]
+    assert locks[0].account == ACCOUNT
+    assert locks[0].acquisition.was_abandoned == abandoned
+    assert locks[0].exits == 1
+    assert not locks[0].active
+    # The successor itself is valid: admission failed because the proof changed.
+    fresh = authority.preflight()
+    assert fresh.anchor == anchor_for(one)
+    assert fresh.terminal_checkpoint_id == two.terminal_id != one.terminal_id
+    assert fresh.finalized_transition_count == 2
+
+
 @pytest.mark.parametrize("transform", [copy.copy, copy.deepcopy, pickle.dumps])
 def test_authority_and_scope_cannot_be_copied(tmp_path, one, transform):
     authority, _, _ = setup(tmp_path, genesis_only(one))

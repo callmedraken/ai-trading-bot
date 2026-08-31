@@ -400,9 +400,7 @@ def _locked_revalidate(
     with binding.mutex(before.paper_account_id) as lock:
         # Includes abandoned ownership; never reuse before-lock proof.
         fresh = _preflight(binding)
-        if fresh.anchor != before.anchor or (
-            expected is not None and fresh != expected
-        ):
+        if fresh != before:
             raise ManualPaperAccountAuthorityError("P3_ACCOUNT_CHANGED_BEFORE_LOCK")
         if type(lock.acquisition) is not PaperAccountMutexAcquisition:
             raise ManualPaperAccountAuthorityError("P3_MUTEX_ACQUISITION_INVALID")

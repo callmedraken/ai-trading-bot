@@ -11,6 +11,13 @@ not make the existing publisher resumable and does not authorize cleanup,
 replacement, regeneration, a new account identifier, P4 execution, provider
 call #7, or production/live trading.
 
+**Architecture 96 is a mandatory addendum to this document.** It closes the
+post-build release/operator authority-binding gap found during review of the
+first P3-R1 implementation. Any implementation of this architecture must also
+satisfy the signed-recovery-authorization contract in Architecture 96. A
+caller-created SID/digest/deployment-expectation object is not recovery
+authority.
+
 ## Frozen incident state
 
 The accepted production facts before any P3-R1 implementation are:
@@ -83,8 +90,10 @@ The operation is callable only when all of the following hold:
 2. execution is from the exact sealed production runtime;
 3. installed C1 is complete and matches the exact frozen machine authority and
    Trading SID;
-4. the accepted P3 production bundle and release/deployment identities match
-   the frozen release checkpoint;
+4. the accepted P3 production bundle and post-build release/deployment identity
+   are independently bound by the valid signed Architecture-96 recovery
+   authorization, and the signed exact Administrator SID equals the actual
+   current-token SID;
 5. `F:\AITradingBot\Paper` is absent;
 6. `F:\AITradingBot\.Paper.provisioning-v1` exists;
 7. the staging tree validates exactly as the previously accepted forensic state;
@@ -93,10 +102,16 @@ The operation is callable only when all of the following hold:
 10. no provider, credential, broker, strategy, risk, paper-transition, or P4
     authority is invoked.
 
+A caller-supplied SID, installed-RECORD digest/length, release path, environment
+value, manifest, or reconstructed expectation object may be evidence but cannot
+satisfy item 4. Architecture 96 defines the non-circular signed post-build
+binding and process-local recovery permit required before the native mutation
+boundary.
+
 Any other state fails closed. In particular, final present, final+staging,
 staging absent, unexpected staging inventory, identity/security drift, frozen
-byte mismatch, account-ID mismatch, or database drift must block without
-mutation.
+byte mismatch, account-ID mismatch, release/authorization mismatch, or database
+drift must block without mutation.
 
 ## Required retained-handle ordering
 
@@ -106,7 +121,7 @@ Windows constraint established by the diagnostics.
 The required order is:
 
 ```text
-validate immutable release/bundle/C1 inputs
+validate immutable signed-release authorization/bundle/C1 inputs
 -> retain safe parent handle
 -> retain staging-root handle with delete authority and no replacement sharing
 -> open and retain every expected staging descendant
@@ -135,9 +150,10 @@ validate immutable release/bundle/C1 inputs
 
 The close-descendants boundary is intentional. Once a descendant handle is
 closed, its previously recorded native identity is audit evidence only. It does
-not authorize publication. Publication remains authorized solely by the retained
-staging-root object, retained trusted parent, exact fixed destination, and the
-complete pre-rename proof.
+not authorize publication. Publication remains authorized solely by the valid
+Architecture-96 process-local recovery permit together with the retained staging
+root, retained trusted parent, exact fixed destination, and the complete
+pre-rename proof.
 
 After rename, every descendant must be reopened and matched to its exact
 pre-rename native identity before P3-R1 can report success.
@@ -166,7 +182,8 @@ crossed.
 
 Before the root rename, failure leaves the existing retained staging tree and no
 final tree. The recovery attempt is retained failed evidence and must not be
-rerun blindly.
+rerun blindly. A previously valid signed authorization is not generic retry
+authority after a failed invocation.
 
 The first production mutation marker must occur immediately before the native
 root rename.
@@ -225,7 +242,9 @@ Tests must prove:
 - recovery rejects clean-state absence of staging;
 - recovery rejects final present or final+staging;
 - recovery rejects any staging security/identity/inventory/byte mismatch;
-- recovery performs no provider/network/credential/P4/paper-transition effect.
+- recovery performs no provider/network/credential/P4/paper-transition effect;
+- Architecture-96 signed-authorization and permit gates cannot be bypassed by
+  caller-selected evidence.
 
 Add an opt-in native disposable Windows regression that reproduces at minimum:
 
@@ -235,7 +254,9 @@ same tree, descendants closed -> rename PASS
 retained root final path -> exact intended absolute final path
 ```
 
-No native test may touch either production Paper path.
+The native regression must use pytest-managed/external-basetemp scratch rather
+than intentionally using a worktree `.pytest_cache`. No native test may touch
+either production Paper path.
 
 ## Release and production recovery gates
 
@@ -244,13 +265,16 @@ P3-R1 source implementation does not authorize production recovery.
 After source review:
 
 ```text
-accepted P3-R1 source checkpoint
+accepted corrected P3-R1/Architecture-96 source checkpoint
 -> focused/fake-native tests
 -> opt-in disposable native Windows rename regression
+-> one broad source-certification suite
 -> exact isolated wheel build
 -> wheel/RECORD/package reconciliation
 -> freeze new wheel SHA-256/length
--> separately reviewed sealed-runtime deployment
+-> construct/sign/freeze canonical Architecture-96 recovery authorization
+-> separately reviewed sealed-runtime deployment of the authorized wheel
+-> installed RECORD/payload reconciliation
 -> read-only revalidation of the retained production staging tree
 -> explicit operator authorization for exactly one P3-R1 production recovery
 -> Administrator recovered-publication validation
@@ -269,6 +293,8 @@ This architecture checkpoint does not authorize any of the following:
 PRODUCTION_RECOVERY_RENAME=NOT_AUTHORIZED
 PUBLISHER_RERUN=FORBIDDEN
 STAGING_DELETE_OR_REPAIR=FORBIDDEN
+CALLER_ASSERTED_RECOVERY_AUTHORITY=FORBIDDEN
+UNSIGNED_RECOVERY_AUTHORIZATION=FORBIDDEN
 P3_TRADING_ACCEPTANCE=BLOCKED_PENDING_RECOVERY
 P4_PRODUCTION_EXECUTION=BLOCKED
 PROVIDER_CALL_7=NOT_AUTHORIZED
@@ -277,9 +303,12 @@ PRODUCTION_LIVE=NO-GO
 
 ## Next milestone
 
-Implement P3-R1 as a bounded native Windows/security/crash-recovery change using
-Sol High. The implementation checkpoint must include the ordinary publisher
-ordering correction, dedicated retained-staging recovery seam, fake-native model
-correction, focused source tests, and disposable native regression. Production
-recovery remains blocked until ChatGPT/Sol reviews and accepts the exact diff and
-release/deployment evidence.
+Implementation commit `2b82222fbaee857e02519a0ea3627679d309276d` is retained as a
+correction-required checkpoint: its rename/identity/crash design is useful, but
+its caller-asserted deployment/operator expectation is not accepted authority.
+
+Use Sol High for one bounded correction implementing Architecture 96 on top of
+that retained checkpoint, including the signed authorization/process-local
+permit boundary and disposable-native-scratch fix. Production recovery remains
+blocked until ChatGPT/Sol reviews and accepts the corrected exact diff and the
+later release/deployment/authorization evidence.

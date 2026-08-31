@@ -1,12 +1,12 @@
 # AI Trading Bot — Project Development Roadmap & Handoff
 
-**Repository:** `callmedraken/ai-trading-bot`  
-**Integration branch:** `develop`  
-**Accepted integrated baseline:** `bd88ee966bff455f9fc897d6cfdfafdd807f27e2`  
-**Current Architecture-94 worktree:** `F:\AI\ai-trading-bot-paper`  
-**Current Architecture-94 branch:** `feature/reliable-manual-paper-cycle`  
-**Accepted P2 source head:** `a810122a96b6fc90da25d71eede8da64b7272c98`  
-**C3 production release-source checkpoint:** `82ba29ae2c2cc6bb3544077db0ee21868e6d5693`  
+**Repository:** `callmedraken/ai-trading-bot`
+**Integration branch:** `develop`
+**Accepted integrated baseline:** `bd88ee966bff455f9fc897d6cfdfafdd807f27e2`
+**Current Architecture-94 worktree:** `F:\AI\ai-trading-bot-paper`
+**Current Architecture-94 branch:** `feature/reliable-manual-paper-cycle`
+**Accepted P2 source head:** `a810122a96b6fc90da25d71eede8da64b7272c98`
+**C3 production release-source checkpoint:** `82ba29ae2c2cc6bb3544077db0ee21868e6d5693`
 **Handoff status:** August 30, 2026 — C3 is FULLY COMPLETE / ACCEPTED; Architecture-94 P1 is ACCEPTED; Architecture-94 P2 read-only selected-C3 authority is FULLY ACCEPTED through source review, local regression, frozen release artifact, sealed production deployment, non-admin Trading zero-provider preflight, and one supervised read-only reread of the already-consumed successful call #6; P3 fixed-root paper-account authority is NEXT and should be implemented with Codex Sol High; all six C3 provider effects remain consumed; no provider call #7 is authorized; `/v2` credential references remain immutable historical state; GUI through A7 remains accepted; production/live trading remains NO-GO.
 
 > This Git-tracked handoff is the canonical cross-chat resume document. Uploaded

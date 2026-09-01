@@ -406,30 +406,126 @@ def test_exact_pre_post_identity_continuity(
 
 
 @pytest.mark.parametrize(
-    "path",
+    "mode,accepted",
     [
-        r"F:\AITradingBot\Paper",
-        r"\\?\F:\AITradingBot\paper",
-        r"\\?\F:\AITradingBot\PaperOther",
-        r"\\?\F:\AITradingBot\.Paper.provisioning-v1",
-        "",
+        ("exact", True),
+        ("outside-count-garbage", True),
+        ("included-trailing-character", False),
+        ("included-trailing-characters", False),
+        ("short", False),
+        ("wrong-same-length", False),
+        ("zero", False),
+        ("required-buffer-size", False),
+        ("oversized", False),
     ],
 )
-def test_retained_root_requires_exact_raw_final_path(
-    native, recovery, monkeypatch, path
+def test_retained_root_uses_exact_counted_native_final_path(
+    native, recovery, monkeypatch, mode, accepted
 ):
+    expected = "\\\\?\\" + str(p.PRODUCTION_PAPER_ROOT)
+
     def final_path(handle, buffer, size, flags):
-        buffer.value = path
-        return len(path)
+        assert handle in native.handles and flags == 0
+        observed = expected
+        count = len(expected)
+        if mode == "outside-count-garbage":
+            observed += "nondeterministic-garbage"
+        elif mode == "included-trailing-character":
+            observed += "X"
+            count += 1
+        elif mode == "included-trailing-characters":
+            observed += "sis"
+            count += 3
+        elif mode == "short":
+            count -= 1
+        elif mode == "wrong-same-length":
+            observed = expected[:-1] + "X"
+        elif mode == "zero":
+            return 0
+        elif mode == "required-buffer-size":
+            return size
+        elif mode == "oversized":
+            return size + 1
+        encoded = observed.encode("utf-16-le")
+        ctypes.memmove(ctypes.addressof(buffer), encoded, len(encoded))
+        return count
 
     monkeypatch.setattr(native, "api_GetFinalPathNameByHandleW", final_path)
-    with pytest.raises(p.WindowsPaperAccountProvisioningError) as caught:
-        recovery.run()
-    assert caught.value.state is p.PaperAccountPublicationState.PUBLISHED_CANDIDATE
-    assert not any(
-        path.is_relative_to(p.PRODUCTION_PAPER_ROOT) for path, *_ in native.opens
-    )
+    if accepted:
+        result = recovery.run()
+        assert (
+            result.publication.state
+            is p.PaperAccountPublicationState.PUBLISHED_VALIDATED
+        )
+    else:
+        with pytest.raises(p.WindowsPaperAccountProvisioningError) as caught:
+            recovery.run()
+        assert caught.value.state is p.PaperAccountPublicationState.PUBLISHED_CANDIDATE
+        assert not any(
+            path.is_relative_to(p.PRODUCTION_PAPER_ROOT) for path, *_ in native.opens
+        )
     assert not native.handles
+
+
+def test_rename_info_is_fixed_no_replace_and_explicitly_terminated(
+    native, recovery, monkeypatch
+):
+    original = p._WindowsPublicationSession._call
+    observed = []
+    writable_pointer_declarations = []
+
+    def call(session, name, result, types, *args):
+        if name == "SetFileInformationByHandle":
+            handle, info_class, buffer, size = args
+            info = p._PaperRootRenameInfo.from_buffer(buffer)
+            name_offset = p._PaperRootRenameInfo.name.offset
+            destination = ctypes.string_at(
+                ctypes.addressof(buffer) + name_offset, info.name_length
+            )
+            terminator = ctypes.string_at(
+                ctypes.addressof(buffer) + name_offset + info.name_length,
+                len("\0".encode("utf-16-le")),
+            )
+            observed.append(
+                (
+                    handle,
+                    info_class,
+                    info.flags,
+                    info.root_directory,
+                    info.name_length,
+                    destination,
+                    terminator,
+                    size,
+                )
+            )
+        elif name == "GetFinalPathNameByHandleW":
+            writable_pointer_declarations.append(types[1])
+        return original(session, name, result, types, *args)
+
+    monkeypatch.setattr(p._WindowsPublicationSession, "_call", call)
+    recovery.run()
+    assert len(observed) == 1
+    (
+        handle,
+        info_class,
+        flags,
+        root_directory,
+        name_length,
+        destination,
+        terminator,
+        size,
+    ) = observed[0]
+    expected_destination = str(p.PRODUCTION_PAPER_ROOT).encode("utf-16-le")
+    assert handle and info_class == 3
+    assert flags == 0 and not root_directory
+    assert name_length == len(expected_destination)
+    assert destination == expected_destination
+    assert terminator == b"\0\0"
+    assert size >= p._PaperRootRenameInfo.name.offset + name_length + len(terminator)
+    assert writable_pointer_declarations == [
+        ctypes.POINTER(p.wintypes.WCHAR),
+        ctypes.POINTER(p.wintypes.WCHAR),
+    ]
 
 
 @pytest.mark.parametrize(
@@ -622,9 +718,11 @@ def test_fake_kernel_rejects_old_retained_descendant_topology(
                 share=p.FILE_SHARE_READ | p.FILE_SHARE_DELETE,
             )
         name = str(p.PRODUCTION_PAPER_ROOT).encode("utf-16-le")
+        terminator_size = len("\0".encode("utf-16-le"))
+        terminator_offset = p._PaperRootRenameInfo.name.offset + len(name)
         size = max(
             ctypes.sizeof(p._PaperRootRenameInfo),
-            p._PaperRootRenameInfo.name.offset + len(name),
+            terminator_offset + terminator_size,
         )
         buffer = ctypes.create_string_buffer(size)
         info = p._PaperRootRenameInfo.from_buffer(buffer)
@@ -634,6 +732,7 @@ def test_fake_kernel_rejects_old_retained_descendant_topology(
             name,
             len(name),
         )
+        ctypes.memset(ctypes.addressof(buffer) + terminator_offset, 0, terminator_size)
         assert (
             native.api_SetFileInformationByHandle(root.handle.value, 3, buffer, size)
             == 0

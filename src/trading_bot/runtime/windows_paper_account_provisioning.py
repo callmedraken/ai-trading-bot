@@ -193,6 +193,36 @@ class _PaperRootRenameInfo(ctypes.Structure):
     ]
 
 
+def _counted_wchar_text(buffer: ctypes.Array, returned_count: int) -> str:
+    """Observe only the WCHARs that a native API reports as written."""
+
+    if not 0 < returned_count < len(buffer):
+        raise ValueError("NATIVE_WCHAR_OUTPUT_RANGE_INVALID")
+    return ctypes.wstring_at(ctypes.addressof(buffer), returned_count)
+
+
+def _paper_root_rename_information() -> tuple[ctypes.Array, int]:
+    """Build fixed no-replace FILE_RENAME_INFO with defensive trailing NUL."""
+
+    name = str(PRODUCTION_PAPER_ROOT).encode("utf-16-le")
+    terminator_size = len("\0".encode("utf-16-le"))
+    terminator_offset = _PaperRootRenameInfo.name.offset + len(name)
+    size = max(
+        ctypes.sizeof(_PaperRootRenameInfo),
+        terminator_offset + terminator_size,
+    )
+    buffer = ctypes.create_string_buffer(size)
+    info = _PaperRootRenameInfo.from_buffer(buffer)
+    info.flags = 0
+    info.root_directory = None
+    info.name_length = len(name)
+    ctypes.memmove(
+        ctypes.addressof(buffer) + _PaperRootRenameInfo.name.offset, name, len(name)
+    )
+    ctypes.memset(ctypes.addressof(buffer) + terminator_offset, 0, terminator_size)
+    return buffer, size
+
+
 class _ProcessEntry(ctypes.Structure):
     _fields_ = [
         ("size", wintypes.DWORD),
@@ -705,15 +735,20 @@ class _WindowsPublicationSession:
         count = self._call(
             "GetFinalPathNameByHandleW",
             wintypes.DWORD,
-            [wintypes.HANDLE, ctypes.c_wchar_p, wintypes.DWORD, wintypes.DWORD],
+            [
+                wintypes.HANDLE,
+                ctypes.POINTER(wintypes.WCHAR),
+                wintypes.DWORD,
+                wintypes.DWORD,
+            ],
             retained.handle.value,
             buffer,
             len(buffer),
             0,
         )
-        if not 0 < count < len(buffer) or buffer.value != (
-            "\\\\?\\" + str(PRODUCTION_PAPER_ROOT)
-        ):
+        expected = "\\\\?\\" + str(PRODUCTION_PAPER_ROOT)
+        observed = _counted_wchar_text(buffer, count)
+        if count != len(expected) or observed != expected:
             raise ValueError("RETAINED_ROOT_FINAL_PATH_MISMATCH")
         self._inspect(PRODUCTION_PAPER_ROOT, retained)
 
@@ -723,19 +758,7 @@ class _WindowsPublicationSession:
         self.require_rename_ready()
         # A paper-specific retained-root rename. Destination and flags are not
         # caller inputs. C1 rename/path helpers remain untouched.
-        name = str(PRODUCTION_PAPER_ROOT).encode("utf-16-le")
-        size = max(
-            ctypes.sizeof(_PaperRootRenameInfo),
-            _PaperRootRenameInfo.name.offset + len(name),
-        )
-        buffer = ctypes.create_string_buffer(size)
-        info = _PaperRootRenameInfo.from_buffer(buffer)
-        info.flags = 0
-        info.root_directory = None
-        info.name_length = len(name)
-        ctypes.memmove(
-            ctypes.addressof(buffer) + _PaperRootRenameInfo.name.offset, name, len(name)
-        )
+        buffer, size = _paper_root_rename_information()
         # FIRST_PRODUCTION_MUTATION=P3_R1_ROOT_RENAME for recovery. No native
         # operation intervenes between this conservative marker and the call.
         self.rename_attempted = True

@@ -71,9 +71,11 @@ def test_disposable_retained_descendant_denied_then_absolute_rename(
         handles.enter_context(retained_child)
         root_identity = session._facts(root.value, True)
         name = str(final).encode("utf-16-le")
+        terminator_size = len("\0".encode("utf-16-le"))
+        terminator_offset = p._PaperRootRenameInfo.name.offset + len(name)
         size = max(
             ctypes.sizeof(p._PaperRootRenameInfo),
-            p._PaperRootRenameInfo.name.offset + len(name),
+            terminator_offset + terminator_size,
         )
         buffer = ctypes.create_string_buffer(size)
         info = p._PaperRootRenameInfo.from_buffer(buffer)
@@ -85,6 +87,7 @@ def test_disposable_retained_descendant_denied_then_absolute_rename(
             name,
             len(name),
         )
+        ctypes.memset(ctypes.addressof(buffer) + terminator_offset, 0, terminator_size)
 
         def rename():
             return session._call(
@@ -108,14 +111,21 @@ def test_disposable_retained_descendant_denied_then_absolute_rename(
         count = session._call(
             "GetFinalPathNameByHandleW",
             wintypes.DWORD,
-            [wintypes.HANDLE, ctypes.c_wchar_p, wintypes.DWORD, wintypes.DWORD],
+            [
+                wintypes.HANDLE,
+                ctypes.POINTER(wintypes.WCHAR),
+                wintypes.DWORD,
+                wintypes.DWORD,
+            ],
             root.value,
             final_path,
             len(final_path),
             0,
         )
-        assert 0 < count < len(final_path)
-        assert final_path.value == "\\\\?\\" + str(final)
+        expected_final_path = "\\\\?\\" + str(final)
+        observed_final_path = p._counted_wchar_text(final_path, count)
+        assert count == len(expected_final_path)
+        assert observed_final_path == expected_final_path
         assert session._facts(root.value, True) == root_identity
         assert final.is_dir() and not source.exists()
         assert (final / "anchor").read_bytes() == b"disposable direct child"

@@ -7,19 +7,15 @@ repairs, or replaces state. Native production acceptance is a separate gate.
 
 from __future__ import annotations
 
-import base64
-import csv
 import ctypes
-import io
 import os
-import re
 import sys
 from collections.abc import Callable
 from ctypes import wintypes
 from dataclasses import dataclass
 from enum import StrEnum
 from hashlib import sha256
-from pathlib import Path, PurePosixPath, PureWindowsPath
+from pathlib import PureWindowsPath
 from uuid import UUID
 
 from trading_bot.runtime.manual_paper_account_authority import (
@@ -63,11 +59,15 @@ from trading_bot.runtime.windows_authority_security import (
     inspect_open_authority_object,
     require_administrator_token,
     require_security_policy,
-    resolve_current_token_sid,
 )
 from trading_bot.runtime.windows_authority_validation import (
     require_initialized_supported_authority_evidence,
     validate_installed_authority_complete,
+)
+from trading_bot.runtime.windows_p3_r1_recovery_authorization import (
+    P3R1RecoveryPermit,
+    authorize_p3_r1_recovery,
+    consume_p3_r1_recovery_permit,
 )
 from trading_bot.runtime.windows_paper_account_security import (
     PRODUCTION_PAPER_ROOT,
@@ -80,8 +80,6 @@ PRODUCTION_PAPER_STAGING_ROOT = PureWindowsPath(
 )
 _PARENT = PureWindowsPath(r"F:\AITradingBot")
 _RUNTIME = _PARENT / "runtime"
-_SITE_PACKAGES = _RUNTIME / "Lib" / "site-packages"
-_RECORD_NAME = "ai_trading_bot-0.1.0.dist-info/RECORD"
 
 # Architecture 94 accepted v2 bundle / Architecture 95 incident evidence. These
 # are assertions, never a request to construct or regenerate this account.
@@ -133,31 +131,6 @@ class WindowsPaperAccountPublicationEvidence:
 
 
 @dataclass(frozen=True, slots=True)
-class P3R1RecoveryDeploymentExpectation:
-    """Reviewed operator and installed RECORD from the new release freeze.
-
-    This is deployment evidence, not a path/account override or an authority
-    capability. The new release must first pass the separate sealed deployment
-    gate; there is intentionally no default release or operator identity.
-    """
-
-    operator_sid: str
-    installed_record_sha256: str
-    installed_record_byte_length: int
-
-    def __post_init__(self) -> None:
-        if (
-            type(self.operator_sid) is not str
-            or re.fullmatch(r"S-1-5-21-(?:[0-9]+-){3}[0-9]+", self.operator_sid) is None
-            or type(self.installed_record_sha256) is not str
-            or re.fullmatch(r"[0-9a-f]{64}", self.installed_record_sha256) is None
-            or type(self.installed_record_byte_length) is not int
-            or not 0 < self.installed_record_byte_length <= 1024 * 1024
-        ):
-            raise ValueError("RECOVERY_DEPLOYMENT_EXPECTATION_INVALID")
-
-
-@dataclass(frozen=True, slots=True)
 class P3R1RecoveryEvidence:
     publication: WindowsPaperAccountPublicationEvidence
     # Root and descendants, in fixed layout order; identities are audit only.
@@ -165,64 +138,6 @@ class P3R1RecoveryEvidence:
     authority_database_sha256: str
     authority_database_byte_length: int
     first_production_mutation: str = "P3_R1_ROOT_RENAME"
-
-
-def _require_recovery_deployment(expected: P3R1RecoveryDeploymentExpectation) -> None:
-    require_administrator_token()
-    if type(expected) is not P3R1RecoveryDeploymentExpectation:
-        raise ValueError("RECOVERY_DEPLOYMENT_EXPECTATION_REQUIRED")
-    expected.__post_init__()
-    if (
-        resolve_current_token_sid() != expected.operator_sid
-        or sys.executable != str(_RUNTIME / "python.exe")
-        or str(PureWindowsPath(__file__))
-        != str(
-            _SITE_PACKAGES / "trading_bot/runtime/windows_paper_account_provisioning.py"
-        )
-    ):
-        raise ValueError("RECOVERY_RUNTIME_OR_OPERATOR_MISMATCH")
-    record = Path(str(_SITE_PACKAGES / _RECORD_NAME)).read_bytes()
-    if (sha256(record).hexdigest(), len(record)) != (
-        expected.installed_record_sha256,
-        expected.installed_record_byte_length,
-    ):
-        raise ValueError("RECOVERY_RELEASE_MISMATCH")
-    names = set()
-    hashed = set()
-    for row in csv.reader(io.StringIO(record.decode("utf-8")), strict=True):
-        if len(row) != 3:
-            raise ValueError("RECOVERY_RECORD_INVALID")
-        name, digest, length = row
-        relative = PurePosixPath(name)
-        if (
-            name in names
-            or name != relative.as_posix()
-            or relative.is_absolute()
-            or any(part in {".", ".."} for part in relative.parts)
-            or any(char in name for char in "\\:*")
-        ):
-            raise ValueError("RECOVERY_RECORD_PATH_INVALID")
-        names.add(name)
-        # pip adds un-hashed installer metadata and bytecode. Only the pinned
-        # RECORD may describe them; every source/resource payload must be hashed.
-        if not digest:
-            if name.startswith("trading_bot/") and not name.endswith(".pyc"):
-                raise ValueError("RECOVERY_UNHASHED_PACKAGE_FILE")
-            continue
-        payload = Path(str(_SITE_PACKAGES.joinpath(*relative.parts))).read_bytes()
-        actual = (
-            base64.urlsafe_b64encode(sha256(payload).digest()).rstrip(b"=").decode()
-        )
-        if digest != "sha256=" + actual or length != str(len(payload)):
-            raise ValueError("RECOVERY_INSTALLED_PAYLOAD_MISMATCH")
-        hashed.add(name)
-    for name, module in tuple(sys.modules.items()):
-        if name == "trading_bot" or name.startswith("trading_bot."):
-            source = PureWindowsPath(getattr(module, "__file__", ""))
-            if not source.is_relative_to(_SITE_PACKAGES):
-                raise ValueError("RECOVERY_IMPORT_PROVENANCE_MISMATCH")
-            if source.relative_to(_SITE_PACKAGES).as_posix() not in hashed:
-                raise ValueError("RECOVERY_IMPORT_NOT_IN_RELEASE")
 
 
 def _layout(root: PureWindowsPath, checkpoint_id: UUID) -> dict[PureWindowsPath, str]:
@@ -845,6 +760,12 @@ class _WindowsPublicationSession:
         if self.exists(source) or not self.exists(PRODUCTION_PAPER_ROOT):
             raise ValueError("PUBLICATION_NAMESPACE_MISMATCH")
 
+    def rename_recovery_root(self, permit: P3R1RecoveryPermit) -> None:
+        """Consume signed recovery provenance at the native mutation seam."""
+
+        consume_p3_r1_recovery_permit(permit)
+        self.rename_root()
+
     def validate_final(self, bundle: ManualPaperAccountProvisioningBundle) -> None:
         layout = _layout(PRODUCTION_PAPER_ROOT, self.checkpoint_id)
         for path, role in layout.items():
@@ -1000,32 +921,22 @@ def publish_manual_paper_account(
 def recover_p3_r1_retained_staging(
     *,
     bundle: ManualPaperAccountProvisioningBundle,
-    deployment: P3R1RecoveryDeploymentExpectation,
+    authorization_bytes: bytes,
+    signature: bytes,
 ) -> P3R1RecoveryEvidence:
     """Recover only the frozen Architecture-95 incident, once, without repair.
 
-    Caller inputs are frozen transport bytes and the separately reviewed new
-    deployment expectation. No root, account, replacement, cleanup, resume, or
-    creation option exists. Production execution requires separate authorization.
+    Authorization/signature inputs are transport bytes only. No root, account,
+    operator, release, replacement, cleanup, resume, or creation option exists.
     Failures retain the candidate state and must never be blindly rerun.
     """
     state = PaperAccountPublicationState.NOT_PUBLISHED
     session = None
     try:
-        _require_recovery_deployment(deployment)
+        permit = authorize_p3_r1_recovery(authorization_bytes, signature)
         evidence = verify_manual_paper_account_provisioning_bundle(bundle)
         if evidence != _P3_R1_BUNDLE:
             raise ValueError("RECOVERY_FROZEN_BUNDLE_MISMATCH")
-        validation = validate_installed_authority_complete()
-        require_initialized_supported_authority_evidence(validation)
-        verification = validation.bootstrap_verification
-        bootstrap = verification.bootstrap
-        if (
-            bootstrap.machine_authority_id != evidence.manifest.machine_authority_id
-            or bootstrap.approved_account_sid != evidence.manifest.approved_trading_sid
-            or verification.bootstrap_digest != _P3_R1_BOOTSTRAP
-        ):
-            raise ValueError("RECOVERY_INSTALLED_AUTHORITY_MISMATCH")
         session = _WindowsPublicationSession(evidence)
         with session:
             session.require_quiescent_runtime()
@@ -1047,7 +958,7 @@ def recover_p3_r1_retained_staging(
             session.prepare_rename(bundle)
             session.validate_recovery_database()
             session.require_quiescent_runtime()
-            session.rename_root()
+            session.rename_recovery_root(permit)
             state = PaperAccountPublicationState.PUBLISHED_CANDIDATE
             session.validate_final(bundle)
             session.validate_recovery_database()

@@ -715,6 +715,19 @@ def _cng_verify_p256_sha256(public_key: bytes, data: bytes, signature: bytes) ->
             close_algorithm(alg, 0)
 
 
+def verify_p256_p1363_sha256_signature(
+    public_key: bytes, data: bytes, signature: bytes
+) -> None:
+    """Verify detached P-256/SHA-256 P1363 material through Windows CNG.
+
+    Callers own the signed-message domain and schema.  This public primitive
+    exists so dedicated signed domains can reuse the C1-pinned public key
+    without importing C1's private implementation helpers.
+    """
+
+    _cng_verify_p256_sha256(public_key, data, signature)
+
+
 @dataclass(frozen=True, slots=True)
 class BootstrapVerification:
     """Sanitized successful verification evidence."""

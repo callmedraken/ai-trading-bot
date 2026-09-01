@@ -1,16 +1,13 @@
 """Architecture-95 fake-native gates; never open a production path."""
 
-import base64
-import csv
 import ctypes
 import inspect
-import io
 import socket
 from dataclasses import replace
 from datetime import datetime
 from decimal import Decimal
 from hashlib import sha256
-from pathlib import Path, PureWindowsPath
+from pathlib import PureWindowsPath
 from types import SimpleNamespace
 
 import pytest
@@ -22,6 +19,7 @@ from tests.runtime.test_windows_paper_account_provisioning import (
     publish,
 )
 
+import trading_bot.runtime.windows_p3_r1_recovery_authorization as a
 import trading_bot.runtime.windows_paper_account_provisioning as p
 from trading_bot.runtime.manual_paper_account_authority import (
     ManualPaperAccountAnchor,
@@ -105,26 +103,43 @@ def recovery(native, monkeypatch, frozen_bundle):
         )
         if not directory:
             node["data"] = database
-    validation = SimpleNamespace(
-        bootstrap_verification=SimpleNamespace(
-            bootstrap=SimpleNamespace(
-                machine_authority_id=manifest.machine_authority_id,
-                approved_account_sid=manifest.approved_trading_sid,
-            ),
-            bootstrap_digest=p._P3_R1_BOOTSTRAP,
-        )
+    authorization = a.P3R1RecoveryAuthorization(
+        schema=a.RECOVERY_AUTHORIZATION_SCHEMA,
+        signing_key_id=a.RECOVERY_SIGNING_KEY_ID,
+        machine_authority_id=manifest.machine_authority_id,
+        approved_trading_sid=manifest.approved_trading_sid,
+        administrator_operator_sid="S-1-5-21-1-2-3-1001",
+        paper_account_id=str(manifest.paper_account_id),
+        genesis_checkpoint_id=str(manifest.genesis_checkpoint_id),
+        bootstrap_sha256=p._P3_R1_BOOTSTRAP,
+        authority_database_sha256=a._AUTHORITY_DATABASE_SHA256,
+        authority_database_bytes=a._AUTHORITY_DATABASE_BYTES,
+        source_commit="1" * 40,
+        source_tree="2" * 40,
+        wheel_sha256="3" * 64,
+        wheel_bytes=1000,
+        installed_record_sha256="4" * 64,
+        installed_record_bytes=100,
+        staging_root=str(p.PRODUCTION_PAPER_STAGING_ROOT),
+        final_root=str(p.PRODUCTION_PAPER_ROOT),
     )
+    permit = a.issue_disposable_p3_r1_recovery_permit_for_test(authorization)
 
     def check(phase):
         native.event(phase, "before")
         native.event(phase, "after")
 
+    def authorize(authorization_bytes, signature):
+        assert authorization_bytes == authorization.canonical_bytes()
+        assert signature == b"test-signature"
+        check("authorization")
+        return permit
+
+    monkeypatch.setattr(p, "authorize_p3_r1_recovery", authorize)
     monkeypatch.setattr(
-        p, "_require_recovery_deployment", lambda _: check("deployment")
-    )
-    monkeypatch.setattr(p, "validate_installed_authority_complete", lambda: validation)
-    monkeypatch.setattr(
-        p, "require_initialized_supported_authority_evidence", lambda _: None
+        p,
+        "consume_p3_r1_recovery_permit",
+        a.consume_disposable_p3_r1_recovery_permit_for_test,
     )
     monkeypatch.setattr(
         p._WindowsPublicationSession,
@@ -133,10 +148,17 @@ def recovery(native, monkeypatch, frozen_bundle):
     )
 
     def run():
-        return p.recover_p3_r1_retained_staging(bundle=frozen_bundle, deployment=None)
+        return p.recover_p3_r1_retained_staging(
+            bundle=frozen_bundle,
+            authorization_bytes=authorization.canonical_bytes(),
+            signature=b"test-signature",
+        )
 
     return SimpleNamespace(
-        run=run, validation=validation, bundle=frozen_bundle, layout=layout
+        run=run,
+        authorization=authorization,
+        bundle=frozen_bundle,
+        layout=layout,
     )
 
 
@@ -413,7 +435,7 @@ def test_retained_root_requires_exact_raw_final_path(
 @pytest.mark.parametrize(
     "phase",
     [
-        "deployment",
+        "authorization",
         "quiescent",
         "inspect:root:staging",
         "inspect:genesis-directory:staging",
@@ -527,12 +549,7 @@ def test_recovery_rename_ambiguity_and_postconditions(
     "mode",
     [
         "alternate-bundle",
-        "machine",
-        "sid",
-        "bootstrap",
-        "incomplete",
-        "installed",
-        "deployment",
+        "authorization",
         "quiescence",
     ],
 )
@@ -542,26 +559,21 @@ def test_recovery_preconditions_block_before_paper_opens(
     def fail(*args):
         raise ValueError("precondition failed")
 
-    verification = recovery.validation.bootstrap_verification
     if mode == "alternate-bundle":
         recovery.bundle = make_bundle()
-    elif mode == "machine":
-        verification.bootstrap.machine_authority_id = "wrong"
-    elif mode == "sid":
-        verification.bootstrap.approved_account_sid = "wrong"
-    elif mode == "bootstrap":
-        verification.bootstrap_digest = "0" * 64
     else:
         owner, name = {
-            "incomplete": (p, "require_initialized_supported_authority_evidence"),
-            "installed": (p, "validate_installed_authority_complete"),
-            "deployment": (p, "_require_recovery_deployment"),
+            "authorization": (p, "authorize_p3_r1_recovery"),
             "quiescence": (p._WindowsPublicationSession, "require_quiescent_runtime"),
         }[mode]
         monkeypatch.setattr(owner, name, fail)
     before = snapshot(native)
     with pytest.raises(p.WindowsPaperAccountProvisioningError):
-        p.recover_p3_r1_retained_staging(bundle=recovery.bundle, deployment=None)
+        p.recover_p3_r1_retained_staging(
+            bundle=recovery.bundle,
+            authorization_bytes=recovery.authorization.canonical_bytes(),
+            signature=b"test-signature",
+        )
     assert snapshot(native) == before and not native.opens
 
 
@@ -570,7 +582,8 @@ def test_api_has_no_generic_recovery_options_and_ordinary_never_recovers(
 ):
     assert set(inspect.signature(p.recover_p3_r1_retained_staging).parameters) == {
         "bundle",
-        "deployment",
+        "authorization_bytes",
+        "signature",
     }
     monkeypatch.setattr(
         p,
@@ -634,78 +647,6 @@ def test_database_incident_pin_is_exact():
         "6a8fb988d1cb223fbb66b09e8dab1e0de4b6aafd148dfdf01df08029203f4b76",
         331776,
     )
-
-
-@pytest.fixture
-def deployment_files(monkeypatch):
-    # Exercise the real deployment gate with fake fixed-runtime files, no disk I/O.
-    files = {}
-    rows = []
-    for name, module in tuple(p.sys.modules.items()):
-        if name == "trading_bot" or name.startswith("trading_bot."):
-            suffix = PureWindowsPath(module.__file__).parts
-            relative = "/".join(suffix[suffix.index("trading_bot") :])
-            target = str(p._SITE_PACKAGES / relative)
-            monkeypatch.setattr(module, "__file__", target)
-            files[target] = name.encode()
-            digest = (
-                base64.urlsafe_b64encode(sha256(files[target]).digest())
-                .rstrip(b"=")
-                .decode()
-            )
-            rows.append((relative, "sha256=" + digest, str(len(files[target]))))
-    stream = io.StringIO()
-    csv.writer(stream).writerows(rows + [(p._RECORD_NAME, "", "")])
-    record = stream.getvalue().encode()
-    files[str(p._SITE_PACKAGES / p._RECORD_NAME)] = record
-    expected = p.P3R1RecoveryDeploymentExpectation(
-        "S-1-5-21-1-2-3-1001", sha256(record).hexdigest(), len(record)
-    )
-    monkeypatch.setattr(p, "require_administrator_token", lambda: None)
-    monkeypatch.setattr(p, "resolve_current_token_sid", lambda: expected.operator_sid)
-    monkeypatch.setattr(p.sys, "executable", str(p._RUNTIME / "python.exe"))
-    monkeypatch.setattr(Path, "read_bytes", lambda path: files[str(path)])
-    return expected, files
-
-
-@pytest.mark.parametrize(
-    "mode",
-    [
-        "valid",
-        "admin",
-        "operator",
-        "runtime",
-        "source",
-        "record",
-        "payload",
-        "expectation",
-    ],
-)
-def test_exact_recovery_deployment_gate(deployment_files, monkeypatch, mode):
-    expected, files = deployment_files
-    if mode == "admin":
-
-        def fail():
-            raise ValueError("not admin")
-
-        monkeypatch.setattr(p, "require_administrator_token", fail)
-    elif mode == "operator":
-        expected = replace(expected, operator_sid="S-1-5-21-4-5-6-1001")
-    elif mode == "runtime":
-        monkeypatch.setattr(p.sys, "executable", "elsewhere")
-    elif mode == "source":
-        monkeypatch.setattr(p, "__file__", "elsewhere")
-    elif mode == "record":
-        expected = replace(expected, installed_record_sha256="0" * 64)
-    elif mode == "payload":
-        files[p.__file__] += b"changed"
-    elif mode == "expectation":
-        expected = None
-    if mode == "valid":
-        p._require_recovery_deployment(expected)
-    else:
-        with pytest.raises(ValueError):
-            p._require_recovery_deployment(expected)
 
 
 @pytest.mark.parametrize(
@@ -877,55 +818,6 @@ def test_recovery_complete_final_validation_failure_preserves_candidate(
     assert p.PRODUCTION_PAPER_STAGING_ROOT not in native.nodes
     assert not native.handles and not native.creations
     assert native.events.count(("rename", "before")) == 1
-
-
-@pytest.mark.parametrize(
-    "mode",
-    ["duplicate", "escape", "absolute", "unhashed-source", "unlisted-import", "size"],
-)
-def test_release_record_cannot_redirect_or_omit_source(
-    deployment_files, monkeypatch, mode
-):
-    expected, files = deployment_files
-    record_path = str(p._SITE_PACKAGES / p._RECORD_NAME)
-    rows = list(csv.reader(io.StringIO(files[record_path].decode())))
-    if mode == "duplicate":
-        rows.append(rows[0])
-    elif mode in {"escape", "absolute"}:
-        rows.insert(
-            0,
-            [
-                "../outside.py" if mode == "escape" else "F:/outside.py",
-                "sha256=bad",
-                "3",
-            ],
-        )
-    elif mode == "unhashed-source":
-        rows[0][1] = ""
-    elif mode == "size":
-        rows[0][2] = "99999"
-    else:
-        rows.pop(0)
-    stream = io.StringIO()
-    csv.writer(stream).writerows(rows)
-    record = stream.getvalue().encode()
-    files[record_path] = record
-    expected = replace(
-        expected,
-        installed_record_sha256=sha256(record).hexdigest(),
-        installed_record_byte_length=len(record),
-    )
-    reads = []
-
-    def read(path):
-        reads.append(str(path))
-        return files[str(path)]
-
-    monkeypatch.setattr(Path, "read_bytes", read)
-    with pytest.raises(ValueError):
-        p._require_recovery_deployment(expected)
-    assert all(PureWindowsPath(path).is_relative_to(p._SITE_PACKAGES) for path in reads)
-    assert all("outside" not in path for path in reads)
 
 
 def test_second_quiescence_failure_does_not_cross_mutation_boundary(

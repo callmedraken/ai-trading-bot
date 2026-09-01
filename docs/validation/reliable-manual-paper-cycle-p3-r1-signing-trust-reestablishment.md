@@ -434,4 +434,3 @@ This validation contract covers gates A through S requested for Architecture
 The known blocker is the exact Windows KSP machine-key security/ACL contract;
 the ceremony must not run until that separate contract and exact procedure are
 reviewed and accepted.
-

@@ -473,4 +473,3 @@ running that procedure.
 The mandatory next step after document acceptance is to resolve and review the
 machine-key ACL/security blocker and produce an exact, no-overwrite,
 no-signature Administrator ceremony procedure with sanitized evidence fields.
-

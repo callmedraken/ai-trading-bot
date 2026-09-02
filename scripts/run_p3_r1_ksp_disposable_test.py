@@ -16,6 +16,7 @@ import struct
 import sys
 import unicodedata
 from collections.abc import Callable, Mapping, Sequence
+from contextlib import AbstractContextManager
 from dataclasses import asdict, dataclass, replace
 from dataclasses import fields as dataclass_fields
 from enum import StrEnum
@@ -48,6 +49,7 @@ LOCAL_SYSTEM_SID = "S-1-5-18"
 # not caller-selectable and remains a fail-closed future architecture input.
 ORDINARY_NONADMIN_TEST_SID: str | None = None
 ORDINARY_NONADMIN_TEST_IDENTITY_BLOCKED = True
+ORDINARY_NONADMIN_SELECTION_REQUIRES_REVIEW = True
 
 PRODUCTION_FORBIDDEN_ROOTS = (
     PureWindowsPath(r"F:\AITradingBot\Paper"),
@@ -84,6 +86,13 @@ NCRYPT_KEY_USAGE_PROPERTY = "Key Usage"
 NCRYPT_KEY_TYPE_PROPERTY = "Key Type"
 NCRYPT_SECURITY_DESCR_SUPPORT_PROPERTY = "Security Descr Support"
 NCRYPT_SECURITY_DESCR_PROPERTY = "Security Descr"
+NCRYPT_PROVIDER_NAME_PROPERTY = "Provider Name"
+
+NTE_BAD_KEYSET = 0x80090016
+NTE_PERM = 0x80090010
+NTE_NOT_SUPPORTED = 0x80090029
+REVIEWED_NOT_FOUND_STATUSES = frozenset({NTE_BAD_KEYSET})
+REVIEWED_ACCESS_DENIED_STATUSES = frozenset({NTE_PERM})
 
 ACCESS_ALLOWED_ACE_TYPE = 0x00
 CRYPTO_KEY_FULL_CONTROL = 0x001F019B
@@ -114,6 +123,22 @@ _ZERO_SHA256 = "0" * 64
 _P256_P = 0xFFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFF
 _P256_A = _P256_P - 3
 _P256_B = 0x5AC635D8AA3A93E7B3EBBD55769886BC651D06B0CC53B0F63BCE3C3E27D2604B
+_P256_N = 0xFFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551
+_P256_GX = 0x6B17D1F2E12C4247F8BCE6E563A440F277037D812DEB33A0F4A13945D898C296
+_P256_GY = 0x4FE342E2FE1A7F9B8EE7EB4A7C0F9E162BCE33576B315ECECBB6406837BF51F5
+
+TEST_SIGNATURE_DOMAIN = (
+    b"AITradingBot/P3R1/DisposableKSPValidation/TestSignature/v1\x00"
+)
+TEST_SIGNATURE_MESSAGE = (
+    b"TEST-ONLY;NO-BOOTSTRAP;NO-P3R1-RECOVERY-AUTHORIZATION;"
+    b"NO-PRODUCTION-ORDER-OR-TRADING-AUTHORITY"
+)
+TEST_SIGNATURE_PREIMAGE = (
+    TEST_SIGNATURE_DOMAIN
+    + len(TEST_SIGNATURE_MESSAGE).to_bytes(4, "big")
+    + TEST_SIGNATURE_MESSAGE
+)
 
 
 class HarnessContractError(ValueError):
@@ -131,6 +156,14 @@ class SecurityStatusError(RuntimeError):
         self.operation = operation
         self.status = status & 0xFFFFFFFF
         super().__init__(f"{operation} failed with SECURITY_STATUS 0x{self.status:08X}")
+
+
+class NativeOperationUncertain(RuntimeError):
+    """Raised when a future native effect may have happened but is unproved."""
+
+
+class HandleReleaseError(NativeOperationUncertain):
+    """Raised when an owned native resource could not be released exactly once."""
 
 
 class Phase(StrEnum):
@@ -343,6 +376,135 @@ class HarnessEvidence:
     )
 
 
+@dataclass(frozen=True)
+class TokenFacts:
+    user_sid: str
+    elevated: bool
+    elevation_type_full: bool
+    administrators_enabled: bool
+
+
+class OwnedNativeHandle(AbstractContextManager[Any]):
+    """Own one non-null native handle and release it at most once."""
+
+    def __init__(
+        self,
+        value: Any,
+        release: Callable[[Any], None],
+        label: str,
+    ) -> None:
+        if value is None or value == 0:
+            raise HarnessContractError(f"{label} returned a null handle")
+        self.value = value
+        self._release = release
+        self._label = label
+        self._owned = True
+
+    @property
+    def owned(self) -> bool:
+        return self._owned
+
+    def close(self) -> None:
+        if not self._owned:
+            return
+        self._owned = False
+        try:
+            self._release(self.value)
+        except Exception as error:
+            raise HandleReleaseError(f"failed to release {self._label}") from error
+
+    def __enter__(self) -> Any:
+        if not self._owned:
+            raise HandleReleaseError(f"{self._label} is already released")
+        return self.value
+
+    def __exit__(self, exc_type: Any, exc: Any, traceback: Any) -> bool:
+        try:
+            self.close()
+        except HandleReleaseError as release_error:
+            if exc is not None:
+                combined = BaseExceptionGroup(
+                    f"{self._label} operation and release both failed",
+                    [exc, release_error],
+                )
+                raise HandleReleaseError(
+                    f"{self._label} operation ended with an uncertain release"
+                ) from combined
+            raise
+        return False
+
+
+@dataclass(frozen=True)
+class NativeOpenResult:
+    status: int
+    handle: OwnedNativeHandle | None
+
+
+class NativeApi(Protocol):
+    """Narrow injectable native surface used by the disabled phase bodies."""
+
+    def current_token_facts(self) -> TokenFacts: ...
+
+    def evidence_root_exists(self, root: PureWindowsPath) -> bool: ...
+
+    def open_provider(self) -> OwnedNativeHandle: ...
+
+    def get_dword(self, handle: Any, property_name: str, flags: int) -> int: ...
+
+    def get_string(self, handle: Any, property_name: str, flags: int) -> str: ...
+
+    def get_bytes(self, handle: Any, property_name: str, flags: int) -> bytes: ...
+
+    def try_open_key(
+        self,
+        provider: Any,
+        identity: KeyIdentity,
+        flags: int,
+    ) -> NativeOpenResult: ...
+
+    def create_key(
+        self,
+        provider: Any,
+        identity: KeyIdentity,
+        flags: int,
+    ) -> OwnedNativeHandle: ...
+
+    def set_dword(
+        self,
+        handle: Any,
+        property_name: str,
+        value: int,
+        flags: int,
+    ) -> None: ...
+
+    def set_bytes(
+        self,
+        handle: Any,
+        property_name: str,
+        value: bytes,
+        flags: int,
+    ) -> None: ...
+
+    def build_exact_security_descriptor(self) -> bytes: ...
+
+    def decode_security_descriptor(
+        self, value: bytes
+    ) -> SecurityDescriptorSemantic: ...
+
+    def finalize_key(self, handle: Any, flags: int) -> None: ...
+
+    def export_public(self, handle: Any, flags: int) -> bytes: ...
+
+    def private_export_probe_status(
+        self,
+        handle: Any,
+        blob_type: str,
+        flags: int,
+    ) -> int: ...
+
+    def sign_hash(self, handle: Any, digest: bytes, flags: int) -> bytes: ...
+
+
 class NativePhaseOperations(Protocol):
     """Future effect implementation boundary; never invoked by this checkpoint."""
 
@@ -417,6 +579,28 @@ def check_security_status(operation: str, status: int) -> None:
         raise TypeError("SECURITY_STATUS must be converted explicitly to int")
     if status != 0:
         raise SecurityStatusError(operation, status)
+
+
+def parse_ncrypt_dword(value: bytes, property_name: str) -> int:
+    """Parse one exact little-endian NCrypt DWORD property buffer."""
+
+    if len(value) != 4:
+        raise HarnessContractError(f"{property_name} is not exactly one DWORD")
+    return struct.unpack("<I", value)[0]
+
+
+def parse_ncrypt_string(value: bytes, property_name: str) -> str:
+    """Parse one exact null-terminated NCrypt UTF-16 property buffer."""
+
+    if len(value) < 2 or len(value) % 2 or not value.endswith(b"\x00\x00"):
+        raise HarnessContractError(f"{property_name} is malformed UTF-16")
+    try:
+        text = value[:-2].decode("utf-16-le")
+    except UnicodeDecodeError as error:
+        raise HarnessContractError(f"{property_name} is malformed UTF-16") from error
+    if "\x00" in text:
+        raise HarnessContractError(f"{property_name} contains embedded NUL data")
+    return text
 
 
 def _validate_public_point(x_bytes: bytes, y_bytes: bytes) -> None:
@@ -1346,6 +1530,414 @@ def publish_test_evidence_create_new(
     return destination
 
 
+def _strict_object(value: Any, fields: frozenset[str], label: str) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise HarnessContractError(f"{label} must be an object")
+    if frozenset(value) != fields:
+        raise HarnessContractError(f"{label} has unknown or missing fields")
+    return value
+
+
+def _strict_bool(value: Any, label: str) -> bool:
+    if type(value) is not bool:
+        raise HarnessContractError(f"{label} must be a boolean")
+    return value
+
+
+def _strict_int(value: Any, label: str) -> int:
+    if type(value) is not int:
+        raise HarnessContractError(f"{label} must be an integer")
+    return value
+
+
+def _strict_text(value: Any, label: str) -> str:
+    if type(value) is not str:
+        raise HarnessContractError(f"{label} must be text")
+    return value
+
+
+def _enum_value(enum_type: type[StrEnum], value: Any, label: str) -> StrEnum:
+    text = _strict_text(value, label)
+    try:
+        return enum_type(text)
+    except ValueError as error:
+        raise HarnessContractError(f"{label} is not a recognized value") from error
+
+
+def _parse_lifecycle(value: Any) -> LifecycleEvidence:
+    item = _strict_object(
+        value,
+        frozenset(field.name for field in dataclass_fields(LifecycleEvidence)),
+        "lifecycle",
+    )
+    return LifecycleEvidence(
+        machine_creation_attempted=_strict_bool(
+            item["machine_creation_attempted"], "machine_creation_attempted"
+        ),
+        machine_created=_strict_bool(item["machine_created"], "machine_created"),
+        shadow_creation_attempted=_strict_bool(
+            item["shadow_creation_attempted"], "shadow_creation_attempted"
+        ),
+        shadow_created=_strict_bool(item["shadow_created"], "shadow_created"),
+        test_name_retired=_strict_bool(item["test_name_retired"], "test_name_retired"),
+    )
+
+
+def _parse_key_metadata(value: Any) -> KeyMetadata:
+    item = _strict_object(
+        value,
+        frozenset(
+            {
+                "algorithm",
+                "algorithm_group",
+                "identity",
+                "key_length_bits",
+                "key_type",
+                "public_sec1_hex",
+            }
+        ),
+        "key metadata",
+    )
+    identity_item = _strict_object(
+        item["identity"],
+        frozenset({"container", "operator_sid", "provider", "scope"}),
+        "key identity",
+    )
+    operator_sid = identity_item["operator_sid"]
+    if operator_sid is not None:
+        operator_sid = _strict_text(operator_sid, "operator_sid")
+    scope = _enum_value(KeyScope, identity_item["scope"], "scope")
+    if not isinstance(scope, KeyScope):  # pragma: no cover - type narrowing
+        raise HarnessContractError("invalid key scope")
+    identity = KeyIdentity(
+        provider=_strict_text(identity_item["provider"], "provider"),
+        scope=scope,
+        container=_strict_text(identity_item["container"], "container"),
+        operator_sid=operator_sid,
+    )
+    public_hex = _strict_text(item["public_sec1_hex"], "public_sec1_hex")
+    try:
+        public_sec1 = bytes.fromhex(public_hex)
+    except ValueError as error:
+        raise HarnessContractError("public_sec1_hex is malformed") from error
+    if public_sec1.hex() != public_hex:
+        raise HarnessContractError("public_sec1_hex is not canonical lowercase hex")
+    return KeyMetadata(
+        identity=identity,
+        key_type=_strict_int(item["key_type"], "key_type"),
+        algorithm=_strict_text(item["algorithm"], "algorithm"),
+        algorithm_group=_strict_text(item["algorithm_group"], "algorithm_group"),
+        key_length_bits=_strict_int(item["key_length_bits"], "key_length_bits"),
+        public_sec1=public_sec1,
+    )
+
+
+def _parse_completion(value: Any) -> PhaseCompletion | None:
+    if value is None:
+        return None
+    if not isinstance(value, dict) or type(value.get("kind")) is not str:
+        raise HarnessContractError("completion must have an exact kind")
+    kind = value["kind"]
+    if kind == "read-only-preflight/v1":
+        item = _strict_object(
+            value,
+            frozenset(
+                {
+                    "both_scope_absence_proved",
+                    "elevated_operator_sid",
+                    "future_evidence_root_absent",
+                    "kind",
+                    "provider_security_descriptor_support",
+                }
+            ),
+            "preflight completion",
+        )
+        return ReadOnlyPreflightCompletion(
+            _strict_bool(
+                item["both_scope_absence_proved"], "both_scope_absence_proved"
+            ),
+            _strict_bool(
+                item["future_evidence_root_absent"], "future_evidence_root_absent"
+            ),
+            _strict_bool(
+                item["provider_security_descriptor_support"],
+                "provider_security_descriptor_support",
+            ),
+            _strict_text(item["elevated_operator_sid"], "elevated_operator_sid"),
+        )
+    if kind == "machine-validation/v1":
+        item = _strict_object(
+            value,
+            frozenset(
+                {
+                    "exact_properties_verified",
+                    "independent_reopen_verified",
+                    "kind",
+                    "machine_metadata",
+                    "security_descriptor_verified",
+                }
+            ),
+            "machine completion",
+        )
+        return MachineValidationCompletion(
+            _parse_key_metadata(item["machine_metadata"]),
+            _strict_bool(
+                item["exact_properties_verified"], "exact_properties_verified"
+            ),
+            _strict_bool(
+                item["security_descriptor_verified"],
+                "security_descriptor_verified",
+            ),
+            _strict_bool(
+                item["independent_reopen_verified"], "independent_reopen_verified"
+            ),
+        )
+    if kind == "shadow-scope/v1":
+        item = _strict_object(
+            value,
+            frozenset(
+                {
+                    "kind",
+                    "machine_metadata",
+                    "scope_non_substitution_verified",
+                    "shadow_metadata",
+                }
+            ),
+            "shadow completion",
+        )
+        return ShadowScopeCompletion(
+            _parse_key_metadata(item["machine_metadata"]),
+            _parse_key_metadata(item["shadow_metadata"]),
+            _strict_bool(
+                item["scope_non_substitution_verified"],
+                "scope_non_substitution_verified",
+            ),
+        )
+    if kind == "elevated-effect/v1":
+        item = _strict_object(
+            value,
+            frozenset(
+                {
+                    "kind",
+                    "private_export_denial_matrix_verified",
+                    "signature_verified_with_machine_public",
+                }
+            ),
+            "elevated completion",
+        )
+        return ElevatedEffectCompletion(
+            _strict_bool(
+                item["signature_verified_with_machine_public"],
+                "signature_verified_with_machine_public",
+            ),
+            _strict_bool(
+                item["private_export_denial_matrix_verified"],
+                "private_export_denial_matrix_verified",
+            ),
+        )
+    if kind == "principal-denial/v1":
+        item = _strict_object(
+            value,
+            frozenset(
+                {
+                    "actor_sid",
+                    "downstream_private_operations_unreachable",
+                    "kind",
+                    "machine_open_denied",
+                }
+            ),
+            "principal denial completion",
+        )
+        return PrincipalDenialCompletion(
+            _strict_text(item["actor_sid"], "actor_sid"),
+            _strict_bool(item["machine_open_denied"], "machine_open_denied"),
+            _strict_bool(
+                item["downstream_private_operations_unreachable"],
+                "downstream_private_operations_unreachable",
+            ),
+        )
+    if kind == "final-reconciliation/v1":
+        item = _strict_object(
+            value,
+            frozenset(
+                {
+                    "all_phase_evidence_reconciled",
+                    "both_scope_qualified_keys_retained",
+                    "cleanup_performed",
+                    "kind",
+                }
+            ),
+            "final completion",
+        )
+        return FinalReconciliationCompletion(
+            _strict_bool(
+                item["all_phase_evidence_reconciled"],
+                "all_phase_evidence_reconciled",
+            ),
+            _strict_bool(
+                item["both_scope_qualified_keys_retained"],
+                "both_scope_qualified_keys_retained",
+            ),
+            _strict_bool(item["cleanup_performed"], "cleanup_performed"),
+        )
+    raise HarnessContractError("unknown completion kind")
+
+
+def _parse_probe_results(value: Any) -> tuple[PrivateExportProbeResult, ...]:
+    if not isinstance(value, list):
+        raise HarnessContractError("private_export_probe_results must be a list")
+    results: list[PrivateExportProbeResult] = []
+    for raw in value:
+        item = _strict_object(raw, frozenset({"outcome", "probe"}), "probe result")
+        probe = _enum_value(PrivateExportProbe, item["probe"], "probe")
+        outcome = _enum_value(
+            PrivateExportProbeOutcome, item["outcome"], "probe outcome"
+        )
+        if not isinstance(probe, PrivateExportProbe) or not isinstance(
+            outcome, PrivateExportProbeOutcome
+        ):
+            raise HarnessContractError("invalid probe result")
+        results.append(PrivateExportProbeResult(probe, outcome))
+    return tuple(results)
+
+
+def _parse_snapshot(value: Any) -> PhaseStateSnapshot:
+    item = _strict_object(
+        value,
+        frozenset(
+            {
+                "completion",
+                "lifecycle",
+                "private_export_probe_results",
+                "signature_attempt_count",
+                "signature_outcome",
+            }
+        ),
+        "phase snapshot",
+    )
+    signature = _enum_value(
+        SignatureOutcome, item["signature_outcome"], "signature_outcome"
+    )
+    if not isinstance(signature, SignatureOutcome):
+        raise HarnessContractError("invalid signature outcome")
+    return PhaseStateSnapshot(
+        lifecycle=_parse_lifecycle(item["lifecycle"]),
+        completion=_parse_completion(item["completion"]),
+        signature_outcome=signature,
+        signature_attempt_count=_strict_int(
+            item["signature_attempt_count"], "signature_attempt_count"
+        ),
+        private_export_probe_results=_parse_probe_results(
+            item["private_export_probe_results"]
+        ),
+    )
+
+
+def _reject_duplicate_json_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise HarnessContractError(f"duplicate JSON field: {key}")
+        result[key] = value
+    return result
+
+
+def load_test_evidence(path: Path) -> HarnessEvidence:
+    """Strictly load canonical v2 retained evidence and revalidate its chain."""
+
+    raw = path.read_bytes()
+    try:
+        text = raw.decode("ascii")
+    except UnicodeDecodeError as error:
+        raise HarnessContractError("evidence must be canonical ASCII JSON") from error
+    try:
+        payload = json.loads(text, object_pairs_hook=_reject_duplicate_json_keys)
+    except (json.JSONDecodeError, HarnessContractError) as error:
+        raise HarnessContractError("evidence JSON is malformed or ambiguous") from error
+    item = _strict_object(
+        payload,
+        frozenset(
+            {
+                "future_evidence_root",
+                "lifecycle",
+                "phases",
+                "private_export_probe_results",
+                "schema",
+                "signature_attempt_count",
+                "signature_outcome",
+                "test_container",
+            }
+        ),
+        "evidence",
+    )
+    schema = _strict_text(item["schema"], "schema")
+    if schema != HARNESS_SCHEMA_VERSION:
+        raise HarnessContractError("only exact v2 retained evidence is accepted")
+    if not isinstance(item["phases"], list):
+        raise HarnessContractError("phases must be a list")
+    records: list[PhaseRecord] = []
+    for raw_record in item["phases"]:
+        record = _strict_object(
+            raw_record,
+            frozenset(
+                {
+                    "actor_sid",
+                    "outcome",
+                    "phase",
+                    "previous_record_sha256",
+                    "record_sha256",
+                    "state_snapshot",
+                    "state_snapshot_sha256",
+                }
+            ),
+            "phase record",
+        )
+        phase = _enum_value(Phase, record["phase"], "phase")
+        outcome = _enum_value(PhaseOutcome, record["outcome"], "phase outcome")
+        if not isinstance(phase, Phase) or not isinstance(outcome, PhaseOutcome):
+            raise HarnessContractError("invalid phase record")
+        records.append(
+            PhaseRecord(
+                phase=phase,
+                outcome=outcome,
+                actor_sid=_strict_text(record["actor_sid"], "actor_sid"),
+                previous_record_sha256=_strict_text(
+                    record["previous_record_sha256"], "previous_record_sha256"
+                ),
+                state_snapshot=_parse_snapshot(record["state_snapshot"]),
+                state_snapshot_sha256=_strict_text(
+                    record["state_snapshot_sha256"], "state_snapshot_sha256"
+                ),
+                record_sha256=_strict_text(record["record_sha256"], "record_sha256"),
+            )
+        )
+    signature = _enum_value(
+        SignatureOutcome, item["signature_outcome"], "signature_outcome"
+    )
+    if not isinstance(signature, SignatureOutcome):
+        raise HarnessContractError("invalid signature outcome")
+    evidence = HarnessEvidence(
+        schema=schema,
+        test_container=_strict_text(item["test_container"], "test_container"),
+        future_evidence_root=_strict_text(
+            item["future_evidence_root"], "future_evidence_root"
+        ),
+        lifecycle=_parse_lifecycle(item["lifecycle"]),
+        phases=tuple(records),
+        signature_outcome=signature,
+        signature_attempt_count=_strict_int(
+            item["signature_attempt_count"], "signature_attempt_count"
+        ),
+        private_export_probe_results=_parse_probe_results(
+            item["private_export_probe_results"]
+        ),
+    )
+    validate_harness_evidence(evidence)
+    if canonical_evidence_bytes(evidence) != raw:
+        raise HarnessContractError("evidence bytes are not exact canonical v2")
+    return evidence
+
+
 def _require_native_execution_authorized() -> None:
     if not _NATIVE_EFFECT_EXECUTION_AUTHORIZED:
         raise NativeExecutionDisabled(
@@ -1353,6 +1945,142 @@ def _require_native_execution_authorized() -> None:
         )
     if _NATIVE_EFFECT_AUTHORIZATION_ID.startswith("NOT-AUTHORIZED"):
         raise NativeExecutionDisabled("native authorization identifier is disabled")
+
+
+def _validate_evidence_successor(
+    previous: HarnessEvidence, current: HarnessEvidence
+) -> None:
+    if previous == current:
+        raise HarnessContractError("duplicate retained evidence snapshot")
+    if (
+        len(current.phases) < len(previous.phases)
+        or current.phases[: len(previous.phases)] != previous.phases
+    ):
+        raise HarnessContractError("retained evidence phase history regressed")
+    if not _lifecycle_contains(current.lifecycle, previous.lifecycle):
+        raise HarnessContractError("retained evidence lifecycle regressed")
+    if current.signature_attempt_count < previous.signature_attempt_count or not (
+        _outcome_contains(current.signature_outcome, previous.signature_outcome)
+    ):
+        raise HarnessContractError("retained signature state regressed")
+    for current_probe, previous_probe in zip(
+        current.private_export_probe_results,
+        previous.private_export_probe_results,
+        strict=True,
+    ):
+        if not _outcome_contains(current_probe.outcome, previous_probe.outcome):
+            raise HarnessContractError("retained private-export state regressed")
+
+
+def _snapshot_files(root: Path) -> list[tuple[int, int, str, Path]]:
+    entries: list[tuple[int, int, str, Path]] = []
+    for path in root.iterdir():
+        parts = path.name.split("-")
+        if (
+            not path.is_file()
+            or len(parts) != 4
+            or parts[0] != "snapshot"
+            or len(parts[1]) != 4
+            or len(parts[2]) != 2
+            or not parts[1].isdigit()
+            or not parts[2].isdigit()
+            or not parts[3].endswith(".json")
+        ):
+            raise HarnessContractError("retained evidence root has an unknown entry")
+        digest = parts[3][:-5]
+        if len(digest) != 64 or any(
+            character not in "0123456789abcdef" for character in digest
+        ):
+            raise HarnessContractError("retained evidence filename digest is malformed")
+        entries.append((int(parts[1]), int(parts[2]), digest, path))
+    entries.sort(key=lambda item: item[0])
+    if [entry[0] for entry in entries] != list(range(1, len(entries) + 1)):
+        raise HarnessContractError(
+            "retained evidence sequence is missing or duplicated"
+        )
+    return entries
+
+
+def _load_retained_evidence_from_root(root: Path) -> HarnessEvidence:
+    if root == Path(str(FUTURE_EVIDENCE_ROOT)):
+        _require_native_execution_authorized()
+    if not root.is_dir():
+        raise HarnessContractError(
+            "retained evidence root is absent or not a directory"
+        )
+    entries = _snapshot_files(root)
+    if not entries:
+        raise HarnessContractError("retained evidence root contains no snapshots")
+    previous: HarnessEvidence | None = None
+    for _, phase_count, digest, path in entries:
+        raw = path.read_bytes()
+        if hashlib.sha256(raw).hexdigest() != digest:
+            raise HarnessContractError("retained evidence filename digest is wrong")
+        current = load_test_evidence(path)
+        if len(current.phases) != phase_count:
+            raise HarnessContractError(
+                "retained evidence filename phase count is wrong"
+            )
+        if previous is not None:
+            _validate_evidence_successor(previous, current)
+        previous = current
+    if previous is None:  # pragma: no cover - entries is proven nonempty
+        raise HarnessContractError("retained evidence is absent")
+    return previous
+
+
+def _publish_retained_evidence_to_root_create_new(
+    evidence: HarnessEvidence, root: Path
+) -> Path:
+    if root == Path(str(FUTURE_EVIDENCE_ROOT)):
+        _require_native_execution_authorized()
+    validate_harness_evidence(evidence)
+    first_publication = (
+        len(evidence.phases) == 1
+        and evidence.phases[0].phase is Phase.READ_ONLY_PREFLIGHT
+        and evidence.lifecycle == LifecycleEvidence()
+    )
+    if first_publication:
+        root.mkdir(parents=False, exist_ok=False)
+    elif not root.is_dir():
+        raise HarnessContractError(
+            "retained evidence root is absent or not a directory"
+        )
+    entries = _snapshot_files(root)
+    if entries:
+        previous = _load_retained_evidence_from_root(root)
+        _validate_evidence_successor(previous, evidence)
+    elif not first_publication:
+        raise HarnessContractError(
+            "non-preflight evidence cannot be the first snapshot"
+        )
+    encoded = canonical_evidence_bytes(evidence)
+    digest = hashlib.sha256(encoded).hexdigest()
+    sequence = len(entries) + 1
+    destination = root / (
+        f"snapshot-{sequence:04d}-{len(evidence.phases):02d}-{digest}.json"
+    )
+    with destination.open("xb") as stream:
+        stream.write(encoded)
+        stream.flush()
+        os.fsync(stream.fileno())
+    return destination
+
+
+def publish_retained_evidence_create_new(evidence: HarnessEvidence) -> Path:
+    """Future append-only publisher for the fixed root; disabled in source."""
+
+    _require_native_execution_authorized()
+    root = Path(str(validate_evidence_root(FUTURE_EVIDENCE_ROOT)))
+    return _publish_retained_evidence_to_root_create_new(evidence, root)
+
+
+def load_retained_evidence() -> HarnessEvidence:
+    """Future fixed-root multi-session loader; disabled from ordinary use."""
+
+    _require_native_execution_authorized()
+    root = Path(str(validate_evidence_root(FUTURE_EVIDENCE_ROOT)))
+    return _load_retained_evidence_from_root(root)
 
 
 def execute_native_phase(
@@ -1371,11 +2099,561 @@ def execute_native_phase(
     return operations.execute(phase, evidence)  # pragma: no cover - disabled
 
 
+def _p256_add(
+    left: tuple[int, int] | None,
+    right: tuple[int, int] | None,
+) -> tuple[int, int] | None:
+    if left is None:
+        return right
+    if right is None:
+        return left
+    x1, y1 = left
+    x2, y2 = right
+    if x1 == x2 and (y1 + y2) % _P256_P == 0:
+        return None
+    if left == right:
+        if y1 == 0:
+            return None
+        slope = ((3 * x1 * x1 + _P256_A) * pow(2 * y1, -1, _P256_P)) % _P256_P
+    else:
+        slope = ((y2 - y1) * pow((x2 - x1) % _P256_P, -1, _P256_P)) % _P256_P
+    x3 = (slope * slope - x1 - x2) % _P256_P
+    return x3, (slope * (x1 - x3) - y1) % _P256_P
+
+
+def _p256_multiply(scalar: int, point: tuple[int, int]) -> tuple[int, int] | None:
+    result: tuple[int, int] | None = None
+    addend: tuple[int, int] | None = point
+    while scalar:
+        if scalar & 1:
+            result = _p256_add(result, addend)
+        addend = _p256_add(addend, addend)
+        scalar >>= 1
+    return result
+
+
+def verify_test_signature_p1363(
+    public_sec1: bytes,
+    digest: bytes,
+    signature: bytes,
+) -> bool:
+    """Verify the one fixed test signature without accepting DER ambiguity."""
+
+    if len(public_sec1) != 65 or public_sec1[0] != 4 or len(digest) != 32:
+        return False
+    if len(signature) != 64:
+        return False
+    x = int.from_bytes(public_sec1[1:33], "big")
+    y = int.from_bytes(public_sec1[33:], "big")
+    try:
+        _validate_public_point(public_sec1[1:33], public_sec1[33:])
+    except HarnessContractError:
+        return False
+    r = int.from_bytes(signature[:32], "big")
+    s = int.from_bytes(signature[32:], "big")
+    if not (1 <= r < _P256_N and 1 <= s < _P256_N):
+        return False
+    inverse = pow(s, -1, _P256_N)
+    z = int.from_bytes(digest, "big")
+    point = _p256_add(
+        _p256_multiply((z * inverse) % _P256_N, (_P256_GX, _P256_GY)),
+        _p256_multiply((r * inverse) % _P256_N, (x, y)),
+    )
+    return point is not None and point[0] % _P256_N == r
+
+
+def classify_private_export_status(status: int) -> PrivateExportProbeOutcome:
+    """Classify a native probe without treating unsupported format as denial."""
+
+    normalized = status & 0xFFFFFFFF
+    if normalized in REVIEWED_ACCESS_DENIED_STATUSES:
+        return PrivateExportProbeOutcome.DENIED_AS_REQUIRED
+    if normalized == NTE_NOT_SUPPORTED:
+        return PrivateExportProbeOutcome.UNSUPPORTED_FORMAT
+    return PrivateExportProbeOutcome.FAILED
+
+
+class NativeWindowsPhaseOperations:
+    """Exact future phase bodies, reachable only behind the disabled source gate."""
+
+    def __init__(
+        self,
+        api: NativeApi,
+        evidence_retainer: Callable[[HarnessEvidence], Any] | None = None,
+    ) -> None:
+        if getattr(api, "requires_persistent_retainer", False) and (
+            evidence_retainer is None
+        ):
+            raise HarnessContractError(
+                "native ctypes operations require append-only evidence retention"
+            )
+        self._api = api
+        self._evidence_retainer = evidence_retainer
+        self._retained_evidence = HarnessEvidence()
+
+    @classmethod
+    def load_for_authorized_execution(cls) -> NativeWindowsPhaseOperations:
+        _require_native_execution_authorized()
+        return cls(
+            CtypesNativeApi.load_for_authorized_execution(),
+            publish_retained_evidence_create_new,
+        )
+
+    def _retain(self, evidence: HarnessEvidence) -> HarnessEvidence:
+        self._retained_evidence = evidence
+        if self._evidence_retainer is not None:
+            self._evidence_retainer(evidence)
+        return evidence
+
+    def execute(self, phase: Phase, evidence: HarnessEvidence) -> HarnessEvidence:
+        validate_phase_dispatch_eligibility(phase, evidence)
+        self._retained_evidence = evidence
+        handlers: dict[
+            Phase, Callable[[HarnessEvidence], tuple[HarnessEvidence, PhaseCompletion]]
+        ] = {
+            Phase.READ_ONLY_PREFLIGHT: self._read_only_preflight,
+            Phase.MACHINE_CREATE_AND_VALIDATE: self._machine_create_and_validate,
+            Phase.SHADOW_CREATE_AND_SCOPE_PROOF: self._shadow_create_and_scope_proof,
+            Phase.ELEVATED_MACHINE_EFFECT_TEST: self._elevated_machine_effect_test,
+            Phase.TRADING_DENIAL: self._principal_denial,
+            Phase.ORDINARY_NONADMIN_DENIAL: self._principal_denial,
+            Phase.FINAL_EVIDENCE_RECONCILIATION: self._final_reconciliation,
+        }
+        try:
+            updated, completion = handlers[phase](evidence)
+        except (HandleReleaseError, NativeOperationUncertain, SecurityStatusError):
+            return self._retain(
+                append_phase_result(
+                    self._retained_evidence, phase, PhaseOutcome.UNCERTAIN
+                )
+            )
+        except HarnessContractError:
+            return self._retain(
+                append_phase_result(self._retained_evidence, phase, PhaseOutcome.FAILED)
+            )
+        return self._retain(
+            append_phase_result(updated, phase, PhaseOutcome.SUCCEEDED, completion)
+        )
+
+    def _require_operator_token(self) -> TokenFacts:
+        facts = self._api.current_token_facts()
+        if facts.user_sid != ELEVATED_TEST_OPERATOR_SID:
+            raise HarnessContractError("current token is not the exact test operator")
+        if not facts.elevated or not facts.elevation_type_full:
+            raise HarnessContractError("test operator token is not genuinely elevated")
+        if not facts.administrators_enabled:
+            raise HarnessContractError("Administrators is not enabled in the token")
+        return facts
+
+    def _require_provider_name(self, provider: Any) -> None:
+        if (
+            self._api.get_string(
+                provider, NCRYPT_PROVIDER_NAME_PROPERTY, NCRYPT_PROPERTY_GET_FLAGS
+            )
+            != PROVIDER_NAME
+        ):
+            raise HarnessContractError("opened provider did not report the exact name")
+
+    def _require_absent(self, provider: Any, identity: KeyIdentity, flags: int) -> None:
+        result = self._api.try_open_key(provider, identity, flags)
+        if result.handle is not None:
+            result.handle.close()
+            raise HarnessContractError(
+                "TEST container already exists in a frozen scope"
+            )
+        if (result.status & 0xFFFFFFFF) not in REVIEWED_NOT_FOUND_STATUSES:
+            raise SecurityStatusError("NCryptOpenKey absence probe", result.status)
+
+    def _read_only_preflight(
+        self, evidence: HarnessEvidence
+    ) -> tuple[HarnessEvidence, PhaseCompletion]:
+        if os.name != "nt" or sys.platform != "win32":
+            raise HarnessContractError("native harness requires Windows")
+        self._require_operator_token()
+        validate_test_container(TEST_CONTAINER_TEXT)
+        validate_key_identity(MACHINE_TEST_KEY)
+        validate_key_identity(CURRENT_USER_SHADOW_KEY)
+        validate_evidence_root(FUTURE_EVIDENCE_ROOT)
+        if self._api.evidence_root_exists(FUTURE_EVIDENCE_ROOT):
+            raise HarnessContractError("future evidence root already exists")
+        with self._api.open_provider() as provider:
+            self._require_provider_name(provider)
+            if (
+                self._api.get_dword(
+                    provider,
+                    NCRYPT_SECURITY_DESCR_SUPPORT_PROPERTY,
+                    NCRYPT_PROPERTY_GET_FLAGS,
+                )
+                != 1
+            ):
+                raise HarnessContractError(
+                    "provider security-descriptor support is not exactly DWORD 1"
+                )
+            self._require_absent(
+                provider, MACHINE_TEST_KEY, NCRYPT_MACHINE_REOPEN_FLAGS
+            )
+            self._require_absent(
+                provider, CURRENT_USER_SHADOW_KEY, NCRYPT_CURRENT_USER_REOPEN_FLAGS
+            )
+        return evidence, ReadOnlyPreflightCompletion(
+            both_scope_absence_proved=True,
+            future_evidence_root_absent=True,
+            provider_security_descriptor_support=True,
+            elevated_operator_sid=ELEVATED_TEST_OPERATOR_SID,
+        )
+
+    def _read_metadata(
+        self,
+        handle: Any,
+        identity: KeyIdentity,
+    ) -> KeyMetadata:
+        name = self._api.get_string(
+            handle, NCRYPT_NAME_PROPERTY, NCRYPT_PROPERTY_GET_FLAGS
+        )
+        if name != identity.container:
+            raise HarnessContractError("key name readback is not exact")
+        algorithm = self._api.get_string(
+            handle, NCRYPT_ALGORITHM_PROPERTY, NCRYPT_PROPERTY_GET_FLAGS
+        )
+        group = self._api.get_string(
+            handle, NCRYPT_ALGORITHM_GROUP_PROPERTY, NCRYPT_PROPERTY_GET_FLAGS
+        )
+        length = self._api.get_dword(
+            handle, NCRYPT_LENGTH_PROPERTY, NCRYPT_PROPERTY_GET_FLAGS
+        )
+        key_type = self._api.get_dword(
+            handle, NCRYPT_KEY_TYPE_PROPERTY, NCRYPT_PROPERTY_GET_FLAGS
+        )
+        public = normalize_ecc_public_blob(
+            self._api.export_public(handle, NCRYPT_PUBLIC_EXPORT_FLAGS)
+        )
+        metadata = KeyMetadata(identity, key_type, algorithm, group, length, public)
+        _validate_metadata_common(metadata)
+        return metadata
+
+    def _verify_machine_handle(
+        self,
+        handle: Any,
+        expected_public: bytes | None = None,
+        expected_unique_name: str | None = None,
+    ) -> tuple[KeyMetadata, str]:
+        metadata = self._read_metadata(handle, MACHINE_TEST_KEY)
+        if metadata.key_type != NCRYPT_KEY_TYPE_MACHINE:
+            raise HarnessContractError("machine key type is not exactly 0x20")
+        if (
+            self._api.get_dword(
+                handle, NCRYPT_KEY_USAGE_PROPERTY, NCRYPT_PROPERTY_GET_FLAGS
+            )
+            != NCRYPT_ALLOW_SIGNING_FLAG
+        ):
+            raise HarnessContractError("machine usage is not signing-only")
+        if (
+            self._api.get_dword(
+                handle, NCRYPT_EXPORT_POLICY_PROPERTY, NCRYPT_PROPERTY_GET_FLAGS
+            )
+            != NCRYPT_EXPORT_POLICY_NONE
+        ):
+            raise HarnessContractError("machine export policy is not zero")
+        unique_name = self._api.get_string(
+            handle, NCRYPT_UNIQUE_NAME_PROPERTY, NCRYPT_PROPERTY_GET_FLAGS
+        )
+        if not unique_name:
+            raise HarnessContractError("machine unique name is empty")
+        descriptor = self._api.decode_security_descriptor(
+            self._api.get_bytes(
+                handle,
+                NCRYPT_SECURITY_DESCR_PROPERTY,
+                NCRYPT_SECURITY_GET_FLAGS,
+            )
+        )
+        verify_security_descriptor(descriptor)
+        if expected_public is not None and metadata.public_sec1 != expected_public:
+            raise HarnessContractError("machine public identity changed")
+        if expected_unique_name is not None and unique_name != expected_unique_name:
+            raise HarnessContractError("machine unique name changed")
+        return metadata, unique_name
+
+    def _open_exact(
+        self, provider: Any, identity: KeyIdentity, flags: int
+    ) -> OwnedNativeHandle:
+        result = self._api.try_open_key(provider, identity, flags)
+        check_security_status("NCryptOpenKey", result.status)
+        if result.handle is None:
+            raise HarnessContractError("successful open returned no owned key handle")
+        return result.handle
+
+    def _machine_create_and_validate(
+        self, evidence: HarnessEvidence
+    ) -> tuple[HarnessEvidence, PhaseCompletion]:
+        self._require_operator_token()
+        if NCRYPT_MACHINE_CREATE_FLAGS & NCRYPT_OVERWRITE_KEY_FLAG:
+            raise HarnessContractError("machine create flags contain overwrite")
+        with self._api.open_provider() as provider:
+            self._require_provider_name(provider)
+            with self._api.create_key(
+                provider, MACHINE_TEST_KEY, NCRYPT_MACHINE_CREATE_FLAGS
+            ) as key:
+                evidence = record_machine_created(evidence)
+                self._retain(evidence)
+                self._api.set_dword(
+                    key,
+                    NCRYPT_KEY_USAGE_PROPERTY,
+                    NCRYPT_ALLOW_SIGNING_FLAG,
+                    NCRYPT_PROPERTY_SET_FLAGS,
+                )
+                if (
+                    self._api.get_dword(
+                        key, NCRYPT_KEY_USAGE_PROPERTY, NCRYPT_PROPERTY_GET_FLAGS
+                    )
+                    != NCRYPT_ALLOW_SIGNING_FLAG
+                ):
+                    raise HarnessContractError("pre-finalization usage readback failed")
+                self._api.set_dword(
+                    key,
+                    NCRYPT_EXPORT_POLICY_PROPERTY,
+                    NCRYPT_EXPORT_POLICY_NONE,
+                    NCRYPT_PROPERTY_SET_FLAGS,
+                )
+                if (
+                    self._api.get_dword(
+                        key, NCRYPT_EXPORT_POLICY_PROPERTY, NCRYPT_PROPERTY_GET_FLAGS
+                    )
+                    != NCRYPT_EXPORT_POLICY_NONE
+                ):
+                    raise HarnessContractError(
+                        "pre-finalization export-policy readback failed"
+                    )
+                descriptor_bytes = self._api.build_exact_security_descriptor()
+                verify_security_descriptor(
+                    self._api.decode_security_descriptor(descriptor_bytes)
+                )
+                self._api.set_bytes(
+                    key,
+                    NCRYPT_SECURITY_DESCR_PROPERTY,
+                    descriptor_bytes,
+                    NCRYPT_SECURITY_SET_FLAGS,
+                )
+                verify_security_descriptor(
+                    self._api.decode_security_descriptor(
+                        self._api.get_bytes(
+                            key,
+                            NCRYPT_SECURITY_DESCR_PROPERTY,
+                            NCRYPT_SECURITY_GET_FLAGS,
+                        )
+                    )
+                )
+                self._api.finalize_key(key, NCRYPT_FINALIZE_FLAGS)
+                machine_metadata, unique_name = self._verify_machine_handle(key)
+            with self._open_exact(
+                provider, MACHINE_TEST_KEY, NCRYPT_MACHINE_REOPEN_FLAGS
+            ) as reopened:
+                reopened_metadata, _ = self._verify_machine_handle(
+                    reopened,
+                    expected_public=machine_metadata.public_sec1,
+                    expected_unique_name=unique_name,
+                )
+        if reopened_metadata != machine_metadata:
+            raise HarnessContractError(
+                "machine metadata changed after independent reopen"
+            )
+        return evidence, MachineValidationCompletion(
+            machine_metadata=machine_metadata,
+            exact_properties_verified=True,
+            security_descriptor_verified=True,
+            independent_reopen_verified=True,
+        )
+
+    def _machine_completion(
+        self, evidence: HarnessEvidence
+    ) -> MachineValidationCompletion:
+        for record in evidence.phases:
+            completion = record.state_snapshot.completion
+            if isinstance(completion, MachineValidationCompletion):
+                return completion
+        raise HarnessContractError("retained machine completion is absent")
+
+    def _shadow_completion(self, evidence: HarnessEvidence) -> ShadowScopeCompletion:
+        for record in evidence.phases:
+            completion = record.state_snapshot.completion
+            if isinstance(completion, ShadowScopeCompletion):
+                return completion
+        raise HarnessContractError("retained shadow completion is absent")
+
+    def _shadow_create_and_scope_proof(
+        self, evidence: HarnessEvidence
+    ) -> tuple[HarnessEvidence, PhaseCompletion]:
+        self._require_operator_token()
+        if NCRYPT_CURRENT_USER_CREATE_FLAGS & (
+            NCRYPT_MACHINE_KEY_FLAG | NCRYPT_OVERWRITE_KEY_FLAG
+        ):
+            raise HarnessContractError(
+                "shadow create flags contain forbidden scope/overwrite"
+            )
+        machine_expected = self._machine_completion(evidence).machine_metadata
+        with self._api.open_provider() as provider:
+            self._require_provider_name(provider)
+            with self._api.create_key(
+                provider, CURRENT_USER_SHADOW_KEY, NCRYPT_CURRENT_USER_CREATE_FLAGS
+            ) as shadow_key:
+                evidence = record_shadow_created(evidence)
+                self._retain(evidence)
+                self._api.finalize_key(shadow_key, NCRYPT_FINALIZE_FLAGS)
+                shadow_frozen = self._read_metadata(shadow_key, CURRENT_USER_SHADOW_KEY)
+            with self._open_exact(
+                provider,
+                CURRENT_USER_SHADOW_KEY,
+                NCRYPT_CURRENT_USER_REOPEN_FLAGS,
+            ) as shadow_reopened:
+                shadow_metadata = self._read_metadata(
+                    shadow_reopened, CURRENT_USER_SHADOW_KEY
+                )
+            if shadow_metadata != shadow_frozen:
+                raise HarnessContractError("shadow identity changed after reopen")
+            with self._open_exact(
+                provider, MACHINE_TEST_KEY, NCRYPT_MACHINE_REOPEN_FLAGS
+            ) as machine_reopened:
+                machine_metadata, _ = self._verify_machine_handle(
+                    machine_reopened,
+                    expected_public=machine_expected.public_sec1,
+                )
+        verify_scope_non_substitution(machine_metadata, shadow_metadata)
+        return evidence, ShadowScopeCompletion(
+            machine_metadata=machine_metadata,
+            shadow_metadata=shadow_metadata,
+            scope_non_substitution_verified=True,
+        )
+
+    def _elevated_machine_effect_test(
+        self, evidence: HarnessEvidence
+    ) -> tuple[HarnessEvidence, PhaseCompletion]:
+        self._require_operator_token()
+        machine_public = self._shadow_completion(evidence).machine_metadata.public_sec1
+        with self._api.open_provider() as provider:
+            self._require_provider_name(provider)
+            with self._open_exact(
+                provider, MACHINE_TEST_KEY, NCRYPT_MACHINE_REOPEN_FLAGS
+            ) as machine_key:
+                for probe in PrivateExportProbe:
+                    evidence = begin_private_export_denial_probe(
+                        evidence, MACHINE_TEST_KEY, probe
+                    )
+                    self._retain(evidence)
+                    status = self._api.private_export_probe_status(
+                        machine_key, probe.value, NCRYPT_PUBLIC_EXPORT_FLAGS
+                    )
+                    outcome = classify_private_export_status(status)
+                    evidence = record_private_export_probe_outcome(
+                        evidence, probe, outcome
+                    )
+                    self._retain(evidence)
+                if not _all_probes_denied_as_required(
+                    evidence.private_export_probe_results
+                ):
+                    raise HarnessContractError(
+                        "private-export matrix did not produce exact policy denials"
+                    )
+                evidence = begin_test_signature(evidence, MACHINE_TEST_KEY)
+                self._retain(evidence)
+                digest = hashlib.sha256(TEST_SIGNATURE_PREIMAGE).digest()
+                signature = self._api.sign_hash(machine_key, digest, NCRYPT_SILENT_FLAG)
+                if not verify_test_signature_p1363(machine_public, digest, signature):
+                    evidence = record_test_signature_outcome(
+                        evidence, SignatureOutcome.FAILED
+                    )
+                    self._retain(evidence)
+                    raise HarnessContractError("TEST signature verification failed")
+                evidence = record_test_signature_outcome(
+                    evidence, SignatureOutcome.SUCCEEDED
+                )
+                self._retain(evidence)
+        return evidence, ElevatedEffectCompletion(
+            signature_verified_with_machine_public=True,
+            private_export_denial_matrix_verified=True,
+        )
+
+    def _principal_denial(
+        self, evidence: HarnessEvidence
+    ) -> tuple[HarnessEvidence, PhaseCompletion]:
+        phase = determine_next_phase(evidence)
+        actor_sid = _expected_actor(phase)
+        facts = self._api.current_token_facts()
+        if facts.user_sid != actor_sid:
+            raise HarnessContractError("current genuine process token SID is wrong")
+        if facts.elevated or facts.elevation_type_full or facts.administrators_enabled:
+            raise HarnessContractError("denial phase requires a non-elevated token")
+        with self._api.open_provider() as provider:
+            self._require_provider_name(provider)
+            result = self._api.try_open_key(
+                provider, MACHINE_TEST_KEY, NCRYPT_MACHINE_REOPEN_FLAGS
+            )
+            if result.handle is not None:
+                result.handle.close()
+                raise HarnessContractError("non-admin unexpectedly opened machine key")
+            if (result.status & 0xFFFFFFFF) not in REVIEWED_ACCESS_DENIED_STATUSES:
+                raise SecurityStatusError("NCryptOpenKey denial proof", result.status)
+        return evidence, PrincipalDenialCompletion(
+            actor_sid=actor_sid,
+            machine_open_denied=True,
+            downstream_private_operations_unreachable=True,
+        )
+
+    def _final_reconciliation(
+        self, evidence: HarnessEvidence
+    ) -> tuple[HarnessEvidence, PhaseCompletion]:
+        self._require_operator_token()
+        validate_harness_evidence(evidence)
+        if len(evidence.phases) != len(PHASE_ORDER) - 1:
+            raise HarnessContractError("final reconciliation lacks the complete chain")
+        if any(
+            record.outcome is not PhaseOutcome.SUCCEEDED for record in evidence.phases
+        ):
+            raise HarnessContractError(
+                "final reconciliation has a terminal predecessor"
+            )
+        if evidence.signature_outcome is not SignatureOutcome.SUCCEEDED or not (
+            _all_probes_denied_as_required(evidence.private_export_probe_results)
+        ):
+            raise HarnessContractError("final reconciliation has unresolved effects")
+        expected = self._shadow_completion(evidence)
+        with self._api.open_provider() as provider:
+            self._require_provider_name(provider)
+            with self._open_exact(
+                provider, MACHINE_TEST_KEY, NCRYPT_MACHINE_REOPEN_FLAGS
+            ) as machine_key:
+                machine, _ = self._verify_machine_handle(
+                    machine_key, expected_public=expected.machine_metadata.public_sec1
+                )
+            with self._open_exact(
+                provider,
+                CURRENT_USER_SHADOW_KEY,
+                NCRYPT_CURRENT_USER_REOPEN_FLAGS,
+            ) as shadow_key:
+                shadow = self._read_metadata(shadow_key, CURRENT_USER_SHADOW_KEY)
+        if machine != expected.machine_metadata or shadow != expected.shadow_metadata:
+            raise HarnessContractError("retained key identities contradict snapshots")
+        verify_scope_non_substitution(machine, shadow)
+        return evidence, FinalReconciliationCompletion(
+            all_phase_evidence_reconciled=True,
+            both_scope_qualified_keys_retained=True,
+            cleanup_performed=False,
+        )
+
+
 class _AclSizeInformation(ctypes.Structure):
     _fields_ = [
         ("ace_count", ctypes.c_uint32),
         ("acl_bytes_in_use", ctypes.c_uint32),
         ("acl_bytes_free", ctypes.c_uint32),
+    ]
+
+
+class _AclHeader(ctypes.Structure):
+    _fields_ = [
+        ("revision", ctypes.c_ubyte),
+        ("sbz1", ctypes.c_ubyte),
+        ("acl_size", ctypes.c_uint16),
+        ("ace_count", ctypes.c_uint16),
+        ("sbz2", ctypes.c_uint16),
     ]
 
 
@@ -1393,6 +2671,279 @@ class _AccessAllowedAce(ctypes.Structure):
         ("mask", ctypes.c_uint32),
         ("sid_start", ctypes.c_uint32),
     ]
+
+
+class _SidAndAttributes(ctypes.Structure):
+    _fields_ = [("sid", ctypes.c_void_p), ("attributes", ctypes.c_uint32)]
+
+
+class _TokenUser(ctypes.Structure):
+    _fields_ = [("user", _SidAndAttributes)]
+
+
+class _SecurityDescriptorAbsolute(ctypes.Structure):
+    _fields_ = [
+        ("revision", ctypes.c_ubyte),
+        ("sbz1", ctypes.c_ubyte),
+        ("control", ctypes.c_uint16),
+        ("owner", ctypes.c_void_p),
+        ("group", ctypes.c_void_p),
+        ("sacl", ctypes.c_void_p),
+        ("dacl", ctypes.c_void_p),
+    ]
+
+
+def _sid_binary(sid: str) -> bytes:
+    parts = sid.split("-")
+    if len(parts) < 4 or parts[0] != "S":
+        raise HarnessContractError("SID text is malformed")
+    try:
+        revision = int(parts[1], 10)
+        authority = int(parts[2], 10)
+        subauthorities = [int(part, 10) for part in parts[3:]]
+    except ValueError as error:
+        raise HarnessContractError("SID text is malformed") from error
+    if revision != 1 or not 0 <= authority < (1 << 48):
+        raise HarnessContractError("SID revision/authority is unsupported")
+    if not 1 <= len(subauthorities) <= 15 or any(
+        value < 0 or value > 0xFFFFFFFF for value in subauthorities
+    ):
+        raise HarnessContractError("SID subauthority is invalid")
+    return (
+        bytes((revision, len(subauthorities)))
+        + authority.to_bytes(6, "big")
+        + b"".join(value.to_bytes(4, "little") for value in subauthorities)
+    )
+
+
+def build_exact_security_descriptor_bytes() -> bytes:
+    """Build the exact self-relative owner/protected two-allow DACL."""
+
+    owner = _sid_binary(ADMINISTRATORS_SID)
+    system = _sid_binary(LOCAL_SYSTEM_SID)
+    administrators = _sid_binary(ADMINISTRATORS_SID)
+
+    def allow_ace(sid_bytes: bytes) -> bytes:
+        size = 8 + len(sid_bytes)
+        return (
+            struct.pack(
+                "<BBHI", ACCESS_ALLOWED_ACE_TYPE, 0, size, CRYPTO_KEY_FULL_CONTROL
+            )
+            + sid_bytes
+        )
+
+    ace_bytes = allow_ace(system) + allow_ace(administrators)
+    acl_size = ctypes.sizeof(_AclHeader) + len(ace_bytes)
+    acl = struct.pack("<BBHHH", ACL_REVISION, 0, acl_size, 2, 0) + ace_bytes
+    owner_offset = 20
+    dacl_offset = (owner_offset + len(owner) + 3) & ~3
+    padding = b"\x00" * (dacl_offset - owner_offset - len(owner))
+    header = struct.pack(
+        "<BBHLLLL",
+        1,
+        0,
+        SE_SELF_RELATIVE | SE_DACL_PRESENT | SE_DACL_PROTECTED,
+        owner_offset,
+        0,
+        0,
+        dacl_offset,
+    )
+    return header + owner + padding + acl
+
+
+def _bounded_pointer(
+    pointer: int | None,
+    size: int,
+    base: int,
+    total: int,
+    label: str,
+) -> int:
+    if pointer is None or pointer == 0 or size < 0:
+        raise HarnessContractError(f"{label} pointer/size is invalid")
+    if pointer < base or pointer > base + total:
+        raise HarnessContractError(f"{label} pointer is outside the descriptor")
+    if size > total or pointer + size > base + total:
+        raise HarnessContractError(f"{label} extends outside the descriptor")
+    return pointer
+
+
+def decode_native_security_descriptor(
+    value: bytes,
+    functions: Mapping[str, Callable[..., Any]],
+) -> SecurityDescriptorSemantic:
+    """Decode provider bytes through Windows APIs with explicit pointer bounds."""
+
+    if len(value) < 20:
+        raise HarnessContractError("security descriptor is shorter than its header")
+    buffer = ctypes.create_string_buffer(value, len(value))
+    base = ctypes.addressof(buffer)
+    descriptor = ctypes.c_void_p(base)
+
+    def require_bool(name: str, *args: Any) -> None:
+        if not bool(functions[name](*args)):
+            raise HarnessContractError(f"{name} rejected native security data")
+
+    require_bool("IsValidSecurityDescriptor", descriptor)
+    returned_length = int(functions["GetSecurityDescriptorLength"](descriptor))
+    if returned_length != len(value):
+        raise HarnessContractError("security descriptor length/trailing bytes mismatch")
+
+    def sid_text(pointer: int, range_base: int, range_size: int, label: str) -> str:
+        _bounded_pointer(pointer, 8, range_base, range_size, label)
+        sid_pointer = ctypes.c_void_p(pointer)
+        require_bool("IsValidSid", sid_pointer)
+        sid_length = int(functions["GetLengthSid"](sid_pointer))
+        _bounded_pointer(pointer, sid_length, range_base, range_size, label)
+        converted = ctypes.c_wchar_p()
+        converted_ok = bool(
+            functions["ConvertSidToStringSidW"](sid_pointer, ctypes.byref(converted))
+        )
+        allocation = ctypes.cast(converted, ctypes.c_void_p).value
+        if not converted_ok:
+            if allocation is not None:
+                if functions["LocalFree"](ctypes.c_void_p(allocation)):
+                    raise HandleReleaseError(
+                        "LocalFree failed after SID conversion failure"
+                    )
+            raise HarnessContractError("ConvertSidToStringSidW rejected SID")
+        if allocation is None:
+            raise HarnessContractError("SID conversion returned no allocation")
+
+        def release_local(pointer_value: int) -> None:
+            if functions["LocalFree"](ctypes.c_void_p(pointer_value)):
+                raise HandleReleaseError("LocalFree failed for SID string")
+
+        with OwnedNativeHandle(allocation, release_local, "SID string allocation"):
+            text = converted.value
+            if text is None:
+                raise HarnessContractError("SID conversion returned null text")
+            return text
+
+    owner_pointer = ctypes.c_void_p()
+    owner_defaulted = ctypes.c_int()
+    require_bool(
+        "GetSecurityDescriptorOwner",
+        descriptor,
+        ctypes.byref(owner_pointer),
+        ctypes.byref(owner_defaulted),
+    )
+    owner_address = _bounded_pointer(
+        owner_pointer.value, 8, base, len(value), "owner SID"
+    )
+    owner_sid = sid_text(owner_address, base, len(value), "owner SID")
+
+    control = ctypes.c_uint16()
+    revision = ctypes.c_uint32()
+    require_bool(
+        "GetSecurityDescriptorControl",
+        descriptor,
+        ctypes.byref(control),
+        ctypes.byref(revision),
+    )
+    if revision.value != 1:
+        raise HarnessContractError("security descriptor revision is not one")
+
+    dacl_present = ctypes.c_int()
+    dacl_pointer = ctypes.c_void_p()
+    dacl_defaulted = ctypes.c_int()
+    require_bool(
+        "GetSecurityDescriptorDacl",
+        descriptor,
+        ctypes.byref(dacl_present),
+        ctypes.byref(dacl_pointer),
+        ctypes.byref(dacl_defaulted),
+    )
+    if not dacl_present.value or dacl_pointer.value is None:
+        raise HarnessContractError("security descriptor DACL is missing or NULL")
+    dacl_address = _bounded_pointer(
+        dacl_pointer.value,
+        ctypes.sizeof(_AclHeader),
+        base,
+        len(value),
+        "DACL",
+    )
+    size_info = _AclSizeInformation()
+    require_bool(
+        "GetAclInformation",
+        dacl_pointer,
+        ctypes.byref(size_info),
+        ctypes.sizeof(size_info),
+        2,
+    )
+    if size_info.acl_bytes_in_use < ctypes.sizeof(_AclHeader):
+        raise HarnessContractError("DACL bytes-in-use is too small")
+    _bounded_pointer(
+        dacl_address,
+        size_info.acl_bytes_in_use,
+        base,
+        len(value),
+        "DACL",
+    )
+    header = _AclHeader.from_buffer_copy(
+        ctypes.string_at(dacl_address, ctypes.sizeof(_AclHeader))
+    )
+    if header.acl_size != size_info.acl_bytes_in_use:
+        raise HarnessContractError("DACL header and API sizes disagree")
+    if header.ace_count != size_info.ace_count:
+        raise HarnessContractError("DACL header and API ACE counts disagree")
+    if dacl_address + header.acl_size != base + len(value):
+        raise HarnessContractError("DACL has trailing or detached descriptor bytes")
+    if size_info.ace_count > (header.acl_size - ctypes.sizeof(_AclHeader)) // 8:
+        raise HarnessContractError("DACL ACE count cannot fit inside its byte length")
+
+    aces: list[AceSemantic] = []
+    for index in range(size_info.ace_count):
+        ace_pointer = ctypes.c_void_p()
+        require_bool("GetAce", dacl_pointer, index, ctypes.byref(ace_pointer))
+        ace_address = _bounded_pointer(
+            ace_pointer.value,
+            ctypes.sizeof(_AceHeader),
+            dacl_address,
+            header.acl_size,
+            f"ACE {index}",
+        )
+        ace_header = _AceHeader.from_buffer_copy(
+            ctypes.string_at(ace_address, ctypes.sizeof(_AceHeader))
+        )
+        if ace_header.ace_size < 8:
+            raise HarnessContractError("ACE is shorter than ACCESS_ALLOWED_ACE")
+        _bounded_pointer(
+            ace_address,
+            ace_header.ace_size,
+            dacl_address,
+            header.acl_size,
+            f"ACE {index}",
+        )
+        access_mask = struct.unpack("<I", ctypes.string_at(ace_address + 4, 4))[0]
+        sid_address = ace_address + 8
+        sid = sid_text(
+            sid_address,
+            ace_address,
+            ace_header.ace_size,
+            f"ACE {index} SID",
+        )
+        sid_length = int(functions["GetLengthSid"](ctypes.c_void_p(sid_address)))
+        if sid_address + sid_length != ace_address + ace_header.ace_size:
+            raise HarnessContractError("ACE contains trailing or truncated SID bytes")
+        aces.append(
+            AceSemantic(
+                ace_type=ace_header.ace_type,
+                ace_flags=ace_header.ace_flags,
+                sid=sid,
+                access_mask=access_mask,
+            )
+        )
+    return SecurityDescriptorSemantic(
+        is_valid=True,
+        owner_sid=owner_sid,
+        owner_defaulted=bool(owner_defaulted.value),
+        dacl_present=bool(dacl_present.value),
+        dacl_is_null=False,
+        dacl_defaulted=bool(dacl_defaulted.value),
+        control=control.value,
+        acl_revision=header.revision,
+        aces=tuple(aces),
+    )
 
 
 def _bind(
@@ -1626,6 +3177,521 @@ class WindowsNativeBindings:
         return cls(functions=functions)
 
 
+class CtypesNativeApi:
+    """ctypes implementation for a future separately authorized Windows run."""
+
+    requires_persistent_retainer = True
+
+    def __init__(self, bindings: WindowsNativeBindings) -> None:
+        _require_native_execution_authorized()
+        self._functions = bindings.functions
+
+    @classmethod
+    def load_for_authorized_execution(cls) -> CtypesNativeApi:
+        return cls(WindowsNativeBindings.load_for_authorized_execution())
+
+    def _free_object(self, handle: Any) -> None:
+        check_security_status(
+            "NCryptFreeObject", int(self._functions["NCryptFreeObject"](handle))
+        )
+
+    def _close_token(self, handle: Any) -> None:
+        if not bool(self._functions["CloseHandle"](handle)):
+            raise HandleReleaseError("CloseHandle failed for process token")
+
+    def _local_free(self, pointer: Any) -> None:
+        if self._functions["LocalFree"](pointer):
+            raise HandleReleaseError("LocalFree failed")
+
+    def _sid_to_text(self, sid: Any) -> str:
+        if not bool(self._functions["IsValidSid"](sid)):
+            raise HarnessContractError("native SID is invalid")
+        converted = ctypes.c_wchar_p()
+        converted_ok = bool(
+            self._functions["ConvertSidToStringSidW"](sid, ctypes.byref(converted))
+        )
+        if not converted_ok:
+            failed_pointer = ctypes.cast(converted, ctypes.c_void_p).value
+            if failed_pointer is not None:
+                OwnedNativeHandle(
+                    failed_pointer,
+                    self._local_free,
+                    "failed SID string allocation",
+                ).close()
+            raise HarnessContractError("ConvertSidToStringSidW failed")
+        pointer = ctypes.cast(converted, ctypes.c_void_p).value
+        if pointer is None:
+            raise HarnessContractError("SID conversion returned a null allocation")
+        with OwnedNativeHandle(pointer, self._local_free, "SID string allocation"):
+            if converted.value is None:
+                raise HarnessContractError("SID conversion returned null text")
+            return converted.value
+
+    def _string_sid(self, text: str) -> OwnedNativeHandle:
+        pointer = ctypes.c_void_p()
+        converted_ok = bool(
+            self._functions["ConvertStringSidToSidW"](text, ctypes.byref(pointer))
+        )
+        if not converted_ok:
+            if pointer.value is not None:
+                OwnedNativeHandle(
+                    pointer.value,
+                    self._local_free,
+                    "failed binary SID allocation",
+                ).close()
+            raise HarnessContractError("ConvertStringSidToSidW failed")
+        return OwnedNativeHandle(
+            pointer.value, self._local_free, "binary SID allocation"
+        )
+
+    def _token_information(self, token: Any, information_class: int) -> Any:
+        required = ctypes.c_uint32()
+        self._functions["GetTokenInformation"](
+            token, information_class, None, 0, ctypes.byref(required)
+        )
+        if required.value == 0:
+            raise HarnessContractError("GetTokenInformation size query failed")
+        buffer = ctypes.create_string_buffer(required.value)
+        returned = ctypes.c_uint32()
+        if not bool(
+            self._functions["GetTokenInformation"](
+                token,
+                information_class,
+                buffer,
+                required.value,
+                ctypes.byref(returned),
+            )
+        ):
+            raise HarnessContractError("GetTokenInformation data call failed")
+        if returned.value != required.value:
+            raise HarnessContractError("token information size changed")
+        return buffer
+
+    def current_token_facts(self) -> TokenFacts:
+        token = ctypes.c_void_p()
+        process = self._functions["GetCurrentProcess"]()
+        if not bool(
+            self._functions["OpenProcessToken"](process, 0x0008, ctypes.byref(token))
+        ):
+            if token.value is not None:
+                OwnedNativeHandle(
+                    token.value,
+                    self._close_token,
+                    "failed process token acquisition",
+                ).close()
+            raise HarnessContractError("OpenProcessToken failed")
+        with OwnedNativeHandle(
+            token.value, self._close_token, "process token"
+        ) as owned:
+            token_user_buffer = self._token_information(owned, 1)
+            token_user = _TokenUser.from_buffer(token_user_buffer)
+            user_sid = self._sid_to_text(token_user.user.sid)
+            elevation_buffer = self._token_information(owned, 20)
+            elevation_type_buffer = self._token_information(owned, 18)
+            if (
+                ctypes.sizeof(elevation_buffer) != 4
+                or ctypes.sizeof(elevation_type_buffer) != 4
+            ):
+                raise HarnessContractError("token elevation data is malformed")
+            elevated = struct.unpack("<I", elevation_buffer.raw)[0]
+            elevation_type = struct.unpack("<I", elevation_type_buffer.raw)[0]
+            if elevated not in (0, 1) or elevation_type not in (1, 2, 3):
+                raise HarnessContractError("token elevation value is unexpected")
+            with self._string_sid(ADMINISTRATORS_SID) as administrators_sid:
+                enabled = ctypes.c_int()
+                if not bool(
+                    self._functions["CheckTokenMembership"](
+                        owned, administrators_sid, ctypes.byref(enabled)
+                    )
+                ):
+                    raise HarnessContractError("CheckTokenMembership failed")
+        return TokenFacts(
+            user_sid=user_sid,
+            elevated=bool(elevated),
+            elevation_type_full=elevation_type == 2,
+            administrators_enabled=bool(enabled.value),
+        )
+
+    def evidence_root_exists(self, root: PureWindowsPath) -> bool:
+        validate_evidence_root(root)
+        return Path(str(root)).exists()
+
+    def open_provider(self) -> OwnedNativeHandle:
+        provider = ctypes.c_void_p()
+        status = int(
+            self._functions["NCryptOpenStorageProvider"](
+                ctypes.byref(provider), PROVIDER_NAME, 0
+            )
+        )
+        if status != 0 and provider.value is not None:
+            OwnedNativeHandle(
+                provider.value,
+                self._free_object,
+                "failed KSP provider acquisition",
+            ).close()
+            raise NativeOperationUncertain(
+                "provider failure returned a handle that was released"
+            ) from SecurityStatusError("NCryptOpenStorageProvider", status)
+        check_security_status("NCryptOpenStorageProvider", status)
+        return OwnedNativeHandle(provider.value, self._free_object, "KSP provider")
+
+    def _raw_property(self, handle: Any, property_name: str, flags: int) -> bytes:
+        required = ctypes.c_uint32()
+        status = int(
+            self._functions["NCryptGetProperty"](
+                handle,
+                property_name,
+                None,
+                0,
+                ctypes.byref(required),
+                flags,
+            )
+        )
+        check_security_status(f"NCryptGetProperty({property_name}) size", status)
+        if required.value == 0:
+            raise HarnessContractError(f"{property_name} returned zero bytes")
+        buffer = ctypes.create_string_buffer(required.value)
+        returned = ctypes.c_uint32()
+        status = int(
+            self._functions["NCryptGetProperty"](
+                handle,
+                property_name,
+                buffer,
+                required.value,
+                ctypes.byref(returned),
+                flags,
+            )
+        )
+        check_security_status(f"NCryptGetProperty({property_name}) data", status)
+        if returned.value != required.value:
+            raise HarnessContractError(f"{property_name} size changed between calls")
+        return bytes(buffer.raw)
+
+    def get_dword(self, handle: Any, property_name: str, flags: int) -> int:
+        return parse_ncrypt_dword(
+            self._raw_property(handle, property_name, flags), property_name
+        )
+
+    def get_string(self, handle: Any, property_name: str, flags: int) -> str:
+        return parse_ncrypt_string(
+            self._raw_property(handle, property_name, flags), property_name
+        )
+
+    def get_bytes(self, handle: Any, property_name: str, flags: int) -> bytes:
+        return self._raw_property(handle, property_name, flags)
+
+    def _validate_scope_flags(self, identity: KeyIdentity, flags: int) -> None:
+        validate_key_identity(identity)
+        has_machine = bool(flags & NCRYPT_MACHINE_KEY_FLAG)
+        if has_machine != (identity.scope is KeyScope.LOCAL_MACHINE):
+            raise HarnessContractError("NCrypt flags do not match the frozen key scope")
+
+    def try_open_key(
+        self,
+        provider: Any,
+        identity: KeyIdentity,
+        flags: int,
+    ) -> NativeOpenResult:
+        self._validate_scope_flags(identity, flags)
+        key = ctypes.c_void_p()
+        status = int(
+            self._functions["NCryptOpenKey"](
+                provider,
+                ctypes.byref(key),
+                identity.container,
+                0,
+                flags,
+            )
+        )
+        if status != 0:
+            if key.value is not None:
+                OwnedNativeHandle(
+                    key.value, self._free_object, "failed NCrypt key acquisition"
+                ).close()
+                raise NativeOperationUncertain(
+                    "failed key open returned a handle that was released"
+                ) from SecurityStatusError("NCryptOpenKey", status)
+            return NativeOpenResult(status & 0xFFFFFFFF, None)
+        return NativeOpenResult(
+            0, OwnedNativeHandle(key.value, self._free_object, "NCrypt key")
+        )
+
+    def create_key(
+        self,
+        provider: Any,
+        identity: KeyIdentity,
+        flags: int,
+    ) -> OwnedNativeHandle:
+        self._validate_scope_flags(identity, flags)
+        if flags & NCRYPT_OVERWRITE_KEY_FLAG:
+            raise HarnessContractError(
+                "NCryptCreatePersistedKey overwrite is forbidden"
+            )
+        key = ctypes.c_void_p()
+        status = int(
+            self._functions["NCryptCreatePersistedKey"](
+                provider,
+                ctypes.byref(key),
+                ALGORITHM_NAME,
+                identity.container,
+                0,
+                flags,
+            )
+        )
+        if status != 0 and key.value is not None:
+            OwnedNativeHandle(
+                key.value,
+                self._free_object,
+                "failed created NCrypt key acquisition",
+            ).close()
+            raise NativeOperationUncertain(
+                "failed key creation returned a handle that was released"
+            ) from SecurityStatusError("NCryptCreatePersistedKey", status)
+        check_security_status("NCryptCreatePersistedKey", status)
+        return OwnedNativeHandle(key.value, self._free_object, "created NCrypt key")
+
+    def _set_property(
+        self, handle: Any, property_name: str, value: bytes, flags: int
+    ) -> None:
+        if not value:
+            raise HarnessContractError("NCryptSetProperty value cannot be empty")
+        buffer = ctypes.create_string_buffer(value, len(value))
+        status = int(
+            self._functions["NCryptSetProperty"](
+                handle,
+                property_name,
+                buffer,
+                len(value),
+                flags,
+            )
+        )
+        check_security_status(f"NCryptSetProperty({property_name})", status)
+
+    def set_dword(
+        self,
+        handle: Any,
+        property_name: str,
+        value: int,
+        flags: int,
+    ) -> None:
+        if not 0 <= value <= 0xFFFFFFFF:
+            raise HarnessContractError("DWORD property value is out of range")
+        self._set_property(handle, property_name, struct.pack("<I", value), flags)
+
+    def set_bytes(
+        self,
+        handle: Any,
+        property_name: str,
+        value: bytes,
+        flags: int,
+    ) -> None:
+        self._set_property(handle, property_name, value, flags)
+
+    def build_exact_security_descriptor(self) -> bytes:
+        with self._string_sid(ADMINISTRATORS_SID) as administrators_sid:
+            with self._string_sid(LOCAL_SYSTEM_SID) as system_sid:
+                administrators_length = int(
+                    self._functions["GetLengthSid"](administrators_sid)
+                )
+                system_length = int(self._functions["GetLengthSid"](system_sid))
+                if administrators_length <= 0 or system_length <= 0:
+                    raise HarnessContractError(
+                        "security principal SID length is invalid"
+                    )
+                acl_size = (
+                    ctypes.sizeof(_AclHeader)
+                    + 8
+                    + system_length
+                    + 8
+                    + administrators_length
+                )
+                acl = ctypes.create_string_buffer(acl_size)
+                if not bool(
+                    self._functions["InitializeAcl"](acl, acl_size, ACL_REVISION)
+                ):
+                    raise HarnessContractError("InitializeAcl failed")
+                for sid in (system_sid, administrators_sid):
+                    if not bool(
+                        self._functions["AddAccessAllowedAceEx"](
+                            acl,
+                            ACL_REVISION,
+                            0,
+                            CRYPTO_KEY_FULL_CONTROL,
+                            sid,
+                        )
+                    ):
+                        raise HarnessContractError("AddAccessAllowedAceEx failed")
+
+                absolute = ctypes.create_string_buffer(
+                    ctypes.sizeof(_SecurityDescriptorAbsolute)
+                )
+                if not bool(
+                    self._functions["InitializeSecurityDescriptor"](absolute, 1)
+                ):
+                    raise HarnessContractError("InitializeSecurityDescriptor failed")
+                if not bool(
+                    self._functions["SetSecurityDescriptorOwner"](
+                        absolute, administrators_sid, False
+                    )
+                ):
+                    raise HarnessContractError("SetSecurityDescriptorOwner failed")
+                if not bool(
+                    self._functions["SetSecurityDescriptorDacl"](
+                        absolute, True, acl, False
+                    )
+                ):
+                    raise HarnessContractError("SetSecurityDescriptorDacl failed")
+                if not bool(
+                    self._functions["SetSecurityDescriptorControl"](
+                        absolute, SE_DACL_PROTECTED, SE_DACL_PROTECTED
+                    )
+                ):
+                    raise HarnessContractError("SetSecurityDescriptorControl failed")
+
+                required = ctypes.c_uint32()
+                ctypes.set_last_error(0)
+                if bool(
+                    self._functions["MakeSelfRelativeSD"](
+                        absolute, None, ctypes.byref(required)
+                    )
+                ):
+                    raise HarnessContractError(
+                        "MakeSelfRelativeSD size query unexpectedly succeeded"
+                    )
+                if ctypes.get_last_error() != 122 or required.value < 20:
+                    raise HarnessContractError(
+                        "MakeSelfRelativeSD size query did not return "
+                        "exact insufficiency"
+                    )
+                relative = ctypes.create_string_buffer(required.value)
+                returned = ctypes.c_uint32(required.value)
+                if not bool(
+                    self._functions["MakeSelfRelativeSD"](
+                        absolute, relative, ctypes.byref(returned)
+                    )
+                ):
+                    raise HarnessContractError("MakeSelfRelativeSD data call failed")
+                if returned.value != required.value:
+                    raise HarnessContractError(
+                        "MakeSelfRelativeSD size changed between calls"
+                    )
+                value = bytes(relative.raw)
+        verify_security_descriptor(self.decode_security_descriptor(value))
+        return value
+
+    def decode_security_descriptor(self, value: bytes) -> SecurityDescriptorSemantic:
+        return decode_native_security_descriptor(value, self._functions)
+
+    def finalize_key(self, handle: Any, flags: int) -> None:
+        check_security_status(
+            "NCryptFinalizeKey",
+            int(self._functions["NCryptFinalizeKey"](handle, flags)),
+        )
+
+    def _export(self, handle: Any, blob_type: str, flags: int) -> bytes:
+        required = ctypes.c_uint32()
+        status = int(
+            self._functions["NCryptExportKey"](
+                handle,
+                None,
+                blob_type,
+                None,
+                None,
+                0,
+                ctypes.byref(required),
+                flags,
+            )
+        )
+        check_security_status(f"NCryptExportKey({blob_type}) size", status)
+        if required.value == 0:
+            raise HarnessContractError("public export returned zero bytes")
+        buffer = ctypes.create_string_buffer(required.value)
+        returned = ctypes.c_uint32()
+        status = int(
+            self._functions["NCryptExportKey"](
+                handle,
+                None,
+                blob_type,
+                None,
+                buffer,
+                required.value,
+                ctypes.byref(returned),
+                flags,
+            )
+        )
+        check_security_status(f"NCryptExportKey({blob_type}) data", status)
+        if returned.value != required.value:
+            raise HarnessContractError("public export size changed")
+        return bytes(buffer.raw)
+
+    def export_public(self, handle: Any, flags: int) -> bytes:
+        return self._export(handle, BCRYPT_ECCPUBLIC_BLOB, flags)
+
+    def private_export_probe_status(
+        self,
+        handle: Any,
+        blob_type: str,
+        flags: int,
+    ) -> int:
+        if blob_type not in {probe.value for probe in PrivateExportProbe}:
+            raise HarnessContractError("private-export blob type is not in the matrix")
+        required = ctypes.c_uint32()
+        return (
+            int(
+                self._functions["NCryptExportKey"](
+                    handle,
+                    None,
+                    blob_type,
+                    None,
+                    None,
+                    0,
+                    ctypes.byref(required),
+                    flags,
+                )
+            )
+            & 0xFFFFFFFF
+        )
+
+    def sign_hash(self, handle: Any, digest: bytes, flags: int) -> bytes:
+        if len(digest) != 32:
+            raise HarnessContractError("TEST signature digest must be SHA-256")
+        digest_buffer = ctypes.create_string_buffer(digest, len(digest))
+        required = ctypes.c_uint32()
+        status = int(
+            self._functions["NCryptSignHash"](
+                handle,
+                None,
+                digest_buffer,
+                len(digest),
+                None,
+                0,
+                ctypes.byref(required),
+                flags,
+            )
+        )
+        check_security_status("NCryptSignHash size", status)
+        if required.value != 64:
+            raise HarnessContractError("ECDSA P-256 signature is not exactly 64 bytes")
+        signature = ctypes.create_string_buffer(required.value)
+        returned = ctypes.c_uint32()
+        status = int(
+            self._functions["NCryptSignHash"](
+                handle,
+                None,
+                digest_buffer,
+                len(digest),
+                signature,
+                required.value,
+                ctypes.byref(returned),
+                flags,
+            )
+        )
+        check_security_status("NCryptSignHash data", status)
+        if returned.value != required.value:
+            raise HarnessContractError("signature size changed")
+        return bytes(signature.raw)
+
+
 NCRYPT_REQUIRED_FUNCTIONS = frozenset(
     {
         "NCryptOpenStorageProvider",
@@ -1649,6 +3715,9 @@ def harness_description() -> dict[str, Any]:
         "native_effect_execution_authorized": False,
         "ordinary_nonadmin_test_identity_blocked": (
             ORDINARY_NONADMIN_TEST_IDENTITY_BLOCKED
+        ),
+        "ordinary_nonadmin_selection_requires_review": (
+            ORDINARY_NONADMIN_SELECTION_REQUIRES_REVIEW
         ),
         "phases": [phase.value for phase in PHASE_ORDER],
         "provider": PROVIDER_NAME,

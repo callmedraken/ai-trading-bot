@@ -78,8 +78,8 @@ exact legal next phase for the supplied retained evidence. The pure eligibility
 validator runs before effect dispatch and does not delegate ordering authority
 to a `NativePhaseOperations` implementation.
 
-The source contains typed, lazy bindings so they can be reviewed without being
-used. They cover:
+The source contains typed, lazy bindings and the exact future phase bodies so
+they can be reviewed without being used. They cover:
 
 ```text
 NCryptOpenStorageProvider
@@ -98,10 +98,20 @@ and semantic-inspection APIs required by Architecture 98. `NCryptDeleteKey` is
 deliberately absent. Cleanup must be implemented and authorized in a separate
 future executable surface.
 
-This checkpoint implements no native phase body. A later review must supply
-the exact effect implementation and replace the disabled source gate. Merely
-setting an environment variable or passing a caller assertion can never
-authorize it.
+`NativeWindowsPhaseOperations` contains the future read-only preflight,
+machine creation/validation, current-user shadow, elevated TEST effect,
+principal-denial, and final-reconciliation bodies. `CtypesNativeApi` contains
+the exact lazy NCrypt/token/security implementation, while tests inject only a
+fake adapter. These bodies remain unreachable because the source gate is still
+false. A later review must replace that disabled source gate before the bodies
+can load a DLL or make a native call. Merely setting an environment variable,
+passing a caller assertion, importing the module, or invoking the ordinary CLI
+cannot authorize them.
+
+The future native implementation owns every provider, key, process-token, and
+`LocalFree` allocation with a one-owner release helper. Successful acquisition
+is released at most once, nonexistent handles are never released, and release
+failure is retained as an uncertain phase result. `NCryptDeleteKey` is absent.
 
 ## Multi-session phase contract
 
@@ -181,14 +191,30 @@ not accept a success-completion object and cannot acquire successors.
 
 ## Ordinary non-admin identity blocker
 
-Read-only account and Administrators-group inspection on the development host
-showed enabled non-administrator account candidates. None was already reviewed
-and frozen as a suitable distinct ordinary non-admin test principal. The
-harness therefore records:
+Read-only local-user, local-group, nested-group, and current-token inspection
+was repeated on 2026-09-01. The sanitized relevant facts were:
+
+- `...-1007` (`CodexSandboxOffline`) and `...-1008`
+  (`CodexSandboxOnline`) are enabled local accounts, direct members of
+  `Users` and `CodexSandboxUsers`, and not direct members of Administrators.
+  The current `...-1007` process token was a genuine medium-integrity
+  interactive token. Both sandbox identities are nevertheless infrastructure
+  identities; interactive tokens on this host also receive `Performance Log
+  Users` through the local `INTERACTIVE` group, so neither was silently
+  promoted to the frozen ordinary-test role.
+- `...-1003` (`defaultuser0`) is enabled but is an old Windows setup/default
+  identity with no current suitability proof.
+- `...-1005` is the frozen Administrator, `...-1009` is Trading, and the
+  built-in Guest/DefaultAccount/WDAG/Administrator identities are excluded or
+  disabled.
+
+Zero candidates could therefore be confidently qualified without review, and
+multiple sandbox identities remain materially plausible. The harness records:
 
 ```text
 ORDINARY_NONADMIN_TEST_IDENTITY_BLOCKED=True
 ORDINARY_NONADMIN_TEST_SID=None
+ORDINARY_NONADMIN_SELECTION_REQUIRES_REVIEW=True
 ```
 
 It does not choose a candidate, create an account, accept a caller SID, reuse
@@ -308,6 +334,61 @@ unkeyed digest. The evidence is never production authority.
 The corrected canonical evidence schema is explicitly versioned
 `p3-r1-ksp-disposable-test-evidence/v2`; no native v1 evidence exists or is
 adopted.
+
+The retained-evidence loader accepts only canonical ASCII v2 JSON. It rejects
+v1, duplicate JSON keys, unknown or missing fields, wrong primitive types,
+unknown enum/completion values, non-canonical bytes, malformed public-key hex,
+and broken snapshot/record digests. It reconstructs every typed record and
+runs `validate_harness_evidence` before returning evidence to a later session.
+The future source-gated publisher creates the fixed root only for the first
+successful preflight publication and then adds deterministic
+`snapshot-<sequence>-<phase-count>-<canonical-sha256>.json` files with
+exclusive-create mode. Sequence numbers must be gap-free from one; every
+filename digest and phase count is re-proved, every prior snapshot is strictly
+loaded, and every later snapshot must contain the exact prior phase prefix and
+one-way lifecycle/signature/probe state. Unknown root entries fail closed. The
+loader therefore selects the latest validated retained snapshot rather than a
+caller assertion. The publisher never overwrites a prior snapshot. The phase implementation invokes
+the configured retainer after every lifecycle transition, probe/signature
+attempt marker, terminal probe/signature result, and phase result; the real
+ctypes factory cannot be constructed without that retainer and the still-
+disabled source authorization.
+
+## Fixed TEST-signature domain
+
+The future elevated effect phase first completes the machine-only
+private-export denial matrix and then consumes exactly one signature attempt.
+The fixed deterministic preimage is:
+
+```text
+ASCII("AITradingBot/P3R1/DisposableKSPValidation/TestSignature/v1")
+|| 0x00
+|| uint32_be(len(message))
+|| ASCII("TEST-ONLY;NO-BOOTSTRAP;NO-P3R1-RECOVERY-AUTHORIZATION;NO-PRODUCTION-ORDER-OR-TRADING-AUTHORITY")
+```
+
+NCrypt signs only `SHA-256(preimage)`. The result must be exactly 64-byte IEEE
+P1363 `r || s` and independently verify against the frozen machine TEST SEC1
+public point. The explicit domain and message prevent the artifact from being
+interpreted as bootstrap, recovery authorization, a production order, or
+trading authority. The shadow is never signed with.
+
+## Native property and security decoding
+
+The future adapter reads every DWORD as exactly four bytes and every string as
+exact null-terminated UTF-16 without embedded or trailing material. Property
+size probes and data calls must agree. Only `NTE_BAD_KEYSET` is the reviewed
+absence result; only `NTE_PERM` is the reviewed access/policy-denial result.
+`NTE_NOT_SUPPORTED` is retained as `UNSUPPORTED_FORMAT` and cannot satisfy the
+private-export denial matrix.
+
+The native security-descriptor decoder calls the bound Windows validity,
+owner, DACL, ACL, ACE, SID, and SID-string APIs. Every returned pointer is
+bounded against the exact returned descriptor/ACL length before it is read;
+ACE header/size and SID length must end at the same boundary. Descriptor,
+DACL, ACE, SID, trailing-byte, or allocation-release ambiguity fails closed.
+The resulting `SecurityDescriptorSemantic` is still passed to the pure verifier
+as the sole semantic authority.
 
 ## Evidence restrictions
 

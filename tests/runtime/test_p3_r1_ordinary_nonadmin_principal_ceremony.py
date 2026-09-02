@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parents[2]
 HELPER = ROOT / "scripts/p3_r1_ordinary_nonadmin_principal_ceremony.cs"
 WRAPPER = ROOT / "scripts/run_p3_r1_ordinary_nonadmin_principal_ceremony.ps1"
 POWERSHELL = Path(r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe")
-EVIDENCE_ROOT = Path(r"F:\AI\p3-r1-ordinary-nonadmin-principal-v1")
+EVIDENCE_ROOT = Path(r"F:\p3-r1-ordinary-nonadmin-principal-v2")
 
 pytestmark = pytest.mark.skipif(os.name != "nt", reason="Windows 5.1 compile gate")
 
@@ -122,6 +122,11 @@ def test_frozen_source_surface_and_secure_input_order() -> None:
         "NetworkCredential",
         "GetEnvironmentVariable",
         "NCrypt",
+        "SetSecurityInfo",
+        "SetNamedSecurityInfo",
+        "SetFileSecurity",
+        "Set-Acl",
+        "Directory.CreateDirectory",
     ):
         assert forbidden not in source + wrapper
     required = {
@@ -149,6 +154,9 @@ def test_frozen_source_surface_and_secure_input_order() -> None:
         "GetFileAttributesW",
         "CloseHandle",
         "LocalFree",
+        "GetVolumeInformationByHandleW",
+        "GetFinalPathNameByHandleW",
+        "GetDriveTypeW",
     }
     bindings = set(re.findall(r"extern\s+[\w<>]+\s+(\w+)\(", source))
     assert required <= bindings
@@ -168,6 +176,24 @@ def test_frozen_source_surface_and_secure_input_order() -> None:
     runner = source.split("public static void RunFutureCeremony()", 1)[1]
     assert runner.index("Gate.Require();") < runner.index("new WindowsAdapter()")
     assert wrapper.index("return") < wrapper.index("function Read-P3R1")
+    assert r"F:\AI\p3-r1-ordinary-nonadmin-principal-v1" not in source
+    assert "p3-r1-ordinary-nonadmin-principal-evidence/v1" not in source
+    assert source.count("Native.CreateDirectoryW(") == 1
+    root_create = source.split("internal Dictionary<string, object> CreateRoot()", 1)[
+        1
+    ].split("private void Check()", 1)[0]
+    assert root_create.index("Gate.Require();") < root_create.index("ProveAbsent();")
+    assert root_create.index("SecurityProof.CreateDescriptor()") < (
+        root_create.index("Native.CreateDirectoryW(")
+    )
+    assert "ref attributes)" in root_create and "inheritHandle = false" in root_create
+    assert root_create.index("creation.Begin();") < root_create.index(
+        "Native.CreateDirectoryW("
+    )
+    assert 'new DirectoryGuard(@"F:\\AI")' not in source
+    assert "Native.CreateFileW(path, 0x00020080, 3," in source
+    assert "0x02200000" in source  # reparse-safe, no-delete-share directory guards
+    assert runner.index("native.Observation()") < runner.index("new FixedStore()")
 
 
 CASES = (
@@ -200,6 +226,21 @@ CASES = (
     "reload_mismatch",
     "fake_success_branches",
     "test_store_no_overwrite_unknown_gaps",
+    "protected_root_descriptor",
+    "protected_root_inheritance",
+    "malformed_security_descriptors",
+    "wrong_root_owner",
+    "removed_dacl_protection",
+    "extra_untrusted_root_ace",
+    "unsafe_parent_delete_child",
+    "unsafe_parent_security_authority",
+    "safe_parent_creation_and_read_rights",
+    "wrong_volume_identity",
+    "wrong_root_file_identity",
+    "root_reparse_substitution",
+    "precreated_root_collision",
+    "uncertain_root_creation",
+    "strict_v2_root_reload",
 )
 
 
@@ -291,9 +332,32 @@ namespace P3R1OrdinaryPrincipalV1
         private static Dictionary<string, object> Preflight()
         {
             return J.O("creator_token", Token(true), "absence", Proof.Absence(new ReadFake()), "root_absent", true,
-                "root_identity", J.O("volume_serial", 1UL, "file_id", "0000000000000001", "owner_sid", Gate.Administrators, "dacl_sddl", "O:BAG:BAD:(A;;FA;;;BA)"),
+                "root_identity", RootIdentity(),
                 "tools", J.O("powershell_version", "5.1.TEST", "helper_source_commit", TestCommit, "helper_source_tree", TestTree,
                     "helper_sha256", TestHelperHash, "netapi32_version", "TEST_ONLY"), "users_identity", Identity(), "baseline_mode", "CONDITIONAL_USERS");
+        }
+        private static Dictionary<string, object> RootIdentity()
+        {
+            var root = SecurityProof.Decode(SecurityProof.CreateDescriptor());
+            root.Add("volume_guid", RootProof.VolumeGuid); root.Add("volume_serial", RootProof.VolumeSerial);
+            root.Add("file_id", "0000000000000042"); root.Add("resolved_final_path", RootProof.FinalPath); root.Add("reparse_point", false);
+            return root;
+        }
+        private static byte[] Descriptor(RawSecurityDescriptor descriptor)
+        { byte[] bytes = new byte[descriptor.BinaryLength]; descriptor.GetBinaryForm(bytes, 0); return bytes; }
+        private static RawSecurityDescriptor RootDescriptor()
+        { return new RawSecurityDescriptor(SecurityProof.CreateDescriptor(), 0); }
+        private static byte[] ParentDescriptor(string sid, uint mask, AceFlags flags)
+        {
+            var descriptor = RootDescriptor();
+            descriptor.DiscretionaryAcl.InsertAce(2, new CommonAce(flags, AceQualifier.AccessAllowed, unchecked((int)mask), new SecurityIdentifier(sid), false, null));
+            return Descriptor(descriptor);
+        }
+        private static void RejectCode(Action action, string code, bool effect)
+        {
+            try { action(); }
+            catch (CeremonyException ex) { Check(ex.Code == code && ex.EffectMayHaveOccurred == effect); return; }
+            throw new Exception("EXPECTED_REJECTION");
         }
         private static Dictionary<string, object> CreationAttempt()
         { return J.O("absence", Proof.Absence(new ReadFake()), "creator_token", Token(true), "secure_input_method", "READ_HOST_SECURESTRING_GLOBALALLOCUNICODE",
@@ -371,10 +435,14 @@ namespace P3R1OrdinaryPrincipalV1
                 Check(Launcher.HOST == "DESKTOP-I4DOKM7" && Launcher.CANDIDATE_NAME == "P3R1KspTestUser");
                 Check(Launcher.CREATOR_SID == Gate.MachineSid + "-1005" && Launcher.TRADING_SID == Gate.MachineSid + "-1009");
                 Check(Launcher.BUILTIN_USERS_SID == "S-1-5-32-545" && Launcher.PERFORMANCE_LOG_USERS_SID == "S-1-5-32-559");
-                Check(Launcher.CEREMONY_EVIDENCE_ROOT == @"F:\AI\p3-r1-ordinary-nonadmin-principal-v1" && Launcher.KSP_EVIDENCE_ROOT == @"F:\AI\p3-r1-ksp-disposable-test-v1");
+                Check(Launcher.CEREMONY_EVIDENCE_ROOT == @"F:\p3-r1-ordinary-nonadmin-principal-v2" && Launcher.KSP_EVIDENCE_ROOT == @"F:\AI\p3-r1-ksp-disposable-test-v1");
+                Check(Gate.Schema == "p3-r1-ordinary-nonadmin-principal-evidence/v2");
             });
             tests.Add("real_gates", delegate {
                 Reject(Launcher.RunFutureCeremony); Reject(delegate { new WindowsAdapter(); }); Reject(delegate { new FixedStore(); });
+                RejectCode(delegate { new DirectoryGuard(RootProof.ParentPath); }, "SOURCE_DISABLED", false);
+                RejectCode(delegate { SecurityProof.Read(IntPtr.Zero, false, false); }, "SOURCE_DISABLED", false);
+                RejectCode(delegate { RootProof.NativeVolume(IntPtr.Zero, 0, RootProof.FinalPath); }, "SOURCE_DISABLED", false);
                 Check(!Launcher.ACCOUNT_EFFECT_EXECUTION_AUTHORIZED && Launcher.Describe().Contains("candidate_sid=UNKNOWN"));
                 Check(typeof(WindowsAdapter).GetInterfaces().All(x => x != typeof(ITestEffects)));
             });
@@ -560,6 +628,193 @@ namespace P3R1OrdinaryPrincipalV1
                 Reject(delegate { files.Publish(j.Confirmed[0]); }); Check(files.Load().Count == 1);
                 File.WriteAllText(Path.Combine(path, "unknown.json"), "{}"); Reject(delegate { files.Load(); });
                 string gap = Path.Combine(temporaryRoot, "gap"); Directory.CreateDirectory(gap); File.WriteAllBytes(Path.Combine(gap, "record-002.json"), j.Confirmed[0]); Reject(delegate { new TestFiles(gap).Load(); });
+            });
+            tests.Add("protected_root_descriptor", delegate {
+                byte[] bytes = SecurityProof.CreateDescriptor(); var decoded = SecurityProof.Decode(bytes);
+                SecurityProof.Protected(decoded, false); Check(J.S(decoded["owner_sid"]) == Launcher.CREATOR_SID && decoded["group_sid"] == null);
+                var native = new RawSecurityDescriptor(bytes, 0);
+                Check((native.ControlFlags & ControlFlags.DiscretionaryAclProtected) != 0 && native.DiscretionaryAcl.Count == 2);
+                Check(native.DiscretionaryAcl[0].AceFlags == (AceFlags.ObjectInherit | AceFlags.ContainerInherit));
+                Check(((CommonAce)native.DiscretionaryAcl[0]).SecurityIdentifier.Value == "S-1-5-18");
+                Check(((CommonAce)native.DiscretionaryAcl[1]).SecurityIdentifier.Value == Gate.Administrators);
+                Check(((CommonAce)native.DiscretionaryAcl[0]).AccessMask == 0x001F01FF);
+                native.Group = new SecurityIdentifier(Launcher.BUILTIN_USERS_SID);
+                var grouped = SecurityProof.Decode(Descriptor(native)); SecurityProof.Protected(grouped, false);
+                Check(J.S(grouped["group_sid"]) == Launcher.BUILTIN_USERS_SID); // observed, never writer authority
+                // Equivalent SDDL spelling/binary layout is not textual authority.
+                var equivalent = new RawSecurityDescriptor("O:" + Launcher.CREATOR_SID + "D:P(A;OICI;0x1f01ff;;;S-1-5-18)(A;OICI;FA;;;S-1-5-32-544)");
+                Check(J.Bytes(decoded).SequenceEqual(J.Bytes(SecurityProof.Decode(Descriptor(equivalent)))));
+                RootProof.Identity(RootIdentity());
+            });
+            tests.Add("protected_root_inheritance", delegate {
+                var descriptor = RootDescriptor();
+                descriptor.SetFlags(ControlFlags.SelfRelative | ControlFlags.DiscretionaryAclPresent | ControlFlags.DiscretionaryAclAutoInherited);
+                foreach (GenericAce ace in descriptor.DiscretionaryAcl) ace.AceFlags = AceFlags.Inherited;
+                SecurityProof.Protected(SecurityProof.Decode(Descriptor(descriptor)), true);
+                Reject(delegate { SecurityProof.Protected(SecurityProof.Decode(Descriptor(descriptor)), false); });
+                foreach (AceFlags flags in new[] { AceFlags.None, AceFlags.InheritOnly, AceFlags.Inherited | AceFlags.ObjectInherit }) {
+                    descriptor.DiscretionaryAcl[0].AceFlags = flags;
+                    Reject(delegate { SecurityProof.Protected(SecurityProof.Decode(Descriptor(descriptor)), true); });
+                }
+                descriptor.DiscretionaryAcl[0].AceFlags = AceFlags.Inherited;
+                descriptor.Owner = new SecurityIdentifier(TestSid);
+                Reject(delegate { SecurityProof.Protected(SecurityProof.Decode(Descriptor(descriptor)), true); });
+                descriptor.Owner = new SecurityIdentifier(Launcher.CREATOR_SID);
+                descriptor.DiscretionaryAcl.InsertAce(2, new CommonAce(AceFlags.Inherited, AceQualifier.AccessAllowed, 1, new SecurityIdentifier(TestSid), false, null));
+                Reject(delegate { SecurityProof.Protected(SecurityProof.Decode(Descriptor(descriptor)), true); });
+            });
+            tests.Add("malformed_security_descriptors", delegate {
+                byte[] valid = SecurityProof.CreateDescriptor();
+                foreach (int size in new[] { 0, 1, 19, valid.Length - 1 }) {
+                    byte[] truncated = valid.Take(size).ToArray(); Reject(delegate { SecurityProof.Decode(truncated); });
+                }
+                Reject(delegate { SecurityProof.Decode(null); });
+                foreach (int offset in new[] { 0, 1, 4, 8, 12, 16 }) {
+                    byte[] bad = valid.ToArray(); bad[offset] = 255; Reject(delegate { SecurityProof.Decode(bad); });
+                }
+                int acl = BitConverter.ToInt32(valid, 16), owner = BitConverter.ToInt32(valid, 4);
+                foreach (int offset in new[] { owner, owner + 1, acl, acl + 1, acl + 2, acl + 4, acl + 6, acl + 8, acl + 9, acl + 10, acl + 16 }) {
+                    byte[] bad = valid.ToArray(); bad[offset] = 255; Reject(delegate { SecurityProof.Decode(bad); });
+                }
+                byte[] overlap = valid.ToArray(); Array.Copy(BitConverter.GetBytes(acl + 8), 0, overlap, 4, 4);
+                Reject(delegate { SecurityProof.Decode(overlap); });
+                var callback = RootDescriptor(); callback.DiscretionaryAcl.InsertAce(2, new CommonAce(AceFlags.None, AceQualifier.AccessAllowed,
+                    1, new SecurityIdentifier(TestSid), true, new byte[4]));
+                Reject(delegate { SecurityProof.Decode(Descriptor(callback)); });
+                var nullAcl = RootDescriptor(); nullAcl.DiscretionaryAcl = null;
+                Reject(delegate { SecurityProof.Decode(Descriptor(nullAcl)); });
+                var nullOwner = RootDescriptor(); nullOwner.Owner = null;
+                Reject(delegate { SecurityProof.Decode(Descriptor(nullOwner)); });
+                var group = RootDescriptor(); group.Group = new SecurityIdentifier(TestSid); byte[] invalidGroup = Descriptor(group);
+                invalidGroup[BitConverter.ToInt32(invalidGroup, 8) + 1] = 255;
+                Reject(delegate { SecurityProof.Decode(invalidGroup); });
+            });
+            tests.Add("wrong_root_owner", delegate {
+                foreach (string sid in new[] { Gate.Administrators, "S-1-5-18", TestSid, Launcher.TRADING_SID }) {
+                    var descriptor = RootDescriptor(); descriptor.Owner = new SecurityIdentifier(sid);
+                    Reject(delegate { SecurityProof.Protected(SecurityProof.Decode(Descriptor(descriptor)), false); });
+                }
+            });
+            tests.Add("removed_dacl_protection", delegate {
+                var descriptor = RootDescriptor(); descriptor.SetFlags(descriptor.ControlFlags & ~ControlFlags.DiscretionaryAclProtected);
+                Reject(delegate { SecurityProof.Protected(SecurityProof.Decode(Descriptor(descriptor)), false); });
+                byte[] noPresent = SecurityProof.CreateDescriptor(); noPresent[2] = (byte)(noPresent[2] & ~4);
+                Reject(delegate { SecurityProof.Decode(noPresent); });
+            });
+            tests.Add("extra_untrusted_root_ace", delegate {
+                foreach (string sid in new[] { TestSid, Launcher.TRADING_SID, Launcher.BUILTIN_USERS_SID, "S-1-5-11", Launcher.CREATOR_SID, Gate.Administrators })
+                foreach (int mask in new[] { 1, (int)SecurityProof.FullControl }) {
+                    var descriptor = RootDescriptor(); descriptor.DiscretionaryAcl.InsertAce(2, new CommonAce(AceFlags.ObjectInherit | AceFlags.ContainerInherit,
+                        AceQualifier.AccessAllowed, mask, new SecurityIdentifier(sid), false, null));
+                    Reject(delegate { SecurityProof.Protected(SecurityProof.Decode(Descriptor(descriptor)), false); });
+                }
+                foreach (AceFlags flags in new[] { AceFlags.None, AceFlags.ObjectInherit, AceFlags.ContainerInherit,
+                    AceFlags.ObjectInherit | AceFlags.ContainerInherit | AceFlags.InheritOnly,
+                    AceFlags.ObjectInherit | AceFlags.ContainerInherit | AceFlags.NoPropagateInherit, AceFlags.Inherited }) {
+                    var descriptor = RootDescriptor(); descriptor.DiscretionaryAcl[1].AceFlags = flags;
+                    Reject(delegate { SecurityProof.Protected(SecurityProof.Decode(Descriptor(descriptor)), false); });
+                }
+                var wrongMask = RootDescriptor(); ((CommonAce)wrongMask.DiscretionaryAcl[0]).AccessMask = 1;
+                Reject(delegate { SecurityProof.Protected(SecurityProof.Decode(Descriptor(wrongMask)), false); });
+                var deny = RootDescriptor(); deny.DiscretionaryAcl.InsertAce(0, new CommonAce(AceFlags.None, AceQualifier.AccessDenied,
+                    1, new SecurityIdentifier(TestSid), false, null));
+                Reject(delegate { SecurityProof.Protected(SecurityProof.Decode(Descriptor(deny)), false); });
+            });
+            tests.Add("unsafe_parent_delete_child", delegate {
+                foreach (string sid in new[] { TestSid, "S-1-5-11", "S-1-1-0", Launcher.BUILTIN_USERS_SID, Launcher.TRADING_SID })
+                foreach (AceFlags flags in new[] { AceFlags.None, AceFlags.ObjectInherit | AceFlags.ContainerInherit, AceFlags.Inherited })
+                    RejectCode(delegate { SecurityProof.Parent(ParentDescriptor(sid, 0x40, flags)); }, "UNTRUSTED_PARENT_REPLACEMENT", false);
+            });
+            tests.Add("unsafe_parent_security_authority", delegate {
+                foreach (uint mask in new uint[] { 0x40000, 0x80000, 0xC0040, 0x10000000, SecurityProof.FullControl })
+                    RejectCode(delegate { SecurityProof.Parent(ParentDescriptor(TestSid, mask, AceFlags.None)); }, "UNTRUSTED_PARENT_REPLACEMENT", false);
+                var wrongOwner = RootDescriptor(); wrongOwner.Owner = new SecurityIdentifier(TestSid);
+                RejectCode(delegate { SecurityProof.Parent(Descriptor(wrongOwner)); }, "PARENT_OWNER", false);
+                // Denies are never used to excuse uncertain effective allows.
+                var denied = new RawSecurityDescriptor(ParentDescriptor(TestSid, 0x40, AceFlags.None), 0);
+                denied.DiscretionaryAcl.InsertAce(0, new CommonAce(AceFlags.None, AceQualifier.AccessDenied, 0x40, new SecurityIdentifier(TestSid), false, null));
+                RejectCode(delegate { SecurityProof.Parent(Descriptor(denied)); }, "UNTRUSTED_PARENT_REPLACEMENT", false);
+                foreach (uint mask in new uint[] { 0x02000000, 0x01000000, 0x200 })
+                    Reject(delegate { SecurityProof.Parent(ParentDescriptor(TestSid, mask, AceFlags.None)); });
+            });
+            tests.Add("safe_parent_creation_and_read_rights", delegate {
+                foreach (uint mask in new uint[] { 1, 2, 4, 0x20, 0x10000, 0x1201BF, 0x40000000, 0x80000000, 0x20000000 })
+                    SecurityProof.Parent(ParentDescriptor(TestSid, mask, AceFlags.None));
+                SecurityProof.Parent(ParentDescriptor(TestSid, SecurityProof.FullControl, AceFlags.ObjectInherit | AceFlags.ContainerInherit | AceFlags.InheritOnly));
+                foreach (string sid in new[] { Launcher.CREATOR_SID, Gate.Administrators, "S-1-5-18" })
+                    SecurityProof.Parent(ParentDescriptor(sid, SecurityProof.FullControl, AceFlags.None));
+            });
+            tests.Add("wrong_volume_identity", delegate {
+                RootProof.Volume(3, "NTFS", 8, (uint)RootProof.VolumeSerial, RootProof.VolumeGuid, RootProof.VolumeGuid);
+                foreach (uint drive in new uint[] { 0, 1, 2, 4, 5, 6 })
+                    Reject(delegate { RootProof.Volume(drive, "NTFS", 8, (uint)RootProof.VolumeSerial, RootProof.VolumeGuid, RootProof.VolumeGuid); });
+                Reject(delegate { RootProof.Volume(3, "ReFS", 8, (uint)RootProof.VolumeSerial, RootProof.VolumeGuid, RootProof.VolumeGuid); });
+                Reject(delegate { RootProof.Volume(3, "NTFS", 0, (uint)RootProof.VolumeSerial, RootProof.VolumeGuid, RootProof.VolumeGuid); });
+                Reject(delegate { RootProof.Volume(3, "NTFS", 8, 1, RootProof.VolumeGuid, RootProof.VolumeGuid); });
+                foreach (string final in new[] { @"\\?\F:\", RootProof.VolumeGuid + "AI", @"\\?\Volume{00000000-0000-0000-0000-000000000000}\" })
+                    Reject(delegate { RootProof.Volume(3, "NTFS", 8, (uint)RootProof.VolumeSerial, final, RootProof.VolumeGuid); });
+            });
+            tests.Add("wrong_root_file_identity", delegate {
+                var frozen = RootIdentity(); var changed = RootIdentity(); changed["file_id"] = "0000000000000043";
+                RejectCode(delegate { RootProof.Continuity(changed, frozen); }, "ROOT_IDENTITY_DRIFT", false);
+                RootProof.Continuity(RootIdentity(), frozen);
+                var files = new TestFiles(Path.Combine(temporaryRoot, "identity")); files.Publish(Prefix(false)[0]);
+                RejectCode(delegate { RootProof.Retained(files.Load(), changed); }, "ROOT_IDENTITY_DRIFT", false);
+            });
+            tests.Add("root_reparse_substitution", delegate {
+                RootProof.Directory(0x10);
+                foreach (uint attr in new uint[] { 0, 0x400, 0x410, UInt32.MaxValue })
+                    RejectCode(delegate { RootProof.Directory(attr); }, "DIRECTORY_REPARSE", false);
+                var root = RootIdentity(); root["reparse_point"] = true; Reject(delegate { RootProof.Continuity(root, RootIdentity()); });
+                root = RootIdentity(); root["resolved_final_path"] = RootProof.VolumeGuid + "moved";
+                Reject(delegate { RootProof.Continuity(root, RootIdentity()); });
+            });
+            tests.Add("precreated_root_collision", delegate {
+                RootProof.Absent(UInt32.MaxValue, 2);
+                foreach (uint attr in new uint[] { 0, 0x10, 0x410 })
+                    RejectCode(delegate { RootProof.Absent(attr, 0); }, "ROOT_COLLISION", false);
+                foreach (int error in new[] { 0, 3, 5, 183 })
+                    RejectCode(delegate { RootProof.Absent(UInt32.MaxValue, error); }, "ROOT_ABSENCE_UNKNOWN", false);
+                var state = new RootCreationAttempt(); state.Begin(); RejectCode(delegate { state.Complete(false, 183); }, "ROOT_COLLISION", false);
+                RejectCode(state.Begin, "ROOT_ATTEMPT_CONSUMED", false);
+                var files = new TestFiles(Path.Combine(temporaryRoot, "precreated"));
+                RejectCode(delegate { RootProof.Retained(files.Load(), RootIdentity()); }, "ROOT_COLLISION_OR_UNCONFIRMED", false);
+                Check(files.Names().Length == 0);
+            });
+            tests.Add("uncertain_root_creation", delegate {
+                foreach (int error in new[] { 0, 3, 5, 87, 112, Int32.MaxValue }) {
+                    var state = new RootCreationAttempt(); state.Begin();
+                    RejectCode(delegate { state.Complete(false, error); }, "ROOT_CREATE_UNCERTAIN", true);
+                    RejectCode(state.Begin, "ROOT_ATTEMPT_CONSUMED", false);
+                }
+                var lostReturn = new RootCreationAttempt(); lostReturn.Begin(); RejectCode(lostReturn.Begin, "ROOT_ATTEMPT_CONSUMED", false);
+                var success = new RootCreationAttempt(); success.Begin(); success.Complete(true, 183); // stale last-error is irrelevant on success
+                RejectCode(success.Begin, "ROOT_ATTEMPT_CONSUMED", false);
+                Reject(delegate { success.Complete(true, 0); });
+            });
+            tests.Add("strict_v2_root_reload", delegate {
+                var files = new TestFiles(Path.Combine(temporaryRoot, "v2")); foreach (byte[] bytes in Complete(false)) files.Publish(bytes);
+                var chain = files.Load(); RootProof.Retained(chain, RootIdentity());
+                var record = J.Obj(J.Parse(chain[0])); var root = J.Obj(J.Obj(record["facts"])["root_identity"]);
+                foreach (string key in root.Keys) {
+                    var missing = J.Obj(J.Clone(record)); J.Obj(J.Obj(missing["facts"])["root_identity"]).Remove(key);
+                    Reject(delegate { Evidence.Validate(new List<byte[]> { J.Bytes(missing) }); });
+                }
+                foreach (var pair in J.O("volume_guid", "wrong", "volume_serial", 1UL, "file_id", "0000000000000000", "owner_sid", Gate.Administrators,
+                    "group_sid", "not-a-sid", "dacl_semantic_identity", J.A(), "dacl_protected", false, "reparse_point", true, "resolved_final_path", Launcher.CEREMONY_EVIDENCE_ROOT)) {
+                    var changed = J.Obj(J.Clone(record)); J.Obj(J.Obj(changed["facts"])["root_identity"])[pair.Key] = pair.Value;
+                    Reject(delegate { Evidence.Validate(new List<byte[]> { J.Bytes(changed) }); });
+                }
+                foreach (string extra in new[] { "dacl_sddl", "native_handle", "security_override" }) {
+                    var changed = J.Obj(J.Clone(record)); J.Obj(J.Obj(changed["facts"])["root_identity"]).Add(extra, "FORBIDDEN");
+                    Reject(delegate { Evidence.Validate(new List<byte[]> { J.Bytes(changed) }); });
+                }
+                var old = J.Obj(J.Clone(record)); old["schema"] = "p3-r1-ordinary-nonadmin-principal-evidence/v1";
+                Reject(delegate { Evidence.Validate(new List<byte[]> { J.Bytes(old) }); });
+                old = J.Obj(J.Clone(record)); J.Obj(old["ceremony"])["evidence_root"] = @"F:\AI\p3-r1-ordinary-nonadmin-principal-v1";
+                Reject(delegate { Evidence.Validate(new List<byte[]> { J.Bytes(old) }); });
+                // Re-entry can observe the retained chain, never re-dispatch an effect.
+                var reopened = new Journal(files, Host()); Reject(delegate { reopened.BeginDispatch("ACCOUNT_CREATION_ATTEMPTED"); });
             });
             var results = J.O();
             foreach (var test in tests)

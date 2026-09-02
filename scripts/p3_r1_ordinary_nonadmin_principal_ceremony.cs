@@ -27,7 +27,7 @@ namespace P3R1OrdinaryPrincipalV1
         public const string CANDIDATE_NAME = "P3R1KspTestUser";
         public const string BUILTIN_USERS_SID = "S-1-5-32-545";
         public const string PERFORMANCE_LOG_USERS_SID = "S-1-5-32-559";
-        public const string CEREMONY_EVIDENCE_ROOT = @"F:\AI\p3-r1-ordinary-nonadmin-principal-v1";
+        public const string CEREMONY_EVIDENCE_ROOT = @"F:\p3-r1-ordinary-nonadmin-principal-v2";
         public const string KSP_EVIDENCE_ROOT = @"F:\AI\p3-r1-ksp-disposable-test-v1";
 
         public static string Describe()
@@ -43,9 +43,19 @@ namespace P3R1OrdinaryPrincipalV1
         {
             Gate.Require(); // BEFORE constructing an adapter, store, or prompt.
             using (WindowsAdapter native = new WindowsAdapter())
-            using (FixedStore store = new FixedStore())
             {
-                RealRunner.Run(native, store);
+                // The ordinary desktop supplies sanitized observations only.
+                // Architecture 100 grants it no retained-evidence read ACE.
+                var current = native.Token();
+                if (J.S(current["user_sid"]) != CREATOR_SID)
+                {
+                    var account = native.Account(); Proof.Ordinary(current, J.S(account["sid"]));
+                    var observation = native.Observation();
+                    J.Eq(J.Obj(observation["account"])["sid"], account["sid"]);
+                    Console.WriteLine(new UTF8Encoding(false, true).GetString(J.Bytes(observation))); return;
+                }
+                Proof.Creator(current);
+                using (FixedStore store = new FixedStore()) { RealRunner.Run(native, store); }
             }
         }
     }
@@ -56,7 +66,7 @@ namespace P3R1OrdinaryPrincipalV1
         internal const string Administrators = "S-1-5-32-544";
         internal const string Interactive = "S-1-5-4";
         internal const string Comment = "P3-R1 ordinary non-admin test only";
-        internal const string Schema = "p3-r1-ordinary-nonadmin-principal-evidence/v1";
+        internal const string Schema = "p3-r1-ordinary-nonadmin-principal-evidence/v2";
         internal const string PerformanceClass = "CONDITIONALLY_ACCEPTED_HOST_DYNAMIC_BASELINE";
         internal static void Require()
         {
@@ -631,8 +641,7 @@ namespace P3R1OrdinaryPrincipalV1
                     {
                         case "PREFLIGHT":
                             Proof.Creator(f["creator_token"]); Absence(f["absence"]); J.Eq(f["root_absent"], true);
-                            J.Fields(f["root_identity"], "volume_serial file_id owner_sid dacl_sddl"); var root = J.Obj(f["root_identity"]);
-                            Gate.Check(J.N(root["volume_serial"]) <= UInt32.MaxValue, "VOLUME"); J.Hex(root["file_id"], 16); J.Sid(root["owner_sid"]); J.Text(root["dacl_sddl"]);
+                            RootProof.Identity(f["root_identity"]);
                             J.Fields(f["tools"], "powershell_version helper_source_commit helper_source_tree helper_sha256 netapi32_version"); var tools = J.Obj(f["tools"]);
                             J.Text(tools["powershell_version"]); Gate.Check(J.S(tools["powershell_version"]).StartsWith("5.1.", StringComparison.Ordinal), "POWERSHELL_VERSION");
                             J.Eq(tools["helper_source_commit"], ceremony["source_commit"]); J.Eq(tools["helper_source_tree"], ceremony["source_tree"]);
@@ -900,14 +909,23 @@ namespace P3R1OrdinaryPrincipalV1
         [DllImport("Kernel32.dll", CharSet = CharSet.Unicode, ExactSpelling = true, SetLastError = true)]
         internal static extern uint GetFileAttributesW(string path);
         [DllImport("Kernel32.dll", CharSet = CharSet.Unicode, ExactSpelling = true, SetLastError = true)]
-        [return: MarshalAs(UnmanagedType.Bool)] internal static extern bool CreateDirectoryW(string path, IntPtr security);
+        [return: MarshalAs(UnmanagedType.Bool)] internal static extern bool CreateDirectoryW(string path, ref SECURITY_ATTRIBUTES security);
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct SECURITY_ATTRIBUTES
+        { internal uint length; internal IntPtr descriptor; [MarshalAs(UnmanagedType.Bool)] internal bool inheritHandle; }
         [DllImport("Kernel32.dll", CharSet = CharSet.Unicode, ExactSpelling = true, SetLastError = true)]
         internal static extern IntPtr CreateFileW(string path, uint access, uint share, IntPtr security, uint disposition, uint flags, IntPtr template);
         [DllImport("Kernel32.dll", ExactSpelling = true, SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)] internal static extern bool GetFileInformationByHandle(IntPtr handle, out FILE_INFO info);
         [DllImport("Advapi32.dll", ExactSpelling = true)]
         internal static extern uint GetSecurityInfo(IntPtr handle, uint type, uint information, out IntPtr owner, out IntPtr group, out IntPtr dacl, out IntPtr sacl, out IntPtr descriptor);
-        [DllImport("Advapi32.dll", ExactSpelling = true)] internal static extern uint GetSecurityDescriptorLength(IntPtr descriptor);
+        [DllImport("Kernel32.dll", CharSet = CharSet.Unicode, ExactSpelling = true)]
+        internal static extern uint GetDriveTypeW(string root);
+        [DllImport("Kernel32.dll", CharSet = CharSet.Unicode, ExactSpelling = true, SetLastError = true)]
+        internal static extern uint GetFinalPathNameByHandleW(IntPtr handle, StringBuilder path, uint size, uint flags);
+        [DllImport("Kernel32.dll", CharSet = CharSet.Unicode, ExactSpelling = true, SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)] internal static extern bool GetVolumeInformationByHandleW(IntPtr handle, StringBuilder name, uint nameSize,
+            out uint serial, out uint componentLength, out uint flags, StringBuilder filesystem, uint filesystemSize);
         [StructLayout(LayoutKind.Sequential)]
         internal struct MEMORY_INFO
         { internal IntPtr address, allocation; internal uint allocationProtect; internal UIntPtr size; internal uint state, protect, type; }
@@ -1365,6 +1383,201 @@ namespace P3R1OrdinaryPrincipalV1
         }
     }
 
+    // Semantic, bounded decoding shared by generated descriptors and native readback.
+    // No text SDDL, name resolution, or caller assertion supplies security authority.
+    internal static class SecurityProof
+    {
+        internal const uint FullControl = 0x001F01FF;
+        private static void Range(byte[] bytes, int offset, int size)
+        { Gate.Check(bytes != null && offset >= 0 && size >= 0 && offset <= bytes.Length - size, "SECURITY_BOUNDS"); }
+        private static ushort U16(byte[] bytes, int offset)
+        { Range(bytes, offset, 2); return (ushort)(bytes[offset] | (bytes[offset + 1] << 8)); }
+        private static uint U32(byte[] bytes, int offset)
+        { Range(bytes, offset, 4); return (uint)(bytes[offset] | (bytes[offset + 1] << 8) | (bytes[offset + 2] << 16) | (bytes[offset + 3] << 24)); }
+        private static int Offset(byte[] bytes, int at)
+        {
+            uint value = U32(bytes, at); Gate.Check(value <= Int32.MaxValue && (value == 0 || (value >= 20 && value % 4 == 0)), "SECURITY_OFFSET");
+            return (int)value;
+        }
+        private static string Sid(byte[] bytes, int at, out int size)
+        {
+            Range(bytes, at, 8); Gate.Check(bytes[at] == 1 && bytes[at + 1] <= 15, "SECURITY_SID");
+            size = 8 + 4 * bytes[at + 1]; Range(bytes, at, size);
+            var sid = new SecurityIdentifier(bytes, at); Gate.Check(sid.BinaryLength == size, "SECURITY_SID_SIZE");
+            J.Sid(sid.Value); return sid.Value;
+        }
+        private static void Separate(int first, int size, int second, int otherSize, bool sameSid)
+        {
+            if (second == 0) return;
+            Gate.Check((sameSid && first == second && size == otherSize) || first + size <= second || second + otherSize <= first, "SECURITY_OVERLAP");
+        }
+        internal static bool TrustedWriter(string sid)
+        { return sid == Launcher.CREATOR_SID || sid == Gate.Administrators || sid == "S-1-5-18"; }
+        internal static Dictionary<string, object> Decode(byte[] bytes)
+        {
+            try
+            {
+                Range(bytes, 0, 20); Gate.Check(bytes.Length <= 1048576 && bytes[0] == 1 && bytes[1] == 0, "SECURITY_HEADER");
+                ushort control = U16(bytes, 2);
+                // Self-relative, present non-NULL DACL. SACLs/unknown controls are
+                // not part of this read request; never silently discard them.
+                const ushort supported = 0x950F;
+                Gate.Check((control & 0x8004) == 0x8004 && (control & ~supported) == 0 && U32(bytes, 12) == 0, "SECURITY_CONTROL");
+                int ownerAt = Offset(bytes, 4), groupAt = Offset(bytes, 8), aclAt = Offset(bytes, 16);
+                Gate.Check(ownerAt != 0 && aclAt != 0, "SECURITY_OWNER_DACL");
+                int ownerSize, groupSize = 0; string owner = Sid(bytes, ownerAt, out ownerSize);
+                string group = groupAt == 0 ? null : Sid(bytes, groupAt, out groupSize);
+                Range(bytes, aclAt, 8); int aclSize = U16(bytes, aclAt + 2), count = U16(bytes, aclAt + 4);
+                Gate.Check((bytes[aclAt] == 2 || bytes[aclAt] == 4) && bytes[aclAt + 1] == 0 && U16(bytes, aclAt + 6) == 0 && aclSize >= 8 && aclSize % 4 == 0, "SECURITY_ACL");
+                Range(bytes, aclAt, aclSize); Separate(ownerAt, ownerSize, groupAt, groupSize, true);
+                Separate(aclAt, aclSize, ownerAt, ownerSize, false); Separate(aclAt, aclSize, groupAt, groupSize, false);
+                var aces = J.A(); int cursor = aclAt + 8, order = 0;
+                for (int i = 0; i < count; i++)
+                {
+                    Gate.Check(cursor <= aclAt + aclSize - 8, "SECURITY_ACE_BOUNDS");
+                    byte type = bytes[cursor], flags = bytes[cursor + 1]; int size = U16(bytes, cursor + 2);
+                    Gate.Check((type == 0 || type == 1) && (flags & ~0x1F) == 0 && size >= 16 && size % 4 == 0 && size <= aclAt + aclSize - cursor, "SECURITY_ACE");
+                    // No callback/object/conditional/unknown ACE interpretation.
+                    int sidSize; string sid = Sid(bytes, cursor + 8, out sidSize);
+                    Gate.Check(size == 8 + sidSize, "SECURITY_ACE_SIZE");
+                    uint mask = U32(bytes, cursor + 4); Gate.Check((mask & ~0xF01F01FFU) == 0, "SECURITY_ACCESS_MASK");
+                    int next = (flags & 0x10) != 0 ? 2 : type == 1 ? 0 : 1;
+                    Gate.Check(next >= order, "SECURITY_ACE_ORDER"); order = next;
+                    aces.Add(J.O("ace_type", type == 0 ? "ACCESS_ALLOWED" : "ACCESS_DENIED", "ace_flags", (ulong)flags, "access_mask", (ulong)mask, "sid", sid));
+                    cursor += size;
+                }
+                // ACL allocation slack has no authority; require zero padding so
+                // uncertain/truncated native results cannot be normalized away.
+                for (; cursor < aclAt + aclSize; cursor++) Gate.Check(bytes[cursor] == 0, "SECURITY_ACL_PADDING");
+                return J.O("owner_sid", owner, "group_sid", group, "dacl_protected", (control & 0x1000) != 0, "dacl_semantic_identity", aces);
+            }
+            catch (CeremonyException) { throw; }
+            catch { throw new CeremonyException("SECURITY_DECODE", false); }
+        }
+        internal static List<object> ExactAces(bool record)
+        {
+            return J.A(new[] { "S-1-5-18", Gate.Administrators }.Select(sid => (object)J.O("ace_type", "ACCESS_ALLOWED",
+                "ace_flags", record ? 16UL : 3UL, "access_mask", (ulong)FullControl, "sid", sid)).ToArray());
+        }
+        internal static void Protected(object value, bool record)
+        {
+            J.Fields(value, "owner_sid group_sid dacl_protected dacl_semantic_identity"); var security = J.Obj(value);
+            J.Eq(security["owner_sid"], Launcher.CREATOR_SID); if (security["group_sid"] != null) J.Sid(security["group_sid"]);
+            // Files inherit the two effective ACEs; protection is on their root.
+            J.Eq(security["dacl_protected"], !record);
+            Gate.Check(J.Bytes(security["dacl_semantic_identity"]).SequenceEqual(J.Bytes(ExactAces(record))), "PROTECTED_DACL");
+        }
+        internal static byte[] CreateDescriptor()
+        {
+            var acl = new RawAcl(2, 2);
+            foreach (string sid in new[] { "S-1-5-18", Gate.Administrators })
+                acl.InsertAce(acl.Count, new CommonAce(AceFlags.ObjectInherit | AceFlags.ContainerInherit,
+                    AceQualifier.AccessAllowed, (int)FullControl, new SecurityIdentifier(sid), false, null));
+            var descriptor = new RawSecurityDescriptor(ControlFlags.DiscretionaryAclPresent | ControlFlags.DiscretionaryAclProtected | ControlFlags.SelfRelative,
+                new SecurityIdentifier(Launcher.CREATOR_SID), null, null, acl);
+            var bytes = new byte[descriptor.BinaryLength]; descriptor.GetBinaryForm(bytes, 0);
+            Protected(Decode(bytes), false); return bytes;
+        }
+        internal static void Parent(byte[] bytes)
+        {
+            var security = Decode(bytes); Gate.Check(TrustedWriter(J.S(security["owner_sid"])), "PARENT_OWNER");
+            foreach (object value in J.Arr(security["dacl_semantic_identity"]))
+            {
+                var ace = J.Obj(value); uint mask = (uint)J.N(ace["access_mask"]);
+                // FILE_GENERIC_WRITE does not grant WRITE_DAC/WRITE_OWNER;
+                // GENERIC_ALL does. Untrusted group/unresolved SIDs are untrusted
+                // regardless of display name or deny ACEs elsewhere in the ACL.
+                if ((mask & 0x10000000) != 0) mask |= FullControl;
+                if (J.S(ace["ace_type"]) == "ACCESS_ALLOWED" && (J.N(ace["ace_flags"]) & 8) == 0 && (mask & 0x000C0040) != 0)
+                    Gate.Check(TrustedWriter(J.S(ace["sid"])), "UNTRUSTED_PARENT_REPLACEMENT");
+            }
+        }
+        internal static Dictionary<string, object> Read(IntPtr handle, bool parent, bool record)
+        {
+            Gate.Require(); IntPtr owner, group, dacl, sacl, descriptor = IntPtr.Zero;
+            try
+            {
+                Gate.Check(Native.GetSecurityInfo(handle, 1, 7, out owner, out group, out dacl, out sacl, out descriptor) == 0 && descriptor != IntPtr.Zero, "DIRECTORY_SECURITY");
+                // GetSecurityInfo returns one LocalAlloc-owned self-relative SD.
+                // Bound the allocation before decoding any offset or SID.
+                ulong allocation = Native.LocalSize(descriptor).ToUInt64();
+                Gate.Check(allocation >= 20 && allocation <= 1048576, "DIRECTORY_SECURITY_SIZE");
+                byte[] bytes = new byte[(int)allocation]; Marshal.Copy(descriptor, bytes, 0, bytes.Length);
+                var decoded = Decode(bytes); if (parent) Parent(bytes); else Protected(decoded, record); return decoded;
+            }
+            finally { if (descriptor != IntPtr.Zero) Gate.Check(Native.LocalFree(descriptor) == IntPtr.Zero, "DIRECTORY_SECURITY_RELEASE"); }
+        }
+    }
+
+    internal static class RootProof
+    {
+        internal const string ParentPath = @"F:\";
+        // Discovery constraints only until the separate full readiness freeze
+        // re-observes and accepts them. They never enable an effect.
+        internal const string VolumeGuid = @"\\?\Volume{16af2363-e432-4684-be5a-9861a99741b4}\";
+        internal const ulong VolumeSerial = 0x6E962F80;
+        internal const string FinalPath = VolumeGuid + "p3-r1-ordinary-nonadmin-principal-v2";
+        internal static void Volume(uint drive, string filesystem, uint flags, uint serial, string final, string expected)
+        {
+            Gate.Check(drive == 3 && filesystem == "NTFS" && (flags & 8) != 0, "FIXED_NTFS_VOLUME");
+            Gate.Check(serial == VolumeSerial && final == expected, "VOLUME_IDENTITY");
+        }
+        internal static void Absent(uint attributes, int error)
+        { Gate.Check(attributes == UInt32.MaxValue && error == 2, attributes == UInt32.MaxValue ? "ROOT_ABSENCE_UNKNOWN" : "ROOT_COLLISION"); }
+        internal static void Directory(uint attributes)
+        { Gate.Check((attributes & 0x410) == 0x10, "DIRECTORY_REPARSE"); }
+        // Canonical v2 encoding: serial/masks/flags are unsigned JSON integers,
+        // file_id is 16 lowercase hex digits, group_sid is SID or null, final
+        // path is the exact normalized GUID path, and DACL identity is the
+        // ordered closed ACE array above (not SDDL or a pointer/hash assertion).
+        internal static void Identity(object value)
+        {
+            J.Fields(value, "volume_guid volume_serial file_id owner_sid group_sid dacl_semantic_identity dacl_protected reparse_point resolved_final_path");
+            var root = J.Obj(value); J.Eq(root["volume_guid"], VolumeGuid); J.Eq(root["volume_serial"], VolumeSerial);
+            J.Hex(root["file_id"], 16); Gate.Check(J.S(root["file_id"]).Trim('0').Length > 0, "ROOT_FILE_ID");
+            J.Eq(root["resolved_final_path"], FinalPath); J.Eq(root["reparse_point"], false);
+            SecurityProof.Protected(J.O("owner_sid", root["owner_sid"], "group_sid", root["group_sid"],
+                "dacl_protected", root["dacl_protected"], "dacl_semantic_identity", root["dacl_semantic_identity"]), false);
+        }
+        internal static void Continuity(object observed, object frozen)
+        {
+            Identity(observed); Identity(frozen);
+            Gate.Check(J.Bytes(observed).SequenceEqual(J.Bytes(frozen)), "ROOT_IDENTITY_DRIFT");
+        }
+        internal static void Retained(List<byte[]> chain, object observed)
+        {
+            Identity(observed); Evidence.Validate(chain);
+            Gate.Check(chain.Count > 0 && J.S(J.Obj(J.Parse(chain[0]))["event"]) == "PREFLIGHT", "ROOT_COLLISION_OR_UNCONFIRMED");
+            Continuity(observed, J.Obj(J.Obj(J.Parse(chain[0]))["facts"])["root_identity"]);
+        }
+        internal static string FinalName(IntPtr handle)
+        {
+            Gate.Require(); var path = new StringBuilder(1024);
+            uint count = Native.GetFinalPathNameByHandleW(handle, path, (uint)path.Capacity, 1);
+            Gate.Check(count > 0 && count < path.Capacity && count == path.Length, "RESOLVED_PATH"); return path.ToString();
+        }
+        internal static void NativeVolume(IntPtr handle, uint serial, string expected)
+        {
+            Gate.Require(); uint observed, componentLength, flags; var filesystem = new StringBuilder(261);
+            Gate.Check(Native.GetVolumeInformationByHandleW(handle, null, 0, out observed, out componentLength, out flags, filesystem, (uint)filesystem.Capacity), "VOLUME_QUERY");
+            Gate.Check(observed == serial, "VOLUME_SERIAL_DRIFT");
+            Volume(Native.GetDriveTypeW(ParentPath), filesystem.ToString(), flags, observed, FinalName(handle), expected);
+        }
+    }
+
+    // One instance per store, consumed before native dispatch, including lost
+    // returns and failed readback. No catch path can reopen this attempt.
+    internal sealed class RootCreationAttempt
+    {
+        private bool consumed, returned;
+        internal void Begin() { Gate.Check(!consumed, "ROOT_ATTEMPT_CONSUMED"); consumed = true; }
+        internal void Complete(bool success, int error)
+        {
+            Gate.Check(consumed && !returned, "ROOT_RETURN_STATE"); returned = true;
+            if (!success) throw new CeremonyException(error == 183 ? "ROOT_COLLISION" : "ROOT_CREATE_UNCERTAIN", error != 183);
+        }
+    }
+
     internal sealed class DirectoryGuard : IDisposable
     {
         private readonly string path;
@@ -1372,44 +1585,28 @@ namespace P3R1OrdinaryPrincipalV1
         private readonly Dictionary<string, object> identity;
         internal DirectoryGuard(string exactPath)
         {
+            Gate.Require(); Gate.Check(exactPath == RootProof.ParentPath || exactPath == Launcher.CEREMONY_EVIDENCE_ROOT, "DIRECTORY_PATH");
             path = exactPath; IntPtr p = Native.CreateFileW(path, 0x00020080, 3, IntPtr.Zero, 3, 0x02200000, IntPtr.Zero);
             Gate.Check(p != IntPtr.Zero && p != new IntPtr(-1), "DIRECTORY_OPEN");
             handle = new Owned(p, 0, delegate(IntPtr v) { Gate.Check(Native.CloseHandle(v), "DIRECTORY_RELEASE"); });
-            try { identity = Read(handle.Pointer); }
+            try { identity = Read(handle.Pointer, path == RootProof.ParentPath); }
             catch { handle.Dispose(); throw; }
         }
-        private static Dictionary<string, object> Read(IntPtr handle)
+        private static Dictionary<string, object> Read(IntPtr handle, bool parent)
         {
             Native.FILE_INFO info; Gate.Check(Native.GetFileInformationByHandle(handle, out info), "DIRECTORY_IDENTITY");
-            Gate.Check((info.attributes & 0x410) == 0x10, "DIRECTORY_REPARSE");
-            IntPtr owner, group, dacl, sacl, descriptor = IntPtr.Zero;
-            try
-            {
-                Gate.Check(Native.GetSecurityInfo(handle, 1, 5, out owner, out group, out dacl, out sacl, out descriptor) == 0 && descriptor != IntPtr.Zero, "DIRECTORY_SECURITY");
-                uint length = Native.GetSecurityDescriptorLength(descriptor); Gate.Check(length >= 20 && length <= 1048576, "DIRECTORY_SECURITY_SIZE");
-                byte[] bytes = new byte[length]; Marshal.Copy(descriptor, bytes, 0, (int)length); var security = new RawSecurityDescriptor(bytes, 0);
-                Gate.Check(security.Owner != null && security.DiscretionaryAcl != null && (security.ControlFlags & ControlFlags.DiscretionaryAclPresent) != 0, "DIRECTORY_DACL");
-                string ownerSid = security.Owner.Value; Gate.Check(TrustedWriter(ownerSid), "DIRECTORY_OWNER");
-                foreach (GenericAce ace in security.DiscretionaryAcl)
-                {
-                    var common = ace as CommonAce; Gate.Check(common != null && !common.IsCallback, "DIRECTORY_ACE");
-                    Gate.Check(common.AceQualifier == AceQualifier.AccessAllowed || common.AceQualifier == AceQualifier.AccessDenied, "DIRECTORY_ACE_TYPE");
-                    // Include inheritance-only ACEs: these will protect the future
-                    // root/records. Never repair an unsafe parent or inherited ACL.
-                    const uint writeMask = 0x500D0156;
-                    if (common.AceQualifier == AceQualifier.AccessAllowed && (unchecked((uint)common.AccessMask) & writeMask) != 0)
-                        Gate.Check(TrustedWriter(common.SecurityIdentifier.Value), "UNTRUSTED_EVIDENCE_WRITER");
-                }
-                return J.O("volume_serial", (ulong)info.volume, "file_id", (((ulong)info.indexHigh << 32) | info.indexLow).ToString("x16", CultureInfo.InvariantCulture),
-                    "owner_sid", ownerSid, "dacl_sddl", security.GetSddlForm(AccessControlSections.Owner | AccessControlSections.Access));
-            }
-            finally { if (descriptor != IntPtr.Zero) Gate.Check(Native.LocalFree(descriptor) == IntPtr.Zero, "DIRECTORY_SECURITY_RELEASE"); }
+            RootProof.Directory(info.attributes);
+            string final = parent ? RootProof.VolumeGuid : RootProof.FinalPath; RootProof.NativeVolume(handle, info.volume, final);
+            var identity = SecurityProof.Read(handle, parent, false);
+            identity.Add("volume_guid", RootProof.VolumeGuid); identity.Add("volume_serial", (ulong)info.volume);
+            identity.Add("file_id", (((ulong)info.indexHigh << 32) | info.indexLow).ToString("x16", CultureInfo.InvariantCulture));
+            identity.Add("resolved_final_path", final); identity.Add("reparse_point", false);
+            if (!parent) RootProof.Identity(identity); return identity;
         }
-        private static bool TrustedWriter(string sid) { return sid == Launcher.CREATOR_SID || sid == Gate.Administrators || sid == "S-1-5-18"; }
         internal Dictionary<string, object> Identity { get { return J.Obj(J.Clone(identity)); } }
         internal void Check()
         {
-            Gate.Check(J.Bytes(Read(handle.Pointer)).SequenceEqual(J.Bytes(identity)), "DIRECTORY_IDENTITY_DRIFT");
+            Gate.Check(J.Bytes(Read(handle.Pointer, path == RootProof.ParentPath)).SequenceEqual(J.Bytes(identity)), "DIRECTORY_IDENTITY_DRIFT");
             using (var reopened = new DirectoryGuard(path)) Gate.Check(J.Bytes(reopened.identity).SequenceEqual(J.Bytes(identity)), "DIRECTORY_PATH_DRIFT");
         }
         public void Dispose() { handle.Dispose(); }
@@ -1481,7 +1678,9 @@ namespace P3R1OrdinaryPrincipalV1
 
     internal sealed class FixedStore : IStore, IRecordFiles, IDisposable
     {
-        private DirectoryGuard volume, parent, root;
+        private DirectoryGuard parent, root;
+        private readonly RootCreationAttempt creation = new RootCreationAttempt();
+        private bool createdHere, halted;
         internal readonly SourceIdentity Source;
         internal FixedStore()
         {
@@ -1489,7 +1688,7 @@ namespace P3R1OrdinaryPrincipalV1
             Source = SourceIdentity.Capture();
             try
             {
-                volume = new DirectoryGuard(@"F:\"); parent = new DirectoryGuard(@"F:\AI");
+                parent = new DirectoryGuard(RootProof.ParentPath);
                 uint attr = Native.GetFileAttributesW(Launcher.CEREMONY_EVIDENCE_ROOT); int error = Marshal.GetLastWin32Error();
                 if (attr == UInt32.MaxValue) Gate.Check(error == 2, "ROOT_ABSENCE_UNKNOWN");
                 else root = new DirectoryGuard(Launcher.CEREMONY_EVIDENCE_ROOT);
@@ -1499,25 +1698,50 @@ namespace P3R1OrdinaryPrincipalV1
         internal bool Absent { get { return root == null; } }
         internal void ProveAbsent()
         {
-            Gate.Require(); volume.Check(); parent.Check(); Gate.Check(root == null, "ROOT_EXISTS");
+            Gate.Require(); Gate.Check(!halted, "ROOT_HALTED"); parent.Check(); Gate.Check(root == null, "ROOT_COLLISION");
             uint attr = Native.GetFileAttributesW(Launcher.CEREMONY_EVIDENCE_ROOT); int error = Marshal.GetLastWin32Error();
-            Gate.Check(attr == UInt32.MaxValue && error == 2, "ROOT_NOT_DEFINITELY_ABSENT");
+            RootProof.Absent(attr, error);
         }
         internal Dictionary<string, object> CreateRoot()
         {
-            Gate.Require(); ProveAbsent();
-            Gate.Check(Native.CreateDirectoryW(Launcher.CEREMONY_EVIDENCE_ROOT, IntPtr.Zero), "ROOT_CREATE");
-            root = new DirectoryGuard(Launcher.CEREMONY_EVIDENCE_ROOT); Check(); return root.Identity;
+            Gate.Require(); ProveAbsent(); byte[] bytes = SecurityProof.CreateDescriptor();
+            using (var descriptor = Owned.Allocate((uint)bytes.Length))
+            {
+                Marshal.Copy(bytes, 0, descriptor.Pointer, bytes.Length);
+                var attributes = new Native.SECURITY_ATTRIBUTES { length = (uint)Marshal.SizeOf(typeof(Native.SECURITY_ATTRIBUTES)),
+                    descriptor = descriptor.Pointer, inheritHandle = false };
+                ProveAbsent(); creation.Begin(); bool confirmedReturn = false, success = false;
+                try
+                {
+                    // Never NULL/default attributes and never a later DACL repair.
+                    success = Native.CreateDirectoryW(Launcher.CEREMONY_EVIDENCE_ROOT, ref attributes); int error = Marshal.GetLastWin32Error();
+                    confirmedReturn = true; creation.Complete(success, error);
+                    root = new DirectoryGuard(Launcher.CEREMONY_EVIDENCE_ROOT); createdHere = true; Check(); return root.Identity;
+                }
+                catch (CeremonyException ex)
+                {
+                    halted = true;
+                    if (!confirmedReturn || success) throw new CeremonyException("ROOT_CREATE_UNCERTAIN", true);
+                    throw new CeremonyException(ex.Code, ex.EffectMayHaveOccurred);
+                }
+                catch { halted = true; throw new CeremonyException("ROOT_CREATE_UNCERTAIN", true); }
+            }
         }
-        private void Check() { Source.Check(); volume.Check(); parent.Check(); Gate.Check(root != null, "ROOT_MISSING"); root.Check(); }
+        private void Check() { Gate.Check(!halted, "ROOT_HALTED"); Source.Check(); parent.Check(); Gate.Check(root != null, "ROOT_MISSING"); root.Check(); }
         public List<byte[]> Load()
         {
             Gate.Require(); if (root == null) { ProveAbsent(); return new List<byte[]>(); }
-            Check(); var chain = new RecordArchive(this).Load(); Source.Validate(chain); Check(); return chain;
+            Check(); var chain = new RecordArchive(this).Load();
+            // Records are only candidate bytes until independently protected
+            // handle observations match the retained PREFLIGHT binding. An empty
+            // pre-created root cannot establish a ceremony or be adopted.
+            if (!createdHere || chain.Count > 0) RootProof.Retained(chain, root.Identity);
+            Source.Validate(chain); Check(); return chain;
         }
         public void Publish(byte[] bytes)
         {
-            Gate.Require(); Check(); var intended = Load(); intended.Add(bytes); Evidence.Validate(intended); Source.Validate(intended);
+            Gate.Require(); Check(); var intended = Load(); intended.Add(bytes); Evidence.Validate(intended);
+            RootProof.Retained(intended, root.Identity); Source.Validate(intended);
             new RecordArchive(this).Publish(bytes); Check();
         }
         string[] IRecordFiles.Names()
@@ -1534,10 +1758,13 @@ namespace P3R1OrdinaryPrincipalV1
             using (var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read))
             {
                 Native.FILE_INFO info; Gate.Check(Native.GetFileInformationByHandle(file.SafeFileHandle.DangerousGetHandle(), out info) && (info.attributes & 0x410) == 0 && info.links == 1, "RECORD_IDENTITY");
+                RootProof.NativeVolume(file.SafeFileHandle.DangerousGetHandle(), info.volume, RootProof.FinalPath + "\\" + name);
+                SecurityProof.Read(file.SafeFileHandle.DangerousGetHandle(), false, true);
                 Gate.Check(file.Length > 0 && file.Length <= 4194304, "RECORD_SIZE");
                 byte[] bytes = new byte[(int)file.Length]; int read = 0;
                 while (read < bytes.Length) { int n = file.Read(bytes, read, bytes.Length - read); Gate.Check(n > 0, "RECORD_SHORT_READ"); read += n; }
-                Gate.Check(file.ReadByte() == -1, "RECORD_TRAILING"); Check(); return bytes;
+                Gate.Check(file.ReadByte() == -1, "RECORD_TRAILING");
+                SecurityProof.Read(file.SafeFileHandle.DangerousGetHandle(), false, true); Check(); return bytes;
             }
         }
         void IRecordFiles.CreateNew(string name, byte[] bytes)
@@ -1545,12 +1772,13 @@ namespace P3R1OrdinaryPrincipalV1
             Gate.Require(); Check(); string path = RecordPath(name);
             using (var file = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None, 4096, FileOptions.WriteThrough))
             { file.Write(bytes, 0, bytes.Length); file.Flush(true); }
+            // Independent reopen/reload performs the inherited owner/ACE check.
             Check();
         }
         public void Dispose()
         {
             try { if (root != null) root.Dispose(); }
-            finally { try { if (parent != null) parent.Dispose(); } finally { if (volume != null) volume.Dispose(); } }
+            finally { if (parent != null) parent.Dispose(); }
         }
     }
 
@@ -1592,12 +1820,6 @@ namespace P3R1OrdinaryPrincipalV1
                 // Existing attempt markers never authorize dispatch or recovery.
                 Gate.Check(Evidence.Next(journal.Confirmed) == "QUALIFICATION_OBSERVED", "RETAINED_STATE_NOT_CONTINUABLE");
                 string sid = RetainedSid(journal.Confirmed);
-                if (J.S(current["user_sid"]) == sid)
-                {
-                    var observation = native.Observation(); Proof.Ordinary(current, sid);
-                    Console.WriteLine(new UTF8Encoding(false, true).GetString(J.Bytes(observation)));
-                    return; // Read-only facts from a manually established desktop.
-                }
                 Proof.Creator(current);
                 try { QualifyTransferredObservation(native, journal, sid); }
                 catch

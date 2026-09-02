@@ -22,7 +22,7 @@ try {
     $helperHash = [BitConverter]::ToString($hasher.ComputeHash($helperBytes)).Replace('-', '').ToLowerInvariant()
 }
 finally { $hasher.Dispose() }
-$expectedHelperHash = '6ad2915363a1af6298d87dc5e3202f8582cccebac1f7afbb6681c461521fdf25'
+$expectedHelperHash = '6945d03baf6289faf95e4da2115791496b7c35fac38d12a70e49129a14b0c34c'
 if ($helperHash -cne $expectedHelperHash) { throw 'Reviewed helper source hash mismatch.' }
 $helperText = (New-Object Text.UTF8Encoding($false, $true)).GetString($helperBytes)
 $references = @(

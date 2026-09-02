@@ -3,17 +3,16 @@
 **Repository:** `callmedraken/ai-trading-bot`  
 **Integration branch:** `develop`  
 **Accepted integrated baseline:** `bd88ee966bff455f9fc897d6cfdfafdd807f27e2`  
-**Current P3-R1 worktree:** `F:\AI\worktrees\ai-trading-bot-p3-r1`  
-**Current P3-R1 branch:** `feature/p3-r1-recovery-implementation`  
-**Retained P3-R1 implementation checkpoint:** `2b82222fbaee857e02519a0ea3627679d309276d`  
-**Current P3-R1 status:** correction required under Architectures 95 + 96  
+**P3-R1 worktree:** `F:\AI\worktrees\ai-trading-bot-p3-r1`  
+**P3-R1 branch:** `feature/p3-r1-recovery-implementation`  
+**Architecture-100 checkpoint:** `e2861fab3af7d297d79274db2a82fd134672fb58`  
+**Architecture-100 tree:** `d6f9203184d90a0c409d929c25bb2c7e7e520f29`  
 **Production/live trading:** NO-GO
 
 > This Git-tracked handoff is the canonical cross-chat resume document. Uploaded
-> Project copies are mirrors only. Always prove the live worktree/branch/HEAD
-> before acting. Detailed historical evidence remains in architecture,
-> validation, and Git history; this file prioritizes current actionable state and
-> regression-prevention rules.
+> Project copies are mirrors only. Always prove the live worktree, branch, and
+> HEAD before acting. Architecture/validation documents and Git history remain
+> authoritative for detailed contracts and historical evidence.
 
 ---
 
@@ -25,7 +24,7 @@ Build a conservative automated trading platform that progresses through:
 paper → long paper soak → broker-paper → live-readiness certification → tiny
 restricted live → mature automated operation → polished GUI.**
 
-AI/strategy remains subordinate to deterministic risk, reviewed authority,
+AI/strategy is always subordinate to deterministic risk, reviewed authority,
 credential isolation, durable evidence, brokerage/reconciliation,
 operating-mode controls, and explicit operator safety gates.
 
@@ -55,13 +54,12 @@ C3 worktree:
   accepted C3 feature history
 ```
 
-Do not reuse another active worktree for P3-R1. Existing historical worktrees,
-release directories, diagnostics, and pytest evidence are not moved/cleaned as
-incidental housekeeping.
+Do not reuse another active worktree for P3-R1. Do not clean, reset, rebase,
+move, delete, or repair unrelated worktrees or retained evidence.
 
 ---
 
-## 3. Non-compressible AI execution workflow
+## 3. Mandatory AI/Codex workflow
 
 ChatGPT/Sol owns architecture, debugging strategy, GitHub exact-diff review,
 test/certification gates, production-authority review, and next-step planning.
@@ -70,15 +68,15 @@ Codex is a bounded implementation agent.
 Model routing:
 
 ```text
-localized/mechanical/docs/frozen contract   -> Luna Extra High
-subtle bounded deterministic implementation -> Sol Medium
+localized/mechanical/frozen-contract work  -> Luna Extra High
+subtle bounded implementation              -> Sol Medium
 native Windows/security/authority/locking/
-ordering/crash-recovery/architecture         -> Sol High
+ordering/crash-recovery/architecture        -> Sol High
 ```
 
 Do not use subagents unless explicitly requested.
 
-Every bounded Codex task with a frozen checkpoint must start by running:
+Every bounded Codex task with a frozen checkpoint begins with:
 
 ```text
 git rev-parse --show-toplevel
@@ -86,55 +84,37 @@ git branch --show-current
 git rev-parse HEAD
 ```
 
-The outputs must equal the exact worktree, branch, and HEAD in the task. Any
-mismatch is a hard stop. Codex must not self-correct with checkout/switch,
+The outputs must equal the exact worktree, branch, and HEAD supplied in the task.
+Any mismatch is a hard STOP. Codex must not self-correct with checkout/switch,
 reset, rebase, clean, branch recreation, or worktree creation/move/deletion.
 
-These safeguards are never removed for token efficiency. Token-efficient prompts
-may omit repeated architecture background, but must retain:
-
-- exact worktree/branch/HEAD startup gate;
-- stop-on-mismatch behavior;
-- Windows test-isolation requirements;
-- exact-file staging rules;
-- commit/push authorization state;
-- relevant production/provider/credential prohibitions.
-
-Normal implementation flow:
+Implementation flow:
 
 ```text
 ChatGPT freezes architecture/scope
 -> Codex proves startup gate
--> Codex implements only bounded change
+-> Codex changes only bounded files
 -> Codex runs focused isolated tests/checks
 -> Codex reports without commit/push unless explicitly authorized
--> user creates/pushes exact checkpoint when instructed
+-> user stages exact paths, commits, and pushes when instructed
 -> ChatGPT reviews exact GitHub diff
--> one broad local certification only after source-diff acceptance
--> release/deployment/operator gates only after source certification
+-> user runs broad/full local certification only after source-diff acceptance
+-> release/deployment/operator effects remain separate later gates
 ```
 
-Do not use `git add .` or `git add -A` for a scoped checkpoint. Do not merge,
+Never use `git add .` or `git add -A` for a scoped checkpoint. Never merge,
 rebase, amend, force-push, change PR metadata, resolve review threads, or modify
 unrelated files without explicit approval.
 
-Canonical workflow detail: `docs/AI_DEVELOPMENT_WORKFLOW.md`.
-
 ---
 
-## 4. Mandatory Windows pytest isolation
+## 4. Windows pytest isolation
 
-The default user pytest temp hierarchy has repeatedly been inaccessible:
-
-```text
-C:\Users\John\AppData\Local\Temp\pytest-of-John
-```
-
-Every controlled Windows pytest gate now uses a fresh unique external basetemp
-under:
+Every controlled Windows pytest invocation uses a fresh explicit external
+basetemp under:
 
 ```text
-F:\AI\temp\pytest\
+F:\AI\temp\pytest\<fresh-unique-name>
 ```
 
 and normally:
@@ -145,18 +125,14 @@ and normally:
 
 when cache behavior is irrelevant.
 
-New tests use `tmp_path`/`tmp_path_factory` or another explicitly supplied
-scratch root. Do not intentionally use worktree `.pytest_cache` as general native
-filesystem scratch. Do not delete, take ownership of, repair, or repurpose
-historical pytest/cache directories merely to make a gate pass.
-
-Legacy hard-coded harnesses may use a proven clean-harness fallback only after
-exact `PYTHONPATH`/module `__file__` provenance proves the reviewed source is
-under test.
+New tests use pytest-managed temp paths or another explicitly supplied external
+scratch root. Never intentionally use worktree `.pytest_cache` as native
+filesystem scratch. Preserve inaccessible or malformed historical pytest/cache
+evidence rather than deleting or taking ownership merely to make a gate pass.
 
 ---
 
-## 5. Frozen production authority and C3 state
+## 5. Frozen C3 production state
 
 Authority chain:
 
@@ -174,7 +150,18 @@ Windows Credential Manager
 Alpaca market-data API
 ```
 
-Frozen runtime facts:
+Accepted C3 release-source checkpoint:
+
+```text
+82ba29ae2c2cc6bb3544077db0ee21868e6d5693
+```
+
+All six real-provider C3 effects are consumed. Call #5 remains permanently
+`FAILED / CONFIRMED`; call #6 remains permanently `SUCCEEDED / CONFIRMED` and
+`SUCCESS_SELECTED`. Never rerun call #6 and never authorize provider call #7
+without a new architecture checkpoint.
+
+Frozen production authority facts include:
 
 ```text
 Trading account: DESKTOP-I4DOKM7\Trading
@@ -185,62 +172,12 @@ Authority DB: F:\AITradingBot\Authority\authority.sqlite3
 Capture output: F:\AITradingBot\Authority\capture-output
 Paper final root: F:\AITradingBot\Paper
 Paper staging root: F:\AITradingBot\.Paper.provisioning-v1
-Production SQL bytes: 118896
-Production SQL SHA-256: aa61df2f5db0090f8373222d1f5e492a58f4c10273afacfab45e382bacd4bb58
-SQLite: 3.50.4
 Credential policy: windows-credential-manager-alpaca-market-data/v2
 ```
-
-C3 final accepted source checkpoint:
-
-```text
-82ba29ae2c2cc6bb3544077db0ee21868e6d5693
-```
-
-All six real-provider C3 effects are consumed. No provider call #7 is
-authorized. Call #5 is permanently `FAILED / CONFIRMED` and non-retryable.
-Call #6 is permanently `SUCCEEDED / CONFIRMED` and `SUCCESS_SELECTED`; its
-provider effect must never be rerun.
-
-Selected call #6:
-
-```text
-request digest: 67c8e2c81da2467aa0c67328af191038d00858fe153dd0850f59ef786612efad
-session: f787e4f6-c3ca-58fe-802b-f068dd474b41
-attempt: e809f393-b557-5c6b-8665-78d66822fee8
-claim: 487618c1-a5a5-5dd9-971d-a1ea843194c5
-reservation: fa5b4538-e475-5a13-9cb2-0d7936232c84
-execution: d85a8085-137b-55c2-9679-cddade4a5907
-terminal: b4c76e5f-44bb-54ce-a917-3e3223b84107
-selection: 36d6fbb3-bdec-57e0-a9cf-78dc2b8f7280
-snapshot: eba46838-44ae-5bec-97bf-98c6639ae6a7
-artifact SHA-256: 31d82a31a3fbd909f8771820bf47e796a1503264fe0ac6ce0eff7ba163f0767d
-artifact bytes: 1291
-artifact identity SHA-256: c23b0c5a8cd5d4808bb18e5f5165344a8013b4c29b9930dc33f74a30846978f2
-```
-
-`/v2` credential references are immutable historical state. Any future rotation
-requires separately reviewed `/v3` or later authority.
 
 ---
 
 ## 6. Architecture 94 paper-cycle status
-
-Product flow:
-
-```text
-verified selected C3 snapshot
--> offline deterministic strategy history/plan
--> target/planner proposal
--> deterministic risk
--> simulated paper execution
--> verified successor checkpoint/lineage
--> durable Architecture-67 transition/receipt evidence
-```
-
-Architecture 94 remains simulated paper. It does not authorize broker/live,
-unattended scheduling, automatic retry, GUI execution, online history fill, or
-another C3 provider effect.
 
 ### P1 — ACCEPTED
 
@@ -249,10 +186,6 @@ another C3 provider effect.
 fix: bind Architecture 94 P1 provenance
 ```
 
-P1 is pure deterministic strategy-history/plan logic. Its selected-C3 assertion
-contains only non-authorizing selection/session/terminal/snapshot IDs and
-artifact SHA/length.
-
 ### P2 — FULLY ACCEPTED
 
 ```text
@@ -260,302 +193,291 @@ a810122a96b6fc90da25d71eede8da64b7272c98
 fix: bind Architecture 94 P2 permit issuance
 ```
 
-P2 performs the genuine C1-attenuated, read-only selected-C3 proof and issues a
-process-local permit. Frozen release wheel:
+P2's one supervised production reread of the already-durable successful C3 call
+#6 passed. **Do not rerun that supervised read.**
 
-```text
-F:\AI\p2-production-wheelhouse-v1\ai_trading_bot-0.1.0-py3-none-any.whl
-bytes: 743531
-SHA-256: 3b4862eb44763bead9cf0dd826645043e7de6419a182664ed780248eae6ff0c0
-```
-
-The one supervised P2 reread of already-durable successful call #6 passed after
-sealed deployment and a separate non-admin zero-provider preflight. It performed
-no provider call, no DB mutation, zero Python socket connects, and no provider
-call #7. **Do not rerun the supervised P2 call-#6 read.**
+Architecture 94 remains simulated paper only: no broker/live trading, unattended
+scheduling, automatic retry, or additional C3 provider effect.
 
 ---
 
-## 7. P3 frozen account and production provisioning state
+## 7. P3 retained production-recovery state
 
-Frozen paper account:
-
-```text
-paper account ID: d1510a4b-6ebf-58ef-92a4-e743ca91151e
-genesis checkpoint ID: 7b7b83ba-69e2-5ed8-a033-b4306cd1ffc7
-starting cash: 100000
-genesis SHA-256: b6172753ee4f30a82265ff38b341c3de42869ba6af7ccb69739234135183026d
-genesis bytes: 534
-anchor SHA-256: 650b977db5ea5f5f1d89e3ed5bf52dfb5b2c5c44c3b34ccceb6d22dd492df871
-anchor bytes: 411
-manifest SHA-256: 8505eddd07be2f90d1211ee49a9cac4829d0faff9d88d0dc4c609b209a2e8801
-```
-
-Accepted bundle/release evidence:
-
-```text
-bundle freeze: F:\AI\p3-paper-provisioning-freeze-v2
-release wheel: F:\AI\p3-provisioning-release-v4\ai_trading_bot-0.1.0-py3-none-any.whl
-release wheel SHA-256: 86834a81dd21887fafd6efc3af1d2525ff9a37a3229dbea6e8cd7cfaba5b8a27
-release wheel bytes: 764270
-sealed deployment: P3_SEALED_RUNTIME_DEPLOYMENT_V5=ACCEPTED
-Trading zero-provider preflight: ACCEPTED
-```
-
-The first native Administrator publication attempt is retained failed evidence:
-
-```text
-P3_NATIVE_ADMIN_PROVISIONING_V1=FAILED_RETAINED
-PUBLICATION_ERROR_STATE=PUBLICATION_OUTCOME_UNCERTAIN
-```
-
-Do not rerun that publisher.
-
-Read-only ambiguity resolution and staging forensic established:
+The first Administrator paper-root publication attempt failed and remains
+retained. Do not rerun it. Read-only resolution established:
 
 ```text
 FINAL_EXISTS=False
 STAGING_EXISTS=True
 PUBLICATION_STATE=STAGING_REQUIRES_MANUAL_RECOVERY
-staging exact inventory/security/bytes/native identities: PASS
-authority DB unchanged exact: PASS
+production authority DB: unchanged exact
 ```
 
-The staging tree is valid frozen recovery evidence. Do not delete, rename,
-repair, resume, or regenerate it outside the reviewed recovery path.
+Architectures 95 and 96 remain the retained-staging recovery and signed recovery
+authorization contracts. The staging tree remains retained evidence and must not
+be deleted, renamed, repaired, regenerated, or implicitly recovered.
 
 ---
 
-## 8. P3-R1 native diagnosis and Architecture 95
+## 8. Architectures 97–100 — current P3-R1 security line
 
-Disposable diagnostics proved:
-
-```text
-root-only absolute FileRenameInfo rename             -> PASS
-retained child directory across root rename          -> ERROR_ACCESS_DENIED
-retained direct child file across root rename        -> ERROR_ACCESS_DENIED
-retained nested file across root rename              -> ERROR_ACCESS_DENIED
-publisher topology with retained descendants         -> ERROR_ACCESS_DENIED
-all descendants closed before same root rename       -> PASS
-adding FILE_SHARE_DELETE to retained root            -> still denied with descendant
-retained root GetFinalPathNameByHandleW after PASS   -> exact final path
-```
-
-Therefore the production failure was the retained-descendant-handle ordering,
-not the frozen account, ACLs, authority DB, or absolute destination path.
-
-Architecture 95 requires:
+Current authoritative documents:
 
 ```text
-complete staging proof with descendants retained
--> record all native identities
--> close every descendant successfully
--> retain/revalidate trusted parent + staging root
--> final still absent
--> FIRST_PRODUCTION_MUTATION=P3_R1_ROOT_RENAME
--> one absolute no-replace retained-root rename
--> exact retained-root final-path proof
--> staging absent / final present
--> reopen final descendants read-only
--> exact pre/post native identity equality
--> complete final proof
--> DB before == after
+docs/architecture/97-p3-r1-recovery-signing-trust-reestablishment.md
+docs/architecture/98-p3-r1-ksp-machine-key-security-contract.md
+docs/architecture/99-p3-r1-ordinary-nonadmin-test-principal.md
+docs/architecture/100-p3-r1-protected-account-ceremony-evidence-root.md
+
+docs/validation/p3-r1-ordinary-nonadmin-test-principal-creation-ceremony.md
+docs/validation/reliable-manual-paper-cycle-p3-r1-ordinary-nonadmin-test-principal.md
+docs/validation/p3-r1-ksp-disposable-test-harness.md
 ```
 
-The ordinary publisher must use the corrected ordering for future clean-state
-publication but must continue to reject existing staging and never invoke P3-R1
-recovery implicitly.
+Architecture 97 re-establishes the recovery-signing trust path. Architecture 98
+freezes the Windows KSP machine-key security experiment. Architecture 99 adds the
+separate ordinary non-admin denial perspective using a dedicated new local test
+principal. Architecture 100 corrects the account-ceremony retained-evidence
+filesystem boundary before any account/root effect occurs.
+
+### Architecture 99 identity
+
+Exact candidate name:
+
+```text
+P3R1KspTestUser
+```
+
+Its Windows SID is deliberately unknown until a separately authorized create-new
+ceremony and Windows readback. The identity may never become production runtime,
+Trading, recovery, signing, KSP owner/ACE, or Credential Manager authority.
+
+Accepted Architecture-99 docs checkpoint:
+
+```text
+89506d9104b4699d19eee96aac2ad0b18ee25e4a
+docs: define P3-R1 ordinary non-admin test principal
+```
+
+Creation-ceremony contract:
+
+```text
+022960a3f242ded927edf3ae4667f87e724aeb19
+docs: define P3-R1 test-user creation ceremony
+```
+
+The ceremony uses one-shot direct Netapi32 account creation, exact dual
+name-absence proof, secure in-process `SecureString` handling, independent SID
+readback/mapping, a deterministic conditional BUILTIN\Users branch, genuine
+process-token qualification, sanitized retained evidence, and no automatic
+retry/rollback/cleanup/repair.
+
+### Disabled helper checkpoint
+
+```text
+d509537b88f66ef244d326e5417d38d9e5f25f53
+test: add disabled P3-R1 test-user ceremony helper
+```
+
+Changed only:
+
+```text
+scripts/p3_r1_ordinary_nonadmin_principal_ceremony.cs
+scripts/run_p3_r1_ordinary_nonadmin_principal_ceremony.ps1
+tests/runtime/test_p3_r1_ordinary_nonadmin_principal_ceremony.py
+```
+
+The helper remains source-only and disabled:
+
+```text
+ACCOUNT_EFFECT_EXECUTION_AUTHORIZED=false
+```
+
+Ordinary invocation cannot prompt for the account password or dispatch account/
+group effects.
+
+### Architecture 100 — accepted docs-only design
+
+Checkpoint:
+
+```text
+e2861fab3af7d297d79274db2a82fd134672fb58
+docs: define protected P3-R1 ceremony evidence root
+```
+
+A stopped read-only ACL/namespace diagnostic proved the old root under `F:\AI`
+was incompatible with the strict cross-run retained-path integrity model because
+untrusted authority on the ancestor could displace the pathname after in-run
+no-delete-share guards were released.
+
+Architecture 100 retires the old root before any effect occurred:
+
+```text
+RETIRED:
+F:\AI\p3-r1-ordinary-nonadmin-principal-v1
+
+NEW:
+F:\p3-r1-ordinary-nonadmin-principal-v2
+
+SCHEMA:
+p3-r1-ordinary-nonadmin-principal-evidence/v2
+```
+
+The new evidence root itself is the protected top-level anchor. It must be
+created once with a protected DACL **at create time**, never created with default
+inheritance and repaired later.
+
+Trusted security writers are limited to:
+
+```text
+exact P3-R1 creator SID ...-1005
+BUILTIN\Administrators  S-1-5-32-544
+NT AUTHORITY\SYSTEM     S-1-5-18
+```
+
+Ordinary users, Trading, the future test principal, Authenticated Users,
+BUILTIN\Users, Codex sandbox identities, and unresolved SIDs are not retained
+evidence writers.
+
+The new cross-run root contract also binds:
+
+```text
+fixed/local NTFS volume
+volume GUID + serial
+parent namespace authority
+root file identity
+exact owner
+semantic protected DACL
+reparse-point absence
+resolved final path
+```
+
+A pre-created fixed v2 name is fail-closed denial of service: STOP, never adopt,
+delete, repair, rename, retry, or select another suffix.
+
+The separate KSP evidence root remains unchanged:
+
+```text
+F:\AI\p3-r1-ksp-disposable-test-v1
+```
+
+Architecture 100 authorized and executed **no Windows filesystem, ACL, account,
+group, password, KSP, recovery, provider, or production effect**.
 
 ---
 
-## 9. Retained implementation checkpoint and Architecture 96 correction
+## 9. Immediate next milestone
 
-First P3-R1 implementation checkpoint:
+Next is a bounded **Codex Sol High** source-only Architecture-100 correction of
+the disabled ceremony helper. Sol High is required because this is native Windows
+security/authority work involving security descriptors, ACL interpretation,
+namespace authority, volume/file identities, handle continuity, and crash/re-entry
+semantics.
+
+Allowed implementation files:
 
 ```text
-2b82222fbaee857e02519a0ea3627679d309276d
-fix: add P3 retained staging recovery
+scripts/p3_r1_ordinary_nonadmin_principal_ceremony.cs
+scripts/run_p3_r1_ordinary_nonadmin_principal_ceremony.ps1
+tests/runtime/test_p3_r1_ordinary_nonadmin_principal_ceremony.py
 ```
 
-Focused final gate on that tree passed:
+Required implementation changes:
+
+1. replace the retired v1 root/schema constants with Architecture-100 v2;
+2. construct the exact protected root security descriptor at create time;
+3. validate owner, DACL protection, canonical trusted writer semantics, and reject
+   extra/untrusted writer authority;
+4. implement fixed-volume and parent `FILE_DELETE_CHILD`, `WRITE_DAC`, and
+   `WRITE_OWNER` gates;
+5. preserve the existing no-delete-share in-run guards;
+6. strengthen process re-entry with exact frozen volume/root identity;
+7. update strict v2 root-identity evidence and loader validation;
+8. keep `ACCOUNT_EFFECT_EXECUTION_AUTHORIZED=false` and all password/account/group
+   paths unreachable by ordinary invocation/tests; and
+9. add focused tests for unsafe parent delete-child authority, de-protected/wrong
+   DACL, wrong owner, extra ACEs, wrong volume/file identity, reparse
+   substitution, pre-created-name collision, uncertain create, and successful
+   protected-root inheritance.
+
+Do not touch production files, KSP harness source, recovery key material,
+provider code, unrelated subsystems, or retained Windows evidence.
+
+Codex runs focused tests/checks only. ChatGPT reviews the exact GitHub source diff
+before the user runs broad/full local certification.
+
+---
+
+## 10. Effect authorization — still blocked
+
+The following remain **NOT AUTHORIZED**:
+
+- creation of the new v2 evidence root;
+- ACL/security-descriptor mutation on Windows;
+- password prompting, capture, or serialization;
+- `P3R1KspTestUser` creation/reset/delete/rename/enable/disable;
+- local-group mutation;
+- source SID freeze in the KSP harness;
+- native KSP experiment execution or cleanup;
+- production P3 retained-staging recovery;
+- provider call #7;
+- brokerage or live trading; and
+- unrelated production/provider/credential effects.
+
+After corrected helper source acceptance, the expected chain is:
 
 ```text
-641 passed, 7 skipped
-Ruff: PASS
-format: PASS
-git diff --check: PASS
-```
-
-Exact GitHub review accepted:
-
-- descendant close-before-rename ordering;
-- exact retained-root final-path proof;
-- exact pre/post descendant native-identity continuity;
-- conservative crash/ambiguity semantics;
-- ordinary-publisher separation;
-- fake-Win32 retained-descendant access-denied behavior.
-
-It was **not accepted as final source** because
-`P3R1RecoveryDeploymentExpectation` let the caller choose the expected elevated
-operator SID and installed RECORD digest/length. Caller-selected SIDs/digests,
-paths, manifests, reconstructed objects, or environment values cannot create
-production recovery authority.
-
-Architecture 96 resolves this non-circularly:
-
-```text
-accepted corrected source
--> exact post-build wheel/RECORD freeze
--> collect exact elevated Administrator SID
--> canonical p3-r1-recovery-authorization/v1 bytes
--> detached domain-separated signature using external production P-256 signer
--> verify against source-pinned production public key
--> freeze signed authorization evidence
--> deploy exactly authorized wheel
--> runtime verifies signed operator/release/incident facts
--> reconcile installed RECORD/package/import provenance
--> issue private process-local recovery permit
--> permit required directly by native recovery mutation boundary
-```
-
-A bootstrap signature cannot authorize recovery; recovery uses a dedicated
-signed domain and verifier. Raw signed fields are evidence, not a substitute for
-the issued permit.
-
-The same correction pass must also move the opt-in native rename regression away
-from worktree `.pytest_cache` to pytest-managed/external-basetemp scratch.
-
-Authoritative docs:
-
-```text
-docs/architecture/95-p3-r1-retained-staging-recovery.md
-docs/architecture/96-p3-r1-signed-recovery-authorization.md
-docs/validation/reliable-manual-paper-cycle-p3-r1-recovery.md
-docs/validation/reliable-manual-paper-cycle-p3-r1-signed-authorization.md
+focused implementation verification
+-> ChatGPT exact GitHub diff acceptance
+-> broad local source certification
+-> restart the complete read-only Architecture-100 readiness freeze from gate #1
+-> freeze current volume/root-parent observations
+-> separate explicit one-time effect authorization
+-> create protected evidence root/account ceremony
+-> genuine ordinary-user token/group qualification
+-> later source SID freeze in the KSP harness
+-> separately authorized KSP denial experiment
+-> recovery execution only after all independent recovery gates are accepted
 ```
 
 ---
 
-## 10. Next milestone
+## 11. GUI status
 
-**Next: Codex Sol High bounded P3-R1 Architecture-96 correction.**
-
-Before implementation, fast-forward the local P3-R1 worktree to the current
-remote docs head, then use that exact new HEAD in the mandatory startup gate.
-Do not reset/rebase/amend the retained `2b82222...` implementation checkpoint.
-
-Correction scope:
-
-- remove caller-authoritative recovery deployment/operator expectation;
-- add strict canonical signed recovery-authorization parsing/verification;
-- add private process-local recovery permit/provenance boundary;
-- require the permit directly at native recovery mutation admission;
-- preserve all accepted Architecture-95 rename/identity/crash behavior;
-- fix native disposable test scratch to use pytest-managed temp;
-- focused tests only using fresh `F:\AI\temp\pytest\... --basetemp` and normally
-  `-p no:cacheprovider`;
-- no commit/push until ChatGPT exact-diff handoff unless explicitly authorized.
-
-After corrected exact-diff acceptance:
-
-```text
-one broad isolated-basetemp source certification
--> exact release wheel freeze
--> wheel/package/RECORD reconciliation
--> exact Administrator SID collection
--> signed P3-R1 authorization freeze
--> sealed-runtime deployment
--> installed RECORD/package reconciliation
--> read-only retained-staging revalidation
--> explicit one-time production recovery approval
--> Administrator P3-R1 recovery
--> close Administrator shell
--> non-admin Trading P3 acceptance
-```
-
-P4 remains blocked until P3 recovery and Trading acceptance complete.
+GUI-A1 through GUI-A7 are fully accepted and integrated. GUI capabilities remain
+read-only presentation/inspection boundaries. The GUI does not own production
+authority, credentials, paper-account mutation, retry, recovery, brokerage, or
+execution.
 
 ---
 
-## 11. Non-authorizations / hard stops
+## 12. Stable project constraints
 
-```text
-PRODUCTION_RECOVERY_RENAME=NOT_AUTHORIZED
-PUBLISHER_RERUN=FORBIDDEN
-STAGING_DELETE_OR_REPAIR=FORBIDDEN
-CALLER_ASSERTED_RECOVERY_AUTHORITY=FORBIDDEN
-UNSIGNED_RECOVERY_AUTHORIZATION=FORBIDDEN
-P3_TRADING_ACCEPTANCE=BLOCKED_PENDING_RECOVERY
-P4_PRODUCTION_EXECUTION=BLOCKED
-PROVIDER_CALL_7=NOT_AUTHORIZED
-CALL6_PROVIDER_EFFECT_REEXECUTION=FORBIDDEN
-P2_SUPERVISED_CALL6_REREAD=DO_NOT_RERUN
-PRODUCTION_LIVE=NO-GO
-```
-
-No production/provider/Credential Manager/broker/Paper transition effect is
-authorized by source tests, documentation, release preparation, or signed
-artifact construction alone.
+- US stocks and ETFs;
+- long-only;
+- no margin or leverage;
+- no options;
+- no short selling;
+- no crypto;
+- deterministic risk approval for every order;
+- paper mode by default;
+- complete auditability.
 
 ---
 
-## 12. GUI track
+## 13. Closeout rule
 
-GUI-A1 through GUI-A7 are fully accepted and integrated. Accepted semantic GUI
-head:
-
-```text
-7fb2e0b014938215e9ab4fbdb1cddde2651fad92
-```
-
-Final GUI documentation/reference-correction head:
+At every accepted checkpoint review/update:
 
 ```text
-5c1944d19416d0fdd6c4ff681e2ebda01d83ead4
-```
-
-The GUI remains presentation/read-only inspection. It does not own production
-authority, capture, credentials, paper mutation, retry/recovery, brokerage, or
-live execution.
-
----
-
-## 13. Files to read when resuming P3-R1
-
-Read first:
-
-```text
-AGENTS.md
 docs/PROJECT_STATUS.md
 docs/AI_TRADING_BOT_HANDOFF.md
-docs/AI_DEVELOPMENT_WORKFLOW.md
-docs/architecture/94-p3-production-paper-account-provisioning.md
-docs/architecture/95-p3-r1-retained-staging-recovery.md
-docs/architecture/96-p3-r1-signed-recovery-authorization.md
-docs/validation/reliable-manual-paper-cycle-p3-provisioning.md
-docs/validation/reliable-manual-paper-cycle-p3-r1-recovery.md
-docs/validation/reliable-manual-paper-cycle-p3-r1-signed-authorization.md
 ```
 
-When changing C1 trust/signature primitives, also read the relevant C1 Windows
-authority architecture, especially Architectures 77 and 80, and preserve
-bootstrap/recovery domain separation.
+Update `docs/AI_DEVELOPMENT_WORKFLOW.md` only when a new reusable workflow lesson
+is discovered that is not already covered.
 
----
-
-## 14. Documentation closeout rule
-
-At every accepted milestone, review/update:
-
-```text
-docs/PROJECT_STATUS.md
-docs/AI_TRADING_BOT_HANDOFF.md
-```
-
-If a milestone reveals a reusable workflow/recovery lesson, also update
-`AGENTS.md`, `docs/AI_DEVELOPMENT_WORKFLOW.md`, and the applicable
-validation/acceptance record.
-
-Docs-only closeout does not authorize merge, rebase, amend, force-push,
-review-thread resolution, PR metadata changes, unrelated changes, production
-recovery, provider effects, credential operations, or live trading.
+Git-tracked documents are authoritative. Documentation closeout does not itself
+authorize merge, rebase, force-push, amend, review-thread resolution, PR metadata
+changes, production/provider effects, Windows security effects, or unrelated
+modifications.

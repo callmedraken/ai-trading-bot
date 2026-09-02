@@ -300,7 +300,8 @@ zero before finalization, then read exact zero after finalization and independen
 reopen. Public `BCRYPT_ECCPUBLIC_BLOB` export remains required.
 
 The production ceremony never probes a private blob. Denial of private export
-is exercised only against a separately authorized disposable key.
+is exercised only against the separately authorized primary machine-scope
+disposable key, never the current-user shadow.
 
 ## Machine scope, algorithm, size, and identity readback
 
@@ -536,32 +537,92 @@ license to discard unknown fields.
 
 No disposable key is created by this checkpoint. A later native harness
 requires a separate ChatGPT/Sol review and explicit security-effect approval.
-It must use the exact Microsoft Software KSP, ECDSA_P256, and machine scope, but
-a reviewed TEST-only container that can never equal or alias:
+The later procedure freezes one exact test-only textual container name; this
+document does not select or authorize that future name:
 
 ```text
-AITradingBot-P3R1-Recovery-v1
+TEST_CONTAINER_TEXT=<exact future reviewed test-only name>
 ```
 
-The test name must be unique, fixed in the reviewed procedure, preflight-absent,
-and never reused after any creation attempt. The harness must prove:
+`TEST_CONTAINER_TEXT` must never equal, normalize to, prefix-match, or alias the
+production container `AITradingBot-P3R1-Recovery-v1`.
+
+The harness owns two scope-qualified persisted TEST identities that deliberately
+share that one textual name during one reviewed execution:
+
+```text
+MACHINE_TEST_KEY=(
+  provider=Microsoft Software Key Storage Provider,
+  scope=local-machine,
+  container=TEST_CONTAINER_TEXT
+)
+
+CURRENT_USER_SHADOW_KEY=(
+  provider=Microsoft Software Key Storage Provider,
+  scope=current-user of the exact elevated test operator,
+  container=TEST_CONTAINER_TEXT
+)
+```
+
+Before either create call, the exact elevated test operator must perform
+read-only absence probes for `TEST_CONTAINER_TEXT` in both local-machine scope
+and that operator's current-user scope. An existing or uncertain object in
+either scope stops the harness before creation. It is never adopted, deleted,
+repaired, overwritten, or treated as prior test evidence.
+
+The primary `MACHINE_TEST_KEY` preserves every Architecture-98 disposable gate:
+exact Microsoft Software KSP, ECDSA_P256, machine scope, create-new/no-overwrite,
+usage `0x00000002`, export policy zero, exact owner/protected DACL and
+`0x001F019B` mask candidate, pre-finalization timing, finalize/reopen/readback,
+public export, private-export denial, genuine Trading/ordinary-user denial, and
+exactly one authorized TEST signature.
+
+The `CURRENT_USER_SHADOW_KEY` exists only to prove scope non-substitution. The
+same separately reviewed elevated operator creates it under that operator's
+exact current-user context using the Microsoft Software KSP, ECDSA_P256, the
+same `TEST_CONTAINER_TEXT`, legacy spec zero, and create flags that omit
+`NCRYPT_MACHINE_KEY_FLAG` and every overwrite flag. It must be cryptographically
+distinct from `MACHINE_TEST_KEY`. Freeze and export at least its public identity
+so the harness can prove which key an open resolved. It is never production
+trust, never signed with, and never subjected to a private-export request. It is
+not required to imitate the production machine-key ACL; a later reviewed
+harness may add least-risk TEST-only properties without weakening any primary
+machine-key gate.
+
+After both objects exist and their public identities are frozen, prove:
+
+1. `NCryptOpenKey` with `NCRYPT_MACHINE_KEY_FLAG | NCRYPT_SILENT_FLAG`
+   resolves `MACHINE_TEST_KEY`, whose public identity equals the frozen machine
+   TEST identity and whose `NCRYPT_KEY_TYPE_PROPERTY` is exactly `0x00000020`;
+2. `NCryptOpenKey` without `NCRYPT_MACHINE_KEY_FLAG`, under the exact elevated
+   test operator context, resolves `CURRENT_USER_SHADOW_KEY`, whose public
+   identity equals the distinct frozen shadow identity and whose
+   `NCRYPT_KEY_TYPE_PROPERTY` lacks `NCRYPT_MACHINE_KEY_FLAG`;
+3. the two public identities are not equal;
+4. the current-user shadow cannot satisfy the machine-key identity gate; and
+5. scope remains part of every evidence identity, so equal container text alone
+   is never authority.
+
+The complete harness must prove:
 
 1. exact provider name and security-descriptor support `DWORD == 1`;
-2. absent-name/create-new behavior and no overwrite;
+2. both-scope absence before either create and create-new/no-overwrite behavior
+   for each scope-qualified object;
 3. exact pre-finalization property-set/readback timing and flags;
 4. signing-only usage equals `0x00000002` before/after/reopen;
 5. export policy equals zero before/after/reopen;
-6. exact machine scope and wrong-scope non-substitution;
+6. the exact two-object wrong-scope non-substitution proof above;
 7. exact ECDSA_P256/ECDSA/256 properties and stable names;
 8. exact owner, DACL, protection, ACE types/flags/SIDs/masks after reopen;
 9. close/reopen persistence and stable public/unique identity evidence;
 10. `BCRYPT_ECCPUBLIC_BLOB` export and exact SEC1 conversion succeed;
 11. all relevant private/opaque/PKCS#8 export requests are denied;
-12. the elevated authorized operator performs exactly one TEST-key signature;
-13. that signature verifies with the exported TEST public point;
+12. the elevated authorized operator performs exactly one `MACHINE_TEST_KEY`
+    signature;
+13. that signature verifies with the exported machine TEST public point;
 14. Trading cannot open/use the private key or sign;
 15. Trading cannot change owner/DACL, delete, or privately export the key;
-16. a same-name current-user TEST key cannot substitute for the machine key; and
+16. the same-text current-user shadow cannot substitute for the machine key; and
 17. altered/default/unprotected/unexpected ACL states are rejected by the
     semantic verifier.
 
@@ -577,22 +638,52 @@ is a test effect only. No production public or private key is involved.
 ## Disposable failure and cleanup
 
 Disposable-key creation is a security effect with one-way evidence semantics.
+The harness records independently:
 
-If every reviewed test passes, stop with the test key retained. A later,
-separately reviewed cleanup phase may open and delete only that exact disposable
-container, then independently prove the exact machine-scope name absent.
+```text
+MACHINE_TEST_KEY_CREATION_ATTEMPTED
+MACHINE_TEST_KEY_CREATED
+CURRENT_USER_SHADOW_CREATION_ATTEMPTED
+CURRENT_USER_SHADOW_CREATED
+```
 
-If any test fails or any return/outcome becomes uncertain after creation:
+Create the primary machine key first. If its creation fails or is uncertain, do
+not attempt shadow creation. If shadow creation fails after the machine key
+passed, the machine key remains retained.
 
-- retain the disposable key and sanitized evidence;
-- do not delete, repair, overwrite, rename, refinalize, or automatically retry;
-- do not reuse its container name;
-- do not broaden usage, export, or ACL policy; and
-- stop for review.
+If any failure or uncertainty occurs after either create begins:
 
-A retry requires a newly reviewed, distinct TEST container. None of these
-cleanup semantics applies to the fixed production container, which remains
-absent until an explicitly authorized production ceremony.
+- retain every scope-qualified TEST key that may have been created;
+- retain sanitized evidence for both scope states and all four lifecycle facts;
+- do not delete, repair, overwrite, rename, refinalize, or retry either object;
+- do not broaden usage, export, or ACL policy;
+- permanently retire `TEST_CONTAINER_TEXT` from future attempts; and
+- stop for review without best-effort cleanup.
+
+If every reviewed test passes, stop with both scope-qualified objects retained.
+A later, separately reviewed cleanup authorization must explicitly identify and
+cover both:
+
+```text
+(Microsoft Software Key Storage Provider, local-machine, TEST_CONTAINER_TEXT)
+(Microsoft Software Key Storage Provider,
+ exact elevated test operator current-user scope,
+ TEST_CONTAINER_TEXT)
+```
+
+Cleanup may delete only those two exact reviewed TEST objects and must then
+independently prove `TEST_CONTAINER_TEXT` absent in both scopes. A partial or
+uncertain deletion stops without automatic retry and retains the remaining
+object and evidence.
+
+Using `TEST_CONTAINER_TEXT` exactly once in each of the two reviewed scopes
+during one harness execution is deliberate scope qualification, not name reuse
+or retry. After creation has been attempted in either scope, the textual name is
+permanently retired from every later harness attempt. A retry requires a newly
+reviewed textual TEST name that is preflight-absent in both scopes.
+
+None of these cleanup semantics applies to the fixed production container,
+which remains absent until an explicitly authorized production ceremony.
 
 ## Required production-ceremony inputs and evidence
 

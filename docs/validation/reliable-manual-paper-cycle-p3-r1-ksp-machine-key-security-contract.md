@@ -96,14 +96,35 @@ best-effort continuation exists.
 
 ## E. Create-new and scope gate
 
-For an approved TEST-only container:
+The later procedure freezes, but this document does not select, one exact
+test-only textual name:
 
-- prove the reviewed machine-scope name absent;
-- call `NCryptCreatePersistedKey` with `ECDSA_P256`, exact name, legacy spec
-  zero, and `NCRYPT_MACHINE_KEY_FLAG` only;
-- never pass `NCRYPT_OVERWRITE_KEY_FLAG`;
-- prove the same no-overwrite call cannot replace an existing key; and
-- prove a same-name current-user TEST key does not satisfy machine-scope open.
+```text
+TEST_CONTAINER_TEXT=<exact future reviewed test-only name>
+```
+
+The harness owns two scope-qualified objects with that same text:
+
+```text
+MACHINE_TEST_KEY=(Microsoft Software Key Storage Provider,
+                  local-machine,
+                  TEST_CONTAINER_TEXT)
+CURRENT_USER_SHADOW_KEY=(Microsoft Software Key Storage Provider,
+                         current-user of exact elevated test operator,
+                         TEST_CONTAINER_TEXT)
+```
+
+Before either creation, use read-only `NCryptOpenKey` probes to prove
+`TEST_CONTAINER_TEXT` absent in both scopes under the exact elevated test
+operator context. An existing or uncertain object in either scope stops before
+creation; never delete, repair, overwrite, or adopt it.
+
+Create the primary machine key first with `ECDSA_P256`, exact name, legacy spec
+zero, and `NCRYPT_MACHINE_KEY_FLAG` only. Create the current-user shadow only
+after the machine creation and its required gates have succeeded, using the
+same provider/algorithm/name/operator but no `NCRYPT_MACHINE_KEY_FLAG`. Neither
+create may use `NCRYPT_OVERWRITE_KEY_FLAG`. Prove no-overwrite behavior in each
+scope without replacing either object.
 
 After independent reopen require:
 
@@ -225,7 +246,7 @@ get flags = NCRYPT_SILENT_FLAG
 
 `NCRYPT_PERSIST_ONLY_FLAG` is forbidden. Record the high-bit numeric overlap
 between `NCRYPT_PERSIST_FLAG` and `PROTECTED_DACL_SECURITY_INFORMATION`; prove
-the exact call on the disposable key instead of inferring its provider-specific
+the exact call on `MACHINE_TEST_KEY` instead of inferring its provider-specific
 interpretation. Protection acceptance comes from parsed `SE_DACL_PROTECTED`
 readback.
 
@@ -302,9 +323,9 @@ Require identical SEC1 bytes across original and reopened handles.
 
 ## M. Private-export denial gate
 
-Only the disposable test key may exercise private-export denial. With export
-policy zero, attempt each reviewed private-bearing format supported/relevant to
-the software KSP, including ECC private, generic private, opaque transport, and
+Only `MACHINE_TEST_KEY` may exercise private-export denial. With export policy
+zero, attempt each reviewed private-bearing format supported/relevant to the
+software KSP, including ECC private, generic private, opaque transport, and
 PKCS#8 private export. Require denial and no returned private material.
 
 Public export must still succeed. No certificate, PFX, PEM, archive, escrow,
@@ -317,9 +338,10 @@ The production key is never subjected to any private export request.
 ## N. Authorized TEST signature gate
 
 After every property/security/reopen gate passes, the exact elevated authorized
-operator may perform one and only one TEST-key ECDSA P-256/SHA-256 signature.
-Require a 64-byte P1363 signature and independent verification using only the
-exported TEST SEC1 public point.
+operator may perform one and only one `MACHINE_TEST_KEY` ECDSA P-256/SHA-256
+signature. Require a 64-byte P1363 signature and independent verification using
+only the exported machine TEST SEC1 public point. The shadow key is never signed
+with.
 
 Any return after the signing call begins is an attempted test signature. Retain
 all sanitized output, never sign again automatically, and never use a produced
@@ -340,8 +362,25 @@ Prove Trading cannot:
 - export any private-bearing blob.
 
 When key open itself is denied, record downstream operations as unreachable; do
-not weaken the DACL to exercise them. Also prove a same-name current-user key
-cannot substitute for the machine key.
+not weaken the DACL to exercise them.
+
+After both scope-qualified objects exist, freeze distinct public identities and
+prove under the exact elevated test operator context:
+
+1. machine flags `NCRYPT_MACHINE_KEY_FLAG | NCRYPT_SILENT_FLAG` open
+   `MACHINE_TEST_KEY`, return its exact public identity, and report
+   `NCRYPT_KEY_TYPE_PROPERTY == 0x00000020`;
+2. current-user flags omitting `NCRYPT_MACHINE_KEY_FLAG` open
+   `CURRENT_USER_SHADOW_KEY`, return its distinct public identity, and report a
+   key type lacking `NCRYPT_MACHINE_KEY_FLAG`;
+3. the shadow public identity never satisfies the machine identity gate; and
+4. evidence identity includes provider, scope, container text, key type, and
+   public identity rather than container text alone.
+
+The shadow is created only by the exact elevated test operator, is ECDSA_P256,
+current-user scope, create-new/no-overwrite, cryptographically distinct,
+test-only, never production trust, never signed with, and never subjected to a
+private-export request. It need not imitate the production machine-key ACL.
 
 ## P. Unexpected-state rejection gate
 
@@ -366,15 +405,22 @@ key.
 
 ## Q. Disposable key naming and isolation gate
 
-The separately reviewed native harness must freeze one TEST-only machine-key
-container that:
+The separately reviewed native harness must freeze one `TEST_CONTAINER_TEXT`
+that:
 
 - is visibly marked TEST;
-- is preflight-absent;
+- is preflight-absent in local-machine and exact-operator current-user scope
+  before either create;
 - cannot equal, normalize to, prefix-match, or alias
   `AITradingBot-P3R1-Recovery-v1`;
 - is never caller-selected; and
-- is never reused after any creation attempt.
+- is used exactly once in each reviewed scope during one harness execution.
+
+That deliberate same-text use across the two scope-qualified identities is not
+a retry or reuse. After either scope's creation has been attempted,
+`TEST_CONTAINER_TEXT` is permanently retired from future harness attempts. A
+retry requires a newly reviewed textual TEST name preflight-absent in both
+scopes.
 
 The harness must contain a structural guard that rejects the production
 container before any provider call. No enumeration or open of production
@@ -382,23 +428,33 @@ private material occurs.
 
 ## R. Failure, retention, and cleanup gate
 
-After disposable creation, any failed or uncertain gate means:
+Track independently:
 
 ```text
-RETAIN_TEST_KEY=True
+MACHINE_TEST_KEY_CREATION_ATTEMPTED
+MACHINE_TEST_KEY_CREATED
+CURRENT_USER_SHADOW_CREATION_ATTEMPTED
+CURRENT_USER_SHADOW_CREATED
+RETAIN_EVERY_POSSIBLY_CREATED_SCOPE_QUALIFIED_KEY=True
 AUTOMATIC_DELETE=False
 AUTOMATIC_REPAIR=False
 AUTOMATIC_RETRY=False
-REUSE_TEST_NAME=False
+REUSE_TEST_CONTAINER_TEXT=False
 ```
 
-Retain sanitized evidence and stop. A later retry uses a newly reviewed distinct
-container.
+Create the machine key first. If its creation fails or is uncertain, never
+attempt shadow creation. If shadow creation fails after the machine key passed,
+retain the machine key. Any failure or uncertainty after either create begins
+retains every scope-qualified key that may exist plus sanitized evidence for
+both scope states. Do not delete, repair, overwrite, or retry either object.
 
-If every test passes, the test key still remains until a separate reviewed
-cleanup phase. That phase may delete only the exact disposable machine key and
-must independently prove the exact name absent afterward. Cleanup approval does
-not apply to the production container.
+If every test passes, retain both objects until a separate reviewed cleanup.
+That cleanup authorization must explicitly cover the exact provider/name in
+machine scope and in the exact operator's current-user scope. It may delete only
+those two reviewed objects and must independently prove absence in both scopes.
+A partial or uncertain deletion stops without automatic retry and retains the
+remaining object/evidence. Cleanup approval never applies to the production
+container.
 
 ## S. Production ceremony review gate
 

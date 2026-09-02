@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import dataclasses
+import inspect
 import json
 import struct
 from pathlib import Path, PureWindowsPath
@@ -983,6 +984,18 @@ def test_retained_loader_rejects_unknown_gap_and_digest_tamper(tmp_path: Path) -
         harness._load_retained_evidence_from_root(other_root)
 
 
+def test_retained_root_is_created_only_for_successful_first_preflight(
+    tmp_path: Path,
+) -> None:
+    failed = harness.NativeWindowsPhaseOperations(
+        _FakeNativeApi(provider_name="Wrong Provider")
+    ).execute(harness.Phase.READ_ONLY_PREFLIGHT, harness.HarnessEvidence())
+    root = tmp_path / "retained"
+    with pytest.raises(harness.HarnessContractError):
+        harness._publish_retained_evidence_to_root_create_new(failed, root)
+    assert not root.exists()
+
+
 def _deterministic_test_signature(digest: bytes) -> bytes:
     private_scalar = 1
     nonce = 7
@@ -1002,10 +1015,12 @@ class _FakeNativeApi:
         shadow_exists: bool = False,
         token: harness.TokenFacts | None = None,
         deny_machine: bool = False,
+        provider_name: str = harness.PROVIDER_NAME,
     ) -> None:
         self.machine_exists = machine_exists
         self.shadow_exists = shadow_exists
         self.deny_machine = deny_machine
+        self.provider_name = provider_name
         self.token = token or harness.TokenFacts(
             harness.ELEVATED_TEST_OPERATOR_SID, True, True, True
         )
@@ -1051,7 +1066,9 @@ class _FakeNativeApi:
     def get_string(self, handle, property_name: str, flags: int) -> str:
         self.events.append(f"get-string:{handle}:{property_name}:{flags:#x}")
         if handle == "provider":
-            return harness.PROVIDER_NAME
+            if property_name != harness.NCRYPT_NAME_PROPERTY:
+                raise harness.HarnessContractError("wrong provider identity property")
+            return self.provider_name
         values = {
             harness.NCRYPT_NAME_PROPERTY: harness.TEST_CONTAINER_TEXT,
             harness.NCRYPT_UNIQUE_NAME_PROPERTY: "machine-unique-name",
@@ -1135,6 +1152,33 @@ class _FakeNativeApi:
         return _deterministic_test_signature(digest)
 
 
+class _FakeRetainedStore:
+    def __init__(self, initial: harness.HarnessEvidence | None = None) -> None:
+        self.latest = initial
+        self.events: list[str] = []
+
+    def root_exists(self) -> bool:
+        self.events.append("root-exists")
+        return self.latest is not None
+
+    def load(self) -> harness.HarnessEvidence:
+        self.events.append("load")
+        if self.latest is None:
+            raise AssertionError("no retained evidence")
+        return self.latest
+
+    def persist(self, evidence: harness.HarnessEvidence) -> harness.HarnessEvidence:
+        harness.validate_harness_evidence(evidence)
+        self.events.append(
+            "persist:"
+            f"{evidence.lifecycle.machine_creation_attempted}:"
+            f"{evidence.lifecycle.shadow_creation_attempted}:"
+            f"{len(evidence.phases)}"
+        )
+        self.latest = evidence
+        return evidence
+
+
 def test_read_only_preflight_uses_exact_provider_and_both_scope_absence() -> None:
     api = _FakeNativeApi()
     result = harness.NativeWindowsPhaseOperations(api).execute(
@@ -1147,6 +1191,272 @@ def test_read_only_preflight_uses_exact_provider_and_both_scope_absence() -> Non
         f"open:current-user:{harness.TEST_CONTAINER_TEXT}:0x40",
     ]
     assert all(harness.PRODUCTION_CONTAINER_TEXT not in event for event in api.events)
+    assert f"get-string:provider:Name:{harness.NCRYPT_PROPERTY_GET_FLAGS:#x}" in (
+        api.events
+    )
+    assert not hasattr(harness, "NCRYPT_PROVIDER_NAME_PROPERTY")
+    assert "Provider Name" not in inspect.getsource(
+        harness.NativeWindowsPhaseOperations._require_provider_name
+    )
+
+
+def test_provider_name_readback_mismatch_fails_closed() -> None:
+    api = _FakeNativeApi(provider_name="Unexpected Provider")
+    result = harness.NativeWindowsPhaseOperations(api).execute(
+        harness.Phase.READ_ONLY_PREFLIGHT, harness.HarnessEvidence()
+    )
+    assert result.phases[-1].outcome is harness.PhaseOutcome.FAILED
+    assert not any(event.startswith("open:") for event in api.events)
+
+
+def test_fixed_root_runner_accepts_no_caller_evidence_path_or_environment(
+    monkeypatch,
+) -> None:
+    assert tuple(
+        inspect.signature(harness.execute_next_retained_native_phase).parameters
+    ) == ("requested_phase",)
+    reached = False
+
+    def forbidden_factory():
+        nonlocal reached
+        reached = True
+        raise AssertionError("source gate was bypassed")
+
+    monkeypatch.setattr(
+        harness.NativeWindowsPhaseOperations,
+        "load_for_authorized_execution",
+        forbidden_factory,
+    )
+    with pytest.raises(harness.NativeExecutionDisabled):
+        harness.execute_next_retained_native_phase(harness.Phase.READ_ONLY_PREFLIGHT)
+    assert reached is False
+
+
+def test_retained_runner_first_preflight_starts_empty_and_publishes_result() -> None:
+    store = _FakeRetainedStore()
+    api = _FakeNativeApi()
+    api.requires_persistent_retainer = True
+
+    result = harness._execute_next_retained_native_phase(
+        harness.Phase.READ_ONLY_PREFLIGHT,
+        evidence_root_exists=store.root_exists,
+        load_latest=store.load,
+        persist_reload=store.persist,
+        operations_factory=lambda: harness.NativeWindowsPhaseOperations(
+            api, store.persist
+        ),
+    )
+
+    assert result == _through_preflight()
+    assert store.latest == result
+    assert store.events[0] == "root-exists"
+    assert store.events[-1] == "load"
+
+
+@pytest.mark.parametrize(
+    ("phase", "initial", "machine_exists", "attempt_event", "create_event"),
+    [
+        (
+            harness.Phase.MACHINE_CREATE_AND_VALIDATE,
+            _through_preflight(),
+            False,
+            "persist:True:False:1",
+            "create:local-machine:0x20",
+        ),
+        (
+            harness.Phase.SHADOW_CREATE_AND_SCOPE_PROOF,
+            _through_machine(),
+            True,
+            "persist:True:True:2",
+            "create:current-user:0x0",
+        ),
+    ],
+)
+def test_retained_runner_durably_confirms_create_attempt_before_dispatch(
+    phase: harness.Phase,
+    initial: harness.HarnessEvidence,
+    machine_exists: bool,
+    attempt_event: str,
+    create_event: str,
+) -> None:
+    store = _FakeRetainedStore(initial)
+    api = _FakeNativeApi(machine_exists=machine_exists)
+    api.requires_persistent_retainer = True
+    ordering: list[str] = []
+    original_persist = store.persist
+    original_create = api.create_key
+
+    def persist(evidence: harness.HarnessEvidence) -> harness.HarnessEvidence:
+        result = original_persist(evidence)
+        ordering.append(store.events[-1])
+        return result
+
+    def create(*args, **kwargs):
+        ordering.append(create_event)
+        return original_create(*args, **kwargs)
+
+    api.create_key = create
+
+    def factory() -> harness.NativeWindowsPhaseOperations:
+        ordering.append("factory")
+        return harness.NativeWindowsPhaseOperations(api, persist)
+
+    result = harness._execute_next_retained_native_phase(
+        phase,
+        evidence_root_exists=store.root_exists,
+        load_latest=store.load,
+        persist_reload=persist,
+        operations_factory=factory,
+    )
+
+    assert result.phases[-1].phase is phase
+    assert result.phases[-1].outcome is harness.PhaseOutcome.SUCCEEDED
+    assert ordering.index(attempt_event) < ordering.index("factory")
+    assert ordering.index("factory") < ordering.index(create_event)
+
+
+@pytest.mark.parametrize(
+    ("phase", "initial"),
+    [
+        (harness.Phase.MACHINE_CREATE_AND_VALIDATE, _through_preflight()),
+        (harness.Phase.SHADOW_CREATE_AND_SCOPE_PROOF, _through_machine()),
+    ],
+)
+def test_retained_runner_stops_before_create_when_attempt_retention_fails(
+    phase: harness.Phase,
+    initial: harness.HarnessEvidence,
+) -> None:
+    store = _FakeRetainedStore(initial)
+    factory_reached = False
+
+    def fail_persist(evidence: harness.HarnessEvidence):
+        raise OSError(evidence.lifecycle)
+
+    def forbidden_factory():
+        nonlocal factory_reached
+        factory_reached = True
+        raise AssertionError("native factory reached after retention failure")
+
+    with pytest.raises(harness.EvidenceRetentionUncertain) as raised:
+        harness._execute_next_retained_native_phase(
+            phase,
+            evidence_root_exists=store.root_exists,
+            load_latest=store.load,
+            persist_reload=fail_persist,
+            operations_factory=forbidden_factory,
+        )
+    assert raised.value.effect_may_have_occurred is False
+    assert factory_reached is False
+
+
+def test_retained_runner_rejects_requested_phase_mismatch_before_factory() -> None:
+    store = _FakeRetainedStore(_through_preflight())
+    reached = False
+
+    def forbidden_factory():
+        nonlocal reached
+        reached = True
+
+    with pytest.raises(harness.HarnessContractError, match="retained authority"):
+        harness._execute_next_retained_native_phase(
+            harness.Phase.SHADOW_CREATE_AND_SCOPE_PROOF,
+            evidence_root_exists=store.root_exists,
+            load_latest=store.load,
+            persist_reload=store.persist,
+            operations_factory=forbidden_factory,
+        )
+    assert reached is False
+
+
+def test_retained_runner_fsyncs_and_reloads_tmp_snapshots_before_each_create(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    root = tmp_path / "retained"
+    ordering: list[str] = []
+    real_fsync = harness.os.fsync
+
+    def fsync(descriptor: int) -> None:
+        real_fsync(descriptor)
+        ordering.append("fsync")
+
+    monkeypatch.setattr(harness.os, "fsync", fsync)
+
+    def load() -> harness.HarnessEvidence:
+        result = harness._load_retained_evidence_from_root(root)
+        ordering.append("reload")
+        return result
+
+    def persist(evidence: harness.HarnessEvidence) -> harness.HarnessEvidence:
+        harness._publish_retained_evidence_to_root_create_new(evidence, root)
+        return load()
+
+    api = _FakeNativeApi()
+    api.requires_persistent_retainer = True
+    original_create = api.create_key
+
+    def create(*args, **kwargs):
+        assert ordering[-2:] == ["fsync", "reload"]
+        ordering.append("create")
+        return original_create(*args, **kwargs)
+
+    api.create_key = create
+    for phase in (
+        harness.Phase.READ_ONLY_PREFLIGHT,
+        harness.Phase.MACHINE_CREATE_AND_VALIDATE,
+        harness.Phase.SHADOW_CREATE_AND_SCOPE_PROOF,
+    ):
+        result = harness._execute_next_retained_native_phase(
+            phase,
+            evidence_root_exists=root.exists,
+            load_latest=load,
+            persist_reload=persist,
+            operations_factory=lambda: harness.NativeWindowsPhaseOperations(
+                api, persist
+            ),
+        )
+        assert result.phases[-1].outcome is harness.PhaseOutcome.SUCCEEDED
+    assert ordering.count("create") == 2
+
+
+@pytest.mark.parametrize(
+    ("phase", "initial"),
+    [
+        (harness.Phase.MACHINE_CREATE_AND_VALIDATE, _through_preflight()),
+        (harness.Phase.SHADOW_CREATE_AND_SCOPE_PROOF, _through_machine()),
+    ],
+)
+def test_retained_runner_rejects_mismatched_reload_and_previously_retained_attempt(
+    phase: harness.Phase,
+    initial: harness.HarnessEvidence,
+) -> None:
+    store = _FakeRetainedStore(initial)
+
+    def forbidden_factory():
+        raise AssertionError("unconfirmed or previously attempted create dispatched")
+
+    with pytest.raises(harness.EvidenceRetentionUncertain):
+        harness._execute_next_retained_native_phase(
+            phase,
+            evidence_root_exists=store.root_exists,
+            load_latest=store.load,
+            persist_reload=lambda intended: initial,
+            operations_factory=forbidden_factory,
+        )
+
+    store.latest = (
+        harness.begin_machine_creation(initial)
+        if phase is harness.Phase.MACHINE_CREATE_AND_VALIDATE
+        else harness.begin_shadow_creation(initial)
+    )
+    with pytest.raises(harness.HarnessContractError, match="cannot restart"):
+        harness._execute_next_retained_native_phase(
+            phase,
+            evidence_root_exists=store.root_exists,
+            load_latest=store.load,
+            persist_reload=store.persist,
+            operations_factory=forbidden_factory,
+        )
 
 
 def test_machine_phase_exact_prefinalization_finalize_reopen_order() -> None:
@@ -1367,6 +1677,98 @@ def test_effect_attempt_state_is_retained_before_each_native_call() -> None:
     assert result.phases[-1].outcome is harness.PhaseOutcome.SUCCEEDED
 
 
+def test_probe_attempt_retention_failure_prevents_native_probe() -> None:
+    api = _FakeNativeApi(machine_exists=True, shadow_exists=True)
+    api.requires_persistent_retainer = True
+    operations = harness.NativeWindowsPhaseOperations(
+        api,
+        lambda evidence: (_ for _ in ()).throw(OSError(evidence)),
+    )
+    prior = _through_shadow()
+
+    with pytest.raises(harness.EvidenceRetentionUncertain) as raised:
+        operations.execute(harness.Phase.ELEVATED_MACHINE_EFFECT_TEST, prior)
+
+    assert raised.value.effect_may_have_occurred is False
+    assert operations._retained_evidence == prior
+    assert not any(event.startswith("private-probe:") for event in api.events)
+
+
+@pytest.mark.parametrize("release_fails", [False, True])
+def test_post_probe_retention_failure_stops_without_retry_or_recursive_record(
+    release_fails: bool,
+) -> None:
+    api = _FakeNativeApi(machine_exists=True, shadow_exists=True)
+    api.requires_persistent_retainer = True
+    retained: list[harness.HarnessEvidence] = []
+    retention_calls = 0
+    if release_fails:
+        original_handle = api._handle
+
+        def handle(value: str) -> harness.OwnedNativeHandle:
+            if value != "machine":
+                return original_handle(value)
+
+            def fail_release(released: str) -> None:
+                raise OSError("release failed")
+
+            return harness.OwnedNativeHandle(value, fail_release, value)
+
+        api._handle = handle
+
+    def fail_second(evidence: harness.HarnessEvidence) -> harness.HarnessEvidence:
+        nonlocal retention_calls
+        retention_calls += 1
+        if len(retained) == 1:
+            raise OSError("terminal probe result could not be retained")
+        retained.append(evidence)
+        return evidence
+
+    operations = harness.NativeWindowsPhaseOperations(api, fail_second)
+    with pytest.raises(harness.EvidenceRetentionUncertain) as raised:
+        operations.execute(
+            harness.Phase.ELEVATED_MACHINE_EFFECT_TEST, _through_shadow()
+        )
+
+    assert raised.value.effect_may_have_occurred is True
+    assert (
+        len([event for event in api.events if event.startswith("private-probe:")]) == 1
+    )
+    assert not any(event.startswith("sign:") for event in api.events)
+    assert (
+        operations._retained_evidence.private_export_probe_results[0].outcome
+        is harness.PrivateExportProbeOutcome.ATTEMPTED_UNCERTAIN
+    )
+    assert len(retained) == 1
+    assert retention_calls == 2
+
+
+def test_signature_attempt_retention_failure_prevents_native_signature() -> None:
+    api = _FakeNativeApi(machine_exists=True, shadow_exists=True)
+    api.requires_persistent_retainer = True
+    retain_count = 0
+
+    def fail_signature_marker(
+        evidence: harness.HarnessEvidence,
+    ) -> harness.HarnessEvidence:
+        nonlocal retain_count
+        retain_count += 1
+        if retain_count == len(harness.PrivateExportProbe) * 2 + 1:
+            raise OSError("signature marker could not be retained")
+        return evidence
+
+    with pytest.raises(harness.EvidenceRetentionUncertain) as raised:
+        harness.NativeWindowsPhaseOperations(api, fail_signature_marker).execute(
+            harness.Phase.ELEVATED_MACHINE_EFFECT_TEST, _through_shadow()
+        )
+
+    assert raised.value.effect_may_have_occurred is True
+    assert len(
+        [event for event in api.events if event.startswith("private-probe:")]
+    ) == len(harness.PrivateExportProbe)
+    assert not any(event.startswith("sign:") for event in api.events)
+
+
 def test_real_native_operations_are_unreachable_while_source_gate_disabled(
     monkeypatch,
 ) -> None:
@@ -1404,6 +1806,50 @@ def test_ctypes_adapter_and_future_evidence_publisher_are_source_gated(
     with pytest.raises(harness.NativeExecutionDisabled):
         harness.publish_retained_evidence_create_new(_through_preflight())
     assert touched is False
+
+
+def test_create_success_without_handle_is_classified_uncertain() -> None:
+    api = object.__new__(harness.CtypesNativeApi)
+
+    def success_without_handle(
+        provider, output, algorithm, container, legacy_spec, flags
+    ) -> int:
+        return 0
+
+    api._functions = {"NCryptCreatePersistedKey": success_without_handle}
+    with pytest.raises(harness.NativeOperationUncertain, match="without.*handle"):
+        api.create_key(
+            "provider", harness.MACHINE_TEST_KEY, harness.NCRYPT_MACHINE_CREATE_FLAGS
+        )
+
+
+def test_generic_operations_cannot_dispatch_ctypes_with_caller_evidence() -> None:
+    api = object.__new__(harness.CtypesNativeApi)
+    api._functions = {}
+    operations = harness.NativeWindowsPhaseOperations(api, lambda evidence: evidence)
+    with pytest.raises(harness.NativeExecutionDisabled):
+        operations.execute(harness.Phase.READ_ONLY_PREFLIGHT, harness.HarnessEvidence())
+
+
+@pytest.mark.parametrize("bad_size_query", [False, True])
+def test_signature_success_with_invalid_output_length_is_uncertain(
+    bad_size_query: bool,
+) -> None:
+    api = object.__new__(harness.CtypesNativeApi)
+    calls = 0
+
+    def sign(handle, padding, digest, digest_size, output, size, returned, flags):
+        nonlocal calls
+        calls += 1
+        harness.ctypes.cast(returned, harness.ctypes.POINTER(harness.ctypes.c_uint32))[
+            0
+        ] = 0 if bad_size_query or output is not None else 64
+        return 0
+
+    api._functions = {"NCryptSignHash": sign}
+    with pytest.raises(harness.NativeOperationUncertain):
+        api.sign_hash(1, bytes(32), harness.NCRYPT_SILENT_FLAG)
+    assert calls == (1 if bad_size_query else 2)
 
 
 def _sid_text_from_pointer(pointer: int) -> str:
@@ -1537,15 +1983,61 @@ def test_native_security_decoder_accepts_exact_bounded_descriptor() -> None:
     )
 
 
-@pytest.mark.parametrize("mutation", ["dacl-out-of-bounds", "ace-size-short"])
-def test_native_security_decoder_rejects_pointer_and_ace_bounds(mutation: str) -> None:
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        "owner-out-of-bounds",
+        "dacl-out-of-bounds",
+        "acl-size-out-of-bounds",
+        "ace-size-out-of-bounds",
+        "ace-size-short",
+        "owner-sid-truncated",
+        "ace-sid-truncated",
+    ],
+)
+def test_native_security_decoder_rejects_bounds_before_pointer_callbacks(
+    mutation: str,
+) -> None:
     value = bytearray(harness.build_exact_security_descriptor_bytes())
-    if mutation == "dacl-out-of-bounds":
+    dacl_offset = struct.unpack_from("<I", value, 16)[0]
+    if mutation == "owner-out-of-bounds":
+        struct.pack_into("<I", value, 4, 0xFFFFFFFC)
+    elif mutation == "dacl-out-of-bounds":
         struct.pack_into("<I", value, 16, len(value) + 4)
-    else:
-        dacl_offset = struct.unpack_from("<I", value, 16)[0]
+    elif mutation == "acl-size-out-of-bounds":
+        struct.pack_into("<H", value, dacl_offset + 2, len(value))
+    elif mutation == "ace-size-short":
         struct.pack_into("<H", value, dacl_offset + 8 + 2, 7)
-    with pytest.raises(harness.HarnessContractError):
-        harness.decode_native_security_descriptor(
-            bytes(value), _fake_security_functions(len(value))
+    elif mutation == "ace-size-out-of-bounds":
+        struct.pack_into("<H", value, dacl_offset + 8 + 2, 0xFFFC)
+    elif mutation == "owner-sid-truncated":
+        owner_offset = struct.unpack_from("<I", value, 4)[0]
+        value[owner_offset + 1] = 15
+    else:
+        value[dacl_offset + 8 + 8 + 1] = 15
+
+    callbacks: list[str] = []
+
+    def forbidden(*args, **kwargs):
+        callbacks.append("unsafe")
+        raise AssertionError("pointer-taking callback reached malformed data")
+
+    functions = {
+        name: forbidden
+        for name in (
+            "IsValidSecurityDescriptor",
+            "GetSecurityDescriptorLength",
+            "GetSecurityDescriptorOwner",
+            "GetSecurityDescriptorControl",
+            "GetSecurityDescriptorDacl",
+            "GetAclInformation",
+            "GetAce",
+            "IsValidSid",
+            "GetLengthSid",
+            "ConvertSidToStringSidW",
+            "LocalFree",
         )
+    }
+    with pytest.raises(harness.HarnessContractError):
+        harness.decode_native_security_descriptor(bytes(value), functions)
+    assert callbacks == []

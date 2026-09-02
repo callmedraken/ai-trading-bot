@@ -86,7 +86,6 @@ NCRYPT_KEY_USAGE_PROPERTY = "Key Usage"
 NCRYPT_KEY_TYPE_PROPERTY = "Key Type"
 NCRYPT_SECURITY_DESCR_SUPPORT_PROPERTY = "Security Descr Support"
 NCRYPT_SECURITY_DESCR_PROPERTY = "Security Descr"
-NCRYPT_PROVIDER_NAME_PROPERTY = "Provider Name"
 
 NTE_BAD_KEYSET = 0x80090016
 NTE_PERM = 0x80090010
@@ -164,6 +163,25 @@ class NativeOperationUncertain(RuntimeError):
 
 class HandleReleaseError(NativeOperationUncertain):
     """Raised when an owned native resource could not be released exactly once."""
+
+
+class EvidenceRetentionError(RuntimeError):
+    """Base class for classified fixed-root evidence retention failures."""
+
+
+class EvidenceRetentionUncertain(EvidenceRetentionError):
+    """Durable evidence authority could not be proved; execution must stop."""
+
+    def __init__(
+        self,
+        message: str,
+        intended_evidence: HarnessEvidence | None = None,
+        *,
+        effect_may_have_occurred: bool = False,
+    ) -> None:
+        self.intended_evidence = intended_evidence
+        self.effect_may_have_occurred = effect_may_have_occurred
+        super().__init__(message)
 
 
 class Phase(StrEnum):
@@ -427,6 +445,12 @@ class OwnedNativeHandle(AbstractContextManager[Any]):
                     f"{self._label} operation and release both failed",
                     [exc, release_error],
                 )
+                if isinstance(exc, EvidenceRetentionUncertain):
+                    raise EvidenceRetentionUncertain(
+                        f"{self._label} retention and release both failed",
+                        exc.intended_evidence,
+                        effect_may_have_occurred=exc.effect_may_have_occurred,
+                    ) from combined
                 raise HandleReleaseError(
                     f"{self._label} operation ended with an uncertain release"
                 ) from combined
@@ -579,6 +603,21 @@ def check_security_status(operation: str, status: int) -> None:
         raise TypeError("SECURITY_STATUS must be converted explicitly to int")
     if status != 0:
         raise SecurityStatusError(operation, status)
+
+
+def require_successful_effect_handle(
+    operation: str,
+    status: int,
+    handle: int | None,
+) -> int:
+    """Require an effect API's success status and its promised acquired handle."""
+
+    check_security_status(operation, status)
+    if handle is None or handle == 0:
+        raise NativeOperationUncertain(
+            f"{operation} returned success without the required key handle"
+        )
+    return handle
 
 
 def parse_ncrypt_dword(value: bytes, property_name: str) -> int:
@@ -2038,6 +2077,7 @@ def _publish_retained_evidence_to_root_create_new(
     first_publication = (
         len(evidence.phases) == 1
         and evidence.phases[0].phase is Phase.READ_ONLY_PREFLIGHT
+        and evidence.phases[0].outcome is PhaseOutcome.SUCCEEDED
         and evidence.lifecycle == LifecycleEvidence()
     )
     if first_publication:
@@ -2072,7 +2112,15 @@ def publish_retained_evidence_create_new(evidence: HarnessEvidence) -> Path:
 
     _require_native_execution_authorized()
     root = Path(str(validate_evidence_root(FUTURE_EVIDENCE_ROOT)))
-    return _publish_retained_evidence_to_root_create_new(evidence, root)
+    try:
+        return _publish_retained_evidence_to_root_create_new(evidence, root)
+    except EvidenceRetentionError:
+        raise
+    except Exception as error:
+        raise EvidenceRetentionUncertain(
+            "fixed-root evidence publication could not be proved",
+            evidence,
+        ) from error
 
 
 def load_retained_evidence() -> HarnessEvidence:
@@ -2080,7 +2128,78 @@ def load_retained_evidence() -> HarnessEvidence:
 
     _require_native_execution_authorized()
     root = Path(str(validate_evidence_root(FUTURE_EVIDENCE_ROOT)))
-    return _load_retained_evidence_from_root(root)
+    try:
+        return _load_retained_evidence_from_root(root)
+    except EvidenceRetentionError:
+        raise
+    except Exception as error:
+        raise EvidenceRetentionUncertain(
+            "fixed-root retained evidence could not be loaded and reconciled"
+        ) from error
+
+
+def persist_and_reload_retained_evidence(
+    evidence: HarnessEvidence,
+) -> HarnessEvidence:
+    """Append, fsync, reload, validate, and exactly confirm fixed-root state."""
+
+    _require_native_execution_authorized()
+    try:
+        publish_retained_evidence_create_new(evidence)
+        confirmed = load_retained_evidence()
+    except EvidenceRetentionUncertain:
+        raise
+    except Exception as error:  # pragma: no cover - public helpers classify first
+        raise EvidenceRetentionUncertain(
+            "retained evidence persistence/reload failed",
+            evidence,
+        ) from error
+    if confirmed != evidence:
+        raise EvidenceRetentionUncertain(
+            "reloaded retained evidence differs from the intended state",
+            evidence,
+        )
+    return confirmed
+
+
+def _confirm_evidence_retention(
+    evidence: HarnessEvidence,
+    retainer: Callable[[HarnessEvidence], HarnessEvidence | None],
+    *,
+    require_exact_confirmation: bool,
+    effect_may_have_occurred: bool,
+) -> HarnessEvidence:
+    try:
+        confirmed = retainer(evidence)
+    except EvidenceRetentionUncertain as error:
+        raise EvidenceRetentionUncertain(
+            str(error),
+            evidence,
+            effect_may_have_occurred=(
+                effect_may_have_occurred or error.effect_may_have_occurred
+            ),
+        ) from error
+    except Exception as error:
+        raise EvidenceRetentionUncertain(
+            "evidence publication/reload could not be proved",
+            evidence,
+            effect_may_have_occurred=effect_may_have_occurred,
+        ) from error
+    if require_exact_confirmation:
+        if confirmed != evidence:
+            raise EvidenceRetentionUncertain(
+                "persistent retainer did not reload the exact intended evidence",
+                evidence,
+                effect_may_have_occurred=effect_may_have_occurred,
+            )
+        return confirmed
+    if confirmed is not None and confirmed != evidence:
+        raise EvidenceRetentionUncertain(
+            "test retainer returned contradictory evidence",
+            evidence,
+            effect_may_have_occurred=effect_may_have_occurred,
+        )
+    return evidence
 
 
 def execute_native_phase(
@@ -2097,6 +2216,159 @@ def execute_native_phase(
     _require_native_execution_authorized()
     validate_phase_dispatch_eligibility(phase, evidence)
     return operations.execute(phase, evidence)  # pragma: no cover - disabled
+
+
+def _load_confirmed_evidence(
+    loader: Callable[[], HarnessEvidence],
+) -> HarnessEvidence:
+    try:
+        evidence = loader()
+        return validate_harness_evidence(evidence)
+    except EvidenceRetentionUncertain:
+        raise
+    except Exception as error:
+        raise EvidenceRetentionUncertain(
+            "retained evidence load/validation could not be proved"
+        ) from error
+
+
+def _derive_next_retained_phase(evidence: HarnessEvidence) -> Phase:
+    validate_harness_evidence(evidence)
+    if evidence.phases and evidence.phases[-1].outcome is not PhaseOutcome.SUCCEEDED:
+        raise HarnessContractError("terminal predecessor blocks native dispatch")
+    if len(evidence.phases) >= len(PHASE_ORDER):
+        raise HarnessContractError("all phases are already complete")
+    return PHASE_ORDER[len(evidence.phases)]
+
+
+def _validate_phase_start_eligibility(
+    phase: Phase,
+    evidence: HarnessEvidence,
+) -> None:
+    if phase is Phase.MACHINE_CREATE_AND_VALIDATE:
+        if evidence.lifecycle != LifecycleEvidence():
+            raise HarnessContractError(
+                "machine phase cannot restart from a retained attempt state"
+            )
+        return
+    if phase is Phase.SHADOW_CREATE_AND_SCOPE_PROOF:
+        if evidence.lifecycle != LifecycleEvidence(
+            machine_creation_attempted=True,
+            machine_created=True,
+            test_name_retired=True,
+        ):
+            raise HarnessContractError(
+                "shadow phase cannot restart from a retained attempt state"
+            )
+        return
+    validate_phase_dispatch_eligibility(phase, evidence)
+
+
+def _execute_next_retained_native_phase(
+    requested_phase: Phase,
+    *,
+    evidence_root_exists: Callable[[], bool],
+    load_latest: Callable[[], HarnessEvidence],
+    persist_reload: Callable[[HarnessEvidence], HarnessEvidence | None],
+    operations_factory: Callable[[], NativePhaseOperations],
+) -> HarnessEvidence:
+    """Pure-testable authority runner that never accepts caller evidence."""
+
+    try:
+        root_exists = evidence_root_exists()
+    except EvidenceRetentionUncertain:
+        raise
+    except Exception as error:
+        raise EvidenceRetentionUncertain(
+            "fixed evidence-root existence could not be proved"
+        ) from error
+
+    if root_exists:
+        evidence = _load_confirmed_evidence(load_latest)
+    else:
+        evidence = HarnessEvidence()
+
+    next_phase = _derive_next_retained_phase(evidence)
+    if requested_phase is not next_phase:
+        raise HarnessContractError(
+            f"requested {requested_phase.value}; retained authority requires "
+            f"{next_phase.value}"
+        )
+    if not root_exists and next_phase is not Phase.READ_ONLY_PREFLIGHT:
+        raise HarnessContractError(
+            "absent evidence root permits only initial preflight"
+        )
+    _validate_phase_start_eligibility(next_phase, evidence)
+
+    if next_phase is Phase.MACHINE_CREATE_AND_VALIDATE:
+        intended = begin_machine_creation(evidence)
+        evidence = _confirm_evidence_retention(
+            intended,
+            persist_reload,
+            require_exact_confirmation=True,
+            effect_may_have_occurred=False,
+        )
+    elif next_phase is Phase.SHADOW_CREATE_AND_SCOPE_PROOF:
+        intended = begin_shadow_creation(evidence)
+        evidence = _confirm_evidence_retention(
+            intended,
+            persist_reload,
+            require_exact_confirmation=True,
+            effect_may_have_occurred=False,
+        )
+
+    operations = operations_factory()
+    result = operations.execute(next_phase, evidence)
+    effect_phase = next_phase in {
+        Phase.MACHINE_CREATE_AND_VALIDATE,
+        Phase.SHADOW_CREATE_AND_SCOPE_PROOF,
+        Phase.ELEVATED_MACHINE_EFFECT_TEST,
+    }
+    try:
+        confirmed = _load_confirmed_evidence(load_latest)
+    except EvidenceRetentionUncertain as error:
+        raise EvidenceRetentionUncertain(
+            "completed phase could not be reloaded from the fixed evidence root",
+            result,
+            effect_may_have_occurred=effect_phase or error.effect_may_have_occurred,
+        ) from error
+    if confirmed != result:
+        raise EvidenceRetentionUncertain(
+            "latest fixed-root evidence differs from completed phase state",
+            result,
+            effect_may_have_occurred=effect_phase,
+        )
+    return confirmed
+
+
+def execute_next_retained_native_phase(requested_phase: Phase) -> HarnessEvidence:
+    """Source-gated real runner deriving authority only from the fixed root."""
+
+    _require_native_execution_authorized()
+    root = Path(str(validate_evidence_root(FUTURE_EVIDENCE_ROOT)))
+
+    def fixed_root_exists() -> bool:
+        try:
+            return root.exists()
+        except OSError as error:
+            raise EvidenceRetentionUncertain(
+                "fixed evidence-root absence/presence is uncertain"
+            ) from error
+
+    class FixedRootDispatch:
+        # Constructed only here, after the source gate. The generic public
+        # operations.execute API cannot dispatch a real ctypes adapter.
+        def execute(self, phase: Phase, evidence: HarnessEvidence) -> HarnessEvidence:
+            operations = NativeWindowsPhaseOperations.load_for_authorized_execution()
+            return operations._execute_phase(phase, evidence)
+
+    return _execute_next_retained_native_phase(
+        requested_phase,
+        evidence_root_exists=fixed_root_exists,
+        load_latest=load_retained_evidence,
+        persist_reload=persist_and_reload_retained_evidence,
+        operations_factory=FixedRootDispatch,
+    )
 
 
 def _p256_add(
@@ -2179,7 +2451,9 @@ class NativeWindowsPhaseOperations:
     def __init__(
         self,
         api: NativeApi,
-        evidence_retainer: Callable[[HarnessEvidence], Any] | None = None,
+        evidence_retainer: (
+            Callable[[HarnessEvidence], HarnessEvidence | None] | None
+        ) = None,
     ) -> None:
         if getattr(api, "requires_persistent_retainer", False) and (
             evidence_retainer is None
@@ -2189,25 +2463,48 @@ class NativeWindowsPhaseOperations:
             )
         self._api = api
         self._evidence_retainer = evidence_retainer
+        self._persistent_retainer_required = bool(
+            getattr(api, "requires_persistent_retainer", False)
+        )
         self._retained_evidence = HarnessEvidence()
+        self._effect_may_have_occurred = False
 
     @classmethod
     def load_for_authorized_execution(cls) -> NativeWindowsPhaseOperations:
         _require_native_execution_authorized()
         return cls(
             CtypesNativeApi.load_for_authorized_execution(),
-            publish_retained_evidence_create_new,
+            persist_and_reload_retained_evidence,
         )
 
     def _retain(self, evidence: HarnessEvidence) -> HarnessEvidence:
-        self._retained_evidence = evidence
+        confirmed = evidence
         if self._evidence_retainer is not None:
-            self._evidence_retainer(evidence)
-        return evidence
+            confirmed = _confirm_evidence_retention(
+                evidence,
+                self._evidence_retainer,
+                require_exact_confirmation=self._persistent_retainer_required,
+                effect_may_have_occurred=self._effect_may_have_occurred,
+            )
+        self._retained_evidence = confirmed
+        return confirmed
 
     def execute(self, phase: Phase, evidence: HarnessEvidence) -> HarnessEvidence:
+        if isinstance(self._api, CtypesNativeApi):
+            _require_native_execution_authorized()
+            raise HarnessContractError(
+                "real native phases require execute_next_retained_native_phase"
+            )
+        return self._execute_phase(phase, evidence)
+
+    def _execute_phase(
+        self, phase: Phase, evidence: HarnessEvidence
+    ) -> HarnessEvidence:
+        if isinstance(self._api, CtypesNativeApi):
+            _require_native_execution_authorized()
         validate_phase_dispatch_eligibility(phase, evidence)
         self._retained_evidence = evidence
+        self._effect_may_have_occurred = False
         handlers: dict[
             Phase, Callable[[HarnessEvidence], tuple[HarnessEvidence, PhaseCompletion]]
         ] = {
@@ -2221,6 +2518,8 @@ class NativeWindowsPhaseOperations:
         }
         try:
             updated, completion = handlers[phase](evidence)
+        except EvidenceRetentionUncertain:
+            raise
         except (HandleReleaseError, NativeOperationUncertain, SecurityStatusError):
             return self._retain(
                 append_phase_result(
@@ -2248,7 +2547,7 @@ class NativeWindowsPhaseOperations:
     def _require_provider_name(self, provider: Any) -> None:
         if (
             self._api.get_string(
-                provider, NCRYPT_PROVIDER_NAME_PROPERTY, NCRYPT_PROPERTY_GET_FLAGS
+                provider, NCRYPT_NAME_PROPERTY, NCRYPT_PROPERTY_GET_FLAGS
             )
             != PROVIDER_NAME
         ):
@@ -2390,6 +2689,7 @@ class NativeWindowsPhaseOperations:
             raise HarnessContractError("machine create flags contain overwrite")
         with self._api.open_provider() as provider:
             self._require_provider_name(provider)
+            self._effect_may_have_occurred = True
             with self._api.create_key(
                 provider, MACHINE_TEST_KEY, NCRYPT_MACHINE_CREATE_FLAGS
             ) as key:
@@ -2492,6 +2792,7 @@ class NativeWindowsPhaseOperations:
         machine_expected = self._machine_completion(evidence).machine_metadata
         with self._api.open_provider() as provider:
             self._require_provider_name(provider)
+            self._effect_may_have_occurred = True
             with self._api.create_key(
                 provider, CURRENT_USER_SHADOW_KEY, NCRYPT_CURRENT_USER_CREATE_FLAGS
             ) as shadow_key:
@@ -2538,6 +2839,7 @@ class NativeWindowsPhaseOperations:
                         evidence, MACHINE_TEST_KEY, probe
                     )
                     self._retain(evidence)
+                    self._effect_may_have_occurred = True
                     status = self._api.private_export_probe_status(
                         machine_key, probe.value, NCRYPT_PUBLIC_EXPORT_FLAGS
                     )
@@ -2555,6 +2857,7 @@ class NativeWindowsPhaseOperations:
                 evidence = begin_test_signature(evidence, MACHINE_TEST_KEY)
                 self._retain(evidence)
                 digest = hashlib.sha256(TEST_SIGNATURE_PREIMAGE).digest()
+                self._effect_may_have_occurred = True
                 signature = self._api.sign_hash(machine_key, digest, NCRYPT_SILENT_FLAG)
                 if not verify_test_signature_p1363(machine_public, digest, signature):
                     evidence = record_test_signature_outcome(
@@ -2767,14 +3070,124 @@ def _bounded_pointer(
     return pointer
 
 
+def _bounded_native_slice_end(
+    offset: int,
+    size: int,
+    total: int,
+    label: str,
+) -> int:
+    if offset < 0 or size < 0 or offset > total or size > total - offset:
+        raise HarnessContractError(f"{label} extends outside the descriptor")
+    return offset + size
+
+
+def _bounded_native_sid_length(
+    value: bytes,
+    offset: int,
+    range_start: int,
+    range_end: int,
+    label: str,
+) -> int:
+    if range_start < 0 or range_end > len(value) or range_start > range_end:
+        raise HarnessContractError(f"{label} containing range is invalid")
+    if offset < range_start or offset > range_end:
+        raise HarnessContractError(f"{label} offset is outside its containing range")
+    if offset > range_end - 8:
+        raise HarnessContractError(f"{label} is shorter than a SID header")
+    revision = value[offset]
+    subauthority_count = value[offset + 1]
+    if revision != 1 or subauthority_count > 15:
+        raise HarnessContractError(f"{label} header is invalid")
+    sid_length = 8 + 4 * subauthority_count
+    if offset > range_end - sid_length:
+        raise HarnessContractError(f"{label} extends outside its containing range")
+    return sid_length
+
+
 def decode_native_security_descriptor(
     value: bytes,
     functions: Mapping[str, Callable[..., Any]],
 ) -> SecurityDescriptorSemantic:
-    """Decode provider bytes through Windows APIs with explicit pointer bounds."""
+    """Decode provider bytes after pure bounds checks, then cross-check Windows."""
 
     if len(value) < 20:
         raise HarnessContractError("security descriptor is shorter than its header")
+    (
+        native_revision,
+        sbz1,
+        native_control,
+        owner_offset,
+        group_offset,
+        sacl_offset,
+        dacl_offset,
+    ) = struct.unpack_from("<BBHLLLL", value, 0)
+    if native_revision != 1 or sbz1 != 0:
+        raise HarnessContractError("security descriptor header is malformed")
+    if not native_control & SE_SELF_RELATIVE:
+        raise HarnessContractError("security descriptor is not self-relative")
+    if not native_control & SE_DACL_PRESENT:
+        raise HarnessContractError("security descriptor does not declare a DACL")
+    if group_offset != 0 or sacl_offset != 0:
+        raise HarnessContractError("unexpected group or SACL data is present")
+    if owner_offset < 20 or dacl_offset < 20:
+        raise HarnessContractError(
+            "owner or DACL offset overlaps the descriptor header"
+        )
+
+    if owner_offset % 4 or dacl_offset % 4:
+        raise HarnessContractError("owner or DACL offset is not DWORD-aligned")
+    owner_length = _bounded_native_sid_length(
+        value, owner_offset, 20, len(value), "owner SID"
+    )
+    owner_end = _bounded_native_slice_end(
+        owner_offset, owner_length, len(value), "owner SID"
+    )
+    dacl_header_end = _bounded_native_slice_end(
+        dacl_offset, 8, len(value), "DACL header"
+    )
+    if owner_offset >= dacl_offset or owner_end > dacl_offset:
+        raise HarnessContractError("owner SID and DACL ranges overlap or are reordered")
+
+    acl_revision, acl_sbz1, acl_size, ace_count, acl_sbz2 = struct.unpack_from(
+        "<BBHHH", value, dacl_offset
+    )
+    if acl_revision not in (ACL_REVISION, ACL_REVISION_DS):
+        raise HarnessContractError("DACL revision is invalid")
+    if acl_sbz1 != 0 or acl_sbz2 != 0:
+        raise HarnessContractError("DACL reserved fields are nonzero")
+    if acl_size < dacl_header_end - dacl_offset:
+        raise HarnessContractError("DACL size is shorter than its header")
+    dacl_end = _bounded_native_slice_end(dacl_offset, acl_size, len(value), "DACL")
+    if dacl_end != len(value):
+        raise HarnessContractError("DACL has trailing or detached descriptor bytes")
+    if ace_count > (acl_size - 8) // 16:
+        raise HarnessContractError("DACL ACE count cannot fit inside its byte length")
+
+    manual_aces: list[tuple[int, int, int]] = []
+    ace_offset = dacl_offset + 8
+    for index in range(ace_count):
+        _bounded_native_slice_end(ace_offset, 4, dacl_end, f"ACE {index} header")
+        ace_type, _, ace_size = struct.unpack_from("<BBH", value, ace_offset)
+        if ace_type != ACCESS_ALLOWED_ACE_TYPE:
+            raise HarnessContractError("ACE does not have the frozen allow-ACE shape")
+        if ace_size < 16:
+            raise HarnessContractError("ACE is shorter than ACCESS_ALLOWED_ACE")
+        ace_end = _bounded_native_slice_end(
+            ace_offset, ace_size, dacl_end, f"ACE {index}"
+        )
+        sid_offset = ace_offset + 8
+        sid_length = _bounded_native_sid_length(
+            value, sid_offset, ace_offset, ace_end, f"ACE {index} SID"
+        )
+        if sid_offset + sid_length != ace_end:
+            raise HarnessContractError("ACE contains trailing or truncated SID bytes")
+        manual_aces.append((ace_offset, ace_size, sid_length))
+        ace_offset = ace_end
+    if ace_offset != dacl_end:
+        raise HarnessContractError("DACL contains unclaimed or truncated ACE bytes")
+
+    # No pointer-taking Windows routine is called until every native range above is
+    # independently proven to be contained by the returned byte string.
     buffer = ctypes.create_string_buffer(value, len(value))
     base = ctypes.addressof(buffer)
     descriptor = ctypes.c_void_p(base)
@@ -2788,12 +3201,13 @@ def decode_native_security_descriptor(
     if returned_length != len(value):
         raise HarnessContractError("security descriptor length/trailing bytes mismatch")
 
-    def sid_text(pointer: int, range_base: int, range_size: int, label: str) -> str:
-        _bounded_pointer(pointer, 8, range_base, range_size, label)
+    def sid_text(pointer: int, expected_length: int, label: str) -> str:
+        _bounded_pointer(pointer, expected_length, base, len(value), label)
         sid_pointer = ctypes.c_void_p(pointer)
         require_bool("IsValidSid", sid_pointer)
         sid_length = int(functions["GetLengthSid"](sid_pointer))
-        _bounded_pointer(pointer, sid_length, range_base, range_size, label)
+        if sid_length != expected_length:
+            raise HarnessContractError(f"{label} native and bounded lengths disagree")
         converted = ctypes.c_wchar_p()
         converted_ok = bool(
             functions["ConvertSidToStringSidW"](sid_pointer, ctypes.byref(converted))
@@ -2827,10 +3241,10 @@ def decode_native_security_descriptor(
         ctypes.byref(owner_pointer),
         ctypes.byref(owner_defaulted),
     )
-    owner_address = _bounded_pointer(
-        owner_pointer.value, 8, base, len(value), "owner SID"
-    )
-    owner_sid = sid_text(owner_address, base, len(value), "owner SID")
+    expected_owner_address = base + owner_offset
+    if owner_pointer.value != expected_owner_address:
+        raise HarnessContractError("native owner pointer disagrees with bounded offset")
+    owner_sid = sid_text(expected_owner_address, owner_length, "owner SID")
 
     control = ctypes.c_uint16()
     revision = ctypes.c_uint32()
@@ -2842,6 +3256,8 @@ def decode_native_security_descriptor(
     )
     if revision.value != 1:
         raise HarnessContractError("security descriptor revision is not one")
+    if control.value != native_control:
+        raise HarnessContractError("native descriptor control disagrees with header")
 
     dacl_present = ctypes.c_int()
     dacl_pointer = ctypes.c_void_p()
@@ -2855,13 +3271,9 @@ def decode_native_security_descriptor(
     )
     if not dacl_present.value or dacl_pointer.value is None:
         raise HarnessContractError("security descriptor DACL is missing or NULL")
-    dacl_address = _bounded_pointer(
-        dacl_pointer.value,
-        ctypes.sizeof(_AclHeader),
-        base,
-        len(value),
-        "DACL",
-    )
+    dacl_address = base + dacl_offset
+    if dacl_pointer.value != dacl_address:
+        raise HarnessContractError("native DACL pointer disagrees with bounded offset")
     size_info = _AclSizeInformation()
     require_bool(
         "GetAclInformation",
@@ -2870,65 +3282,34 @@ def decode_native_security_descriptor(
         ctypes.sizeof(size_info),
         2,
     )
-    if size_info.acl_bytes_in_use < ctypes.sizeof(_AclHeader):
-        raise HarnessContractError("DACL bytes-in-use is too small")
-    _bounded_pointer(
-        dacl_address,
-        size_info.acl_bytes_in_use,
-        base,
-        len(value),
-        "DACL",
-    )
-    header = _AclHeader.from_buffer_copy(
-        ctypes.string_at(dacl_address, ctypes.sizeof(_AclHeader))
-    )
-    if header.acl_size != size_info.acl_bytes_in_use:
+    if size_info.acl_bytes_in_use != acl_size:
         raise HarnessContractError("DACL header and API sizes disagree")
-    if header.ace_count != size_info.ace_count:
+    if size_info.ace_count != ace_count:
         raise HarnessContractError("DACL header and API ACE counts disagree")
-    if dacl_address + header.acl_size != base + len(value):
-        raise HarnessContractError("DACL has trailing or detached descriptor bytes")
-    if size_info.ace_count > (header.acl_size - ctypes.sizeof(_AclHeader)) // 8:
-        raise HarnessContractError("DACL ACE count cannot fit inside its byte length")
+    if size_info.acl_bytes_free != 0:
+        raise HarnessContractError("DACL API reported unclaimed bytes")
 
     aces: list[AceSemantic] = []
-    for index in range(size_info.ace_count):
+    for index, (manual_offset, ace_size, sid_length) in enumerate(manual_aces):
         ace_pointer = ctypes.c_void_p()
         require_bool("GetAce", dacl_pointer, index, ctypes.byref(ace_pointer))
-        ace_address = _bounded_pointer(
-            ace_pointer.value,
-            ctypes.sizeof(_AceHeader),
-            dacl_address,
-            header.acl_size,
-            f"ACE {index}",
+        ace_address = base + manual_offset
+        if ace_pointer.value != ace_address:
+            raise HarnessContractError(
+                f"native ACE {index} pointer disagrees with bounded offset"
+            )
+        ace_type, ace_flags, native_ace_size = struct.unpack_from(
+            "<BBH", value, manual_offset
         )
-        ace_header = _AceHeader.from_buffer_copy(
-            ctypes.string_at(ace_address, ctypes.sizeof(_AceHeader))
-        )
-        if ace_header.ace_size < 8:
-            raise HarnessContractError("ACE is shorter than ACCESS_ALLOWED_ACE")
-        _bounded_pointer(
-            ace_address,
-            ace_header.ace_size,
-            dacl_address,
-            header.acl_size,
-            f"ACE {index}",
-        )
-        access_mask = struct.unpack("<I", ctypes.string_at(ace_address + 4, 4))[0]
+        if native_ace_size != ace_size:  # pragma: no cover - parsed together above
+            raise HarnessContractError("ACE size changed during decoding")
+        access_mask = struct.unpack_from("<I", value, manual_offset + 4)[0]
         sid_address = ace_address + 8
-        sid = sid_text(
-            sid_address,
-            ace_address,
-            ace_header.ace_size,
-            f"ACE {index} SID",
-        )
-        sid_length = int(functions["GetLengthSid"](ctypes.c_void_p(sid_address)))
-        if sid_address + sid_length != ace_address + ace_header.ace_size:
-            raise HarnessContractError("ACE contains trailing or truncated SID bytes")
+        sid = sid_text(sid_address, sid_length, f"ACE {index} SID")
         aces.append(
             AceSemantic(
-                ace_type=ace_header.ace_type,
-                ace_flags=ace_header.ace_flags,
+                ace_type=ace_type,
+                ace_flags=ace_flags,
                 sid=sid,
                 access_mask=access_mask,
             )
@@ -2941,7 +3322,7 @@ def decode_native_security_descriptor(
         dacl_is_null=False,
         dacl_defaulted=bool(dacl_defaulted.value),
         control=control.value,
-        acl_revision=header.revision,
+        acl_revision=acl_revision,
         aces=tuple(aces),
     )
 
@@ -3447,8 +3828,10 @@ class CtypesNativeApi:
             raise NativeOperationUncertain(
                 "failed key creation returned a handle that was released"
             ) from SecurityStatusError("NCryptCreatePersistedKey", status)
-        check_security_status("NCryptCreatePersistedKey", status)
-        return OwnedNativeHandle(key.value, self._free_object, "created NCrypt key")
+        acquired = require_successful_effect_handle(
+            "NCryptCreatePersistedKey", status, key.value
+        )
+        return OwnedNativeHandle(acquired, self._free_object, "created NCrypt key")
 
     def _set_property(
         self, handle: Any, property_name: str, value: bytes, flags: int
@@ -3671,7 +4054,9 @@ class CtypesNativeApi:
         )
         check_security_status("NCryptSignHash size", status)
         if required.value != 64:
-            raise HarnessContractError("ECDSA P-256 signature is not exactly 64 bytes")
+            raise NativeOperationUncertain(
+                "successful signature size query did not return exactly 64 bytes"
+            )
         signature = ctypes.create_string_buffer(required.value)
         returned = ctypes.c_uint32()
         status = int(
@@ -3688,7 +4073,9 @@ class CtypesNativeApi:
         )
         check_security_status("NCryptSignHash data", status)
         if returned.value != required.value:
-            raise HarnessContractError("signature size changed")
+            raise NativeOperationUncertain(
+                "successful signature call returned an invalid output length"
+            )
         return bytes(signature.raw)
 
 

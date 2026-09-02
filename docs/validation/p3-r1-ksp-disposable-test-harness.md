@@ -73,10 +73,18 @@ explicitly marked not authorized. The authorization check runs before loading
 native phase operation. No command-line or environment value can change it.
 
 Even after a future reviewed authorization replaces that disabled boundary,
-`execute_native_phase` independently requires its requested phase to be the one
-exact legal next phase for the supplied retained evidence. The pure eligibility
-validator runs before effect dispatch and does not delegate ordering authority
-to a `NativePhaseOperations` implementation.
+the real `execute_next_retained_native_phase` entrypoint accepts only a requested
+phase. It accepts no caller evidence, path, environment input, or operations
+adapter. It derives authority only from the fixed evidence root, strictly loads
+and validates the latest snapshot when the root exists, and requires the
+requested phase to equal the one exact legal next phase. An absent root can
+start only from a new empty `HarnessEvidence` and only for read-only preflight.
+The separately pure-testable runner receives fake stores and fake operations;
+the ordinary CLI and real entrypoint expose no such injection surface.
+The generic `NativeWindowsPhaseOperations.execute` rejects a real ctypes
+adapter; its in-memory evidence parameter remains a fake-test surface only.
+Real dispatch is private to the fixed-root entrypoint after retained-state
+validation and durable pre-effect transitions.
 
 The source contains typed, lazy bindings and the exact future phase bodies so
 they can be reviewed without being used. They cover:
@@ -166,6 +174,13 @@ requires both keys and pristine signature/export-attempt state; it cannot be
 used as a retry surface. Trading, ordinary-user, and final dispatch each require
 the exact immediately preceding success. The ordinary-user phase remains
 ineligible while its exact SID is blocked.
+
+The fixed-root runner durably publishes and reloads the machine or shadow
+`begin_*` transition before it constructs the real operations adapter or
+dispatches the native create. A mismatch, publication error, reload error, or
+validation error at that boundary prevents the effect call.
+An attempt marker found by a later invocation is not permission to resume or
+retry creation: the runner refuses that unresolved attempt state.
 
 ## Phase-specific completion proofs
 
@@ -348,11 +363,22 @@ filename digest and phase count is re-proved, every prior snapshot is strictly
 loaded, and every later snapshot must contain the exact prior phase prefix and
 one-way lifecycle/signature/probe state. Unknown root entries fail closed. The
 loader therefore selects the latest validated retained snapshot rather than a
-caller assertion. The publisher never overwrites a prior snapshot. The phase implementation invokes
-the configured retainer after every lifecycle transition, probe/signature
-attempt marker, terminal probe/signature result, and phase result; the real
-ctypes factory cannot be constructed without that retainer and the still-
-disabled source authorization.
+caller assertion. The publisher never overwrites a prior snapshot. The phase
+implementation invokes the configured retainer after every lifecycle
+transition, probe/signature attempt marker, terminal probe/signature result,
+and phase result; the real ctypes factory cannot be constructed without that
+retainer and the still-disabled source authorization.
+
+Persistent authority advances only after exclusive append, file flush and
+`fsync`, strict reload, canonical validation, and exact equality with the
+intended typed evidence. Retention failure has a dedicated uncertain error
+classification. Before an effect, it prevents dispatch. After an effect may
+have started, it stops immediately with `effect_may_have_occurred=True`; it
+does not retry the effect and does not recursively attempt a best-effort
+uncertain record. The last confirmed evidence pointer therefore never advances
+to an unconfirmed state.
+A simultaneous handle-release failure preserves the retention-uncertain
+classification and both errors without calling the failed retainer again.
 
 ## Fixed TEST-signature domain
 
@@ -382,11 +408,25 @@ absence result; only `NTE_PERM` is the reviewed access/policy-denial result.
 `NTE_NOT_SUPPORTED` is retained as `UNSUPPORTED_FORMAT` and cannot satisfy the
 private-export denial matrix.
 
-The native security-descriptor decoder calls the bound Windows validity,
-owner, DACL, ACL, ACE, SID, and SID-string APIs. Every returned pointer is
-bounded against the exact returned descriptor/ACL length before it is read;
-ACE header/size and SID length must end at the same boundary. Descriptor,
-DACL, ACE, SID, trailing-byte, or allocation-release ambiguity fails closed.
+Provider identity is read from the provider handle using the documented
+`NCRYPT_NAME_PROPERTY` (`"Name"`) and must equal
+`Microsoft Software Key Storage Provider` exactly. The harness defines and
+uses no invented `"Provider Name"` property. A successful
+`NCryptCreatePersistedKey` status without a non-NULL returned key handle is
+classified as an uncertain effect outcome, never ordinary success.
+Likewise, a successful signature API status with an invalid required/returned
+output length remains an uncertain consumed attempt.
+
+Before calling any pointer-taking Windows validator, the native security-
+descriptor decoder manually parses the 20-byte self-relative header and
+bounds-checks owner/DACL offsets, exact SID lengths, ACL size/count, every ACE
+header/size, and every embedded SID against the returned byte-string ranges.
+Malformed data therefore cannot reach `IsValidSecurityDescriptor`, SID, ACL,
+or ACE callbacks. Only after that complete pure bounds pass does it call the
+bound Windows validity, owner, DACL, ACL, ACE, SID, and SID-string APIs as
+secondary consistency checks; every returned pointer, size, count, and control
+value must match the manually proven offsets and lengths. Descriptor, DACL,
+ACE, SID, trailing-byte, pointer, or allocation-release ambiguity fails closed.
 The resulting `SecurityDescriptorSemantic` is still passed to the pure verifier
 as the sole semantic authority.
 

@@ -17,6 +17,7 @@ import sys
 import unicodedata
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, dataclass, replace
+from dataclasses import fields as dataclass_fields
 from enum import StrEnum
 from pathlib import Path, PureWindowsPath
 from typing import Any, Protocol
@@ -27,7 +28,7 @@ else:  # pragma: no cover - definitions remain inspectable off Windows
     wintypes = None  # type: ignore[assignment]
 
 
-HARNESS_SCHEMA_VERSION = "p3-r1-ksp-disposable-test-evidence/v1"
+HARNESS_SCHEMA_VERSION = "p3-r1-ksp-disposable-test-evidence/v2"
 PROVIDER_NAME = "Microsoft Software Key Storage Provider"
 ALGORITHM_NAME = "ECDSA_P256"
 ALGORITHM_GROUP = "ECDSA"
@@ -171,6 +172,14 @@ class PrivateExportProbe(StrEnum):
     PKCS8_PRIVATE = NCRYPT_PKCS8_PRIVATE_KEY_BLOB
 
 
+class PrivateExportProbeOutcome(StrEnum):
+    NOT_ATTEMPTED = "NOT_ATTEMPTED"
+    ATTEMPTED_UNCERTAIN = "ATTEMPTED_UNCERTAIN"
+    DENIED_AS_REQUIRED = "DENIED_AS_REQUIRED"
+    UNSUPPORTED_FORMAT = "UNSUPPORTED_FORMAT"
+    FAILED = "FAILED"
+
+
 @dataclass(frozen=True)
 class KeyIdentity:
     provider: str
@@ -228,6 +237,59 @@ class KeyMetadata:
 
 
 @dataclass(frozen=True)
+class ReadOnlyPreflightCompletion:
+    both_scope_absence_proved: bool
+    future_evidence_root_absent: bool
+    provider_security_descriptor_support: bool
+    elevated_operator_sid: str
+
+
+@dataclass(frozen=True)
+class MachineValidationCompletion:
+    machine_metadata: KeyMetadata
+    exact_properties_verified: bool
+    security_descriptor_verified: bool
+    independent_reopen_verified: bool
+
+
+@dataclass(frozen=True)
+class ShadowScopeCompletion:
+    machine_metadata: KeyMetadata
+    shadow_metadata: KeyMetadata
+    scope_non_substitution_verified: bool
+
+
+@dataclass(frozen=True)
+class ElevatedEffectCompletion:
+    signature_verified_with_machine_public: bool
+    private_export_denial_matrix_verified: bool
+
+
+@dataclass(frozen=True)
+class PrincipalDenialCompletion:
+    actor_sid: str
+    machine_open_denied: bool
+    downstream_private_operations_unreachable: bool
+
+
+@dataclass(frozen=True)
+class FinalReconciliationCompletion:
+    all_phase_evidence_reconciled: bool
+    both_scope_qualified_keys_retained: bool
+    cleanup_performed: bool
+
+
+PhaseCompletion = (
+    ReadOnlyPreflightCompletion
+    | MachineValidationCompletion
+    | ShadowScopeCompletion
+    | ElevatedEffectCompletion
+    | PrincipalDenialCompletion
+    | FinalReconciliationCompletion
+)
+
+
+@dataclass(frozen=True)
 class LifecycleEvidence:
     machine_creation_attempted: bool = False
     machine_created: bool = False
@@ -237,11 +299,33 @@ class LifecycleEvidence:
 
 
 @dataclass(frozen=True)
+class PrivateExportProbeResult:
+    probe: PrivateExportProbe
+    outcome: PrivateExportProbeOutcome = PrivateExportProbeOutcome.NOT_ATTEMPTED
+
+
+INITIAL_PRIVATE_EXPORT_PROBE_RESULTS = tuple(
+    PrivateExportProbeResult(probe) for probe in PrivateExportProbe
+)
+
+
+@dataclass(frozen=True)
+class PhaseStateSnapshot:
+    lifecycle: LifecycleEvidence
+    completion: PhaseCompletion | None
+    signature_outcome: SignatureOutcome
+    signature_attempt_count: int
+    private_export_probe_results: tuple[PrivateExportProbeResult, ...]
+
+
+@dataclass(frozen=True)
 class PhaseRecord:
     phase: Phase
     outcome: PhaseOutcome
     actor_sid: str
     previous_record_sha256: str
+    state_snapshot: PhaseStateSnapshot
+    state_snapshot_sha256: str
     record_sha256: str
 
 
@@ -254,7 +338,9 @@ class HarnessEvidence:
     phases: tuple[PhaseRecord, ...] = ()
     signature_outcome: SignatureOutcome = SignatureOutcome.NOT_ATTEMPTED
     signature_attempt_count: int = 0
-    private_export_probes_attempted: tuple[PrivateExportProbe, ...] = ()
+    private_export_probe_results: tuple[PrivateExportProbeResult, ...] = (
+        INITIAL_PRIVATE_EXPORT_PROBE_RESULTS
+    )
 
 
 class NativePhaseOperations(Protocol):
@@ -543,30 +629,370 @@ def _expected_actor(phase: Phase) -> str:
     return ELEVATED_TEST_OPERATOR_SID
 
 
-def _record_digest(
-    phase: Phase,
-    outcome: PhaseOutcome,
-    actor_sid: str,
-    previous_record_sha256: str,
-) -> str:
-    payload = {
-        "actor_sid": actor_sid,
-        "outcome": outcome.value,
-        "phase": phase.value,
-        "previous_record_sha256": previous_record_sha256,
+def _metadata_payload(metadata: KeyMetadata) -> dict[str, Any]:
+    return {
+        "algorithm": metadata.algorithm,
+        "algorithm_group": metadata.algorithm_group,
+        "identity": {
+            "container": metadata.identity.container,
+            "operator_sid": metadata.identity.operator_sid,
+            "provider": metadata.identity.provider,
+            "scope": metadata.identity.scope.value,
+        },
+        "key_length_bits": metadata.key_length_bits,
+        "key_type": metadata.key_type,
+        "public_sec1_hex": metadata.public_sec1.hex(),
     }
+
+
+def _completion_payload(completion: PhaseCompletion | None) -> dict[str, Any] | None:
+    if completion is None:
+        return None
+    if isinstance(completion, ReadOnlyPreflightCompletion):
+        return {
+            "both_scope_absence_proved": completion.both_scope_absence_proved,
+            "elevated_operator_sid": completion.elevated_operator_sid,
+            "future_evidence_root_absent": completion.future_evidence_root_absent,
+            "kind": "read-only-preflight/v1",
+            "provider_security_descriptor_support": (
+                completion.provider_security_descriptor_support
+            ),
+        }
+    if isinstance(completion, MachineValidationCompletion):
+        return {
+            "exact_properties_verified": completion.exact_properties_verified,
+            "independent_reopen_verified": completion.independent_reopen_verified,
+            "kind": "machine-validation/v1",
+            "machine_metadata": _metadata_payload(completion.machine_metadata),
+            "security_descriptor_verified": completion.security_descriptor_verified,
+        }
+    if isinstance(completion, ShadowScopeCompletion):
+        return {
+            "kind": "shadow-scope/v1",
+            "machine_metadata": _metadata_payload(completion.machine_metadata),
+            "scope_non_substitution_verified": (
+                completion.scope_non_substitution_verified
+            ),
+            "shadow_metadata": _metadata_payload(completion.shadow_metadata),
+        }
+    if isinstance(completion, ElevatedEffectCompletion):
+        return {
+            "kind": "elevated-effect/v1",
+            "private_export_denial_matrix_verified": (
+                completion.private_export_denial_matrix_verified
+            ),
+            "signature_verified_with_machine_public": (
+                completion.signature_verified_with_machine_public
+            ),
+        }
+    if isinstance(completion, PrincipalDenialCompletion):
+        return {
+            "actor_sid": completion.actor_sid,
+            "downstream_private_operations_unreachable": (
+                completion.downstream_private_operations_unreachable
+            ),
+            "kind": "principal-denial/v1",
+            "machine_open_denied": completion.machine_open_denied,
+        }
+    if isinstance(completion, FinalReconciliationCompletion):
+        return {
+            "all_phase_evidence_reconciled": (completion.all_phase_evidence_reconciled),
+            "both_scope_qualified_keys_retained": (
+                completion.both_scope_qualified_keys_retained
+            ),
+            "cleanup_performed": completion.cleanup_performed,
+            "kind": "final-reconciliation/v1",
+        }
+    raise TypeError("unknown phase completion type")
+
+
+def _probe_results_payload(
+    results: tuple[PrivateExportProbeResult, ...],
+) -> list[dict[str, str]]:
+    return [
+        {"outcome": result.outcome.value, "probe": result.probe.value}
+        for result in results
+    ]
+
+
+def _snapshot_payload(snapshot: PhaseStateSnapshot) -> dict[str, Any]:
+    return {
+        "completion": _completion_payload(snapshot.completion),
+        "lifecycle": {
+            "machine_created": snapshot.lifecycle.machine_created,
+            "machine_creation_attempted": (
+                snapshot.lifecycle.machine_creation_attempted
+            ),
+            "shadow_created": snapshot.lifecycle.shadow_created,
+            "shadow_creation_attempted": snapshot.lifecycle.shadow_creation_attempted,
+            "test_name_retired": snapshot.lifecycle.test_name_retired,
+        },
+        "private_export_probe_results": _probe_results_payload(
+            snapshot.private_export_probe_results
+        ),
+        "signature_attempt_count": snapshot.signature_attempt_count,
+        "signature_outcome": snapshot.signature_outcome.value,
+    }
+
+
+def _canonical_digest(payload: Mapping[str, Any]) -> str:
     encoded = json.dumps(
         payload, ensure_ascii=True, separators=(",", ":"), sort_keys=True
     ).encode("ascii")
     return hashlib.sha256(encoded).hexdigest()
 
 
-def append_phase_result(
+def _snapshot_digest(snapshot: PhaseStateSnapshot) -> str:
+    return _canonical_digest(_snapshot_payload(snapshot))
+
+
+def _record_digest(
+    phase: Phase,
+    outcome: PhaseOutcome,
+    actor_sid: str,
+    previous_record_sha256: str,
+    state_snapshot_sha256: str,
+) -> str:
+    return _canonical_digest(
+        {
+            "actor_sid": actor_sid,
+            "outcome": outcome.value,
+            "phase": phase.value,
+            "previous_record_sha256": previous_record_sha256,
+            "state_snapshot_sha256": state_snapshot_sha256,
+        }
+    )
+
+
+def _validate_signature_state(outcome: SignatureOutcome, attempt_count: int) -> None:
+    if attempt_count not in (0, 1):
+        raise HarnessContractError("signature attempt count must be zero or one")
+    if (attempt_count == 0 and outcome is not SignatureOutcome.NOT_ATTEMPTED) or (
+        attempt_count == 1 and outcome is SignatureOutcome.NOT_ATTEMPTED
+    ):
+        raise HarnessContractError("signature state and attempt count disagree")
+
+
+def _validate_probe_results(
+    results: tuple[PrivateExportProbeResult, ...],
+) -> None:
+    if tuple(result.probe for result in results) != tuple(PrivateExportProbe):
+        raise HarnessContractError(
+            "private-export probe results must contain the exact ordered matrix"
+        )
+    if len({result.probe for result in results}) != len(results):
+        raise HarnessContractError("private-export probes cannot be duplicated")
+
+
+def _all_probes_not_attempted(
+    results: tuple[PrivateExportProbeResult, ...],
+) -> bool:
+    return all(
+        result.outcome is PrivateExportProbeOutcome.NOT_ATTEMPTED for result in results
+    )
+
+
+def _all_probes_denied_as_required(
+    results: tuple[PrivateExportProbeResult, ...],
+) -> bool:
+    return all(
+        result.outcome is PrivateExportProbeOutcome.DENIED_AS_REQUIRED
+        for result in results
+    )
+
+
+def _validate_metadata_common(metadata: KeyMetadata) -> None:
+    validate_key_identity(metadata.identity)
+    if metadata.algorithm != ALGORITHM_NAME:
+        raise HarnessContractError("wrong key algorithm")
+    if metadata.algorithm_group != ALGORITHM_GROUP:
+        raise HarnessContractError("wrong key algorithm group")
+    if metadata.key_length_bits != KEY_LENGTH_BITS:
+        raise HarnessContractError("wrong key length")
+    if len(metadata.public_sec1) != 65 or metadata.public_sec1[0] != 0x04:
+        raise HarnessContractError("invalid SEC1 public identity")
+    _validate_public_point(metadata.public_sec1[1:33], metadata.public_sec1[33:])
+
+
+def _validate_phase_snapshot(
+    phase: Phase,
+    outcome: PhaseOutcome,
+    actor_sid: str,
+    snapshot: PhaseStateSnapshot,
+    prior_records: tuple[PhaseRecord, ...],
+) -> None:
+    validate_lifecycle(snapshot.lifecycle)
+    _validate_signature_state(
+        snapshot.signature_outcome, snapshot.signature_attempt_count
+    )
+    _validate_probe_results(snapshot.private_export_probe_results)
+    if any(record.outcome is not PhaseOutcome.SUCCEEDED for record in prior_records):
+        raise HarnessContractError("a terminal predecessor cannot have a successor")
+
+    completion = snapshot.completion
+    if outcome is not PhaseOutcome.SUCCEEDED:
+        if completion is not None:
+            raise HarnessContractError(
+                "terminal phase outcomes cannot claim completion"
+            )
+        if phase is Phase.READ_ONLY_PREFLIGHT:
+            if snapshot.lifecycle != LifecycleEvidence():
+                raise HarnessContractError("failed preflight cannot follow key effects")
+        elif phase is Phase.MACHINE_CREATE_AND_VALIDATE:
+            if (
+                not snapshot.lifecycle.machine_creation_attempted
+                or not snapshot.lifecycle.test_name_retired
+                or snapshot.lifecycle.shadow_creation_attempted
+            ):
+                raise HarnessContractError("terminal machine state is incomplete")
+        elif phase is Phase.SHADOW_CREATE_AND_SCOPE_PROOF:
+            if (
+                not snapshot.lifecycle.machine_created
+                or not snapshot.lifecycle.shadow_creation_attempted
+                or not snapshot.lifecycle.test_name_retired
+            ):
+                raise HarnessContractError("terminal shadow state is incomplete")
+        elif not (
+            snapshot.lifecycle.machine_created and snapshot.lifecycle.shadow_created
+        ):
+            raise HarnessContractError("later terminal state must retain both keys")
+        return
+
+    if phase is Phase.READ_ONLY_PREFLIGHT:
+        if not isinstance(completion, ReadOnlyPreflightCompletion):
+            raise HarnessContractError("preflight success lacks its completion proof")
+        if snapshot.lifecycle != LifecycleEvidence():
+            raise HarnessContractError("preflight success cannot contain key effects")
+        if snapshot.signature_attempt_count or not _all_probes_not_attempted(
+            snapshot.private_export_probe_results
+        ):
+            raise HarnessContractError(
+                "preflight success cannot contain effect attempts"
+            )
+        if not (
+            completion.both_scope_absence_proved
+            and completion.future_evidence_root_absent
+            and completion.provider_security_descriptor_support
+            and completion.elevated_operator_sid == ELEVATED_TEST_OPERATOR_SID
+        ):
+            raise HarnessContractError("preflight completion proof is incomplete")
+        return
+
+    if phase is Phase.MACHINE_CREATE_AND_VALIDATE:
+        if not isinstance(completion, MachineValidationCompletion):
+            raise HarnessContractError("machine success lacks its completion proof")
+        if snapshot.lifecycle != LifecycleEvidence(
+            machine_creation_attempted=True,
+            machine_created=True,
+            test_name_retired=True,
+        ):
+            raise HarnessContractError("machine success lifecycle is not exact")
+        _validate_metadata_common(completion.machine_metadata)
+        if (
+            completion.machine_metadata.identity != MACHINE_TEST_KEY
+            or completion.machine_metadata.key_type != NCRYPT_KEY_TYPE_MACHINE
+            or not completion.exact_properties_verified
+            or not completion.security_descriptor_verified
+            or not completion.independent_reopen_verified
+        ):
+            raise HarnessContractError("machine completion proof is incomplete")
+        if snapshot.signature_attempt_count or not _all_probes_not_attempted(
+            snapshot.private_export_probe_results
+        ):
+            raise HarnessContractError("machine phase cannot contain effect attempts")
+        return
+
+    if phase is Phase.SHADOW_CREATE_AND_SCOPE_PROOF:
+        if not isinstance(completion, ShadowScopeCompletion):
+            raise HarnessContractError("shadow success lacks its completion proof")
+        if snapshot.lifecycle != LifecycleEvidence(
+            machine_creation_attempted=True,
+            machine_created=True,
+            shadow_creation_attempted=True,
+            shadow_created=True,
+            test_name_retired=True,
+        ):
+            raise HarnessContractError("shadow success lifecycle is not exact")
+        verify_scope_non_substitution(
+            completion.machine_metadata, completion.shadow_metadata
+        )
+        if not completion.scope_non_substitution_verified:
+            raise HarnessContractError("scope non-substitution proof is absent")
+        if snapshot.signature_attempt_count or not _all_probes_not_attempted(
+            snapshot.private_export_probe_results
+        ):
+            raise HarnessContractError("shadow phase cannot contain effect attempts")
+        return
+
+    if not (snapshot.lifecycle.machine_created and snapshot.lifecycle.shadow_created):
+        raise HarnessContractError("later phase success must retain both TEST keys")
+
+    if phase is Phase.ELEVATED_MACHINE_EFFECT_TEST:
+        if not isinstance(completion, ElevatedEffectCompletion):
+            raise HarnessContractError("elevated success lacks its completion proof")
+        if (
+            snapshot.signature_attempt_count != 1
+            or snapshot.signature_outcome is not SignatureOutcome.SUCCEEDED
+            or not _all_probes_denied_as_required(snapshot.private_export_probe_results)
+            or not completion.signature_verified_with_machine_public
+            or not completion.private_export_denial_matrix_verified
+        ):
+            raise HarnessContractError("elevated effect completion is not exact")
+        return
+
+    if phase in (Phase.TRADING_DENIAL, Phase.ORDINARY_NONADMIN_DENIAL):
+        if not isinstance(completion, PrincipalDenialCompletion):
+            raise HarnessContractError("denial success lacks its completion proof")
+        if (
+            completion.actor_sid != actor_sid
+            or not completion.machine_open_denied
+            or not completion.downstream_private_operations_unreachable
+        ):
+            raise HarnessContractError("principal denial completion is incomplete")
+        if (
+            snapshot.signature_outcome is not SignatureOutcome.SUCCEEDED
+            or not _all_probes_denied_as_required(snapshot.private_export_probe_results)
+        ):
+            raise HarnessContractError("denial phase has unresolved elevated effects")
+        return
+
+    if phase is Phase.FINAL_EVIDENCE_RECONCILIATION:
+        if not isinstance(completion, FinalReconciliationCompletion):
+            raise HarnessContractError("final success lacks its completion proof")
+        if len(prior_records) != len(PHASE_ORDER) - 1:
+            raise HarnessContractError("final reconciliation has missing phases")
+        if (
+            not completion.all_phase_evidence_reconciled
+            or not completion.both_scope_qualified_keys_retained
+            or completion.cleanup_performed
+            or snapshot.signature_outcome is not SignatureOutcome.SUCCEEDED
+            or not _all_probes_denied_as_required(snapshot.private_export_probe_results)
+        ):
+            raise HarnessContractError("final reconciliation is incomplete")
+        return
+    raise HarnessContractError("unknown phase")
+
+
+def _current_snapshot(
+    evidence: HarnessEvidence,
+    completion: PhaseCompletion | None,
+) -> PhaseStateSnapshot:
+    return PhaseStateSnapshot(
+        lifecycle=evidence.lifecycle,
+        completion=completion,
+        signature_outcome=evidence.signature_outcome,
+        signature_attempt_count=evidence.signature_attempt_count,
+        private_export_probe_results=evidence.private_export_probe_results,
+    )
+
+
+def validate_phase_result_eligibility(
     evidence: HarnessEvidence,
     phase: Phase,
     outcome: PhaseOutcome,
-) -> HarnessEvidence:
-    """Append the one allowed next result to the retained hash-linked chain."""
+    completion: PhaseCompletion | None,
+) -> PhaseStateSnapshot:
+    """Require exact retained state before recording a phase result."""
 
     validate_harness_evidence(evidence)
     if evidence.phases and evidence.phases[-1].outcome is not PhaseOutcome.SUCCEEDED:
@@ -574,40 +1000,40 @@ def append_phase_result(
     next_index = len(evidence.phases)
     if next_index >= len(PHASE_ORDER) or PHASE_ORDER[next_index] is not phase:
         raise HarnessContractError("phase is missing, duplicated, or out of order")
+    actor_sid = _expected_actor(phase)
+    snapshot = _current_snapshot(evidence, completion)
+    _validate_phase_snapshot(phase, outcome, actor_sid, snapshot, evidence.phases)
+    return snapshot
 
-    if phase is Phase.READ_ONLY_PREFLIGHT:
-        if evidence.lifecycle != LifecycleEvidence():
-            raise HarnessContractError("preflight cannot follow a create attempt")
-    elif phase is Phase.MACHINE_CREATE_AND_VALIDATE:
-        if not evidence.lifecycle.machine_creation_attempted:
-            raise HarnessContractError("machine phase must record the attempt first")
-        if outcome is PhaseOutcome.SUCCEEDED and not evidence.lifecycle.machine_created:
-            raise HarnessContractError("successful machine phase requires created=True")
-        if evidence.lifecycle.shadow_creation_attempted:
-            raise HarnessContractError(
-                "shadow cannot begin before machine phase success"
-            )
-    elif phase is Phase.SHADOW_CREATE_AND_SCOPE_PROOF:
-        if not evidence.lifecycle.shadow_creation_attempted:
-            raise HarnessContractError("shadow phase must record the attempt first")
-        if outcome is PhaseOutcome.SUCCEEDED and not evidence.lifecycle.shadow_created:
-            raise HarnessContractError("successful shadow phase requires created=True")
-    else:
-        if (
-            not evidence.lifecycle.machine_created
-            or not evidence.lifecycle.shadow_created
-        ):
-            raise HarnessContractError("later phases require both retained TEST keys")
 
+def append_phase_result(
+    evidence: HarnessEvidence,
+    phase: Phase,
+    outcome: PhaseOutcome,
+    completion: PhaseCompletion | None = None,
+) -> HarnessEvidence:
+    """Append one validated result and its immutable security-state snapshot."""
+
+    snapshot = validate_phase_result_eligibility(evidence, phase, outcome, completion)
     actor_sid = _expected_actor(phase)
     previous = evidence.phases[-1].record_sha256 if evidence.phases else _ZERO_SHA256
-    digest = _record_digest(phase, outcome, actor_sid, previous)
-    record = PhaseRecord(phase, outcome, actor_sid, previous, digest)
+    state_digest = _snapshot_digest(snapshot)
+    digest = _record_digest(phase, outcome, actor_sid, previous, state_digest)
+    record = PhaseRecord(
+        phase,
+        outcome,
+        actor_sid,
+        previous,
+        snapshot,
+        state_digest,
+        digest,
+    )
     updated = replace(evidence, phases=(*evidence.phases, record))
     return validate_harness_evidence(updated)
 
 
 def _require_last_success(evidence: HarnessEvidence, phase: Phase) -> None:
+    validate_harness_evidence(evidence)
     if not evidence.phases:
         raise HarnessContractError(f"{phase.value} evidence is absent")
     latest = evidence.phases[-1]
@@ -615,28 +1041,36 @@ def _require_last_success(evidence: HarnessEvidence, phase: Phase) -> None:
         raise HarnessContractError(f"{phase.value} is not the latest retained success")
 
 
+def _lifecycle_contains(
+    current: LifecycleEvidence,
+    committed: LifecycleEvidence,
+) -> bool:
+    return all(
+        not getattr(committed, field.name) or getattr(current, field.name)
+        for field in dataclass_fields(LifecycleEvidence)
+    )
+
+
+def _outcome_contains(current: StrEnum, committed: StrEnum) -> bool:
+    if committed.value == "NOT_ATTEMPTED":
+        return True
+    if committed.value == "ATTEMPTED_UNCERTAIN":
+        return current.value != "NOT_ATTEMPTED"
+    return current is committed
+
+
 def validate_harness_evidence(evidence: HarnessEvidence) -> HarnessEvidence:
-    """Validate schema, fixed identities, lifecycle, and complete phase chain."""
+    """Validate fixed state, immutable phase snapshots, and digest linkage."""
 
     if evidence.schema != HARNESS_SCHEMA_VERSION:
         raise HarnessContractError("wrong evidence schema")
     validate_test_container(evidence.test_container)
     validate_evidence_root(PureWindowsPath(evidence.future_evidence_root))
     validate_lifecycle(evidence.lifecycle)
-    if evidence.signature_attempt_count not in (0, 1):
-        raise HarnessContractError("signature attempt count must be zero or one")
-    if (
-        evidence.signature_attempt_count == 0
-        and evidence.signature_outcome is not SignatureOutcome.NOT_ATTEMPTED
-    ) or (
-        evidence.signature_attempt_count == 1
-        and evidence.signature_outcome is SignatureOutcome.NOT_ATTEMPTED
-    ):
-        raise HarnessContractError("signature state and attempt count disagree")
-    if len(set(evidence.private_export_probes_attempted)) != len(
-        evidence.private_export_probes_attempted
-    ):
-        raise HarnessContractError("private-export probes cannot be retried")
+    _validate_signature_state(
+        evidence.signature_outcome, evidence.signature_attempt_count
+    )
+    _validate_probe_results(evidence.private_export_probe_results)
 
     previous = _ZERO_SHA256
     for index, record in enumerate(evidence.phases):
@@ -646,11 +1080,15 @@ def validate_harness_evidence(evidence: HarnessEvidence) -> HarnessEvidence:
             raise HarnessContractError("phase actor SID is not the frozen identity")
         if record.previous_record_sha256 != previous:
             raise HarnessContractError("phase chain predecessor digest is invalid")
+        expected_state_digest = _snapshot_digest(record.state_snapshot)
+        if record.state_snapshot_sha256 != expected_state_digest:
+            raise HarnessContractError("phase state snapshot digest is invalid")
         expected = _record_digest(
             record.phase,
             record.outcome,
             record.actor_sid,
             record.previous_record_sha256,
+            record.state_snapshot_sha256,
         )
         if record.record_sha256 != expected:
             raise HarnessContractError("phase record digest is invalid")
@@ -658,8 +1096,115 @@ def validate_harness_evidence(evidence: HarnessEvidence) -> HarnessEvidence:
             record.outcome is not PhaseOutcome.SUCCEEDED
         ):
             raise HarnessContractError("terminal phase has a successor")
+        _validate_phase_snapshot(
+            record.phase,
+            record.outcome,
+            record.actor_sid,
+            record.state_snapshot,
+            evidence.phases[:index],
+        )
+        if not _lifecycle_contains(evidence.lifecycle, record.state_snapshot.lifecycle):
+            raise HarnessContractError(
+                "current lifecycle regressed from committed state"
+            )
+        if (
+            evidence.signature_attempt_count
+            < record.state_snapshot.signature_attempt_count
+        ):
+            raise HarnessContractError("current signature count regressed")
+        if not _outcome_contains(
+            evidence.signature_outcome, record.state_snapshot.signature_outcome
+        ):
+            raise HarnessContractError(
+                "current signature state contradicts its snapshot"
+            )
+        for current_probe, committed_probe in zip(
+            evidence.private_export_probe_results,
+            record.state_snapshot.private_export_probe_results,
+            strict=True,
+        ):
+            if not _outcome_contains(current_probe.outcome, committed_probe.outcome):
+                raise HarnessContractError(
+                    "current private-export state contradicts its snapshot"
+                )
         previous = record.record_sha256
     return evidence
+
+
+def determine_next_phase(evidence: HarnessEvidence) -> Phase:
+    """Return the one phase eligible for native dispatch from retained state."""
+
+    validate_harness_evidence(evidence)
+    if evidence.phases and evidence.phases[-1].outcome is not PhaseOutcome.SUCCEEDED:
+        raise HarnessContractError("terminal predecessor blocks native dispatch")
+    if len(evidence.phases) >= len(PHASE_ORDER):
+        raise HarnessContractError("all phases are already complete")
+    phase = PHASE_ORDER[len(evidence.phases)]
+    lifecycle = evidence.lifecycle
+
+    if phase is Phase.READ_ONLY_PREFLIGHT:
+        if (
+            lifecycle != LifecycleEvidence()
+            or evidence.signature_attempt_count
+            or not _all_probes_not_attempted(evidence.private_export_probe_results)
+        ):
+            raise HarnessContractError("preflight dispatch state is not pristine")
+    elif phase is Phase.MACHINE_CREATE_AND_VALIDATE:
+        if lifecycle != LifecycleEvidence(
+            machine_creation_attempted=True,
+            test_name_retired=True,
+        ):
+            raise HarnessContractError("machine dispatch lacks its durable attempt")
+    elif phase is Phase.SHADOW_CREATE_AND_SCOPE_PROOF:
+        if lifecycle != LifecycleEvidence(
+            machine_creation_attempted=True,
+            machine_created=True,
+            shadow_creation_attempted=True,
+            test_name_retired=True,
+        ):
+            raise HarnessContractError("shadow dispatch lacks its durable attempt")
+    elif phase is Phase.ELEVATED_MACHINE_EFFECT_TEST:
+        if not (lifecycle.machine_created and lifecycle.shadow_created):
+            raise HarnessContractError("elevated dispatch requires both retained keys")
+        if evidence.signature_attempt_count or not _all_probes_not_attempted(
+            evidence.private_export_probe_results
+        ):
+            raise HarnessContractError("elevated effect dispatch cannot be retried")
+    elif phase is Phase.TRADING_DENIAL:
+        if (
+            evidence.signature_outcome is not SignatureOutcome.SUCCEEDED
+            or not _all_probes_denied_as_required(evidence.private_export_probe_results)
+        ):
+            raise HarnessContractError("trading denial has unresolved elevated effects")
+    elif phase is Phase.ORDINARY_NONADMIN_DENIAL:
+        _expected_actor(phase)
+    elif phase is Phase.FINAL_EVIDENCE_RECONCILIATION:
+        if any(
+            record.outcome is not PhaseOutcome.SUCCEEDED for record in evidence.phases
+        ):
+            raise HarnessContractError(
+                "final reconciliation has a terminal predecessor"
+            )
+        if (
+            evidence.signature_outcome is not SignatureOutcome.SUCCEEDED
+            or not _all_probes_denied_as_required(evidence.private_export_probe_results)
+        ):
+            raise HarnessContractError("final reconciliation has unresolved effects")
+    return phase
+
+
+def validate_phase_dispatch_eligibility(
+    phase: Phase,
+    evidence: HarnessEvidence,
+) -> Phase:
+    """Require the requested phase to be the exact sole legal next dispatch."""
+
+    expected = determine_next_phase(evidence)
+    if phase is not expected:
+        raise HarnessContractError(
+            f"requested {phase.value}; only {expected.value} is eligible"
+        )
+    return phase
 
 
 def begin_test_signature(
@@ -685,6 +1230,7 @@ def record_test_signature_outcome(
     evidence: HarnessEvidence,
     outcome: SignatureOutcome,
 ) -> HarnessEvidence:
+    validate_harness_evidence(evidence)
     if evidence.signature_attempt_count != 1:
         raise HarnessContractError("no TEST signing attempt is retained")
     if evidence.signature_outcome is not SignatureOutcome.ATTEMPTED_UNCERTAIN:
@@ -705,36 +1251,63 @@ def begin_private_export_denial_probe(
     if identity != MACHINE_TEST_KEY:
         raise HarnessContractError("shadow private export is structurally forbidden")
     _require_last_success(evidence, Phase.SHADOW_CREATE_AND_SCOPE_PROOF)
-    if probe in evidence.private_export_probes_attempted:
-        raise HarnessContractError("private-export denial probes are not retried")
-    return replace(
-        evidence,
-        private_export_probes_attempted=(
-            *evidence.private_export_probes_attempted,
-            probe,
-        ),
+    results = list(evidence.private_export_probe_results)
+    index = tuple(PrivateExportProbe).index(probe)
+    if results[index].outcome is not PrivateExportProbeOutcome.NOT_ATTEMPTED:
+        raise HarnessContractError("private-export denial probes are never retried")
+    results[index] = PrivateExportProbeResult(
+        probe, PrivateExportProbeOutcome.ATTEMPTED_UNCERTAIN
     )
+    return replace(evidence, private_export_probe_results=tuple(results))
+
+
+def record_private_export_probe_outcome(
+    evidence: HarnessEvidence,
+    probe: PrivateExportProbe,
+    outcome: PrivateExportProbeOutcome,
+) -> HarnessEvidence:
+    """Record one terminal sanitized result without permitting a retry."""
+
+    validate_harness_evidence(evidence)
+    if outcome not in (
+        PrivateExportProbeOutcome.DENIED_AS_REQUIRED,
+        PrivateExportProbeOutcome.UNSUPPORTED_FORMAT,
+        PrivateExportProbeOutcome.FAILED,
+    ):
+        raise HarnessContractError("probe outcome must be terminal and explicit")
+    results = list(evidence.private_export_probe_results)
+    index = tuple(PrivateExportProbe).index(probe)
+    if results[index].outcome is not PrivateExportProbeOutcome.ATTEMPTED_UNCERTAIN:
+        raise HarnessContractError("probe was not durably marked uncertain")
+    results[index] = PrivateExportProbeResult(probe, outcome)
+    return replace(evidence, private_export_probe_results=tuple(results))
 
 
 def _evidence_payload(evidence: HarnessEvidence) -> dict[str, Any]:
     validate_harness_evidence(evidence)
-    payload = asdict(evidence)
-    # Convert StrEnum instances explicitly so canonical bytes are stable.
-    payload["phases"] = [
-        {
-            "actor_sid": record.actor_sid,
-            "outcome": record.outcome.value,
-            "phase": record.phase.value,
-            "previous_record_sha256": record.previous_record_sha256,
-            "record_sha256": record.record_sha256,
-        }
-        for record in evidence.phases
-    ]
-    payload["signature_outcome"] = evidence.signature_outcome.value
-    payload["private_export_probes_attempted"] = [
-        probe.value for probe in evidence.private_export_probes_attempted
-    ]
-    return payload
+    return {
+        "future_evidence_root": evidence.future_evidence_root,
+        "lifecycle": asdict(evidence.lifecycle),
+        "phases": [
+            {
+                "actor_sid": record.actor_sid,
+                "outcome": record.outcome.value,
+                "phase": record.phase.value,
+                "previous_record_sha256": record.previous_record_sha256,
+                "record_sha256": record.record_sha256,
+                "state_snapshot": _snapshot_payload(record.state_snapshot),
+                "state_snapshot_sha256": record.state_snapshot_sha256,
+            }
+            for record in evidence.phases
+        ],
+        "private_export_probe_results": _probe_results_payload(
+            evidence.private_export_probe_results
+        ),
+        "schema": evidence.schema,
+        "signature_attempt_count": evidence.signature_attempt_count,
+        "signature_outcome": evidence.signature_outcome.value,
+        "test_container": evidence.test_container,
+    }
 
 
 def canonical_evidence_bytes(evidence: HarnessEvidence) -> bytes:
@@ -794,6 +1367,7 @@ def execute_native_phase(
     validate_key_identity(CURRENT_USER_SHADOW_KEY)
     validate_evidence_root(FUTURE_EVIDENCE_ROOT)
     _require_native_execution_authorized()
+    validate_phase_dispatch_eligibility(phase, evidence)
     return operations.execute(phase, evidence)  # pragma: no cover - disabled
 
 

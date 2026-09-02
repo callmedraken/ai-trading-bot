@@ -72,6 +72,12 @@ explicitly marked not authorized. The authorization check runs before loading
 `ncrypt.dll`, `advapi32.dll`, or `kernel32.dll`, and before dispatching any
 native phase operation. No command-line or environment value can change it.
 
+Even after a future reviewed authorization replaces that disabled boundary,
+`execute_native_phase` independently requires its requested phase to be the one
+exact legal next phase for the supplied retained evidence. The pure eligibility
+validator runs before effect dispatch and does not delegate ordering authority
+to a `NativePhaseOperations` implementation.
+
 The source contains typed, lazy bindings so they can be reviewed without being
 used. They cover:
 
@@ -111,11 +117,13 @@ ORDINARY_NONADMIN_DENIAL
 FINAL_EVIDENCE_RECONCILIATION
 ```
 
-Each result records its code-owned expected actor SID and is linked to the
-previous result digest. A missing, duplicated, reordered, tampered, failed,
-blocked, or uncertain prior result prevents a later result. Later sessions must
-load and validate retained evidence; they cannot replace it with CLI claims.
-The evidence chain is sanitized test evidence, not production authority.
+Each result records its code-owned expected actor SID, a canonical immutable
+snapshot of the security-relevant state that justified the result, the snapshot
+digest, and the predecessor/result digests. A missing, duplicated, reordered,
+tampered, failed, blocked, or uncertain prior result prevents a later result.
+Later sessions must load and validate retained evidence; they cannot replace it
+with CLI claims. The evidence chain is sanitized test evidence, not production
+authority.
 
 Future phase responsibility is:
 
@@ -138,6 +146,38 @@ Future phase responsibility is:
    non-admin token.
 7. `FINAL_EVIDENCE_RECONCILIATION` verifies the complete retained state and
    stops with both TEST keys retained. It performs no cleanup.
+
+The pre-dispatch validator additionally requires the exact in-progress state
+for the effect-bearing create phases: the machine attempt and name retirement
+must already be retained before machine dispatch, and the shadow attempt must
+already be retained before shadow dispatch. Machine creation failure or
+uncertainty therefore cannot reach shadow dispatch. Elevated-effect dispatch
+requires both keys and pristine signature/export-attempt state; it cannot be
+used as a retry surface. Trading, ordinary-user, and final dispatch each require
+the exact immediately preceding success. The ordinary-user phase remains
+ineligible while its exact SID is blocked.
+
+## Phase-specific completion proofs
+
+A generic `SUCCEEDED` outcome is insufficient. Each success record must include
+the exact pure, sanitized completion type for its phase:
+
+- preflight proves both-scope absence, evidence-root absence, provider security-
+  descriptor support, and the frozen elevated operator SID;
+- machine completion binds exact machine metadata/public identity plus property,
+  security-descriptor, and independent-reopen verification;
+- shadow completion binds both scope-qualified metadata/public identities and
+  successful non-substitution proof;
+- elevated-effect completion requires the single successful TEST signature,
+  independent verification with the machine public identity, and the complete
+  accepted private-export denial matrix;
+- Trading and future ordinary-user success each require a dedicated denial
+  completion bound to the exact actor SID; and
+- final reconciliation requires every predecessor success, retained keys,
+  complete evidence reconciliation, no unresolved effect, and no cleanup.
+
+`FAILED`, `UNCERTAIN`, and `BLOCKED` remain one-way terminal outcomes. They do
+not accept a success-completion object and cannot acquire successors.
 
 ## Ordinary non-admin identity blocker
 
@@ -232,16 +272,51 @@ consumed. The shadow and production identity are rejected structurally.
 
 Private-export denial probes likewise require retained scope-proof success and
 route only to `MACHINE_TEST_KEY`. Duplicate probes, the shadow, and the
-production container are rejected before native dispatch. This source does not
-perform any probe.
+production container are rejected before native dispatch. Each required format
+has one fixed result slot with the states:
+
+```text
+NOT_ATTEMPTED
+ATTEMPTED_UNCERTAIN
+DENIED_AS_REQUIRED
+UNSUPPORTED_FORMAT
+FAILED
+```
+
+The gate writes `ATTEMPTED_UNCERTAIN` before a future native request. Every
+other outcome is terminal, and neither an uncertain nor a terminal result can
+be retried. `UNSUPPORTED_FORMAT` stays distinguishable from a policy denial and
+does not satisfy elevated-effect success. This source performs no probe.
+
+## Hash-linked evidence integrity
+
+Every phase snapshot deterministically commits, as applicable, to lifecycle
+attempt/created/name-retired facts, the typed completion proof, machine/shadow
+scope-qualified public metadata, signature attempt/outcome, and every private-
+export probe result. The phase-record digest separately commits the actor SID,
+phase, outcome, predecessor digest, and snapshot digest. Historical snapshots
+remain stable when legitimate later phases add state; validation instead
+requires current one-way state not to regress or contradict a committed fact.
+
+Changing a snapshot without updating its digest, breaking predecessor linkage,
+or changing current lifecycle/signature/probe state contrary to a committed
+phase is detected. These unkeyed SHA-256 links provide deterministic integrity
+and accidental/tamper evidence. They do not authenticate evidence against an
+adversarial Administrator who can rewrite the evidence and recompute every
+unkeyed digest. The evidence is never production authority.
+
+The corrected canonical evidence schema is explicitly versioned
+`p3-r1-ksp-disposable-test-evidence/v2`; no native v1 evidence exists or is
+adopted.
 
 ## Evidence restrictions
 
-Canonical evidence contains only fixed identities, lifecycle booleans,
-hash-linked phase results, sanitized outcome state, and the names of attempted
-denial probes. It contains no private key material, private blob, provider/key
-handle, credentials, Credential Manager data, broker/provider secret, or
-production permit. Publication is create-new/no-overwrite.
+Canonical evidence contains only fixed identities, lifecycle booleans, typed
+sanitized completion records, scope-qualified public metadata, hash-linked
+phase snapshots/results, signature outcome state, and sanitized denial-probe
+results. It contains no private key material, private blob, provider/key handle,
+credentials, Credential Manager data, broker/provider secret, or production
+permit. Publication is create-new/no-overwrite.
 
 Successful future native validation retains both scope-qualified TEST objects.
 Deletion remains a separate reviewed checkpoint that must name each exact

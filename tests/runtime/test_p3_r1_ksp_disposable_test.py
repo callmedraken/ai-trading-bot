@@ -53,11 +53,67 @@ def _valid_descriptor() -> harness.SecurityDescriptorSemantic:
     )
 
 
+def _machine_metadata() -> harness.KeyMetadata:
+    return harness.KeyMetadata(
+        harness.MACHINE_TEST_KEY,
+        harness.NCRYPT_KEY_TYPE_MACHINE,
+        harness.ALGORITHM_NAME,
+        harness.ALGORITHM_GROUP,
+        harness.KEY_LENGTH_BITS,
+        _PUBLIC_SEC1,
+    )
+
+
+def _shadow_metadata() -> harness.KeyMetadata:
+    return harness.KeyMetadata(
+        harness.CURRENT_USER_SHADOW_KEY,
+        0,
+        harness.ALGORITHM_NAME,
+        harness.ALGORITHM_GROUP,
+        harness.KEY_LENGTH_BITS,
+        _SHADOW_SEC1,
+    )
+
+
+def _preflight_completion() -> harness.ReadOnlyPreflightCompletion:
+    return harness.ReadOnlyPreflightCompletion(
+        both_scope_absence_proved=True,
+        future_evidence_root_absent=True,
+        provider_security_descriptor_support=True,
+        elevated_operator_sid=harness.ELEVATED_TEST_OPERATOR_SID,
+    )
+
+
+def _machine_completion() -> harness.MachineValidationCompletion:
+    return harness.MachineValidationCompletion(
+        machine_metadata=_machine_metadata(),
+        exact_properties_verified=True,
+        security_descriptor_verified=True,
+        independent_reopen_verified=True,
+    )
+
+
+def _shadow_completion() -> harness.ShadowScopeCompletion:
+    return harness.ShadowScopeCompletion(
+        machine_metadata=_machine_metadata(),
+        shadow_metadata=_shadow_metadata(),
+        scope_non_substitution_verified=True,
+    )
+
+
+def _elevated_completion() -> harness.ElevatedEffectCompletion:
+    return harness.ElevatedEffectCompletion(
+        signature_verified_with_machine_public=True,
+        private_export_denial_matrix_verified=True,
+    )
+
+
 def _through_preflight() -> harness.HarnessEvidence:
     return harness.append_phase_result(
         harness.HarnessEvidence(),
         harness.Phase.READ_ONLY_PREFLIGHT,
         harness.PhaseOutcome.SUCCEEDED,
+        _preflight_completion(),
     )
 
 
@@ -68,6 +124,7 @@ def _through_machine() -> harness.HarnessEvidence:
         evidence,
         harness.Phase.MACHINE_CREATE_AND_VALIDATE,
         harness.PhaseOutcome.SUCCEEDED,
+        _machine_completion(),
     )
 
 
@@ -78,10 +135,47 @@ def _through_shadow() -> harness.HarnessEvidence:
         evidence,
         harness.Phase.SHADOW_CREATE_AND_SCOPE_PROOF,
         harness.PhaseOutcome.SUCCEEDED,
+        _shadow_completion(),
+    )
+
+
+def _through_elevated() -> harness.HarnessEvidence:
+    evidence = harness.begin_test_signature(_through_shadow(), harness.MACHINE_TEST_KEY)
+    evidence = harness.record_test_signature_outcome(
+        evidence, harness.SignatureOutcome.SUCCEEDED
+    )
+    for probe in harness.PrivateExportProbe:
+        evidence = harness.begin_private_export_denial_probe(
+            evidence, harness.MACHINE_TEST_KEY, probe
+        )
+        evidence = harness.record_private_export_probe_outcome(
+            evidence,
+            probe,
+            harness.PrivateExportProbeOutcome.DENIED_AS_REQUIRED,
+        )
+    return harness.append_phase_result(
+        evidence,
+        harness.Phase.ELEVATED_MACHINE_EFFECT_TEST,
+        harness.PhaseOutcome.SUCCEEDED,
+        _elevated_completion(),
+    )
+
+
+def _through_trading() -> harness.HarnessEvidence:
+    return harness.append_phase_result(
+        _through_elevated(),
+        harness.Phase.TRADING_DENIAL,
+        harness.PhaseOutcome.SUCCEEDED,
+        harness.PrincipalDenialCompletion(
+            actor_sid=harness.TRADING_SID,
+            machine_open_denied=True,
+            downstream_private_operations_unreachable=True,
+        ),
     )
 
 
 def test_frozen_test_identity_and_evidence_root() -> None:
+    assert harness.HARNESS_SCHEMA_VERSION == "p3-r1-ksp-disposable-test-evidence/v2"
     assert harness.TEST_CONTAINER_TEXT == "AITradingBot-P3R1-KSP-TEST-800CA51-v1"
     assert harness.FUTURE_EVIDENCE_ROOT == PureWindowsPath(
         r"F:\AI\p3-r1-ksp-disposable-test-v1"
@@ -174,6 +268,121 @@ def test_native_phase_gate_precedes_fake_effect_call() -> None:
             operations,
         )
     assert not operations.called
+
+
+class _FakeOperations:
+    def __init__(self) -> None:
+        self.calls: list[harness.Phase] = []
+
+    def execute(
+        self,
+        phase: harness.Phase,
+        evidence: harness.HarnessEvidence,
+    ) -> harness.HarnessEvidence:
+        self.calls.append(phase)
+        return evidence
+
+
+def _authorize_pure_fake_dispatch(monkeypatch) -> None:
+    monkeypatch.setattr(harness, "_NATIVE_EFFECT_EXECUTION_AUTHORIZED", True)
+    monkeypatch.setattr(
+        harness,
+        "_NATIVE_EFFECT_AUTHORIZATION_ID",
+        "TEST-ONLY-PURE-FAKE-DISPATCH",
+    )
+    monkeypatch.setattr(
+        harness.ctypes,
+        "WinDLL",
+        lambda *_args, **_kwargs: pytest.fail("Windows DLL load was attempted"),
+    )
+
+
+@pytest.mark.parametrize(
+    ("evidence_factory", "requested_phase"),
+    [
+        (lambda: harness.HarnessEvidence(), harness.Phase.MACHINE_CREATE_AND_VALIDATE),
+        (
+            lambda: harness.HarnessEvidence(),
+            harness.Phase.FINAL_EVIDENCE_RECONCILIATION,
+        ),
+        (
+            lambda: harness.begin_machine_creation(_through_preflight()),
+            harness.Phase.SHADOW_CREATE_AND_SCOPE_PROOF,
+        ),
+        (lambda: _through_preflight(), harness.Phase.READ_ONLY_PREFLIGHT),
+    ],
+)
+def test_authorized_fake_dispatch_rejects_wrong_or_skipped_phase(
+    monkeypatch,
+    evidence_factory,
+    requested_phase: harness.Phase,
+) -> None:
+    _authorize_pure_fake_dispatch(monkeypatch)
+    operations = _FakeOperations()
+    with pytest.raises(harness.HarnessContractError):
+        harness.execute_native_phase(
+            requested_phase,
+            evidence_factory(),
+            operations,
+        )
+    assert operations.calls == []
+
+
+@pytest.mark.parametrize(
+    "terminal_outcome",
+    [
+        harness.PhaseOutcome.FAILED,
+        harness.PhaseOutcome.UNCERTAIN,
+        harness.PhaseOutcome.BLOCKED,
+    ],
+)
+def test_authorized_fake_dispatch_rejects_terminal_predecessor(
+    monkeypatch,
+    terminal_outcome: harness.PhaseOutcome,
+) -> None:
+    _authorize_pure_fake_dispatch(monkeypatch)
+    evidence = harness.append_phase_result(
+        harness.HarnessEvidence(),
+        harness.Phase.READ_ONLY_PREFLIGHT,
+        terminal_outcome,
+    )
+    operations = _FakeOperations()
+    with pytest.raises(harness.HarnessContractError):
+        harness.execute_native_phase(
+            harness.Phase.MACHINE_CREATE_AND_VALIDATE,
+            evidence,
+            operations,
+        )
+    assert operations.calls == []
+
+
+def test_authorized_fake_dispatch_rejects_blocked_ordinary_identity(
+    monkeypatch,
+) -> None:
+    _authorize_pure_fake_dispatch(monkeypatch)
+    operations = _FakeOperations()
+    with pytest.raises(harness.HarnessContractError):
+        harness.execute_native_phase(
+            harness.Phase.ORDINARY_NONADMIN_DENIAL,
+            _through_trading(),
+            operations,
+        )
+    assert operations.calls == []
+
+
+def test_exact_eligible_phase_reaches_fake_operations_once(monkeypatch) -> None:
+    _authorize_pure_fake_dispatch(monkeypatch)
+    operations = _FakeOperations()
+    evidence = harness.HarnessEvidence()
+    assert (
+        harness.execute_native_phase(
+            harness.Phase.READ_ONLY_PREFLIGHT,
+            evidence,
+            operations,
+        )
+        is evidence
+    )
+    assert operations.calls == [harness.Phase.READ_ONLY_PREFLIGHT]
 
 
 def test_required_typed_native_surface_excludes_cleanup() -> None:
@@ -428,19 +637,59 @@ def test_phase_order_and_retained_digest_chain_are_mandatory() -> None:
         harness.validate_harness_evidence(tampered)
 
 
+def test_modifying_committed_phase_snapshot_is_detected() -> None:
+    evidence = _through_machine()
+    record = evidence.phases[-1]
+    completion = record.state_snapshot.completion
+    assert isinstance(completion, harness.MachineValidationCompletion)
+    altered_snapshot = dataclasses.replace(
+        record.state_snapshot,
+        completion=dataclasses.replace(completion, security_descriptor_verified=False),
+    )
+    altered_record = dataclasses.replace(record, state_snapshot=altered_snapshot)
+    tampered = dataclasses.replace(
+        evidence, phases=(*evidence.phases[:-1], altered_record)
+    )
+    with pytest.raises(harness.HarnessContractError, match="snapshot digest"):
+        harness.validate_harness_evidence(tampered)
+
+
+def test_current_lifecycle_cannot_regress_from_committed_phase() -> None:
+    evidence = _through_machine()
+    tampered = dataclasses.replace(
+        evidence,
+        lifecycle=dataclasses.replace(evidence.lifecycle, machine_created=False),
+    )
+    with pytest.raises(harness.HarnessContractError, match="lifecycle regressed"):
+        harness.validate_harness_evidence(tampered)
+
+
+def test_current_signature_cannot_contradict_committed_effect_phase() -> None:
+    evidence = _through_elevated()
+    tampered = dataclasses.replace(
+        evidence, signature_outcome=harness.SignatureOutcome.FAILED
+    )
+    with pytest.raises(harness.HarnessContractError, match="signature state"):
+        harness.validate_harness_evidence(tampered)
+
+
+def test_current_probe_result_cannot_contradict_committed_effect_phase() -> None:
+    evidence = _through_elevated()
+    results = list(evidence.private_export_probe_results)
+    results[0] = dataclasses.replace(
+        results[0], outcome=harness.PrivateExportProbeOutcome.FAILED
+    )
+    tampered = dataclasses.replace(
+        evidence, private_export_probe_results=tuple(results)
+    )
+    with pytest.raises(harness.HarnessContractError, match="private-export state"):
+        harness.validate_harness_evidence(tampered)
+
+
 def test_ordinary_nonadmin_phase_remains_fail_closed() -> None:
     assert harness.ORDINARY_NONADMIN_TEST_IDENTITY_BLOCKED is True
     assert harness.ORDINARY_NONADMIN_TEST_SID is None
-    evidence = harness.append_phase_result(
-        _through_shadow(),
-        harness.Phase.ELEVATED_MACHINE_EFFECT_TEST,
-        harness.PhaseOutcome.SUCCEEDED,
-    )
-    evidence = harness.append_phase_result(
-        evidence,
-        harness.Phase.TRADING_DENIAL,
-        harness.PhaseOutcome.SUCCEEDED,
-    )
+    evidence = _through_trading()
     with pytest.raises(harness.HarnessContractError):
         harness.append_phase_result(
             evidence,
@@ -469,6 +718,119 @@ def test_single_signing_attempt_is_consumed_before_outcome() -> None:
         harness.begin_test_signature(completed, harness.MACHINE_TEST_KEY)
 
 
+def _complete_export_probes(
+    evidence: harness.HarnessEvidence,
+    first_outcome: harness.PrivateExportProbeOutcome = (
+        harness.PrivateExportProbeOutcome.DENIED_AS_REQUIRED
+    ),
+) -> harness.HarnessEvidence:
+    for index, probe in enumerate(harness.PrivateExportProbe):
+        evidence = harness.begin_private_export_denial_probe(
+            evidence, harness.MACHINE_TEST_KEY, probe
+        )
+        outcome = (
+            first_outcome
+            if index == 0
+            else harness.PrivateExportProbeOutcome.DENIED_AS_REQUIRED
+        )
+        if outcome is not harness.PrivateExportProbeOutcome.ATTEMPTED_UNCERTAIN:
+            evidence = harness.record_private_export_probe_outcome(
+                evidence, probe, outcome
+            )
+    return evidence
+
+
+def test_elevated_success_rejects_absent_signature() -> None:
+    evidence = _complete_export_probes(_through_shadow())
+    with pytest.raises(harness.HarnessContractError):
+        harness.append_phase_result(
+            evidence,
+            harness.Phase.ELEVATED_MACHINE_EFFECT_TEST,
+            harness.PhaseOutcome.SUCCEEDED,
+            _elevated_completion(),
+        )
+
+
+@pytest.mark.parametrize(
+    "signature_outcome",
+    [
+        harness.SignatureOutcome.ATTEMPTED_UNCERTAIN,
+        harness.SignatureOutcome.FAILED,
+    ],
+)
+def test_elevated_success_rejects_uncertain_or_failed_signature(
+    signature_outcome: harness.SignatureOutcome,
+) -> None:
+    evidence = harness.begin_test_signature(_through_shadow(), harness.MACHINE_TEST_KEY)
+    if signature_outcome is harness.SignatureOutcome.FAILED:
+        evidence = harness.record_test_signature_outcome(evidence, signature_outcome)
+    evidence = _complete_export_probes(evidence)
+    with pytest.raises(harness.HarnessContractError):
+        harness.append_phase_result(
+            evidence,
+            harness.Phase.ELEVATED_MACHINE_EFFECT_TEST,
+            harness.PhaseOutcome.SUCCEEDED,
+            _elevated_completion(),
+        )
+
+
+def test_elevated_success_rejects_missing_export_probe() -> None:
+    evidence = harness.begin_test_signature(_through_shadow(), harness.MACHINE_TEST_KEY)
+    evidence = harness.record_test_signature_outcome(
+        evidence, harness.SignatureOutcome.SUCCEEDED
+    )
+    for probe in tuple(harness.PrivateExportProbe)[:-1]:
+        evidence = harness.begin_private_export_denial_probe(
+            evidence, harness.MACHINE_TEST_KEY, probe
+        )
+        evidence = harness.record_private_export_probe_outcome(
+            evidence,
+            probe,
+            harness.PrivateExportProbeOutcome.DENIED_AS_REQUIRED,
+        )
+    with pytest.raises(harness.HarnessContractError):
+        harness.append_phase_result(
+            evidence,
+            harness.Phase.ELEVATED_MACHINE_EFFECT_TEST,
+            harness.PhaseOutcome.SUCCEEDED,
+            _elevated_completion(),
+        )
+
+
+@pytest.mark.parametrize(
+    "probe_outcome",
+    [
+        harness.PrivateExportProbeOutcome.ATTEMPTED_UNCERTAIN,
+        harness.PrivateExportProbeOutcome.FAILED,
+        harness.PrivateExportProbeOutcome.UNSUPPORTED_FORMAT,
+    ],
+)
+def test_elevated_success_rejects_non_denial_probe_result(
+    probe_outcome: harness.PrivateExportProbeOutcome,
+) -> None:
+    evidence = harness.begin_test_signature(_through_shadow(), harness.MACHINE_TEST_KEY)
+    evidence = harness.record_test_signature_outcome(
+        evidence, harness.SignatureOutcome.SUCCEEDED
+    )
+    evidence = _complete_export_probes(evidence, probe_outcome)
+    with pytest.raises(harness.HarnessContractError):
+        harness.append_phase_result(
+            evidence,
+            harness.Phase.ELEVATED_MACHINE_EFFECT_TEST,
+            harness.PhaseOutcome.SUCCEEDED,
+            _elevated_completion(),
+        )
+
+
+def test_trading_success_requires_dedicated_completion_result() -> None:
+    with pytest.raises(harness.HarnessContractError):
+        harness.append_phase_result(
+            _through_elevated(),
+            harness.Phase.TRADING_DENIAL,
+            harness.PhaseOutcome.SUCCEEDED,
+        )
+
+
 def test_private_export_probe_routes_only_to_machine_and_never_retries() -> None:
     evidence = _through_shadow()
     with pytest.raises(harness.HarnessContractError):
@@ -481,6 +843,10 @@ def test_private_export_probe_routes_only_to_machine_and_never_retries() -> None
         evidence,
         harness.MACHINE_TEST_KEY,
         harness.PrivateExportProbe.ECC_PRIVATE,
+    )
+    assert (
+        updated.private_export_probe_results[0].outcome
+        is harness.PrivateExportProbeOutcome.ATTEMPTED_UNCERTAIN
     )
     with pytest.raises(harness.HarnessContractError):
         harness.begin_private_export_denial_probe(

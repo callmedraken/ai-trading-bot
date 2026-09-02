@@ -205,7 +205,7 @@ tests:
 ```text
 scripts/p3_r1_ordinary_nonadmin_principal_ceremony.cs
 scripts/run_p3_r1_ordinary_nonadmin_principal_ceremony.ps1
- tests/runtime/test_p3_r1_ordinary_nonadmin_principal_ceremony.py
+tests/runtime/test_p3_r1_ordinary_nonadmin_principal_ceremony.py
 ```
 
 The correction must:

@@ -35,6 +35,8 @@ from trading_bot.runtime.windows_authority import (
 )
 from trading_bot.runtime.windows_authority_security import (
     FILE_ALL_ACCESS,
+    WRITE_DAC,
+    WRITE_OWNER,
     AuthorityObjectKind,
     SecurityAce,
     SecurityInspection,
@@ -67,6 +69,7 @@ TRADING_DIRECTORY_READ = TRADING_FILE_READ | 0x20  # traverse/list
 TRADING_FILE_DATA = 0x13019F  # read/write/append/EA/attributes/delete; no DAC/owner
 TRADING_DIRECTORY_DATA = TRADING_FILE_DATA | 0x20  # traverse; children have DELETE
 TRADING_CONTAINER_DATA = TRADING_DIRECTORY_DATA & ~0x10000  # never delete containers
+_FILE_DELETE_CHILD = 0x40
 _UUID = r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
 _TRADING_SID = re.compile(
     r"S-1-5-21-(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*)-(?:0|[1-9][0-9]*)"
@@ -210,9 +213,22 @@ def paper_security_policy(
     )
 
 
-def _require_parent_security(inspection: SecurityInspection) -> None:
-    # Parent-chain roles are not installed v2 objects. Permit existing read-only
-    # parent grants, but no non-admin data, delete-child, DAC, or owner authority.
+def _require_parent_security(
+    inspection: SecurityInspection, role: PaperObjectRole
+) -> None:
+    if role is PaperObjectRole.VOLUME:
+        # Sibling-create/data rights and DELETE on the volume root do not grant
+        # deletion of its governed child. Accept concrete file rights only, so
+        # generic/unknown masks cannot hide replacement or security authority.
+        non_admin_rights = FILE_ALL_ACCESS & ~(
+            _FILE_DELETE_CHILD | WRITE_DAC | WRITE_OWNER
+        )
+    elif role is PaperObjectRole.PARENT:
+        # Keep the immediate parent conservatively read-only for unrelated
+        # principals, including no DELETE on the parent component itself.
+        non_admin_rights = TRADING_DIRECTORY_READ
+    else:
+        raise AuthoritySecurityError("unsupported fixed parent role")
     if inspection.owner_sid not in {ADMINISTRATORS_SID, SYSTEM_SID}:
         raise AuthoritySecurityError("fixed parent owner is untrusted")
     full: set[str] = set()
@@ -222,7 +238,7 @@ def _require_parent_security(inspection: SecurityInspection) -> None:
         if ace.principal_sid in {ADMINISTRATORS_SID, SYSTEM_SID}:
             if ace.access_mask == FILE_ALL_ACCESS and not ace.ace_flags & 0x8:
                 full.add(ace.principal_sid)
-        elif ace.access_mask & ~TRADING_DIRECTORY_READ:
+        elif ace.access_mask & ~non_admin_rights:
             raise AuthoritySecurityError("fixed parent permits non-admin replacement")
     if full != {ADMINISTRATORS_SID, SYSTEM_SID}:
         raise AuthoritySecurityError("fixed parent lacks SYSTEM/Administrators control")
@@ -242,7 +258,7 @@ def require_paper_object_security(
     ):
         raise AuthorityObjectError("PD1B object type/path/volume is unsafe")
     if spec.role in {PaperObjectRole.VOLUME, PaperObjectRole.PARENT}:
-        _require_parent_security(inspection)
+        _require_parent_security(inspection, spec.role)
         return
     if spec.role is PaperObjectRole.HISTORICAL_SNAPSHOT:
         # C3 artifact security belongs to C1/C3. The held read handle, exact

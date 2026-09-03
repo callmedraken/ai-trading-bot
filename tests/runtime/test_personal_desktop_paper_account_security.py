@@ -551,3 +551,78 @@ def test_parent_chain_rejects_unrelated_replacement_authority(mask):
         with security.PinnedPaperReadSession(api, SID) as session:
             session.read(ANCHOR)
     assert not any(call[0] == "open" and call[1] == ROOT for call in api.calls)
+
+
+@pytest.mark.parametrize("mask", [0x1301BF, 0x1200A9, 0x2, 0x4, 0x10, 0x100, 0x10000])
+def test_volume_accepts_ordinary_data_and_self_delete_rights(mask):
+    path = "F:\\"
+    observed = inspection(path)
+    observed = replace(observed, aces=(*observed.aces, SecurityAce("S-1-5-11", mask)))
+    security.require_paper_object_security(
+        path, security.paper_object_spec(path), observed, SID
+    )
+
+
+@pytest.mark.parametrize("mask", [0x40, 0x40000, 0x80000, 0x10000000, 0x200])
+def test_volume_rejects_child_delete_security_control_and_unknown_rights(mask):
+    path = "F:\\"
+    observed = inspection(path)
+    observed = replace(
+        observed, aces=(*observed.aces, SecurityAce("S-1-5-11", 0x1301BF | mask))
+    )
+    with pytest.raises(AuthoritySecurityError, match="replacement"):
+        security.require_paper_object_security(
+            path, security.paper_object_spec(path), observed, SID
+        )
+
+
+@pytest.mark.parametrize("path", ["F:\\", security.PERSONAL_DESKTOP_PAPER_PARENT])
+@pytest.mark.parametrize(
+    "change",
+    ["owner", "missing-system", "missing-admin", "partial-admin", "deny", "flags"],
+)
+def test_parent_roles_retain_owner_full_control_and_ace_validation(path, change):
+    observed = inspection(path)
+    if change == "owner":
+        observed = replace(observed, owner_sid=SID)
+    elif change == "missing-system":
+        observed = replace(observed, aces=observed.aces[:1])
+    elif change == "missing-admin":
+        observed = replace(observed, aces=observed.aces[1:])
+    else:
+        changes = {
+            "partial-admin": {"access_mask": 0x1200A9},
+            "deny": {"ace_type": 1},
+            "flags": {"ace_flags": 8},  # inherit-only is not effective control
+        }
+        observed = replace(
+            observed,
+            aces=(replace(observed.aces[0], **changes[change]), observed.aces[1]),
+        )
+    with pytest.raises(AuthoritySecurityError):
+        security.require_paper_object_security(
+            path, security.paper_object_spec(path), observed, SID
+        )
+
+
+@pytest.mark.parametrize("owner", [security.ADMINISTRATORS_SID, security.SYSTEM_SID])
+def test_recursive_pin_crosses_representative_safe_volume_acl(owner):
+    api = MemoryReadApi()
+    api.put(ANCHOR, b"anchor")
+    volume = api.nodes["F:\\"]
+    observed = replace(
+        volume.observation.security,
+        owner_sid=owner,
+        aces=(
+            *volume.observation.security.aces,
+            SecurityAce("S-1-5-11", 0x1301BF, ace_flags=3),
+            SecurityAce("S-1-5-32-545", 0x1200A9, ace_flags=0x13),
+        ),
+    )
+    volume.observation = replace(volume.observation, security=observed)
+    with security.PinnedPaperReadSession(api, SID) as session:
+        assert session.read(ANCHOR) == b"anchor"
+    opened = [call[1] for call in api.calls if call[0] == "open"]
+    assert opened[:4] == ["F:\\", security.PERSONAL_DESKTOP_PAPER_PARENT, ROOT, ANCHOR]
+    assert api.inspections["F:\\"] >= 3  # initial, retained, and reopened checks
+    assert not api.handles

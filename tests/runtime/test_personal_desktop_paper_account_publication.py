@@ -104,7 +104,7 @@ sys.addaudithook(_production_path_guard)
 
 @pytest.fixture(autouse=True)
 def prohibit_production_effects(monkeypatch):
-    assert security.PERSONAL_DESKTOP_PAPER_V2_PRODUCTION_EFFECTS_ENABLED is False
+    assert security.PERSONAL_DESKTOP_PAPER_V2_PRODUCTION_EFFECTS_ENABLED is True
     configured = publication_freeze.PERSONAL_DESKTOP_PAPER_V2_PUBLICATION_FREEZE
     assert type(configured) is PersonalDesktopPaperPublicationFreeze
     assert configured is PERSONAL_DESKTOP_PAPER_V2_PUBLICATION_FREEZE
@@ -118,10 +118,19 @@ def prohibit_production_effects(monkeypatch):
     monkeypatch.setattr(
         security.WindowsPaperReadNativeApi, "__init__", forbidden_native
     )
+    monkeypatch.setattr(
+        publication.WindowsTradingTokenObserver, "__init__", forbidden_native
+    )
+    monkeypatch.setattr(
+        publication, "validate_installed_authority_complete", forbidden_native
+    )
+    monkeypatch.setattr(native, "_bind", forbidden_native)
+    monkeypatch.setattr(native, "build_security_attributes", forbidden_native)
+    monkeypatch.setattr(native, "apply_security_policy", forbidden_native)
     try:
         yield
         assert _production_events == []
-        assert security.PERSONAL_DESKTOP_PAPER_V2_PRODUCTION_EFFECTS_ENABLED is False
+        assert security.PERSONAL_DESKTOP_PAPER_V2_PRODUCTION_EFFECTS_ENABLED is True
         assert (
             publication_freeze.PERSONAL_DESKTOP_PAPER_V2_PUBLICATION_FREEZE
             is configured
@@ -923,14 +932,77 @@ def test_production_false_gate_precedes_inputs_native_construction_and_every_eff
         publication_freeze, "require_production_paper_publication_freeze", forbidden
     )
     monkeypatch.setenv("PERSONAL_DESKTOP_PAPER_V2_PRODUCTION_EFFECTS_ENABLED", "true")
-    with pytest.raises(PersonalDesktopPaperAccountError, match="disabled"):
-        publication.publish_personal_desktop_paper_account(bundle=supplied)
+    with monkeypatch.context() as patch:
+        patch.setattr(
+            security, "PERSONAL_DESKTOP_PAPER_V2_PRODUCTION_EFFECTS_ENABLED", False
+        )
+        patch.setattr(security.WindowsPaperReadNativeApi, "__init__", forbidden)
+        patch.setattr(publication.WindowsTradingTokenObserver, "__init__", forbidden)
+        with pytest.raises(PersonalDesktopPaperAccountError, match="disabled"):
+            publication.publish_personal_desktop_paper_account(bundle=supplied)
     assert calls == []
 
 
-def test_native_constructor_itself_remains_disabled():
-    with pytest.raises(PersonalDesktopPaperAccountError, match="disabled"):
-        native.WindowsPaperPublicationApi("not even parsed")
+def test_enabled_publisher_reaches_fake_freeze_admission_without_effects(monkeypatch):
+    assert security.PERSONAL_DESKTOP_PAPER_V2_PRODUCTION_EFFECTS_ENABLED is True
+    calls = []
+
+    class AdmissionStopped(RuntimeError):
+        pass
+
+    class Hostile:
+        def __getattribute__(self, name):
+            raise AssertionError("fake admission must precede caller input inspection")
+
+    def stop_at_freeze():
+        calls.append("freeze-admission")
+        raise AdmissionStopped("test-only freeze admission boundary")
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("enabled publisher reached a native mutation constructor")
+
+    # The autouse guard already blocks C1, token/read constructors and Win32
+    # effects. Install both remaining fakes before entering the enabled path.
+    monkeypatch.setattr(native, "WindowsPaperPublicationApi", forbidden)
+    monkeypatch.setattr(
+        publication_freeze,
+        "require_production_paper_publication_freeze",
+        stop_at_freeze,
+    )
+    with pytest.raises(AdmissionStopped, match="test-only freeze admission boundary"):
+        publication.publish_personal_desktop_paper_account(bundle=Hostile())
+    assert calls == ["freeze-admission"]
+
+
+@pytest.mark.parametrize("enabled", [False, True])
+def test_native_constructor_gate_precedes_blocked_native_initialization(
+    monkeypatch, enabled
+):
+    # The autouse fixture replaces the base constructor and every effect binding
+    # before this test runs. Even the enabled case cannot initialize a native API.
+    calls = []
+
+    class NativeInitializationStopped(RuntimeError):
+        pass
+
+    def stop_native_initialization(self):
+        calls.append("native-initialization")
+        raise NativeInitializationStopped("test-only native initialization boundary")
+
+    with monkeypatch.context() as patch:
+        patch.setattr(
+            security, "PERSONAL_DESKTOP_PAPER_V2_PRODUCTION_EFFECTS_ENABLED", enabled
+        )
+        patch.setattr(
+            security.WindowsPaperReadNativeApi, "__init__", stop_native_initialization
+        )
+        error = (
+            NativeInitializationStopped if enabled else PersonalDesktopPaperAccountError
+        )
+        message = "test-only native initialization boundary" if enabled else "disabled"
+        with pytest.raises(error, match=message):
+            native.WindowsPaperPublicationApi("not even parsed")
+    assert calls == (["native-initialization"] if enabled else [])
 
 
 def test_runtime_capability_cannot_be_transferred_into_administrator_publisher(case):
@@ -1058,9 +1130,11 @@ def test_close_failure_blocks_acceptance_without_cleanup_or_retry(case, when):
 
 
 @pytest.mark.parametrize("succeeds", [True, False])
-def test_native_close_acknowledgement_with_read_only_fake_binding(succeeds):
+def test_native_close_acknowledgement_with_read_only_fake_binding(
+    succeeds, monkeypatch
+):
     # Exercise resource release without constructing a production adapter,
-    # enabling the gate, or loading/calling a native library. This fake exposes
+    # changing the gate, or loading/calling a native library. This fake exposes
     # only CloseHandle, so no create/write/ACL/rename/delete call can occur.
     calls = []
 
@@ -1072,6 +1146,12 @@ def test_native_close_acknowledgement_with_read_only_fake_binding(succeeds):
         _kernel=SimpleNamespace(CloseHandle=close),
         _created={77: "disposable test handle"},
     )
+
+    def fake_bind(library, name, arguments, result):
+        assert library is probe._kernel and name == "CloseHandle"
+        return close
+
+    monkeypatch.setattr(native, "_bind", fake_bind)
     handle = WindowsHandle(77, close=False)
     if succeeds:
         native.WindowsPaperPublicationApi.close(probe, handle)

@@ -732,8 +732,8 @@ def test_runtime_security_checked_before_anchor_parse(monkeypatch):
     assert not any(call[0] == "read" for call in case.api.calls)
 
 
-def test_read_only_slice_keeps_production_effect_gate_false():
-    assert security.PERSONAL_DESKTOP_PAPER_V2_PRODUCTION_EFFECTS_ENABLED is False
+def test_read_only_slice_has_no_execution_api_with_publication_enabled():
+    assert security.PERSONAL_DESKTOP_PAPER_V2_PRODUCTION_EFFECTS_ENABLED is True
     assert not hasattr(reader, "execute_paper_operation_once")
     assert not hasattr(reader, "commit_paper_operation_receipt")
 

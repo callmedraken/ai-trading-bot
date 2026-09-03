@@ -30,8 +30,8 @@ Current P3-R1 development context:
 ```text
 worktree: F:\AI\worktrees\ai-trading-bot-p3-r1
 branch: feature/p3-r1-recovery-implementation
-Architecture-100 docs checkpoint: e2861fab3af7d297d79274db2a82fd134672fb58
-Architecture-100 tree: d6f9203184d90a0c409d929c25bb2c7e7e520f29
+Architecture-100 source-certified checkpoint: 8cfbbd3a30eb704e6acfc1866bf2ed752879e231
+Architecture-100 source-certified tree: fc682a5baf35f2f2e8b01c9f8f04ce318681ee85
 ```
 
 The main `F:\AI\ai-trading-bot` worktree remains the GUI worktree and must not
@@ -144,7 +144,7 @@ The account-creation procedure is documentation-complete at:
 docs: define P3-R1 test-user creation ceremony
 ```
 
-The first disabled/source-only helper checkpoint is:
+The first disabled/source-only helper checkpoint was:
 
 ```text
 d509537b88f66ef244d326e5417d38d9e5f25f53
@@ -159,10 +159,7 @@ scripts/run_p3_r1_ordinary_nonadmin_principal_ceremony.ps1
 tests/runtime/test_p3_r1_ordinary_nonadmin_principal_ceremony.py
 ```
 
-The helper keeps `ACCOUNT_EFFECT_EXECUTION_AUTHORIZED=false`; ordinary invocation
-cannot prompt for a password or cross the account/group mutation boundaries.
-
-### Architecture 100 — ACCEPTED DOCS-ONLY DESIGN
+### Architecture 100 — SOURCE CERTIFIED
 
 A read-only ACL/namespace diagnostic invalidated the old retained-evidence
 location under `F:\AI`: untrusted principals had enough authority on that
@@ -179,57 +176,79 @@ new:     F:\p3-r1-ordinary-nonadmin-principal-v2
 schema:  p3-r1-ordinary-nonadmin-principal-evidence/v2
 ```
 
-The new top-level evidence root must be created once with a protected DACL at the
-successful create operation, not created permissively and repaired afterward.
-The reviewed security-writer set is limited to the exact P3-R1 creator,
-BUILTIN\Administrators, and SYSTEM. Ordinary users receive no evidence-root ACE.
-
-Architecture 100 also requires fresh parent/volume authority proof, persistent
-root identity binding, reparse-safe reopen, exact owner/protected-DACL
-validation, and fail-closed handling of a pre-created fixed name. The separate
-KSP evidence root remains unchanged.
-
-**No Windows filesystem/account/group/password/KSP effect was authorized or run
-by Architecture 100.**
-
-## Immediate next implementation checkpoint
-
-The next task is a bounded **Codex Sol High** source-only correction from the
-exact current P3-R1 branch checkpoint. Sol High is required because the change
-involves native Windows security descriptors, ACL semantics, namespace authority,
-volume/file identity, handle continuity, and crash/re-entry behavior.
-
-Scope is limited to the existing disabled ceremony helper/wrapper and focused
-tests:
+The accepted source implementation checkpoint is:
 
 ```text
-scripts/p3_r1_ordinary_nonadmin_principal_ceremony.cs
-scripts/run_p3_r1_ordinary_nonadmin_principal_ceremony.ps1
-tests/runtime/test_p3_r1_ordinary_nonadmin_principal_ceremony.py
+8cfbbd3a30eb704e6acfc1866bf2ed752879e231
+test: implement protected P3-R1 ceremony evidence root
+
+tree: fc682a5baf35f2f2e8b01c9f8f04ce318681ee85
 ```
 
-The correction must:
+The source change remained limited to the existing ceremony helper, wrapper, and
+focused tests. It implements create-time protected-DACL construction, exact
+owner/protection/ACE validation, parent namespace replacement-authority checks,
+fixed NTFS volume/root identity binding, reparse-safe/no-delete-share continuity,
+strict v2 retained root identity, and fail-closed collision/uncertain-create
+handling. The separate KSP evidence root remains unchanged.
 
-1. replace the retired v1 root/schema with the exact Architecture-100 v2 values;
-2. construct the protected root security descriptor at create time;
-3. validate exact trusted owner/protected DACL and reject extra/untrusted writer
-   authority;
-4. implement the fixed-volume and parent `FILE_DELETE_CHILD` / `WRITE_DAC` /
-   `WRITE_OWNER` gates;
-5. preserve the existing in-run no-delete-share guards and strengthen cross-run
-   volume/root identity continuity;
-6. freeze/validate the v2 root-identity evidence schema;
-7. keep all password/account/group effects unreachable by default; and
-8. add focused fake/native-model tests for wrong parent authority, DACL
-   de-protection, wrong owner, extra ACEs, wrong volume/file identity, reparse
-   substitution, collision, uncertain create, and protected inheritance.
+`ACCOUNT_EFFECT_EXECUTION_AUTHORIZED=false` remains hard-coded. No password
+prompt, evidence-root creation, ACL mutation, account/group mutation, KSP effect,
+production recovery, signing effect, or provider effect was authorized or run.
 
-Do not modify production files, KSP harness source, provider code, recovery key
-material, unrelated subsystems, or historical retained evidence.
+Source certification evidence:
 
-Codex should run focused tests/checks only while iterating. Full repository or
-long integration/E2E certification remains a later local user gate after ChatGPT
-accepts the exact source diff.
+```text
+focused Architecture-100 helper gate: 47 passed
+broad repository run: 3862 passed before legacy harness cache failures
+legacy-harness recovery: 758 passed
+Ruff check: passed
+Ruff format check: passed
+git diff --check: passed
+final reviewed HEAD/tree: unchanged exact
+final P3-R1 worktree: clean
+```
+
+The broad-run failures were classified as environment-invalid legacy harness
+scratch failures: the two unchanged Architecture-77 authority test modules use a
+hard-coded worktree `.pytest_cache` lifecycle-arbiter root that was inaccessible
+in this P3-R1 worktree. Those exact unchanged test blobs were rerun from the
+validated integration harness while `PYTHONPATH` and printed module `__file__`
+provenance proved imports came from the exact reviewed P3-R1 source; the entire
+legacy slice then passed 758/758. No full-suite rerun is required unless source
+changes.
+
+## Immediate next milestone — read-only execution-readiness restart
+
+Architecture 100 source work is complete. The next substantive milestone is to
+restart the complete P3-R1 execution-readiness sequence from **gate #1** rather
+than resume the earlier stopped run.
+
+The restart is read-only. It must freshly prove/freeze at least:
+
+1. exact worktree, branch, source commit/tree, helper/wrapper/test hashes, and
+   source-enablement diff;
+2. exact absence of the retired v1 evidence root and the new v2 evidence root;
+3. current `F:\` fixed/local NTFS volume GUID/serial and persistent-ACL support;
+4. current `F:\` owner/DACL semantics, no reparse traversal, and no untrusted
+   `FILE_DELETE_CHILD`, `WRITE_DAC`, or `WRITE_OWNER` authority capable of
+   replacing the protected child;
+5. exact creator/Trading identities and expected built-in group SID mappings;
+6. candidate-name absence and special-group topology relevant to
+   `P3R1KspTestUser`;
+7. current password/account/logon policy needed by the one-shot account ceremony;
+8. exact Windows PowerShell 5.1, helper, Git, and `netapi32.dll` identities; and
+9. confirmation that every effect gate remains disabled before any later
+   authorization discussion.
+
+Changed, missing, ambiguous, or unexpectedly writable observations are a STOP.
+Do not repair F:\, F:\AI, historical cache state, retained production staging, or
+any candidate root merely to make readiness pass.
+
+The later execution authorization, if readiness succeeds, must also treat root
+creation as one-shot across process loss: once an authorized create may have
+begun, an ambiguous process termination consumes that authorization and permits
+only read-only reconciliation, never blind relaunch/retry.
 
 ## Effect authorization state
 
@@ -246,15 +265,13 @@ Still **NOT AUTHORIZED**:
 - broker/live trading; and
 - P4/P5/P6 external effects.
 
-After corrected helper source acceptance, the required order is:
+Required order from the source-certified checkpoint is:
 
 ```text
-focused source verification
--> ChatGPT exact GitHub diff acceptance
--> broader local source certification
--> restart complete read-only Architecture-100 readiness freeze from gate #1
--> separate explicit effect authorization
--> account/root ceremony
+complete read-only Architecture-100 readiness restart from gate #1
+-> ChatGPT acceptance of frozen readiness evidence
+-> separate explicit one-time filesystem/account effect authorization
+-> protected evidence-root/account ceremony
 -> genuine ordinary-user qualification
 -> later KSP SID/source freeze and denial experiment
 -> recovery path only after all independent recovery gates are accepted
@@ -279,6 +296,11 @@ Canonical workflow rules remain in `AGENTS.md` and
 - preserve unrelated generated/untracked reports and historical pytest evidence;
 - run focused tests during implementation and reserve full certification for the
   accepted final source tree;
+- when an unchanged legacy harness hard-codes inaccessible `.pytest_cache`
+  scratch, use the validated clean-harness/provenance method rather than repairing
+  retained cache state;
+- under Windows PowerShell 5.1, prefer piping a here-string to Python stdin for
+  quoting-sensitive provenance snippets instead of `python -c`;
 - never merge, rebase, force-push, amend, change PR metadata/review threads, or
   modify unrelated files without explicit approval.
 

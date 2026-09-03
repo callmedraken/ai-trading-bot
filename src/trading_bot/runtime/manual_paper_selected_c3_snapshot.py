@@ -216,6 +216,7 @@ class _PermitBinding:
     core_ref: weakref.ReferenceType[object]
     reader_ref: weakref.ReferenceType[object]
     registration: _ReadCoreRegistration
+    authority_identity: tuple[str, str, str]
 
 
 @dataclass(frozen=True, slots=True)
@@ -224,6 +225,7 @@ class _SuccessfulReadBinding:
     core_ref: weakref.ReferenceType[object]
     reader_ref: weakref.ReferenceType[object]
     registration: _ReadCoreRegistration
+    authority_identity: tuple[str, str, str]
 
 
 class _SuccessfulReadIssuance:
@@ -298,6 +300,7 @@ def _issue_permit(
             weakref.ref(core),
             weakref.ref(reader),
             registration,
+            successful_read.authority_identity,
         )
         _PERMIT_REGISTRY[permit] = binding
     return permit
@@ -383,6 +386,53 @@ def require_disposable_selected_c3_snapshot_permit_for_test(
             "disposable selected C3 snapshot permit provenance is invalid"
         )
     return permit
+
+
+def require_selected_c3_snapshot_matches_authority(
+    permit: SelectedC3SnapshotPermit,
+    audit: SelectedC3SnapshotAuditEvidence,
+    authority: ValidatedProductionAuthority,
+) -> None:
+    """Purely reconcile a production P2 read with the consuming C1 authority."""
+
+    require_validated_production_authority(authority)
+    require_selected_c3_snapshot_permit(permit, audit)
+    with _PERMIT_REGISTRY_LOCK:
+        binding = _PERMIT_REGISTRY.get(permit)
+        if (
+            not _binding_is_exact(binding, audit, _PRODUCTION_CORE_PROVENANCE)
+            or binding.registration.authority != authority
+            or binding.authority_identity
+            != (
+                authority.machine_authority_id,
+                authority.approved_account_sid,
+                authority.authority_epoch_id,
+            )
+        ):
+            raise SelectedC3SnapshotReadError("P2 read does not match C1 authority")
+
+
+def require_disposable_selected_c3_snapshot_matches_identity_for_test(
+    permit: SelectedC3SnapshotPermit,
+    audit: SelectedC3SnapshotAuditEvidence,
+    *,
+    machine_authority_id: str,
+    approved_trading_sid: str,
+    authority_epoch_id: str,
+) -> None:
+    """Reconcile retained disposable database facts without production authority."""
+
+    require_disposable_selected_c3_snapshot_permit_for_test(permit, audit)
+    with _PERMIT_REGISTRY_LOCK:
+        binding = _PERMIT_REGISTRY.get(permit)
+        if not _binding_is_exact(
+            binding, audit, _DISPOSABLE_CORE_PROVENANCE
+        ) or binding.authority_identity != (
+            machine_authority_id,
+            approved_trading_sid,
+            authority_epoch_id,
+        ):
+            raise SelectedC3SnapshotReadError("disposable P2 read identity mismatch")
 
 
 class _SelectedC3SnapshotReadCore:
@@ -540,6 +590,7 @@ class _SelectedC3SnapshotReadCore:
                 weakref.ref(self),
                 weakref.ref(reader),
                 registration,
+                durable.authority_identity,
             )
         permit = _issue_permit(
             audit,
@@ -863,6 +914,11 @@ class _SelectedC3SnapshotReadCore:
                 "terminal artifact SHA-256 does not bind snapshot digest"
             )
         return _DurableSelection(
+            authority_identity=(
+                row["machine_authority_id"],
+                row["approved_account_sid"],
+                row["authority_epoch_id"],
+            ),
             session_id=row["session_id"],
             attempt_id=row["attempt_id"],
             terminal_id=row["terminal_id"],
@@ -878,6 +934,7 @@ class _SelectedC3SnapshotReadCore:
 
 @dataclass(frozen=True, slots=True)
 class _DurableSelection:
+    authority_identity: tuple[str, str, str]
     session_id: str
     attempt_id: str
     terminal_id: str
@@ -1089,6 +1146,7 @@ SELECT
     s.session_id AS session_id,
     s.authority_epoch_id AS authority_epoch_id,
     m.machine_authority_id AS machine_authority_id,
+    m.approved_account_sid AS approved_account_sid,
     s.session_schema AS session_schema,
     s.authority_policy_version AS authority_policy_version,
     s.claim_policy_version AS claim_policy_version,

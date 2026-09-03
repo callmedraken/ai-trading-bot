@@ -1202,6 +1202,8 @@ def test_production_p2_uses_fixed_read_only_vfs_and_one_read_transaction(
     genuine = SimpleNamespace(
         sqlite_build_manifest_digest="55" * 32,
         authority_epoch_id=_EPOCH,
+        machine_authority_id=_MACHINE,
+        approved_account_sid="S-1-5-21-1-2-3-1009",
         provider_id=_PROVIDER,
         permitted_provider_operation=_OPERATION,
     )
@@ -1269,6 +1271,21 @@ def test_production_p2_uses_fixed_read_only_vfs_and_one_read_transaction(
     assert require_selected_c3_snapshot_permit(result.permit, result.audit) is (
         result.permit
     )
+    p2_module.require_selected_c3_snapshot_matches_authority(
+        result.permit, result.audit, genuine
+    )
+    for field, changed in (
+        ("machine_authority_id", "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"),
+        ("approved_account_sid", "S-1-5-21-1-2-3-1010"),
+        ("authority_epoch_id", "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"),
+    ):
+        original = getattr(genuine, field)
+        setattr(genuine, field, changed)
+        with pytest.raises(SelectedC3SnapshotReadError, match="match C1"):
+            p2_module.require_selected_c3_snapshot_matches_authority(
+                result.permit, result.audit, genuine
+            )
+        setattr(genuine, field, original)
     with pytest.raises(SelectedC3SnapshotReadError, match="provenance"):
         require_selected_c3_snapshot_permit(result.permit, replace(result.audit))
 

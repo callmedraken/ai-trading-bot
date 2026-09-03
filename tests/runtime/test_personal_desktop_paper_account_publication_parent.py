@@ -183,13 +183,11 @@ def test_publication_parent_child_metadata_and_old_failure_flow(
         Status.BLOCKED if old_guard else Status.PUBLISHED_AND_VERIFIED
     )
     assert result.phase is (Phase.STAGED_VERIFY if old_guard else Phase.COMPLETE)
-    assert result.state is (
-        State.STAGING_REQUIRES_REVIEW if old_guard else State.FINAL_REQUIRES_VALIDATION
-    )
+    assert result.state is (None if old_guard else State.FINAL_REQUIRES_VALIDATION)
     assert result.failure_type == ("AuthorityObjectError" if old_guard else None)
     assert old_failures == (
-        ["PD1B pinned identity/security drift"] * 2 if old_guard else []
-    )  # Both post-staging revalidation and outer context finalization failed.
+        ["PD1B pinned identity/security drift"] * 3 if old_guard else []
+    )  # Post-staging, failure-occupancy, and outer finalization checks failed.
     assert (
         result.staging_may_have_begun and result.rename_may_have_begun is not old_guard
     )
@@ -205,6 +203,14 @@ def test_publication_parent_replacement_blocks_before_rename(
     bundle = prepare_personal_desktop_paper_account_bundle_for_test(**inputs)
     with monkeypatch.context() as patch:
         api, parent = install_memory_publisher(patch, bundle)
+        occupancy_reads = []
+        occupied = api.occupied
+
+        def record_occupancy(path):
+            occupancy_reads.append(path)
+            return occupied(path)
+
+        api.occupied = record_occupancy
 
         def child_created(path):
             if path != security.PERSONAL_DESKTOP_PAPER_V2_STAGING_ROOT:
@@ -233,7 +239,73 @@ def test_publication_parent_replacement_blocks_before_rename(
         api.after_create = child_created
         result = publication.publish_personal_desktop_paper_account(bundle=bundle)
     assert result.status is Status.BLOCKED and result.phase is Phase.STAGED_VERIFY
-    assert result.state is State.STAGING_REQUIRES_REVIEW
+    assert result.state is None
+    assert result.failure_type == (
+        "AuthoritySecurityError" if drift == "acl" else "AuthorityObjectError"
+    )
+    assert occupancy_reads == [
+        security.PERSONAL_DESKTOP_PAPER_V2_ROOT,
+        security.PERSONAL_DESKTOP_PAPER_V2_STAGING_ROOT,
+    ]  # Only preflight reads; failed parent revalidation forbids another probe.
+    assert result.staging_may_have_begun and not result.rename_may_have_begun
+    assert api.renames == 0 and not api.handles and not parent.handles
+
+
+@pytest.mark.parametrize("failure_evidence", ["intact", "parent", "c1", "occupancy"])
+def test_artifact_failure_requires_trusted_occupancy_and_preserves_primary_error(
+    inputs, monkeypatch, failure_evidence
+):
+    bundle = prepare_personal_desktop_paper_account_bundle_for_test(**inputs)
+    with monkeypatch.context() as patch:
+        api, parent = install_memory_publisher(patch, bundle)
+        events = []
+        artifact_failed = False
+        admission = publication.require_paper_publication_inputs
+        occupied = api.occupied
+
+        def revalidate_inputs(**kwargs):
+            events.append("revalidate")
+            if artifact_failed and failure_evidence == "c1":
+                raise AuthorityObjectError("test C1 trust lost")
+            return admission(**kwargs)
+
+        def read_occupancy(path):
+            events.append("occupancy")
+            if artifact_failed and failure_evidence == "occupancy":
+                raise PermissionError("test occupancy unavailable")
+            return occupied(path)
+
+        def fail_artifact(node):
+            nonlocal artifact_failed
+            events.clear()
+            artifact_failed = True
+            if failure_evidence == "parent":
+                parent_node = parent.nodes[security.PERSONAL_DESKTOP_PAPER_PARENT]
+                parent_node.observation = replace(
+                    parent_node.observation, identity=(7, 999)
+                )
+            raise ValueError("primary staged artifact failure")
+
+        patch.setattr(
+            publication, "require_paper_publication_inputs", revalidate_inputs
+        )
+        api.occupied = read_occupancy
+        api.on_read = fail_artifact
+        result = publication.publish_personal_desktop_paper_account(bundle=bundle)
+    assert (
+        events
+        == {
+            "intact": ["revalidate", "occupancy", "occupancy"],
+            "parent": ["revalidate"],
+            "c1": ["revalidate"],
+            "occupancy": ["revalidate", "occupancy"],
+        }[failure_evidence]
+    )
+    assert result.status is Status.BLOCKED and result.phase is Phase.STAGED_VERIFY
+    assert result.state is (
+        State.STAGING_REQUIRES_REVIEW if failure_evidence == "intact" else None
+    )
+    assert result.failure_type == "ValueError"
     assert result.staging_may_have_begun and not result.rename_may_have_begun
     assert api.renames == 0 and not api.handles and not parent.handles
 
@@ -279,6 +351,11 @@ def test_parent_finalization_failure_preserves_prior_occupancy_and_primary_failu
         patch.setattr(publication, "_publish", publish_then_drift)
         result = publication.publish_personal_desktop_paper_account(bundle=bundle)
     prior = captured[0]
+    if publication_fails:
+        assert prior.failure_type == "ValueError"
+        assert prior.state is (
+            State.STAGING_REQUIRES_REVIEW if occupancy_readable else None
+        )
     assert result.status is Status.BLOCKED
     assert result.state is prior.state
     assert (result.state is None) is not occupancy_readable

@@ -480,9 +480,10 @@ def _publish(
         )
     except Exception as error:
         try:
+            revalidate()  # Occupancy is evidence only while parent/C1 trust holds.
             state = _occupancy(api, final, staging)
         except Exception:
-            state = None  # Read failure never implies absence or a safe retry.
+            state = None  # Trust/read failure never implies absence or a safe retry.
         return PaperPublicationResult(
             PaperPublicationStatus.BLOCKED,
             phase,

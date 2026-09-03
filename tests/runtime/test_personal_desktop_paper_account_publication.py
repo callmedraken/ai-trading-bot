@@ -1098,6 +1098,8 @@ def test_parent_and_administrator_revalidation_before_and_after_commit(
     api.hook = inject
     result = publish(case)
     assert result.status is Status.BLOCKED
+    assert result.state is None
+    assert result.staging_may_have_begun
     assert result.phase is (
         Phase.STAGED_VERIFY if when == "staged" else Phase.FINAL_VERIFY
     )

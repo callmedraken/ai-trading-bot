@@ -7,7 +7,7 @@ import os
 import stat
 import sys
 from collections import Counter
-from dataclasses import dataclass, replace
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -29,6 +29,10 @@ from trading_bot.runtime.personal_desktop_paper_account_authority import (
 )
 from trading_bot.runtime.personal_desktop_paper_account_provisioning import (
     prepare_personal_desktop_paper_account_bundle_for_test,
+)
+from trading_bot.runtime.personal_desktop_paper_account_publication_freeze import (
+    PERSONAL_DESKTOP_PAPER_V2_PUBLICATION_FREEZE,
+    PersonalDesktopPaperPublicationFreeze,
 )
 from trading_bot.runtime.personal_desktop_paper_account_read_authority import (
     ValidatedPersonalDesktopPaperAccount,
@@ -101,7 +105,10 @@ sys.addaudithook(_production_path_guard)
 @pytest.fixture(autouse=True)
 def prohibit_production_effects(monkeypatch):
     assert security.PERSONAL_DESKTOP_PAPER_V2_PRODUCTION_EFFECTS_ENABLED is False
-    assert publication_freeze.PERSONAL_DESKTOP_PAPER_V2_PUBLICATION_FREEZE is None
+    configured = publication_freeze.PERSONAL_DESKTOP_PAPER_V2_PUBLICATION_FREEZE
+    assert type(configured) is PersonalDesktopPaperPublicationFreeze
+    assert configured is PERSONAL_DESKTOP_PAPER_V2_PUBLICATION_FREEZE
+    frozen_values = asdict(configured)
     _guard_active.append(True)
     _production_events.clear()
 
@@ -115,7 +122,11 @@ def prohibit_production_effects(monkeypatch):
         yield
         assert _production_events == []
         assert security.PERSONAL_DESKTOP_PAPER_V2_PRODUCTION_EFFECTS_ENABLED is False
-        assert publication_freeze.PERSONAL_DESKTOP_PAPER_V2_PUBLICATION_FREEZE is None
+        assert (
+            publication_freeze.PERSONAL_DESKTOP_PAPER_V2_PUBLICATION_FREEZE
+            is configured
+        )
+        assert asdict(configured) == frozen_values
     finally:
         _guard_active.clear()
 
@@ -338,8 +349,27 @@ def test_classifier_rejects_unproven_occupancy(value):
         )
 
 
-def test_complete_disposable_publication_exact_layout_bytes_policies_and_order(case):
+def test_complete_disposable_publication_exact_layout_bytes_policies_and_order(
+    case, monkeypatch
+):
     root, bundle, api, _ = case
+    anchor = parse_personal_desktop_paper_account_anchor(bundle.anchor_bytes)
+    assert (
+        anchor.paper_account_id
+        != PERSONAL_DESKTOP_PAPER_V2_PUBLICATION_FREEZE.paper_account_id
+    )
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("disposable publication must not use production freeze")
+
+    monkeypatch.setattr(
+        publication_freeze, "require_production_paper_publication_freeze", forbidden
+    )
+    monkeypatch.setattr(
+        publication_freeze,
+        "verify_personal_desktop_paper_publication_freeze",
+        forbidden,
+    )
     result = publish(case)
     assert result.status is Status.PUBLISHED_AND_VERIFIED
     assert result.phase is Phase.COMPLETE

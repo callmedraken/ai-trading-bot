@@ -98,11 +98,23 @@ class PersonalDesktopPaperPublicationFreeze:
                 )
 
 
-# UNCONFIGURED. Only a separately reviewed PD1E source diff may populate this.
+# Exact PD1E readiness values; this data freeze does not enable production effects.
 # There is deliberately no loader, environment override, setter, or CLI input.
 PERSONAL_DESKTOP_PAPER_V2_PUBLICATION_FREEZE: (
     PersonalDesktopPaperPublicationFreeze | None
-) = None
+) = PersonalDesktopPaperPublicationFreeze(
+    machine_authority_id="223f0d4e-36f9-4b9b-bf0e-febf16fcd3f1",
+    approved_trading_sid="S-1-5-21-1397534616-3988210162-180023805-1009",
+    paper_account_id="9415cd7b-bf36-5fba-bd58-a0f99119dc21",
+    starting_cash=Decimal("25000"),
+    genesis_as_of=datetime(2026, 8, 29, 9, 46, 43, 769105, tzinfo=UTC),
+    genesis_sha256="d1a7ff14425c8a797a952860a1102489a4c81cac2a24a45bc3127eb8eb2e9548",
+    genesis_byte_length=533,
+    anchor_sha256="16c4dba01835c5bc2def91f0103ad79c3da0b5d18af72091b4fdd37fe4353c85",
+    anchor_byte_length=465,
+    manifest_sha256="8fe1d705d59a79207ab6236af71becee0051042dc7b3ecaf23bb7f5531cb0029",
+    manifest_byte_length=532,
+)
 
 
 def require_production_paper_publication_freeze() -> (

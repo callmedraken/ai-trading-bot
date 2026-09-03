@@ -1,9 +1,11 @@
-"""Pure administrator freeze reconciliation; no production freeze or effects."""
+"""Exact source freeze and pure administrator reconciliation; no production effects."""
 
+import ast
 import builtins
+import inspect
 import os
 from dataclasses import FrozenInstanceError, asdict, replace
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 from decimal import Context, Decimal, localcontext
 from hashlib import sha256
 
@@ -20,8 +22,16 @@ from trading_bot.runtime import (
     personal_desktop_paper_account_publication_freeze as freeze_module,
 )
 from trading_bot.runtime import windows_authority_validation as validation
+from trading_bot.runtime.paper_account_checkpoint import (
+    PaperAccountGenesisRequest,
+    create_genesis_paper_account_checkpoint,
+    serialize_paper_account_checkpoint,
+)
 from trading_bot.runtime.personal_desktop_paper_account_authority import (
+    PersonalDesktopPaperAccountAnchor,
+    derive_personal_desktop_paper_account_id,
     parse_personal_desktop_paper_account_anchor,
+    serialize_personal_desktop_paper_account_anchor,
 )
 from trading_bot.runtime.personal_desktop_paper_account_publication_freeze import (
     PersonalDesktopPaperPublicationFreeze,
@@ -155,7 +165,151 @@ def test_matching_administrator_freeze_reconciles_without_p2_or_runtime_capabili
             )
             is None
         )
-    assert freeze_module.PERSONAL_DESKTOP_PAPER_V2_PUBLICATION_FREEZE is None
+    assert require_production_paper_publication_freeze() is not freeze
+
+
+def test_production_freeze_contains_only_exact_accepted_immutable_values():
+    production = freeze_module.PERSONAL_DESKTOP_PAPER_V2_PUBLICATION_FREEZE
+    assert type(production) is PersonalDesktopPaperPublicationFreeze
+    assert asdict(production) == {
+        "machine_authority_id": "223f0d4e-36f9-4b9b-bf0e-febf16fcd3f1",
+        "approved_trading_sid": "S-1-5-21-1397534616-3988210162-180023805-1009",
+        "paper_account_id": "9415cd7b-bf36-5fba-bd58-a0f99119dc21",
+        "starting_cash": Decimal("25000"),
+        "genesis_as_of": datetime(2026, 8, 29, 9, 46, 43, 769105, tzinfo=UTC),
+        "genesis_sha256": (
+            "d1a7ff14425c8a797a952860a1102489a4c81cac2a24a45bc3127eb8eb2e9548"
+        ),
+        "genesis_byte_length": 533,
+        "anchor_sha256": (
+            "16c4dba01835c5bc2def91f0103ad79c3da0b5d18af72091b4fdd37fe4353c85"
+        ),
+        "anchor_byte_length": 465,
+        "manifest_sha256": (
+            "8fe1d705d59a79207ab6236af71becee0051042dc7b3ecaf23bb7f5531cb0029"
+        ),
+        "manifest_byte_length": 532,
+    }
+    assert production.genesis_as_of.tzinfo is UTC
+    with pytest.raises(FrozenInstanceError):
+        production.starting_cash = Decimal("1")
+
+
+def test_production_freeze_returns_source_object_and_revalidates(monkeypatch):
+    production = freeze_module.PERSONAL_DESKTOP_PAPER_V2_PUBLICATION_FREEZE
+    validate = PersonalDesktopPaperPublicationFreeze.__post_init__
+    calls = []
+
+    def observed(value):
+        calls.append(value)
+        validate(value)
+
+    monkeypatch.setattr(
+        PersonalDesktopPaperPublicationFreeze, "__post_init__", observed
+    )
+    for _ in range(2):
+        assert require_production_paper_publication_freeze() is production
+    assert len(calls) == 2 and all(value is production for value in calls)
+
+
+def test_conflicting_environment_cannot_select_production_freeze(monkeypatch):
+    production = freeze_module.PERSONAL_DESKTOP_PAPER_V2_PUBLICATION_FREEZE
+    expected = asdict(production)
+    monkeypatch.setenv("PERSONAL_DESKTOP_PAPER_V2_PUBLICATION_FREEZE", "None")
+    monkeypatch.setenv("PERSONAL_DESKTOP_PAPER_V2_STARTING_CASH", "1")
+    assert require_production_paper_publication_freeze() is production
+    assert asdict(production) == expected
+
+
+def test_production_freeze_has_no_loader_setter_or_runtime_selection_input():
+    assert not inspect.signature(require_production_paper_publication_freeze).parameters
+    assert {
+        name
+        for name, value in vars(freeze_module).items()
+        if callable(value)
+        and getattr(value, "__module__", None) == freeze_module.__name__
+    } == {
+        "PersonalDesktopPaperPublicationFreeze",
+        "require_production_paper_publication_freeze",
+        "verify_personal_desktop_paper_publication_freeze",
+    }
+    tree = ast.parse(inspect.getsource(freeze_module))
+    assignments = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Name)
+        and isinstance(node.ctx, ast.Store)
+        and node.id == "PERSONAL_DESKTOP_PAPER_V2_PUBLICATION_FREEZE"
+    ]
+    assert len(assignments) == 1
+    definition = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.AnnAssign) and node.target is assignments[0]
+    )
+    assert isinstance(definition.value, ast.Call)
+    assert isinstance(definition.value.func, ast.Name)
+    assert definition.value.func.id == "PersonalDesktopPaperPublicationFreeze"
+    assert not definition.value.args
+    # Every field is source literal data or the exact Decimal/UTC constructor.
+    for keyword in definition.value.keywords:
+        if keyword.arg == "starting_cash":
+            expected = ast.parse('Decimal("25000")', mode="eval").body
+        elif keyword.arg == "genesis_as_of":
+            expected = ast.parse(
+                "datetime(2026, 8, 29, 9, 46, 43, 769105, tzinfo=UTC)", mode="eval"
+            ).body
+        else:
+            assert isinstance(keyword.value, ast.Constant)
+            continue
+        assert ast.dump(keyword.value) == ast.dump(expected)
+
+
+@pytest.mark.parametrize(
+    "freeze", [freeze_module.PERSONAL_DESKTOP_PAPER_V2_PUBLICATION_FREEZE]
+)
+def test_production_freeze_reconciles_exact_a61_and_pd1a_artifacts(
+    freeze, administrator
+):
+    # Reconstruct bytes purely from frozen data; this does not recreate P2 provenance.
+    genesis = create_genesis_paper_account_checkpoint(
+        PaperAccountGenesisRequest(
+            as_of=freeze.genesis_as_of,
+            cash=freeze.starting_cash,
+            positions=(),
+            realized_profit_loss=Decimal("0"),
+            open_orders=(),
+            metadata=(),
+        )
+    )
+    genesis_bytes = serialize_paper_account_checkpoint(genesis)
+    identity = dict(
+        machine_authority_id=freeze.machine_authority_id,
+        approved_trading_sid=freeze.approved_trading_sid,
+        genesis_checkpoint_id=str(genesis.checkpoint_id),
+        genesis_sha256=sha256(genesis_bytes).hexdigest(),
+        genesis_byte_length=len(genesis_bytes),
+    )
+    common = dict(
+        paper_account_id=derive_personal_desktop_paper_account_id(**identity),
+        **identity,
+    )
+    anchor_bytes = serialize_personal_desktop_paper_account_anchor(
+        PersonalDesktopPaperAccountAnchor(**common)
+    )
+    manifest_bytes = preparation.serialize_personal_desktop_paper_account_manifest(
+        preparation.PersonalDesktopPaperAccountProvisioningManifest(
+            **common,
+            anchor_sha256=sha256(anchor_bytes).hexdigest(),
+            anchor_byte_length=len(anchor_bytes),
+        )
+    )
+    bundle = preparation.PersonalDesktopPaperAccountBundle(
+        genesis_bytes, anchor_bytes, manifest_bytes
+    )
+    verify_personal_desktop_paper_publication_freeze(
+        bundle, freeze=freeze, administrator_validation=administrator
+    )
 
 
 def test_unconfigured_freeze_blocks_read_only_admission_before_native_validation(
@@ -170,10 +324,33 @@ def test_unconfigured_freeze_blocks_read_only_admission_before_native_validation
     monkeypatch.setattr(publication, "require_windows_platform", forbidden)
     monkeypatch.setattr(publication.WindowsTradingTokenObserver, "observe", forbidden)
     monkeypatch.setenv("PERSONAL_DESKTOP_PAPER_V2_PUBLICATION_FREEZE", "configured")
-    with pytest.raises(WindowsAuthorityError, match="unconfigured"):
-        require_production_paper_publication_freeze()
-    with pytest.raises(WindowsAuthorityError, match="unconfigured"):
-        publication.require_paper_publication_inputs(bundle=bundle)
+    with monkeypatch.context() as patch:
+        patch.setattr(
+            freeze_module, "PERSONAL_DESKTOP_PAPER_V2_PUBLICATION_FREEZE", None
+        )
+        with pytest.raises(WindowsAuthorityError, match="unconfigured"):
+            require_production_paper_publication_freeze()
+        with pytest.raises(WindowsAuthorityError, match="unconfigured"):
+            publication.require_paper_publication_inputs(bundle=bundle)
+
+
+def test_invalid_production_constant_fails_closed(freeze, monkeypatch):
+    class Subclass(PersonalDesktopPaperPublicationFreeze):
+        pass
+
+    with monkeypatch.context() as patch:
+        for value in (asdict(freeze), Subclass(**asdict(freeze))):
+            patch.setattr(
+                freeze_module, "PERSONAL_DESKTOP_PAPER_V2_PUBLICATION_FREEZE", value
+            )
+            with pytest.raises(WindowsAuthorityError, match="unconfigured"):
+                require_production_paper_publication_freeze()
+        object.__setattr__(freeze, "manifest_byte_length", True)
+        patch.setattr(
+            freeze_module, "PERSONAL_DESKTOP_PAPER_V2_PUBLICATION_FREEZE", freeze
+        )
+        with pytest.raises(WindowsAuthorityError, match="length"):
+            require_production_paper_publication_freeze()
 
 
 @pytest.mark.parametrize(

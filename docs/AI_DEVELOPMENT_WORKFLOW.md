@@ -31,9 +31,16 @@ Codex is the bounded implementation agent. It should:
   validation documents;
 - run focused tests/checks during implementation;
 - preserve unrelated generated/untracked files;
-- report files changed, focused commands/results, and deviations/blockers;
-- normally stop before commit/push and before broad local certification unless
-  the task explicitly says otherwise.
+- when the task explicitly authorizes the checkpoint, exact-file stage only the
+  intended paths, verify the staged filename set and diff check, create a normal
+  commit, and ordinary-push the isolated feature branch;
+- report files changed, focused commands/results, commit/push result when
+  authorized, and deviations/blockers;
+- stop before broad local certification unless the task explicitly says
+  otherwise.
+
+If the task does not explicitly authorize commit/push, Codex stops before those
+Git operations and reports the local changes.
 
 ## Model selection
 
@@ -52,27 +59,32 @@ Do not use subagents unless explicitly requested.
 The normal cycle is:
 
 ```text
-ChatGPT scopes/finalizes the contract
+ChatGPT scopes/finalizes the contract and explicitly authorizes the checkpoint
 -> Codex implements
 -> Codex runs focused tests/checks
--> Codex returns its final report without committing
--> ChatGPT reviews the report and supplies simple exact PowerShell/Git commands
--> user stages only the intended paths
--> user verifies the staged filename list/diff as appropriate
--> user creates a normal commit and pushes the isolated feature branch
+-> Codex verifies the index is initially clean
+-> Codex exact-file stages only the intended paths
+-> Codex verifies the staged filename set and runs git diff --cached --check
+-> Codex creates a normal checkpoint commit
+-> Codex ordinary-pushes the isolated feature branch
+-> Codex reports files, focused verification, commit SHA/push result, and blockers
 -> ChatGPT reviews the exact GitHub commit/diff
 -> user runs the broader/full local certification only when ChatGPT says the
    reviewed source has reached the final certification gate
 -> ChatGPT accepts/rejects certification and supplies the next milestone
 ```
 
+When ChatGPT intentionally withholds commit/push authorization, Codex stops
+after focused verification and reports the local change set instead.
+
 Manual patch-file transfer or pasting a large diff into chat is a fallback only
 when GitHub/tool access fails. It is not the normal review path.
 
 For a scoped checkpoint with known paths, do not use `git add .` or
-`git add -A`. Stage the exact intended files. Normal feature-branch push does
-not authorize merge, rebase, amend, force-push, PR metadata changes, review
-thread resolution, or unrelated modifications.
+`git add -A`. Stage the exact intended files. Before committing, verify the
+staged filename set and run `git diff --cached --check`. A normal feature-branch
+push does not authorize merge, rebase, amend, force-push, PR metadata changes,
+review-thread resolution, branch switching, or unrelated modifications.
 
 ## Testing and certification
 
@@ -100,18 +112,25 @@ step.
 
 ## PowerShell and Git checkpoint style
 
-Routine local Git checkpoints should stay simple and explicit. Prefer commands
-such as:
+Routine bounded checkpoints performed by Codex should stay simple and explicit.
+The task prompt should name the exact worktree, branch, expected HEAD, intended
+paths, and whether commit/push is authorized. A typical authorized sequence is:
 
 ```powershell
 git status --short
+git diff --cached --name-only
 git add -- path/to/one.py path/to/test.py
 git diff --cached --name-only
 git diff --cached --check
 git commit -m "..."
 git push origin <feature-branch>
 git rev-parse HEAD
+git status --short
 ```
+
+The initial staged-file check must prove the index is empty before Codex adds
+files. If branch/worktree/HEAD/index state differs from the frozen startup gate,
+Codex stops instead of self-correcting.
 
 Use larger defensive scripts only when a security-sensitive deployment,
 production authority gate, or unusually fragile operator operation genuinely
@@ -140,6 +159,10 @@ them:
 - credential-store reads/writes outside an approved gate;
 - production authority database mutation outside an approved gate;
 - deployment outside an approved deployment checkpoint.
+
+Routine exact-file staging, normal commit, and ordinary feature-branch push are
+permitted when the current bounded task explicitly authorizes that checkpoint.
+They do not imply authorization for any operation in the prohibited list above.
 
 External-effect prerequisites and no-effect preflight must remain separate from
 any command that can cross an effect fence. A consumed `CONFIRMED` or

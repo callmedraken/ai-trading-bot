@@ -127,6 +127,9 @@ def test_frozen_source_surface_and_secure_input_order() -> None:
         "SetFileSecurity",
         "Set-Acl",
         "Directory.CreateDirectory",
+        "LsaAddAccountRights",
+        "LsaRemoveAccountRights",
+        "secedit",
     ):
         assert forbidden not in source + wrapper
     required = {
@@ -194,6 +197,22 @@ def test_frozen_source_surface_and_secure_input_order() -> None:
     assert "Native.CreateFileW(path, 0x00020080, 3," in source
     assert "0x02200000" in source  # reparse-safe, no-delete-share directory guards
     assert runner.index("native.Observation()") < runner.index("new FixedStore()")
+    assert "p3-r1-ordinary-nonadmin-principal-evidence/v2" not in source
+    candidate = source.split("ObserveCandidate(ICandidateReads api)", 1)[1].split(
+        "internal static Dictionary<string, object> TransferAndCollect", 1
+    )[0]
+    assert "Lsa" not in candidate and "Rights" not in candidate
+    assert candidate.index("Qualification.AcceptCandidate(observation)") < (
+        candidate.index("return observation")
+    )
+    native_query = source.split("public LsaRightsResult QueryRights", 1)[1].split(
+        "internal Dictionary<string, object> Observation()", 1
+    )[0]
+    assert native_query.index("Proof.Creator(Token())") < native_query.index(
+        "Native.LsaOpenPolicy"
+    )
+    assert "EXACT_CONSOLE_MATCH" not in source
+    assert "EXACT_CANDIDATE_CONSOLE_MATCH" in source
 
 
 CASES = (
@@ -241,6 +260,22 @@ CASES = (
     "precreated_root_collision",
     "uncertain_root_creation",
     "strict_v2_root_reload",
+    "ordinary_observation_no_lsa",
+    "candidate_owned_gates",
+    "candidate_closed_schema",
+    "creator_rights_success",
+    "creator_no_lsa_account",
+    "creator_lsa_failure",
+    "rights_target_set",
+    "rights_query_set",
+    "candidate_hash_mismatch",
+    "candidate_transfer_reconciliation",
+    "collector_token_revalidation",
+    "rights_dispositions",
+    "rights_query_integrity",
+    "split_closed_schema",
+    "split_halves_rejected",
+    "split_lifecycle",
 )
 
 
@@ -368,7 +403,7 @@ namespace P3R1OrdinaryPrincipalV1
         { return J.O("group_sid", Launcher.BUILTIN_USERS_SID, "member_sid", TestSid, "creator_token", Token(true), "direct_view", View(0), "users_identity", Identity()); }
         private static Dictionary<string, object> UsersConfirmed()
         { return J.O("group_sid", Launcher.BUILTIN_USERS_SID, "member_sid", TestSid, "net_status", 0UL, "direct_view", View(0, Launcher.BUILTIN_USERS_SID), "identity_continuity_passed", true); }
-        private static Dictionary<string, object> Observation(bool performance)
+        private static Dictionary<string, object> Candidate(bool performance)
         {
             var token = Token(false); var tg = J.Arr(token["groups"]);
             if (performance) tg.Add(TokenGroup(Launcher.PERFORMANCE_LOG_USERS_SID, 7)); Proof.Sort(tg, "sid name");
@@ -377,10 +412,54 @@ namespace P3R1OrdinaryPrincipalV1
             var effective = J.A();
             foreach (object v in tg) { var g = J.Obj(v); effective.Add(J.O("sid", g["sid"], "name", g["name"], "attributes", g["attributes"],
                 "origin", J.S(g["sid"]) == Launcher.BUILTIN_USERS_SID ? "DIRECT" : "LOGON_CONTEXT", "disposition", "ACCEPTED")); }
-            return J.O("account", Account(), "direct_view", View(0, Launcher.BUILTIN_USERS_SID), "indirect_view", View(1, Launcher.BUILTIN_USERS_SID),
-                "relevant_edges", edges, "effective_groups", effective, "rights", J.A(), "candidate_token", token, "collection_method", "operator_observed_console",
+            return J.O("schema", Qualification.CandidateSchema, "account", Account(), "direct_view", View(0, Launcher.BUILTIN_USERS_SID), "indirect_view", View(1, Launcher.BUILTIN_USERS_SID),
+                "relevant_edges", edges, "effective_groups", effective, "candidate_token", token, "collection_method", "operator_observed_candidate_console",
                 "performance_log_users", J.O("classification", Gate.PerformanceClass, "effective", performance, "direct_assignment", false,
                     "interactive_enabled", true, "host_edge_present", true, "alternate_path_present", false, "provenance_passed", true));
+        }
+        private sealed class QualificationFake : ICandidateReads, ILsaRights
+        {
+            internal Dictionary<string, object> Data;
+            internal bool Creator = true, ThrowLsa;
+            internal int TokenCalls, Queries;
+            internal Func<int, Dictionary<string, object>> TokenOverride;
+            internal Func<string, LsaRightsResult> RightsOverride;
+            internal List<string> Calls = new List<string>(), Output = new List<string>(), Queried = new List<string>();
+            internal Queue<string> Input = new Queue<string>();
+            internal QualificationFake(bool performance)
+            {
+                Data = Candidate(performance);
+                Input.Enqueue(Encoding.UTF8.GetString(J.Bytes(Data))); Input.Enqueue("EXACT_CANDIDATE_CONSOLE_MATCH");
+            }
+            public Dictionary<string, object> Token()
+            {
+                Calls.Add("TOKEN"); TokenCalls++;
+                return TokenOverride != null ? TokenOverride(TokenCalls) : Creator ? GeneratedTests.Token(true) : J.Obj(J.Clone(Data["candidate_token"]));
+            }
+            public Dictionary<string, object> Account() { Calls.Add("ACCOUNT"); return J.Obj(J.Clone(Data["account"])); }
+            public Dictionary<string, object> Groups(uint flags)
+            { Calls.Add("GROUPS" + flags); return J.Obj(J.Clone(Data[flags == 0 ? "direct_view" : "indirect_view"])); }
+            public List<object> Inventory(string sid)
+            { Check(sid == TestSid); Calls.Add("EDGES"); return J.Arr(J.Clone(Data["relevant_edges"])); }
+            public LsaRightsResult QueryRights(string sid)
+            {
+                Calls.Add("LSA"); Queries++; Queried.Add(sid);
+                if (ThrowLsa) throw new Exception("ORDINARY_LSA_CALLED");
+                return RightsOverride != null ? RightsOverride(sid) : new LsaRightsResult(0, new List<string> { "SeInteractiveLogonRight", "SeChangeNotifyPrivilege" });
+            }
+            internal string ReadLine() { Calls.Add(Input.Count == 2 ? "TRANSFER" : "CONFIRM"); return Input.Dequeue(); }
+            internal void WriteLine(string line) { Calls.Add("OUTPUT"); Output.Add(line); }
+            internal Dictionary<string, object> Transfer()
+            { return QualificationSession.TransferAndCollect(this, this, TestSid, ReadLine, WriteLine); }
+        }
+        private static Dictionary<string, object> Observation(bool performance)
+        { return new QualificationFake(performance).Transfer(); }
+        private static Dictionary<string, object> Collection(Dictionary<string, object> observation)
+        { return J.Obj(observation["rights_collection"]); }
+        private static void RejectSplit(Dictionary<string, object> observation)
+        {
+            Reject(delegate { Qualification.Accept(observation); });
+            var c = Prefix(false); Reject(delegate { Append(c, "QUALIFICATION_OBSERVED", observation); }); Check(c.Count == 5);
         }
         private static void Append(List<byte[]> chain, string ev, Dictionary<string, object> facts)
         { chain.Add(Evidence.Make(chain, ev, facts, Host(), "2026-09-02T00:00:00.0000000Z", "PASS", null)); }
@@ -431,12 +510,220 @@ namespace P3R1OrdinaryPrincipalV1
         public static string Run(string temporaryRoot)
         {
             var tests = new Dictionary<string, Action>();
+            tests.Add("ordinary_observation_no_lsa", delegate {
+                foreach (bool performance in new[] { false, true }) {
+                    var fake = new QualificationFake(performance) { Creator = false, ThrowLsa = true };
+                    var observation = QualificationSession.ObserveCandidate(fake); Qualification.AcceptCandidate(observation);
+                    Check(J.Bytes(observation).SequenceEqual(J.Bytes(fake.Data)) && fake.Queries == 0);
+                    Check(!observation.ContainsKey("rights") && !observation.ContainsKey("rights_collection"));
+                }
+            });
+            tests.Add("candidate_owned_gates", delegate {
+                var changes = new Action<Dictionary<string, object>>[] {
+                    o => J.Obj(o["candidate_token"])["user_sid"] = Launcher.TRADING_SID,
+                    o => J.Obj(o["candidate_token"])["elevated"] = true,
+                    o => J.Obj(o["candidate_token"])["thread_token_absent"] = false,
+                    o => J.Obj(o["candidate_token"])["privileges"] = J.A(Privilege("SeDebugPrivilege", 0)),
+                    o => J.Obj(o["candidate_token"])["privileges"] = J.A(Privilege("SeUnknownPrivilege", 0)),
+                    o => o["direct_view"] = View(0),
+                    o => o["direct_view"] = View(0, Launcher.BUILTIN_USERS_SID, Launcher.PERFORMANCE_LOG_USERS_SID),
+                    o => o["indirect_view"] = View(1),
+                    o => J.Obj(o["account"])["enabled"] = false,
+                    o => J.Arr(o["relevant_edges"]).Clear(),
+                    o => J.Arr(J.Obj(o["candidate_token"])["groups"]).RemoveAll(g => J.S(J.Obj(g)["sid"]) == Gate.Interactive),
+                    o => J.Arr(J.Obj(o["candidate_token"])["groups"]).Add(TokenGroup(Gate.Administrators, 16)),
+                    o => J.Arr(o["relevant_edges"]).Add(J.O("member_sid", Launcher.BUILTIN_USERS_SID,
+                        "group_sid", Launcher.PERFORMANCE_LOG_USERS_SID, "origin", "NESTED"))
+                };
+                foreach (var change in changes) {
+                    var fake = new QualificationFake(true) { Creator = false, ThrowLsa = true }; change(fake.Data);
+                    Reject(delegate { fake.WriteLine(Encoding.UTF8.GetString(J.Bytes(QualificationSession.ObserveCandidate(fake)))); });
+                    Check(fake.Queries == 0 && fake.Output.Count == 0);
+                }
+            });
+            tests.Add("candidate_closed_schema", delegate {
+                var candidate = Candidate(false);
+                foreach (string key in candidate.Keys) { var o = J.Obj(J.Clone(candidate)); o.Remove(key); Reject(delegate { Qualification.AcceptCandidate(o); }); }
+                foreach (string key in new[] { "rights", "rights_collection", "candidate_observation_sha256", "native_handle" }) {
+                    var o = Candidate(false); o.Add(key, J.A()); Reject(delegate { Qualification.AcceptCandidate(o); });
+                }
+                var wrong = Candidate(false); wrong["schema"] = Qualification.SplitSchema; Reject(delegate { Qualification.AcceptCandidate(wrong); });
+                wrong = Candidate(false); wrong["collection_method"] = "operator_observed_console"; Reject(delegate { Qualification.AcceptCandidate(wrong); });
+                var bounded = Candidate(false); J.Obj(bounded["candidate_token"])["groups"] = Enumerable.Repeat((object)TokenGroup(Gate.Interactive, 7), Qualification.MaxTargets).ToList();
+                RejectCode(delegate { Qualification.Targets(bounded); }, "RIGHT_TARGET_BOUND", false);
+                var duplicate = Candidate(false); J.Arr(J.Obj(duplicate["candidate_token"])["groups"]).Add(TokenGroup(Gate.Interactive, 7));
+                Reject(delegate { Qualification.Targets(duplicate); });
+                foreach (string sid in new[] { "S-1-05-4", "S-1-5-4294967296", "S-1-281474976710656-1", "S-1-5-4\n" }) {
+                    var malformed = Candidate(false); J.Obj(J.Arr(J.Obj(malformed["candidate_token"])["groups"])[0])["sid"] = sid;
+                    Reject(delegate { Qualification.Targets(malformed); });
+                }
+                // A candidate SID already in the group list is deduplicated as a query target,
+                // but remains an unknown group and cannot qualify.
+                var union = Candidate(false); J.Arr(J.Obj(union["candidate_token"])["groups"]).Add(TokenGroup(TestSid, 7));
+                Proof.Sort(J.Arr(J.Obj(union["candidate_token"])["groups"]), "sid name");
+                Check(Qualification.Targets(union).Count(t => J.S(t) == TestSid) == 1);
+                Reject(delegate { Qualification.AcceptCandidate(union); });
+            });
+            tests.Add("creator_rights_success", delegate {
+                var fake = new QualificationFake(true); var o = fake.Transfer(); Qualification.Accept(o);
+                var c = Collection(o); var targets = Qualification.Targets(fake.Data);
+                Check(fake.Queried.SequenceEqual(targets.Select(J.S)) && fake.Queries == targets.Count);
+                Check(J.S(o["candidate_observation_sha256"]) == J.Hash(J.Bytes(fake.Data)));
+                Check(fake.Output[1] == Encoding.UTF8.GetString(J.Bytes(fake.Data)));
+                Check(fake.Calls.IndexOf("ACCOUNT") < fake.Calls.IndexOf("CONFIRM") && fake.Calls.IndexOf("EDGES") < fake.Calls.IndexOf("CONFIRM"));
+                Check(fake.Calls[fake.Calls.IndexOf("LSA") - 1] == "TOKEN" && fake.Calls[fake.Calls.IndexOf("LSA") - 2] == "CONFIRM");
+                Check(fake.TokenCalls == 2 && J.N(c["policy_access"]) == 2048);
+                Check(J.Arr(o["rights"]).Count == 2 * targets.Count);
+                foreach (object v in J.Arr(o["rights"])) {
+                    var r = J.Obj(v); J.Eq(r["origin"], J.S(r["principal_sid"]) == TestSid ? "DIRECT" : "NESTED"); J.Eq(r["disposition"], "ACCEPTED");
+                }
+            });
+            tests.Add("creator_no_lsa_account", delegate {
+                var fake = new QualificationFake(false) { RightsOverride = sid => new LsaRightsResult(
+                    sid == TestSid ? 0U : Qualification.NoLsaAccount, new List<string>()) };
+                var o = fake.Transfer(); Qualification.Accept(o); Check(J.Arr(o["rights"]).Count == 0);
+                foreach (object v in J.Arr(Collection(o)["queries"])) {
+                    var q = J.Obj(v); bool candidate = J.S(q["principal_sid"]) == TestSid;
+                    J.Eq(q["native_status"], candidate ? 0UL : (ulong)Qualification.NoLsaAccount);
+                    J.Eq(q["result"], candidate ? "RIGHTS_RETURNED" : "NO_LSA_ACCOUNT_OBJECT"); J.Eq(q["rights_count"], 0UL);
+                }
+                fake = new QualificationFake(false) { RightsOverride = sid => new LsaRightsResult(Qualification.NoLsaAccount, new List<string> { "SeInteractiveLogonRight" }) };
+                RejectCode(delegate { fake.Transfer(); }, "LSA_EMPTY", false); Check(fake.Queries == 1);
+            });
+            tests.Add("creator_lsa_failure", delegate {
+                foreach (uint status in new uint[] { 0xC0000022, 0xC0000001, 5, UInt32.MaxValue }) {
+                    var fake = new QualificationFake(false) { RightsOverride = sid => new LsaRightsResult(status, new List<string>()) };
+                    var store = new MemoryStore { Records = Prefix(false) }; var journal = new Journal(store, Host());
+                    RejectCode(delegate { QualificationSession.Qualify(fake, fake, journal, TestSid, fake.ReadLine, fake.WriteLine); }, "LSA_RIGHTS", false);
+                    Check(fake.Queries == 1 && store.Writes == 0 && journal.Confirmed.Count == 5);
+                }
+            });
+            tests.Add("rights_target_set", delegate {
+                var changes = new Action<List<object>>[] {
+                    a => a.RemoveAt(0), a => a.Add("S-1-5-999"), a => a.Insert(0, a[0]),
+                    a => a.Reverse(), a => a[0] = "S-1-5-999", a => a[0] = "S-1-05-4"
+                };
+                foreach (var change in changes) { var o = Observation(false); change(J.Arr(Collection(o)["target_sids"])); RejectSplit(o); }
+            });
+            tests.Add("rights_query_set", delegate {
+                var changes = new Action<List<object>>[] {
+                    a => a.RemoveAt(0), a => a.Add(J.Clone(a[0])), a => a[1] = J.Clone(a[0]),
+                    a => a.Reverse(), a => J.Obj(a[0])["principal_sid"] = "S-1-5-999"
+                };
+                foreach (var change in changes) { var o = Observation(false); change(J.Arr(Collection(o)["queries"])); RejectSplit(o); }
+            });
+            tests.Add("candidate_hash_mismatch", delegate {
+                var o = Observation(false); o["candidate_observation_sha256"] = new string('0', 64); RejectSplit(o);
+                o = Observation(false); var candidate = J.Obj(o["candidate_observation"]); var t = J.Obj(candidate["candidate_token"]);
+                t["privileges"] = J.A(Privilege("SeShutdownPrivilege", 0)); Qualification.AcceptCandidate(candidate); RejectSplit(o);
+            });
+            tests.Add("candidate_transfer_reconciliation", delegate {
+                foreach (string key in new[] { "account", "direct_view", "indirect_view", "relevant_edges" }) {
+                    var fake = new QualificationFake(false);
+                    if (key == "account") J.Obj(fake.Data[key])["sid"] = Gate.MachineSid + "-424243";
+                    else if (key == "relevant_edges") J.Arr(fake.Data[key]).Clear();
+                    else fake.Data[key] = View(key == "direct_view" ? 0UL : 1UL);
+                    Reject(delegate { fake.Transfer(); }); Check(fake.Queries == 0 && fake.TokenCalls == 1 && fake.Output.Count == 1);
+                }
+                foreach (string confirmation in new[] { "EXACT_CONSOLE_MATCH", "", "EXACT_CANDIDATE_CONSOLE_MATCH ", null }) {
+                    var fake = new QualificationFake(false); fake.Input = new Queue<string>(new[] { Encoding.UTF8.GetString(J.Bytes(fake.Data)), confirmation });
+                    RejectCode(delegate { fake.Transfer(); }, "OBSERVATION_TRANSFER_UNCONFIRMED", false); Check(fake.Queries == 0 && fake.TokenCalls == 1);
+                }
+                foreach (string text in new[] { "{}", Encoding.UTF8.GetString(J.Bytes(Candidate(false))) + "\n", Encoding.UTF8.GetString(J.Bytes(Observation(false))), null }) {
+                    var fake = new QualificationFake(false); fake.Input = new Queue<string>(new[] { text, "EXACT_CANDIDATE_CONSOLE_MATCH" });
+                    Reject(delegate { fake.Transfer(); }); Check(fake.Queries == 0 && fake.Output.Count == 1);
+                }
+                var mismatch = new QualificationFake(false);
+                Reject(delegate { QualificationSession.TransferAndCollect(mismatch, mismatch, Gate.MachineSid + "-424243", mismatch.ReadLine, mismatch.WriteLine); });
+                Check(mismatch.Queries == 0 && mismatch.Output.Count == 1);
+            });
+            tests.Add("collector_token_revalidation", delegate {
+                var changes = new Action<Dictionary<string, object>>[] {
+                    t => t["user_sid"] = Launcher.TRADING_SID, t => t["token_type"] = 2UL,
+                    t => t["elevated"] = false, t => t["elevation_type"] = 3UL, t => t["thread_token_absent"] = false,
+                    t => { t["groups"] = J.A(); t["administrators_present"] = false; t["administrators_enabled"] = false; },
+                    t => { t["groups"] = J.A(TokenGroup(Gate.Administrators, 16)); t["administrators_enabled"] = false; t["administrators_deny_only"] = true; },
+                    t => { t["groups"] = J.A(TokenGroup(Gate.Administrators, 0)); t["administrators_enabled"] = false; }
+                };
+                foreach (var change in changes) {
+                    foreach (int failAt in new[] { 1, 2 }) {
+                        var fake = new QualificationFake(false) { TokenOverride = n => { var t = Token(true); if (n == failAt) change(t); return t; } };
+                        Reject(delegate { fake.Transfer(); }); Check(fake.Queries == 0 && fake.TokenCalls == failAt);
+                        Check(failAt != 2 || fake.Calls.Contains("CONFIRM"));
+                    }
+                    var o = Observation(false); change(J.Obj(Collection(o)["collector_token"])); RejectSplit(o);
+                }
+            });
+            tests.Add("rights_dispositions", delegate {
+                foreach (string name in new[] { "SeDebugPrivilege", "SeServiceLogonRight", "SeUnknownRight" }) {
+                    var fake = new QualificationFake(false) { RightsOverride = sid => new LsaRightsResult(0, new List<string> { name }) };
+                    var store = new MemoryStore { Records = Prefix(false) }; var journal = new Journal(store, Host());
+                    Reject(delegate { QualificationSession.Qualify(fake, fake, journal, TestSid, fake.ReadLine, fake.WriteLine); });
+                    Check(fake.Queries > 0 && store.Writes == 0);
+                    var o = Observation(false); var r = J.Obj(J.Arr(o["rights"])[0]); r["name"] = name; r["disposition"] = "ACCEPTED";
+                    Proof.Sort(J.Arr(o["rights"]), "principal_sid name origin"); RejectSplit(o);
+                    r["disposition"] = Qualification.RightDisposition(name); RejectSplit(o);
+                }
+            });
+            tests.Add("rights_query_integrity", delegate {
+                var changes = new Action<Dictionary<string, object>>[] {
+                    o => J.Arr(o["rights"]).RemoveAt(0),
+                    o => J.Arr(o["rights"]).Add(J.Clone(J.Arr(o["rights"])[0])),
+                    o => J.Arr(o["rights"]).Reverse(),
+                    o => J.Obj(J.Arr(o["rights"])[0])["principal_sid"] = "S-1-5-999",
+                    o => J.Obj(J.Arr(o["rights"])[0])["origin"] = "LOGON_CONTEXT",
+                    o => J.Obj(J.Arr(Collection(o)["queries"])[0])["rights_count"] = 0UL,
+                    o => J.Obj(J.Arr(Collection(o)["queries"])[0])["native_status"] = 0xC0000022UL,
+                    o => J.Obj(J.Arr(Collection(o)["queries"])[0])["result"] = "NO_LSA_ACCOUNT_OBJECT",
+                    o => { var q = J.Obj(J.Arr(Collection(o)["queries"])[0]); q["native_status"] = (ulong)Qualification.NoLsaAccount; q["result"] = "NO_LSA_ACCOUNT_OBJECT"; },
+                    o => Collection(o)["policy_access"] = 1UL,
+                    o => Collection(o)["collection_method"] = "operator_observed_candidate_console"
+                };
+                foreach (var change in changes) { var o = Observation(false); change(o); RejectSplit(o); }
+                foreach (var names in new[] { new List<string> { "SeInteractiveLogonRight", "SeInteractiveLogonRight" }, new List<string> { "" }, new List<string> { "SeInteractiveLogonRight\n" }, null }) {
+                    var fake = new QualificationFake(false) { RightsOverride = sid => new LsaRightsResult(0, names) }; Reject(delegate { fake.Transfer(); });
+                }
+            });
+            tests.Add("split_closed_schema", delegate {
+                var original = Observation(false);
+                foreach (string key in original.Keys) { var o = J.Obj(J.Clone(original)); o.Remove(key); RejectSplit(o); }
+                foreach (string level in new[] { "split", "collection", "query", "right" }) {
+                    var o = Observation(false); var obj = level == "split" ? o : level == "collection" ? Collection(o) :
+                        level == "query" ? J.Obj(J.Arr(Collection(o)["queries"])[0]) : J.Obj(J.Arr(o["rights"])[0]);
+                    foreach (string key in obj.Keys.ToArray()) { object saved = obj[key]; obj.Remove(key); RejectSplit(o); obj.Add(key, saved); }
+                    obj.Add("unlisted", false); RejectSplit(o);
+                }
+                foreach (string schema in new[] { "p3-r1-ordinary-nonadmin-principal-evidence/v1", "p3-r1-ordinary-nonadmin-principal-evidence/v2" }) {
+                    var r = J.Obj(J.Parse(Prefix(false)[0])); r["schema"] = schema; Reject(delegate { Evidence.Validate(new List<byte[]> { J.Bytes(r) }); });
+                }
+            });
+            tests.Add("split_halves_rejected", delegate {
+                RejectSplit(Candidate(false)); RejectSplit(Collection(Observation(false)));
+                var c = Prefix(false); Reject(delegate { Append(c, "GROUPS_QUALIFIED", J.O()); }); Reject(delegate { Append(c, "TOKEN_QUALIFIED", J.O()); });
+                var final = Observation(false); J.Obj(final["candidate_observation"])["direct_view"] = View(0);
+                final["candidate_observation_sha256"] = J.Hash(J.Bytes(final["candidate_observation"])); RejectSplit(final);
+            });
+            tests.Add("split_lifecycle", delegate {
+                foreach (bool add in new[] { false, true }) {
+                    var records = Prefix(add); if (add) { Append(records, "USERS_ASSIGNMENT_ATTEMPTED", UsersAttempt()); Append(records, "USERS_ASSIGNMENT_CONFIRMED", UsersConfirmed()); }
+                    var store = new MemoryStore { Records = records }; var journal = new Journal(store, Host()); var fake = new QualificationFake(true);
+                    QualificationSession.Qualify(fake, fake, journal, TestSid, fake.ReadLine, fake.WriteLine); Evidence.Validate(store.Records);
+                    Check(store.Writes == 3 && fake.TokenCalls == 3 && Evidence.Next(journal.Confirmed) == null);
+                    var observationRecord = J.Obj(J.Parse(store.Records[store.Records.Count - 3]));
+                    var groups = J.Obj(J.Parse(store.Records[store.Records.Count - 2])); var last = J.Obj(J.Parse(store.Records.Last()));
+                    J.Eq(J.Obj(groups["facts"])["observation_sha256"], J.Hash(store.Records[store.Records.Count - 3]));
+                    J.Eq(J.Obj(last["facts"])["observation_sha256"], J.Obj(groups["facts"])["observation_sha256"]);
+                    J.Eq(J.Obj(observationRecord["lifecycle"])["GROUPS_QUALIFIED"], false);
+                    J.Eq(J.Obj(last["lifecycle"])["GROUPS_QUALIFIED"], true); J.Eq(J.Obj(last["lifecycle"])["TOKEN_QUALIFIED"], true);
+                    J.Eq(J.Obj(last["lifecycle"])["USERS_ASSIGNMENT_ATTEMPTED"], add);
+                }
+            });
             tests.Add("fixed_identities", delegate {
                 Check(Launcher.HOST == "DESKTOP-I4DOKM7" && Launcher.CANDIDATE_NAME == "P3R1KspTestUser");
                 Check(Launcher.CREATOR_SID == Gate.MachineSid + "-1005" && Launcher.TRADING_SID == Gate.MachineSid + "-1009");
                 Check(Launcher.BUILTIN_USERS_SID == "S-1-5-32-545" && Launcher.PERFORMANCE_LOG_USERS_SID == "S-1-5-32-559");
                 Check(Launcher.CEREMONY_EVIDENCE_ROOT == @"F:\p3-r1-ordinary-nonadmin-principal-v2" && Launcher.KSP_EVIDENCE_ROOT == @"F:\AI\p3-r1-ksp-disposable-test-v1");
-                Check(Gate.Schema == "p3-r1-ordinary-nonadmin-principal-evidence/v2");
+                Check(Gate.Schema == "p3-r1-ordinary-nonadmin-principal-evidence/v3");
             });
             tests.Add("real_gates", delegate {
                 Reject(Launcher.RunFutureCeremony); Reject(delegate { new WindowsAdapter(); }); Reject(delegate { new FixedStore(); });
@@ -535,19 +822,19 @@ namespace P3R1OrdinaryPrincipalV1
                 Reject(delegate { Qualification.Accept(right); });
             });
             tests.Add("performance_provenance", delegate {
-                Qualification.Accept(Observation(true)); Qualification.Accept(Observation(false));
+                Qualification.AcceptCandidate(Candidate(true)); Qualification.AcceptCandidate(Candidate(false));
                 foreach (string key in new[] { "direct_assignment", "interactive_enabled", "host_edge_present", "alternate_path_present", "provenance_passed" }) {
-                    var o = Observation(true); var p = J.Obj(o["performance_log_users"]); p[key] = !J.B(p[key]); Reject(delegate { Qualification.Accept(o); });
+                    var o = Candidate(true); var p = J.Obj(o["performance_log_users"]); p[key] = !J.B(p[key]); Reject(delegate { Qualification.AcceptCandidate(o); });
                 }
-                var missing = Observation(true); J.Arr(missing["relevant_edges"]).RemoveAt(1); J.Obj(missing["performance_log_users"])["host_edge_present"] = false;
-                Reject(delegate { Qualification.Accept(missing); });
-                var direct = Observation(true); direct["direct_view"] = View(0, Launcher.BUILTIN_USERS_SID, Launcher.PERFORMANCE_LOG_USERS_SID); Reject(delegate { Qualification.Accept(direct); });
+                var missing = Candidate(true); J.Arr(missing["relevant_edges"]).RemoveAt(1); J.Obj(missing["performance_log_users"])["host_edge_present"] = false;
+                Reject(delegate { Qualification.AcceptCandidate(missing); });
+                var direct = Candidate(true); direct["direct_view"] = View(0, Launcher.BUILTIN_USERS_SID, Launcher.PERFORMANCE_LOG_USERS_SID); Reject(delegate { Qualification.AcceptCandidate(direct); });
             });
             tests.Add("graph_cycle_and_alternate", delegate {
                 var cycle = J.A(J.O("member_sid", "S-1-5-4", "group_sid", "S-1-5-11", "origin", "NESTED"), J.O("member_sid", "S-1-5-11", "group_sid", "S-1-5-4", "origin", "NESTED"));
                 Reject(delegate { Qualification.Reach(new[] { "S-1-5-4" }, cycle, false); });
-                var o = Observation(true); J.Arr(o["relevant_edges"]).Add(J.O("member_sid", Launcher.BUILTIN_USERS_SID, "group_sid", Launcher.PERFORMANCE_LOG_USERS_SID, "origin", "NESTED"));
-                Proof.Sort(J.Arr(o["relevant_edges"]), "member_sid group_sid origin"); Reject(delegate { Qualification.Accept(o); });
+                var o = Candidate(true); J.Arr(o["relevant_edges"]).Add(J.O("member_sid", Launcher.BUILTIN_USERS_SID, "group_sid", Launcher.PERFORMANCE_LOG_USERS_SID, "origin", "NESTED"));
+                Proof.Sort(J.Arr(o["relevant_edges"]), "member_sid group_sid origin"); Reject(delegate { Qualification.AcceptCandidate(o); });
             });
             tests.Add("strict_json", delegate {
                 foreach (string text in new[] { "{}\n", " { }", "{\"a\":1,\"a\":1}", "{\"a\":01}", "{\"a\":-0}", "{\"a\":1.0}", "{\"a\":1e0}", "{\"a\":18446744073709551616}", "{\"a\":\"\\ud800\"}", "{\"z\":0,\"a\":0}", "\ufeff{}" })
@@ -576,7 +863,9 @@ namespace P3R1OrdinaryPrincipalV1
                 Reject(delegate { Evidence.Validate(regression); });
             });
             tests.Add("evidence_sid_drift", delegate {
-                var c = Prefix(false); var o = Observation(false); J.Obj(o["account"])["sid"] = Gate.MachineSid + "-424243";
+                var c = Prefix(false); var o = J.Obj(J.Parse(Encoding.UTF8.GetBytes(
+                    Encoding.UTF8.GetString(J.Bytes(Observation(false))).Replace(TestSid, Gate.MachineSid + "-424243"))));
+                o["candidate_observation_sha256"] = J.Hash(J.Bytes(o["candidate_observation"])); Qualification.Accept(o);
                 Reject(delegate { Append(c, "QUALIFICATION_OBSERVED", o); });
                 var wrong = Prefix(true); var attempt = UsersAttempt(); attempt["member_sid"] = Launcher.TRADING_SID; Reject(delegate { Append(wrong, "USERS_ASSIGNMENT_ATTEMPTED", attempt); });
             });

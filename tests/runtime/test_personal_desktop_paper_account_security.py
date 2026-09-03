@@ -149,6 +149,7 @@ class MemoryReadApi:
 
 
 def test_exact_constants_and_existing_c1_path_guard_is_unchanged():
+    assert security.PERSONAL_DESKTOP_PAPER_V2_PRODUCTION_EFFECTS_ENABLED is False
     assert ROOT == r"F:\AITradingBot\Paper-v2"
     assert (
         security.PERSONAL_DESKTOP_PAPER_V2_STAGING_ROOT
@@ -628,6 +629,103 @@ def test_recursive_pin_crosses_representative_safe_volume_acl(owner):
     opened = [call[1] for call in api.calls if call[0] == "open"]
     assert opened[:4] == ["F:\\", security.PERSONAL_DESKTOP_PAPER_PARENT, ROOT, ANCHOR]
     assert api.inspections["F:\\"] >= 3  # initial, retained, and reopened checks
+    assert not api.handles
+
+
+@pytest.mark.parametrize("field", ["byte_length", "links"])
+def test_publication_parent_metadata_reproduces_strict_read_failure(field):
+    api = MemoryReadApi()
+    path = security.PERSONAL_DESKTOP_PAPER_PARENT
+    api.put(path)
+    with security.PinnedPaperPublicationParent(api, SID) as parent:
+        # The exact generic session/comparison used by the old publisher.
+        with pytest.raises(
+            AuthorityObjectError, match="pinned identity/security drift"
+        ):
+            with security.PinnedPaperReadSession(api, SID) as ordinary:
+                ordinary.pin(path)
+                node = api.nodes[path]
+                node.observation = replace(
+                    node.observation, **{field: getattr(node.observation, field) + 1}
+                )
+                parent.finish()
+    assert not api.handles
+
+
+@pytest.mark.parametrize("named_only", [False, True])
+@pytest.mark.parametrize("path", ["F:\\", security.PERSONAL_DESKTOP_PAPER_PARENT])
+@pytest.mark.parametrize(
+    "change",
+    [
+        "identity",
+        "identity-type",
+        "owner",
+        "acl",
+        "protected",
+        "expected-path",
+        "final-path",
+        "kind",
+        "reparse",
+        "volume",
+        "filesystem",
+    ],
+)
+def test_publication_parent_rejects_authority_drift(path, change, named_only):
+    api = MemoryReadApi()
+    api.put(security.PERSONAL_DESKTOP_PAPER_PARENT)
+    with pytest.raises((AuthorityObjectError, AuthoritySecurityError)):
+        with security.PinnedPaperPublicationParent(api, SID):
+            node = api.nodes[path]
+            observed = node.observation
+            if change == "identity":
+                changed = replace(observed, identity=(7, 999))
+            elif change == "identity-type":
+                changed = replace(
+                    observed, identity=tuple(map(float, observed.identity))
+                )
+            else:
+                fields = {
+                    "owner": {"owner_sid": security.SYSTEM_SID},
+                    "acl": {"aces": tuple(reversed(observed.security.aces))},
+                    "protected": {"dacl_protected": False},
+                    "expected-path": {"expected_path": path.lower()},
+                    "final-path": {"final_path": path.lower()},
+                    "kind": {"kind": AuthorityObjectKind.FILE},
+                    "reparse": {"is_reparse_point": True},
+                    "volume": {"volume_root": "G:\\"},
+                    "filesystem": {"filesystem": "FAT32"},
+                }
+                changed = replace(
+                    observed, security=replace(observed.security, **fields[change])
+                )
+            if named_only:
+                api.nodes[path] = replace(node, observation=changed)
+            else:
+                node.observation = changed
+    assert not api.handles
+
+
+@pytest.mark.parametrize("field", ["byte_length", "links"])
+def test_publication_guard_does_not_relax_volume_metadata(field):
+    api = MemoryReadApi()
+    api.put(security.PERSONAL_DESKTOP_PAPER_PARENT)
+    with pytest.raises(AuthorityObjectError, match="identity/security drift"):
+        with security.PinnedPaperPublicationParent(api, SID):
+            node = api.nodes["F:\\"]
+            node.observation = replace(node.observation, **{field: 9})
+    assert not api.handles
+
+
+def test_explicit_parent_inventory_remains_strict_during_publication():
+    api = MemoryReadApi()
+    path = security.PERSONAL_DESKTOP_PAPER_PARENT
+    api.put(path)
+    with security.PinnedPaperPublicationParent(api, SID) as parent:
+        with pytest.raises(AuthorityObjectError, match="inventory changed"):
+            with security.PinnedPaperReadSession(api, SID) as ordinary:
+                assert ordinary.names(path) == ()
+                api.overrides[path] = (".Paper-v2.provisioning",)
+                parent.finish()
     assert not api.handles
 
 

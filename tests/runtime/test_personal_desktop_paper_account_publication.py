@@ -104,7 +104,7 @@ sys.addaudithook(_production_path_guard)
 
 @pytest.fixture(autouse=True)
 def prohibit_production_effects(monkeypatch):
-    assert security.PERSONAL_DESKTOP_PAPER_V2_PRODUCTION_EFFECTS_ENABLED is True
+    assert security.PERSONAL_DESKTOP_PAPER_V2_PRODUCTION_EFFECTS_ENABLED is False
     configured = publication_freeze.PERSONAL_DESKTOP_PAPER_V2_PUBLICATION_FREEZE
     assert type(configured) is PersonalDesktopPaperPublicationFreeze
     assert configured is PERSONAL_DESKTOP_PAPER_V2_PUBLICATION_FREEZE
@@ -130,7 +130,7 @@ def prohibit_production_effects(monkeypatch):
     try:
         yield
         assert _production_events == []
-        assert security.PERSONAL_DESKTOP_PAPER_V2_PRODUCTION_EFFECTS_ENABLED is True
+        assert security.PERSONAL_DESKTOP_PAPER_V2_PRODUCTION_EFFECTS_ENABLED is False
         assert (
             publication_freeze.PERSONAL_DESKTOP_PAPER_V2_PUBLICATION_FREEZE
             is configured
@@ -933,9 +933,6 @@ def test_production_false_gate_precedes_inputs_native_construction_and_every_eff
     )
     monkeypatch.setenv("PERSONAL_DESKTOP_PAPER_V2_PRODUCTION_EFFECTS_ENABLED", "true")
     with monkeypatch.context() as patch:
-        patch.setattr(
-            security, "PERSONAL_DESKTOP_PAPER_V2_PRODUCTION_EFFECTS_ENABLED", False
-        )
         patch.setattr(security.WindowsPaperReadNativeApi, "__init__", forbidden)
         patch.setattr(publication.WindowsTradingTokenObserver, "__init__", forbidden)
         with pytest.raises(PersonalDesktopPaperAccountError, match="disabled"):
@@ -944,7 +941,7 @@ def test_production_false_gate_precedes_inputs_native_construction_and_every_eff
 
 
 def test_enabled_publisher_reaches_fake_freeze_admission_without_effects(monkeypatch):
-    assert security.PERSONAL_DESKTOP_PAPER_V2_PRODUCTION_EFFECTS_ENABLED is True
+    assert security.PERSONAL_DESKTOP_PAPER_V2_PRODUCTION_EFFECTS_ENABLED is False
     calls = []
 
     class AdmissionStopped(RuntimeError):
@@ -969,8 +966,14 @@ def test_enabled_publisher_reaches_fake_freeze_admission_without_effects(monkeyp
         "require_production_paper_publication_freeze",
         stop_at_freeze,
     )
-    with pytest.raises(AdmissionStopped, match="test-only freeze admission boundary"):
-        publication.publish_personal_desktop_paper_account(bundle=Hostile())
+    with monkeypatch.context() as patch:
+        patch.setattr(
+            security, "PERSONAL_DESKTOP_PAPER_V2_PRODUCTION_EFFECTS_ENABLED", True
+        )
+        with pytest.raises(
+            AdmissionStopped, match="test-only freeze admission boundary"
+        ):
+            publication.publish_personal_desktop_paper_account(bundle=Hostile())
     assert calls == ["freeze-admission"]
 
 

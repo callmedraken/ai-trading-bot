@@ -10,6 +10,7 @@ from __future__ import annotations
 import ctypes
 import os
 import re
+from contextlib import ExitStack
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Protocol, Self
@@ -56,7 +57,7 @@ PERSONAL_DESKTOP_PAPER_V2_ANCHOR = (
     PERSONAL_DESKTOP_PAPER_V2_ROOT + r"\personal-desktop-paper-account-authority.json"
 )
 PERSONAL_DESKTOP_PAPER_PARENT = r"F:\AITradingBot"
-PERSONAL_DESKTOP_PAPER_V2_PRODUCTION_EFFECTS_ENABLED = True
+PERSONAL_DESKTOP_PAPER_V2_PRODUCTION_EFFECTS_ENABLED = False
 MAX_INSTALLED_PAPER_ANCHOR_BYTES = 4096
 MAX_PAPER_V2_DIRECTORY_ENTRIES = 1024
 MAX_PAPER_V2_PINNED_OBJECTS = 8192
@@ -492,6 +493,92 @@ class _Pinned:
     observation: PaperObjectObservation
     payload: bytes | None = None
     names: tuple[str, ...] | None = None
+
+
+class PinnedPaperPublicationParent:
+    """Hold only the fixed publication parent chain across child creation.
+
+    Parent directory size/link metadata is not authority and may change as the
+    publisher creates its child. All security and stable identity facts remain
+    pinned. The volume observation remains exact. This guard offers no artifact
+    or inventory API; ordinary pinned reads retain their full drift checks.
+    """
+
+    def __init__(self, api: PaperReadNativeApi, trading_sid: str) -> None:
+        self._api = api
+        self._sid = trading_sid
+        self._handles = ExitStack()
+        self._objects: dict[str, _Pinned] = {}
+        self._closed = False
+
+    def __enter__(self) -> Self:
+        if self._closed or self._objects:
+            raise AuthorityObjectError("publication parent guard cannot be reused")
+        try:
+            for path in ("F:\\", PERSONAL_DESKTOP_PAPER_PARENT):
+                spec = paper_object_spec(path)
+                handle = self._api.open(path, spec.kind)
+                self._handles.callback(self._api.close, handle)
+                observed = self._api.inspect(handle, path, spec.kind)
+                require_paper_object_security(path, spec, observed.security, self._sid)
+                if (
+                    type(observed.identity) is not tuple
+                    or len(observed.identity) != 2
+                    or any(type(n) is not int or n < 0 for n in observed.identity)
+                    or observed.identity[1] == 0
+                ):
+                    raise AuthorityObjectError("publication parent identity is invalid")
+                self._objects[path] = _Pinned(handle, spec, observed)
+            self.finish()
+        except BaseException:
+            self._closed = True
+            self._handles.close()
+            raise
+        return self
+
+    def __exit__(self, exc_type: object, exc: object, traceback: object) -> None:
+        try:
+            if exc_type is None:
+                self.finish()
+        finally:
+            self._closed = True
+            self._handles.close()
+
+    def finish(self) -> None:
+        """Revalidate held handles and independently reopen both fixed names."""
+        if self._closed or set(self._objects) != {
+            "F:\\",
+            PERSONAL_DESKTOP_PAPER_PARENT,
+        }:
+            raise AuthorityObjectError("publication parent guard is not active")
+        for path, pinned in self._objects.items():
+
+            def check(
+                path: str, pinned: _Pinned, observed: PaperObjectObservation
+            ) -> None:
+                require_paper_object_security(
+                    path, pinned.spec, observed.security, self._sid
+                )
+                previous = pinned.observation
+                if (
+                    type(observed.identity) is not tuple
+                    or any(type(n) is not int for n in observed.identity)
+                    or observed.security != previous.security
+                    or observed.identity != previous.identity
+                    or (path != PERSONAL_DESKTOP_PAPER_PARENT and observed != previous)
+                ):
+                    raise AuthorityObjectError(
+                        "publication parent identity/security drift"
+                    )
+
+            check(
+                path, pinned, self._api.inspect(pinned.handle, path, pinned.spec.kind)
+            )
+            reopened = self._api.open(path, pinned.spec.kind)
+            try:
+                check(path, pinned, self._api.inspect(reopened, path, pinned.spec.kind))
+            finally:
+                self._api.close(reopened)
 
 
 class PinnedPaperReadSession:

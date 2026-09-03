@@ -103,8 +103,9 @@ class PaperPublicationPhase(StrEnum):
 class PaperPublicationResult:
     """Observation only, never a production account capability or retry permit.
 
-    None means occupancy could not be read. Flags are set BEFORE potentially
-    durable calls, so even loss of a native response consumes this attempt.
+    State is the last safely read occupancy, not current authority after a later
+    parent failure. None means occupancy could not be read. Flags are set BEFORE
+    potentially durable calls, so even loss of a native response consumes this attempt.
     """
 
     status: PaperPublicationStatus
@@ -510,10 +511,9 @@ def publish_personal_desktop_paper_account(
     sid = validation.bootstrap_verification.bootstrap.approved_account_sid
     result = None
     try:
-        with security.PinnedPaperReadSession(
+        with security.PinnedPaperPublicationParent(
             security.WindowsPaperReadNativeApi(), sid
         ) as parent:
-            parent.pin(security.PERSONAL_DESKTOP_PAPER_PARENT)
 
             def revalidate() -> None:
                 if require_paper_publication_inputs(bundle=bundle) != validation:
@@ -536,6 +536,8 @@ def publish_personal_desktop_paper_account(
             raise  # Preflight failed; no publication invocation began.
         # Parent finish/close is part of acceptance, too. A failed parent
         # observation makes a new path-based occupancy probe untrustworthy.
+        # Preserve previously read occupancy as historical evidence only, and
+        # preserve the primary failure when publication was already blocked.
         return replace(
             result,
             status=PaperPublicationStatus.BLOCKED,
@@ -544,8 +546,7 @@ def publish_personal_desktop_paper_account(
                 if result.phase is PaperPublicationPhase.COMPLETE
                 else result.phase
             ),
-            state=None,
-            failure_type=type(error).__name__,
+            failure_type=result.failure_type or type(error).__name__,
         )
 
 

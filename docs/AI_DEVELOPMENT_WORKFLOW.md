@@ -237,8 +237,13 @@ legacy harness cannot run from the reviewed worktree:
 Architecture-94 P2 historically required the clean-harness fallback: its focused
 P2 file passed 48 cases using an external basetemp, while five selected C2 nodes
 expanded to 77 cases and passed from the integration harness only after import
-provenance proved the exact P2 source was under test. That history explains the
-fallback; it is not the default for new tests.
+provenance proved the exact P2 source was under test. Architecture 100 later
+reused the same pattern for two unchanged legacy authority harnesses after an
+inaccessible worktree `.pytest_cache` invalidated the broad run: the exact test
+blobs were rerun from the integration harness, `PYTHONPATH` and printed
+`__file__` values proved the reviewed P3-R1 source was imported, and the entire
+legacy slice passed. That history explains the fallback; it is not the default
+for new tests.
 
 ## PowerShell and Git checkpoint style
 
@@ -265,6 +270,21 @@ Do not assume PowerShell 7 parameter compatibility. In particular,
 write-denial/temp probes, prefer `[System.IO.File]` APIs or a command form proven
 compatible with Windows PowerShell 5.1. A shell syntax/parameter failure is an
 operator-command defect and must not be classified as an application failure.
+
+Windows PowerShell 5.1 also has fragile native-command quoting for `python -c`
+when the Python snippet itself contains quotes, f-strings, or other
+quote-sensitive syntax. For provenance or validation snippets, prefer piping a
+single-quoted PowerShell here-string to Python stdin:
+
+```powershell
+@'
+print("provenance")
+'@ | & $python -B -
+```
+
+This keeps the Python program bytes out of PowerShell's native argument quoting
+boundary. If a `python -c` probe fails with visibly stripped/altered quoting,
+classify it as an operator-command defect, not a repository-source failure.
 
 ## Production runtime trust contexts
 

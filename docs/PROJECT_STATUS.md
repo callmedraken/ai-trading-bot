@@ -49,7 +49,22 @@ Architecture 102 adoption: fab1d776abcdcbf09fb26a257ea7fc86f6201b26
 Architecture 103 + validation plan: 12e41c4e407a79d63ea896773bf8462038ebba27
 ```
 
-A dedicated local worktree for this branch has **not yet been established**. Do not reuse the P3-R1, GUI/main, paper, or integration worktrees for PD1 source implementation.
+Accepted PD1 source checkpoints:
+
+```text
+PD1A pure authority/bundle: fa16eef106638e5d6441a05b7f0dd5f757a63e53
+PD1B read authority/security: 1390a16be5f16f7f38757c875a4648f7ef414d70
+PD1B accepted tree:          0e9942f293136e9fd6f3bb5c145ada42800608a6
+```
+
+Dedicated local worktree:
+
+```text
+F:\AI\worktrees\ai-trading-bot-personal-desktop
+feature/personal-desktop-paper-runtime
+```
+
+Do not reuse the P3-R1, GUI/main, paper, or integration worktrees for PD1 source implementation.
 
 ## Mandatory personal-desktop security baseline
 
@@ -199,6 +214,31 @@ Steady-state runtime authority requires the exact approved Trading SID, primary 
 
 Immutable root/anchor/GENESIS remain administrator-owned and Trading-read-only. Runtime containers grant the approved Trading SID only the data rights required for Architecture-67 transitions/receipts. Unrelated principals are rejected.
 
+For the fixed ancestor chain, the volume role allows ordinary concrete data/sibling rights that do not permit replacement of the governed child, while rejecting `FILE_DELETE_CHILD`, `WRITE_DAC`, `WRITE_OWNER`, and unknown masks. The immediate `F:\AITradingBot` parent remains more restrictive and rejects unrelated delete/replacement/security-control authority.
+
+### Accepted PD1A / PD1B source
+
+PD1A is source-accepted at `fa16eef106638e5d6441a05b7f0dd5f757a63e53`. It implements the deterministic v2 account ID, strict canonical anchor/manifest models, exact Architecture-61 GENESIS reuse, explicit positive `Decimal` starting cash, and preserved C1/P2 provenance with no filesystem/provider effect.
+
+PD1B is source-accepted at `1390a16be5f16f7f38757c875a4648f7ef414d70` after the bounded desktop-parent ACL correction. It adds:
+
+- exact native Trading-token observation with primary/non-elevated/no-thread-impersonation/no-enabled-Administrators requirements and no LSA dependency;
+- source-owned fixed v2 paths and bounded no-follow pinned reads;
+- role-based v2 ACL verification without modifying the existing C1 policy;
+- full installed-account reconstruction through existing Architecture-61/66/67 verification;
+- unique graph-derived terminal selection, receipt replay, historical snapshot/configuration dependency verification, and identity/security/content/inventory drift checks.
+
+Focused implementation evidence reported by Codex:
+
+```text
+initial PD1B focused/regression set: 553 passed
+parent-policy correction set:       244 passed
+Ruff check/format:                   passed
+git diff --check / whitespace:       passed
+```
+
+No broad PD1 suite or real installed-v2 Windows validation has been run yet. Those remain later gates.
+
 ### Crash semantics
 
 No automatic provisioning retry exists. If v2 staging creation may have begun and the process exits unexpectedly, that effect authorization is consumed and read-only reconciliation is required. Crash-left staging is never silently deleted/repaired/retried.
@@ -256,9 +296,9 @@ Architecture 102 adopted; new branch created from accepted P2; high-assurance br
 Architecture 103 and validation plan are frozen. Implementation sequence:
 
 ```text
-PD1A pure anchor / account-ID / provisioning-bundle model      NEXT
-PD1B Windows read-only authority + token/ACL/path policy
-PD1C production-disabled publisher + disposable publication tests
+PD1A pure anchor / account-ID / provisioning-bundle model      ACCEPTED
+PD1B Windows read-only authority + token/ACL/path policy       ACCEPTED
+PD1C production-disabled publisher + disposable publication   NEXT
 PD1D exact diff review + broad source certification
 PD1E separate production bundle/readiness/effect authorization
 ```
@@ -301,7 +341,7 @@ Live remains NO-GO until PD7 is separately accepted.
 
 ## Effect authorization state
 
-Architecture 103 is docs-only and authorizes **no operational effects**. Still not authorized:
+Architectures 102/103 plus accepted PD1A/PD1B source authorize **no operational effects**. Still not authorized:
 
 ```text
 retained v1 staging delete/repair/rename
@@ -337,4 +377,4 @@ docs/PROJECT_STATUS.md
 docs/AI_TRADING_BOT_HANDOFF.md
 ```
 
-Update `docs/AI_DEVELOPMENT_WORKFLOW.md` only for a new reusable workflow rule. Architecture 103 changes product/security architecture, not the reusable development workflow.
+Update `docs/AI_DEVELOPMENT_WORKFLOW.md` only for a new reusable workflow rule.

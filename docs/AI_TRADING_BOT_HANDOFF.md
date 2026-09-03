@@ -5,8 +5,8 @@
 **Accepted integrated baseline:** `bd88ee966bff455f9fc897d6cfdfafdd807f27e2`  
 **P3-R1 worktree:** `F:\AI\worktrees\ai-trading-bot-p3-r1`  
 **P3-R1 branch:** `feature/p3-r1-recovery-implementation`  
-**Architecture-100 checkpoint:** `e2861fab3af7d297d79274db2a82fd134672fb58`  
-**Architecture-100 tree:** `d6f9203184d90a0c409d929c25bb2c7e7e520f29`  
+**Architecture-100 source-certified checkpoint:** `8cfbbd3a30eb704e6acfc1866bf2ed752879e231`  
+**Architecture-100 source-certified tree:** `fc682a5baf35f2f2e8b01c9f8f04ce318681ee85`  
 **Production/live trading:** NO-GO
 
 > This Git-tracked handoff is the canonical cross-chat resume document. Uploaded
@@ -63,7 +63,8 @@ move, delete, or repair unrelated worktrees or retained evidence.
 
 ChatGPT/Sol owns architecture, debugging strategy, GitHub exact-diff review,
 test/certification gates, production-authority review, and next-step planning.
-Codex is a bounded implementation agent.
+Codex is a bounded implementation agent; ChatGPT may directly handle tiny,
+tightly scoped tasks and canonical documentation closeout.
 
 Model routing:
 
@@ -95,8 +96,7 @@ ChatGPT freezes architecture/scope
 -> Codex proves startup gate
 -> Codex changes only bounded files
 -> Codex runs focused isolated tests/checks
--> Codex reports without commit/push unless explicitly authorized
--> user stages exact paths, commits, and pushes when instructed
+-> when explicitly authorized, Codex stages exact files, commits, and ordinary-pushes
 -> ChatGPT reviews exact GitHub diff
 -> user runs broad/full local certification only after source-diff acceptance
 -> release/deployment/operator effects remain separate later gates
@@ -129,6 +129,12 @@ New tests use pytest-managed temp paths or another explicitly supplied external
 scratch root. Never intentionally use worktree `.pytest_cache` as native
 filesystem scratch. Preserve inaccessible or malformed historical pytest/cache
 evidence rather than deleting or taking ownership merely to make a gate pass.
+
+Legacy authority harnesses may still hard-code `.pytest_cache` scratch. If that
+scratch is inaccessible, do not repair/delete it merely for certification. Use a
+previously validated clean harness only when the test contract permits it, force
+`PYTHONPATH` to the exact reviewed source, print and verify affected module
+`__file__` provenance, and rerun only the invalidated legacy slice.
 
 ---
 
@@ -272,45 +278,16 @@ readback/mapping, a deterministic conditional BUILTIN\Users branch, genuine
 process-token qualification, sanitized retained evidence, and no automatic
 retry/rollback/cleanup/repair.
 
-### Disabled helper checkpoint
+### Architecture 100 source-certified helper
+
+The original disabled helper checkpoint was:
 
 ```text
 d509537b88f66ef244d326e5417d38d9e5f25f53
 test: add disabled P3-R1 test-user ceremony helper
 ```
 
-Changed only:
-
-```text
-scripts/p3_r1_ordinary_nonadmin_principal_ceremony.cs
-scripts/run_p3_r1_ordinary_nonadmin_principal_ceremony.ps1
-tests/runtime/test_p3_r1_ordinary_nonadmin_principal_ceremony.py
-```
-
-The helper remains source-only and disabled:
-
-```text
-ACCOUNT_EFFECT_EXECUTION_AUTHORIZED=false
-```
-
-Ordinary invocation cannot prompt for the account password or dispatch account/
-group effects.
-
-### Architecture 100 — accepted docs-only design
-
-Checkpoint:
-
-```text
-e2861fab3af7d297d79274db2a82fd134672fb58
-docs: define protected P3-R1 ceremony evidence root
-```
-
-A stopped read-only ACL/namespace diagnostic proved the old root under `F:\AI`
-was incompatible with the strict cross-run retained-path integrity model because
-untrusted authority on the ancestor could displace the pathname after in-run
-no-delete-share guards were released.
-
-Architecture 100 retires the old root before any effect occurred:
+Architecture 100 then retired the unsafe retained root under `F:\AI` and froze:
 
 ```text
 RETIRED:
@@ -323,58 +300,17 @@ SCHEMA:
 p3-r1-ordinary-nonadmin-principal-evidence/v2
 ```
 
-The new evidence root itself is the protected top-level anchor. It must be
-created once with a protected DACL **at create time**, never created with default
-inheritance and repaired later.
-
-Trusted security writers are limited to:
+The accepted implementation checkpoint is:
 
 ```text
-exact P3-R1 creator SID ...-1005
-BUILTIN\Administrators  S-1-5-32-544
-NT AUTHORITY\SYSTEM     S-1-5-18
+8cfbbd3a30eb704e6acfc1866bf2ed752879e231
+test: implement protected P3-R1 ceremony evidence root
+
+tree:
+fc682a5baf35f2f2e8b01c9f8f04ce318681ee85
 ```
 
-Ordinary users, Trading, the future test principal, Authenticated Users,
-BUILTIN\Users, Codex sandbox identities, and unresolved SIDs are not retained
-evidence writers.
-
-The new cross-run root contract also binds:
-
-```text
-fixed/local NTFS volume
-volume GUID + serial
-parent namespace authority
-root file identity
-exact owner
-semantic protected DACL
-reparse-point absence
-resolved final path
-```
-
-A pre-created fixed v2 name is fail-closed denial of service: STOP, never adopt,
-delete, repair, rename, retry, or select another suffix.
-
-The separate KSP evidence root remains unchanged:
-
-```text
-F:\AI\p3-r1-ksp-disposable-test-v1
-```
-
-Architecture 100 authorized and executed **no Windows filesystem, ACL, account,
-group, password, KSP, recovery, provider, or production effect**.
-
----
-
-## 9. Immediate next milestone
-
-Next is a bounded **Codex Sol High** source-only Architecture-100 correction of
-the disabled ceremony helper. Sol High is required because this is native Windows
-security/authority work involving security descriptors, ACL interpretation,
-namespace authority, volume/file identities, handle continuity, and crash/re-entry
-semantics.
-
-Allowed implementation files:
+Changed only:
 
 ```text
 scripts/p3_r1_ordinary_nonadmin_principal_ceremony.cs
@@ -382,29 +318,87 @@ scripts/run_p3_r1_ordinary_nonadmin_principal_ceremony.ps1
 tests/runtime/test_p3_r1_ordinary_nonadmin_principal_ceremony.py
 ```
 
-Required implementation changes:
+The source implements the create-time protected DACL, exact creator/SYSTEM/
+Administrators security semantics, parent replacement-authority gates, fixed NTFS
+volume/root identity binding, reparse-safe/no-delete-share continuity, strict v2
+root-identity evidence, and fail-closed collision/uncertain-create handling. The
+separate KSP evidence root remains unchanged:
 
-1. replace the retired v1 root/schema constants with Architecture-100 v2;
-2. construct the exact protected root security descriptor at create time;
-3. validate owner, DACL protection, canonical trusted writer semantics, and reject
-   extra/untrusted writer authority;
-4. implement fixed-volume and parent `FILE_DELETE_CHILD`, `WRITE_DAC`, and
-   `WRITE_OWNER` gates;
-5. preserve the existing no-delete-share in-run guards;
-6. strengthen process re-entry with exact frozen volume/root identity;
-7. update strict v2 root-identity evidence and loader validation;
-8. keep `ACCOUNT_EFFECT_EXECUTION_AUTHORIZED=false` and all password/account/group
-   paths unreachable by ordinary invocation/tests; and
-9. add focused tests for unsafe parent delete-child authority, de-protected/wrong
-   DACL, wrong owner, extra ACEs, wrong volume/file identity, reparse
-   substitution, pre-created-name collision, uncertain create, and successful
-   protected-root inheritance.
+```text
+F:\AI\p3-r1-ksp-disposable-test-v1
+```
 
-Do not touch production files, KSP harness source, recovery key material,
-provider code, unrelated subsystems, or retained Windows evidence.
+The helper remains source-only and disabled:
 
-Codex runs focused tests/checks only. ChatGPT reviews the exact GitHub source diff
-before the user runs broad/full local certification.
+```text
+ACCOUNT_EFFECT_EXECUTION_AUTHORIZED=false
+```
+
+No password prompt, evidence-root creation, ACL/account/group mutation, KSP,
+production recovery, signing, or provider effect occurred.
+
+### Architecture 100 certification
+
+Certification is accepted:
+
+```text
+focused helper gate: 47 passed
+broad repository run: 3862 passed before legacy harness environment failures
+legacy harness recovery: 758 passed
+Ruff check: passed
+Ruff format check: passed
+git diff --check: passed
+reviewed HEAD/tree unchanged exact
+P3-R1 worktree clean
+```
+
+The broad-run failures were not accepted as source defects. They all traced to
+unchanged legacy authority harnesses attempting to use the inaccessible hard-coded
+P3-R1 path:
+
+```text
+F:\AI\worktrees\ai-trading-bot-p3-r1\.pytest_cache\ai-trading-bot-lifecycle-arbiters-v1
+```
+
+Both affected test files were byte-identical to `develop`. They were rerun from
+the validated integration harness with `PYTHONPATH=F:\AI\worktrees\ai-trading-bot-p3-r1\src`; printed `__file__` provenance proved the imported `trading_bot`
+modules came from the reviewed P3-R1 source, and the entire two-file legacy slice
+passed 758/758. Do not rerun the full repository suite unless source changes.
+
+---
+
+## 9. Immediate next milestone — restart read-only readiness from gate #1
+
+Architecture 100 is **SOURCE CERTIFIED**. Do not resume the old stopped readiness
+run at its former DACL checkpoint. Start a new complete readiness sequence from
+gate #1.
+
+The restart is read-only and must freshly prove/freeze:
+
+1. exact P3-R1 worktree, branch, source commit/tree, helper/wrapper/test hashes,
+   and the exact future source-enablement diff;
+2. absence of both the retired v1 account evidence root and the new v2 root;
+3. current `F:\` fixed/local NTFS volume GUID/serial and persistent-ACL support;
+4. `F:\` no-reparse identity and current owner/DACL semantics, including no
+   untrusted `FILE_DELETE_CHILD`, `WRITE_DAC`, or `WRITE_OWNER` authority capable
+   of replacing the future protected child;
+5. exact creator and Trading identities plus built-in SID mappings;
+6. candidate-name absence and relevant direct/indirect/token/special-group
+   topology;
+7. password/account/logon policy prerequisites;
+8. exact Windows PowerShell 5.1, helper, Git, and `netapi32.dll` identities; and
+9. confirmation that all filesystem/account/group/KSP/provider/production effects
+   remain disabled.
+
+Any changed, missing, ambiguous, pre-created, reparse, volume-mismatched, or
+unexpectedly writable observation is a STOP. Do not repair ancestors, retained
+cache, production staging, or a candidate root to make readiness pass.
+
+The later root/account authorization, if readiness eventually succeeds, must be
+one-shot across process loss. Once an authorized root-creation call may have
+begun, an ambiguous process termination consumes that authorization and permits
+only read-only reconciliation—not another launch simply because the fixed root
+appears absent.
 
 ---
 
@@ -424,16 +418,13 @@ The following remain **NOT AUTHORIZED**:
 - brokerage or live trading; and
 - unrelated production/provider/credential effects.
 
-After corrected helper source acceptance, the expected chain is:
+Expected chain from the current source-certified checkpoint:
 
 ```text
-focused implementation verification
--> ChatGPT exact GitHub diff acceptance
--> broad local source certification
--> restart the complete read-only Architecture-100 readiness freeze from gate #1
--> freeze current volume/root-parent observations
--> separate explicit one-time effect authorization
--> create protected evidence root/account ceremony
+complete read-only Architecture-100 readiness restart from gate #1
+-> ChatGPT acceptance of frozen readiness evidence
+-> separate explicit one-time filesystem/account effect authorization
+-> protected evidence-root/account ceremony
 -> genuine ordinary-user token/group qualification
 -> later source SID freeze in the KSP harness
 -> separately authorized KSP denial experiment

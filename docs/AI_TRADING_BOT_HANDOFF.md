@@ -5,82 +5,57 @@
 **Accepted integrated baseline:** `bd88ee966bff455f9fc897d6cfdfafdd807f27e2`  
 **P3-R1 worktree:** `F:\AI\worktrees\ai-trading-bot-p3-r1`  
 **P3-R1 branch:** `feature/p3-r1-recovery-implementation`  
-**Architecture-100 source-certified checkpoint:** `8cfbbd3a30eb704e6acfc1866bf2ed752879e231`  
-**Architecture-100 source-certified tree:** `fc682a5baf35f2f2e8b01c9f8f04ce318681ee85`  
-**Architecture-101 docs checkpoint:** `4e9e4de829376e42a68acca158ab1d4f4c01a241`  
+**Architecture-101 source-certified checkpoint:** `fad6bfe6fb3fc3af96902d8df300c1cef98e7687`  
+**Architecture-101 source-certified tree:** `7adb9bf17997f5236846d68443ed2a17011c58d6`  
 **Production/live trading:** NO-GO
 
-> This Git-tracked handoff is the canonical cross-chat resume document. Uploaded
-> Project copies are mirrors only. Always prove the live worktree, branch, and
-> HEAD before acting. Architecture/validation documents and Git history remain
-> authoritative for detailed contracts and historical evidence.
-
----
+> This Git-tracked handoff is the canonical cross-chat resume document. Uploaded copies are mirrors only. Always prove the live worktree, branch, HEAD, and clean state before acting.
 
 ## 1. Product goal
 
-Build a conservative automated trading platform that progresses through:
+Build a conservative automated trading platform progressing through:
 
-**historical research → deterministic simulation → manual paper → unattended
-paper → long paper soak → broker-paper → live-readiness certification → tiny
-restricted live → mature automated operation → polished GUI.**
+**historical research → deterministic simulation → manual paper → unattended paper → long paper soak → broker-paper → live-readiness → tiny restricted live → mature automated operation → polished GUI.**
 
-AI/strategy is always subordinate to deterministic risk, reviewed authority,
-credential isolation, durable evidence, brokerage/reconciliation,
-operating-mode controls, and explicit operator safety gates.
+Stable constraints: US stocks/ETFs, long-only, no margin/leverage/options/shorts/crypto, deterministic risk approval, paper-by-default, complete auditability.
 
----
-
-## 2. Current worktrees and branch routing
+## 2. Worktrees and branch routing
 
 ```text
-P3-R1 implementation:
+P3-R1:
   F:\AI\worktrees\ai-trading-bot-p3-r1
   feature/p3-r1-recovery-implementation
 
-paper-cycle lineage:
+paper lineage:
   F:\AI\ai-trading-bot-paper
   feature/reliable-manual-paper-cycle
 
-integration:
+integration / clean legacy harness:
   F:\AI\ai-trading-bot-integration
   develop
 
-GUI worktree:
+GUI/main worktree:
   F:\AI\ai-trading-bot
-  feature/gui-foundation
-
-C3 worktree:
-  F:\AI\ai-trading-bot-c3
-  accepted C3 feature history
 ```
 
-Do not reuse another active worktree for P3-R1. Do not clean, reset, rebase,
-move, delete, take ownership of, or repair unrelated worktrees or retained
-evidence.
+Do not reuse another active worktree for P3-R1. Preserve unrelated generated/untracked reports and historical pytest/cache evidence.
 
----
+## 3. ChatGPT/Codex workflow
 
-## 3. Mandatory ChatGPT/Codex workflow
-
-ChatGPT/Sol owns architecture, Windows-security/authority review, debugging
-strategy, exact GitHub diff review, test/certification gates, production-authority
-review, and next-step planning. ChatGPT may directly handle tiny scoped work and
-canonical docs closeout. Codex is a bounded implementation agent.
+ChatGPT/Sol owns architecture, Windows security/authority review, exact GitHub diff review, debugging strategy, test/certification gates, merge/deployment/production decisions, and next-step planning. ChatGPT may directly perform tiny scoped work and docs closeout.
 
 Model routing:
 
 ```text
-tiny/simple scoped work                   -> ChatGPT direct
-localized/mechanical/frozen contract      -> Luna Extra High
+tiny/simple                                  -> ChatGPT direct
+localized/mechanical/frozen contract         -> Luna Extra High
 subtle bounded deterministic implementation -> Sol Medium
-native Windows/security/authority/locking/
-ordering/crash-recovery/architecture      -> Sol High
+native Windows/security/authority/recovery   -> Sol High
 ```
 
 Do not use subagents unless explicitly requested.
 
-Every bounded Codex task begins with:
+Every bounded Codex task starts with:
 
 ```text
 git rev-parse --show-toplevel
@@ -88,65 +63,31 @@ git branch --show-current
 git rev-parse HEAD
 ```
 
-The outputs must equal the exact worktree, branch, and HEAD supplied in the task.
-Any mismatch is a hard STOP. Codex must not self-correct with checkout/switch,
-reset, rebase, clean, branch recreation, or worktree operations.
+Any worktree/branch/HEAD mismatch is a STOP. Codex must not self-correct with checkout/switch/reset/rebase/clean/worktree operations.
 
-After required focused gates pass, Codex may exact-file stage, commit, and
-ordinary fast-forward push the current approved feature branch when the prompt
-authorizes that checkpoint. Never use `git add .` or `git add -A`; stage only the
-exact authorized files. Never amend, rebase, merge, force-push, alter PR metadata,
-resolve review threads, or absorb unrelated work without explicit approval.
+After required focused gates pass, Codex may exact-file stage, commit, and ordinary-push the approved feature branch when explicitly authorized. Never `git add .` or `git add -A`; stage only exact authorized files. No amend/rebase/merge/force-push/PR metadata/review-thread changes or unrelated cleanup without explicit approval.
 
-Implementation flow:
+## 4. Windows pytest / clean-harness rule
+
+Every controlled Windows pytest invocation uses:
 
 ```text
-ChatGPT freezes architecture/scope
--> Codex proves startup gate
--> Codex changes only bounded files
--> Codex runs focused isolated tests/checks
--> if authorized, Codex exact-stages + commits + ordinary-pushes
--> ChatGPT reviews authoritative GitHub commit/diff
--> user runs broad/full local certification after source-diff acceptance
--> execution/deployment/operator effects remain separate later gates
-```
-
----
-
-## 4. Windows pytest isolation and legacy harness rule
-
-Every controlled Windows pytest invocation uses a fresh explicit external
-basetemp:
-
-```text
-F:\AI\temp\pytest\<fresh-unique-name>
-```
-
-and normally:
-
-```text
+--basetemp F:\AI\temp\pytest\<fresh-unique>
 -p no:cacheprovider
 ```
 
-when cache behavior is irrelevant.
+unless the test specifically requires cache behavior.
 
-Never delete/repair/move historical `.pytest_cache` state merely to make a gate
-pass. Legacy authority harnesses may hard-code worktree `.pytest_cache` scratch;
-if that scratch is inaccessible, use the already validated clean-harness method
-only when the test contract permits it:
+Do not delete/repair/move historical `.pytest_cache` state merely to make a gate pass. Two legacy authority files hard-code a P3 worktree `.pytest_cache` scratch path that is inaccessible on this host. Their validated recovery procedure is:
 
-1. preserve the inaccessible historical cache;
-2. prove the legacy test blobs are exact;
-3. run from the validated clean integration harness;
-4. force `PYTHONPATH` to the exact reviewed P3-R1 source;
-5. print and verify affected module `__file__` provenance;
-6. rerun only the invalidated legacy slice;
-7. restore `PYTHONPATH` and re-prove the reviewed checkpoint.
+1. prove exact legacy test blobs;
+2. run them from `F:\AI\ai-trading-bot-integration`;
+3. force `PYTHONPATH` to the exact reviewed P3 source;
+4. print module `__file__` provenance;
+5. run only the invalidated legacy slice;
+6. restore `PYTHONPATH` and re-prove P3 HEAD/tree/clean.
 
-Under Windows PowerShell 5.1, avoid quote-sensitive `python -c` provenance
-snippets; pipe a here-string to Python stdin instead.
-
----
+Under Windows PowerShell 5.1, prefer a here-string piped to Python stdin for quote-sensitive provenance code rather than `python -c`.
 
 ## 5. Frozen C3 production state
 
@@ -156,409 +97,198 @@ Accepted C3 release-source checkpoint:
 82ba29ae2c2cc6bb3544077db0ee21868e6d5693
 ```
 
-All six real-provider C3 effects are consumed. Call #5 remains permanently
-`FAILED / CONFIRMED`; call #6 remains permanently `SUCCEEDED / CONFIRMED` and
-`SUCCESS_SELECTED`. Never rerun call #6 and never authorize provider call #7
-without a new architecture checkpoint.
+All six real-provider calls are consumed. Call #5 remains permanently `FAILED / CONFIRMED`. Call #6 remains permanently `SUCCEEDED / CONFIRMED / SUCCESS_SELECTED`; never rerun it. Provider call #7 is not authorized.
 
-Frozen production facts include:
+Selected call #6 snapshot/artifact remain frozen:
 
 ```text
-Trading account: DESKTOP-I4DOKM7\Trading
+snapshot: eba46838-44ae-5bec-97bf-98c6639ae6a7
+artifact SHA-256: 31d82a31a3fbd909f8771820bf47e796a1503264fe0ac6ce0eff7ba163f0767d
+```
+
+Production identities/paths:
+
+```text
+host: DESKTOP-I4DOKM7
+creator SID: S-1-5-21-1397534616-3988210162-180023805-1005
 Trading SID: S-1-5-21-1397534616-3988210162-180023805-1009
-Creator SID: S-1-5-21-1397534616-3988210162-180023805-1005
-Fixed runtime: F:\AITradingBot\runtime\python.exe
-Production TEMP/TMP: F:\AITradingBot\temp
-Authority root: F:\AITradingBot\Authority
-Authority DB: F:\AITradingBot\Authority\authority.sqlite3
-Paper final root: F:\AITradingBot\Paper
-Paper retained staging root: F:\AITradingBot\.Paper.provisioning-v1
-Credential policy: windows-credential-manager-alpaca-market-data/v2
+runtime: F:\AITradingBot\runtime\python.exe
+production temp: F:\AITradingBot\temp
+authority DB: F:\AITradingBot\Authority\authority.sqlite3
+paper final: F:\AITradingBot\Paper
+retained staging: F:\AITradingBot\.Paper.provisioning-v1
+credential policy: windows-credential-manager-alpaca-market-data/v2
 ```
 
----
-
-## 6. Architecture 94 paper-cycle status
-
-P1 accepted:
-
-```text
-1028e60b99c27cef0994f40d6ce381392abfb0f8
-fix: bind Architecture 94 P1 provenance
-```
-
-P2 fully accepted:
-
-```text
-a810122a96b6fc90da25d71eede8da64b7272c98
-fix: bind Architecture 94 P2 permit issuance
-```
-
-The one supervised production P2 reread of already-durable successful C3 call #6
-passed and **must not be rerun**.
-
-Architecture 94 remains simulated paper only: no broker/live trading, unattended
-scheduling, automatic retry, or additional C3 provider effect.
-
----
-
-## 7. P3 retained production-recovery state
-
-The first Administrator paper-root publication attempt failed and remains
-retained. Do not rerun it. Read-only resolution established:
+The original Administrator paper-root publication attempt failed at rename and remains retained. Never rerun the publisher. Read-only state remains:
 
 ```text
 FINAL_EXISTS=False
 STAGING_EXISTS=True
 PUBLICATION_STATE=STAGING_REQUIRES_MANUAL_RECOVERY
-production authority DB: unchanged exact
 ```
 
-Architectures 95 and 96 remain the retained-staging recovery and signed recovery
-authorization contracts. The staging tree must not be deleted, renamed, repaired,
-regenerated, or implicitly recovered.
+Production recovery remains blocked.
 
----
-
-## 8. Architectures 97–101 — current P3-R1 security line
-
-Current architecture documents:
+## 6. Architecture 94 paper-cycle line
 
 ```text
-docs/architecture/97-p3-r1-recovery-signing-trust-reestablishment.md
-docs/architecture/98-p3-r1-ksp-machine-key-security-contract.md
-docs/architecture/99-p3-r1-ordinary-nonadmin-test-principal.md
-docs/architecture/100-p3-r1-protected-account-ceremony-evidence-root.md
-docs/architecture/101-p3-r1-split-authority-qualification-rights.md
+P1: 1028e60b99c27cef0994f40d6ce381392abfb0f8
+P2: a810122a96b6fc90da25d71eede8da64b7272c98
 ```
 
-Related validation documents:
+The one supervised P2 production reread of durable successful C3 call #6 passed and must not be rerun. Architecture 94 remains simulated paper only.
+
+## 7. P3-R1 architectures 97–101
 
 ```text
-docs/validation/p3-r1-ordinary-nonadmin-test-principal-creation-ceremony.md
-docs/validation/reliable-manual-paper-cycle-p3-r1-ordinary-nonadmin-test-principal.md
-docs/validation/p3-r1-ksp-disposable-test-harness.md
+97 recovery signing trust re-establishment
+98 Windows Software KSP machine-key security contract
+99 dedicated ordinary non-admin test principal
+100 protected account-ceremony evidence root
+101 split-authority qualification-rights collection
 ```
 
-Architecture 97 re-establishes the recovery-signing trust path. Architecture 98
-freezes the Windows Software KSP machine-key security experiment. Architecture 99
-adds the separate ordinary non-admin denial perspective using a dedicated new
-local test principal. Architecture 100 corrects the account-ceremony retained
-filesystem boundary. Architecture 101 corrects the qualification authority split
-for LSA account-right reads.
-
-### Architecture 99 identity
-
-Exact candidate name:
+Candidate fixed name:
 
 ```text
 P3R1KspTestUser
 ```
 
-Its SID remains deliberately unknown until Windows creates the account and the
-helper independently reads it back. Never predict a RID. The candidate may never
-become production runtime, Trading, recovery, signing, KSP owner/ACE, Credential
-Manager, or other production authority.
+Its SID is unknown until a separately authorized create-new ceremony and independent Windows readback. Never predict a RID.
 
-Accepted Architecture-99 docs checkpoint:
+### Architecture 100
 
-```text
-89506d9104b4699d19eee96aac2ad0b18ee25e4a
-docs: define P3-R1 ordinary non-admin test principal
-```
-
-Creation-ceremony contract checkpoint:
+Retired root:
 
 ```text
-022960a3f242ded927edf3ae4667f87e724aeb19
-docs: define P3-R1 test-user creation ceremony
+F:\AI\p3-r1-ordinary-nonadmin-principal-v1
 ```
 
-The ceremony uses one-shot direct Netapi32 account creation, dual name-absence,
-SecureString handling, Windows SID readback, deterministic conditional
-BUILTIN\Users assignment, genuine token qualification, sanitized retained
-evidence, and no automatic retry/rollback/cleanup/repair.
-
-### Architecture 100 source-certified helper
-
-The first disabled helper checkpoint was:
-
-```text
-d509537b88f66ef244d326e5417d38d9e5f25f53
-test: add disabled P3-R1 test-user ceremony helper
-```
-
-Architecture 100 froze:
-
-```text
-retired root:
-  F:\AI\p3-r1-ordinary-nonadmin-principal-v1
-
-protected root:
-  F:\p3-r1-ordinary-nonadmin-principal-v2
-```
-
-The source-certified implementation checkpoint is:
-
-```text
-8cfbbd3a30eb704e6acfc1866bf2ed752879e231
-test: implement protected P3-R1 ceremony evidence root
-
-tree:
-fc682a5baf35f2f2e8b01c9f8f04ce318681ee85
-```
-
-It changed only:
-
-```text
-scripts/p3_r1_ordinary_nonadmin_principal_ceremony.cs
-scripts/run_p3_r1_ordinary_nonadmin_principal_ceremony.ps1
-tests/runtime/test_p3_r1_ordinary_nonadmin_principal_ceremony.py
-```
-
-Architecture-100 source certification remains accepted:
-
-```text
-focused helper gate: 47 passed
-broad repository run: 3862 passed before legacy harness environment failures
-legacy harness recovery: 758 passed
-Ruff check: passed
-Ruff format check: passed
-git diff --check: passed
-reviewed HEAD/tree unchanged exact
-```
-
-The broad failures were environmental hard-coded legacy `.pytest_cache` scratch
-failures, not source regressions. Exact affected legacy test blobs passed 758/758
-from the validated integration harness with P3-R1 `PYTHONPATH` and printed module
-provenance.
-
-The helper remains disabled:
-
-```text
-ACCOUNT_EFFECT_EXECUTION_AUTHORIZED=false
-ACCOUNT_EFFECT_AUTHORIZATION_ID=NOT-AUTHORIZED-P3R1-ORDINARY-NONADMIN-PRINCIPAL-V1
-```
-
-No password/root/ACL/account/group/KSP/provider/production effect occurred.
-
----
-
-## 9. Restarted readiness result that triggered Architecture 101
-
-Before Architecture 101, the local worktree was clean at:
-
-```text
-HEAD: 2040e6dbc4e7418a9275df139aaca7428930380d
-tree: e481496fad89b2f82ba26accbe45029d995e583e
-```
-
-The Architecture-100 readiness restart produced:
-
-```text
-Gate 1  exact source/tool identity                     PASS
-Gate 2  F:\ volume + parent namespace authority       PASS
-Gate 3  root/account namespace absence                 PASS
-Gate 4A local-group topology                           PASS
-Gate 4B password/account policy                        PASS
-Gate 4C LSA account-rights baseline                    BLOCKED
-```
-
-Key discovery facts:
-
-```text
-F:\ serial: 0x6E962F80
-F:\ fixed local NTFS: PASS
-persistent ACLs: PASS
-F:\ reparse point: false
-parent untrusted FILE_DELETE_CHILD: absent
-parent untrusted WRITE_DAC: absent
-parent untrusted WRITE_OWNER: absent
-
-retired v1 root: absent
-new v2 root: absent
-P3R1KspTestUser: absent by NetUserGetInfo and fully resumed NetUserEnum
-BUILTIN\Users mapping: PASS
-
-BUILTIN\Users local-group nesting: NONE
-INTERACTIVE -> Performance Log Users: present
-Performance Log Users members:
-  creator SID ...-1005
-  NT AUTHORITY\INTERACTIVE S-1-5-4
-
-password policy:
-  min length 0
-  max age 3628800 sec
-  min age 0
-  history length 0
-  lockout threshold 0
-creator enabled: true
-Trading enabled: true
-```
-
-These observations are **discovery evidence only** after the Architecture-101
-source change. They do not remain perpetual readiness authority.
-
-### Gate 4C blocker
-
-The intended ordinary non-elevated Windows PowerShell 5.1 process attempted the
-same LSA surface used by the source-certified helper:
-
-```text
-LsaOpenPolicy(... POLICY_LOOKUP_NAMES=0x00000800 ...)
-LsaEnumerateAccountRights(...)
-```
-
-`LsaEnumerateAccountRights` returned:
-
-```text
-0xC0000022 STATUS_ACCESS_DENIED
-```
-
-for `S-1-1-0` and again for `S-1-5-32-559` Performance Log Users. Subsequent
-literal `...=PASS` strings printed by the interactive shell after the exception
-were invalid and were not accepted.
-
-The source-certified helper's ordinary branch currently executes
-`native.Observation()`, and that path calls `Rights(...)`. Therefore the disabled
-source remains correctly certified as source but is **not execution-ready** for
-the intended least-privileged qualification session.
-
----
-
-## 10. Architecture 101 — split-authority qualification rights
-
-Accepted docs checkpoint:
-
-```text
-4e9e4de829376e42a68acca158ab1d4f4c01a241
-docs: split P3-R1 qualification rights authority
-```
-
-Architecture 101 does not give the ordinary user more LSA access and does not
-weaken the right classifier. It separates the two native evidence authorities.
-
-### Candidate owns genuine candidate-token facts
-
-The genuine candidate process must still prove:
-
-```text
-exact candidate SID
-primary token
-not elevated
-no thread impersonation
-Administrators absent
-enabled INTERACTIVE
-exact token groups/attributes
-exact held token privileges
-all held token privileges classified ACCEPTED
-direct local groups exactly BUILTIN\Users
-indirect/direct consistency
-no unreviewed nested authority
-Performance Log Users provenance only through reviewed INTERACTIVE edge
-```
-
-The candidate no longer calls `LsaEnumerateAccountRights`.
-
-It prints one strict canonical object:
-
-```text
-schema: p3-r1-candidate-qualification-observation/v1
-collection_method: operator_observed_candidate_console
-```
-
-with closed fields:
-
-```text
-schema
-account
-direct_view
-indirect_view
-relevant_edges
-effective_groups
-candidate_token
-collection_method
-performance_log_users
-```
-
-### Creator owns LSA account-right facts
-
-After exact candidate-console transfer, creator-side fresh account/group/edge
-reconciliation, and operator confirmation using exactly:
-
-```text
-EXACT_CANDIDATE_CONSOLE_MATCH
-```
-
-the revalidated fully elevated creator derives the exact rights target set:
-
-```text
-candidate SID
-UNION
-all candidate_token group SIDs
-```
-
-and performs read-only native LSA enumeration for every target.
-
-Accepted outcomes are only:
-
-```text
-STATUS_SUCCESS
-STATUS_OBJECT_NAME_NOT_FOUND   # exact no-LSA-account-object case
-```
-
-`STATUS_ACCESS_DENIED` or any other error is a STOP. No LSA policy/group/ACL
-mutation may be used to manufacture a pass.
-
-The creator builds a strict `rights_collection` containing its creator token,
-method, `policy_access=2048`, exact sorted target SIDs, and per-target query
-status/count. Every returned right keeps the frozen disposition classifier; any
-`REJECTED` or `UNRESOLVED` right blocks qualification.
-
-### Final qualification object and evidence schema
-
-The creator constructs the only object eligible for `QUALIFICATION_OBSERVED`:
-
-```text
-p3-r1-split-qualification-observation/v1
-```
-
-with:
-
-```text
-schema
-candidate_observation
-candidate_observation_sha256
-rights
-rights_collection
-```
-
-Neither candidate-only evidence nor creator-rights-only evidence can qualify the
-account.
-
-The strict account-ceremony evidence schema advances, before any evidence root
-or records exist, to:
-
-```text
-p3-r1-ordinary-nonadmin-principal-evidence/v3
-```
-
-The Architecture-100 protected root path remains unchanged:
+Protected root:
 
 ```text
 F:\p3-r1-ordinary-nonadmin-principal-v2
 ```
 
-There is no migration or adoption path because no v2 ceremony evidence exists.
+Historical source-certified checkpoint:
 
----
+```text
+commit: 8cfbbd3a30eb704e6acfc1866bf2ed752879e231
+tree:   fc682a5baf35f2f2e8b01c9f8f04ce318681ee85
+focused: 47 passed
+legacy clean-harness recovery: 758 passed
+```
 
-## 11. Immediate next milestone — Architecture-101 source correction
+Architecture-100 root ambiguity rule remains binding: once an authorized root-creation call may have begun, ambiguous process loss consumes that execution authorization. Do not simply relaunch even if the fixed root later appears absent; stop for read-only reconciliation and review.
 
-**Do not continue readiness from Gate 4C.** The next checkpoint is a disabled,
-source-only Sol High implementation.
+### Readiness discovery that triggered Architecture 101
 
-Exact authorized source scope:
+Before Architecture 101, read-only readiness established:
+
+```text
+Gate 1  source/tool identity                         PASS
+Gate 2  F:\ fixed NTFS + parent namespace authority PASS
+Gate 3  roots + candidate-name absence               PASS
+Gate 4A local-group topology                         PASS
+Gate 4B password/account policy                      PASS
+Gate 4C ordinary LSA rights                          BLOCKED
+```
+
+Discovery facts included:
+
+```text
+F:\ serial: 0x6E962F80
+F:\ fixed NTFS + persistent ACLs: PASS
+F:\ reparse: false
+untrusted parent FILE_DELETE_CHILD / WRITE_DAC / WRITE_OWNER: absent
+retired v1 root: absent
+new v2 root: absent
+P3R1KspTestUser: absent by NetUserGetInfo + resumed NetUserEnum
+BUILTIN\Users mapping: PASS
+BUILTIN\Users local-group nesting: NONE
+INTERACTIVE -> Performance Log Users: present
+password lockout threshold: 0
+creator enabled: true
+Trading enabled: true
+```
+
+These are discovery evidence only after Architecture 101; they are not perpetual readiness authority.
+
+Gate 4C observed ordinary `LsaEnumerateAccountRights` returning:
+
+```text
+0xC0000022 STATUS_ACCESS_DENIED
+```
+
+Architecture 101 treats this as a real least-privilege boundary.
+
+## 8. Architecture 101 contract
+
+Candidate process owns only genuine candidate-session facts:
+
+```text
+candidate account SID continuity
+primary non-elevated token
+thread token absent
+Administrators absent
+enabled INTERACTIVE
+exact token groups/attributes
+held token privileges, all ACCEPTED
+direct groups exactly BUILTIN\Users
+indirect/direct consistency
+local-group graph / Performance Log Users provenance
+```
+
+The candidate does **not** call `LsaEnumerateAccountRights`.
+
+Candidate schema:
+
+```text
+p3-r1-candidate-qualification-observation/v1
+```
+
+After exact candidate console transfer and creator-side account/group/edge reconciliation, the operator confirms exactly:
+
+```text
+EXACT_CANDIDATE_CONSOLE_MATCH
+```
+
+The creator then repeats the full creator-token gate and performs read-only LSA rights collection for:
+
+```text
+candidate SID
+UNION
+exact candidate_token.groups SIDs
+```
+
+Accepted native per-target outcomes are only success or exact `STATUS_OBJECT_NAME_NOT_FOUND`. `STATUS_ACCESS_DENIED` and every other status are STOPs.
+
+Split observation schema:
+
+```text
+p3-r1-split-qualification-observation/v1
+```
+
+Ceremony evidence schema:
+
+```text
+p3-r1-ordinary-nonadmin-principal-evidence/v3
+```
+
+Only a fully validated split observation may advance retained `QUALIFICATION_OBSERVED`, `GROUPS_QUALIFIED`, and `TOKEN_QUALIFIED` evidence.
+
+## 9. Architecture 101 source implementation and certification
+
+Source implementation:
+
+```text
+commit: fad6bfe6fb3fc3af96902d8df300c1cef98e7687
+tree:   7adb9bf17997f5236846d68443ed2a17011c58d6
+message: test: split P3-R1 qualification rights authority
+```
+
+Changed exactly:
 
 ```text
 scripts/p3_r1_ordinary_nonadmin_principal_ceremony.cs
@@ -566,69 +296,82 @@ scripts/run_p3_r1_ordinary_nonadmin_principal_ceremony.ps1
 tests/runtime/test_p3_r1_ordinary_nonadmin_principal_ceremony.py
 ```
 
-Required behavior is frozen by Architecture 101:
+Source review accepted the authority split: candidate observation has no LSA operation; creator performs exact target-derived rights collection after transfer reconciliation and fresh creator-token proof; v3 evidence retains only the complete split observation; Architecture-100 root/account/security behavior remains unchanged.
 
-1. evidence schema v3; protected root path unchanged;
-2. candidate observation excludes LSA rights and performs all candidate-owned
-   token/group/privilege/provenance gates before output;
-3. candidate branch must never open LSA policy or enumerate account rights;
-4. creator imports only the strict candidate object, independently re-reads
-   account/groups/edges, reprints exact canonical candidate bytes, and requires
-   `EXACT_CANDIDATE_CONSOLE_MATCH`;
-5. creator repeats its full token gate before rights collection;
-6. creator derives target SIDs from candidate SID + exact token groups and
-   performs all native LSA queries;
-7. strict per-target result reconciliation and right classification;
-8. final split observation required before `QUALIFICATION_OBSERVED`,
-   `GROUPS_QUALIFIED`, or `TOKEN_QUALIFIED`;
-9. all Architecture-100 protected-root/account/Users/one-shot behavior preserved;
-10. `ACCOUNT_EFFECT_EXECUTION_AUTHORIZED=false` and not-authorized ID preserved.
-
-Required focused test themes include ordinary-no-LSA-call, creator success,
-`STATUS_OBJECT_NAME_NOT_FOUND`, creator access-denied rejection, target-set
-mismatch/duplicates/extras/missing targets, transfer/hash mismatch, dangerous or
-unknown rights, wrong creator token, and a complete successful split lifecycle
-using fakes only. Existing Architecture-100 tests must remain passing.
-
-This is a native Windows/security/authority change: use **Codex Sol High**, not
-Luna Extra High.
-
-Codex should run focused tests/checks only during implementation. If they pass and
-only the three authorized files changed, Codex may exact-stage, commit, and
-ordinary-push the feature branch when the implementation prompt explicitly
-permits it.
-
-ChatGPT then reviews the exact GitHub diff before any broad certification.
-
----
-
-## 12. Readiness after Architecture-101 source certification
-
-Because source and qualification protocol change, the prior Gate 1–4B results do
-not allow readiness to resume from Gate 4C.
-
-After the new source is accepted and fully source-certified:
+Focused verification:
 
 ```text
-restart complete read-only readiness from Gate 1
+63 passed
+strengthened evidence SID regression: 1 passed
+Ruff: pass
+diff checks: pass
 ```
 
-The new readiness sequence must include an elevated creator-side LSA probe using
-the exact source-owned native path. It must **not** attempt to prove ordinary LSA
-access, because ordinary rights enumeration is no longer part of the design.
+Broad certification used two slices to avoid the known-invalid legacy P3 `.pytest_cache` harness:
 
-All root/account/group/password/KSP effects remain disabled during readiness.
+```text
+current P3 non-legacy slice:
+  3494 passed
+  24 skipped
+  381.82s
+  Ruff check: pass
+  Ruff format: 418 files formatted
+  git diff --check: pass
 
-Architecture 100's root-create ambiguity rule remains non-negotiable: once an
-authorized root-creation call may have begun, unexpected process loss consumes
-that authorization and permits only read-only reconciliation, never a blind
-relaunch even if the fixed root subsequently appears absent.
+legacy integration-harness slice:
+  exact frozen test blobs: pass
+  exact P3 source provenance: pass
+  758 passed
+  1214.95s
+```
 
----
+Printed provenance for all four modules resolved under:
 
-## 13. Effect authorization — still blocked
+```text
+F:\AI\worktrees\ai-trading-bot-p3-r1\src\trading_bot\...
+```
 
-The following remain **NOT AUTHORIZED**:
+Final P3 checkpoint remained:
+
+```text
+HEAD=fad6bfe6fb3fc3af96902d8df300c1cef98e7687
+TREE=7adb9bf17997f5236846d68443ed2a17011c58d6
+STATUS=CLEAN
+```
+
+Disposition:
+
+```text
+ARCHITECTURE_101_SOURCE_DIFF=ACCEPTED
+ARCHITECTURE_101_SOURCE_CERTIFICATION=ACCEPTED
+```
+
+No ceremony/root/account/password/group/KSP/provider/production effect occurred.
+
+## 10. Immediate next milestone — restart readiness from Gate 1
+
+Because Architecture 101 changed reviewed source and qualification protocol, execution readiness must restart from **Gate 1** against the exact source-certified commit/tree above. Prior Gate 1–4B observations remain discovery context only.
+
+The new readiness sequence must include a **read-only elevated creator LSA capability probe** using the same source-owned native LSA path. Do not attempt to prove ordinary LSA access; ordinary rights enumeration is no longer part of the design.
+
+Planned order:
+
+```text
+Gate 1  exact source/helper/wrapper/tool identity + disabled-effect proof
+Gate 2  fresh F:\ volume + parent namespace security
+Gate 3  v1/v2 root absence + dual candidate-name absence + BUILTIN\Users mapping
+Gate 4  group topology + account/password policy
+Gate 5  genuine elevated creator token + read-only creator LSA capability
+Gate 6  exact future enablement diff + one-shot root-creation operator rule + final readiness freeze
+-> ChatGPT readiness acceptance
+-> separate explicit effect-authorization discussion
+```
+
+Do not resume from the old Gate 4C stopping point.
+
+## 11. Non-authorizations
+
+Still not authorized:
 
 ```text
 ACL_MUTATION
@@ -653,61 +396,24 @@ P4_PRODUCTION_EXECUTION
 PRODUCTION_LIVE
 ```
 
-Production retained staging must remain untouched. The failed publisher must not
-be rerun. No provider call #7 is authorized.
+`ACCOUNT_EFFECT_EXECUTION_AUTHORIZED=false` and the `NOT-AUTHORIZED` authorization ID remain mandatory until a later separately reviewed source-enablement checkpoint.
 
-Expected chain from here:
-
-```text
-Architecture-101 source implementation
--> ChatGPT exact GitHub diff/security review
--> focused + broad source certification
--> restart read-only readiness from Gate 1
--> ChatGPT acceptance of complete frozen readiness
--> separate explicit filesystem/account effect authorization discussion
--> protected root/account ceremony
--> genuine candidate qualification + creator LSA reconciliation
--> KSP SID/source freeze
--> separately authorized disposable KSP denial experiment
--> recovery only after all independent recovery gates pass
-```
-
----
-
-## 14. GUI and stable product constraints
-
-GUI-A1 through GUI-A7 are fully accepted and integrated. GUI capabilities remain
-read-only presentation/inspection boundaries and do not own production authority,
-credentials, paper-account mutation, retry, recovery, brokerage, or execution.
-
-Stable product constraints:
-
-- US stocks and ETFs;
-- long-only;
-- no margin or leverage;
-- no options;
-- no short selling;
-- no crypto;
-- deterministic risk approval for every order;
-- paper mode by default;
-- complete auditability.
-
----
-
-## 15. Closeout rule
-
-At every accepted checkpoint review/update:
+Additional production restrictions remain:
 
 ```text
-docs/PROJECT_STATUS.md
-docs/AI_TRADING_BOT_HANDOFF.md
+PRODUCTION_RECOVERY_RENAME=NOT_AUTHORIZED
+PRODUCTION_STAGING_TREE=PRESERVE_UNTOUCHED
+STAGING_DELETE_OR_REPAIR=FORBIDDEN
+PUBLISHER_RERUN=FORBIDDEN
+CALLER_ASSERTED_RECOVERY_AUTHORITY=FORBIDDEN
 ```
 
-Update `docs/AI_DEVELOPMENT_WORKFLOW.md` only when a reusable workflow lesson is
-new and not already covered. Architecture 101 is a subsystem authority correction,
-not a new generic workflow rule, so no workflow-doc change is required here.
+## 12. Next-chat resume procedure
 
-Git-tracked documents are authoritative. Documentation closeout does not itself
-authorize merge, rebase, force-push, amend, review-thread resolution, PR metadata
-changes, production/provider effects, Windows security effects, or unrelated
-modifications.
+1. Read this file plus `docs/PROJECT_STATUS.md` and Architectures 97–101.
+2. Prove P3-R1 worktree/branch/HEAD/clean state.
+3. Source-certified implementation identity is `fad6bfe6...` / `7adb9bf...`; docs-only closeout commits may sit above it and must be proven source-neutral before readiness.
+4. Restart read-only P3-R1 readiness from Gate 1.
+5. Do not authorize any effect merely because source certification passed.
+6. Keep the Architecture-100 ambiguous-root-attempt rule in every future execution authorization.
+7. Include the next milestone in every verification/closeout report.

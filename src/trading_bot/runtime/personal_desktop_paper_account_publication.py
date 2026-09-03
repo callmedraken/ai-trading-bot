@@ -16,6 +16,9 @@ from enum import StrEnum
 from pathlib import Path, PureWindowsPath
 from typing import Protocol
 
+from trading_bot.runtime import (
+    personal_desktop_paper_account_publication_freeze as publication_freeze,
+)
 from trading_bot.runtime import personal_desktop_paper_account_security as security
 from trading_bot.runtime.manual_paper_selected_c3_snapshot import (
     SelectedC3SnapshotReadResult,
@@ -27,7 +30,6 @@ from trading_bot.runtime.personal_desktop_paper_account_authority import (
 from trading_bot.runtime.personal_desktop_paper_account_provisioning import (
     PersonalDesktopPaperAccountBundle,
     reconcile_personal_desktop_paper_account_artifacts,
-    verify_personal_desktop_paper_account_bundle,
     verify_personal_desktop_paper_account_bundle_for_test,
 )
 from trading_bot.runtime.personal_desktop_paper_account_token import (
@@ -50,8 +52,8 @@ from trading_bot.runtime.windows_authority_security import (
     SecurityPolicy,
 )
 from trading_bot.runtime.windows_authority_validation import (
-    ValidatedProductionAuthority,
-    require_validated_production_authority,
+    InstalledAuthorityValidation,
+    validate_installed_authority_complete,
 )
 
 
@@ -209,21 +211,19 @@ def require_paper_publication_administrator(
 
 def require_paper_publication_inputs(
     *,
-    authority: ValidatedProductionAuthority,
     bundle: PersonalDesktopPaperAccountBundle,
-    selected_snapshot: SelectedC3SnapshotReadResult,
-    starting_cash: Decimal,
-) -> None:
-    """Read-only production admission; does not use the Trading runtime gate."""
+) -> InstalledAuthorityValidation:
+    """Read-only administrator admission against a source-owned PD1E freeze."""
+    freeze = publication_freeze.require_production_paper_publication_freeze()
     require_windows_platform()
-    require_validated_production_authority(authority)
-    verify_personal_desktop_paper_account_bundle(
-        bundle,
-        authority=authority,
-        selected_snapshot=selected_snapshot,
-        starting_cash=starting_cash,
-    )
     require_paper_publication_administrator(WindowsTradingTokenObserver().observe())
+    validation = validate_installed_authority_complete()
+    publication_freeze.verify_personal_desktop_paper_publication_freeze(
+        bundle,
+        freeze=freeze,
+        administrator_validation=validation,
+    )
+    return validation
 
 
 def _occupancy(
@@ -494,10 +494,7 @@ def _publish(
 
 def publish_personal_desktop_paper_account(
     *,
-    authority: ValidatedProductionAuthority,
     bundle: PersonalDesktopPaperAccountBundle,
-    selected_snapshot: SelectedC3SnapshotReadResult,
-    starting_cash: Decimal,
 ) -> PaperPublicationResult:
     """Fixed production destination; no caller path/API/enable flag is accepted."""
     # FIRST executable statement, before constructing even a native read object.
@@ -505,17 +502,12 @@ def publish_personal_desktop_paper_account(
         raise PersonalDesktopPaperAccountError(
             "PD1C production publication is disabled"
         )
-    require_paper_publication_inputs(
-        authority=authority,
-        bundle=bundle,
-        selected_snapshot=selected_snapshot,
-        starting_cash=starting_cash,
-    )
+    validation = require_paper_publication_inputs(bundle=bundle)
     from trading_bot.runtime.personal_desktop_paper_account_publication_native import (
         WindowsPaperPublicationApi,
     )
 
-    sid = authority.approved_account_sid
+    sid = validation.bootstrap_verification.bootstrap.approved_account_sid
     result = None
     try:
         with security.PinnedPaperReadSession(
@@ -524,10 +516,10 @@ def publish_personal_desktop_paper_account(
             parent.pin(security.PERSONAL_DESKTOP_PAPER_PARENT)
 
             def revalidate() -> None:
-                require_validated_production_authority(authority)
-                require_paper_publication_administrator(
-                    WindowsTradingTokenObserver().observe()
-                )
+                if require_paper_publication_inputs(bundle=bundle) != validation:
+                    raise AuthorityObjectError(
+                        "administrator C1 publication evidence drift"
+                    )
                 parent.finish()
 
             anchor = parse_personal_desktop_paper_account_anchor(bundle.anchor_bytes)

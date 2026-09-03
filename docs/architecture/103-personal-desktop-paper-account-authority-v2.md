@@ -211,6 +211,18 @@ Preparation must independently verify the exact selected C3 snapshot through P2 
 
 Before any future production publication, ChatGPT/Sol freezes the exact manifest, anchor, GENESIS SHA-256 values and byte lengths plus the chosen starting cash.
 
+### Trading preparation and administrator publication are separate planes
+
+The Trading runtime plane uses genuine process-local `ValidatedProductionAuthority` plus P2 to prepare and contextually revalidate the bundle during readiness. C1 runtime acquisition still requires the exact non-elevated Trading process. That capability and the P2 permit are not serialized, transferred into an Administrator process, or recreated by publication.
+
+The Administrator publication plane obtains complete installation-conformance evidence internally through `validate_installed_authority_complete()` and requires `require_initialized_supported_authority_evidence()`. The evidence must reconcile the installed signed bootstrap, machine-authority ID, approved Trading SID, and initialized/supported authority database. It is administrative evidence, not executable Trading authority.
+
+The bridge is an immutable source-owned `PersonalDesktopPaperPublicationFreeze`, populated only by a later reviewed PD1E source diff. It binds canonical machine/account UUID text, the exact approved Trading SID, explicit positive Decimal starting cash, exact UTC GENESIS `as_of`, and SHA-256/byte length for each of GENESIS, anchor, and provisioning manifest. No environment variable, CLI argument, config file, caller-supplied freeze, or disposable test seam configures the production freeze.
+
+Pure reconciliation verifies the existing PD1A manifest -> anchor -> Architecture-61 GENESIS chain, all three exact byte hashes/lengths, account identity, opening cash/chronology, and machine/SID agreement with complete Administrator C1 evidence. This does not recreate a P2 permit: the later reviewed source freeze binds the bytes whose P2 provenance was established in the Trading/readiness phase.
+
+The certified production freeze is `PERSONAL_DESKTOP_PAPER_V2_PUBLICATION_FREEZE = None` (unconfigured). The production publisher accepts only the bundle, obtains Administrator evidence itself, and fails closed before mutation while the freeze is absent. No current production freeze values are selected by PD1C.
+
 ## Trusted-administrator provisioning boundary
 
 Provisioning is a deliberately invoked one-time owner/admin operation. The high-assurance account ceremony is not required.
@@ -223,9 +235,11 @@ The publisher requires:
 - a primary process token;
 - elevated administrator membership;
 - no active thread impersonation token;
-- validated production C1 authority;
+- complete administrator C1 installation-conformance evidence, including an initialized/supported production authority database;
 - exact machine-authority ID matching the frozen bundle;
 - exact C1-approved Trading SID matching the frozen bundle.
+
+The publisher does not require or accept `ValidatedProductionAuthority` or a P2 permit. It requires the exact source-owned PD1E publication freeze and never issues Trading runtime authority from the Administrator process.
 
 The publisher does not enumerate LSA account rights, create test users, change groups, prompt for or reset passwords, create KSP keys, or sign a recovery authorization.
 
@@ -412,6 +426,8 @@ The production publisher/CLI must contain a source-owned gate whose default cert
 ```text
 PERSONAL_DESKTOP_PAPER_V2_PRODUCTION_EFFECTS_ENABLED=false
 ```
+
+The effect check is the first executable gate, before freeze access, Administrator validation, or native API construction. The separate source-owned publication freeze remains unconfigured; enabling effects without configuring an accepted PD1E freeze still fails closed before mutation. A future PD1E source diff must populate the reviewed freeze and separately enable effects; neither operation is a caller-selectable runtime control.
 
 Tests may exercise pure preparation and isolated disposable test-root logic, but must not mutate `F:\AITradingBot\Paper-v2` or the retained v1 paths.
 

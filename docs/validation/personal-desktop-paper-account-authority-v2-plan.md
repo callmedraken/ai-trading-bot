@@ -169,6 +169,25 @@ Negative tests include conflicting successor edges, corrupt receipts/reports/che
 
 Production gate remains false.
 
+### Administrator boundary and source-owned publication freeze
+
+The Trading runtime plane retains genuine process-local `ValidatedProductionAuthority` plus P2 for readiness preparation/contextual bundle verification. Neither capability is transferred to the Administrator process, made serializable, or replaced by a transferable runtime capability.
+
+The Administrator publication plane must obtain complete installation-conformance evidence through `validate_installed_authority_complete()` and require initialized/supported database evidence. Publication combines that evidence with the exact source-owned PD1E bundle freeze and the elevated primary Administrator token, without accepting a runtime capability or P2 result from the caller.
+
+The immutable publication-freeze model binds machine-authority ID, Trading SID, paper-account ID, explicit positive Decimal cash, exact UTC GENESIS `as_of`, and SHA-256/byte length for GENESIS, anchor, and manifest. Production remains `PERSONAL_DESKTOP_PAPER_V2_PUBLICATION_FREEZE = None`; only a later reviewed PD1E source diff may populate it. No environment, CLI, config, caller-provided freeze, or disposable seam can configure production.
+
+Focused regressions must prove:
+
+- the production API accepts only the bundle, rejecting runtime authority/P2/freeze/path/API/enable inputs;
+- complete matching Administrator evidence and a matching test freeze pass pure pre-publication reconciliation without a P2 permit or capability issuance;
+- wrong freeze type, absent production freeze, machine/SID/account ID/cash/chronology mismatch, and every artifact hash/length mismatch fail closed;
+- incomplete/unsupported Administrator evidence and inconsistent installed bootstrap evidence are rejected;
+- the source freeze binds the reviewed Trading/P2 bytes without claiming to recreate P2 provenance;
+- the disposable seam leaves the production freeze unconfigured and cannot issue production authority.
+
+The PD1A production preparation/contextual verifier, P2 provenance rules, and C1 runtime capability contract must remain unchanged.
+
 ### Disposable publication harness
 
 Exercise the same logical algorithm under a fresh disposable root with explicit test-only dependency injection. The test root must not share a production path prefix interpreted as authority.
@@ -206,7 +225,7 @@ No test may turn a crash-left state into an automatic production retry.
 
 ### Hard production-gate test
 
-A direct attempt to invoke the production publisher while the certified constant is false must stop before the first production filesystem mutation.
+A direct attempt to invoke the production publisher while the certified constant is false must stop before freeze access, Administrator validation, native API construction, and every filesystem effect. Separately test the unconfigured-freeze admission failure without enabling or monkeypatching the production effect gate True. No production path may be touched.
 
 ## PD1 concurrency seam
 
@@ -278,6 +297,8 @@ A later PD1 production-readiness freeze must separately prove/freeze:
 - exact GENESIS bytes/hash/length;
 - exact anchor bytes/hash/length;
 - exact provisioning manifest bytes/hash/length;
+- reviewed source-owned publication freeze binding machine/SID/account ID, starting cash, GENESIS chronology, and all three exact artifact hashes/lengths;
+- complete current Administrator C1 installation-conformance evidence, distinct from Trading runtime authority;
 - current elevated administrator gate for publication;
 - exact future source-enablement diff;
 - one-shot/ambiguous-loss operator rule.

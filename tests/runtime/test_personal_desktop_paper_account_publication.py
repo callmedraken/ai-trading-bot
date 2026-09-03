@@ -17,6 +17,9 @@ from trading_bot.runtime import (
     personal_desktop_paper_account_publication as publication,
 )
 from trading_bot.runtime import (
+    personal_desktop_paper_account_publication_freeze as publication_freeze,
+)
+from trading_bot.runtime import (
     personal_desktop_paper_account_publication_native as native,
 )
 from trading_bot.runtime import personal_desktop_paper_account_security as security
@@ -98,6 +101,7 @@ sys.addaudithook(_production_path_guard)
 @pytest.fixture(autouse=True)
 def prohibit_production_effects(monkeypatch):
     assert security.PERSONAL_DESKTOP_PAPER_V2_PRODUCTION_EFFECTS_ENABLED is False
+    assert publication_freeze.PERSONAL_DESKTOP_PAPER_V2_PUBLICATION_FREEZE is None
     _guard_active.append(True)
     _production_events.clear()
 
@@ -111,6 +115,7 @@ def prohibit_production_effects(monkeypatch):
         yield
         assert _production_events == []
         assert security.PERSONAL_DESKTOP_PAPER_V2_PRODUCTION_EFFECTS_ENABLED is False
+        assert publication_freeze.PERSONAL_DESKTOP_PAPER_V2_PUBLICATION_FREEZE is None
     finally:
         _guard_active.clear()
 
@@ -862,16 +867,16 @@ def test_unrelated_content_and_reparse_root_fail_before_factory(case, monkeypatc
 def test_production_false_gate_precedes_inputs_native_construction_and_every_effect(
     case, monkeypatch, input_kind
 ):
-    _, bundle, _, args = case
+    _, _, _, args = case
     calls = []
 
     class Hostile:
         def __getattribute__(self, name):
             raise AssertionError("disabled publisher must not inspect caller input")
 
-    authority = None if input_kind == "none" else Hostile()
+    supplied = None if input_kind == "none" else Hostile()
     if input_kind == "test-authority":
-        authority = issue_validated_production_authority_for_test(
+        supplied = issue_validated_production_authority_for_test(
             **{
                 k: args[k]
                 for k in ("bootstrap", "bootstrap_digest", "production_evidence")
@@ -883,15 +888,13 @@ def test_production_false_gate_precedes_inputs_native_construction_and_every_eff
         raise AssertionError("disabled production publisher reached a dependency")
 
     monkeypatch.setattr(native, "WindowsPaperPublicationApi", forbidden)
-    monkeypatch.setattr(publication, "require_paper_publication_inputs", forbidden)
+    monkeypatch.setattr(publication, "validate_installed_authority_complete", forbidden)
+    monkeypatch.setattr(
+        publication_freeze, "require_production_paper_publication_freeze", forbidden
+    )
     monkeypatch.setenv("PERSONAL_DESKTOP_PAPER_V2_PRODUCTION_EFFECTS_ENABLED", "true")
     with pytest.raises(PersonalDesktopPaperAccountError, match="disabled"):
-        publication.publish_personal_desktop_paper_account(
-            authority=authority,
-            bundle=bundle,
-            selected_snapshot=args["selected_snapshot"],
-            starting_cash=args["starting_cash"],
-        )
+        publication.publish_personal_desktop_paper_account(bundle=supplied)
     assert calls == []
 
 
@@ -900,35 +903,43 @@ def test_native_constructor_itself_remains_disabled():
         native.WindowsPaperPublicationApi("not even parsed")
 
 
-def test_production_admission_rejects_disposable_c1_without_native_mutator(case):
+def test_runtime_capability_cannot_be_transferred_into_administrator_publisher(case):
     _, bundle, api, args = case
     authority = issue_validated_production_authority_for_test(
         **{k: args[k] for k in ("bootstrap", "bootstrap_digest", "production_evidence")}
     )
-    with pytest.raises(WindowsAuthorityError, match="non-production provenance"):
-        publication.require_paper_publication_inputs(
-            authority=authority,
-            bundle=bundle,
-            selected_snapshot=args["selected_snapshot"],
-            starting_cash=args["starting_cash"],
-        )
+    for boundary in (
+        publication.publish_personal_desktop_paper_account,
+        publication.require_paper_publication_inputs,
+    ):
+        with pytest.raises(TypeError):
+            boundary(authority=authority, bundle=bundle)
     assert not api.calls
 
 
 def test_production_signature_has_no_root_api_or_enable_override():
     assert set(
         inspect.signature(publication.publish_personal_desktop_paper_account).parameters
-    ) == {"authority", "bundle", "selected_snapshot", "starting_cash"}
+    ) == {"bundle"}
     assert set(inspect.signature(native.WindowsPaperPublicationApi).parameters) == {
         "genesis_id"
     }
-    for override in ("root", "destination", "native_api", "enabled", "test", "config"):
+    for override in (
+        "root",
+        "destination",
+        "native_api",
+        "enabled",
+        "test",
+        "config",
+        "authority",
+        "selected_snapshot",
+        "starting_cash",
+        "freeze",
+        "administrator_validation",
+    ):
         with pytest.raises(TypeError):
             publication.publish_personal_desktop_paper_account(
-                authority=None,
                 bundle=None,
-                selected_snapshot=None,
-                starting_cash=None,
                 **{override: True},
             )
 

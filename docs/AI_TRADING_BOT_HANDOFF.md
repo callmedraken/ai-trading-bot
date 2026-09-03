@@ -7,6 +7,9 @@
 **Primary branch base / accepted Architecture-94 P2:** `a810122a96b6fc90da25d71eede8da64b7272c98`  
 **Architecture-102 adoption checkpoint:** `fab1d776abcdcbf09fb26a257ea7fc86f6201b26`  
 **Architecture-103 + validation-plan checkpoint:** `12e41c4e407a79d63ea896773bf8462038ebba27`  
+**Accepted PD1A source checkpoint:** `fa16eef106638e5d6441a05b7f0dd5f757a63e53`  
+**Accepted PD1B source checkpoint:** `1390a16be5f16f7f38757c875a4648f7ef414d70`  
+**Accepted PD1B source tree:** `0e9942f293136e9fd6f3bb5c145ada42800608a6`  
 **Historical high-assurance branch:** `feature/p3-r1-recovery-implementation`  
 **Production/live trading:** NO-GO
 
@@ -42,9 +45,14 @@ feature/personal-desktop-paper-runtime
 base: a810122a96b6fc90da25d71eede8da64b7272c98
 ```
 
-A dedicated local worktree for the new branch has **not yet been established**. Before PD1 source implementation, create and prove a fresh worktree. Do not reuse another active worktree.
+Dedicated personal-desktop worktree:
 
-Existing worktrees:
+```text
+F:\AI\worktrees\ai-trading-bot-personal-desktop
+feature/personal-desktop-paper-runtime
+```
+
+Existing parallel worktrees:
 
 ```text
 historical/high-assurance P3-R1:
@@ -63,7 +71,7 @@ GUI/main worktree:
   F:\AI\ai-trading-bot
 ```
 
-Preserve unrelated generated/untracked reports and historical pytest/cache evidence.
+Preserve unrelated generated/untracked reports and historical pytest/cache evidence. Do not reuse or disturb another active worktree for PD1.
 
 ## 3. ChatGPT/Codex workflow
 
@@ -86,6 +94,7 @@ Every bounded Codex task starts with:
 git rev-parse --show-toplevel
 git branch --show-current
 git rev-parse HEAD
+git status --short
 ```
 
 Mismatch is a STOP. Do not self-correct with checkout/switch/reset/rebase/clean/worktree operations.
@@ -263,6 +272,50 @@ Steady-state authority requires exact approved Trading SID, primary non-elevated
 
 Immutable root/anchor/GENESIS are administrator-owned and Trading-read-only. `runtime` / `paper-operations` grant only the approved Trading SID the data rights needed by Architecture 67. Unrelated principals are rejected.
 
+For the fixed ancestor chain, the volume role allows ordinary concrete data/sibling rights that do not permit replacement of the governed child, while rejecting `FILE_DELETE_CHILD`, `WRITE_DAC`, `WRITE_OWNER`, and unknown masks. The immediate `F:\AITradingBot` parent remains more restrictive and rejects unrelated delete/replacement/security-control authority.
+
+### Accepted source implementation
+
+PD1A — **ACCEPTED**:
+
+```text
+commit: fa16eef106638e5d6441a05b7f0dd5f757a63e53
+```
+
+Implements the pure deterministic v2 account-ID, strict anchor/manifest models, exact Architecture-61 GENESIS reuse, explicit positive `Decimal` starting cash, and preserved C1/P2 provenance. No filesystem/provider effect occurs.
+
+PD1B — **ACCEPTED**:
+
+```text
+commit: 1390a16be5f16f7f38757c875a4648f7ef414d70
+tree:   0e9942f293136e9fd6f3bb5c145ada42800608a6
+```
+
+The accepted PD1B tree includes the initial read-authority checkpoint `59703c0fec6038b223876ad89d632dbab1e915cb` plus bounded parent-policy correction `1390a16be5f16f7f38757c875a4648f7ef414d70`.
+
+PD1B provides:
+
+- bounded native process-token proof for exact Trading SID, primary token, non-elevated state, no thread impersonation, and no enabled Administrators authority;
+- no LSA-right enumeration dependency;
+- exact source-owned v2 paths and bounded no-follow/pinned object reads;
+- role-based ACL verification independent of the existing C1 policy;
+- finite anchor/artifact/inventory/pinned-object bounds;
+- full installed account reconstruction through Architecture 61/66/67;
+- graph-derived unique terminal selection rather than filename/time/newest heuristics;
+- receipt replay and exact historical snapshot/configuration dependency checks;
+- final token, identity, ACL, content, and inventory drift rejection.
+
+Focused evidence reported during implementation:
+
+```text
+initial PD1B focused + directly affected regressions: 553 passed
+parent-security correction verification:             244 passed
+Ruff check / Ruff format check:                       passed
+Git whitespace/diff checks:                           passed
+```
+
+Real installed-v2 end-to-end Windows validation remains unperformed because production `Paper-v2` does not yet exist and production effects remain disabled.
+
 ### Crash/recovery rule
 
 No automatic provisioning retry. If staging creation may have begun and the publisher exits unexpectedly, that effect authorization is consumed. Reconcile final/staging read-only before any later action. Never silently delete, repair, or retry crash-left staging.
@@ -314,9 +367,9 @@ Do not mutate local LSA policy just to satisfy this parked high-assurance gate.
 ```text
 PD0  personal-desktop profile adoption                     COMPLETE
 PD1  personal-desktop paper-account authority v2           CURRENT
-  PD1A pure anchor/account-ID/provisioning bundle           NEXT
-  PD1B Windows read-only authority + token/ACL/path
-  PD1C disabled publisher + disposable publication tests
+  PD1A pure anchor/account-ID/provisioning bundle           ACCEPTED
+  PD1B Windows read-only authority + token/ACL/path         ACCEPTED
+  PD1C disabled publisher + disposable publication tests   NEXT
   PD1D source diff review + broad certification
   PD1E separate production bundle/readiness/effect gate
 PD2  reliable supervised manual paper cycle
@@ -355,15 +408,16 @@ broker order submission
 live trading
 ```
 
-Architecture 103 is docs-only.
+Accepted PD1A/PD1B source grants no production effect authority.
 
 ## 12. Next-session procedure
 
 1. Read Architecture 102, Architecture 103, the PD1 validation plan, this handoff, and `PROJECT_STATUS.md`.
-2. Create/prove a fresh local worktree for `feature/personal-desktop-paper-runtime`; do not reuse an existing worktree.
-3. Prove worktree/branch/HEAD/clean state.
-4. Implement **PD1A only** against the frozen contract with production effects disabled.
-5. Run focused PD1A tests, Ruff, format check, and `git diff --check`.
-6. Push the exact scoped checkpoint only if explicitly authorized.
-7. ChatGPT/Sol reviews the authoritative GitHub diff before broader certification or PD1B.
-8. Include the next milestone in every verification report.
+2. Use only `F:\AI\worktrees\ai-trading-bot-personal-desktop` on `feature/personal-desktop-paper-runtime`.
+3. Prove worktree/branch/HEAD/clean state; fast-forward any docs-only remote checkpoints before starting a Codex task.
+4. Implement **PD1C only** with Sol High: production-disabled publisher plus disposable publication/crash-state tests.
+5. Keep `PERSONAL_DESKTOP_PAPER_V2_PRODUCTION_EFFECTS_ENABLED=false`; no real `Paper-v2`, staging, ACL, account, provider, broker, or live effect is authorized.
+6. Run focused PD1C tests plus directly affected PD1A/PD1B regressions, Ruff, format check, and `git diff --check`.
+7. Codex may exact-file stage/commit/ordinary-push the scoped PD1C checkpoint when the prompt explicitly authorizes it.
+8. ChatGPT/Sol reviews the authoritative GitHub diff before PD1D broad source certification.
+9. Include the next milestone in every verification report.

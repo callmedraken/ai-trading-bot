@@ -32,6 +32,7 @@ worktree: F:\AI\worktrees\ai-trading-bot-p3-r1
 branch: feature/p3-r1-recovery-implementation
 Architecture-100 source-certified checkpoint: 8cfbbd3a30eb704e6acfc1866bf2ed752879e231
 Architecture-100 source-certified tree: fc682a5baf35f2f2e8b01c9f8f04ce318681ee85
+Architecture-101 docs checkpoint: 4e9e4de829376e42a68acca158ab1d4f4c01a241
 ```
 
 The main `F:\AI\ai-trading-bot` worktree remains the GUI worktree and must not
@@ -41,11 +42,11 @@ reports and historical pytest evidence.
 
 ## C3 — FULLY COMPLETE / ACCEPTED
 
-C1 `ValidatedProductionAuthority` and C2 `WindowsTransactionalAuthority` are the
-reviewed authority foundations. C3 is the reviewed bridge into real market-data
-credentials, isolated native Windows child execution, Alpaca transport, parent
-verification, final-artifact publication, terminal evidence, and durable
-selection.
+C1 `ValidatedProductionAuthority` and C2 `WindowsTransactionalAuthority` remain
+the reviewed authority foundations. C3 is the accepted bridge into real
+market-data credentials, isolated native Windows child execution, Alpaca
+transport, parent verification, final-artifact publication, terminal evidence,
+and durable selection.
 
 Accepted C3 production release-source checkpoint:
 
@@ -55,10 +56,8 @@ Accepted C3 production release-source checkpoint:
 
 All six real-provider C3 effects are consumed. Call #5 remains
 `FAILED / CONFIRMED` and permanently non-retryable. Call #6 remains
-`SUCCEEDED / CONFIRMED` and `SUCCESS_SELECTED`; its provider effect must never be
-rerun. No provider call #7 is authorized. `/v2` Alpaca credential references are
-immutable historical state; later rotation requires a separately reviewed `/v3`
-or later version.
+`SUCCEEDED / CONFIRMED` and `SUCCESS_SELECTED`; it must never be rerun. No
+provider call #7 is authorized.
 
 ## Architecture 94 manual paper cycle
 
@@ -66,37 +65,34 @@ Architecture 94 remains simulated paper only. It does not authorize a broker,
 live trading, unattended scheduling, automatic retry, or another C3 provider
 effect.
 
-### P1 — ACCEPTED
+Accepted P1:
 
 ```text
 1028e60b99c27cef0994f40d6ce381392abfb0f8
 fix: bind Architecture 94 P1 provenance
 ```
 
-P1 remains the pure deterministic strategy-history/plan boundary.
-
-### P2 — FULLY ACCEPTED
+Accepted P2:
 
 ```text
 a810122a96b6fc90da25d71eede8da64b7272c98
 fix: bind Architecture 94 P2 permit issuance
 ```
 
-P2 remains the genuine C1-attenuated, read-only selected-C3 authority boundary.
-The one supervised production P2 reread of already-durable successful call #6
+The one supervised production P2 reread of already-durable successful C3 call #6
 passed and **must not be rerun**.
 
 ## P3 / P3-R1 retained production state
 
-Frozen production paths and identities remain:
+Frozen production identities and paths remain:
 
 ```text
 Trading account: DESKTOP-I4DOKM7\Trading
 Trading SID: S-1-5-21-1397534616-3988210162-180023805-1009
+Creator SID: S-1-5-21-1397534616-3988210162-180023805-1005
 Fixed runtime: F:\AITradingBot\runtime\python.exe
 Production temp: F:\AITradingBot\temp
 Authority DB: F:\AITradingBot\Authority\authority.sqlite3
-Capture output: F:\AITradingBot\Authority\capture-output
 Paper final root: F:\AITradingBot\Paper
 Paper retained staging root: F:\AITradingBot\.Paper.provisioning-v1
 Credential policy: windows-credential-manager-alpaca-market-data/v2
@@ -113,70 +109,47 @@ production authority DB: unchanged exact
 ```
 
 Architectures 95 and 96 remain the retained-staging recovery and signed recovery
-authorization contracts. Architectures 97 through 100 now define the additional
-recovery-signing/KSP-validation path needed before recovery execution can be
-trusted.
+authorization contracts. Production recovery remains blocked.
 
-## Architectures 97–100 — current security checkpoint
+## Architectures 97–101 — current P3-R1 security line
 
-Relevant contracts:
+Current authoritative architecture documents:
 
 ```text
 docs/architecture/97-p3-r1-recovery-signing-trust-reestablishment.md
 docs/architecture/98-p3-r1-ksp-machine-key-security-contract.md
 docs/architecture/99-p3-r1-ordinary-nonadmin-test-principal.md
 docs/architecture/100-p3-r1-protected-account-ceremony-evidence-root.md
+docs/architecture/101-p3-r1-split-authority-qualification-rights.md
+```
 
+Related validation/runbook documents remain:
+
+```text
 docs/validation/p3-r1-ordinary-nonadmin-test-principal-creation-ceremony.md
 docs/validation/reliable-manual-paper-cycle-p3-r1-ordinary-nonadmin-test-principal.md
 docs/validation/p3-r1-ksp-disposable-test-harness.md
 ```
 
-Architecture 99 freezes a dedicated ordinary non-admin local test identity named
-`P3R1KspTestUser`. Windows must supply its SID after a separately authorized
-create-new ceremony. The account may never become production, Trading, recovery,
-signing, KSP-owner/ACE, or Credential Manager authority.
+Architecture 97 re-establishes recovery-signing trust. Architecture 98 freezes
+the disposable Windows Software KSP machine-key security experiment.
+Architecture 99 adds the dedicated ordinary non-admin identity
+`P3R1KspTestUser`, whose Windows SID remains unknown until a separately
+authorized create-new ceremony and Windows readback. Architecture 100 moves the
+account-ceremony retained-evidence root to a protected top-level NTFS pathname.
+Architecture 101 corrects the qualification authority split after a real
+least-privilege LSA-read blocker was observed.
 
-The account-creation procedure is documentation-complete at:
+### Architecture 100 — source certified, no longer execution-ready by itself
 
-```text
-022960a3f242ded927edf3ae4667f87e724aeb19
-docs: define P3-R1 test-user creation ceremony
-```
-
-The first disabled/source-only helper checkpoint was:
-
-```text
-d509537b88f66ef244d326e5417d38d9e5f25f53
-test: add disabled P3-R1 test-user ceremony helper
-```
-
-It added only:
-
-```text
-scripts/p3_r1_ordinary_nonadmin_principal_ceremony.cs
-scripts/run_p3_r1_ordinary_nonadmin_principal_ceremony.ps1
-tests/runtime/test_p3_r1_ordinary_nonadmin_principal_ceremony.py
-```
-
-### Architecture 100 — SOURCE CERTIFIED
-
-A read-only ACL/namespace diagnostic invalidated the old retained-evidence
-location under `F:\AI`: untrusted principals had enough authority on that
-ancestor to defeat the strict cross-run pathname-integrity requirement after
-no-delete-share guards were released.
-
-Architecture 100 supersedes only the account-ceremony evidence-root location,
-schema, and inherited-security assumption. The old location is retired before
-any effect occurred:
+Architecture 100 retired the unsafe account evidence location under `F:\AI`:
 
 ```text
 retired: F:\AI\p3-r1-ordinary-nonadmin-principal-v1
-new:     F:\p3-r1-ordinary-nonadmin-principal-v2
-schema:  p3-r1-ordinary-nonadmin-principal-evidence/v2
+protected root: F:\p3-r1-ordinary-nonadmin-principal-v2
 ```
 
-The accepted source implementation checkpoint is:
+The source-certified implementation checkpoint remains:
 
 ```text
 8cfbbd3a30eb704e6acfc1866bf2ed752879e231
@@ -185,18 +158,15 @@ test: implement protected P3-R1 ceremony evidence root
 tree: fc682a5baf35f2f2e8b01c9f8f04ce318681ee85
 ```
 
-The source change remained limited to the existing ceremony helper, wrapper, and
-focused tests. It implements create-time protected-DACL construction, exact
-owner/protection/ACE validation, parent namespace replacement-authority checks,
-fixed NTFS volume/root identity binding, reparse-safe/no-delete-share continuity,
-strict v2 retained root identity, and fail-closed collision/uncertain-create
-handling. The separate KSP evidence root remains unchanged.
+It changed only:
 
-`ACCOUNT_EFFECT_EXECUTION_AUTHORIZED=false` remains hard-coded. No password
-prompt, evidence-root creation, ACL mutation, account/group mutation, KSP effect,
-production recovery, signing effect, or provider effect was authorized or run.
+```text
+scripts/p3_r1_ordinary_nonadmin_principal_ceremony.cs
+scripts/run_p3_r1_ordinary_nonadmin_principal_ceremony.ps1
+tests/runtime/test_p3_r1_ordinary_nonadmin_principal_ceremony.py
+```
 
-Source certification evidence:
+Source certification remains accepted:
 
 ```text
 focused Architecture-100 helper gate: 47 passed
@@ -206,76 +176,199 @@ Ruff check: passed
 Ruff format check: passed
 git diff --check: passed
 final reviewed HEAD/tree: unchanged exact
-final P3-R1 worktree: clean
 ```
 
-The broad-run failures were classified as environment-invalid legacy harness
-scratch failures: the two unchanged Architecture-77 authority test modules use a
-hard-coded worktree `.pytest_cache` lifecycle-arbiter root that was inaccessible
-in this P3-R1 worktree. Those exact unchanged test blobs were rerun from the
-validated integration harness while `PYTHONPATH` and printed module `__file__`
-provenance proved imports came from the exact reviewed P3-R1 source; the entire
-legacy slice then passed 758/758. No full-suite rerun is required unless source
-changes.
+The broad-run failures were environment-invalid legacy harness scratch failures.
+The exact affected legacy test blobs passed 758/758 from the validated clean
+integration harness while `PYTHONPATH` and printed `__file__` provenance bound
+imports to the reviewed P3-R1 source. No full-suite rerun was required for that
+checkpoint.
 
-## Immediate next milestone — read-only execution-readiness restart
+`ACCOUNT_EFFECT_EXECUTION_AUTHORIZED=false` remains hard-coded. No password,
+root, ACL, account, group, KSP, production, signing, or provider effect occurred.
 
-Architecture 100 source work is complete. The next substantive milestone is to
-restart the complete P3-R1 execution-readiness sequence from **gate #1** rather
-than resume the earlier stopped run.
+### Restarted readiness observations through Gate 4C
 
-The restart is read-only. It must freshly prove/freeze at least:
+After the Architecture-100 certification closeout, the local P3-R1 worktree was
+fast-forwarded to the docs-only head that existed before Architecture 101:
 
-1. exact worktree, branch, source commit/tree, helper/wrapper/test hashes, and
-   source-enablement diff;
-2. exact absence of the retired v1 evidence root and the new v2 evidence root;
-3. current `F:\` fixed/local NTFS volume GUID/serial and persistent-ACL support;
-4. current `F:\` owner/DACL semantics, no reparse traversal, and no untrusted
-   `FILE_DELETE_CHILD`, `WRITE_DAC`, or `WRITE_OWNER` authority capable of
-   replacing the protected child;
-5. exact creator/Trading identities and expected built-in group SID mappings;
-6. candidate-name absence and special-group topology relevant to
-   `P3R1KspTestUser`;
-7. current password/account/logon policy needed by the one-shot account ceremony;
-8. exact Windows PowerShell 5.1, helper, Git, and `netapi32.dll` identities; and
-9. confirmation that every effect gate remains disabled before any later
-   authorization discussion.
+```text
+HEAD: 2040e6dbc4e7418a9275df139aaca7428930380d
+tree: e481496fad89b2f82ba26accbe45029d995e583e
+```
 
-Changed, missing, ambiguous, or unexpectedly writable observations are a STOP.
-Do not repair F:\, F:\AI, historical cache state, retained production staging, or
-any candidate root merely to make readiness pass.
+Read-only discovery established:
 
-The later execution authorization, if readiness succeeds, must also treat root
-creation as one-shot across process loss: once an authorized create may have
-begun, an ambiguous process termination consumes that authorization and permits
-only read-only reconciliation, never blind relaunch/retry.
+```text
+Gate 1  source/tool identity                         PASS
+Gate 2  F:\ fixed NTFS + parent namespace authority PASS
+Gate 3  v1/v2 roots + candidate-name absence        PASS
+Gate 4A local-group topology                         PASS
+Gate 4B password/account policy                      PASS
+Gate 4C LSA account-rights baseline                  BLOCKED
+```
+
+Important accepted observations included:
+
+```text
+F:\ volume serial: 0x6E962F80
+F:\ fixed local NTFS: PASS
+persistent ACLs: PASS
+F:\ reparse point: false
+untrusted FILE_DELETE_CHILD / WRITE_DAC / WRITE_OWNER on parent: absent
+
+retired v1 root: absent
+new v2 root: absent
+P3R1KspTestUser: absent by NetUserGetInfo and fully resumed NetUserEnum
+BUILTIN\Users SID/name round-trip: PASS
+
+BUILTIN\Users nested into another local group: none
+INTERACTIVE -> Performance Log Users edge: present
+Performance Log Users members observed:
+  creator SID ...-1005
+  NT AUTHORITY\INTERACTIVE S-1-5-4
+
+password policy discovery:
+  min length 0
+  max age 3628800 seconds
+  min age 0
+  history length 0
+  lockout threshold 0
+creator enabled: true
+Trading enabled: true
+```
+
+These are discovery facts only after Architecture 101 because the reviewed
+source/protocol is changing. They do not authorize any effect and must be
+re-proved where required by the later restarted readiness sequence.
+
+### Architecture 101 — split qualification rights authority
+
+Gate 4C exposed a real source/execution mismatch. The ordinary non-elevated
+PowerShell process opened the LSA policy lookup surface but
+`LsaEnumerateAccountRights` returned:
+
+```text
+0xC0000022 STATUS_ACCESS_DENIED
+```
+
+for `S-1-1-0` and separately for Performance Log Users. The old helper's ordinary
+`Observation()` path includes `Rights(...)`, so the source-certified helper could
+not complete the intended genuine ordinary qualification on this host.
+
+The Architecture-101 checkpoint is:
+
+```text
+4e9e4de829376e42a68acca158ab1d4f4c01a241
+docs: split P3-R1 qualification rights authority
+```
+
+Architecture 101 does **not** grant the ordinary user more LSA authority and does
+not weaken the rights check. It splits the evidence sources:
+
+```text
+genuine candidate process:
+  account/group/token/privilege/INTERACTIVE/Performance-Log-Users evidence
+  NO LsaEnumerateAccountRights call
+
+revalidated elevated creator:
+  exact LSA rights for candidate SID + genuine candidate token-group SIDs
+  read-only only
+
+creator reconciliation:
+  exact canonical candidate-console transfer
+  independent account/group/edge re-read
+  operator EXACT_CANDIDATE_CONSOLE_MATCH
+  creator-side LSA collection
+  strict combined qualification object
+```
+
+The candidate observation schema becomes:
+
+```text
+p3-r1-candidate-qualification-observation/v1
+```
+
+The final combined qualification observation becomes:
+
+```text
+p3-r1-split-qualification-observation/v1
+```
+
+The strict account-ceremony evidence schema advances before any evidence exists:
+
+```text
+p3-r1-ordinary-nonadmin-principal-evidence/v3
+```
+
+The protected root path stays exactly:
+
+```text
+F:\p3-r1-ordinary-nonadmin-principal-v2
+```
+
+No root/evidence exists to migrate or adopt.
+
+## Immediate next milestone — Architecture-101 disabled source correction
+
+Readiness is stopped. Do not continue from Gate 4C and do not run the old helper
+with effects enabled.
+
+The next checkpoint is a **Sol High** Windows-security implementation bounded to:
+
+```text
+scripts/p3_r1_ordinary_nonadmin_principal_ceremony.cs
+scripts/run_p3_r1_ordinary_nonadmin_principal_ceremony.ps1
+tests/runtime/test_p3_r1_ordinary_nonadmin_principal_ceremony.py
+```
+
+Required source behavior is frozen in Architecture 101. The implementation must
+keep all effects disabled, remove ordinary LSA enumeration, add strict candidate
+and split-observation schemas, collect LSA rights only from the revalidated
+creator, reconcile exact query targets/results, and preserve all Architecture-100
+root/account/security behavior.
+
+Codex should run only focused tests/checks during implementation. After an exact
+GitHub source-diff review accepts the three-file change, broad local certification
+will be requested. Because source changes, a later successful source
+certification must restart execution readiness from **Gate 1** again.
 
 ## Effect authorization state
 
 Still **NOT AUTHORIZED**:
 
-- evidence-root creation or ACL mutation;
-- password prompting or capture;
-- `P3R1KspTestUser` creation, reset, deletion, rename, or enable/disable;
-- local-group add/remove effects;
-- KSP native effect execution or cleanup;
-- recovery signing/private-key effects beyond already accepted retained state;
-- production P3 recovery;
+- protected evidence-root creation or ACL mutation;
+- ceremony evidence publication;
+- password prompt/capture;
+- `P3R1KspTestUser` creation/reset/delete/rename/enable/disable;
+- candidate interactive logon;
+- local-group mutation;
+- LSA policy or account-right mutation;
+- KSP native execution/key creation/signature/private export;
+- production recovery-key creation/signing/recovery;
 - provider call #7;
 - broker/live trading; and
-- P4/P5/P6 external effects.
+- P4/P5/P6 production effects.
 
-Required order from the source-certified checkpoint is:
+Required order is now:
 
 ```text
-complete read-only Architecture-100 readiness restart from gate #1
+Architecture-101 disabled source implementation
+-> exact GitHub diff/security review
+-> focused + broad source certification
+-> restart complete read-only readiness from Gate 1
 -> ChatGPT acceptance of frozen readiness evidence
--> separate explicit one-time filesystem/account effect authorization
+-> separate explicit effect authorization discussion
 -> protected evidence-root/account ceremony
--> genuine ordinary-user qualification
+-> genuine ordinary candidate qualification + creator LSA reconciliation
 -> later KSP SID/source freeze and denial experiment
--> recovery path only after all independent recovery gates are accepted
+-> recovery only after all independent gates are accepted
 ```
+
+Architecture 100's one-shot ambiguous root-creation rule remains unchanged:
+once an authorized root-creation call may have begun, unexpected process loss
+consumes that authorization and permits only read-only reconciliation, never a
+blind relaunch even if the root later appears absent.
 
 ## GUI status
 
@@ -289,18 +382,17 @@ Canonical workflow rules remain in `AGENTS.md` and
 `docs/AI_DEVELOPMENT_WORKFLOW.md`:
 
 - prove exact worktree, branch, and HEAD before every bounded Codex task;
-- any startup mismatch is a STOP; never self-correct Git state;
+- startup mismatch is a STOP; never self-correct Git state;
 - every controlled Windows pytest gate uses a fresh explicit external
-  `F:\AI\temp\pytest\<unique-run>` basetemp;
-- normally use `-p no:cacheprovider` when cache behavior is irrelevant;
+  `F:\AI\temp\pytest\<unique-run>` basetemp and normally
+  `-p no:cacheprovider`;
 - preserve unrelated generated/untracked reports and historical pytest evidence;
-- run focused tests during implementation and reserve full certification for the
-  accepted final source tree;
-- when an unchanged legacy harness hard-codes inaccessible `.pytest_cache`
-  scratch, use the validated clean-harness/provenance method rather than repairing
-  retained cache state;
-- under Windows PowerShell 5.1, prefer piping a here-string to Python stdin for
-  quoting-sensitive provenance snippets instead of `python -c`;
+- use focused tests during implementation and broad/full certification only after
+  exact source-diff acceptance;
+- use the validated clean-harness/provenance method for unchanged legacy tests
+  whose hard-coded `.pytest_cache` scratch is inaccessible;
+- under Windows PowerShell 5.1, prefer a here-string piped to Python stdin for
+  quoting-sensitive provenance snippets rather than `python -c`;
 - never merge, rebase, force-push, amend, change PR metadata/review threads, or
   modify unrelated files without explicit approval.
 
@@ -325,10 +417,7 @@ docs/PROJECT_STATUS.md
 docs/AI_TRADING_BOT_HANDOFF.md
 ```
 
-Update `docs/AI_DEVELOPMENT_WORKFLOW.md` only when a checkpoint reveals a
-reusable workflow rule that is not already captured. Git-tracked documents are
-authoritative; uploaded Project copies are context mirrors only.
-
+Update `docs/AI_DEVELOPMENT_WORKFLOW.md` only for a new reusable workflow rule.
+Git-tracked documents are authoritative; uploaded copies are context mirrors.
 Documentation closeout does not authorize merge, rebase, force-push, amend,
-review-thread resolution, PR metadata changes, production/provider effects, or
-unrelated modifications.
+review-thread resolution, PR metadata changes, or any production/security effect.

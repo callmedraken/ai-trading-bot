@@ -3,21 +3,22 @@
 **Repository:** `callmedraken/ai-trading-bot`  
 **Integration branch:** `develop`  
 **Accepted integrated baseline:** `bd88ee966bff455f9fc897d6cfdfafdd807f27e2`  
-**Primary personal-desktop branch:** `feature/personal-desktop-paper-runtime`  
+**Primary product branch:** `feature/personal-desktop-paper-runtime`  
 **Primary branch base / accepted Architecture-94 P2:** `a810122a96b6fc90da25d71eede8da64b7272c98`  
-**Architecture-102 docs checkpoint:** `fab1d776abcdcbf09fb26a257ea7fc86f6201b26`  
+**Architecture-102 adoption checkpoint:** `fab1d776abcdcbf09fb26a257ea7fc86f6201b26`  
+**Architecture-103 + validation-plan checkpoint:** `12e41c4e407a79d63ea896773bf8462038ebba27`  
 **Historical high-assurance branch:** `feature/p3-r1-recovery-implementation`  
 **Production/live trading:** NO-GO
 
-> This Git-tracked handoff is the canonical cross-chat resume document. Uploaded copies are mirrors only. Prove the active worktree, branch, HEAD, and clean state before acting.
+> This Git-tracked handoff is the canonical cross-chat resume document. Uploaded copies are mirrors. Prove the active worktree, branch, HEAD, and clean state before acting.
 
-## 1. Product goal and actual deployment model
+## 1. Product goal and threat model
 
-Build a conservative automated trading platform for a **closed, single-owner personal Windows desktop**, progressing through:
+Build a conservative automated trading platform for a **closed, single-owner personal Windows desktop**:
 
-**deterministic research → supervised simulated paper → unattended simulated paper → broker-paper → long paper soak → personal-desktop live-readiness → tiny restricted live → mature automated operation → polished GUI.**
+**deterministic research → supervised simulated paper → unattended simulated paper → broker-paper → long paper soak → personal-desktop live-readiness → tiny restricted live → mature operation → polished GUI.**
 
-Stable product constraints:
+Stable constraints:
 
 ```text
 US stocks / ETFs
@@ -28,11 +29,9 @@ paper-by-default
 complete auditability
 ```
 
-Architecture 102 narrows the security threat model to the real deployment. The machine owner/Administrator, Windows kernel/boot chain, SYSTEM, and physical control are trusted. The bot must defend against ordinary user-space compromise, accidental execution/configuration, credential leakage, non-admin state tampering, duplicate or ambiguous external effects, risk bypass, accidental live enablement, stale/corrupt durable state, and unattended-operation failures.
+Architecture 102 trusts the owner/Administrator, Windows kernel/boot/SYSTEM, and physical machine control. The bot still protects against practical ordinary-process/configuration/credential/state/duplicate-effect/risk-bypass/recovery failures. It is not designed to survive a malicious local Administrator/SYSTEM/kernel compromise.
 
-The application is **not** attempting to remain secure after a malicious local Administrator/SYSTEM/kernel compromise.
-
-Reconsider the optional high-assurance Windows track if the deployment later includes mutually untrusted local users, commercial distribution, third-party funds, regulatory/custody requirements, or a hostile-admin threat model.
+The high-assurance Windows line becomes blocking again only if the deployment changes to mutually untrusted local users, commercial distribution, third-party funds, regulatory/custody requirements, or hostile-admin resistance.
 
 ## 2. Branch/worktree routing
 
@@ -43,11 +42,9 @@ feature/personal-desktop-paper-runtime
 base: a810122a96b6fc90da25d71eede8da64b7272c98
 ```
 
-This branch intentionally forks from accepted Architecture-94 P2 instead of inheriting the P3-R1 KSP/recovery/ceremony implementation.
+A dedicated local worktree for the new branch has **not yet been established**. Before PD1 source implementation, create and prove a fresh worktree. Do not reuse another active worktree.
 
-A dedicated local worktree for the new branch has **not yet been created**. Before PD1 implementation, choose a fresh path and create/prove it explicitly. Do not reuse another active worktree.
-
-Existing worktrees remain:
+Existing worktrees:
 
 ```text
 historical/high-assurance P3-R1:
@@ -70,9 +67,9 @@ Preserve unrelated generated/untracked reports and historical pytest/cache evide
 
 ## 3. ChatGPT/Codex workflow
 
-ChatGPT/Sol owns architecture, Windows security/authority review, exact GitHub diff review, debugging strategy, test/certification gates, merge/deployment/production decisions, and next-step planning. ChatGPT may directly perform tiny scoped work and docs closeout.
+ChatGPT/Sol owns architecture, native Windows security/authority review, exact GitHub diff review, debugging strategy, test/certification gates, merge/deployment/production decisions, and next-step planning.
 
-Model routing remains:
+Model routing:
 
 ```text
 tiny/simple                                  -> ChatGPT direct
@@ -91,9 +88,9 @@ git branch --show-current
 git rev-parse HEAD
 ```
 
-Any worktree/branch/HEAD mismatch is a STOP. Codex must not self-correct with checkout/switch/reset/rebase/clean/worktree operations.
+Mismatch is a STOP. Do not self-correct with checkout/switch/reset/rebase/clean/worktree operations.
 
-After focused gates pass, Codex may exact-file stage, commit, and ordinary-push the approved feature branch when explicitly authorized. Never `git add .` or `git add -A`. No amend/rebase/merge/force-push/PR metadata/review-thread changes or unrelated cleanup without explicit approval.
+Codex may exact-file stage, commit, and ordinary-push an explicitly authorized checkpoint after focused gates pass. Never `git add .` or `git add -A`. No amend/rebase/merge/force-push/PR-metadata/review-thread changes without explicit approval.
 
 Controlled Windows pytest uses:
 
@@ -102,22 +99,22 @@ Controlled Windows pytest uses:
 -p no:cacheprovider
 ```
 
-unless a test specifically requires cache behavior. Preserve inaccessible historical `.pytest_cache` state.
+unless cache behavior itself is under test.
 
 ## 4. Mandatory personal-desktop security baseline
 
-The roadmap pivot removes disproportionate ceremony, not material safety controls.
+Keep these as product requirements:
 
-Keep all of these as product requirements:
-
-1. **Dedicated ordinary trading identity.** Operational trading runs under `DESKTOP-I4DOKM7\Trading` / SID `S-1-5-21-1397534616-3988210162-180023805-1009`, not an administrator account.
-2. **Credential isolation.** Market-data, broker-paper, and future live credentials stay out of source/plain config and use reviewed Windows-backed storage. Credential classes/versions remain explicit.
-3. **Paper default / explicit live arming.** Credentials, GUI state, scheduler launch, or configuration alone can never silently switch to live.
-4. **Deterministic risk authority.** Every order capable of reaching a paper broker or live broker passes deterministic risk. Strategy/optimizer/GUI/AI/scheduler/adapters cannot bypass it.
-5. **Durable ambiguity handling.** Durable state outranks process-local assumptions. Ambiguous provider/broker effects are reconciled or fail closed; never blindly retry.
-6. **Controlled runtime/state.** Important runtime/config/state locations use source-governed identity and practical least-privilege ACLs. Unrelated ordinary processes must not be able to rewrite state later treated as authoritative.
-7. **Audit/recovery.** Retain deterministic evidence sufficient to explain attempted effects, durable commitments, broker/provider responses, and whether recovery/retry is safe.
-8. **Operational failure testing.** Crash/restart, duplicate invocation, stale inputs, corruption/conflicts, and receipt recovery are roadmap gates.
+1. steady-state trading runs under `DESKTOP-I4DOKM7\Trading` / `S-1-5-21-1397534616-3988210162-180023805-1009`, not an administrator;
+2. market-data/broker/live credentials stay out of source/plain config and use reviewed Windows-backed storage;
+3. paper is default; live later requires explicit arming;
+4. every executable order passes deterministic risk authority;
+5. strategy/optimizer/GUI/AI/scheduler/adapters cannot bypass risk;
+6. durable state outranks process-local assumptions;
+7. ambiguous external effects are reconciled/fail-closed, never blindly retried;
+8. important runtime/config/state paths are source-governed and use practical least-privilege ACLs;
+9. audit/recovery evidence explains attempted effects, durable state, external responses, and retry safety;
+10. crash/restart/duplicate/stale/corrupt/conflicting-state testing remains required.
 
 ## 5. Frozen C3 production state
 
@@ -127,7 +124,7 @@ Accepted C3 release-source checkpoint:
 82ba29ae2c2cc6bb3544077db0ee21868e6d5693
 ```
 
-All six real-provider calls are consumed. Call #5 remains permanently `FAILED / CONFIRMED`. Call #6 remains permanently `SUCCEEDED / CONFIRMED / SUCCESS_SELECTED`; never rerun it. Provider call #7 is not authorized.
+All six real-provider calls are consumed. Call #5 remains `FAILED / CONFIRMED`. Call #6 remains `SUCCEEDED / CONFIRMED / SUCCESS_SELECTED` and must never be rerun. Provider call #7 is not authorized.
 
 Selected call #6:
 
@@ -150,10 +147,6 @@ credential policy: windows-credential-manager-alpaca-market-data/v2
 
 ## 6. Architecture 94 accepted product work
 
-Architecture 94 remains the reliable manually invoked simulated-paper composition.
-
-Accepted stages:
-
 ```text
 P1 pure strategy history / deterministic strategy plan
   1028e60b99c27cef0994f40d6ce381392abfb0f8
@@ -162,25 +155,129 @@ P2 read-only selected-C3 snapshot authority
   a810122a96b6fc90da25d71eede8da64b7272c98
 ```
 
-The composition to preserve is:
+Preserve this composition:
 
 ```text
 selected verified C3 snapshot
 + explicit deterministic strategy history
 + authoritative paper-account tip
--> pure deterministic strategy plan
--> existing planner / proposal path
+-> deterministic strategy plan
+-> planner / proposal
 -> deterministic portfolio risk
 -> simulated paper execution
 -> successor checkpoint + full-lineage verification
 -> Architecture-67 durable transition + receipt
 ```
 
-No broker order submission, unattended scheduling, or live trading is authorized by Architecture 94.
+No broker order, scheduler, or live effect is authorized here.
 
-## 7. Failed v1 paper-root publication remains frozen
+## 7. Architecture 103 — PD1 paper-account authority v2
 
-The earlier production publication attempt remains retained:
+Frozen design:
+
+```text
+docs/architecture/103-personal-desktop-paper-account-authority-v2.md
+docs/validation/personal-desktop-paper-account-authority-v2-plan.md
+checkpoint: 12e41c4e407a79d63ea896773bf8462038ebba27
+```
+
+Architecture 103 reuses Architectures 61/62/63/66/67 and P1/P2. It deliberately removes the parked KSP/LSA/test-user/protected-ceremony dependencies from the primary personal-desktop paper roadmap.
+
+### Fixed paths
+
+```text
+final authority root:
+  F:\AITradingBot\Paper-v2
+
+provisioning staging root:
+  F:\AITradingBot\.Paper-v2.provisioning
+
+Architecture-67 operation root:
+  F:\AITradingBot\Paper-v2\runtime
+
+receipt parent:
+  F:\AITradingBot\Paper-v2\runtime\paper-operations
+```
+
+Initial layout:
+
+```text
+Paper-v2\
+  personal-desktop-paper-account-authority.json
+  paper-account-genesis-<genesis-checkpoint-id>\
+    paper-account-checkpoint-<genesis-checkpoint-id>.json
+  runtime\
+    paper-operations\
+```
+
+### Schemas and identity
+
+```text
+anchor schema: personal-desktop-paper-account-authority/v1
+layout:        personal-desktop-paper-layout/v1
+manifest:      personal-desktop-paper-account-provisioning/v1
+UUID5 ns:      022bbd87-6bea-5fd0-a323-5fa355616643
+```
+
+Paper-account identity binds the validated machine-authority ID, exact approved Trading SID, and exact GENESIS checkpoint ID/hash/length. Paths, environment, wall clock, random UUIDs, and C3 transport paths do not create account identity.
+
+### Opening-state policy
+
+Production v2 starts as a fresh simulated cash-only account:
+
+```text
+starting cash: explicit positive Decimal, no code default
+positions: none
+realized P&L: 0
+open orders: none
+application metadata: empty
+GENESIS as_of: verified captured_at of accepted selected C3 call #6
+```
+
+Starting cash has **not yet been selected**. It belongs to the later production-bundle/readiness freeze.
+
+### Provisioning contract
+
+One trusted elevated owner/admin operation:
+
+```text
+validated C1 machine + Trading binding
+-> fixed safe F:\AITradingBot parent
+-> exact reviewed offline manifest/anchor/GENESIS bytes
+-> final + staging absence
+-> fixed staging creation
+-> exact layout + create-new writes + flush
+-> final ACL application
+-> full staged bytes/layout/ACL verification
+-> same-parent no-clobber staging-to-final rename
+-> full final reopen/reverification
+```
+
+The rename is the publication commit point.
+
+Staging need not receive final ACLs at the instant each child is created because it exists below the trusted administrator-controlled parent, is not authority before publication, and must receive/verify final ACLs before rename.
+
+### Runtime security
+
+Steady-state authority requires exact approved Trading SID, primary non-elevated token, no thread impersonation, and no enabled Administrators membership. No LSA-right enumeration is required.
+
+Immutable root/anchor/GENESIS are administrator-owned and Trading-read-only. `runtime` / `paper-operations` grant only the approved Trading SID the data rights needed by Architecture 67. Unrelated principals are rejected.
+
+### Crash/recovery rule
+
+No automatic provisioning retry. If staging creation may have begun and the publisher exits unexpectedly, that effect authorization is consumed. Reconcile final/staging read-only before any later action. Never silently delete, repair, or retry crash-left staging.
+
+### Source effect gate
+
+Throughout PD1 implementation and source certification:
+
+```text
+PERSONAL_DESKTOP_PAPER_V2_PRODUCTION_EFFECTS_ENABLED=false
+```
+
+A later separately reviewed checkpoint freezes exact bundle bytes/hashes, starting cash, readiness evidence, and an enablement diff before any production effect discussion.
+
+## 8. Failed v1 publication — preserve untouched
 
 ```text
 F:\AITradingBot\Paper
@@ -192,185 +289,81 @@ F:\AITradingBot\.Paper.provisioning-v1
 PUBLICATION_STATE=STAGING_REQUIRES_MANUAL_RECOVERY
 ```
 
-Do not rerun the old publisher. Do not delete, repair, rename, or reuse the retained staging tree as an incidental cleanup step.
+Never rerun the old publisher. Never delete/repair/rename/migrate/reuse the retained staging tree as incidental cleanup or v2 input.
 
-Architecture 102 chooses a **new versioned personal-desktop paper-account authority** instead of declaring this v1 failure recovered or using another path as a fallback.
-
-## 8. High-assurance P3-R1 line — preserved but parked
-
-Historical branch:
+## 9. High-assurance P3-R1 line — parked, preserved
 
 ```text
-feature/p3-r1-recovery-implementation
+branch: feature/p3-r1-recovery-implementation
 remote head: 45e5b745c9dca63d69dbb9c2032cd29d3731f27a
+A101 source: fad6bfe6fb3fc3af96902d8df300c1cef98e7687
+A101 tree:   7adb9bf17997f5236846d68443ed2a17011c58d6
 ```
 
-Architectures 95-101 remain valid historical/high-assurance work. Architecture-101 source certification remains accepted:
-
-```text
-source commit: fad6bfe6fb3fc3af96902d8df300c1cef98e7687
-source tree:   7adb9bf17997f5236846d68443ed2a17011c58d6
-focused:       63 passed + strengthened SID regression
-broad current slice: 3494 passed, 24 skipped
-legacy clean harness: 758 passed
-```
-
-That line includes retained-staging recovery, signed recovery authorization, Windows Software KSP machine-key proof, `P3R1KspTestUser`, a protected ceremony evidence root, and split candidate/creator LSA-rights collection.
-
-These are **optional defense-in-depth** under the personal-desktop profile and no longer block simulated-paper product development.
-
-### Architecture-101 readiness discovery
-
-Fresh A101 readiness established:
-
-```text
-Gate 1  source/tool + disabled-effect identity           PASS
-Gate 2  F:\ fixed NTFS + parent namespace authority      PASS
-Gate 3  roots/candidate absence + BUILTIN\Users mapping  PASS
-Gate 4A local-group topology                             PASS
-Gate 4B account/password policy                          PASS
-Gate 5A fully elevated creator token                     PASS
-Gate 5B creator-side LSA rights baseline                 BLOCKED
-```
-
-Gate 5B proved the elevated creator can read LSA account rights. It then observed Performance Log Users (`S-1-5-32-559`) holding:
-
-```text
-SeBatchLogonRight
-```
-
-Architecture 101's frozen classifier labels that right `UNRESOLVED`, so its high-assurance ceremony remains blocked. The later shell text that printed a PASS after the throw is not evidence.
-
-Architecture 102 does not alter that classifier and does not mutate Windows policy:
+A101 readiness reached Gate 5A and remains blocked at 5B because Performance Log Users (`S-1-5-32-559`) has `SeBatchLogonRight`, which the frozen A101 classifier labels `UNRESOLVED`.
 
 ```text
 ARCHITECTURE_101_HIGH_ASSURANCE_READINESS=BLOCKED
 PERSONAL_DESKTOP_PRODUCT_ROADMAP=NOT_BLOCKED_BY_THIS_FINDING
 ```
 
-Do not use `secedit`, add/remove LSA rights, or otherwise change host policy merely to satisfy the parked gate.
+Do not mutate local LSA policy just to satisfy this parked high-assurance gate.
 
-## 9. Architecture 102 — personal-desktop security profile
-
-Architecture 102 is the roadmap/security pivot checkpoint:
+## 10. Current roadmap
 
 ```text
-commit: fab1d776abcdcbf09fb26a257ea7fc86f6201b26
-branch: feature/personal-desktop-paper-runtime
+PD0  personal-desktop profile adoption                     COMPLETE
+PD1  personal-desktop paper-account authority v2           CURRENT
+  PD1A pure anchor/account-ID/provisioning bundle           NEXT
+  PD1B Windows read-only authority + token/ACL/path
+  PD1C disabled publisher + disposable publication tests
+  PD1D source diff review + broad certification
+  PD1E separate production bundle/readiness/effect gate
+PD2  reliable supervised manual paper cycle
+PD3  supervised crash/recovery validation
+PD4  unattended simulated paper under Trading
+PD5  broker-paper integration
+PD6  broker-paper soak / operational hardening
+PD7  personal-desktop live-readiness
+PD8  tiny restricted live -> gradual maturity
 ```
 
-Key decision:
-
-- keep the practical Windows security controls that isolate ordinary bot execution, credentials, runtime/state, and trading authority;
-- stop treating exhaustive Windows ceremony/LSA/KSP proofs as prerequisites for a single-owner personal desktop;
-- preserve those proofs on the historical branch for future stronger threat models;
-- spend the next engineering budget on reliable paper operation, crash recovery, broker-paper reconciliation, risk controls, and live-loss containment.
-
-Architecture 102 is docs-only and authorizes no effect.
-
-## 10. Revised primary roadmap
-
-### PD0 — personal-desktop profile adoption — CURRENT
-
-Architecture 102 and the canonical roadmap/handoff update. Preserve P3-R1 history; make the new branch the primary product line.
-
-### PD1 — simplified operational paper-account authority v2 — NEXT
-
-Freeze a new source-governed personal-desktop paper authority that:
+Implementation routing for PD1:
 
 ```text
-reuses deterministic GENESIS/checkpoint/lineage + Architecture-67
-uses a new fixed versioned root and authority identity
-leaves v1 retained staging untouched
-is provisioned by trusted owner/admin
-uses practical least-privilege ACLs
-grants Trading only required runtime/state access
-retains create-new/no-clobber publication
-retains exact byte/identity validation
-retains fail-closed ambiguity semantics
-does not require KSP recovery signing / test principal / LSA ceremony / protected ceremony root
-remains simulated paper only
+PD1A frozen mechanical model                 -> Luna Extra High
+PD1A subtle P2/A61 integration               -> Sol Medium
+PD1B/PD1C native Windows authority/security  -> Sol High
 ```
 
-PD1 is a Windows state/authority design, so ChatGPT/Sol High owns architecture/security review. Do not implement or create the root until the contract is frozen and a separate implementation/effect checkpoint is authorized.
+## 11. Current effect authorization
 
-### PD2 — reliable supervised manual paper cycle
-
-Complete Architecture-94 composition against the new v2 authority. No broker submission or scheduler yet.
-
-### PD3 — repeated supervised paper + crash/recovery validation
-
-Test clean restart, crash boundaries, duplicate invocation, stale market/history input, corrupt/conflicting paper state, and zero-runtime-call receipt recovery.
-
-### PD4 — unattended simulated paper
-
-Add scheduler-owned paper execution under `Trading`, with explicit duplicate/restart protection and deterministic risk. Task Scheduler / batch-logon capability is treated as an operational requirement to review, not automatically as a hostile privilege.
-
-### PD5 — broker-paper integration
-
-Add real broker-paper order submission behind deterministic risk. Use separate broker-paper credentials, request/response reconciliation, idempotency, and conservative handling of uncertain broker effects.
-
-### PD6 — broker-paper soak / operational hardening
-
-Sustained unattended paper use with alerting, reconciliation, backups, credential rotation, restart/failure drills, and measurable reliability gates.
-
-### PD7 — personal-desktop live-readiness
-
-Only after successful paper soak, review:
+Still **NOT AUTHORIZED**:
 
 ```text
-separate live credentials
-explicit live arming
-tiny per-order / symbol / daily caps
-deterministic risk
-position + open-order reconciliation
-kill switch / emergency disable
-startup + stale-state rejection
-broker idempotency / ambiguity reconciliation
-complete audit logging
-operator alerts
-appropriate Windows account/runtime/credential sanity checks
+retained v1 staging delete/repair/rename
+old publisher rerun
+Paper-v2 creation/mutation
+.Paper-v2.provisioning creation/mutation
+production paper-state mutation
+production ACL mutation
+account/group/password mutation
+LSA policy/right mutation
+KSP key/signature/private-export effects
+provider call #7
+broker order submission
+live trading
 ```
 
-Reconsider the high-assurance 95-101 line here only if the deployment threat model has expanded.
+Architecture 103 is docs-only.
 
-### PD8 — tiny restricted live, then gradual maturity
+## 12. Next-session procedure
 
-Live remains NO-GO until PD7 is separately accepted. If ever authorized, first live operation uses intentionally tiny capital and hard limits and expands only after observed stability.
-
-### GUI track
-
-GUI development may proceed in parallel as an inspection/control surface, but GUI never owns credentials, deterministic risk, durable trading truth, recovery, brokerage authority, or implicit live enablement.
-
-## 11. Current effect non-authorizations
-
-The roadmap pivot authorizes no production or account effects. Still not authorized:
-
-```text
-RETAINED_V1_STAGING_DELETE_OR_REPAIR
-OLD_PUBLISHER_RERUN
-NEW_PAPER_ROOT_CREATION
-NEW_PAPER_STATE_MUTATION
-ACL_MUTATION
-ACCOUNT_CREATION_OR_MUTATION
-WINDOWS_GROUP_MUTATION
-PASSWORD_PROMPT
-LSA_POLICY_OR_RIGHTS_MUTATION
-KSP_KEY_OR_SIGNATURE_OPERATIONS
-PROVIDER_CALL_7
-BROKER_ORDER_SUBMISSION
-LIVE_TRADING
-```
-
-Production recovery under the old v1 line remains blocked.
-
-## 12. Next-chat resume procedure
-
-1. Read `docs/architecture/102-personal-desktop-security-profile.md`, this handoff, and `docs/PROJECT_STATUS.md`.
-2. Treat `feature/personal-desktop-paper-runtime` as the primary product branch; its base is accepted P2 `a810122a...`.
-3. Do not assume a local personal-desktop worktree exists. Create/choose a fresh dedicated worktree only when moving into PD1 implementation, then prove root/branch/HEAD/clean state.
-4. Leave `feature/p3-r1-recovery-implementation` and `F:\AI\worktrees\ai-trading-bot-p3-r1` preserved as the historical high-assurance line.
-5. Do not continue Architecture-101 Gate 5B or modify Windows LSA policy merely to clear `SeBatchLogonRight`.
-6. Do not touch `F:\AITradingBot\.Paper.provisioning-v1` or rerun the old publisher.
-7. **Next milestone: PD1 architecture/design for the new versioned personal-desktop paper-account authority.** Freeze that contract before any source implementation or filesystem effect.
-8. Include the next milestone in every verification/closeout report.
+1. Read Architecture 102, Architecture 103, the PD1 validation plan, this handoff, and `PROJECT_STATUS.md`.
+2. Create/prove a fresh local worktree for `feature/personal-desktop-paper-runtime`; do not reuse an existing worktree.
+3. Prove worktree/branch/HEAD/clean state.
+4. Implement **PD1A only** against the frozen contract with production effects disabled.
+5. Run focused PD1A tests, Ruff, format check, and `git diff --check`.
+6. Push the exact scoped checkpoint only if explicitly authorized.
+7. ChatGPT/Sol reviews the authoritative GitHub diff before broader certification or PD1B.
+8. Include the next milestone in every verification report.

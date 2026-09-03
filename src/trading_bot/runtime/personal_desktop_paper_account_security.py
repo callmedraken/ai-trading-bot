@@ -233,8 +233,17 @@ def _require_parent_security(
         raise AuthoritySecurityError("fixed parent owner is untrusted")
     full: set[str] = set()
     for ace in inspection.aces:
-        if ace.ace_type != 0 or ace.ace_flags & ~0x13:
+        allowed_flags = 0x1B if role is PaperObjectRole.VOLUME else 0x13
+        if ace.ace_type != 0 or ace.ace_flags & ~allowed_flags:
             raise AuthoritySecurityError("fixed parent ACE is unsupported")
+        if role is PaperObjectRole.VOLUME and ace.ace_flags & 0x08:
+            if not ace.ace_flags & 0x03:  # OBJECT_INHERIT or CONTAINER_INHERIT
+                raise AuthoritySecurityError(
+                    "volume inherit-only ACE lacks inheritance"
+                )
+            # Templates are not effective on the volume or its independently
+            # verified governed parent. They grant no effective full control.
+            continue
         if ace.principal_sid in {ADMINISTRATORS_SID, SYSTEM_SID}:
             if ace.access_mask == FILE_ALL_ACCESS and not ace.ace_flags & 0x8:
                 full.add(ace.principal_sid)

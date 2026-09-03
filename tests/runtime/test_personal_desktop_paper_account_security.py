@@ -563,7 +563,10 @@ def test_volume_accepts_ordinary_data_and_self_delete_rights(mask):
     )
 
 
-@pytest.mark.parametrize("mask", [0x40, 0x40000, 0x80000, 0x10000000, 0x200])
+@pytest.mark.parametrize(
+    "mask",
+    [0x40, 0x40000, 0x80000, 0x10000000, 0x20000000, 0x40000000, 0x80000000, 0x200],
+)
 def test_volume_rejects_child_delete_security_control_and_unknown_rights(mask):
     path = "F:\\"
     observed = inspection(path)
@@ -626,3 +629,133 @@ def test_recursive_pin_crosses_representative_safe_volume_acl(owner):
     assert opened[:4] == ["F:\\", security.PERSONAL_DESKTOP_PAPER_PARENT, ROOT, ANCHOR]
     assert api.inspections["F:\\"] >= 3  # initial, retained, and reopened checks
     assert not api.handles
+
+
+REAL_HOST_VOLUME_ACES = (
+    SecurityAce(security.ADMINISTRATORS_SID, FILE_ALL_ACCESS),
+    SecurityAce(security.ADMINISTRATORS_SID, 0x10000000, ace_flags=0x0B),
+    SecurityAce(security.SYSTEM_SID, FILE_ALL_ACCESS),
+    SecurityAce(security.SYSTEM_SID, 0x10000000, ace_flags=0x0B),
+    SecurityAce("S-1-5-11", 0x001301BF),
+    SecurityAce("S-1-5-11", 0xE0010000, ace_flags=0x0B),
+    SecurityAce("S-1-5-32-545", 0x001200A9),
+    SecurityAce("S-1-5-32-545", 0xA0000000, ace_flags=0x0B),
+)
+
+
+def test_real_host_volume_acl_accepts_effective_rights_and_inherit_only_templates():
+    path = "F:\\"
+    security.require_paper_object_security(
+        path,
+        security.paper_object_spec(path),
+        replace(inspection(path), aces=REAL_HOST_VOLUME_ACES),
+        SID,
+    )
+
+
+def test_recursive_pin_crosses_real_host_volume_and_strict_protected_parent():
+    api = MemoryReadApi()
+    api.put(ANCHOR, b"anchor")
+    volume = api.nodes["F:\\"]
+    volume.observation = replace(
+        volume.observation,
+        security=replace(volume.observation.security, aces=REAL_HOST_VOLUME_ACES),
+    )
+    parent = api.nodes[security.PERSONAL_DESKTOP_PAPER_PARENT].observation.security
+    assert parent.owner_sid == security.ADMINISTRATORS_SID
+    assert parent.dacl_protected is True
+    assert parent.aces == (
+        SecurityAce(security.ADMINISTRATORS_SID, FILE_ALL_ACCESS),
+        SecurityAce(security.SYSTEM_SID, FILE_ALL_ACCESS),
+    )
+    with security.PinnedPaperReadSession(api, SID) as session:
+        assert session.read(ANCHOR) == b"anchor"
+    opened = [call[1] for call in api.calls if call[0] == "open"]
+    assert opened[:4] == ["F:\\", security.PERSONAL_DESKTOP_PAPER_PARENT, ROOT, ANCHOR]
+    assert api.inspections["F:\\"] >= 3
+    assert not api.handles
+
+
+@pytest.mark.parametrize(
+    "principal", [security.ADMINISTRATORS_SID, security.SYSTEM_SID]
+)
+@pytest.mark.parametrize("mask", [FILE_ALL_ACCESS, 0x10000000])
+def test_volume_inherit_only_control_does_not_replace_effective_control(
+    principal, mask
+):
+    path = "F:\\"
+    aces = tuple(
+        replace(ace, access_mask=mask, ace_flags=0x0B)
+        if ace.principal_sid == principal
+        else ace
+        for ace in inspection(path).aces
+    )
+    with pytest.raises(AuthoritySecurityError, match="lacks SYSTEM/Administrators"):
+        security.require_paper_object_security(
+            path,
+            security.paper_object_spec(path),
+            replace(inspection(path), aces=aces),
+            SID,
+        )
+
+
+@pytest.mark.parametrize("flags", [0x09, 0x0A, 0x0B, 0x19, 0x1A, 0x1B])
+def test_volume_inherit_only_requires_object_or_container_inheritance(flags):
+    path = "F:\\"
+    observed = inspection(path)
+    template = SecurityAce("S-1-5-11", 0xE0010000, ace_flags=flags)
+    security.require_paper_object_security(
+        path,
+        security.paper_object_spec(path),
+        replace(observed, aces=(*observed.aces, template)),
+        SID,
+    )
+
+
+@pytest.mark.parametrize("flags", [0x08, 0x18, 0x04, 0x0F, 0x20, 0x2B, 0x4B, 0x8B])
+def test_volume_rejects_malformed_inherit_only_and_unsupported_flags(flags):
+    path = "F:\\"
+    observed = inspection(path)
+    template = SecurityAce("S-1-5-11", 0xE0010000, ace_flags=flags)
+    with pytest.raises(AuthoritySecurityError):
+        security.require_paper_object_security(
+            path,
+            security.paper_object_spec(path),
+            replace(observed, aces=(*observed.aces, template)),
+            SID,
+        )
+
+
+@pytest.mark.parametrize("ace_type", [1, 5])
+def test_volume_inherit_only_still_requires_ordinary_allow_ace(ace_type):
+    path = "F:\\"
+    aces = (
+        *REAL_HOST_VOLUME_ACES[:-1],
+        replace(REAL_HOST_VOLUME_ACES[-1], ace_type=ace_type),
+    )
+    with pytest.raises(AuthoritySecurityError, match="unsupported"):
+        security.require_paper_object_security(
+            path,
+            security.paper_object_spec(path),
+            replace(inspection(path), aces=aces),
+            SID,
+        )
+
+
+@pytest.mark.parametrize("mask", [0xE0010000, 0xA0000000, 0x1301BF])
+@pytest.mark.parametrize("flags", [0, 0x03, 0x0B])
+def test_parent_rejects_unrelated_effective_and_inherit_only_write_templates(
+    mask, flags
+):
+    path = security.PERSONAL_DESKTOP_PAPER_PARENT
+    observed = inspection(path)
+    with pytest.raises(AuthoritySecurityError):
+        security.require_paper_object_security(
+            path,
+            security.paper_object_spec(path),
+            replace(
+                observed,
+                aces=(*observed.aces, SecurityAce("S-1-5-11", mask, ace_flags=flags)),
+            ),
+            SID,
+        )

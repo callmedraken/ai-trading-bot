@@ -323,8 +323,12 @@ class WindowsPaperReadNativeApi:
         require_windows_platform()
         self._kernel = ctypes.WinDLL("kernel32", use_last_error=True)
 
+    def object_spec(self, path: str) -> PaperObjectSpec:
+        """Source-owned admission hook; ordinary runtime still excludes staging."""
+        return paper_object_spec(path)
+
     def open(self, path: str, kind: AuthorityObjectKind) -> WindowsHandle:
-        spec = paper_object_spec(path)
+        spec = self.object_spec(path)
         if kind is not spec.kind:
             raise AuthorityObjectError("PD1B open kind does not match its source role")
         create = _function(
@@ -603,8 +607,12 @@ class PinnedPaperReadSession:
             for pinned in reversed(tuple(self._objects.values())):
                 self._api.close(pinned.handle)
 
+    def object_spec(self, path: str) -> PaperObjectSpec:
+        """Source-owned admission hook, independent of the native implementation."""
+        return paper_object_spec(path)
+
     def pin(self, path: str) -> _Pinned:
-        spec = paper_object_spec(path)
+        spec = self.object_spec(path)
         if self._closed:
             raise AuthorityObjectError("PD1B read session is closed")
         if path in self._objects:

@@ -154,11 +154,11 @@ def test_attempt_consumed_before_native_invocation(kernel, monkeypatch):
         api.rename_no_clobber()
 
 
-def test_source_gates_have_single_literal_false_assignment():
+def test_source_gates_have_single_certified_literal_assignment():
     tree = ast.parse(Path(security.__file__).read_text())
-    for name in (
-        "PERSONAL_DESKTOP_PAPER_V2_RECOVERY_EFFECTS_ENABLED",
-        "PERSONAL_DESKTOP_PAPER_V2_PRODUCTION_EFFECTS_ENABLED",
+    for name, expected in (
+        ("PERSONAL_DESKTOP_PAPER_V2_RECOVERY_EFFECTS_ENABLED", True),
+        ("PERSONAL_DESKTOP_PAPER_V2_PRODUCTION_EFFECTS_ENABLED", False),
     ):
         assignments = [
             node
@@ -171,6 +171,6 @@ def test_source_gates_have_single_literal_false_assignment():
         ]
         assert len(assignments) == 1
         assert isinstance(assignments[0].value, ast.Constant)
-        assert assignments[0].value.value is False
-    assert security.PERSONAL_DESKTOP_PAPER_V2_RECOVERY_EFFECTS_ENABLED is False
+        assert assignments[0].value.value is expected
+    assert security.PERSONAL_DESKTOP_PAPER_V2_RECOVERY_EFFECTS_ENABLED is True
     assert security.PERSONAL_DESKTOP_PAPER_V2_PRODUCTION_EFFECTS_ENABLED is False

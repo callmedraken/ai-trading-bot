@@ -301,6 +301,7 @@ class PaperObjectObservation:
 
 
 class PaperReadNativeApi(Protocol):
+    def fixed_staging_present(self) -> bool: ...
     def open(self, path: str, kind: AuthorityObjectKind) -> object: ...
     def close(self, handle: object) -> None: ...
     def inspect(
@@ -318,7 +319,7 @@ def _function(library: object, name: str, arguments: list, result: object):
 
 
 class WindowsPaperReadNativeApi:
-    """No-follow OPEN_EXISTING only; files deny shared write and all deny delete."""
+    """No-follow reads; pinned objects deny delete, presence probes share all."""
 
     def __init__(self) -> None:
         require_windows_platform()
@@ -327,6 +328,50 @@ class WindowsPaperReadNativeApi:
     def object_spec(self, path: str) -> PaperObjectSpec:
         """Source-owned admission hook; ordinary runtime still excludes staging."""
         return paper_object_spec(path)
+
+    def fixed_staging_present(self) -> bool:
+        """Observe only the fixed sibling name, without data or ACL access.
+
+        Any object, including a reparse point, blocks runtime admission. Only
+        exact file/path-not-found establishes absence; all uncertainty blocks.
+        The protected Administrator/SYSTEM parent is trusted under A102.
+        """
+        create = _function(
+            self._kernel,
+            "CreateFileW",
+            [
+                ctypes.c_wchar_p,
+                ctypes.c_uint32,
+                ctypes.c_uint32,
+                ctypes.c_void_p,
+                ctypes.c_uint32,
+                ctypes.c_uint32,
+                ctypes.c_void_p,
+            ],
+            ctypes.c_void_p,
+        )
+        close = _function(
+            self._kernel, "CloseHandle", [ctypes.c_void_p], ctypes.c_int32
+        )
+        handle = create(
+            PERSONAL_DESKTOP_PAPER_V2_STAGING_ROOT,
+            0,  # no read/list/READ_CONTROL or mutation rights
+            7,  # FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE
+            None,
+            3,  # OPEN_EXISTING
+            0x02200000,  # BACKUP_SEMANTICS | OPEN_REPARSE_POINT
+            None,
+        )
+        if handle in (-1, ctypes.c_void_p(-1).value):
+            error = ctypes.get_last_error()
+            if error in (2, 3):  # ERROR_FILE_NOT_FOUND / ERROR_PATH_NOT_FOUND
+                return False
+            raise AuthorityObjectError("cannot observe fixed v2 staging presence")
+        if handle in (None, 0):
+            raise AuthorityObjectError("invalid fixed v2 staging probe handle")
+        if not close(handle):
+            raise AuthorityObjectError("cannot close fixed v2 staging probe handle")
+        return True
 
     def open(self, path: str, kind: AuthorityObjectKind) -> WindowsHandle:
         spec = self.object_spec(path)
@@ -479,7 +524,7 @@ class WindowsPaperReadNativeApi:
         return buffer.raw
 
     def names(self, handle: WindowsHandle, path: str, maximum: int) -> tuple[str, ...]:
-        del handle  # The session holds every ancestor with delete sharing denied.
+        del handle  # The session pins this directory and its governed ancestors.
         names: list[str] = []
         with os.scandir(path) as entries:
             for entry in entries:
@@ -612,6 +657,13 @@ class PinnedPaperReadSession:
         """Source-owned admission hook, independent of the native implementation."""
         return paper_object_spec(path)
 
+    def _pin_parent(self, path: str) -> None:
+        if path != "F:\\":
+            parent = path.rsplit("\\", 1)[0]
+            if parent == "F:":
+                parent += "\\"
+            self.pin(parent)
+
     def pin(self, path: str) -> _Pinned:
         spec = self.object_spec(path)
         if self._closed:
@@ -620,11 +672,7 @@ class PinnedPaperReadSession:
             return self._objects[path]
         if len(self._objects) >= MAX_PAPER_V2_PINNED_OBJECTS:
             raise AuthorityObjectError("PD1B pinned-object bound exceeded")
-        if path != "F:\\":
-            parent = path.rsplit("\\", 1)[0]
-            if parent == "F:":
-                parent += "\\"
-            self.pin(parent)
+        self._pin_parent(path)
         if len(self._objects) >= MAX_PAPER_V2_PINNED_OBJECTS:
             raise AuthorityObjectError("PD1B pinned-object bound exceeded")
         handle = self._api.open(path, spec.kind)
@@ -724,3 +772,27 @@ class PinnedPaperReadSession:
                 raise AuthorityObjectError("PD1B pinned content drift")
             if pinned.names is not None:
                 self.names(path)
+
+
+class PinnedTradingPaperReadSession(PinnedPaperReadSession):
+    """Strict reads rooted at the fixed Trading-accessible authority objects.
+
+    A102 trusts the protected Administrator/SYSTEM parent. Paper-v2 and the C1
+    root (needed for historical snapshots) are opened directly, then receive
+    every ordinary security, identity, independent-reopen and drift check.
+    Descendant pinning is unchanged; no caller can choose a different root.
+    Publication/recovery keep the original full-parent-chain session.
+    """
+
+    def object_spec(self, path: str) -> PaperObjectSpec:
+        spec = super().object_spec(path)
+        if spec.role in {PaperObjectRole.VOLUME, PaperObjectRole.PARENT}:
+            raise AuthorityPathError("Trading reads exclude the protected parent")
+        return spec
+
+    def _pin_parent(self, path: str) -> None:
+        if path not in {
+            PERSONAL_DESKTOP_PAPER_V2_ROOT,
+            str(PRODUCTION_AUTHORITY_PATHS.root),
+        }:
+            super()._pin_parent(path)

@@ -75,6 +75,12 @@ from .test_personal_desktop_paper_account_security import (
     SID,
     MemoryReadApi,
 )
+from .test_personal_desktop_paper_account_security import (
+    block_real_native as block_real_native,
+)
+from .test_personal_desktop_paper_account_security import (
+    prohibit_production_effects as prohibit_production_effects,
+)
 from .test_verified_snapshot_preparation import _policies, _verification, calendar
 from .test_windows_authority import _bootstrap
 
@@ -129,6 +135,7 @@ def memory_case(edges=0, *, no_action=False):
         derive_personal_desktop_paper_account_id(**identity), **identity
     )
     api = MemoryReadApi()
+    api.trading_runtime = True
     api.put(ANCHOR, serialize_personal_desktop_paper_account_anchor(anchor))
     genesis_path = (
         ROOT
@@ -293,6 +300,119 @@ def test_genesis_only_exposes_immutable_evidence_after_pins_close():
         reader.require_validated_personal_desktop_paper_account(result)
 
 
+@pytest.mark.parametrize("edges", [0, 1])
+def test_trading_read_uses_exact_root_acl_without_parent_access(edges):
+    case = memory_case(edges)
+    parent = case.api.nodes[security.PERSONAL_DESKTOP_PAPER_PARENT].observation.security
+    assert parent.owner_sid == security.ADMINISTRATORS_SID
+    assert parent.dacl_protected is True
+    assert parent.aces == (
+        security.SecurityAce(security.ADMINISTRATORS_SID, security.FILE_ALL_ACCESS),
+        security.SecurityAce(security.SYSTEM_SID, security.FILE_ALL_ACCESS),
+    )
+    root = case.api.nodes[ROOT].observation.security
+    policy = security.paper_security_policy(security.PaperObjectRole.ROOT, SID)
+    assert root.owner_sid == policy.owner_sid
+    assert root.dacl_protected is True
+    assert root.aces == policy.aces
+    # Demonstrate the old parent-recursive route fails under this topology.
+    with pytest.raises(WindowsAuthorityError, match="protected parent"):
+        with security.PinnedPaperReadSession(case.api, SID) as session:
+            session.pin(ROOT)
+    case.api.calls.clear()
+    assert read_case(case).lineage == case.full.evidence
+    assert case.api.calls[0] == ("fixed_staging_present",)
+    assert case.api.calls[-1] == ("fixed_staging_present",)
+    opened = [call[1] for call in case.api.calls if call[0] == "open"]
+    assert opened[0] == ROOT
+    assert opened.count(ROOT) == 2  # initial and independent reopen
+    assert case.api.inspections[ROOT] == 3
+    assert not any(
+        call[0] in {"open", "names"}
+        and call[1] in {"F:\\", security.PERSONAL_DESKTOP_PAPER_PARENT}
+        for call in case.api.calls
+    )
+    assert not case.api.handles
+
+
+@pytest.mark.parametrize(
+    "failure", ["absent", "present", "appears", "error", "final-error", "unknown"]
+)
+def test_staging_or_missing_root_never_issues_account_authority(monkeypatch, failure):
+    case = memory_case()
+    c1 = SimpleNamespace(machine_authority_id=MACHINE, approved_account_sid=SID)
+    monkeypatch.setattr(reader, "require_validated_production_authority", lambda _: c1)
+    monkeypatch.setattr(reader, "WindowsTradingTokenObserver", Observer)
+    monkeypatch.setattr(reader, "WindowsPaperReadNativeApi", lambda: case.api)
+    monkeypatch.setattr(reader, "BoundMarketCalendar", lambda *args: calendar())
+    if failure == "absent":
+        del case.api.nodes[ROOT]
+    elif failure == "present":
+        case.api.staging_present = True
+    elif failure == "unknown":
+        case.api.staging_present = None
+    elif failure == "error":
+
+        def denied():
+            raise security.AuthorityObjectError("staging access denied")
+
+        case.api.on_staging_probe = denied
+    else:
+
+        def drift(path, count, node):
+            if path == ROOT and count == 3:
+                if failure == "appears":
+                    case.api.staging_present = True
+                else:
+
+                    def denied():
+                        raise security.AuthorityObjectError("staging access denied")
+
+                    case.api.on_staging_probe = denied
+
+        case.api.on_inspect = drift
+    before = len(reader._REGISTRY)
+    with pytest.raises((WindowsAuthorityError, PersonalDesktopPaperAccountError)):
+        reader.read_personal_desktop_paper_account(c1)
+    assert len(reader._REGISTRY) == before
+    assert not case.api.handles
+    if failure in {"present", "error", "unknown"}:
+        assert case.api.calls == [("fixed_staging_present",)]
+    if failure in {"appears", "final-error"}:
+        assert case.api.calls.count(("fixed_staging_present",)) == 2
+        assert case.api.inspections[ROOT] == 3
+
+
+@pytest.mark.parametrize("change", ["owner", "acl", "identity", "replacement"])
+def test_runtime_root_checks_still_block_drift(change):
+    case = memory_case()
+
+    def drift(path, count, node):
+        if path != ROOT or count != 2:
+            return
+        if change == "owner":
+            node.observation = replace(
+                node.observation,
+                security=replace(node.observation.security, owner_sid=SID),
+            )
+        elif change == "acl":
+            node.observation = replace(
+                node.observation,
+                security=replace(node.observation.security, dacl_protected=False),
+            )
+        elif change == "identity":
+            node.observation = replace(node.observation, identity=(7, 999))
+        else:
+            case.api.nodes[path] = replace(
+                node, observation=replace(node.observation, identity=(7, 999))
+            )
+
+    case.api.on_inspect = drift
+    with pytest.raises(WindowsAuthorityError):
+        read_case(case)
+    assert not case.api.handles
+
+
 @pytest.mark.parametrize("edges,no_action", [(1, False), (1, True), (2, True)])
 def test_full_lineage_and_receipts_verify_without_order_or_newest_selection(
     edges, no_action
@@ -302,7 +422,10 @@ def test_full_lineage_and_receipts_verify_without_order_or_newest_selection(
     # Reverse all directory enumeration, deliberately disconnecting it from
     # chronology. Object names supply candidates, not the terminal checkpoint.
     for path, node in case.api.nodes.items():
-        if node.payload is None:
+        if node.payload is None and path not in {
+            "F:\\",
+            security.PERSONAL_DESKTOP_PAPER_PARENT,
+        }:
             case.api.overrides[path] = tuple(reversed(case.api.names(None, path, 1024)))
     second = read_case(case)
     assert first == second
@@ -456,7 +579,6 @@ def test_stale_or_malformed_anchor_rejected(change):
         (RUNTIME, ".paper-account-transition-dead.staging"),
         (OPERATIONS, "unexpected"),
         (OPERATIONS, ".paper-operation-dead.staging"),
-        (security.PERSONAL_DESKTOP_PAPER_PARENT, ".Paper-v2.provisioning"),
     ],
 )
 def test_unrecognized_or_staging_layout_blocks(place, name):
@@ -734,6 +856,7 @@ def test_runtime_security_checked_before_anchor_parse(monkeypatch):
 
 def test_read_only_slice_has_no_execution_api_with_publication_contained():
     assert security.PERSONAL_DESKTOP_PAPER_V2_PRODUCTION_EFFECTS_ENABLED is False
+    assert security.PERSONAL_DESKTOP_PAPER_V2_RECOVERY_EFFECTS_ENABLED is False
     assert not hasattr(reader, "execute_paper_operation_once")
     assert not hasattr(reader, "commit_paper_operation_receipt")
 

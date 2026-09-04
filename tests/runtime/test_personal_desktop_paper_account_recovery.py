@@ -646,6 +646,7 @@ def test_native_recovery_flags_and_admission_are_read_only(case):
             api.open(path, AuthorityObjectKind.DIRECTORY)
     assert len(calls) == 2
     assert {name for name in dir(api) if not name.startswith("_")} == {
+        "fixed_staging_present",
         "open",
         "close",
         "inspect",

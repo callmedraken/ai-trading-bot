@@ -56,13 +56,13 @@ from trading_bot.runtime.personal_desktop_paper_account_authority import (
     parse_personal_desktop_paper_account_anchor,
 )
 from trading_bot.runtime.personal_desktop_paper_account_security import (
-    PERSONAL_DESKTOP_PAPER_PARENT,
     PERSONAL_DESKTOP_PAPER_V2_ANCHOR,
     PERSONAL_DESKTOP_PAPER_V2_OPERATIONS,
     PERSONAL_DESKTOP_PAPER_V2_ROOT,
     PERSONAL_DESKTOP_PAPER_V2_RUNTIME,
     PaperReadNativeApi,
     PinnedPaperReadSession,
+    PinnedTradingPaperReadSession,
     WindowsPaperReadNativeApi,
     historical_snapshot_path,
 )
@@ -299,14 +299,9 @@ def _read_account_evidence(
     initial_token = observer.observe()
     require_trading_token(trading_sid, initial_token)
     configuration_bytes = _configurations(configurations)
-    with PinnedPaperReadSession(api, trading_sid) as session:
-        parent_names = session.names(PERSONAL_DESKTOP_PAPER_PARENT)
-        if "Paper-v2" not in parent_names or any(
-            name.casefold() == ".paper-v2.provisioning" for name in parent_names
-        ):
-            raise PersonalDesktopPaperAccountError(
-                "v2 final/staging occupancy is ambiguous"
-            )
+    if api.fixed_staging_present() is not False:
+        raise PersonalDesktopPaperAccountError("v2 staging absence is required")
+    with PinnedTradingPaperReadSession(api, trading_sid) as session:
         root_names = session.names(PERSONAL_DESKTOP_PAPER_V2_ROOT)
         genesis_names = tuple(
             name for name in root_names if name.startswith("paper-account-genesis-")
@@ -467,6 +462,8 @@ def _read_account_evidence(
                 r for _, r in sorted(receipts, key=lambda item: str(item[1].receipt_id))
             ),
         )
+    if api.fixed_staging_present() is not False:
+        raise PersonalDesktopPaperAccountError("v2 staging absence is required")
     final_token = observer.observe()
     require_trading_token(trading_sid, final_token)
     if final_token != initial_token:

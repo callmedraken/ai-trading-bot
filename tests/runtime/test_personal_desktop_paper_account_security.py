@@ -1,6 +1,7 @@
 """Read-only memory object tests; no production directory is ever created."""
 
 import ctypes
+import inspect
 from dataclasses import dataclass, replace
 from uuid import UUID
 
@@ -21,6 +22,19 @@ from trading_bot.runtime.windows_authority_security import (
     WindowsHandle,
     authority_security_policy,
 )
+
+from .test_personal_desktop_paper_account_publication import (
+    prohibit_production_effects as prohibit_production_effects,
+)
+
+
+@pytest.fixture(autouse=True)
+def block_real_native(monkeypatch, prohibit_production_effects):
+    def forbidden(*args, **kwargs):
+        pytest.fail("read tests must never load a native DLL")
+
+    monkeypatch.setattr(ctypes, "WinDLL", forbidden, raising=False)
+
 
 SID = "S-1-5-21-1-2-3-1009"
 IDENTITY = "11111111-1111-5111-8111-111111111111"
@@ -90,6 +104,17 @@ class MemoryReadApi:
         self.on_inspect = lambda *args: None
         self.on_read = lambda *args: None
         self.next_handle = 1
+        self.trading_runtime = False
+        self.staging_present = False
+        self.on_staging_probe = lambda: self.staging_present
+
+    def fixed_staging_present(self):
+        self.calls.append(("fixed_staging_present",))
+        return self.on_staging_probe()
+
+    def require_parent_access(self, path):
+        if self.trading_runtime and path == security.PERSONAL_DESKTOP_PAPER_PARENT:
+            raise AuthorityObjectError("Trading cannot read/list protected parent")
 
     def put(self, path, payload=None):
         if path != "F:\\":
@@ -110,6 +135,7 @@ class MemoryReadApi:
 
     def open(self, path, kind):
         self.calls.append(("open", path, kind))
+        self.require_parent_access(path)
         if path not in self.nodes:
             raise AuthorityObjectError("memory object absent")
         handle = self.next_handle
@@ -138,6 +164,7 @@ class MemoryReadApi:
 
     def names(self, handle, path, maximum):
         self.calls.append(("names", path, maximum))
+        self.require_parent_access(path)
         if path in self.overrides:
             return self.overrides[path]
         prefix = path if path.endswith("\\") else path + "\\"
@@ -150,6 +177,7 @@ class MemoryReadApi:
 
 def test_exact_constants_and_existing_c1_path_guard_is_unchanged():
     assert security.PERSONAL_DESKTOP_PAPER_V2_PRODUCTION_EFFECTS_ENABLED is False
+    assert security.PERSONAL_DESKTOP_PAPER_V2_RECOVERY_EFFECTS_ENABLED is False
     assert ROOT == r"F:\AITradingBot\Paper-v2"
     assert (
         security.PERSONAL_DESKTOP_PAPER_V2_STAGING_ROOT
@@ -288,7 +316,11 @@ def test_trading_cannot_own_immutable_or_runtime_containers(path):
         {"volume_root": "G:\\"},
     ],
 )
-def test_unsafe_handle_facts_fail_before_artifact_read(changes):
+@pytest.mark.parametrize(
+    "session_type",
+    [security.PinnedPaperReadSession, security.PinnedTradingPaperReadSession],
+)
+def test_unsafe_handle_facts_fail_before_artifact_read(changes, session_type):
     api = MemoryReadApi()
     api.put(ROOT)
     node = api.nodes[ROOT]
@@ -296,7 +328,7 @@ def test_unsafe_handle_facts_fail_before_artifact_read(changes):
         node.observation, security=replace(node.observation.security, **changes)
     )
     with pytest.raises((AuthorityObjectError, AuthoritySecurityError)):
-        with security.PinnedPaperReadSession(api, SID) as session:
+        with session_type(api, SID) as session:
             session.pin(ROOT)
     assert not api.handles
     assert not any(call[0] == "read" for call in api.calls)
@@ -305,11 +337,17 @@ def test_unsafe_handle_facts_fail_before_artifact_read(changes):
 @pytest.mark.parametrize(
     "change", ["identity", "replacement", "acl", "content", "inventory"]
 )
-def test_pinned_interval_rechecks_identity_security_bytes_and_inventory(change):
+@pytest.mark.parametrize(
+    "session_type",
+    [security.PinnedPaperReadSession, security.PinnedTradingPaperReadSession],
+)
+def test_pinned_interval_rechecks_identity_security_bytes_and_inventory(
+    change, session_type
+):
     api = MemoryReadApi()
     api.put(ANCHOR, b"anchor")
     with pytest.raises((AuthorityObjectError, AuthoritySecurityError)):
-        with security.PinnedPaperReadSession(api, SID) as session:
+        with session_type(api, SID) as session:
             session.read(ANCHOR)
             session.names(ROOT)
             node = api.nodes[ANCHOR]
@@ -399,6 +437,137 @@ def test_native_open_is_read_only_open_existing_no_follow_and_no_delete_sharing(
     with pytest.raises(AuthorityPathError):
         api.open(r"F:\test\Paper-v2", AuthorityObjectKind.DIRECTORY)
     assert len(calls) == 2
+
+
+@pytest.fixture
+def staging_kernel(monkeypatch):
+    class Function:
+        def __init__(self, action):
+            self.action = action
+
+        def __call__(self, *args):
+            return self.action(*args)
+
+    class Kernel:
+        def __init__(self):
+            self.calls = []
+            self.handle = 9
+            self.error = 0
+            self.close_result = 1
+            self.CreateFileW = Function(self.create)
+            self.CloseHandle = Function(self.close)
+
+        def create(self, *args):
+            self.calls.append(("create", args))
+            return self.handle
+
+        def close(self, handle):
+            self.calls.append(("close", handle))
+            return self.close_result
+
+    kernel = Kernel()
+    monkeypatch.setattr(ctypes, "get_last_error", lambda: kernel.error, raising=False)
+    api = object.__new__(security.WindowsPaperReadNativeApi)
+    api._kernel = kernel
+    return api, kernel
+
+
+def test_fixed_staging_probe_is_zero_access_no_follow_and_closes(staging_kernel):
+    api, kernel = staging_kernel
+    # Only CreateFileW and CloseHandle exist on this kernel. No type/content/ACL
+    # query or mutation can occur; any successful object open blocks admission.
+    assert api.fixed_staging_present() is True
+    assert kernel.calls == [
+        (
+            "create",
+            (
+                security.PERSONAL_DESKTOP_PAPER_V2_STAGING_ROOT,
+                0,
+                1 | 2 | 4,
+                None,
+                3,
+                0x02000000 | 0x00200000,
+                None,
+            ),
+        ),
+        ("close", 9),
+    ]
+    assert kernel.CreateFileW.argtypes == [
+        ctypes.c_wchar_p,
+        ctypes.c_uint32,
+        ctypes.c_uint32,
+        ctypes.c_void_p,
+        ctypes.c_uint32,
+        ctypes.c_uint32,
+        ctypes.c_void_p,
+    ]
+    assert kernel.CreateFileW.restype is ctypes.c_void_p
+    assert kernel.CloseHandle.argtypes == [ctypes.c_void_p]
+    assert kernel.CloseHandle.restype is ctypes.c_int32
+
+
+@pytest.mark.parametrize("handle", [-1, ctypes.c_void_p(-1).value])
+@pytest.mark.parametrize("error", [2, 3, 0, 5, 32, 123, 303, 1920])
+def test_fixed_staging_probe_only_exact_not_found_is_absent(
+    staging_kernel, handle, error
+):
+    api, kernel = staging_kernel
+    kernel.handle, kernel.error = handle, error
+    if error in (2, 3):
+        assert api.fixed_staging_present() is False
+    else:
+        with pytest.raises(AuthorityObjectError, match="staging presence"):
+            api.fixed_staging_present()
+    assert [call[0] for call in kernel.calls] == ["create"]
+
+
+@pytest.mark.parametrize("handle", [None, 0])
+def test_fixed_staging_probe_null_handle_is_not_trustworthy_absence(
+    staging_kernel, handle
+):
+    api, kernel = staging_kernel
+    kernel.handle, kernel.error = handle, 2
+    with pytest.raises(AuthorityObjectError, match="invalid"):
+        api.fixed_staging_present()
+    assert [call[0] for call in kernel.calls] == ["create"]
+
+
+def test_fixed_staging_probe_close_failure_blocks(staging_kernel):
+    api, kernel = staging_kernel
+    kernel.close_result = 0
+    with pytest.raises(AuthorityObjectError, match="close"):
+        api.fixed_staging_present()
+    assert kernel.calls[-1] == ("close", 9)
+
+
+def test_fixed_staging_probe_has_no_caller_inputs(staging_kernel):
+    api, kernel = staging_kernel
+    assert not inspect.signature(api.fixed_staging_present).parameters
+    assert tuple(
+        inspect.signature(security.PaperReadNativeApi.fixed_staging_present).parameters
+    ) == ("self",)
+    for value in (ROOT, security.PERSONAL_DESKTOP_PAPER_V2_STAGING_ROOT, False, api):
+        with pytest.raises(TypeError):
+            api.fixed_staging_present(value)
+    with pytest.raises(TypeError):
+        api.fixed_staging_present(path=ROOT)
+    assert kernel.calls == []
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "F:\\",
+        security.PERSONAL_DESKTOP_PAPER_PARENT,
+        security.PERSONAL_DESKTOP_PAPER_V2_STAGING_ROOT,
+    ],
+)
+def test_trading_session_cannot_admit_parent_or_staging(path):
+    api = MemoryReadApi()
+    with security.PinnedTradingPaperReadSession(api, SID) as session:
+        with pytest.raises(AuthorityPathError):
+            session.pin(path)
+    assert api.calls == []
 
 
 def test_snapshot_dependencies_cannot_supply_a_path():

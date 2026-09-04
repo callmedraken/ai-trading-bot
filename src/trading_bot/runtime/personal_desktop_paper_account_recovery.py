@@ -1,14 +1,15 @@
 """FR2 read-only qualification of the fixed retained v2 staging tree.
 
 Returned facts are historical observations, never a capability, retry permit,
-or authorization for a later recovery effect. No recovery effects exist here.
+or authorization for a later recovery effect. FR3 finalization is source-disabled.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from decimal import Decimal
+from enum import StrEnum
 from hashlib import sha256
 
 from trading_bot.runtime import personal_desktop_paper_account_security as security
@@ -24,6 +25,7 @@ from trading_bot.runtime.personal_desktop_paper_account_provisioning import (
 )
 from trading_bot.runtime.personal_desktop_paper_account_publication import (
     PaperPublicationState,
+    classify_paper_publication_state,
     paper_publication_layout,
     require_paper_publication_administrator,
 )
@@ -31,6 +33,9 @@ from trading_bot.runtime.personal_desktop_paper_account_publication_freeze impor
     PersonalDesktopPaperPublicationFreeze,
     require_production_paper_publication_freeze,
     verify_personal_desktop_paper_publication_freeze,
+)
+from trading_bot.runtime.personal_desktop_paper_account_recovery_native import (
+    WindowsPaperRecoveryFinalizeApi,
 )
 from trading_bot.runtime.personal_desktop_paper_account_token import (
     WindowsTradingTokenObserver,
@@ -76,14 +81,17 @@ class PersonalDesktopPaperStagingRecoveryQualification:
 class _RecoveryPaths:
     """Only the fixed anchor can bind the two GENESIS names for this interval."""
 
+    root = _ROOT
+    anchor = _ANCHOR
+
     def __init__(self) -> None:
         self._specs = {
             path: security.paper_object_spec(path) for path in ("F:\\", _PARENT)
         }
-        self._specs[_ROOT] = security.paper_object_spec(
+        self._specs[self.root] = security.paper_object_spec(
             security.PERSONAL_DESKTOP_PAPER_V2_ROOT
         )
-        self._specs[_ANCHOR] = security.paper_object_spec(
+        self._specs[self.anchor] = security.paper_object_spec(
             security.PERSONAL_DESKTOP_PAPER_V2_ANCHOR
         )
         self._bound = False
@@ -99,11 +107,18 @@ class _RecoveryPaths:
         anchor.__post_init__()
         paths = []
         for entry in paper_publication_layout(anchor.genesis_checkpoint_id):
-            path = _ROOT + ("\\" + entry.relative if entry.relative else "")
+            path = self.root + ("\\" + entry.relative if entry.relative else "")
             self._specs[path] = entry.spec
             paths.append(path)
         self._bound = True
         return tuple(paths)
+
+
+class _FinalRecoveryPaths(_RecoveryPaths):
+    """Dedicated Administrator final verification; never Trading authority."""
+
+    root = security.PERSONAL_DESKTOP_PAPER_V2_ROOT
+    anchor = security.PERSONAL_DESKTOP_PAPER_V2_ANCHOR
 
 
 class _WindowsRecoveryReadApi(security.WindowsPaperReadNativeApi):
@@ -137,23 +152,40 @@ def _require_disarmed() -> None:
         )
 
 
-def _administrator(
-    freeze: PersonalDesktopPaperPublicationFreeze,
-) -> InstalledAuthorityValidation:
+def _observe_administrator() -> InstalledAuthorityValidation:
     require_windows_platform()
     require_paper_publication_administrator(WindowsTradingTokenObserver().observe())
     validation = validate_installed_authority_complete()
     require_initialized_supported_authority_evidence(validation)
+    return validation
+
+
+def _match_administrator(
+    validation: InstalledAuthorityValidation,
+    freeze: PersonalDesktopPaperPublicationFreeze,
+) -> None:
     bootstrap = validation.bootstrap_verification.bootstrap
     if (
         bootstrap.machine_authority_id != freeze.machine_authority_id
         or bootstrap.approved_account_sid != freeze.approved_trading_sid
     ):
         raise PersonalDesktopPaperAccountError("recovery C1 differs from source freeze")
+
+
+def _administrator(
+    freeze: PersonalDesktopPaperPublicationFreeze,
+) -> InstalledAuthorityValidation:
+    validation = _observe_administrator()
+    _match_administrator(validation, freeze)
     return validation
 
 
 def _require_occupancy(session: _RecoveryReadSession) -> None:
+    if _observe_occupancy(session) is not PaperPublicationState.STAGING_REQUIRES_REVIEW:
+        raise AuthorityObjectError("recovery requires exact frozen v1/v2 occupancy")
+
+
+def _observe_occupancy(session: _RecoveryReadSession) -> PaperPublicationState:
     names = session.names(_PARENT)
     # Reject Windows aliases even when they refer to otherwise unrelated siblings.
     if any(name.endswith((".", " ")) or "~" in name for name in names):
@@ -163,8 +195,16 @@ def _require_occupancy(session: _RecoveryReadSession) -> None:
     present = {
         name for name in names if name.casefold() in {n.casefold() for n in governed}
     }
-    if present != expected:
+    if (
+        "Paper" in present
+        or ".Paper.provisioning-v1" not in present
+        or not present <= governed
+    ):
         raise AuthorityObjectError("recovery requires exact frozen v1/v2 occupancy")
+    return classify_paper_publication_state(
+        final_present="Paper-v2" in present,
+        staging_present=".Paper-v2.provisioning" in present,
+    )
 
 
 def _require_digest(payload: bytes, digest: str, length: int) -> None:
@@ -188,49 +228,7 @@ def qualify_personal_desktop_paper_staging_recovery() -> (
     with _RecoveryReadSession(api, freeze.approved_trading_sid, paths) as session:
         _require_occupancy(session)
         session.finish()  # Trust occupancy before opening the retained tree.
-        session.pin(_ROOT)
-        anchor_bytes = session.read(_ANCHOR)
-        anchor = parse_personal_desktop_paper_account_anchor(anchor_bytes)
-        _require_digest(anchor_bytes, freeze.anchor_sha256, freeze.anchor_byte_length)
-        staged_paths = paths.bind(anchor)
-        _, _, genesis_directory, genesis_path, runtime, operations = staged_paths
-        expected_names = {
-            _ROOT: {
-                _ANCHOR.rsplit("\\", 1)[1],
-                genesis_directory.rsplit("\\", 1)[1],
-                "runtime",
-            },
-            genesis_directory: {genesis_path.rsplit("\\", 1)[1]},
-            runtime: {"paper-operations"},
-            operations: set(),
-        }
-        for path, expected in expected_names.items():
-            if set(session.names(path)) != expected:
-                raise AuthorityObjectError("recovery staging layout is not exact")
-        genesis_bytes = session.read(genesis_path)
-        _require_digest(
-            genesis_bytes, freeze.genesis_sha256, freeze.genesis_byte_length
-        )
-        # Reconstruct deployment evidence from observed bytes, never from a
-        # caller bundle or prepared/replayed Trading/P2 capability.
-        manifest = PersonalDesktopPaperAccountProvisioningManifest(
-            paper_account_id=anchor.paper_account_id,
-            machine_authority_id=anchor.machine_authority_id,
-            approved_trading_sid=anchor.approved_trading_sid,
-            genesis_checkpoint_id=anchor.genesis_checkpoint_id,
-            genesis_sha256=sha256(genesis_bytes).hexdigest(),
-            genesis_byte_length=len(genesis_bytes),
-            anchor_sha256=sha256(anchor_bytes).hexdigest(),
-            anchor_byte_length=len(anchor_bytes),
-        )
-        manifest_bytes = serialize_personal_desktop_paper_account_manifest(manifest)
-        bundle = PersonalDesktopPaperAccountBundle(
-            genesis_bytes, anchor_bytes, manifest_bytes
-        )
-        verify_personal_desktop_paper_publication_freeze(
-            bundle, freeze=freeze, administrator_validation=validation
-        )
-        objects = tuple((path, session.pin(path).observation) for path in staged_paths)
+        result = _verify_recovery_tree(session, paths, freeze, validation)
         session.finish()
         _require_disarmed()
         if require_production_paper_publication_freeze() != freeze:
@@ -240,6 +238,57 @@ def qualify_personal_desktop_paper_staging_recovery() -> (
         _require_occupancy(session)
         # Context exit independently reopens every name, rechecks all security,
         # identity, bytes and inventories, then releases every held read handle.
+    return result
+
+
+def _verify_recovery_tree(
+    session: _RecoveryReadSession,
+    paths: _RecoveryPaths,
+    freeze: PersonalDesktopPaperPublicationFreeze,
+    validation: InstalledAuthorityValidation,
+) -> PersonalDesktopPaperStagingRecoveryQualification:
+    """Shared exact FR2 semantics within the caller's still-pinned read interval."""
+    session.pin(paths.root)
+    anchor_bytes = session.read(paths.anchor)
+    anchor = parse_personal_desktop_paper_account_anchor(anchor_bytes)
+    _require_digest(anchor_bytes, freeze.anchor_sha256, freeze.anchor_byte_length)
+    staged_paths = paths.bind(anchor)
+    _, _, genesis_directory, genesis_path, runtime, operations = staged_paths
+    expected_names = {
+        paths.root: {
+            paths.anchor.rsplit("\\", 1)[1],
+            genesis_directory.rsplit("\\", 1)[1],
+            "runtime",
+        },
+        genesis_directory: {genesis_path.rsplit("\\", 1)[1]},
+        runtime: {"paper-operations"},
+        operations: set(),
+    }
+    for path, expected in expected_names.items():
+        if set(session.names(path)) != expected:
+            raise AuthorityObjectError("recovery staging layout is not exact")
+    genesis_bytes = session.read(genesis_path)
+    _require_digest(genesis_bytes, freeze.genesis_sha256, freeze.genesis_byte_length)
+    # Reconstruct deployment evidence from observed bytes, never from a
+    # caller bundle or prepared/replayed Trading/P2 capability.
+    manifest = PersonalDesktopPaperAccountProvisioningManifest(
+        paper_account_id=anchor.paper_account_id,
+        machine_authority_id=anchor.machine_authority_id,
+        approved_trading_sid=anchor.approved_trading_sid,
+        genesis_checkpoint_id=anchor.genesis_checkpoint_id,
+        genesis_sha256=sha256(genesis_bytes).hexdigest(),
+        genesis_byte_length=len(genesis_bytes),
+        anchor_sha256=sha256(anchor_bytes).hexdigest(),
+        anchor_byte_length=len(anchor_bytes),
+    )
+    manifest_bytes = serialize_personal_desktop_paper_account_manifest(manifest)
+    bundle = PersonalDesktopPaperAccountBundle(
+        genesis_bytes, anchor_bytes, manifest_bytes
+    )
+    verify_personal_desktop_paper_publication_freeze(
+        bundle, freeze=freeze, administrator_validation=validation
+    )
+    objects = tuple((path, session.pin(path).observation) for path in staged_paths)
     return PersonalDesktopPaperStagingRecoveryQualification(
         paper_account_id=anchor.paper_account_id,
         genesis_checkpoint_id=anchor.genesis_checkpoint_id,
@@ -254,7 +303,206 @@ def qualify_personal_desktop_paper_staging_recovery() -> (
         manifest_sha256=sha256(manifest_bytes).hexdigest(),
         manifest_byte_length=len(manifest_bytes),
         objects=objects,
-        v2_state=PaperPublicationState.STAGING_REQUIRES_REVIEW,
+        v2_state=(
+            PaperPublicationState.STAGING_REQUIRES_REVIEW
+            if paths.root == _ROOT
+            else PaperPublicationState.FINAL_REQUIRES_VALIDATION
+        ),
         v1_final_present=False,
         v1_historical_staging_present=True,
     )
+
+
+class PaperStagingRecoveryFinalizeStatus(StrEnum):
+    FINALIZED_AND_VERIFIED = "FINALIZED_AND_VERIFIED"
+    BLOCKED = "BLOCKED"
+
+
+class PaperStagingRecoveryFinalizePhase(StrEnum):
+    PREFLIGHT = "PREFLIGHT"
+    STAGING_VERIFY = "STAGING_VERIFY"
+    COMMIT_REVALIDATE = "COMMIT_REVALIDATE"
+    RENAME = "RENAME"
+    FINAL_REOPEN = "FINAL_REOPEN"
+    FINAL_VERIFY = "FINAL_VERIFY"
+    COMPLETE = "COMPLETE"
+
+
+@dataclass(frozen=True, slots=True)
+class PersonalDesktopPaperStagingRecoveryFinalizeResult:
+    """Historical evidence only, never authority or permission to retry.
+
+    None means no trusted occupancy was obtained. The attempt flag is set
+    before invocation even if native response/effect is subsequently ambiguous.
+    """
+
+    status: PaperStagingRecoveryFinalizeStatus
+    phase: PaperStagingRecoveryFinalizePhase
+    state: PaperPublicationState | None
+    rename_may_have_begun: bool
+    failure_type: str | None = None
+    paper_account_id: str | None = None
+
+
+def _require_recovery_gates() -> None:
+    if security.PERSONAL_DESKTOP_PAPER_V2_RECOVERY_EFFECTS_ENABLED is not True:
+        raise PersonalDesktopPaperAccountError("recovery effects are disabled")
+    _require_disarmed()
+
+
+def _read_occupancy(
+    api: security.PaperReadNativeApi, sid: str
+) -> PaperPublicationState:
+    # Each read is a new bounded interval; parent inventories must not be cached
+    # across our deliberate rename. The outer parent guard stays pinned.
+    with _RecoveryReadSession(api, sid, _RecoveryPaths()) as session:
+        state = _observe_occupancy(session)
+    return state
+
+
+def _require_same_objects(
+    staged: PersonalDesktopPaperStagingRecoveryQualification,
+    final: PersonalDesktopPaperStagingRecoveryQualification,
+) -> None:
+    translated = []
+    for path, observed in staged.objects:
+        final_path = security.PERSONAL_DESKTOP_PAPER_V2_ROOT + path[len(_ROOT) :]
+        translated.append(
+            (
+                final_path,
+                replace(
+                    observed,
+                    security=replace(
+                        observed.security,
+                        expected_path=final_path,
+                        final_path=final_path,
+                    ),
+                ),
+            )
+        )
+    # Compare every identity/security/length/link fact, plus all reconstructed
+    # artifact hashes/lengths and account facts. Only source-derived paths and
+    # the expected occupancy transition may differ.
+    if replace(staged, objects=tuple(translated), v2_state=final.v2_state) != final:
+        raise AuthorityObjectError("recovery final objects differ from pinned staging")
+
+
+def finalize_personal_desktop_paper_staging_recovery() -> (
+    PersonalDesktopPaperStagingRecoveryFinalizeResult
+):
+    """Fresh fixed-tree recovery, with zero caller authority and no automatic retry."""
+    if security.PERSONAL_DESKTOP_PAPER_V2_RECOVERY_EFFECTS_ENABLED is not True:
+        return PersonalDesktopPaperStagingRecoveryFinalizeResult(
+            PaperStagingRecoveryFinalizeStatus.BLOCKED,
+            PaperStagingRecoveryFinalizePhase.PREFLIGHT,
+            None,
+            False,
+            PersonalDesktopPaperAccountError.__name__,
+        )
+    phase = PaperStagingRecoveryFinalizePhase.PREFLIGHT
+    begun = False
+    try:
+        _require_disarmed()
+        validation = _observe_administrator()
+        freeze = require_production_paper_publication_freeze()
+        _match_administrator(validation, freeze)
+        paths = _RecoveryPaths()
+        api = _WindowsRecoveryReadApi(paths)
+        sid = freeze.approved_trading_sid
+        with security.PinnedPaperPublicationParent(api, sid) as parent:
+
+            def revalidate() -> None:
+                _require_recovery_gates()
+                if _administrator(freeze) != validation:
+                    raise AuthorityObjectError("recovery Administrator C1 drift")
+                if require_production_paper_publication_freeze() != freeze:
+                    raise AuthorityObjectError("recovery source freeze drift")
+                parent.finish()
+
+            try:
+                if (
+                    _read_occupancy(api, sid)
+                    is not PaperPublicationState.STAGING_REQUIRES_REVIEW
+                ):
+                    raise AuthorityObjectError(
+                        "recovery requires staging-only occupancy"
+                    )
+                effect = WindowsPaperRecoveryFinalizeApi()
+                phase = PaperStagingRecoveryFinalizePhase.STAGING_VERIFY
+                with _RecoveryReadSession(api, sid, paths) as session:
+                    _require_occupancy(session)
+                    staged = _verify_recovery_tree(session, paths, freeze, validation)
+                    session.finish()
+                    revalidate()
+                    _require_occupancy(session)
+                # Ordinary no-follow handles deny DELETE. Close this tree read
+                # interval, retaining the independent governed parent pins. The
+                # Architecture-102 trusted Administrator/SYSTEM parent model
+                # protects the fixed child name during this narrow seam.
+                phase = PaperStagingRecoveryFinalizePhase.COMMIT_REVALIDATE
+                revalidate()
+                if (
+                    _read_occupancy(api, sid)
+                    is not PaperPublicationState.STAGING_REQUIRES_REVIEW
+                ):
+                    raise AuthorityObjectError("recovery commit occupancy drift")
+                phase = PaperStagingRecoveryFinalizePhase.RENAME
+                begun = True
+                effect.rename_no_clobber()
+                phase = PaperStagingRecoveryFinalizePhase.FINAL_REOPEN
+                revalidate()
+                if (
+                    _read_occupancy(api, sid)
+                    is not PaperPublicationState.FINAL_REQUIRES_VALIDATION
+                ):
+                    raise AuthorityObjectError("recovery final occupancy is not exact")
+                final_paths = _FinalRecoveryPaths()
+                final_api = _WindowsRecoveryReadApi(final_paths)
+                with _RecoveryReadSession(final_api, sid, final_paths) as session:
+                    session.pin(final_paths.root)
+                    phase = PaperStagingRecoveryFinalizePhase.FINAL_VERIFY
+                    final = _verify_recovery_tree(
+                        session, final_paths, freeze, validation
+                    )
+                    _require_same_objects(staged, final)
+                    session.finish()
+                    if (
+                        _observe_occupancy(session)
+                        is not PaperPublicationState.FINAL_REQUIRES_VALIDATION
+                    ):
+                        raise AuthorityObjectError("recovery final occupancy drift")
+                    revalidate()
+                revalidate()
+                result = PersonalDesktopPaperStagingRecoveryFinalizeResult(
+                    PaperStagingRecoveryFinalizeStatus.FINALIZED_AND_VERIFIED,
+                    PaperStagingRecoveryFinalizePhase.COMPLETE,
+                    PaperPublicationState.FINAL_REQUIRES_VALIDATION,
+                    True,
+                    paper_account_id=final.paper_account_id,
+                )
+            except Exception as error:
+                # Native failure/response loss is never success, even when the
+                # final name exists. Reconcile names only under current trust;
+                # do not traverse either retained v1 name or retry the rename.
+                try:
+                    revalidate()
+                    state = _read_occupancy(api, sid)
+                    revalidate()
+                except Exception:
+                    state = None
+                result = PersonalDesktopPaperStagingRecoveryFinalizeResult(
+                    PaperStagingRecoveryFinalizeStatus.BLOCKED,
+                    phase,
+                    state,
+                    begun,
+                    type(error).__name__,
+                )
+        return result  # Parent finish AND close are part of acceptance.
+    except Exception as error:
+        return PersonalDesktopPaperStagingRecoveryFinalizeResult(
+            PaperStagingRecoveryFinalizeStatus.BLOCKED,
+            phase,
+            None,  # No new path probe after parent trust/close failure.
+            begun,
+            type(error).__name__,
+        )

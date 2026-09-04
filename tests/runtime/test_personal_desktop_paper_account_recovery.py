@@ -64,6 +64,7 @@ def forbidden(*args, **kwargs):
 
 @pytest.fixture(autouse=True)
 def block_real_recovery(monkeypatch, prohibit_production_effects):
+    monkeypatch.setattr(recovery, "WindowsPaperRecoveryFinalizeApi", forbidden)
     monkeypatch.setattr(recovery, "_WindowsRecoveryReadApi", forbidden)
     monkeypatch.setattr(recovery, "WindowsTradingTokenObserver", forbidden)
     monkeypatch.setattr(recovery, "validate_installed_authority_complete", forbidden)
@@ -723,3 +724,588 @@ def test_final_revalidation_is_inside_pinned_interval(case, monkeypatch, change)
         monkeypatch.setattr(
             security, "PERSONAL_DESKTOP_PAPER_V2_PRODUCTION_EFFECTS_ENABLED", False
         )
+
+
+# FR3A: the production entry point runs against memory only. Install every
+# boundary before test-local enablement; the actual native adapter stays blocked.
+FINAL = security.PERSONAL_DESKTOP_PAPER_V2_ROOT
+FinalizeStatus = recovery.PaperStagingRecoveryFinalizeStatus
+FinalizePhase = recovery.PaperStagingRecoveryFinalizePhase
+
+
+@pytest.fixture
+def finalize_case(case, monkeypatch):
+    case.renames = 0
+    case.before_move = lambda: None
+    case.after_move = lambda: None
+    case.events = []
+    case.original_objects = tuple(
+        (path, case.api.nodes[path].observation) for path in case.paths
+    )
+
+    class MemoryRename:
+        def rename_no_clobber(self):
+            case.renames += 1
+            assert case.renames == 1
+            # All six tree handles are closed, but BOTH original parent pins
+            # survive. This models the real deny-DELETE sharing constraint.
+            assert len(case.api.handles) == 2
+            assert {
+                n.observation.security.expected_path for n in case.api.handles.values()
+            } == {"F:\\", PARENT}
+            case.events.append("rename")
+            case.before_move()
+            assert FINAL not in case.api.nodes
+            for path in case.paths:
+                node = case.api.nodes.pop(path)
+                final_path = FINAL + path[len(ROOT) :]
+                node.observation = replace(
+                    node.observation,
+                    security=replace(
+                        node.observation.security,
+                        expected_path=final_path,
+                        final_path=final_path,
+                    ),
+                )
+                case.api.nodes[final_path] = node
+            case.api.overrides[PARENT] = (
+                NAMES[1],
+                NAMES[2],
+                "Authority",
+                "runtime",
+                "temp",
+            )
+            case.after_move()
+
+    monkeypatch.setattr(recovery, "WindowsPaperRecoveryFinalizeApi", MemoryRename)
+    monkeypatch.setattr(
+        recovery, "qualify_personal_desktop_paper_staging_recovery", forbidden
+    )
+    verify = recovery._verify_recovery_tree
+
+    def record_verify(session, paths, freeze, validation):
+        case.events.append("verify:" + paths.root)
+        return verify(session, paths, freeze, validation)
+
+    monkeypatch.setattr(recovery, "_verify_recovery_tree", record_verify)
+    # All C1/token/platform/read/rename boundaries are deterministic fakes now.
+    with monkeypatch.context() as enabled:
+        enabled.setattr(
+            security, "PERSONAL_DESKTOP_PAPER_V2_RECOVERY_EFFECTS_ENABLED", True
+        )
+        case.gates = enabled
+        yield case
+    assert security.PERSONAL_DESKTOP_PAPER_V2_RECOVERY_EFFECTS_ENABLED is False
+    assert case.renames in {0, 1}
+
+
+def assert_blocked(case, *, begun=False, phase=None):
+    result = recovery.finalize_personal_desktop_paper_staging_recovery()
+    assert result.status is FinalizeStatus.BLOCKED
+    assert result.rename_may_have_begun is begun
+    assert result.failure_type is not None
+    assert result.paper_account_id is None
+    assert case.renames == int(begun)
+    if phase is not None:
+        assert result.phase is phase
+    return result
+
+
+@pytest.mark.parametrize("value", [False, None, 0, 1, "True", object()])
+def test_finalize_disabled_gate_is_first(case, monkeypatch, value):
+    unexpected = []
+
+    def boundary(*args, **kwargs):
+        unexpected.append("called")
+        forbidden()
+
+    for name in (
+        "require_production_paper_publication_freeze",
+        "_observe_administrator",
+        "_require_disarmed",
+        "_WindowsRecoveryReadApi",
+        "WindowsPaperRecoveryFinalizeApi",
+    ):
+        monkeypatch.setattr(recovery, name, boundary)
+    monkeypatch.setattr(
+        security, "PERSONAL_DESKTOP_PAPER_V2_RECOVERY_EFFECTS_ENABLED", value
+    )
+    result = recovery.finalize_personal_desktop_paper_staging_recovery()
+    assert result.status is FinalizeStatus.BLOCKED
+    assert result.phase is FinalizePhase.PREFLIGHT
+    assert result.rename_may_have_begun is False
+    assert result.state is None
+    assert case.api.calls == []
+    assert case.c1_calls == case.native_calls == 0
+
+    assert unexpected == []
+    assert result.failure_type == "PersonalDesktopPaperAccountError"
+
+
+@pytest.mark.parametrize("value", [True, None, 0, 1, "False"])
+def test_finalize_original_publisher_must_be_exactly_disarmed(
+    finalize_case, monkeypatch, value
+):
+    with monkeypatch.context() as patch:
+        patch.setattr(
+            security, "PERSONAL_DESKTOP_PAPER_V2_PRODUCTION_EFFECTS_ENABLED", value
+        )
+        assert_blocked(finalize_case, phase=FinalizePhase.PREFLIGHT)
+    assert finalize_case.c1_calls == finalize_case.native_calls == 0
+
+
+@pytest.mark.parametrize(
+    "argument",
+    [
+        "path",
+        "root",
+        "qualification",
+        "bundle",
+        "freeze",
+        "sid",
+        "account_id",
+        "manifest",
+        "native_api",
+        "c1_evidence",
+        "enabled",
+        "retry_token",
+        "recovery_permit",
+    ],
+)
+def test_finalize_accepts_no_caller_authority(case, argument):
+    assert not inspect.signature(
+        recovery.finalize_personal_desktop_paper_staging_recovery
+    ).parameters
+    with pytest.raises(TypeError):
+        recovery.finalize_personal_desktop_paper_staging_recovery(
+            **{argument: object()}
+        )
+    with pytest.raises(TypeError):
+        recovery.finalize_personal_desktop_paper_staging_recovery(object())
+    assert case.api.calls == []
+
+
+def test_finalize_clean_memory_rename_preserves_all_six_objects(finalize_case):
+    case = finalize_case
+    result = recovery.finalize_personal_desktop_paper_staging_recovery()
+    assert result.status is FinalizeStatus.FINALIZED_AND_VERIFIED
+    assert result.phase is FinalizePhase.COMPLETE
+    assert result.state is recovery.PaperPublicationState.FINAL_REQUIRES_VALIDATION
+    assert result.rename_may_have_begun is True
+    assert result.failure_type is None
+    assert result.paper_account_id == case.freeze.paper_account_id
+    assert case.events == ["verify:" + ROOT, "rename", "verify:" + FINAL]
+    assert case.renames == 1
+    assert ROOT not in case.api.nodes
+    for path, observed in case.original_objects:
+        final_path = FINAL + path[len(ROOT) :]
+        now = case.api.nodes[final_path].observation
+        assert now == replace(
+            observed,
+            security=replace(
+                observed.security, expected_path=final_path, final_path=final_path
+            ),
+        )
+    with pytest.raises(FrozenInstanceError):
+        result.rename_may_have_begun = False
+    assert not any(
+        callable(getattr(result, name))
+        for name in dir(result)
+        if not name.startswith("_")
+    )
+
+
+@pytest.mark.parametrize(
+    "present",
+    [p for p in product((False, True), repeat=4) if p != (False, True, False, True)],
+)
+def test_finalize_every_bad_initial_occupancy(finalize_case, present):
+    case = finalize_case
+    case.api.overrides[PARENT] = tuple(
+        name for name, yes in zip(NAMES, present, strict=True) if yes
+    )
+    assert_blocked(case, phase=FinalizePhase.PREFLIGHT)
+    assert "verify:" + ROOT not in case.events
+
+
+@pytest.mark.parametrize(
+    "change", ["token", "impersonation", "primary", "c1", "freeze", "parent"]
+)
+def test_finalize_preflight_failures_never_rename(finalize_case, monkeypatch, change):
+    case = finalize_case
+    if change in {"token", "impersonation", "primary"}:
+        case.token = replace(
+            ADMIN,
+            **{
+                "token": {"elevated": False},
+                "impersonation": {"thread_token_present": True},
+                "primary": {"token_type": 2},
+            }[change],
+        )
+    elif change == "c1":
+        case.validation = replace(case.validation, production_evidence=None)
+    elif change == "freeze":
+        monkeypatch.setattr(
+            recovery, "require_production_paper_publication_freeze", forbidden
+        )
+    else:
+        node = case.api.nodes[PARENT]
+        node.observation = replace(
+            node.observation, security=replace(node.observation.security, aces=())
+        )
+    assert_blocked(case, phase=FinalizePhase.PREFLIGHT)
+
+
+@pytest.mark.parametrize(
+    "when,index,change",
+    [
+        (when, index, change)
+        for when, index, change in product(
+            ("staging", "final"),
+            range(6),
+            (
+                "identity",
+                "acl",
+                "reparse",
+                "kind",
+                "owner",
+                "metadata",
+                "links",
+                "content",
+            ),
+        )
+        if not (
+            when == "staging"
+            and change in {"metadata", "links"}
+            and index not in {1, 3}
+        )
+    ],
+)
+def test_finalize_complete_tree_verification(finalize_case, when, index, change):
+    case = finalize_case
+
+    def corrupt():
+        path = case.paths[index]
+        if when == "final":
+            path = FINAL + path[len(ROOT) :]
+        node = case.api.nodes[path]
+        obs = node.observation
+        if change == "identity":
+            obs = replace(obs, identity=(7, 987) if when == "final" else (7, 0))
+        elif change == "metadata":
+            obs = replace(
+                obs, byte_length=obs.byte_length + 1 if when == "final" else -1
+            )
+        elif change == "links":
+            obs = replace(obs, links=2)
+        elif change == "content":
+            if node.payload is None:
+                case.api.overrides[path] = (*case.api.names(None, path, 1024), "extra")
+            else:
+                node.payload += b" "
+        else:
+            updates = {
+                "acl": {"aces": ()},
+                "reparse": {"is_reparse_point": True},
+                "kind": {
+                    "kind": AuthorityObjectKind.FILE
+                    if obs.security.kind is AuthorityObjectKind.DIRECTORY
+                    else AuthorityObjectKind.DIRECTORY
+                },
+                "owner": {"owner_sid": case.freeze.approved_trading_sid},
+            }
+            obs = replace(obs, security=replace(obs.security, **updates[change]))
+        node.observation = obs
+
+    if when == "staging":
+        corrupt()
+    else:
+        case.after_move = corrupt
+    assert_blocked(
+        case,
+        begun=when == "final",
+        phase=(
+            FinalizePhase.FINAL_REOPEN
+            if index == 0 and change in {"acl", "reparse", "kind", "owner"}
+            else FinalizePhase.FINAL_VERIFY
+        )
+        if when == "final"
+        else FinalizePhase.STAGING_VERIFY,
+    )
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        "recovery_gate",
+        "publication_gate",
+        "c1",
+        "token",
+        "freeze",
+        "parent_identity",
+        "parent_acl",
+        "occupancy",
+        "v1",
+    ],
+)
+def test_finalize_commit_seam_drift(finalize_case, monkeypatch, change):
+    case = finalize_case
+    close = case.api.close
+    fired = False
+
+    def drift_after_staging_close(handle):
+        nonlocal fired
+        close(handle)
+        if fired or "verify:" + ROOT not in case.events or len(case.api.handles) != 2:
+            return
+        fired = True
+        if change == "recovery_gate":
+            case.gates.setattr(
+                security, "PERSONAL_DESKTOP_PAPER_V2_RECOVERY_EFFECTS_ENABLED", False
+            )
+        elif change == "publication_gate":
+            monkeypatch.setattr(
+                security, "PERSONAL_DESKTOP_PAPER_V2_PRODUCTION_EFFECTS_ENABLED", True
+            )
+        elif change == "c1":
+            case.validation = replace(case.validation, production_evidence=None)
+        elif change == "token":
+            case.token = replace(ADMIN, elevated=False)
+        elif change == "freeze":
+            case.freeze = replace(case.freeze, starting_cash=Decimal("1"))
+        elif change.startswith("parent"):
+            node = case.api.nodes[PARENT]
+            node.observation = replace(
+                node.observation,
+                **(
+                    {"identity": (7, 999)}
+                    if change.endswith("identity")
+                    else {"security": replace(node.observation.security, aces=())}
+                ),
+            )
+        else:
+            case.api.overrides[PARENT] = (
+                (NAMES[1], NAMES[2], NAMES[3]) if change == "occupancy" else (NAMES[3],)
+            )
+
+    monkeypatch.setattr(case.api, "close", drift_after_staging_close)
+    try:
+        assert_blocked(case, phase=FinalizePhase.COMMIT_REVALIDATE)
+        assert fired
+    finally:
+        monkeypatch.setattr(
+            security, "PERSONAL_DESKTOP_PAPER_V2_PRODUCTION_EFFECTS_ENABLED", False
+        )
+
+
+@pytest.mark.parametrize("after_effect", [False, True])
+@pytest.mark.parametrize("trust_lost", [False, True])
+def test_finalize_rename_failure_and_response_loss_never_retry(
+    finalize_case, after_effect, trust_lost
+):
+    case = finalize_case
+
+    def fail():
+        if trust_lost:
+            case.validation = replace(case.validation, production_evidence=None)
+        raise OSError("injected lost native response")
+
+    if after_effect:
+        case.after_move = fail
+    else:
+        case.before_move = fail
+    result = assert_blocked(case, begun=True, phase=FinalizePhase.RENAME)
+    expected = (
+        recovery.PaperPublicationState.FINAL_REQUIRES_VALIDATION
+        if after_effect
+        else recovery.PaperPublicationState.STAGING_REQUIRES_REVIEW
+    )
+    assert result.state is (None if trust_lost else expected)
+    assert "verify:" + FINAL not in case.events
+    assert not any(call[0] == "open" and call[1] == FINAL for call in case.api.calls)
+
+
+@pytest.mark.parametrize(
+    "present",
+    [p for p in product((False, True), repeat=4) if p != (False, True, True, False)],
+)
+def test_finalize_bad_postrename_occupancy_never_succeeds(finalize_case, present):
+    case = finalize_case
+
+    def drift():
+        case.api.overrides[PARENT] = tuple(
+            name for name, yes in zip(NAMES, present, strict=True) if yes
+        )
+
+    case.after_move = drift
+    assert_blocked(case, begun=True, phase=FinalizePhase.FINAL_REOPEN)
+
+
+@pytest.mark.parametrize("operation", ["open", "read", "inspect", "names"])
+def test_finalize_reader_failure_is_blocked(finalize_case, monkeypatch, operation):
+    monkeypatch.setattr(finalize_case.api, operation, forbidden)
+    assert_blocked(finalize_case)
+
+
+def test_finalize_final_reopen_failure(finalize_case, monkeypatch):
+    case = finalize_case
+    original = case.api.open
+
+    def fail_final(path, kind):
+        if path == FINAL:
+            raise AuthorityObjectError("final reopen failed")
+        return original(path, kind)
+
+    monkeypatch.setattr(case.api, "open", fail_final)
+    assert_blocked(case, begun=True, phase=FinalizePhase.FINAL_REOPEN)
+
+
+@pytest.mark.parametrize("change", ["c1", "freeze", "parent", "gate", "manifest"])
+def test_finalize_final_verification_drift(finalize_case, monkeypatch, change):
+    case = finalize_case
+    serialize = recovery.serialize_personal_desktop_paper_account_manifest
+
+    def drift(node):
+        if not case.renames:
+            return
+        if change == "c1":
+            case.validation = replace(case.validation, production_evidence=None)
+        elif change == "freeze":
+            case.freeze = replace(case.freeze, starting_cash=Decimal("1"))
+        elif change == "parent":
+            parent = case.api.nodes[PARENT]
+            parent.observation = replace(parent.observation, identity=(7, 999))
+        elif change == "gate":
+            case.gates.setattr(
+                security, "PERSONAL_DESKTOP_PAPER_V2_RECOVERY_EFFECTS_ENABLED", False
+            )
+
+    case.api.on_read = drift
+    if change == "manifest":
+        monkeypatch.setattr(
+            recovery,
+            "serialize_personal_desktop_paper_account_manifest",
+            lambda m: serialize(m) + (b" " if case.renames else b""),
+        )
+    assert_blocked(case, begun=True, phase=FinalizePhase.FINAL_VERIFY)
+
+
+def test_final_resolver_is_fixed_and_does_not_admit_staging(case):
+    paths = recovery._FinalRecoveryPaths()
+    assert paths.object_spec(FINAL).role is security.PaperObjectRole.ROOT
+    for path in (
+        ROOT,
+        PARENT + "\\" + NAMES[1],
+        FINAL.lower(),
+        FINAL + ".",
+        FINAL + r"\runtime",
+    ):
+        with pytest.raises(AuthorityPathError):
+            paths.object_spec(path)
+
+
+@pytest.mark.parametrize("when", ["staging", "final", "parent"])
+def test_finalize_close_failure_cannot_report_success(finalize_case, monkeypatch, when):
+    case = finalize_case
+    close = case.api.close
+    failed = False
+
+    def fail_close(handle):
+        nonlocal failed
+        close(handle)
+        # Fail after the last tree-session handle closes, or after outer parent
+        # close. Other handles are not leaked by the fake failure injection.
+        target = (
+            when == "staging"
+            and not case.renames
+            and "verify:" + ROOT in case.events
+            or when == "final"
+            and "verify:" + FINAL in case.events
+        ) and len(case.api.handles) == 2
+        if when == "parent":
+            target = "verify:" + FINAL in case.events and not case.api.handles
+        if target and not failed:
+            failed = True
+            raise AuthorityObjectError("injected close response failure")
+
+    monkeypatch.setattr(case.api, "close", fail_close)
+    result = assert_blocked(case, begun=when != "staging")
+    assert failed
+    if when == "parent":
+        assert result.state is None
+
+
+@pytest.mark.parametrize("when", ["staging", "final"])
+def test_finalize_close_interval_reopen_detects_replacement(finalize_case, when):
+    case = finalize_case
+    target = (ROOT if when == "staging" else FINAL) + r"\runtime\paper-operations"
+    fired = False
+
+    def drift(path, count, node):
+        nonlocal fired
+        # First finish checks the held object, then the independently reopened
+        # name. Swap only the name, leaving the held object intact.
+        if path == target and count == 2:
+            fired = True
+            case.api.nodes[path] = replace(
+                node, observation=replace(node.observation, identity=(7, 999))
+            )
+
+    case.api.on_inspect = drift
+    assert_blocked(case, begun=when == "final")
+    assert fired
+
+
+@pytest.mark.parametrize("change", ["c1", "freeze", "parent"])
+def test_finalize_response_loss_with_untrusted_state_does_not_probe_names(
+    finalize_case, change
+):
+    case = finalize_case
+    stop_at = None
+
+    def lost():
+        nonlocal stop_at
+        stop_at = len(case.api.calls)
+        if change == "c1":
+            case.validation = replace(case.validation, production_evidence=None)
+        elif change == "freeze":
+            case.freeze = replace(case.freeze, starting_cash=Decimal("1"))
+        else:
+            node = case.api.nodes[PARENT]
+            node.observation = replace(node.observation, identity=(7, 999))
+        raise OSError("lost native response and trust")
+
+    case.after_move = lost
+    result = assert_blocked(case, begun=True)
+    assert result.state is None
+    assert not any(call[0] == "names" for call in case.api.calls[stop_at:])
+
+
+def test_finalize_c1_precedes_freeze_and_both_precede_native(
+    finalize_case, monkeypatch
+):
+    ordered = []
+    c1 = recovery.validate_installed_authority_complete
+    freeze = recovery.require_production_paper_publication_freeze
+    reader = recovery._WindowsRecoveryReadApi
+
+    def observe_c1():
+        ordered.append("c1")
+        return c1()
+
+    def observe_freeze():
+        ordered.append("freeze")
+        return freeze()
+
+    def construct_reader(paths):
+        ordered.append("read")
+        return reader(paths)
+
+    monkeypatch.setattr(recovery, "validate_installed_authority_complete", observe_c1)
+    monkeypatch.setattr(
+        recovery, "require_production_paper_publication_freeze", observe_freeze
+    )
+    monkeypatch.setattr(recovery, "_WindowsRecoveryReadApi", construct_reader)
+    result = recovery.finalize_personal_desktop_paper_staging_recovery()
+    assert result.status is FinalizeStatus.FINALIZED_AND_VERIFIED
+    assert ordered[:3] == ["c1", "freeze", "read"]

@@ -44,13 +44,73 @@ Git operations and reports the local changes.
 
 ## Model selection
 
-Use the smallest model class appropriate to the contract:
+Use the smallest model class that fits the *uncertainty and safety profile* of
+the task, not simply the number of files changed.
 
-- **Luna Extra High** — localized, mechanical, or frozen-contract work;
-- **Sol Medium** — subtle but bounded implementation;
-- **Sol High** — native Windows/security, authority, ordering, crash/recovery,
-  credential/reference-version, external-effect containment, or
-  architecture-sensitive work.
+### Luna Extra High — known contract, known surface
+
+Use **Luna Extra High** by default when:
+
+- the contract is frozen or nearly frozen;
+- the relevant entry points and affected files are already known;
+- the focused tests/checks are obvious;
+- the work is localized, mechanical, or a small bounded correction;
+- implementation should follow an established pattern rather than discover a
+  new one.
+
+Typical Luna work includes known-file feature implementation, focused test
+additions, narrow bug fixes with an established root cause, small refactors
+under a frozen contract, and routine docs/help updates.
+
+### Astra — discovery-aware bounded implementation
+
+Use **Astra** by default when the task is still bounded but useful implementation
+requires broader repository understanding first, including when:
+
+- the affected file set is not obvious at the start;
+- the root cause must be traced across modules;
+- the change crosses multiple non-security subsystems;
+- the work is a bounded refactor, migration, hygiene, dependency, or consistency
+  pass;
+- hidden coupling or duplicated behavior must be found before editing;
+- a broad read-only repository audit is explicitly requested.
+
+Astra replaces **Sol Medium** as the normal middle tier for new Codex work.
+Astra's broader exploration allowance is not permission to redesign settled
+architecture or broaden the authorized checkpoint. If discovery reveals that
+the contract itself must change, stop and return the issue to ChatGPT.
+
+### Sol High — safety/authority escalation
+
+Use **Sol High** for native Windows/security, production authority, ordering,
+crash/recovery, credential/reference-version changes, external-effect
+containment, broker/live boundaries, or other architecture-sensitive
+implementation where a mistake could weaken a safety invariant.
+
+Sol Medium is no longer part of the default routing ladder. Use it only when the
+user explicitly requests it or Astra is unavailable and the task still fits the
+former subtle-but-bounded tier.
+
+A practical routing shortcut is:
+
+```text
+contract + entry points + focused tests already known
+-> Luna Extra High
+
+root cause / affected files / cross-module consequences require discovery
+-> Astra
+
+security / authority / external-effect / crash-ordering invariant involved
+-> Sol High
+```
+
+Do not escalate to Astra merely because a mechanical change touches several
+files. Conversely, do not use Luna to brute-force a task whose root cause or
+cross-module impact is still uncertain.
+
+Model choice never transfers architecture or acceptance authority. ChatGPT
+still owns architecture, exact GitHub diff review, certification, merge or
+deployment decisions, production-effect authorization, and the next milestone.
 
 Do not use subagents unless explicitly requested.
 
@@ -60,6 +120,7 @@ The normal cycle is:
 
 ```text
 ChatGPT scopes/finalizes the contract and explicitly authorizes the checkpoint
+-> ChatGPT chooses Luna / Astra / Sol High from the routing rules above
 -> Codex implements
 -> Codex runs focused tests/checks
 -> Codex verifies the index is initially clean

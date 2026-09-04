@@ -63,14 +63,24 @@ Any mismatch is a STOP. Do not self-correct with checkout/switch/reset/rebase/cl
 
 ChatGPT/Sol owns architecture, native Windows security/authority review, exact GitHub diff review, debugging strategy, test/certification gates, merge/deployment/production decisions, and next-step planning.
 
-Model routing:
+Current Codex model routing:
 
 ```text
 tiny/simple                                  -> ChatGPT direct
-localized/mechanical/frozen contract         -> Luna Extra High
-subtle bounded deterministic implementation -> Sol Medium
+known contract + known files/test surface    -> Luna Extra High
+discovery-aware/cross-module bounded work    -> Astra
 native Windows/security/authority/recovery   -> Sol High
 ```
+
+Use **Luna Extra High** when the contract, entry points, affected files, and focused tests are already known and implementation is localized/mechanical or a small bounded correction.
+
+Use **Astra** when the task remains bounded but the root cause, affected file set, hidden coupling, or cross-module consequences need repository exploration before implementation. Astra is also preferred for bounded refactors/migrations/hygiene/consistency work and explicitly requested broad read-only repository audits. Astra replaces Sol Medium as the normal middle tier for new Codex work.
+
+Use **Sol High** for native Windows/security, production authority, ordering, crash/recovery, credential/reference-version changes, external-effect containment, broker/live boundaries, or other architecture-sensitive implementation where a mistake could weaken a safety invariant.
+
+Sol Medium is no longer part of the default routing ladder; use it only if explicitly requested or Astra is unavailable and the task still fits the former subtle-but-bounded tier.
+
+Model choice does not transfer architecture or acceptance authority. If Astra exploration exposes a need to change the contract or architecture, stop and return that decision to ChatGPT rather than broadening the checkpoint.
 
 Do not use subagents unless explicitly requested.
 

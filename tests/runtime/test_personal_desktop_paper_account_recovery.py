@@ -795,7 +795,7 @@ def finalize_case(case, monkeypatch):
         )
         case.gates = enabled
         yield case
-    assert security.PERSONAL_DESKTOP_PAPER_V2_RECOVERY_EFFECTS_ENABLED is True
+    assert security.PERSONAL_DESKTOP_PAPER_V2_RECOVERY_EFFECTS_ENABLED is False
     assert case.renames in {0, 1}
 
 

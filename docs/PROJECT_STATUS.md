@@ -4,7 +4,7 @@ This is the canonical high-level project status for AI Trading Bot. Detailed sub
 
 ## Product objective and deployment profile
 
-Build a conservative automated trading platform for a **closed, single-owner personal Windows desktop**, progressing through deterministic research, supervised simulated paper, unattended simulated paper, broker-paper, long paper soak, live-readiness review, tiny restricted live operation, and a polished GUI.
+Build a conservative automated trading platform for a **closed, single-owner personal Windows desktop**, progressing through deterministic research, supervised simulated paper, unattended simulated paper, broker-paper, long paper soak, personal-desktop live-readiness, tiny restricted live operation, and a polished GUI.
 
 Stable product constraints:
 
@@ -19,7 +19,7 @@ complete auditability
 
 **Production/live trading remains NO-GO.**
 
-Architecture 102 freezes the personal-desktop threat model. The owner/Administrator, Windows kernel/boot chain, SYSTEM, and physical control are trusted. The application still protects against practical ordinary-process/configuration/credential/state/duplicate-effect/risk-bypass/recovery failures. The high-assurance hostile-local-admin line is preserved but is no longer a blocker for the single-owner desktop roadmap.
+Architecture 102 freezes the personal-desktop threat model. The owner/Administrator, Windows kernel/boot chain, SYSTEM, and physical control are trusted. The application still protects against practical ordinary-process/configuration/credential/state/duplicate-effect/risk-bypass/recovery failures. The preserved high-assurance hostile-local-admin line is not a blocker for the single-owner desktop roadmap.
 
 ## Primary development line
 
@@ -43,47 +43,14 @@ base: a810122a96b6fc90da25d71eede8da64b7272c98
 F:\AI\worktrees\ai-trading-bot-personal-desktop
 ```
 
-Personal-desktop docs checkpoints:
+Architecture checkpoints:
 
 ```text
-Architecture 102 adoption: fab1d776abcdcbf09fb26a257ea7fc86f6201b26
+Architecture 102 adoption:          fab1d776abcdcbf09fb26a257ea7fc86f6201b26
 Architecture 103 + validation plan: 12e41c4e407a79d63ea896773bf8462038ebba27
 ```
 
-Accepted PD1 checkpoints:
-
-```text
-PD1A pure authority/bundle:
-  fa16eef106638e5d6441a05b7f0dd5f757a63e53
-
-PD1B read authority/security:
-  1390a16be5f16f7f38757c875a4648f7ef414d70
-
-PD1C corrected publisher/freeze architecture:
-  e7c2ccbc21972f28b0e82622b426459c67b8007c
-  tree d14a986f63a600a8b17bef37c56df332c3b3b88c
-
-PD1B real-host volume-ACL compatibility correction:
-  a58f231a7bf01ef2556c0f11f599d02e1a01f7c7
-  tree 74d9d3f29c76a10261632d531fdfe9f786a336a7
-
-PD1E-C exact source-owned production bundle freeze:
-  da1807bcbccfcd07b552b6ae6bbd0fc3b1b1150e
-  tree 666147f4bedb754a60fbae6778360b08f5a00cc3
-```
-
-```text
-PD1_SOURCE_ACCEPTED = YES
-PD1_SOURCE_CERTIFIED = YES
-PD1_PRODUCTION_READY = NOT YET FINALIZED
-PD1_V2_PUBLISHED = NO
-```
-
-The current-head certification basis is the exact reviewed PD1E-C diff on top of the broadly re-certified `a58f231...` parent plus its focused 514-test freeze/publication/security/provisioning regression gate. The full suite was intentionally not rerun for the immutable-data-only freeze checkpoint.
-
 ## Mandatory personal-desktop security baseline
-
-The roadmap pivot reduces ceremony depth, not material trading safety. Mandatory controls remain:
 
 - steady-state trading runs under the dedicated non-admin `Trading` account;
 - market-data/broker/live credentials stay outside source/plain config and use reviewed Windows-backed storage;
@@ -98,13 +65,13 @@ The roadmap pivot reduces ceremony depth, not material trading safety. Mandatory
 
 ## Frozen C3 production state
 
-Accepted C3 release-source checkpoint:
+Accepted C3 release source:
 
 ```text
 82ba29ae2c2cc6bb3544077db0ee21868e6d5693
 ```
 
-All six real-provider effects are consumed. Call #5 is permanently `FAILED / CONFIRMED`. Call #6 is permanently `SUCCEEDED / CONFIRMED / SUCCESS_SELECTED` and must never be rerun. Provider call #7 is not authorized.
+All six authorized real-provider effects are consumed. Call #5 is permanently `FAILED / CONFIRMED`. Call #6 is permanently `SUCCEEDED / CONFIRMED / SUCCESS_SELECTED` and must never be rerun. **Provider call #7 is not authorized.**
 
 Selected call #6:
 
@@ -116,17 +83,15 @@ artifact byte length: 1291
 captured_at: 2026-08-29T09:46:43.769105+00:00
 ```
 
-Production identities/paths:
+Production identities:
 
 ```text
 host: DESKTOP-I4DOKM7
-creator SID: S-1-5-21-1397534616-3988210162-180023805-1005
 Trading account: DESKTOP-I4DOKM7\Trading
 Trading SID: S-1-5-21-1397534616-3988210162-180023805-1009
 machine_authority_id: 223f0d4e-36f9-4b9b-bf0e-febf16fcd3f1
 authority_epoch_id: e6f3de5d-1412-40ad-a022-8b33e72a5f6d
 runtime: F:\AITradingBot\runtime\python.exe
-production temp: F:\AITradingBot\temp
 authority DB: F:\AITradingBot\Authority\authority.sqlite3
 credential policy: windows-credential-manager-alpaca-market-data/v2
 ```
@@ -134,10 +99,10 @@ credential policy: windows-credential-manager-alpaca-market-data/v2
 ## Architecture 94 accepted product work
 
 ```text
-P1 pure strategy history / deterministic strategy plan: ACCEPTED
+P1 pure strategy history / deterministic strategy plan
   1028e60b99c27cef0994f40d6ce381392abfb0f8
 
-P2 read-only selected-C3 snapshot authority: ACCEPTED
+P2 read-only selected-C3 snapshot authority
   a810122a96b6fc90da25d71eede8da64b7272c98
 ```
 
@@ -155,175 +120,154 @@ selected verified C3 snapshot
 -> Architecture-67 durable transition + receipt
 ```
 
-## Architecture 103 — personal-desktop paper-account authority v2
+## PD1 — personal-desktop paper-account authority v2 — COMPLETE
 
-Design and validation plan:
-
-```text
-docs/architecture/103-personal-desktop-paper-account-authority-v2.md
-docs/validation/personal-desktop-paper-account-authority-v2-plan.md
-```
-
-Fixed production paths:
+Canonical completion record:
 
 ```text
-final authority root:       F:\AITradingBot\Paper-v2
-provisioning staging root:  F:\AITradingBot\.Paper-v2.provisioning
-Architecture-67 root:       F:\AITradingBot\Paper-v2\runtime
-operation receipt parent:   F:\AITradingBot\Paper-v2\runtime\paper-operations
+docs/validation/pd1-personal-desktop-paper-v2-completion.md
+commit c26a9b5333d62967e574de89a2ae5fd966594abd
 ```
 
-The accepted authority split is:
+Final accepted PD1 production-read source:
 
 ```text
-Trading / non-admin plane
-  genuine process-local ValidatedProductionAuthority + P2
-  -> prepares/contextually verifies exact bundle during readiness
-
-Administrator publication plane
-  complete Administrator C1 installation-conformance evidence
-  + reviewed source-owned PersonalDesktopPaperPublicationFreeze
-  -> publication admission
+commit a353d58230b5b37231d00e7799fa828ddf31bf30
+tree   db750395e9a4a837269c1b93befea453ed604380
+message fix: admit protected paper parent runtime
 ```
 
-`ValidatedProductionAuthority` and the P2 permit are never serialized or transferred into the Administrator process.
-
-### PD1E exact production bundle freeze
-
-Starting cash is now selected and frozen as:
+Canonical PD1 status:
 
 ```text
-Decimal("25000")
+PD1_ARCHITECTURE_ACCEPTED    = YES
+PD1_SOURCE_ACCEPTED          = YES
+PD1_SOURCE_CERTIFIED         = YES
+PD1_PRODUCTION_READY         = YES
+PD1_V2_PUBLISHED             = YES
+PD1_TRADING_RUNTIME_VERIFIED = YES
+PD1                          = COMPLETE
 ```
 
-Trading-plane readiness passed under `DESKTOP-I4DOKM7\Trading` using genuine C1/P2 evidence. No provider call and no authority-database mutation occurred.
-
-Administrator-plane readiness passed under elevated `DESKTOP-I4DOKM7\John` with:
+Exact published account:
 
 ```text
-primary token: true
-thread impersonation: false
-elevated: true
-C1 database state: INITIALIZED_SUPPORTED
+paper_account_id:     9415cd7b-bf36-5fba-bd58-a0f99119dc21
+GENESIS checkpoint:   1832a2b5-8b63-501a-8f7d-f1722c32307b
+starting cash:        Decimal("25000")
+GENESIS as_of:        2026-08-29T09:46:43.769105+00:00
+machine_authority_id: 223f0d4e-36f9-4b9b-bf0e-febf16fcd3f1
+Trading SID:          S-1-5-21-1397534616-3988210162-180023805-1009
 ```
 
-Read-only occupancy/security at readiness:
+Frozen artifacts:
 
 ```text
-F:\ volume: accepted after bounded VOLUME-only inherit-template correction
-F:\AITradingBot: Administrators-owned, protected DACL, Administrators+SYSTEM full
-v1 final: absent
-v1 retained staging: present
-v2 final: absent
-v2 staging: absent
+GENESIS  SHA-256 d1a7ff14425c8a797a952860a1102489a4c81cac2a24a45bc3127eb8eb2e9548  length 533
+anchor   SHA-256 16c4dba01835c5bc2def91f0103ad79c3da0b5d18af72091b4fdd37fe4353c85  length 465
+manifest SHA-256 8fe1d705d59a79207ab6236af71becee0051042dc7b3ecaf23bb7f5531cb0029  length 532
+freeze Git blob b125cbb1c80a827f74018cf2955b9a27ba69fa90
 ```
 
-The exact source-owned freeze at `da1807b...` is:
+Durable occupancy:
 
 ```text
-machine_authority_id = 223f0d4e-36f9-4b9b-bf0e-febf16fcd3f1
-approved_trading_sid = S-1-5-21-1397534616-3988210162-180023805-1009
-paper_account_id = 9415cd7b-bf36-5fba-bd58-a0f99119dc21
-starting_cash = Decimal("25000")
-genesis_as_of = 2026-08-29T09:46:43.769105+00:00
-
-genesis_sha256 = d1a7ff14425c8a797a952860a1102489a4c81cac2a24a45bc3127eb8eb2e9548
-genesis_byte_length = 533
-
-anchor_sha256 = 16c4dba01835c5bc2def91f0103ad79c3da0b5d18af72091b4fdd37fe4353c85
-anchor_byte_length = 465
-
-manifest_sha256 = 8fe1d705d59a79207ab6236af71becee0051042dc7b3ecaf23bb7f5531cb0029
-manifest_byte_length = 532
+F:\AITradingBot\Paper-v2                    PRESENT / VERIFIED
+F:\AITradingBot\.Paper-v2.provisioning      ABSENT
+F:\AITradingBot\Paper                       ABSENT
+F:\AITradingBot\.Paper.provisioning-v1      PRESENT / RETAINED / UNTOUCHED
 ```
 
-Current production source state:
+Both production effect gates are contained:
 
 ```text
 PERSONAL_DESKTOP_PAPER_V2_PRODUCTION_EFFECTS_ENABLED = False
-PERSONAL_DESKTOP_PAPER_V2_PUBLICATION_FREEZE = configured exact immutable PD1E values
+PERSONAL_DESKTOP_PAPER_V2_RECOVERY_EFFECTS_ENABLED   = False
 ```
 
-The configured freeze is data only and grants no publication authority while the effect gate remains false.
-
-### Certification evidence
-
-Initial PD1D broad certification:
+Important production/recovery history:
 
 ```text
-4117 passed
+PD1E-D source-bound Administrator admission         PASS
+PD1E-F original production publication              CONSUMED / BLOCKED
+PD1E-FR2 read-only recovery qualification            PASS
+PD1E-FR3C one-shot real-host recovery                SUCCESS / FINALIZED_AND_VERIFIED
+PD1E-FR3C-R1 recovery re-containment                 ACCEPTED
+initial FR3D Trading read                            BLOCKED by protected-parent source mismatch
+PD1E-FR3D-R1 source correction                       ACCEPTED at a353d582...
+final FR3D genuine non-admin Trading verification    PASS
+```
+
+The protected-parent correction is a source correction, not a host-ACL relaxation. `F:\AITradingBot` remains Administrator/SYSTEM-only. Trading probes the exact fixed staging sibling without requiring parent enumeration and opens/verifies `Paper-v2` directly through the strict source-owned runtime boundary.
+
+Final PD1 certification at `a353d582...`:
+
+```text
+4686 passed
 17 skipped
 Ruff check: PASS
-Ruff format --check: PASS (417 files)
+Ruff format --check: PASS (402 files)
 git diff --check: PASS
+worktree: clean
 ```
 
-After the real-host VOLUME ACL compatibility correction, broad re-certification at `a58f231...` / tree `74d9d3...` passed:
+The retained failed v1 staging tree is historical evidence. Never rerun the old v1 publisher or delete, repair, rename, migrate, or reuse that tree as incidental cleanup.
+
+## Current milestone — PD2A
+
+PD2 is the reliable supervised manual paper-cycle milestone.
+
+The currently authorized first slice is:
 
 ```text
-4151 passed
-17 skipped
-Ruff check: PASS
-Ruff format --check: PASS (417 files)
-git diff --check: PASS
-final HEAD/tree exact
-final worktree clean
+PD2A source-only account-scoped Windows mutex
++ supervised paper-cycle admission contract
 ```
 
-PD1E-C freeze-only focused verification at `da1807b...`:
+PD2A performs **no production Paper-v2 mutation**. It establishes concurrency/admission authority only.
+
+Architecture 103 requires one exclusive account-scoped Windows mutex before any Architecture-67 mutation under `Paper-v2\runtime`. The mutex:
+
+- is deterministically derived from the exact canonical `paper_account_id` under a source-owned namespace;
+- is never caller-named;
+- does not create account authority;
+- is acquired only from genuine validated paper-account authority in the production admission seam;
+- has a protected reviewed Admin/SYSTEM/Trading kernel DACL;
+- uses bounded acquisition, never `INFINITE`;
+- fails closed on timeout, wait failure, unknown status, or security mismatch;
+- preserves `WAIT_ABANDONED` as explicit `ABANDONED_OWNER` evidence;
+- must eventually remain held across authoritative account-state revalidation, strategy/plan/risk/simulated execution, Architecture-67 transition commitment, and receipt commitment/reconciliation.
+
+Proposed source-owned identity contract:
 
 ```text
-514 passed
-Ruff check: PASS
-Ruff format --check: PASS
-git diff --check: PASS
-git diff --cached --check: PASS
-production effects remained False
-no production filesystem effect occurred
+label  = personal-desktop-paper-account-mutex/v1
+prefix = Global\AITradingBot-PaperAccount-v1-
+identity material = exact label + canonical paper_account_id only
 ```
 
-## Retained failed v1 publication
-
-Historical state remains frozen:
+Reviewed DACL target:
 
 ```text
-F:\AITradingBot\Paper                       absent
-F:\AITradingBot\.Paper.provisioning-v1     retained historical staging
-PUBLICATION_STATE=STAGING_REQUIRES_MANUAL_RECOVERY
+Administrators: MUTEX_ALL_ACCESS
+SYSTEM:         MUTEX_ALL_ACCESS
+Trading SID:    MUTEX_MODIFY_STATE | READ_CONTROL | SYNCHRONIZE
+protected DACL
 ```
 
-Never rerun the old publisher or delete/repair/rename/migrate/reuse the retained v1 staging tree.
+A small deterministic production wait bound such as 30 seconds is the working target unless implementation discovers a stronger already-reviewed repository convention.
 
-## High-assurance P3-R1 line — preserved, parked, optional
+PD2A must not call the Architecture-67 writer and must not create/open the real production paper-account mutex during ordinary unit verification. Fake native/kernel boundaries are the default; an optional disposable native integration test must use a test-only name that cannot collide with production.
 
-```text
-branch: feature/p3-r1-recovery-implementation
-remote head: 45e5b745c9dca63d69dbb9c2032cd29d3731f27a
-Architecture-101 source: fad6bfe6fb3fc3af96902d8df300c1cef98e7687
-Architecture-101 tree:   7adb9bf17997f5236846d68443ed2a17011c58d6
-```
-
-```text
-ARCHITECTURE_101_HIGH_ASSURANCE_READINESS=BLOCKED
-PERSONAL_DESKTOP_PRODUCT_ROADMAP=NOT_BLOCKED_BY_THIS_FINDING
-```
-
-Do not change host LSA policy merely to satisfy this parked gate.
-
-## Revised primary roadmap
+## Primary roadmap
 
 ```text
 PD0  personal-desktop profile adoption                     COMPLETE
-PD1  personal-desktop paper-account authority v2           CURRENT
-  PD1A pure anchor/account-ID/provisioning bundle           ACCEPTED
-  PD1B Windows read-only authority + token/ACL/path         ACCEPTED
-  PD1C disabled publisher + disposable publication tests   ACCEPTED
-  PD1D exact diff review + broad source certification      COMPLETE
-  PD1E-A Trading/P2 exact bundle readiness                  PASS
-  PD1E-B Administrator/C1/parent/occupancy readiness        PASS
-  PD1E-C source-owned exact bundle freeze                   ACCEPTED
-  PD1E-D final production-effect decision/publication       NEXT
-PD2  reliable supervised manual paper cycle
+PD1  personal-desktop paper-account authority v2           COMPLETE
+PD2  reliable supervised manual paper cycle                CURRENT
+  PD2A account-scoped Windows mutex + admission contract   AUTHORIZED / NEXT
+  PD2B supervised composition                              NOT YET AUTHORIZED
+  first real Paper-v2 runtime mutation                     NOT YET AUTHORIZED
 PD3  supervised crash/recovery validation
 PD4  unattended simulated paper under Trading
 PD5  broker-paper integration
@@ -332,48 +276,41 @@ PD7  personal-desktop live-readiness
 PD8  tiny restricted live -> gradual maturity
 ```
 
-### PD1E-D next milestone
-
-Before any production mutation, perform one final **read-only source-bound Administrator admission** against the configured freeze and current C1/parent/occupancy state. If it remains clean, ChatGPT/Sol may present the exact one-line production-effect enablement diff and one-shot publication procedure for a separate explicit user authorization.
-
-PD1E-D is not authorized merely by reaching this checkpoint. Publication, ACL creation under `Paper-v2`, and the source effect-gate change remain separate explicit-effect decisions.
-
-## Effect authorization state
-
-Still **NOT AUTHORIZED**:
+## Still not authorized
 
 ```text
-retained v1 staging delete/repair/rename
-old publisher rerun
-Paper-v2 or .Paper-v2.provisioning creation/mutation
-production paper-state mutation
-production ACL mutation
-account/group/password changes
-LSA policy/right changes
-KSP key/signature/private-export effects
 provider call #7
 broker order submission
 live trading
+unattended scheduling
+old v1 publisher rerun
+v1 staging delete/repair/rename/migration/reuse
+Paper-v2 manual mutation outside reviewed PD2 effect checkpoints
+account/group/password changes
+LSA rights/policy changes
+KSP/signing/private-export effects
+merge/rebase/force-push/amend/PR metadata changes without explicit approval
 ```
 
 ## Workflow invariants
 
 - ChatGPT/Sol owns architecture/security review, exact GitHub diff review, test gates, merge/deployment/production decisions, and next milestones.
-- **Tiny scoped status/handoff/docs closeouts are handled directly by ChatGPT by default.**
-- Codex handles bounded implementation and may, when explicitly authorized, exact-file stage/commit/ordinary-push after focused gates pass.
-- Never `git add .` or `git add -A`.
-- Worktree/branch/HEAD mismatch is a STOP; do not self-correct it.
+- Tiny scoped status/handoff/docs closeouts are handled directly by ChatGPT by default.
+- Codex handles bounded implementation. Model routing: Luna Extra High for localized/mechanical/frozen-contract work; Sol Medium for subtle bounded deterministic work; Sol High for native Windows/security/authority/order/crash/recovery work.
+- Codex runs focused tests/checks during iteration; broad/full certification is normally run locally by the user at the final gate.
+- Never `git add .` or `git add -A`; exact-file stage only.
+- Worktree/branch/HEAD mismatch is a STOP; do not self-correct with checkout/switch/reset/rebase/clean.
 - Controlled Windows pytest uses fresh external `F:\AI\temp\pytest\<unique>` and normally `-p no:cacheprovider`.
 - Preserve historical inaccessible caches and unrelated generated/untracked reports.
 - No merge/rebase/force-push/amend/PR metadata/review-thread changes without explicit approval.
 
 ## Documentation workflow
 
-At accepted checkpoints update:
+At accepted checkpoints review/update:
 
 ```text
 docs/PROJECT_STATUS.md
 docs/AI_TRADING_BOT_HANDOFF.md
 ```
 
-Small milestone/status/handoff documentation updates are a ChatGPT-direct task by default. Update `docs/AI_DEVELOPMENT_WORKFLOW.md` only when the reusable workflow rule itself actually changes.
+Small milestone/status/handoff documentation updates are a ChatGPT-direct task by default. Update `docs/AI_DEVELOPMENT_WORKFLOW.md` only when the reusable workflow rule itself changes.

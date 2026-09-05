@@ -1,4 +1,4 @@
-"""Read-only command adapter for one restart-safe paper-operation inspection."""
+"""Command adapter for one explicit restart-safe paper operation."""
 
 from __future__ import annotations
 
@@ -38,7 +38,7 @@ from trading_bot.market_data import XNYS_CALENDAR_DESCRIPTOR, BoundMarketCalenda
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Inspect one explicit paper operation without writing."
+        description="Inspect or execute one explicit restart-safe paper operation."
     )
     parser.add_argument("--config", required=True, type=Path)
     parser.add_argument("--operation-root", required=True, type=Path)

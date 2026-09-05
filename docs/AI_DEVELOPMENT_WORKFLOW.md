@@ -171,6 +171,33 @@ At the final source-certification boundary:
 Milestone and verification reports should always include the next recommended
 step.
 
+## Worktree source provenance
+
+When a virtual environment belongs to one checkout but is used to run code from
+a different worktree, the editable installation inside that environment may
+otherwise resolve `trading_bot` from the wrong checkout. Pytest's configured
+`pythonpath = ["src"]` protects normal pytest collection, but it does not protect
+standalone `python -c`, module, script, Ruff, or operator invocations.
+
+For an isolated worktree, explicitly bind imports to that worktree before
+running Python-backed checks. For the current personal-desktop worktree:
+
+```powershell
+Set-Location 'F:\AI\worktrees\ai-trading-bot-personal-desktop'
+$env:AI_TRADING_BOT_WORKTREE = (Get-Location).Path
+$env:PYTHONPATH = "$env:AI_TRADING_BOT_WORKTREE\src"
+
+& 'F:\AI\ai-trading-bot\.venv\Scripts\python.exe' -c "import os, pathlib, trading_bot; root=(pathlib.Path(os.environ['AI_TRADING_BOT_WORKTREE'])/'src').resolve(); module=pathlib.Path(trading_bot.__file__).resolve(); assert root in module.parents, (root, module); print(module)"
+```
+
+The printed module path must be under the expected worktree `src` tree. An
+assertion failure is an environment/provenance STOP: do not continue tests,
+operator commands, or certification against an ambiguous import source.
+
+Apply the same pattern to other worktrees by changing only the explicitly
+selected worktree path. Do not mutate the shared virtual environment or rely on
+its editable-install target as source authority for another worktree.
+
 ## PowerShell and Git checkpoint style
 
 Routine bounded checkpoints performed by Codex should stay simple and explicit.

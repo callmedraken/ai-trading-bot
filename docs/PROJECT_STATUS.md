@@ -1,8 +1,8 @@
 # Project Status and Roadmap
 
 This is the canonical high-level project status for AI Trading Bot. Detailed
-subsystem contracts remain in `docs/architecture/` and `docs/validation/`; the
-canonical cross-chat resume document is `docs/AI_TRADING_BOT_HANDOFF.md`.
+subsystem contracts remain under `docs/architecture/` and `docs/validation/`;
+`docs/AI_TRADING_BOT_HANDOFF.md` is the canonical cross-chat resume document.
 
 ## Product objective and deployment profile
 
@@ -25,11 +25,6 @@ complete auditability
 
 **Production/live trading remains NO-GO.**
 
-Architecture 102 trusts the owner/Administrator, Windows kernel/boot chain,
-SYSTEM, and physical control. The application still protects against practical
-ordinary-process/configuration/credential/state/duplicate-effect/risk-bypass/
-recovery failures.
-
 ## Primary development line
 
 ```text
@@ -45,6 +40,7 @@ Architecture checkpoints:
 ```text
 Architecture 102 adoption:          fab1d776abcdcbf09fb26a257ea7fc86f6201b26
 Architecture 103 + validation plan: 12e41c4e407a79d63ea896773bf8462038ebba27
+Architecture 104:                   PD2C supervised execution boundary
 ```
 
 ## Mandatory personal-desktop security baseline
@@ -69,8 +65,8 @@ Accepted C3 release source:
 
 All six authorized real-provider effects are consumed. Call #5 is permanently
 `FAILED / CONFIRMED`. Call #6 is permanently
-`SUCCEEDED / CONFIRMED / SUCCESS_SELECTED` and must never be rerun.
-**Provider call #7 is not authorized.**
+`SUCCEEDED / CONFIRMED / SUCCESS_SELECTED`. **Provider call #7 is not
+authorized.**
 
 Selected call #6:
 
@@ -99,13 +95,13 @@ credential policy: windows-credential-manager-alpaca-market-data/v2
 
 ```text
 P1 pure strategy history / deterministic strategy plan
-  1028e60b99c27cef0994f40d6ce381392abfb0f8
+1028e60b99c27cef0994f40d6ce381392abfb0f8
 
 P2 read-only selected-C3 snapshot authority
-  a810122a96b6fc90da25d71eede8da64b7272c98
+a810122a96b6fc90da25d71eede8da64b7272c98
 ```
 
-Preserve this eventual composition:
+Preserve the product composition:
 
 ```text
 selected verified C3 snapshot
@@ -121,18 +117,10 @@ selected verified C3 snapshot
 
 ## PD1 — personal-desktop paper-account authority v2 — COMPLETE
 
-Canonical completion record:
+Completion record:
 
 ```text
 docs/validation/pd1-personal-desktop-paper-v2-completion.md
-commit c26a9b5333d62967e574de89a2ae5fd966594abd
-```
-
-Final accepted production-read source:
-
-```text
-commit a353d58230b5b37231d00e7799fa828ddf31bf30
-tree   db750395e9a4a837269c1b93befea453ed604380
 ```
 
 Canonical PD1 status:
@@ -154,8 +142,6 @@ paper_account_id:     9415cd7b-bf36-5fba-bd58-a0f99119dc21
 GENESIS checkpoint:   1832a2b5-8b63-501a-8f7d-f1722c32307b
 starting cash:        Decimal("25000")
 GENESIS as_of:        2026-08-29T09:46:43.769105+00:00
-machine_authority_id: 223f0d4e-36f9-4b9b-bf0e-febf16fcd3f1
-Trading SID:          S-1-5-21-1397534616-3988210162-180023805-1009
 ```
 
 Frozen artifacts:
@@ -194,17 +180,11 @@ Completion record:
 docs/validation/pd2a-paper-account-runtime-mutex-completion.md
 ```
 
-Accepted source:
+Accepted correction/source checkpoint:
 
 ```text
-initial implementation:
-7e9ca73cef578ad28b97036755f7b4723bb832fc
-feat: add paper account runtime mutex
-
-fail-closed release correction:
 38212c07e0c06c7cf25152c5a362434ded7c3adf
 tree 9dc5087b87cfd2c16ef76d97c04fd20d41ba7187
-fix: fail closed after paper mutex release failure
 ```
 
 Canonical PD2A status:
@@ -216,64 +196,123 @@ PD2A_SOURCE_CERTIFIED      = YES
 PD2A                       = COMPLETE
 ```
 
-PD2A established a deterministic account-scoped Windows mutex and supervised
-admission from genuine registered paper-account authority. The production wait
-is fixed at 30 seconds; kernel owner/DACL are inspected before waiting;
-`WAIT_ABANDONED` remains explicit evidence; same-account recursive/reentrant
-acquisition is blocked in process.
+PD2A provides the deterministic account-scoped Windows mutex, fixed 30-second
+wait, exact kernel owner/DACL validation, explicit `ABANDONED_OWNER`, process-
+wide same-account non-reentrancy, and process-lifetime poison after uncertain
+`ReleaseMutex` failure.
 
-If `ReleaseMutex` fails, the account is process-lifetime poisoned. A later
-same-account admission fails before any native operation rather than assuming
-ownership was released.
-
-Full certification at `38212c07...`:
+Final PD2A certification:
 
 ```text
-4720 passed
-17 skipped
+4720 passed, 17 skipped
 Ruff check: PASS
 Ruff format --check: PASS (424 files)
 git diff --check: PASS
 worktree/index: clean
 ```
 
-PD2A performed no production Paper-v2 mutation and did not authorize one.
+## PD2B — supervised paper composition — COMPLETE
 
-## Current milestone — PD2B supervised composition design
+Completion record:
 
-PD2B is next, but the first step is **source-only architecture/composition**.
-The first real `Paper-v2\runtime` mutation remains a later explicit effect
-checkpoint.
+```text
+docs/validation/pd2b-supervised-paper-composition-completion.md
+```
+
+Accepted source checkpoints:
+
+```text
+PD2B1 84f12f030221207fa41de2f39bf8c1e4aef42160
+PD2B2 d0f6dc29be273df6fec44a5d7c8eaa65448bf3e3
+PD2B3 f86f8c8758b3e8941e5bbfa26d40892433cf0110
+tree  9f883335ec13a9385113b2c310c6009a8a0e72aa
+```
+
+Canonical PD2B status:
+
+```text
+PD2B1_SOURCE_ACCEPTED = YES
+PD2B1                  = COMPLETE
+PD2B2_SOURCE_ACCEPTED = YES
+PD2B2                  = COMPLETE
+PD2B3_SOURCE_ACCEPTED = YES
+PD2B3                  = COMPLETE
+PD2B_SOURCE_ACCEPTED  = YES
+PD2B_SOURCE_CERTIFIED = YES
+PD2B                  = COMPLETE
+```
+
+PD2B establishes:
+
+```text
+genuine C1 authority
+-> pre-lock account read for immutable account identity only
+-> PD2A account mutex
+-> genuine post-lock account reread
+-> post-lock lineage/prior only
++ genuine P2 selected snapshot
++ deterministic P1 planning inputs
+-> P1 build + exact replay verification
+-> path-independent A67 intent/application/input evidence
+```
+
+PD2B2 removed caller-path authority from the Architecture-67 semantic input
+contract. PD2B3 keeps the production operation root and raw A67 execution inputs
+inside a private active binding that expires before mutex release.
+
+`ABANDONED_OWNER` blocks before P1/A67 preparation and requires later durable
+reconciliation.
+
+Final PD2B certification:
+
+```text
+4754 passed, 17 skipped
+Ruff check: PASS
+Ruff format --check: PASS (430 files)
+git diff --check: PASS
+worktree/index: clean
+```
+
+No real Paper-v2 mutation occurred.
+
+## Current milestone — PD2C supervised Architecture-67 execution boundary
+
+Architecture contract:
+
+```text
+docs/architecture/104-personal-desktop-supervised-paper-execution-boundary.md
+```
+
+Validation plan:
+
+```text
+docs/validation/pd2c-supervised-paper-execution-boundary-plan.md
+```
+
+PD2C is **source-only first**. It must consume the private active PD2B3 binding
+while the same account mutex is held, require the exact source-owned
+`F:\AITradingBot\Paper-v2\runtime` root, and route to the existing
+Architecture-67 `execute_paper_operation_once` contract only through a
+source-owned production-effect gate.
 
 Required ordering:
 
 ```text
-genuine C1/Trading paper-account authority
--> pre-lock read used only for immutable paper_account_id
--> acquire PD2A account mutex
--> post-lock genuine paper-account reread/revalidation
--> authoritative fresh terminal checkpoint
-+ selected verified C3 snapshot
-+ deterministic strategy history
--> strategy plan
--> proposal/planner
--> deterministic risk
--> simulated execution
--> successor + full-lineage verification
--> Architecture-67 transition
--> receipt commitment or zero-runtime recovery/reconciliation
--> release mutex only after terminal durable outcome
+genuine C1/P2
+-> PD2B3 preparation
+-> PD2B1/PD2A mutex held
+-> private active A67 binding
+-> exact fixed Paper-v2 runtime root
+-> production-effect admission
+-> Architecture-67 execute-once
+-> durable terminal result / receipt semantics
+-> prepared binding expires
+-> mutex release
 ```
 
-PD2B must preserve these rules:
-
-- the pre-lock read never supplies mutable execution state;
-- the same genuine authority chain anchors both pre-lock and post-lock reads;
-- production operation root is source-owned as `F:\AITradingBot\Paper-v2\runtime`;
-- caller UUID/path/root values cannot mint production mutation authority;
-- `ABANDONED_OWNER` requires durable reconciliation before a new mutation;
-- the mutex spans the complete critical section through receipt/reconciliation;
-- PD2B source tests use fake/disposable boundaries and do not mutate the real account.
+PD2C implementation/certification must leave both Paper-v2 effect gates false.
+Tests use fake/disposable executors and roots only. The first real
+`Paper-v2\runtime` mutation remains a later explicit authorization.
 
 ## Primary roadmap
 
@@ -282,8 +321,9 @@ PD0  personal-desktop profile adoption                     COMPLETE
 PD1  personal-desktop paper-account authority v2           COMPLETE
 PD2  reliable supervised manual paper cycle                CURRENT
   PD2A account-scoped Windows mutex + admission contract   COMPLETE
-  PD2B supervised composition                              DESIGN NEXT / SOURCE-ONLY
-  first real Paper-v2 runtime mutation                     NOT AUTHORIZED
+  PD2B supervised source-only composition                  COMPLETE
+  PD2C supervised A67 execution boundary                   CURRENT / SOURCE-ONLY
+  PD2D first explicitly authorized Paper-v2 mutation       NOT AUTHORIZED
 PD3  supervised crash/recovery validation
 PD4  unattended simulated paper under Trading
 PD5  broker-paper integration
@@ -311,25 +351,17 @@ merge/rebase/force-push/amend/PR metadata changes without explicit approval
 
 ## Workflow invariants
 
-- ChatGPT/Sol owns architecture/security review, exact GitHub diff review, test
-  gates, merge/deployment/production decisions, and next milestones.
+- ChatGPT/Sol owns architecture/security review, exact GitHub diff review, test gates, merge/deployment/production decisions, and next milestones.
 - Tiny scoped status/handoff/docs closeouts are ChatGPT-direct by default.
-- Codex model routing:
-  - Luna Extra High for frozen/known/localized mechanical work;
-  - Astra for bounded discovery-aware/cross-module work;
-  - Sol High for native Windows/security/authority/order/crash/recovery and
-    other safety-sensitive implementation.
+- Codex uses Luna Extra High for frozen/local mechanical work, Astra for bounded discovery-aware/cross-module work, and Sol High for native Windows/security/authority/order/crash/recovery and other safety-sensitive implementation.
 - Model choice never transfers architecture or acceptance authority.
 - No subagents unless explicitly requested.
-- Codex runs focused tests/checks during implementation; broad/full
-  certification is normally run locally by the user at the final gate.
+- Codex runs focused tests/checks during implementation; broad/full certification is normally user-run locally at the final gate.
 - Never `git add .` or `git add -A`; exact-file stage only.
 - Worktree/branch/HEAD mismatch is a STOP; do not self-correct.
-- Controlled Windows pytest uses fresh external
-  `F:\AI\temp\pytest\<unique>` and normally `-p no:cacheprovider`.
+- Controlled Windows pytest uses a fresh external `F:\AI\temp\pytest\<unique>` and normally `-p no:cacheprovider`.
 - Preserve unrelated generated/untracked reports and historical evidence.
-- No merge/rebase/force-push/amend/PR metadata/review-thread changes without
-  explicit approval.
+- No merge/rebase/force-push/amend/PR metadata/review-thread changes without explicit approval.
 
 ## Documentation workflow
 

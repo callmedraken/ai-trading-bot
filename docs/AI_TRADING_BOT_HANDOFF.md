@@ -15,7 +15,7 @@
 Build a conservative automated trading platform for a **closed, single-owner
 personal Windows desktop**:
 
-**deterministic research → supervised simulated paper → unattend simulated
+**deterministic research → supervised simulated paper → unattended simulated
 paper → broker-paper → long paper soak → personal-desktop live-readiness → tiny
 restricted live → mature operation → polished GUI.**
 
@@ -73,7 +73,7 @@ merge/deployment/production decisions, and next-step planning.
 Current Codex routing:
 
 ```text
-tiny/simple                                   -> ChatGPT direct
+tiny/simple                                  -> ChatGPT direct
 known contract + known files/test surface    -> Luna Extra High
 discovery-aware/cross-module bounded work    -> Astra
 native Windows/security/authority/recovery   -> Sol High
@@ -101,7 +101,7 @@ F:\AI\worktrees\ai-trading-bot-personal-desktop\src
 ```
 
 Controlled pytest uses a fresh external
-`E:\AI\temp\pytest\<unique>` plus `-p no:cacheprovider`.
+`F:\AI\temp\pytest\<unique>` plus `-p no:cacheprovider`.
 
 ## 4. Standing authorization model
 
@@ -259,7 +259,7 @@ freeze Git blob b125cbb1c80a827f74018cf2955b9a27ba69fa90
 Occupancy:
 
 ```text
-F:\AITradingBot\Paper-v2                     PRESENT / VERIFIED
+F:\AITradingBot\Paper-v2                    PRESENT / VERIFIED
 F:\AITradingBot\.Paper-v2.provisioning      ABSENT
 F:\AITradingBot\Paper                       ABSENT
 F:\AITradingBot\.Paper.provisioning-v1      PRESENT / RETAINED / UNTOUCHED

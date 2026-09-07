@@ -11,16 +11,23 @@ boundaries decide what may actually happen.
 ## Current status
 
 The contained C3 production market-data capture boundary is complete and
-certified, and PD1 personal-desktop Paper-v2 authority is complete.
+certified, PD1 personal-desktop Paper-v2 authority is complete, and **PD2A is
+complete and source-certified**.
 
-The current milestone is **PD2: reliable supervised manual paper operation**.
-The first slice, **PD2A**, is source-only: it adds the account-scoped Windows
-mutex and supervised paper admission contract required before any production
-Paper-v2 runtime mutation. PD2A itself must not mutate production paper state.
+PD2A added the account-scoped Windows mutex and supervised paper admission
+boundary. Its final certification passed **4720 tests with 17 expected skips**,
+plus Ruff, format, and diff checks.
+
+The current development target is **PD2B: supervised paper-cycle composition**.
+PD2B begins as a source-only checkpoint: it will compose the already-reviewed
+account authority, mutex, post-lock account-state reread, deterministic
+strategy/risk/simulated execution, and Architecture-67 transition/receipt
+machinery. It does **not** authorize a real `Paper-v2` runtime mutation.
 
 **Production/live trading remains NO-GO.** Provider call #7, broker order
-submission, unattended operation, and live trading remain unauthorized unless a
-later reviewed checkpoint explicitly changes that state.
+submission, unattended operation, the first real Paper-v2 runtime mutation, and
+live trading remain unauthorized unless a later reviewed checkpoint explicitly
+changes that state.
 
 See [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md) for the canonical current
 milestone, roadmap, production status, and final product-completion goal.

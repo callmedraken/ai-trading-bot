@@ -1,10 +1,16 @@
 # Project Status and Roadmap
 
-This is the canonical high-level project status for AI Trading Bot. Detailed subsystem contracts remain in `docs/architecture/` and `docs/validation/`; the canonical cross-chat resume document is `docs/AI_TRADING_BOT_HANDOFF.md`.
+This is the canonical high-level project status for AI Trading Bot. Detailed
+subsystem contracts remain in `docs/architecture/` and `docs/validation/`; the
+canonical cross-chat resume document is `docs/AI_TRADING_BOT_HANDOFF.md`.
 
 ## Product objective and deployment profile
 
-Build a conservative automated trading platform for a **closed, single-owner personal Windows desktop**, progressing through deterministic research, supervised simulated paper, unattended simulated paper, broker-paper, long paper soak, personal-desktop live-readiness, tiny restricted live operation, and a polished GUI.
+Build a conservative automated trading platform for a **closed, single-owner
+personal Windows desktop**, progressing through deterministic research,
+supervised simulated paper, unattended simulated paper, broker-paper, long
+paper soak, personal-desktop live-readiness, tiny restricted live operation,
+and a polished GUI.
 
 Stable product constraints:
 
@@ -19,28 +25,19 @@ complete auditability
 
 **Production/live trading remains NO-GO.**
 
-Architecture 102 freezes the personal-desktop threat model. The owner/Administrator, Windows kernel/boot chain, SYSTEM, and physical control are trusted. The application still protects against practical ordinary-process/configuration/credential/state/duplicate-effect/risk-bypass/recovery failures. The preserved high-assurance hostile-local-admin line is not a blocker for the single-owner desktop roadmap.
+Architecture 102 trusts the owner/Administrator, Windows kernel/boot chain,
+SYSTEM, and physical control. The application still protects against practical
+ordinary-process/configuration/credential/state/duplicate-effect/risk-bypass/
+recovery failures.
 
 ## Primary development line
 
-Accepted integrated `develop` baseline:
-
 ```text
-bd88ee966bff455f9fc897d6cfdfafdd807f27e2
-```
-
-Accepted Architecture-94 P2 product checkpoint:
-
-```text
-a810122a96b6fc90da25d71eede8da64b7272c98
-```
-
-Primary product branch/worktree:
-
-```text
-feature/personal-desktop-paper-runtime
-base: a810122a96b6fc90da25d71eede8da64b7272c98
-F:\AI\worktrees\ai-trading-bot-personal-desktop
+repository: callmedraken/ai-trading-bot
+integration baseline: bd88ee966bff455f9fc897d6cfdfafdd807f27e2
+Architecture-94 P2 base: a810122a96b6fc90da25d71eede8da64b7272c98
+branch: feature/personal-desktop-paper-runtime
+worktree: F:\AI\worktrees\ai-trading-bot-personal-desktop
 ```
 
 Architecture checkpoints:
@@ -53,14 +50,13 @@ Architecture 103 + validation plan: 12e41c4e407a79d63ea896773bf8462038ebba27
 ## Mandatory personal-desktop security baseline
 
 - steady-state trading runs under the dedicated non-admin `Trading` account;
-- market-data/broker/live credentials stay outside source/plain config and use reviewed Windows-backed storage;
+- credentials stay outside source/plain config and use reviewed Windows-backed storage;
 - paper is default; future live requires a separate explicit arming boundary;
 - every executable order passes deterministic risk authority;
 - strategy/optimizer/GUI/AI/scheduler/adapters cannot bypass risk;
 - durable state outranks process-local assumptions;
 - ambiguous provider/broker effects are reconciled or fail closed rather than blindly retried;
-- important runtime/config/state locations are source-governed with practical least-privilege ACLs;
-- audit/recovery evidence explains attempts, durable commitments, external responses, and retry safety;
+- source-governed runtime/config/state locations use practical least privilege;
 - crash/restart, duplicate invocation, stale input, corruption/conflict, and receipt recovery remain roadmap gates.
 
 ## Frozen C3 production state
@@ -71,7 +67,10 @@ Accepted C3 release source:
 82ba29ae2c2cc6bb3544077db0ee21868e6d5693
 ```
 
-All six authorized real-provider effects are consumed. Call #5 is permanently `FAILED / CONFIRMED`. Call #6 is permanently `SUCCEEDED / CONFIRMED / SUCCESS_SELECTED` and must never be rerun. **Provider call #7 is not authorized.**
+All six authorized real-provider effects are consumed. Call #5 is permanently
+`FAILED / CONFIRMED`. Call #6 is permanently
+`SUCCEEDED / CONFIRMED / SUCCESS_SELECTED` and must never be rerun.
+**Provider call #7 is not authorized.**
 
 Selected call #6:
 
@@ -106,7 +105,7 @@ P2 read-only selected-C3 snapshot authority
   a810122a96b6fc90da25d71eede8da64b7272c98
 ```
 
-Preserve this composition:
+Preserve this eventual composition:
 
 ```text
 selected verified C3 snapshot
@@ -129,12 +128,11 @@ docs/validation/pd1-personal-desktop-paper-v2-completion.md
 commit c26a9b5333d62967e574de89a2ae5fd966594abd
 ```
 
-Final accepted PD1 production-read source:
+Final accepted production-read source:
 
 ```text
 commit a353d58230b5b37231d00e7799fa828ddf31bf30
 tree   db750395e9a4a837269c1b93befea453ed604380
-message fix: admit protected paper parent runtime
 ```
 
 Canonical PD1 status:
@@ -149,7 +147,7 @@ PD1_TRADING_RUNTIME_VERIFIED = YES
 PD1                          = COMPLETE
 ```
 
-Exact published account:
+Published account:
 
 ```text
 paper_account_id:     9415cd7b-bf36-5fba-bd58-a0f99119dc21
@@ -178,86 +176,104 @@ F:\AITradingBot\Paper                       ABSENT
 F:\AITradingBot\.Paper.provisioning-v1      PRESENT / RETAINED / UNTOUCHED
 ```
 
-Both production effect gates are contained:
+Both effect gates remain contained:
 
 ```text
 PERSONAL_DESKTOP_PAPER_V2_PRODUCTION_EFFECTS_ENABLED = False
 PERSONAL_DESKTOP_PAPER_V2_RECOVERY_EFFECTS_ENABLED   = False
 ```
 
-Important production/recovery history:
+Never rerun the old v1 publisher or delete, repair, rename, migrate, or reuse
+the retained v1 staging tree as incidental cleanup.
+
+## PD2A — account mutex + supervised admission — COMPLETE
+
+Completion record:
 
 ```text
-PD1E-D source-bound Administrator admission         PASS
-PD1E-F original production publication              CONSUMED / BLOCKED
-PD1E-FR2 read-only recovery qualification            PASS
-PD1E-FR3C one-shot real-host recovery                SUCCESS / FINALIZED_AND_VERIFIED
-PD1E-FR3C-R1 recovery re-containment                 ACCEPTED
-initial FR3D Trading read                            BLOCKED by protected-parent source mismatch
-PD1E-FR3D-R1 source correction                       ACCEPTED at a353d582...
-final FR3D genuine non-admin Trading verification    PASS
+docs/validation/pd2a-paper-account-runtime-mutex-completion.md
 ```
 
-The protected-parent correction is a source correction, not a host-ACL relaxation. `F:\AITradingBot` remains Administrator/SYSTEM-only. Trading probes the exact fixed staging sibling without requiring parent enumeration and opens/verifies `Paper-v2` directly through the strict source-owned runtime boundary.
-
-Final PD1 certification at `a353d582...`:
+Accepted source:
 
 ```text
-4686 passed
+initial implementation:
+7e9ca73cef578ad28b97036755f7b4723bb832fc
+feat: add paper account runtime mutex
+
+fail-closed release correction:
+38212c07e0c06c7cf25152c5a362434ded7c3adf
+tree 9dc5087b87cfd2c16ef76d97c04fd20d41ba7187
+fix: fail closed after paper mutex release failure
+```
+
+Canonical PD2A status:
+
+```text
+PD2A_ARCHITECTURE_ACCEPTED = YES
+PD2A_SOURCE_ACCEPTED       = YES
+PD2A_SOURCE_CERTIFIED      = YES
+PD2A                       = COMPLETE
+```
+
+PD2A established a deterministic account-scoped Windows mutex and supervised
+admission from genuine registered paper-account authority. The production wait
+is fixed at 30 seconds; kernel owner/DACL are inspected before waiting;
+`WAIT_ABANDONED` remains explicit evidence; same-account recursive/reentrant
+acquisition is blocked in process.
+
+If `ReleaseMutex` fails, the account is process-lifetime poisoned. A later
+same-account admission fails before any native operation rather than assuming
+ownership was released.
+
+Full certification at `38212c07...`:
+
+```text
+4720 passed
 17 skipped
 Ruff check: PASS
-Ruff format --check: PASS (402 files)
+Ruff format --check: PASS (424 files)
 git diff --check: PASS
-worktree: clean
+worktree/index: clean
 ```
 
-The retained failed v1 staging tree is historical evidence. Never rerun the old v1 publisher or delete, repair, rename, migrate, or reuse that tree as incidental cleanup.
+PD2A performed no production Paper-v2 mutation and did not authorize one.
 
-## Current milestone — PD2A
+## Current milestone — PD2B supervised composition design
 
-PD2 is the reliable supervised manual paper-cycle milestone.
+PD2B is next, but the first step is **source-only architecture/composition**.
+The first real `Paper-v2\runtime` mutation remains a later explicit effect
+checkpoint.
 
-The currently authorized first slice is:
+Required ordering:
 
 ```text
-PD2A source-only account-scoped Windows mutex
-+ supervised paper-cycle admission contract
+genuine C1/Trading paper-account authority
+-> pre-lock read used only for immutable paper_account_id
+-> acquire PD2A account mutex
+-> post-lock genuine paper-account reread/revalidation
+-> authoritative fresh terminal checkpoint
++ selected verified C3 snapshot
++ deterministic strategy history
+-> strategy plan
+-> proposal/planner
+-> deterministic risk
+-> simulated execution
+-> successor + full-lineage verification
+-> Architecture-67 transition
+-> receipt commitment or zero-runtime recovery/reconciliation
+-> release mutex only after terminal durable outcome
 ```
 
-PD2A performs **no production Paper-v2 mutation**. It establishes concurrency/admission authority only.
+PD2B must preserve these rules:
 
-Architecture 103 requires one exclusive account-scoped Windows mutex before any Architecture-67 mutation under `Paper-v2\runtime`. The mutex:
-
-- is deterministically derived from the exact canonical `paper_account_id` under a source-owned namespace;
-- is never caller-named;
-- does not create account authority;
-- is acquired only from genuine validated paper-account authority in the production admission seam;
-- has a protected reviewed Admin/SYSTEM/Trading kernel DACL;
-- uses bounded acquisition, never `INFINITE`;
-- fails closed on timeout, wait failure, unknown status, or security mismatch;
-- preserves `WAIT_ABANDONED` as explicit `ABANDONED_OWNER` evidence;
-- must eventually remain held across authoritative account-state revalidation, strategy/plan/risk/simulated execution, Architecture-67 transition commitment, and receipt commitment/reconciliation.
-
-Proposed source-owned identity contract:
-
-```text
-label  = personal-desktop-paper-account-mutex/v1
-prefix = Global\AITradingBot-PaperAccount-v1-
-identity material = exact label + canonical paper_account_id only
-```
-
-Reviewed DACL target:
-
-```text
-Administrators: MUTEX_ALL_ACCESS
-SYSTEM:         MUTEX_ALL_ACCESS
-Trading SID:    MUTEX_MODIFY_STATE | READ_CONTROL | SYNCHRONIZE
-protected DACL
-```
-
-A small deterministic production wait bound such as 30 seconds is the working target unless implementation discovers a stronger already-reviewed repository convention.
-
-PD2A must not call the Architecture-67 writer and must not create/open the real production paper-account mutex during ordinary unit verification. Fake native/kernel boundaries are the default; an optional disposable native integration test must use a test-only name that cannot collide with production.
+- the pre-lock read never supplies mutable execution state;
+- the same genuine authority chain anchors both pre-lock and post-lock reads;
+- production operation root is source-owned as `F:\AITradingBot\Paper-v2\runtime`;
+- caller UUID/path/root values cannot mint production mutation authority;
+- `ABANDONED_OWNER` requires durable reconciliation before a new mutation;
+- the mutex spans the complete critical section through receipt/reconciliation;
+- PD2B source tests use fake/disposable boundaries and do not mutate the real account.
 
 ## Primary roadmap
 
@@ -265,9 +281,9 @@ PD2A must not call the Architecture-67 writer and must not create/open the real 
 PD0  personal-desktop profile adoption                     COMPLETE
 PD1  personal-desktop paper-account authority v2           COMPLETE
 PD2  reliable supervised manual paper cycle                CURRENT
-  PD2A account-scoped Windows mutex + admission contract   AUTHORIZED / NEXT
-  PD2B supervised composition                              NOT YET AUTHORIZED
-  first real Paper-v2 runtime mutation                     NOT YET AUTHORIZED
+  PD2A account-scoped Windows mutex + admission contract   COMPLETE
+  PD2B supervised composition                              DESIGN NEXT / SOURCE-ONLY
+  first real Paper-v2 runtime mutation                     NOT AUTHORIZED
 PD3  supervised crash/recovery validation
 PD4  unattended simulated paper under Trading
 PD5  broker-paper integration
@@ -283,6 +299,7 @@ provider call #7
 broker order submission
 live trading
 unattended scheduling
+first real Paper-v2 runtime mutation
 old v1 publisher rerun
 v1 staging delete/repair/rename/migration/reuse
 Paper-v2 manual mutation outside reviewed PD2 effect checkpoints
@@ -294,23 +311,35 @@ merge/rebase/force-push/amend/PR metadata changes without explicit approval
 
 ## Workflow invariants
 
-- ChatGPT/Sol owns architecture/security review, exact GitHub diff review, test gates, merge/deployment/production decisions, and next milestones.
-- Tiny scoped status/handoff/docs closeouts are handled directly by ChatGPT by default.
-- Codex handles bounded implementation. Model routing: Luna Extra High for localized/mechanical/frozen-contract work; Sol Medium for subtle bounded deterministic work; Sol High for native Windows/security/authority/order/crash/recovery work.
-- Codex runs focused tests/checks during iteration; broad/full certification is normally run locally by the user at the final gate.
+- ChatGPT/Sol owns architecture/security review, exact GitHub diff review, test
+  gates, merge/deployment/production decisions, and next milestones.
+- Tiny scoped status/handoff/docs closeouts are ChatGPT-direct by default.
+- Codex model routing:
+  - Luna Extra High for frozen/known/localized mechanical work;
+  - Astra for bounded discovery-aware/cross-module work;
+  - Sol High for native Windows/security/authority/order/crash/recovery and
+    other safety-sensitive implementation.
+- Model choice never transfers architecture or acceptance authority.
+- No subagents unless explicitly requested.
+- Codex runs focused tests/checks during implementation; broad/full
+  certification is normally run locally by the user at the final gate.
 - Never `git add .` or `git add -A`; exact-file stage only.
-- Worktree/branch/HEAD mismatch is a STOP; do not self-correct with checkout/switch/reset/rebase/clean.
-- Controlled Windows pytest uses fresh external `F:\AI\temp\pytest\<unique>` and normally `-p no:cacheprovider`.
-- Preserve historical inaccessible caches and unrelated generated/untracked reports.
-- No merge/rebase/force-push/amend/PR metadata/review-thread changes without explicit approval.
+- Worktree/branch/HEAD mismatch is a STOP; do not self-correct.
+- Controlled Windows pytest uses fresh external
+  `F:\AI\temp\pytest\<unique>` and normally `-p no:cacheprovider`.
+- Preserve unrelated generated/untracked reports and historical evidence.
+- No merge/rebase/force-push/amend/PR metadata/review-thread changes without
+  explicit approval.
 
 ## Documentation workflow
 
 At accepted checkpoints review/update:
 
 ```text
+README.md
 docs/PROJECT_STATUS.md
 docs/AI_TRADING_BOT_HANDOFF.md
 ```
 
-Small milestone/status/handoff documentation updates are a ChatGPT-direct task by default. Update `docs/AI_DEVELOPMENT_WORKFLOW.md` only when the reusable workflow rule itself changes.
+Completion records belong under `docs/validation/`. Reusable workflow changes
+belong in `docs/AI_DEVELOPMENT_WORKFLOW.md`.

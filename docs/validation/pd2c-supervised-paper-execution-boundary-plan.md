@@ -37,18 +37,20 @@ PERSONAL_DESKTOP_PAPER_V2_SUPERVISED_EXECUTION_EFFECTS_ENABLED = False
 The production-facing PD2C API must:
 
 1. require genuine production authority and the same genuine P2/provenance inputs needed by PD2B3;
-2. internally enter the existing PD2B3 supervised preparation rather than accept a caller-created preparation;
-3. consume the private active prepared binding only while PD2B3 is active;
-4. reconcile the binding operation root exactly to `F:\AITradingBot\Paper-v2\runtime`;
-5. reject a mismatching root before calling Architecture 67;
-6. fail closed before Architecture-67 execution while `PERSONAL_DESKTOP_PAPER_V2_SUPERVISED_EXECUTION_EFFECTS_ENABLED` is false;
-7. provide a private test-only factory/seam with an explicit non-public construction barrier for injected disposable execution;
-8. never expose that injected executor/gate override on the production-facing API;
-9. when execution is allowed through the private disposable test seam, invoke the existing Architecture-67 execute-once contract exactly once;
-10. never automatically retry runtime execution;
-11. keep the PD2A account mutex held through the entire executor call and terminal result handling;
-12. remove/expire the private prepared binding before mutex release through the existing PD2B3 context semantics;
-13. return only immutable non-authorizing result/audit evidence.
+2. validate exact C1/P2 provenance before any production execution admission;
+3. check `PERSONAL_DESKTOP_PAPER_V2_SUPERVISED_EXECUTION_EFFECTS_ENABLED` immediately after that pure/process-local authority validation;
+4. while the gate is false, raise a stable typed disabled error before entering PD2B3, acquiring the production account mutex, rereading Paper-v2, or calling Architecture 67;
+5. when later enabled, internally enter the existing PD2B3 supervised preparation rather than accept a caller-created preparation;
+6. consume the private active prepared binding only while PD2B3 is active;
+7. reconcile the binding operation root exactly to `F:\AITradingBot\Paper-v2\runtime`;
+8. reject a mismatching root before calling Architecture 67;
+9. provide a private test-only factory/seam with an explicit non-public construction barrier for injected disposable execution;
+10. never expose that injected executor/gate override on the production-facing API;
+11. when execution is allowed through the private disposable test seam, invoke the existing Architecture-67 execute-once contract exactly once;
+12. never automatically retry runtime execution;
+13. keep the PD2A account mutex held through the entire executor call and terminal result handling;
+14. remove/expire the private prepared binding before mutex release through the existing PD2B3 context semantics;
+15. return only immutable non-authorizing result/audit evidence.
 
 `ABANDONED_OWNER` remains blocked before PD2C execution through PD2B3 and must not be bypassed.
 
@@ -82,16 +84,16 @@ Focused tests must prove at least:
 - invalid/forged C1 fails before P2/B1/executor;
 - forged/disposable P2 cannot enter the production boundary;
 - production boundary does not accept a prebuilt preparation;
+- the dedicated production execution gate defaults false;
+- after genuine C1/P2 validation, gate false blocks before PD2B3 construction/entry, account-mutex acquisition, Paper-v2 reread, and executor invocation;
+- caller cannot override or configure the gate;
+- existing PD1 production/recovery gates remain false and are not reused as the runtime-execution gate;
+- a private disposable test seam can exercise the later full PD2B3->A67 composition without enabling production effects;
+- the private test seam cannot be invoked as ordinary production authority without its explicit test-only issuer/barrier;
 - private prepared binding is consumed only while active;
 - executor observes that PD2B3/B1 scope is still active during the call;
 - exact fixed Paper-v2 runtime root is required;
 - a mismatching root blocks before executor invocation;
-- the dedicated production execution gate defaults false;
-- gate false blocks before executor invocation;
-- caller cannot override or configure the gate;
-- existing PD1 production/recovery gates remain false and are not reused as the runtime-execution gate;
-- a private disposable test seam can exercise one execute-once call without enabling production effects;
-- the private test seam cannot be invoked as ordinary production authority without its explicit test-only issuer/barrier;
 - executor is called exactly once on the allowed test path;
 - executor exceptions propagate/fail closed without retry;
 - blocked/conflicting/failed/success/recovered Architecture-67 classifications are passed through without being reinterpreted as permission for another runtime;

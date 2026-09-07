@@ -25,6 +25,7 @@ from trading_bot.runtime.windows_authority_security import (
 
 ACCOUNT_ID = "9415cd7b-bf36-5fba-bd58-a0f99119dc21"
 OTHER_ACCOUNT_ID = "1dbbe770-9587-40cb-9762-7fa13654df5e"
+POISONED_RELEASE_ACCOUNT_ID = "7560de7c-dd3f-4f7b-bd03-d4fdd7890aa1"
 TRADING_SID = "S-1-5-21-1397534616-3988210162-180023805-1009"
 EXPECTED_MATERIAL = (
     b"39:personal-desktop-paper-account-mutex/v136:9415cd7b-bf36-5fba-bd58-a0f99119dc21"
@@ -416,16 +417,45 @@ def test_release_only_when_owned_and_handle_always_closes() -> None:
     assert owned_api.events[-2:] == ["release", "close"]
 
 
-def test_release_failure_fails_closed_but_still_closes_and_unreserves() -> None:
+def test_release_failure_closes_and_permanently_poisons_only_that_account() -> None:
     api = FakeNativeApi(release_result=False)
-    acquired_scope = scope(api)
+    acquired_scope = scope(api, POISONED_RELEASE_ACCOUNT_ID)
     acquired_scope.acquire()
     with pytest.raises(mutex.PaperAccountMutexReleaseError):
         acquired_scope.release()
     assert api.events[-2:] == ["release", "close"]
-    retry = scope(FakeNativeApi())
-    retry.acquire()
-    retry.release()
+
+    events_after_failure = list(api.events)
+    acquired_scope.release()
+    assert api.events == events_after_failure
+
+    retry_api = FakeNativeApi()
+    with pytest.raises(mutex.PaperAccountMutexPoisonedError, match="uncertain"):
+        scope(retry_api, POISONED_RELEASE_ACCOUNT_ID).acquire()
+    assert retry_api.events == []
+
+    independent_api = FakeNativeApi()
+    with scope(independent_api, OTHER_ACCOUNT_ID):
+        pass
+    assert independent_api.events[-2:] == ["release", "close"]
+
+
+def test_successful_release_allows_later_same_account_acquisition() -> None:
+    first_api = FakeNativeApi()
+    with scope(first_api):
+        pass
+
+    second_api = FakeNativeApi()
+    with scope(second_api):
+        pass
+    assert second_api.events == [
+        ("creator", TRADING_SID, False),
+        "create",
+        "inspect",
+        ("wait", 30_000),
+        "release",
+        "close",
+    ]
 
 
 def test_context_manager_closes_on_success_and_body_exception() -> None:

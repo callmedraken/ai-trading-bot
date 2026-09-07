@@ -85,6 +85,10 @@ class PaperAccountMutexReleaseError(PaperAccountMutexError):
     """An owned mutex could not be released cleanly."""
 
 
+class PaperAccountMutexPoisonedError(PaperAccountMutexError):
+    """The account is blocked after uncertain mutex release ownership."""
+
+
 def _canonical_paper_account_id(paper_account_id: str) -> str:
     if (
         type(paper_account_id) is not str
@@ -247,6 +251,7 @@ class PaperAccountMutexAcquisition:
 
 
 _ACTIVE_ACCOUNT_MUTEXES: set[str] = set()
+_POISONED_ACCOUNT_MUTEXES: set[str] = set()
 _ACTIVE_ACCOUNT_MUTEXES_LOCK = threading.Lock()
 
 
@@ -285,6 +290,10 @@ class _PaperAccountMutex:
                 "paper-account mutex scope is already active"
             )
         with _ACTIVE_ACCOUNT_MUTEXES_LOCK:
+            if self.digest in _POISONED_ACCOUNT_MUTEXES:
+                raise PaperAccountMutexPoisonedError(
+                    "paper account mutex ownership is uncertain after release failure"
+                )
             if self.digest in _ACTIVE_ACCOUNT_MUTEXES:
                 raise PaperAccountMutexReentrantError(
                     "paper account already has an active in-process mutex scope"
@@ -344,18 +353,26 @@ class _PaperAccountMutex:
         if self._handle is None:
             self._unreserve()
             return
-        release_failed = False
-        try:
-            if self._owns_mutex:
-                release_failed = not self._api.release(self._handle)
-                if not release_failed:
-                    self._owns_mutex = False
-        finally:
-            self._close_and_unreserve()
-        if release_failed:
+        if self._owns_mutex and not self._api.release(self._handle):
+            self._close_and_poison()
             raise PaperAccountMutexReleaseError(
                 "owned paper-account mutex could not be released"
             )
+        if self._owns_mutex:
+            self._owns_mutex = False
+        self._close_and_unreserve()
+
+    def _close_and_poison(self) -> None:
+        handle, self._handle = self._handle, None
+        with _ACTIVE_ACCOUNT_MUTEXES_LOCK:
+            _POISONED_ACCOUNT_MUTEXES.add(self.digest)
+            _ACTIVE_ACCOUNT_MUTEXES.discard(self.digest)
+            self._reserved = False
+        try:
+            if handle is not None:
+                self._api.close(handle)
+        finally:
+            self._owns_mutex = False
 
     def _close_and_unreserve(self) -> None:
         handle, self._handle = self._handle, None

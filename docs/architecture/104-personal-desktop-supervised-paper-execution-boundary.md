@@ -18,14 +18,20 @@ A67 operation root:  F:\AITradingBot\Paper-v2\runtime
 receipt parent:      F:\AITradingBot\Paper-v2\runtime\paper-operations
 ```
 
-The production effect gates remain source-owned:
+The existing PD1 publisher/recovery gates remain source-owned and false:
 
 ```text
 PERSONAL_DESKTOP_PAPER_V2_PRODUCTION_EFFECTS_ENABLED = False
 PERSONAL_DESKTOP_PAPER_V2_RECOVERY_EFFECTS_ENABLED   = False
 ```
 
-PD2C source certification must leave both false.
+PD2C adds a separate runtime-execution gate so later enabling supervised paper execution cannot accidentally re-enable publisher/recovery effects:
+
+```text
+PERSONAL_DESKTOP_PAPER_V2_SUPERVISED_EXECUTION_EFFECTS_ENABLED = False
+```
+
+PD2C source certification must leave all three false.
 
 ## Authority composition
 
@@ -44,7 +50,7 @@ genuine ValidatedProductionAuthority
 -> PD2C validates active preparation provenance
 -> PD2C consumes the private binding while the same mutex is still held
 -> source-owned fixed production root only
--> production-effect admission gate
+-> PD2C supervised-execution effect gate
 -> Architecture-67 execute-once
 -> durable terminal result
 -> private binding expires
@@ -73,16 +79,25 @@ It must come from the genuine post-lock Paper-v2 authority already retained insi
 
 A mismatching root fails closed before Architecture-67 execution.
 
-## Effect gate
+## PD2C effect gate
 
-PD2C must introduce or reuse a narrow source-owned production execution gate such that:
+The exact PD2C gate is:
+
+```text
+PERSONAL_DESKTOP_PAPER_V2_SUPERVISED_EXECUTION_EFFECTS_ENABLED = False
+```
+
+It belongs to the PD2C supervised-execution source boundary, not to configuration, environment variables, CLI arguments, or caller objects.
+
+Required semantics:
 
 - when the gate is `False`, the production-facing execution entry point fails closed before calling Architecture 67;
-- tests can exercise the composition through an explicitly disposable/injected executor seam without changing the production gate;
-- caller input cannot override, shadow, monkey-select, or configure the production gate;
-- enabling the production gate is a later explicitly reviewed source checkpoint and is not part of PD2C source implementation.
+- tests exercise the composition through an explicitly private disposable/injected executor seam without changing the production gate;
+- caller input cannot override, shadow, select, or configure the production gate;
+- the test seam must require an explicit private/test-only authority token or equivalent construction barrier so an ordinary caller cannot bypass the gate by calling the helper directly;
+- enabling the gate is a later explicitly reviewed source checkpoint and is not part of PD2C source implementation.
 
-PD2C must not flip either existing Paper-v2 production/recovery gate to `True`.
+The existing PD1 production/recovery gates stay false and are not reused for runtime execution.
 
 ## Architecture-67 semantics retained
 
@@ -121,9 +136,9 @@ PD2C may expose a small immutable supervised execution result containing safe au
 - cycle result ID when present;
 - successor checkpoint ID when present;
 - transition/receipt completion classification;
-- whether any production executor call was performed.
+- whether the Architecture-67 executor was called.
 
-The result must not itself grant authority for a second execution.
+The result must not itself grant authority for a second execution and must not expose the operation root or raw execution inputs.
 
 ## Failure and cleanup
 

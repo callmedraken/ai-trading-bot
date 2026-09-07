@@ -31,9 +31,9 @@ complete auditability
 ```
 
 Architecture 102 trusts the owner/Administrator, Windows kernel/boot/SYSTEM, and
-physical machine control. The bot still protects against practical
-ordinary-process/configuration/credential/state/duplicate-effect/risk-bypass/
-recovery failures.
+physical machine control. The bot still protects against practical ordinary-
+process/configuration/credential/state/duplicate-effect/risk-bypass/recovery
+failures.
 
 ## 2. Primary development line
 
@@ -61,8 +61,21 @@ git show -s --format=%T HEAD
 git status --short
 ```
 
-Any mismatch is a STOP. Do not self-correct with
-checkout/switch/reset/rebase/clean.
+Any mismatch is a STOP. Do not self-correct with checkout/switch/reset/rebase/
+clean.
+
+Shared-interpreter provenance:
+
+```text
+interpreter:
+F:\AI\ai-trading-bot\.venv\Scripts\python.exe
+
+PYTHONPATH:
+F:\AI\worktrees\ai-trading-bot-personal-desktop\src
+```
+
+Controlled pytest uses a fresh external
+`F:\AI\temp\pytest\<unique>` plus `-p no:cacheprovider`.
 
 ## 3. ChatGPT / Codex workflow
 
@@ -70,7 +83,7 @@ ChatGPT/Sol owns architecture, native Windows/security/authority review, exact
 GitHub diff review, debugging strategy, test/certification gates,
 merge/deployment/production decisions, and next-step planning.
 
-Current Codex routing:
+Current repository routing:
 
 ```text
 tiny/simple                                  -> ChatGPT direct
@@ -83,25 +96,12 @@ Model choice does not transfer architecture or acceptance authority. If
 implementation discovers that the contract itself must change, stop and return
 to ChatGPT/Sol. Do not use subagents unless explicitly requested.
 
-Codex uses focused tests during implementation. Broad/full certification is
-normally user-run locally only after ChatGPT reviews the exact source. Exact-file
-stage only; never `git add .` or `git add -A`.
+Codex runs focused tests during implementation. Broad/full certification is
+normally user-run locally only after ChatGPT reviews the exact source. Exact-
+file stage only; never `git add .` or `git add -A`.
 
 No amend/rebase/merge/force-push/PR-metadata/review-thread changes without
 explicit approval.
-
-Shared-interpreter worktree provenance must be explicit:
-
-```text
-interpreter:
-F:\AI\ai-trading-bot\.venv\Scripts\python.exe
-
-PYTHONPATH:
-F:\AI\worktrees\ai-trading-bot-personal-desktop\src
-```
-
-Controlled pytest uses a fresh external
-`F:\AI\temp\pytest\<unique>` plus `-p no:cacheprovider`.
 
 ## 4. Standing authorization model
 
@@ -243,8 +243,6 @@ paper_account_id:     9415cd7b-bf36-5fba-bd58-a0f99119dc21
 GENESIS checkpoint:   1832a2b5-8b63-501a-8f7d-f1722c32307b
 starting cash:        Decimal("25000")
 GENESIS as_of:        2026-08-29T09:46:43.769105+00:00
-machine_authority_id: 223f0d4e-36f9-4b9b-bf0e-febf16fcd3f1
-Trading SID:          S-1-5-21-1397534616-3988210162-180023805-1009
 ```
 
 Frozen artifacts:
@@ -285,12 +283,10 @@ Accepted source:
 ```text
 initial PD2A:
 7e9ca73cef578ad28b97036755f7b4723bb832fc
-feat: add paper account runtime mutex
 
 PD2A-R1:
 38212c07e0c06c7cf25152c5a362434ded7c3adf
 tree 9dc5087b87cfd2c16ef76d97c04fd20d41ba7187
-fix: fail closed after paper mutex release failure
 ```
 
 Canonical state:
@@ -302,97 +298,151 @@ PD2A_SOURCE_CERTIFIED      = YES
 PD2A                       = COMPLETE
 ```
 
-Mutex contract:
-
-```text
-label  = personal-desktop-paper-account-mutex/v1
-prefix = Global\AITradingBot-PaperAccount-v1-
-identity = length-framed exact label + canonical lowercase paper_account_id
-wait = fixed 30,000 ms
-```
-
-Protected DACL:
-
-```text
-Administrators: MUTEX_ALL_ACCESS
-SYSTEM:         MUTEX_ALL_ACCESS
-Trading SID:    MUTEX_MODIFY_STATE | READ_CONTROL | SYNCHRONIZE
-```
-
 Key semantics:
 
-- production admission requires a genuine registered
-  `ValidatedPersonalDesktopPaperAccount`;
-- caller cannot select production name, UUID, timeout, path, or native handle;
-- kernel owner/protected DACL/exact ACEs are verified before waiting;
-- `WAIT_OBJECT_0` -> `OWNED`;
-- timeout/wait failure/unknown result -> fail closed;
-- `WAIT_ABANDONED` -> explicit `ABANDONED_OWNER`;
-- process-wide same-account non-reentrancy blocks Win32 recursive ownership;
-- `ReleaseMutex` failure poisons that account for the process lifetime, closes
-  the handle, raises a typed error, and blocks later same-account admission
-  before any native operation.
+- deterministic account-scoped global Windows mutex;
+- source-owned 30,000 ms wait bound, never `INFINITE`;
+- exact owner/protected-DACL/ACE inspection before waiting;
+- `WAIT_ABANDONED` retained as `ABANDONED_OWNER` evidence;
+- same-account cross-instance/process-local recursive admission blocked;
+- failed `ReleaseMutex` poisons that account for process lifetime and blocks a
+  later same-account admission before native work.
 
-Certification:
+Final certification:
 
 ```text
-focused PD2A after R1: 34 passed
-full suite:            4720 passed, 17 skipped
-Ruff check:            PASS
-Ruff format --check:   PASS (424 files)
-git diff --check:      PASS
-worktree/index:        clean
+4720 passed, 17 skipped
+Ruff check: PASS
+Ruff format --check: PASS (424 files)
+git diff --check: PASS
+worktree/index: clean
 ```
 
-No production filesystem access/mutation, real production mutex acquisition,
-provider call, broker action, scheduling effect, or live effect was authorized
-or performed.
+## 10. PD2B — supervised composition — COMPLETE
 
-## 10. Current checkpoint — PD2B supervised composition design
-
-PD2B is next. Begin with architecture/source composition only. The first real
-`Paper-v2\runtime` mutation remains a later explicit production-effect gate.
-
-Required ordering:
+Completion record:
 
 ```text
-genuine C1/Trading paper-account authority
--> pre-lock paper-account read
-   (immutable account identity only)
--> acquire PD2A account mutex
--> post-lock genuine paper-account reread/revalidation
--> authoritative fresh terminal checkpoint
-+ selected verified C3 snapshot
-+ deterministic strategy history
--> strategy plan
--> proposal/planner
--> deterministic risk
--> simulated execution
--> successor + full-lineage verification
--> Architecture-67 transition commitment
--> receipt commitment or zero-runtime recovery/reconciliation
--> release mutex only after terminal durable outcome
+docs/validation/pd2b-supervised-paper-composition-completion.md
 ```
 
-Freeze these rules before implementation:
+Accepted source:
 
-1. The pre-lock read may establish immutable `paper_account_id` only. It cannot
-   supply mutable execution state.
-2. The post-lock reread is the authoritative account state for the cycle.
-3. The same genuine C1/Trading authority chain anchors both reads.
-4. Production operation root remains source-owned as
-   `F:\AITradingBot\Paper-v2\runtime`; callers cannot choose it.
-5. The account mutex spans post-lock state validation through durable
-   Architecture-67 receipt commitment or exact reconciliation.
-6. `ABANDONED_OWNER` requires durable state/receipt reconciliation before any
-   new transition.
-7. PD2B source verification uses fake/disposable boundaries only. It does not
-   mutate the published production account.
+```text
+PD2B1 84f12f030221207fa41de2f39bf8c1e4aef42160
+PD2B2 d0f6dc29be273df6fec44a5d7c8eaa65448bf3e3
+PD2B3 f86f8c8758b3e8941e5bbfa26d40892433cf0110
+tree  9f883335ec13a9385113b2c310c6009a8a0e72aa
+```
 
-PD2B remains Sol-High territory because it composes native Windows authority,
-ordering, abandoned-owner/recovery semantics, and the future mutation boundary.
+Canonical state:
 
-## 11. Architecture-67 ordering context
+```text
+PD2B1_SOURCE_ACCEPTED = YES
+PD2B1                  = COMPLETE
+PD2B2_SOURCE_ACCEPTED = YES
+PD2B2                  = COMPLETE
+PD2B3_SOURCE_ACCEPTED = YES
+PD2B3                  = COMPLETE
+PD2B_SOURCE_ACCEPTED  = YES
+PD2B_SOURCE_CERTIFIED = YES
+PD2B                  = COMPLETE
+```
+
+Accepted ordering:
+
+```text
+genuine C1
+-> pre-lock Paper-v2 read for immutable paper_account_id only
+-> PD2A account mutex
+-> post-lock genuine Paper-v2 reread
+-> authoritative post-lock prior/lineage
++ genuine P2 selected snapshot
++ pure P1 planning inputs
+-> P1 build
+-> exact P1 replay verification
+-> PaperOperationIntent
+-> path-independent VerifiedPaperOperationExecutionInputs
+```
+
+PD2B2 removed caller-path authority from Architecture-67 semantic inputs.
+PD2B3 retains the production operation root and raw A67 execution inputs only
+inside a private process-local active binding that expires before account-mutex
+release.
+
+`ABANDONED_OWNER` blocks before P1/A67 preparation and requires later durable
+reconciliation.
+
+Final certification:
+
+```text
+4754 passed, 17 skipped
+Ruff check: PASS
+Ruff format --check: PASS (430 files)
+git diff --check: PASS
+worktree/index: clean
+```
+
+PD2B caused no real Paper-v2 mutation and did not authorize one.
+
+## 11. Current checkpoint — PD2C supervised A67 execution boundary
+
+Architecture:
+
+```text
+docs/architecture/104-personal-desktop-supervised-paper-execution-boundary.md
+```
+
+Validation plan:
+
+```text
+docs/validation/pd2c-supervised-paper-execution-boundary-plan.md
+```
+
+PD2C starts source-only. The first real Paper-v2 mutation remains a later
+explicit production-effect checkpoint.
+
+Required composition:
+
+```text
+genuine C1/P2
+-> PD2B3 one-shot supervised preparation
+-> PD2B1/PD2A mutex remains held
+-> private active A67 binding
+-> exact fixed F:\AITradingBot\Paper-v2\runtime root
+-> source-owned production-effect admission
+-> existing Architecture-67 execute_paper_operation_once
+-> terminal durable result / receipt semantics
+-> prepared binding expires
+-> mutex release
+```
+
+Freeze these rules:
+
+1. Production PD2C never accepts an operation root or raw A67 execution inputs
+   from callers.
+2. It internally enters PD2B3 rather than accepting a prebuilt supervised
+   preparation as authority.
+3. The A67 call, when eventually enabled, occurs while the same account mutex is
+   held.
+4. The operation root must reconcile exactly to the Architecture-103 fixed
+   Paper-v2 runtime root.
+5. A source-owned production effect gate blocks before A67 while false.
+6. PD2C implementation and certification leave both Paper-v2 effect gates false.
+7. Tests use only injected/disposable executor seams and do not touch the real
+   Paper-v2 runtime.
+8. No blind runtime retry is added; existing Architecture-67 idempotency,
+   transition, receipt, and zero-runtime receipt-recovery semantics remain
+   authoritative.
+9. `ABANDONED_OWNER` remains blocked; abandoned-owner/recovery qualification is
+   not silently folded into ordinary execution.
+10. Provider call #7, brokerage, live trading, scheduling, credential and
+    Windows account/security mutations remain outside PD2C.
+
+PD2C remains Sol-High territory because it creates the authority/lifetime
+boundary around the future persistent mutation.
+
+## 12. Architecture-67 ordering context
 
 Preserve existing Architecture-67 facts:
 
@@ -400,22 +450,22 @@ Preserve existing Architecture-67 facts:
 - prospective successor edge/full lineage verify before transition publication;
 - staged and finalized transition bytes are reread/reverified;
 - receipt commitment occurs only after committed transition rereads/verifies;
-- crash after transition finalization but before receipt may use existing
+- crash after transition finalization but before receipt may use the existing
   zero-runtime receipt recovery when exact reconciliation proves the state;
-- receipt staging, invalid transition/receipt evidence, or dependency mismatch
-  blocks rather than being automatically repaired/retried;
-- the account mutex must span the whole critical section through receipt or
-  reconciliation.
+- invalid/staging/ambiguous/mismatched state blocks rather than being blindly
+  retried or repaired;
+- the account mutex must span the whole future production critical section.
 
-## 12. Roadmap
+## 13. Roadmap
 
 ```text
 PD0  personal-desktop profile adoption                     COMPLETE
 PD1  personal-desktop paper-account authority v2           COMPLETE
 PD2  reliable supervised manual paper cycle                CURRENT
   PD2A account mutex + supervised admission                COMPLETE
-  PD2B supervised composition                              DESIGN NEXT / SOURCE-ONLY
-  first real Paper-v2 runtime mutation                     NOT AUTHORIZED
+  PD2B supervised source-only composition                  COMPLETE
+  PD2C supervised A67 execution boundary                   CURRENT / SOURCE-ONLY
+  PD2D first explicitly authorized real Paper-v2 mutation  NOT AUTHORIZED
 PD3  supervised crash/recovery validation
 PD4  unattended simulated paper under Trading
 PD5  broker-paper integration
@@ -424,7 +474,7 @@ PD7  personal-desktop live-readiness
 PD8  tiny restricted live -> gradual maturity
 ```
 
-## 13. Still NOT authorized
+## 14. Still NOT authorized
 
 ```text
 provider call #7
@@ -441,30 +491,29 @@ KSP/signing/private-export effects
 merge/rebase/force-push/amend/PR metadata changes without explicit approval
 ```
 
-## 14. Resume procedure
+## 15. Resume procedure
 
 1. Read `AGENTS.md`, `docs/PROJECT_STATUS.md`, this handoff,
-   `docs/AI_DEVELOPMENT_WORKFLOW.md`, Architecture 103, the PD1 completion
-   record, and the PD2A completion record.
+   `docs/AI_DEVELOPMENT_WORKFLOW.md`, Architecture 103, Architecture 104, and
+   PD1/PD2A/PD2B completion records.
 2. Prove exact worktree/branch/HEAD/tree/clean state.
-3. For PD2B, review the PD2A mutex/admission source, genuine Paper-v2 read
-   authority, Architecture 67, Architecture 94 P1/P2 composition, and directly
-   associated tests.
-4. ChatGPT/Sol freezes the PD2B authority/order contract before implementation.
-5. Use Codex Sol High for PD2B because it is authority/order/recovery-sensitive.
-6. Keep PD2B source-only until a later explicit effect checkpoint authorizes any
-   real production Paper-v2 mutation.
-7. Codex runs focused tests; user runs the broad suite only at the next final
-   certification gate.
+3. For PD2C, review PD2B3 private-binding lifetime, PD2A/B1 cleanup semantics,
+   Architecture-67 execute-once behavior, and the source-owned Paper-v2 fixed
+   namespace/effect gates.
+4. Use Codex Sol High for PD2C implementation.
+5. Keep PD2C source-only; use fake/disposable execution seams only.
+6. Codex runs focused tests; ChatGPT/Sol reviews the exact diff; user runs the
+   broad suite at the final PD2C certification gate.
+7. Do not start or authorize the first real Paper-v2 mutation automatically.
 8. Include the next milestone in every verification/acceptance report.
 
-## 15. Definition of project success
+## 16. Definition of project success
 
 The project is not complete merely when it can place trades. It succeeds when
 the platform can research deterministically, acquire trusted data safely, apply
 deterministic risk, interact safely with a brokerage, reconcile external
-outcomes after failures/restarts, run unattended, fail closed when
-authority/state is uncertain, expose durable evidence, operate under strict
-real-money controls, recover predictably, remain understandable/stoppable by
-its operator, and expose the reviewed system through a polished GUI without
-giving AI or presentation code alternate authority paths.
+outcomes after failures/restarts, run unattended, fail closed when authority or
+state is uncertain, expose durable evidence, operate under strict real-money
+controls, recover predictably, remain understandable/stoppable by its operator,
+and expose the reviewed system through a polished GUI without giving AI or
+presentation code alternate authority paths.

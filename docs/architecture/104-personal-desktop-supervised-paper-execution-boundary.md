@@ -41,27 +41,30 @@ The production-facing execution boundary must have this shape:
 genuine ValidatedProductionAuthority
 + genuine SelectedC3SnapshotReadResult
 + pure planning inputs
+-> validate C1/P2 provenance without external mutation
+-> require PD2C supervised-execution effect gate
+   -> when false: fail before entering PD2B3 / account mutex / A67
 -> enter PD2B3 supervised preparation
    -> genuine P2 provenance revalidated
    -> PD2B1 enters PD2A account mutex
    -> post-lock Paper-v2 reread
    -> P1 build + exact replay verification
    -> private active A67 binding
--> PD2C validates active preparation provenance
 -> PD2C consumes the private binding while the same mutex is still held
 -> source-owned fixed production root only
--> PD2C supervised-execution effect gate
 -> Architecture-67 execute-once
 -> durable terminal result
 -> private binding expires
 -> account mutex releases
 ```
 
+The early false-gate check is deliberate: an accidentally invoked production execution API must not even open the production account mutex or reread Paper-v2 while supervised execution is disabled.
+
 A caller may never mint PD2C authority from an arbitrary UUID, path, operation root, `VerifiedPaperOperationExecutionInputs`, `PaperOperationIntent`, prebuilt preparation binding, native handle, timeout, or copied audit evidence.
 
 ## Same-scope requirement
 
-The Architecture-67 call, when eventually enabled, must happen before PD2B3 exits. The private prepared binding is process-local and valid only during the exact active PD2B3 scope.
+When execution is enabled, the Architecture-67 call must happen before PD2B3 exits. The private prepared binding is process-local and valid only during the exact active PD2B3 scope.
 
 PD2C must not detach or serialize that binding for later use. It must not return a reusable object that contains both the production operation root and raw A67 inputs.
 
@@ -69,7 +72,7 @@ PD2C must not detach or serialize that binding for later use. It must not return
 
 The generic Architecture-67 coordinator intentionally accepts an explicit operation root for manual/disposable use. PD2C must not expose that flexibility to production.
 
-For production composition, the root must reconcile exactly to:
+For enabled production composition, the root must reconcile exactly to:
 
 ```text
 F:\AITradingBot\Paper-v2\runtime
@@ -91,8 +94,9 @@ It belongs to the PD2C supervised-execution source boundary, not to configuratio
 
 Required semantics:
 
-- when the gate is `False`, the production-facing execution entry point fails closed before calling Architecture 67;
-- tests exercise the composition through an explicitly private disposable/injected executor seam without changing the production gate;
+- the production-facing API first validates exact C1/P2 provenance, then checks the gate;
+- when the gate is `False`, it raises a stable typed disabled error before entering PD2B3, acquiring the account mutex, rereading Paper-v2, or calling Architecture 67;
+- tests exercise the full later composition through an explicitly private disposable/injected seam without changing the production gate;
 - caller input cannot override, shadow, select, or configure the production gate;
 - the test seam must require an explicit private/test-only authority token or equivalent construction barrier so an ordinary caller cannot bypass the gate by calling the helper directly;
 - enabling the gate is a later explicitly reviewed source checkpoint and is not part of PD2C source implementation.
@@ -142,7 +146,7 @@ The result must not itself grant authority for a second execution and must not e
 
 ## Failure and cleanup
 
-Any failure before Architecture-67 invocation must perform zero paper mutation and unwind the PD2B3/PD2A scope normally.
+Any failure before Architecture-67 invocation must perform zero paper mutation and unwind any entered PD2B3/PD2A scope normally.
 
 If the executor raises or returns a fail-closed Architecture-67 result, PD2C must still unwind through the existing context stack. It must not retry the runtime in the same call.
 

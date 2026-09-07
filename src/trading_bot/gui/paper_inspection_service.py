@@ -2,7 +2,6 @@
 
 from pathlib import Path
 
-from trading_bot.cli.paper_operation_config import VerifiedPaperOperationInputs
 from trading_bot.cli.paper_operation_inspection import (
     PaperOperationInspectionResult,
     inspect_paper_operation_root,
@@ -14,6 +13,7 @@ from trading_bot.gui.paper_models import (
     PaperPageState,
     PaperPageStatus,
 )
+from trading_bot.runtime import VerifiedPaperOperationExecutionInputs
 
 _INSPECTED_MESSAGE = "One paper operation was inspected read-only."
 _UNAVAILABLE_MESSAGE = "Paper-operation inspection is unavailable."
@@ -25,7 +25,7 @@ class PaperOperationInspectionService:
     def __init__(
         self,
         operation_root: Path,
-        inputs: VerifiedPaperOperationInputs,
+        inputs: VerifiedPaperOperationExecutionInputs,
     ) -> None:
         self._operation_root = operation_root
         self._inputs = inputs

@@ -247,6 +247,10 @@ from trading_bot.runtime.paper_operation import (  # noqa: F401
     serialize_paper_operation_receipt,
     verify_paper_operation_receipt,
 )
+from trading_bot.runtime.paper_operation_execution_inputs import (  # noqa: F401
+    PaperOperationExecutionInputsError,
+    VerifiedPaperOperationExecutionInputs,
+)
 from trading_bot.runtime.paper_portfolio import (
     PaperPortfolioCycleDiagnostic,
     PaperPortfolioCycleDiagnosticCode,

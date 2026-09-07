@@ -766,14 +766,13 @@ def test_completed_receipt_passes_full_offline_verification(tmp_path: Path) -> N
     checkpoint_path = next(
         result.transition_path.glob("paper-account-checkpoint-*.json")
     )
-    manifest = fixture.inputs.lineage_manifest
     verification = verify_paper_operation_receipt(
         result.receipt_path.read_bytes(),
         cycle_configuration_payload=fixture.inputs.cycle_configuration_payload,
-        prior_genesis_checkpoint=manifest.genesis_checkpoint,
-        prior_successor_checkpoints=manifest.successor_checkpoints,
-        prior_cycle_reports=manifest.cycle_reports,
-        prior_snapshots=manifest.snapshots,
+        prior_genesis_checkpoint=fixture.inputs.prior_genesis_checkpoint,
+        prior_successor_checkpoints=fixture.inputs.prior_successor_checkpoints,
+        prior_cycle_reports=fixture.inputs.prior_cycle_reports,
+        prior_snapshots=fixture.inputs.prior_snapshots,
         completed_snapshot_payload=fixture.inputs.completed_snapshot_payload,
         calendar=fixture.inputs.calendar,
         transition_report_payload=report_path.read_bytes(),

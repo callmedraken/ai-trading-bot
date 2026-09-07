@@ -19,6 +19,7 @@ from trading_bot.cli.paper_operation_config import (
     PaperOperationConfigSyntaxError,
     PaperOperationConfigValidationError,
     PaperOperationInputVerificationError,
+    adapt_verified_paper_operation_execution_inputs,
     load_verified_paper_operation_inputs,
 )
 from trading_bot.cli.paper_operation_execution import (
@@ -54,7 +55,8 @@ def inspect_operation(
 ) -> PaperOperationInspectionResult:
     """Load explicit inputs and inspect one existing operation root read-only."""
     calendar = BoundMarketCalendar(XNYS_CALENDAR_DESCRIPTOR, NYSEMarketCalendar())
-    inputs = load_verified_paper_operation_inputs(config_path, calendar)
+    cli_inputs = load_verified_paper_operation_inputs(config_path, calendar)
+    inputs = adapt_verified_paper_operation_execution_inputs(cli_inputs)
     return inspect_paper_operation_root(operation_root, inputs)
 
 
@@ -68,7 +70,8 @@ def main(argv: list[str] | None = None) -> int:
             XNYS_CALENDAR_DESCRIPTOR,
             NYSEMarketCalendar(),
         )
-        inputs = load_verified_paper_operation_inputs(args.config, calendar)
+        cli_inputs = load_verified_paper_operation_inputs(args.config, calendar)
+        inputs = adapt_verified_paper_operation_execution_inputs(cli_inputs)
         if args.inspect_only:
             inspection = inspect_paper_operation_root(args.operation_root, inputs)
         else:

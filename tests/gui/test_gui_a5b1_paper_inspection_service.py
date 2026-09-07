@@ -5,7 +5,6 @@ from uuid import UUID
 
 import pytest
 
-from trading_bot.cli.paper_operation_config import VerifiedPaperOperationInputs
 from trading_bot.cli.paper_operation_inspection import (
     PaperOperationClassification,
     PaperOperationInspectionCode,
@@ -18,14 +17,15 @@ from trading_bot.gui.paper_models import (
     PaperInspectionDiagnostic,
     PaperPageStatus,
 )
+from trading_bot.runtime import VerifiedPaperOperationExecutionInputs
 
 _OPERATION_ID = UUID("00000000-0000-0000-0000-000000000001")
 _CHECKPOINT_ID = UUID("00000000-0000-0000-0000-000000000002")
 _APPLICATION_ID = UUID("00000000-0000-0000-0000-000000000003")
 
 
-def _verified_inputs() -> VerifiedPaperOperationInputs:
-    return object.__new__(VerifiedPaperOperationInputs)
+def _verified_inputs() -> VerifiedPaperOperationExecutionInputs:
+    return object.__new__(VerifiedPaperOperationExecutionInputs)
 
 
 def _result(
@@ -69,11 +69,11 @@ def test_adapter_preserves_classification_diagnostic_and_identities(
     operation_root = Path("explicit-operation-root")
     inputs = _verified_inputs()
     expected = _result(classification, diagnostic)
-    calls: list[tuple[Path, VerifiedPaperOperationInputs]] = []
+    calls: list[tuple[Path, VerifiedPaperOperationExecutionInputs]] = []
 
     def inspect(
         received_root: Path,
-        received_inputs: VerifiedPaperOperationInputs,
+        received_inputs: VerifiedPaperOperationExecutionInputs,
     ) -> PaperOperationInspectionResult:
         calls.append((received_root, received_inputs))
         return expected

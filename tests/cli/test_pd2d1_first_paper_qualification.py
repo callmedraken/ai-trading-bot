@@ -28,6 +28,10 @@ from trading_bot.runtime.personal_desktop_supervised_paper_operation_qualificati
 )
 from trading_bot.strategies import MovingAverageCrossoverConfig
 
+_SECRET_DIAGNOSTIC_TEXT = (
+    r"token=private-token F:\private\operation-root handle=0xDEADBEEF sid=secret"
+)
+
 
 class _FakeDailySnapshot:
     def __init__(self, *, symbol: Symbol | None = None) -> None:
@@ -92,6 +96,31 @@ def _qualification_result(
         ),
         inspector_called=True,
     )
+
+
+def _expected_evidence_record(*, ready: bool) -> dict[str, object]:
+    return {
+        "all_effect_gates_false": True,
+        "application_id": "33333333-3333-4333-8333-333333333333",
+        "authority_epoch_id": harness._EXPECTED_AUTHORITY_EPOCH_ID,
+        "inspection_classification": "PENDING" if ready else "ALREADY_APPLIED",
+        "inspection_diagnostic": "PENDING" if ready else "ALREADY_APPLIED",
+        "machine_authority_id": harness._EXPECTED_MACHINE_AUTHORITY_ID,
+        "open_reference_price": "767.33",
+        "open_reference_session": "2026-08-31",
+        "open_reference_symbol": "SPY",
+        "operation_id": "22222222-2222-4222-8222-222222222222",
+        "paper_account_id": harness._EXPECTED_PAPER_ACCOUNT_ID,
+        "plan_id": "11111111-1111-4111-8111-111111111111",
+        "qualification_status": "READY" if ready else "NOT_READY",
+        "schema": harness._SCHEMA,
+        "seed_byte_length": harness._EXPECTED_SEED_BYTE_LENGTH,
+        "seed_id": str(harness._EXPECTED_SEED_ID),
+        "seed_sha256": harness._EXPECTED_SEED_SHA256,
+        "selected_snapshot_id": str(harness._EXPECTED_SELECTED_SNAPSHOT_ID),
+        "selection_id": str(harness._EXPECTED_SELECTION_ID),
+        "terminal_checkpoint_id": str(harness._EXPECTED_TERMINAL_CHECKPOINT_ID),
+    }
 
 
 def _install_happy_runtime(
@@ -221,6 +250,80 @@ def test_each_gate_must_be_exact_false_before_c1(
     output = capsys.readouterr()
     assert output.out == ""
     assert json.loads(output.err)["reason"] == "PREFLIGHT_BLOCKED"
+
+
+def test_preflight_failure_preserves_exit_and_safe_evidence(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(
+        harness,
+        "_require_all_effect_gates_false",
+        lambda: (_ for _ in ()).throw(RuntimeError(_SECRET_DIAGNOSTIC_TEXT)),
+    )
+    monkeypatch.setattr(
+        harness,
+        "acquire_validated_production_authority",
+        lambda: pytest.fail("preflight failure reached C1"),
+    )
+
+    assert harness.main([]) == harness._EXIT_PREFLIGHT
+    output = capsys.readouterr()
+    assert output.out == ""
+    assert json.loads(output.err) == {
+        "reason": "PREFLIGHT_BLOCKED",
+        "schema": harness._SCHEMA,
+    }
+    assert _SECRET_DIAGNOSTIC_TEXT not in output.err
+
+
+def test_c1_failure_preserves_exit_and_stops_before_p2(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _, _, calls = _install_happy_runtime(monkeypatch)
+    monkeypatch.setattr(
+        harness,
+        "acquire_validated_production_authority",
+        lambda: (_ for _ in ()).throw(RuntimeError(_SECRET_DIAGNOSTIC_TEXT)),
+    )
+
+    assert harness.main([]) == harness._EXIT_AUTHORITY
+    assert calls["p2_construct"] == []
+    assert calls["qualification"] == []
+    output = capsys.readouterr()
+    assert output.out == ""
+    assert json.loads(output.err) == {
+        "reason": "PRODUCTION_AUTHORITY_BLOCKED",
+        "schema": harness._SCHEMA,
+    }
+    assert _SECRET_DIAGNOSTIC_TEXT not in output.err
+
+
+def test_p2_failure_preserves_exit_and_stops_before_qualification(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    authority, _, calls = _install_happy_runtime(monkeypatch)
+
+    class BlockedReader:
+        def __init__(self, candidate: object) -> None:
+            assert candidate is authority
+
+        def read_selected_snapshot(self, selection_id: str) -> object:
+            assert selection_id == str(harness._EXPECTED_SELECTION_ID)
+            raise RuntimeError(_SECRET_DIAGNOSTIC_TEXT)
+
+    monkeypatch.setattr(
+        harness, "WindowsSelectedC3SnapshotReadAuthority", BlockedReader
+    )
+
+    assert harness.main([]) == harness._EXIT_SELECTED_SNAPSHOT
+    assert calls["qualification"] == []
+    output = capsys.readouterr()
+    assert output.out == ""
+    assert json.loads(output.err) == {
+        "reason": "SELECTED_SNAPSHOT_BLOCKED",
+        "schema": harness._SCHEMA,
+    }
+    assert _SECRET_DIAGNOSTIC_TEXT not in output.err
 
 
 def test_publication_freeze_mismatch_stops_before_seed_and_c1(
@@ -477,32 +580,7 @@ def test_ready_pending_pending_succeeds_and_stdout_is_exact_safe_surface(
     assert output.err == ""
     assert output.out.count("\n") == 1
     record = json.loads(output.out)
-    assert set(record) == {
-        "all_effect_gates_false",
-        "application_id",
-        "authority_epoch_id",
-        "inspection_classification",
-        "inspection_diagnostic",
-        "machine_authority_id",
-        "open_reference_price",
-        "open_reference_session",
-        "open_reference_symbol",
-        "operation_id",
-        "paper_account_id",
-        "plan_id",
-        "qualification_status",
-        "schema",
-        "seed_byte_length",
-        "seed_id",
-        "seed_sha256",
-        "selected_snapshot_id",
-        "selection_id",
-        "terminal_checkpoint_id",
-    }
-    assert record["inspection_classification"] == "PENDING"
-    assert record["inspection_diagnostic"] == "PENDING"
-    assert record["qualification_status"] == "READY"
-    assert record["all_effect_gates_false"] is True
+    assert record == _expected_evidence_record(ready=True)
     for prohibited in (
         "F:\\",
         "operation_root",
@@ -530,11 +608,72 @@ def test_not_ready_is_emitted_once_and_returns_nonzero_without_retry(
     assert len(calls["qualification"]) == 1
     output = capsys.readouterr()
     assert output.err == ""
-    assert json.loads(output.out)["qualification_status"] == "NOT_READY"
+    assert output.out.count("\n") == 1
+    assert json.loads(output.out) == _expected_evidence_record(ready=False)
 
 
-def test_qualification_exception_is_stderr_only_and_never_retried(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+@pytest.mark.parametrize(
+    ("error_type", "reason"),
+    (
+        (
+            harness.SupervisedPaperOperationQualificationGateError,
+            "QUALIFICATION_GATE_CHANGED",
+        ),
+        (
+            harness.SupervisedPaperOperationQualificationRootMismatchError,
+            "QUALIFICATION_ROOT_MISMATCH",
+        ),
+        (
+            harness.SupervisedPaperOperationQualificationReconciliationError,
+            "QUALIFICATION_IDENTITY_MISMATCH",
+        ),
+        (
+            harness.SupervisedPaperOperationQualificationError,
+            "QUALIFICATION_INTERNAL_BLOCKED",
+        ),
+        (
+            harness.PaperOperationPreparationReconciliationRequiredError,
+            "ABANDONED_OWNER_RECONCILIATION_REQUIRED",
+        ),
+        (harness.PaperAccountMutexSecurityError, "PAPER_MUTEX_SECURITY_BLOCKED"),
+        (harness.PaperAccountMutexBusyError, "PAPER_MUTEX_BUSY"),
+        (harness.PaperAccountMutexWaitError, "PAPER_MUTEX_WAIT_BLOCKED"),
+        (harness.PaperAccountMutexReentrantError, "PAPER_MUTEX_REENTRANT"),
+        (harness.PaperAccountMutexReleaseError, "PAPER_MUTEX_RELEASE_BLOCKED"),
+        (harness.PaperAccountMutexPoisonedError, "PAPER_MUTEX_POISONED"),
+        (harness.PaperAccountMutexError, "PAPER_MUTEX_BLOCKED"),
+        (harness.ManualPaperStrategyPlanError, "STRATEGY_PLAN_BLOCKED"),
+        (
+            harness.VerifiedSnapshotPaperCyclePreparationError,
+            "VERIFIED_CYCLE_PREPARATION_BLOCKED",
+        ),
+        (harness.SelectedC3SnapshotReadError, "P2_REVALIDATION_BLOCKED"),
+        (harness.PaperOperationError, "OPERATION_INTENT_BLOCKED"),
+        (
+            harness.PaperOperationExecutionInputsError,
+            "EXECUTION_INPUT_RECONCILIATION_BLOCKED",
+        ),
+        (
+            harness.SupervisedPaperOperationPreparationError,
+            "SUPERVISED_PREPARATION_BLOCKED",
+        ),
+        (
+            harness.SupervisedPersonalDesktopPaperCycleError,
+            "SUPERVISED_CYCLE_BLOCKED",
+        ),
+        (
+            harness.PersonalDesktopPaperAccountError,
+            "PAPER_ACCOUNT_READ_OR_AUTHORITY_BLOCKED",
+        ),
+        (harness.WindowsAuthorityError, "WINDOWS_AUTHORITY_BLOCKED"),
+        (RuntimeError, "QUALIFICATION_BLOCKED"),
+    ),
+)
+def test_qualification_exception_is_typed_stderr_only_and_never_retried(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    error_type: type[Exception],
+    reason: str,
 ) -> None:
     _, _, calls = _install_happy_runtime(monkeypatch)
 
@@ -542,7 +681,7 @@ def test_qualification_exception_is_stderr_only_and_never_retried(
         cast = calls["qualification"]
         assert isinstance(cast, list)
         cast.append((args, kwargs))
-        raise RuntimeError("private operation root detail")
+        raise error_type(_SECRET_DIAGNOSTIC_TEXT)
 
     monkeypatch.setattr(
         harness, "qualify_supervised_personal_desktop_paper_operation", fail
@@ -552,8 +691,71 @@ def test_qualification_exception_is_stderr_only_and_never_retried(
     assert len(calls["qualification"]) == 1
     output = capsys.readouterr()
     assert output.out == ""
-    assert json.loads(output.err)["reason"] == "QUALIFICATION_BLOCKED"
-    assert "private operation root detail" not in output.err
+    assert output.err.count("\n") == 1
+    assert json.loads(output.err) == {"reason": reason, "schema": harness._SCHEMA}
+    assert _SECRET_DIAGNOSTIC_TEXT not in output.err
+
+
+@pytest.mark.parametrize(
+    ("operation", "error_code", "invalid_code", "expected_fields"),
+    (
+        (
+            "GetSecurityInfo",
+            5,
+            False,
+            {"native_error_code": 5, "native_operation": "GetSecurityInfo"},
+        ),
+        (_SECRET_DIAGNOSTIC_TEXT, 5, False, {"native_error_code": 5}),
+        (
+            "GetSecurityInfo",
+            None,
+            False,
+            {"native_error_code": None, "native_operation": "GetSecurityInfo"},
+        ),
+        (
+            "GetSecurityInfo",
+            None,
+            True,
+            {"native_operation": "GetSecurityInfo"},
+        ),
+    ),
+)
+def test_windows_native_exception_emits_only_allowlisted_typed_fields(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    operation: str,
+    error_code: int | None,
+    invalid_code: bool,
+    expected_fields: dict[str, object],
+) -> None:
+    _, _, calls = _install_happy_runtime(monkeypatch)
+    error = harness.WindowsNativeError(operation, error_code)
+    if invalid_code:
+        error.error_code = _SECRET_DIAGNOSTIC_TEXT  # type: ignore[assignment]
+    error.args = (_SECRET_DIAGNOSTIC_TEXT,)
+
+    def fail(*args: object, **kwargs: object) -> object:
+        cast = calls["qualification"]
+        assert isinstance(cast, list)
+        cast.append((args, kwargs))
+        raise error
+
+    monkeypatch.setattr(
+        harness, "qualify_supervised_personal_desktop_paper_operation", fail
+    )
+
+    assert harness.main([]) == harness._EXIT_QUALIFICATION
+    assert len(calls["qualification"]) == 1
+    output = capsys.readouterr()
+    assert output.out == ""
+    assert output.err.count("\n") == 1
+    expected = {
+        "reason": "WINDOWS_NATIVE_BLOCKED",
+        "schema": harness._SCHEMA,
+        **expected_fields,
+    }
+    assert json.loads(output.err) == expected
+    assert _SECRET_DIAGNOSTIC_TEXT not in output.err
 
 
 @pytest.mark.parametrize(
@@ -597,6 +799,39 @@ def test_frozen_production_identities_are_exact() -> None:
         "31d82a31a3fbd909f8771820bf47e796a1503264fe0ac6ce0eff7ba163f0767d"
     )
     assert harness._EXPECTED_SELECTED_BYTE_LENGTH == 1291
+    assert harness._EXPECTED_PAPER_ACCOUNT_ID == (
+        "9415cd7b-bf36-5fba-bd58-a0f99119dc21"
+    )
+    assert str(harness._EXPECTED_TERMINAL_CHECKPOINT_ID) == (
+        "1832a2b5-8b63-501a-8f7d-f1722c32307b"
+    )
+    assert str(harness._EXPECTED_SEED_ID) == ("5dc95e10-ba22-5b91-94b2-0d851aa8e2d7")
+    assert harness._EXPECTED_SEED_SHA256 == (
+        "40dda54c82324f358d640cce89e467295b8f5b73a32fed76c52e7ca90d398e64"
+    )
+    assert harness._EXPECTED_SEED_BYTE_LENGTH == 1060
+    assert harness._EXPECTED_TARGET_SESSION == TradingSession(date(2026, 8, 28))
+    assert harness._EXPECTED_OPEN_SESSION == TradingSession(date(2026, 8, 31))
+    assert harness._EXPECTED_SYMBOL == Symbol("SPY")
+    assert harness._EXPECTED_GENESIS_SHA256 == (
+        "d1a7ff14425c8a797a952860a1102489a4c81cac2a24a45bc3127eb8eb2e9548"
+    )
+    assert harness._EXPECTED_GENESIS_BYTE_LENGTH == 533
+    assert harness._EXPECTED_GENESIS_AS_OF == datetime(
+        2026, 8, 29, 9, 46, 43, 769105, tzinfo=UTC
+    )
+    assert (
+        harness.paper_security.PERSONAL_DESKTOP_PAPER_V2_PRODUCTION_EFFECTS_ENABLED
+        is False
+    )
+    assert (
+        harness.paper_security.PERSONAL_DESKTOP_PAPER_V2_RECOVERY_EFFECTS_ENABLED
+        is False
+    )
+    assert (
+        harness.pd2c.PERSONAL_DESKTOP_PAPER_V2_SUPERVISED_EXECUTION_EFFECTS_ENABLED
+        is False
+    )
 
 
 def test_source_has_no_effect_writer_or_external_effect_path() -> None:
@@ -611,11 +846,19 @@ def test_source_has_no_effect_writer_or_external_effect_path() -> None:
     imported_modules = {
         node.module or "" for node in ast.walk(tree) if isinstance(node, ast.ImportFrom)
     }
+    imported_modules.update(
+        alias.name
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Import)
+        for alias in node.names
+    )
     assert {
         "execute_paper_operation_once",
         "execute_supervised_personal_desktop_paper_operation",
         "commit_transition_directory",
         "commit_paper_operation_receipt",
+        "ProcessPoolExecutor",
+        "ThreadPoolExecutor",
     }.isdisjoint(imported_names)
     assert not any(
         boundary in module
@@ -627,7 +870,10 @@ def test_source_has_no_effect_writer_or_external_effect_path() -> None:
             "scheduler",
             "provisioning",
             "recovery",
-            "paper_operation_execution",
+            "requests",
+            "socket",
+            "subprocess",
+            "urllib",
         )
     )
     called_names = {
@@ -639,7 +885,11 @@ def test_source_has_no_effect_writer_or_external_effect_path() -> None:
         "execute_paper_operation_once",
         "commit_transition_directory",
         "commit_paper_operation_receipt",
+        "Popen",
+        "check_call",
+        "check_output",
         "open",
+        "run",
     }.isdisjoint(called_names)
     forbidden_attributes = {
         "write_bytes",

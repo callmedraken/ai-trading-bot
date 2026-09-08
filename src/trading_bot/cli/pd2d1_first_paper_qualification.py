@@ -32,12 +32,42 @@ from trading_bot.runtime import (
 from trading_bot.runtime import (
     personal_desktop_supervised_paper_operation_execution as pd2c,
 )
+from trading_bot.runtime.exceptions import VerifiedSnapshotPaperCyclePreparationError
 from trading_bot.runtime.manual_paper_selected_c3_snapshot import (
+    SelectedC3SnapshotReadError,
     SelectedC3SnapshotReadResult,
     WindowsSelectedC3SnapshotReadAuthority,
 )
+from trading_bot.runtime.manual_paper_strategy_plan import ManualPaperStrategyPlanError
+from trading_bot.runtime.paper_operation import PaperOperationError
+from trading_bot.runtime.paper_operation_execution_inputs import (
+    PaperOperationExecutionInputsError,
+)
+from trading_bot.runtime.personal_desktop_paper_account_authority import (
+    PersonalDesktopPaperAccountError,
+)
+from trading_bot.runtime.personal_desktop_paper_account_mutex import (
+    PaperAccountMutexBusyError,
+    PaperAccountMutexError,
+    PaperAccountMutexPoisonedError,
+    PaperAccountMutexReentrantError,
+    PaperAccountMutexReleaseError,
+    PaperAccountMutexSecurityError,
+    PaperAccountMutexWaitError,
+)
+from trading_bot.runtime.personal_desktop_supervised_paper_cycle import (
+    SupervisedPersonalDesktopPaperCycleError,
+)
+from trading_bot.runtime.personal_desktop_supervised_paper_operation_preparation import (  # noqa: E501
+    PaperOperationPreparationReconciliationRequiredError,
+    SupervisedPaperOperationPreparationError,
+)
 from trading_bot.runtime.personal_desktop_supervised_paper_operation_qualification import (  # noqa: E501
+    SupervisedPaperOperationQualificationError,
+    SupervisedPaperOperationQualificationGateError,
+    SupervisedPaperOperationQualificationReconciliationError,
     SupervisedPaperOperationQualificationResult,
+    SupervisedPaperOperationQualificationRootMismatchError,
     SupervisedPaperOperationQualificationStatus,
     qualify_supervised_personal_desktop_paper_operation,
 )
@@ -48,6 +78,10 @@ from trading_bot.runtime.strategy_history_seed import (
 from trading_bot.runtime.verified_snapshot_preparation import (
     CallerAssertedNextSessionOpenReference,
     VerifiedSnapshotPaperCyclePolicies,
+)
+from trading_bot.runtime.windows_authority import (
+    WindowsAuthorityError,
+    WindowsNativeError,
 )
 from trading_bot.runtime.windows_authority_validation import (
     ValidatedProductionAuthority,
@@ -93,6 +127,30 @@ _EXIT_SELECTED_SNAPSHOT = 5
 _EXIT_QUALIFICATION = 6
 _EXIT_RECONCILIATION = 7
 _EXIT_NOT_READY = 8
+
+_QUALIFICATION_NATIVE_OPERATION_ALLOWLIST = frozenset(
+    {
+        "AddAccessAllowedAceEx",
+        "ConvertSidToStringSidW",
+        "ConvertStringSidToSidW",
+        "GetAce",
+        "GetAclInformation",
+        "GetFileInformationByHandleEx(FileAttributeTagInfo)",
+        "GetFinalPathNameByHandleW",
+        "GetSecurityDescriptorControl",
+        "GetSecurityInfo",
+        "GetTokenInformation(TokenUser size)",
+        "GetTokenInformation(TokenUser)",
+        "GetVolumeInformationW",
+        "GetVolumePathNameW",
+        "InitializeAcl",
+        "InitializeSecurityDescriptor",
+        "OpenProcessToken",
+        "SetSecurityDescriptorControl",
+        "SetSecurityDescriptorDacl",
+        "SetSecurityDescriptorOwner",
+    }
+)
 
 
 class _CliUsageError(ValueError):
@@ -377,6 +435,66 @@ def _blocked(reason: str, exit_code: int) -> int:
     return exit_code
 
 
+def _classify_qualification_exception(error: Exception) -> dict[str, object]:
+    if isinstance(error, SupervisedPaperOperationQualificationGateError):
+        reason = "QUALIFICATION_GATE_CHANGED"
+    elif isinstance(error, SupervisedPaperOperationQualificationRootMismatchError):
+        reason = "QUALIFICATION_ROOT_MISMATCH"
+    elif isinstance(error, SupervisedPaperOperationQualificationReconciliationError):
+        reason = "QUALIFICATION_IDENTITY_MISMATCH"
+    elif isinstance(error, SupervisedPaperOperationQualificationError):
+        reason = "QUALIFICATION_INTERNAL_BLOCKED"
+    elif isinstance(error, PaperOperationPreparationReconciliationRequiredError):
+        reason = "ABANDONED_OWNER_RECONCILIATION_REQUIRED"
+    elif isinstance(error, PaperAccountMutexSecurityError):
+        reason = "PAPER_MUTEX_SECURITY_BLOCKED"
+    elif isinstance(error, PaperAccountMutexBusyError):
+        reason = "PAPER_MUTEX_BUSY"
+    elif isinstance(error, PaperAccountMutexWaitError):
+        reason = "PAPER_MUTEX_WAIT_BLOCKED"
+    elif isinstance(error, PaperAccountMutexReentrantError):
+        reason = "PAPER_MUTEX_REENTRANT"
+    elif isinstance(error, PaperAccountMutexReleaseError):
+        reason = "PAPER_MUTEX_RELEASE_BLOCKED"
+    elif isinstance(error, PaperAccountMutexPoisonedError):
+        reason = "PAPER_MUTEX_POISONED"
+    elif isinstance(error, PaperAccountMutexError):
+        reason = "PAPER_MUTEX_BLOCKED"
+    elif isinstance(error, ManualPaperStrategyPlanError):
+        reason = "STRATEGY_PLAN_BLOCKED"
+    elif isinstance(error, VerifiedSnapshotPaperCyclePreparationError):
+        reason = "VERIFIED_CYCLE_PREPARATION_BLOCKED"
+    elif isinstance(error, SelectedC3SnapshotReadError):
+        reason = "P2_REVALIDATION_BLOCKED"
+    elif isinstance(error, PaperOperationError):
+        reason = "OPERATION_INTENT_BLOCKED"
+    elif isinstance(error, PaperOperationExecutionInputsError):
+        reason = "EXECUTION_INPUT_RECONCILIATION_BLOCKED"
+    elif isinstance(error, SupervisedPaperOperationPreparationError):
+        reason = "SUPERVISED_PREPARATION_BLOCKED"
+    elif isinstance(error, SupervisedPersonalDesktopPaperCycleError):
+        reason = "SUPERVISED_CYCLE_BLOCKED"
+    elif isinstance(error, PersonalDesktopPaperAccountError):
+        reason = "PAPER_ACCOUNT_READ_OR_AUTHORITY_BLOCKED"
+    elif isinstance(error, WindowsNativeError):
+        reason = "WINDOWS_NATIVE_BLOCKED"
+    elif isinstance(error, WindowsAuthorityError):
+        reason = "WINDOWS_AUTHORITY_BLOCKED"
+    else:
+        reason = "QUALIFICATION_BLOCKED"
+
+    record: dict[str, object] = {"reason": reason, "schema": _SCHEMA}
+    if isinstance(error, WindowsNativeError):
+        if (
+            type(error.operation) is str
+            and error.operation in _QUALIFICATION_NATIVE_OPERATION_ALLOWLIST
+        ):
+            record["native_operation"] = error.operation
+        if type(error.error_code) is int or error.error_code is None:
+            record["native_error_code"] = error.error_code
+    return record
+
+
 def main(argv: list[str] | None = None) -> int:
     """Run one frozen read-only qualification with no caller semantic inputs."""
 
@@ -427,8 +545,9 @@ def main(argv: list[str] | None = None) -> int:
             metadata=(),
             historical_cycle_configuration_payloads=(),
         )
-    except Exception:
-        return _blocked("QUALIFICATION_BLOCKED", _EXIT_QUALIFICATION)
+    except Exception as error:
+        _emit(_classify_qualification_exception(error), stream=sys.stderr)
+        return _EXIT_QUALIFICATION
 
     try:
         _require_all_effect_gates_false()

@@ -38,3 +38,10 @@ file. Copy the terminal output manually for review.
 - The first mutation remains protected by its separate source review,
   real-host revalidation, one-shot command review, and fresh explicit user
   authorization.
+
+## Real-host attempt status
+
+Attempt 1 is consumed. Do not rerun the harness from commit `564fdf8`.
+A future second attempt requires accepted F3-R1 diagnostic source and a fresh
+ChatGPT/Sol High review. Even a `READY` result would remain non-authorizing and
+would not authorize PD2D2.

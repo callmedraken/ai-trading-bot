@@ -323,61 +323,76 @@ def main(argv: list[str] | None = None) -> int:
 
     primary_record: dict[str, object] | None = None
     primary_exit = _EXIT_MUTEX_ACQUIRE
+    pending_base_exception: BaseException | None = None
     try:
-        acquisition = held.acquisition
-        if (
-            held is not admission
-            or acquisition is None
-            or acquisition.paper_account_id != _EXPECTED_PAPER_ACCOUNT_ID
-        ):
-            primary_record = {
-                "reason": "MUTEX_ACQUIRE_RECONCILIATION_BLOCKED",
-                "schema": _SCHEMA,
-            }
-        elif acquisition.state is PaperAccountMutexState.ABANDONED_OWNER:
-            primary_record = {
-                "reason": "ABANDONED_OWNER_RECONCILIATION_REQUIRED",
-                "schema": _SCHEMA,
-            }
-        elif acquisition.state is not PaperAccountMutexState.OWNED:
-            primary_record = {
-                "reason": "MUTEX_ACQUIRE_RECONCILIATION_BLOCKED",
-                "schema": _SCHEMA,
-            }
-    except Exception as error:
-        primary_record = _exception_record(
-            "MUTEX_ACQUIRE_RECONCILIATION_BLOCKED", error
-        )
-
-    if primary_record is None:
-        primary_exit = _EXIT_POST_LOCK_READ
         try:
-            post_lock_account = read_personal_desktop_paper_account(
-                authority,
-                historical_cycle_configuration_payloads=(),
-            )
-            post = require_validated_personal_desktop_paper_account(post_lock_account)
+            acquisition = held.acquisition
+            if (
+                held is not admission
+                or acquisition is None
+                or acquisition.paper_account_id != _EXPECTED_PAPER_ACCOUNT_ID
+            ):
+                primary_record = {
+                    "reason": "MUTEX_ACQUIRE_RECONCILIATION_BLOCKED",
+                    "schema": _SCHEMA,
+                }
+            elif acquisition.state is PaperAccountMutexState.ABANDONED_OWNER:
+                primary_record = {
+                    "reason": "ABANDONED_OWNER_RECONCILIATION_REQUIRED",
+                    "schema": _SCHEMA,
+                }
+            elif acquisition.state is not PaperAccountMutexState.OWNED:
+                primary_record = {
+                    "reason": "MUTEX_ACQUIRE_RECONCILIATION_BLOCKED",
+                    "schema": _SCHEMA,
+                }
         except Exception as error:
-            primary_record = _exception_record("POST_LOCK_ACCOUNT_READ_BLOCKED", error)
-        else:
+            primary_record = _exception_record(
+                "MUTEX_ACQUIRE_RECONCILIATION_BLOCKED", error
+            )
+
+        if primary_record is None:
+            primary_exit = _EXIT_POST_LOCK_READ
             try:
-                post_account_id = _reconcile_account(post_lock_account, post)
-                if not (
-                    post_account_id == pre_account_id == acquisition.paper_account_id
-                ):
-                    raise _HarnessReconciliationError(
-                        "pre-lock, mutex, and post-lock account identities differ"
-                    )
+                post_lock_account = read_personal_desktop_paper_account(
+                    authority,
+                    historical_cycle_configuration_payloads=(),
+                )
+                post = require_validated_personal_desktop_paper_account(
+                    post_lock_account
+                )
             except Exception as error:
                 primary_record = _exception_record(
-                    "POST_LOCK_ACCOUNT_RECONCILIATION_BLOCKED", error
+                    "POST_LOCK_ACCOUNT_READ_BLOCKED", error
                 )
+            else:
+                try:
+                    post_account_id = _reconcile_account(post_lock_account, post)
+                    if not (
+                        post_account_id
+                        == pre_account_id
+                        == acquisition.paper_account_id
+                    ):
+                        raise _HarnessReconciliationError(
+                            "pre-lock, mutex, and post-lock account identities differ"
+                        )
+                except Exception as error:
+                    primary_record = _exception_record(
+                        "POST_LOCK_ACCOUNT_RECONCILIATION_BLOCKED", error
+                    )
+    except BaseException as error:
+        pending_base_exception = error
 
     release_error = _release(admission)
     if release_error is not None:
         return _blocked(
             "MUTEX_RELEASE_BLOCKED", _EXIT_MUTEX_RELEASE, error=release_error
         )
+    if pending_base_exception is not None:
+        raise pending_base_exception.with_traceback(
+            pending_base_exception.__traceback__
+        )
+
     if primary_record is not None:
         _emit(primary_record, stream=sys.stderr)
         return primary_exit

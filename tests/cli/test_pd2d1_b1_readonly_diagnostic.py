@@ -25,19 +25,31 @@ class _Admission:
         calls: dict[str, object],
         *,
         state: object = diagnostic.PaperAccountMutexState.OWNED,
-        enter_error: Exception | None = None,
+        enter_error: BaseException | None = None,
+        acquisition_error: BaseException | None = None,
         release_error: Exception | None = None,
         return_self: bool = True,
         acquisition_account_id: str = diagnostic._EXPECTED_PAPER_ACCOUNT_ID,
     ) -> None:
         self.calls = calls
         self.enter_error = enter_error
+        self.acquisition_error = acquisition_error
         self.release_error = release_error
         self.return_self = return_self
-        self.acquisition = SimpleNamespace(
+        self._acquisition = SimpleNamespace(
             paper_account_id=acquisition_account_id,
             state=state,
         )
+
+    @property
+    def acquisition(self) -> object:
+        if self.acquisition_error is not None:
+            raise self.acquisition_error
+        return self._acquisition
+
+    @acquisition.setter
+    def acquisition(self, value: object) -> None:
+        self._acquisition = value
 
     def __enter__(self) -> object:
         self.calls["enter"] = int(self.calls["enter"]) + 1
@@ -376,6 +388,35 @@ def test_mutex_enter_failure_is_safe_typed_and_never_retried(
     assert calls["exit"] == 0
 
 
+@pytest.mark.parametrize("error", (KeyboardInterrupt(), SystemExit(17)))
+def test_base_exception_during_acquisition_reconciliation_releases_and_reraises(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    error: BaseException,
+) -> None:
+    calls, _, _ = _install_happy_path(
+        monkeypatch,
+        admission_factory=lambda values: _Admission(
+            values,
+            acquisition_error=error,
+        ),
+    )
+
+    with pytest.raises(type(error)) as raised:
+        diagnostic.main([])
+
+    assert raised.value is error
+    if isinstance(error, SystemExit):
+        assert raised.value.code == 17
+    out, err = _result(capsys)
+    assert out == ""
+    assert err == ""
+    assert len(calls["reads"]) == 1
+    assert calls["enter"] == 1
+    assert calls["exit"] == 1
+    assert calls["active"] is False
+
+
 @pytest.mark.parametrize(
     ("state", "reason"),
     (
@@ -457,6 +498,60 @@ def test_post_lock_read_uses_same_c1_empty_history_and_active_mutex(
     assert calls["exit"] == 1
     assert calls["active"] is False
     assert calls["admit"] == [calls["requires"][0]]
+
+
+def test_keyboard_interrupt_from_post_lock_read_releases_and_reraises(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    calls, _, _ = _install_happy_path(monkeypatch)
+    original = diagnostic.read_personal_desktop_paper_account
+
+    def read(*args: object, **kwargs: object) -> object:
+        if len(calls["reads"]) == 1:
+            assert calls["active"] is True
+            raise KeyboardInterrupt
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(diagnostic, "read_personal_desktop_paper_account", read)
+
+    with pytest.raises(KeyboardInterrupt):
+        diagnostic.main([])
+
+    out, err = _result(capsys)
+    assert out == ""
+    assert err == ""
+    assert calls["enter"] == 1
+    assert calls["exit"] == 1
+    assert calls["active"] is False
+
+
+def test_keyboard_interrupt_from_post_lock_reconciliation_releases_and_reraises(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    calls, _, _ = _install_happy_path(monkeypatch)
+    original = diagnostic._reconcile_account
+    reconciliations = 0
+
+    def reconcile(account: object, evidence: object) -> str:
+        nonlocal reconciliations
+        reconciliations += 1
+        if reconciliations == 2:
+            assert calls["active"] is True
+            raise KeyboardInterrupt
+        return original(account, evidence)
+
+    monkeypatch.setattr(diagnostic, "_reconcile_account", reconcile)
+
+    with pytest.raises(KeyboardInterrupt):
+        diagnostic.main([])
+
+    out, err = _result(capsys)
+    assert out == ""
+    assert err == ""
+    assert reconciliations == 2
+    assert calls["enter"] == 1
+    assert calls["exit"] == 1
+    assert calls["active"] is False
 
 
 @pytest.mark.parametrize("reconciliation_failure", (False, True))

@@ -5,6 +5,7 @@ import os
 from dataclasses import replace
 from datetime import UTC, date, datetime, time, timedelta
 from decimal import Decimal
+from hashlib import sha256
 from uuid import UUID
 
 import pytest
@@ -19,13 +20,20 @@ from tests.market_data.daily_snapshot_test_support import (
 from tests.runtime.test_verified_snapshot_preparation import _policies
 
 from trading_bot.domain import Bar, OrderSide
+from trading_bot.execution import PaperFillPolicy
 from trading_bot.market_calendar import TradingSession
 from trading_bot.market_data import (
     DailySnapshotBar,
     serialize_daily_snapshot,
     verify_daily_snapshot,
 )
-from trading_bot.portfolio import MetadataEntry
+from trading_bot.portfolio import MetadataEntry, PortfolioConstraints
+from trading_bot.rebalancing import (
+    RebalanceAssumptions,
+    RebalanceProposalPolicy,
+    RebalanceStatus,
+)
+from trading_bot.risk import PortfolioRiskPolicy, RiskLimits
 from trading_bot.runtime import (
     ARCHITECTURE94_STRATEGY_PLAN_BYTE_LENGTH_METADATA_KEY,
     ARCHITECTURE94_STRATEGY_PLAN_ID_METADATA_KEY,
@@ -159,6 +167,7 @@ def _request(
     closes: tuple[str, str, str] = ("10", "10", "9"),
     selected_close: str = "12",
     config: MovingAverageCrossoverConfig = _DEFAULT_CONFIG,
+    history_seed=None,
     prior=None,
     paper_account_id: str = "paper.account-1",
     selected_c3_assertion: ManualPaperSelectedC3Assertion | None = None,
@@ -176,7 +185,7 @@ def _request(
         paper_account_id,
         selected_c3_assertion or _c3_assertion(snapshot_verification),
         prior or _prior(),
-        _verified_seed(config, closes),
+        history_seed or _verified_seed(config, closes),
         config,
         caller_key,
         CallerAssertedNextSessionOpenReference(SPY, _NEXT_SESSION, Decimal(open_price)),
@@ -426,6 +435,189 @@ def test_exact_reconstructed_existing_request_round_trips_unchanged_schema() -> 
     assert (
         parse_checkpointed_verified_snapshot_paper_cycle_request(payload)
         == bound.checkpointed_request
+    )
+
+
+@pytest.mark.parametrize(
+    ("turnover", "minimum_position", "expected_turnover", "expected_minimum"),
+    (
+        (Decimal("0.25"), None, "0.25", None),
+        (None, Decimal("0.05"), None, "0.05"),
+        (None, None, None, None),
+        (Decimal("0.25"), Decimal("0.05"), "0.25", "0.05"),
+    ),
+)
+def test_checkpointed_request_optional_portfolio_constraints_round_trip(
+    turnover: Decimal | None,
+    minimum_position: Decimal | None,
+    expected_turnover: str | None,
+    expected_minimum: str | None,
+) -> None:
+    from trading_bot.runtime import (
+        parse_checkpointed_verified_snapshot_paper_cycle_request,
+        serialize_checkpointed_verified_snapshot_paper_cycle_request,
+    )
+
+    constraints = PortfolioConstraints(
+        minimum_cash_weight=Decimal("0.1"),
+        maximum_cash_weight=Decimal("0.9"),
+        maximum_position_weight=Decimal("0.8"),
+        maximum_one_way_rebalance_turnover=turnover,
+        minimum_position_weight=minimum_position,
+    )
+    bound = _binding(policies=replace(_policies(), portfolio_constraints=constraints))
+    payload = serialize_checkpointed_verified_snapshot_paper_cycle_request(
+        bound.checkpointed_request
+    )
+    tree = json.loads(payload)
+    serialized = tree["policies"]["portfolio_constraints"]
+    parsed = parse_checkpointed_verified_snapshot_paper_cycle_request(payload)
+    parsed_constraints = parsed.policies.portfolio_constraints
+
+    assert serialized["maximum_one_way_rebalance_turnover"] == expected_turnover
+    assert serialized["minimum_position_weight"] == expected_minimum
+    assert parsed == bound.checkpointed_request
+    assert parsed_constraints == constraints
+    assert parsed_constraints is not None
+    assert parsed_constraints.maximum_one_way_rebalance_turnover == turnover
+    assert parsed_constraints.minimum_position_weight == minimum_position
+    if turnover is None:
+        assert parsed_constraints.maximum_one_way_rebalance_turnover is None
+    if minimum_position is None:
+        assert parsed_constraints.minimum_position_weight is None
+
+    if turnover is not None and minimum_position is not None:
+        assert len(payload) == 1924
+        assert sha256(payload).hexdigest() == (
+            "b13a88eb454fbb782524388ffcf78226ec4d254bd2ed6a8457d6f0ed4a361142"
+        )
+
+
+@pytest.mark.parametrize(
+    ("field", "invalid_value"),
+    (
+        ("maximum_one_way_rebalance_turnover", "not-a-decimal"),
+        ("minimum_position_weight", 0),
+    ),
+)
+def test_checkpointed_request_invalid_non_null_optional_constraint_fails_closed(
+    field: str,
+    invalid_value: object,
+) -> None:
+    from trading_bot.runtime import (
+        CheckpointedPaperCycleReportSchemaError,
+        parse_checkpointed_verified_snapshot_paper_cycle_request,
+        serialize_checkpointed_verified_snapshot_paper_cycle_request,
+    )
+
+    constraints = PortfolioConstraints(
+        maximum_one_way_rebalance_turnover=Decimal("0.25"),
+        minimum_position_weight=Decimal("0.05"),
+    )
+    bound = _binding(policies=replace(_policies(), portfolio_constraints=constraints))
+    tree = json.loads(
+        serialize_checkpointed_verified_snapshot_paper_cycle_request(
+            bound.checkpointed_request
+        )
+    )
+    tree["policies"]["portfolio_constraints"][field] = invalid_value
+    payload = (json.dumps(tree, sort_keys=True, separators=(",", ":")) + "\n").encode()
+
+    with pytest.raises(CheckpointedPaperCycleReportSchemaError):
+        parse_checkpointed_verified_snapshot_paper_cycle_request(payload)
+
+
+def test_frozen_p1_profile_builds_and_detached_replay_is_no_action() -> None:
+    config = MovingAverageCrossoverConfig(3, 5, Decimal("1"))
+    seed_sessions = (
+        date(2024, 12, 27),
+        date(2024, 12, 30),
+        date(2024, 12, 31),
+        date(2025, 1, 2),
+        date(2025, 1, 3),
+    )
+    seed = create_strategy_history_seed(
+        symbol=SPY,
+        source=_SOURCE,
+        bars=tuple(
+            _seed_bar(session, close)
+            for session, close in zip(
+                seed_sessions, ("10", "11", "12", "13", "14"), strict=True
+            )
+        ),
+    )
+    verified_seed = verify_strategy_history_seed(
+        serialize_strategy_history_seed(seed),
+        expected_symbol=SPY,
+        target_session=_TARGET_SESSION,
+        strategy_config=config,
+        calendar=calendar(),
+    )
+    policies = replace(
+        _policies(),
+        rebalance_assumptions=RebalanceAssumptions(
+            fixed_commission=Decimal("0"),
+            allow_fractional_quantities=False,
+            quantity_increment=Decimal("1"),
+            minimum_trade_notional=Decimal("0"),
+            minimum_trade_quantity=Decimal("1"),
+            target_weight_tolerance=Decimal("0"),
+            additional_execution_cash_buffer=Decimal("0"),
+            use_planned_sell_proceeds=False,
+        ),
+        portfolio_constraints=PortfolioConstraints(
+            minimum_cash_weight=Decimal("0.90"),
+            maximum_cash_weight=Decimal("1"),
+            maximum_position_weight=Decimal("0.10"),
+            maximum_one_way_rebalance_turnover=Decimal("0.10"),
+            minimum_position_weight=None,
+            long_only=True,
+            allow_leverage=False,
+        ),
+        proposal_policy=RebalanceProposalPolicy(allow_partial_plans=False),
+        risk_limits=RiskLimits(
+            max_position_percent=Decimal("0.10"),
+            max_total_exposure_percent=Decimal("0.10"),
+            max_order_notional=Decimal("2500"),
+            max_new_position_percent=Decimal("0.10"),
+            minimum_cash_reserve_percent=Decimal("0.90"),
+            allow_fractional_shares=False,
+            fractional_increment=Decimal("1"),
+            allow_buying=True,
+            allow_selling=True,
+            estimated_commission=Decimal("0"),
+        ),
+        risk_policy=PortfolioRiskPolicy(allow_sell_proceeds_for_later_buys=False),
+        fill_policy=PaperFillPolicy(
+            slippage_basis_points=Decimal("0"),
+            fixed_commission=Decimal("0"),
+        ),
+        trading_enabled=True,
+    )
+    built = build_manual_paper_strategy_plan(
+        _request(
+            selected_close="15",
+            config=config,
+            history_seed=verified_seed,
+            policies=policies,
+            open_price="15",
+            metadata=(),
+        ),
+        calendar(),
+    )
+    replayed = verify_manual_paper_strategy_plan(
+        built.artifact_bytes,
+        calendar(),
+        expected_sha256=built.artifact_sha256,
+        expected_byte_length=built.artifact_byte_length,
+        expected_checkpointed_request=built.checkpointed_request,
+    )
+
+    assert replayed == built
+    assert replayed.plan.signal_status is ManualPaperStrategySignalStatus.NO_SIGNAL
+    assert replayed.plan.planner_status is RebalanceStatus.NO_ACTION
+    assert replayed.checkpointed_request.policies.portfolio_constraints == (
+        policies.portfolio_constraints
     )
 
 

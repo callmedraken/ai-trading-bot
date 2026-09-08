@@ -858,12 +858,12 @@ def _policies_tree(policies: VerifiedSnapshotPaperCyclePolicies) -> dict[str, ob
             "maximum_position_weight": canonical_decimal(
                 constraints.maximum_position_weight
             ),
-            "maximum_one_way_rebalance_turnover": canonical_decimal(
-                constraints.maximum_one_way_rebalance_turnover
-            ),
-            "minimum_position_weight": canonical_decimal(
-                constraints.minimum_position_weight
-            ),
+            "maximum_one_way_rebalance_turnover": None
+            if constraints.maximum_one_way_rebalance_turnover is None
+            else canonical_decimal(constraints.maximum_one_way_rebalance_turnover),
+            "minimum_position_weight": None
+            if constraints.minimum_position_weight is None
+            else canonical_decimal(constraints.minimum_position_weight),
             "long_only": constraints.long_only,
             "allow_leverage": constraints.allow_leverage,
         },
@@ -1045,11 +1045,15 @@ def _policies(value: object) -> VerifiedSnapshotPaperCyclePolicies:
             _decimal(item["minimum_cash_weight"], "minimum_cash_weight"),
             _decimal(item["maximum_cash_weight"], "maximum_cash_weight"),
             _decimal(item["maximum_position_weight"], "maximum_position_weight"),
-            _decimal(
+            None
+            if item["maximum_one_way_rebalance_turnover"] is None
+            else _decimal(
                 item["maximum_one_way_rebalance_turnover"],
                 "maximum_one_way_rebalance_turnover",
             ),
-            _decimal(item["minimum_position_weight"], "minimum_position_weight"),
+            None
+            if item["minimum_position_weight"] is None
+            else _decimal(item["minimum_position_weight"], "minimum_position_weight"),
             _bool(item["long_only"], "long_only"),
             _bool(item["allow_leverage"], "allow_leverage"),
         )

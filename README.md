@@ -11,45 +11,49 @@ boundaries decide what may actually happen.
 ## Current status
 
 The contained C3 production market-data capture boundary is complete and
-certified, PD1 personal-desktop Paper-v2 authority is complete, PD2A account
-mutex/admission is complete, and **PD2B supervised paper composition is complete
-and source-certified**.
+certified. PD1 Paper-v2 authority, PD2A account mutex/admission, PD2B supervised
+operation preparation, and **PD2C supervised Architecture-67 execution boundary
+are complete and source-certified**.
 
-PD2B final certification passed:
+PD2C final certification passed:
 
 ```text
-4754 passed, 17 expected skips
+4775 passed, 17 expected skips
 Ruff check: PASS
-Ruff format --check: PASS (430 files)
+Ruff format --check: PASS (432 files)
 git diff --check: PASS
 worktree/index: clean
 ```
 
-PD2B now proves the source-only chain from genuine production authority and a
-genuine selected C3 snapshot through post-lock Paper-v2 reread, deterministic
-P1 strategy planning, exact replay verification, and path-independent
-Architecture-67 execution inputs. The prepared Architecture-67 capability stays
-private and valid only while the same account mutex remains held.
+PD2C now proves the complete source chain from genuine C1/P2 provenance through
+post-lock Paper-v2 state, deterministic P1 planning, path-independent A67
+inputs, fixed production-root reconciliation, and one-shot A67 execution
+composition. The dedicated execution gate remains hard-coded `False`, so the
+public production execution API still fails before entering PD2B3, acquiring the
+paper-account mutex, rereading Paper-v2, or invoking Architecture 67.
 
-The current development target is **PD2C: the supervised Architecture-67
-execution boundary**. PD2C begins source-only and must remain unable to mutate
-the published Paper-v2 account while the production effect gate is false.
+The current development target is **PD2D1: read-only first-mutation
+qualification**. It will prepare the exact would-be supervised operation under
+the real authority/lock lifetime and run only the existing read-only A67
+inspection/classification. It will not execute the paper cycle and will not
+mutate Paper-v2.
 
 **Production/live trading remains NO-GO.** Provider call #7, broker order
-submission, unattended operation, the first real Paper-v2 runtime mutation, and
-live trading remain unauthorized unless a later reviewed checkpoint explicitly
-changes that state.
+submission, unattended operation, enabling the PD2C execution gate, the first
+real Paper-v2 runtime mutation, and live trading remain unauthorized unless a
+later explicitly reviewed checkpoint changes that state.
 
-See [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md) for the canonical current
-milestone and roadmap, and
-[`docs/architecture/104-personal-desktop-supervised-paper-execution-boundary.md`](docs/architecture/104-personal-desktop-supervised-paper-execution-boundary.md)
-for the PD2C contract.
+See [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md) for canonical status,
+[`docs/architecture/105-personal-desktop-first-paper-mutation-qualification.md`](docs/architecture/105-personal-desktop-first-paper-mutation-qualification.md)
+for the current qualification contract, and
+[`docs/validation/pd2c-supervised-paper-execution-boundary-completion.md`](docs/validation/pd2c-supervised-paper-execution-boundary-completion.md)
+for the PD2C completion evidence.
 
 ## Product direction
 
 The long-term progression is:
 
-1. Complete the PD2 supervised manual paper cycle from verified snapshot and authoritative Paper-v2 account state through deterministic planning/risk/simulated execution, durable transition, receipt, and restart-safe reconciliation.
+1. Finish qualification and the explicitly authorized first supervised simulated-paper mutation.
 2. Add supervised crash/recovery validation, then unattended paper operation with authoritative scheduling, reconciliation, monitoring, and recovery.
 3. Complete a long simulated-paper soak.
 4. Add broker-paper integration with real broker identifiers, submit/cancel/replace, partial fills, rejects, reconciliation, idempotency, and ambiguous-submit recovery.
@@ -57,7 +61,7 @@ The long-term progression is:
 6. Add explicit live-readiness controls, separate live credentials, account verification, kill switch, strict risk limits, outage/stale-data behavior, and startup reconciliation.
 7. Permit only a tiny restricted live deployment after all acceptance gates are satisfied.
 8. Deepen AI/strategy capabilities only after operational safety and reconciliation are trustworthy.
-9. Finish the product with a polished, user-friendly GUI for research, backtesting, account/portfolio views, paper/live operations, system health, recovery, audit history, settings, and safety controls.
+9. Finish with a polished GUI for research, backtesting, account/portfolio views, paper/live operations, system health, recovery, audit history, settings, and safety controls.
 
 The GUI is a presentation and operator-control layer. It must use the same
 reviewed application/service boundaries as CLI, automation, and tests and may
@@ -67,18 +71,15 @@ mode gates.
 ## Legacy/manual operator tools
 
 Two older manual command surfaces remain intentionally available, but they are
-not substitutes for the current production authority chain:
+not substitutes for the production authority chain:
 
 - `scripts/capture_daily_market_snapshot.py` /
   `trading_bot.cli.daily_snapshot_capture` is the Architecture-57 manual Alpaca
   artifact command. It is not the C3 production capture authority and does not
-  authorize provider call #7 or any additional production provider effect.
+  authorize provider call #7.
 - `trading_bot.cli.paper_operation` is the Architecture-67 generic/manual
-  restart-safe paper-operation command and therefore accepts an explicit
-  operation root. It is not the Architecture-103/PD2 production composition
-  boundary. Production Paper-v2 operation must obtain its runtime root from
-  genuine validated personal-desktop paper-account authority and the reviewed
-  PD2 admission path.
+  restart-safe paper-operation command and accepts an explicit operation root.
+  It is not the Architecture-103/PD2 production composition boundary.
 
 Changing or disabling either accepted legacy command is a separate behavioral
 checkpoint. Their presence does not broaden current production authorization.

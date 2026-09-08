@@ -185,13 +185,19 @@ git diff --check
 
 Do not run the full repository suite during iteration.
 
-## Broad source certification
+## Broad/full source certification
 
-After ChatGPT/Sol exact-diff review accepts source, the user runs one full local
-repository suite with pinned worktree provenance and a fresh external pytest
-base temp.
+Focused verification is the default during implementation. Acceptance of an
+exact PD2D1 source diff does not, by itself, automatically require a full
+repository suite.
 
-PD2D1 source certification requires:
+Run a broad/full repository certification only at a genuinely necessary final
+certification gate and only when ChatGPT/Sol explicitly requests it. When that
+gate is requested, the user runs the suite with pinned worktree provenance and
+a fresh external pytest base temp. Do not rerun a clean full suite without
+relevant source changes.
+
+When explicitly requested, PD2D1 source certification requires:
 
 ```text
 full pytest: PASS

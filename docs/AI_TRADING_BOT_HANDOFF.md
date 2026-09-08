@@ -401,6 +401,31 @@ Validation plan:
 docs/validation/pd2d1-first-paper-mutation-qualification-plan.md
 ```
 
+Accepted and verified source:
+
+```text
+commit bd95d522f5bcf398a243ec2b5fdb8cdc18f63afc
+tree   90b9fc8abb21a61e78e8beae9cdfc9e11e4ebd5c
+```
+
+Current checkpoint state:
+
+```text
+PD2D1_SOURCE_ACCEPTED                = YES
+PD2D1_SOURCE_VERIFIED                = YES
+PD2D1_RH0_PLANNING_ACCEPTED          = YES
+PD2D1_NON_MARKET_DATA_PROFILE_FROZEN = YES
+PD2D1_REAL_HOST_QUALIFIED            = NO
+PD2D2_AUTHORIZED                     = NO
+```
+
+The first-cycle non-market-data profile is frozen in
+`docs/validation/pd2d1-first-cycle-input-freeze.md`. The exact offline
+`strategy-history-seed/v1` evidence and the SPY `2026-08-31` next-session
+open-reference evidence remain unfrozen blockers to a runnable real-host
+qualification. No PD2D1 real-host qualification has occurred, and PD2D2
+remains **NOT AUTHORIZED**.
+
 PD2D1 is a non-mutating readiness checkpoint. It prepares the exact would-be
 operation under genuine production authority and the same account-mutex lifetime,
 then calls the existing read-only `inspect_paper_operation_root` rather than the
@@ -468,7 +493,7 @@ PD2   reliable supervised manual paper cycle                CURRENT
   PD2A account mutex + supervised admission                 COMPLETE
   PD2B supervised source-only composition                   COMPLETE
   PD2C supervised A67 execution boundary                    COMPLETE
-  PD2D1 read-only first-mutation qualification              CURRENT / SOURCE-ONLY
+  PD2D1 read-only first-mutation qualification              CURRENT / SOURCE ACCEPTED / INPUT FREEZE
   PD2D2 enable gate + first real Paper-v2 mutation          NOT AUTHORIZED
 PD3   supervised crash/recovery validation
 PD4   unattended simulated paper under Trading

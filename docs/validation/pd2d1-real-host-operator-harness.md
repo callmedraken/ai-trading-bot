@@ -42,6 +42,9 @@ file. Copy the terminal output manually for review.
 ## Real-host attempt status
 
 Attempt 1 is consumed. Do not rerun the harness from commit `564fdf8`.
-A future second attempt requires accepted F3-R1 diagnostic source and a fresh
-ChatGPT/Sol High review. Even a `READY` result would remain non-authorizing and
-would not authorize PD2D2.
+The meaningful F3-R1 run from `94a7509` remained generically blocked outside
+the classified typed boundaries. The full qualification is paused pending the
+narrower B1 stage-isolation diagnostic documented in
+`pd2d1-real-host-b1-diagnostic.md`. Do not rerun the full qualification while
+that isolation is pending. Even a future `READY` result would remain
+non-authorizing and would not authorize PD2D2.

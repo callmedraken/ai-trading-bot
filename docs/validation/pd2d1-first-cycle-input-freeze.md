@@ -101,23 +101,30 @@ PD2D1 and any eventually authorized PD2D2 execution must use the same caller
 idempotency UUID and identical semantic planning inputs. PD2D2 must not silently
 replan, substitute current time, change policy, or manufacture a new UUID.
 
-## Deliberately not frozen evidence
+## Frozen offline market evidence
 
-Two evidence values remain deliberately **not frozen** by this checkpoint and
-block a runnable real-host qualification.
+PD2D1-F2 freezes the two formerly open market-evidence inputs. Their complete
+source and provenance record is
+`docs/validation/pd2d1-first-cycle-market-data-evidence.md`.
 
-1. The `strategy-history-seed/v1` artifact must contain the exact five
-   consecutive XNYS sessions immediately before `2026-08-28`. A later evidence
-   checkpoint must freeze its exact canonical bytes, SHA-256, byte length,
-   offline source descriptor, and reviewed transport location.
-2. The `CallerAssertedNextSessionOpenReference` price for SPY on `2026-08-31`
-   must come from separately preserved and reviewed offline historical
-   evidence. It must not be inferred from the selected close, fetched during
-   this checkpoint, or copied from a test/example value.
+```text
+strategy-history artifact:
+  path: docs/validation/evidence/pd2d1-spy-strategy-history-seed-2026-08-28.json
+  seed_id: 5dc95e10-ba22-5b91-94b2-0d851aa8e2d7
+  SHA-256: 40dda54c82324f358d640cce89e467295b8f5b73a32fed76c52e7ca90d398e64
+  byte length: 1060
+  source_id: stockanalysis-tiingo-spy-daily-2026-08-v1
 
-Until both evidence values are separately preserved, reviewed, and frozen,
-PD2D1 real-host qualification is not runnable. No provider call or broker call
-is authorized to fill either gap.
+next-session open reference:
+  symbol: SPY
+  session: 2026-08-31
+  caller_asserted_open_reference_price: Decimal("767.33")
+```
+
+Both values are non-authoritative offline historical evidence. They grant no C3
+authority, and the `2026-08-28` target bar remains the genuine selected C3
+snapshot bar. This freeze does not claim that PD2D1 real-host qualification has
+occurred and does not authorize a provider or broker call.
 
 ## Authorization boundary
 

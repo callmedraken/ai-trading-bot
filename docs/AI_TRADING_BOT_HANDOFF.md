@@ -408,6 +408,18 @@ commit bd95d522f5bcf398a243ec2b5fdb8cdc18f63afc
 tree   90b9fc8abb21a61e78e8beae9cdfc9e11e4ebd5c
 ```
 
+PD2D1-F1 first-cycle pure-input freeze is complete at commit
+`45291c3053a23de02e118f5b853bd67b5cf36ca8` (tree
+`e3fdf3af20d3d8cbceb1e9bedbf59603f9913c9e`). PD2D1-F2 freezes the offline
+market evidence as:
+
+```text
+seed_id: 5dc95e10-ba22-5b91-94b2-0d851aa8e2d7
+seed SHA-256: 40dda54c82324f358d640cce89e467295b8f5b73a32fed76c52e7ca90d398e64
+seed byte length: 1060
+SPY 2026-08-31 caller-asserted open reference: Decimal("767.33")
+```
+
 Current checkpoint state:
 
 ```text
@@ -415,16 +427,19 @@ PD2D1_SOURCE_ACCEPTED                = YES
 PD2D1_SOURCE_VERIFIED                = YES
 PD2D1_RH0_PLANNING_ACCEPTED          = YES
 PD2D1_NON_MARKET_DATA_PROFILE_FROZEN = YES
+PD2D1_F1_COMPLETE                    = YES
+PD2D1_F2_OFFLINE_EVIDENCE_FROZEN     = YES
 PD2D1_REAL_HOST_QUALIFIED            = NO
 PD2D2_AUTHORIZED                     = NO
 ```
 
 The first-cycle non-market-data profile is frozen in
-`docs/validation/pd2d1-first-cycle-input-freeze.md`. The exact offline
-`strategy-history-seed/v1` evidence and the SPY `2026-08-31` next-session
-open-reference evidence remain unfrozen blockers to a runnable real-host
-qualification. No PD2D1 real-host qualification has occurred, and PD2D2
-remains **NOT AUTHORIZED**.
+`docs/validation/pd2d1-first-cycle-input-freeze.md`; its exact offline
+`strategy-history-seed/v1` and SPY `2026-08-31` open-reference provenance are
+frozen in `docs/validation/pd2d1-first-cycle-market-data-evidence.md`. No PD2D1
+real-host qualification has occurred. The next checkpoint is review and freeze
+of the read-only real-host operator harness, and PD2D2 remains **NOT
+AUTHORIZED**.
 
 PD2D1 is a non-mutating readiness checkpoint. It prepares the exact would-be
 operation under genuine production authority and the same account-mutex lifetime,
@@ -493,7 +508,7 @@ PD2   reliable supervised manual paper cycle                CURRENT
   PD2A account mutex + supervised admission                 COMPLETE
   PD2B supervised source-only composition                   COMPLETE
   PD2C supervised A67 execution boundary                    COMPLETE
-  PD2D1 read-only first-mutation qualification              CURRENT / SOURCE ACCEPTED / INPUT FREEZE
+  PD2D1 read-only first-mutation qualification              CURRENT / F1 COMPLETE / F2 EVIDENCE FROZEN
   PD2D2 enable gate + first real Paper-v2 mutation          NOT AUTHORIZED
 PD3   supervised crash/recovery validation
 PD4   unattended simulated paper under Trading

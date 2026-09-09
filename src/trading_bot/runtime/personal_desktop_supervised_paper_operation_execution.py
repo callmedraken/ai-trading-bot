@@ -47,7 +47,7 @@ from trading_bot.runtime.windows_authority_validation import (
 )
 from trading_bot.strategies import MovingAverageCrossoverConfig
 
-PERSONAL_DESKTOP_PAPER_V2_SUPERVISED_EXECUTION_EFFECTS_ENABLED = False
+PERSONAL_DESKTOP_PAPER_V2_SUPERVISED_EXECUTION_EFFECTS_ENABLED = True
 
 _PERSONAL_DESKTOP_PAPER_V2_OPERATION_ROOT = r"F:\AITradingBot\Paper-v2\runtime"
 _PRODUCTION_EXECUTION_ISSUER = object()

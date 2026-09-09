@@ -11,8 +11,8 @@ Implementation begins from the exact reviewed branch head:
 
 ```text
 branch: feature/personal-desktop-paper-runtime
-HEAD:   7256a3867dbbc660698a5c18f683faf594775be2
-tree:   7b670f0c5dbd78d16b50cbce7754fbaff3eb26de
+HEAD:   9b4c019978e9f5c915a1894a93b23a0467b59d19
+tree:   bf4c92f7368e9d19846cb9e5e59b07515af48e9c
 ```
 
 The implementation task must STOP rather than self-correct if the local branch,

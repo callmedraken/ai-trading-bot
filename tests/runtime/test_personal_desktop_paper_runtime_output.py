@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import copy
 import inspect
+import pickle
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
@@ -244,6 +246,130 @@ def test_existing_operations_parent_is_required() -> None:
         with _capability(api):
             pass
     assert not any(event[0] == "create-directory" for event in api.events)
+
+
+@pytest.mark.parametrize(
+    ("verification", "path", "byte_length"),
+    [
+        (
+            "verify_staged_directory",
+            security.PERSONAL_DESKTOP_PAPER_V2_RUNTIME
+            + f"\\.paper-account-transition-{APPLICATION_ID}.staging",
+            0,
+        ),
+        (
+            "verify_staged_file",
+            security.PERSONAL_DESKTOP_PAPER_V2_RUNTIME
+            + f"\\.paper-account-transition-{APPLICATION_ID}.staging"
+            + f"\\checkpointed-paper-cycle-report-{RESULT_ID}.json",
+            1,
+        ),
+        (
+            "verify_finalized_directory",
+            security.PERSONAL_DESKTOP_PAPER_V2_RUNTIME
+            + f"\\paper-account-transition-{APPLICATION_ID}",
+            0,
+        ),
+        (
+            "verify_finalized_file",
+            security.PERSONAL_DESKTOP_PAPER_V2_RUNTIME
+            + f"\\paper-account-transition-{APPLICATION_ID}"
+            + f"\\checkpointed-paper-cycle-report-{RESULT_ID}.json",
+            1,
+        ),
+    ],
+)
+def test_output_child_requires_exact_trading_owner_during_staged_and_final_checks(
+    verification: str,
+    path: str,
+    byte_length: int,
+) -> None:
+    api = FakeNative()
+    spec = security.paper_object_spec(path)
+    policy = security.paper_security_policy(
+        spec.role,
+        SID,
+        owner_sid=security.ADMINISTRATORS_SID,
+    )
+    api.objects[path] = security.PaperObjectObservation(
+        SecurityInspection(
+            path,
+            path,
+            spec.kind,
+            policy.owner_sid,
+            policy.dacl_protected,
+            policy.aces,
+            False,
+            "F:\\",
+            "NTFS",
+        ),
+        (1, 20),
+        byte_length,
+        1,
+    )
+
+    with _capability(api) as capability:
+        with pytest.raises(
+            output.PersonalDesktopPaperRuntimeOutputError,
+            match="exact Trading SID",
+        ):
+            getattr(capability, verification)(Path(path))
+
+
+def test_disposable_runtime_output_authority_is_issuer_bound_and_one_shot() -> None:
+    with pytest.raises(TypeError, match="test issuer"):
+        output._DisposablePaperRuntimeOutputAuthorityForTest()
+
+    authority = output._open_disposable_paper_runtime_output_authority_for_test()
+    with output._open_personal_desktop_paper_runtime_output_capability_for_test(
+        FakeNative(),
+        authority=authority,
+    ):
+        pass
+
+    with pytest.raises(TypeError, match="consumed"):
+        output._open_personal_desktop_paper_runtime_output_capability_for_test(
+            FakeNative(),
+            authority=authority,
+        )
+
+
+def test_disposable_runtime_output_authority_cannot_be_copied_or_pickled() -> None:
+    authority = output._open_disposable_paper_runtime_output_authority_for_test()
+
+    with pytest.raises(TypeError, match="cannot be copied"):
+        copy.copy(authority)
+    with pytest.raises(TypeError, match="cannot be deep-copied"):
+        copy.deepcopy(authority)
+    with pytest.raises(TypeError, match="cannot be pickled"):
+        pickle.dumps(authority)
+
+
+def test_disposable_seam_rejects_genuine_native_without_initialization_or_effect() -> (
+    None
+):
+    class NativeSubclass(output._WindowsPaperRuntimeOutputNativeApi):
+        pass
+
+    for native_type in (output._WindowsPaperRuntimeOutputNativeApi, NativeSubclass):
+        native = object.__new__(native_type)
+        authority = output._open_disposable_paper_runtime_output_authority_for_test()
+
+        with pytest.raises(
+            TypeError,
+            match="genuine production native implementation",
+        ):
+            output._open_personal_desktop_paper_runtime_output_capability_for_test(
+                native,
+                authority=authority,
+            )
+
+        assert not hasattr(native, "_kernel")
+        with output._open_personal_desktop_paper_runtime_output_capability_for_test(
+            FakeNative(),
+            authority=authority,
+        ):
+            pass
 
 
 def test_alternate_output_path_and_kind_are_rejected_before_native_create() -> None:

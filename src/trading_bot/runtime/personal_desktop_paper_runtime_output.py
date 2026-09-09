@@ -33,6 +33,7 @@ _FILE_ATTRIBUTE_NORMAL = 0x80
 _FILE_FLAG_OPEN_REPARSE_POINT = 0x00200000
 _RUNTIME_OUTPUT_ISSUER = object()
 _DISPOSABLE_RUNTIME_OUTPUT_ISSUER = object()
+_DISPOSABLE_RUNTIME_OUTPUT_AUTHORITY_ISSUER = object()
 
 
 class PersonalDesktopPaperRuntimeOutputError(AuthorityObjectError):
@@ -153,6 +154,18 @@ class _PersonalDesktopPaperRuntimeOutputCapability(PaperOperationOutputCapabilit
             observation.security,
             PERSONAL_DESKTOP_FIRST_PAPER_OPERATION_PROFILE.approved_trading_sid,
         )
+        if (
+            spec.role
+            in {
+                security.PaperObjectRole.OUTPUT_DIRECTORY,
+                security.PaperObjectRole.OUTPUT_FILE,
+            }
+            and observation.security.owner_sid
+            != PERSONAL_DESKTOP_FIRST_PAPER_OPERATION_PROFILE.approved_trading_sid
+        ):
+            raise PersonalDesktopPaperRuntimeOutputError(
+                "Paper-v2 runtime output owner is not the exact Trading SID"
+            )
         if (
             type(observation.identity) is not tuple
             or len(observation.identity) != 2
@@ -454,23 +467,49 @@ def open_personal_desktop_paper_runtime_output_capability() -> (
 
 
 class _DisposablePaperRuntimeOutputAuthorityForTest:
-    __slots__ = ("_lock", "_used")
+    __slots__ = ("_issuer", "_lock", "_used")
 
-    def __init__(self) -> None:
+    def __init__(self, *, _issuer: object | None = None) -> None:
+        if _issuer is not _DISPOSABLE_RUNTIME_OUTPUT_AUTHORITY_ISSUER:
+            raise TypeError(
+                "disposable runtime output authority requires its test issuer"
+            )
+        self._issuer = _issuer
         self._lock = threading.Lock()
         self._used = False
 
     def _consume(self) -> None:
         with self._lock:
-            if self._used:
-                raise TypeError("disposable runtime output authority is consumed")
+            if (
+                self._issuer is not _DISPOSABLE_RUNTIME_OUTPUT_AUTHORITY_ISSUER
+                or self._used
+            ):
+                raise TypeError(
+                    "disposable runtime output authority is invalid or consumed"
+                )
             self._used = True
+
+    def __copy__(self) -> object:
+        raise TypeError("disposable runtime output authorities cannot be copied")
+
+    def __deepcopy__(self, memo: object) -> object:
+        del memo
+        raise TypeError("disposable runtime output authorities cannot be deep-copied")
+
+    def __reduce__(self) -> object:
+        raise TypeError("disposable runtime output authorities cannot be serialized")
+
+    def __reduce_ex__(self, protocol: int) -> object:
+        del protocol
+        raise TypeError("disposable runtime output authorities cannot be pickled")
 
 
 def _open_disposable_paper_runtime_output_authority_for_test() -> (
     _DisposablePaperRuntimeOutputAuthorityForTest
 ):
-    return _DisposablePaperRuntimeOutputAuthorityForTest()
+    return _DisposablePaperRuntimeOutputAuthorityForTest(
+        _issuer=_DISPOSABLE_RUNTIME_OUTPUT_AUTHORITY_ISSUER
+    )
 
 
 def _open_personal_desktop_paper_runtime_output_capability_for_test(
@@ -480,6 +519,11 @@ def _open_personal_desktop_paper_runtime_output_capability_for_test(
 ) -> _PersonalDesktopPaperRuntimeOutputCapability:
     if type(authority) is not _DisposablePaperRuntimeOutputAuthorityForTest:
         raise TypeError("disposable runtime output authority is invalid")
+    if isinstance(api, _WindowsPaperRuntimeOutputNativeApi):
+        raise TypeError(
+            "the disposable runtime output seam rejects the genuine production "
+            "native implementation"
+        )
     authority._consume()
     return _PersonalDesktopPaperRuntimeOutputCapability(
         api,

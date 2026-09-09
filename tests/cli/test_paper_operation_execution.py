@@ -26,6 +26,9 @@ from trading_bot.cli.paper_operation_execution import (
     PaperOperationExecutionDiagnosticCode,
     execute_paper_operation_once,
 )
+from trading_bot.cli.paper_operation_output_capability import (
+    PaperOperationOutputCapability,
+)
 from trading_bot.runtime import (
     CheckpointedVerifiedSnapshotPaperCycleInsufficientCashError,
     PaperOperationReceiptVerificationStatus,
@@ -43,6 +46,46 @@ def _transition_paths(fixture) -> tuple[Path, Path]:
         / f".paper-account-transition-{fixture.inputs.application_id}.staging"
     )
     return final, staging
+
+
+class _RecordingOutputCapability(PaperOperationOutputCapability):
+    def __init__(self, events: list[str]) -> None:
+        self.events = events
+
+    @staticmethod
+    def _kind(path: Path) -> str:
+        return "receipt" if "paper-operations" in str(path) else "transition"
+
+    def verify_parent(self, path: Path) -> None:
+        self.events.append(f"verify-parent:{path.name}")
+        assert path.is_dir()
+
+    def create_staging_directory(self, path: Path) -> None:
+        self.events.append(f"{self._kind(path)}:create-staging")
+        os.mkdir(path)
+
+    def write_staged_file(self, path: Path, payload: bytes) -> None:
+        self.events.append(f"{self._kind(path)}:write-file")
+        with path.open("xb") as stream:
+            assert stream.write(payload) == len(payload)
+            stream.flush()
+            os.fsync(stream.fileno())
+
+    def verify_staged_directory(self, path: Path) -> None:
+        self.events.append(f"{self._kind(path)}:verify-staged-directory")
+
+    def verify_staged_file(self, path: Path) -> None:
+        self.events.append(f"{self._kind(path)}:verify-staged-file")
+
+    def finalize_directory(self, staging: Path, final: Path) -> None:
+        self.events.append(f"{self._kind(staging)}:finalize")
+        os.rename(staging, final)
+
+    def verify_finalized_directory(self, path: Path) -> None:
+        self.events.append(f"{self._kind(path)}:verify-final-directory")
+
+    def verify_finalized_file(self, path: Path) -> None:
+        self.events.append(f"{self._kind(path)}:verify-final-file")
 
 
 def test_pending_execution_invokes_runtime_once_and_commits_exact_layout(
@@ -66,7 +109,6 @@ def test_pending_execution_invokes_runtime_once_and_commits_exact_layout(
         "execute_checkpointed_verified_snapshot_paper_cycle",
         counted,
     )
-
     result = execute_paper_operation_once(
         fixture.operation_root,
         fixture.inputs,
@@ -99,6 +141,87 @@ def test_pending_execution_invokes_runtime_once_and_commits_exact_layout(
     )
     assert repeated.diagnostic_code == "ALREADY_APPLIED"
     assert repeated.receipt_path == result.receipt_path
+
+
+def test_output_capability_hooks_preserve_transition_then_receipt_order(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = _setup(tmp_path)
+    (fixture.operation_root / "paper-operations").mkdir()
+    events: list[str] = []
+    capability = _RecordingOutputCapability(events)
+    from trading_bot.cli import paper_operation_execution as execution_module
+
+    original_successor = execution_module._verify_successor
+    original_receipt = execution_module._verify_completed_receipt
+
+    def verify_successor(*args, **kwargs):  # type: ignore[no-untyped-def]
+        phase = args[6]
+        events.append(f"transition:semantic-{phase.value.lower()}")
+        return original_successor(*args, **kwargs)
+
+    def verify_receipt(*args, **kwargs):  # type: ignore[no-untyped-def]
+        events.append("receipt:semantic")
+        return original_receipt(*args, **kwargs)
+
+    monkeypatch.setattr(execution_module, "_verify_successor", verify_successor)
+    monkeypatch.setattr(execution_module, "_verify_completed_receipt", verify_receipt)
+    result = execute_paper_operation_once(
+        fixture.operation_root,
+        fixture.inputs,
+        output_capability=capability,
+    )
+    assert result.classification is PaperOperationExecutionClassification.COMPLETED
+
+    assert events.index("transition:create-staging") < events.index(
+        "transition:verify-staged-directory"
+    )
+    assert events.index("transition:verify-staged-directory") < events.index(
+        "transition:write-file"
+    )
+    assert events.index("transition:verify-staged-file") < events.index(
+        "transition:semantic-staged"
+    )
+    assert events.index("transition:semantic-staged") < events.index(
+        "transition:finalize"
+    )
+    assert events.index("transition:finalize") < events.index(
+        "transition:verify-final-directory"
+    )
+    assert events.index("transition:verify-final-file") < events.index(
+        "transition:semantic-finalized"
+    )
+
+    receipt_create = events.index("receipt:create-staging")
+    receipt_staged_security = events.index("receipt:verify-staged-file")
+    receipt_finalize = events.index("receipt:finalize")
+    receipt_final_security = events.index("receipt:verify-final-file")
+    staged_receipt_semantic = events.index("receipt:semantic", receipt_create)
+    finalized_receipt_semantic = events.index("receipt:semantic", receipt_finalize)
+    assert receipt_create < receipt_staged_security < staged_receipt_semantic
+    assert staged_receipt_semantic < receipt_finalize < receipt_final_security
+    assert receipt_final_security < finalized_receipt_semantic
+
+
+def test_output_capability_commits_eligible_failed_receipt_after_runtime_attempt(
+    tmp_path: Path,
+) -> None:
+    fixture = _failed_fixture(tmp_path)
+    (fixture.operation_root / "paper-operations").mkdir()
+    events: list[str] = []
+    result = execute_paper_operation_once(
+        fixture.operation_root,
+        fixture.inputs,
+        output_capability=_RecordingOutputCapability(events),
+    )
+    assert (
+        result.classification is PaperOperationExecutionClassification.EXECUTION_FAILED
+    )
+    assert result.diagnostic_code == "INSUFFICIENT_CASH"
+    assert "receipt:create-staging" in events
+    assert "receipt:finalize" in events
+    assert not any(event.startswith("transition:create") for event in events)
 
 
 def test_no_action_still_commits_successor_checkpoint(tmp_path: Path) -> None:

@@ -132,27 +132,39 @@ def paper_object_spec(path: str) -> PaperObjectSpec:
         return PaperObjectSpec(
             PaperObjectRole.GENESIS_CHECKPOINT, file, MAX_PAPER_ACCOUNT_CHECKPOINT_BYTES
         )
-    transition = (
-        re.escape(PERSONAL_DESKTOP_PAPER_V2_RUNTIME)
-        + rf"\\paper-account-transition-{_UUID}"
-    )
-    operation = (
-        re.escape(PERSONAL_DESKTOP_PAPER_V2_OPERATIONS)
-        + rf"\\paper-operation-({_UUID})"
-    )
-    if re.fullmatch(transition, path) or re.fullmatch(operation, path):
+    runtime = re.escape(PERSONAL_DESKTOP_PAPER_V2_RUNTIME)
+    operations = re.escape(PERSONAL_DESKTOP_PAPER_V2_OPERATIONS)
+    transition = runtime + rf"\\paper-account-transition-{_UUID}"
+    transition_staging = runtime + rf"\\\.paper-account-transition-{_UUID}\.staging"
+    operation = operations + rf"\\paper-operation-({_UUID})"
+    operation_staging = operations + rf"\\\.paper-operation-({_UUID})\.staging"
+    if any(
+        re.fullmatch(expression, path)
+        for expression in (
+            transition,
+            transition_staging,
+            operation,
+            operation_staging,
+        )
+    ):
         return PaperObjectSpec(PaperObjectRole.OUTPUT_DIRECTORY, directory)
     for expression, maximum in (
         (
-            transition + rf"\\checkpointed-paper-cycle-report-{_UUID}\.json",
+            rf"(?:{transition}|{transition_staging})"
+            + rf"\\checkpointed-paper-cycle-report-{_UUID}\.json",
             MAX_CHECKPOINTED_PAPER_CYCLE_REPORT_BYTES,
         ),
         (
-            transition + rf"\\paper-account-checkpoint-{_UUID}\.json",
+            rf"(?:{transition}|{transition_staging})"
+            + rf"\\paper-account-checkpoint-{_UUID}\.json",
             MAX_PAPER_ACCOUNT_SUCCESSOR_CHECKPOINT_BYTES,
         ),
         (
             operation + r"\\paper-operation-receipt-\1\.json",
+            MAX_PAPER_OPERATION_RECEIPT_BYTES,
+        ),
+        (
+            operation_staging + r"\\paper-operation-receipt-\1\.json",
             MAX_PAPER_OPERATION_RECEIPT_BYTES,
         ),
     ):

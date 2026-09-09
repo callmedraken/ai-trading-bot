@@ -20,7 +20,11 @@ from trading_bot.cli.paper_operation_execution import (
     PaperOperationExecutionClassification,
     PaperOperationExecutionResult,
 )
-from trading_bot.cli.paper_operation_inspection import PaperOperationClassification
+from trading_bot.cli.paper_operation_inspection import (
+    PaperOperationClassification,
+    PaperOperationInspectionCode,
+    PaperOperationInspectionResult,
+)
 from trading_bot.runtime import (
     CheckpointedVerifiedSnapshotPaperCycleStatus,
     SelectedC3SnapshotPermit,
@@ -108,6 +112,21 @@ def _raw_result(
             CheckpointedVerifiedSnapshotPaperCycleStatus.APPLIED if committed else None
         ),
         diagnostic_code=classification.value,
+    )
+
+
+def _inspection(
+    inputs,  # type: ignore[no-untyped-def]
+    classification: PaperOperationClassification,
+    diagnostic: PaperOperationInspectionCode,
+) -> PaperOperationInspectionResult:
+    return PaperOperationInspectionResult(
+        classification,
+        inputs.intent.operation_id,
+        inputs.intent.prior_lineage_evidence.terminal_checkpoint_id,
+        inputs.application_id,
+        None,
+        (diagnostic,),
     )
 
 
@@ -510,6 +529,173 @@ def test_executor_result_identity_mismatch_fails_closed_without_retry(
     )
 
 
+def test_frozen_profile_failure_precedes_inspection_output_policy_and_executor(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    scope, _, events, _ = _fixed_root_case(monkeypatch)
+
+    def mismatch(**kwargs):  # type: ignore[no-untyped-def]
+        del kwargs
+        raise ValueError("frozen mismatch")
+
+    monkeypatch.setattr(
+        execution,
+        "reconcile_personal_desktop_first_paper_operation",
+        mismatch,
+    )
+    authority = (
+        execution._open_disposable_supervised_paper_execution_authority_for_test()
+    )
+    with pytest.raises(
+        execution.SupervisedPaperOperationFrozenProfileMismatchError,
+        match="frozen first operation",
+    ):
+        execution._execute_prepared_supervised_paper_operation_for_test(
+            scope,
+            executor=lambda *args: pytest.fail("mismatch reached executor"),
+            inspector=lambda *args: pytest.fail("mismatch reached inspection"),
+            output_capability_factory=lambda: pytest.fail(
+                "mismatch reached output policy"
+            ),
+            authority=authority,
+        )
+    assert events[-1] == (
+        "b1-exit",
+        execution.SupervisedPaperOperationFrozenProfileMismatchError,
+    )
+
+
+@pytest.mark.parametrize(
+    ("classification", "diagnostic"),
+    [
+        (
+            PaperOperationClassification.ALREADY_APPLIED,
+            PaperOperationInspectionCode.ALREADY_APPLIED,
+        ),
+        (
+            PaperOperationClassification.CONFLICTING,
+            PaperOperationInspectionCode.LINEAGE_CONFLICT,
+        ),
+        (
+            PaperOperationClassification.BLOCKED,
+            PaperOperationInspectionCode.FINALIZED_TRANSITION_WITHOUT_RECEIPT,
+        ),
+        (
+            PaperOperationClassification.BLOCKED,
+            PaperOperationInspectionCode.VALID_FAILED_RECEIPT,
+        ),
+        (
+            PaperOperationClassification.BLOCKED,
+            PaperOperationInspectionCode.OPERATION_STAGING_EXISTS,
+        ),
+        (
+            PaperOperationClassification.BLOCKED,
+            PaperOperationInspectionCode.TRANSITION_STAGING_EXISTS,
+        ),
+        (
+            PaperOperationClassification.BLOCKED,
+            PaperOperationInspectionCode.INVALID_OPERATION_STATE,
+        ),
+        (
+            PaperOperationClassification.BLOCKED,
+            PaperOperationInspectionCode.UNSAFE_OPERATION_ROOT,
+        ),
+    ],
+)
+def test_first_run_non_pending_state_calls_no_output_policy_or_executor(
+    monkeypatch: pytest.MonkeyPatch,
+    classification: PaperOperationClassification,
+    diagnostic: PaperOperationInspectionCode,
+) -> None:
+    scope, _, events, _ = _fixed_root_case(monkeypatch)
+    monkeypatch.setattr(
+        execution,
+        "reconcile_personal_desktop_first_paper_operation",
+        lambda **kwargs: None,
+    )
+
+    def inspector(root, inputs):  # type: ignore[no-untyped-def]
+        assert root == Path(FIXED_OPERATION_ROOT)
+        return _inspection(inputs, classification, diagnostic)
+
+    authority = (
+        execution._open_disposable_supervised_paper_execution_authority_for_test()
+    )
+    with pytest.raises(
+        execution.SupervisedPaperOperationFirstRunAdmissionError,
+        match="PENDING/PENDING",
+    ):
+        execution._execute_prepared_supervised_paper_operation_for_test(
+            scope,
+            executor=lambda *args: pytest.fail("non-PENDING reached executor"),
+            inspector=inspector,
+            output_capability_factory=lambda: pytest.fail(
+                "non-PENDING reached output policy"
+            ),
+            authority=authority,
+        )
+    assert events[-1] == (
+        "b1-exit",
+        execution.SupervisedPaperOperationFirstRunAdmissionError,
+    )
+
+
+def test_first_run_exact_pending_enters_policy_and_calls_executor_once(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    scope, cycle, events, _ = _fixed_root_case(monkeypatch)
+    monkeypatch.setattr(
+        execution,
+        "reconcile_personal_desktop_first_paper_operation",
+        lambda **kwargs: None,
+    )
+    calls = 0
+    capability = object()
+
+    class OutputContext:
+        def __enter__(self):  # type: ignore[no-untyped-def]
+            assert cycle.active
+            events.append("output-enter")
+            return capability
+
+        def __exit__(self, exc_type, exc, traceback):  # type: ignore[no-untyped-def]
+            events.append(("output-exit", exc_type))
+
+    def inspector(root, inputs):  # type: ignore[no-untyped-def]
+        events.append("strict-inspection")
+        return _inspection(
+            inputs,
+            PaperOperationClassification.PENDING,
+            PaperOperationInspectionCode.PENDING,
+        )
+
+    def executor(root, inputs, output_capability):  # type: ignore[no-untyped-def]
+        nonlocal calls
+        calls += 1
+        assert cycle.active
+        assert output_capability is capability
+        assert events[-1] == "output-enter"
+        return _raw_result(inputs, PaperOperationExecutionClassification.COMPLETED)
+
+    authority = (
+        execution._open_disposable_supervised_paper_execution_authority_for_test()
+    )
+    result = execution._execute_prepared_supervised_paper_operation_for_test(
+        scope,
+        executor=executor,
+        inspector=inspector,
+        output_capability_factory=OutputContext,
+        authority=authority,
+    )
+    assert calls == 1
+    assert (
+        result.execution_classification
+        is PaperOperationExecutionClassification.COMPLETED
+    )
+    assert events.index("strict-inspection") < events.index("output-enter")
+    assert events[-2:] == [("output-exit", None), ("b1-exit", None)]
+
+
 def test_abandoned_owner_never_reaches_binding_or_executor(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -566,15 +752,11 @@ def test_pd2c_isolated_surface_keeps_all_effect_gates_false() -> None:
             "paper_account_security",
         )
     )
-    assert source.count("executor=execute_paper_operation_once") == 1
-    executor_calls = [
-        node
-        for node in ast.walk(ast.parse(source))
-        if isinstance(node, ast.Call)
-        and isinstance(node.func, ast.Name)
-        and node.func.id == "executor"
-    ]
-    assert len(executor_calls) == 1
+    assert source.count("executor=_execute_architecture_67") == 1
+    core_source = inspect.getsource(
+        execution._execute_prepared_supervised_paper_operation
+    )
+    assert core_source.count("result = executor(") == 1
 
     freeze_payload = Path(
         personal_desktop_paper_account_publication_freeze.__file__

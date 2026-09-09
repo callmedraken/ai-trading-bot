@@ -11,6 +11,7 @@ executor while the production gate remains false.
 from __future__ import annotations
 
 import threading
+from contextlib import nullcontext
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -22,6 +23,15 @@ from trading_bot.cli.paper_operation_execution import (
     PaperOperationExecutionResult,
     execute_paper_operation_once,
 )
+from trading_bot.cli.paper_operation_inspection import (
+    PaperOperationClassification,
+    PaperOperationInspectionCode,
+    PaperOperationInspectionResult,
+    inspect_paper_operation_root,
+)
+from trading_bot.cli.paper_operation_output_capability import (
+    PaperOperationOutputCapability,
+)
 from trading_bot.portfolio import MetadataEntry
 from trading_bot.runtime.manual_paper_selected_c3_snapshot import (
     SelectedC3SnapshotReadResult,
@@ -29,8 +39,15 @@ from trading_bot.runtime.manual_paper_selected_c3_snapshot import (
 from trading_bot.runtime.paper_operation_execution_inputs import (
     VerifiedPaperOperationExecutionInputs,
 )
+from trading_bot.runtime.personal_desktop_first_paper_operation import (
+    PERSONAL_DESKTOP_FIRST_PAPER_OPERATION_PROFILE,
+    reconcile_personal_desktop_first_paper_operation,
+)
 from trading_bot.runtime.personal_desktop_paper_account_authority import (
     PersonalDesktopPaperAccountError,
+)
+from trading_bot.runtime.personal_desktop_paper_runtime_output import (
+    open_personal_desktop_paper_runtime_output_capability,
 )
 from trading_bot.runtime.personal_desktop_supervised_paper_operation_preparation import (  # noqa: E501
     _require_active_prepared_paper_operation_binding,
@@ -49,7 +66,9 @@ from trading_bot.strategies import MovingAverageCrossoverConfig
 
 PERSONAL_DESKTOP_PAPER_V2_SUPERVISED_EXECUTION_EFFECTS_ENABLED = False
 
-_PERSONAL_DESKTOP_PAPER_V2_OPERATION_ROOT = r"F:\AITradingBot\Paper-v2\runtime"
+_PERSONAL_DESKTOP_PAPER_V2_OPERATION_ROOT = (
+    PERSONAL_DESKTOP_FIRST_PAPER_OPERATION_PROFILE.operation_root
+)
 _PRODUCTION_EXECUTION_ISSUER = object()
 _DISPOSABLE_EXECUTION_AUTHORITY_ISSUER = object()
 
@@ -74,12 +93,37 @@ class SupervisedPaperOperationResultReconciliationError(
     """The Architecture-67 result does not match the active preparation."""
 
 
+class SupervisedPaperOperationFrozenProfileMismatchError(
+    SupervisedPaperOperationExecutionError
+):
+    """The active post-lock operation differs from Architecture 106."""
+
+
+class SupervisedPaperOperationFirstRunAdmissionError(
+    SupervisedPaperOperationExecutionError
+):
+    """The frozen first operation is not exact PENDING/PENDING."""
+
+
 class _PaperOperationExecutor(Protocol):
     def __call__(
         self,
         operation_root: Path,
         inputs: VerifiedPaperOperationExecutionInputs,
+        output_capability: PaperOperationOutputCapability | None,
     ) -> PaperOperationExecutionResult: ...
+
+
+class _PaperOperationInspector(Protocol):
+    def __call__(
+        self,
+        operation_root: Path,
+        inputs: VerifiedPaperOperationExecutionInputs,
+    ) -> PaperOperationInspectionResult: ...
+
+
+class _OutputCapabilityFactory(Protocol):
+    def __call__(self) -> object: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -199,7 +243,11 @@ def execute_supervised_personal_desktop_paper_operation(
         )
     return _execute_prepared_supervised_paper_operation(
         preparation,
-        executor=execute_paper_operation_once,
+        executor=_execute_architecture_67,
+        inspector=inspect_paper_operation_root,
+        output_capability_factory=(
+            open_personal_desktop_paper_runtime_output_capability
+        ),
         _issuer=_PRODUCTION_EXECUTION_ISSUER,
     )
 
@@ -219,15 +267,33 @@ def _execute_prepared_supervised_paper_operation_for_test(
     *,
     executor: _PaperOperationExecutor,
     authority: _DisposableSupervisedPaperExecutionAuthorityForTest,
+    inspector: _PaperOperationInspector | None = None,
+    output_capability_factory: _OutputCapabilityFactory | None = None,
 ) -> SupervisedPaperOperationExecutionResult:
     """Exercise the future enabled branch with explicit disposable authority."""
 
     if type(authority) is not _DisposableSupervisedPaperExecutionAuthorityForTest:
         raise TypeError("disposable supervised execution authority is invalid")
     authority._consume()
+
+    def injected_executor(
+        operation_root: Path,
+        inputs: VerifiedPaperOperationExecutionInputs,
+        output_capability: PaperOperationOutputCapability | None,
+    ) -> PaperOperationExecutionResult:
+        if inspector is None:
+            return executor(operation_root, inputs)  # type: ignore[call-arg]
+        return executor(  # type: ignore[call-arg]
+            operation_root,
+            inputs,
+            output_capability,
+        )
+
     return _execute_prepared_supervised_paper_operation(
         preparation,
-        executor=executor,
+        executor=injected_executor,
+        inspector=inspector,
+        output_capability_factory=output_capability_factory,
         _issuer=_DISPOSABLE_EXECUTION_AUTHORITY_ISSUER,
     )
 
@@ -236,6 +302,8 @@ def _execute_prepared_supervised_paper_operation(
     preparation: _SupervisedPaperOperationPreparation,
     *,
     executor: _PaperOperationExecutor,
+    inspector: _PaperOperationInspector | None,
+    output_capability_factory: _OutputCapabilityFactory | None,
     _issuer: object,
 ) -> SupervisedPaperOperationExecutionResult:
     if (
@@ -247,6 +315,18 @@ def _execute_prepared_supervised_paper_operation(
         raise TypeError("supervised operation preparation type is invalid")
     if not callable(executor):
         raise TypeError("paper-operation executor is invalid")
+    if (inspector is None) != (output_capability_factory is None):
+        raise TypeError("first-operation inspection and output policy must be paired")
+    if inspector is not None and (
+        not callable(inspector) or not callable(output_capability_factory)
+    ):
+        raise TypeError("first-operation inspection or output policy is invalid")
+    if _issuer is _PRODUCTION_EXECUTION_ISSUER and (
+        inspector is not inspect_paper_operation_root
+        or output_capability_factory
+        is not open_personal_desktop_paper_runtime_output_capability
+    ):
+        raise TypeError("production first-operation policy is not source-owned")
 
     with preparation as active:
         if active is not preparation:
@@ -271,7 +351,44 @@ def _execute_prepared_supervised_paper_operation(
             raise SupervisedPaperOperationResultReconciliationError(
                 "prepared execution identities do not match the active preparation"
             )
-        result = executor(Path(binding.operation_root), inputs)
+        capability_context = nullcontext(None)
+        if inspector is not None:
+            try:
+                reconcile_personal_desktop_first_paper_operation(
+                    paper_account_id=active.paper_account_id,
+                    plan_id=active.plan_id,
+                    selected_snapshot_id=active.selected_snapshot_id,
+                    plan_sha256=active.plan_artifact_sha256,
+                    plan_byte_length=active.plan_artifact_byte_length,
+                    operation_root=binding.operation_root,
+                    inputs=inputs,
+                )
+            except Exception as error:
+                raise SupervisedPaperOperationFrozenProfileMismatchError(
+                    "active operation differs from the frozen first operation"
+                ) from error
+            first_inspection = inspector(Path(binding.operation_root), inputs)
+            if (
+                type(first_inspection) is not PaperOperationInspectionResult
+                or first_inspection.classification
+                is not PaperOperationClassification.PENDING
+                or first_inspection.diagnostics
+                != (PaperOperationInspectionCode.PENDING,)
+                or first_inspection.operation_id != inputs.intent.operation_id
+                or first_inspection.application_id != inputs.application_id
+                or first_inspection.terminal_checkpoint_id
+                != inputs.intent.prior_lineage_evidence.terminal_checkpoint_id
+            ):
+                raise SupervisedPaperOperationFirstRunAdmissionError(
+                    "first Paper-v2 operation requires exact PENDING/PENDING"
+                )
+            capability_context = output_capability_factory()
+        with capability_context as output_capability:
+            result = executor(
+                Path(binding.operation_root),
+                inputs,
+                output_capability,
+            )
         if type(result) is not PaperOperationExecutionResult:
             raise SupervisedPaperOperationResultReconciliationError(
                 "Architecture-67 executor returned an invalid result type"
@@ -294,3 +411,17 @@ def _execute_prepared_supervised_paper_operation(
             receipt_evidence_produced=result.receipt_path is not None,
             executor_called=True,
         )
+
+
+def _execute_architecture_67(
+    operation_root: Path,
+    inputs: VerifiedPaperOperationExecutionInputs,
+    output_capability: PaperOperationOutputCapability | None,
+) -> PaperOperationExecutionResult:
+    if output_capability is None:
+        raise TypeError("production Architecture-67 output capability is missing")
+    return execute_paper_operation_once(
+        operation_root,
+        inputs,
+        output_capability=output_capability,
+    )

@@ -24,6 +24,10 @@ from trading_bot.cli.paper_operation_inspection import (
     PaperOperationInspectionResult,
     inspect_paper_operation_root,
 )
+from trading_bot.cli.paper_operation_output_capability import (
+    PaperOperationOutputCapability,
+    require_output_capability,
+)
 from trading_bot.cli.paper_operation_receipt_output import (
     PaperOperationReceiptOutputError,
     ReceiptCommitVerificationPhase,
@@ -209,6 +213,8 @@ class _VerificationFailure(Exception):
 def execute_paper_operation_once(
     operation_root: Path,
     inputs: VerifiedPaperOperationExecutionInputs,
+    *,
+    output_capability: PaperOperationOutputCapability | None = None,
 ) -> PaperOperationExecutionResult:
     """Complete or recover one exact operation without retrying its runtime."""
     if (
@@ -216,6 +222,15 @@ def execute_paper_operation_once(
         or type(inputs) is not VerifiedPaperOperationExecutionInputs
     ):
         raise TypeError("paper-operation execution arguments are invalid")
+    try:
+        capability = require_output_capability(output_capability)
+    except TypeError:
+        inspection = _unavailable_inspection(inputs)
+        return _from_inspection(
+            inspection,
+            PaperOperationExecutionClassification.BLOCKED,
+            PaperOperationExecutionDiagnosticCode.OUTPUT_SAFETY_FAILURE.value,
+        )
     try:
         retained_parent = validate_output_parent(operation_root)
     except CheckpointTransitionOutputError:
@@ -236,6 +251,7 @@ def execute_paper_operation_once(
                 retained_parent,
                 inspection,
                 inputs,
+                capability,
             )
         if (
             inspection.classification is PaperOperationClassification.BLOCKED
@@ -271,6 +287,9 @@ def execute_paper_operation_once(
                 PaperOperationExecutionClassification.BLOCKED,
                 PaperOperationExecutionDiagnosticCode.OPERATION_ROOT_CHANGED.value,
             )
+        if capability is not None:
+            capability.verify_parent(current_parent.path)
+            capability.verify_parent(current_parent.path / "paper-operations")
         preflight_transition_directory(
             current_parent,
             application_id=str(inputs.application_id),
@@ -296,6 +315,7 @@ def execute_paper_operation_once(
                 inspection,
                 inputs,
                 diagnostic,
+                capability,
             )
         return _from_inspection(
             inspection,
@@ -390,6 +410,7 @@ def execute_paper_operation_once(
             successor=successor,
             successor_payload=successor_payload,
             verifier=verify_reread,
+            output_capability=capability,
         )
     except _VerificationFailure as error:
         return _produced_failure(
@@ -426,6 +447,7 @@ def execute_paper_operation_once(
         transition.directory,
         PaperOperationExecutionClassification.COMPLETED,
         PaperOperationExecutionDiagnosticCode.COMPLETED,
+        capability,
     )
 
 
@@ -433,6 +455,7 @@ def _recover_receipt(
     parent: OutputParent,
     inspection: PaperOperationInspectionResult,
     inputs: VerifiedPaperOperationExecutionInputs,
+    output_capability: PaperOperationOutputCapability | None,
 ) -> PaperOperationExecutionResult:
     try:
         current_parent = validate_output_parent(parent.path)
@@ -515,6 +538,7 @@ def _recover_receipt(
         transition.directory,
         PaperOperationExecutionClassification.RECEIPT_RECOVERED,
         PaperOperationExecutionDiagnosticCode.RECEIPT_RECOVERED,
+        output_capability,
     )
 
 
@@ -560,6 +584,7 @@ def _finalize_failed_receipt(
     inspection: PaperOperationInspectionResult,
     inputs: VerifiedPaperOperationExecutionInputs,
     diagnostic: PaperOperationDiagnosticCode,
+    output_capability: PaperOperationOutputCapability | None,
 ) -> PaperOperationExecutionResult:
     if diagnostic not in ELIGIBLE_FAILED_RECEIPT_DIAGNOSTICS:
         return _from_inspection(
@@ -634,6 +659,7 @@ def _finalize_failed_receipt(
             operation_id=inputs.intent.operation_id,
             receipt_payload=receipt_payload,
             verifier=verify_receipt_reread,
+            output_capability=output_capability,
         )
     except _VerificationFailure as error:
         return _from_inspection(
@@ -695,6 +721,7 @@ def _finalize_completed_receipt(
     transition_path: Path,
     classification: PaperOperationExecutionClassification,
     success_diagnostic: PaperOperationExecutionDiagnosticCode,
+    output_capability: PaperOperationOutputCapability | None,
 ) -> PaperOperationExecutionResult:
     try:
         receipt = PaperOperationReceipt(
@@ -759,6 +786,7 @@ def _finalize_completed_receipt(
             operation_id=inputs.intent.operation_id,
             receipt_payload=receipt_payload,
             verifier=verify_receipt_reread,
+            output_capability=output_capability,
         )
     except _VerificationFailure as error:
         return _receipt_failure(

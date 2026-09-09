@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import ast
+import gc
 import json
+import weakref
+from dataclasses import replace
 from hashlib import sha256
 from pathlib import Path
 from types import SimpleNamespace
@@ -351,6 +354,35 @@ def test_success_reconstructs_original_inputs_and_rereads_account(
     assert input_args[3:6] == ((), (), ())
     assert input_args[7] == _GENESIS_BYTES
     assert input_args[0] is case.receipt.intent
+
+
+def test_selected_reader_remains_alive_through_bundle_preparation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    case = _case(monkeypatch)
+    original_factory = case.deps.selected_reader_factory
+    original_bundle_preparer = case.deps.bundle_preparer
+    reader_reference: weakref.ReferenceType[_Reader] | None = None
+
+    def selected_reader_factory(authority: object) -> _Reader:
+        nonlocal reader_reference
+        reader = original_factory(authority)
+        reader_reference = weakref.ref(reader)
+        return reader
+
+    def bundle_preparer(**kwargs: object) -> object:
+        gc.collect()
+        assert reader_reference is not None
+        assert reader_reference() is not None
+        return original_bundle_preparer(**kwargs)
+
+    case.deps = replace(
+        case.deps,
+        selected_reader_factory=selected_reader_factory,
+        bundle_preparer=bundle_preparer,
+    )
+
+    assert _run(case)["result"] == "RECONCILED"
 
 
 @pytest.mark.parametrize(

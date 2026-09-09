@@ -646,9 +646,8 @@ def _run(deps: _Dependencies, *, _issuer: object) -> dict[str, object]:
     frozen = _frozen_inputs(history_seed)
     authority = deps.authority_loader()
     _require_authority(authority)
-    selected = deps.selected_reader_factory(authority).read_selected_snapshot(
-        str(_EXPECTED_SELECTION_ID)
-    )
+    selected_reader = deps.selected_reader_factory(authority)
+    selected = selected_reader.read_selected_snapshot(str(_EXPECTED_SELECTION_ID))
     _require_selected_snapshot(selected)
 
     bundle = deps.bundle_preparer(

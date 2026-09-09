@@ -875,12 +875,87 @@ def test_script_is_thin_delegate_only() -> None:
         / "scripts"
         / "execute_first_personal_desktop_paper_operation.py"
     )
-    tree = ast.parse(script.read_text(encoding="utf-8"))
-    imports = [node for node in tree.body if isinstance(node, ast.ImportFrom)]
-    assert len(imports) == 1
-    assert imports[0].module == "trading_bot.cli.pd2d2_first_paper_execution"
-    assert [alias.name for alias in imports[0].names] == ["main"]
-    assert sum(isinstance(node, ast.Call) for node in ast.walk(tree)) == 2
+    source = script.read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    assert ast.get_docstring(tree) == (
+        "Run the frozen first personal-desktop Paper-v2 execution harness."
+    )
+    assert len(tree.body) == 7
+
+    sys_import, pathlib_import = tree.body[1:3]
+    assert isinstance(sys_import, ast.Import)
+    assert [(alias.name, alias.asname) for alias in sys_import.names] == [("sys", None)]
+    assert isinstance(pathlib_import, ast.ImportFrom)
+    assert pathlib_import.module == "pathlib"
+    assert [(alias.name, alias.asname) for alias in pathlib_import.names] == [
+        ("Path", None)
+    ]
+
+    source_root_assignment = tree.body[3]
+    assert isinstance(source_root_assignment, ast.Assign)
+    assert ast.dump(source_root_assignment, include_attributes=False) == ast.dump(
+        ast.parse('_SOURCE_ROOT = Path(__file__).resolve().parents[1] / "src"').body[0],
+        include_attributes=False,
+    )
+
+    bootstrap = tree.body[4]
+    assert isinstance(bootstrap, ast.If)
+    assert ast.dump(bootstrap.test, include_attributes=False) == ast.dump(
+        ast.parse("str(_SOURCE_ROOT) not in sys.path", mode="eval").body,
+        include_attributes=False,
+    )
+    assert len(bootstrap.body) == 1
+    assert ast.dump(bootstrap.body[0], include_attributes=False) == ast.dump(
+        ast.parse("sys.path.insert(0, str(_SOURCE_ROOT))").body[0],
+        include_attributes=False,
+    )
+    assert bootstrap.orelse == []
+
+    delegate_import = tree.body[5]
+    assert isinstance(delegate_import, ast.ImportFrom)
+    assert delegate_import.module == "trading_bot.cli.pd2d2_first_paper_execution"
+    assert [(alias.name, alias.asname) for alias in delegate_import.names] == [
+        ("main", None)
+    ]
+
+    main_guard = tree.body[6]
+    assert isinstance(main_guard, ast.If)
+    assert ast.dump(main_guard.test, include_attributes=False) == ast.dump(
+        ast.parse('__name__ == "__main__"', mode="eval").body,
+        include_attributes=False,
+    )
+    assert len(main_guard.body) == 1
+    assert ast.dump(main_guard.body[0], include_attributes=False) == ast.dump(
+        ast.parse("raise SystemExit(main())").body[0],
+        include_attributes=False,
+    )
+    assert main_guard.orelse == []
+
+    imports = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.Import, ast.ImportFrom))
+    ]
+    assert imports == [sys_import, pathlib_import, delegate_import]
+    identifiers = {node.id for node in ast.walk(tree) if isinstance(node, ast.Name)} | {
+        node.attr for node in ast.walk(tree) if isinstance(node, ast.Attribute)
+    }
+    assert identifiers.isdisjoint(
+        {
+            "broker",
+            "execute_paper_operation_once",
+            "executor",
+            "provider",
+            "recover",
+            "recovery",
+            "rename",
+            "replace",
+            "subprocess",
+            "unlink",
+            "write_bytes",
+            "write_text",
+        }
+    )
 
 
 def test_publication_freeze_values_are_fully_reconciled(

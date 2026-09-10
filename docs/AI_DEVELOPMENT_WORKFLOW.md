@@ -20,7 +20,9 @@ ChatGPT owns:
 - concrete next-step and next-milestone instructions.
 
 When the next action is known, ChatGPT should provide it automatically rather
-than waiting for the user to ask what to do next.
+than waiting for the user to ask what to do next. Tiny, tightly scoped status,
+handoff, and workflow-documentation closeouts should normally be handled
+directly by ChatGPT rather than delegated to Codex.
 
 ### Codex
 
@@ -168,6 +170,31 @@ At the final source-certification boundary:
 - after a clean certification, do not rerun the full suite unless source code
   changes.
 
+### Windows pytest temporary-directory rule
+
+On John's Windows development account, pytest commands that may use `tmp_path`
+or `tmpdir` must use a fresh explicit `--basetemp` outside
+`C:\Users\John\AppData\Local\Temp\pytest-of-John`. The default pytest temp root
+has previously produced `WinError 5` while pytest was only setting up fixtures;
+that is an environment/setup failure, not a source regression.
+
+Use the existing external test-temp convention:
+
+```powershell
+$BaseTemp = "F:\AI\temp\pytest\<purpose>-$([guid]::NewGuid().ToString('N'))"
+New-Item -ItemType Directory -Force 'F:\AI\temp\pytest' | Out-Null
+& $Python -m pytest ... --basetemp="$BaseTemp" -p no:cacheprovider
+```
+
+Rules:
+
+- use a fresh unique basetemp for each controlled run;
+- do not globally change `TEMP` or `TMP` to work around pytest permissions;
+- do not persistently set `PYTHONPATH` for normal pytest collection;
+- `pyproject.toml`'s `pythonpath = ["src"]` owns normal pytest imports;
+- when a certification command is generated for this host, explicit basetemp is
+  part of the command, not an optional troubleshooting fallback.
+
 Milestone and verification reports should always include the next recommended
 step.
 
@@ -179,15 +206,13 @@ otherwise resolve `trading_bot` from the wrong checkout. Pytest's configured
 `pythonpath = ["src"]` protects normal pytest collection, but it does not protect
 standalone `python -c`, module, script, Ruff, or operator invocations.
 
-For an isolated worktree, explicitly bind imports to that worktree before
-running Python-backed checks. For the current personal-desktop worktree:
+For a standalone provenance probe, bind the expected source root only inside
+that one Python process instead of exporting persistent `PYTHONPATH`. For the
+current personal-desktop worktree:
 
 ```powershell
 Set-Location 'F:\AI\worktrees\ai-trading-bot-personal-desktop'
-$env:AI_TRADING_BOT_WORKTREE = (Get-Location).Path
-$env:PYTHONPATH = "$env:AI_TRADING_BOT_WORKTREE\src"
-
-& 'F:\AI\ai-trading-bot\.venv\Scripts\python.exe' -c "import os, pathlib, trading_bot; root=(pathlib.Path(os.environ['AI_TRADING_BOT_WORKTREE'])/'src').resolve(); module=pathlib.Path(trading_bot.__file__).resolve(); assert root in module.parents, (root, module); print(module)"
+& 'F:\AI\ai-trading-bot\.venv\Scripts\python.exe' -c "import sys,pathlib; root=pathlib.Path(r'F:\AI\worktrees\ai-trading-bot-personal-desktop\src').resolve(); sys.path.insert(0,str(root)); import trading_bot; module=pathlib.Path(trading_bot.__file__).resolve(); assert root in module.parents, (root,module); print(module)"
 ```
 
 The printed module path must be under the expected worktree `src` tree. An

@@ -44,6 +44,12 @@ bd88ee966bff455f9fc897d6cfdfafdd807f27e2
 Architecture-94 P2 product base:
 a810122a96b6fc90da25d71eede8da64b7272c98
 
+latest accepted PD2D2 source:
+f05921244057052158a57b360e9bf556209b9654
+
+latest accepted PD2D2 tree:
+35a5a7e1d59bbe90ca303b6037d29dc7fc085f4c
+
 branch:
 feature/personal-desktop-paper-runtime
 
@@ -52,9 +58,6 @@ F:\AI\worktrees\ai-trading-bot-personal-desktop
 
 interpreter:
 F:\AI\ai-trading-bot\.venv\Scripts\python.exe
-
-PYTHONPATH:
-F:\AI\worktrees\ai-trading-bot-personal-desktop\src
 ```
 
 Before every bounded task:
@@ -68,8 +71,25 @@ git status --short
 ```
 
 Any mismatch is a STOP. Do not self-correct with checkout/switch/reset/rebase/
-clean. Controlled pytest uses a fresh external
-`F:\AI\temp\pytest\<unique>` plus `-p no:cacheprovider`.
+clean.
+
+Normal pytest collection uses `pyproject.toml`'s `pythonpath = ["src"]`. Do not
+persistently export `PYTHONPATH` for ordinary pytest runs. Standalone provenance
+checks may insert the selected worktree `src` into `sys.path` inside that one
+Python process only.
+
+Controlled pytest on John's Windows development account must use a fresh
+external basetemp because the default
+`C:\Users\John\AppData\Local\Temp\pytest-of-John` has a known WinError-5 access
+condition:
+
+```powershell
+$BaseTemp = "F:\AI\temp\pytest\<purpose>-$([guid]::NewGuid().ToString('N'))"
+New-Item -ItemType Directory -Force 'F:\AI\temp\pytest' | Out-Null
+& $Python -m pytest ... --basetemp="$BaseTemp" -p no:cacheprovider
+```
+
+Do not globally alter `TEMP` or `TMP` to work around that condition.
 
 ## 3. ChatGPT / Codex workflow
 
@@ -85,6 +105,9 @@ known contract + known files/test surface    -> Luna Extra High
 discovery-aware/cross-module bounded work    -> Astra
 native Windows/security/authority/recovery   -> Sol High
 ```
+
+Tiny status, handoff, and workflow-documentation closeouts should normally be
+handled directly by ChatGPT rather than delegated.
 
 After a reviewed checkpoint passes, automatically continue to the next safe
 scoped checkpoint. Model choice does not transfer architecture or acceptance
@@ -108,11 +131,11 @@ This does **not** automatically authorize:
 
 ```text
 provider call #7
+Paper-v2 recovery effects
 broker submission
 live trading
 unattended scheduling
-changing the PD2C supervised-execution gate to True
-first real Paper-v2 runtime mutation
+changing a closed production/recovery/supervised effect gate
 v1 cleanup/repair/migration
 account/group/password changes
 LSA policy/right changes
@@ -121,9 +144,10 @@ unrelated project effects
 merge/rebase/amend/force-push/PR metadata changes
 ```
 
-Read-only qualification work may proceed through its reviewed source/test gates.
-Any step that would actually enable or perform the first durable Paper-v2
-mutation stops for fresh explicit user authorization.
+Read-only architecture, source, review, and qualification work may continue when
+it does not cross an effect boundary. Any real recovery effect, unattended run,
+broker effect, or later live effect requires a separately reviewed checkpoint
+and fresh explicit authorization where required.
 
 ## 5. Frozen C3 production state
 
@@ -265,15 +289,6 @@ Accepted source:
 tree 9dc5087b87cfd2c16ef76d97c04fd20d41ba7187
 ```
 
-Canonical state:
-
-```text
-PD2A_ARCHITECTURE_ACCEPTED = YES
-PD2A_SOURCE_ACCEPTED       = YES
-PD2A_SOURCE_CERTIFIED      = YES
-PD2A                       = COMPLETE
-```
-
 Key semantics: fixed 30-second deterministic account mutex, exact kernel
 security validation, explicit `ABANDONED_OWNER`, same-account non-reentrancy,
 and process-lifetime poison after uncertain `ReleaseMutex` failure.
@@ -295,14 +310,6 @@ PD2B1 84f12f030221207fa41de2f39bf8c1e4aef42160
 PD2B2 d0f6dc29be273df6fec44a5d7c8eaa65448bf3e3
 PD2B3 f86f8c8758b3e8941e5bbfa26d40892433cf0110
 tree  9f883335ec13a9385113b2c310c6009a8a0e72aa
-```
-
-Canonical state:
-
-```text
-PD2B_SOURCE_ACCEPTED  = YES
-PD2B_SOURCE_CERTIFIED = YES
-PD2B                  = COMPLETE
 ```
 
 Accepted ordering:
@@ -347,15 +354,6 @@ commit 8d590d06d346140002a3a20eefa9b5a7d087326d
 tree   ed322f18b1f98ff88f144ac11bfbcc3fd353d9a3
 ```
 
-Canonical state:
-
-```text
-PD2C_ARCHITECTURE_ACCEPTED = YES
-PD2C_SOURCE_ACCEPTED       = YES
-PD2C_SOURCE_CERTIFIED      = YES
-PD2C                       = COMPLETE
-```
-
 Dedicated execution gate:
 
 ```text
@@ -369,123 +367,126 @@ PERSONAL_DESKTOP_PAPER_V2_PRODUCTION_EFFECTS_ENABLED = False
 PERSONAL_DESKTOP_PAPER_V2_RECOVERY_EFFECTS_ENABLED   = False
 ```
 
-With the execution gate false, the public PD2C API validates genuine C1/P2 then
-blocks before entering PD2B3, acquiring the account mutex, rereading Paper-v2,
-retrieving the private binding, or invoking A67. The future enabled branch uses
-the exact source-owned runtime root, executes A67 once, reconciles operation and
-application identities, and returns only non-authorizing audit fields.
+Final certification: `4775 passed, 17 skipped`; Ruff/diff clean.
 
-Final certification:
+### PD2D — first real supervised Paper-v2 operation — COMPLETE
+
+Completion record:
 
 ```text
-4775 passed, 17 skipped
+docs/validation/pd2d2-first-real-paper-operation-completion.md
+```
+
+PD2D1 completed the read-only qualification and froze the exact first-cycle
+inputs. PD2D2 then performed exactly one explicitly authorized real Paper-v2
+mutation under the dedicated non-admin Trading account.
+
+Durable first-operation identities:
+
+```text
+paper_account_id:       9415cd7b-bf36-5fba-bd58-a0f99119dc21
+GENESIS checkpoint:     1832a2b5-8b63-501a-8f7d-f1722c32307b
+operation_id:           307f769a-f09a-539d-b12d-3fb51b973809
+application_id:         78a1bae8-51ac-5bf0-b159-500768c758fc
+cycle_result_id:        854f133e-d9cd-5a9d-be63-0eb4137787db
+successor checkpoint:   ed4640e5-0630-525d-b916-d50e31e3ba2a
+terminal checkpoint:    ed4640e5-0630-525d-b916-d50e31e3ba2a
+receipt_status:         COMPLETED
+receipt_outcome:        NO_ACTION
+```
+
+After the mutation, the supervised gate was closed again. Architecture 108
+performed an independent read-only production reconciliation under Trading.
+Architecture-108 R1 fixed one P2 reader-lifetime composition bug without
+altering P2 provenance checks or durable Paper-v2 state.
+
+Accepted final source:
+
+```text
+commit f05921244057052158a57b360e9bf556209b9654
+tree   35a5a7e1d59bbe90ca303b6037d29dc7fc085f4c
+```
+
+Accepted reconciliation:
+
+```text
+result:                    RECONCILED
+all_effect_gates_false:    true
+lineage_edge_count:        1
+account_cash:              25000
+position_count:            0
+receipt_status:            COMPLETED
+receipt_outcome:           NO_ACTION
+inspection_classification: ALREADY_APPLIED
+inspection_diagnostic:     ALREADY_APPLIED
+exit:                      0
+```
+
+Final broad certification:
+
+```text
+5146 passed, 17 skipped in 1505.92s
 Ruff check: PASS
-Ruff format --check: PASS (432 files)
+Ruff format --check: PASS (457 files)
 git diff --check: PASS
 worktree/index: clean
 ```
 
-No production/native/provider/broker effect or Paper-v2 mutation occurred.
-
-## 9. Current checkpoint — PD2D1 read-only first-mutation qualification
-
-Architecture:
+Canonical PD2 state:
 
 ```text
-docs/architecture/105-personal-desktop-first-paper-mutation-qualification.md
+PD2A  = COMPLETE
+PD2B  = COMPLETE
+PD2C  = COMPLETE
+PD2D1 = COMPLETE
+PD2D2 = COMPLETE
+PD2   = COMPLETE
 ```
 
-Validation plan:
+## 9. Current checkpoint — PD3 supervised crash/recovery validation
+
+PD3 is now the active milestone. It should validate a personal-desktop recovery
+authority around the **existing Architecture-67 restart-safe recovery
+semantics**, not introduce a second recovery implementation.
+
+Existing generic behavior to preserve:
 
 ```text
-docs/validation/pd2d1-first-paper-mutation-qualification-plan.md
+verified finalized transition + missing receipt
+-> reconstruct the same canonical completed receipt
+-> runtime invocation count = 0
+-> transition bytes unchanged
+
+verified completed transition + completed receipt
+-> ALREADY_APPLIED
+-> runtime invocation count = 0
+-> writes = 0
+
+receipt staging / transition staging / malformed or altered evidence /
+ambiguous layout / lineage mismatch
+-> BLOCKED
+-> no deletion, cleanup, repair, replacement, finalization, or blind retry
 ```
 
-Accepted and verified source:
+PD3 must keep the real-host composition proportional to the closed single-user
+desktop threat model:
 
 ```text
-commit bd95d522f5bcf398a243ec2b5fdb8cdc18f63afc
-tree   90b9fc8abb21a61e78e8beae9cdfc9e11e4ebd5c
-```
-
-PD2D1-F1 first-cycle pure-input freeze is complete at commit
-`45291c3053a23de02e118f5b853bd67b5cf36ca8` (tree
-`e3fdf3af20d3d8cbceb1e9bedbf59603f9913c9e`). PD2D1-F2 freezes the offline
-market evidence as:
-
-```text
-seed_id: 5dc95e10-ba22-5b91-94b2-0d851aa8e2d7
-seed SHA-256: 40dda54c82324f358d640cce89e467295b8f5b73a32fed76c52e7ca90d398e64
-seed byte length: 1060
-SPY 2026-08-31 caller-asserted open reference: Decimal("767.33")
-```
-
-Current checkpoint state:
-
-```text
-PD2D1_SOURCE_ACCEPTED                = YES
-PD2D1_SOURCE_VERIFIED                = YES
-PD2D1_RH0_PLANNING_ACCEPTED          = YES
-PD2D1_NON_MARKET_DATA_PROFILE_FROZEN = YES
-PD2D1_F1_COMPLETE                    = YES
-PD2D1_F2_OFFLINE_EVIDENCE_FROZEN     = YES
-PD2D1_REAL_HOST_QUALIFIED            = NO
-PD2D2_AUTHORIZED                     = NO
-```
-
-The first-cycle non-market-data profile is frozen in
-`docs/validation/pd2d1-first-cycle-input-freeze.md`; its exact offline
-`strategy-history-seed/v1` and SPY `2026-08-31` open-reference provenance are
-frozen in `docs/validation/pd2d1-first-cycle-market-data-evidence.md`. No PD2D1
-real-host qualification has occurred. The next checkpoint is review and freeze
-of the read-only real-host operator harness, and PD2D2 remains **NOT
-AUTHORIZED**.
-
-PD2D1 is a non-mutating readiness checkpoint. It prepares the exact would-be
-operation under genuine production authority and the same account-mutex lifetime,
-then calls the existing read-only `inspect_paper_operation_root` rather than the
-A67 executor.
-
-Required ordering:
-
-```text
-genuine C1/P2
--> PD2B3 preparation
--> PD2A mutex + post-lock Paper-v2 reread
--> exact P1 replay verification
--> private active A67 binding
--> exact fixed F:\AITradingBot\Paper-v2\runtime
--> inspect_paper_operation_root only
--> reconcile inspection operation/application/terminal identities
--> READY only for exact PENDING/PENDING
--> private binding expires
+dedicated non-admin Trading principal
+-> genuine C1 authority
+-> exact Paper-v2 identity
+-> PD2A account mutex
+-> post-lock genuine Paper-v2 reread/reconciliation
+-> exact crash-state classification
+-> recovery gate checked separately
+-> only the already-reviewed zero-runtime receipt-recovery path may be admitted
+-> reread/reverify durable state
 -> mutex release
 ```
 
-Qualification must preserve these rules:
-
-1. The PD2C execution gate remains false and qualification must refuse to act if
-   it is already true.
-2. Qualification never calls `execute_paper_operation_once` and never imports a
-   mutation coordinator as an injected production seam.
-3. Production-facing callers cannot supply a root, raw A67 inputs, preparation,
-   inspector override, IDs, prior/lineage, mutex values, or a readiness override.
-4. The inspector result must exactly reconcile operation ID, application ID,
-   and terminal checkpoint ID to the active prepared inputs.
-5. Only `PaperOperationClassification.PENDING` with diagnostic `PENDING` is
-   READY. Every other valid classification is NOT_READY; wrong types/identity
-   mismatches fail closed.
-6. The result exposes no filesystem path or raw execution input and grants no
-   permission to execute later.
-7. `ABANDONED_OWNER` remains blocked by PD2B3 before inspection.
-8. Focused source tests use fake/disposable seams. A later real-host
-   qualification may acquire the real mutex and perform read-only Paper-v2
-   inspection under `Trading`, but still performs no durable mutation.
-9. Provider call #7, brokerage, live trading, scheduling, credentials, and
-   Windows security/account mutation remain out of scope.
-
-PD2D1 remains Sol-High territory because it qualifies the exact production
-state immediately before the future mutation boundary.
+Recovery effects remain disabled and unauthorized until a separately reviewed
+source/effect checkpoint explicitly opens them. PD3 must never turn a failed,
+ambiguous, or already-complete operation into a new trading-cycle attempt.
 
 ## 10. Architecture-67 ordering facts to preserve
 
@@ -504,13 +505,13 @@ state immediately before the future mutation boundary.
 ```text
 PD0   personal-desktop profile adoption                     COMPLETE
 PD1   personal-desktop paper-account authority v2           COMPLETE
-PD2   reliable supervised manual paper cycle                CURRENT
+PD2   reliable supervised manual paper cycle                COMPLETE
   PD2A account mutex + supervised admission                 COMPLETE
   PD2B supervised source-only composition                   COMPLETE
   PD2C supervised A67 execution boundary                    COMPLETE
-  PD2D1 read-only first-mutation qualification              CURRENT / F1 COMPLETE / F2 EVIDENCE FROZEN
-  PD2D2 enable gate + first real Paper-v2 mutation          NOT AUTHORIZED
-PD3   supervised crash/recovery validation
+  PD2D1 read-only first-mutation qualification              COMPLETE
+  PD2D2 first real Paper-v2 mutation + reconciliation       COMPLETE
+PD3   supervised crash/recovery validation                  CURRENT
 PD4   unattended simulated paper under Trading
 PD5   broker-paper integration
 PD6   broker-paper soak / operational hardening
@@ -522,14 +523,14 @@ PD8   tiny restricted live -> gradual maturity
 
 ```text
 provider call #7
+Paper-v2 recovery effects
 broker order submission
 live trading
 unattended scheduling
-changing PERSONAL_DESKTOP_PAPER_V2_SUPERVISED_EXECUTION_EFFECTS_ENABLED to True
-first real Paper-v2 runtime mutation
+changing any closed production/recovery/supervised effect gate without review
 old v1 publisher rerun
 v1 staging delete/repair/rename/migration/reuse
-Paper-v2 manual mutation outside reviewed PD2 effect checkpoints
+Paper-v2 manual mutation outside reviewed effect checkpoints
 account/group/password changes
 LSA rights/policy changes
 KSP/signing/private-export effects
@@ -539,20 +540,21 @@ merge/rebase/force-push/amend/PR metadata changes without explicit approval
 ## 13. Resume procedure
 
 1. Read `AGENTS.md`, `docs/PROJECT_STATUS.md`, this handoff,
-   `docs/AI_DEVELOPMENT_WORKFLOW.md`, Architectures 103–105, and the PD1/PD2A/
-   PD2B/PD2C completion records.
-2. Prove exact worktree/branch/HEAD/tree/clean state.
-3. For PD2D1, review PD2B3 private-binding lifetime, PD2C gate semantics,
-   `inspect_paper_operation_root`, account-read authority, and PD2A cleanup.
-4. Use Codex Sol High for PD2D1 source implementation.
-5. Keep implementation source-only/fake-disposable; user runs the broad suite
-   only after exact GitHub review.
-6. After source certification, perform a separately reviewed read-only Trading-
-   host qualification. That run may read Paper-v2 and acquire/release its mutex
-   but must not execute A67 or mutate Paper-v2.
-7. Stop before any source gate enablement or first real mutation and obtain
-   fresh explicit user authorization.
-8. Include the next milestone in every verification/acceptance report.
+   `docs/AI_DEVELOPMENT_WORKFLOW.md`, Architecture 108, the PD2D2 completion
+   record, and the existing restart-safe paper-operation validation document.
+2. Prove exact worktree/branch/HEAD/tree/clean state before edits or local
+   operator work.
+3. Treat PD2D2 as complete; do not rerun the first execution harness.
+4. For PD3, begin with source-only architecture/validation design around the
+   existing zero-runtime missing-receipt recovery behavior.
+5. Preserve the PD2A mutex and genuine post-lock Paper-v2 reread as authority;
+   do not grant recovery from pre-lock or caller-supplied state.
+6. Keep `PERSONAL_DESKTOP_PAPER_V2_RECOVERY_EFFECTS_ENABLED` false through
+   architecture/source review and focused tests.
+7. Do not authorize a real recovery effect merely because source tests pass.
+8. Use a fresh explicit `--basetemp` under `F:\AI\temp\pytest\` for controlled
+   Windows pytest runs; do not persistently export `PYTHONPATH`.
+9. Include the next milestone in every verification/acceptance report.
 
 ## 14. Definition of project success
 

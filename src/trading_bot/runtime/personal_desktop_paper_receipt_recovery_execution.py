@@ -111,6 +111,21 @@ class PersonalDesktopPaperReceiptRecoveryResult:
 
     def __post_init__(self) -> None:
         attempted = self.operation_id is not None
+        valid_attempt_result = (
+            self.pre_recovery_classification is PaperOperationClassification.BLOCKED
+            and self.recovery_classification
+            is PaperOperationExecutionClassification.RECEIPT_RECOVERED
+            and self.receipt_evidence_produced
+        ) or (
+            (
+                self.pre_recovery_classification is PaperOperationClassification.BLOCKED
+                or self.pre_recovery_classification
+                is PaperOperationClassification.ALREADY_APPLIED
+            )
+            and self.recovery_classification
+            is PaperOperationExecutionClassification.ALREADY_APPLIED
+            and not self.receipt_evidence_produced
+        )
         paired = (
             self.application_id,
             self.predecessor_checkpoint_id,
@@ -166,20 +181,9 @@ class PersonalDesktopPaperReceiptRecoveryResult:
                     is not (
                         PaperReceiptRecoveryQualificationStatus.RECEIPT_RECOVERY_REQUIRED
                     )
-                    or self.pre_recovery_classification
-                    is not PaperOperationClassification.BLOCKED
                     or self.post_recovery_classification
                     is not PaperOperationClassification.ALREADY_APPLIED
-                    or self.recovery_classification
-                    not in {
-                        PaperOperationExecutionClassification.RECEIPT_RECOVERED,
-                        PaperOperationExecutionClassification.ALREADY_APPLIED,
-                    }
-                    or self.receipt_evidence_produced
-                    != (
-                        self.recovery_classification
-                        is PaperOperationExecutionClassification.RECEIPT_RECOVERED
-                    )
+                    or not valid_attempt_result
                 )
             )
         ):
@@ -573,7 +577,7 @@ def _compose_personal_desktop_paper_receipt_recovery(
                 installed_terminal_checkpoint_id=(
                     result.installed_terminal_checkpoint_id
                 ),
-                pre_recovery_classification=result.inspection_classification,
+                pre_recovery_classification=before_classification,
                 recovery_classification=recovery_classification,
                 recovery_diagnostic=recovery_diagnostic,
                 receipt_evidence_produced=(

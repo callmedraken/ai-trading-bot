@@ -325,10 +325,14 @@ def test_pre_lock_no_recovery_is_benign_zero_write() -> None:
 def test_recovery_holds_mutex_through_post_read_final_inspection_and_close() -> None:
     events: list[str] = []
     result = _run(events)
+    assert result.pre_recovery_classification is PaperOperationClassification.BLOCKED
     assert result.recovery_classification is (
         PaperOperationExecutionClassification.RECEIPT_RECOVERED
     )
     assert result.receipt_evidence_produced is True
+    assert result.post_recovery_classification is (
+        PaperOperationClassification.ALREADY_APPLIED
+    )
     assert events == [
         "pre-qualify",
         "admit",
@@ -401,10 +405,16 @@ def test_pre_call_already_applied_is_benign_and_skips_recovery() -> None:
     events: list[str] = []
     already = _inspection(PaperOperationClassification.ALREADY_APPLIED)
     result = _run(events, inspections=(already, already))
+    assert result.pre_recovery_classification is (
+        PaperOperationClassification.ALREADY_APPLIED
+    )
     assert result.recovery_classification is (
         PaperOperationExecutionClassification.ALREADY_APPLIED
     )
     assert result.receipt_evidence_produced is False
+    assert result.post_recovery_classification is (
+        PaperOperationClassification.ALREADY_APPLIED
+    )
     assert "recover" not in events
 
 
@@ -416,11 +426,68 @@ def test_recovery_call_already_applied_race_is_benign_zero_write() -> None:
             PaperOperationExecutionClassification.ALREADY_APPLIED
         ),
     )
+    assert result.pre_recovery_classification is PaperOperationClassification.BLOCKED
     assert result.recovery_classification is (
         PaperOperationExecutionClassification.ALREADY_APPLIED
     )
     assert result.receipt_evidence_produced is False
+    assert result.post_recovery_classification is (
+        PaperOperationClassification.ALREADY_APPLIED
+    )
     assert events.count("recover") == 1
+
+
+@pytest.mark.parametrize(
+    ("pre", "recovery", "receipt_produced", "post"),
+    [
+        (
+            PaperOperationClassification.ALREADY_APPLIED,
+            PaperOperationExecutionClassification.RECEIPT_RECOVERED,
+            True,
+            PaperOperationClassification.ALREADY_APPLIED,
+        ),
+        (
+            PaperOperationClassification.BLOCKED,
+            PaperOperationExecutionClassification.ALREADY_APPLIED,
+            True,
+            PaperOperationClassification.ALREADY_APPLIED,
+        ),
+        (
+            PaperOperationClassification.BLOCKED,
+            PaperOperationExecutionClassification.RECEIPT_RECOVERED,
+            False,
+            PaperOperationClassification.ALREADY_APPLIED,
+        ),
+        (
+            PaperOperationClassification.BLOCKED,
+            PaperOperationExecutionClassification.RECEIPT_RECOVERED,
+            True,
+            PaperOperationClassification.BLOCKED,
+        ),
+    ],
+)
+def test_result_rejects_invalid_attempted_classification_combinations(
+    pre: PaperOperationClassification,
+    recovery: PaperOperationExecutionClassification,
+    receipt_produced: bool,
+    post: PaperOperationClassification,
+) -> None:
+    with pytest.raises(ValueError, match="receipt-recovery result is invalid"):
+        execution.PersonalDesktopPaperReceiptRecoveryResult(
+            qualification_status=(
+                PaperReceiptRecoveryQualificationStatus.RECEIPT_RECOVERY_REQUIRED
+            ),
+            paper_account_id=ACCOUNT,
+            operation_id=OPERATION,
+            application_id=APPLICATION,
+            predecessor_checkpoint_id=PREDECESSOR,
+            installed_terminal_checkpoint_id=TERMINAL,
+            pre_recovery_classification=pre,
+            recovery_classification=recovery,
+            recovery_diagnostic=recovery.value,
+            receipt_evidence_produced=receipt_produced,
+            post_recovery_classification=post,
+        )
 
 
 @pytest.mark.parametrize(

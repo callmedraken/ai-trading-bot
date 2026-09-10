@@ -261,6 +261,27 @@ from trading_bot.runtime.paper_portfolio import (
     PaperPortfolioCycleStatus,
     PaperPortfolioRuntime,
 )
+from trading_bot.runtime.personal_desktop_unattended_paper_invocation import (  # noqa: F401
+    MAX_PERSONAL_DESKTOP_UNATTENDED_PAPER_INVOCATION_BYTES,
+    MAX_UNATTENDED_PAPER_INVOCATION_BYTES,
+    UNATTENDED_PAPER_INVOCATION_IDENTITY_MATERIAL_VERSION,
+    UNATTENDED_PAPER_INVOCATION_NAMESPACE,
+    UNATTENDED_PAPER_INVOCATION_SCHEMA,
+    UNATTENDED_PAPER_POLICY_VERSION,
+    PersonalDesktopUnattendedPaperInvocation,
+    PersonalDesktopUnattendedPaperInvocationArtifactBinding,
+    PersonalDesktopUnattendedPaperInvocationArtifactEvidence,
+    PersonalDesktopUnattendedPaperInvocationError,
+    PersonalDesktopUnattendedPaperInvocationSerializationError,
+    PersonalDesktopUnattendedPaperInvocationValidationError,
+    PersonalDesktopUnattendedPaperInvocationVerificationError,
+    VerifiedPersonalDesktopUnattendedPaperInvocation,
+    create_personal_desktop_unattended_paper_invocation,
+    derive_personal_desktop_unattended_paper_invocation_id,
+    parse_personal_desktop_unattended_paper_invocation,
+    serialize_personal_desktop_unattended_paper_invocation,
+    verify_personal_desktop_unattended_paper_invocation,
+)
 from trading_bot.runtime.strategy_history_seed import (  # noqa: F401
     MAX_STRATEGY_HISTORY_SEED_BARS,
     MAX_STRATEGY_HISTORY_SEED_BYTES,
@@ -532,6 +553,30 @@ __all__.extend(
         "serialize_successor_paper_account_checkpoint",
         "verify_checkpointed_paper_cycle_report",
         "verify_checkpointed_paper_cycle_successor_edge",
+    ]
+)
+
+__all__.extend(
+    [
+        "MAX_PERSONAL_DESKTOP_UNATTENDED_PAPER_INVOCATION_BYTES",
+        "MAX_UNATTENDED_PAPER_INVOCATION_BYTES",
+        "UNATTENDED_PAPER_INVOCATION_IDENTITY_MATERIAL_VERSION",
+        "UNATTENDED_PAPER_INVOCATION_NAMESPACE",
+        "UNATTENDED_PAPER_INVOCATION_SCHEMA",
+        "UNATTENDED_PAPER_POLICY_VERSION",
+        "PersonalDesktopUnattendedPaperInvocation",
+        "PersonalDesktopUnattendedPaperInvocationArtifactBinding",
+        "PersonalDesktopUnattendedPaperInvocationArtifactEvidence",
+        "PersonalDesktopUnattendedPaperInvocationError",
+        "PersonalDesktopUnattendedPaperInvocationSerializationError",
+        "PersonalDesktopUnattendedPaperInvocationValidationError",
+        "PersonalDesktopUnattendedPaperInvocationVerificationError",
+        "VerifiedPersonalDesktopUnattendedPaperInvocation",
+        "create_personal_desktop_unattended_paper_invocation",
+        "derive_personal_desktop_unattended_paper_invocation_id",
+        "parse_personal_desktop_unattended_paper_invocation",
+        "serialize_personal_desktop_unattended_paper_invocation",
+        "verify_personal_desktop_unattended_paper_invocation",
     ]
 )
 

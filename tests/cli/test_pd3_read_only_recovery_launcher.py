@@ -31,6 +31,7 @@ def test_pd3_read_only_recovery_launcher_is_cwd_and_package_root_independent(
         / "scripts"
         / "validate_pd3_read_only_recovery.py"
     )
+    expected_help = "Validate the frozen healthy PD3 recovery path without effects."
 
     completed = subprocess.run(
         [sys.executable, "-I", str(script), "--help"],
@@ -41,10 +42,7 @@ def test_pd3_read_only_recovery_launcher_is_cwd_and_package_root_independent(
         check=False,
     )
     assert completed.returncode == 0
-    assert (
-        "Validate the frozen healthy PD3 recovery path without effects."
-        in completed.stdout
-    )
+    assert expected_help in completed.stdout
     assert "alternate package selected" not in completed.stdout
     assert completed.stderr == ""
 
@@ -57,9 +55,6 @@ def test_pd3_read_only_recovery_launcher_is_cwd_and_package_root_independent(
         check=False,
     )
     assert package_selection.returncode == 0
-    assert (
-        "Validate the frozen healthy PD3 recovery path without effects."
-        in package_selection.stdout
-    )
+    assert expected_help in package_selection.stdout
     assert "alternate package selected" not in package_selection.stdout
     assert package_selection.stderr == ""

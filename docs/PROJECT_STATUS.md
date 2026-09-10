@@ -33,21 +33,21 @@ integration baseline: bd88ee966bff455f9fc897d6cfdfafdd807f27e2
 Architecture-94 P2 base: a810122a96b6fc90da25d71eede8da64b7272c98
 branch: feature/personal-desktop-paper-runtime
 worktree: F:\AI\worktrees\ai-trading-bot-personal-desktop
-latest accepted PD2D2 source: f05921244057052158a57b360e9bf556209b9654
-latest accepted PD2D2 tree:   35a5a7e1d59bbe90ca303b6037d29dc7fc085f4c
+latest accepted PD3 source: e690ce83d6c53507d9e93dca97bcb79191c62a0b
+latest accepted PD3 tree:   522f41115d2079ae777f667a19e5179c1d492e1f
 ```
 
 Architecture checkpoints:
 
 ```text
-Architecture 102 adoption:          fab1d776abcdcbf09fb26a257ea7fc86f6201b26
-Architecture 103 + validation plan: 12e41c4e407a79d63ea896773bf8462038ebba27
-Architecture 104:                   supervised A67 execution boundary
-Architecture 105:                   first-mutation qualification
-Architecture 106:                   first Paper-v2 execution preparation
-Architecture 107:                   first Paper-v2 output authority hardening
-Architecture 108:                   first Paper-v2 post-mutation reconciliation
-Architecture 108 R1:                f05921244057052158a57b360e9bf556209b9654
+Architecture 102  personal-desktop profile adoption
+Architecture 103  Paper-v2 deployment/provisioning authority
+Architecture 104  supervised A67 execution boundary
+Architecture 105  first-mutation qualification
+Architecture 106  first Paper-v2 execution preparation
+Architecture 107  first Paper-v2 output authority hardening
+Architecture 108  first Paper-v2 post-mutation reconciliation
+Architecture 109  personal-desktop Paper-v2 receipt-recovery authority
 ```
 
 ## Mandatory personal-desktop security baseline
@@ -59,11 +59,11 @@ Architecture 108 R1:                f05921244057052158a57b360e9bf556209b9654
 - every executable order passes deterministic risk authority;
 - strategy/optimizer/GUI/AI/scheduler/adapters cannot bypass risk;
 - durable state outranks process-local assumptions;
-- ambiguous provider/broker effects are reconciled or fail closed rather than
+- ambiguous provider/broker effects reconcile or fail closed rather than being
   blindly retried;
 - source-governed runtime/config/state locations use practical least privilege;
 - crash/restart, duplicate invocation, stale input, corruption/conflict, and
-  receipt recovery remain roadmap gates.
+  receipt recovery fail closed unless exact reviewed authority is present.
 
 ## Frozen C3 production state
 
@@ -125,36 +125,26 @@ selected verified C3 snapshot
 -> Architecture-67 durable transition + receipt
 ```
 
-## PD1 — personal-desktop paper-account authority v2 — COMPLETE
+## Paper-v2 production authority
 
-Completion record:
-
-```text
-docs/validation/pd1-personal-desktop-paper-v2-completion.md
-```
-
-Canonical status:
+Fixed paths:
 
 ```text
-PD1_ARCHITECTURE_ACCEPTED    = YES
-PD1_SOURCE_ACCEPTED          = YES
-PD1_SOURCE_CERTIFIED         = YES
-PD1_PRODUCTION_READY         = YES
-PD1_V2_PUBLISHED             = YES
-PD1_TRADING_RUNTIME_VERIFIED = YES
-PD1                          = COMPLETE
+Paper-v2 root:       F:\AITradingBot\Paper-v2
+A67 operation root: F:\AITradingBot\Paper-v2\runtime
+receipt parent:     F:\AITradingBot\Paper-v2\runtime\paper-operations
 ```
 
 Published account:
 
 ```text
-paper_account_id:     9415cd7b-bf36-5fba-bd58-a0f99119dc21
-GENESIS checkpoint:   1832a2b5-8b63-501a-8f7d-f1722c32307b
-starting cash:        Decimal("25000")
-GENESIS as_of:        2026-08-29T09:46:43.769105+00:00
+paper_account_id:   9415cd7b-bf36-5fba-bd58-a0f99119dc21
+GENESIS checkpoint: 1832a2b5-8b63-501a-8f7d-f1722c32307b
+starting cash:      Decimal("25000")
+GENESIS as_of:      2026-08-29T09:46:43.769105+00:00
 ```
 
-Frozen artifacts:
+Frozen publication artifacts:
 
 ```text
 GENESIS  SHA-256 d1a7ff14425c8a797a952860a1102489a4c81cac2a24a45bc3127eb8eb2e9548  length 533
@@ -163,162 +153,34 @@ manifest SHA-256 8fe1d705d59a79207ab6236af71becee0051042dc7b3ecaf23bb7f5531cb002
 freeze Git blob b125cbb1c80a827f74018cf2955b9a27ba69fa90
 ```
 
-Durable occupancy:
+Retained failed v1 state:
 
 ```text
-F:\AITradingBot\Paper-v2                    PRESENT / VERIFIED
-F:\AITradingBot\.Paper-v2.provisioning      ABSENT
-F:\AITradingBot\Paper                       ABSENT
-F:\AITradingBot\.Paper.provisioning-v1      PRESENT / RETAINED / UNTOUCHED
+F:\AITradingBot\Paper                    ABSENT
+F:\AITradingBot\.Paper.provisioning-v1  PRESENT / RETAINED / UNTOUCHED
 ```
 
 Never rerun the old v1 publisher or delete, repair, rename, migrate, or reuse
 the retained v1 staging tree as incidental cleanup.
 
-## PD2A — account mutex + supervised admission — COMPLETE
+## PD1 — personal-desktop Paper-v2 authority — COMPLETE
 
 Completion record:
+
+```text
+docs/validation/pd1-personal-desktop-paper-v2-completion.md
+```
+
+## PD2 — reliable supervised manual paper cycle — COMPLETE
+
+Completion records:
 
 ```text
 docs/validation/pd2a-paper-account-runtime-mutex-completion.md
-```
-
-Accepted correction/source checkpoint:
-
-```text
-38212c07e0c06c7cf25152c5a362434ded7c3adf
-tree 9dc5087b87cfd2c16ef76d97c04fd20d41ba7187
-```
-
-PD2A provides the deterministic account-scoped Windows mutex, fixed 30-second
-wait, exact kernel owner/DACL validation, explicit `ABANDONED_OWNER`, process-
-wide same-account non-reentrancy, and process-lifetime poison after uncertain
-`ReleaseMutex` failure.
-
-Final certification: `4720 passed, 17 skipped`; Ruff/diff clean.
-
-## PD2B — supervised paper composition — COMPLETE
-
-Completion record:
-
-```text
 docs/validation/pd2b-supervised-paper-composition-completion.md
-```
-
-Accepted source:
-
-```text
-PD2B1 84f12f030221207fa41de2f39bf8c1e4aef42160
-PD2B2 d0f6dc29be273df6fec44a5d7c8eaa65448bf3e3
-PD2B3 f86f8c8758b3e8941e5bbfa26d40892433cf0110
-tree  9f883335ec13a9385113b2c310c6009a8a0e72aa
-```
-
-PD2B removed caller-path authority from semantic A67 inputs and retains the
-production operation root/raw A67 inputs only inside an active process-local
-binding under the same account mutex. `ABANDONED_OWNER` blocks before P1/A67
-preparation.
-
-Final certification: `4754 passed, 17 skipped`; Ruff/diff clean.
-
-## PD2C — supervised Architecture-67 execution boundary — COMPLETE
-
-Completion record:
-
-```text
 docs/validation/pd2c-supervised-paper-execution-boundary-completion.md
-```
-
-Accepted source:
-
-```text
-commit 8d590d06d346140002a3a20eefa9b5a7d087326d
-tree   ed322f18b1f98ff88f144ac11bfbcc3fd353d9a3
-```
-
-The dedicated supervised-execution gate exists and is normally closed:
-
-```text
-PERSONAL_DESKTOP_PAPER_V2_SUPERVISED_EXECUTION_EFFECTS_ENABLED = False
-```
-
-The publisher/recovery gates are also normally closed:
-
-```text
-PERSONAL_DESKTOP_PAPER_V2_PRODUCTION_EFFECTS_ENABLED = False
-PERSONAL_DESKTOP_PAPER_V2_RECOVERY_EFFECTS_ENABLED   = False
-```
-
-Final certification: `4775 passed, 17 skipped`; Ruff/diff clean.
-
-## PD2D — first real supervised Paper-v2 operation — COMPLETE
-
-Completion record:
-
-```text
 docs/validation/pd2d2-first-real-paper-operation-completion.md
 ```
-
-PD2D1 completed the read-only first-mutation qualification and froze the exact
-first-cycle plan, selected C3 snapshot, GENESIS predecessor, strategy-history
-seed, caller idempotency key, open reference, policies, and timestamps. The
-real-host qualification classified the exact operation as ready without
-mutating Paper-v2.
-
-PD2D2 then performed exactly one explicitly authorized supervised execution.
-The durable identities are:
-
-```text
-paper_account_id:       9415cd7b-bf36-5fba-bd58-a0f99119dc21
-GENESIS checkpoint:     1832a2b5-8b63-501a-8f7d-f1722c32307b
-operation_id:           307f769a-f09a-539d-b12d-3fb51b973809
-application_id:         78a1bae8-51ac-5bf0-b159-500768c758fc
-cycle_result_id:        854f133e-d9cd-5a9d-be63-0eb4137787db
-successor checkpoint:   ed4640e5-0630-525d-b916-d50e31e3ba2a
-terminal checkpoint:    ed4640e5-0630-525d-b916-d50e31e3ba2a
-receipt_status:         COMPLETED
-receipt_outcome:        NO_ACTION
-```
-
-After execution the supervised gate was closed. Architecture 108 then performed
-a separate read-only production reconciliation under the Trading principal.
-After R1 fixed the selected-C3 reader lifetime bug, the reconciliation returned:
-
-```text
-result:                    RECONCILED
-all_effect_gates_false:    true
-lineage_edge_count:        1
-account_cash:              25000
-position_count:            0
-inspection_classification: ALREADY_APPLIED
-inspection_diagnostic:     ALREADY_APPLIED
-exit:                      0
-```
-
-The `ALREADY_APPLIED` result proves the durable transition/receipt lineage is
-recognized and the completed operation is not admitted as a new execution.
-
-Final accepted source:
-
-```text
-commit f05921244057052158a57b360e9bf556209b9654
-tree   35a5a7e1d59bbe90ca303b6037d29dc7fc085f4c
-```
-
-Final broad certification:
-
-```text
-5146 passed, 17 skipped in 1505.92s
-Ruff check: PASS
-Ruff format --check: PASS (457 files)
-git diff --check: PASS
-worktree/index: clean
-```
-
-The first invalid broad attempt hit the already-known host-specific pytest temp
-permission failure at `C:\Users\John\AppData\Local\Temp\pytest-of-John` during
-fixture setup. The successful controlled run used a fresh explicit external
-`--basetemp`. This was an environment/setup failure, not a source regression.
 
 Canonical PD2 state:
 
@@ -331,33 +193,168 @@ PD2D2 = COMPLETE
 PD2 = COMPLETE
 ```
 
-## Current milestone — PD3 supervised crash/recovery validation
+First durable Paper-v2 operation:
 
-PD3 must validate the personal-desktop recovery authority around the existing
-Architecture-67 restart-safe coordinator; it must not create a second recovery
-engine.
+```text
+operation_id:         307f769a-f09a-539d-b12d-3fb51b973809
+application_id:       78a1bae8-51ac-5bf0-b159-500768c758fc
+cycle_result_id:      854f133e-d9cd-5a9d-be63-0eb4137787db
+successor checkpoint: ed4640e5-0630-525d-b916-d50e31e3ba2a
+receipt_status:       COMPLETED
+receipt_outcome:      NO_ACTION
+```
 
-The existing generic semantics already distinguish the important states:
+Independent post-mutation reconciliation proved:
+
+```text
+result:                    RECONCILED
+lineage_edge_count:        1
+account_cash:              25000
+position_count:            0
+inspection_classification: ALREADY_APPLIED
+inspection_diagnostic:     ALREADY_APPLIED
+```
+
+PD2 final broad certification:
+
+```text
+5146 passed, 17 skipped in 1505.92s
+Ruff check: PASS
+Ruff format --check: PASS (457 files)
+git diff --check: PASS
+```
+
+## PD3 — supervised crash/recovery validation — COMPLETE
+
+Architecture:
+
+```text
+docs/architecture/109-personal-desktop-paper-receipt-recovery-authority.md
+```
+
+Completion record:
+
+```text
+docs/validation/pd3-personal-desktop-receipt-recovery-completion.md
+```
+
+PD3 wraps the existing Architecture-67 restart-safe receipt-recovery behavior;
+it does not introduce a second recovery engine. The accepted production
+composition is:
+
+```text
+genuine C1 + genuine P2
+-> pre-lock recovery qualification
+-> existing PD2A account mutex
+-> fresh authoritative post-lock qualification
+-> exact target agreement
+-> reconstruct original operation from explicit semantic inputs
+-> exact four-gate check
+-> receipt-only output capability
+-> A67 reinspection
+-> recovery-only A67 call at most once
+-> strict ordinary account reread
+-> exact ALREADY_APPLIED verification
+-> capability close
+-> mutex release
+```
+
+Exact recovery semantics:
 
 ```text
 finalized transition + missing receipt + exact verification
--> reconstruct the same canonical completed receipt
--> runtime invocation count = 0
+-> same canonical receipt may be reconstructed
+-> strategy/runtime execution count = 0
+-> no new transition
 
 verified completed transition + completed receipt
 -> ALREADY_APPLIED
 -> writes = 0
--> runtime invocation count = 0
 
 staging / malformed / altered / ambiguous / mismatched evidence
 -> BLOCKED
 -> no cleanup, repair, replacement, or blind retry
 ```
 
-PD3's personal-desktop layer must preserve the dedicated non-admin Trading
-principal, genuine production authority, account mutex, exact Paper-v2 root,
-read/reconciliation-before-effect ordering, and a separately reviewed recovery
-gate that remains false by default. Recovery effects are not yet authorized.
+Accepted PD3 source:
+
+```text
+commit e690ce83d6c53507d9e93dca97bcb79191c62a0b
+tree   522f41115d2079ae777f667a19e5179c1d492e1f
+```
+
+Final broad source certification:
+
+```text
+5285 passed, 17 skipped in 1478.19s
+Ruff check: PASS
+Ruff format --check: PASS (467 files)
+git diff --check: PASS
+worktree/index: clean
+```
+
+Real-host acceptance ran under `DESKTOP-I4DOKM7\Trading`, SID
+`S-1-5-21-1397534616-3988210162-180023805-1009`, non-elevated, with exact
+branch/HEAD/tree/origin/clean provenance. The production-interpreter launcher
+probe passed, followed by one actual read-only validation:
+
+```text
+result:                         VALIDATED
+all_effect_gates_false:         true
+qualification_status:           NO_RECOVERY_REQUIRED
+qualification_diagnostic:       VERIFIED_COMPLETE_ACCOUNT
+inspection_classification:      ALREADY_APPLIED
+inspection_diagnostic:          ALREADY_APPLIED
+receipt_status:                 COMPLETED
+receipt_outcome:                NO_ACTION
+account_cash:                   25000
+position_count:                 0
+recovery_invocation_performed:  false
+receipt_evidence_produced:      false
+exit:                           0
+```
+
+Canonical PD3 state:
+
+```text
+ARCH109_DESIGN_ACCEPTED                 = YES
+PD3_RECOVERY_ONLY_A67_ACCEPTED          = YES
+PD3_RECOVERY_QUALIFIER_ACCEPTED         = YES
+PD3_ORIGINAL_OPERATION_RECONSTRUCTION   = YES
+PD3_EFFECT_CONTAINMENT_ACCEPTED         = YES
+PD3_PERSONAL_DESKTOP_BOUNDARY_ACCEPTED  = YES
+PD3_SOURCE_CERTIFIED                    = YES
+PD3_REAL_HOST_READ_ONLY_VALIDATED       = YES
+ALL_EFFECT_GATES_CLOSED                 = YES
+REAL_RECOVERY_MUTATION_PERFORMED        = NO
+PD3                                     = COMPLETE
+```
+
+## Current milestone — PD4 unattended simulated paper under Trading
+
+PD4 is the next product milestone. It must make the already-reviewed Paper-v2
+cycle operable without an interactive user while preserving the same C1/P2,
+PD2A mutex, deterministic strategy/risk, A67 durability, and PD3 recovery
+contracts.
+
+The first PD4 checkpoint is architecture/validation only. Before any unattended
+execution is authorized, PD4 must freeze at least:
+
+- source-owned unattended invocation identity and schedule/session policy;
+- exact non-admin `Trading` principal and production interpreter provenance;
+- durable retention of every original semantic invocation fact required by PD3
+  recovery after process restart;
+- overlap/duplicate suppression through the same account mutex and durable A67
+  identity rather than scheduler assumptions;
+- startup and post-run reconciliation rules;
+- stale/missing/ambiguous input behavior;
+- explicit source-owned unattended-effect gate that defaults closed;
+- operator-visible audit evidence and fail-closed exit/status semantics;
+- no provider, broker, or live authority expansion merely because the launcher
+  is unattended.
+
+No real unattended run or scheduler installation is authorized merely because
+PD4 is current.
 
 ## Primary roadmap
 
@@ -370,23 +367,34 @@ PD2   reliable supervised manual paper cycle                COMPLETE
   PD2C supervised A67 execution boundary                    COMPLETE
   PD2D1 read-only first-mutation qualification              COMPLETE
   PD2D2 first real Paper-v2 mutation + reconciliation       COMPLETE
-PD3   supervised crash/recovery validation                  CURRENT
-PD4   unattended simulated paper under Trading
+PD3   supervised crash/recovery validation                  COMPLETE
+PD4   unattended simulated paper under Trading              CURRENT
 PD5   broker-paper integration
 PD6   broker-paper soak / operational hardening
 PD7   personal-desktop live-readiness
 PD8   tiny restricted live -> gradual maturity
 ```
 
-## Still not authorized
+## Effect gates and still-not-authorized actions
+
+All current Paper-v2 effect gates remain closed:
+
+```text
+PERSONAL_DESKTOP_PAPER_V2_PRODUCTION_EFFECTS_ENABLED           = False
+PERSONAL_DESKTOP_PAPER_V2_RECOVERY_EFFECTS_ENABLED             = False
+PERSONAL_DESKTOP_PAPER_V2_SUPERVISED_EXECUTION_EFFECTS_ENABLED = False
+PERSONAL_DESKTOP_PAPER_V2_RECEIPT_RECOVERY_EFFECTS_ENABLED     = False
+```
+
+Still not authorized:
 
 ```text
 provider call #7
-Paper-v2 recovery effects
+real Paper-v2 receipt-recovery mutation
+unattended scheduling or unattended Paper-v2 execution
 broker order submission
 live trading
-unattended scheduling
-changing any closed production/recovery/supervised effect gate without a reviewed checkpoint
+changing any closed effect gate without a reviewed checkpoint
 old v1 publisher rerun
 v1 staging delete/repair/rename/migration/reuse
 Paper-v2 manual mutation outside reviewed effect checkpoints
@@ -411,24 +419,30 @@ merge/rebase/force-push/amend/PR metadata changes without explicit approval
 - Codex runs focused tests/checks during implementation; broad/full
   certification is normally user-run locally at the final gate.
 - Never `git add .` or `git add -A`; exact-file stage only.
-- Worktree/branch/HEAD mismatch is a STOP; do not self-correct.
+- Worktree/branch/HEAD/tree mismatch is a STOP; do not self-correct.
 - Controlled Windows pytest uses a fresh external
   `F:\AI\temp\pytest\<purpose>-<unique>` via explicit `--basetemp` and normally
   `-p no:cacheprovider`; do not globally change `TEMP`, `TMP`, or persistently
   set `PYTHONPATH` for normal pytest collection.
+- Source-checkout operator CLIs that must run independently of the current
+  working directory/package environment use a reviewed `scripts/` launcher that
+  selects the checkout `src` explicitly; production-interpreter import probes
+  must exercise that launcher before real-host invocation.
 - Preserve unrelated generated/untracked reports and historical evidence.
 - No merge/rebase/force-push/amend/PR metadata/review-thread changes without
   explicit approval.
 
 ## Documentation workflow
 
-At accepted checkpoints review/update:
+At accepted milestones review/update:
 
 ```text
 README.md
 docs/PROJECT_STATUS.md
 docs/AI_TRADING_BOT_HANDOFF.md
+relevant docs/architecture/*
+relevant docs/validation/*
 ```
 
-Completion records belong under `docs/validation/`. Reusable workflow changes
-belong in `docs/AI_DEVELOPMENT_WORKFLOW.md`.
+Docs-only closeouts do not require a new full repository suite when exact diff
+review proves no source/test change.

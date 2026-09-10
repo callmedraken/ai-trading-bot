@@ -13,7 +13,13 @@ from uuid import UUID
 import pytest
 
 from trading_bot.runtime import personal_desktop_paper_account_security as security
+from trading_bot.runtime import (
+    personal_desktop_paper_receipt_recovery_execution as recovery_execution,
+)
 from trading_bot.runtime import personal_desktop_paper_runtime_output as output
+from trading_bot.runtime import (
+    personal_desktop_supervised_paper_operation_execution as supervised_execution,
+)
 from trading_bot.runtime.personal_desktop_first_paper_operation import (
     PERSONAL_DESKTOP_FIRST_PAPER_OPERATION_PROFILE,
 )
@@ -151,6 +157,18 @@ def _capability(api: FakeNative):  # type: ignore[no-untyped-def]
     return output._open_personal_desktop_paper_runtime_output_capability_for_test(
         api,
         authority=authority,
+    )
+
+
+def _recovery_capability(api: FakeNative):  # type: ignore[no-untyped-def]
+    authority = (
+        output._open_disposable_paper_receipt_recovery_output_authority_for_test()
+    )
+    return (
+        output._open_personal_desktop_paper_receipt_recovery_output_capability_for_test(
+            api,
+            authority=authority,
+        )
     )
 
 
@@ -491,3 +509,321 @@ def test_production_factory_exposes_no_root_or_sid_override_and_gate_is_false() 
         match="effect-gate state is invalid",
     ):
         output.open_personal_desktop_paper_runtime_output_capability()
+
+
+def test_receipt_recovery_capability_allows_only_exact_receipt_commit_layout() -> None:
+    api = FakeNative()
+    staging = Path(
+        security.PERSONAL_DESKTOP_PAPER_V2_OPERATIONS
+        + f"\\.paper-operation-{OPERATION_ID}.staging"
+    )
+    final = Path(
+        security.PERSONAL_DESKTOP_PAPER_V2_OPERATIONS
+        + f"\\paper-operation-{OPERATION_ID}"
+    )
+    receipt_name = f"paper-operation-receipt-{OPERATION_ID}.json"
+
+    with _recovery_capability(api) as capability:
+        capability.verify_parent(Path(security.PERSONAL_DESKTOP_PAPER_V2_RUNTIME))
+        capability.verify_parent(Path(security.PERSONAL_DESKTOP_PAPER_V2_OPERATIONS))
+        capability.create_staging_directory(staging)
+        capability.verify_staged_directory(staging)
+        capability.write_staged_file(staging / receipt_name, b"receipt")
+        capability.verify_staged_file(staging / receipt_name)
+        capability.finalize_directory(staging, final)
+        capability.verify_finalized_directory(final)
+        capability.verify_finalized_file(final / receipt_name)
+
+    assert ("rename-write-through", str(staging), str(final)) in api.events
+    policies = [
+        event[-1]
+        for event in api.events
+        if event[0] in {"create-directory", "write-file"}
+    ]
+    assert [policy.owner_sid for policy in policies] == [SID, SID]
+    assert all(policy.dacl_protected for policy in policies)
+    assert all(
+        next(ace for ace in policy.aces if ace.principal_sid == SID).access_mask
+        & (WRITE_DAC | WRITE_OWNER)
+        == 0
+        for policy in policies
+    )
+
+
+@pytest.mark.parametrize(
+    ("method", "path"),
+    [
+        (
+            "create_staging_directory",
+            security.PERSONAL_DESKTOP_PAPER_V2_RUNTIME
+            + f"\\.paper-account-transition-{APPLICATION_ID}.staging",
+        ),
+        (
+            "verify_finalized_directory",
+            security.PERSONAL_DESKTOP_PAPER_V2_RUNTIME
+            + f"\\paper-account-transition-{APPLICATION_ID}",
+        ),
+    ],
+)
+def test_receipt_recovery_capability_rejects_transition_directories(
+    method: str, path: str
+) -> None:
+    api = FakeNative()
+    with _recovery_capability(api) as capability:
+        with pytest.raises(AuthorityPathError):
+            getattr(capability, method)(Path(path))
+    assert not any(
+        event[0] in {"create-directory", "write-file", "rename-write-through"}
+        for event in api.events
+    )
+
+
+@pytest.mark.parametrize(
+    ("method", "path"),
+    [
+        (
+            "write_staged_file",
+            security.PERSONAL_DESKTOP_PAPER_V2_RUNTIME
+            + f"\\.paper-account-transition-{APPLICATION_ID}.staging"
+            + f"\\checkpointed-paper-cycle-report-{RESULT_ID}.json",
+        ),
+        (
+            "verify_staged_file",
+            security.PERSONAL_DESKTOP_PAPER_V2_RUNTIME
+            + f"\\.paper-account-transition-{APPLICATION_ID}.staging"
+            + f"\\paper-account-checkpoint-{SUCCESSOR_ID}.json",
+        ),
+        (
+            "verify_finalized_file",
+            security.PERSONAL_DESKTOP_PAPER_V2_RUNTIME
+            + f"\\paper-account-transition-{APPLICATION_ID}"
+            + f"\\checkpointed-paper-cycle-report-{RESULT_ID}.json",
+        ),
+        (
+            "verify_finalized_file",
+            security.PERSONAL_DESKTOP_PAPER_V2_RUNTIME
+            + f"\\paper-account-transition-{APPLICATION_ID}"
+            + f"\\paper-account-checkpoint-{SUCCESSOR_ID}.json",
+        ),
+    ],
+)
+def test_receipt_recovery_capability_rejects_all_transition_files(
+    method: str, path: str
+) -> None:
+    api = FakeNative()
+    with _recovery_capability(api) as capability:
+        with pytest.raises(AuthorityPathError):
+            if method == "write_staged_file":
+                getattr(capability, method)(Path(path), b"forbidden")
+            else:
+                getattr(capability, method)(Path(path))
+    assert not any(
+        event[0] in {"create-directory", "write-file", "rename-write-through"}
+        for event in api.events
+    )
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        security.PERSONAL_DESKTOP_PAPER_V2_OPERATIONS
+        + f"\\.paper-operation-{UUID(int=99)}.staging"
+        + f"\\paper-operation-receipt-{OPERATION_ID}.json",
+        security.PERSONAL_DESKTOP_PAPER_V2_OPERATIONS
+        + f"\\.PAPER-operation-{OPERATION_ID}.staging"
+        + f"\\paper-operation-receipt-{OPERATION_ID}.json",
+        security.PERSONAL_DESKTOP_PAPER_V2_RUNTIME
+        + f"\\.paper-operation-{OPERATION_ID}.staging"
+        + f"\\paper-operation-receipt-{OPERATION_ID}.json",
+        security.PERSONAL_DESKTOP_PAPER_V2_OPERATIONS
+        + f"\\.paper-operation-{OPERATION_ID}.staging"
+        + f"\\paper-operation-receipt-{str(OPERATION_ID).upper()}.json",
+    ],
+)
+def test_receipt_recovery_capability_rejects_wrong_uuid_case_or_parent(
+    path: str,
+) -> None:
+    api = FakeNative()
+    with _recovery_capability(api) as capability:
+        with pytest.raises(AuthorityPathError):
+            capability.write_staged_file(Path(path), b"forbidden")
+    assert not any(event[0] == "write-file" for event in api.events)
+
+
+def test_receipt_recovery_finalization_requires_same_exact_uuid() -> None:
+    api = FakeNative()
+    staging = Path(
+        security.PERSONAL_DESKTOP_PAPER_V2_OPERATIONS
+        + f"\\.paper-operation-{OPERATION_ID}.staging"
+    )
+    wrong_final = Path(
+        security.PERSONAL_DESKTOP_PAPER_V2_OPERATIONS
+        + f"\\paper-operation-{UUID(int=99)}"
+    )
+    with _recovery_capability(api) as capability:
+        with pytest.raises(AuthorityPathError, match="identities"):
+            capability.finalize_directory(staging, wrong_final)
+    assert not any(event[0] == "rename-write-through" for event in api.events)
+
+
+def test_receipt_recovery_capability_is_one_shot() -> None:
+    api = FakeNative()
+    authority = (
+        output._open_disposable_paper_receipt_recovery_output_authority_for_test()
+    )
+    capability = (
+        output._open_personal_desktop_paper_receipt_recovery_output_capability_for_test(
+            api,
+            authority=authority,
+        )
+    )
+    with capability:
+        pass
+    with pytest.raises(output.PersonalDesktopPaperRuntimeOutputError, match="one-shot"):
+        with capability:
+            pass
+    with pytest.raises(TypeError, match="consumed"):
+        output._open_personal_desktop_paper_receipt_recovery_output_capability_for_test(
+            FakeNative(),
+            authority=authority,
+        )
+
+
+def test_receipt_recovery_parent_identity_drift_blocks() -> None:
+    api = FakeNative()
+    with _recovery_capability(api) as capability:
+        path = security.PERSONAL_DESKTOP_PAPER_V2_OPERATIONS
+        original = api.objects[path]
+        try:
+            api.objects[path] = replace(original, identity=(9, 9))
+            with pytest.raises(
+                output.PersonalDesktopPaperRuntimeOutputError, match="parent changed"
+            ):
+                capability.verify_parent(Path(path))
+        finally:
+            api.objects[path] = original
+
+
+def test_receipt_recovery_parent_security_drift_blocks() -> None:
+    api = FakeNative()
+    with _recovery_capability(api) as capability:
+        path = security.PERSONAL_DESKTOP_PAPER_V2_OPERATIONS
+        original = api.objects[path]
+        try:
+            api.objects[path] = replace(
+                original,
+                security=replace(original.security, dacl_protected=False),
+            )
+            with pytest.raises(AuthoritySecurityError):
+                capability.verify_parent(Path(path))
+        finally:
+            api.objects[path] = original
+
+
+def test_receipt_recovery_child_requires_exact_trading_owner_and_acl() -> None:
+    api = FakeNative()
+    path = (
+        security.PERSONAL_DESKTOP_PAPER_V2_OPERATIONS
+        + f"\\.paper-operation-{OPERATION_ID}.staging"
+    )
+    spec = security.paper_object_spec(path)
+    policy = security.paper_security_policy(
+        spec.role,
+        SID,
+        owner_sid=security.ADMINISTRATORS_SID,
+    )
+    api.objects[path] = security.PaperObjectObservation(
+        SecurityInspection(
+            path,
+            path,
+            spec.kind,
+            policy.owner_sid,
+            policy.dacl_protected,
+            policy.aces,
+            False,
+            "F:\\",
+            "NTFS",
+        ),
+        (1, 20),
+        0,
+        1,
+    )
+    with _recovery_capability(api) as capability:
+        with pytest.raises(
+            output.PersonalDesktopPaperRuntimeOutputError,
+            match="exact Trading SID",
+        ):
+            capability.verify_staged_directory(Path(path))
+
+
+def test_receipt_recovery_gate_is_false_and_production_opener_fails_closed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assert (
+        recovery_execution.PERSONAL_DESKTOP_PAPER_V2_RECEIPT_RECOVERY_EFFECTS_ENABLED
+        is False
+    )
+    assert security.PERSONAL_DESKTOP_PAPER_V2_PRODUCTION_EFFECTS_ENABLED is False
+    assert security.PERSONAL_DESKTOP_PAPER_V2_RECOVERY_EFFECTS_ENABLED is False
+    assert (
+        supervised_execution.PERSONAL_DESKTOP_PAPER_V2_SUPERVISED_EXECUTION_EFFECTS_ENABLED
+        is False
+    )
+    assert (
+        tuple(
+            inspect.signature(
+                output.open_personal_desktop_paper_receipt_recovery_output_capability
+            ).parameters
+        )
+        == ()
+    )
+
+    def forbidden_native() -> None:
+        pytest.fail("disabled receipt-recovery opener constructed native output")
+
+    monkeypatch.setattr(output, "_WindowsPaperRuntimeOutputNativeApi", forbidden_native)
+    with pytest.raises(
+        output.PersonalDesktopPaperRuntimeOutputError,
+        match="receipt-recovery output effect-gate state is invalid",
+    ):
+        output.open_personal_desktop_paper_receipt_recovery_output_capability()
+
+
+def test_disposable_receipt_authority_cannot_enter_production_opener() -> None:
+    authority = (
+        output._open_disposable_paper_receipt_recovery_output_authority_for_test()
+    )
+    assert (
+        "authority"
+        not in inspect.signature(
+            output.open_personal_desktop_paper_receipt_recovery_output_capability
+        ).parameters
+    )
+    with pytest.raises(output.PersonalDesktopPaperRuntimeOutputError):
+        output.open_personal_desktop_paper_receipt_recovery_output_capability()
+    with (
+        output._open_personal_desktop_paper_receipt_recovery_output_capability_for_test(
+            FakeNative(),
+            authority=authority,
+        )
+    ):
+        pass
+
+
+def test_disposable_receipt_seam_rejects_genuine_native() -> None:
+    native = object.__new__(output._WindowsPaperRuntimeOutputNativeApi)
+    authority = (
+        output._open_disposable_paper_receipt_recovery_output_authority_for_test()
+    )
+    with pytest.raises(TypeError, match="genuine production native implementation"):
+        output._open_personal_desktop_paper_receipt_recovery_output_capability_for_test(
+            native,
+            authority=authority,
+        )
+    with (
+        output._open_personal_desktop_paper_receipt_recovery_output_capability_for_test(
+            FakeNative(),
+            authority=authority,
+        )
+    ):
+        pass

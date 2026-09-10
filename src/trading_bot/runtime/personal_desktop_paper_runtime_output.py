@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ctypes
+import re
 import threading
 from dataclasses import dataclass
 from pathlib import Path, PureWindowsPath
@@ -34,6 +35,12 @@ _FILE_FLAG_OPEN_REPARSE_POINT = 0x00200000
 _RUNTIME_OUTPUT_ISSUER = object()
 _DISPOSABLE_RUNTIME_OUTPUT_ISSUER = object()
 _DISPOSABLE_RUNTIME_OUTPUT_AUTHORITY_ISSUER = object()
+_RECEIPT_RECOVERY_RUNTIME_OUTPUT_ISSUER = object()
+_DISPOSABLE_RECEIPT_RECOVERY_RUNTIME_OUTPUT_ISSUER = object()
+_DISPOSABLE_RECEIPT_RECOVERY_OUTPUT_AUTHORITY_ISSUER = object()
+_CANONICAL_UUID = re.compile(
+    r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+)
 
 
 class PersonalDesktopPaperRuntimeOutputError(AuthorityObjectError):
@@ -72,6 +79,8 @@ class _PersonalDesktopPaperRuntimeOutputCapability(PaperOperationOutputCapabilit
         if _issuer not in {
             _RUNTIME_OUTPUT_ISSUER,
             _DISPOSABLE_RUNTIME_OUTPUT_ISSUER,
+            _RECEIPT_RECOVERY_RUNTIME_OUTPUT_ISSUER,
+            _DISPOSABLE_RECEIPT_RECOVERY_RUNTIME_OUTPUT_ISSUER,
         }:
             raise TypeError("Paper-v2 runtime output capability issuer is invalid")
         self._api = api
@@ -304,6 +313,84 @@ class _PersonalDesktopPaperRuntimeOutputCapability(PaperOperationOutputCapabilit
         self._verify_named(path, AuthorityObjectKind.FILE)
 
 
+class _PersonalDesktopPaperReceiptRecoveryOutputCapability(
+    _PersonalDesktopPaperRuntimeOutputCapability
+):
+    """One-use capability restricted to one Architecture-67 receipt layout."""
+
+    __slots__ = ()
+
+    def __init__(self, api: _PaperRuntimeOutputNativeApi, *, _issuer: object) -> None:
+        if _issuer not in {
+            _RECEIPT_RECOVERY_RUNTIME_OUTPUT_ISSUER,
+            _DISPOSABLE_RECEIPT_RECOVERY_RUNTIME_OUTPUT_ISSUER,
+        }:
+            raise TypeError("Paper-v2 receipt-recovery output issuer is invalid")
+        super().__init__(api, _issuer=_issuer)
+
+    def create_staging_directory(self, path: Path) -> None:
+        _require_receipt_directory(path, staging=True)
+        super().create_staging_directory(path)
+
+    def write_staged_file(self, path: Path, payload: bytes) -> None:
+        _require_receipt_file(path, staging=True)
+        super().write_staged_file(path, payload)
+
+    def verify_staged_directory(self, path: Path) -> None:
+        _require_receipt_directory(path, staging=True)
+        super().verify_staged_directory(path)
+
+    def verify_staged_file(self, path: Path) -> None:
+        _require_receipt_file(path, staging=True)
+        super().verify_staged_file(path)
+
+    def finalize_directory(self, staging: Path, final: Path) -> None:
+        staging_id = _require_receipt_directory(staging, staging=True)
+        final_id = _require_receipt_directory(final, staging=False)
+        if staging_id != final_id:
+            raise AuthorityPathError(
+                "receipt-recovery finalization identities do not match"
+            )
+        super().finalize_directory(staging, final)
+
+    def verify_finalized_directory(self, path: Path) -> None:
+        _require_receipt_directory(path, staging=False)
+        super().verify_finalized_directory(path)
+
+    def verify_finalized_file(self, path: Path) -> None:
+        _require_receipt_file(path, staging=False)
+        super().verify_finalized_file(path)
+
+
+def _require_receipt_directory(path: Path, *, staging: bool) -> str:
+    text = str(path)
+    candidate = PureWindowsPath(text)
+    if str(candidate.parent) != security.PERSONAL_DESKTOP_PAPER_V2_OPERATIONS:
+        raise AuthorityPathError(
+            "receipt-recovery directory is outside the fixed operations parent"
+        )
+    expression = (
+        r"^\.paper-operation-([0-9a-f-]+)\.staging$"
+        if staging
+        else r"^paper-operation-([0-9a-f-]+)$"
+    )
+    match = re.fullmatch(expression, candidate.name)
+    if match is None or _CANONICAL_UUID.fullmatch(match.group(1)) is None:
+        raise AuthorityPathError("receipt-recovery directory name is invalid")
+    return match.group(1)
+
+
+def _require_receipt_file(path: Path, *, staging: bool) -> str:
+    text = str(path)
+    candidate = PureWindowsPath(text)
+    operation_id = _require_receipt_directory(
+        Path(str(candidate.parent)), staging=staging
+    )
+    if candidate.name != f"paper-operation-receipt-{operation_id}.json":
+        raise AuthorityPathError("receipt-recovery file name is invalid")
+    return operation_id
+
+
 def _is_staging(path: str) -> bool:
     name = PureWindowsPath(path).name
     return name.startswith(".") and name.endswith(".staging")
@@ -466,6 +553,33 @@ def open_personal_desktop_paper_runtime_output_capability() -> (
     )
 
 
+def open_personal_desktop_paper_receipt_recovery_output_capability() -> (
+    _PersonalDesktopPaperReceiptRecoveryOutputCapability
+):
+    """Open receipt-only output for the exact source-owned four-gate state."""
+
+    from trading_bot.runtime.personal_desktop_paper_receipt_recovery_execution import (  # noqa: E501, PLC0415
+        PERSONAL_DESKTOP_PAPER_V2_RECEIPT_RECOVERY_EFFECTS_ENABLED,
+    )
+    from trading_bot.runtime.personal_desktop_supervised_paper_operation_execution import (  # noqa: E501, PLC0415
+        PERSONAL_DESKTOP_PAPER_V2_SUPERVISED_EXECUTION_EFFECTS_ENABLED,
+    )
+
+    if (
+        PERSONAL_DESKTOP_PAPER_V2_RECEIPT_RECOVERY_EFFECTS_ENABLED is not True
+        or security.PERSONAL_DESKTOP_PAPER_V2_PRODUCTION_EFFECTS_ENABLED is not False
+        or security.PERSONAL_DESKTOP_PAPER_V2_RECOVERY_EFFECTS_ENABLED is not False
+        or PERSONAL_DESKTOP_PAPER_V2_SUPERVISED_EXECUTION_EFFECTS_ENABLED is not False
+    ):
+        raise PersonalDesktopPaperRuntimeOutputError(
+            "Paper-v2 receipt-recovery output effect-gate state is invalid"
+        )
+    return _PersonalDesktopPaperReceiptRecoveryOutputCapability(
+        _WindowsPaperRuntimeOutputNativeApi(),
+        _issuer=_RECEIPT_RECOVERY_RUNTIME_OUTPUT_ISSUER,
+    )
+
+
 class _DisposablePaperRuntimeOutputAuthorityForTest:
     __slots__ = ("_issuer", "_lock", "_used")
 
@@ -528,4 +642,78 @@ def _open_personal_desktop_paper_runtime_output_capability_for_test(
     return _PersonalDesktopPaperRuntimeOutputCapability(
         api,
         _issuer=_DISPOSABLE_RUNTIME_OUTPUT_ISSUER,
+    )
+
+
+class _DisposablePaperReceiptRecoveryOutputAuthorityForTest:
+    __slots__ = ("_issuer", "_lock", "_used")
+
+    def __init__(self, *, _issuer: object | None = None) -> None:
+        if _issuer is not _DISPOSABLE_RECEIPT_RECOVERY_OUTPUT_AUTHORITY_ISSUER:
+            raise TypeError(
+                "disposable receipt-recovery output authority requires its test issuer"
+            )
+        self._issuer = _issuer
+        self._lock = threading.Lock()
+        self._used = False
+
+    def _consume(self) -> None:
+        with self._lock:
+            if (
+                self._issuer is not _DISPOSABLE_RECEIPT_RECOVERY_OUTPUT_AUTHORITY_ISSUER
+                or self._used
+            ):
+                raise TypeError(
+                    "disposable receipt-recovery output authority is invalid "
+                    "or consumed"
+                )
+            self._used = True
+
+    def __copy__(self) -> object:
+        raise TypeError(
+            "disposable receipt-recovery output authorities cannot be copied"
+        )
+
+    def __deepcopy__(self, memo: object) -> object:
+        del memo
+        raise TypeError(
+            "disposable receipt-recovery output authorities cannot be deep-copied"
+        )
+
+    def __reduce__(self) -> object:
+        raise TypeError(
+            "disposable receipt-recovery output authorities cannot be serialized"
+        )
+
+    def __reduce_ex__(self, protocol: int) -> object:
+        del protocol
+        raise TypeError(
+            "disposable receipt-recovery output authorities cannot be pickled"
+        )
+
+
+def _open_disposable_paper_receipt_recovery_output_authority_for_test() -> (
+    _DisposablePaperReceiptRecoveryOutputAuthorityForTest
+):
+    return _DisposablePaperReceiptRecoveryOutputAuthorityForTest(
+        _issuer=_DISPOSABLE_RECEIPT_RECOVERY_OUTPUT_AUTHORITY_ISSUER
+    )
+
+
+def _open_personal_desktop_paper_receipt_recovery_output_capability_for_test(
+    api: _PaperRuntimeOutputNativeApi,
+    *,
+    authority: _DisposablePaperReceiptRecoveryOutputAuthorityForTest,
+) -> _PersonalDesktopPaperReceiptRecoveryOutputCapability:
+    if type(authority) is not _DisposablePaperReceiptRecoveryOutputAuthorityForTest:
+        raise TypeError("disposable receipt-recovery output authority is invalid")
+    if isinstance(api, _WindowsPaperRuntimeOutputNativeApi):
+        raise TypeError(
+            "the disposable receipt-recovery output seam rejects the genuine "
+            "production native implementation"
+        )
+    authority._consume()
+    return _PersonalDesktopPaperReceiptRecoveryOutputCapability(
+        api,
+        _issuer=_DISPOSABLE_RECEIPT_RECOVERY_RUNTIME_OUTPUT_ISSUER,
     )

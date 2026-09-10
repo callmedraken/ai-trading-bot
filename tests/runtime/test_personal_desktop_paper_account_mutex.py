@@ -4,6 +4,7 @@ import ctypes
 import inspect
 from pathlib import Path
 from types import SimpleNamespace
+from uuid import UUID
 
 import pytest
 
@@ -11,6 +12,9 @@ from trading_bot.runtime import personal_desktop_paper_account_mutex as mutex
 from trading_bot.runtime import personal_desktop_paper_account_read_authority as reader
 from trading_bot.runtime import (
     personal_desktop_paper_account_security as paper_security,
+)
+from trading_bot.runtime import (
+    personal_desktop_paper_receipt_recovery_qualification as recovery_qualification,
 )
 from trading_bot.runtime.personal_desktop_paper_account_publication_freeze import (
     PERSONAL_DESKTOP_PAPER_V2_PUBLICATION_FREEZE,
@@ -26,6 +30,7 @@ from trading_bot.runtime.windows_authority_security import (
 ACCOUNT_ID = "9415cd7b-bf36-5fba-bd58-a0f99119dc21"
 OTHER_ACCOUNT_ID = "1dbbe770-9587-40cb-9762-7fa13654df5e"
 POISONED_RELEASE_ACCOUNT_ID = "7560de7c-dd3f-4f7b-bd03-d4fdd7890aa1"
+RECOVERY_POISONED_ACCOUNT_ID = "7560de7c-dd3f-4f7b-bd03-d4fdd7890aa2"
 TRADING_SID = "S-1-5-21-1397534616-3988210162-180023805-1009"
 EXPECTED_MATERIAL = (
     b"39:personal-desktop-paper-account-mutex/v136:9415cd7b-bf36-5fba-bd58-a0f99119dc21"
@@ -121,6 +126,54 @@ def registered_authority():  # type: ignore[no-untyped-def]
 def unregister(authority) -> None:  # type: ignore[no-untyped-def]
     with reader._REGISTRY_LOCK:
         reader._REGISTRY.pop(authority, None)
+
+
+def recovery_result(
+    status: recovery_qualification.PaperReceiptRecoveryQualificationStatus = (
+        recovery_qualification.PaperReceiptRecoveryQualificationStatus.RECEIPT_RECOVERY_REQUIRED
+    ),
+    *,
+    account_id: str = ACCOUNT_ID,
+):
+    statuses = recovery_qualification.PaperReceiptRecoveryQualificationStatus
+    diagnostics = recovery_qualification.PaperReceiptRecoveryQualificationDiagnostic
+    diagnostic = {
+        statuses.RECEIPT_RECOVERY_REQUIRED: (
+            diagnostics.VERIFIED_TERMINAL_RECEIPT_MISSING
+        ),
+        statuses.NO_RECOVERY_REQUIRED: diagnostics.VERIFIED_COMPLETE_ACCOUNT,
+        statuses.BLOCKED: diagnostics.VERIFICATION_BLOCKED,
+    }[status]
+    blocked = status is statuses.BLOCKED
+    recoverable = status is statuses.RECEIPT_RECOVERY_REQUIRED
+    return recovery_qualification.PaperReceiptRecoveryQualificationResult(
+        status=status,
+        diagnostic=diagnostic,
+        paper_account_id=None if blocked else account_id,
+        terminal_checkpoint_id=None if blocked else UUID(int=10),
+        missing_application_id=UUID(int=11) if recoverable else None,
+        predecessor_checkpoint_id=UUID(int=12) if recoverable else None,
+    )
+
+
+def register_recovery_result(*, account_id: str = ACCOUNT_ID):
+    result = recovery_result(account_id=account_id)
+    evidence = SimpleNamespace(
+        account=SimpleNamespace(
+            anchor=SimpleNamespace(
+                paper_account_id=account_id,
+                approved_trading_sid=TRADING_SID,
+            )
+        )
+    )
+    with recovery_qualification._REGISTRY_LOCK:
+        recovery_qualification._REGISTRY[result] = evidence  # type: ignore[assignment]
+    return result
+
+
+def unregister_recovery_result(result) -> None:  # type: ignore[no-untyped-def]
+    with recovery_qualification._REGISTRY_LOCK:
+        recovery_qualification._REGISTRY.pop(result, None)
 
 
 def test_exact_framed_identity_digest_and_name() -> None:
@@ -520,6 +573,123 @@ def test_admission_has_no_filesystem_or_architecture_67_effect() -> None:
     assert "paper_operation import" not in source
     assert "PERSONAL_DESKTOP_PAPER_V2_ROOT" not in source
     assert "open(" not in source
+
+
+def test_recovery_admission_derives_and_reuses_same_pd2a_mutex() -> None:
+    result = register_recovery_result()
+    api = FakeNativeApi()
+    try:
+        admission = mutex._paper_receipt_recovery_admission(result, api=api)
+        with admission:
+            acquisition = admission.acquisition
+            assert acquisition == mutex.PaperAccountMutexAcquisition(
+                ACCOUNT_ID,
+                EXPECTED_NAME,
+                EXPECTED_DIGEST,
+                mutex.PaperAccountMutexState.OWNED,
+            )
+        assert api.created_name == mutex.paper_account_mutex_name(ACCOUNT_ID)
+        assert api.events[-2:] == ["release", "close"]
+    finally:
+        unregister_recovery_result(result)
+
+
+def test_recovery_mutex_identity_and_native_controls_are_not_caller_selectable() -> (
+    None
+):
+    assert tuple(
+        inspect.signature(mutex.paper_receipt_recovery_admission).parameters
+    ) == ("qualification",)
+    for forbidden in ("paper_account_id", "trading_sid", "name", "handle", "timeout"):
+        assert (
+            forbidden
+            not in inspect.signature(mutex.paper_receipt_recovery_admission).parameters
+        )
+
+
+@pytest.mark.parametrize(
+    "candidate",
+    [
+        object(),
+        recovery_result(),
+        recovery_result(
+            recovery_qualification.PaperReceiptRecoveryQualificationStatus.NO_RECOVERY_REQUIRED
+        ),
+        recovery_result(
+            recovery_qualification.PaperReceiptRecoveryQualificationStatus.BLOCKED
+        ),
+    ],
+)
+def test_only_registered_recoverable_qualification_can_admit(candidate: object) -> None:
+    api = FakeNativeApi()
+    with pytest.raises(reader.PersonalDesktopPaperAccountError, match="qualification"):
+        mutex._paper_receipt_recovery_admission(candidate, api=api)  # type: ignore[arg-type]
+    assert api.events == []
+
+
+@pytest.mark.parametrize(
+    "status",
+    [
+        recovery_qualification.PaperReceiptRecoveryQualificationStatus.NO_RECOVERY_REQUIRED,
+        recovery_qualification.PaperReceiptRecoveryQualificationStatus.BLOCKED,
+    ],
+)
+def test_even_registered_nonrecoverable_qualification_cannot_admit(
+    status: recovery_qualification.PaperReceiptRecoveryQualificationStatus,
+) -> None:
+    candidate = recovery_result(status)
+    with recovery_qualification._REGISTRY_LOCK:
+        recovery_qualification._REGISTRY[candidate] = SimpleNamespace()  # type: ignore[assignment]
+    api = FakeNativeApi()
+    try:
+        with pytest.raises(
+            reader.PersonalDesktopPaperAccountError, match="qualification"
+        ):
+            mutex._paper_receipt_recovery_admission(candidate, api=api)
+        assert api.events == []
+    finally:
+        unregister_recovery_result(candidate)
+
+
+def test_recovery_admission_type_cannot_be_caller_minted() -> None:
+    api = FakeNativeApi()
+    with pytest.raises(mutex.PaperAccountMutexError, match="registered"):
+        mutex.PaperReceiptRecoveryAdmission(scope(api), _key=object())
+    assert api.events == []
+
+
+def test_recovery_admission_preserves_abandoned_owner_evidence() -> None:
+    result = register_recovery_result()
+    api = FakeNativeApi(wait_result=mutex.WAIT_ABANDONED_0)
+    try:
+        with mutex._paper_receipt_recovery_admission(result, api=api) as admission:
+            assert admission.acquisition is not None
+            assert (
+                admission.acquisition.state
+                is mutex.PaperAccountMutexState.ABANDONED_OWNER
+            )
+            assert admission.acquisition.was_abandoned is True
+    finally:
+        unregister_recovery_result(result)
+    assert api.events[-2:] == ["release", "close"]
+
+
+def test_recovery_admission_retains_release_failure_poisoning() -> None:
+    result = register_recovery_result(account_id=RECOVERY_POISONED_ACCOUNT_ID)
+    failing_api = FakeNativeApi(release_result=False)
+    try:
+        admission = mutex._paper_receipt_recovery_admission(result, api=failing_api)
+        admission.__enter__()
+        with pytest.raises(mutex.PaperAccountMutexReleaseError):
+            admission.__exit__(None, None, None)
+
+        retry_api = FakeNativeApi()
+        retry = mutex._paper_receipt_recovery_admission(result, api=retry_api)
+        with pytest.raises(mutex.PaperAccountMutexPoisonedError, match="uncertain"):
+            retry.__enter__()
+        assert retry_api.events == []
+    finally:
+        unregister_recovery_result(result)
 
 
 def test_effect_gates_remain_false_and_publication_freeze_is_unchanged() -> None:

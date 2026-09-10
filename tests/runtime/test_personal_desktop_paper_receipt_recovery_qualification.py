@@ -6,6 +6,7 @@ from uuid import UUID
 
 import pytest
 
+from trading_bot.runtime import personal_desktop_paper_account_mutex as mutex
 from trading_bot.runtime import personal_desktop_paper_account_security as security
 from trading_bot.runtime import (
     personal_desktop_paper_receipt_recovery_qualification as qualification,
@@ -84,6 +85,8 @@ def test_terminal_missing_receipt_is_required_but_test_evidence_is_unregistered(
     assert result.predecessor_checkpoint_id == case.successors[0].artifact_id
     with pytest.raises(PersonalDesktopPaperAccountError, match="production"):
         qualification.require_validated_paper_receipt_recovery_qualification(result)
+    with pytest.raises(PersonalDesktopPaperAccountError, match="production"):
+        mutex.paper_receipt_recovery_admission(result)
 
 
 def test_ordinary_reader_still_rejects_same_terminal_missing_receipt_state():

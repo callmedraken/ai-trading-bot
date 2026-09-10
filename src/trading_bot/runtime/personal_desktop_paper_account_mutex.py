@@ -28,6 +28,10 @@ from trading_bot.runtime.personal_desktop_paper_account_read_authority import (
     ValidatedPersonalDesktopPaperAccount,
     require_validated_personal_desktop_paper_account,
 )
+from trading_bot.runtime.personal_desktop_paper_receipt_recovery_qualification import (
+    PaperReceiptRecoveryQualificationResult,
+    require_validated_paper_receipt_recovery_qualification,
+)
 from trading_bot.runtime.windows_authority import require_windows_platform
 from trading_bot.runtime.windows_authority_security import (
     MUTEX_ALL_ACCESS,
@@ -392,6 +396,7 @@ class _PaperAccountMutex:
 
 
 _ADMISSION_KEY = object()
+_RECOVERY_ADMISSION_KEY = object()
 
 
 class SupervisedPaperCycleAdmission:
@@ -401,6 +406,28 @@ class SupervisedPaperCycleAdmission:
         if _key is not _ADMISSION_KEY:
             raise PaperAccountMutexError(
                 "supervised admission requires registered production authority"
+            )
+        self._mutex = mutex
+
+    @property
+    def acquisition(self) -> PaperAccountMutexAcquisition | None:
+        return self._mutex.acquisition
+
+    def __enter__(self) -> Self:
+        self._mutex.acquire()
+        return self
+
+    def __exit__(self, exc_type: object, exc: object, traceback: object) -> None:
+        self._mutex.release()
+
+
+class PaperReceiptRecoveryAdmission:
+    """Held PD3 admission derived only from registered recovery evidence."""
+
+    def __init__(self, mutex: _PaperAccountMutex, *, _key: object) -> None:
+        if _key is not _RECOVERY_ADMISSION_KEY:
+            raise PaperAccountMutexError(
+                "receipt-recovery admission requires registered production authority"
             )
         self._mutex = mutex
 
@@ -444,3 +471,27 @@ def _supervised_paper_cycle_admission(
         _api=api,
     )
     return SupervisedPaperCycleAdmission(mutex, _key=_ADMISSION_KEY)
+
+
+def paper_receipt_recovery_admission(
+    qualification: PaperReceiptRecoveryQualificationResult,
+) -> PaperReceiptRecoveryAdmission:
+    """Admit only genuine recoverable PD3-B evidence to the existing mutex."""
+
+    return _paper_receipt_recovery_admission(
+        qualification, api=_WindowsPaperAccountMutexNativeApi()
+    )
+
+
+def _paper_receipt_recovery_admission(
+    qualification: PaperReceiptRecoveryQualificationResult,
+    *,
+    api: _PaperAccountMutexNativeApi,
+) -> PaperReceiptRecoveryAdmission:
+    evidence = require_validated_paper_receipt_recovery_qualification(qualification)
+    mutex = _PaperAccountMutex(
+        evidence.account.anchor.paper_account_id,
+        evidence.account.anchor.approved_trading_sid,
+        _api=api,
+    )
+    return PaperReceiptRecoveryAdmission(mutex, _key=_RECOVERY_ADMISSION_KEY)

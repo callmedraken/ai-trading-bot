@@ -451,6 +451,68 @@ def execute_paper_operation_once(
     )
 
 
+def recover_paper_operation_receipt_once(
+    operation_root: Path,
+    inputs: VerifiedPaperOperationExecutionInputs,
+    *,
+    output_capability: PaperOperationOutputCapability | None,
+) -> PaperOperationExecutionResult:
+    """Recover one exact completed receipt without executing a paper cycle."""
+    if (
+        not isinstance(operation_root, Path)
+        or type(inputs) is not VerifiedPaperOperationExecutionInputs
+    ):
+        raise TypeError("paper-operation recovery arguments are invalid")
+    try:
+        capability = require_output_capability(output_capability)
+    except TypeError:
+        inspection = _unavailable_inspection(inputs)
+        return _from_inspection(
+            inspection,
+            PaperOperationExecutionClassification.BLOCKED,
+            PaperOperationExecutionDiagnosticCode.OUTPUT_SAFETY_FAILURE.value,
+        )
+    try:
+        retained_parent = validate_output_parent(operation_root)
+    except CheckpointTransitionOutputError:
+        inspection = _unavailable_inspection(inputs)
+        return _from_inspection(
+            inspection,
+            PaperOperationExecutionClassification.BLOCKED,
+            PaperOperationExecutionDiagnosticCode.OUTPUT_SAFETY_FAILURE.value,
+        )
+    inspection = inspect_paper_operation_root(operation_root, inputs)
+    if (
+        inspection.classification is PaperOperationClassification.BLOCKED
+        and inspection.diagnostics[0]
+        is PaperOperationInspectionCode.FINALIZED_TRANSITION_WITHOUT_RECEIPT
+    ):
+        return _recover_receipt(
+            retained_parent,
+            inspection,
+            inputs,
+            capability,
+        )
+    classification = (
+        PaperOperationExecutionClassification.ALREADY_APPLIED
+        if inspection.classification is PaperOperationClassification.ALREADY_APPLIED
+        else PaperOperationExecutionClassification.CONFLICTING
+        if inspection.classification is PaperOperationClassification.CONFLICTING
+        else PaperOperationExecutionClassification.BLOCKED
+    )
+    return _from_inspection(
+        inspection,
+        classification,
+        inspection.diagnostics[0].value,
+        receipt_path=inspection.receipt_path,
+        transition_path=(
+            retained_parent.path / f"paper-account-transition-{inputs.application_id}"
+            if classification is PaperOperationExecutionClassification.ALREADY_APPLIED
+            else None
+        ),
+    )
+
+
 def _recover_receipt(
     parent: OutputParent,
     inspection: PaperOperationInspectionResult,

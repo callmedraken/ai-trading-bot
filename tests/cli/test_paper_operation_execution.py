@@ -25,6 +25,7 @@ from trading_bot.cli.paper_operation_execution import (
     PaperOperationExecutionClassification,
     PaperOperationExecutionDiagnosticCode,
     execute_paper_operation_once,
+    recover_paper_operation_receipt_once,
 )
 from trading_bot.cli.paper_operation_output_capability import (
     PaperOperationOutputCapability,
@@ -46,6 +47,20 @@ def _transition_paths(fixture) -> tuple[Path, Path]:
         / f".paper-account-transition-{fixture.inputs.application_id}.staging"
     )
     return final, staging
+
+
+def _filesystem_state(root: Path) -> tuple[tuple[str, str, int, bytes | None], ...]:
+    retained: list[tuple[str, str, int, bytes | None]] = []
+    for path in sorted(root.rglob("*"), key=lambda item: str(item.relative_to(root))):
+        retained.append(
+            (
+                path.relative_to(root).as_posix(),
+                "file" if path.is_file() else "directory",
+                path.stat().st_mtime_ns,
+                path.read_bytes() if path.is_file() else None,
+            )
+        )
+    return tuple(retained)
 
 
 class _RecordingOutputCapability(PaperOperationOutputCapability):
@@ -972,6 +987,230 @@ def test_crash_after_transition_commit_recovers_byte_identical_receipt(
         item.name: (item.read_bytes(), item.stat().st_mtime_ns)
         for item in transition.iterdir()
     }
+
+
+def test_recovery_only_recovers_byte_identical_receipt_without_transition_changes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    crashed = _setup(tmp_path / "crashed")
+    normal = _setup(tmp_path / "normal")
+    from trading_bot.cli import paper_operation_execution as execution_module
+
+    original_commit = execution_module.commit_paper_operation_receipt
+
+    def crash_before_receipt(*args, **kwargs):
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(
+        execution_module,
+        "commit_paper_operation_receipt",
+        crash_before_receipt,
+    )
+    with pytest.raises(KeyboardInterrupt):
+        execute_paper_operation_once(crashed.operation_root, crashed.inputs)
+    monkeypatch.setattr(
+        execution_module,
+        "commit_paper_operation_receipt",
+        original_commit,
+    )
+    normal_result = execute_paper_operation_once(normal.operation_root, normal.inputs)
+    assert normal_result.receipt_path is not None
+
+    transition, _ = _transition_paths(crashed)
+    transition_before = {
+        item.name: (item.read_bytes(), item.stat().st_mtime_ns)
+        for item in transition.iterdir()
+    }
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("recovery-only API must not execute the paper cycle")
+
+    monkeypatch.setattr(
+        execution_module,
+        "execute_checkpointed_verified_snapshot_paper_cycle",
+        forbidden,
+    )
+    recovered = recover_paper_operation_receipt_once(
+        crashed.operation_root,
+        crashed.inputs,
+        output_capability=None,
+    )
+
+    assert (
+        recovered.classification
+        is PaperOperationExecutionClassification.RECEIPT_RECOVERED
+    )
+    assert recovered.diagnostic_code == "RECEIPT_RECOVERED"
+    assert recovered.receipt_path is not None
+    assert (
+        recovered.receipt_path.read_bytes() == normal_result.receipt_path.read_bytes()
+    )
+    assert transition_before == {
+        item.name: (item.read_bytes(), item.stat().st_mtime_ns)
+        for item in transition.iterdir()
+    }
+
+
+def test_recovery_only_pending_already_applied_and_conflicting_are_zero_write(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pending = _setup(tmp_path / "pending")
+    already = _setup(tmp_path / "already")
+    _install_completed_receipt(already)
+    conflicting = _setup(tmp_path / "conflicting")
+    changed_cycle = _changed_request_cycle(conflicting)
+    _install_completed_receipt(
+        conflicting,
+        transition_cycle_path=changed_cycle,
+        configuration_evidence=(conflicting.inputs.intent.cycle_configuration_artifact),
+    )
+    fixtures = (pending, already, conflicting)
+    before = {
+        fixture.operation_root: _filesystem_state(fixture.operation_root)
+        for fixture in fixtures
+    }
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("recovery-only API must not execute the paper cycle")
+
+    monkeypatch.setattr(
+        "trading_bot.cli.paper_operation_execution."
+        "execute_checkpointed_verified_snapshot_paper_cycle",
+        forbidden,
+    )
+    pending_result = recover_paper_operation_receipt_once(
+        pending.operation_root,
+        pending.inputs,
+        output_capability=None,
+    )
+    already_result = recover_paper_operation_receipt_once(
+        already.operation_root,
+        already.inputs,
+        output_capability=None,
+    )
+    conflicting_result = recover_paper_operation_receipt_once(
+        conflicting.operation_root,
+        conflicting.inputs,
+        output_capability=None,
+    )
+
+    assert (
+        pending_result.classification is PaperOperationExecutionClassification.BLOCKED
+    )
+    assert pending_result.diagnostic_code == "PENDING"
+    assert (
+        already_result.classification
+        is PaperOperationExecutionClassification.ALREADY_APPLIED
+    )
+    assert already_result.diagnostic_code == "ALREADY_APPLIED"
+    assert (
+        conflicting_result.classification
+        is PaperOperationExecutionClassification.CONFLICTING
+    )
+    assert conflicting_result.diagnostic_code == "CALLER_IDEMPOTENCY_CONFLICT"
+    for fixture in fixtures:
+        assert (
+            _filesystem_state(fixture.operation_root) == before[fixture.operation_root]
+        )
+
+
+def test_recovery_only_staging_and_invalid_state_are_zero_write(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    transition_staging = _setup(tmp_path / "transition-staging")
+    _, transition_staging_path = _transition_paths(transition_staging)
+    transition_staging_path.mkdir()
+
+    receipt_staging = _setup(tmp_path / "receipt-staging")
+    receipt_staging_path = (
+        receipt_staging.operation_root
+        / "paper-operations"
+        / f".paper-operation-{receipt_staging.inputs.intent.operation_id}.staging"
+    )
+    receipt_staging_path.mkdir(parents=True)
+
+    invalid = _setup(tmp_path / "invalid")
+    completed = execute_paper_operation_once(invalid.operation_root, invalid.inputs)
+    assert completed.transition_path is not None
+    detached_transition = tmp_path / "detached-transition"
+    completed.transition_path.rename(detached_transition)
+
+    roots = (
+        transition_staging.operation_root,
+        receipt_staging.operation_root,
+        tmp_path,
+    )
+    before = {root: _filesystem_state(root) for root in roots}
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("recovery-only API must not execute the paper cycle")
+
+    monkeypatch.setattr(
+        "trading_bot.cli.paper_operation_execution."
+        "execute_checkpointed_verified_snapshot_paper_cycle",
+        forbidden,
+    )
+    transition_staging_result = recover_paper_operation_receipt_once(
+        transition_staging.operation_root,
+        transition_staging.inputs,
+        output_capability=None,
+    )
+    receipt_staging_result = recover_paper_operation_receipt_once(
+        receipt_staging.operation_root,
+        receipt_staging.inputs,
+        output_capability=None,
+    )
+    invalid_result = recover_paper_operation_receipt_once(
+        invalid.operation_root,
+        invalid.inputs,
+        output_capability=None,
+    )
+
+    assert (
+        transition_staging_result.classification
+        is PaperOperationExecutionClassification.BLOCKED
+    )
+    assert transition_staging_result.diagnostic_code == "TRANSITION_STAGING_EXISTS"
+    assert (
+        receipt_staging_result.classification
+        is PaperOperationExecutionClassification.BLOCKED
+    )
+    assert receipt_staging_result.diagnostic_code == "OPERATION_STAGING_EXISTS"
+    assert (
+        invalid_result.classification is PaperOperationExecutionClassification.BLOCKED
+    )
+    assert invalid_result.diagnostic_code == "BLOCKED_INVALID_OPERATION_STATE"
+    for root in roots:
+        assert _filesystem_state(root) == before[root]
+
+
+def test_recovery_only_invalid_output_capability_blocks_before_inspection(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = _setup(tmp_path)
+    before = _filesystem_state(fixture.operation_root)
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("recovery-only API must not execute the paper cycle")
+
+    monkeypatch.setattr(
+        "trading_bot.cli.paper_operation_execution."
+        "execute_checkpointed_verified_snapshot_paper_cycle",
+        forbidden,
+    )
+    result = recover_paper_operation_receipt_once(
+        fixture.operation_root,
+        fixture.inputs,
+        output_capability=object(),  # type: ignore[arg-type]
+    )
+
+    assert result.classification is PaperOperationExecutionClassification.BLOCKED
+    assert result.diagnostic_code == "OUTPUT_SAFETY_FAILURE"
+    assert _filesystem_state(fixture.operation_root) == before
 
 
 def test_receipt_staging_crash_blocks_recovery_without_runtime(

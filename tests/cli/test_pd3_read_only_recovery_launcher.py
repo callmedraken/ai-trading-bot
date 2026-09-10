@@ -17,9 +17,7 @@ def test_pd3_read_only_recovery_launcher_is_cwd_and_package_root_independent(
     (alternate_root / "trading_bot" / "__init__.py").write_text("")
     (alternate_cli / "__init__.py").write_text("")
     (alternate_cli / "pd3_read_only_recovery_validation.py").write_text(
-        "def main(argv=None):\n"
-        "    print('alternate package selected')\n"
-        "    return 73\n"
+        "def main(argv=None):\n    print('alternate package selected')\n    return 73\n"
     )
 
     away = tmp_path / "away-from-repository"

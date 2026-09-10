@@ -96,6 +96,35 @@ class PersonalDesktopPaperAccountReadEvidence:
     receipts: tuple[PaperOperationReceipt, ...]
 
 
+@dataclass(frozen=True, slots=True)
+class PersonalDesktopPaperAccountRecoveryReadEvidence:
+    """Fully verified account state with at most one terminal missing receipt.
+
+    This evidence is read-only and non-authorizing.  In particular, the
+    missing application identity is not a caller idempotency or operation ID.
+    """
+
+    account: PersonalDesktopPaperAccountReadEvidence
+    missing_application_id: UUID | None
+    missing_predecessor_checkpoint_id: UUID | None
+
+    def __post_init__(self) -> None:
+        missing = self.missing_application_id is not None
+        if (
+            type(self.account) is not PersonalDesktopPaperAccountReadEvidence
+            or (missing != (self.missing_predecessor_checkpoint_id is not None))
+            or (
+                self.missing_application_id is not None
+                and type(self.missing_application_id) is not UUID
+            )
+            or (
+                self.missing_predecessor_checkpoint_id is not None
+                and type(self.missing_predecessor_checkpoint_id) is not UUID
+            )
+        ):
+            raise ValueError("paper-account recovery read evidence is invalid")
+
+
 class ValidatedPersonalDesktopPaperAccount:
     """Process-local production read provenance; constructed only after success."""
 
@@ -166,6 +195,32 @@ def read_personal_desktop_paper_account(
     with _REGISTRY_LOCK:
         _REGISTRY[result] = evidence
     return result
+
+
+def _read_account_evidence(
+    machine_authority_id: str,
+    trading_sid: str,
+    *,
+    api: PaperReadNativeApi,
+    observer: TradingTokenObserver,
+    calendar: IdentifiedMarketCalendar,
+    configurations: tuple[bytes, ...] = (),
+) -> PersonalDesktopPaperAccountReadEvidence:
+    """Strict ordinary-reader core; every transition still requires a receipt."""
+
+    recovery_read = verify_personal_desktop_paper_account_recovery_read(
+        machine_authority_id,
+        trading_sid,
+        api=api,
+        observer=observer,
+        calendar=calendar,
+        configurations=configurations,
+    )
+    if recovery_read.missing_application_id is not None:
+        raise PersonalDesktopPaperAccountError(
+            "finalized transition has no verified receipt; recovery is required"
+        )
+    return recovery_read.account
 
 
 @dataclass(frozen=True, slots=True)
@@ -286,7 +341,7 @@ def _read_receipts(
     return tuple(receipts)
 
 
-def _read_account_evidence(
+def verify_personal_desktop_paper_account_recovery_read(
     machine_authority_id: str,
     trading_sid: str,
     *,
@@ -294,8 +349,13 @@ def _read_account_evidence(
     observer: TradingTokenObserver,
     calendar: IdentifiedMarketCalendar,
     configurations: tuple[bytes, ...] = (),
-) -> PersonalDesktopPaperAccountReadEvidence:
-    """Injectable verification core. It never registers production authority."""
+) -> PersonalDesktopPaperAccountRecoveryReadEvidence:
+    """Verify a healthy account or exactly one terminal missing receipt.
+
+    This injectable core reuses the ordinary reader's complete A61/A66/A67
+    verification lineage.  It returns evidence only and never registers
+    production provenance or grants mutation authority.
+    """
     initial_token = observer.observe()
     require_trading_token(trading_sid, initial_token)
     configuration_bytes = _configurations(configurations)
@@ -431,7 +491,7 @@ def _read_account_evidence(
             raise PersonalDesktopPaperAccountError(
                 "v2 complete A66 lineage verification failed"
             )
-        _verify_receipts(
+        missing_applications = _verify_receipts(
             receipts,
             transitions,
             genesis,
@@ -440,11 +500,37 @@ def _read_account_evidence(
             lineage.evidence,
             calendar,
         )
+        missing_application_id: UUID | None = None
+        missing_predecessor_checkpoint_id: UUID | None = None
+        if len(missing_applications) > 1:
+            raise PersonalDesktopPaperAccountError(
+                "multiple finalized transitions lack verified receipts"
+            )
+        if missing_applications:
+            missing_application_id = missing_applications[0]
+            transition_map = {
+                transition.checkpoint.application_id: transition
+                for transition in transitions
+            }
+            missing_transition = transition_map[missing_application_id]
+            missing_predecessor_checkpoint_id = (
+                missing_transition.checkpoint.prior_checkpoint.checkpoint_id
+            )
+            checkpoint_ids = lineage.evidence.checkpoint_ids
+            if (
+                len(checkpoint_ids) < 2
+                or missing_transition.checkpoint.checkpoint_id != terminal_id
+                or checkpoint_ids[-1] != terminal_id
+                or checkpoint_ids[-2] != missing_predecessor_checkpoint_id
+            ):
+                raise PersonalDesktopPaperAccountError(
+                    "a nonterminal transition lacks its verified receipt"
+                )
         # Evidence leaves this scope only after __exit__ completes every pinned
         # identity, named-object, ACL, inventory, and exact-byte reread check.
         successor_map = {a.artifact_id: a for a in successors}
         report_map = {a.artifact_id: a for a in reports}
-        evidence = PersonalDesktopPaperAccountReadEvidence(
+        account_evidence = PersonalDesktopPaperAccountReadEvidence(
             anchor,
             anchor_bytes,
             verified_prior_from_full_lineage(lineage),
@@ -470,7 +556,11 @@ def _read_account_evidence(
         raise PersonalDesktopPaperAccountError(
             "Trading token changed during account read"
         )
-    return evidence
+    return PersonalDesktopPaperAccountRecoveryReadEvidence(
+        account=account_evidence,
+        missing_application_id=missing_application_id,
+        missing_predecessor_checkpoint_id=missing_predecessor_checkpoint_id,
+    )
 
 
 def _verify_receipts(
@@ -481,7 +571,7 @@ def _verify_receipts(
     configurations: dict[tuple[str, int], bytes],
     full_lineage: PaperAccountLineageEvidence,
     calendar: IdentifiedMarketCalendar,
-) -> None:
+) -> tuple[UUID, ...]:
     checkpoint_map = {
         t.checkpoint.checkpoint_id: t.checkpoint_artifact for t in transitions
     }
@@ -571,11 +661,8 @@ def _verify_receipts(
             raise PersonalDesktopPaperAccountError(
                 "installed receipt fails A67 verification"
             )
-    if completed != set(application_map):
-        raise PersonalDesktopPaperAccountError(
-            "finalized transition has no verified receipt; recovery is required"
-        )
     if used_configurations != set(configurations):
         raise PersonalDesktopPaperAccountError(
             "unrecognized historical configuration dependency"
         )
+    return tuple(sorted(set(application_map) - completed, key=str))

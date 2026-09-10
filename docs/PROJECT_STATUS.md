@@ -33,6 +33,8 @@ integration baseline: bd88ee966bff455f9fc897d6cfdfafdd807f27e2
 Architecture-94 P2 base: a810122a96b6fc90da25d71eede8da64b7272c98
 branch: feature/personal-desktop-paper-runtime
 worktree: F:\AI\worktrees\ai-trading-bot-personal-desktop
+latest accepted PD2D2 source: f05921244057052158a57b360e9bf556209b9654
+latest accepted PD2D2 tree:   35a5a7e1d59bbe90ca303b6037d29dc7fc085f4c
 ```
 
 Architecture checkpoints:
@@ -42,19 +44,26 @@ Architecture 102 adoption:          fab1d776abcdcbf09fb26a257ea7fc86f6201b26
 Architecture 103 + validation plan: 12e41c4e407a79d63ea896773bf8462038ebba27
 Architecture 104:                   supervised A67 execution boundary
 Architecture 105:                   first-mutation qualification
+Architecture 106:                   first Paper-v2 execution preparation
+Architecture 107:                   first Paper-v2 output authority hardening
+Architecture 108:                   first Paper-v2 post-mutation reconciliation
+Architecture 108 R1:                f05921244057052158a57b360e9bf556209b9654
 ```
 
 ## Mandatory personal-desktop security baseline
 
 - steady-state trading runs under the dedicated non-admin `Trading` account;
-- credentials stay outside source/plain config and use reviewed Windows-backed storage;
+- credentials stay outside source/plain config and use reviewed Windows-backed
+  storage;
 - paper is default; future live requires a separate explicit arming boundary;
 - every executable order passes deterministic risk authority;
 - strategy/optimizer/GUI/AI/scheduler/adapters cannot bypass risk;
 - durable state outranks process-local assumptions;
-- ambiguous provider/broker effects are reconciled or fail closed rather than blindly retried;
+- ambiguous provider/broker effects are reconciled or fail closed rather than
+  blindly retried;
 - source-governed runtime/config/state locations use practical least privilege;
-- crash/restart, duplicate invocation, stale input, corruption/conflict, and receipt recovery remain roadmap gates.
+- crash/restart, duplicate invocation, stale input, corruption/conflict, and
+  receipt recovery remain roadmap gates.
 
 ## Frozen C3 production state
 
@@ -181,29 +190,12 @@ Accepted correction/source checkpoint:
 tree 9dc5087b87cfd2c16ef76d97c04fd20d41ba7187
 ```
 
-Canonical status:
-
-```text
-PD2A_ARCHITECTURE_ACCEPTED = YES
-PD2A_SOURCE_ACCEPTED       = YES
-PD2A_SOURCE_CERTIFIED      = YES
-PD2A                       = COMPLETE
-```
-
 PD2A provides the deterministic account-scoped Windows mutex, fixed 30-second
 wait, exact kernel owner/DACL validation, explicit `ABANDONED_OWNER`, process-
 wide same-account non-reentrancy, and process-lifetime poison after uncertain
 `ReleaseMutex` failure.
 
-Final certification:
-
-```text
-4720 passed, 17 skipped
-Ruff check: PASS
-Ruff format --check: PASS (424 files)
-git diff --check: PASS
-worktree/index: clean
-```
+Final certification: `4720 passed, 17 skipped`; Ruff/diff clean.
 
 ## PD2B — supervised paper composition — COMPLETE
 
@@ -222,34 +214,12 @@ PD2B3 f86f8c8758b3e8941e5bbfa26d40892433cf0110
 tree  9f883335ec13a9385113b2c310c6009a8a0e72aa
 ```
 
-Canonical status:
-
-```text
-PD2B1_SOURCE_ACCEPTED = YES
-PD2B1                  = COMPLETE
-PD2B2_SOURCE_ACCEPTED = YES
-PD2B2                  = COMPLETE
-PD2B3_SOURCE_ACCEPTED = YES
-PD2B3                  = COMPLETE
-PD2B_SOURCE_ACCEPTED  = YES
-PD2B_SOURCE_CERTIFIED = YES
-PD2B                  = COMPLETE
-```
-
-Final certification:
-
-```text
-4754 passed, 17 skipped
-Ruff check: PASS
-Ruff format --check: PASS (430 files)
-git diff --check: PASS
-worktree/index: clean
-```
-
 PD2B removed caller-path authority from semantic A67 inputs and retains the
 production operation root/raw A67 inputs only inside an active process-local
 binding under the same account mutex. `ABANDONED_OWNER` blocks before P1/A67
 preparation.
+
+Final certification: `4754 passed, 17 skipped`; Ruff/diff clean.
 
 ## PD2C — supervised Architecture-67 execution boundary — COMPLETE
 
@@ -266,144 +236,141 @@ commit 8d590d06d346140002a3a20eefa9b5a7d087326d
 tree   ed322f18b1f98ff88f144ac11bfbcc3fd353d9a3
 ```
 
-Canonical status:
-
-```text
-PD2C_ARCHITECTURE_ACCEPTED = YES
-PD2C_SOURCE_ACCEPTED       = YES
-PD2C_SOURCE_CERTIFIED      = YES
-PD2C                       = COMPLETE
-```
-
-PD2C adds the public supervised execution boundary and a dedicated gate:
+The dedicated supervised-execution gate exists and is normally closed:
 
 ```text
 PERSONAL_DESKTOP_PAPER_V2_SUPERVISED_EXECUTION_EFFECTS_ENABLED = False
 ```
 
-The existing publisher/recovery gates also remain false:
+The publisher/recovery gates are also normally closed:
 
 ```text
 PERSONAL_DESKTOP_PAPER_V2_PRODUCTION_EFFECTS_ENABLED = False
 PERSONAL_DESKTOP_PAPER_V2_RECOVERY_EFFECTS_ENABLED   = False
 ```
 
-When the PD2C gate is false, the production execution API fails after genuine
-C1/P2 validation but before entering PD2B3, acquiring the account mutex,
-rereading Paper-v2, retrieving the private A67 binding, or invoking A67. The
-future enabled path requires the exact Architecture-103 runtime root, calls the
-existing A67 execute-once boundary exactly once, reconciles operation and
-application identities, strips paths/raw inputs from its result, and unwinds the
-same account-mutex scope on success or failure.
+Final certification: `4775 passed, 17 skipped`; Ruff/diff clean.
 
-Final certification:
+## PD2D — first real supervised Paper-v2 operation — COMPLETE
+
+Completion record:
 
 ```text
-4775 passed, 17 skipped
+docs/validation/pd2d2-first-real-paper-operation-completion.md
+```
+
+PD2D1 completed the read-only first-mutation qualification and froze the exact
+first-cycle plan, selected C3 snapshot, GENESIS predecessor, strategy-history
+seed, caller idempotency key, open reference, policies, and timestamps. The
+real-host qualification classified the exact operation as ready without
+mutating Paper-v2.
+
+PD2D2 then performed exactly one explicitly authorized supervised execution.
+The durable identities are:
+
+```text
+paper_account_id:       9415cd7b-bf36-5fba-bd58-a0f99119dc21
+GENESIS checkpoint:     1832a2b5-8b63-501a-8f7d-f1722c32307b
+operation_id:           307f769a-f09a-539d-b12d-3fb51b973809
+application_id:         78a1bae8-51ac-5bf0-b159-500768c758fc
+cycle_result_id:        854f133e-d9cd-5a9d-be63-0eb4137787db
+successor checkpoint:   ed4640e5-0630-525d-b916-d50e31e3ba2a
+terminal checkpoint:    ed4640e5-0630-525d-b916-d50e31e3ba2a
+receipt_status:         COMPLETED
+receipt_outcome:        NO_ACTION
+```
+
+After execution the supervised gate was closed. Architecture 108 then performed
+a separate read-only production reconciliation under the Trading principal.
+After R1 fixed the selected-C3 reader lifetime bug, the reconciliation returned:
+
+```text
+result:                    RECONCILED
+all_effect_gates_false:    true
+lineage_edge_count:        1
+account_cash:              25000
+position_count:            0
+inspection_classification: ALREADY_APPLIED
+inspection_diagnostic:     ALREADY_APPLIED
+exit:                      0
+```
+
+The `ALREADY_APPLIED` result proves the durable transition/receipt lineage is
+recognized and the completed operation is not admitted as a new execution.
+
+Final accepted source:
+
+```text
+commit f05921244057052158a57b360e9bf556209b9654
+tree   35a5a7e1d59bbe90ca303b6037d29dc7fc085f4c
+```
+
+Final broad certification:
+
+```text
+5146 passed, 17 skipped in 1505.92s
 Ruff check: PASS
-Ruff format --check: PASS (432 files)
+Ruff format --check: PASS (457 files)
 git diff --check: PASS
 worktree/index: clean
 ```
 
-No production/native/provider/broker effect or Paper-v2 mutation occurred.
+The first invalid broad attempt hit the already-known host-specific pytest temp
+permission failure at `C:\Users\John\AppData\Local\Temp\pytest-of-John` during
+fixture setup. The successful controlled run used a fresh explicit external
+`--basetemp`. This was an environment/setup failure, not a source regression.
 
-## Current milestone — PD2D1 read-only first-mutation qualification
-
-Architecture:
-
-```text
-docs/architecture/105-personal-desktop-first-paper-mutation-qualification.md
-```
-
-Validation plan:
+Canonical PD2 state:
 
 ```text
-docs/validation/pd2d1-first-paper-mutation-qualification-plan.md
+PD2A = COMPLETE
+PD2B = COMPLETE
+PD2C = COMPLETE
+PD2D1 = COMPLETE
+PD2D2 = COMPLETE
+PD2 = COMPLETE
 ```
 
-Accepted and verified source:
+## Current milestone — PD3 supervised crash/recovery validation
+
+PD3 must validate the personal-desktop recovery authority around the existing
+Architecture-67 restart-safe coordinator; it must not create a second recovery
+engine.
+
+The existing generic semantics already distinguish the important states:
 
 ```text
-commit bd95d522f5bcf398a243ec2b5fdb8cdc18f63afc
-tree   90b9fc8abb21a61e78e8beae9cdfc9e11e4ebd5c
+finalized transition + missing receipt + exact verification
+-> reconstruct the same canonical completed receipt
+-> runtime invocation count = 0
+
+verified completed transition + completed receipt
+-> ALREADY_APPLIED
+-> writes = 0
+-> runtime invocation count = 0
+
+staging / malformed / altered / ambiguous / mismatched evidence
+-> BLOCKED
+-> no cleanup, repair, replacement, or blind retry
 ```
 
-PD2D1-F1 first-cycle pure-input freeze is complete at commit
-`45291c3053a23de02e118f5b853bd67b5cf36ca8` (tree
-`e3fdf3af20d3d8cbceb1e9bedbf59603f9913c9e`). PD2D1-F2 freezes the offline
-market evidence as:
-
-```text
-seed_id: 5dc95e10-ba22-5b91-94b2-0d851aa8e2d7
-seed SHA-256: 40dda54c82324f358d640cce89e467295b8f5b73a32fed76c52e7ca90d398e64
-seed byte length: 1060
-SPY 2026-08-31 caller-asserted open reference: Decimal("767.33")
-```
-
-Current checkpoint state:
-
-```text
-PD2D1_SOURCE_ACCEPTED                = YES
-PD2D1_SOURCE_VERIFIED                = YES
-PD2D1_RH0_PLANNING_ACCEPTED          = YES
-PD2D1_NON_MARKET_DATA_PROFILE_FROZEN = YES
-PD2D1_F1_COMPLETE                    = YES
-PD2D1_F2_OFFLINE_EVIDENCE_FROZEN     = YES
-PD2D1_REAL_HOST_QUALIFIED            = NO
-PD2D2_AUTHORIZED                     = NO
-```
-
-The exact first-cycle non-market-data profile is frozen in
-`docs/validation/pd2d1-first-cycle-input-freeze.md`; its offline market evidence
-is frozen in `docs/validation/pd2d1-first-cycle-market-data-evidence.md`. No
-PD2D1 real-host qualification has occurred. The next checkpoint is review and
-freeze of the read-only real-host operator harness, and PD2D2 remains
-**NOT AUTHORIZED**.
-
-PD2D1 must answer one question without writing anything: **if the exact current
-production authority, selected snapshot, post-lock account state, and planning
-inputs were presented to A67 now, does the existing read-only inspection classify
-the operation as clean `PENDING`?**
-
-Required qualification ordering:
-
-```text
-genuine C1/P2
--> enter PD2B3
--> acquire PD2A account mutex
--> post-lock genuine Paper-v2 reread
--> exact P1 replay verification
--> private active A67 binding
--> exact fixed F:\AITradingBot\Paper-v2\runtime root
--> existing inspect_paper_operation_root (read-only)
--> reconcile inspection identities
--> non-authorizing READY / NOT_READY evidence
--> private binding expires
--> mutex release
-```
-
-Qualification never calls `execute_paper_operation_once`, never enables the
-PD2C execution gate, and never creates/renames/writes/deletes a Paper-v2 object.
-A later real-host qualification may perform read-only filesystem/native mutex
-operations under `Trading`; that evidence still grants no execution authority.
-
-Only `PENDING` + `PENDING` inspection is `READY`. `ALREADY_APPLIED`,
-`CONFLICTING`, `BLOCKED`, staging/recovery conditions, identity mismatches, or
-any uncertainty are `NOT_READY`/fail-closed.
+PD3's personal-desktop layer must preserve the dedicated non-admin Trading
+principal, genuine production authority, account mutex, exact Paper-v2 root,
+read/reconciliation-before-effect ordering, and a separately reviewed recovery
+gate that remains false by default. Recovery effects are not yet authorized.
 
 ## Primary roadmap
 
 ```text
 PD0   personal-desktop profile adoption                     COMPLETE
 PD1   personal-desktop paper-account authority v2           COMPLETE
-PD2   reliable supervised manual paper cycle                CURRENT
+PD2   reliable supervised manual paper cycle                COMPLETE
   PD2A account-scoped Windows mutex + admission             COMPLETE
   PD2B supervised source-only composition                   COMPLETE
   PD2C supervised A67 execution boundary                    COMPLETE
-  PD2D1 read-only first-mutation qualification              CURRENT / F1 COMPLETE / F2 EVIDENCE FROZEN
-  PD2D2 enable gate + first real Paper-v2 mutation          NOT AUTHORIZED
-PD3   supervised crash/recovery validation
+  PD2D1 read-only first-mutation qualification              COMPLETE
+  PD2D2 first real Paper-v2 mutation + reconciliation       COMPLETE
+PD3   supervised crash/recovery validation                  CURRENT
 PD4   unattended simulated paper under Trading
 PD5   broker-paper integration
 PD6   broker-paper soak / operational hardening
@@ -415,14 +382,14 @@ PD8   tiny restricted live -> gradual maturity
 
 ```text
 provider call #7
+Paper-v2 recovery effects
 broker order submission
 live trading
 unattended scheduling
-changing the PD2C supervised-execution gate to True
-first real Paper-v2 runtime mutation
+changing any closed production/recovery/supervised effect gate without a reviewed checkpoint
 old v1 publisher rerun
 v1 staging delete/repair/rename/migration/reuse
-Paper-v2 manual mutation outside reviewed PD2 effect checkpoints
+Paper-v2 manual mutation outside reviewed effect checkpoints
 account/group/password changes
 LSA rights/policy changes
 KSP/signing/private-export effects
@@ -431,18 +398,27 @@ merge/rebase/force-push/amend/PR metadata changes without explicit approval
 
 ## Workflow invariants
 
-- ChatGPT/Sol owns architecture/security review, exact GitHub diff review, test gates, merge/deployment/production decisions, and next milestones.
-- After a reviewed checkpoint passes, automatically continue to the next safe scoped checkpoint; stop at explicitly protected production/effect boundaries.
+- ChatGPT/Sol owns architecture/security review, exact GitHub diff review, test
+  gates, merge/deployment/production decisions, and next milestones.
+- After a reviewed checkpoint passes, automatically continue to the next safe
+  scoped checkpoint; stop at explicitly protected production/effect boundaries.
 - Tiny scoped status/handoff/docs closeouts are ChatGPT-direct by default.
-- Codex uses Luna Extra High for frozen/local mechanical work, Astra for bounded discovery-aware/cross-module work, and Sol High for native Windows/security/authority/order/crash/recovery and other safety-sensitive implementation.
+- Codex uses Luna Extra High for frozen/local mechanical work, Astra for bounded
+  discovery-aware/cross-module work, and Sol High for native Windows/security/
+  authority/order/crash/recovery and other safety-sensitive implementation.
 - Model choice never transfers architecture or acceptance authority.
 - No subagents unless explicitly requested.
-- Codex runs focused tests/checks during implementation; broad/full certification is normally user-run locally at the final gate.
+- Codex runs focused tests/checks during implementation; broad/full
+  certification is normally user-run locally at the final gate.
 - Never `git add .` or `git add -A`; exact-file stage only.
 - Worktree/branch/HEAD mismatch is a STOP; do not self-correct.
-- Controlled Windows pytest uses a fresh external `F:\AI\temp\pytest\<unique>` and normally `-p no:cacheprovider`.
+- Controlled Windows pytest uses a fresh external
+  `F:\AI\temp\pytest\<purpose>-<unique>` via explicit `--basetemp` and normally
+  `-p no:cacheprovider`; do not globally change `TEMP`, `TMP`, or persistently
+  set `PYTHONPATH` for normal pytest collection.
 - Preserve unrelated generated/untracked reports and historical evidence.
-- No merge/rebase/force-push/amend/PR metadata/review-thread changes without explicit approval.
+- No merge/rebase/force-push/amend/PR metadata/review-thread changes without
+  explicit approval.
 
 ## Documentation workflow
 

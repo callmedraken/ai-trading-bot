@@ -144,6 +144,14 @@ class _PreparedPaperOperationBinding:
     execution_inputs: VerifiedPaperOperationExecutionInputs
 
 
+@dataclass(frozen=True, slots=True)
+class _PreparedPaperOperationMaterial:
+    """Pure post-lock plan and A67 inputs with no filesystem authority."""
+
+    plan_binding: ManualPaperStrategyPlanArtifactBinding
+    execution_inputs: VerifiedPaperOperationExecutionInputs
+
+
 _CONTEXT_KEY = object()
 _ACTIVE_BINDINGS: weakref.WeakKeyDictionary[
     _SupervisedPaperOperationPreparation, _PreparedPaperOperationBinding
@@ -281,99 +289,32 @@ class _SupervisedPaperOperationPreparation:
                 )
 
             account = cycle.evidence
-            paper_account_id = account.anchor.paper_account_id
-            prior = account.prior_checkpoint
-            terminal = _terminal_artifact(account, prior.checkpoint_id)
-            selected = self._selected_snapshot
-            assertion = ManualPaperSelectedC3Assertion(
-                selected.audit.selection_id,
-                selected.audit.session_id,
-                selected.audit.terminal_id,
-                selected.audit.snapshot_id,
-                selected.audit.artifact_sha256,
-                selected.audit.artifact_byte_length,
-            )
-            plan_request = ManualPaperStrategyPlanRequest(
-                selected.verification,
-                paper_account_id,
-                assertion,
-                prior,
-                self._history_seed,
-                self._strategy_config,
-                str(self._user_key),
-                self._open_reference,
-                self._policies,
-                self._planning_at,
-                self._submitted_at,
-                self._filled_at,
-                self._metadata,
-            )
-            built_plan = self._build_plan(plan_request, self._calendar)
-            verified_plan = self._verify_plan(
-                built_plan.artifact_bytes,
-                self._calendar,
-                expected_sha256=built_plan.artifact_sha256,
-                expected_byte_length=built_plan.artifact_byte_length,
-                expected_checkpointed_request=built_plan.checkpointed_request,
-            )
-            if verified_plan != built_plan:
-                raise SupervisedPaperOperationPreparationError(
-                    "strategy-plan replay differs from the produced binding"
-                )
-            _reconcile_plan(
-                verified_plan,
-                paper_account_id=paper_account_id,
-                prior=prior,
-                assertion=assertion,
-                selected_snapshot=selected,
+            material = _prepare_verified_paper_operation_from_account(
+                account,
+                self._selected_snapshot,
+                history_seed=self._history_seed,
+                strategy_config=self._strategy_config,
                 caller_idempotency_key=self._user_key,
+                open_reference=self._open_reference,
+                policies=self._policies,
+                planning_at=self._planning_at,
+                submitted_at=self._submitted_at,
+                filled_at=self._filled_at,
+                metadata=self._metadata,
+                build_plan=self._build_plan,
+                verify_plan=self._verify_plan,
+                calendar=self._calendar,
             )
-
-            terminal_evidence = _artifact_evidence(terminal)
-            snapshot_evidence = PaperAccountLineageArtifactEvidence(
-                PaperAccountLineageArtifactKind.DAILY_SNAPSHOT,
-                selected.audit.snapshot_id,
-                selected.audit.artifact_sha256,
-                selected.audit.artifact_byte_length,
-            )
-            configuration_evidence = PaperOperationArtifactEvidence(
-                verified_plan.artifact_sha256,
-                verified_plan.artifact_byte_length,
-            )
-            request = verified_plan.checkpointed_request
-            intent = create_paper_operation_intent(
-                self._user_key,
-                account.lineage,
-                terminal_evidence,
-                snapshot_evidence,
-                configuration_evidence,
-                request,
-            )
-            application_id = derive_checkpointed_verified_snapshot_application_id(
-                prior.checkpoint_id,
-                request.request_id,
-            )
-            execution_inputs = VerifiedPaperOperationExecutionInputs(
-                intent,
-                application_id,
-                account.genesis,
-                account.successors,
-                account.reports,
-                account.snapshots,
-                prior,
-                terminal.payload,
-                selected.snapshot_bytes,
-                selected.verification,
-                verified_plan.artifact_bytes,
-                request,
-                self._calendar,
-            )
+            verified_plan = material.plan_binding
+            execution_inputs = material.execution_inputs
+            paper_account_id = account.anchor.paper_account_id
+            application_id = execution_inputs.application_id
             audit = _PreparationAudit(
                 paper_account_id,
                 verified_plan.plan.plan_id,
-                intent.operation_id,
+                execution_inputs.intent.operation_id,
                 application_id,
-                selected.audit.snapshot_id,
+                self._selected_snapshot.audit.snapshot_id,
                 verified_plan.artifact_sha256,
                 verified_plan.artifact_byte_length,
                 acquisition.state,
@@ -558,6 +499,122 @@ def _require_active_prepared_paper_operation_binding(
             "prepared operation binding is not active"
         )
     return binding
+
+
+def _prepare_verified_paper_operation_from_account(
+    account: object,
+    selected: SelectedC3SnapshotReadResult,
+    *,
+    history_seed: VerifiedStrategyHistorySeed,
+    strategy_config: MovingAverageCrossoverConfig,
+    caller_idempotency_key: UUID,
+    open_reference: CallerAssertedNextSessionOpenReference,
+    policies: VerifiedSnapshotPaperCyclePolicies,
+    planning_at: datetime,
+    submitted_at: datetime,
+    filled_at: datetime,
+    metadata: tuple[MetadataEntry, ...],
+    build_plan: _BuildPlan,
+    verify_plan: _VerifyPlan,
+    calendar: IdentifiedMarketCalendar,
+) -> _PreparedPaperOperationMaterial:
+    """Derive and replay exact plan/A67 inputs from authoritative account evidence."""
+
+    if type(selected) is not SelectedC3SnapshotReadResult:
+        raise SupervisedPaperOperationPreparationError(
+            "selected snapshot must be an exact P2 read result"
+        )
+    if type(caller_idempotency_key) is not UUID:
+        raise SupervisedPaperOperationPreparationError(
+            "caller idempotency key must be an exact UUID"
+        )
+    paper_account_id = account.anchor.paper_account_id
+    prior = account.prior_checkpoint
+    terminal = _terminal_artifact(account, prior.checkpoint_id)
+    assertion = ManualPaperSelectedC3Assertion(
+        selected.audit.selection_id,
+        selected.audit.session_id,
+        selected.audit.terminal_id,
+        selected.audit.snapshot_id,
+        selected.audit.artifact_sha256,
+        selected.audit.artifact_byte_length,
+    )
+    plan_request = ManualPaperStrategyPlanRequest(
+        selected.verification,
+        paper_account_id,
+        assertion,
+        prior,
+        history_seed,
+        strategy_config,
+        str(caller_idempotency_key),
+        open_reference,
+        policies,
+        planning_at,
+        submitted_at,
+        filled_at,
+        metadata,
+    )
+    built_plan = build_plan(plan_request, calendar)
+    verified_plan = verify_plan(
+        built_plan.artifact_bytes,
+        calendar,
+        expected_sha256=built_plan.artifact_sha256,
+        expected_byte_length=built_plan.artifact_byte_length,
+        expected_checkpointed_request=built_plan.checkpointed_request,
+    )
+    if verified_plan != built_plan:
+        raise SupervisedPaperOperationPreparationError(
+            "strategy-plan replay differs from the produced binding"
+        )
+    _reconcile_plan(
+        verified_plan,
+        paper_account_id=paper_account_id,
+        prior=prior,
+        assertion=assertion,
+        selected_snapshot=selected,
+        caller_idempotency_key=caller_idempotency_key,
+    )
+
+    terminal_evidence = _artifact_evidence(terminal)
+    snapshot_evidence = PaperAccountLineageArtifactEvidence(
+        PaperAccountLineageArtifactKind.DAILY_SNAPSHOT,
+        selected.audit.snapshot_id,
+        selected.audit.artifact_sha256,
+        selected.audit.artifact_byte_length,
+    )
+    configuration_evidence = PaperOperationArtifactEvidence(
+        verified_plan.artifact_sha256,
+        verified_plan.artifact_byte_length,
+    )
+    request = verified_plan.checkpointed_request
+    intent = create_paper_operation_intent(
+        caller_idempotency_key,
+        account.lineage,
+        terminal_evidence,
+        snapshot_evidence,
+        configuration_evidence,
+        request,
+    )
+    application_id = derive_checkpointed_verified_snapshot_application_id(
+        prior.checkpoint_id,
+        request.request_id,
+    )
+    execution_inputs = VerifiedPaperOperationExecutionInputs(
+        intent,
+        application_id,
+        account.genesis,
+        account.successors,
+        account.reports,
+        account.snapshots,
+        prior,
+        terminal.payload,
+        selected.snapshot_bytes,
+        selected.verification,
+        verified_plan.artifact_bytes,
+        request,
+        calendar,
+    )
+    return _PreparedPaperOperationMaterial(verified_plan, execution_inputs)
 
 
 def _terminal_artifact(

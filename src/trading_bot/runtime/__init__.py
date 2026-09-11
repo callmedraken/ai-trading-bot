@@ -357,6 +357,13 @@ from trading_bot.runtime.verified_snapshot_serialization import (
     verify_verified_snapshot_paper_cycle_report,
 )
 
+from .personal_desktop_unattended_paper_startup_qualification import (  # noqa: F401
+    PersonalDesktopUnattendedPaperStartupDiagnostic,
+    PersonalDesktopUnattendedPaperStartupQualificationResult,
+    PersonalDesktopUnattendedPaperStartupStatus,
+    qualify_personal_desktop_unattended_paper_startup,
+)
+
 __all__ = [
     "APPLICATION_ID_METADATA_KEY",
     "CHECKPOINTED_VERIFIED_SNAPSHOT_APPLICATION_MATERIAL_VERSION",
@@ -597,6 +604,10 @@ __all__.extend(
         "require_validated_personal_desktop_unattended_invocation_storage_read",
         "unattended_paper_invocation_artifact_name",
         "unattended_paper_invocation_directory_name",
+        "PersonalDesktopUnattendedPaperStartupDiagnostic",
+        "PersonalDesktopUnattendedPaperStartupQualificationResult",
+        "PersonalDesktopUnattendedPaperStartupStatus",
+        "qualify_personal_desktop_unattended_paper_startup",
     ]
 )
 

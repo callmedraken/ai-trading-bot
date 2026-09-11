@@ -27,6 +27,9 @@ from trading_bot.runtime.paper_account_successor_checkpoint import (
     MAX_PAPER_ACCOUNT_SUCCESSOR_CHECKPOINT_BYTES,
 )
 from trading_bot.runtime.paper_operation import MAX_PAPER_OPERATION_RECEIPT_BYTES
+from trading_bot.runtime.personal_desktop_unattended_paper_invocation import (
+    MAX_PERSONAL_DESKTOP_UNATTENDED_PAPER_INVOCATION_BYTES,
+)
 from trading_bot.runtime.windows_authority import (
     PRODUCTION_AUTHORITY_PATHS,
     AuthorityObjectError,
@@ -52,6 +55,9 @@ PERSONAL_DESKTOP_PAPER_V2_STAGING_ROOT = r"F:\AITradingBot\.Paper-v2.provisionin
 PERSONAL_DESKTOP_PAPER_V2_RUNTIME = PERSONAL_DESKTOP_PAPER_V2_ROOT + r"\runtime"
 PERSONAL_DESKTOP_PAPER_V2_OPERATIONS = (
     PERSONAL_DESKTOP_PAPER_V2_RUNTIME + r"\paper-operations"
+)
+PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_INVOCATIONS = (
+    r"F:\AITradingBot\Paper-v2\runtime\unattended-invocations"
 )
 PERSONAL_DESKTOP_PAPER_V2_ANCHOR = (
     PERSONAL_DESKTOP_PAPER_V2_ROOT + r"\personal-desktop-paper-account-authority.json"
@@ -87,6 +93,9 @@ class PaperObjectRole(StrEnum):
     GENESIS_CHECKPOINT = "genesis-checkpoint"
     RUNTIME = "runtime"
     OPERATIONS = "paper-operations"
+    UNATTENDED_INVOCATIONS = "unattended-invocations"
+    UNATTENDED_INVOCATION_DIRECTORY = "unattended-invocation-directory"
+    UNATTENDED_INVOCATION_FILE = "unattended-invocation-file"
     OUTPUT_DIRECTORY = "output-directory"
     OUTPUT_FILE = "output-file"
     C1_ROOT = "c1-root"
@@ -113,6 +122,9 @@ def paper_object_spec(path: str) -> PaperObjectSpec:
         PERSONAL_DESKTOP_PAPER_V2_ROOT: PaperObjectRole.ROOT,
         PERSONAL_DESKTOP_PAPER_V2_RUNTIME: PaperObjectRole.RUNTIME,
         PERSONAL_DESKTOP_PAPER_V2_OPERATIONS: PaperObjectRole.OPERATIONS,
+        PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_INVOCATIONS: (
+            PaperObjectRole.UNATTENDED_INVOCATIONS
+        ),
         str(PRODUCTION_AUTHORITY_PATHS.root): PaperObjectRole.C1_ROOT,
         str(PRODUCTION_AUTHORITY_PATHS.capture_output): PaperObjectRole.CAPTURE_OUTPUT,
     }
@@ -138,6 +150,28 @@ def paper_object_spec(path: str) -> PaperObjectSpec:
     transition_staging = runtime + rf"\\\.paper-account-transition-{_UUID}\.staging"
     operation = operations + rf"\\paper-operation-({_UUID})"
     operation_staging = operations + rf"\\\.paper-operation-({_UUID})\.staging"
+    unattended = re.escape(PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_INVOCATIONS)
+    unattended_final = unattended + rf"\\unattended-paper-invocation-({_UUID})"
+    unattended_staging = (
+        unattended + rf"\\\.unattended-paper-invocation-({_UUID})\.staging"
+    )
+    if any(
+        re.fullmatch(expression, path)
+        for expression in (unattended_final, unattended_staging)
+    ):
+        return PaperObjectSpec(
+            PaperObjectRole.UNATTENDED_INVOCATION_DIRECTORY, directory
+        )
+    for expression in (unattended_final, unattended_staging):
+        if re.fullmatch(
+            expression + r"\\personal-desktop-unattended-paper-invocation-\1\.json",
+            path,
+        ):
+            return PaperObjectSpec(
+                PaperObjectRole.UNATTENDED_INVOCATION_FILE,
+                file,
+                MAX_PERSONAL_DESKTOP_UNATTENDED_PAPER_INVOCATION_BYTES,
+            )
     if any(
         re.fullmatch(expression, path)
         for expression in (
@@ -203,18 +237,41 @@ def paper_security_policy(
         rights = TRADING_DIRECTORY_READ
     elif role in {PaperObjectRole.ANCHOR, PaperObjectRole.GENESIS_CHECKPOINT}:
         rights = TRADING_FILE_READ
-    elif role in {PaperObjectRole.RUNTIME, PaperObjectRole.OPERATIONS}:
+    elif role in {
+        PaperObjectRole.RUNTIME,
+        PaperObjectRole.OPERATIONS,
+        PaperObjectRole.UNATTENDED_INVOCATIONS,
+    }:
         rights = TRADING_CONTAINER_DATA
-    elif role in {PaperObjectRole.OUTPUT_DIRECTORY, PaperObjectRole.OUTPUT_FILE}:
+    elif role in {
+        PaperObjectRole.OUTPUT_DIRECTORY,
+        PaperObjectRole.OUTPUT_FILE,
+    }:
         owners.add(trading_sid)
         rights = (
             TRADING_DIRECTORY_DATA
             if role is PaperObjectRole.OUTPUT_DIRECTORY
             else TRADING_FILE_DATA
         )
+    elif role in {
+        PaperObjectRole.UNATTENDED_INVOCATION_DIRECTORY,
+        PaperObjectRole.UNATTENDED_INVOCATION_FILE,
+    }:
+        owners = {trading_sid}
+        rights = (
+            TRADING_DIRECTORY_DATA
+            if role is PaperObjectRole.UNATTENDED_INVOCATION_DIRECTORY
+            else TRADING_FILE_DATA
+        )
     else:
         raise AuthoritySecurityError("role is not a v2 ACL policy role")
-    owner = ADMINISTRATORS_SID if owner_sid is None else owner_sid
+    if owner_sid is None and role in {
+        PaperObjectRole.UNATTENDED_INVOCATION_DIRECTORY,
+        PaperObjectRole.UNATTENDED_INVOCATION_FILE,
+    }:
+        owner = trading_sid
+    else:
+        owner = ADMINISTRATORS_SID if owner_sid is None else owner_sid
     if owner not in owners:
         raise AuthoritySecurityError("PD1B object owner violates its role")
     return SecurityPolicy(

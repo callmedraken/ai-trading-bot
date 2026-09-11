@@ -282,6 +282,17 @@ from trading_bot.runtime.personal_desktop_unattended_paper_invocation import (  
     serialize_personal_desktop_unattended_paper_invocation,
     verify_personal_desktop_unattended_paper_invocation,
 )
+from trading_bot.runtime.personal_desktop_unattended_paper_invocation_storage import (  # noqa: F401
+    PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_INVOCATIONS,
+    PersonalDesktopUnattendedInvocationStorageClassification,
+    PersonalDesktopUnattendedInvocationStorageDiagnostic,
+    PersonalDesktopUnattendedInvocationStorageError,
+    PersonalDesktopUnattendedInvocationStorageReadResult,
+    read_personal_desktop_unattended_invocation_storage,
+    require_validated_personal_desktop_unattended_invocation_storage_read,
+    unattended_paper_invocation_artifact_name,
+    unattended_paper_invocation_directory_name,
+)
 from trading_bot.runtime.strategy_history_seed import (  # noqa: F401
     MAX_STRATEGY_HISTORY_SEED_BARS,
     MAX_STRATEGY_HISTORY_SEED_BYTES,
@@ -577,6 +588,15 @@ __all__.extend(
         "parse_personal_desktop_unattended_paper_invocation",
         "serialize_personal_desktop_unattended_paper_invocation",
         "verify_personal_desktop_unattended_paper_invocation",
+        "PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_INVOCATIONS",
+        "PersonalDesktopUnattendedInvocationStorageClassification",
+        "PersonalDesktopUnattendedInvocationStorageDiagnostic",
+        "PersonalDesktopUnattendedInvocationStorageError",
+        "PersonalDesktopUnattendedInvocationStorageReadResult",
+        "read_personal_desktop_unattended_invocation_storage",
+        "require_validated_personal_desktop_unattended_invocation_storage_read",
+        "unattended_paper_invocation_artifact_name",
+        "unattended_paper_invocation_directory_name",
     ]
 )
 

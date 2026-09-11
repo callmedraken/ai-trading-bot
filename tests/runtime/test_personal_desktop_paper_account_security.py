@@ -42,6 +42,7 @@ ROOT = security.PERSONAL_DESKTOP_PAPER_V2_ROOT
 ANCHOR = security.PERSONAL_DESKTOP_PAPER_V2_ANCHOR
 RUNTIME = security.PERSONAL_DESKTOP_PAPER_V2_RUNTIME
 OPERATIONS = security.PERSONAL_DESKTOP_PAPER_V2_OPERATIONS
+UNATTENDED = security.PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_INVOCATIONS
 GENESIS = ROOT + f"\\paper-account-genesis-{IDENTITY}"
 CHECKPOINT = GENESIS + f"\\paper-account-checkpoint-{IDENTITY}.json"
 TRANSITION = RUNTIME + f"\\paper-account-transition-{IDENTITY}"
@@ -76,6 +77,8 @@ def inspection(path):
             in {
                 security.PaperObjectRole.OUTPUT_FILE,
                 security.PaperObjectRole.OUTPUT_DIRECTORY,
+                security.PaperObjectRole.UNATTENDED_INVOCATION_FILE,
+                security.PaperObjectRole.UNATTENDED_INVOCATION_DIRECTORY,
             }
             else security.ADMINISTRATORS_SID
         )
@@ -185,6 +188,7 @@ def test_exact_constants_and_existing_c1_path_guard_is_unchanged():
     )
     assert RUNTIME == r"F:\AITradingBot\Paper-v2\runtime"
     assert OPERATIONS == r"F:\AITradingBot\Paper-v2\runtime\paper-operations"
+    assert UNATTENDED == (r"F:\AITradingBot\Paper-v2\runtime\unattended-invocations")
     with pytest.raises(AuthorityPathError):
         require_fixed_authority_tree_path(ROOT)
 
@@ -220,7 +224,31 @@ def test_alias_traversal_and_alternate_roots_rejected_before_open(path):
     assert api.calls == []
 
 
-V2_ROLES = [ROOT, ANCHOR, GENESIS, CHECKPOINT, RUNTIME, OPERATIONS, TRANSITION, REPORT]
+UNATTENDED_FINAL = UNATTENDED + f"\\unattended-paper-invocation-{IDENTITY}"
+UNATTENDED_STAGING = UNATTENDED + f"\\.unattended-paper-invocation-{IDENTITY}.staging"
+UNATTENDED_FILE = (
+    UNATTENDED_FINAL + f"\\personal-desktop-unattended-paper-invocation-{IDENTITY}.json"
+)
+UNATTENDED_STAGING_FILE = (
+    UNATTENDED_STAGING
+    + f"\\personal-desktop-unattended-paper-invocation-{IDENTITY}.json"
+)
+
+V2_ROLES = [
+    ROOT,
+    ANCHOR,
+    GENESIS,
+    CHECKPOINT,
+    RUNTIME,
+    OPERATIONS,
+    TRANSITION,
+    REPORT,
+    UNATTENDED,
+    UNATTENDED_FINAL,
+    UNATTENDED_STAGING,
+    UNATTENDED_FILE,
+    UNATTENDED_STAGING_FILE,
+]
 
 
 @pytest.mark.parametrize("path", V2_ROLES)
@@ -233,9 +261,10 @@ def test_role_policy_exact_rights_protected_owner_and_admin_system(path):
     if path in {ROOT, ANCHOR, GENESIS, CHECKPOINT}:
         assert not trading.access_mask & (0x10000 | 0x2 | 0x4 | 0x10 | 0x40 | 0x100)
         assert observed.owner_sid == security.ADMINISTRATORS_SID
-    elif path in {RUNTIME, OPERATIONS}:
+    elif path in {RUNTIME, OPERATIONS, UNATTENDED}:
         assert observed.owner_sid == security.ADMINISTRATORS_SID
         assert trading.access_mask & 0x6 == 0x6
+        assert not trading.access_mask & 0x10000
     else:
         assert observed.owner_sid == SID
     # All accepted entries are explicit allows without inheritance flags.
@@ -243,6 +272,50 @@ def test_role_policy_exact_rights_protected_owner_and_admin_system(path):
     security.require_paper_object_security(
         path, spec, replace(observed, aces=tuple(reversed(observed.aces))), SID
     )
+
+
+def test_unattended_paths_have_distinct_exact_roles_and_artifact_bound():
+    assert security.paper_object_spec(UNATTENDED).role is (
+        security.PaperObjectRole.UNATTENDED_INVOCATIONS
+    )
+    assert security.paper_object_spec(UNATTENDED_FINAL).role is (
+        security.PaperObjectRole.UNATTENDED_INVOCATION_DIRECTORY
+    )
+    assert security.paper_object_spec(UNATTENDED_STAGING).role is (
+        security.PaperObjectRole.UNATTENDED_INVOCATION_DIRECTORY
+    )
+    artifact = security.paper_object_spec(UNATTENDED_FILE)
+    assert artifact.role is security.PaperObjectRole.UNATTENDED_INVOCATION_FILE
+    assert security.paper_object_spec(UNATTENDED_STAGING_FILE).role is (
+        security.PaperObjectRole.UNATTENDED_INVOCATION_FILE
+    )
+    assert artifact.maximum_bytes == (
+        security.MAX_PERSONAL_DESKTOP_UNATTENDED_PAPER_INVOCATION_BYTES
+    )
+    assert security.paper_security_policy(artifact.role, SID).owner_sid == SID
+
+
+@pytest.mark.parametrize(
+    "path",
+    (
+        UNATTENDED.lower(),
+        UNATTENDED + "\\",
+        UNATTENDED.replace("Paper-v2", "Paper-v20"),
+        UNATTENDED
+        + "\\unattended-paper-invocation-AAAAAAAA-AAAA-5AAA-8AAA-AAAAAAAAAAAA",
+        UNATTENDED_FINAL.replace(IDENTITY, "21111111-1111-5111-8111-111111111111")
+        + f"\\personal-desktop-unattended-paper-invocation-{IDENTITY}.json",
+        UNATTENDED_FINAL
+        + f"\\personal-desktop-unattended-paper-invocation-{IDENTITY}.JSON",
+        UNATTENDED_FINAL + "\\extra.json",
+    ),
+)
+def test_unattended_alias_case_parent_and_identity_mismatch_rejected_before_open(path):
+    api = MemoryReadApi()
+    with security.PinnedTradingPaperReadSession(api, SID) as session:
+        with pytest.raises(AuthorityPathError):
+            session.pin(path)
+    assert api.calls == []
 
 
 @pytest.mark.parametrize("path", V2_ROLES)
@@ -295,7 +368,7 @@ def test_role_policy_rejects_acl_mutations(path, change):
 
 
 @pytest.mark.parametrize(
-    "path", [ROOT, ANCHOR, GENESIS, CHECKPOINT, RUNTIME, OPERATIONS]
+    "path", [ROOT, ANCHOR, GENESIS, CHECKPOINT, RUNTIME, OPERATIONS, UNATTENDED]
 )
 def test_trading_cannot_own_immutable_or_runtime_containers(path):
     with pytest.raises(AuthoritySecurityError):

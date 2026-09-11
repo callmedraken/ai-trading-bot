@@ -21,6 +21,7 @@ from trading_bot.runtime.personal_desktop_paper_account_authority import (
 from .test_personal_desktop_paper_account_read_authority import (
     MACHINE,
     Observer,
+    add_unattended_container,
     memory_case,
     read_case,
 )
@@ -72,6 +73,19 @@ def test_healthy_fully_verified_account_needs_no_recovery():
     assert not case.api.handles
 
 
+def test_healthy_completed_account_with_reserved_unattended_container():
+    case = memory_case(2, no_action=True)
+    add_unattended_container(case, children=("malformed-child",))
+
+    result = qualify(case)
+
+    assert result.status is (
+        qualification.PaperReceiptRecoveryQualificationStatus.NO_RECOVERY_REQUIRED
+    )
+    assert result.terminal_checkpoint_id == case.successors[-1].artifact_id
+    assert not case.api.handles
+
+
 def test_terminal_missing_receipt_is_required_but_test_evidence_is_unregistered():
     case = memory_case(2, no_action=True)
     remove_receipt(case, 1)
@@ -87,6 +101,23 @@ def test_terminal_missing_receipt_is_required_but_test_evidence_is_unregistered(
         qualification.require_validated_paper_receipt_recovery_qualification(result)
     with pytest.raises(PersonalDesktopPaperAccountError, match="production"):
         mutex.paper_receipt_recovery_admission(result)
+
+
+def test_terminal_missing_receipt_evidence_is_unchanged_with_unattended_container():
+    case = memory_case(2, no_action=True)
+    remove_receipt(case, 1)
+    add_unattended_container(case, children=("conflicting-child", ".staging"))
+
+    result = qualify(case, configurations=(case.configurations[0],))
+    terminal = case.receipts[1]
+
+    assert result.status is (
+        qualification.PaperReceiptRecoveryQualificationStatus.RECEIPT_RECOVERY_REQUIRED
+    )
+    assert result.missing_application_id == terminal.application_id
+    assert result.terminal_checkpoint_id == case.successors[-1].artifact_id
+    assert result.predecessor_checkpoint_id == case.successors[0].artifact_id
+    assert not case.api.handles
 
 
 def test_ordinary_reader_still_rejects_same_terminal_missing_receipt_state():

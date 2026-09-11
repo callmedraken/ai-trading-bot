@@ -39,6 +39,13 @@ from trading_bot.runtime import (
 )
 from trading_bot.runtime import personal_desktop_paper_account_read_authority as reader
 from trading_bot.runtime import personal_desktop_paper_account_security as security
+from trading_bot.runtime import personal_desktop_paper_runtime_output as runtime_output
+from trading_bot.runtime import (
+    personal_desktop_unattended_paper_invocation_storage as unattended_storage,
+)
+from trading_bot.runtime import (
+    personal_desktop_unattended_paper_storage_provisioning as unattended_provisioning,
+)
 from trading_bot.runtime.personal_desktop_paper_account_authority import (
     PersonalDesktopPaperAccountAnchor,
     PersonalDesktopPaperAccountError,
@@ -73,6 +80,7 @@ from .test_personal_desktop_paper_account_security import (
     ROOT,
     RUNTIME,
     SID,
+    UNATTENDED,
     MemoryReadApi,
 )
 from .test_personal_desktop_paper_account_security import (
@@ -284,6 +292,11 @@ def read_case(case, *, observer=None, configurations=None):
     )
 
 
+def add_unattended_container(case, *, children=()):
+    case.api.put(UNATTENDED)
+    case.api.overrides[UNATTENDED] = tuple(children)
+
+
 def test_genesis_only_exposes_immutable_evidence_after_pins_close():
     case = memory_case()
     observer = Observer()
@@ -298,6 +311,138 @@ def test_genesis_only_exposes_immutable_evidence_after_pins_close():
         result.anchor = None
     with pytest.raises(PersonalDesktopPaperAccountError):
         reader.require_validated_personal_desktop_paper_account(result)
+
+
+@pytest.mark.parametrize("children", [(), ("malformed", ".staging", "conflict")])
+def test_optional_safe_unattended_container_is_pinned_without_child_inspection(
+    children,
+):
+    case = memory_case()
+    add_unattended_container(case, children=children)
+    case.api.calls.clear()
+
+    result = read_case(case)
+
+    assert result.lineage == case.full.evidence
+    assert case.api.inspections[UNATTENDED] == 3
+    assert [
+        call for call in case.api.calls if call[0] == "open" and call[1] == UNATTENDED
+    ] == [
+        ("open", UNATTENDED, security.AuthorityObjectKind.DIRECTORY),
+        ("open", UNATTENDED, security.AuthorityObjectKind.DIRECTORY),
+    ]
+    assert not any(
+        call[0] == "names" and call[1] == UNATTENDED for call in case.api.calls
+    )
+    assert {call[0] for call in case.api.calls} <= {
+        "fixed_staging_present",
+        "open",
+        "close",
+        "read",
+        "names",
+    }
+    assert not case.api.handles
+
+
+@pytest.mark.parametrize("change", ["kind", "reparse", "owner", "acl"])
+def test_present_unattended_container_requires_exact_b1_security(change):
+    case = memory_case()
+    add_unattended_container(case)
+    node = case.api.nodes[UNATTENDED]
+    updates = {
+        "kind": {"kind": security.AuthorityObjectKind.FILE},
+        "reparse": {"is_reparse_point": True},
+        "owner": {"owner_sid": SID},
+        "acl": {"aces": ()},
+    }
+    node.observation = replace(
+        node.observation,
+        security=replace(node.observation.security, **updates[change]),
+    )
+
+    with pytest.raises(WindowsAuthorityError):
+        read_case(case)
+    assert not case.api.handles
+
+
+@pytest.mark.parametrize("change", ["identity", "security", "replacement"])
+def test_unattended_container_drift_or_named_replacement_blocks(change):
+    case = memory_case()
+    add_unattended_container(case)
+
+    def drift(path, count, node):
+        if path != UNATTENDED or count != 2:
+            return
+        if change == "identity":
+            node.observation = replace(node.observation, identity=(7, 999))
+        elif change == "security":
+            node.observation = replace(
+                node.observation,
+                security=replace(node.observation.security, dacl_protected=False),
+            )
+        else:
+            case.api.nodes[path] = replace(
+                node, observation=replace(node.observation, identity=(7, 999))
+            )
+
+    case.api.on_inspect = drift
+    with pytest.raises(WindowsAuthorityError):
+        read_case(case)
+    assert not case.api.handles
+
+
+def test_unattended_children_never_enter_transition_or_b1_effect_boundaries(
+    monkeypatch,
+):
+    case = memory_case(2, no_action=True)
+    add_unattended_container(
+        case,
+        children=(
+            ".unattended-paper-invocation-conflict.staging",
+            "unattended-paper-invocation-malformed",
+        ),
+    )
+    transition_names = []
+    original_read_transition = reader._read_transition
+
+    def observe_transition(session, name):
+        transition_names.append(name)
+        return original_read_transition(session, name)
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("account reader crossed into unattended B1/effect authority")
+
+    monkeypatch.setattr(reader, "_read_transition", observe_transition)
+    monkeypatch.setattr(
+        unattended_storage,
+        "read_personal_desktop_unattended_invocation_storage",
+        forbidden,
+    )
+    monkeypatch.setattr(
+        unattended_provisioning,
+        "qualify_personal_desktop_unattended_storage_provisioning",
+        forbidden,
+    )
+    monkeypatch.setattr(
+        unattended_provisioning,
+        "provision_personal_desktop_unattended_storage",
+        forbidden,
+    )
+    monkeypatch.setattr(
+        runtime_output,
+        "open_personal_desktop_unattended_invocation_output_capability",
+        forbidden,
+    )
+
+    result = read_case(case)
+
+    assert result.lineage == case.full.evidence
+    assert transition_names == [
+        directory.rsplit("\\", 1)[-1] for directory in case.directories
+    ]
+    assert not any(
+        call[0] == "names" and call[1] == UNATTENDED for call in case.api.calls
+    )
 
 
 @pytest.mark.parametrize("edges", [0, 1])
@@ -576,6 +721,7 @@ def test_stale_or_malformed_anchor_rejected(change):
         (ROOT, "unexpected"),
         (ROOT, "Runtime"),
         (RUNTIME, "unexpected"),
+        (RUNTIME, "Unattended-Invocations"),
         (RUNTIME, ".paper-account-transition-dead.staging"),
         (OPERATIONS, "unexpected"),
         (OPERATIONS, ".paper-operation-dead.staging"),

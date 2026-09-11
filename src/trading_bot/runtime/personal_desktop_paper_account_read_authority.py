@@ -60,6 +60,7 @@ from trading_bot.runtime.personal_desktop_paper_account_security import (
     PERSONAL_DESKTOP_PAPER_V2_OPERATIONS,
     PERSONAL_DESKTOP_PAPER_V2_ROOT,
     PERSONAL_DESKTOP_PAPER_V2_RUNTIME,
+    PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_INVOCATIONS,
     PaperReadNativeApi,
     PinnedPaperReadSession,
     PinnedTradingPaperReadSession,
@@ -424,10 +425,17 @@ def verify_personal_desktop_paper_account_recovery_read(
         runtime_names = session.names(PERSONAL_DESKTOP_PAPER_V2_RUNTIME)
         if "paper-operations" not in runtime_names:
             raise PersonalDesktopPaperAccountError("missing paper-operations container")
+        reserved_runtime_names = {"paper-operations"}
+        unattended_name = PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_INVOCATIONS.rsplit(
+            "\\", 1
+        )[-1]
+        if unattended_name in runtime_names:
+            session.pin(PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_INVOCATIONS)
+            reserved_runtime_names.add(unattended_name)
         transitions = tuple(
             _read_transition(session, name)
             for name in runtime_names
-            if name != "paper-operations"
+            if name not in reserved_runtime_names
         )
         receipts = _read_receipts(session)
         successors = tuple(t.checkpoint_artifact for t in transitions)

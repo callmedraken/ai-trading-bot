@@ -8,13 +8,27 @@ import threading
 from dataclasses import dataclass
 from pathlib import Path, PureWindowsPath
 from typing import Protocol, Self
+from uuid import UUID
 
 from trading_bot.cli.paper_operation_output_capability import (
     PaperOperationOutputCapability,
 )
+from trading_bot.market_calendar import NYSEMarketCalendar
+from trading_bot.market_data import XNYS_CALENDAR_DESCRIPTOR, BoundMarketCalendar
 from trading_bot.runtime import personal_desktop_paper_account_security as security
 from trading_bot.runtime.personal_desktop_first_paper_operation import (
     PERSONAL_DESKTOP_FIRST_PAPER_OPERATION_PROFILE,
+)
+from trading_bot.runtime.personal_desktop_unattended_paper_invocation import (
+    PersonalDesktopUnattendedPaperInvocationArtifactBinding,
+    verify_personal_desktop_unattended_paper_invocation,
+)
+from trading_bot.runtime.personal_desktop_unattended_paper_invocation_storage import (
+    PersonalDesktopUnattendedInvocationStorageClassification,
+    PersonalDesktopUnattendedInvocationStorageReadResult,
+    require_validated_personal_desktop_unattended_invocation_storage_read,
+    unattended_paper_invocation_artifact_name,
+    unattended_paper_invocation_directory_name,
 )
 from trading_bot.runtime.windows_authority import (
     AuthorityObjectError,
@@ -27,6 +41,9 @@ from trading_bot.runtime.windows_authority_security import (
     WindowsHandle,
     build_security_attributes,
 )
+from trading_bot.runtime.windows_authority_validation import (
+    require_validated_production_authority,
+)
 
 _MOVEFILE_WRITE_THROUGH = 0x8
 _CREATE_NEW = 1
@@ -38,6 +55,9 @@ _DISPOSABLE_RUNTIME_OUTPUT_AUTHORITY_ISSUER = object()
 _RECEIPT_RECOVERY_RUNTIME_OUTPUT_ISSUER = object()
 _DISPOSABLE_RECEIPT_RECOVERY_RUNTIME_OUTPUT_ISSUER = object()
 _DISPOSABLE_RECEIPT_RECOVERY_OUTPUT_AUTHORITY_ISSUER = object()
+_UNATTENDED_INVOCATION_OUTPUT_ISSUER = object()
+_DISPOSABLE_UNATTENDED_INVOCATION_OUTPUT_ISSUER = object()
+_DISPOSABLE_UNATTENDED_INVOCATION_OUTPUT_AUTHORITY_ISSUER = object()
 _CANONICAL_UUID = re.compile(
     r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
 )
@@ -60,7 +80,11 @@ class _PaperRuntimeOutputNativeApi(Protocol):
 
     def write_file(self, path: str, payload: bytes, policy: SecurityPolicy) -> None: ...
 
+    def read(self, handle: object, maximum: int) -> bytes: ...
+
     def rename_write_through(self, staging: str, final: str) -> None: ...
+
+    def rename_unattended_write_through(self, staging: str, final: str) -> None: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -68,6 +92,35 @@ class _PinnedParent:
     path: str
     handle: object
     observation: security.PaperObjectObservation
+
+
+@dataclass(frozen=True, slots=True)
+class PersonalDesktopUnattendedInvocationPublicationResult:
+    """Immutable non-authorizing evidence for one verified publication."""
+
+    invocation_id: UUID
+    artifact_sha256: str
+    artifact_byte_length: int
+    staging_created: bool
+    finalized: bool
+    artifact_verified: bool
+
+    def __post_init__(self) -> None:
+        if (
+            type(self.invocation_id) is not UUID
+            or type(self.artifact_sha256) is not str
+            or len(self.artifact_sha256) != 64
+            or any(
+                character not in "0123456789abcdef"
+                for character in self.artifact_sha256
+            )
+            or type(self.artifact_byte_length) is not int
+            or self.artifact_byte_length <= 0
+            or self.staging_created is not True
+            or self.finalized is not True
+            or self.artifact_verified is not True
+        ):
+            raise ValueError("unattended invocation publication result is invalid")
 
 
 class _PersonalDesktopPaperRuntimeOutputCapability(PaperOperationOutputCapability):
@@ -362,6 +415,430 @@ class _PersonalDesktopPaperReceiptRecoveryOutputCapability(
         super().verify_finalized_file(path)
 
 
+class _PersonalDesktopUnattendedInvocationOutputCapability:
+    """Publish exactly one bound PD4-A artifact into the fixed B1 namespace."""
+
+    __slots__ = (
+        "_api",
+        "_calendar",
+        "_closed",
+        "_entered",
+        "_expected",
+        "_parents",
+        "_published",
+    )
+
+    def __init__(
+        self,
+        api: _PaperRuntimeOutputNativeApi,
+        expected: PersonalDesktopUnattendedPaperInvocationArtifactBinding,
+        *,
+        _issuer: object,
+    ) -> None:
+        if _issuer not in {
+            _UNATTENDED_INVOCATION_OUTPUT_ISSUER,
+            _DISPOSABLE_UNATTENDED_INVOCATION_OUTPUT_ISSUER,
+        }:
+            raise TypeError("unattended invocation output issuer is invalid")
+        if (
+            type(expected)
+            is not PersonalDesktopUnattendedPaperInvocationArtifactBinding
+        ):
+            raise TypeError("unattended invocation output binding is invalid")
+        self._api = api
+        self._calendar = BoundMarketCalendar(
+            XNYS_CALENDAR_DESCRIPTOR, NYSEMarketCalendar()
+        )
+        self._expected = expected
+        self._parents: dict[str, _PinnedParent] = {}
+        self._entered = False
+        self._closed = False
+        self._published = False
+
+    def __enter__(self) -> Self:
+        if self._entered or self._closed:
+            raise PersonalDesktopPaperRuntimeOutputError(
+                "unattended invocation output capability is one-shot"
+            )
+        self._entered = True
+        try:
+            for path in (
+                security.PERSONAL_DESKTOP_PAPER_V2_RUNTIME,
+                security.PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_INVOCATIONS,
+            ):
+                self._pin_parent(path)
+            self._verify_parents()
+        except BaseException:
+            self._close()
+            raise
+        return self
+
+    def __exit__(self, exc_type: object, exc: object, traceback: object) -> None:
+        try:
+            if not self._closed:
+                self._verify_parents()
+        finally:
+            self._close()
+
+    def __copy__(self) -> object:
+        raise TypeError("unattended invocation output capabilities cannot be copied")
+
+    def __deepcopy__(self, memo: object) -> object:
+        del memo
+        raise TypeError(
+            "unattended invocation output capabilities cannot be deep-copied"
+        )
+
+    def __reduce__(self) -> object:
+        raise TypeError(
+            "unattended invocation output capabilities cannot be serialized"
+        )
+
+    def __reduce_ex__(self, protocol: int) -> object:
+        del protocol
+        raise TypeError("unattended invocation output capabilities cannot be pickled")
+
+    def publish(self) -> PersonalDesktopUnattendedInvocationPublicationResult:
+        """Publish only the artifact captured from trusted admission evidence."""
+
+        self._require_active()
+        if self._published:
+            raise PersonalDesktopPaperRuntimeOutputError(
+                "unattended invocation publication attempt is already consumed"
+            )
+        self._published = True
+        try:
+            self._verify_parents()
+            expected = self._replay_expected()
+            invocation_id = expected.invocation.invocation_id
+            parent = security.PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_INVOCATIONS
+            staging = (
+                parent
+                + "\\"
+                + unattended_paper_invocation_directory_name(
+                    invocation_id, staging=True
+                )
+            )
+            final = (
+                parent
+                + "\\"
+                + unattended_paper_invocation_directory_name(invocation_id)
+            )
+            artifact_name = unattended_paper_invocation_artifact_name(invocation_id)
+            staged_artifact = staging + "\\" + artifact_name
+            final_artifact = final + "\\" + artifact_name
+
+            directory_spec = security.paper_object_spec(staging)
+            if (
+                directory_spec.role
+                is not security.PaperObjectRole.UNATTENDED_INVOCATION_DIRECTORY
+            ):
+                raise AuthorityPathError(
+                    "unattended invocation staging role is invalid"
+                )
+            self._api.create_directory(
+                staging,
+                security.paper_security_policy(
+                    directory_spec.role,
+                    PERSONAL_DESKTOP_FIRST_PAPER_OPERATION_PROFILE.approved_trading_sid,
+                ),
+            )
+
+            staging_handle, staging_observation = self._open_verified(staging)
+            try:
+                file_spec = security.paper_object_spec(staged_artifact)
+                if (
+                    file_spec.role
+                    is not security.PaperObjectRole.UNATTENDED_INVOCATION_FILE
+                ):
+                    raise AuthorityPathError(
+                        "unattended invocation artifact role is invalid"
+                    )
+                self._api.write_file(
+                    staged_artifact,
+                    expected.artifact_bytes,
+                    security.paper_security_policy(
+                        file_spec.role,
+                        PERSONAL_DESKTOP_FIRST_PAPER_OPERATION_PROFILE.approved_trading_sid,
+                    ),
+                )
+                staged_file_observation = self._read_and_verify_artifact(
+                    staged_artifact, expected
+                )
+                self._reverify_open_object(staging_handle, staging, staging_observation)
+            finally:
+                self._api.close(staging_handle)
+
+            self._verify_parents()
+            self._api.rename_unattended_write_through(staging, final)
+
+            final_handle, final_observation = self._open_verified(final)
+            try:
+                self._require_renamed_object_identity(
+                    staging_observation,
+                    final_observation,
+                    "unattended invocation directory",
+                )
+                final_file_observation = self._read_and_verify_artifact(
+                    final_artifact, expected
+                )
+                self._require_renamed_object_identity(
+                    staged_file_observation,
+                    final_file_observation,
+                    "unattended invocation artifact",
+                )
+                self._reverify_open_object(final_handle, final, final_observation)
+                self._verify_parents()
+            finally:
+                self._api.close(final_handle)
+
+            return PersonalDesktopUnattendedInvocationPublicationResult(
+                invocation_id=invocation_id,
+                artifact_sha256=expected.artifact_sha256,
+                artifact_byte_length=expected.artifact_byte_length,
+                staging_created=True,
+                finalized=True,
+                artifact_verified=True,
+            )
+        except BaseException as error:
+            try:
+                self._close()
+            except BaseException as close_error:
+                raise close_error from error
+            raise
+
+    def _require_active(self) -> None:
+        if not self._entered or self._closed:
+            raise PersonalDesktopPaperRuntimeOutputError(
+                "unattended invocation output capability is not active"
+            )
+
+    def _pin_parent(self, path: str) -> None:
+        spec = security.paper_object_spec(path)
+        expected_roles = {
+            security.PERSONAL_DESKTOP_PAPER_V2_RUNTIME: (
+                security.PaperObjectRole.RUNTIME
+            ),
+            security.PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_INVOCATIONS: (
+                security.PaperObjectRole.UNATTENDED_INVOCATIONS
+            ),
+        }
+        if expected_roles.get(path) is not spec.role:
+            raise AuthorityPathError(
+                "unattended invocation output parent is not source-owned"
+            )
+        handle = self._api.open(path, spec.kind)
+        try:
+            observation = self._api.inspect(handle, path, spec.kind)
+            self._verify_observation(path, observation)
+        except BaseException:
+            self._api.close(handle)
+            raise
+        self._parents[path] = _PinnedParent(path, handle, observation)
+
+    def _verify_parents(self) -> None:
+        self._require_active()
+        expected_paths = (
+            security.PERSONAL_DESKTOP_PAPER_V2_RUNTIME,
+            security.PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_INVOCATIONS,
+        )
+        if set(self._parents) != set(expected_paths):
+            raise PersonalDesktopPaperRuntimeOutputError(
+                "unattended invocation output parents are incomplete"
+            )
+        for path in expected_paths:
+            pinned = self._parents[path]
+            current = self._api.inspect(
+                pinned.handle, path, pinned.observation.security.kind
+            )
+            self._verify_observation(path, current)
+            if not self._same_open_object(current, pinned.observation):
+                raise PersonalDesktopPaperRuntimeOutputError(
+                    "unattended invocation output parent changed"
+                )
+            reopened = self._api.open(path, pinned.observation.security.kind)
+            try:
+                observed = self._api.inspect(
+                    reopened, path, pinned.observation.security.kind
+                )
+                self._verify_observation(path, observed)
+                if not self._same_open_object(observed, pinned.observation):
+                    raise PersonalDesktopPaperRuntimeOutputError(
+                        "unattended invocation output parent was replaced"
+                    )
+            finally:
+                self._api.close(reopened)
+
+    def _open_verified(
+        self, path: str
+    ) -> tuple[object, security.PaperObjectObservation]:
+        spec = security.paper_object_spec(path)
+        handle = self._api.open(path, spec.kind)
+        try:
+            observation = self._api.inspect(handle, path, spec.kind)
+            self._verify_observation(path, observation)
+        except BaseException:
+            self._api.close(handle)
+            raise
+        return handle, observation
+
+    def _read_and_verify_artifact(
+        self,
+        path: str,
+        expected: PersonalDesktopUnattendedPaperInvocationArtifactBinding,
+    ) -> security.PaperObjectObservation:
+        handle, observation = self._open_verified(path)
+        try:
+            spec = security.paper_object_spec(path)
+            payload = self._api.read(handle, spec.maximum_bytes)
+            if (
+                type(payload) is not bytes
+                or payload != expected.artifact_bytes
+                or len(payload) != expected.artifact_byte_length
+                or observation.byte_length != expected.artifact_byte_length
+            ):
+                raise PersonalDesktopPaperRuntimeOutputError(
+                    "unattended invocation artifact bytes differ from the binding"
+                )
+            replayed = verify_personal_desktop_unattended_paper_invocation(
+                payload,
+                self._calendar,
+                expected_invocation_id=expected.invocation.invocation_id,
+                expected_artifact_sha256=expected.artifact_sha256,
+                expected_artifact_byte_length=expected.artifact_byte_length,
+            )
+            if replayed != expected:
+                raise PersonalDesktopPaperRuntimeOutputError(
+                    "unattended invocation artifact replay differs from the binding"
+                )
+            self._reverify_open_object(handle, path, observation)
+            return observation
+        finally:
+            self._api.close(handle)
+
+    def _reverify_open_object(
+        self,
+        handle: object,
+        path: str,
+        expected: security.PaperObjectObservation,
+    ) -> None:
+        spec = security.paper_object_spec(path)
+        current = self._api.inspect(handle, path, spec.kind)
+        self._verify_observation(path, current)
+        if not self._same_open_object(current, expected):
+            raise PersonalDesktopPaperRuntimeOutputError(
+                "unattended invocation output object changed"
+            )
+        reopened = self._api.open(path, spec.kind)
+        try:
+            observed = self._api.inspect(reopened, path, spec.kind)
+            self._verify_observation(path, observed)
+            if not self._same_open_object(observed, expected):
+                raise PersonalDesktopPaperRuntimeOutputError(
+                    "unattended invocation output object was replaced"
+                )
+        finally:
+            self._api.close(reopened)
+
+    @staticmethod
+    def _same_open_object(
+        left: security.PaperObjectObservation,
+        right: security.PaperObjectObservation,
+    ) -> bool:
+        return (
+            left.identity == right.identity
+            and left.security == right.security
+            and (
+                left.security.kind is not AuthorityObjectKind.FILE
+                or (left.byte_length == right.byte_length and left.links == right.links)
+            )
+        )
+
+    def _verify_observation(
+        self, path: str, observation: security.PaperObjectObservation
+    ) -> None:
+        spec = security.paper_object_spec(path)
+        security.require_paper_object_security(
+            path,
+            spec,
+            observation.security,
+            PERSONAL_DESKTOP_FIRST_PAPER_OPERATION_PROFILE.approved_trading_sid,
+        )
+        if (
+            type(observation.identity) is not tuple
+            or len(observation.identity) != 2
+            or any(
+                type(value) is not int or value < 0 for value in observation.identity
+            )
+            or observation.identity[1] == 0
+            or (
+                spec.kind is AuthorityObjectKind.FILE
+                and (
+                    type(observation.byte_length) is not int
+                    or not 0 < observation.byte_length <= spec.maximum_bytes
+                    or observation.links != 1
+                )
+            )
+        ):
+            raise PersonalDesktopPaperRuntimeOutputError(
+                "unattended invocation output object identity is unsafe"
+            )
+
+    def _replay_expected(
+        self,
+    ) -> PersonalDesktopUnattendedPaperInvocationArtifactBinding:
+        expected = self._expected
+        replayed = verify_personal_desktop_unattended_paper_invocation(
+            expected.artifact_bytes,
+            self._calendar,
+            expected_invocation_id=expected.invocation.invocation_id,
+            expected_artifact_sha256=expected.artifact_sha256,
+            expected_artifact_byte_length=expected.artifact_byte_length,
+        )
+        if replayed != expected:
+            raise PersonalDesktopPaperRuntimeOutputError(
+                "unattended invocation output binding differs from exact replay"
+            )
+        return replayed
+
+    def _require_renamed_object_identity(
+        self,
+        before: security.PaperObjectObservation,
+        after: security.PaperObjectObservation,
+        label: str,
+    ) -> None:
+        if (
+            before.identity != after.identity
+            or before.byte_length != after.byte_length
+            or before.links != after.links
+            or before.security.owner_sid != after.security.owner_sid
+            or before.security.dacl_protected != after.security.dacl_protected
+            or before.security.aces != after.security.aces
+            or before.security.kind is not after.security.kind
+            or before.security.is_reparse_point != after.security.is_reparse_point
+            or before.security.volume_root != after.security.volume_root
+            or before.security.filesystem != after.security.filesystem
+        ):
+            raise PersonalDesktopPaperRuntimeOutputError(
+                f"{label} identity/security changed during finalization"
+            )
+
+    def _close(self) -> None:
+        if self._closed:
+            return
+        self._closed = True
+        first_error: BaseException | None = None
+        for pinned in reversed(tuple(self._parents.values())):
+            try:
+                self._api.close(pinned.handle)
+            except BaseException as error:
+                if first_error is None:
+                    first_error = error
+        self._parents.clear()
+        if first_error is not None:
+            raise first_error
+
+
 def _require_receipt_directory(path: Path, *, staging: bool) -> str:
     text = str(path)
     candidate = PureWindowsPath(text)
@@ -415,6 +892,35 @@ def _valid_finalization(staging: str, final: str) -> bool:
     return (
         source_spec.role is security.PaperObjectRole.OUTPUT_DIRECTORY
         and final_spec.role is security.PaperObjectRole.OUTPUT_DIRECTORY
+    )
+
+
+def _valid_unattended_finalization(staging: str, final: str) -> bool:
+    source = PureWindowsPath(staging)
+    destination = PureWindowsPath(final)
+    parent = PureWindowsPath(security.PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_INVOCATIONS)
+    if source.parent != parent or destination.parent != parent:
+        return False
+    prefix = ".unattended-paper-invocation-"
+    suffix = ".staging"
+    if not source.name.startswith(prefix) or not source.name.endswith(suffix):
+        return False
+    identity_text = source.name[len(prefix) : -len(suffix)]
+    if _CANONICAL_UUID.fullmatch(identity_text) is None:
+        return False
+    identity = UUID(identity_text)
+    if source.name != unattended_paper_invocation_directory_name(
+        identity, staging=True
+    ) or destination.name != unattended_paper_invocation_directory_name(identity):
+        return False
+    try:
+        source_spec = security.paper_object_spec(staging)
+        final_spec = security.paper_object_spec(final)
+    except AuthorityPathError:
+        return False
+    return (
+        source_spec.role is security.PaperObjectRole.UNATTENDED_INVOCATION_DIRECTORY
+        and final_spec.role is security.PaperObjectRole.UNATTENDED_INVOCATION_DIRECTORY
     )
 
 
@@ -529,6 +1035,23 @@ class _WindowsPaperRuntimeOutputNativeApi(security.WindowsPaperReadNativeApi):
                 "runtime same-parent no-clobber write-through rename failed"
             )
 
+    def rename_unattended_write_through(self, staging: str, final: str) -> None:
+        if not _valid_unattended_finalization(staging, final):
+            raise AuthorityPathError(
+                "native unattended invocation rename names are invalid"
+            )
+        move = _bind(
+            self._kernel,
+            "MoveFileExW",
+            [ctypes.c_wchar_p, ctypes.c_wchar_p, ctypes.c_uint32],
+            ctypes.c_int32,
+        )
+        if not move(staging, final, _MOVEFILE_WRITE_THROUGH):
+            raise PersonalDesktopPaperRuntimeOutputError(
+                "unattended invocation same-parent no-clobber write-through "
+                "rename failed"
+            )
+
 
 def open_personal_desktop_paper_runtime_output_capability() -> (
     _PersonalDesktopPaperRuntimeOutputCapability
@@ -577,6 +1100,54 @@ def open_personal_desktop_paper_receipt_recovery_output_capability() -> (
     return _PersonalDesktopPaperReceiptRecoveryOutputCapability(
         _WindowsPaperRuntimeOutputNativeApi(),
         _issuer=_RECEIPT_RECOVERY_RUNTIME_OUTPUT_ISSUER,
+    )
+
+
+def open_personal_desktop_unattended_invocation_output_capability(
+    storage_read_result: PersonalDesktopUnattendedInvocationStorageReadResult,
+) -> _PersonalDesktopUnattendedInvocationOutputCapability:
+    """Open publication only from genuine B1 ABSENT production provenance."""
+
+    verified = require_validated_personal_desktop_unattended_invocation_storage_read(
+        storage_read_result
+    )
+    if (
+        verified.classification
+        is not PersonalDesktopUnattendedInvocationStorageClassification.ABSENT
+    ):
+        raise PersonalDesktopPaperRuntimeOutputError(
+            "unattended invocation publication requires exact ABSENT storage"
+        )
+    if verified.authority is None:
+        raise PersonalDesktopPaperRuntimeOutputError(
+            "unattended invocation publication lacks retained C1 authority"
+        )
+    require_validated_production_authority(verified.authority)
+
+    from trading_bot.runtime.personal_desktop_paper_receipt_recovery_execution import (  # noqa: E501, PLC0415
+        PERSONAL_DESKTOP_PAPER_V2_RECEIPT_RECOVERY_EFFECTS_ENABLED,
+    )
+    from trading_bot.runtime.personal_desktop_supervised_paper_operation_execution import (  # noqa: E501, PLC0415
+        PERSONAL_DESKTOP_PAPER_V2_SUPERVISED_EXECUTION_EFFECTS_ENABLED,
+    )
+    from trading_bot.runtime.personal_desktop_unattended_paper_operation_execution import (  # noqa: E501, PLC0415
+        PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_EXECUTION_EFFECTS_ENABLED,
+    )
+
+    if (
+        security.PERSONAL_DESKTOP_PAPER_V2_PRODUCTION_EFFECTS_ENABLED is not False
+        or security.PERSONAL_DESKTOP_PAPER_V2_RECOVERY_EFFECTS_ENABLED is not False
+        or PERSONAL_DESKTOP_PAPER_V2_SUPERVISED_EXECUTION_EFFECTS_ENABLED is not False
+        or PERSONAL_DESKTOP_PAPER_V2_RECEIPT_RECOVERY_EFFECTS_ENABLED is not False
+        or PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_EXECUTION_EFFECTS_ENABLED is not True
+    ):
+        raise PersonalDesktopPaperRuntimeOutputError(
+            "unattended invocation publication effect-gate state is invalid"
+        )
+    return _PersonalDesktopUnattendedInvocationOutputCapability(
+        _WindowsPaperRuntimeOutputNativeApi(),
+        verified.expected,
+        _issuer=_UNATTENDED_INVOCATION_OUTPUT_ISSUER,
     )
 
 
@@ -716,4 +1287,86 @@ def _open_personal_desktop_paper_receipt_recovery_output_capability_for_test(
     return _PersonalDesktopPaperReceiptRecoveryOutputCapability(
         api,
         _issuer=_DISPOSABLE_RECEIPT_RECOVERY_RUNTIME_OUTPUT_ISSUER,
+    )
+
+
+class _DisposableUnattendedInvocationOutputAuthorityForTest:
+    """Private one-shot issuer for fake-native publication tests."""
+
+    __slots__ = ("_issuer", "_lock", "_used")
+
+    def __init__(self, *, _issuer: object | None = None) -> None:
+        if _issuer is not _DISPOSABLE_UNATTENDED_INVOCATION_OUTPUT_AUTHORITY_ISSUER:
+            raise TypeError(
+                "disposable unattended invocation output authority requires "
+                "its test issuer"
+            )
+        self._issuer = _issuer
+        self._lock = threading.Lock()
+        self._used = False
+
+    def _consume(self) -> None:
+        with self._lock:
+            if (
+                self._issuer
+                is not _DISPOSABLE_UNATTENDED_INVOCATION_OUTPUT_AUTHORITY_ISSUER
+                or self._used
+            ):
+                raise TypeError(
+                    "disposable unattended invocation output authority is "
+                    "invalid or consumed"
+                )
+            self._used = True
+
+    def __copy__(self) -> object:
+        raise TypeError(
+            "disposable unattended invocation output authorities cannot be copied"
+        )
+
+    def __deepcopy__(self, memo: object) -> object:
+        del memo
+        raise TypeError(
+            "disposable unattended invocation output authorities cannot be deep-copied"
+        )
+
+    def __reduce__(self) -> object:
+        raise TypeError(
+            "disposable unattended invocation output authorities cannot be serialized"
+        )
+
+    def __reduce_ex__(self, protocol: int) -> object:
+        del protocol
+        raise TypeError(
+            "disposable unattended invocation output authorities cannot be pickled"
+        )
+
+
+def _open_disposable_unattended_invocation_output_authority_for_test() -> (
+    _DisposableUnattendedInvocationOutputAuthorityForTest
+):
+    return _DisposableUnattendedInvocationOutputAuthorityForTest(
+        _issuer=_DISPOSABLE_UNATTENDED_INVOCATION_OUTPUT_AUTHORITY_ISSUER
+    )
+
+
+def _open_personal_desktop_unattended_invocation_output_capability_for_test(
+    expected: PersonalDesktopUnattendedPaperInvocationArtifactBinding,
+    api: _PaperRuntimeOutputNativeApi,
+    *,
+    authority: _DisposableUnattendedInvocationOutputAuthorityForTest,
+) -> _PersonalDesktopUnattendedInvocationOutputCapability:
+    if type(authority) is not _DisposableUnattendedInvocationOutputAuthorityForTest:
+        raise TypeError("disposable unattended invocation output authority is invalid")
+    if type(expected) is not PersonalDesktopUnattendedPaperInvocationArtifactBinding:
+        raise TypeError("disposable unattended invocation output binding is invalid")
+    if isinstance(api, _WindowsPaperRuntimeOutputNativeApi):
+        raise TypeError(
+            "the disposable unattended invocation output seam rejects the genuine "
+            "production native implementation"
+        )
+    authority._consume()
+    return _PersonalDesktopUnattendedInvocationOutputCapability(
+        api,
+        expected,
+        _issuer=_DISPOSABLE_UNATTENDED_INVOCATION_OUTPUT_ISSUER,
     )

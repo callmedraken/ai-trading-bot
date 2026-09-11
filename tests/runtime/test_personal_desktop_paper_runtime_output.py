@@ -827,3 +827,29 @@ def test_disposable_receipt_seam_rejects_genuine_native() -> None:
         )
     ):
         pass
+
+
+@pytest.mark.parametrize("capability_factory", (_capability, _recovery_capability))
+def test_existing_output_capabilities_cannot_mutate_unattended_namespace(
+    capability_factory,  # type: ignore[no-untyped-def]
+) -> None:
+    api = FakeNative()
+    parent = security.PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_INVOCATIONS
+    staging = Path(parent + f"\\.unattended-paper-invocation-{OPERATION_ID}.staging")
+    final = Path(parent + f"\\unattended-paper-invocation-{OPERATION_ID}")
+    artifact = staging / (
+        f"personal-desktop-unattended-paper-invocation-{OPERATION_ID}.json"
+    )
+
+    with capability_factory(api) as capability:
+        with pytest.raises(AuthorityPathError):
+            capability.create_staging_directory(staging)
+        with pytest.raises(AuthorityPathError):
+            capability.write_staged_file(artifact, b"forbidden")
+        with pytest.raises(AuthorityPathError):
+            capability.finalize_directory(staging, final)
+
+    assert not any(
+        event[0] in {"create-directory", "write-file", "rename-write-through"}
+        for event in api.events
+    )

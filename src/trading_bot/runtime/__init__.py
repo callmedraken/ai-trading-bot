@@ -1,5 +1,7 @@
 """Public API for deterministic paper portfolio runtime orchestration."""
 
+from importlib import import_module
+
 from trading_bot.runtime.checkpointed_paper_cycle_report import (  # noqa: F401
     CHECKPOINTED_PAPER_CYCLE_REPORT_MATERIAL_VERSION,
     CHECKPOINTED_PAPER_CYCLE_REPORT_NAMESPACE,
@@ -357,20 +359,6 @@ from trading_bot.runtime.verified_snapshot_serialization import (
     verify_verified_snapshot_paper_cycle_report,
 )
 
-from .personal_desktop_unattended_paper_operation_execution import (  # noqa: F401
-    PersonalDesktopUnattendedPaperEffectsDisabledError,
-    PersonalDesktopUnattendedPaperOperationDiagnostic,
-    PersonalDesktopUnattendedPaperOperationExecutionError,
-    PersonalDesktopUnattendedPaperOperationResult,
-    PersonalDesktopUnattendedPaperOperationStatus,
-    execute_personal_desktop_unattended_paper_operation,
-)
-from .personal_desktop_unattended_paper_startup_qualification import (  # noqa: F401
-    PersonalDesktopUnattendedPaperStartupDiagnostic,
-    PersonalDesktopUnattendedPaperStartupQualificationResult,
-    PersonalDesktopUnattendedPaperStartupStatus,
-    qualify_personal_desktop_unattended_paper_startup,
-)
 from .personal_desktop_unattended_scheduler_contract import (  # noqa: F401
     PERSONAL_DESKTOP_UNATTENDED_SCHEDULER_CONTRACT,
     PERSONAL_DESKTOP_UNATTENDED_SCHEDULER_CONTRACT_SCHEMA,
@@ -378,6 +366,44 @@ from .personal_desktop_unattended_scheduler_contract import (  # noqa: F401
     is_frozen_personal_desktop_unattended_scheduler_contract,
     personal_desktop_unattended_scheduler_contract,
 )
+
+_PD4_UNATTENDED_EXECUTION_EXPORTS = frozenset(
+    {
+        "PersonalDesktopUnattendedPaperEffectsDisabledError",
+        "PersonalDesktopUnattendedPaperOperationDiagnostic",
+        "PersonalDesktopUnattendedPaperOperationExecutionError",
+        "PersonalDesktopUnattendedPaperOperationResult",
+        "PersonalDesktopUnattendedPaperOperationStatus",
+        "execute_personal_desktop_unattended_paper_operation",
+    }
+)
+_PD4_UNATTENDED_STARTUP_EXPORTS = frozenset(
+    {
+        "PersonalDesktopUnattendedPaperStartupDiagnostic",
+        "PersonalDesktopUnattendedPaperStartupQualificationResult",
+        "PersonalDesktopUnattendedPaperStartupStatus",
+        "qualify_personal_desktop_unattended_paper_startup",
+    }
+)
+
+
+def __getattr__(name: str) -> object:
+    """Load PD4 CLI-dependent facade exports only after runtime initialization."""
+
+    if name in _PD4_UNATTENDED_EXECUTION_EXPORTS:
+        module = import_module(
+            ".personal_desktop_unattended_paper_operation_execution", __name__
+        )
+    elif name in _PD4_UNATTENDED_STARTUP_EXPORTS:
+        module = import_module(
+            ".personal_desktop_unattended_paper_startup_qualification", __name__
+        )
+    else:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    value = getattr(module, name)
+    globals()[name] = value
+    return value
+
 
 __all__ = [
     "APPLICATION_ID_METADATA_KEY",

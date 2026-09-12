@@ -11,13 +11,6 @@ from pathlib import Path
 from uuid import UUID
 
 from trading_bot.market_data import MAX_DAILY_SNAPSHOT_ARTIFACT_BYTES
-from trading_bot.runtime import (
-    MAX_CHECKPOINTED_PAPER_CYCLE_REPORT_BYTES,
-    MAX_PAPER_ACCOUNT_CHECKPOINT_BYTES,
-    MAX_PAPER_ACCOUNT_SUCCESSOR_CHECKPOINT_BYTES,
-    PaperAccountLineageArtifact,
-    PaperAccountLineageArtifactKind,
-)
 
 PAPER_ACCOUNT_LINEAGE_MANIFEST_SCHEMA_VERSION = 1
 MAX_PAPER_ACCOUNT_LINEAGE_MANIFEST_BYTES = 1024 * 1024
@@ -129,6 +122,17 @@ def read_safe_regular_file(path: Path, maximum: int, label: str) -> bytes:
             "safe regular-file read arguments are invalid"
         )
     return _read_regular(_absolute(path), maximum, label)
+
+
+# Keep the low-level safe reader defined before importing the runtime facade.
+# PD4 runtime modules import CLI operation modules that depend on this helper.
+from trading_bot.runtime import (  # noqa: E402
+    MAX_CHECKPOINTED_PAPER_CYCLE_REPORT_BYTES,
+    MAX_PAPER_ACCOUNT_CHECKPOINT_BYTES,
+    MAX_PAPER_ACCOUNT_SUCCESSOR_CHECKPOINT_BYTES,
+    PaperAccountLineageArtifact,
+    PaperAccountLineageArtifactKind,
+)
 
 
 def _artifact_array(

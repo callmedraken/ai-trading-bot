@@ -41,6 +41,9 @@ from trading_bot.runtime import (
     PersonalDesktopUnattendedPaperStartupQualificationResult,
 )
 from trading_bot.runtime import (
+    personal_desktop_supervised_paper_operation_preparation as preparation,
+)
+from trading_bot.runtime import (
     personal_desktop_unattended_paper_operation_execution as execution,
 )
 from trading_bot.runtime import (
@@ -264,7 +267,7 @@ def _case(
         return _Admission(events, ACCOUNT_ID, mutex_state, "mutex")
 
     def build(account, snapshot, inputs, identified_calendar):  # type: ignore[no-untyped-def]
-        material = startup._prepare_verified_paper_operation_from_account(
+        material = startup.prepare_verified_paper_operation_from_account(
             account,
             snapshot,
             history_seed=inputs.history_seed,
@@ -310,7 +313,7 @@ def _case(
         events.append(("gates", value))
         return value
 
-    qualification = startup._QualificationDependencies(
+    qualification = startup.PersonalDesktopUnattendedPaperStartupDependencies(
         validate,
         match,
         qualify,
@@ -336,7 +339,7 @@ def _case(
 
     def reconstruct(account, snapshot, plan, identified_calendar):  # type: ignore[no-untyped-def]
         events.append(("reconstruct", plan))
-        material = execution._reconstruct_verified_paper_operation_from_plan(
+        material = execution.reconstruct_verified_paper_operation_from_plan(
             account, snapshot, plan, identified_calendar
         )
         state["material"] = material
@@ -724,6 +727,21 @@ def test_pd4_c_public_result_is_not_execution_authority_and_result_is_sanitized(
     }
     assert "recover_paper_operation_receipt_once" not in called
     assert not any(event[0] in {"provider", "broker", "scheduler"} for event in events)
+
+
+@pytest.mark.parametrize("module", (preparation, startup, execution))
+def test_pd4_composition_does_not_import_private_project_names(module: object) -> None:
+    source = Path(module.__file__).read_text(encoding="utf-8")
+    private_project_imports = {
+        (node.module, alias.name)
+        for node in ast.walk(ast.parse(source))
+        if isinstance(node, ast.ImportFrom)
+        and (node.level > 0 or (node.module or "").startswith("trading_bot."))
+        for alias in node.names
+        if alias.name.startswith("_")
+    }
+
+    assert private_project_imports == set()
 
 
 def test_prelock_recovery_blocked_stops_before_mutex_or_effects() -> None:

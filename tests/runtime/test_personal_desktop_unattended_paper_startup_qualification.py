@@ -98,9 +98,9 @@ class _Admission:
         return False
 
 
-def _inputs() -> startup._PlanningInputs:
+def _inputs() -> startup.PersonalDesktopUnattendedPaperPlanningInputs:
     config = _DEFAULT_CONFIG
-    return startup._PlanningInputs(
+    return startup.PersonalDesktopUnattendedPaperPlanningInputs(
         _verified_seed(config, ("10", "10", "9")),
         config,
         CALLER_KEY,
@@ -261,7 +261,7 @@ def _run(
         events.append(("build", account))
         if build_error is not None:
             raise build_error
-        return startup._prepare_verified_paper_operation_from_account(
+        return startup.prepare_verified_paper_operation_from_account(
             account,
             selected_snapshot,
             history_seed=planning.history_seed,
@@ -320,7 +320,7 @@ def _run(
         events.append(("gates", value))
         return value
 
-    dependencies = startup._QualificationDependencies(
+    dependencies = startup.PersonalDesktopUnattendedPaperStartupDependencies(
         validate,
         match,
         qualify,

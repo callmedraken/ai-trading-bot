@@ -145,7 +145,7 @@ class _PreparedPaperOperationBinding:
 
 
 @dataclass(frozen=True, slots=True)
-class _PreparedPaperOperationMaterial:
+class PreparedPaperOperationMaterial:
     """Pure post-lock plan and A67 inputs with no filesystem authority."""
 
     plan_binding: ManualPaperStrategyPlanArtifactBinding
@@ -289,7 +289,7 @@ class _SupervisedPaperOperationPreparation:
                 )
 
             account = cycle.evidence
-            material = _prepare_verified_paper_operation_from_account(
+            material = prepare_verified_paper_operation_from_account(
                 account,
                 self._selected_snapshot,
                 history_seed=self._history_seed,
@@ -501,7 +501,7 @@ def _require_active_prepared_paper_operation_binding(
     return binding
 
 
-def _prepare_verified_paper_operation_from_account(
+def prepare_verified_paper_operation_from_account(
     account: object,
     selected: SelectedC3SnapshotReadResult,
     *,
@@ -517,7 +517,7 @@ def _prepare_verified_paper_operation_from_account(
     build_plan: _BuildPlan,
     verify_plan: _VerifyPlan,
     calendar: IdentifiedMarketCalendar,
-) -> _PreparedPaperOperationMaterial:
+) -> PreparedPaperOperationMaterial:
     """Derive and replay exact plan/A67 inputs from authoritative account evidence."""
 
     if type(selected) is not SelectedC3SnapshotReadResult:
@@ -565,7 +565,7 @@ def _prepare_verified_paper_operation_from_account(
         raise SupervisedPaperOperationPreparationError(
             "strategy-plan replay differs from the produced binding"
         )
-    return _reconstruct_verified_paper_operation_from_plan(
+    return reconstruct_verified_paper_operation_from_plan(
         account,
         selected,
         verified_plan,
@@ -573,12 +573,12 @@ def _prepare_verified_paper_operation_from_account(
     )
 
 
-def _reconstruct_verified_paper_operation_from_plan(
+def reconstruct_verified_paper_operation_from_plan(
     authoritative_post_lock_account: object,
     selected_snapshot: SelectedC3SnapshotReadResult,
     verified_plan_binding: ManualPaperStrategyPlanArtifactBinding,
     calendar: IdentifiedMarketCalendar,
-) -> _PreparedPaperOperationMaterial:
+) -> PreparedPaperOperationMaterial:
     """Reconstruct exact A67 inputs from one detached durable plan binding."""
 
     if type(selected_snapshot) is not SelectedC3SnapshotReadResult:
@@ -670,7 +670,7 @@ def _reconstruct_verified_paper_operation_from_plan(
         request,
         calendar,
     )
-    return _PreparedPaperOperationMaterial(verified_plan_binding, execution_inputs)
+    return PreparedPaperOperationMaterial(verified_plan_binding, execution_inputs)
 
 
 def _terminal_artifact(

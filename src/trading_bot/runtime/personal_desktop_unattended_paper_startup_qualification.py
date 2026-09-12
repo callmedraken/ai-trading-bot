@@ -79,8 +79,8 @@ from trading_bot.runtime.windows_authority_validation import (
 from trading_bot.strategies import MovingAverageCrossoverConfig
 
 from .personal_desktop_supervised_paper_operation_preparation import (
-    _prepare_verified_paper_operation_from_account,
-    _PreparedPaperOperationMaterial,
+    PreparedPaperOperationMaterial,
+    prepare_verified_paper_operation_from_account,
 )
 
 
@@ -230,7 +230,9 @@ class PersonalDesktopUnattendedPaperStartupQualificationResult:
 
 
 @dataclass(frozen=True, slots=True)
-class _PlanningInputs:
+class PersonalDesktopUnattendedPaperPlanningInputs:
+    """Immutable semantic inputs shared by PD4-C and PD4-D composition."""
+
     history_seed: VerifiedStrategyHistorySeed
     strategy_config: MovingAverageCrossoverConfig
     caller_idempotency_key: UUID
@@ -252,7 +254,9 @@ class _Admission(Protocol):
 
 
 @dataclass(frozen=True, slots=True)
-class _QualificationDependencies:
+class PersonalDesktopUnattendedPaperStartupDependencies:
+    """Explicit read/reconciliation seams shared by PD4-C and PD4-D."""
+
     validate_c1: Callable[[object], object]
     match_snapshot: Callable[[object, object, object], None]
     qualify_recovery: Callable[
@@ -266,10 +270,10 @@ class _QualificationDependencies:
         [
             PersonalDesktopPaperAccountReadEvidence,
             SelectedC3SnapshotReadResult,
-            _PlanningInputs,
+            PersonalDesktopUnattendedPaperPlanningInputs,
             IdentifiedMarketCalendar,
         ],
-        _PreparedPaperOperationMaterial,
+        PreparedPaperOperationMaterial,
     ]
     read_storage: Callable[
         [object, PersonalDesktopUnattendedPaperInvocationArtifactBinding],
@@ -281,20 +285,43 @@ class _QualificationDependencies:
 
 @dataclass(frozen=True, slots=True)
 class _HeldStartupReconciliation:
-    """Private mutex-scoped reconciliation state; never public authority."""
+    """Mutex-scoped reconciliation state; never reusable execution authority."""
 
     public_result: PersonalDesktopUnattendedPaperStartupQualificationResult | None
     captured_gate_state: tuple[bool, bool, bool, bool, bool, bool]
     c1: object | None = None
     paper_account_id: str | None = None
     post_lock_account: PersonalDesktopPaperAccountReadEvidence | None = None
-    material: _PreparedPaperOperationMaterial | None = None
+    material: PreparedPaperOperationMaterial | None = None
     expected_invocation: (
         PersonalDesktopUnattendedPaperInvocationArtifactBinding | None
     ) = None
     storage: PersonalDesktopUnattendedInvocationStorageReadResult | None = None
     inspection: PaperOperationInspectionResult | None = None
     acquisition: PaperAccountMutexAcquisition | None = None
+
+
+class PersonalDesktopUnattendedPaperStartupReconciliation(Protocol):
+    """Read-only shape shared only while the PD2A scope remains active."""
+
+    public_result: PersonalDesktopUnattendedPaperStartupQualificationResult | None
+    captured_gate_state: tuple[bool, bool, bool, bool, bool, bool]
+    c1: object | None
+    paper_account_id: str | None
+    post_lock_account: PersonalDesktopPaperAccountReadEvidence | None
+    material: PreparedPaperOperationMaterial | None
+    expected_invocation: PersonalDesktopUnattendedPaperInvocationArtifactBinding | None
+    storage: PersonalDesktopUnattendedInvocationStorageReadResult | None
+    inspection: PaperOperationInspectionResult | None
+    acquisition: PaperAccountMutexAcquisition | None
+
+
+class PersonalDesktopUnattendedPaperStartupReconciliationScope(Protocol):
+    """Context-bound PD4-C reconciliation seam with no execution capability."""
+
+    def __enter__(self) -> PersonalDesktopUnattendedPaperStartupReconciliation: ...
+
+    def __exit__(self, exc_type: object, exc: object, traceback: object) -> object: ...
 
 
 class _UnattendedPaperStartupReconciliationScope:
@@ -315,9 +342,9 @@ class _UnattendedPaperStartupReconciliationScope:
         self,
         authority: object,
         selected: SelectedC3SnapshotReadResult,
-        inputs: _PlanningInputs,
+        inputs: PersonalDesktopUnattendedPaperPlanningInputs,
         calendar: IdentifiedMarketCalendar,
-        dependencies: _QualificationDependencies,
+        dependencies: PersonalDesktopUnattendedPaperStartupDependencies,
         *,
         allowed_gate_states: frozenset[tuple[bool, bool, bool, bool, bool, bool]],
     ) -> None:
@@ -330,7 +357,7 @@ class _UnattendedPaperStartupReconciliationScope:
         self._exit_stack: ExitStack | None = None
         self._entered = False
 
-    def __enter__(self) -> _HeldStartupReconciliation:
+    def __enter__(self) -> PersonalDesktopUnattendedPaperStartupReconciliation:
         if self._entered:
             raise RuntimeError("unattended startup reconciliation scope is one-shot")
         self._entered = True
@@ -374,7 +401,7 @@ class _UnattendedPaperStartupReconciliationScope:
         captured: tuple[bool, bool, bool, bool, bool, bool],
         c1: object,
         pre_recovery: PaperReceiptRecoveryQualificationResult,
-    ) -> _HeldStartupReconciliation:
+    ) -> PersonalDesktopUnattendedPaperStartupReconciliation:
         dependencies = self._dependencies
         admission = dependencies.admit_recovery(pre_recovery)
         held = stack.enter_context(admission)
@@ -386,7 +413,9 @@ class _UnattendedPaperStartupReconciliationScope:
             return _HeldStartupReconciliation(
                 _blocked_result(mutex_state=acquisition.state), captured
             )
-        _revalidate_c1_p2_gate_state(c1, self._selected, captured, dependencies)
+        revalidate_personal_desktop_unattended_paper_startup_state(
+            c1, self._selected, captured, dependencies
+        )
         held_recovery = dependencies.qualify_recovery(
             c1, self._inputs.historical_configurations
         )
@@ -394,7 +423,9 @@ class _UnattendedPaperStartupReconciliationScope:
             return _HeldStartupReconciliation(
                 _blocked_result(mutex_state=acquisition.state), captured
             )
-        _revalidate_c1_p2_gate_state(c1, self._selected, captured, dependencies)
+        revalidate_personal_desktop_unattended_paper_startup_state(
+            c1, self._selected, captured, dependencies
+        )
         final_recovery = dependencies.qualify_recovery(
             c1, self._inputs.historical_configurations
         )
@@ -402,7 +433,9 @@ class _UnattendedPaperStartupReconciliationScope:
             return _HeldStartupReconciliation(
                 _blocked_result(mutex_state=acquisition.state), captured
             )
-        _revalidate_c1_p2_gate_state(c1, self._selected, captured, dependencies)
+        revalidate_personal_desktop_unattended_paper_startup_state(
+            c1, self._selected, captured, dependencies
+        )
         return _HeldStartupReconciliation(
             _recovery_result(final_recovery, acquisition.state), captured
         )
@@ -413,7 +446,7 @@ class _UnattendedPaperStartupReconciliationScope:
         captured: tuple[bool, bool, bool, bool, bool, bool],
         c1: object,
         pre_recovery: PaperReceiptRecoveryQualificationResult,
-    ) -> _HeldStartupReconciliation:
+    ) -> PersonalDesktopUnattendedPaperStartupReconciliation:
         dependencies = self._dependencies
         inputs = self._inputs
         selected = self._selected
@@ -432,7 +465,9 @@ class _UnattendedPaperStartupReconciliationScope:
             return _HeldStartupReconciliation(
                 _blocked_result(mutex_state=acquisition.state), captured
             )
-        _revalidate_c1_p2_gate_state(c1, selected, captured, dependencies)
+        revalidate_personal_desktop_unattended_paper_startup_state(
+            c1, selected, captured, dependencies
+        )
         post_recovery = dependencies.qualify_recovery(
             c1, inputs.historical_configurations
         )
@@ -456,7 +491,9 @@ class _UnattendedPaperStartupReconciliationScope:
         )
         expected = _expected_invocation(material, self._calendar)
         storage = dependencies.read_storage(c1, expected)
-        if not _safe_storage_result(storage, expected.invocation.invocation_id):
+        if not is_safe_personal_desktop_unattended_invocation_storage_result(
+            storage, expected.invocation.invocation_id
+        ):
             return _HeldStartupReconciliation(
                 _blocked_result(
                     paper_account_id=pre_account_id,
@@ -470,7 +507,7 @@ class _UnattendedPaperStartupReconciliationScope:
         inspection = dependencies.inspect_operation(
             Path(PERSONAL_DESKTOP_PAPER_V2_RUNTIME), material.execution_inputs
         )
-        if not _safe_inspection(inspection, material):
+        if not is_safe_prepared_paper_operation_inspection(inspection, material):
             return _HeldStartupReconciliation(
                 _blocked_from_healthy(
                     pre_account_id,
@@ -503,15 +540,17 @@ class _UnattendedPaperStartupReconciliationScope:
         return stack.__exit__(exc_type, exc, traceback)
 
 
-def _unattended_paper_startup_reconciliation_scope(
+def personal_desktop_unattended_paper_startup_reconciliation_scope(
     authority: object,
     selected: SelectedC3SnapshotReadResult,
-    inputs: _PlanningInputs,
+    inputs: PersonalDesktopUnattendedPaperPlanningInputs,
     calendar: IdentifiedMarketCalendar,
-    dependencies: _QualificationDependencies,
+    dependencies: PersonalDesktopUnattendedPaperStartupDependencies,
     *,
     allowed_gate_states: frozenset[tuple[bool, bool, bool, bool, bool, bool]],
-) -> _UnattendedPaperStartupReconciliationScope:
+) -> PersonalDesktopUnattendedPaperStartupReconciliationScope:
+    """Create the context-bound shared reconciliation seam without authority."""
+
     return _UnattendedPaperStartupReconciliationScope(
         authority,
         selected,
@@ -527,7 +566,9 @@ class _DisposableStartupQualificationAuthority:
 
     __slots__ = ("dependencies", "used")
 
-    def __init__(self, dependencies: _QualificationDependencies) -> None:
+    def __init__(
+        self, dependencies: PersonalDesktopUnattendedPaperStartupDependencies
+    ) -> None:
         self.dependencies = dependencies
         self.used = False
 
@@ -561,7 +602,7 @@ def qualify_personal_desktop_unattended_paper_startup(
 ) -> PersonalDesktopUnattendedPaperStartupQualificationResult:
     """Reconcile one production wakeup without opening any effect boundary."""
 
-    inputs = _PlanningInputs(
+    inputs = PersonalDesktopUnattendedPaperPlanningInputs(
         history_seed,
         strategy_config,
         caller_idempotency_key,
@@ -579,16 +620,16 @@ def qualify_personal_desktop_unattended_paper_startup(
         selected_snapshot,
         inputs,
         calendar,
-        _production_dependencies(),
+        personal_desktop_unattended_paper_startup_production_dependencies(),
     )
 
 
 def _create_disposable_startup_qualification_authority_for_test(
-    dependencies: _QualificationDependencies,
+    dependencies: PersonalDesktopUnattendedPaperStartupDependencies,
 ) -> _DisposableStartupQualificationAuthority:
     """Create one disposable read-only seam without production provenance."""
 
-    if type(dependencies) is not _QualificationDependencies:
+    if type(dependencies) is not PersonalDesktopUnattendedPaperStartupDependencies:
         raise TypeError("disposable startup qualification dependencies are invalid")
     return _DisposableStartupQualificationAuthority(dependencies)
 
@@ -597,7 +638,7 @@ def _qualify_personal_desktop_unattended_paper_startup_for_test(
     disposable: _DisposableStartupQualificationAuthority,
     authority: object,
     selected_snapshot: SelectedC3SnapshotReadResult,
-    inputs: _PlanningInputs,
+    inputs: PersonalDesktopUnattendedPaperPlanningInputs,
     calendar: IdentifiedMarketCalendar,
 ) -> PersonalDesktopUnattendedPaperStartupQualificationResult:
     """Consume exactly one injected qualification authority for focused tests."""
@@ -619,7 +660,11 @@ def _qualify_personal_desktop_unattended_paper_startup_for_test(
     )
 
 
-def _production_dependencies() -> _QualificationDependencies:
+def personal_desktop_unattended_paper_startup_production_dependencies() -> (
+    PersonalDesktopUnattendedPaperStartupDependencies
+):
+    """Bind the source-owned read-only production reconciliation seams."""
+
     def qualify(authority: object, configurations: tuple[bytes, ...]):
         return qualify_personal_desktop_paper_receipt_recovery(
             authority,  # type: ignore[arg-type]
@@ -635,10 +680,10 @@ def _production_dependencies() -> _QualificationDependencies:
     def build(
         account: PersonalDesktopPaperAccountReadEvidence,
         selected: SelectedC3SnapshotReadResult,
-        inputs: _PlanningInputs,
+        inputs: PersonalDesktopUnattendedPaperPlanningInputs,
         calendar: IdentifiedMarketCalendar,
-    ) -> _PreparedPaperOperationMaterial:
-        return _prepare_verified_paper_operation_from_account(
+    ) -> PreparedPaperOperationMaterial:
+        return prepare_verified_paper_operation_from_account(
             account,
             selected,
             history_seed=inputs.history_seed,
@@ -655,7 +700,7 @@ def _production_dependencies() -> _QualificationDependencies:
             calendar=calendar,
         )
 
-    return _QualificationDependencies(
+    return PersonalDesktopUnattendedPaperStartupDependencies(
         validate_c1=require_validated_production_authority,
         match_snapshot=require_selected_c3_snapshot_matches_authority,
         qualify_recovery=qualify,
@@ -673,12 +718,12 @@ def _production_dependencies() -> _QualificationDependencies:
 def _qualify_startup(
     authority: object,
     selected: SelectedC3SnapshotReadResult,
-    inputs: _PlanningInputs,
+    inputs: PersonalDesktopUnattendedPaperPlanningInputs,
     calendar: IdentifiedMarketCalendar,
-    dependencies: _QualificationDependencies,
+    dependencies: PersonalDesktopUnattendedPaperStartupDependencies,
 ) -> PersonalDesktopUnattendedPaperStartupQualificationResult:
     try:
-        scope = _unattended_paper_startup_reconciliation_scope(
+        scope = personal_desktop_unattended_paper_startup_reconciliation_scope(
             authority,
             selected,
             inputs,
@@ -708,7 +753,7 @@ def _qualify_startup(
                 or paper_account_id is None
             ):
                 raise TypeError("held startup reconciliation is incomplete")
-            _revalidate_c1_p2_gate_state(
+            revalidate_personal_desktop_unattended_paper_startup_state(
                 c1,
                 selected,
                 reconciliation.captured_gate_state,
@@ -731,8 +776,11 @@ def _qualify_startup(
             final_inspection = dependencies.inspect_operation(
                 Path(PERSONAL_DESKTOP_PAPER_V2_RUNTIME), material.execution_inputs
             )
-            if final_inspection != inspection or not _safe_inspection(
-                final_inspection, material
+            if (
+                final_inspection != inspection
+                or not is_safe_prepared_paper_operation_inspection(
+                    final_inspection, material
+                )
             ):
                 return _blocked_from_healthy(
                     paper_account_id,
@@ -743,7 +791,7 @@ def _qualify_startup(
                     final_inspection,
                     acquisition,
                 )
-            _revalidate_c1_p2_gate_state(
+            revalidate_personal_desktop_unattended_paper_startup_state(
                 c1,
                 selected,
                 reconciliation.captured_gate_state,
@@ -763,10 +811,10 @@ def _qualify_startup(
 
 
 def _expected_invocation(
-    material: _PreparedPaperOperationMaterial,
+    material: PreparedPaperOperationMaterial,
     calendar: IdentifiedMarketCalendar,
 ) -> PersonalDesktopUnattendedPaperInvocationArtifactBinding:
-    if type(material) is not _PreparedPaperOperationMaterial:
+    if type(material) is not PreparedPaperOperationMaterial:
         raise TypeError("prepared paper operation material is invalid")
     invocation = create_personal_desktop_unattended_paper_invocation(
         material.plan_binding, calendar
@@ -787,7 +835,7 @@ def _expected_invocation(
 
 
 def _capture_gate_state(
-    dependencies: _QualificationDependencies,
+    dependencies: PersonalDesktopUnattendedPaperStartupDependencies,
     allowed_gate_states: frozenset[tuple[bool, bool, bool, bool, bool, bool]],
 ) -> tuple[bool, bool, bool, bool, bool, bool]:
     state = dependencies.gate_state()
@@ -801,12 +849,14 @@ def _capture_gate_state(
     return state
 
 
-def _revalidate_c1_p2_gate_state(
+def revalidate_personal_desktop_unattended_paper_startup_state(
     c1: object,
     selected: SelectedC3SnapshotReadResult,
     captured_gate_state: tuple[bool, bool, bool, bool, bool, bool],
-    dependencies: _QualificationDependencies,
+    dependencies: PersonalDesktopUnattendedPaperStartupDependencies,
 ) -> None:
+    """Revalidate exact C1/P2 and captured six-gate state under the mutex."""
+
     try:
         _capture_gate_state(dependencies, frozenset({captured_gate_state}))
     except RuntimeError as error:
@@ -852,7 +902,11 @@ def _recovery_signature(
     )
 
 
-def _safe_storage_result(result: object, expected_invocation_id: UUID) -> bool:
+def is_safe_personal_desktop_unattended_invocation_storage_result(
+    result: object, expected_invocation_id: UUID
+) -> bool:
+    """Return whether B1 storage is exact and safe for PD4 composition."""
+
     return (
         type(result) is PersonalDesktopUnattendedInvocationStorageReadResult
         and result.expected_invocation_id == expected_invocation_id
@@ -872,7 +926,11 @@ def _storage_classification(
     return None
 
 
-def _safe_inspection(result: object, material: _PreparedPaperOperationMaterial) -> bool:
+def is_safe_prepared_paper_operation_inspection(
+    result: object, material: PreparedPaperOperationMaterial
+) -> bool:
+    """Return whether an A67 inspection exactly matches prepared material."""
+
     inputs = material.execution_inputs
     if (
         type(result) is not PaperOperationInspectionResult
@@ -895,7 +953,7 @@ def _healthy_result(
     paper_account_id: str,
     selected: SelectedC3SnapshotReadResult,
     expected: PersonalDesktopUnattendedPaperInvocationArtifactBinding,
-    material: _PreparedPaperOperationMaterial,
+    material: PreparedPaperOperationMaterial,
     storage: PersonalDesktopUnattendedInvocationStorageReadResult,
     inspection: PaperOperationInspectionResult,
     mutex_state: PaperAccountMutexState,
@@ -964,7 +1022,7 @@ def _blocked_from_healthy(
     paper_account_id: str,
     selected: SelectedC3SnapshotReadResult,
     expected: PersonalDesktopUnattendedPaperInvocationArtifactBinding,
-    material: _PreparedPaperOperationMaterial,
+    material: PreparedPaperOperationMaterial,
     storage: PersonalDesktopUnattendedInvocationStorageReadResult,
     inspection: object,
     acquisition: PaperAccountMutexAcquisition,

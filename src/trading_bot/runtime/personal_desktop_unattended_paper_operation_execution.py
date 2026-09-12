@@ -67,18 +67,18 @@ from trading_bot.runtime.windows_authority_validation import (
 from trading_bot.strategies import MovingAverageCrossoverConfig
 
 from .personal_desktop_supervised_paper_operation_preparation import (
-    _PreparedPaperOperationMaterial,
-    _reconstruct_verified_paper_operation_from_plan,
+    PreparedPaperOperationMaterial,
+    reconstruct_verified_paper_operation_from_plan,
 )
 from .personal_desktop_unattended_paper_startup_qualification import (
+    PersonalDesktopUnattendedPaperPlanningInputs,
+    PersonalDesktopUnattendedPaperStartupDependencies,
     PersonalDesktopUnattendedPaperStartupStatus,
-    _PlanningInputs,
-    _production_dependencies,
-    _QualificationDependencies,
-    _revalidate_c1_p2_gate_state,
-    _safe_inspection,
-    _safe_storage_result,
-    _unattended_paper_startup_reconciliation_scope,
+    is_safe_personal_desktop_unattended_invocation_storage_result,
+    is_safe_prepared_paper_operation_inspection,
+    personal_desktop_unattended_paper_startup_production_dependencies,
+    personal_desktop_unattended_paper_startup_reconciliation_scope,
+    revalidate_personal_desktop_unattended_paper_startup_state,
 )
 
 PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_EXECUTION_EFFECTS_ENABLED = False
@@ -215,7 +215,7 @@ class _OutputCapability(Protocol):
 
 @dataclass(frozen=True, slots=True)
 class _ExecutionDependencies:
-    qualification: _QualificationDependencies
+    qualification: PersonalDesktopUnattendedPaperStartupDependencies
     resolve_storage: Callable[
         [PersonalDesktopUnattendedInvocationStorageReadResult],
         PersonalDesktopUnattendedPaperInvocationArtifactBinding,
@@ -225,7 +225,7 @@ class _ExecutionDependencies:
     ]
     reconstruct: Callable[
         [object, SelectedC3SnapshotReadResult, object, IdentifiedMarketCalendar],
-        _PreparedPaperOperationMaterial,
+        PreparedPaperOperationMaterial,
     ]
     open_output: Callable[[], _OutputCapability]
     execute_operation: Callable[[Path, object, object], PaperOperationExecutionResult]
@@ -275,7 +275,7 @@ def execute_personal_desktop_unattended_paper_operation(
     metadata: tuple[MetadataEntry, ...] = (),
     historical_cycle_configuration_payloads: tuple[bytes, ...] = (),
 ) -> PersonalDesktopUnattendedPaperOperationResult:
-    inputs = _PlanningInputs(
+    inputs = PersonalDesktopUnattendedPaperPlanningInputs(
         history_seed,
         strategy_config,
         caller_idempotency_key,
@@ -318,7 +318,7 @@ def _execute_personal_desktop_unattended_paper_operation_for_test(
     authority: _DisposableUnattendedPaperExecutionAuthorityForTest,
     c1: object,
     selected_snapshot: SelectedC3SnapshotReadResult,
-    inputs: _PlanningInputs,
+    inputs: PersonalDesktopUnattendedPaperPlanningInputs,
     calendar: IdentifiedMarketCalendar,
 ) -> PersonalDesktopUnattendedPaperOperationResult:
     if type(authority) is not _DisposableUnattendedPaperExecutionAuthorityForTest:
@@ -336,10 +336,10 @@ def _execute_personal_desktop_unattended_paper_operation_for_test(
 
 def _production_execution_dependencies() -> _ExecutionDependencies:
     return _ExecutionDependencies(
-        _production_dependencies(),
+        personal_desktop_unattended_paper_startup_production_dependencies(),
         _resolve_finalized_storage_binding,
         open_personal_desktop_unattended_invocation_output_capability,
-        _reconstruct_verified_paper_operation_from_plan,
+        reconstruct_verified_paper_operation_from_plan,
         open_personal_desktop_unattended_paper_runtime_output_capability,
         _execute_architecture_67,
     )
@@ -348,7 +348,7 @@ def _production_execution_dependencies() -> _ExecutionDependencies:
 def _compose_personal_desktop_unattended_paper_operation(
     authority: object,
     selected: SelectedC3SnapshotReadResult,
-    inputs: _PlanningInputs,
+    inputs: PersonalDesktopUnattendedPaperPlanningInputs,
     calendar: IdentifiedMarketCalendar,
     dependencies: _ExecutionDependencies,
     *,
@@ -366,7 +366,7 @@ def _compose_personal_desktop_unattended_paper_operation(
         or dependencies.execute_operation is not _execute_architecture_67
         or dependencies.resolve_storage is not _resolve_finalized_storage_binding
         or dependencies.reconstruct
-        is not _reconstruct_verified_paper_operation_from_plan
+        is not reconstruct_verified_paper_operation_from_plan
     ):
         raise TypeError(
             "production unattended execution dependencies are not source-owned"
@@ -381,7 +381,7 @@ def _compose_personal_desktop_unattended_paper_operation(
     }
     disabled_after_reconciliation = False
     try:
-        scope = _unattended_paper_startup_reconciliation_scope(
+        scope = personal_desktop_unattended_paper_startup_reconciliation_scope(
             authority,
             selected,
             inputs,
@@ -431,7 +431,7 @@ def _compose_personal_desktop_unattended_paper_operation(
             ):
                 raise TypeError("healthy mutex-held reconciliation is incomplete")
             if (
-                type(material) is not _PreparedPaperOperationMaterial
+                type(material) is not PreparedPaperOperationMaterial
                 or type(expected)
                 is not PersonalDesktopUnattendedPaperInvocationArtifactBinding
                 or type(storage)
@@ -506,7 +506,7 @@ def _compose_personal_desktop_unattended_paper_operation(
                     storage.classification
                     is PersonalDesktopUnattendedInvocationStorageClassification.ABSENT
                 ):
-                    _revalidate_c1_p2_gate_state(
+                    revalidate_personal_desktop_unattended_paper_startup_state(
                         c1, selected, captured, dependencies.qualification
                     )
                     with dependencies.open_publisher(storage) as publisher:
@@ -555,7 +555,7 @@ def _compose_personal_desktop_unattended_paper_operation(
                         final_account,
                         final_inspection,
                     )
-                _revalidate_c1_p2_gate_state(
+                revalidate_personal_desktop_unattended_paper_startup_state(
                     c1, selected, captured, dependencies.qualification
                 )
                 with dependencies.open_output() as output_capability:
@@ -635,7 +635,7 @@ def _remember_material(
     known: dict[str, object],
     account_id: str,
     expected: PersonalDesktopUnattendedPaperInvocationArtifactBinding,
-    material: _PreparedPaperOperationMaterial,
+    material: PreparedPaperOperationMaterial,
     inspection: PaperOperationInspectionResult,
 ) -> None:
     known.update(
@@ -649,15 +649,15 @@ def _remember_material(
 
 
 def _require_reconstructed_identity(
-    expected_material: _PreparedPaperOperationMaterial,
-    reconstructed: _PreparedPaperOperationMaterial,
+    expected_material: PreparedPaperOperationMaterial,
+    reconstructed: PreparedPaperOperationMaterial,
     expected_invocation: PersonalDesktopUnattendedPaperInvocationArtifactBinding,
     durable_invocation: PersonalDesktopUnattendedPaperInvocationArtifactBinding,
 ) -> None:
     expected_inputs = expected_material.execution_inputs
     reconstructed_inputs = reconstructed.execution_inputs
     if (
-        type(reconstructed) is not _PreparedPaperOperationMaterial
+        type(reconstructed) is not PreparedPaperOperationMaterial
         or durable_invocation.invocation.invocation_id
         != expected_invocation.invocation.invocation_id
         or durable_invocation.replayed_plan != reconstructed.plan_binding
@@ -670,14 +670,14 @@ def _require_reconstructed_identity(
 
 def _inspect_exact(
     dependencies: _ExecutionDependencies,
-    material: _PreparedPaperOperationMaterial,
+    material: PreparedPaperOperationMaterial,
     *,
     allow_already_applied: bool,
 ) -> PaperOperationInspectionResult:
     result = dependencies.qualification.inspect_operation(
         Path(PERSONAL_DESKTOP_PAPER_V2_RUNTIME), material.execution_inputs
     )
-    if not _safe_inspection(result, material):
+    if not is_safe_prepared_paper_operation_inspection(result, material):
         raise ValueError("Architecture-67 inspection is not exact")
     if (
         not allow_already_applied
@@ -706,7 +706,9 @@ def _require_finalized_storage(
     storage: object, expected: PersonalDesktopUnattendedPaperInvocationArtifactBinding
 ) -> None:
     if (
-        not _safe_storage_result(storage, expected.invocation.invocation_id)
+        not is_safe_personal_desktop_unattended_invocation_storage_result(
+            storage, expected.invocation.invocation_id
+        )
         or storage.classification is not _Storage.FINALIZED_IDENTICAL
     ):
         raise ValueError("invocation storage is not exact FINALIZED_IDENTICAL")
@@ -715,16 +717,18 @@ def _require_finalized_storage(
 def _require_read_only_stability(
     c1: object,
     selected: SelectedC3SnapshotReadResult,
-    inputs: _PlanningInputs,
+    inputs: PersonalDesktopUnattendedPaperPlanningInputs,
     captured: tuple[bool, bool, bool, bool, bool, bool],
     account_id: str,
     post_lock_account: object,
-    material: _PreparedPaperOperationMaterial,
+    material: PreparedPaperOperationMaterial,
     expected: PersonalDesktopUnattendedPaperInvocationArtifactBinding,
     initial_storage: PersonalDesktopUnattendedInvocationStorageReadResult,
     dependencies: _ExecutionDependencies,
 ) -> None:
-    _revalidate_c1_p2_gate_state(c1, selected, captured, dependencies.qualification)
+    revalidate_personal_desktop_unattended_paper_startup_state(
+        c1, selected, captured, dependencies.qualification
+    )
     configurations = _configuration_dependencies(
         inputs.historical_configurations, material.plan_binding.artifact_bytes
     )
@@ -738,20 +742,24 @@ def _require_read_only_stability(
     _inspect_exact(dependencies, material, allow_already_applied=False)
     final_storage = dependencies.qualification.read_storage(c1, expected)
     if (
-        not _safe_storage_result(final_storage, expected.invocation.invocation_id)
+        not is_safe_personal_desktop_unattended_invocation_storage_result(
+            final_storage, expected.invocation.invocation_id
+        )
         or final_storage.classification is not initial_storage.classification
     ):
         raise ValueError("read-only durable invocation state changed")
-    _revalidate_c1_p2_gate_state(c1, selected, captured, dependencies.qualification)
+    revalidate_personal_desktop_unattended_paper_startup_state(
+        c1, selected, captured, dependencies.qualification
+    )
 
 
 def _final_reconciliation(
     c1: object,
     selected: SelectedC3SnapshotReadResult,
-    inputs: _PlanningInputs,
+    inputs: PersonalDesktopUnattendedPaperPlanningInputs,
     captured: tuple[bool, bool, bool, bool, bool, bool],
     account_id: str,
-    material: _PreparedPaperOperationMaterial,
+    material: PreparedPaperOperationMaterial,
     expected: PersonalDesktopUnattendedPaperInvocationArtifactBinding,
     initial_storage: PersonalDesktopUnattendedInvocationStorageReadResult,
     durable: PersonalDesktopUnattendedPaperInvocationArtifactBinding | None,
@@ -783,11 +791,15 @@ def _final_reconciliation(
         if durable is None or final_durable != durable:
             raise ValueError("final durable invocation binding changed")
     elif (
-        not _safe_storage_result(final_storage, expected.invocation.invocation_id)
+        not is_safe_personal_desktop_unattended_invocation_storage_result(
+            final_storage, expected.invocation.invocation_id
+        )
         or final_storage.classification is not initial_storage.classification
     ):
         raise ValueError("final invocation storage state changed")
-    _revalidate_c1_p2_gate_state(c1, selected, captured, dependencies.qualification)
+    revalidate_personal_desktop_unattended_paper_startup_state(
+        c1, selected, captured, dependencies.qualification
+    )
     return final_account, final_inspection
 
 
@@ -813,7 +825,7 @@ def _configuration_dependencies(
 
 
 def _require_execution_result(
-    result: object, material: _PreparedPaperOperationMaterial
+    result: object, material: PreparedPaperOperationMaterial
 ) -> PaperOperationExecutionClassification:
     inputs = material.execution_inputs
     if type(result) is not PaperOperationExecutionResult:
@@ -850,7 +862,7 @@ def _require_execution_result(
 
 def _require_terminal_receipt(
     evidence: PersonalDesktopPaperAccountReadEvidence,
-    material: _PreparedPaperOperationMaterial,
+    material: PreparedPaperOperationMaterial,
     execution_result: PaperOperationExecutionResult | None,
 ) -> None:
     inputs = material.execution_inputs

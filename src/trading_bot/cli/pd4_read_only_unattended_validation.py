@@ -613,7 +613,7 @@ def _success_record(
         "result": "VALIDATED",
         "scheduler_modified": False,
         "schema": _SCHEMA,
-        "selected_snapshot_id": str(_EXPECTED_SELECTED_SNAPSHOT_ID),
+        "selected_snapshot_id": _optional_value(result.selected_snapshot_id),
         "selection_id": str(_EXPECTED_SELECTION_ID),
         "storage_classification": _optional_value(result.storage_classification),
         "terminal_checkpoint_id": _optional_value(result.terminal_checkpoint_id),

@@ -512,6 +512,7 @@ def test_main_emits_one_sanitized_non_authorizing_record(
     record = json.loads(captured.out)
     assert record["qualification_status"] == "BLOCKED"
     assert record["paper_account_id"] is None
+    assert record["selected_snapshot_id"] is None
     forbidden = ("F:\\", "C:\\", "Traceback", "Exception", "secret", "token")
     assert all(item not in captured.out for item in forbidden)
 

@@ -20,6 +20,12 @@ from trading_bot.runtime import personal_desktop_paper_runtime_output as output
 from trading_bot.runtime import (
     personal_desktop_supervised_paper_operation_execution as supervised_execution,
 )
+from trading_bot.runtime import (
+    personal_desktop_unattended_paper_operation_execution as unattended_execution,
+)
+from trading_bot.runtime import (
+    personal_desktop_unattended_paper_storage_provisioning as storage_provisioning,
+)
 from trading_bot.runtime.personal_desktop_first_paper_operation import (
     PERSONAL_DESKTOP_FIRST_PAPER_OPERATION_PROFILE,
 )
@@ -853,3 +859,64 @@ def test_existing_output_capabilities_cannot_mutate_unattended_namespace(
         event[0] in {"create-directory", "write-file", "rename-write-through"}
         for event in api.events
     )
+
+
+def test_unattended_a67_opener_accepts_only_exact_unattended_six_gate_state(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        output, "_WindowsPaperRuntimeOutputNativeApi", lambda: FakeNative()
+    )
+
+    def set_gates(state):  # type: ignore[no-untyped-def]
+        publication, recovery, supervised, receipt, unattended, provisioning = state
+        monkeypatch.setattr(
+            security,
+            "PERSONAL_DESKTOP_PAPER_V2_PRODUCTION_EFFECTS_ENABLED",
+            publication,
+        )
+        monkeypatch.setattr(
+            security, "PERSONAL_DESKTOP_PAPER_V2_RECOVERY_EFFECTS_ENABLED", recovery
+        )
+        monkeypatch.setattr(
+            supervised_execution,
+            "PERSONAL_DESKTOP_PAPER_V2_SUPERVISED_EXECUTION_EFFECTS_ENABLED",
+            supervised,
+        )
+        monkeypatch.setattr(
+            recovery_execution,
+            "PERSONAL_DESKTOP_PAPER_V2_RECEIPT_RECOVERY_EFFECTS_ENABLED",
+            receipt,
+        )
+        monkeypatch.setattr(
+            unattended_execution,
+            "PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_EXECUTION_EFFECTS_ENABLED",
+            unattended,
+        )
+        monkeypatch.setattr(
+            storage_provisioning,
+            "PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_STORAGE_PROVISIONING_EFFECTS_ENABLED",
+            provisioning,
+        )
+
+    set_gates((False, False, False, False, True, False))
+    capability = (
+        output.open_personal_desktop_unattended_paper_runtime_output_capability()
+    )
+    assert type(capability) is output._PersonalDesktopPaperRuntimeOutputCapability
+
+    invalid_states = [
+        (False, False, False, False, False, False),
+        (True, False, False, False, True, False),
+        (False, True, False, False, True, False),
+        (False, False, True, False, True, False),
+        (False, False, False, True, True, False),
+        (False, False, False, False, True, True),
+    ]
+    for state in invalid_states:
+        set_gates(state)
+        with pytest.raises(
+            output.PersonalDesktopPaperRuntimeOutputError,
+            match="effect-gate state is invalid",
+        ):
+            output.open_personal_desktop_unattended_paper_runtime_output_capability()

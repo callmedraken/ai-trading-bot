@@ -357,6 +357,14 @@ from trading_bot.runtime.verified_snapshot_serialization import (
     verify_verified_snapshot_paper_cycle_report,
 )
 
+from .personal_desktop_unattended_paper_operation_execution import (  # noqa: F401
+    PersonalDesktopUnattendedPaperEffectsDisabledError,
+    PersonalDesktopUnattendedPaperOperationDiagnostic,
+    PersonalDesktopUnattendedPaperOperationExecutionError,
+    PersonalDesktopUnattendedPaperOperationResult,
+    PersonalDesktopUnattendedPaperOperationStatus,
+    execute_personal_desktop_unattended_paper_operation,
+)
 from .personal_desktop_unattended_paper_startup_qualification import (  # noqa: F401
     PersonalDesktopUnattendedPaperStartupDiagnostic,
     PersonalDesktopUnattendedPaperStartupQualificationResult,
@@ -608,6 +616,12 @@ __all__.extend(
         "PersonalDesktopUnattendedPaperStartupQualificationResult",
         "PersonalDesktopUnattendedPaperStartupStatus",
         "qualify_personal_desktop_unattended_paper_startup",
+        "PersonalDesktopUnattendedPaperEffectsDisabledError",
+        "PersonalDesktopUnattendedPaperOperationDiagnostic",
+        "PersonalDesktopUnattendedPaperOperationExecutionError",
+        "PersonalDesktopUnattendedPaperOperationResult",
+        "PersonalDesktopUnattendedPaperOperationStatus",
+        "execute_personal_desktop_unattended_paper_operation",
     ]
 )
 

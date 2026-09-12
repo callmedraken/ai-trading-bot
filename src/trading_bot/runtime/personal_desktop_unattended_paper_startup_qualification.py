@@ -8,6 +8,7 @@ execution, or receipt recovery.
 from __future__ import annotations
 
 from collections.abc import Callable
+from contextlib import ExitStack
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
@@ -278,6 +279,249 @@ class _QualificationDependencies:
     gate_state: Callable[[], tuple[bool, bool, bool, bool, bool, bool]]
 
 
+@dataclass(frozen=True, slots=True)
+class _HeldStartupReconciliation:
+    """Private mutex-scoped reconciliation state; never public authority."""
+
+    public_result: PersonalDesktopUnattendedPaperStartupQualificationResult | None
+    captured_gate_state: tuple[bool, bool, bool, bool, bool, bool]
+    c1: object | None = None
+    paper_account_id: str | None = None
+    post_lock_account: PersonalDesktopPaperAccountReadEvidence | None = None
+    material: _PreparedPaperOperationMaterial | None = None
+    expected_invocation: (
+        PersonalDesktopUnattendedPaperInvocationArtifactBinding | None
+    ) = None
+    storage: PersonalDesktopUnattendedInvocationStorageReadResult | None = None
+    inspection: PaperOperationInspectionResult | None = None
+    acquisition: PaperAccountMutexAcquisition | None = None
+
+
+class _UnattendedPaperStartupReconciliationScope:
+    """Enter PD4-C reconciliation and retain the same PD2A mutex when healthy."""
+
+    __slots__ = (
+        "_allowed_gate_states",
+        "_authority",
+        "_calendar",
+        "_dependencies",
+        "_entered",
+        "_exit_stack",
+        "_inputs",
+        "_selected",
+    )
+
+    def __init__(
+        self,
+        authority: object,
+        selected: SelectedC3SnapshotReadResult,
+        inputs: _PlanningInputs,
+        calendar: IdentifiedMarketCalendar,
+        dependencies: _QualificationDependencies,
+        *,
+        allowed_gate_states: frozenset[tuple[bool, bool, bool, bool, bool, bool]],
+    ) -> None:
+        self._authority = authority
+        self._selected = selected
+        self._inputs = inputs
+        self._calendar = calendar
+        self._dependencies = dependencies
+        self._allowed_gate_states = allowed_gate_states
+        self._exit_stack: ExitStack | None = None
+        self._entered = False
+
+    def __enter__(self) -> _HeldStartupReconciliation:
+        if self._entered:
+            raise RuntimeError("unattended startup reconciliation scope is one-shot")
+        self._entered = True
+        stack = ExitStack()
+        self._exit_stack = stack
+        try:
+            dependencies = self._dependencies
+            selected = self._selected
+            inputs = self._inputs
+            captured = _capture_gate_state(dependencies, self._allowed_gate_states)
+            c1 = dependencies.validate_c1(self._authority)
+            if type(selected) is not SelectedC3SnapshotReadResult:
+                raise TypeError("selected snapshot must be an exact P2 result")
+            dependencies.match_snapshot(selected.permit, selected.audit, c1)
+            pre_recovery = dependencies.qualify_recovery(
+                c1, inputs.historical_configurations
+            )
+            if type(pre_recovery) is not PaperReceiptRecoveryQualificationResult:
+                raise TypeError("recovery qualification result type is invalid")
+            if pre_recovery.status is PaperReceiptRecoveryQualificationStatus.BLOCKED:
+                return _HeldStartupReconciliation(_blocked_result(), captured)
+            if (
+                pre_recovery.status
+                is PaperReceiptRecoveryQualificationStatus.RECEIPT_RECOVERY_REQUIRED
+            ):
+                return self._enter_recovery(stack, captured, c1, pre_recovery)
+            if (
+                pre_recovery.status
+                is not PaperReceiptRecoveryQualificationStatus.NO_RECOVERY_REQUIRED
+            ):
+                return _HeldStartupReconciliation(_blocked_result(), captured)
+            return self._enter_healthy(stack, captured, c1, pre_recovery)
+        except BaseException:
+            stack.close()
+            self._exit_stack = None
+            raise
+
+    def _enter_recovery(
+        self,
+        stack: ExitStack,
+        captured: tuple[bool, bool, bool, bool, bool, bool],
+        c1: object,
+        pre_recovery: PaperReceiptRecoveryQualificationResult,
+    ) -> _HeldStartupReconciliation:
+        dependencies = self._dependencies
+        admission = dependencies.admit_recovery(pre_recovery)
+        held = stack.enter_context(admission)
+        acquisition = _require_acquisition(held)
+        if (
+            acquisition.state is not PaperAccountMutexState.OWNED
+            or acquisition.paper_account_id != pre_recovery.paper_account_id
+        ):
+            return _HeldStartupReconciliation(
+                _blocked_result(mutex_state=acquisition.state), captured
+            )
+        _revalidate_c1_p2_gate_state(c1, self._selected, captured, dependencies)
+        held_recovery = dependencies.qualify_recovery(
+            c1, self._inputs.historical_configurations
+        )
+        if not _same_exact_recovery_required(pre_recovery, held_recovery):
+            return _HeldStartupReconciliation(
+                _blocked_result(mutex_state=acquisition.state), captured
+            )
+        _revalidate_c1_p2_gate_state(c1, self._selected, captured, dependencies)
+        final_recovery = dependencies.qualify_recovery(
+            c1, self._inputs.historical_configurations
+        )
+        if not _same_exact_recovery_required(held_recovery, final_recovery):
+            return _HeldStartupReconciliation(
+                _blocked_result(mutex_state=acquisition.state), captured
+            )
+        _revalidate_c1_p2_gate_state(c1, self._selected, captured, dependencies)
+        return _HeldStartupReconciliation(
+            _recovery_result(final_recovery, acquisition.state), captured
+        )
+
+    def _enter_healthy(
+        self,
+        stack: ExitStack,
+        captured: tuple[bool, bool, bool, bool, bool, bool],
+        c1: object,
+        pre_recovery: PaperReceiptRecoveryQualificationResult,
+    ) -> _HeldStartupReconciliation:
+        dependencies = self._dependencies
+        inputs = self._inputs
+        selected = self._selected
+        pre_account = dependencies.read_account(c1, inputs.historical_configurations)
+        pre_evidence = dependencies.require_account(pre_account)
+        pre_account_id = pre_evidence.anchor.paper_account_id
+        if pre_recovery.paper_account_id != pre_account_id:
+            return _HeldStartupReconciliation(_blocked_result(), captured)
+        admission = dependencies.admit_healthy(pre_account)
+        held = stack.enter_context(admission)
+        acquisition = _require_acquisition(held)
+        if (
+            acquisition.state is not PaperAccountMutexState.OWNED
+            or acquisition.paper_account_id != pre_account_id
+        ):
+            return _HeldStartupReconciliation(
+                _blocked_result(mutex_state=acquisition.state), captured
+            )
+        _revalidate_c1_p2_gate_state(c1, selected, captured, dependencies)
+        post_recovery = dependencies.qualify_recovery(
+            c1, inputs.historical_configurations
+        )
+        if (
+            type(post_recovery) is not PaperReceiptRecoveryQualificationResult
+            or post_recovery.status
+            is not PaperReceiptRecoveryQualificationStatus.NO_RECOVERY_REQUIRED
+            or post_recovery.paper_account_id != pre_account_id
+        ):
+            return _HeldStartupReconciliation(
+                _blocked_result(mutex_state=acquisition.state), captured
+            )
+        post_account = dependencies.read_account(c1, inputs.historical_configurations)
+        post_evidence = dependencies.require_account(post_account)
+        if post_evidence.anchor.paper_account_id != pre_account_id:
+            return _HeldStartupReconciliation(
+                _blocked_result(mutex_state=acquisition.state), captured
+            )
+        material = dependencies.build_material(
+            post_evidence, selected, inputs, self._calendar
+        )
+        expected = _expected_invocation(material, self._calendar)
+        storage = dependencies.read_storage(c1, expected)
+        if not _safe_storage_result(storage, expected.invocation.invocation_id):
+            return _HeldStartupReconciliation(
+                _blocked_result(
+                    paper_account_id=pre_account_id,
+                    selected_snapshot_id=selected.audit.snapshot_id,
+                    invocation_id=expected.invocation.invocation_id,
+                    storage_classification=_storage_classification(storage),
+                    mutex_state=acquisition.state,
+                ),
+                captured,
+            )
+        inspection = dependencies.inspect_operation(
+            Path(PERSONAL_DESKTOP_PAPER_V2_RUNTIME), material.execution_inputs
+        )
+        if not _safe_inspection(inspection, material):
+            return _HeldStartupReconciliation(
+                _blocked_from_healthy(
+                    pre_account_id,
+                    selected,
+                    expected,
+                    material,
+                    storage,
+                    inspection,
+                    acquisition,
+                ),
+                captured,
+            )
+        return _HeldStartupReconciliation(
+            None,
+            captured,
+            c1,
+            pre_account_id,
+            post_evidence,
+            material,
+            expected,
+            storage,
+            inspection,
+            acquisition,
+        )
+
+    def __exit__(self, exc_type: object, exc: object, traceback: object) -> bool:
+        stack, self._exit_stack = self._exit_stack, None
+        if stack is None:
+            raise RuntimeError("unattended startup reconciliation scope is not active")
+        return stack.__exit__(exc_type, exc, traceback)
+
+
+def _unattended_paper_startup_reconciliation_scope(
+    authority: object,
+    selected: SelectedC3SnapshotReadResult,
+    inputs: _PlanningInputs,
+    calendar: IdentifiedMarketCalendar,
+    dependencies: _QualificationDependencies,
+    *,
+    allowed_gate_states: frozenset[tuple[bool, bool, bool, bool, bool, bool]],
+) -> _UnattendedPaperStartupReconciliationScope:
+    return _UnattendedPaperStartupReconciliationScope(
+        authority,
+        selected,
+        inputs,
+        calendar,
+        dependencies,
+        allowed_gate_states=allowed_gate_states,
+    )
+
+
 class _DisposableStartupQualificationAuthority:
     """One-shot holder for bounded injected read-only test seams."""
 
@@ -434,142 +678,49 @@ def _qualify_startup(
     dependencies: _QualificationDependencies,
 ) -> PersonalDesktopUnattendedPaperStartupQualificationResult:
     try:
-        _require_closed_gates(dependencies)
-        c1 = dependencies.validate_c1(authority)
-        if type(selected) is not SelectedC3SnapshotReadResult:
-            raise TypeError("selected snapshot must be an exact P2 result")
-        dependencies.match_snapshot(selected.permit, selected.audit, c1)
-        pre_recovery = dependencies.qualify_recovery(
-            c1, inputs.historical_configurations
+        scope = _unattended_paper_startup_reconciliation_scope(
+            authority,
+            selected,
+            inputs,
+            calendar,
+            dependencies,
+            allowed_gate_states=frozenset({(False, False, False, False, False, False)}),
         )
-        if type(pre_recovery) is not PaperReceiptRecoveryQualificationResult:
-            raise TypeError("recovery qualification result type is invalid")
-    except Exception:
-        return _blocked_result()
-    if pre_recovery.status is PaperReceiptRecoveryQualificationStatus.BLOCKED:
-        return _blocked_result()
-    if (
-        pre_recovery.status
-        is PaperReceiptRecoveryQualificationStatus.RECEIPT_RECOVERY_REQUIRED
-    ):
-        return _qualify_recovery_path(c1, selected, inputs, pre_recovery, dependencies)
-    if (
-        pre_recovery.status
-        is not PaperReceiptRecoveryQualificationStatus.NO_RECOVERY_REQUIRED
-    ):
-        return _blocked_result()
-    return _qualify_healthy_path(
-        c1, selected, inputs, calendar, pre_recovery, dependencies
-    )
-
-
-def _qualify_recovery_path(
-    c1: object,
-    selected: SelectedC3SnapshotReadResult,
-    inputs: _PlanningInputs,
-    pre_recovery: PaperReceiptRecoveryQualificationResult,
-    dependencies: _QualificationDependencies,
-) -> PersonalDesktopUnattendedPaperStartupQualificationResult:
-    try:
-        admission = dependencies.admit_recovery(pre_recovery)
-        with admission as held:
-            acquisition = _require_acquisition(held)
+        with scope as reconciliation:
+            if reconciliation.public_result is not None:
+                return reconciliation.public_result
+            c1 = reconciliation.c1
+            post_evidence = reconciliation.post_lock_account
+            material = reconciliation.material
+            expected = reconciliation.expected_invocation
+            storage = reconciliation.storage
+            inspection = reconciliation.inspection
+            acquisition = reconciliation.acquisition
+            paper_account_id = reconciliation.paper_account_id
             if (
-                acquisition.state is not PaperAccountMutexState.OWNED
-                or acquisition.paper_account_id != pre_recovery.paper_account_id
+                c1 is None
+                or post_evidence is None
+                or material is None
+                or expected is None
+                or storage is None
+                or inspection is None
+                or acquisition is None
+                or paper_account_id is None
             ):
-                return _blocked_result(mutex_state=acquisition.state)
-            _revalidate_c1_p2_gates(c1, selected, dependencies)
-            held_recovery = dependencies.qualify_recovery(
-                c1, inputs.historical_configurations
+                raise TypeError("held startup reconciliation is incomplete")
+            _revalidate_c1_p2_gate_state(
+                c1,
+                selected,
+                reconciliation.captured_gate_state,
+                dependencies,
             )
-            if not _same_exact_recovery_required(pre_recovery, held_recovery):
-                return _blocked_result(mutex_state=acquisition.state)
-            _revalidate_c1_p2_gates(c1, selected, dependencies)
-            final_recovery = dependencies.qualify_recovery(
-                c1, inputs.historical_configurations
-            )
-            if not _same_exact_recovery_required(held_recovery, final_recovery):
-                return _blocked_result(mutex_state=acquisition.state)
-            _revalidate_c1_p2_gates(c1, selected, dependencies)
-            return _recovery_result(final_recovery, acquisition.state)
-    except Exception:
-        return _blocked_result()
-
-
-def _qualify_healthy_path(
-    c1: object,
-    selected: SelectedC3SnapshotReadResult,
-    inputs: _PlanningInputs,
-    calendar: IdentifiedMarketCalendar,
-    pre_recovery: PaperReceiptRecoveryQualificationResult,
-    dependencies: _QualificationDependencies,
-) -> PersonalDesktopUnattendedPaperStartupQualificationResult:
-    try:
-        pre_account = dependencies.read_account(c1, inputs.historical_configurations)
-        pre_evidence = dependencies.require_account(pre_account)
-        pre_account_id = pre_evidence.anchor.paper_account_id
-        if pre_recovery.paper_account_id != pre_account_id:
-            return _blocked_result()
-        admission = dependencies.admit_healthy(pre_account)
-        with admission as held:
-            acquisition = _require_acquisition(held)
-            if (
-                acquisition.state is not PaperAccountMutexState.OWNED
-                or acquisition.paper_account_id != pre_account_id
-            ):
-                return _blocked_result(mutex_state=acquisition.state)
-            _revalidate_c1_p2_gates(c1, selected, dependencies)
-            post_recovery = dependencies.qualify_recovery(
-                c1, inputs.historical_configurations
-            )
-            if (
-                type(post_recovery) is not PaperReceiptRecoveryQualificationResult
-                or post_recovery.status
-                is not PaperReceiptRecoveryQualificationStatus.NO_RECOVERY_REQUIRED
-                or post_recovery.paper_account_id != pre_account_id
-            ):
-                return _blocked_result(mutex_state=acquisition.state)
-            post_account = dependencies.read_account(
-                c1, inputs.historical_configurations
-            )
-            post_evidence = dependencies.require_account(post_account)
-            if post_evidence.anchor.paper_account_id != pre_account_id:
-                return _blocked_result(mutex_state=acquisition.state)
-            material = dependencies.build_material(
-                post_evidence, selected, inputs, calendar
-            )
-            expected = _expected_invocation(material, calendar)
-            storage = dependencies.read_storage(c1, expected)
-            if not _safe_storage_result(storage, expected.invocation.invocation_id):
-                return _blocked_result(
-                    paper_account_id=pre_account_id,
-                    selected_snapshot_id=selected.audit.snapshot_id,
-                    invocation_id=expected.invocation.invocation_id,
-                    storage_classification=_storage_classification(storage),
-                    mutex_state=acquisition.state,
-                )
-            inspection = dependencies.inspect_operation(
-                Path(PERSONAL_DESKTOP_PAPER_V2_RUNTIME), material.execution_inputs
-            )
-            if not _safe_inspection(inspection, material):
-                return _blocked_from_healthy(
-                    pre_account_id,
-                    selected,
-                    expected,
-                    material,
-                    storage,
-                    inspection,
-                    acquisition,
-                )
-            _revalidate_c1_p2_gates(c1, selected, dependencies)
             final_account = dependencies.read_account(
                 c1, inputs.historical_configurations
             )
             final_evidence = dependencies.require_account(final_account)
             if final_evidence != post_evidence:
                 return _blocked_from_healthy(
-                    pre_account_id,
+                    paper_account_id,
                     selected,
                     expected,
                     material,
@@ -584,7 +735,7 @@ def _qualify_healthy_path(
                 final_inspection, material
             ):
                 return _blocked_from_healthy(
-                    pre_account_id,
+                    paper_account_id,
                     selected,
                     expected,
                     material,
@@ -592,9 +743,14 @@ def _qualify_healthy_path(
                     final_inspection,
                     acquisition,
                 )
-            _revalidate_c1_p2_gates(c1, selected, dependencies)
+            _revalidate_c1_p2_gate_state(
+                c1,
+                selected,
+                reconciliation.captured_gate_state,
+                dependencies,
+            )
             return _healthy_result(
-                pre_account_id,
+                paper_account_id,
                 selected,
                 expected,
                 material,
@@ -630,19 +786,35 @@ def _expected_invocation(
     return replayed
 
 
-def _revalidate_c1_p2_gates(
+def _capture_gate_state(
+    dependencies: _QualificationDependencies,
+    allowed_gate_states: frozenset[tuple[bool, bool, bool, bool, bool, bool]],
+) -> tuple[bool, bool, bool, bool, bool, bool]:
+    state = dependencies.gate_state()
+    if (
+        type(state) is not tuple
+        or len(state) != 6
+        or any(type(value) is not bool for value in state)
+        or state not in allowed_gate_states
+    ):
+        raise RuntimeError("Paper-v2 effect-gate state is invalid")
+    return state
+
+
+def _revalidate_c1_p2_gate_state(
     c1: object,
     selected: SelectedC3SnapshotReadResult,
+    captured_gate_state: tuple[bool, bool, bool, bool, bool, bool],
     dependencies: _QualificationDependencies,
 ) -> None:
-    _require_closed_gates(dependencies)
+    try:
+        _capture_gate_state(dependencies, frozenset({captured_gate_state}))
+    except RuntimeError as error:
+        raise RuntimeError(
+            "Paper-v2 effect-gate state changed during reconciliation"
+        ) from error
     validated = dependencies.validate_c1(c1)
     dependencies.match_snapshot(selected.permit, selected.audit, validated)
-
-
-def _require_closed_gates(dependencies: _QualificationDependencies) -> None:
-    if dependencies.gate_state() != (False, False, False, False, False, False):
-        raise RuntimeError("all six committed Paper-v2 effect gates must be false")
 
 
 def _require_acquisition(admission: _Admission) -> PaperAccountMutexAcquisition:

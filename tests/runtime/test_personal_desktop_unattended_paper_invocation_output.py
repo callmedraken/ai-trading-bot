@@ -37,6 +37,9 @@ from trading_bot.runtime import (
 from trading_bot.runtime import (
     personal_desktop_unattended_paper_operation_execution as unattended_execution,
 )
+from trading_bot.runtime import (
+    personal_desktop_unattended_paper_storage_provisioning as storage_provisioning,
+)
 from trading_bot.runtime.personal_desktop_first_paper_operation import (
     PERSONAL_DESKTOP_FIRST_PAPER_OPERATION_PROFILE,
 )
@@ -288,7 +291,7 @@ def _trusted_storage_read(monkeypatch, binding, *, finalized=False):  # type: ig
     return result
 
 
-def test_five_production_effect_gates_are_committed_false() -> None:
+def test_six_production_effect_gates_are_committed_false() -> None:
     assert security.PERSONAL_DESKTOP_PAPER_V2_PRODUCTION_EFFECTS_ENABLED is False
     assert security.PERSONAL_DESKTOP_PAPER_V2_RECOVERY_EFFECTS_ENABLED is False
     assert (
@@ -301,6 +304,10 @@ def test_five_production_effect_gates_are_committed_false() -> None:
     )
     assert (
         unattended_execution.PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_EXECUTION_EFFECTS_ENABLED
+        is False
+    )
+    assert (
+        storage_provisioning.PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_STORAGE_PROVISIONING_EFFECTS_ENABLED
         is False
     )
 
@@ -355,6 +362,33 @@ def test_finalized_identical_and_disabled_gate_stop_before_native_construction(
         output.open_personal_desktop_unattended_invocation_output_capability(finalized)
 
     absent = _trusted_storage_read(monkeypatch, binding)
+    with pytest.raises(
+        output.PersonalDesktopPaperRuntimeOutputError,
+        match="effect-gate state is invalid",
+    ):
+        output.open_personal_desktop_unattended_invocation_output_capability(absent)
+
+
+def test_publication_opener_rejects_unattended_storage_provisioning_gate(
+    monkeypatch,
+) -> None:
+    absent = _trusted_storage_read(monkeypatch, _expected())
+    monkeypatch.setattr(
+        unattended_execution,
+        "PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_EXECUTION_EFFECTS_ENABLED",
+        True,
+    )
+    monkeypatch.setattr(
+        storage_provisioning,
+        "PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_STORAGE_PROVISIONING_EFFECTS_ENABLED",
+        True,
+    )
+    monkeypatch.setattr(
+        output,
+        "_WindowsPaperRuntimeOutputNativeApi",
+        lambda: pytest.fail("invalid six-gate state constructed native output"),
+    )
+
     with pytest.raises(
         output.PersonalDesktopPaperRuntimeOutputError,
         match="effect-gate state is invalid",

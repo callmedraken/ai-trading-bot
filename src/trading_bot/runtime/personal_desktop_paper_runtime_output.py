@@ -55,6 +55,7 @@ _DISPOSABLE_RUNTIME_OUTPUT_AUTHORITY_ISSUER = object()
 _RECEIPT_RECOVERY_RUNTIME_OUTPUT_ISSUER = object()
 _DISPOSABLE_RECEIPT_RECOVERY_RUNTIME_OUTPUT_ISSUER = object()
 _DISPOSABLE_RECEIPT_RECOVERY_OUTPUT_AUTHORITY_ISSUER = object()
+_UNATTENDED_RUNTIME_OUTPUT_ISSUER = object()
 _UNATTENDED_INVOCATION_OUTPUT_ISSUER = object()
 _DISPOSABLE_UNATTENDED_INVOCATION_OUTPUT_ISSUER = object()
 _DISPOSABLE_UNATTENDED_INVOCATION_OUTPUT_AUTHORITY_ISSUER = object()
@@ -134,6 +135,7 @@ class _PersonalDesktopPaperRuntimeOutputCapability(PaperOperationOutputCapabilit
             _DISPOSABLE_RUNTIME_OUTPUT_ISSUER,
             _RECEIPT_RECOVERY_RUNTIME_OUTPUT_ISSUER,
             _DISPOSABLE_RECEIPT_RECOVERY_RUNTIME_OUTPUT_ISSUER,
+            _UNATTENDED_RUNTIME_OUTPUT_ISSUER,
         }:
             raise TypeError("Paper-v2 runtime output capability issuer is invalid")
         self._api = api
@@ -1103,6 +1105,42 @@ def open_personal_desktop_paper_receipt_recovery_output_capability() -> (
     )
 
 
+def open_personal_desktop_unattended_paper_runtime_output_capability() -> (
+    _PersonalDesktopPaperRuntimeOutputCapability
+):
+    """Open A67 output only for the exact unattended-only six-gate state."""
+
+    from trading_bot.runtime.personal_desktop_paper_receipt_recovery_execution import (  # noqa: E501, PLC0415
+        PERSONAL_DESKTOP_PAPER_V2_RECEIPT_RECOVERY_EFFECTS_ENABLED,
+    )
+    from trading_bot.runtime.personal_desktop_supervised_paper_operation_execution import (  # noqa: E501, PLC0415
+        PERSONAL_DESKTOP_PAPER_V2_SUPERVISED_EXECUTION_EFFECTS_ENABLED,
+    )
+    from trading_bot.runtime.personal_desktop_unattended_paper_operation_execution import (  # noqa: E501, PLC0415
+        PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_EXECUTION_EFFECTS_ENABLED,
+    )
+    from trading_bot.runtime.personal_desktop_unattended_paper_storage_provisioning import (  # noqa: E501, PLC0415
+        PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_STORAGE_PROVISIONING_EFFECTS_ENABLED,
+    )
+
+    if (
+        security.PERSONAL_DESKTOP_PAPER_V2_PRODUCTION_EFFECTS_ENABLED is not False
+        or security.PERSONAL_DESKTOP_PAPER_V2_RECOVERY_EFFECTS_ENABLED is not False
+        or PERSONAL_DESKTOP_PAPER_V2_SUPERVISED_EXECUTION_EFFECTS_ENABLED is not False
+        or PERSONAL_DESKTOP_PAPER_V2_RECEIPT_RECOVERY_EFFECTS_ENABLED is not False
+        or PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_EXECUTION_EFFECTS_ENABLED is not True
+        or PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_STORAGE_PROVISIONING_EFFECTS_ENABLED
+        is not False
+    ):
+        raise PersonalDesktopPaperRuntimeOutputError(
+            "unattended Paper-v2 runtime output effect-gate state is invalid"
+        )
+    return _PersonalDesktopPaperRuntimeOutputCapability(
+        _WindowsPaperRuntimeOutputNativeApi(),
+        _issuer=_UNATTENDED_RUNTIME_OUTPUT_ISSUER,
+    )
+
+
 def open_personal_desktop_unattended_invocation_output_capability(
     storage_read_result: PersonalDesktopUnattendedInvocationStorageReadResult,
 ) -> _PersonalDesktopUnattendedInvocationOutputCapability:
@@ -1133,6 +1171,9 @@ def open_personal_desktop_unattended_invocation_output_capability(
     from trading_bot.runtime.personal_desktop_unattended_paper_operation_execution import (  # noqa: E501, PLC0415
         PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_EXECUTION_EFFECTS_ENABLED,
     )
+    from trading_bot.runtime.personal_desktop_unattended_paper_storage_provisioning import (  # noqa: E501, PLC0415
+        PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_STORAGE_PROVISIONING_EFFECTS_ENABLED,
+    )
 
     if (
         security.PERSONAL_DESKTOP_PAPER_V2_PRODUCTION_EFFECTS_ENABLED is not False
@@ -1140,6 +1181,8 @@ def open_personal_desktop_unattended_invocation_output_capability(
         or PERSONAL_DESKTOP_PAPER_V2_SUPERVISED_EXECUTION_EFFECTS_ENABLED is not False
         or PERSONAL_DESKTOP_PAPER_V2_RECEIPT_RECOVERY_EFFECTS_ENABLED is not False
         or PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_EXECUTION_EFFECTS_ENABLED is not True
+        or PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_STORAGE_PROVISIONING_EFFECTS_ENABLED
+        is not False
     ):
         raise PersonalDesktopPaperRuntimeOutputError(
             "unattended invocation publication effect-gate state is invalid"

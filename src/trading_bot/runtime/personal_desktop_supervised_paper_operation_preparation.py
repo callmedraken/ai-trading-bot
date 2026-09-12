@@ -530,7 +530,6 @@ def _prepare_verified_paper_operation_from_account(
         )
     paper_account_id = account.anchor.paper_account_id
     prior = account.prior_checkpoint
-    terminal = _terminal_artifact(account, prior.checkpoint_id)
     assertion = ManualPaperSelectedC3Assertion(
         selected.audit.selection_id,
         selected.audit.session_id,
@@ -566,27 +565,84 @@ def _prepare_verified_paper_operation_from_account(
         raise SupervisedPaperOperationPreparationError(
             "strategy-plan replay differs from the produced binding"
         )
-    _reconcile_plan(
+    return _reconstruct_verified_paper_operation_from_plan(
+        account,
+        selected,
         verified_plan,
+        calendar,
+    )
+
+
+def _reconstruct_verified_paper_operation_from_plan(
+    authoritative_post_lock_account: object,
+    selected_snapshot: SelectedC3SnapshotReadResult,
+    verified_plan_binding: ManualPaperStrategyPlanArtifactBinding,
+    calendar: IdentifiedMarketCalendar,
+) -> _PreparedPaperOperationMaterial:
+    """Reconstruct exact A67 inputs from one detached durable plan binding."""
+
+    if type(selected_snapshot) is not SelectedC3SnapshotReadResult:
+        raise SupervisedPaperOperationPreparationError(
+            "selected snapshot must be an exact P2 read result"
+        )
+    if type(verified_plan_binding) is not ManualPaperStrategyPlanArtifactBinding:
+        raise SupervisedPaperOperationPreparationError(
+            "verified strategy-plan binding type is invalid"
+        )
+    replayed = verify_manual_paper_strategy_plan(
+        verified_plan_binding.artifact_bytes,
+        calendar,
+        expected_sha256=verified_plan_binding.artifact_sha256,
+        expected_byte_length=verified_plan_binding.artifact_byte_length,
+        expected_checkpointed_request=verified_plan_binding.checkpointed_request,
+    )
+    if replayed != verified_plan_binding:
+        raise SupervisedPaperOperationPreparationError(
+            "durable strategy-plan replay differs from its verified binding"
+        )
+    account = authoritative_post_lock_account
+    try:
+        paper_account_id = account.anchor.paper_account_id
+        prior = account.prior_checkpoint
+        caller_idempotency_key = UUID(verified_plan_binding.plan.caller_idempotency_key)
+    except (AttributeError, TypeError, ValueError) as error:
+        raise SupervisedPaperOperationPreparationError(
+            "durable strategy plan or post-lock account evidence is invalid"
+        ) from error
+    if str(caller_idempotency_key) != verified_plan_binding.plan.caller_idempotency_key:
+        raise SupervisedPaperOperationPreparationError(
+            "durable strategy-plan caller idempotency key is noncanonical"
+        )
+    terminal = _terminal_artifact(account, prior.checkpoint_id)
+    assertion = ManualPaperSelectedC3Assertion(
+        selected_snapshot.audit.selection_id,
+        selected_snapshot.audit.session_id,
+        selected_snapshot.audit.terminal_id,
+        selected_snapshot.audit.snapshot_id,
+        selected_snapshot.audit.artifact_sha256,
+        selected_snapshot.audit.artifact_byte_length,
+    )
+    _reconcile_plan(
+        verified_plan_binding,
         paper_account_id=paper_account_id,
         prior=prior,
         assertion=assertion,
-        selected_snapshot=selected,
+        selected_snapshot=selected_snapshot,
         caller_idempotency_key=caller_idempotency_key,
     )
 
     terminal_evidence = _artifact_evidence(terminal)
     snapshot_evidence = PaperAccountLineageArtifactEvidence(
         PaperAccountLineageArtifactKind.DAILY_SNAPSHOT,
-        selected.audit.snapshot_id,
-        selected.audit.artifact_sha256,
-        selected.audit.artifact_byte_length,
+        selected_snapshot.audit.snapshot_id,
+        selected_snapshot.audit.artifact_sha256,
+        selected_snapshot.audit.artifact_byte_length,
     )
     configuration_evidence = PaperOperationArtifactEvidence(
-        verified_plan.artifact_sha256,
-        verified_plan.artifact_byte_length,
+        verified_plan_binding.artifact_sha256,
+        verified_plan_binding.artifact_byte_length,
     )
-    request = verified_plan.checkpointed_request
+    request = verified_plan_binding.checkpointed_request
     intent = create_paper_operation_intent(
         caller_idempotency_key,
         account.lineage,
@@ -608,13 +664,13 @@ def _prepare_verified_paper_operation_from_account(
         account.snapshots,
         prior,
         terminal.payload,
-        selected.snapshot_bytes,
-        selected.verification,
-        verified_plan.artifact_bytes,
+        selected_snapshot.snapshot_bytes,
+        selected_snapshot.verification,
+        verified_plan_binding.artifact_bytes,
         request,
         calendar,
     )
-    return _PreparedPaperOperationMaterial(verified_plan, execution_inputs)
+    return _PreparedPaperOperationMaterial(verified_plan_binding, execution_inputs)
 
 
 def _terminal_artifact(

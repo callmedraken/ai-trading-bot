@@ -371,6 +371,13 @@ from .personal_desktop_unattended_paper_startup_qualification import (  # noqa: 
     PersonalDesktopUnattendedPaperStartupStatus,
     qualify_personal_desktop_unattended_paper_startup,
 )
+from .personal_desktop_unattended_scheduler_contract import (  # noqa: F401
+    PERSONAL_DESKTOP_UNATTENDED_SCHEDULER_CONTRACT,
+    PERSONAL_DESKTOP_UNATTENDED_SCHEDULER_CONTRACT_SCHEMA,
+    PersonalDesktopUnattendedSchedulerContract,
+    is_frozen_personal_desktop_unattended_scheduler_contract,
+    personal_desktop_unattended_scheduler_contract,
+)
 
 __all__ = [
     "APPLICATION_ID_METADATA_KEY",
@@ -622,6 +629,11 @@ __all__.extend(
         "PersonalDesktopUnattendedPaperOperationResult",
         "PersonalDesktopUnattendedPaperOperationStatus",
         "execute_personal_desktop_unattended_paper_operation",
+        "PERSONAL_DESKTOP_UNATTENDED_SCHEDULER_CONTRACT",
+        "PERSONAL_DESKTOP_UNATTENDED_SCHEDULER_CONTRACT_SCHEMA",
+        "PersonalDesktopUnattendedSchedulerContract",
+        "is_frozen_personal_desktop_unattended_scheduler_contract",
+        "personal_desktop_unattended_scheduler_contract",
     ]
 )
 

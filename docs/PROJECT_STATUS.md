@@ -33,8 +33,8 @@ integration baseline: bd88ee966bff455f9fc897d6cfdfafdd807f27e2
 Architecture-94 P2 base: a810122a96b6fc90da25d71eede8da64b7272c98
 branch: feature/personal-desktop-paper-runtime
 worktree: F:\AI\worktrees\ai-trading-bot-personal-desktop
-latest accepted PD3 source: e690ce83d6c53507d9e93dca97bcb79191c62a0b
-latest accepted PD3 tree:   522f41115d2079ae777f667a19e5179c1d492e1f
+latest accepted PD4-D source: 6e606531bf0c6c11793fd89b2adb54f0db170869
+latest accepted PD4-D tree:   2b1315f9332148fac20b087d760630b699db6fb1
 ```
 
 Architecture checkpoints:
@@ -48,6 +48,7 @@ Architecture 106  first Paper-v2 execution preparation
 Architecture 107  first Paper-v2 output authority hardening
 Architecture 108  first Paper-v2 post-mutation reconciliation
 Architecture 109  personal-desktop Paper-v2 receipt-recovery authority
+Architecture 110  personal-desktop unattended Paper-v2 operation authority
 ```
 
 ## Mandatory personal-desktop security baseline
@@ -332,29 +333,53 @@ PD3                                     = COMPLETE
 
 ## Current milestone — PD4 unattended simulated paper under Trading
 
-PD4 is the next product milestone. It must make the already-reviewed Paper-v2
-cycle operable without an interactive user while preserving the same C1/P2,
-PD2A mutex, deterministic strategy/risk, A67 durability, and PD3 recovery
-contracts.
+Architecture 110 is the accepted unattended-operation contract:
 
-The first PD4 checkpoint is architecture/validation only. Before any unattended
-execution is authorized, PD4 must freeze at least:
+```text
+docs/architecture/110-personal-desktop-unattended-paper-operation-authority.md
+```
 
-- source-owned unattended invocation identity and schedule/session policy;
-- exact non-admin `Trading` principal and production interpreter provenance;
-- durable retention of every original semantic invocation fact required by PD3
-  recovery after process restart;
-- overlap/duplicate suppression through the same account mutex and durable A67
-  identity rather than scheduler assumptions;
-- startup and post-run reconciliation rules;
-- stale/missing/ambiguous input behavior;
-- explicit source-owned unattended-effect gate that defaults closed;
-- operator-visible audit evidence and fail-closed exit/status semantics;
-- no provider, broker, or live authority expansion merely because the launcher
-  is unattended.
+Accepted PD4 source checkpoints now cover:
 
-No real unattended run or scheduler installation is authorized merely because
-PD4 is current.
+```text
+PD4-A   durable unattended invocation identity/model and verification
+PD4-B   durable invocation storage/read/publication/provisioning boundaries
+PD4-C   read-only unattended startup qualification under the same PD2A mutex
+PD4-D   unattended Paper-v2 execution composition with effects still closed
+PD4-D-R1 explicit non-private shared composition interfaces
+```
+
+The accepted PD4-D/R1 source is:
+
+```text
+commit 6e606531bf0c6c11793fd89b2adb54f0db170869
+tree   2b1315f9332148fac20b087d760630b699db6fb1
+```
+
+PD4 preserves these authority rules:
+
+- Task Scheduler is only an untrusted wake-up source and supplies no semantic
+  trading arguments;
+- durable unattended invocation state, the PD2A account mutex, and Architecture
+  67 remain the authority for identity, duplicate suppression, execution, and
+  restart recovery;
+- missing receipt never becomes permission for a fresh execution;
+- the selected verified C3 snapshot remains authoritative; no unattended
+  provider capture is authorized;
+- startup and post-run reconciliation revalidate C1, P2, all six effect gates,
+  durable invocation storage, A67 state, receipt/lineage evidence, and account
+  state before releasing the mutex;
+- the public PD4-C qualification result is not reusable execution authority.
+
+The next source checkpoint is **PD4-E**: add the reviewed source-checkout
+launcher with **no semantic command-line arguments** and freeze the Windows Task
+Scheduler task contract. PD4-E is source-only. It must not install, modify, run,
+or enable a real scheduled task and must not authorize a real unattended
+Paper-v2 execution.
+
+After PD4-E exact review, PD4-F performs final source certification plus the
+Trading-principal read-only qualification. Any actual Task Scheduler
+installation/modification remains a separate protected Windows effect boundary.
 
 ## Primary roadmap
 
@@ -380,10 +405,12 @@ PD8   tiny restricted live -> gradual maturity
 All current Paper-v2 effect gates remain closed:
 
 ```text
-PERSONAL_DESKTOP_PAPER_V2_PRODUCTION_EFFECTS_ENABLED           = False
-PERSONAL_DESKTOP_PAPER_V2_RECOVERY_EFFECTS_ENABLED             = False
-PERSONAL_DESKTOP_PAPER_V2_SUPERVISED_EXECUTION_EFFECTS_ENABLED = False
-PERSONAL_DESKTOP_PAPER_V2_RECEIPT_RECOVERY_EFFECTS_ENABLED     = False
+PERSONAL_DESKTOP_PAPER_V2_PRODUCTION_EFFECTS_ENABLED                       = False
+PERSONAL_DESKTOP_PAPER_V2_RECOVERY_EFFECTS_ENABLED                         = False
+PERSONAL_DESKTOP_PAPER_V2_SUPERVISED_EXECUTION_EFFECTS_ENABLED             = False
+PERSONAL_DESKTOP_PAPER_V2_RECEIPT_RECOVERY_EFFECTS_ENABLED                 = False
+PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_EXECUTION_EFFECTS_ENABLED             = False
+PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_STORAGE_PROVISIONING_EFFECTS_ENABLED  = False
 ```
 
 Still not authorized:
@@ -391,7 +418,7 @@ Still not authorized:
 ```text
 provider call #7
 real Paper-v2 receipt-recovery mutation
-unattended scheduling or unattended Paper-v2 execution
+Task Scheduler installation/modification or real unattended Paper-v2 execution
 broker order submission
 live trading
 changing any closed effect gate without a reviewed checkpoint

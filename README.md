@@ -11,57 +11,64 @@ boundaries decide what may actually happen.
 ## Current status
 
 The contained C3 production market-data capture boundary is complete and
-certified. PD1 Paper-v2 authority, PD2A account mutex/admission, PD2B supervised
-operation preparation, and **PD2C supervised Architecture-67 execution boundary
-are complete and source-certified**.
+certified. PD1 Paper-v2 authority, PD2 reliable supervised paper operation, PD3
+supervised crash/recovery validation, and the **PD4 unattended simulated-paper
+source foundation are complete and source-certified**.
 
-PD2C final certification passed:
+The exact PD4 source tree certified before docs-only closeout is:
 
 ```text
-4775 passed, 17 expected skips
+commit 248cd8de6a3539aab21d5719d96cb7ff1aa0d14c
+tree   5e867f1bfc6d945ad67f6c56be252b534645aeb2
+```
+
+PD4 final certification passed:
+
+```text
+5588 passed, 17 expected skips in 1519.25s
 Ruff check: PASS
-Ruff format --check: PASS (432 files)
+Ruff format --check: PASS (486 files)
 git diff --check: PASS
+git diff --cached --check: PASS
 worktree/index: clean
 ```
 
-PD2C now proves the complete source chain from genuine C1/P2 provenance through
-post-lock Paper-v2 state, deterministic P1 planning, path-independent A67
-inputs, fixed production-root reconciliation, and one-shot A67 execution
-composition. The dedicated execution gate remains hard-coded `False`, so the
-public production execution API still fails before entering PD2B3, acquiring the
-paper-account mutex, rereading Paper-v2, or invoking Architecture 67.
+The final Trading-principal read-only qualification also passed under the
+intended dedicated non-admin account. The frozen unattended launcher reported
+`EFFECTS_CLOSED`; the genuine PD4 read-only harness returned `VALIDATED` with an
+underlying fail-closed `BLOCKED` qualification and recorded no invocation
+publication, execution, recovery, provider call, database mutation, or scheduler
+mutation.
 
-The current development target is **PD2D1: read-only first-mutation
-qualification**. It will prepare the exact would-be supervised operation under
-the real authority/lock lifetime and run only the existing read-only A67
-inspection/classification. It will not execute the paper cycle and will not
-mutate Paper-v2.
+All six Paper-v2 effect gates remain hard-coded `False`. The current safe target
+is the **PD4 unattended deployment acceptance design**: freeze the intended
+session/timing policy, scheduler deployment/verification sequence, invocation-
+storage provisioning checkpoint, first unattended Paper-v2 acceptance ordering,
+and the separate unattended C3/provider authority boundary.
 
-**Production/live trading remains NO-GO.** Provider call #7, broker order
-submission, unattended operation, enabling the PD2C execution gate, the first
-real Paper-v2 runtime mutation, and live trading remain unauthorized unless a
-later explicitly reviewed checkpoint changes that state.
+**Production/live trading remains NO-GO.** Provider call #7, unattended provider
+capture, Task Scheduler installation/modification/enabling/running, unattended
+storage provisioning, the first real unattended Paper-v2 cycle, broker order
+submission, recovery mutation, and live trading remain unauthorized unless a
+later explicitly reviewed checkpoint grants that specific effect.
 
 See [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md) for canonical status,
-[`docs/architecture/105-personal-desktop-first-paper-mutation-qualification.md`](docs/architecture/105-personal-desktop-first-paper-mutation-qualification.md)
-for the current qualification contract, and
-[`docs/validation/pd2c-supervised-paper-execution-boundary-completion.md`](docs/validation/pd2c-supervised-paper-execution-boundary-completion.md)
-for the PD2C completion evidence.
+[`docs/architecture/110-personal-desktop-unattended-paper-operation-authority.md`](docs/architecture/110-personal-desktop-unattended-paper-operation-authority.md)
+for the current unattended authority contract, and
+[`docs/validation/pd4-unattended-personal-desktop-paper-completion.md`](docs/validation/pd4-unattended-personal-desktop-paper-completion.md)
+for the PD4 source-foundation completion evidence.
 
 ## Product direction
 
 The long-term progression is:
 
-1. Finish qualification and the explicitly authorized first supervised simulated-paper mutation.
-2. Add supervised crash/recovery validation, then unattended paper operation with authoritative scheduling, reconciliation, monitoring, and recovery.
-3. Complete a long simulated-paper soak.
-4. Add broker-paper integration with real broker identifiers, submit/cancel/replace, partial fills, rejects, reconciliation, idempotency, and ambiguous-submit recovery.
-5. Complete a broker-paper soak and operational-hardening phase.
-6. Add explicit live-readiness controls, separate live credentials, account verification, kill switch, strict risk limits, outage/stale-data behavior, and startup reconciliation.
-7. Permit only a tiny restricted live deployment after all acceptance gates are satisfied.
-8. Deepen AI/strategy capabilities only after operational safety and reconciliation are trustworthy.
-9. Finish with a polished GUI for research, backtesting, account/portfolio views, paper/live operations, system health, recovery, audit history, settings, and safety controls.
+1. Complete the separately reviewed operational acceptance for unattended simulated-paper deployment while preserving fail-closed authority and reconciliation.
+2. Add broker-paper integration with real broker identifiers, submit/cancel/replace, partial fills, rejects, reconciliation, idempotency, and ambiguous-submit recovery.
+3. Complete a broker-paper soak and operational-hardening phase.
+4. Add explicit live-readiness controls, separate live credentials, account verification, kill switch, strict risk limits, outage/stale-data behavior, and startup reconciliation.
+5. Permit only a tiny restricted live deployment after all acceptance gates are satisfied.
+6. Deepen AI/strategy capabilities only after operational safety and reconciliation are trustworthy.
+7. Finish with a polished GUI for research, backtesting, account/portfolio views, paper/live operations, system health, recovery, audit history, settings, and safety controls.
 
 The GUI is a presentation and operator-control layer. It must use the same
 reviewed application/service boundaries as CLI, automation, and tests and may
@@ -79,7 +86,8 @@ not substitutes for the production authority chain:
   authorize provider call #7.
 - `trading_bot.cli.paper_operation` is the Architecture-67 generic/manual
   restart-safe paper-operation command and accepts an explicit operation root.
-  It is not the Architecture-103/PD2 production composition boundary.
+  It is not the Architecture-103+ personal-desktop production composition
+  boundary.
 
 Changing or disabling either accepted legacy command is a separate behavioral
 checkpoint. Their presence does not broaden current production authorization.

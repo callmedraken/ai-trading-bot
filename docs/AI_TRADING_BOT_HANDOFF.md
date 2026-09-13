@@ -44,11 +44,11 @@ bd88ee966bff455f9fc897d6cfdfafdd807f27e2
 Architecture-94 P2 product base:
 a810122a96b6fc90da25d71eede8da64b7272c98
 
-latest accepted PD4-D source:
-6e606531bf0c6c11793fd89b2adb54f0db170869
+final PD4 certified source commit:
+248cd8de6a3539aab21d5719d96cb7ff1aa0d14c
 
-latest accepted PD4-D tree:
-2b1315f9332148fac20b087d760630b699db6fb1
+final PD4 certified source tree:
+5e867f1bfc6d945ad67f6c56be252b534645aeb2
 
 branch:
 feature/personal-desktop-paper-runtime
@@ -63,6 +63,10 @@ production interpreter:
 F:\AITradingBot\runtime\python.exe
 ```
 
+The branch may contain later **docs-only** closeout commits. Do not mistake the
+documentation HEAD for the exact source tree that received the PD4 broad
+certification; the certified source identity is the commit/tree above.
+
 Before every bounded task:
 
 ```text
@@ -74,8 +78,8 @@ git rev-parse origin/feature/personal-desktop-paper-runtime
 git status --short
 ```
 
-Any mismatch is a STOP. Do not self-correct with checkout/switch/reset/rebase/
-clean.
+Any unexpected mismatch is a STOP. Do not self-correct with checkout/switch/
+reset/rebase/clean.
 
 ## 3. Windows pytest and source-checkout rules
 
@@ -104,7 +108,8 @@ import/help probe with the production interpreter against that launcher.
 
 ChatGPT/Sol owns architecture, native Windows/security/authority review, exact
 GitHub diff review, debugging strategy, test/certification gates,
-merge/deployment/production decisions, and next-step planning.
+merge/deployment/production decisions, small tightly scoped project changes,
+and next-step planning.
 
 Current routing:
 
@@ -119,10 +124,9 @@ Tiny status, handoff, workflow, completion-record, and frozen architecture docs
 should normally be handled directly by ChatGPT rather than delegated.
 
 After a reviewed checkpoint passes, automatically continue to the next safe
-scoped checkpoint. Model choice does not transfer architecture or acceptance
-authority. If implementation discovers that the contract itself must change,
-stop and return to ChatGPT/Sol. Do not use subagents unless explicitly
-requested.
+scoped checkpoint. Stop at protected effect boundaries or genuine architecture
+ambiguity. Model choice never transfers architecture or acceptance authority.
+Do not use subagents unless explicitly requested.
 
 Codex runs focused tests during implementation. Broad/full certification is
 normally user-run locally only after ChatGPT reviews the exact source. Exact-
@@ -139,9 +143,11 @@ checkpoint when the preceding reviewed checkpoint passes.
 This does **not** automatically authorize:
 
 ```text
-provider call #7
+provider call #7 / unattended C3 provider capture
 real Paper-v2 receipt-recovery mutation
-Task Scheduler installation/modification or real unattended Paper-v2 execution
+unattended invocation-storage provisioning effect
+Task Scheduler installation/modification/enabling/running
+first real unattended Paper-v2 execution
 broker submission
 live trading
 changing a closed production/recovery/supervised/unattended effect gate
@@ -228,6 +234,7 @@ Fixed production paths:
 final authority root: F:\AITradingBot\Paper-v2
 A67 operation root:   F:\AITradingBot\Paper-v2\runtime
 receipt parent:       F:\AITradingBot\Paper-v2\runtime\paper-operations
+unattended namespace: F:\AITradingBot\Paper-v2\runtime\unattended-invocations
 ```
 
 Retained failed v1 state:
@@ -301,16 +308,6 @@ receipt_status:       COMPLETED
 receipt_outcome:      NO_ACTION
 ```
 
-Independent read-only reconciliation returned `RECONCILED` and
-`ALREADY_APPLIED`, with cash `25000`, zero positions, and one lineage edge.
-
-Final PD2 source:
-
-```text
-f05921244057052158a57b360e9bf556209b9654
-tree 35a5a7e1d59bbe90ca303b6037d29dc7fc085f4c
-```
-
 Final PD2 certification:
 
 ```text
@@ -334,65 +331,18 @@ Completion record:
 docs/validation/pd3-personal-desktop-receipt-recovery-completion.md
 ```
 
-Accepted source chain:
+Final accepted PD3 source:
 
 ```text
-PD3-A  cbca467b07c74217c0bb595b9426086a1f1ad8bd
-PD3-B  f0cf65cefd432c14b9a519c11b0636cc68b6a6c4
-PD3-C  b54046d08739babc7e1aed3c461f487984a12267
-PD3-D1 b9f411aa43fdc6c8b10af7fb081449f57afb4d00
-PD3-D2 3ebeff8f279b4e2391bf7a4c6404f0a4dce99007
-D2-R1  8a3ce8eb110fb7d2be31de130fdfe51955731ae8
-PD3-F  78c90da32abb2e7dfd88d933af44e95f110a237a
-launcher 034637e7cf76258a90644161f075c959940d6e1e
-format   dd36f164636beaf62ac1383217654767ed49dab1
-final    f246d099bf1f236ecbe59df746c0c93516da8023
-accepted e690ce83d6c53507d9e93dca97bcb79191c62a0b
-tree     522f41115d2079ae777f667a19e5179c1d492e1f
+commit e690ce83d6c53507d9e93dca97bcb79191c62a0b
+tree   522f41115d2079ae777f667a19e5179c1d492e1f
 ```
 
 Architecture 109 reuses Architecture-67's existing completed-receipt recovery.
-The recovery-only A67 entry point cannot execute a fresh paper cycle. The
-personal-desktop layer adds terminal-missing-receipt qualification, exact
-original-operation reconstruction from explicit semantic inputs, the same PD2A
-account mutex, a dedicated closed receipt-recovery gate, and a receipt-only
-output capability that cannot create transition output.
-
-Accepted production recovery ordering:
-
-```text
-genuine C1 + genuine P2
--> pre-lock qualification
--> same PD2A account mutex
--> post-lock qualification
--> exact target agreement
--> original-operation reconstruction
--> four-gate check
--> receipt-only output capability
--> A67 reinspection
--> recovery-only A67 call at most once
--> strict account reread
--> final ALREADY_APPLIED inspection
--> capability close
--> mutex release
-```
-
-Exact states:
-
-```text
-verified terminal transition + missing receipt
--> same canonical receipt only
--> zero strategy/runtime execution
--> no new transition
-
-verified complete transition + receipt
--> ALREADY_APPLIED
--> zero writes
-
-ambiguous/staging/malformed/conflicting state
--> BLOCKED
--> no repair, cleanup, replacement, or blind retry
-```
+The recovery-only A67 entry point cannot execute a fresh paper cycle. Healthy
+completed state is `ALREADY_APPLIED` with zero writes; exact terminal missing
+receipt may reconstruct only the same canonical receipt; ambiguous or staging
+state blocks without repair or blind retry.
 
 Final PD3 broad certification:
 
@@ -404,85 +354,166 @@ git diff --check PASS
 worktree/index clean
 ```
 
-Real-host acceptance under the intended non-admin Trading account passed exact
-repo provenance, production-interpreter launcher import/help probe, and one
-actual read-only validation:
+Real-host acceptance under the intended non-admin Trading account passed with no
+real recovery mutation.
 
-```text
-result:                        VALIDATED
-all_effect_gates_false:        true
-qualification_status:          NO_RECOVERY_REQUIRED
-qualification_diagnostic:      VERIFIED_COMPLETE_ACCOUNT
-inspection_classification:     ALREADY_APPLIED
-inspection_diagnostic:         ALREADY_APPLIED
-receipt_status:                COMPLETED
-receipt_outcome:               NO_ACTION
-account_cash:                  25000
-position_count:                0
-recovery_invocation_performed: false
-receipt_evidence_produced:     false
-exit:                          0
-```
+### PD4 — unattended simulated-paper source foundation — COMPLETE
 
-No real recovery mutation was performed or required.
-
-## 10. Current milestone — PD4 unattended simulated paper under Trading
-
-Architecture 110 is accepted:
+Architecture:
 
 ```text
 docs/architecture/110-personal-desktop-unattended-paper-operation-authority.md
 ```
 
-Accepted PD4 source checkpoints:
+Validation plan:
+
+```text
+docs/validation/pd4-unattended-personal-desktop-paper-plan.md
+```
+
+Completion record:
+
+```text
+docs/validation/pd4-unattended-personal-desktop-paper-completion.md
+```
+
+Accepted PD4 source surface:
 
 ```text
 PD4-A   durable unattended invocation model and verification
 PD4-B   durable invocation storage/read/publication/provisioning boundaries
-PD4-C   read-only startup qualification under the same PD2A account mutex
-PD4-D   unattended Paper-v2 execution composition with effect gates closed
+PD4-C   read-only startup qualification under the same PD2A mutex
+PD4-D   unattended Paper-v2 execution composition with effects closed
 PD4-D-R1 explicit non-private shared composition interfaces
+PD4-E   zero-semantic-argument launcher + frozen scheduler contract
+PD4-F1  production read-only host-validation harness
+PD4-F2  final source certification
+PD4-F3  Trading-principal read-only qualification
 ```
 
-Latest accepted source:
+Final certified source:
 
 ```text
-commit 6e606531bf0c6c11793fd89b2adb54f0db170869
-tree   2b1315f9332148fac20b087d760630b699db6fb1
+commit 248cd8de6a3539aab21d5719d96cb7ff1aa0d14c
+tree   5e867f1bfc6d945ad67f6c56be252b534645aeb2
 ```
 
-Architecture 110 freezes the unattended authority model:
+The final source contains the import-cycle correction in
+`src/trading_bot/runtime/__init__.py`: CLI-dependent PD4 unattended
+startup/execution facade exports are lazy-loaded so importing the base runtime
+package cannot recursively import partially initialized CLI modules.
+
+Focused final import-regression gate:
 
 ```text
-Task Scheduler is only an untrusted wake-up source
-scheduler supplies no semantic trading arguments
-durable unattended invocation state owns invocation identity
-same PD2A account mutex owns account critical-section admission
-Architecture 67 owns durable duplicate/idempotency state
-startup is recovery-first and fail-closed
-missing receipt never becomes permission for fresh execution
-selected C3/P2 state remains authoritative
-no unattended provider capture; provider call #7 remains unauthorized
-post-run reconciliation rereads receipt/lineage/A67/B1/C1/P2/all six gates
-public PD4-C qualification results are not execution authority
+132 passed in 13.46s
+Ruff check PASS
+Ruff format --check PASS
+git diff --check PASS
+git diff --cached --check PASS
+worktree/index clean
 ```
 
-The next safe source checkpoint is **PD4-E**:
+Final PD4 broad certification:
 
 ```text
-add a no-semantic-arguments source-checkout launcher
-freeze the Windows Task Scheduler task definition/contract
-use the fixed production interpreter F:\AITradingBot\runtime\python.exe
-keep scheduler state non-authoritative
-perform no task installation/modification/enabling/running
-perform no real unattended Paper-v2 execution
-keep all six effect gates False
+5588 passed, 17 skipped in 1519.25s (0:25:19)
+Ruff check PASS
+Ruff format --check PASS (486 files)
+git diff --check PASS
+git diff --cached --check PASS
+worktree/index clean
+local HEAD == origin feature HEAD
 ```
 
-After PD4-E exact review, PD4-F is the final PD4 source certification and
-Trading-principal read-only qualification. Any actual Task Scheduler
-installation/modification is a separate protected Windows effect boundary and
-requires explicit later approval.
+Real-host PD4-F3 ran under:
+
+```text
+principal: DESKTOP-I4DOKM7\Trading
+SID: S-1-5-21-1397534616-3988210162-180023805-1009
+integrity: Medium Mandatory Level
+BUILTIN\Administrators membership: absent
+production interpreter: F:\AITradingBot\runtime\python.exe
+```
+
+The frozen unattended launcher returned:
+
+```text
+status: EFFECTS_CLOSED
+diagnostic: SOURCE_ONLY_ZERO_ARGUMENT_BOUNDARY
+qualification_performed: false
+invocation_published: false
+execution_performed: false
+recovery_performed: false
+scheduler_modified: false
+exit: 0
+```
+
+The read-only PD4 harness returned:
+
+```text
+result: VALIDATED
+all_effect_gates_false: true
+qualification_status: BLOCKED
+qualification_diagnostic: QUALIFICATION_BLOCKED
+unattended_operation_authorized: false
+selection_id: 36d6fbb3-bdec-57e0-a9cf-78dc2b8f7280
+selected_snapshot_id: null
+invocation_published: false
+execution_performed: false
+recovery_performed: false
+provider_call_performed: false
+database_mutation_performed: false
+scheduler_modified: false
+exit: 0
+```
+
+`BLOCKED` is the accepted fail-closed host result for this read-only checkpoint:
+no unavailable/non-authorized unattended condition may be converted into
+execution authority.
+
+Canonical PD4 source-foundation state:
+
+```text
+ARCH110_DESIGN_ACCEPTED                    = YES
+PD4_INVOCATION_MODEL_ACCEPTED              = YES
+PD4_INVOCATION_STORAGE_AUTHORITY_ACCEPTED  = YES
+PD4_STARTUP_RECONCILIATION_ACCEPTED        = YES
+PD4_UNATTENDED_BOUNDARY_ACCEPTED           = YES
+PD4_LAUNCHER_CONTRACT_ACCEPTED             = YES
+PD4_SOURCE_CERTIFIED                       = YES
+PD4_REAL_HOST_READ_ONLY_VALIDATED          = YES
+ALL_REAL_EFFECT_GATES_CLOSED               = YES
+PD4_SOURCE_FOUNDATION                      = COMPLETE
+PD4_UNATTENDED_DEPLOYMENT_ACCEPTED         = NO
+REAL_UNATTENDED_PAPER_EXECUTION_PERFORMED  = NO
+UNATTENDED_PROVIDER_CAPTURE_AUTHORIZED     = NO
+```
+
+PD4 source completion is **not** operational unattended deployment acceptance.
+No scheduled task was installed/modified/enabled/run; no invocation was
+published; no real unattended Paper-v2 execution/recovery/provider/broker/live
+effect occurred.
+
+## 10. Current milestone — PD4 unattended deployment acceptance design
+
+The next safe checkpoint is source/design only. Freeze the intended unattended
+deployment and acceptance sequence while every effect gate remains false.
+At minimum cover:
+
+```text
+session/timing eligibility policy
+scheduler trigger and verification contract
+unattended invocation-storage provisioning checkpoint
+first real unattended Paper-v2 acceptance ordering
+strict post-run reconciliation and evidence requirements
+separate unattended C3/provider authority checkpoint
+```
+
+Do not install or modify a task, provision storage, invoke provider call #7,
+perform a real unattended Paper-v2 cycle, or enable any effect gate merely
+because the source/design plan is accepted. Those remain explicit protected
+operator checkpoints.
 
 ## 11. Roadmap
 
@@ -496,19 +527,26 @@ PD2   reliable supervised manual paper cycle                COMPLETE
   PD2D1 read-only first-mutation qualification              COMPLETE
   PD2D2 first real Paper-v2 mutation + reconciliation       COMPLETE
 PD3   supervised crash/recovery validation                  COMPLETE
-PD4   unattended simulated paper under Trading              CURRENT
-PD5   broker-paper integration
-PD6   broker-paper soak / operational hardening
-PD7   personal-desktop live-readiness
-PD8   tiny restricted live -> gradual maturity
+PD4   unattended simulated-paper source foundation          COMPLETE
+      unattended operational deployment                     PENDING / PROTECTED
+PD5   broker-paper integration                              NOT STARTED
+PD6   broker-paper soak / operational hardening             NOT STARTED
+PD7   personal-desktop live-readiness                       NOT STARTED
+PD8   tiny restricted live -> gradual maturity              NOT STARTED
 ```
+
+The next roadmap milestone after operational PD4 acceptance is PD5 broker-paper
+integration. Do not treat source-only PD4 completion as implicit broker or
+scheduler authority.
 
 ## 12. Still NOT authorized
 
 ```text
-provider call #7
+provider call #7 / unattended C3 provider capture
 real Paper-v2 receipt-recovery mutation
-Task Scheduler installation/modification or real unattended Paper-v2 execution
+unattended invocation-storage provisioning effect
+Task Scheduler installation/modification/enabling/running
+first real unattended Paper-v2 execution
 broker order submission
 live trading
 changing any closed effect gate without review
@@ -524,28 +562,34 @@ merge/rebase/force-push/amend/PR metadata changes without explicit approval
 ## 13. Resume procedure
 
 1. Read `AGENTS.md`, `docs/PROJECT_STATUS.md`, this handoff,
-   `docs/AI_DEVELOPMENT_WORKFLOW.md`, Architecture 110, and the relevant PD4
-   source/tests before new implementation.
+   `docs/AI_DEVELOPMENT_WORKFLOW.md`, Architecture 110, the PD4 validation plan,
+   and the PD4 completion record before new implementation.
 2. Prove exact worktree/branch/HEAD/tree/origin/clean state before edits or local
-   operator work.
-3. Treat PD1, PD2, PD3, and PD4-A through PD4-D/R1 as accepted. Do not rerun the
-   first PD2D2 execution harness and do not manufacture a PD3 recovery state in
-   real Paper-v2.
-4. Continue automatically with PD4-E: source-only no-argument launcher plus the
-   frozen Task Scheduler contract.
+   operator work. If docs-only closeout commits are ahead of the certified
+   source commit, confirm the intervening diff is documentation-only.
+3. Treat PD1, PD2, PD3, and the **PD4 source foundation** as accepted. Do not
+   rerun the first PD2D2 execution harness or manufacture a PD3 recovery state
+   in real Paper-v2.
+4. Preserve the final certified PD4 source identity:
+   `248cd8de6a3539aab21d5719d96cb7ff1aa0d14c` / tree
+   `5e867f1bfc6d945ad67f6c56be252b534645aeb2`.
 5. Preserve the dedicated non-admin Trading principal, genuine C1/P2 authority,
-   PD2A account mutex, durable unattended invocation state, A67 durability and
-   idempotency, and PD3 recovery rules.
-6. Keep all six current effect gates false during PD4-E source work.
-7. Do not install/modify/enable/run a scheduled task or authorize a real
-   unattended Paper-v2 run merely because PD4-E source tests pass.
-8. Do not authorize a provider call, broker effect, recovery mutation, or live
-   operation as part of PD4-E.
-9. Use a fresh explicit `--basetemp` under `F:\AI\temp\pytest\` for controlled
-   Windows pytest runs; do not persistently export `PYTHONPATH`.
-10. After PD4-E exact review, proceed to PD4-F final source certification and
-    Trading-principal read-only qualification.
-11. Include the next milestone/step in every milestone and verification report.
+   PD2A account mutex, durable unattended invocation state, Architecture-67
+   durability/idempotency, and PD3 recovery rules.
+6. Keep all six current effect gates false during the next source/design work.
+7. Continue with the PD4 unattended deployment acceptance design: timing/session
+   policy, scheduler deployment verification, storage provisioning checkpoint,
+   first unattended Paper-v2 acceptance ordering, and separate unattended C3
+   capture authority.
+8. Stop before any scheduler/storage/provider/Paper-v2/recovery effect unless
+   the user explicitly authorizes that protected checkpoint.
+9. Do not authorize broker submission or live operation as part of PD4.
+10. Use a fresh explicit `--basetemp` under `F:\AI\temp\pytest\` for controlled
+    Windows pytest runs; do not persistently export `PYTHONPATH`.
+11. Do not rerun the broad suite solely for docs-only closeout commits. A new
+    broad certification is needed only after meaningful source change at the
+    next final source gate.
+12. Include the next milestone/step in every milestone and verification report.
 
 ## 14. Definition of project success
 

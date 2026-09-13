@@ -87,18 +87,27 @@ def test_out_of_range_session_is_rejected() -> None:
 def test_pre_open_eligibility_is_strictly_before_regular_open() -> None:
     session = TradingSession(date(2026, 7, 15))
 
-    assert classify_pre_open_decision_eligibility(
-        session,
-        datetime(2026, 7, 15, 13, 29, 59, 999999, tzinfo=UTC),
-    ) is PersonalDesktopPreOpenDecisionEligibility.ELIGIBLE
-    assert classify_pre_open_decision_eligibility(
-        session,
-        datetime(2026, 7, 15, 13, 30, tzinfo=UTC),
-    ) is PersonalDesktopPreOpenDecisionEligibility.MISSED_DEADLINE
-    assert classify_pre_open_decision_eligibility(
-        session,
-        datetime(2026, 7, 15, 13, 30, 0, 1, tzinfo=UTC),
-    ) is PersonalDesktopPreOpenDecisionEligibility.MISSED_DEADLINE
+    assert (
+        classify_pre_open_decision_eligibility(
+            session,
+            datetime(2026, 7, 15, 13, 29, 59, 999999, tzinfo=UTC),
+        )
+        is PersonalDesktopPreOpenDecisionEligibility.ELIGIBLE
+    )
+    assert (
+        classify_pre_open_decision_eligibility(
+            session,
+            datetime(2026, 7, 15, 13, 30, tzinfo=UTC),
+        )
+        is PersonalDesktopPreOpenDecisionEligibility.MISSED_DEADLINE
+    )
+    assert (
+        classify_pre_open_decision_eligibility(
+            session,
+            datetime(2026, 7, 15, 13, 30, 0, 1, tzinfo=UTC),
+        )
+        is PersonalDesktopPreOpenDecisionEligibility.MISSED_DEADLINE
+    )
 
 
 def test_pre_open_eligibility_normalizes_aware_timestamp_to_utc() -> None:

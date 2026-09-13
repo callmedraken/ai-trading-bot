@@ -102,11 +102,7 @@ def _require_modeled_session(session: TradingSession) -> None:
 
 
 def _utc(value: datetime) -> datetime:
-    if (
-        type(value) is not datetime
-        or value.tzinfo is None
-        or value.utcoffset() is None
-    ):
+    if type(value) is not datetime or value.tzinfo is None or value.utcoffset() is None:
         raise PersonalDesktopUnattendedDailyCycleTimingError(
             "observed_at must be an exact timezone-aware datetime"
         )

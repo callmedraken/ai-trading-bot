@@ -15,6 +15,10 @@ from tests.runtime.test_personal_desktop_unattended_paper_invocation_output impo
 
 from trading_bot.runtime import personal_desktop_paper_account_security as security
 from trading_bot.runtime import personal_desktop_paper_runtime_output as output
+from trading_bot.runtime.personal_desktop_unattended_daily_cycle_timing import (
+    next_xnys_execution_session,
+    xnys_regular_open,
+)
 from trading_bot.runtime.personal_desktop_unattended_paper_decision_publication import (
     PersonalDesktopUnattendedDecisionPublicationError,
     PreOpenDecisionPublicationPermit,
@@ -34,6 +38,10 @@ from trading_bot.runtime.windows_authority import (
 
 from .test_personal_desktop_unattended_paper_decision_intent import _decision_binding
 
+_OPEN_DECISION_OUTPUT_FOR_TEST = (
+    output._open_personal_desktop_unattended_decision_output_capability_for_test
+)
+
 
 class DecisionNative(FakeNative):
     def __init__(self) -> None:
@@ -52,21 +60,35 @@ def _storage(binding):
     )
 
 
+def _before_open(binding):
+    return xnys_regular_open(binding.decision.intended_execution_session) - timedelta(
+        microseconds=1
+    )
+
+
+def _assert_no_publication_mutation(api: DecisionNative) -> None:
+    mutation_events = {
+        "create-directory",
+        "write-file",
+        "rename-unattended-write-through",
+    }
+    assert not any(event[0] in mutation_events for event in api.events)
+
+
 def _capability(monkeypatch: pytest.MonkeyPatch, api=None):
     binding = _decision_binding(monkeypatch)
     storage = _storage(binding)
-    deadline = binding.decision.prepared_decision.submitted_at
     permit = issue_disposable_pre_open_decision_publication_permit_for_test(
         binding,
         storage,
         binding.decision.intended_execution_session,
-        deadline - timedelta(seconds=1),
+        _before_open(binding),
     )
     return (
         binding,
         storage,
         permit,
-        output._open_personal_desktop_unattended_decision_output_capability_for_test(
+        _OPEN_DECISION_OUTPUT_FOR_TEST(
             binding, storage, permit, api or DecisionNative()
         ),
     )
@@ -78,9 +100,9 @@ def test_disposable_output_publishes_exact_bytes_once(
     api = DecisionNative()
     binding, _, _, capability = _capability(monkeypatch, api)
     with capability as active:
-        result = active.publish()
+        result = active.publish(_before_open(binding))
         with pytest.raises(output.PersonalDesktopPaperRuntimeOutputError):
-            active.publish()
+            active.publish(_before_open(binding))
     assert result.decision_id == binding.decision.decision_id
     final = (
         security.PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_DECISIONS
@@ -95,6 +117,80 @@ def test_disposable_output_publishes_exact_bytes_once(
     )
     assert api.objects[artifact][1] == binding.artifact_bytes
     assert not any(path.startswith("F:\\test") for path in api.objects)
+
+
+@pytest.mark.parametrize("offset", [timedelta(0), timedelta(microseconds=1)])
+def test_at_or_after_open_publication_fails_before_filesystem_mutation(
+    monkeypatch: pytest.MonkeyPatch, offset: timedelta
+) -> None:
+    api = DecisionNative()
+    binding, _, _, capability = _capability(monkeypatch, api)
+    deadline = xnys_regular_open(binding.decision.intended_execution_session)
+    with pytest.raises(PersonalDesktopUnattendedDecisionPublicationError):
+        with capability as active:
+            active.publish(deadline + offset)
+    _assert_no_publication_mutation(api)
+
+
+def test_naive_publication_observation_fails_before_filesystem_mutation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    api = DecisionNative()
+    binding, _, _, capability = _capability(monkeypatch, api)
+    naive = _before_open(binding).replace(tzinfo=None)
+    with pytest.raises(PersonalDesktopUnattendedDecisionPublicationError):
+        with capability as active:
+            active.publish(naive)
+    _assert_no_publication_mutation(api)
+
+
+def test_publication_uses_exact_bound_execution_session_deadline(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    api = DecisionNative()
+    binding, _, _, capability = _capability(monkeypatch, api)
+    wrong_session = next_xnys_execution_session(
+        binding.decision.intended_execution_session
+    )
+    observation_before_wrong_deadline = xnys_regular_open(wrong_session) - timedelta(
+        microseconds=1
+    )
+    with pytest.raises(PersonalDesktopUnattendedDecisionPublicationError):
+        with capability as active:
+            active.publish(observation_before_wrong_deadline)
+    _assert_no_publication_mutation(api)
+
+
+def test_publication_observation_does_not_change_identity_or_artifact_bytes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    binding = _decision_binding(monkeypatch)
+    deadline = xnys_regular_open(binding.decision.intended_execution_session)
+    publications = []
+    for offset in (timedelta(seconds=2), timedelta(seconds=1)):
+        api = DecisionNative()
+        storage = _storage(binding)
+        permit = issue_disposable_pre_open_decision_publication_permit_for_test(
+            binding,
+            storage,
+            binding.decision.intended_execution_session,
+            deadline - timedelta(seconds=3),
+        )
+        capability = _OPEN_DECISION_OUTPUT_FOR_TEST(binding, storage, permit, api)
+        with capability as active:
+            result = active.publish(deadline - offset)
+        artifact_payloads = tuple(
+            payload
+            for path, (_, payload) in api.objects.items()
+            if path.endswith(".json")
+        )
+        publications.append((result, artifact_payloads))
+
+    first, second = publications
+    assert first[0].decision_id == second[0].decision_id == binding.decision.decision_id
+    assert first[0].artifact_sha256 == second[0].artifact_sha256
+    assert first[0].artifact_byte_length == second[0].artifact_byte_length
+    assert first[1] == second[1] == (binding.artifact_bytes,)
 
 
 def test_output_capability_cannot_be_copied_or_pickled(
@@ -149,10 +245,10 @@ def test_failed_finalization_spends_permit(monkeypatch: pytest.MonkeyPatch) -> N
     binding, storage, permit, capability = _capability(monkeypatch, FailRename())
     with pytest.raises(AuthorityObjectError):
         with capability as active:
-            active.publish()
+            active.publish(_before_open(binding))
     with pytest.raises(PersonalDesktopUnattendedDecisionPublicationError):
         consume_disposable_pre_open_decision_publication_permit_for_test(
-            permit, binding, storage
+            permit, binding, storage, _before_open(binding)
         )
 
 
@@ -162,10 +258,10 @@ def test_failed_write_spends_permit(monkeypatch: pytest.MonkeyPatch) -> None:
     binding, storage, permit, capability = _capability(monkeypatch, api)
     with pytest.raises(AuthorityObjectError):
         with capability as active:
-            active.publish()
+            active.publish(_before_open(binding))
     with pytest.raises(PersonalDesktopUnattendedDecisionPublicationError):
         consume_disposable_pre_open_decision_publication_permit_for_test(
-            permit, binding, storage
+            permit, binding, storage, _before_open(binding)
         )
 
 
@@ -178,10 +274,10 @@ def test_failed_flush_spends_permit(monkeypatch: pytest.MonkeyPatch) -> None:
     binding, storage, permit, capability = _capability(monkeypatch, FailFlush())
     with pytest.raises(AuthorityObjectError):
         with capability as active:
-            active.publish()
+            active.publish(_before_open(binding))
     with pytest.raises(PersonalDesktopUnattendedDecisionPublicationError):
         consume_disposable_pre_open_decision_publication_permit_for_test(
-            permit, binding, storage
+            permit, binding, storage, _before_open(binding)
         )
 
 
@@ -199,10 +295,10 @@ def test_failed_readback_spends_permit(monkeypatch: pytest.MonkeyPatch) -> None:
     binding, storage, permit, capability = _capability(monkeypatch, TamperReadback())
     with pytest.raises(output.PersonalDesktopPaperRuntimeOutputError):
         with capability as active:
-            active.publish()
+            active.publish(_before_open(binding))
     with pytest.raises(PersonalDesktopUnattendedDecisionPublicationError):
         consume_disposable_pre_open_decision_publication_permit_for_test(
-            permit, binding, storage
+            permit, binding, storage, _before_open(binding)
         )
 
 

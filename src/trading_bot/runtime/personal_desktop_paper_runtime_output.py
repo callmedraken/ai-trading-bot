@@ -6,6 +6,7 @@ import ctypes
 import re
 import threading
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path, PureWindowsPath
 from typing import Protocol, Self
 from uuid import UUID
@@ -951,8 +952,10 @@ class _PersonalDesktopUnattendedDecisionOutputCapability(
             raise
         return self
 
-    def publish(self) -> PersonalDesktopUnattendedDecisionPublicationResult:
-        """Consume admission, then make exactly one durable finalization attempt."""
+    def publish(
+        self, publication_observed_at: datetime
+    ) -> PersonalDesktopUnattendedDecisionPublicationResult:
+        """Recheck the deadline, consume admission, and attempt finalization once."""
 
         self._require_active()
         if self._published:
@@ -965,7 +968,10 @@ class _PersonalDesktopUnattendedDecisionOutputCapability(
             expected = self._replay_expected()
             if self._disposable:
                 consume_disposable_pre_open_decision_publication_permit_for_test(
-                    self._permit, expected, self._storage_read
+                    self._permit,
+                    expected,
+                    self._storage_read,
+                    publication_observed_at,
                 )
             else:
                 consume_pre_open_decision_publication_permit(
@@ -973,6 +979,7 @@ class _PersonalDesktopUnattendedDecisionOutputCapability(
                     expected,
                     self._storage_read,
                     self._authority,
+                    publication_observed_at,
                 )
             decision_id = expected.decision.decision_id
             parent = security.PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_DECISIONS

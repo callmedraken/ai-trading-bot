@@ -131,36 +131,43 @@ def test_durable_decision_bytes_cannot_mint_a_permit(
     binding = _decision_binding(monkeypatch)
     storage = _absent(binding)
     forged = object.__new__(PreOpenDecisionPublicationPermit)
+    deadline = xnys_regular_open(binding.decision.intended_execution_session)
     assert binding.artifact_bytes
     with pytest.raises(PersonalDesktopUnattendedDecisionPublicationError):
         consume_disposable_pre_open_decision_publication_permit_for_test(
-            forged, binding, storage
+            forged, binding, storage, deadline - timedelta(microseconds=1)
         )
 
 
 def test_permit_is_consumable_exactly_once(monkeypatch: pytest.MonkeyPatch) -> None:
-    binding, storage, permit, _ = _permit(monkeypatch)
+    binding, storage, permit, deadline = _permit(monkeypatch)
     consume_disposable_pre_open_decision_publication_permit_for_test(
-        permit, binding, storage
+        permit, binding, storage, deadline - timedelta(microseconds=1)
     )
     with pytest.raises(PersonalDesktopUnattendedDecisionPublicationError):
         consume_disposable_pre_open_decision_publication_permit_for_test(
-            permit, binding, storage
+            permit, binding, storage, deadline - timedelta(microseconds=1)
         )
 
 
 def test_wrong_decision_or_storage_provenance_fails(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    binding, storage, permit, _ = _permit(monkeypatch)
+    binding, storage, permit, deadline = _permit(monkeypatch)
     different = _decision_binding(monkeypatch, caller_key="other")
     with pytest.raises(PersonalDesktopUnattendedDecisionPublicationError):
         consume_disposable_pre_open_decision_publication_permit_for_test(
-            permit, different, storage
+            permit,
+            different,
+            storage,
+            deadline - timedelta(microseconds=1),
         )
     with pytest.raises(PersonalDesktopUnattendedDecisionPublicationError):
         consume_disposable_pre_open_decision_publication_permit_for_test(
-            permit, binding, _absent(binding)
+            permit,
+            binding,
+            _absent(binding),
+            deadline - timedelta(microseconds=1),
         )
 
 

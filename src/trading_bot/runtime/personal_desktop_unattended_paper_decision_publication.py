@@ -217,11 +217,19 @@ def consume_pre_open_decision_publication_permit(
     expected: PersonalDesktopUnattendedPaperDecisionIntentArtifactBinding,
     storage_read: PersonalDesktopUnattendedDecisionStorageReadResult,
     authority: ValidatedProductionAuthority,
+    publication_observed_at: datetime,
 ) -> None:
-    """Irrevocably spend one exact production permit before finalization."""
+    """Validate fresh pre-open evidence, then spend one production permit."""
 
     c1 = require_validated_production_authority(authority)
-    _consume(permit, expected, storage_read, c1, production=True)
+    _consume(
+        permit,
+        expected,
+        storage_read,
+        c1,
+        publication_observed_at,
+        production=True,
+    )
 
 
 def qualify_personal_desktop_unattended_decision_publication(
@@ -314,8 +322,16 @@ def consume_disposable_pre_open_decision_publication_permit_for_test(
     permit: PreOpenDecisionPublicationPermit,
     expected: PersonalDesktopUnattendedPaperDecisionIntentArtifactBinding,
     storage_read: PersonalDesktopUnattendedDecisionStorageReadResult,
+    publication_observed_at: datetime,
 ) -> None:
-    _consume(permit, expected, storage_read, None, production=False)
+    _consume(
+        permit,
+        expected,
+        storage_read,
+        None,
+        publication_observed_at,
+        production=False,
+    )
 
 
 def _require_evidence(
@@ -370,6 +386,7 @@ def _consume(
     expected: PersonalDesktopUnattendedPaperDecisionIntentArtifactBinding,
     storage_read: PersonalDesktopUnattendedDecisionStorageReadResult,
     authority: ValidatedProductionAuthority | None,
+    publication_observed_at: datetime,
     *,
     production: bool,
 ) -> None:
@@ -390,6 +407,8 @@ def _consume(
             or evidence.production is not production
             or evidence.expected != expected
             or evidence.storage_read is not storage_read
+            or evidence.intended_execution_session
+            != expected.decision.intended_execution_session
             or (
                 production
                 and identity
@@ -403,6 +422,9 @@ def _consume(
             raise PersonalDesktopUnattendedDecisionPublicationError(
                 "decision publication permit provenance is invalid or consumed"
             )
+        _eligible_observation(
+            evidence.intended_execution_session, publication_observed_at
+        )
         _REGISTRY[permit] = _PermitEvidence(
             evidence.expected,
             evidence.storage_read,

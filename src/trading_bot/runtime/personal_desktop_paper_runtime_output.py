@@ -19,6 +19,25 @@ from trading_bot.runtime import personal_desktop_paper_account_security as secur
 from trading_bot.runtime.personal_desktop_first_paper_operation import (
     PERSONAL_DESKTOP_FIRST_PAPER_OPERATION_PROFILE,
 )
+from trading_bot.runtime.personal_desktop_unattended_paper_decision_intent import (
+    PersonalDesktopUnattendedPaperDecisionIntentArtifactBinding,
+    personal_desktop_unattended_decision_calendar,
+    verify_personal_desktop_unattended_paper_decision_intent,
+)
+from trading_bot.runtime.personal_desktop_unattended_paper_decision_publication import (
+    PERSONAL_DESKTOP_UNATTENDED_DECISION_PUBLICATION_EFFECTS_ENABLED,
+    PreOpenDecisionPublicationPermit,
+    consume_disposable_pre_open_decision_publication_permit_for_test,
+    consume_pre_open_decision_publication_permit,
+    require_pre_open_decision_publication_permit,
+)
+from trading_bot.runtime.personal_desktop_unattended_paper_decision_storage import (
+    PersonalDesktopUnattendedDecisionStorageClassification,
+    PersonalDesktopUnattendedDecisionStorageReadResult,
+    require_validated_personal_desktop_unattended_decision_storage_read,
+    unattended_paper_decision_artifact_name,
+    unattended_paper_decision_directory_name,
+)
 from trading_bot.runtime.personal_desktop_unattended_paper_invocation import (
     PersonalDesktopUnattendedPaperInvocationArtifactBinding,
     verify_personal_desktop_unattended_paper_invocation,
@@ -59,6 +78,8 @@ _UNATTENDED_RUNTIME_OUTPUT_ISSUER = object()
 _UNATTENDED_INVOCATION_OUTPUT_ISSUER = object()
 _DISPOSABLE_UNATTENDED_INVOCATION_OUTPUT_ISSUER = object()
 _DISPOSABLE_UNATTENDED_INVOCATION_OUTPUT_AUTHORITY_ISSUER = object()
+_UNATTENDED_DECISION_OUTPUT_ISSUER = object()
+_DISPOSABLE_UNATTENDED_DECISION_OUTPUT_ISSUER = object()
 _CANONICAL_UUID = re.compile(
     r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
 )
@@ -122,6 +143,35 @@ class PersonalDesktopUnattendedInvocationPublicationResult:
             or self.artifact_verified is not True
         ):
             raise ValueError("unattended invocation publication result is invalid")
+
+
+@dataclass(frozen=True, slots=True)
+class PersonalDesktopUnattendedDecisionPublicationResult:
+    """Non-authorizing evidence of one verified durable decision publication."""
+
+    decision_id: UUID
+    artifact_sha256: str
+    artifact_byte_length: int
+    staging_created: bool
+    finalized: bool
+    artifact_verified: bool
+
+    def __post_init__(self) -> None:
+        if (
+            type(self.decision_id) is not UUID
+            or type(self.artifact_sha256) is not str
+            or len(self.artifact_sha256) != 64
+            or any(
+                character not in "0123456789abcdef"
+                for character in self.artifact_sha256
+            )
+            or type(self.artifact_byte_length) is not int
+            or self.artifact_byte_length <= 0
+            or self.staging_created is not True
+            or self.finalized is not True
+            or self.artifact_verified is not True
+        ):
+            raise ValueError("unattended decision publication result is invalid")
 
 
 class _PersonalDesktopPaperRuntimeOutputCapability(PaperOperationOutputCapability):
@@ -841,6 +891,281 @@ class _PersonalDesktopUnattendedInvocationOutputCapability:
             raise first_error
 
 
+class _PersonalDesktopUnattendedDecisionOutputCapability(
+    _PersonalDesktopUnattendedInvocationOutputCapability
+):
+    """Publish one exact G4 decision with a consumed pre-open permit."""
+
+    __slots__ = ("_authority", "_disposable", "_permit", "_storage_read")
+
+    def __init__(
+        self,
+        api: _PaperRuntimeOutputNativeApi,
+        expected: PersonalDesktopUnattendedPaperDecisionIntentArtifactBinding,
+        storage_read: PersonalDesktopUnattendedDecisionStorageReadResult,
+        permit: PreOpenDecisionPublicationPermit,
+        *,
+        authority: object | None,
+        _issuer: object,
+    ) -> None:
+        if _issuer not in {
+            _UNATTENDED_DECISION_OUTPUT_ISSUER,
+            _DISPOSABLE_UNATTENDED_DECISION_OUTPUT_ISSUER,
+        }:
+            raise TypeError("unattended decision output issuer is invalid")
+        if (
+            type(expected)
+            is not PersonalDesktopUnattendedPaperDecisionIntentArtifactBinding
+            or type(storage_read)
+            is not PersonalDesktopUnattendedDecisionStorageReadResult
+            or type(permit) is not PreOpenDecisionPublicationPermit
+        ):
+            raise TypeError("unattended decision output evidence is invalid")
+        self._api = api
+        self._calendar = personal_desktop_unattended_decision_calendar()
+        self._expected = expected
+        self._storage_read = storage_read
+        self._permit = permit
+        self._authority = authority
+        self._disposable = _issuer is _DISPOSABLE_UNATTENDED_DECISION_OUTPUT_ISSUER
+        self._parents = {}
+        self._entered = False
+        self._closed = False
+        self._published = False
+
+    def __enter__(self) -> Self:
+        if self._entered or self._closed:
+            raise PersonalDesktopPaperRuntimeOutputError(
+                "unattended decision output capability is one-shot"
+            )
+        self._entered = True
+        try:
+            for path in (
+                security.PERSONAL_DESKTOP_PAPER_V2_RUNTIME,
+                security.PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_DECISIONS,
+            ):
+                self._pin_parent(path)
+            self._verify_parents()
+        except BaseException:
+            self._close()
+            raise
+        return self
+
+    def publish(self) -> PersonalDesktopUnattendedDecisionPublicationResult:
+        """Consume admission, then make exactly one durable finalization attempt."""
+
+        self._require_active()
+        if self._published:
+            raise PersonalDesktopPaperRuntimeOutputError(
+                "unattended decision publication attempt is already consumed"
+            )
+        self._published = True
+        try:
+            self._verify_parents()
+            expected = self._replay_expected()
+            if self._disposable:
+                consume_disposable_pre_open_decision_publication_permit_for_test(
+                    self._permit, expected, self._storage_read
+                )
+            else:
+                consume_pre_open_decision_publication_permit(
+                    self._permit,
+                    expected,
+                    self._storage_read,
+                    self._authority,
+                )
+            decision_id = expected.decision.decision_id
+            parent = security.PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_DECISIONS
+            staging = (
+                parent
+                + "\\"
+                + unattended_paper_decision_directory_name(decision_id, staging=True)
+            )
+            final = (
+                parent + "\\" + unattended_paper_decision_directory_name(decision_id)
+            )
+            artifact_name = unattended_paper_decision_artifact_name(decision_id)
+            staged_artifact = staging + "\\" + artifact_name
+            final_artifact = final + "\\" + artifact_name
+            directory_spec = security.paper_object_spec(staging)
+            if (
+                directory_spec.role
+                is not security.PaperObjectRole.UNATTENDED_DECISION_DIRECTORY
+            ):
+                raise AuthorityPathError("unattended decision staging role is invalid")
+            self._api.create_directory(
+                staging,
+                security.paper_security_policy(
+                    directory_spec.role,
+                    PERSONAL_DESKTOP_FIRST_PAPER_OPERATION_PROFILE.approved_trading_sid,
+                ),
+            )
+            staging_handle, staging_observation = self._open_verified(staging)
+            try:
+                file_spec = security.paper_object_spec(staged_artifact)
+                if (
+                    file_spec.role
+                    is not security.PaperObjectRole.UNATTENDED_DECISION_FILE
+                ):
+                    raise AuthorityPathError(
+                        "unattended decision artifact role is invalid"
+                    )
+                self._api.write_file(
+                    staged_artifact,
+                    expected.artifact_bytes,
+                    security.paper_security_policy(
+                        file_spec.role,
+                        PERSONAL_DESKTOP_FIRST_PAPER_OPERATION_PROFILE.approved_trading_sid,
+                    ),
+                )
+                staged_file_observation = self._read_and_verify_artifact(
+                    staged_artifact, expected
+                )
+                self._reverify_open_object(staging_handle, staging, staging_observation)
+            finally:
+                self._api.close(staging_handle)
+            self._verify_parents()
+            self._api.rename_unattended_write_through(staging, final)
+            final_handle, final_observation = self._open_verified(final)
+            try:
+                self._require_renamed_object_identity(
+                    staging_observation,
+                    final_observation,
+                    "unattended decision directory",
+                )
+                final_file_observation = self._read_and_verify_artifact(
+                    final_artifact, expected
+                )
+                self._require_renamed_object_identity(
+                    staged_file_observation,
+                    final_file_observation,
+                    "unattended decision artifact",
+                )
+                self._reverify_open_object(final_handle, final, final_observation)
+                self._verify_parents()
+            finally:
+                self._api.close(final_handle)
+            return PersonalDesktopUnattendedDecisionPublicationResult(
+                decision_id,
+                expected.artifact_sha256,
+                expected.artifact_byte_length,
+                True,
+                True,
+                True,
+            )
+        except BaseException as error:
+            try:
+                self._close()
+            except BaseException as close_error:
+                raise close_error from error
+            raise
+
+    def _pin_parent(self, path: str) -> None:
+        spec = security.paper_object_spec(path)
+        expected_roles = {
+            security.PERSONAL_DESKTOP_PAPER_V2_RUNTIME: (
+                security.PaperObjectRole.RUNTIME
+            ),
+            security.PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_DECISIONS: (
+                security.PaperObjectRole.UNATTENDED_DECISIONS
+            ),
+        }
+        if expected_roles.get(path) is not spec.role:
+            raise AuthorityPathError("unattended decision parent is not source-owned")
+        handle = self._api.open(path, spec.kind)
+        try:
+            observation = self._api.inspect(handle, path, spec.kind)
+            self._verify_observation(path, observation)
+        except BaseException:
+            self._api.close(handle)
+            raise
+        self._parents[path] = _PinnedParent(path, handle, observation)
+
+    def _verify_parents(self) -> None:
+        self._require_active()
+        expected_paths = (
+            security.PERSONAL_DESKTOP_PAPER_V2_RUNTIME,
+            security.PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_DECISIONS,
+        )
+        if set(self._parents) != set(expected_paths):
+            raise PersonalDesktopPaperRuntimeOutputError(
+                "unattended decision output parents are incomplete"
+            )
+        for path in expected_paths:
+            pinned = self._parents[path]
+            current = self._api.inspect(
+                pinned.handle, path, pinned.observation.security.kind
+            )
+            self._verify_observation(path, current)
+            if not self._same_open_object(current, pinned.observation):
+                raise PersonalDesktopPaperRuntimeOutputError(
+                    "unattended decision output parent changed"
+                )
+            reopened = self._api.open(path, pinned.observation.security.kind)
+            try:
+                observed = self._api.inspect(
+                    reopened, path, pinned.observation.security.kind
+                )
+                self._verify_observation(path, observed)
+                if not self._same_open_object(observed, pinned.observation):
+                    raise PersonalDesktopPaperRuntimeOutputError(
+                        "unattended decision output parent was replaced"
+                    )
+            finally:
+                self._api.close(reopened)
+
+    def _read_and_verify_artifact(
+        self,
+        path: str,
+        expected: PersonalDesktopUnattendedPaperDecisionIntentArtifactBinding,
+    ) -> security.PaperObjectObservation:
+        handle, observation = self._open_verified(path)
+        try:
+            spec = security.paper_object_spec(path)
+            payload = self._api.read(handle, spec.maximum_bytes)
+            if (
+                type(payload) is not bytes
+                or payload != expected.artifact_bytes
+                or len(payload) != expected.artifact_byte_length
+                or observation.byte_length != expected.artifact_byte_length
+            ):
+                raise PersonalDesktopPaperRuntimeOutputError(
+                    "unattended decision artifact differs from its binding"
+                )
+            replayed = verify_personal_desktop_unattended_paper_decision_intent(
+                payload,
+                self._calendar,
+                expected_decision_id=expected.decision.decision_id,
+                expected_artifact_sha256=expected.artifact_sha256,
+                expected_artifact_byte_length=expected.artifact_byte_length,
+            )
+            if replayed != expected:
+                raise PersonalDesktopPaperRuntimeOutputError(
+                    "unattended decision replay differs from its binding"
+                )
+            self._reverify_open_object(handle, path, observation)
+            return observation
+        finally:
+            self._api.close(handle)
+
+    def _replay_expected(
+        self,
+    ) -> PersonalDesktopUnattendedPaperDecisionIntentArtifactBinding:
+        expected = self._expected
+        replayed = verify_personal_desktop_unattended_paper_decision_intent(
+            expected.artifact_bytes,
+            self._calendar,
+            expected_decision_id=expected.decision.decision_id,
+            expected_artifact_sha256=expected.artifact_sha256,
+            expected_artifact_byte_length=expected.artifact_byte_length,
+        )
+        if replayed != expected:
+            raise PersonalDesktopPaperRuntimeOutputError(
+                "unattended decision output binding differs from exact replay"
+            )
+        return replayed
+
+
 def _require_receipt_directory(path: Path, *, staging: bool) -> str:
     text = str(path)
     candidate = PureWindowsPath(text)
@@ -900,10 +1225,22 @@ def _valid_finalization(staging: str, final: str) -> bool:
 def _valid_unattended_finalization(staging: str, final: str) -> bool:
     source = PureWindowsPath(staging)
     destination = PureWindowsPath(final)
-    parent = PureWindowsPath(security.PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_INVOCATIONS)
-    if source.parent != parent or destination.parent != parent:
+    if destination.parent != source.parent:
         return False
-    prefix = ".unattended-paper-invocation-"
+    if source.parent == PureWindowsPath(
+        security.PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_INVOCATIONS
+    ):
+        prefix = ".unattended-paper-invocation-"
+        name_builder = unattended_paper_invocation_directory_name
+        expected_role = security.PaperObjectRole.UNATTENDED_INVOCATION_DIRECTORY
+    elif source.parent == PureWindowsPath(
+        security.PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_DECISIONS
+    ):
+        prefix = ".unattended-paper-decision-"
+        name_builder = unattended_paper_decision_directory_name
+        expected_role = security.PaperObjectRole.UNATTENDED_DECISION_DIRECTORY
+    else:
+        return False
     suffix = ".staging"
     if not source.name.startswith(prefix) or not source.name.endswith(suffix):
         return False
@@ -911,19 +1248,16 @@ def _valid_unattended_finalization(staging: str, final: str) -> bool:
     if _CANONICAL_UUID.fullmatch(identity_text) is None:
         return False
     identity = UUID(identity_text)
-    if source.name != unattended_paper_invocation_directory_name(
+    if source.name != name_builder(
         identity, staging=True
-    ) or destination.name != unattended_paper_invocation_directory_name(identity):
+    ) or destination.name != name_builder(identity):
         return False
     try:
         source_spec = security.paper_object_spec(staging)
         final_spec = security.paper_object_spec(final)
     except AuthorityPathError:
         return False
-    return (
-        source_spec.role is security.PaperObjectRole.UNATTENDED_INVOCATION_DIRECTORY
-        and final_spec.role is security.PaperObjectRole.UNATTENDED_INVOCATION_DIRECTORY
-    )
+    return source_spec.role is expected_role and final_spec.role is expected_role
 
 
 def _bind(library: object, name: str, arguments: list, result: object):
@@ -1040,7 +1374,7 @@ class _WindowsPaperRuntimeOutputNativeApi(security.WindowsPaperReadNativeApi):
     def rename_unattended_write_through(self, staging: str, final: str) -> None:
         if not _valid_unattended_finalization(staging, final):
             raise AuthorityPathError(
-                "native unattended invocation rename names are invalid"
+                "native unattended publication rename names are invalid"
             )
         move = _bind(
             self._kernel,
@@ -1050,7 +1384,7 @@ class _WindowsPaperRuntimeOutputNativeApi(security.WindowsPaperReadNativeApi):
         )
         if not move(staging, final, _MOVEFILE_WRITE_THROUGH):
             raise PersonalDesktopPaperRuntimeOutputError(
-                "unattended invocation same-parent no-clobber write-through "
+                "unattended publication same-parent no-clobber write-through "
                 "rename failed"
             )
 
@@ -1191,6 +1525,64 @@ def open_personal_desktop_unattended_invocation_output_capability(
         _WindowsPaperRuntimeOutputNativeApi(),
         verified.expected,
         _issuer=_UNATTENDED_INVOCATION_OUTPUT_ISSUER,
+    )
+
+
+def open_personal_desktop_unattended_decision_output_capability(
+    storage_read_result: PersonalDesktopUnattendedDecisionStorageReadResult,
+    permit: PreOpenDecisionPublicationPermit,
+) -> _PersonalDesktopUnattendedDecisionOutputCapability:
+    """Open the fixed G4 writer only for the exact isolated gate state."""
+
+    verified = require_validated_personal_desktop_unattended_decision_storage_read(
+        storage_read_result
+    )
+    if (
+        verified.classification
+        is not PersonalDesktopUnattendedDecisionStorageClassification.ABSENT
+        or verified.authority is None
+    ):
+        raise PersonalDesktopPaperRuntimeOutputError(
+            "unattended decision publication requires exact ABSENT production storage"
+        )
+    authority = require_validated_production_authority(verified.authority)
+    require_pre_open_decision_publication_permit(
+        permit, verified.expected, storage_read_result, authority
+    )
+
+    from trading_bot.runtime.personal_desktop_paper_receipt_recovery_execution import (  # noqa: E501, PLC0415
+        PERSONAL_DESKTOP_PAPER_V2_RECEIPT_RECOVERY_EFFECTS_ENABLED,
+    )
+    from trading_bot.runtime.personal_desktop_supervised_paper_operation_execution import (  # noqa: E501, PLC0415
+        PERSONAL_DESKTOP_PAPER_V2_SUPERVISED_EXECUTION_EFFECTS_ENABLED,
+    )
+    from trading_bot.runtime.personal_desktop_unattended_paper_operation_execution import (  # noqa: E501, PLC0415
+        PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_EXECUTION_EFFECTS_ENABLED,
+    )
+    from trading_bot.runtime.personal_desktop_unattended_paper_storage_provisioning import (  # noqa: E501, PLC0415
+        PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_STORAGE_PROVISIONING_EFFECTS_ENABLED,
+    )
+
+    if (
+        PERSONAL_DESKTOP_UNATTENDED_DECISION_PUBLICATION_EFFECTS_ENABLED is not True
+        or security.PERSONAL_DESKTOP_PAPER_V2_PRODUCTION_EFFECTS_ENABLED is not False
+        or security.PERSONAL_DESKTOP_PAPER_V2_RECOVERY_EFFECTS_ENABLED is not False
+        or PERSONAL_DESKTOP_PAPER_V2_SUPERVISED_EXECUTION_EFFECTS_ENABLED is not False
+        or PERSONAL_DESKTOP_PAPER_V2_RECEIPT_RECOVERY_EFFECTS_ENABLED is not False
+        or PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_EXECUTION_EFFECTS_ENABLED is not False
+        or PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_STORAGE_PROVISIONING_EFFECTS_ENABLED
+        is not False
+    ):
+        raise PersonalDesktopPaperRuntimeOutputError(
+            "unattended decision publication effect-gate state is invalid"
+        )
+    return _PersonalDesktopUnattendedDecisionOutputCapability(
+        _WindowsPaperRuntimeOutputNativeApi(),
+        verified.expected,
+        storage_read_result,
+        permit,
+        authority=authority,
+        _issuer=_UNATTENDED_DECISION_OUTPUT_ISSUER,
     )
 
 
@@ -1412,4 +1804,36 @@ def _open_personal_desktop_unattended_invocation_output_capability_for_test(
         api,
         expected,
         _issuer=_DISPOSABLE_UNATTENDED_INVOCATION_OUTPUT_ISSUER,
+    )
+
+
+def _open_personal_desktop_unattended_decision_output_capability_for_test(
+    expected: PersonalDesktopUnattendedPaperDecisionIntentArtifactBinding,
+    storage_read: PersonalDesktopUnattendedDecisionStorageReadResult,
+    permit: PreOpenDecisionPublicationPermit,
+    api: _PaperRuntimeOutputNativeApi,
+) -> _PersonalDesktopUnattendedDecisionOutputCapability:
+    """Open only a fake-native writer from disposable permit provenance."""
+
+    if (
+        type(expected)
+        is not PersonalDesktopUnattendedPaperDecisionIntentArtifactBinding
+        or type(storage_read) is not PersonalDesktopUnattendedDecisionStorageReadResult
+        or storage_read.classification
+        is not PersonalDesktopUnattendedDecisionStorageClassification.ABSENT
+        or storage_read.expected_decision_id != expected.decision.decision_id
+        or type(permit) is not PreOpenDecisionPublicationPermit
+    ):
+        raise TypeError("disposable unattended decision output evidence is invalid")
+    if isinstance(api, _WindowsPaperRuntimeOutputNativeApi):
+        raise TypeError(
+            "the disposable decision output seam rejects the production native API"
+        )
+    return _PersonalDesktopUnattendedDecisionOutputCapability(
+        api,
+        expected,
+        storage_read,
+        permit,
+        authority=None,
+        _issuer=_DISPOSABLE_UNATTENDED_DECISION_OUTPUT_ISSUER,
     )

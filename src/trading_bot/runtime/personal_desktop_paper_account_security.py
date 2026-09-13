@@ -27,6 +27,9 @@ from trading_bot.runtime.paper_account_successor_checkpoint import (
     MAX_PAPER_ACCOUNT_SUCCESSOR_CHECKPOINT_BYTES,
 )
 from trading_bot.runtime.paper_operation import MAX_PAPER_OPERATION_RECEIPT_BYTES
+from trading_bot.runtime.personal_desktop_unattended_paper_decision_intent import (
+    MAX_PERSONAL_DESKTOP_UNATTENDED_PAPER_DECISION_INTENT_BYTES,
+)
 from trading_bot.runtime.personal_desktop_unattended_paper_invocation import (
     MAX_PERSONAL_DESKTOP_UNATTENDED_PAPER_INVOCATION_BYTES,
 )
@@ -58,6 +61,9 @@ PERSONAL_DESKTOP_PAPER_V2_OPERATIONS = (
 )
 PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_INVOCATIONS = (
     r"F:\AITradingBot\Paper-v2\runtime\unattended-invocations"
+)
+PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_DECISIONS = (
+    r"F:\AITradingBot\Paper-v2\runtime\unattended-decisions"
 )
 PERSONAL_DESKTOP_PAPER_V2_ANCHOR = (
     PERSONAL_DESKTOP_PAPER_V2_ROOT + r"\personal-desktop-paper-account-authority.json"
@@ -96,6 +102,9 @@ class PaperObjectRole(StrEnum):
     UNATTENDED_INVOCATIONS = "unattended-invocations"
     UNATTENDED_INVOCATION_DIRECTORY = "unattended-invocation-directory"
     UNATTENDED_INVOCATION_FILE = "unattended-invocation-file"
+    UNATTENDED_DECISIONS = "unattended-decisions"
+    UNATTENDED_DECISION_DIRECTORY = "unattended-decision-directory"
+    UNATTENDED_DECISION_FILE = "unattended-decision-file"
     OUTPUT_DIRECTORY = "output-directory"
     OUTPUT_FILE = "output-file"
     C1_ROOT = "c1-root"
@@ -124,6 +133,9 @@ def paper_object_spec(path: str) -> PaperObjectSpec:
         PERSONAL_DESKTOP_PAPER_V2_OPERATIONS: PaperObjectRole.OPERATIONS,
         PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_INVOCATIONS: (
             PaperObjectRole.UNATTENDED_INVOCATIONS
+        ),
+        PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_DECISIONS: (
+            PaperObjectRole.UNATTENDED_DECISIONS
         ),
         str(PRODUCTION_AUTHORITY_PATHS.root): PaperObjectRole.C1_ROOT,
         str(PRODUCTION_AUTHORITY_PATHS.capture_output): PaperObjectRole.CAPTURE_OUTPUT,
@@ -171,6 +183,25 @@ def paper_object_spec(path: str) -> PaperObjectSpec:
                 PaperObjectRole.UNATTENDED_INVOCATION_FILE,
                 file,
                 MAX_PERSONAL_DESKTOP_UNATTENDED_PAPER_INVOCATION_BYTES,
+            )
+    decisions = re.escape(PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_DECISIONS)
+    decision_final = decisions + rf"\\unattended-paper-decision-({_UUID})"
+    decision_staging = decisions + rf"\\\.unattended-paper-decision-({_UUID})\.staging"
+    if any(
+        re.fullmatch(expression, path)
+        for expression in (decision_final, decision_staging)
+    ):
+        return PaperObjectSpec(PaperObjectRole.UNATTENDED_DECISION_DIRECTORY, directory)
+    for expression in (decision_final, decision_staging):
+        if re.fullmatch(
+            expression
+            + r"\\personal-desktop-unattended-paper-decision-intent-\1\.json",
+            path,
+        ):
+            return PaperObjectSpec(
+                PaperObjectRole.UNATTENDED_DECISION_FILE,
+                file,
+                MAX_PERSONAL_DESKTOP_UNATTENDED_PAPER_DECISION_INTENT_BYTES,
             )
     if any(
         re.fullmatch(expression, path)
@@ -241,6 +272,7 @@ def paper_security_policy(
         PaperObjectRole.RUNTIME,
         PaperObjectRole.OPERATIONS,
         PaperObjectRole.UNATTENDED_INVOCATIONS,
+        PaperObjectRole.UNATTENDED_DECISIONS,
     }:
         rights = TRADING_CONTAINER_DATA
     elif role in {
@@ -256,11 +288,17 @@ def paper_security_policy(
     elif role in {
         PaperObjectRole.UNATTENDED_INVOCATION_DIRECTORY,
         PaperObjectRole.UNATTENDED_INVOCATION_FILE,
+        PaperObjectRole.UNATTENDED_DECISION_DIRECTORY,
+        PaperObjectRole.UNATTENDED_DECISION_FILE,
     }:
         owners = {trading_sid}
         rights = (
             TRADING_DIRECTORY_DATA
-            if role is PaperObjectRole.UNATTENDED_INVOCATION_DIRECTORY
+            if role
+            in {
+                PaperObjectRole.UNATTENDED_INVOCATION_DIRECTORY,
+                PaperObjectRole.UNATTENDED_DECISION_DIRECTORY,
+            }
             else TRADING_FILE_DATA
         )
     else:
@@ -268,6 +306,8 @@ def paper_security_policy(
     if owner_sid is None and role in {
         PaperObjectRole.UNATTENDED_INVOCATION_DIRECTORY,
         PaperObjectRole.UNATTENDED_INVOCATION_FILE,
+        PaperObjectRole.UNATTENDED_DECISION_DIRECTORY,
+        PaperObjectRole.UNATTENDED_DECISION_FILE,
     }:
         owner = trading_sid
     else:

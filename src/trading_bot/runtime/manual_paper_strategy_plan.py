@@ -789,6 +789,59 @@ def build_manual_paper_strategy_decision(
     )
 
 
+def verify_prepared_manual_paper_strategy_decision(
+    prepared_decision: PreparedManualPaperStrategyDecision,
+    calendar: IdentifiedMarketCalendar,
+) -> PreparedManualPaperStrategyDecision:
+    """Purely replay and reconcile one retained G3 pre-open decision.
+
+    This is the narrow public replay seam used by durable Architecture-111
+    evidence.  It mints no execution, C3, filesystem, or publication authority.
+    """
+    if type(prepared_decision) is not PreparedManualPaperStrategyDecision:
+        raise ManualPaperStrategyPlanVerificationError(
+            "prepared_decision must be exact"
+        )
+    try:
+        verification = verify_daily_snapshot(
+            prepared_decision.selected_snapshot_artifact,
+            calendar,
+            expected_sha256=prepared_decision.snapshot_verification.sha256,
+            expected_byte_length=prepared_decision.snapshot_verification.byte_length,
+        )
+        if verification.status is not DailySnapshotVerificationStatus.PASS:
+            raise ManualPaperStrategyPlanValidationError(
+                "prepared selected snapshot does not replay"
+            )
+        replayed = _prepare_decision_from_evidence(
+            snapshot_payload=prepared_decision.selected_snapshot_artifact,
+            snapshot_verification=verification,
+            seed_payload=prepared_decision.history_seed_artifact,
+            paper_account_id=prepared_decision.paper_account_id,
+            selected_c3_assertion=prepared_decision.selected_c3_assertion,
+            prior=prepared_decision.prior_checkpoint,
+            strategy_config=prepared_decision.strategy_config,
+            caller_idempotency_key=prepared_decision.caller_idempotency_key,
+            policies=prepared_decision.policies,
+            planning_at=prepared_decision.planning_at,
+            submitted_at=prepared_decision.submitted_at,
+            filled_at=prepared_decision.filled_at,
+            metadata=prepared_decision.metadata,
+            calendar=calendar,
+        )
+    except ManualPaperStrategyPlanError:
+        raise
+    except Exception as error:
+        raise ManualPaperStrategyPlanVerificationError(
+            "prepared decision failed pure replay"
+        ) from error
+    if replayed != prepared_decision:
+        raise ManualPaperStrategyPlanVerificationError(
+            "prepared decision differs from pure replay"
+        )
+    return replayed
+
+
 def complete_manual_paper_strategy_plan(
     prepared_decision: PreparedManualPaperStrategyDecision,
     verified_open_binding: C3VerifiedDailyBarOpenBinding,

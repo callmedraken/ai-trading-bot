@@ -43,6 +43,7 @@ ANCHOR = security.PERSONAL_DESKTOP_PAPER_V2_ANCHOR
 RUNTIME = security.PERSONAL_DESKTOP_PAPER_V2_RUNTIME
 OPERATIONS = security.PERSONAL_DESKTOP_PAPER_V2_OPERATIONS
 UNATTENDED = security.PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_INVOCATIONS
+DECISIONS = security.PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_DECISIONS
 GENESIS = ROOT + f"\\paper-account-genesis-{IDENTITY}"
 CHECKPOINT = GENESIS + f"\\paper-account-checkpoint-{IDENTITY}.json"
 TRANSITION = RUNTIME + f"\\paper-account-transition-{IDENTITY}"
@@ -79,6 +80,8 @@ def inspection(path):
                 security.PaperObjectRole.OUTPUT_DIRECTORY,
                 security.PaperObjectRole.UNATTENDED_INVOCATION_FILE,
                 security.PaperObjectRole.UNATTENDED_INVOCATION_DIRECTORY,
+                security.PaperObjectRole.UNATTENDED_DECISION_FILE,
+                security.PaperObjectRole.UNATTENDED_DECISION_DIRECTORY,
             }
             else security.ADMINISTRATORS_SID
         )
@@ -189,6 +192,7 @@ def test_exact_constants_and_existing_c1_path_guard_is_unchanged():
     assert RUNTIME == r"F:\AITradingBot\Paper-v2\runtime"
     assert OPERATIONS == r"F:\AITradingBot\Paper-v2\runtime\paper-operations"
     assert UNATTENDED == (r"F:\AITradingBot\Paper-v2\runtime\unattended-invocations")
+    assert DECISIONS == (r"F:\AITradingBot\Paper-v2\runtime\unattended-decisions")
     with pytest.raises(AuthorityPathError):
         require_fixed_authority_tree_path(ROOT)
 
@@ -233,6 +237,16 @@ UNATTENDED_STAGING_FILE = (
     UNATTENDED_STAGING
     + f"\\personal-desktop-unattended-paper-invocation-{IDENTITY}.json"
 )
+DECISION_FINAL = DECISIONS + f"\\unattended-paper-decision-{IDENTITY}"
+DECISION_STAGING = DECISIONS + f"\\.unattended-paper-decision-{IDENTITY}.staging"
+DECISION_FILE = (
+    DECISION_FINAL
+    + f"\\personal-desktop-unattended-paper-decision-intent-{IDENTITY}.json"
+)
+DECISION_STAGING_FILE = (
+    DECISION_STAGING
+    + f"\\personal-desktop-unattended-paper-decision-intent-{IDENTITY}.json"
+)
 
 V2_ROLES = [
     ROOT,
@@ -248,6 +262,11 @@ V2_ROLES = [
     UNATTENDED_STAGING,
     UNATTENDED_FILE,
     UNATTENDED_STAGING_FILE,
+    DECISIONS,
+    DECISION_FINAL,
+    DECISION_STAGING,
+    DECISION_FILE,
+    DECISION_STAGING_FILE,
 ]
 
 
@@ -261,7 +280,7 @@ def test_role_policy_exact_rights_protected_owner_and_admin_system(path):
     if path in {ROOT, ANCHOR, GENESIS, CHECKPOINT}:
         assert not trading.access_mask & (0x10000 | 0x2 | 0x4 | 0x10 | 0x40 | 0x100)
         assert observed.owner_sid == security.ADMINISTRATORS_SID
-    elif path in {RUNTIME, OPERATIONS, UNATTENDED}:
+    elif path in {RUNTIME, OPERATIONS, UNATTENDED, DECISIONS}:
         assert observed.owner_sid == security.ADMINISTRATORS_SID
         assert trading.access_mask & 0x6 == 0x6
         assert not trading.access_mask & 0x10000
@@ -291,6 +310,27 @@ def test_unattended_paths_have_distinct_exact_roles_and_artifact_bound():
     )
     assert artifact.maximum_bytes == (
         security.MAX_PERSONAL_DESKTOP_UNATTENDED_PAPER_INVOCATION_BYTES
+    )
+    assert security.paper_security_policy(artifact.role, SID).owner_sid == SID
+
+
+def test_decision_paths_have_distinct_exact_roles_and_artifact_bound():
+    assert security.paper_object_spec(DECISIONS).role is (
+        security.PaperObjectRole.UNATTENDED_DECISIONS
+    )
+    assert security.paper_object_spec(DECISION_FINAL).role is (
+        security.PaperObjectRole.UNATTENDED_DECISION_DIRECTORY
+    )
+    assert security.paper_object_spec(DECISION_STAGING).role is (
+        security.PaperObjectRole.UNATTENDED_DECISION_DIRECTORY
+    )
+    artifact = security.paper_object_spec(DECISION_FILE)
+    assert artifact.role is security.PaperObjectRole.UNATTENDED_DECISION_FILE
+    assert security.paper_object_spec(DECISION_STAGING_FILE).role is (
+        security.PaperObjectRole.UNATTENDED_DECISION_FILE
+    )
+    assert artifact.maximum_bytes == (
+        security.MAX_PERSONAL_DESKTOP_UNATTENDED_PAPER_DECISION_INTENT_BYTES
     )
     assert security.paper_security_policy(artifact.role, SID).owner_sid == SID
 
@@ -368,7 +408,8 @@ def test_role_policy_rejects_acl_mutations(path, change):
 
 
 @pytest.mark.parametrize(
-    "path", [ROOT, ANCHOR, GENESIS, CHECKPOINT, RUNTIME, OPERATIONS, UNATTENDED]
+    "path",
+    [ROOT, ANCHOR, GENESIS, CHECKPOINT, RUNTIME, OPERATIONS, UNATTENDED, DECISIONS],
 )
 def test_trading_cannot_own_immutable_or_runtime_containers(path):
     with pytest.raises(AuthoritySecurityError):

@@ -31,8 +31,12 @@ from trading_bot.runtime.strategy_history_seed import (
     verify_strategy_history_seed,
 )
 from trading_bot.runtime.windows_authority import PRODUCTION_AUTHORITY_PATHS
-from trading_bot.runtime.windows_authority_schema import load_approved_sqlite_authority_build
-from trading_bot.runtime.windows_authority_sqlite import open_read_only_sqlite_connection
+from trading_bot.runtime.windows_authority_schema import (
+    load_approved_sqlite_authority_build,
+)
+from trading_bot.runtime.windows_authority_sqlite import (
+    open_read_only_sqlite_connection,
+)
 from trading_bot.runtime.windows_authority_validation import (
     ValidatedProductionAuthority,
     require_open_connection_matches_validated_authority,
@@ -168,7 +172,8 @@ class WindowsPersonalDesktopUnattendedSelectedC3ReadAuthority:
     def __init_subclass__(cls, **kwargs: object) -> None:
         del cls, kwargs
         raise TypeError(
-            "WindowsPersonalDesktopUnattendedSelectedC3ReadAuthority cannot be subclassed"
+            "WindowsPersonalDesktopUnattendedSelectedC3ReadAuthority "
+            "cannot be subclassed"
         )
 
     def read_selected_snapshot_for_session(

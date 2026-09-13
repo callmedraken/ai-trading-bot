@@ -38,15 +38,15 @@ def test_timing_policy_version_is_frozen() -> None:
 
 
 def test_next_session_skips_weekend() -> None:
-    assert next_xnys_execution_session(TradingSession(date(2026, 3, 13))) == (
-        TradingSession(date(2026, 3, 16))
-    )
+    assert next_xnys_execution_session(
+        TradingSession(date(2026, 3, 13))
+    ) == TradingSession(date(2026, 3, 16))
 
 
 def test_next_session_skips_exchange_holiday() -> None:
-    assert next_xnys_execution_session(TradingSession(date(2026, 4, 2))) == (
-        TradingSession(date(2026, 4, 6))
-    )
+    assert next_xnys_execution_session(
+        TradingSession(date(2026, 4, 2))
+    ) == TradingSession(date(2026, 4, 6))
 
 
 def test_early_close_session_keeps_regular_open_rule() -> None:
@@ -56,9 +56,9 @@ def test_early_close_session_keeps_regular_open_rule() -> None:
 
 
 def test_next_session_can_be_early_close_session() -> None:
-    assert next_xnys_execution_session(TradingSession(date(2026, 11, 25))) == (
-        TradingSession(date(2026, 11, 27))
-    )
+    assert next_xnys_execution_session(
+        TradingSession(date(2026, 11, 25))
+    ) == TradingSession(date(2026, 11, 27))
 
 
 @pytest.mark.parametrize(

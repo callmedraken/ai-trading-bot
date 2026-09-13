@@ -2544,6 +2544,27 @@ class WindowsEffectfulDailySnapshotCapture:
         plan = self.prepare_capture_plan(request, datetime.now(UTC))
         return self._capture_prepared_once(plan)
 
+    def capture_prepared_once(
+        self, plan: ProductionCapturePlan
+    ) -> ProductionCaptureInvocationResult:
+        """Run one already reviewed plan without obtaining a second timestamp."""
+
+        self._require_open()
+        if type(plan) is not ProductionCapturePlan:
+            raise TypeError("capture_prepared_once requires ProductionCapturePlan")
+        expected = prepare_production_capture_plan(
+            plan.request,
+            plan.requested_at_utc,
+        )
+        if plan != expected:
+            raise WindowsEffectfulCaptureCompositionError(
+                "prepared production capture plan is inconsistent"
+            )
+        adapter = getattr(self, "_adapter", None)
+        if type(adapter) is _ProductionC3TransactionalAdapter:
+            adapter.register_capture_plan(plan)
+        return self._capture_prepared_once(plan)
+
     def close(self) -> None:
         if self._closed:
             return

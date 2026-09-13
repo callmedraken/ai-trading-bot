@@ -9,9 +9,26 @@ from trading_bot.runtime.personal_desktop_unattended_daily_cycle_timing import (
     PersonalDesktopPreOpenDecisionEligibility,
     PersonalDesktopUnattendedDailyCycleTimingError,
     classify_pre_open_decision_eligibility,
+    completed_xnys_session_at,
     next_xnys_execution_session,
     xnys_regular_open,
 )
+
+
+@pytest.mark.parametrize(
+    ("observed_at", "expected"),
+    [
+        (datetime(2026, 8, 18, 14, tzinfo=UTC), date(2026, 8, 17)),
+        (datetime(2026, 8, 22, 12, tzinfo=UTC), date(2026, 8, 21)),
+        (datetime(2026, 8, 23, 12, tzinfo=UTC), date(2026, 8, 21)),
+        (datetime(2026, 7, 6, 12, tzinfo=UTC), date(2026, 7, 2)),
+    ],
+)
+def test_completed_session_uses_existing_xnys_semantics(
+    observed_at: datetime,
+    expected: date,
+) -> None:
+    assert completed_xnys_session_at(observed_at) == TradingSession(expected)
 
 
 @pytest.mark.parametrize(

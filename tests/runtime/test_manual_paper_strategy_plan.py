@@ -2,7 +2,7 @@
 
 import json
 import os
-from dataclasses import replace
+from dataclasses import fields, replace
 from datetime import UTC, date, datetime, time, timedelta
 from decimal import Decimal
 from hashlib import sha256
@@ -11,6 +11,7 @@ from uuid import UUID
 import pytest
 from tests.market_data.daily_snapshot_test_support import (
     CAPTURED_AT,
+    QQQ,
     SPY,
     accepted_result,
     calendar,
@@ -41,6 +42,7 @@ from trading_bot.runtime import (
     CallerAssertedNextSessionOpenReference,
     CheckpointedVerifiedSnapshotPaperCycleRequest,
     ManualPaperSelectedC3Assertion,
+    ManualPaperStrategyDecisionRequest,
     ManualPaperStrategyPlanRequest,
     ManualPaperStrategyPlanSerializationError,
     ManualPaperStrategyPlanValidationError,
@@ -49,8 +51,16 @@ from trading_bot.runtime import (
     PaperAccountCheckpointPosition,
     PaperAccountGenesisRequest,
     PaperPortfolioRuntime,
+    PreparedManualPaperStrategyDecision,
+    SelectedC3SnapshotAuditEvidence,
+    SelectedC3SnapshotPermit,
+    SelectedC3SnapshotReadError,
+    SelectedC3SnapshotReadResult,
     StrategyHistorySeedSourceDescriptor,
+    build_c3_verified_daily_bar_open_binding,
+    build_manual_paper_strategy_decision,
     build_manual_paper_strategy_plan,
+    complete_manual_paper_strategy_plan,
     create_genesis_paper_account_checkpoint,
     create_strategy_history_seed,
     parse_manual_paper_strategy_plan,
@@ -199,6 +209,329 @@ def _request(
 
 def _binding(**kwargs):
     return build_manual_paper_strategy_plan(_request(**kwargs), calendar())
+
+
+def _decision_request(
+    request: ManualPaperStrategyPlanRequest,
+) -> ManualPaperStrategyDecisionRequest:
+    return ManualPaperStrategyDecisionRequest(
+        request.snapshot_verification,
+        request.paper_account_id,
+        request.selected_c3_assertion,
+        request.prior_checkpoint,
+        request.history_seed,
+        request.strategy_config,
+        request.caller_idempotency_key,
+        request.policies,
+        request.planning_at,
+        request.submitted_at,
+        request.filled_at,
+        request.metadata,
+    )
+
+
+def _execution_snapshot(open_price: str, *, symbol=SPY):
+    requested_at = datetime(2025, 1, 8, 18, tzinfo=UTC)
+    price = Decimal(open_price)
+    accepted = accepted_result(
+        request=capture_request(
+            request_id=UUID("98dbdaca-e14b-5f10-8ca9-3650e18aa1d9"),
+            requested_at=requested_at,
+            symbols=(symbol,),
+        ),
+        candidates=(
+            candidate(
+                symbol,
+                0,
+                session=_NEXT_SESSION,
+                timestamp=datetime(2025, 1, 7, 20, tzinfo=UTC),
+                open_price=price,
+                high=price + Decimal("1"),
+                low=price - Decimal("1"),
+                close=price,
+            ),
+        ),
+        captured_at=requested_at + timedelta(seconds=1),
+    )
+    assert accepted.snapshot is not None
+    payload = serialize_daily_snapshot(accepted.snapshot)
+    return verify_daily_snapshot(payload, calendar())
+
+
+def _selected_result(snapshot_verification) -> SelectedC3SnapshotReadResult:
+    assert snapshot_verification.snapshot is not None
+    payload = serialize_daily_snapshot(snapshot_verification.snapshot)
+    audit = SelectedC3SnapshotAuditEvidence(
+        UUID("81000000-0000-4000-8000-000000000001"),
+        UUID("82000000-0000-4000-8000-000000000002"),
+        UUID("83000000-0000-4000-8000-000000000003"),
+        UUID("84000000-0000-4000-8000-000000000004"),
+        snapshot_verification.snapshot.snapshot_id,
+        snapshot_verification.sha256,
+        snapshot_verification.byte_length,
+        "8" * 64,
+        "SUCCEEDED",
+        "CONFIRMED",
+        r"F:\AITradingBot\Authority\capture-output\selected.json",
+    )
+    return SelectedC3SnapshotReadResult(
+        audit,
+        object.__new__(SelectedC3SnapshotPermit),
+        payload,
+        snapshot_verification,
+    )
+
+
+def _verified_open_binding(
+    monkeypatch: pytest.MonkeyPatch,
+    open_price: str,
+    *,
+    symbol=SPY,
+):
+    import trading_bot.runtime.verified_c3_daily_bar_open as open_module
+
+    authority = object()
+    monkeypatch.setattr(
+        open_module, "require_validated_production_authority", lambda value: value
+    )
+    monkeypatch.setattr(
+        open_module,
+        "require_selected_c3_snapshot_matches_authority",
+        lambda permit, audit, current: None,
+    )
+    return build_c3_verified_daily_bar_open_binding(
+        _selected_result(_execution_snapshot(open_price, symbol=symbol)),
+        authority,  # type: ignore[arg-type]
+    )
+
+
+def test_pre_open_request_and_prepared_decision_contain_no_open_input() -> None:
+    request = _decision_request(_request())
+    prepared = build_manual_paper_strategy_decision(request, calendar())
+
+    assert all("open" not in item.name for item in fields(type(request)))
+    assert all("open" not in item.name for item in fields(type(prepared)))
+    assert isinstance(prepared, PreparedManualPaperStrategyDecision)
+    assert prepared.intended_execution_session == _NEXT_SESSION
+
+
+def test_phase_one_evaluates_once_and_completion_never_reevaluates(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from trading_bot.runtime import manual_paper_strategy_plan as module
+
+    original = module.MovingAverageCrossoverStrategy.evaluate
+    calls = 0
+
+    def counted(self, context):
+        nonlocal calls
+        calls += 1
+        return original(self, context)
+
+    monkeypatch.setattr(module.MovingAverageCrossoverStrategy, "evaluate", counted)
+    prepared = build_manual_paper_strategy_decision(
+        _decision_request(_request()), calendar()
+    )
+    assert calls == 1
+
+    def forbidden(self, context):
+        del self, context
+        raise AssertionError("completion must not reevaluate the strategy")
+
+    monkeypatch.setattr(module.MovingAverageCrossoverStrategy, "evaluate", forbidden)
+    completed = complete_manual_paper_strategy_plan(
+        prepared, _verified_open_binding(monkeypatch, "12"), calendar()
+    )
+    assert completed.plan.strategy_proposal == prepared.strategy_proposal
+
+
+def test_later_c3_open_changes_only_final_completion(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    request = _decision_request(_request())
+    first_prepared = build_manual_paper_strategy_decision(request, calendar())
+    second_prepared = build_manual_paper_strategy_decision(request, calendar())
+    first = complete_manual_paper_strategy_plan(
+        first_prepared, _verified_open_binding(monkeypatch, "12"), calendar()
+    )
+    second = complete_manual_paper_strategy_plan(
+        second_prepared, _verified_open_binding(monkeypatch, "13"), calendar()
+    )
+
+    assert first_prepared == second_prepared
+    assert first.plan.target == second.plan.target == first_prepared.target
+    assert first.plan.plan_id != second.plan.plan_id
+    assert first.artifact_bytes != second.artifact_bytes
+
+
+def test_completion_rejects_wrong_execution_session(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import trading_bot.runtime.verified_c3_daily_bar_open as open_module
+
+    monkeypatch.setattr(
+        open_module, "require_validated_production_authority", lambda value: value
+    )
+    monkeypatch.setattr(
+        open_module,
+        "require_selected_c3_snapshot_matches_authority",
+        lambda permit, audit, current: None,
+    )
+    wrong_session = build_c3_verified_daily_bar_open_binding(
+        _selected_result(_snapshot()),
+        object(),  # type: ignore[arg-type]
+    )
+    prepared = build_manual_paper_strategy_decision(
+        _decision_request(_request()), calendar()
+    )
+
+    with pytest.raises(ManualPaperStrategyPlanValidationError, match="session"):
+        complete_manual_paper_strategy_plan(prepared, wrong_session, calendar())
+
+
+def test_completion_rejects_wrong_symbol(monkeypatch: pytest.MonkeyPatch) -> None:
+    prepared = build_manual_paper_strategy_decision(
+        _decision_request(_request()), calendar()
+    )
+    wrong_symbol = _verified_open_binding(monkeypatch, "12", symbol=QQQ)
+
+    with pytest.raises(ManualPaperStrategyPlanValidationError, match="symbol"):
+        complete_manual_paper_strategy_plan(prepared, wrong_symbol, calendar())
+
+
+def test_forged_replacement_open_cannot_override_selected_artifact(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    prepared = build_manual_paper_strategy_decision(
+        _decision_request(_request()), calendar()
+    )
+    binding = _verified_open_binding(monkeypatch, "12")
+    object.__setattr__(binding, "_open_price", Decimal("999"))
+
+    with pytest.raises(ManualPaperStrategyPlanValidationError, match="provenance"):
+        complete_manual_paper_strategy_plan(prepared, binding, calendar())
+
+
+def test_wrong_current_c1_p2_provenance_rejects_open_binding(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import trading_bot.runtime.verified_c3_daily_bar_open as open_module
+
+    monkeypatch.setattr(
+        open_module, "require_validated_production_authority", lambda value: value
+    )
+
+    def reject(permit, audit, authority):
+        del permit, audit, authority
+        raise SelectedC3SnapshotReadError("P2 read does not match C1 authority")
+
+    monkeypatch.setattr(
+        open_module, "require_selected_c3_snapshot_matches_authority", reject
+    )
+    with pytest.raises(ValueError, match="current C1"):
+        build_c3_verified_daily_bar_open_binding(
+            _selected_result(_execution_snapshot("12")),
+            object(),  # type: ignore[arg-type]
+        )
+
+
+def test_completion_revalidates_current_c1_p2_provenance(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import trading_bot.runtime.verified_c3_daily_bar_open as open_module
+
+    prepared = build_manual_paper_strategy_decision(
+        _decision_request(_request()), calendar()
+    )
+    binding = _verified_open_binding(monkeypatch, "12")
+
+    def reject(permit, audit, authority):
+        del permit, audit, authority
+        raise SelectedC3SnapshotReadError("P2 read does not match current C1")
+
+    monkeypatch.setattr(
+        open_module, "require_selected_c3_snapshot_matches_authority", reject
+    )
+    with pytest.raises(ManualPaperStrategyPlanValidationError, match="provenance"):
+        complete_manual_paper_strategy_plan(prepared, binding, calendar())
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "expected_plan_id", "expected_sha256", "expected_length", "request_id"),
+    (
+        (
+            {},
+            "51752429-00b3-577a-9008-6f9845918975",
+            "f94d3dbd2d3372c261617ee5180c0b46227a269dc2c73672f773fbc3fbb3a2af",
+            5946,
+            "20af4bbb-15e2-59da-a0d0-fe2e09ea1355",
+        ),
+        (
+            {
+                "closes": ("9", "12", "12"),
+                "selected_close": "10",
+                "config": MovingAverageCrossoverConfig(2, 3, Decimal("99")),
+                "prior": _prior(cash="10", quantity="2.5", basis="25"),
+                "open_price": "10",
+            },
+            "8d6da27e-4282-54fd-b681-1d1776323b57",
+            "fc8d4be1b37b34a9bc8e674a45b77404a9820f8e8aec8df347c6a4804caccb55",
+            6026,
+            "20c1300b-26ac-5cec-b42a-797397e69d4a",
+        ),
+        (
+            {"closes": ("10", "11", "12"), "selected_close": "13"},
+            "cbc85bd1-7f53-57fe-9837-56a1a46e11f9",
+            "96ac573fbf8c2f998130322643249cec378824de5e2345db9497e682e91fafff",
+            5452,
+            "ffb2e701-ac8c-556c-892f-dd9233d87169",
+        ),
+    ),
+    ids=("bullish", "bearish", "no-signal"),
+)
+def test_two_phase_completion_is_exactly_legacy_compatible(
+    monkeypatch: pytest.MonkeyPatch,
+    kwargs: dict[str, object],
+    expected_plan_id: str,
+    expected_sha256: str,
+    expected_length: int,
+    request_id: str,
+) -> None:
+    request = _request(**kwargs)
+    legacy = build_manual_paper_strategy_plan(request, calendar())
+    prepared = build_manual_paper_strategy_decision(
+        _decision_request(request), calendar()
+    )
+    completed = complete_manual_paper_strategy_plan(
+        prepared,
+        _verified_open_binding(
+            monkeypatch,
+            str(request.open_reference.caller_asserted_open_reference_price),
+        ),
+        calendar(),
+    )
+
+    assert completed == legacy
+    assert completed.plan == legacy.plan
+    assert completed.artifact_bytes == legacy.artifact_bytes
+    assert completed.plan.plan_id == legacy.plan.plan_id
+    assert completed.artifact_sha256 == legacy.artifact_sha256
+    assert completed.artifact_byte_length == legacy.artifact_byte_length
+    assert completed.checkpointed_request == legacy.checkpointed_request
+    assert completed.checkpointed_request.request_id == (
+        legacy.checkpointed_request.request_id
+    )
+    assert completed.plan.target == legacy.plan.target
+    assert completed.plan.strategy_run_id == legacy.plan.strategy_run_id
+    assert completed.plan.strategy_step_index == legacy.plan.strategy_step_index
+    assert completed.plan.planner_plan_id == legacy.plan.planner_plan_id
+    assert completed.plan.planner_result_id == legacy.plan.planner_result_id
+    assert completed.plan.strategy_proposal == legacy.plan.strategy_proposal
+    assert completed.plan.planner_proposal == legacy.plan.planner_proposal
+    assert str(completed.plan.plan_id) == expected_plan_id
+    assert completed.artifact_sha256 == expected_sha256
+    assert completed.artifact_byte_length == expected_length
+    assert str(completed.checkpointed_request.request_id) == request_id
 
 
 def test_bullish_crossover_flat_produces_exact_buy_and_target() -> None:

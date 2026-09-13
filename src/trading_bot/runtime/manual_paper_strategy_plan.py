@@ -1,17 +1,18 @@
-"""Pure deterministic strategy planning for Architecture 94 P1."""
+"""Pure Architecture-94 planning with Architecture-111 two-phase construction."""
 
 from __future__ import annotations
 
 import json
 import re
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, time
 from decimal import Context, Decimal, InvalidOperation, localcontext
 from enum import StrEnum
 from hashlib import sha256
 from types import MappingProxyType
 from typing import Any
 from uuid import UUID, uuid5
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from trading_bot.backtesting import BacktestContext
 from trading_bot.domain import OrderSide, Position, Symbol, TradeProposal
@@ -20,6 +21,7 @@ from trading_bot.ledger import (
     CompactPaperLedgerPosition,
     CompactPaperLedgerState,
 )
+from trading_bot.market_calendar import TradingSession
 from trading_bot.market_data import (
     DailySnapshotVerificationResult,
     DailySnapshotVerificationStatus,
@@ -55,6 +57,11 @@ from trading_bot.runtime.strategy_history_seed import (
     VerifiedStrategyHistorySeed,
     serialize_strategy_history_seed,
     verify_strategy_history_seed,
+)
+from trading_bot.runtime.verified_c3_daily_bar_open import (
+    C3VerifiedDailyBarOpenBinding,
+    C3VerifiedDailyBarOpenBindingError,
+    require_c3_verified_daily_bar_open_binding,
 )
 from trading_bot.runtime.verified_snapshot_preparation import (
     CallerAssertedNextSessionOpenReference,
@@ -360,6 +367,179 @@ class ManualPaperStrategyPlanRequest:
 
 
 @dataclass(frozen=True, slots=True)
+class ManualPaperStrategyDecisionRequest:
+    """Complete pre-open inputs for one pure strategy decision."""
+
+    snapshot_verification: DailySnapshotVerificationResult
+    paper_account_id: str
+    selected_c3_assertion: ManualPaperSelectedC3Assertion
+    prior_checkpoint: VerifiedPriorCheckpoint
+    history_seed: VerifiedStrategyHistorySeed
+    strategy_config: MovingAverageCrossoverConfig
+    caller_idempotency_key: str
+    policies: VerifiedSnapshotPaperCyclePolicies
+    planning_at: datetime
+    submitted_at: datetime
+    filled_at: datetime
+    metadata: tuple[MetadataEntry, ...] = ()
+
+    def __post_init__(self) -> None:
+        if type(self.snapshot_verification) is not DailySnapshotVerificationResult:
+            raise ManualPaperStrategyPlanValidationError(
+                "snapshot_verification must be exact"
+            )
+        _paper_account_id(self.paper_account_id)
+        if type(self.selected_c3_assertion) is not ManualPaperSelectedC3Assertion:
+            raise ManualPaperStrategyPlanValidationError(
+                "selected_c3_assertion must be exact non-authorizing evidence"
+            )
+        if type(self.prior_checkpoint) is not VerifiedPriorCheckpoint:
+            raise ManualPaperStrategyPlanValidationError(
+                "prior_checkpoint must use the existing verified-prior contract"
+            )
+        if type(self.history_seed) is not VerifiedStrategyHistorySeed:
+            raise ManualPaperStrategyPlanValidationError(
+                "history_seed must be complete verified seed evidence"
+            )
+        if type(self.strategy_config) is not MovingAverageCrossoverConfig:
+            raise ManualPaperStrategyPlanValidationError(
+                "strategy_config must be an exact MovingAverageCrossoverConfig"
+            )
+        _idempotency_key(self.caller_idempotency_key)
+        if type(self.policies) is not VerifiedSnapshotPaperCyclePolicies:
+            raise ManualPaperStrategyPlanValidationError("policies must be exact")
+        metadata = _metadata(self.metadata)
+        if any(
+            item.key.startswith(ARCHITECTURE94_METADATA_PREFIX) for item in metadata
+        ):
+            raise ManualPaperStrategyPlanValidationError(
+                "caller/base architecture94. metadata is reserved"
+            )
+        object.__setattr__(self, "planning_at", _utc(self.planning_at, "planning_at"))
+        object.__setattr__(
+            self, "submitted_at", _utc(self.submitted_at, "submitted_at")
+        )
+        object.__setattr__(self, "filled_at", _utc(self.filled_at, "filled_at"))
+        object.__setattr__(self, "metadata", metadata)
+
+
+@dataclass(frozen=True, slots=True)
+class PreparedManualPaperStrategyDecision:
+    """Immutable pre-open result retained for later verified-open completion."""
+
+    selected_snapshot_artifact: bytes
+    snapshot_verification: DailySnapshotVerificationResult
+    history_seed_artifact: bytes
+    paper_account_id: str
+    selected_c3_assertion: ManualPaperSelectedC3Assertion
+    prior_checkpoint: ManualPaperPriorCheckpointEvidence
+    strategy_config: MovingAverageCrossoverConfig
+    caller_idempotency_key: str
+    policies: VerifiedSnapshotPaperCyclePolicies
+    planning_at: datetime
+    submitted_at: datetime
+    filled_at: datetime
+    metadata: tuple[MetadataEntry, ...]
+    symbol: Symbol
+    selected_session: TradingSession
+    intended_execution_session: TradingSession
+    strategy_context_material: str
+    strategy_run_id: UUID
+    strategy_step_index: int
+    signal_status: ManualPaperStrategySignalStatus
+    strategy_proposal: TradeProposal | None
+    target: ExplicitQuantityTargetPortfolio
+
+    def __post_init__(self) -> None:
+        if type(self.selected_snapshot_artifact) is not bytes or not (
+            self.selected_snapshot_artifact
+        ):
+            raise ManualPaperStrategyPlanValidationError(
+                "prepared selected snapshot artifact must be nonempty bytes"
+            )
+        if type(self.snapshot_verification) is not DailySnapshotVerificationResult:
+            raise ManualPaperStrategyPlanValidationError(
+                "prepared snapshot verification must be exact"
+            )
+        if type(self.history_seed_artifact) is not bytes or not (
+            self.history_seed_artifact
+        ):
+            raise ManualPaperStrategyPlanValidationError(
+                "prepared history seed artifact must be nonempty bytes"
+            )
+        _paper_account_id(self.paper_account_id)
+        if type(self.selected_c3_assertion) is not ManualPaperSelectedC3Assertion:
+            raise ManualPaperStrategyPlanValidationError(
+                "prepared selected C3 assertion must be exact"
+            )
+        if type(self.prior_checkpoint) is not ManualPaperPriorCheckpointEvidence:
+            raise ManualPaperStrategyPlanValidationError(
+                "prepared prior checkpoint evidence must be exact"
+            )
+        if type(self.strategy_config) is not MovingAverageCrossoverConfig:
+            raise ManualPaperStrategyPlanValidationError(
+                "prepared strategy configuration must be exact"
+            )
+        _idempotency_key(self.caller_idempotency_key)
+        if type(self.policies) is not VerifiedSnapshotPaperCyclePolicies:
+            raise ManualPaperStrategyPlanValidationError(
+                "prepared policies must be exact"
+            )
+        metadata = _metadata(self.metadata)
+        if any(
+            item.key.startswith(ARCHITECTURE94_METADATA_PREFIX) for item in metadata
+        ):
+            raise ManualPaperStrategyPlanValidationError(
+                "prepared architecture94. metadata is reserved"
+            )
+        if type(self.symbol) is not Symbol:
+            raise ManualPaperStrategyPlanValidationError(
+                "prepared symbol must be exact"
+            )
+        if (
+            type(self.selected_session) is not TradingSession
+            or type(self.intended_execution_session) is not TradingSession
+            or self.intended_execution_session <= self.selected_session
+        ):
+            raise ManualPaperStrategyPlanValidationError(
+                "prepared execution session must be later than selected session"
+            )
+        if (
+            type(self.strategy_context_material) is not str
+            or not self.strategy_context_material
+            or type(self.strategy_run_id) is not UUID
+            or type(self.strategy_step_index) is not int
+            or self.strategy_step_index < 0
+        ):
+            raise ManualPaperStrategyPlanValidationError(
+                "prepared strategy context evidence is invalid"
+            )
+        if type(self.signal_status) is not ManualPaperStrategySignalStatus:
+            raise ManualPaperStrategyPlanValidationError(
+                "prepared strategy signal status is invalid"
+            )
+        if self.signal_status is ManualPaperStrategySignalStatus.NO_SIGNAL:
+            if self.strategy_proposal is not None:
+                raise ManualPaperStrategyPlanValidationError(
+                    "prepared NO_SIGNAL requires no strategy proposal"
+                )
+        elif type(self.strategy_proposal) is not TradeProposal:
+            raise ManualPaperStrategyPlanValidationError(
+                "prepared TRADE_PROPOSAL requires one exact proposal"
+            )
+        if type(self.target) is not ExplicitQuantityTargetPortfolio:
+            raise ManualPaperStrategyPlanValidationError(
+                "prepared target must be exact"
+            )
+        object.__setattr__(self, "planning_at", _utc(self.planning_at, "planning_at"))
+        object.__setattr__(
+            self, "submitted_at", _utc(self.submitted_at, "submitted_at")
+        )
+        object.__setattr__(self, "filled_at", _utc(self.filled_at, "filled_at"))
+        object.__setattr__(self, "metadata", metadata)
+
+
+@dataclass(frozen=True, slots=True)
 class ManualPaperStrategyPlan:
     """Canonical pure plan retaining strategy, target, and planner evidence."""
 
@@ -513,10 +693,41 @@ def build_manual_paper_strategy_plan(
     request: ManualPaperStrategyPlanRequest,
     calendar: IdentifiedMarketCalendar,
 ) -> ManualPaperStrategyPlanArtifactBinding:
-    """Build, serialize, and detach-bind one pure strategy plan."""
+    """Compatibility builder for existing supervised/manual callers."""
     if type(request) is not ManualPaperStrategyPlanRequest:
         raise ManualPaperStrategyPlanValidationError(
             "request must be an exact ManualPaperStrategyPlanRequest"
+        )
+    prepared = build_manual_paper_strategy_decision(
+        ManualPaperStrategyDecisionRequest(
+            request.snapshot_verification,
+            request.paper_account_id,
+            request.selected_c3_assertion,
+            request.prior_checkpoint,
+            request.history_seed,
+            request.strategy_config,
+            request.caller_idempotency_key,
+            request.policies,
+            request.planning_at,
+            request.submitted_at,
+            request.filled_at,
+            request.metadata,
+        ),
+        calendar,
+    )
+    return _complete_prepared_manual_paper_strategy_decision(
+        prepared, request.open_reference, calendar
+    )
+
+
+def build_manual_paper_strategy_decision(
+    request: ManualPaperStrategyDecisionRequest,
+    calendar: IdentifiedMarketCalendar,
+) -> PreparedManualPaperStrategyDecision:
+    """Perform the complete deterministic pre-open strategy decision phase."""
+    if type(request) is not ManualPaperStrategyDecisionRequest:
+        raise ManualPaperStrategyPlanValidationError(
+            "request must be an exact ManualPaperStrategyDecisionRequest"
         )
     verification = request.snapshot_verification
     if (
@@ -556,7 +767,7 @@ def build_manual_paper_strategy_plan(
             "verified history seed evidence does not match the requested plan"
         )
     prior = ManualPaperPriorCheckpointEvidence.from_verified(request.prior_checkpoint)
-    return _build_from_evidence(
+    return _prepare_decision_from_evidence(
         snapshot_payload=snapshot_payload,
         snapshot_verification=replayed_snapshot,
         seed_payload=seed_payload,
@@ -565,13 +776,46 @@ def build_manual_paper_strategy_plan(
         prior=prior,
         strategy_config=request.strategy_config,
         caller_idempotency_key=request.caller_idempotency_key,
-        open_reference=request.open_reference,
         policies=request.policies,
         planning_at=request.planning_at,
         submitted_at=request.submitted_at,
         filled_at=request.filled_at,
         metadata=request.metadata,
         calendar=calendar,
+    )
+
+
+def complete_manual_paper_strategy_plan(
+    prepared_decision: PreparedManualPaperStrategyDecision,
+    verified_open_binding: C3VerifiedDailyBarOpenBinding,
+    calendar: IdentifiedMarketCalendar,
+) -> ManualPaperStrategyPlanArtifactBinding:
+    """Complete one prepared decision from an exact production C3 open proof."""
+    if type(prepared_decision) is not PreparedManualPaperStrategyDecision:
+        raise ManualPaperStrategyPlanValidationError(
+            "prepared_decision must be an exact PreparedManualPaperStrategyDecision"
+        )
+    try:
+        binding = require_c3_verified_daily_bar_open_binding(verified_open_binding)
+    except C3VerifiedDailyBarOpenBindingError as error:
+        raise ManualPaperStrategyPlanValidationError(
+            "execution-session C3 open binding provenance is invalid"
+        ) from error
+    if binding.symbol != prepared_decision.symbol:
+        raise ManualPaperStrategyPlanValidationError(
+            "execution-session C3 open binding symbol does not match decision"
+        )
+    if binding.session != prepared_decision.intended_execution_session:
+        raise ManualPaperStrategyPlanValidationError(
+            "execution-session C3 open binding session does not match decision"
+        )
+    open_reference = CallerAssertedNextSessionOpenReference(
+        binding.symbol,
+        binding.session,
+        binding.open_price,
+    )
+    return _complete_prepared_manual_paper_strategy_decision(
+        prepared_decision, open_reference, calendar
     )
 
 
@@ -776,6 +1020,44 @@ def _build_from_evidence(
     metadata: tuple[MetadataEntry, ...],
     calendar: IdentifiedMarketCalendar,
 ) -> ManualPaperStrategyPlanArtifactBinding:
+    prepared = _prepare_decision_from_evidence(
+        snapshot_payload=snapshot_payload,
+        snapshot_verification=snapshot_verification,
+        seed_payload=seed_payload,
+        paper_account_id=paper_account_id,
+        selected_c3_assertion=selected_c3_assertion,
+        prior=prior,
+        strategy_config=strategy_config,
+        caller_idempotency_key=caller_idempotency_key,
+        policies=policies,
+        planning_at=planning_at,
+        submitted_at=submitted_at,
+        filled_at=filled_at,
+        metadata=metadata,
+        calendar=calendar,
+    )
+    return _complete_prepared_manual_paper_strategy_decision(
+        prepared, open_reference, calendar
+    )
+
+
+def _prepare_decision_from_evidence(
+    *,
+    snapshot_payload: bytes,
+    snapshot_verification: DailySnapshotVerificationResult,
+    seed_payload: bytes,
+    paper_account_id: str,
+    selected_c3_assertion: ManualPaperSelectedC3Assertion,
+    prior: ManualPaperPriorCheckpointEvidence,
+    strategy_config: MovingAverageCrossoverConfig,
+    caller_idempotency_key: str,
+    policies: VerifiedSnapshotPaperCyclePolicies,
+    planning_at: datetime,
+    submitted_at: datetime,
+    filled_at: datetime,
+    metadata: tuple[MetadataEntry, ...],
+    calendar: IdentifiedMarketCalendar,
+) -> PreparedManualPaperStrategyDecision:
     _paper_account_id(paper_account_id)
     _require_c3_snapshot_match(selected_c3_assertion, snapshot_verification)
     try:
@@ -819,13 +1101,6 @@ def _build_from_evidence(
         raise ManualPaperStrategyPlanValidationError(
             "caller/base architecture94. metadata is reserved"
         )
-    if (
-        type(open_reference) is not CallerAssertedNextSessionOpenReference
-        or open_reference.symbol != symbol
-    ):
-        raise ManualPaperStrategyPlanValidationError(
-            "one exact same-symbol open-reference assertion is required"
-        )
     if type(policies) is not VerifiedSnapshotPaperCyclePolicies:
         raise ManualPaperStrategyPlanValidationError("policies must be exact")
     normalized_planning = _utc(planning_at, "planning_at")
@@ -865,6 +1140,70 @@ def _build_from_evidence(
         strategy_proposal,
         context_material,
     )
+    intended_execution_session = _derive_intended_execution_session(
+        replay.target_session,
+        snapshot_verification,
+        calendar,
+    )
+    _validate_prepared_chronology(
+        prior.compact_state.as_of,
+        snapshot_verification.snapshot.audit.captured_at,
+        normalized_planning,
+        normalized_submitted,
+        normalized_filled,
+        intended_execution_session,
+        snapshot_verification,
+    )
+    return PreparedManualPaperStrategyDecision(
+        snapshot_payload,
+        snapshot_verification,
+        seed_payload,
+        paper_account_id,
+        selected_c3_assertion,
+        prior,
+        strategy_config,
+        caller_idempotency_key,
+        policies,
+        normalized_planning,
+        normalized_submitted,
+        normalized_filled,
+        retained_metadata,
+        symbol,
+        replay.target_session,
+        intended_execution_session,
+        context_material,
+        run_id,
+        step_index,
+        signal_status,
+        strategy_proposal,
+        target,
+    )
+
+
+def _complete_prepared_manual_paper_strategy_decision(
+    prepared_decision: PreparedManualPaperStrategyDecision,
+    open_reference: CallerAssertedNextSessionOpenReference,
+    calendar: IdentifiedMarketCalendar,
+) -> ManualPaperStrategyPlanArtifactBinding:
+    if type(prepared_decision) is not PreparedManualPaperStrategyDecision:
+        raise ManualPaperStrategyPlanValidationError("prepared_decision must be exact")
+    if (
+        type(open_reference) is not CallerAssertedNextSessionOpenReference
+        or open_reference.symbol != prepared_decision.symbol
+        or open_reference.session != prepared_decision.intended_execution_session
+    ):
+        raise ManualPaperStrategyPlanValidationError(
+            "one exact intended-session same-symbol open reference is required"
+        )
+    context_material = prepared_decision.strategy_context_material
+    paper_account_id = prepared_decision.paper_account_id
+    selected_c3_assertion = prepared_decision.selected_c3_assertion
+    target = prepared_decision.target
+    policies = prepared_decision.policies
+    normalized_planning = prepared_decision.planning_at
+    normalized_submitted = prepared_decision.submitted_at
+    normalized_filled = prepared_decision.filled_at
+    retained_metadata = prepared_decision.metadata
     request_id = _checkpointed_request_id(
         context_material,
         paper_account_id,
@@ -878,9 +1217,9 @@ def _build_from_evidence(
         retained_metadata,
     )
     snapshot_reference = VerifiedDailySnapshotReference(
-        replay.snapshot_id,
-        snapshot_verification.sha256,
-        snapshot_verification.byte_length,
+        prepared_decision.snapshot_verification.snapshot.snapshot_id,
+        prepared_decision.snapshot_verification.sha256,
+        prepared_decision.snapshot_verification.byte_length,
     )
     request_core = CheckpointedVerifiedSnapshotPaperCycleRequest(
         request_id,
@@ -893,7 +1232,7 @@ def _build_from_evidence(
         normalized_filled,
         retained_metadata,
     )
-    account_state = _verified_account_state(prior)
+    account_state = _verified_account_state(prepared_decision.prior_checkpoint)
     try:
         prepared = prepare_verified_snapshot_paper_cycle(
             VerifiedSnapshotPaperCyclePreparationRequest(
@@ -908,7 +1247,7 @@ def _build_from_evidence(
                 normalized_filled,
                 retained_metadata,
             ),
-            snapshot_verification,
+            prepared_decision.snapshot_verification,
             calendar,
         )
         plan = RebalancePlanner().plan(prepared.planner_request)
@@ -927,24 +1266,24 @@ def _build_from_evidence(
             "existing preparation/planner/proposal path rejected the exact target"
         ) from error
     planner_proposal = _reconcile_proposals(
-        symbol,
-        strategy_proposal,
+        prepared_decision.symbol,
+        prepared_decision.strategy_proposal,
         plan.status,
         proposal_result.status,
         proposal_result.proposals,
     )
     values = _PlanValues(
-        snapshot_payload,
-        seed_payload,
+        prepared_decision.selected_snapshot_artifact,
+        prepared_decision.history_seed_artifact,
         paper_account_id,
         selected_c3_assertion,
-        prior,
-        strategy_config,
-        caller_idempotency_key,
-        run_id,
-        step_index,
-        signal_status,
-        strategy_proposal,
+        prepared_decision.prior_checkpoint,
+        prepared_decision.strategy_config,
+        prepared_decision.caller_idempotency_key,
+        prepared_decision.strategy_run_id,
+        prepared_decision.strategy_step_index,
+        prepared_decision.signal_status,
+        prepared_decision.strategy_proposal,
         target,
         plan.plan_id,
         plan.status,
@@ -1009,6 +1348,63 @@ class _PlanValues:
     planner_result_id: UUID
     planner_proposal: TradeProposal | None
     request_core: CheckpointedVerifiedSnapshotPaperCycleRequest
+
+
+def _derive_intended_execution_session(
+    selected_session: TradingSession,
+    snapshot_verification: DailySnapshotVerificationResult,
+    calendar: IdentifiedMarketCalendar,
+) -> TradingSession:
+    snapshot = snapshot_verification.snapshot
+    if snapshot is None:
+        raise ManualPaperStrategyPlanValidationError(
+            "selected snapshot is unavailable for next-session derivation"
+        )
+    try:
+        timezone = ZoneInfo(snapshot.request.calendar.exchange_timezone)
+        anchor = datetime.combine(selected_session.session_date, time(12), timezone)
+        next_session = calendar.next_session(anchor)
+    except (AttributeError, TypeError, ValueError, ZoneInfoNotFoundError) as error:
+        raise ManualPaperStrategyPlanValidationError(
+            "intended execution session cannot be derived"
+        ) from error
+    if type(next_session) is not TradingSession or next_session <= selected_session:
+        raise ManualPaperStrategyPlanValidationError(
+            "calendar must return the first later intended execution session"
+        )
+    return next_session
+
+
+def _validate_prepared_chronology(
+    account_as_of: datetime,
+    captured_at: datetime,
+    planning_at: datetime,
+    submitted_at: datetime,
+    filled_at: datetime,
+    intended_execution_session: TradingSession,
+    snapshot_verification: DailySnapshotVerificationResult,
+) -> None:
+    if not (account_as_of <= captured_at <= planning_at <= submitted_at <= filled_at):
+        raise ManualPaperStrategyPlanValidationError(
+            "timestamps must satisfy account <= capture <= plan <= submit <= fill"
+        )
+    snapshot = snapshot_verification.snapshot
+    if snapshot is None:
+        raise ManualPaperStrategyPlanValidationError(
+            "selected snapshot is unavailable for chronology validation"
+        )
+    try:
+        filled_session_date = filled_at.astimezone(
+            ZoneInfo(snapshot.request.calendar.exchange_timezone)
+        ).date()
+    except ZoneInfoNotFoundError as error:
+        raise ManualPaperStrategyPlanValidationError(
+            "intended execution timezone cannot be loaded"
+        ) from error
+    if filled_session_date != intended_execution_session.session_date:
+        raise ManualPaperStrategyPlanValidationError(
+            "filled_at must name the intended execution session"
+        )
 
 
 def _strategy_context(

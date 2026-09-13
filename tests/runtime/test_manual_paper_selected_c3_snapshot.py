@@ -39,6 +39,12 @@ from trading_bot.runtime.manual_paper_selected_c3_snapshot import (
     require_disposable_selected_c3_snapshot_permit_for_test,
     require_selected_c3_snapshot_permit,
 )
+from trading_bot.runtime.verified_c3_daily_bar_open import (
+    C3VerifiedDailyBarOpenBindingError,
+    build_disposable_c3_verified_daily_bar_open_binding_for_test,
+    require_c3_verified_daily_bar_open_binding,
+    require_disposable_c3_verified_daily_bar_open_binding_for_test,
+)
 from trading_bot.runtime.windows_authority import (
     WindowsAuthorityBootstrap,
     WindowsAuthorityError,
@@ -69,6 +75,7 @@ from trading_bot.runtime.windows_effectful_capture_service import (
 _NAMESPACE = UUID("7c2d5a44-3b2e-5f8f-9a1c-6d4e7b8f9012")
 _EPOCH = "11111111-1111-4111-8111-111111111111"
 _MACHINE = "22222222-2222-4222-8222-222222222222"
+_TRADING_SID = "S-1-5-21-1-2-3-1009"
 _PROVIDER = ALPACA_DAILY_SNAPSHOT_DESCRIPTOR.provider_id
 _OPERATION = ALPACA_DAILY_SNAPSHOT_DESCRIPTOR.operation
 _TIMESTAMP = "2026-08-29T00:00:00Z"
@@ -703,6 +710,63 @@ def test_success_returns_exact_audit_and_deterministic_read_only_evidence(
     require_disposable_selected_c3_snapshot_permit_for_test(first.permit, first.audit)
     with pytest.raises(SelectedC3SnapshotReadError, match="provenance"):
         require_selected_c3_snapshot_permit(first.permit, first.audit)
+
+
+def test_disposable_verified_open_binding_uses_exact_selected_daily_bar_open(
+    selected_case,
+) -> None:
+    selected = selected_case.authority.read_selected_snapshot(
+        selected_case.ids["selection_id"]
+    )
+    binding = build_disposable_c3_verified_daily_bar_open_binding_for_test(
+        selected,
+        machine_authority_id=_MACHINE,
+        approved_trading_sid=_TRADING_SID,
+        authority_epoch_id=_EPOCH,
+    )
+    snapshot = selected.verification.snapshot
+    assert snapshot is not None
+
+    assert binding.symbol == Symbol("AAPL")
+    assert binding.session == snapshot.target_session
+    assert binding.open_price == snapshot.bars[0].bar.open == Decimal("100")
+    assert require_disposable_c3_verified_daily_bar_open_binding_for_test(binding) is (
+        binding
+    )
+    with pytest.raises(C3VerifiedDailyBarOpenBindingError, match="production"):
+        require_c3_verified_daily_bar_open_binding(binding)
+
+
+def test_disposable_open_binding_rejects_wrong_c1_p2_identity(selected_case) -> None:
+    selected = selected_case.authority.read_selected_snapshot(
+        selected_case.ids["selection_id"]
+    )
+
+    with pytest.raises(C3VerifiedDailyBarOpenBindingError, match="identity"):
+        build_disposable_c3_verified_daily_bar_open_binding_for_test(
+            selected,
+            machine_authority_id="aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            approved_trading_sid=_TRADING_SID,
+            authority_epoch_id=_EPOCH,
+        )
+
+
+def test_disposable_open_binding_rejects_forged_replacement_price(
+    selected_case,
+) -> None:
+    selected = selected_case.authority.read_selected_snapshot(
+        selected_case.ids["selection_id"]
+    )
+    binding = build_disposable_c3_verified_daily_bar_open_binding_for_test(
+        selected,
+        machine_authority_id=_MACHINE,
+        approved_trading_sid=_TRADING_SID,
+        authority_epoch_id=_EPOCH,
+    )
+    object.__setattr__(binding, "_open_price", Decimal("101"))
+
+    with pytest.raises(C3VerifiedDailyBarOpenBindingError, match="selected evidence"):
+        require_disposable_c3_verified_daily_bar_open_binding_for_test(binding)
 
 
 @pytest.mark.parametrize(

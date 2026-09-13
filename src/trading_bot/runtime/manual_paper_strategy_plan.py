@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass
-from datetime import UTC, datetime, time
+from datetime import UTC, datetime
 from decimal import Context, Decimal, InvalidOperation, localcontext
 from enum import StrEnum
 from hashlib import sha256
@@ -51,6 +51,10 @@ from trading_bot.runtime.checkpointed_verified_snapshot_execution import (
     CheckpointedVerifiedSnapshotPaperCycleRequest,
     VerifiedPriorCheckpoint,
     VerifiedPriorCheckpointKind,
+)
+from trading_bot.runtime.personal_desktop_unattended_daily_cycle_timing import (
+    PersonalDesktopUnattendedDailyCycleTimingError,
+    next_xnys_execution_session,
 )
 from trading_bot.runtime.strategy_history_seed import (
     StrategyHistorySeedVerificationError,
@@ -1141,9 +1145,7 @@ def _prepare_decision_from_evidence(
         context_material,
     )
     intended_execution_session = _derive_intended_execution_session(
-        replay.target_session,
-        snapshot_verification,
-        calendar,
+        replay.target_session
     )
     _validate_prepared_chronology(
         prior.compact_state.as_of,
@@ -1352,27 +1354,13 @@ class _PlanValues:
 
 def _derive_intended_execution_session(
     selected_session: TradingSession,
-    snapshot_verification: DailySnapshotVerificationResult,
-    calendar: IdentifiedMarketCalendar,
 ) -> TradingSession:
-    snapshot = snapshot_verification.snapshot
-    if snapshot is None:
-        raise ManualPaperStrategyPlanValidationError(
-            "selected snapshot is unavailable for next-session derivation"
-        )
     try:
-        timezone = ZoneInfo(snapshot.request.calendar.exchange_timezone)
-        anchor = datetime.combine(selected_session.session_date, time(12), timezone)
-        next_session = calendar.next_session(anchor)
-    except (AttributeError, TypeError, ValueError, ZoneInfoNotFoundError) as error:
+        return next_xnys_execution_session(selected_session)
+    except PersonalDesktopUnattendedDailyCycleTimingError as error:
         raise ManualPaperStrategyPlanValidationError(
             "intended execution session cannot be derived"
         ) from error
-    if type(next_session) is not TradingSession or next_session <= selected_session:
-        raise ManualPaperStrategyPlanValidationError(
-            "calendar must return the first later intended execution session"
-        )
-    return next_session
 
 
 def _validate_prepared_chronology(

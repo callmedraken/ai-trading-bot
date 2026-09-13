@@ -315,6 +315,29 @@ def test_pre_open_request_and_prepared_decision_contain_no_open_input() -> None:
     assert prepared.intended_execution_session == _NEXT_SESSION
 
 
+def test_prepared_decision_uses_public_xnys_timing_authority(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from trading_bot.runtime import manual_paper_strategy_plan as module
+
+    authority_session = TradingSession(date(2025, 1, 8))
+    calls: list[TradingSession] = []
+
+    def use_public_authority(selected_session: TradingSession) -> TradingSession:
+        calls.append(selected_session)
+        return authority_session
+
+    monkeypatch.setattr(module, "next_xnys_execution_session", use_public_authority)
+    request = _decision_request(
+        _request(filled_at=datetime(2025, 1, 8, 20, tzinfo=UTC))
+    )
+
+    prepared = build_manual_paper_strategy_decision(request, calendar())
+
+    assert calls == [_TARGET_SESSION]
+    assert prepared.intended_execution_session == authority_session
+
+
 def test_phase_one_evaluates_once_and_completion_never_reevaluates(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

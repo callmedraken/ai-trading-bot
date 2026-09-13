@@ -5,7 +5,6 @@ from __future__ import annotations
 import hashlib
 import sqlite3
 from dataclasses import dataclass
-from pathlib import Path
 from uuid import UUID
 
 from trading_bot.domain import Symbol

@@ -46,9 +46,7 @@ from trading_bot.runtime.windows_effectful_capture import ProductionCaptureReque
 from trading_bot.strategies import MovingAverageCrossoverConfig
 
 PERSONAL_DESKTOP_UNATTENDED_SYMBOL = Symbol("SPY")
-PERSONAL_DESKTOP_UNATTENDED_HISTORY_SOURCE_ID = (
-    "architecture111-selected-c3-history-v1"
-)
+PERSONAL_DESKTOP_UNATTENDED_HISTORY_SOURCE_ID = "architecture111-selected-c3-history-v1"
 
 
 class PersonalDesktopUnattendedC3HistoryError(ValueError):
@@ -291,9 +289,7 @@ def _resolve_selection_id_from_connection(
     if type(connection) is not sqlite3.Connection:
         raise TypeError("session-indexed C3 resolution requires sqlite3.Connection")
     if type(authority_epoch_id) is not str or not authority_epoch_id:
-        raise PersonalDesktopUnattendedC3HistoryError(
-            "authority epoch ID is invalid"
-        )
+        raise PersonalDesktopUnattendedC3HistoryError("authority epoch ID is invalid")
     if type(canonical_request_bytes) is not bytes or not canonical_request_bytes:
         raise PersonalDesktopUnattendedC3HistoryError(
             "canonical C3 request bytes are invalid"

@@ -2,18 +2,17 @@
 
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import UTC, datetime, time
+from datetime import UTC, datetime
 from decimal import Decimal
 from enum import StrEnum
 from typing import Any
 from uuid import UUID, uuid5
-from zoneinfo import ZoneInfo
 
 from trading_bot.execution import PaperFillPolicy
-from trading_bot.market_calendar import NYSEMarketCalendar, TradingSession
-from trading_bot.market_data import XNYS_CALENDAR_DESCRIPTOR, BoundMarketCalendar
+from trading_bot.market_calendar import TradingSession
 from trading_bot.portfolio import PortfolioConstraints
 from trading_bot.rebalancing import RebalanceAssumptions, RebalanceProposalPolicy
 from trading_bot.risk import PortfolioRiskPolicy, RiskLimits
@@ -25,6 +24,9 @@ from trading_bot.runtime.manual_paper_strategy_plan import (
     build_manual_paper_strategy_decision,
     complete_manual_paper_strategy_plan,
 )
+from trading_bot.runtime.personal_desktop_historical_cycle_configurations import (
+    resolve_personal_desktop_historical_cycle_configurations,
+)
 from trading_bot.runtime.personal_desktop_paper_account_read_authority import (
     PersonalDesktopPaperAccountReadEvidence,
     read_personal_desktop_paper_account,
@@ -32,6 +34,7 @@ from trading_bot.runtime.personal_desktop_paper_account_read_authority import (
 )
 from trading_bot.runtime.personal_desktop_unattended_c3_history import (
     SelectedC3StrategyHistoryBinding,
+    SelectedC3StrategyHistoryWindowClassification,
     SessionIndexedSelectedC3SnapshotReadResult,
     WindowsPersonalDesktopUnattendedSelectedC3ReadAuthority,
     build_selected_c3_strategy_history_binding,
@@ -43,7 +46,6 @@ from trading_bot.runtime.personal_desktop_unattended_daily_cycle_timing import (
 from trading_bot.runtime.personal_desktop_unattended_market_data_capture import (
     PersonalDesktopUnattendedMarketDataCaptureClassification,
     PersonalDesktopUnattendedMarketDataCaptureResult,
-    WindowsPersonalDesktopUnattendedC3PreflightAuthority,
     reconcile_personal_desktop_unattended_market_data_capture,
 )
 from trading_bot.runtime.personal_desktop_unattended_paper_decision_intent import (
@@ -90,8 +92,6 @@ PERSONAL_DESKTOP_UNATTENDED_DAILY_CYCLE_IDEMPOTENCY_MATERIAL_VERSION = (
 PERSONAL_DESKTOP_UNATTENDED_DAILY_CYCLE_IDEMPOTENCY_NAMESPACE = UUID(
     "e9f228cd-e814-5df2-aae1-c9fa19fc45af"
 )
-
-_NEW_YORK = ZoneInfo("America/New_York")
 
 
 class PersonalDesktopUnattendedDailyCycleClassification(StrEnum):
@@ -249,7 +249,7 @@ class DisposablePersonalDesktopUnattendedDailyCycleDependencies:
         [object, PersonalDesktopUnattendedPaperDecisionIntentArtifactBinding, datetime],
         Any,
     ]
-    historical_configurations: Callable[[], tuple[bytes, ...]]
+    historical_configurations: Callable[[object], tuple[bytes, ...]]
     gate_state: Callable[[], tuple[bool, bool, bool, bool, bool, bool, bool, bool]]
 
 
@@ -428,7 +428,7 @@ def _run_daily_cycle(
                 selected=selected,
             )
         pending = dependencies.require_pending(c1, discovery)
-        historical = tuple(dependencies.historical_configurations())
+        historical = tuple(dependencies.historical_configurations(c1))
         account = None
         if pending is not None:
             pending_id = pending.decision.decision_id
@@ -459,7 +459,9 @@ def _run_daily_cycle(
                 )
             if settlement.configuration_payload is None:
                 raise ValueError("safe settlement omitted its configuration payload")
-            historical = (*historical, settlement.configuration_payload)
+            historical = _include_configuration_once(
+                historical, settlement.configuration_payload
+            )
 
         account_authority = dependencies.read_account(c1, historical)
         account = dependencies.require_account(account_authority)
@@ -604,7 +606,9 @@ def _production_dependencies() -> (
                 observed,  # type: ignore[arg-type]
             )
         ),
-        historical_configurations=lambda: (),
+        historical_configurations=(
+            resolve_personal_desktop_historical_cycle_configurations
+        ),
         gate_state=_all_eight_gate_state,
     )
 
@@ -648,30 +652,38 @@ def _build_history_production(
 ) -> SelectedC3StrategyHistoryBinding:
     c1 = require_validated_production_authority(authority)
     reader = WindowsPersonalDesktopUnattendedSelectedC3ReadAuthority(c1)
-    sessions: list[TradingSession] = []
-    cursor = current.session
-    calendar = BoundMarketCalendar(XNYS_CALENDAR_DESCRIPTOR, NYSEMarketCalendar())
-    for _ in range(config.long_window):
-        anchor = datetime.combine(cursor.session_date, time(12), tzinfo=_NEW_YORK)
-        cursor = calendar.previous_session(anchor)
-        sessions.append(cursor)
-    retained = []
-    preflight = WindowsPersonalDesktopUnattendedC3PreflightAuthority(c1)
-    for session in reversed(sessions):
-        try:
-            retained.append(reader.read_selected_snapshot_for_session(session))
-        except Exception:
-            state = preflight.inspect(session)
-            if state.classification is _Capture.CAPTURE_REQUIRED:
-                raise _InsufficientAuthoritativeHistory from None
-            if (
-                state.classification
-                is PersonalDesktopUnattendedMarketDataCaptureClassification.SESSION_GAP
-            ):
-                raise _AuthoritativeHistorySessionGap from None
-            raise
-    history = tuple(retained)
-    return build_selected_c3_strategy_history_binding(c1, history, current, config)
+    window = reader.inspect_strategy_history_window(current, config)
+    if (
+        window.classification
+        is SelectedC3StrategyHistoryWindowClassification.WARMING_UP
+    ):
+        raise _InsufficientAuthoritativeHistory
+    if (
+        window.classification
+        is SelectedC3StrategyHistoryWindowClassification.SESSION_GAP
+    ):
+        raise _AuthoritativeHistorySessionGap
+    if (
+        window.classification is not SelectedC3StrategyHistoryWindowClassification.READY
+        or len(window.selected) != config.long_window + 1
+        or window.selected[-1] != current
+    ):
+        raise ValueError("selected-C3 history-window result is invalid")
+    return build_selected_c3_strategy_history_binding(
+        c1, window.selected[:-1], current, config
+    )
+
+
+def _include_configuration_once(
+    historical: tuple[bytes, ...], payload: bytes
+) -> tuple[bytes, ...]:
+    key = (hashlib.sha256(payload).hexdigest(), len(payload))
+    for existing in historical:
+        if (hashlib.sha256(existing).hexdigest(), len(existing)) == key:
+            if existing != payload:
+                raise ValueError("historical configuration digest conflict")
+            return historical
+    return (*historical, payload)
 
 
 def _build_next_decision_production(

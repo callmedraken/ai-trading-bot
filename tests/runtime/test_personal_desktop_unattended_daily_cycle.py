@@ -150,7 +150,7 @@ def _dependencies(
         qualify_decision=lambda authority, decision, observed: SimpleNamespace(
             status=publication
         ),
-        historical_configurations=lambda: (),
+        historical_configurations=lambda authority: (),
         gate_state=lambda: (False,) * 8,
     )
 

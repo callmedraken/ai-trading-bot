@@ -338,6 +338,23 @@ def test_session_gap_and_stale_clock_stop_without_backfill() -> None:
     assert _classification(stale) == "SESSION_GAP"
 
 
+def test_g5_retains_backward_selected_session_nomination_protection() -> None:
+    connection = _database()
+    _select(connection, TradingSession(date(2026, 8, 18)))
+    before = connection.total_changes
+
+    result = inspect_personal_desktop_unattended_c3_preflight_for_test(
+        connection,
+        _EPOCH,
+        TradingSession(date(2026, 8, 17)),
+    )
+
+    assert result.classification is (
+        PersonalDesktopUnattendedMarketDataCaptureClassification.SESSION_GAP
+    )
+    assert connection.total_changes == before
+
+
 def test_closed_gate_performs_no_effectful_root_construction() -> None:
     assert PERSONAL_DESKTOP_UNATTENDED_MARKET_DATA_CAPTURE_EFFECTS_ENABLED is False
     constructed: list[object] = []

@@ -37,8 +37,10 @@ from trading_bot.runtime.personal_desktop_unattended_c3_history import (
     PERSONAL_DESKTOP_UNATTENDED_SYMBOL,
     PersonalDesktopUnattendedC3HistoryError,
     SelectedC3StrategyHistoryBinding,
+    SelectedC3StrategyHistoryWindowClassification,
     SessionIndexedSelectedC3SnapshotReadResult,
     build_selected_c3_strategy_history_binding,
+    inspect_selected_c3_strategy_history_window_for_test,
     personal_desktop_unattended_capture_request,
 )
 from trading_bot.runtime.strategy_history_seed import (
@@ -216,6 +218,43 @@ def _insert_selection(
     connection.commit()
 
 
+def _inspect_window(
+    present: tuple[date, ...],
+) -> tuple[object, sqlite3.Connection, list[str]]:
+    connection = _selection_database()
+    current = _session_read(date(2026, 8, 24), price=Decimal("105"))
+    selected_by_id: dict[str, SelectedC3SnapshotReadResult] = {}
+    for index, session_date in enumerate(present):
+        item = (
+            current
+            if session_date == current.session.session_date
+            else _session_read(session_date, price=Decimal(100 + index))
+        )
+        selection_id = str(item.selected.audit.selection_id)
+        request_bytes = item.capture_request.canonical_c2_request_json()
+        _insert_selection(
+            connection,
+            session_id=str(item.selected.audit.session_id),
+            selection_id=selection_id,
+            request_bytes=request_bytes,
+        )
+        selected_by_id[selection_id] = item.selected
+    reads: list[str] = []
+
+    def read_selected(selection_id: str) -> SelectedC3SnapshotReadResult:
+        reads.append(selection_id)
+        return selected_by_id[selection_id]
+
+    result = inspect_selected_c3_strategy_history_window_for_test(
+        connection,
+        _EPOCH,
+        current,
+        _CONFIG,
+        read_selected,
+    )
+    return result, connection, reads
+
+
 def test_source_owned_capture_request_is_exact_spy_single_session() -> None:
     session = TradingSession(date(2026, 8, 21))
 
@@ -334,6 +373,124 @@ def test_zero_or_multiple_matching_selections_fail_closed() -> None:
             _EPOCH,
             request_bytes,
         )
+
+
+@pytest.mark.parametrize(
+    "present",
+    (
+        (date(2026, 8, 24),),
+        (date(2026, 8, 21), date(2026, 8, 24)),
+        (date(2026, 8, 20), date(2026, 8, 21), date(2026, 8, 24)),
+    ),
+)
+def test_contiguous_selected_suffix_is_normal_warming_up(
+    present: tuple[date, ...],
+) -> None:
+    result, connection, reads = _inspect_window(present)
+
+    assert result.classification is (
+        SelectedC3StrategyHistoryWindowClassification.WARMING_UP
+    )
+    assert tuple(item.session.session_date for item in result.selected) == present
+    assert len(reads) == len(present) - 1
+    assert connection.total_changes == len(present) * 2
+    assert connection.execute("PRAGMA query_only").fetchone() == (1,)
+
+
+def test_exact_five_preceding_sessions_plus_current_is_ready() -> None:
+    dates = (
+        date(2026, 8, 17),
+        date(2026, 8, 18),
+        date(2026, 8, 19),
+        date(2026, 8, 20),
+        date(2026, 8, 21),
+        date(2026, 8, 24),
+    )
+
+    result, _connection, reads = _inspect_window(dates)
+
+    assert result.classification is SelectedC3StrategyHistoryWindowClassification.READY
+    assert tuple(item.session.session_date for item in result.selected) == dates
+    assert len(reads) == 5
+
+
+def test_selected_evidence_on_both_sides_of_missing_required_session_is_gap() -> None:
+    present = (
+        date(2026, 8, 19),
+        date(2026, 8, 21),
+        date(2026, 8, 24),
+    )
+
+    result, _connection, _reads = _inspect_window(present)
+
+    assert result.classification is (
+        SelectedC3StrategyHistoryWindowClassification.SESSION_GAP
+    )
+
+
+def test_disconnected_selected_evidence_before_exact_window_does_not_create_gap() -> (
+    None
+):
+    connection = _selection_database()
+    old = _session_read(date(2026, 8, 14))
+    current = _session_read(date(2026, 8, 24))
+    for item in (old, current):
+        _insert_selection(
+            connection,
+            session_id=str(item.selected.audit.session_id),
+            selection_id=str(item.selected.audit.selection_id),
+            request_bytes=item.canonical_request_bytes,
+        )
+    reads: list[str] = []
+
+    result = inspect_selected_c3_strategy_history_window_for_test(
+        connection,
+        _EPOCH,
+        current,
+        _CONFIG,
+        lambda selection_id: reads.append(selection_id),
+    )
+
+    assert result.classification is (
+        SelectedC3StrategyHistoryWindowClassification.WARMING_UP
+    )
+    assert result.selected == (current,)
+    assert reads == []
+
+
+def test_duplicate_or_malformed_selected_lineage_in_required_window_blocks() -> None:
+    current = _session_read(date(2026, 8, 24))
+    request_bytes = current.canonical_request_bytes
+    duplicate = _selection_database()
+    for suffix in ("one", "two"):
+        _insert_selection(
+            duplicate,
+            session_id=str(uuid5(_NAMESPACE, f"duplicate-session:{suffix}")),
+            selection_id=str(uuid5(_NAMESPACE, f"duplicate-selection:{suffix}")),
+            request_bytes=request_bytes,
+        )
+    duplicate_result = inspect_selected_c3_strategy_history_window_for_test(
+        duplicate, _EPOCH, current, _CONFIG, lambda value: value
+    )
+    assert duplicate_result.classification is (
+        SelectedC3StrategyHistoryWindowClassification.BLOCKED
+    )
+    assert duplicate_result.selected == ()
+
+    malformed = _selection_database()
+    _insert_selection(
+        malformed,
+        session_id=str(current.selected.audit.session_id),
+        selection_id="NOT-A-UUID",
+        request_bytes=request_bytes,
+    )
+    malformed_result = inspect_selected_c3_strategy_history_window_for_test(
+        malformed, _EPOCH, current, _CONFIG, lambda value: value
+    )
+    assert malformed_result.classification is (
+        SelectedC3StrategyHistoryWindowClassification.BLOCKED
+    )
+    assert malformed_result.selected == ()
 
 
 def test_session_binding_rejects_wrong_symbol_snapshot() -> None:

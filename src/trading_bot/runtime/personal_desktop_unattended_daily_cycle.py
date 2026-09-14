@@ -554,12 +554,18 @@ def _run_daily_cycle(
 def _production_dependencies() -> (
     DisposablePersonalDesktopUnattendedDailyCycleDependencies
 ):
+    retained_selected_readers: list[
+        WindowsPersonalDesktopUnattendedSelectedC3ReadAuthority
+    ] = []
+
     def read_selected(
         authority: object, session: TradingSession
     ) -> SessionIndexedSelectedC3SnapshotReadResult:
-        return WindowsPersonalDesktopUnattendedSelectedC3ReadAuthority(
+        reader = WindowsPersonalDesktopUnattendedSelectedC3ReadAuthority(
             authority  # type: ignore[arg-type]
-        ).read_selected_snapshot_for_session(session)
+        )
+        retained_selected_readers.append(reader)
+        return reader.read_selected_snapshot_for_session(session)
 
     def find_pending(
         authority: object, session: TradingSession

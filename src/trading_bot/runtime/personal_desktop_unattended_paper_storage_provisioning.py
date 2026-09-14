@@ -1,8 +1,8 @@
-"""Administrator-only provisioning for the fixed PD4 invocation container.
+"""Administrator-only provisioning for the two fixed PD4 storage namespaces.
 
-The production mutation is separately gated and has exactly one destination.
-Qualification is read-only.  Existing unsafe objects are never repaired, and a
-failed or uncertain create is never retried or cleaned up.
+Qualification covers both source-owned destinations before any mutation.
+Existing unsafe objects are never repaired, and a failed or uncertain create is
+never retried or cleaned up.
 """
 
 from __future__ import annotations
@@ -11,7 +11,7 @@ import ctypes
 import threading
 from collections.abc import Callable
 from contextlib import ExitStack
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import StrEnum
 from typing import Protocol, Self
 
@@ -39,12 +39,28 @@ from trading_bot.runtime.windows_authority_security import (
 
 PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_STORAGE_PROVISIONING_EFFECTS_ENABLED = False
 
-_TARGET = security.PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_INVOCATIONS
 _TRADING_SID = PERSONAL_DESKTOP_FIRST_PAPER_OPERATION_PROFILE.approved_trading_sid
 
 
+@dataclass(frozen=True, slots=True)
+class _ProvisioningTarget:
+    path: str
+    role: security.PaperObjectRole
+
+
+_DECISION_TARGET = _ProvisioningTarget(
+    security.PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_DECISIONS,
+    security.PaperObjectRole.UNATTENDED_DECISIONS,
+)
+_INVOCATION_TARGET = _ProvisioningTarget(
+    security.PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_INVOCATIONS,
+    security.PaperObjectRole.UNATTENDED_INVOCATIONS,
+)
+_TARGETS = (_DECISION_TARGET, _INVOCATION_TARGET)
+
+
 class PersonalDesktopUnattendedStorageProvisioningClassification(StrEnum):
-    """Stable read-only classification of the single fixed target."""
+    """Stable read-only classification of a fixed target or both targets."""
 
     MISSING = "MISSING"
     ALREADY_PROVISIONED = "ALREADY_PROVISIONED"
@@ -66,8 +82,10 @@ class PersonalDesktopUnattendedStorageProvisioningDiagnostic(StrEnum):
     VERIFIED_ALREADY_PROVISIONED = "VERIFIED_ALREADY_PROVISIONED"
     QUALIFICATION_BLOCKED = "QUALIFICATION_BLOCKED"
     EFFECT_STATE_BLOCKED = "EFFECT_STATE_BLOCKED"
+    PRE_CREATE_REVALIDATION_BLOCKED = "PRE_CREATE_REVALIDATION_BLOCKED"
     CREATE_FAILED_OR_UNCERTAIN = "CREATE_FAILED_OR_UNCERTAIN"
     POST_CREATE_VERIFICATION_BLOCKED = "POST_CREATE_VERIFICATION_BLOCKED"
+    FINAL_REVERIFICATION_BLOCKED = "FINAL_REVERIFICATION_BLOCKED"
     PROVISIONED_AND_VERIFIED = "PROVISIONED_AND_VERIFIED"
 
 
@@ -75,9 +93,15 @@ class PersonalDesktopUnattendedStorageProvisioningError(AuthorityObjectError):
     """The fixed provisioning authority failed closed."""
 
 
+_TARGET_ROLES = {
+    security.PaperObjectRole.UNATTENDED_DECISIONS,
+    security.PaperObjectRole.UNATTENDED_INVOCATIONS,
+}
+
+
 @dataclass(frozen=True, slots=True)
-class PersonalDesktopUnattendedStorageProvisioningQualification:
-    """Immutable read-only evidence; never a reusable creation capability."""
+class PersonalDesktopUnattendedStorageTargetQualification:
+    """Immutable read-only evidence for one exact fixed target."""
 
     classification: PersonalDesktopUnattendedStorageProvisioningClassification
     diagnostic: PersonalDesktopUnattendedStorageProvisioningDiagnostic
@@ -86,19 +110,14 @@ class PersonalDesktopUnattendedStorageProvisioningQualification:
 
     def __post_init__(self) -> None:
         classifications = PersonalDesktopUnattendedStorageProvisioningClassification
+        diagnostics = PersonalDesktopUnattendedStorageProvisioningDiagnostic
         expected = {
-            classifications.MISSING: (
-                PersonalDesktopUnattendedStorageProvisioningDiagnostic.VERIFIED_MISSING,
-                False,
-            ),
+            classifications.MISSING: (diagnostics.VERIFIED_MISSING, False),
             classifications.ALREADY_PROVISIONED: (
-                PersonalDesktopUnattendedStorageProvisioningDiagnostic.VERIFIED_ALREADY_PROVISIONED,
+                diagnostics.VERIFIED_ALREADY_PROVISIONED,
                 True,
             ),
-            classifications.BLOCKED: (
-                PersonalDesktopUnattendedStorageProvisioningDiagnostic.QUALIFICATION_BLOCKED,
-                False,
-            ),
+            classifications.BLOCKED: (diagnostics.QUALIFICATION_BLOCKED, False),
         }.get(self.classification)
         if (
             type(self.classification)
@@ -106,69 +125,149 @@ class PersonalDesktopUnattendedStorageProvisioningQualification:
             or type(self.diagnostic)
             is not PersonalDesktopUnattendedStorageProvisioningDiagnostic
             or type(self.target_role) is not security.PaperObjectRole
-            or self.target_role is not security.PaperObjectRole.UNATTENDED_INVOCATIONS
+            or self.target_role not in _TARGET_ROLES
             or type(self.child_present) is not bool
             or expected != (self.diagnostic, self.child_present)
+        ):
+            raise ValueError("unattended storage target qualification is invalid")
+
+
+@dataclass(frozen=True, slots=True)
+class PersonalDesktopUnattendedStorageProvisioningQualification:
+    """Aggregate read-only evidence for both fixed targets."""
+
+    classification: PersonalDesktopUnattendedStorageProvisioningClassification
+    diagnostic: PersonalDesktopUnattendedStorageProvisioningDiagnostic
+    decision_target: PersonalDesktopUnattendedStorageTargetQualification
+    invocation_target: PersonalDesktopUnattendedStorageTargetQualification
+
+    def __post_init__(self) -> None:
+        classifications = PersonalDesktopUnattendedStorageProvisioningClassification
+        diagnostics = PersonalDesktopUnattendedStorageProvisioningDiagnostic
+        target_states = (
+            self.decision_target.classification,
+            self.invocation_target.classification,
+        )
+        if classifications.BLOCKED in target_states:
+            expected = (classifications.BLOCKED, diagnostics.QUALIFICATION_BLOCKED)
+        elif target_states == (
+            classifications.ALREADY_PROVISIONED,
+            classifications.ALREADY_PROVISIONED,
+        ):
+            expected = (
+                classifications.ALREADY_PROVISIONED,
+                diagnostics.VERIFIED_ALREADY_PROVISIONED,
+            )
+        else:
+            expected = (classifications.MISSING, diagnostics.VERIFIED_MISSING)
+        if (
+            type(self.classification)
+            is not PersonalDesktopUnattendedStorageProvisioningClassification
+            or type(self.diagnostic)
+            is not PersonalDesktopUnattendedStorageProvisioningDiagnostic
+            or type(self.decision_target)
+            is not PersonalDesktopUnattendedStorageTargetQualification
+            or type(self.invocation_target)
+            is not PersonalDesktopUnattendedStorageTargetQualification
+            or self.decision_target.target_role
+            is not security.PaperObjectRole.UNATTENDED_DECISIONS
+            or self.invocation_target.target_role
+            is not security.PaperObjectRole.UNATTENDED_INVOCATIONS
+            or expected != (self.classification, self.diagnostic)
         ):
             raise ValueError("unattended storage qualification is invalid")
 
 
 @dataclass(frozen=True, slots=True)
-class PersonalDesktopUnattendedStorageProvisioningResult:
-    """Immutable non-authorizing evidence for one bounded operation."""
+class PersonalDesktopUnattendedStorageTargetResult:
+    """Immutable non-authorizing evidence for one fixed target."""
 
-    status: PersonalDesktopUnattendedStorageProvisioningStatus
-    diagnostic: PersonalDesktopUnattendedStorageProvisioningDiagnostic
+    qualification: PersonalDesktopUnattendedStorageProvisioningClassification
     target_role: security.PaperObjectRole
     create_attempted: bool
     created: bool
     verified: bool
 
     def __post_init__(self) -> None:
+        classifications = PersonalDesktopUnattendedStorageProvisioningClassification
+        valid = (
+            type(self.qualification)
+            is PersonalDesktopUnattendedStorageProvisioningClassification
+            and type(self.target_role) is security.PaperObjectRole
+            and self.target_role in _TARGET_ROLES
+            and all(
+                type(value) is bool
+                for value in (self.create_attempted, self.created, self.verified)
+            )
+            and (not self.created or self.create_attempted)
+            and (
+                self.qualification is not classifications.BLOCKED
+                or (
+                    not self.create_attempted and not self.created and not self.verified
+                )
+            )
+            and (
+                self.qualification is not classifications.ALREADY_PROVISIONED
+                or (not self.create_attempted and not self.created)
+            )
+        )
+        if not valid:
+            raise ValueError("unattended storage target result is invalid")
+
+
+@dataclass(frozen=True, slots=True)
+class PersonalDesktopUnattendedStorageProvisioningResult:
+    """Aggregate immutable non-authorizing evidence for one bounded operation."""
+
+    status: PersonalDesktopUnattendedStorageProvisioningStatus
+    diagnostic: PersonalDesktopUnattendedStorageProvisioningDiagnostic
+    decision_target: PersonalDesktopUnattendedStorageTargetResult
+    invocation_target: PersonalDesktopUnattendedStorageTargetResult
+    failed_target_role: security.PaperObjectRole | None
+
+    def __post_init__(self) -> None:
         statuses = PersonalDesktopUnattendedStorageProvisioningStatus
         diagnostics = PersonalDesktopUnattendedStorageProvisioningDiagnostic
-        valid = {
-            statuses.PROVISIONED: (
-                diagnostics.PROVISIONED_AND_VERIFIED,
-                True,
-                True,
-                True,
-            ),
-            statuses.ALREADY_PROVISIONED: (
-                diagnostics.VERIFIED_ALREADY_PROVISIONED,
-                False,
-                False,
-                True,
-            ),
-        }
-        if self.status is statuses.BLOCKED:
+        targets = (self.decision_target, self.invocation_target)
+        if self.status is statuses.PROVISIONED:
             valid_outcome = (
-                self.diagnostic
-                in {
-                    diagnostics.QUALIFICATION_BLOCKED,
-                    diagnostics.EFFECT_STATE_BLOCKED,
-                    diagnostics.CREATE_FAILED_OR_UNCERTAIN,
-                    diagnostics.POST_CREATE_VERIFICATION_BLOCKED,
-                }
-                and self.verified is False
-                and (not self.created or self.create_attempted)
+                self.diagnostic is diagnostics.PROVISIONED_AND_VERIFIED
+                and self.failed_target_role is None
+                and all(target.verified for target in targets)
+                and any(target.created for target in targets)
+            )
+        elif self.status is statuses.ALREADY_PROVISIONED:
+            valid_outcome = (
+                self.diagnostic is diagnostics.VERIFIED_ALREADY_PROVISIONED
+                and self.failed_target_role is None
+                and all(target.verified for target in targets)
+                and not any(target.create_attempted for target in targets)
             )
         else:
-            valid_outcome = valid.get(self.status) == (
-                self.diagnostic,
-                self.create_attempted,
-                self.created,
-                self.verified,
-            )
+            valid_outcome = self.status is statuses.BLOCKED and self.diagnostic in {
+                diagnostics.QUALIFICATION_BLOCKED,
+                diagnostics.EFFECT_STATE_BLOCKED,
+                diagnostics.PRE_CREATE_REVALIDATION_BLOCKED,
+                diagnostics.CREATE_FAILED_OR_UNCERTAIN,
+                diagnostics.POST_CREATE_VERIFICATION_BLOCKED,
+                diagnostics.FINAL_REVERIFICATION_BLOCKED,
+            }
         if (
             type(self.status) is not PersonalDesktopUnattendedStorageProvisioningStatus
             or type(self.diagnostic)
             is not PersonalDesktopUnattendedStorageProvisioningDiagnostic
-            or type(self.target_role) is not security.PaperObjectRole
-            or self.target_role is not security.PaperObjectRole.UNATTENDED_INVOCATIONS
-            or any(
-                type(value) is not bool
-                for value in (self.create_attempted, self.created, self.verified)
+            or type(self.decision_target)
+            is not PersonalDesktopUnattendedStorageTargetResult
+            or type(self.invocation_target)
+            is not PersonalDesktopUnattendedStorageTargetResult
+            or self.decision_target.target_role
+            is not security.PaperObjectRole.UNATTENDED_DECISIONS
+            or self.invocation_target.target_role
+            is not security.PaperObjectRole.UNATTENDED_INVOCATIONS
+            or self.failed_target_role not in ({None} | _TARGET_ROLES)
+            or (
+                self.failed_target_role is not None
+                and type(self.failed_target_role) is not security.PaperObjectRole
             )
             or not valid_outcome
         ):
@@ -176,11 +275,11 @@ class PersonalDesktopUnattendedStorageProvisioningResult:
 
 
 class _ProvisioningReadNativeApi(security.PaperReadNativeApi, Protocol):
-    def fixed_child_present(self) -> bool: ...
+    def fixed_child_present(self, target: _ProvisioningTarget) -> bool: ...
 
 
 class _ProvisioningMutationNativeApi(_ProvisioningReadNativeApi, Protocol):
-    def create_fixed_unattended_invocations(self) -> None: ...
+    def create_fixed_child(self, target: _ProvisioningTarget) -> None: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -191,7 +290,7 @@ class _PinnedParent:
 
 
 class _PinnedProvisioningParent:
-    """Hold and revalidate the complete fixed chain needed for one child."""
+    """Hold and revalidate the complete fixed chain needed for both children."""
 
     _PATHS = (
         "F:\\",
@@ -298,17 +397,22 @@ class _PinnedProvisioningParent:
                 self._api.close(reopened)
 
 
+def _require_source_target(target: _ProvisioningTarget) -> None:
+    if not any(target is candidate for candidate in _TARGETS):
+        raise AuthorityPathError("unattended provisioning target is not source-owned")
+    spec = security.paper_object_spec(target.path)
+    if spec.role is not target.role or spec.kind is not AuthorityObjectKind.DIRECTORY:
+        raise AuthorityPathError("unattended provisioning target role is not exact")
+
+
 def _validate_target_observation(
+    target: _ProvisioningTarget,
     observation: security.PaperObjectObservation,
 ) -> None:
-    spec = security.paper_object_spec(_TARGET)
-    if (
-        spec.role is not security.PaperObjectRole.UNATTENDED_INVOCATIONS
-        or spec.kind is not AuthorityObjectKind.DIRECTORY
-    ):
-        raise AuthorityPathError("unattended provisioning target role is not exact")
+    _require_source_target(target)
+    spec = security.paper_object_spec(target.path)
     security.require_paper_object_security(
-        _TARGET, spec, observation.security, _TRADING_SID
+        target.path, spec, observation.security, _TRADING_SID
     )
     if (
         type(observation.identity) is not tuple
@@ -321,32 +425,30 @@ def _validate_target_observation(
         )
 
 
-def _fixed_target_policy() -> SecurityPolicy:
-    """Return the already-frozen B1 policy for the one fixed container role."""
+def _fixed_target_policy(target: _ProvisioningTarget) -> SecurityPolicy:
+    """Return the frozen role-specific policy for one source-owned container."""
 
-    spec = security.paper_object_spec(_TARGET)
-    if (
-        spec.role is not security.PaperObjectRole.UNATTENDED_INVOCATIONS
-        or spec.kind is not AuthorityObjectKind.DIRECTORY
-    ):
-        raise AuthorityPathError("unattended provisioning target role is not exact")
-    return security.paper_security_policy(spec.role, _TRADING_SID)
+    _require_source_target(target)
+    return security.paper_security_policy(target.role, _TRADING_SID)
 
 
-def _verify_empty_target(api: _ProvisioningReadNativeApi) -> None:
-    """Pin, inspect, inventory, and independently reopen the fixed child."""
+def _verify_empty_target(
+    api: _ProvisioningReadNativeApi, target: _ProvisioningTarget
+) -> None:
+    """Pin, inspect, inventory, and independently reopen one fixed child."""
 
-    spec = security.paper_object_spec(_TARGET)
-    handle = api.open(_TARGET, spec.kind)
+    _require_source_target(target)
+    spec = security.paper_object_spec(target.path)
+    handle = api.open(target.path, spec.kind)
     try:
-        observation = api.inspect(handle, _TARGET, spec.kind)
-        _validate_target_observation(observation)
-        if api.names(handle, _TARGET, 1) != ():
+        observation = api.inspect(handle, target.path, spec.kind)
+        _validate_target_observation(target, observation)
+        if api.names(handle, target.path, 1) != ():
             raise PersonalDesktopUnattendedStorageProvisioningError(
                 "unattended provisioning target is not empty"
             )
-        current = api.inspect(handle, _TARGET, spec.kind)
-        _validate_target_observation(current)
+        current = api.inspect(handle, target.path, spec.kind)
+        _validate_target_observation(target, current)
         if (
             current.identity != observation.identity
             or current.security != observation.security
@@ -354,21 +456,21 @@ def _verify_empty_target(api: _ProvisioningReadNativeApi) -> None:
             raise PersonalDesktopUnattendedStorageProvisioningError(
                 "unattended provisioning target identity/security drift"
             )
-        reopened = api.open(_TARGET, spec.kind)
+        reopened = api.open(target.path, spec.kind)
         try:
-            independent = api.inspect(reopened, _TARGET, spec.kind)
-            _validate_target_observation(independent)
+            independent = api.inspect(reopened, target.path, spec.kind)
+            _validate_target_observation(target, independent)
             if (
                 independent.identity != observation.identity
                 or independent.security != observation.security
-                or api.names(reopened, _TARGET, 1) != ()
+                or api.names(reopened, target.path, 1) != ()
             ):
                 raise PersonalDesktopUnattendedStorageProvisioningError(
                     "unattended provisioning target named object changed"
                 )
         finally:
             api.close(reopened)
-        if api.names(handle, _TARGET, 1) != ():
+        if api.names(handle, target.path, 1) != ():
             raise PersonalDesktopUnattendedStorageProvisioningError(
                 "unattended provisioning target inventory drift"
             )
@@ -377,13 +479,92 @@ def _verify_empty_target(api: _ProvisioningReadNativeApi) -> None:
 
 
 def _classify_target(
-    api: _ProvisioningReadNativeApi,
+    api: _ProvisioningReadNativeApi, target: _ProvisioningTarget
 ) -> PersonalDesktopUnattendedStorageProvisioningClassification:
-    if api.fixed_child_present() is False:
+    _require_source_target(target)
+    if api.fixed_child_present(target) is False:
         return PersonalDesktopUnattendedStorageProvisioningClassification.MISSING
-    _verify_empty_target(api)
+    _verify_empty_target(api, target)
     return (
         PersonalDesktopUnattendedStorageProvisioningClassification.ALREADY_PROVISIONED
+    )
+
+
+def _target_qualification(
+    target: _ProvisioningTarget,
+    classification: PersonalDesktopUnattendedStorageProvisioningClassification,
+) -> PersonalDesktopUnattendedStorageTargetQualification:
+    classifications = PersonalDesktopUnattendedStorageProvisioningClassification
+    diagnostics = PersonalDesktopUnattendedStorageProvisioningDiagnostic
+    return PersonalDesktopUnattendedStorageTargetQualification(
+        classification=classification,
+        diagnostic={
+            classifications.MISSING: diagnostics.VERIFIED_MISSING,
+            classifications.ALREADY_PROVISIONED: (
+                diagnostics.VERIFIED_ALREADY_PROVISIONED
+            ),
+            classifications.BLOCKED: diagnostics.QUALIFICATION_BLOCKED,
+        }[classification],
+        target_role=target.role,
+        child_present=classification is classifications.ALREADY_PROVISIONED,
+    )
+
+
+def _classify_both_targets(
+    api: _ProvisioningReadNativeApi,
+) -> tuple[
+    PersonalDesktopUnattendedStorageTargetQualification,
+    PersonalDesktopUnattendedStorageTargetQualification,
+]:
+    evidence: list[PersonalDesktopUnattendedStorageTargetQualification] = []
+    for target in _TARGETS:
+        try:
+            classification = _classify_target(api, target)
+        except Exception:
+            classification = (
+                PersonalDesktopUnattendedStorageProvisioningClassification.BLOCKED
+            )
+        evidence.append(_target_qualification(target, classification))
+    return evidence[0], evidence[1]
+
+
+def _qualification_result(
+    decision_target: PersonalDesktopUnattendedStorageTargetQualification,
+    invocation_target: PersonalDesktopUnattendedStorageTargetQualification,
+) -> PersonalDesktopUnattendedStorageProvisioningQualification:
+    classifications = PersonalDesktopUnattendedStorageProvisioningClassification
+    diagnostics = PersonalDesktopUnattendedStorageProvisioningDiagnostic
+    target_states = (
+        decision_target.classification,
+        invocation_target.classification,
+    )
+    if classifications.BLOCKED in target_states:
+        classification = classifications.BLOCKED
+        diagnostic = diagnostics.QUALIFICATION_BLOCKED
+    elif target_states == (
+        classifications.ALREADY_PROVISIONED,
+        classifications.ALREADY_PROVISIONED,
+    ):
+        classification = classifications.ALREADY_PROVISIONED
+        diagnostic = diagnostics.VERIFIED_ALREADY_PROVISIONED
+    else:
+        classification = classifications.MISSING
+        diagnostic = diagnostics.VERIFIED_MISSING
+    return PersonalDesktopUnattendedStorageProvisioningQualification(
+        classification=classification,
+        diagnostic=diagnostic,
+        decision_target=decision_target,
+        invocation_target=invocation_target,
+    )
+
+
+def _blocked_qualification() -> (
+    PersonalDesktopUnattendedStorageProvisioningQualification
+):
+    blocked = PersonalDesktopUnattendedStorageProvisioningClassification.BLOCKED
+    return _qualification_result(
+        _target_qualification(_DECISION_TARGET, blocked),
+        _target_qualification(_INVOCATION_TARGET, blocked),
     )
 
 
@@ -405,39 +586,6 @@ def _require_unchanged_administrator(
         )
 
 
-def _qualification_result(
-    classification: PersonalDesktopUnattendedStorageProvisioningClassification,
-) -> PersonalDesktopUnattendedStorageProvisioningQualification:
-    classifications = PersonalDesktopUnattendedStorageProvisioningClassification
-    diagnostics = PersonalDesktopUnattendedStorageProvisioningDiagnostic
-    return PersonalDesktopUnattendedStorageProvisioningQualification(
-        classification=classification,
-        diagnostic={
-            classifications.MISSING: diagnostics.VERIFIED_MISSING,
-            classifications.ALREADY_PROVISIONED: (
-                diagnostics.VERIFIED_ALREADY_PROVISIONED
-            ),
-        }[classification],
-        target_role=security.PaperObjectRole.UNATTENDED_INVOCATIONS,
-        child_present=classification is classifications.ALREADY_PROVISIONED,
-    )
-
-
-def _blocked_qualification() -> (
-    PersonalDesktopUnattendedStorageProvisioningQualification
-):
-    return PersonalDesktopUnattendedStorageProvisioningQualification(
-        classification=(
-            PersonalDesktopUnattendedStorageProvisioningClassification.BLOCKED
-        ),
-        diagnostic=(
-            PersonalDesktopUnattendedStorageProvisioningDiagnostic.QUALIFICATION_BLOCKED
-        ),
-        target_role=security.PaperObjectRole.UNATTENDED_INVOCATIONS,
-        child_present=False,
-    )
-
-
 def _qualify(
     observer: TradingTokenObserver,
     api_factory: Callable[[], _ProvisioningReadNativeApi],
@@ -446,10 +594,10 @@ def _qualify(
         initial = _observe_administrator(observer)
         api = api_factory()
         with _PinnedProvisioningParent(api) as parent:
-            classification = _classify_target(api)
+            targets = _classify_both_targets(api)
             parent.finish()
         _require_unchanged_administrator(observer, initial)
-        return _qualification_result(classification)
+        return _qualification_result(*targets)
     except Exception:
         return _blocked_qualification()
 
@@ -457,12 +605,12 @@ def _qualify(
 def qualify_personal_desktop_unattended_storage_provisioning() -> (
     PersonalDesktopUnattendedStorageProvisioningQualification
 ):
-    """Administrator-only read of the one fixed production target."""
+    """Administrator-only read of both fixed production targets."""
 
     return _qualify(WindowsTradingTokenObserver(), _WindowsProvisioningReadNativeApi)
 
 
-def _gate_state() -> tuple[bool, bool, bool, bool, bool, bool]:
+def _gate_state() -> tuple[bool, bool, bool, bool, bool, bool, bool, bool]:
     from trading_bot.runtime import (  # noqa: PLC0415
         personal_desktop_paper_receipt_recovery_execution as receipt,
     )
@@ -470,10 +618,18 @@ def _gate_state() -> tuple[bool, bool, bool, bool, bool, bool]:
         personal_desktop_supervised_paper_operation_execution as supervised,
     )
     from trading_bot.runtime import (  # noqa: PLC0415
+        personal_desktop_unattended_market_data_capture as capture,
+    )
+    from trading_bot.runtime import (  # noqa: PLC0415
+        personal_desktop_unattended_paper_decision_publication as publication,
+    )
+    from trading_bot.runtime import (  # noqa: PLC0415
         personal_desktop_unattended_paper_operation_execution as unattended,
     )
 
     return (
+        capture.PERSONAL_DESKTOP_UNATTENDED_MARKET_DATA_CAPTURE_EFFECTS_ENABLED,
+        publication.PERSONAL_DESKTOP_UNATTENDED_DECISION_PUBLICATION_EFFECTS_ENABLED,
         security.PERSONAL_DESKTOP_PAPER_V2_PRODUCTION_EFFECTS_ENABLED,
         security.PERSONAL_DESKTOP_PAPER_V2_RECOVERY_EFFECTS_ENABLED,
         supervised.PERSONAL_DESKTOP_PAPER_V2_SUPERVISED_EXECUTION_EFFECTS_ENABLED,
@@ -484,15 +640,24 @@ def _gate_state() -> tuple[bool, bool, bool, bool, bool, bool]:
 
 
 def _require_closed_committed_gate_state() -> None:
-    if _gate_state() != (False, False, False, False, False, False):
+    if not _gate_state_is((False, False, False, False, False, False, False, False)):
         raise PersonalDesktopUnattendedStorageProvisioningError(
-            "committed Paper-v2 effect-gate state is invalid"
+            "committed unattended Paper-v2 effect-gate state is invalid"
         )
+
+
+def _gate_state_is(
+    required: tuple[bool, bool, bool, bool, bool, bool, bool, bool],
+) -> bool:
+    return all(
+        observed is expected
+        for observed, expected in zip(_gate_state(), required, strict=True)
+    )
 
 
 class _ProductionProvisioningEffectAuthority:
     def begin(self) -> None:
-        if _gate_state() != (False, False, False, False, False, True):
+        if not _gate_state_is((False, False, False, False, False, False, False, True)):
             raise PersonalDesktopUnattendedStorageProvisioningError(
                 "unattended storage provisioning effect-gate state is invalid"
             )
@@ -559,21 +724,36 @@ def _open_disposable_provisioning_effect_authority_for_test() -> (
     )
 
 
+def _initial_target_result(
+    evidence: PersonalDesktopUnattendedStorageTargetQualification,
+) -> PersonalDesktopUnattendedStorageTargetResult:
+    classifications = PersonalDesktopUnattendedStorageProvisioningClassification
+    return PersonalDesktopUnattendedStorageTargetResult(
+        qualification=evidence.classification,
+        target_role=evidence.target_role,
+        create_attempted=False,
+        created=False,
+        verified=evidence.classification is classifications.ALREADY_PROVISIONED,
+    )
+
+
 def _result(
     status: PersonalDesktopUnattendedStorageProvisioningStatus,
     diagnostic: PersonalDesktopUnattendedStorageProvisioningDiagnostic,
+    target_results: dict[
+        security.PaperObjectRole, PersonalDesktopUnattendedStorageTargetResult
+    ],
     *,
-    create_attempted: bool,
-    created: bool,
-    verified: bool,
+    failed_target_role: security.PaperObjectRole | None = None,
 ) -> PersonalDesktopUnattendedStorageProvisioningResult:
     return PersonalDesktopUnattendedStorageProvisioningResult(
         status=status,
         diagnostic=diagnostic,
-        target_role=security.PaperObjectRole.UNATTENDED_INVOCATIONS,
-        create_attempted=create_attempted,
-        created=created,
-        verified=verified,
+        decision_target=target_results[security.PaperObjectRole.UNATTENDED_DECISIONS],
+        invocation_target=target_results[
+            security.PaperObjectRole.UNATTENDED_INVOCATIONS
+        ],
+        failed_target_role=failed_target_role,
     )
 
 
@@ -588,68 +768,120 @@ def _run_provisioning(
     diagnostics = PersonalDesktopUnattendedStorageProvisioningDiagnostic
     classifications = PersonalDesktopUnattendedStorageProvisioningClassification
     phase = "qualification"
-    attempted = False
-    created = False
+    current_target: _ProvisioningTarget | None = None
+    target_results = {
+        target.role: PersonalDesktopUnattendedStorageTargetResult(
+            classifications.BLOCKED, target.role, False, False, False
+        )
+        for target in _TARGETS
+    }
     try:
         initial = _observe_administrator(observer)
         read_api = read_api_factory()
         with _PinnedProvisioningParent(read_api) as parent:
-            classification = _classify_target(read_api)
+            qualification = _qualification_result(*_classify_both_targets(read_api))
+            target_evidence = (
+                qualification.decision_target,
+                qualification.invocation_target,
+            )
+            target_results = {
+                evidence.target_role: _initial_target_result(evidence)
+                for evidence in target_evidence
+            }
             parent.finish()
-            if classification is classifications.MISSING:
-                phase = "effect"
-                effect_authority.begin()
+            if qualification.classification is classifications.BLOCKED:
+                current_target = next(
+                    target
+                    for target, evidence in zip(_TARGETS, target_evidence, strict=True)
+                    if evidence.classification is classifications.BLOCKED
+                )
+                raise PersonalDesktopUnattendedStorageProvisioningError(
+                    "fixed target qualification blocked"
+                )
+            missing = tuple(
+                target
+                for target, evidence in zip(_TARGETS, target_evidence, strict=True)
+                if evidence.classification is classifications.MISSING
+            )
+            if not missing:
+                _require_unchanged_administrator(observer, initial)
+                return _result(
+                    statuses.ALREADY_PROVISIONED,
+                    diagnostics.VERIFIED_ALREADY_PROVISIONED,
+                    target_results,
+                )
+
+            phase = "effect"
+            effect_authority.begin()
+            mutation_api: _ProvisioningMutationNativeApi | None = None
+            for target in missing:
+                current_target = target
+                phase = "pre_create"
                 _require_unchanged_administrator(observer, initial)
                 parent.finish()
 
-                mutation_api = mutation_api_factory()
+                if mutation_api is None:
+                    mutation_api = mutation_api_factory()
                 effect_authority.require_active()
                 phase = "create"
-                attempted = True
-                mutation_api.create_fixed_unattended_invocations()
-                created = True
+                target_results[target.role] = replace(
+                    target_results[target.role], create_attempted=True
+                )
+                mutation_api.create_fixed_child(target)
+                target_results[target.role] = replace(
+                    target_results[target.role], created=True
+                )
 
                 phase = "verify"
-                _verify_empty_target(mutation_api)
+                _verify_empty_target(mutation_api, target)
                 parent.finish()
                 effect_authority.require_active()
+                target_results[target.role] = replace(
+                    target_results[target.role], verified=True
+                )
+
+            phase = "reverify"
+            for target in _TARGETS:
+                current_target = target
+                target_results[target.role] = replace(
+                    target_results[target.role], verified=False
+                )
+                _verify_empty_target(read_api, target)
+                target_results[target.role] = replace(
+                    target_results[target.role], verified=True
+                )
+            current_target = None
+            parent.finish()
+            effect_authority.require_active()
+        current_target = None
         _require_unchanged_administrator(observer, initial)
-        if classification is classifications.ALREADY_PROVISIONED:
-            return _result(
-                statuses.ALREADY_PROVISIONED,
-                diagnostics.VERIFIED_ALREADY_PROVISIONED,
-                create_attempted=False,
-                created=False,
-                verified=True,
-            )
         effect_authority.require_active()
         return _result(
             statuses.PROVISIONED,
             diagnostics.PROVISIONED_AND_VERIFIED,
-            create_attempted=True,
-            created=True,
-            verified=True,
+            target_results,
         )
     except Exception:
         diagnostic = {
             "qualification": diagnostics.QUALIFICATION_BLOCKED,
             "effect": diagnostics.EFFECT_STATE_BLOCKED,
+            "pre_create": diagnostics.PRE_CREATE_REVALIDATION_BLOCKED,
             "create": diagnostics.CREATE_FAILED_OR_UNCERTAIN,
             "verify": diagnostics.POST_CREATE_VERIFICATION_BLOCKED,
+            "reverify": diagnostics.FINAL_REVERIFICATION_BLOCKED,
         }[phase]
         return _result(
             statuses.BLOCKED,
             diagnostic,
-            create_attempted=attempted,
-            created=created,
-            verified=False,
+            target_results,
+            failed_target_role=None if current_target is None else current_target.role,
         )
 
 
 def provision_personal_desktop_unattended_storage() -> (
     PersonalDesktopUnattendedStorageProvisioningResult
 ):
-    """Provision only the fixed target; accepts no caller authority overrides."""
+    """Provision only the two fixed targets; accepts no caller authority overrides."""
 
     return _run_provisioning(
         observer=WindowsTradingTokenObserver(),
@@ -690,9 +922,10 @@ def _bind(library: object, name: str, arguments: list, result: object):
 
 
 class _WindowsProvisioningReadNativeApi(security.WindowsPaperReadNativeApi):
-    """No-follow presence probe for only the fixed provisioning child."""
+    """No-follow presence probes for only the two fixed provisioning children."""
 
-    def fixed_child_present(self) -> bool:
+    def fixed_child_present(self, target: _ProvisioningTarget) -> bool:
+        _require_source_target(target)
         create = _bind(
             self._kernel,
             "CreateFileW",
@@ -709,7 +942,7 @@ class _WindowsProvisioningReadNativeApi(security.WindowsPaperReadNativeApi):
         )
         close = _bind(self._kernel, "CloseHandle", [ctypes.c_void_p], ctypes.c_int32)
         handle = create(
-            _TARGET,
+            target.path,
             0,
             7,
             None,
@@ -735,35 +968,29 @@ class _WindowsProvisioningReadNativeApi(security.WindowsPaperReadNativeApi):
 
 
 class _WindowsProvisioningMutationNativeApi(_WindowsProvisioningReadNativeApi):
-    """One create-new operation with the final frozen B1 container policy."""
+    """One create-new attempt per fixed child with its frozen container policy."""
 
     def __init__(self) -> None:
         _ProductionProvisioningEffectAuthority().require_active()
         super().__init__()
-        self._attempted = False
+        self._attempted: set[security.PaperObjectRole] = set()
 
-    def create_fixed_unattended_invocations(self) -> None:
+    def create_fixed_child(self, target: _ProvisioningTarget) -> None:
         _ProductionProvisioningEffectAuthority().require_active()
-        if self._attempted:
+        _require_source_target(target)
+        if target.role in self._attempted:
             raise PersonalDesktopUnattendedStorageProvisioningError(
                 "fixed unattended target creation was already attempted"
             )
-        self._attempted = True
-        spec = security.paper_object_spec(_TARGET)
-        if (
-            spec.role is not security.PaperObjectRole.UNATTENDED_INVOCATIONS
-            or spec.kind is not AuthorityObjectKind.DIRECTORY
-        ):
-            raise AuthorityPathError("native provisioning target role is not exact")
-        policy = _fixed_target_policy()
+        self._attempted.add(target.role)
         create = _bind(
             self._kernel,
             "CreateDirectoryW",
             [ctypes.c_wchar_p, ctypes.c_void_p],
             ctypes.c_int32,
         )
-        with build_security_attributes(policy) as attributes:
-            if not create(_TARGET, ctypes.byref(attributes.attributes)):
+        with build_security_attributes(_fixed_target_policy(target)) as attributes:
+            if not create(target.path, ctypes.byref(attributes.attributes)):
                 raise PersonalDesktopUnattendedStorageProvisioningError(
                     "fixed unattended target create-new failed or was uncertain"
                 )

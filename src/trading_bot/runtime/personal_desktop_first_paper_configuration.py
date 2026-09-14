@@ -102,9 +102,8 @@ def read_personal_desktop_first_paper_cycle_configuration(
     _require_publication_freeze()
     calendar = BoundMarketCalendar(XNYS_CALENDAR_DESCRIPTOR, NYSEMarketCalendar())
     history = _load_history_seed(calendar)
-    selected = WindowsSelectedC3SnapshotReadAuthority(c1).read_selected_snapshot(
-        str(_SELECTION_ID)
-    )
+    selected_reader = WindowsSelectedC3SnapshotReadAuthority(c1)
+    selected = selected_reader.read_selected_snapshot(str(_SELECTION_ID))
     require_selected_c3_snapshot_matches_authority(selected.permit, selected.audit, c1)
     _require_selected(selected)
 

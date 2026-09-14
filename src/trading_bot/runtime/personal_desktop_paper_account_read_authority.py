@@ -433,9 +433,9 @@ def verify_personal_desktop_paper_account_recovery_read(
         if unattended_name in runtime_names:
             session.pin(PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_INVOCATIONS)
             reserved_runtime_names.add(unattended_name)
-        decision_name = PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_DECISIONS.rsplit(
-            "\\", 1
-        )[-1]
+        decision_name = PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_DECISIONS.rsplit("\\", 1)[
+            -1
+        ]
         if decision_name in runtime_names:
             session.pin(PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_DECISIONS)
             reserved_runtime_names.add(decision_name)

@@ -1,4 +1,4 @@
-"""Effects-closed PD4-E zero-semantic-argument production entry point."""
+"""Effects-closed PD4-D2 zero-argument daily-cycle launcher."""
 
 from __future__ import annotations
 
@@ -7,31 +7,53 @@ import json
 import sys
 from dataclasses import dataclass
 
-from trading_bot.runtime.personal_desktop_paper_account_security import (
-    PERSONAL_DESKTOP_PAPER_V2_PRODUCTION_EFFECTS_ENABLED,
-    PERSONAL_DESKTOP_PAPER_V2_RECOVERY_EFFECTS_ENABLED,
+from trading_bot.runtime import personal_desktop_paper_account_security as security
+from trading_bot.runtime import (
+    personal_desktop_paper_receipt_recovery_execution as receipt_recovery,
 )
-from trading_bot.runtime.personal_desktop_paper_receipt_recovery_execution import (
-    PERSONAL_DESKTOP_PAPER_V2_RECEIPT_RECOVERY_EFFECTS_ENABLED,
+from trading_bot.runtime import (
+    personal_desktop_supervised_paper_operation_execution as supervised_execution,
 )
-from trading_bot.runtime.personal_desktop_supervised_paper_operation_execution import (
-    PERSONAL_DESKTOP_PAPER_V2_SUPERVISED_EXECUTION_EFFECTS_ENABLED,
+from trading_bot.runtime import (
+    personal_desktop_unattended_market_data_capture as market_data_capture,
 )
-from trading_bot.runtime.personal_desktop_unattended_paper_operation_execution import (
-    PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_EXECUTION_EFFECTS_ENABLED,
+from trading_bot.runtime import (
+    personal_desktop_unattended_paper_decision_publication as decision_publication,
 )
-from trading_bot.runtime.personal_desktop_unattended_paper_storage_provisioning import (
-    PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_STORAGE_PROVISIONING_EFFECTS_ENABLED,
+from trading_bot.runtime import (
+    personal_desktop_unattended_paper_operation_execution as unattended_execution,
+)
+from trading_bot.runtime import (
+    personal_desktop_unattended_paper_storage_provisioning as storage_provisioning,
+)
+from trading_bot.runtime.personal_desktop_unattended_daily_cycle import (
+    PersonalDesktopUnattendedDailyCycleClassification,
+    PersonalDesktopUnattendedDailyCycleResult,
+    run_personal_desktop_unattended_daily_cycle,
 )
 from trading_bot.runtime.personal_desktop_unattended_scheduler_contract import (
     is_frozen_personal_desktop_unattended_scheduler_contract,
     personal_desktop_unattended_scheduler_contract,
 )
 
-_SCHEMA = "personal-desktop-unattended-paper-launcher/v1"
+_SCHEMA = "personal-desktop-unattended-paper-launcher/v2"
 _EXIT_USAGE = 2
 _EXIT_CONTRACT = 3
 _EXIT_GATE = 4
+_EXIT_RESULT = 5
+_EXIT_UNSAFE_CLASSIFICATION = 6
+
+# Exit status is diagnostic only. The frozen task has no automatic retry, and
+# neither its exit status nor Task Scheduler history grants retry authority.
+_UNSAFE_CLASSIFICATIONS = frozenset(
+    {
+        PersonalDesktopUnattendedDailyCycleClassification.BLOCKED,
+        PersonalDesktopUnattendedDailyCycleClassification.SESSION_GAP,
+        PersonalDesktopUnattendedDailyCycleClassification.RECEIPT_RECOVERY_REQUIRED,
+        PersonalDesktopUnattendedDailyCycleClassification.PROVIDER_ATTEMPT_CONSUMED_OR_AMBIGUOUS,
+        PersonalDesktopUnattendedDailyCycleClassification.MISSED_DECISION_DEADLINE,
+    }
+)
 
 
 class _CliUsageError(ValueError):
@@ -46,6 +68,8 @@ class _SanitizedArgumentParser(argparse.ArgumentParser):
 
 @dataclass(frozen=True, slots=True)
 class _EffectGateState:
+    market_data_capture: bool
+    decision_publication: bool
     production: bool
     recovery: bool
     supervised_execution: bool
@@ -60,20 +84,22 @@ def build_parser() -> argparse.ArgumentParser:
     return _SanitizedArgumentParser(
         prog="run_personal_desktop_unattended_paper_operation",
         description=(
-            "Validate the frozen PD4-E unattended launcher contract with all "
-            "Paper-v2 effects closed."
+            "Run the frozen PD4-D2 zero-argument daily-cycle launcher with all "
+            "eight production effects closed."
         ),
     )
 
 
 def _effect_gate_state() -> _EffectGateState:
     return _EffectGateState(
-        PERSONAL_DESKTOP_PAPER_V2_PRODUCTION_EFFECTS_ENABLED,
-        PERSONAL_DESKTOP_PAPER_V2_RECOVERY_EFFECTS_ENABLED,
-        PERSONAL_DESKTOP_PAPER_V2_SUPERVISED_EXECUTION_EFFECTS_ENABLED,
-        PERSONAL_DESKTOP_PAPER_V2_RECEIPT_RECOVERY_EFFECTS_ENABLED,
-        PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_EXECUTION_EFFECTS_ENABLED,
-        PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_STORAGE_PROVISIONING_EFFECTS_ENABLED,
+        market_data_capture.PERSONAL_DESKTOP_UNATTENDED_MARKET_DATA_CAPTURE_EFFECTS_ENABLED,
+        decision_publication.PERSONAL_DESKTOP_UNATTENDED_DECISION_PUBLICATION_EFFECTS_ENABLED,
+        security.PERSONAL_DESKTOP_PAPER_V2_PRODUCTION_EFFECTS_ENABLED,
+        security.PERSONAL_DESKTOP_PAPER_V2_RECOVERY_EFFECTS_ENABLED,
+        supervised_execution.PERSONAL_DESKTOP_PAPER_V2_SUPERVISED_EXECUTION_EFFECTS_ENABLED,
+        receipt_recovery.PERSONAL_DESKTOP_PAPER_V2_RECEIPT_RECOVERY_EFFECTS_ENABLED,
+        unattended_execution.PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_EXECUTION_EFFECTS_ENABLED,
+        storage_provisioning.PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_STORAGE_PROVISIONING_EFFECTS_ENABLED,
     )
 
 
@@ -82,6 +108,8 @@ def _all_effect_gates_are_closed(state: _EffectGateState | None = None) -> bool:
     return type(observed) is _EffectGateState and all(
         type(value) is bool and value is False
         for value in (
+            observed.market_data_capture,
+            observed.decision_publication,
             observed.production,
             observed.recovery,
             observed.supervised_execution,
@@ -99,8 +127,45 @@ def _emit(record: dict[str, object], *, stream: object | None = None) -> None:
     )
 
 
+def _sanitized_result_record(
+    result: object,
+) -> dict[str, object]:
+    if (
+        type(result) is not PersonalDesktopUnattendedDailyCycleResult
+        or result.real_effect_performed is not False
+    ):
+        raise ValueError("daily-cycle result is not safe launcher evidence")
+    return {
+        "classification": result.classification.value,
+        "completed_session": (
+            result.completed_session.session_date.isoformat()
+            if result.completed_session is not None
+            else None
+        ),
+        "decision_publication_status": (
+            result.decision_publication_status.value
+            if result.decision_publication_status is not None
+            else None
+        ),
+        "market_data_classification": (
+            result.market_data_classification.value
+            if result.market_data_classification is not None
+            else None
+        ),
+        "real_effect_performed": False,
+        "scheduler_modified": False,
+        "schema": _SCHEMA,
+        "settlement_status": (
+            result.settlement_status.value
+            if result.settlement_status is not None
+            else None
+        ),
+        "status": "EFFECTS_CLOSED",
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
-    """Validate the source-only boundary without deriving semantic authority."""
+    """Run G6 once after validating the frozen contract and all closed gates."""
 
     try:
         build_parser().parse_args(argv)
@@ -120,18 +185,18 @@ def main(argv: list[str] | None = None) -> int:
             stream=sys.stderr,
         )
         return _EXIT_GATE
-    _emit(
-        {
-            "diagnostic": "SOURCE_ONLY_ZERO_ARGUMENT_BOUNDARY",
-            "execution_performed": False,
-            "invocation_published": False,
-            "qualification_performed": False,
-            "recovery_performed": False,
-            "schema": _SCHEMA,
-            "scheduler_modified": False,
-            "status": "EFFECTS_CLOSED",
-        }
-    )
+    try:
+        result = run_personal_desktop_unattended_daily_cycle()
+        record = _sanitized_result_record(result)
+    except Exception:
+        _emit(
+            {"reason": "DAILY_CYCLE_RESULT_INVALID", "schema": _SCHEMA},
+            stream=sys.stderr,
+        )
+        return _EXIT_RESULT
+    _emit(record)
+    if result.classification in _UNSAFE_CLASSIFICATIONS:
+        return _EXIT_UNSAFE_CLASSIFICATION
     return 0
 
 

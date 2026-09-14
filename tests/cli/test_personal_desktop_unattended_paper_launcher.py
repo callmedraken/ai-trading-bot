@@ -1,4 +1,4 @@
-"""Focused PD4-E no-argument launcher coverage."""
+"""Focused PD4-D2 zero-argument daily-cycle launcher coverage."""
 
 from __future__ import annotations
 
@@ -8,11 +8,14 @@ import os
 import subprocess
 import sys
 from dataclasses import fields
+from datetime import date
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
 import trading_bot.cli.personal_desktop_unattended_paper_launcher as launcher
+from trading_bot.market_calendar import TradingSession
 from trading_bot.runtime import personal_desktop_paper_account_security as security
 from trading_bot.runtime import (
     personal_desktop_paper_receipt_recovery_execution as receipt_recovery,
@@ -21,13 +24,50 @@ from trading_bot.runtime import (
     personal_desktop_supervised_paper_operation_execution as supervised_execution,
 )
 from trading_bot.runtime import (
+    personal_desktop_unattended_market_data_capture as market_data_capture,
+)
+from trading_bot.runtime import (
+    personal_desktop_unattended_paper_decision_publication as decision_publication,
+)
+from trading_bot.runtime import (
     personal_desktop_unattended_paper_operation_execution as unattended_execution,
+)
+from trading_bot.runtime import (
+    personal_desktop_unattended_paper_startup_qualification as startup_qualification,
 )
 from trading_bot.runtime import (
     personal_desktop_unattended_paper_storage_provisioning as storage_provisioning,
 )
+from trading_bot.runtime.personal_desktop_unattended_daily_cycle import (
+    PersonalDesktopUnattendedDailyCycleClassification as Classification,
+)
+from trading_bot.runtime.personal_desktop_unattended_daily_cycle import (
+    PersonalDesktopUnattendedDailyCycleResult,
+)
+from trading_bot.runtime.personal_desktop_unattended_market_data_capture import (
+    PersonalDesktopUnattendedMarketDataCaptureClassification as MarketDataStatus,
+)
+
+SettlementStatus = startup_qualification.PersonalDesktopUnattendedPaperStartupStatus
 
 _ROOT = Path(__file__).resolve().parents[2]
+
+
+def _result(
+    classification: Classification,
+    *,
+    completed: date | None = None,
+    market_data: MarketDataStatus | None = None,
+    settlement: SettlementStatus | None = None,
+) -> PersonalDesktopUnattendedDailyCycleResult:
+    return PersonalDesktopUnattendedDailyCycleResult(
+        classification,
+        completed_session=(
+            TradingSession(completed) if completed is not None else None
+        ),
+        market_data_classification=market_data,
+        settlement_status=settlement,
+    )
 
 
 def test_launcher_is_cwd_and_package_root_independent(tmp_path: Path) -> None:
@@ -44,7 +84,7 @@ def test_launcher_is_cwd_and_package_root_independent(tmp_path: Path) -> None:
     environment = os.environ.copy()
     environment["PYTHONPATH"] = str(alternate_root)
     script = _ROOT / "scripts" / "run_personal_desktop_unattended_paper_operation.py"
-    expected = "Validate the frozen PD4-E unattended launcher contract"
+    expected = "Run the frozen PD4-D2 zero-argument daily-cycle launcher"
 
     for command in (
         [sys.executable, "-I", str(script), "--help"],
@@ -81,38 +121,148 @@ def test_parser_has_no_semantic_override_and_bad_arguments_are_sanitized(
     }
 
 
-def test_source_only_main_emits_sanitized_non_authorizing_evidence(
-    capsys: pytest.CaptureFixture[str],
+def test_contract_mismatch_fails_before_g6(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    assert launcher.main([]) == 0
-    captured = capsys.readouterr()
-    assert captured.err == ""
-    assert json.loads(captured.out) == {
-        "diagnostic": "SOURCE_ONLY_ZERO_ARGUMENT_BOUNDARY",
-        "execution_performed": False,
-        "invocation_published": False,
-        "qualification_performed": False,
-        "recovery_performed": False,
-        "schema": launcher._SCHEMA,
-        "scheduler_modified": False,
-        "status": "EFFECTS_CLOSED",
-    }
-    forbidden = ("S-1-", "F:\\", "account", "snapshot", "credential")
-    assert all(value not in captured.out for value in forbidden)
+    calls: list[str] = []
+    monkeypatch.setattr(
+        launcher, "personal_desktop_unattended_scheduler_contract", object
+    )
+    monkeypatch.setattr(
+        launcher,
+        "run_personal_desktop_unattended_daily_cycle",
+        lambda: calls.append("g6"),
+    )
+    assert launcher.main([]) == launcher._EXIT_CONTRACT
+    assert calls == []
+    assert json.loads(capsys.readouterr().err)["reason"] == (
+        "SCHEDULER_CONTRACT_INVALID"
+    )
 
 
-def test_any_open_gate_fails_closed() -> None:
-    closed = launcher._EffectGateState(False, False, False, False, False, False)
-    assert launcher._all_effect_gates_are_closed(closed)
-    for field in fields(launcher._EffectGateState):
+@pytest.mark.parametrize("invalid", (True, 1, None, "False"))
+def test_each_individual_open_or_non_bool_gate_fails_before_g6(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    invalid: object,
+) -> None:
+    for changed_field in fields(launcher._EffectGateState):
+        calls: list[str] = []
         values = {item.name: False for item in fields(launcher._EffectGateState)}
-        values[field.name] = True
-        assert not launcher._all_effect_gates_are_closed(
-            launcher._EffectGateState(**values)
+        values[changed_field.name] = invalid
+        state = launcher._EffectGateState(**values)
+        monkeypatch.setattr(launcher, "_effect_gate_state", lambda value=state: value)
+        monkeypatch.setattr(
+            launcher,
+            "run_personal_desktop_unattended_daily_cycle",
+            lambda calls=calls: calls.append("g6"),
+        )
+        assert launcher.main([]) == launcher._EXIT_GATE
+        assert calls == []
+        assert json.loads(capsys.readouterr().err)["reason"] == (
+            "EFFECT_GATE_STATE_INVALID"
         )
 
 
-def test_all_six_real_effect_gates_remain_false() -> None:
+def test_exact_all_closed_gate_set_calls_g6_once_and_emits_capture_required(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    calls: list[str] = []
+    result = _result(
+        Classification.CAPTURE_REQUIRED,
+        completed=date(2026, 9, 11),
+        market_data=MarketDataStatus.CAPTURE_REQUIRED,
+    )
+
+    def run() -> PersonalDesktopUnattendedDailyCycleResult:
+        calls.append("g6")
+        return result
+
+    monkeypatch.setattr(
+        launcher,
+        "_effect_gate_state",
+        lambda: launcher._EffectGateState(*((False,) * 8)),
+    )
+    monkeypatch.setattr(launcher, "run_personal_desktop_unattended_daily_cycle", run)
+    assert launcher.main([]) == 0
+    assert calls == ["g6"]
+    captured = capsys.readouterr()
+    assert captured.err == ""
+    assert json.loads(captured.out) == {
+        "classification": "CAPTURE_REQUIRED",
+        "completed_session": "2026-09-11",
+        "decision_publication_status": None,
+        "market_data_classification": "CAPTURE_REQUIRED",
+        "real_effect_performed": False,
+        "scheduler_modified": False,
+        "schema": "personal-desktop-unattended-paper-launcher/v2",
+        "settlement_status": None,
+        "status": "EFFECTS_CLOSED",
+    }
+    forbidden = (
+        "S-1-",
+        "F:\\",
+        "credential",
+        "permit",
+        "capability",
+        "handle",
+        "security_descriptor",
+        "authority",
+    )
+    assert all(value not in captured.out.casefold() for value in forbidden)
+
+
+def test_warming_up_is_a_successful_sanitized_classification(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(
+        launcher,
+        "run_personal_desktop_unattended_daily_cycle",
+        lambda: _result(Classification.WARMING_UP),
+    )
+    assert launcher.main([]) == 0
+    assert json.loads(capsys.readouterr().out)["classification"] == "WARMING_UP"
+
+
+def test_blocked_is_surfaced_with_conservative_nonzero_exit(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(
+        launcher,
+        "run_personal_desktop_unattended_daily_cycle",
+        lambda: _result(Classification.BLOCKED),
+    )
+    assert launcher.main([]) == launcher._EXIT_UNSAFE_CLASSIFICATION
+    record = json.loads(capsys.readouterr().out)
+    assert record["classification"] == "BLOCKED"
+    assert record["real_effect_performed"] is False
+
+
+def test_real_effect_result_is_rejected_even_when_injected(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    fake = SimpleNamespace(
+        classification=Classification.CAPTURE_REQUIRED,
+        real_effect_performed=True,
+    )
+    monkeypatch.setattr(
+        launcher, "run_personal_desktop_unattended_daily_cycle", lambda: fake
+    )
+    assert launcher.main([]) == launcher._EXIT_RESULT
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert json.loads(captured.err)["reason"] == "DAILY_CYCLE_RESULT_INVALID"
+
+
+def test_all_eight_real_effect_gates_remain_committed_false() -> None:
+    assert (
+        market_data_capture.PERSONAL_DESKTOP_UNATTENDED_MARKET_DATA_CAPTURE_EFFECTS_ENABLED
+        is False
+    )
+    assert (
+        decision_publication.PERSONAL_DESKTOP_UNATTENDED_DECISION_PUBLICATION_EFFECTS_ENABLED
+        is False
+    )
     assert security.PERSONAL_DESKTOP_PAPER_V2_PRODUCTION_EFFECTS_ENABLED is False
     assert security.PERSONAL_DESKTOP_PAPER_V2_RECOVERY_EFFECTS_ENABLED is False
     assert (
@@ -133,7 +283,7 @@ def test_all_six_real_effect_gates_remain_false() -> None:
     )
 
 
-def test_pd4e_source_reaches_no_scheduler_or_trading_effect_callable() -> None:
+def test_launcher_reaches_only_g6_and_never_mutates_scheduler_or_opens_gates() -> None:
     paths = (
         _ROOT
         / "src"
@@ -142,7 +292,7 @@ def test_pd4e_source_reaches_no_scheduler_or_trading_effect_callable() -> None:
         / "personal_desktop_unattended_paper_launcher.py",
         _ROOT / "scripts" / "run_personal_desktop_unattended_paper_operation.py",
     )
-    forbidden = {
+    forbidden_calls = {
         "schtasks",
         "register_task",
         "create_task",
@@ -156,12 +306,21 @@ def test_pd4e_source_reaches_no_scheduler_or_trading_effect_callable() -> None:
         "broker_order",
         "live_order",
     }
+    called: set[str] = set()
+    assigned: set[str] = set()
     for path in paths:
         tree = ast.parse(path.read_text(encoding="utf-8"))
-        called = {
+        called.update(
             node.func.id if isinstance(node.func, ast.Name) else node.func.attr
             for node in ast.walk(tree)
             if isinstance(node, ast.Call)
             and isinstance(node.func, (ast.Name, ast.Attribute))
-        }
-        assert called.isdisjoint(forbidden)
+        )
+        assigned.update(
+            node.id
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store)
+        )
+    assert "run_personal_desktop_unattended_daily_cycle" in called
+    assert called.isdisjoint(forbidden_calls)
+    assert not any(name.endswith("EFFECTS_ENABLED") for name in assigned)

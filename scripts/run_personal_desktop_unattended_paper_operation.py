@@ -1,4 +1,4 @@
-"""Run the source-only PD4-E unattended Paper-v2 launcher boundary."""
+"""Run the effects-closed PD4-D2 unattended daily-cycle launcher."""
 
 import sys
 from pathlib import Path

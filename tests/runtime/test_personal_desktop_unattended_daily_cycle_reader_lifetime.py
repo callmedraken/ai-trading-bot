@@ -22,7 +22,9 @@ def test_production_dependencies_retain_every_selected_reader_for_cycle(
             self.authority = authority
             reader_refs.append(weakref.ref(self))
 
-        def read_selected_snapshot_for_session(self, session: TradingSession) -> object:
+        def read_selected_snapshot_for_session(
+            self, session: TradingSession
+        ) -> object:
             return object()
 
     monkeypatch.setattr(

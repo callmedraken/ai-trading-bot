@@ -19,8 +19,8 @@ def test_first_configuration_retains_p2_reader_until_authority_match(
 ) -> None:
     profile = first_config.PERSONAL_DESKTOP_FIRST_PAPER_OPERATION_PROFILE
     c1 = SimpleNamespace(
-        machine_authority_id="223f0d4e-36f9-4b9f-bf0e-febf16fcd3f1",
-        authority_epoch_id="e6f3de5d-1412-40ad-a022-8b33e72a5f6d",
+        machine_authority_id=first_config._MACHINE_AUTHORITY_ID,
+        authority_epoch_id=first_config._AUTHORITY_EPOCH_ID,
         approved_account_sid=profile.approved_trading_sid,
     )
     selected = SimpleNamespace(permit=object(), audit=object())
@@ -33,7 +33,7 @@ def test_first_configuration_retains_p2_reader_until_authority_match(
             reader_ref = weakref.ref(self)
 
         def read_selected_snapshot(self, selection_id: str) -> object:
-            assert selection_id == "36d6fbb3-bdec-57e0-a9cf-78dc2b8f7280"
+            assert selection_id == str(first_config._SELECTION_ID)
             return selected
 
     def validate_authority(authority: object) -> object:

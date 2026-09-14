@@ -34,6 +34,7 @@ from trading_bot.runtime.manual_paper_selected_c3_snapshot import (
     require_selected_c3_snapshot_matches_authority,
 )
 from trading_bot.runtime.manual_paper_strategy_plan import (
+    ManualPaperStrategyPlanArtifactBinding,
     build_manual_paper_strategy_plan,
     verify_manual_paper_strategy_plan,
 )
@@ -67,7 +68,10 @@ from trading_bot.runtime.personal_desktop_unattended_paper_invocation_storage im
     PersonalDesktopUnattendedInvocationStorageReadResult,
     read_personal_desktop_unattended_invocation_storage,
 )
-from trading_bot.runtime.strategy_history_seed import VerifiedStrategyHistorySeed
+from trading_bot.runtime.strategy_history_seed import (
+    VerifiedStrategyHistorySeed,
+    verify_strategy_history_seed,
+)
 from trading_bot.runtime.verified_snapshot_preparation import (
     CallerAssertedNextSessionOpenReference,
     VerifiedSnapshotPaperCyclePolicies,
@@ -81,6 +85,7 @@ from trading_bot.strategies import MovingAverageCrossoverConfig
 from .personal_desktop_supervised_paper_operation_preparation import (
     PreparedPaperOperationMaterial,
     prepare_verified_paper_operation_from_account,
+    reconstruct_verified_paper_operation_from_plan,
 )
 
 
@@ -621,6 +626,106 @@ def qualify_personal_desktop_unattended_paper_startup(
         inputs,
         calendar,
         personal_desktop_unattended_paper_startup_production_dependencies(),
+    )
+
+
+def qualify_personal_desktop_unattended_paper_startup_from_verified_plan(
+    authority: ValidatedProductionAuthority,
+    selected_snapshot: SelectedC3SnapshotReadResult,
+    verified_plan: ManualPaperStrategyPlanArtifactBinding,
+    *,
+    historical_cycle_configuration_payloads: tuple[bytes, ...] = (),
+) -> PersonalDesktopUnattendedPaperStartupQualificationResult:
+    """Reconcile an exact completed G3 plan without reevaluating its strategy."""
+
+    authority = require_validated_production_authority(authority)
+    calendar = BoundMarketCalendar(XNYS_CALENDAR_DESCRIPTOR, NYSEMarketCalendar())
+    inputs = _planning_inputs_from_verified_plan(
+        selected_snapshot,
+        verified_plan,
+        historical_cycle_configuration_payloads,
+        calendar,
+    )
+    dependencies = personal_desktop_unattended_paper_startup_production_dependencies()
+
+    def reconstruct(
+        account: PersonalDesktopPaperAccountReadEvidence,
+        selected: SelectedC3SnapshotReadResult,
+        unused: PersonalDesktopUnattendedPaperPlanningInputs,
+        current_calendar: IdentifiedMarketCalendar,
+    ) -> PreparedPaperOperationMaterial:
+        del unused
+        return reconstruct_verified_paper_operation_from_plan(
+            account, selected, verified_plan, current_calendar
+        )
+
+    dependencies = PersonalDesktopUnattendedPaperStartupDependencies(
+        dependencies.validate_c1,
+        dependencies.match_snapshot,
+        dependencies.qualify_recovery,
+        dependencies.read_account,
+        dependencies.require_account,
+        dependencies.admit_healthy,
+        dependencies.admit_recovery,
+        reconstruct,
+        dependencies.read_storage,
+        dependencies.inspect_operation,
+        dependencies.gate_state,
+    )
+    return _qualify_startup(
+        authority,
+        selected_snapshot,
+        inputs,
+        calendar,
+        dependencies,
+    )
+
+
+def _planning_inputs_from_verified_plan(
+    selected_snapshot: SelectedC3SnapshotReadResult,
+    verified_plan: ManualPaperStrategyPlanArtifactBinding,
+    historical_configurations: tuple[bytes, ...],
+    calendar: IdentifiedMarketCalendar,
+) -> PersonalDesktopUnattendedPaperPlanningInputs:
+    if (
+        type(selected_snapshot) is not SelectedC3SnapshotReadResult
+        or type(verified_plan) is not ManualPaperStrategyPlanArtifactBinding
+    ):
+        raise TypeError("verified-plan startup evidence is invalid")
+    replayed = verify_manual_paper_strategy_plan(
+        verified_plan.artifact_bytes,
+        calendar,
+        expected_sha256=verified_plan.artifact_sha256,
+        expected_byte_length=verified_plan.artifact_byte_length,
+        expected_checkpointed_request=verified_plan.checkpointed_request,
+    )
+    if replayed != verified_plan:
+        raise ValueError("verified plan differs from exact replay")
+    plan = verified_plan.plan
+    request = plan.request_core
+    if len(request.open_references) != 1:
+        raise ValueError("verified plan must contain one exact open reference")
+    snapshot = selected_snapshot.verification.snapshot
+    if snapshot is None or len(snapshot.request.symbols) != 1:
+        raise ValueError("selected snapshot evidence is incomplete")
+    history = verify_strategy_history_seed(
+        plan.history_seed_artifact,
+        expected_symbol=snapshot.request.symbols[0],
+        target_session=snapshot.target_session,
+        strategy_config=plan.strategy_config,
+        calendar=calendar,
+    )
+    return PersonalDesktopUnattendedPaperPlanningInputs(
+        history,
+        plan.strategy_config,
+        UUID(plan.caller_idempotency_key),
+        request.open_references[0],
+        request.policies,
+        request.planning_at,
+        request.submitted_at,
+        request.filled_at,
+        request.metadata,
+        tuple(historical_configurations),
     )
 
 

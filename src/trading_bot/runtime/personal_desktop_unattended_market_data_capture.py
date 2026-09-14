@@ -224,6 +224,24 @@ def run_personal_desktop_unattended_market_data_capture() -> (
 
     authority = acquire_validated_production_authority()
     observed_at = datetime.now(UTC)
+    return reconcile_personal_desktop_unattended_market_data_capture(
+        authority,
+        observed_at,
+    )
+
+
+def reconcile_personal_desktop_unattended_market_data_capture(
+    authority: ValidatedProductionAuthority,
+    observed_at: datetime,
+) -> PersonalDesktopUnattendedMarketDataCaptureResult:
+    """Compose G5 from one already-validated C1 and factual observation.
+
+    This is the production composition seam used by G6 so the daily controller
+    owns the single wall-clock observation.  It does not add semantic caller
+    input: both values are obtained inside the zero-argument G6 boundary.
+    """
+
+    authority = require_validated_production_authority(authority)
     return _run_personal_desktop_unattended_market_data_capture(
         authority,
         observed_at,

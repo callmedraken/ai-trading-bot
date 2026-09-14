@@ -18,6 +18,7 @@ from trading_bot.runtime import (
     personal_desktop_unattended_paper_decision_storage as storage,
 )
 from trading_bot.runtime.personal_desktop_unattended_paper_decision_storage import (
+    FinalizedUnattendedDecisionForSessionClassification,
     PersonalDesktopUnattendedDecisionStorageClassification,
     PersonalDesktopUnattendedDecisionStorageError,
 )
@@ -25,6 +26,7 @@ from trading_bot.runtime.personal_desktop_unattended_paper_decision_storage impo
 from .test_personal_desktop_unattended_paper_decision_intent import (
     _calendar,
     _decision_binding,
+    _session_read,
 )
 
 
@@ -56,6 +58,16 @@ def _put_final(api, binding, *, directory_binding=None):
 def _read(api, binding):
     return storage._read_personal_desktop_unattended_decision_storage_for_test(
         binding,
+        SID,
+        api=api,
+        observer=Observer(),
+        calendar=_calendar(),
+    )
+
+
+def _find(api, binding):
+    return storage._find_finalized_unattended_decision_for_execution_session_for_test(
+        binding.decision.intended_execution_session,
         SID,
         api=api,
         observer=Observer(),
@@ -202,4 +214,106 @@ def test_disposable_read_never_mints_production_provenance(
     with pytest.raises(PersonalDesktopUnattendedDecisionStorageError):
         storage.require_validated_personal_desktop_unattended_decision_storage_read(
             result
+        )
+
+
+def test_session_indexed_discovery_reads_the_complete_fixed_namespace(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    binding = _decision_binding(monkeypatch)
+    empty = _find(_empty_api(), binding)
+    assert (
+        empty.classification is FinalizedUnattendedDecisionForSessionClassification.NONE
+    )
+
+    api = _empty_api()
+    _put_final(api, binding)
+    found = _find(api, binding)
+    assert found.classification is (
+        FinalizedUnattendedDecisionForSessionClassification.FINALIZED
+    )
+    assert found.binding == binding
+    assert found.decision_id == binding.decision.decision_id
+    assert not any(
+        call[0] in {"write", "create", "rename", "delete"} for call in api.calls
+    )
+
+
+def test_session_indexed_discovery_blocks_duplicate_target_or_staging(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    first = _decision_binding(monkeypatch, caller_key="first")
+    second = _decision_binding(monkeypatch, caller_key="second")
+    api = _empty_api()
+    _put_final(api, first)
+    _put_final(api, second)
+    assert _find(api, first).classification is (
+        FinalizedUnattendedDecisionForSessionClassification.BLOCKED
+    )
+
+    staging = _empty_api()
+    staging.put(_directory(first, staging=True))
+    assert _find(staging, first).classification is (
+        FinalizedUnattendedDecisionForSessionClassification.BLOCKED
+    )
+
+
+def test_session_indexed_discovery_blocks_malformed_or_unknown_namespace_state(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    binding = _decision_binding(monkeypatch)
+    malformed = _empty_api()
+    directory = _put_final(malformed, binding)
+    artifact = (
+        directory
+        + "\\"
+        + storage.unattended_paper_decision_artifact_name(binding.decision.decision_id)
+    )
+    malformed.put(artifact, b"not-canonical-json")
+    assert _find(malformed, binding).classification is (
+        FinalizedUnattendedDecisionForSessionClassification.BLOCKED
+    )
+
+    unknown = _empty_api()
+    unknown.overrides[security.PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_DECISIONS] = (
+        "unknown",
+    )
+    assert _find(unknown, binding).classification is (
+        FinalizedUnattendedDecisionForSessionClassification.BLOCKED
+    )
+
+
+def test_disposable_session_discovery_cannot_be_reused_as_current_c1_provenance(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    binding = _decision_binding(monkeypatch)
+    result = _find(_empty_api(), binding)
+    with pytest.raises(PersonalDesktopUnattendedDecisionStorageError):
+        storage.require_finalized_unattended_decision_for_execution_session(
+            result,
+            object(),  # type: ignore[arg-type]
+        )
+
+
+def test_session_discovery_rejects_c3_evidence_from_wrong_current_c1(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    binding = _decision_binding(monkeypatch)
+    monkeypatch.setattr(
+        storage,
+        "WindowsPersonalDesktopUnattendedSelectedC3ReadAuthority",
+        lambda authority: type(
+            "WrongC1Reader",
+            (),
+            {
+                "read_selected_snapshot_for_session": staticmethod(
+                    lambda session: _session_read(session.session_date, 999)
+                )
+            },
+        )(),
+    )
+    with pytest.raises(PersonalDesktopUnattendedDecisionStorageError):
+        storage._require_decision_c3_matches_current_authority(
+            binding,
+            object(),  # type: ignore[arg-type]
         )

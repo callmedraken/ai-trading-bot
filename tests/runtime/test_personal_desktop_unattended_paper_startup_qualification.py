@@ -17,6 +17,7 @@ from tests.market_data.daily_snapshot_test_support import CAPTURED_AT, SPY, cale
 from tests.runtime.test_manual_paper_strategy_plan import (
     _DEFAULT_CONFIG,
     _NEXT_SESSION,
+    _binding,
     _verified_seed,
 )
 from tests.runtime.test_personal_desktop_supervised_paper_operation_preparation import (
@@ -114,6 +115,22 @@ def _inputs() -> startup.PersonalDesktopUnattendedPaperPlanningInputs:
         (MetadataEntry("source", "pd4-c-test"),),
         (b"historical-plan",),
     )
+
+
+def test_verified_plan_inputs_are_replayed_without_strategy_reevaluation() -> None:
+    plan = _binding(caller_key=str(CALLER_KEY))
+    selected = _selected_result()
+    inputs = startup._planning_inputs_from_verified_plan(
+        selected,
+        plan,
+        (b"historical-plan",),
+        calendar(),
+    )
+
+    assert inputs.strategy_config == plan.plan.strategy_config
+    assert inputs.caller_idempotency_key == CALLER_KEY
+    assert inputs.history_seed.seed.symbol == SPY
+    assert inputs.historical_configurations == (b"historical-plan",)
 
 
 def _no_recovery(evidence: object | None = None):  # type: ignore[no-untyped-def]

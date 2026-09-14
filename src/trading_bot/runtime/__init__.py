@@ -276,6 +276,7 @@ from trading_bot.runtime.personal_desktop_unattended_market_data_capture import 
     PersonalDesktopUnattendedMarketDataCaptureResult,
     PersonalDesktopUnattendedSelectedC3Evidence,
     WindowsPersonalDesktopUnattendedC3PreflightAuthority,
+    reconcile_personal_desktop_unattended_market_data_capture,
     run_personal_desktop_unattended_market_data_capture,
 )
 from trading_bot.runtime.personal_desktop_unattended_paper_decision_intent import (  # noqa: F401
@@ -309,11 +310,15 @@ from trading_bot.runtime.personal_desktop_unattended_paper_decision_publication 
 )
 from trading_bot.runtime.personal_desktop_unattended_paper_decision_storage import (  # noqa: F401
     PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_DECISIONS,
+    FinalizedUnattendedDecisionForSessionClassification,
+    FinalizedUnattendedDecisionForSessionResult,
     PersonalDesktopUnattendedDecisionStorageClassification,
     PersonalDesktopUnattendedDecisionStorageDiagnostic,
     PersonalDesktopUnattendedDecisionStorageError,
     PersonalDesktopUnattendedDecisionStorageReadResult,
+    find_finalized_unattended_decision_for_execution_session,
     read_personal_desktop_unattended_decision_storage,
+    require_finalized_unattended_decision_for_execution_session,
     require_validated_personal_desktop_unattended_decision_storage_read,
     unattended_paper_decision_artifact_name,
     unattended_paper_decision_directory_name,
@@ -446,6 +451,22 @@ _PD4_UNATTENDED_STARTUP_EXPORTS = frozenset(
         "PersonalDesktopUnattendedPaperStartupQualificationResult",
         "PersonalDesktopUnattendedPaperStartupStatus",
         "qualify_personal_desktop_unattended_paper_startup",
+        "qualify_personal_desktop_unattended_paper_startup_from_verified_plan",
+    }
+)
+_PD4_G6_EXPORTS = frozenset(
+    {
+        "PERSONAL_DESKTOP_UNATTENDED_DAILY_CYCLE_IDEMPOTENCY_MATERIAL_VERSION",
+        "PERSONAL_DESKTOP_UNATTENDED_DAILY_CYCLE_IDEMPOTENCY_NAMESPACE",
+        "PERSONAL_DESKTOP_UNATTENDED_DAILY_CYCLE_PROFILE_VERSION",
+        "DisposablePersonalDesktopUnattendedDailyCycleDependencies",
+        "PersonalDesktopUnattendedDailyCycleClassification",
+        "PersonalDesktopUnattendedDailyCycleResult",
+        "derive_personal_desktop_unattended_daily_cycle_idempotency_key",
+        "personal_desktop_unattended_paper_policies",
+        "personal_desktop_unattended_strategy_config",
+        "run_personal_desktop_unattended_daily_cycle",
+        "run_personal_desktop_unattended_daily_cycle_for_test",
     }
 )
 
@@ -461,6 +482,8 @@ def __getattr__(name: str) -> object:
         module = import_module(
             ".personal_desktop_unattended_paper_startup_qualification", __name__
         )
+    elif name in _PD4_G6_EXPORTS:
+        module = import_module(".personal_desktop_unattended_daily_cycle", __name__)
     else:
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
     value = getattr(module, name)
@@ -702,6 +725,12 @@ __all__.extend(
         "MAX_PERSONAL_DESKTOP_UNATTENDED_PAPER_DECISION_INTENT_BYTES",
         "PERSONAL_DESKTOP_UNATTENDED_DECISION_PUBLICATION_EFFECTS_ENABLED",
         "PERSONAL_DESKTOP_UNATTENDED_MARKET_DATA_CAPTURE_EFFECTS_ENABLED",
+        "PERSONAL_DESKTOP_UNATTENDED_DAILY_CYCLE_IDEMPOTENCY_MATERIAL_VERSION",
+        "PERSONAL_DESKTOP_UNATTENDED_DAILY_CYCLE_IDEMPOTENCY_NAMESPACE",
+        "PERSONAL_DESKTOP_UNATTENDED_DAILY_CYCLE_PROFILE_VERSION",
+        "DisposablePersonalDesktopUnattendedDailyCycleDependencies",
+        "PersonalDesktopUnattendedDailyCycleClassification",
+        "PersonalDesktopUnattendedDailyCycleResult",
         "PersonalDesktopUnattendedC3PreflightReadResult",
         "PERSONAL_DESKTOP_UNATTENDED_PAPER_DECISION_IDENTITY_MATERIAL_VERSION",
         "PERSONAL_DESKTOP_UNATTENDED_PAPER_DECISION_INTENT_SCHEMA",
@@ -716,6 +745,8 @@ __all__.extend(
         "PersonalDesktopUnattendedDecisionStorageDiagnostic",
         "PersonalDesktopUnattendedDecisionStorageError",
         "PersonalDesktopUnattendedDecisionStorageReadResult",
+        "FinalizedUnattendedDecisionForSessionClassification",
+        "FinalizedUnattendedDecisionForSessionResult",
         "PersonalDesktopUnattendedPaperDecisionC3Evidence",
         "PersonalDesktopUnattendedMarketDataCaptureClassification",
         "PersonalDesktopUnattendedMarketDataCaptureError",
@@ -732,10 +763,18 @@ __all__.extend(
         "bind_personal_desktop_unattended_paper_decision_intent",
         "create_personal_desktop_unattended_paper_decision_intent",
         "issue_pre_open_decision_publication_permit",
+        "find_finalized_unattended_decision_for_execution_session",
         "parse_personal_desktop_unattended_paper_decision_intent",
         "qualify_personal_desktop_unattended_decision_publication",
         "read_personal_desktop_unattended_decision_storage",
         "run_personal_desktop_unattended_market_data_capture",
+        "reconcile_personal_desktop_unattended_market_data_capture",
+        "run_personal_desktop_unattended_daily_cycle",
+        "run_personal_desktop_unattended_daily_cycle_for_test",
+        "derive_personal_desktop_unattended_daily_cycle_idempotency_key",
+        "personal_desktop_unattended_paper_policies",
+        "personal_desktop_unattended_strategy_config",
+        "require_finalized_unattended_decision_for_execution_session",
         "require_validated_personal_desktop_unattended_decision_storage_read",
         "serialize_personal_desktop_unattended_paper_decision_intent",
         "unattended_paper_decision_artifact_name",
@@ -754,6 +793,7 @@ __all__.extend(
         "PersonalDesktopUnattendedPaperStartupQualificationResult",
         "PersonalDesktopUnattendedPaperStartupStatus",
         "qualify_personal_desktop_unattended_paper_startup",
+        "qualify_personal_desktop_unattended_paper_startup_from_verified_plan",
         "PersonalDesktopUnattendedPaperEffectsDisabledError",
         "PersonalDesktopUnattendedPaperOperationDiagnostic",
         "PersonalDesktopUnattendedPaperOperationExecutionError",

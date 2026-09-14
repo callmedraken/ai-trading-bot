@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from uuid import UUID
 
+from trading_bot.market_calendar import TradingSession
 from trading_bot.market_data import IdentifiedMarketCalendar
 from trading_bot.runtime.personal_desktop_paper_account_security import (
     PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_DECISIONS,
@@ -20,6 +21,9 @@ from trading_bot.runtime.personal_desktop_paper_account_token import (
     TradingTokenObserver,
     WindowsTradingTokenObserver,
     require_trading_token,
+)
+from trading_bot.runtime.personal_desktop_unattended_c3_history import (
+    WindowsPersonalDesktopUnattendedSelectedC3ReadAuthority,
 )
 from trading_bot.runtime.personal_desktop_unattended_paper_decision_intent import (
     PersonalDesktopUnattendedPaperDecisionIntent,
@@ -57,6 +61,49 @@ class PersonalDesktopUnattendedDecisionStorageDiagnostic(StrEnum):
 
 class PersonalDesktopUnattendedDecisionStorageError(Exception):
     """Trusted decision-storage read provenance is unavailable."""
+
+
+class FinalizedUnattendedDecisionForSessionClassification(StrEnum):
+    """Complete fixed-namespace discovery classifications for one session."""
+
+    NONE = "NONE"
+    FINALIZED = "FINALIZED"
+    BLOCKED = "BLOCKED"
+
+
+@dataclass(frozen=True, slots=True, eq=False, weakref_slot=True)
+class FinalizedUnattendedDecisionForSessionResult:
+    """Sanitized session-indexed discovery with an immutable verified binding."""
+
+    classification: FinalizedUnattendedDecisionForSessionClassification
+    execution_session: TradingSession
+    decision_id: UUID | None
+    binding: PersonalDesktopUnattendedPaperDecisionIntentArtifactBinding | None
+
+    def __post_init__(self) -> None:
+        finalized = (
+            self.classification
+            is FinalizedUnattendedDecisionForSessionClassification.FINALIZED
+        )
+        if (
+            type(self.classification)
+            is not FinalizedUnattendedDecisionForSessionClassification
+            or type(self.execution_session) is not TradingSession
+            or (finalized != (self.decision_id is not None))
+            or (finalized != (self.binding is not None))
+            or (self.decision_id is not None and type(self.decision_id) is not UUID)
+            or (
+                self.binding is not None
+                and (
+                    type(self.binding)
+                    is not PersonalDesktopUnattendedPaperDecisionIntentArtifactBinding
+                    or self.binding.decision.decision_id != self.decision_id
+                    or self.binding.decision.intended_execution_session
+                    != self.execution_session
+                )
+            )
+        ):
+            raise ValueError("finalized decision session result is invalid")
 
 
 @dataclass(frozen=True, slots=True, eq=False, weakref_slot=True)
@@ -113,6 +160,14 @@ _REGISTRY: weakref.WeakKeyDictionary[
     PersonalDesktopUnattendedDecisionStorageReadResult, _VerifiedDecisionStorageRead
 ] = weakref.WeakKeyDictionary()
 _REGISTRY_LOCK = threading.Lock()
+
+_SESSION_REGISTRY: weakref.WeakKeyDictionary[
+    FinalizedUnattendedDecisionForSessionResult,
+    tuple[
+        ValidatedProductionAuthority,
+        PersonalDesktopUnattendedPaperDecisionIntentArtifactBinding | None,
+    ],
+] = weakref.WeakKeyDictionary()
 
 
 def unattended_paper_decision_directory_name(
@@ -189,6 +244,91 @@ def read_personal_desktop_unattended_decision_storage(
     return result
 
 
+def find_finalized_unattended_decision_for_execution_session(
+    execution_session: TradingSession,
+    authority: ValidatedProductionAuthority,
+) -> FinalizedUnattendedDecisionForSessionResult:
+    """Resolve at most one finalized G4 decision targeting one exact session."""
+
+    if type(execution_session) is not TradingSession:
+        raise PersonalDesktopUnattendedDecisionStorageError(
+            "execution session must be an exact TradingSession"
+        )
+    try:
+        c1 = require_validated_production_authority(authority)
+        finalized = _perform_session_discovery(
+            execution_session,
+            c1.approved_account_sid,
+            api=WindowsPaperReadNativeApi(),
+            observer=WindowsTradingTokenObserver(),
+            calendar=personal_desktop_unattended_decision_calendar(),
+        )
+        if finalized is not None:
+            _require_decision_c3_matches_current_authority(finalized, c1)
+        require_validated_production_authority(c1)
+        result = _session_result(execution_session, finalized)
+    except Exception:
+        return _blocked_session_result(execution_session)
+    with _REGISTRY_LOCK:
+        _SESSION_REGISTRY[result] = (c1, finalized)
+    return result
+
+
+def require_finalized_unattended_decision_for_execution_session(
+    result: FinalizedUnattendedDecisionForSessionResult,
+    authority: ValidatedProductionAuthority,
+) -> PersonalDesktopUnattendedPaperDecisionIntentArtifactBinding | None:
+    """Require same-process current-C1 provenance for session discovery."""
+
+    try:
+        c1 = require_validated_production_authority(authority)
+    except Exception as error:
+        raise PersonalDesktopUnattendedDecisionStorageError(
+            "finalized decision discovery lacks current-C1 provenance"
+        ) from error
+    with _REGISTRY_LOCK:
+        evidence = _SESSION_REGISTRY.get(result)
+    if (
+        type(result) is not FinalizedUnattendedDecisionForSessionResult
+        or result.classification
+        is FinalizedUnattendedDecisionForSessionClassification.BLOCKED
+        or evidence is None
+        or evidence[0] != c1
+        or evidence[1] is not result.binding
+    ):
+        raise PersonalDesktopUnattendedDecisionStorageError(
+            "finalized decision discovery lacks current-C1 provenance"
+        )
+    return evidence[1]
+
+
+def _find_finalized_unattended_decision_for_execution_session_for_test(
+    execution_session: TradingSession,
+    trading_sid: str,
+    *,
+    api: PaperReadNativeApi,
+    observer: TradingTokenObserver,
+    calendar: IdentifiedMarketCalendar,
+) -> FinalizedUnattendedDecisionForSessionResult:
+    """Exercise complete namespace discovery through disposable native seams."""
+
+    try:
+        if api is None or isinstance(api, WindowsPaperReadNativeApi):
+            raise PersonalDesktopUnattendedDecisionStorageError(
+                "disposable discovery requires an explicit fake native API"
+            )
+        finalized = _perform_session_discovery(
+            execution_session,
+            trading_sid,
+            api=api,
+            observer=observer,
+            calendar=calendar,
+        )
+        return _session_result(execution_session, finalized)
+    except Exception:
+        return _blocked_session_result(execution_session)
+
+
 def _read_personal_desktop_unattended_decision_storage_for_test(
     expected: PersonalDesktopUnattendedPaperDecisionIntentArtifactBinding,
     trading_sid: str,
@@ -245,6 +385,111 @@ def _perform_storage_read(
                 "Trading token changed during decision storage read"
             )
     return result
+
+
+def _perform_session_discovery(
+    execution_session: TradingSession,
+    trading_sid: str,
+    *,
+    api: PaperReadNativeApi,
+    observer: TradingTokenObserver,
+    calendar: IdentifiedMarketCalendar,
+) -> PersonalDesktopUnattendedPaperDecisionIntentArtifactBinding | None:
+    if type(execution_session) is not TradingSession:
+        raise PersonalDesktopUnattendedDecisionStorageError(
+            "execution session must be an exact TradingSession"
+        )
+    initial = observer.observe()
+    require_trading_token(trading_sid, initial)
+    try:
+        finalized = _read_complete_fixed_namespace(
+            trading_sid,
+            api=api,
+            calendar=calendar,
+        )
+    finally:
+        final = observer.observe()
+        require_trading_token(trading_sid, final)
+        if final != initial:
+            raise PersonalDesktopUnattendedDecisionStorageError(
+                "Trading token changed during decision session discovery"
+            )
+    matches = tuple(
+        item
+        for item in finalized
+        if item.decision.intended_execution_session == execution_session
+    )
+    if len(matches) > 1:
+        raise PersonalDesktopUnattendedDecisionStorageError(
+            "multiple finalized decisions target the execution session"
+        )
+    return matches[0] if matches else None
+
+
+def _read_complete_fixed_namespace(
+    trading_sid: str,
+    *,
+    api: PaperReadNativeApi,
+    calendar: IdentifiedMarketCalendar,
+) -> tuple[PersonalDesktopUnattendedPaperDecisionIntentArtifactBinding, ...]:
+    finalized: list[PersonalDesktopUnattendedPaperDecisionIntentArtifactBinding] = []
+    with PinnedTradingPaperReadSession(api, trading_sid) as session:
+        names = session.names(PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_DECISIONS)
+        finals: list[tuple[str, UUID]] = []
+        for name in names:
+            final_match = _FINAL_NAME.fullmatch(name)
+            if final_match is not None:
+                finals.append((name, _canonical_uuid(final_match.group(1))))
+                continue
+            if _STAGING_NAME.fullmatch(name) is not None:
+                raise PersonalDesktopUnattendedDecisionStorageError(
+                    "decision namespace contains staging state"
+                )
+            raise PersonalDesktopUnattendedDecisionStorageError(
+                "decision namespace contains an unknown entry"
+            )
+        for name, directory_id in finals:
+            directory = PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_DECISIONS + "\\" + name
+            artifact_name = unattended_paper_decision_artifact_name(directory_id)
+            if session.names(directory) != (artifact_name,):
+                raise PersonalDesktopUnattendedDecisionStorageError(
+                    "finalized decision directory contents are invalid"
+                )
+            binding = verify_personal_desktop_unattended_paper_decision_intent(
+                session.read(directory + "\\" + artifact_name), calendar
+            )
+            if binding.decision.decision_id != directory_id:
+                raise PersonalDesktopUnattendedDecisionStorageError(
+                    "decision directory and artifact identities disagree"
+                )
+            finalized.append(binding)
+    if len({item.decision.decision_id for item in finalized}) != len(finalized):
+        raise PersonalDesktopUnattendedDecisionStorageError(
+            "decision namespace contains duplicate identities"
+        )
+    return tuple(finalized)
+
+
+def _require_decision_c3_matches_current_authority(
+    binding: PersonalDesktopUnattendedPaperDecisionIntentArtifactBinding,
+    authority: ValidatedProductionAuthority,
+) -> None:
+    reader = WindowsPersonalDesktopUnattendedSelectedC3ReadAuthority(authority)
+    for expected in (*binding.decision.history_c3, binding.decision.current_c3):
+        actual = reader.read_selected_snapshot_for_session(expected.selected_session)
+        audit = actual.selected.audit
+        if (
+            actual.selected.snapshot_bytes != expected.snapshot_artifact
+            or audit.selection_id != expected.selection_id
+            or audit.session_id != expected.session_id
+            or audit.terminal_id != expected.terminal_id
+            or audit.snapshot_id != expected.snapshot_id
+            or audit.artifact_sha256 != expected.artifact_sha256
+            or audit.artifact_byte_length != expected.artifact_byte_length
+        ):
+            raise PersonalDesktopUnattendedDecisionStorageError(
+                "finalized decision C3 evidence differs from current C1 authority"
+            )
 
 
 def _replay_expected(
@@ -398,4 +643,34 @@ def _blocked_result(
         0,
         None,
         PersonalDesktopUnattendedDecisionStorageDiagnostic.VERIFICATION_BLOCKED,
+    )
+
+
+def _session_result(
+    execution_session: TradingSession,
+    binding: PersonalDesktopUnattendedPaperDecisionIntentArtifactBinding | None,
+) -> FinalizedUnattendedDecisionForSessionResult:
+    if binding is None:
+        return FinalizedUnattendedDecisionForSessionResult(
+            FinalizedUnattendedDecisionForSessionClassification.NONE,
+            execution_session,
+            None,
+            None,
+        )
+    return FinalizedUnattendedDecisionForSessionResult(
+        FinalizedUnattendedDecisionForSessionClassification.FINALIZED,
+        execution_session,
+        binding.decision.decision_id,
+        binding,
+    )
+
+
+def _blocked_session_result(
+    execution_session: TradingSession,
+) -> FinalizedUnattendedDecisionForSessionResult:
+    return FinalizedUnattendedDecisionForSessionResult(
+        FinalizedUnattendedDecisionForSessionClassification.BLOCKED,
+        execution_session,
+        None,
+        None,
     )

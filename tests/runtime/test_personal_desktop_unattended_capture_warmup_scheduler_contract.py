@@ -12,7 +12,9 @@ from trading_bot.runtime.personal_desktop_unattended_scheduler_contract import (
     personal_desktop_unattended_scheduler_contract,
 )
 
-D5_LAUNCHER = d5_contract.PERSONAL_DESKTOP_UNATTENDED_CAPTURE_WARMUP_LAUNCHER
+D5_LAUNCHER = (
+    d5_contract.PERSONAL_DESKTOP_UNATTENDED_CAPTURE_WARMUP_LAUNCHER
+)
 D5_SCHEMA = (
     d5_contract.PERSONAL_DESKTOP_UNATTENDED_CAPTURE_WARMUP_SCHEDULER_CONTRACT_SCHEMA
 )
@@ -20,7 +22,9 @@ is_d2_predecessor = d5_contract.is_exact_d2_capture_warmup_predecessor
 is_d5_contract = (
     d5_contract.is_frozen_personal_desktop_unattended_capture_warmup_scheduler_contract
 )
-get_d5_contract = d5_contract.personal_desktop_unattended_capture_warmup_scheduler_contract
+get_d5_contract = (
+    d5_contract.personal_desktop_unattended_capture_warmup_scheduler_contract
+)
 
 
 def test_d5_contract_differs_from_d2_only_in_reviewed_action_metadata() -> None:

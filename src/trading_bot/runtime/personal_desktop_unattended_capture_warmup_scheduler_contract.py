@@ -44,7 +44,6 @@ _D5_ALLOWED_DIFFERENCES = frozenset(
         "installation_is_authorized",
         "modification_is_authorized",
         "absent_task_disposition",
-        "conflicting_existing_task_disposition",
     }
 )
 

@@ -12,9 +12,7 @@ from trading_bot.runtime.personal_desktop_unattended_scheduler_contract import (
     personal_desktop_unattended_scheduler_contract,
 )
 
-D5_LAUNCHER = (
-    d5_contract.PERSONAL_DESKTOP_UNATTENDED_CAPTURE_WARMUP_LAUNCHER
-)
+D5_LAUNCHER = d5_contract.PERSONAL_DESKTOP_UNATTENDED_CAPTURE_WARMUP_LAUNCHER
 D5_SCHEMA = (
     d5_contract.PERSONAL_DESKTOP_UNATTENDED_CAPTURE_WARMUP_SCHEDULER_CONTRACT_SCHEMA
 )

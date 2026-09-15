@@ -309,6 +309,7 @@ def _run_capture_warmup(
         type(cycle) is not PersonalDesktopUnattendedDailyCycleResult
         or cycle.real_effect_performed is not False
         or cycle.completed_session != market_data.eligible_completed_session
+        or cycle.market_data_classification is not _Capture.NO_NEW_COMPLETED_SESSION
     ):
         return _result(
             _Cycle.BLOCKED,

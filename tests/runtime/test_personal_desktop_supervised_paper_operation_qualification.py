@@ -637,9 +637,11 @@ def test_pd2d1_surface_keeps_gates_freeze_and_effect_dependencies_closed() -> No
     assert len(inspector_calls) == 1
     assert source.count("inspector=inspect_paper_operation_root") == 1
 
-    freeze_payload = Path(
-        personal_desktop_paper_account_publication_freeze.__file__
-    ).read_bytes()
+    freeze_payload = (
+        Path(personal_desktop_paper_account_publication_freeze.__file__)
+        .read_text(encoding="utf-8")
+        .encode("utf-8")
+    )
     git_blob_material = (
         b"blob " + str(len(freeze_payload)).encode("ascii") + b"\0" + freeze_payload
     )

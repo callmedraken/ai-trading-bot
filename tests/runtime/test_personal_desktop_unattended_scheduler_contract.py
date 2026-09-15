@@ -253,9 +253,11 @@ def test_contract_source_has_no_task_install_or_external_effect_callable() -> No
 
 
 def test_personal_desktop_publication_freeze_remains_unchanged() -> None:
-    payload = Path(
-        personal_desktop_paper_account_publication_freeze.__file__
-    ).read_bytes()
+    payload = (
+        Path(personal_desktop_paper_account_publication_freeze.__file__)
+        .read_text(encoding="utf-8")
+        .encode("utf-8")
+    )
     blob = b"blob " + str(len(payload)).encode("ascii") + b"\0" + payload
     assert (
         sha1(blob, usedforsecurity=False).hexdigest()

@@ -66,6 +66,20 @@ class _FakeVerifiedStrategyHistorySeed:
         self.artifact_byte_length = harness._EXPECTED_SEED_BYTE_LENGTH
 
 
+def _install_checkout_seed(monkeypatch: pytest.MonkeyPatch) -> None:
+    seed_path = (
+        Path(__file__).resolve().parents[2]
+        / "docs/validation/evidence/pd2d1-spy-strategy-history-seed-2026-08-28.json"
+    )
+    monkeypatch.setattr(harness, "_resolve_frozen_seed_path", lambda: seed_path)
+    # Verify the tracked LF bytes independently of Windows checkout EOLs.
+    monkeypatch.setattr(
+        harness,
+        "_read_frozen_seed_bytes",
+        lambda path: path.read_text(encoding="utf-8").encode("utf-8"),
+    )
+
+
 def _qualification_result(
     *,
     ready: bool = True,
@@ -166,6 +180,9 @@ def _install_happy_runtime(
         return result
 
     monkeypatch.setattr(harness, "acquire_validated_production_authority", acquire)
+    monkeypatch.setattr(
+        harness, "_load_frozen_history_seed", _FakeVerifiedStrategyHistorySeed
+    )
     monkeypatch.setattr(harness, "WindowsSelectedC3SnapshotReadAuthority", Reader)
     monkeypatch.setattr(
         harness, "qualify_supervised_personal_desktop_paper_operation", qualify
@@ -388,6 +405,7 @@ def test_missing_seed_stops_before_c1(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_wrong_verified_seed_identity_session_or_config_stops_before_c1(
     monkeypatch: pytest.MonkeyPatch, mismatch: str
 ) -> None:
+    _install_checkout_seed(monkeypatch)
     verified = _FakeVerifiedStrategyHistorySeed()
     if mismatch == "seed_id":
         verified.seed.seed_id = UUID(int=91)
@@ -415,6 +433,7 @@ def test_wrong_verified_seed_identity_session_or_config_stops_before_c1(
 def test_seed_verifier_receives_exact_frozen_profile(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    _install_checkout_seed(monkeypatch)
     original = harness.verify_strategy_history_seed
     observed: dict[str, object] = {}
 
@@ -426,6 +445,8 @@ def test_seed_verifier_receives_exact_frozen_profile(
     verified = harness._load_frozen_history_seed()
 
     assert verified.seed.seed_id == harness._EXPECTED_SEED_ID
+    assert verified.artifact_sha256 == harness._EXPECTED_SEED_SHA256
+    assert verified.artifact_byte_length == harness._EXPECTED_SEED_BYTE_LENGTH
     assert observed["expected_symbol"] == Symbol("SPY")
     assert observed["target_session"] == TradingSession(date(2026, 8, 28))
     assert observed["strategy_config"] == MovingAverageCrossoverConfig(
@@ -451,11 +472,7 @@ def test_source_uses_no_wall_clock_or_environment_semantic_inputs() -> None:
 def test_authority_identity_mismatch_stops_before_p2(
     monkeypatch: pytest.MonkeyPatch, field: str
 ) -> None:
-    authority = SimpleNamespace(
-        machine_authority_id=harness._EXPECTED_MACHINE_AUTHORITY_ID,
-        authority_epoch_id=harness._EXPECTED_AUTHORITY_EPOCH_ID,
-        approved_account_sid=harness._EXPECTED_TRADING_SID,
-    )
+    authority, _, _ = _install_happy_runtime(monkeypatch)
     setattr(authority, field, "wrong")
     monkeypatch.setattr(
         harness, "acquire_validated_production_authority", lambda: authority
@@ -780,6 +797,11 @@ def test_returned_account_or_terminal_mismatch_blocks_success(
 
 
 def test_frozen_production_identities_are_exact() -> None:
+    assert harness._EXPECTED_SEED_PATH == Path(
+        r"F:\AI\worktrees\ai-trading-bot-personal-desktop"
+        r"\docs\validation\evidence"
+        r"\pd2d1-spy-strategy-history-seed-2026-08-28.json"
+    )
     assert harness._EXPECTED_MACHINE_AUTHORITY_ID == (
         "223f0d4e-36f9-4b9b-bf0e-febf16fcd3f1"
     )

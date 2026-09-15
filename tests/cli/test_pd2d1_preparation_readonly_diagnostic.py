@@ -298,7 +298,25 @@ def test_supervised_execution_gate_is_verified_without_importing_executor() -> N
     assert diagnostic._supervised_execution_gate_is_source_false() is True
 
 
-def test_frozen_seed_bytes_identity_and_semantics_are_exact() -> None:
+def test_frozen_seed_bytes_identity_and_semantics_are_exact(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assert diagnostic._EXPECTED_SEED_PATH == Path(
+        r"F:\AI\worktrees\ai-trading-bot-personal-desktop"
+        r"\docs\validation\evidence"
+        r"\pd2d1-spy-strategy-history-seed-2026-08-28.json"
+    )
+    seed_path = (
+        Path(__file__).resolve().parents[2]
+        / "docs/validation/evidence/pd2d1-spy-strategy-history-seed-2026-08-28.json"
+    )
+    monkeypatch.setattr(diagnostic, "_resolve_frozen_seed_path", lambda: seed_path)
+    # Verify the tracked LF bytes independently of Windows checkout EOLs.
+    monkeypatch.setattr(
+        diagnostic,
+        "_read_frozen_seed_bytes",
+        lambda path: path.read_text(encoding="utf-8").encode("utf-8"),
+    )
     verified = diagnostic._load_frozen_history_seed()
     assert verified.seed.seed_id == diagnostic._EXPECTED_SEED_ID
     assert verified.seed.symbol == Symbol("SPY")

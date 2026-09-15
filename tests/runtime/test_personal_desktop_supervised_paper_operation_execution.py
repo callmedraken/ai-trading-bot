@@ -758,9 +758,11 @@ def test_pd2c_isolated_surface_keeps_all_effect_gates_false() -> None:
     )
     assert core_source.count("result = executor(") == 1
 
-    freeze_payload = Path(
-        personal_desktop_paper_account_publication_freeze.__file__
-    ).read_bytes()
+    freeze_payload = (
+        Path(personal_desktop_paper_account_publication_freeze.__file__)
+        .read_text(encoding="utf-8")
+        .encode("utf-8")
+    )
     git_blob_material = (
         b"blob " + str(len(freeze_payload)).encode("ascii") + b"\0" + freeze_payload
     )

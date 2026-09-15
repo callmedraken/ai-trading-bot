@@ -43,6 +43,7 @@ from trading_bot.runtime.personal_desktop_unattended_market_data_capture import 
 
 _Cycle = PersonalDesktopUnattendedDailyCycleClassification
 _Capture = PersonalDesktopUnattendedMarketDataCaptureClassification
+_GATE_FIELD = "PERSONAL_DESKTOP_UNATTENDED_MARKET_DATA_CAPTURE_EFFECTS_ENABLED"
 
 
 @dataclass(frozen=True, slots=True)
@@ -68,7 +69,9 @@ class PersonalDesktopUnattendedCaptureWarmupResult:
     market_data_classification: (
         PersonalDesktopUnattendedMarketDataCaptureClassification | None
     ) = None
-    cycle_classification: PersonalDesktopUnattendedDailyCycleClassification | None = None
+    cycle_classification: (
+        PersonalDesktopUnattendedDailyCycleClassification | None
+    ) = None
     capture_performed: bool = False
     provider_attempt_may_have_occurred: bool = False
     real_effect_performed: bool = False
@@ -105,7 +108,10 @@ class PersonalDesktopUnattendedCaptureWarmupResult:
                 or not self.provider_attempt_may_have_occurred
                 or self.market_data_classification is not _Capture.CAPTURE_REQUIRED
             )
-            or self.real_effect_performed and not self.provider_attempt_may_have_occurred
+            or (
+                self.real_effect_performed
+                and not self.provider_attempt_may_have_occurred
+            )
             or (
                 self.cycle_classification is not None
                 and self.classification is not self.cycle_classification
@@ -168,9 +174,7 @@ def _production_dependencies() -> (
     def set_market_data_gate(value: bool) -> None:
         if type(value) is not bool:
             raise TypeError("market-data gate value must be bool")
-        market_data_capture.PERSONAL_DESKTOP_UNATTENDED_MARKET_DATA_CAPTURE_EFFECTS_ENABLED = (
-            value
-        )
+        setattr(market_data_capture, _GATE_FIELD, value)
 
     return DisposablePersonalDesktopUnattendedCaptureWarmupDependencies(
         gate_state=personal_desktop_unattended_capture_warmup_gate_state,
@@ -262,9 +266,12 @@ def _run_capture_warmup(
         invocation = market_data.invocation
         if invocation is None:
             return _result(_Cycle.BLOCKED, market_data=market_data)
-        provider_may_have_occurred = invocation.provider_call_disposition != "NOT_STARTED"
-        provider_confirmed = invocation.provider_call_disposition == "CONFIRMED"
-        capture_performed = invocation.terminal_state == "SUCCEEDED" and provider_confirmed
+        disposition = invocation.provider_call_disposition
+        provider_may_have_occurred = disposition != "NOT_STARTED"
+        provider_confirmed = disposition == "CONFIRMED"
+        capture_performed = (
+            invocation.terminal_state == "SUCCEEDED" and provider_confirmed
+        )
         real_effect_performed = provider_confirmed
         if not capture_performed:
             return _result(

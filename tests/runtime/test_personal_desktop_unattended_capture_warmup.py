@@ -264,7 +264,10 @@ def test_history_ready_handoff_is_decision_ready_without_publication_effect() ->
 def test_g5_exception_is_ambiguous_and_never_retried_or_sent_to_g6() -> None:
     calls: list[str] = []
     result = run_personal_desktop_unattended_capture_warmup_for_test(
-        _dependencies(market_error=RuntimeError("uncertain provider state"), calls=calls)
+        _dependencies(
+            market_error=RuntimeError("uncertain provider state"),
+            calls=calls,
+        )
     )
     assert calls == ["gate:True", "g5", "gate:False"]
     assert result.classification is CycleStatus.PROVIDER_ATTEMPT_CONSUMED_OR_AMBIGUOUS

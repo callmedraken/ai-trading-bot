@@ -93,14 +93,10 @@ def _invocation(
             else None
         ),
         terminal_id="66666666-6666-4666-8666-666666666666",
-        selection_id=(
-            "77777777-7777-4777-8777-777777777777" if success else None
-        ),
+        selection_id=("77777777-7777-4777-8777-777777777777" if success else None),
         terminal_state=terminal_state,
         provider_call_disposition=provider_call_disposition,
-        snapshot_id=(
-            UUID("88888888-8888-4888-8888-888888888888") if success else None
-        ),
+        snapshot_id=(UUID("88888888-8888-4888-8888-888888888888") if success else None),
         artifact_sha256=("a" * 64 if success else None),
         artifact_byte_length=(1289 if success else None),
     )
@@ -179,7 +175,9 @@ def _dependencies(
 
 def test_production_api_accepts_no_semantic_arguments() -> None:
     assert (
-        tuple(inspect.signature(run_personal_desktop_unattended_capture_warmup).parameters)
+        tuple(
+            inspect.signature(run_personal_desktop_unattended_capture_warmup).parameters
+        )
         == ()
     )
 

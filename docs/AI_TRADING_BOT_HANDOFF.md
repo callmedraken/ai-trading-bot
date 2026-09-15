@@ -5,7 +5,7 @@
 **Armed D5 branch:** `feature/personal-desktop-paper-runtime`  
 **D6/D7 development branch:** `feature/pd4-unattended-decision-publication`  
 **Armed D5 worktree:** `F:\AI\worktrees\ai-trading-bot-personal-desktop`  
-**Planned D6/D7 worktree:** `F:\AI\worktrees\ai-trading-bot-decision-publication`  
+**D6/D7 development worktree:** `F:\AI\worktrees\ai-trading-bot-decision-publication`
 **Production/live trading:** NO-GO
 
 > This Git-tracked handoff is the canonical cross-chat resume document. Uploaded
@@ -290,8 +290,9 @@ Architecture-111 decision namespace concept:
                       F:\AITradingBot\Paper-v2\runtime\unattended-decisions
 ```
 
-The exact decision namespace path/security/publication contract still must be
-frozen by Architecture 113 before production provisioning/publication.
+Architecture 113 and D6 source certification have accepted the fixed decision
+namespace path/security/publication contract. Production provisioning and
+publication remain separately protected D7 checkpoints.
 
 Retained failed v1 state:
 
@@ -567,57 +568,49 @@ D5 itself is **not complete** until the required six-session suffix becomes
 ready. Expected terminal handoff is `G6 = DECISION_READY`; even then D5 performs
 no publication or Paper-v2 settlement.
 
-## 12. Current development checkpoint — Architecture 113 / D6-D7
+## 12. Current development checkpoint — D6 accepted / D7-A source preparation
 
-While D5 capture-only warm-up continues unchanged, use the isolated
-`feature/pd4-unattended-decision-publication` branch for source/design work.
-
-The next architecture checkpoint is:
+D6-A through D6-D source certification is **ACCEPTED** under Architecture 113.
 
 ```text
-Architecture 113
-Personal-Desktop Unattended Decision Publication Authority
+certified D6 source HEAD: fb00e9898c2e5cdd3db27cd91c393f5994c7cca9
+certified D6 source TREE: eef138bb3ed144d153ae60193aaacdcb7584c513
+final full suite: 6007 passed, 17 skipped in 1502.66s
+source-certification completion record:
+docs/validation/pd4-d6-unattended-decision-publication-source-certification.md
 ```
 
-The matching validation plan should freeze D6/D7 before implementation.
+The certified source independently reconstructs the current-C1 selected-C3
+six-session MA(3,5), desired-quantity-1 candidate under the PD2A mutex, enforces
+the strict pre-open deadline, and contains the one-shot decision-only
+publication boundary. Source certification authorizes no production effect.
 
-Required design surface:
+D7-A read-only qualification source preparation adds a separate zero-semantic-
+argument Trading diagnostic boundary and fixed-namespace missing/present/security
+qualification. It issues no permit, opens no writer or effect gate, and performs
+no provisioning, capture, Paper-v2 mutation/recovery, scheduler, broker, or live
+effect. Its sanitized output is not reusable D7-C authority; D7-C must rederive
+production truth independently. The production D7-A harness has not been run.
+
+D5 remains armed and unchanged:
 
 ```text
-canonical immutable pre-open decision-intent artifact
-deterministic UUID5 decision/publication identity
-exact account/predecessor + six-selected-C3 provenance
-strict observed-now < regular_open(E) admission
-process-local non-serializable one-shot publication permit
-fixed unattended-decisions namespace + exact Trading ACL/path identity
-read-only ABSENT / FINALIZED_IDENTICAL / STAGING / CONFLICTING / BLOCKED states
-exclusive staging + durability + no-clobber finalization + exact readback
-identical duplicate convergence without republishing
-crash/ambiguous-publication disposition and no cleanup-as-retry
-MISSED_DECISION_DEADLINE / SESSION_GAP behavior
-future D8/D9 settlement inputs retained without enabling settlement
+D5 HEAD: 8c2af5801cbc8f4df869b832a3b78b1eaa2f8996
+D5 TREE: f0591e966463c7e1e66dc00ad76fd895500a076f
+latest accepted read-only state: WARMING_UP, 2/6
+selected sessions: 2026-09-11, 2026-09-14
 ```
 
-The decision intent must not contain `open(E)` or any later market-data fact.
-Publication identity must not depend on wall-clock publication time, path,
-scheduler state, UUID4, object identity, or ambient process state.
+D7-A production qualification is waiting for natural current six-session
+`6/6 READY` history and an open publication deadline. Preserve the armed D5
+worktree/task and do not synthesize history or manually invoke capture.
 
-D6/D7 authority must be narrower than trading authority. It may eventually
-finalize one pre-open decision but must remain incapable of:
-
-```text
-market-data capture
-Paper-v2 execution
-receipt recovery
-storage provisioning outside its separately reviewed namespace checkpoint
-Task Scheduler mutation
-broker-paper submission
-live trading
-```
-
-Architecture/source work does not authorize a real decision publication. When
-D5 later reaches `DECISION_READY`, the first publication remains a separately
-protected production acceptance effect.
+The protected sequence remains D7-A Trading read-only qualification, conditional
+separately approved D7-B Administrator provisioning if missing, explicitly
+approved D7-C publication, and independent D7-D read-only reconciliation.
+**D7-C remains protected and explicitly unauthorized.** No production D7-A
+qualification, provisioning, publication, or settlement is authorized by this
+source-only preparation checkpoint.
 
 ## 13. Roadmap
 
@@ -631,7 +624,9 @@ PD4   unattended simulated-paper
   Architecture-111 daily-cycle source/design               ACCEPTED
   D3/D4 first unattended C3 acceptance                     ACCEPTED
   Architecture-112 / D5 capture-only warm-up               ACTIVE (2/6)
-  Architecture-113 / D6-D7 decision publication            NEXT / DESIGN
+  Architecture-113 / D6-A through D6-D source              ACCEPTED
+  D7-A Trading read-only qualification                    WAITING FOR 6/6 READY
+  D7-C first decision publication                         PROTECTED / UNAUTHORIZED
   D8/D9 existing-Paper-v2 settlement composition           FUTURE / PROTECTED
   operational unattended simulated-paper acceptance         NOT YET COMPLETE
 PD5   broker-paper integration                              NOT STARTED
@@ -699,8 +694,9 @@ merge/rebase/force-push/amend/PR metadata changes without explicit approval
    mutex, Architecture-67 durability/idempotency, and PD3 recovery rules.
 6. Remember D5 warm-up is currently `2/6` and `WARMING_UP`; there is no authority
    to synthesize missing history from the offline seed.
-7. Develop/review Architecture 113 and the D6/D7 validation plan on the isolated
-   decision-publication branch before implementation.
+7. Treat Architecture 113, its validation plan, and the D6 source-certification
+   completion record as accepted. Review the isolated D7-A source preparation;
+   wait for natural 6/6 READY before protected production qualification.
 8. Use Sol High for Architecture 113 and any implementation changing Windows
    publication security, authority, ordering, crash ambiguity, or effect
    containment. Use Luna/Astra only for bounded work after the contract is

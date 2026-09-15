@@ -7,7 +7,7 @@ import json
 import sys
 
 from trading_bot.runtime import (
-    personal_desktop_unattended_capture_warmup_scheduler_contract as warmup_contract,
+    personal_desktop_unattended_capture_warmup_scheduler_contract as d5_contract,
 )
 from trading_bot.runtime.personal_desktop_unattended_capture_warmup import (
     PersonalDesktopUnattendedCaptureWarmupGateState,
@@ -118,8 +118,8 @@ def main(argv: list[str] | None = None) -> int:
         _emit({"reason": "INVALID_ARGUMENTS", "schema": _SCHEMA}, stream=sys.stderr)
         return _EXIT_USAGE
 
-    contract = warmup_contract.personal_desktop_unattended_capture_warmup_scheduler_contract()
-    if not warmup_contract.is_frozen_personal_desktop_unattended_capture_warmup_scheduler_contract(
+    contract = d5_contract.personal_desktop_unattended_capture_warmup_scheduler_contract()
+    if not d5_contract.is_frozen_personal_desktop_unattended_capture_warmup_scheduler_contract(
         contract
     ):
         _emit(

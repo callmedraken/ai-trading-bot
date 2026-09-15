@@ -25,27 +25,58 @@ complete auditability
 
 **Production/live trading remains NO-GO.**
 
-## Primary development line
+## Primary development lines
+
+The currently armed capture-only warm-up deployment remains on the frozen
+personal-desktop branch/worktree:
 
 ```text
 repository: callmedraken/ai-trading-bot
 integration baseline: bd88ee966bff455f9fc897d6cfdfafdd807f27e2
 Architecture-94 P2 base: a810122a96b6fc90da25d71eede8da64b7272c98
-branch: feature/personal-desktop-paper-runtime
-worktree: F:\AI\worktrees\ai-trading-bot-personal-desktop
 
-final PD4 certified source commit:
-248cd8de6a3539aab21d5719d96cb7ff1aa0d14c
+D5 deployed/warm-up branch:
+feature/personal-desktop-paper-runtime
 
-final PD4 certified source tree:
-5e867f1bfc6d945ad67f6c56be252b534645aeb2
+D5 deployed/warm-up worktree:
+F:\AI\worktrees\ai-trading-bot-personal-desktop
+
+D5 accepted source HEAD:
+8c2af5801cbc8f4df869b832a3b78b1eaa2f8996
+
+D5 accepted source tree:
+f0591e966463c7e1e66dc00ad76fd895500a076f
 ```
 
-Docs-only closeout commits after the certified source tree do not invalidate the
-source certification and do not require another broad suite when exact diff
-review proves that only documentation changed.
+Do not modify the armed D5 worktree merely to continue development. New D6/D7
+source/design work is isolated on:
 
-Architecture checkpoints:
+```text
+branch: feature/pd4-unattended-decision-publication
+planned local worktree: F:\AI\worktrees\ai-trading-bot-decision-publication
+base commit: 8c2af5801cbc8f4df869b832a3b78b1eaa2f8996
+base tree:   f0591e966463c7e1e66dc00ad76fd895500a076f
+```
+
+The earlier PD4 unattended source-foundation certification remains an important
+historical certification boundary:
+
+```text
+final PD4 source-foundation certified commit:
+248cd8de6a3539aab21d5719d96cb7ff1aa0d14c
+
+final PD4 source-foundation certified tree:
+5e867f1bfc6d945ad67f6c56be252b534645aeb2
+
+full suite:
+5588 passed, 17 skipped in 1519.25s (0:25:19)
+```
+
+Later Architectures 111/112 and D5 source/deployment work extend that accepted
+foundation; they do not retroactively change the historical PD4-F certification
+record.
+
+Architecture checkpoints now include:
 
 ```text
 Architecture 102  personal-desktop profile adoption
@@ -57,6 +88,8 @@ Architecture 107  first Paper-v2 output authority hardening
 Architecture 108  first Paper-v2 post-mutation reconciliation
 Architecture 109  personal-desktop Paper-v2 receipt-recovery authority
 Architecture 110  personal-desktop unattended Paper-v2 operation authority
+Architecture 111  personal-desktop unattended daily-cycle authority
+Architecture 112  personal-desktop capture-only warm-up authority
 ```
 
 ## Mandatory personal-desktop security baseline
@@ -74,18 +107,20 @@ Architecture 110  personal-desktop unattended Paper-v2 operation authority
 - crash/restart, duplicate invocation, stale input, corruption/conflict, and
   receipt recovery fail closed unless exact reviewed authority is present.
 
-## Frozen C3 production state
+## C3 production and unattended capture state
 
-Accepted C3 release source:
+Historical C3 release source:
 
 ```text
 82ba29ae2c2cc6bb3544077db0ee21868e6d5693
 ```
 
-All six authorized real-provider effects are consumed. Call #5 is permanently
-`FAILED / CONFIRMED`. Call #6 is permanently
-`SUCCEEDED / CONFIRMED / SUCCESS_SELECTED`. **Provider call #7 is not
-authorized.**
+The earlier manual C3 acceptance established:
+
+```text
+call #5: FAILED / CONFIRMED
+call #6: SUCCEEDED / CONFIRMED / SUCCESS_SELECTED
+```
 
 Selected call #6:
 
@@ -97,7 +132,23 @@ artifact byte length: 1291
 captured_at: 2026-08-29T09:46:43.769105+00:00
 ```
 
-Production identities:
+Architecture 111 subsequently froze a separate unattended market-data gate and
+the zero-semantic-argument daily-cycle model. D3/D4 then accepted the first
+unattended C3 capture and read-only reconciliation for session `2026-09-11`:
+
+```text
+selection_id: 7c42363d-4785-5823-be7e-93bf94426eac
+snapshot_id:  8ddc60ed-3940-5379-a868-b46b9b7c95af
+artifact SHA-256: 704c1d0966acec3489a355fd6ef5369439b07e0e0a8e15c5f68cc2d847aa607f
+artifact byte length: 1289
+```
+
+Architecture 112 then constrained normal warm-up wakes to exactly one G5 call,
+with only the market-data gate opened process-locally and restored in `finally`.
+No scheduler exit code, process failure, or provider ambiguity grants retry
+authority.
+
+Production identities remain:
 
 ```text
 host: DESKTOP-I4DOKM7
@@ -134,6 +185,18 @@ selected verified C3 snapshot
 -> Architecture-67 durable transition + receipt
 ```
 
+Architecture 111 adds a two-phase unattended composition without weakening that
+final plan contract:
+
+```text
+selected current C3 close + C3-authoritative history + account predecessor
+-> PreparedManualPaperStrategyDecision (pre-open; no execution-session open)
+-> durable pre-open decision intent
+-> later selected C3 open for the intended execution session
+-> existing Architecture-94 ManualPaperStrategyPlan
+-> existing PD4 / Architecture-67 Paper-v2 reconciliation and settlement
+```
+
 ## Paper-v2 production authority
 
 Fixed paths:
@@ -142,9 +205,14 @@ Fixed paths:
 Paper-v2 root:       F:\AITradingBot\Paper-v2
 A67 operation root: F:\AITradingBot\Paper-v2\runtime
 receipt parent:     F:\AITradingBot\Paper-v2\runtime\paper-operations
-unattended namespace source path:
+unattended invocation namespace:
                     F:\AITradingBot\Paper-v2\runtime\unattended-invocations
+future decision namespace from Architecture 111:
+                    F:\AITradingBot\Paper-v2\runtime\unattended-decisions
 ```
+
+The exact decision-namespace storage/ACL/publication contract must be frozen and
+accepted before any D6/D7 production publication effect.
 
 Published account:
 
@@ -266,100 +334,39 @@ git diff --check: PASS
 worktree/index: clean
 ```
 
-Real-host read-only acceptance ran under `DESKTOP-I4DOKM7\Trading`, SID
-`S-1-5-21-1397534616-3988210162-180023805-1009`, non-elevated. The production
-boundary returned healthy completed-account evidence with no recovery mutation.
-
-Canonical PD3 state:
-
-```text
-ARCH109_DESIGN_ACCEPTED                 = YES
-PD3_RECOVERY_ONLY_A67_ACCEPTED          = YES
-PD3_RECOVERY_QUALIFIER_ACCEPTED         = YES
-PD3_ORIGINAL_OPERATION_RECONSTRUCTION   = YES
-PD3_EFFECT_CONTAINMENT_ACCEPTED         = YES
-PD3_PERSONAL_DESKTOP_BOUNDARY_ACCEPTED  = YES
-PD3_SOURCE_CERTIFIED                    = YES
-PD3_REAL_HOST_READ_ONLY_VALIDATED       = YES
-ALL_EFFECT_GATES_CLOSED                 = YES
-REAL_RECOVERY_MUTATION_PERFORMED        = NO
-PD3                                     = COMPLETE
-```
+Real-host read-only acceptance ran under `DESKTOP-I4DOKM7\Trading`, non-elevated,
+and returned healthy completed-account evidence with no recovery mutation.
 
 ## PD4 — unattended simulated-paper source foundation — COMPLETE
 
-Architecture:
+Architecture 110 source-foundation completion remains historical and accepted:
 
 ```text
-docs/architecture/110-personal-desktop-unattended-paper-operation-authority.md
-```
-
-Validation plan:
-
-```text
-docs/validation/pd4-unattended-personal-desktop-paper-plan.md
-```
-
-Completion record:
-
-```text
+completion record:
 docs/validation/pd4-unattended-personal-desktop-paper-completion.md
+
+final certified source commit:
+248cd8de6a3539aab21d5719d96cb7ff1aa0d14c
+
+final certified source tree:
+5e867f1bfc6d945ad67f6c56be252b534645aeb2
 ```
 
-Accepted source checkpoints cover:
+Accepted source-foundation checkpoints cover:
 
 ```text
-PD4-A   durable unattended invocation identity/model and verification
-PD4-B   durable invocation storage/read/publication/provisioning boundaries
-PD4-C   read-only startup qualification under the same PD2A mutex
-PD4-D   unattended Paper-v2 execution composition with effects closed
+PD4-A    durable unattended invocation identity/model and verification
+PD4-B    durable invocation storage/read/publication/provisioning boundaries
+PD4-C    read-only startup qualification under the same PD2A mutex
+PD4-D    unattended Paper-v2 execution composition with effects closed
 PD4-D-R1 explicit non-private shared composition interfaces
-PD4-E   zero-semantic-argument launcher + frozen scheduler contract
-PD4-F1  genuine production read-only host-validation harness
-PD4-F2  final exact-tree source certification
-PD4-F3  Trading-principal real-host read-only qualification
+PD4-E    zero-semantic-argument launcher + frozen scheduler contract
+PD4-F1   genuine production read-only host-validation harness
+PD4-F2   final exact-tree source certification
+PD4-F3   Trading-principal real-host read-only qualification
 ```
 
-Final certified PD4 source:
-
-```text
-commit 248cd8de6a3539aab21d5719d96cb7ff1aa0d14c
-tree   5e867f1bfc6d945ad67f6c56be252b534645aeb2
-```
-
-The final source includes the runtime-facade import-cycle correction that lazily
-loads the CLI-dependent PD4 unattended startup/execution facade exports. This
-preserves the public `trading_bot.runtime` API while preventing base runtime
-package initialization from recursively importing partially initialized CLI
-modules.
-
-PD4 preserves these authority rules:
-
-- Task Scheduler is only an untrusted wake-up source and supplies no semantic
-  trading arguments;
-- durable unattended invocation state, the PD2A account mutex, and Architecture
-  67 remain the authority for identity, duplicate suppression, execution, and
-  restart recovery;
-- missing receipt never becomes permission for a fresh execution;
-- the selected verified C3 snapshot remains authoritative; no unattended
-  provider capture is authorized;
-- startup and post-run reconciliation revalidate C1, P2, all six effect gates,
-  durable invocation storage, A67 state, receipt/lineage evidence, and account
-  state before releasing the mutex;
-- public read-only qualification evidence is not reusable execution authority.
-
-Final focused import-regression gate:
-
-```text
-132 passed in 13.46s
-Ruff check: PASS
-Ruff format --check: PASS
-git diff --check: PASS
-git diff --cached --check: PASS
-worktree/index: clean
-```
-
-Final broad source certification:
+Final PD4 source-foundation broad certification:
 
 ```text
 5588 passed, 17 skipped in 1519.25s (0:25:19)
@@ -371,88 +378,135 @@ worktree/index: clean
 local HEAD == origin feature HEAD: YES
 ```
 
-Real-host qualification ran with production Python under the intended dedicated
-principal:
+That completion record must remain historical: it correctly states that the
+Architecture-110 source foundation alone did not authorize operational
+unattended deployment.
+
+## PD4 unattended daily-cycle extension — Architecture 111
+
+Architecture 111 and its validation plan are accepted design/source contracts:
 
 ```text
-principal: DESKTOP-I4DOKM7\Trading
-SID: S-1-5-21-1397534616-3988210162-180023805-1009
-integrity: Medium Mandatory Level
-BUILTIN\Administrators membership: absent
+docs/architecture/111-personal-desktop-unattended-daily-cycle-authority.md
+docs/validation/pd4-unattended-daily-cycle-plan.md
 ```
 
-The frozen launcher returned:
+Key frozen rules:
+
+- Task Scheduler is an untrusted wake-up source and supplies no semantic trading
+  authority;
+- version-1 regular open is 09:30 America/New_York for the modeled XNYS session;
+- a decision targeting session `E` must be finalized strictly before
+  `regular_open(E)`;
+- the pre-open decision contains no `open(E)` or later market-data fact;
+- after `E` completes, only a current-C1 selected C3 snapshot for `E` may bind
+  its verified daily-bar open for settlement;
+- C3-selected history, not the old offline seed, is production authority;
+- the current MA 3/5 profile requires six consecutive selected C3 sessions
+  before the first fully C3-backed decision;
+- no automatic multi-session catch-up is authorized; an internal history gap is
+  `SESSION_GAP`;
+- unattended market-data capture and decision publication have separate
+  closed-by-default source-owned gates.
+
+## PD4-D5 capture-only warm-up — ACTIVE / FIRST SCHEDULED WAKE ACCEPTED
+
+Architecture and validation plan:
 
 ```text
-status: EFFECTS_CLOSED
-diagnostic: SOURCE_ONLY_ZERO_ARGUMENT_BOUNDARY
-qualification_performed: false
-invocation_published: false
-execution_performed: false
-recovery_performed: false
-scheduler_modified: false
-exit: 0
+docs/architecture/112-personal-desktop-capture-only-warmup-authority.md
+docs/validation/pd4-d5-capture-only-warmup-plan.md
 ```
 
-The genuine read-only PD4 validation returned:
+D5-A read-only Task Scheduler qualification was accepted. The exact accepted D2
+predecessor task XML SHA-256 was:
 
 ```text
-result: VALIDATED
-all_effect_gates_false: true
-qualification_status: BLOCKED
-qualification_diagnostic: QUALIFICATION_BLOCKED
-unattended_operation_authorized: false
-selection_id: 36d6fbb3-bdec-57e0-a9cf-78dc2b8f7280
-selected_snapshot_id: null
-invocation_published: false
-execution_performed: false
-recovery_performed: false
-provider_call_performed: false
-database_mutation_performed: false
-scheduler_modified: false
-exit: 0
+da851985d9bfb04c65a83cb64b5441a2f7fd50391924a844749e365ee282d6ec
 ```
 
-`BLOCKED` is accepted here because PD4-F3 validates fail-closed behavior with
-all effects closed; the harness must not invent unattended authority when the
-production boundary is not authorized/ready.
-
-Canonical PD4 source-foundation state:
+D5-B then changed only the existing task launcher action to:
 
 ```text
-ARCH110_DESIGN_ACCEPTED                    = YES
-PD4_INVOCATION_MODEL_ACCEPTED              = YES
-PD4_INVOCATION_STORAGE_AUTHORITY_ACCEPTED  = YES
-PD4_STARTUP_RECONCILIATION_ACCEPTED        = YES
-PD4_UNATTENDED_BOUNDARY_ACCEPTED           = YES
-PD4_LAUNCHER_CONTRACT_ACCEPTED             = YES
-PD4_SOURCE_CERTIFIED                       = YES
-PD4_REAL_HOST_READ_ONLY_VALIDATED          = YES
-ALL_REAL_EFFECT_GATES_CLOSED               = YES
-PD4_SOURCE_FOUNDATION                      = COMPLETE
-PD4_UNATTENDED_DEPLOYMENT_ACCEPTED         = NO
-REAL_UNATTENDED_PAPER_EXECUTION_PERFORMED  = NO
-UNATTENDED_PROVIDER_CAPTURE_AUTHORIZED     = NO
+-I F:\AI\worktrees\ai-trading-bot-personal-desktop\scripts\run_personal_desktop_unattended_capture_warmup.py
 ```
 
-## Current milestone — PD4 unattended deployment acceptance design
-
-The next safe checkpoint is source/design only. Freeze the intended unattended
-deployment and acceptance sequence while all effects remain closed, including:
+The first credential-less mutation call failed authentication. Read-only
+reconciliation proved the installed task remained exactly D2 with the same XML
+hash, so no ambiguous scheduler state was retried blindly. A separately
+credential-aware attempt under the existing D5-B authorization then succeeded.
+The accepted D5 task XML SHA-256 is:
 
 ```text
-session/timing eligibility policy
-scheduler trigger/verification contract
-unattended invocation-storage provisioning checkpoint
-first real unattended Paper-v2 acceptance ordering
-post-run reconciliation and evidence requirements
-separate unattended C3/provider authority boundary
+8005373fad791c85776b4a35b662d46e06fec4ea40ac9ebfead9f413715da457
 ```
 
-Actual Task Scheduler installation/modification/enabling/running, unattended
-storage provisioning, provider call #7, real unattended Paper-v2 execution, and
-recovery mutation remain separately protected effects and require explicit
-operator authorization.
+D5-C first scheduled capture-only wake was accepted with:
+
+```text
+session:                2026-09-14
+terminal:               SUCCEEDED
+provider disposition:   CONFIRMED
+selection_id:           dea50bc9-95b4-5f63-ac40-a7353133be53
+attempt_id:             70f5f586-a05b-56c5-adde-bfa5d027864b
+snapshot_id:            b3737822-35ee-5238-a87f-401b4597df46
+artifact SHA-256:       db16bd7d6edda1709aeea64158f8751c02714ed45e9c6441935640e43ffa5487
+artifact identity SHA:  bfd131801558be6cbbed96b1e176c428b98df4e9c6dcccffb77c74acdc4870ba
+account predecessor:    ed4640e5-0630-525d-b916-d50e31e3ba2a
+```
+
+The authoritative selected warm-up history is currently:
+
+```text
+2026-09-11
+2026-09-14
+selected_count = 2 / 6
+G6 = WARMING_UP
+G5 post-capture = NO_NEW_COMPLETED_SESSION
+```
+
+All eight committed source effect gates were false before and after the accepted
+wake. D5 ordinary wakes may open only the market-data gate process-locally for
+one exact G5 call and must restore it in `finally`; decision publication and all
+Paper-v2 effect gates remain closed.
+
+The armed D5 task should remain untouched while it accumulates sessions
+naturally. Do not manually start it, backfill from the old offline seed, alter
+its source/scheduler contract, or turn a failed/ambiguous provider outcome into
+a blind retry.
+
+## Current milestone — PD4 D6/D7 unattended decision publication
+
+While D5 warm-up continues, development moves to a separate branch so the armed
+D5 source/deployment evidence remains stable.
+
+The next source/design checkpoint is **Architecture 113 — Personal-Desktop
+Unattended Decision Publication Authority** plus its D6/D7 validation plan.
+
+Freeze before implementation:
+
+```text
+canonical pre-open decision-intent schema and verifier
+deterministic decision/publication identity
+exact six-selected-C3 provenance binding
+strict pre-open deadline admission
+process-local one-shot publication permit
+fixed decision namespace + ACL/path/no-reparse contract
+ABSENT / FINALIZED_IDENTICAL / STAGING / CONFLICT / BLOCKED read classifications
+exclusive staging + flush + no-clobber finalization + exact reread verification
+duplicate-wake convergence
+crash/ambiguous-publication behavior
+MISSED_DECISION_DEADLINE and SESSION_GAP handling
+future D8/D9 settlement compatibility without enabling settlement
+```
+
+D6/D7 must publish decision intent only. It must not authorize market-data
+capture, Paper-v2 execution, receipt recovery, storage provisioning, scheduler
+mutation, broker-paper submission, or live trading.
+
+No real D6/D7 publication effect is authorized by architecture/source work.
+When D5 eventually reaches `DECISION_READY`, the first production publication
+remains a separately protected acceptance checkpoint.
 
 ## Primary roadmap
 
@@ -460,25 +514,27 @@ operator authorization.
 PD0   personal-desktop profile adoption                     COMPLETE
 PD1   personal-desktop paper-account authority v2           COMPLETE
 PD2   reliable supervised manual paper cycle                COMPLETE
-  PD2A account-scoped Windows mutex + admission             COMPLETE
-  PD2B supervised source-only composition                   COMPLETE
-  PD2C supervised A67 execution boundary                    COMPLETE
-  PD2D1 read-only first-mutation qualification              COMPLETE
-  PD2D2 first real Paper-v2 mutation + reconciliation       COMPLETE
 PD3   supervised crash/recovery validation                  COMPLETE
 PD4   unattended simulated-paper source foundation          COMPLETE
-      unattended operational deployment                     PENDING / PROTECTED
+  G0-G7 daily-cycle source/design foundation                ACCEPTED
+  D3/D4 first unattended C3 capture/reconciliation          ACCEPTED
+  D5 capture-only warm-up                                   ACTIVE (2/6)
+  D6/D7 first pre-open decision publication                 NEXT / DESIGN
+  D8/D9 settlement through existing Paper-v2 authority      FUTURE / PROTECTED
+  unattended operational deployment                         NOT YET COMPLETE
 PD5   broker-paper integration                              NOT STARTED
 PD6   broker-paper soak / operational hardening             NOT STARTED
 PD7   personal-desktop live-readiness                       NOT STARTED
 PD8   tiny restricted live -> gradual maturity              NOT STARTED
 ```
 
-## Effect gates and still-not-authorized actions
+## Effect gates and protected actions
 
-All current Paper-v2 effect gates remain closed:
+All eight production gate constants remain committed `False`:
 
 ```text
+PERSONAL_DESKTOP_UNATTENDED_MARKET_DATA_CAPTURE_EFFECTS_ENABLED            = False
+PERSONAL_DESKTOP_UNATTENDED_DECISION_PUBLICATION_EFFECTS_ENABLED            = False
 PERSONAL_DESKTOP_PAPER_V2_PRODUCTION_EFFECTS_ENABLED                       = False
 PERSONAL_DESKTOP_PAPER_V2_RECOVERY_EFFECTS_ENABLED                         = False
 PERSONAL_DESKTOP_PAPER_V2_SUPERVISED_EXECUTION_EFFECTS_ENABLED             = False
@@ -487,17 +543,21 @@ PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_EXECUTION_EFFECTS_ENABLED             = Fal
 PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_STORAGE_PROVISIONING_EFFECTS_ENABLED  = False
 ```
 
-Still not authorized:
+The D5 capture-only runtime may temporarily change only the process-local
+market-data gate for exactly one reviewed G5 call. That does not make the
+committed source gate true and does not authorize ad hoc/manual provider calls.
+
+Still protected/not authorized outside their exact reviewed checkpoints:
 
 ```text
-provider call #7 / unattended C3 provider capture
+manual/ad hoc provider effects or retries outside D5 capture-only authority
+real unattended decision publication before D6/D7 protected acceptance
 real Paper-v2 receipt-recovery mutation
-unattended invocation-storage provisioning effect
-Task Scheduler installation/modification/enabling/running
-first real unattended Paper-v2 execution
+unattended decision/storage provisioning effect unless separately authorized
+Task Scheduler changes beyond the already accepted D5 task action
+first real unattended Paper-v2 settlement/execution
 broker order submission
 live trading
-changing any closed effect gate without a reviewed checkpoint
 old v1 publisher rerun
 v1 staging delete/repair/rename/migration/reuse
 Paper-v2 manual mutation outside reviewed effect checkpoints
@@ -546,6 +606,10 @@ docs/AI_TRADING_BOT_HANDOFF.md
 relevant docs/architecture/*
 relevant docs/validation/*
 ```
+
+Historical subsystem completion records remain historical unless a later
+extension explicitly belongs in them. Current operational extension state is
+recorded in the canonical status/handoff plus the relevant Architecture/plan.
 
 Docs-only closeouts do not require a new full repository suite when exact diff
 review proves no source/test change.

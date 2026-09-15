@@ -178,7 +178,10 @@ def _dependencies(
 
 
 def test_production_api_accepts_no_semantic_arguments() -> None:
-    assert tuple(inspect.signature(run_personal_desktop_unattended_capture_warmup).parameters) == ()
+    assert (
+        tuple(inspect.signature(run_personal_desktop_unattended_capture_warmup).parameters)
+        == ()
+    )
 
 
 @pytest.mark.parametrize(
@@ -276,9 +279,7 @@ def test_g5_exception_is_ambiguous_and_never_retried_or_sent_to_g6() -> None:
         (CaptureStatus.SESSION_GAP, CycleStatus.SESSION_GAP),
         (
             CaptureStatus.PROVIDER_ATTEMPT_CONSUMED_OR_AMBIGUOUS,
-            CycleStatus.PROVIDER_ATTEMPT_CONSUMED_OR_AMIGUOUS
-            if hasattr(CycleStatus, "PROVIDER_ATTEMPT_CONSUMED_OR_AMIGUOUS")
-            else CycleStatus.PROVIDER_ATTEMPT_CONSUMED_OR_AMBIGUOUS,
+            CycleStatus.PROVIDER_ATTEMPT_CONSUMED_OR_AMBIGUOUS,
         ),
         (CaptureStatus.BLOCKED, CycleStatus.BLOCKED),
     ),

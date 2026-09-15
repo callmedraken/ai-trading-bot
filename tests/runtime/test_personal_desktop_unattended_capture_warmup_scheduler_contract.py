@@ -33,9 +33,11 @@ def test_d5_contract_differs_from_d2_only_in_reviewed_action_metadata() -> None:
         "installation_is_authorized",
         "modification_is_authorized",
         "absent_task_disposition",
-        "conflicting_existing_task_disposition",
     }
-    assert d5.schema == PERSONAL_DESKTOP_UNATTENDED_CAPTURE_WARMUP_SCHEDULER_CONTRACT_SCHEMA
+    assert (
+        d5.schema
+        == PERSONAL_DESKTOP_UNATTENDED_CAPTURE_WARMUP_SCHEDULER_CONTRACT_SCHEMA
+    )
     assert d5.launcher == PERSONAL_DESKTOP_UNATTENDED_CAPTURE_WARMUP_LAUNCHER
     assert d5.semantic_arguments == ()
     assert d5.scheduler_owned_environment == ()

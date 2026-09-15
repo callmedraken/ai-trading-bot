@@ -130,6 +130,7 @@ def test_at_or_after_open_publication_fails_before_filesystem_mutation(
         with capability as active:
             active.publish(deadline + offset)
     _assert_no_publication_mutation(api)
+    assert capability.real_effect_performed is False
 
 
 def test_naive_publication_observation_fails_before_filesystem_mutation(

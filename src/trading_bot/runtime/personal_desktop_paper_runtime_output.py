@@ -26,7 +26,6 @@ from trading_bot.runtime.personal_desktop_unattended_paper_decision_intent impor
     verify_personal_desktop_unattended_paper_decision_intent,
 )
 from trading_bot.runtime.personal_desktop_unattended_paper_decision_publication import (
-    PERSONAL_DESKTOP_UNATTENDED_DECISION_PUBLICATION_EFFECTS_ENABLED,
     PreOpenDecisionPublicationPermit,
     consume_disposable_pre_open_decision_publication_permit_for_test,
     consume_pre_open_decision_publication_permit,
@@ -897,7 +896,13 @@ class _PersonalDesktopUnattendedDecisionOutputCapability(
 ):
     """Publish one exact G4 decision with a consumed pre-open permit."""
 
-    __slots__ = ("_authority", "_disposable", "_permit", "_storage_read")
+    __slots__ = (
+        "_authority",
+        "_disposable",
+        "_permit",
+        "_storage_read",
+        "_real_effect_performed",
+    )
 
     def __init__(
         self,
@@ -929,10 +934,21 @@ class _PersonalDesktopUnattendedDecisionOutputCapability(
         self._permit = permit
         self._authority = authority
         self._disposable = _issuer is _DISPOSABLE_UNATTENDED_DECISION_OUTPUT_ISSUER
+        self._real_effect_performed = False
         self._parents = {}
         self._entered = False
         self._closed = False
         self._published = False
+
+    @property
+    def real_effect_performed(self) -> bool:
+        """Diagnostic: the native staging-creation boundary was crossed.
+
+        True includes an attempted native effect with an uncertain outcome; it
+        does not prove durable publication or grant authority for another attempt.
+        """
+
+        return self._real_effect_performed
 
     def __enter__(self) -> Self:
         if self._entered or self._closed:
@@ -1000,6 +1016,7 @@ class _PersonalDesktopUnattendedDecisionOutputCapability(
                 is not security.PaperObjectRole.UNATTENDED_DECISION_DIRECTORY
             ):
                 raise AuthorityPathError("unattended decision staging role is invalid")
+            self._real_effect_performed = True
             self._api.create_directory(
                 staging,
                 security.paper_security_policy(
@@ -1541,6 +1558,13 @@ def open_personal_desktop_unattended_decision_output_capability(
 ) -> _PersonalDesktopUnattendedDecisionOutputCapability:
     """Open the fixed G4 writer only for the exact isolated gate state."""
 
+    from trading_bot.runtime import (  # noqa: PLC0415
+        personal_desktop_unattended_market_data_capture as capture,
+    )
+    from trading_bot.runtime import (
+        personal_desktop_unattended_paper_decision_publication as publication,
+    )
+
     verified = require_validated_personal_desktop_unattended_decision_storage_read(
         storage_read_result
     )
@@ -1571,7 +1595,10 @@ def open_personal_desktop_unattended_decision_output_capability(
     )
 
     if (
-        PERSONAL_DESKTOP_UNATTENDED_DECISION_PUBLICATION_EFFECTS_ENABLED is not True
+        publication.PERSONAL_DESKTOP_UNATTENDED_DECISION_PUBLICATION_EFFECTS_ENABLED
+        is not True
+        or capture.PERSONAL_DESKTOP_UNATTENDED_MARKET_DATA_CAPTURE_EFFECTS_ENABLED
+        is not False
         or security.PERSONAL_DESKTOP_PAPER_V2_PRODUCTION_EFFECTS_ENABLED is not False
         or security.PERSONAL_DESKTOP_PAPER_V2_RECOVERY_EFFECTS_ENABLED is not False
         or PERSONAL_DESKTOP_PAPER_V2_SUPERVISED_EXECUTION_EFFECTS_ENABLED is not False

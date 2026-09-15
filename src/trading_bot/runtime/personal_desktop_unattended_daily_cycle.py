@@ -187,12 +187,17 @@ class _SettlementResult:
     configuration_payload: bytes | None = None
 
 
-class _InsufficientAuthoritativeHistory(Exception):
+class InsufficientAuthoritativeC3History(Exception):
     """Normal leading C3 warm-up, distinct from invalid selected evidence."""
 
 
-class _AuthoritativeHistorySessionGap(Exception):
+class AuthoritativeC3HistorySessionGap(Exception):
     """Established selected-C3 chronology contains a required-session gap."""
+
+
+# Preserve the established G6 test seams while exposing shared composition APIs.
+_InsufficientAuthoritativeHistory = InsufficientAuthoritativeC3History
+_AuthoritativeHistorySessionGap = AuthoritativeC3HistorySessionGap
 
 
 @dataclass(frozen=True, slots=True)
@@ -680,6 +685,16 @@ def _build_history_production(
     )
 
 
+def build_personal_desktop_unattended_c3_history(
+    authority: object,
+    current: SessionIndexedSelectedC3SnapshotReadResult,
+    config: MovingAverageCrossoverConfig,
+) -> SelectedC3StrategyHistoryBinding:
+    """Reconstruct the exact current-C1 history through strict production reads."""
+
+    return _build_history_production(authority, current, config)
+
+
 def _include_configuration_once(
     historical: tuple[bytes, ...], payload: bytes
 ) -> tuple[bytes, ...]:
@@ -741,6 +756,28 @@ def _build_next_decision_production(
         expected_predecessor_checkpoint_id=prior.checkpoint_id,
     )
     return bind_personal_desktop_unattended_paper_decision_intent(decision)
+
+
+def build_personal_desktop_unattended_next_decision(
+    authority: object,
+    current: SessionIndexedSelectedC3SnapshotReadResult,
+    history: SelectedC3StrategyHistoryBinding,
+    account: PersonalDesktopPaperAccountReadEvidence,
+    observed_at: datetime,
+    config: MovingAverageCrossoverConfig,
+    policies: VerifiedSnapshotPaperCyclePolicies,
+) -> PersonalDesktopUnattendedPaperDecisionIntentArtifactBinding:
+    """Build the shared G4 intent from current source-owned production evidence."""
+
+    return _build_next_decision_production(
+        authority, current, history, account, observed_at, config, policies
+    )
+
+
+def personal_desktop_unattended_effect_gate_state() -> tuple[bool, ...]:
+    """Read all eight current source-owned effect gates without mutation."""
+
+    return _all_eight_gate_state()
 
 
 def _require_pending_decision(

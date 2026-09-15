@@ -467,6 +467,21 @@ _PD4_G6_EXPORTS = frozenset(
         "personal_desktop_unattended_strategy_config",
         "run_personal_desktop_unattended_daily_cycle",
         "run_personal_desktop_unattended_daily_cycle_for_test",
+        "AuthoritativeC3HistorySessionGap",
+        "InsufficientAuthoritativeC3History",
+        "build_personal_desktop_unattended_c3_history",
+        "build_personal_desktop_unattended_next_decision",
+        "personal_desktop_unattended_effect_gate_state",
+    }
+)
+
+_PD4_D6_EXPORTS = frozenset(
+    {
+        "DisposableUnattendedDecisionPublicationDependencies",
+        "PersonalDesktopUnattendedDecisionPublicationClassification",
+        "PersonalDesktopUnattendedDecisionPublicationResult",
+        "run_personal_desktop_unattended_decision_publication",
+        "run_personal_desktop_unattended_decision_publication_for_test",
     }
 )
 
@@ -484,6 +499,10 @@ def __getattr__(name: str) -> object:
         )
     elif name in _PD4_G6_EXPORTS:
         module = import_module(".personal_desktop_unattended_daily_cycle", __name__)
+    elif name in _PD4_D6_EXPORTS:
+        module = import_module(
+            ".personal_desktop_unattended_decision_publication", __name__
+        )
     else:
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
     value = getattr(module, name)
@@ -492,6 +511,12 @@ def __getattr__(name: str) -> object:
 
 
 __all__ = [
+    *sorted(_PD4_D6_EXPORTS),
+    "AuthoritativeC3HistorySessionGap",
+    "InsufficientAuthoritativeC3History",
+    "build_personal_desktop_unattended_c3_history",
+    "build_personal_desktop_unattended_next_decision",
+    "personal_desktop_unattended_effect_gate_state",
     "APPLICATION_ID_METADATA_KEY",
     "CHECKPOINTED_VERIFIED_SNAPSHOT_APPLICATION_MATERIAL_VERSION",
     "CHECKPOINTED_VERIFIED_SNAPSHOT_APPLICATION_NAMESPACE",

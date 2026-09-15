@@ -69,9 +69,9 @@ class PersonalDesktopUnattendedCaptureWarmupResult:
     market_data_classification: (
         PersonalDesktopUnattendedMarketDataCaptureClassification | None
     ) = None
-    cycle_classification: (
-        PersonalDesktopUnattendedDailyCycleClassification | None
-    ) = None
+    cycle_classification: PersonalDesktopUnattendedDailyCycleClassification | None = (
+        None
+    )
     capture_performed: bool = False
     provider_attempt_may_have_occurred: bool = False
     real_effect_performed: bool = False

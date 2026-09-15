@@ -58,7 +58,10 @@ def test_launcher_is_cwd_and_package_root_independent(tmp_path: Path) -> None:
     alternate_cli.mkdir(parents=True)
     (alternate_root / "trading_bot" / "__init__.py").write_text("")
     (alternate_cli / "__init__.py").write_text("")
-    (alternate_cli / "personal_desktop_unattended_capture_warmup_launcher.py").write_text(
+    alternate_module = (
+        alternate_cli / "personal_desktop_unattended_capture_warmup_launcher.py"
+    )
+    alternate_module.write_text(
         "def main(argv=None):\n    print('alternate package selected')\n    return 73\n"
     )
     away = tmp_path / "away-from-repository"

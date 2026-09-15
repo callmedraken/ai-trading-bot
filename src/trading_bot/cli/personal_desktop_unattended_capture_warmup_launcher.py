@@ -19,6 +19,13 @@ from trading_bot.runtime.personal_desktop_unattended_daily_cycle import (
     PersonalDesktopUnattendedDailyCycleClassification,
 )
 
+personal_desktop_unattended_capture_warmup_scheduler_contract = (
+    d5_contract.personal_desktop_unattended_capture_warmup_scheduler_contract
+)
+is_frozen_personal_desktop_unattended_capture_warmup_scheduler_contract = (
+    d5_contract.is_frozen_personal_desktop_unattended_capture_warmup_scheduler_contract
+)
+
 _SCHEMA = "personal-desktop-unattended-capture-warmup-launcher/v1"
 _EXIT_USAGE = 2
 _EXIT_CONTRACT = 3
@@ -118,8 +125,8 @@ def main(argv: list[str] | None = None) -> int:
         _emit({"reason": "INVALID_ARGUMENTS", "schema": _SCHEMA}, stream=sys.stderr)
         return _EXIT_USAGE
 
-    contract = d5_contract.personal_desktop_unattended_capture_warmup_scheduler_contract()
-    if not d5_contract.is_frozen_personal_desktop_unattended_capture_warmup_scheduler_contract(
+    contract = personal_desktop_unattended_capture_warmup_scheduler_contract()
+    if not is_frozen_personal_desktop_unattended_capture_warmup_scheduler_contract(
         contract
     ):
         _emit(

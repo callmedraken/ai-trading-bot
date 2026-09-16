@@ -476,7 +476,7 @@ naturally. Do not manually start it, backfill from the old offline seed, alter
 its source/scheduler contract, or turn a failed/ambiguous provider outcome into
 a blind retry.
 
-## Current milestone — PD4 D6 accepted / D7-A source preparation
+## Current milestone — PD4 D7-D source preparation
 
 D6-A through D6-D source certification is **ACCEPTED** under Architecture 113.
 
@@ -493,12 +493,30 @@ six-session MA(3,5), desired-quantity-1 candidate under the PD2A mutex, enforces
 the strict pre-open deadline, and contains the one-shot decision-only
 publication boundary. Source certification authorizes no production effect.
 
-D7-A read-only qualification source preparation adds a separate zero-semantic-
-argument Trading diagnostic boundary and fixed-namespace missing/present/security
-qualification. It issues no permit, opens no writer or effect gate, and performs
-no provisioning, capture, Paper-v2 mutation/recovery, scheduler, broker, or live
+D7-A read-only qualification source preparation is **ACCEPTED**:
+
+```text
+accepted D7-A source commit: c72ca6c8665b62c0b8d4f735fc2261a513cb81d5
+accepted D7-A source tree:   3b05c68ff1487a1c7d5984a200ee9f20d7b92fca
+focused verification:       910 passed
+production qualification:   NOT RUN
+```
+
+The accepted D7-A source adds a separate zero-semantic-argument Trading
+diagnostic boundary and fixed-namespace missing/present/security qualification.
+It issues no permit, opens no writer or effect gate, and performs no
+provisioning, capture, Paper-v2 mutation/recovery, scheduler, broker, or live
 effect. Its sanitized output is not reusable D7-C authority; D7-C must rederive
-production truth independently. The production D7-A harness has not been run.
+production truth independently.
+
+D7-D independent Trading-principal post-publication reconciliation is the
+current source-only checkpoint. It must reconstruct the exact candidate from
+fresh current-C1, selected-C3 history, and Paper-v2 account authority; discover
+and reread the exact finalized decision through genuine same-process provenance;
+and prove the account predecessor remains unchanged under the PD2A mutex. D7-D
+does not apply D7-C's fresh-publication deadline and cannot issue publication or
+other effect authority. No production D7-D invocation is authorized by source
+preparation.
 
 D5 remains armed and unchanged:
 
@@ -532,8 +550,10 @@ PD4   unattended simulated-paper source foundation          COMPLETE
   D3/D4 first unattended C3 capture/reconciliation          ACCEPTED
   D5 capture-only warm-up                                   ACTIVE (2/6)
   D6-A through D6-D decision-publication source              ACCEPTED
-  D7-A Trading read-only qualification                      WAITING FOR 6/6 READY
+  D7-A Trading read-only qualification source               ACCEPTED
+  D7-A production qualification                             WAITING FOR 6/6 READY
   D7-C first pre-open decision publication                   PROTECTED / UNAUTHORIZED
+  D7-D independent post-publication reconciliation source    CURRENT CHECKPOINT
   D8/D9 settlement through existing Paper-v2 authority      FUTURE / PROTECTED
   unattended operational deployment                         NOT YET COMPLETE
 PD5   broker-paper integration                              NOT STARTED

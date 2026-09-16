@@ -568,7 +568,7 @@ D5 itself is **not complete** until the required six-session suffix becomes
 ready. Expected terminal handoff is `G6 = DECISION_READY`; even then D5 performs
 no publication or Paper-v2 settlement.
 
-## 12. Current development checkpoint — D6 accepted / D7-A source preparation
+## 12. Current development checkpoint — D7-D source preparation
 
 D6-A through D6-D source certification is **ACCEPTED** under Architecture 113.
 
@@ -585,12 +585,32 @@ six-session MA(3,5), desired-quantity-1 candidate under the PD2A mutex, enforces
 the strict pre-open deadline, and contains the one-shot decision-only
 publication boundary. Source certification authorizes no production effect.
 
-D7-A read-only qualification source preparation adds a separate zero-semantic-
-argument Trading diagnostic boundary and fixed-namespace missing/present/security
-qualification. It issues no permit, opens no writer or effect gate, and performs
-no provisioning, capture, Paper-v2 mutation/recovery, scheduler, broker, or live
+D7-A read-only qualification source preparation is **ACCEPTED**:
+
+```text
+accepted D7-A source commit: c72ca6c8665b62c0b8d4f735fc2261a513cb81d5
+accepted D7-A source tree:   3b05c68ff1487a1c7d5984a200ee9f20d7b92fca
+focused verification:       910 passed
+production qualification:   NOT RUN
+```
+
+The accepted D7-A source adds a separate zero-semantic-argument Trading
+diagnostic boundary and fixed-namespace missing/present/security qualification.
+It issues no permit, opens no writer or effect gate, and performs no
+provisioning, capture, Paper-v2 mutation/recovery, scheduler, broker, or live
 effect. Its sanitized output is not reusable D7-C authority; D7-C must rederive
-production truth independently. The production D7-A harness has not been run.
+production truth independently.
+
+D7-D independent Trading-principal post-publication reconciliation is the
+current source-only checkpoint. It must rederive the exact expected decision
+from fresh current-C1, selected-C3 history, and Paper-v2 account authority,
+discover and reread the finalized decision through genuine same-process
+provenance, and prove the account predecessor remains unchanged under the PD2A
+mutex. D7-D is reconciliation rather than fresh publication admission: an exact
+already-finalized decision remains reconcilable at or after its intended regular
+open. D7-D cannot issue a permit, open a writer or effect gate, provision or
+repair storage, or perform any provider, Paper-v2, scheduler, broker, or live
+effect. No production D7-D invocation is authorized by source preparation.
 
 D5 remains armed and unchanged:
 
@@ -625,8 +645,10 @@ PD4   unattended simulated-paper
   D3/D4 first unattended C3 acceptance                     ACCEPTED
   Architecture-112 / D5 capture-only warm-up               ACTIVE (2/6)
   Architecture-113 / D6-A through D6-D source              ACCEPTED
-  D7-A Trading read-only qualification                    WAITING FOR 6/6 READY
+  D7-A Trading read-only qualification source             ACCEPTED
+  D7-A production qualification                           WAITING FOR 6/6 READY
   D7-C first decision publication                         PROTECTED / UNAUTHORIZED
+  D7-D independent post-publication reconciliation source  CURRENT CHECKPOINT
   D8/D9 existing-Paper-v2 settlement composition           FUTURE / PROTECTED
   operational unattended simulated-paper acceptance         NOT YET COMPLETE
 PD5   broker-paper integration                              NOT STARTED
@@ -694,9 +716,11 @@ merge/rebase/force-push/amend/PR metadata changes without explicit approval
    mutex, Architecture-67 durability/idempotency, and PD3 recovery rules.
 6. Remember D5 warm-up is currently `2/6` and `WARMING_UP`; there is no authority
    to synthesize missing history from the offline seed.
-7. Treat Architecture 113, its validation plan, and the D6 source-certification
-   completion record as accepted. Review the isolated D7-A source preparation;
-   wait for natural 6/6 READY before protected production qualification.
+7. Treat Architecture 113, its validation plan, the D6 source-certification
+   record, and D7-A source commit
+   `c72ca6c8665b62c0b8d4f735fc2261a513cb81d5` as accepted. Continue the
+   isolated D7-D source-only preparation; wait for natural 6/6 READY before any
+   protected production qualification or publication.
 8. Use Sol High for Architecture 113 and any implementation changing Windows
    publication security, authority, ordering, crash ambiguity, or effect
    containment. Use Luna/Astra only for bounded work after the contract is

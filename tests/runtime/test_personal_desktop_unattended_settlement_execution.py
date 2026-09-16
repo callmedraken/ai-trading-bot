@@ -241,22 +241,30 @@ def test_non_boolean_gate_blocks(harness, index, bad):
 
 def test_no_decision_and_existing_durable_states_never_open_effect(harness):
     harness.discovery_state = Discovery.NONE
-    assert harness.run().classification is d8b.Status.SETTLEMENT_NOT_READY
+    not_ready = harness.run()
+    assert not_ready.classification is d8b.Status.SETTLEMENT_NOT_READY
+    assert not_ready.real_effect_performed is False
+    assert not_ready.all_eight_gates_closed is True
     assert harness.calls == 0
     harness.discovery_state = Discovery.FINALIZED
     harness.startup_state = Startup.ALREADY_APPLIED
     applied = harness.run()
     assert applied.classification is d8b.Status.SETTLEMENT_ALREADY_APPLIED
     assert applied.real_effect_performed is False
+    assert applied.all_eight_gates_closed is True
     assert harness.calls == 0
     harness.startup_state = Startup.RECEIPT_RECOVERY_REQUIRED
     recovery = harness.run()
     assert recovery.classification is d8b.Status.RECEIPT_RECOVERY_REQUIRED
     assert recovery.account_predecessor_checkpoint_id != recovery.final_checkpoint_id
     assert recovery.real_effect_performed is False
+    assert recovery.all_eight_gates_closed is True
     assert harness.calls == 0
     harness.startup_state = Startup.BLOCKED
-    assert harness.run().classification is d8b.Status.BLOCKED
+    blocked = harness.run()
+    assert blocked.classification is d8b.Status.BLOCKED
+    assert blocked.real_effect_performed is False
+    assert blocked.all_eight_gates_closed is True
     assert harness.calls == 0
 
 
@@ -324,6 +332,19 @@ def test_token_c1_and_final_gate_drift_block(harness):
     assert harness.calls == 0
 
 
+def test_open_gate_verification_failure_stays_before_effect_boundary(harness):
+    def reject_open():
+        if pd4d.PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_EXECUTION_EFFECTS_ENABLED:
+            return (False,) * 8
+        return harness.gate_state()
+
+    result = harness.run(gate_state=reject_open)
+    assert result.classification is d8b.Status.BLOCKED
+    assert result.real_effect_performed is False
+    assert result.all_eight_gates_closed is True
+    assert harness.calls == 0
+
+
 def test_post_call_token_or_c1_drift_is_ambiguous_without_retry(harness):
     valid = harness.observe_token
     reads = 0
@@ -375,7 +396,17 @@ def test_pd4d_result_mapping(harness, status, expected):
     harness.operation_status = status
     result = harness.run()
     assert result.classification is expected
-    assert result.real_effect_performed is False
+    assert result.real_effect_performed is True
+    assert result.all_eight_gates_closed is True
+    assert harness.calls == 1
+
+
+def test_pd4d_already_applied_after_executor_call_preserves_convergence(harness):
+    harness.operation_status = OperationStatus.ALREADY_APPLIED
+    harness.operation_mutation = lambda result: replace(result, executor_called=True)
+    result = harness.run()
+    assert result.classification is d8b.Status.SETTLEMENT_ALREADY_APPLIED
+    assert result.real_effect_performed is True
     assert result.all_eight_gates_closed is True
     assert harness.calls == 1
 
@@ -387,6 +418,7 @@ def test_mismatched_pd4d_identity_is_ambiguous_without_retry(harness):
     result = harness.run()
     assert result.classification is d8b.Status.SETTLEMENT_OUTCOME_AMBIGUOUS
     assert result.real_effect_performed is True
+    assert result.all_eight_gates_closed is True
     assert harness.calls == 1
 
 
@@ -397,7 +429,20 @@ def test_unrelated_pd4d_recovery_is_ambiguous_without_repair(harness):
     )
     result = harness.run()
     assert result.classification is d8b.Status.SETTLEMENT_OUTCOME_AMBIGUOUS
-    assert result.real_effect_performed is False
+    assert result.real_effect_performed is True
+    assert result.all_eight_gates_closed is True
+    assert harness.calls == 1
+
+
+def test_blocked_pd4d_after_invocation_publication_is_ambiguous(harness):
+    harness.operation_status = OperationStatus.BLOCKED
+    harness.operation_mutation = lambda result: replace(
+        result, invocation_published=True, executor_called=False
+    )
+    result = harness.run()
+    assert result.classification is d8b.Status.SETTLEMENT_OUTCOME_AMBIGUOUS
+    assert result.real_effect_performed is True
+    assert result.all_eight_gates_closed is True
     assert harness.calls == 1
 
 
@@ -407,6 +452,7 @@ def test_blocked_pd4d_after_executor_crossing_is_ambiguous(harness):
     result = harness.run()
     assert result.classification is d8b.Status.SETTLEMENT_OUTCOME_AMBIGUOUS
     assert result.real_effect_performed is True
+    assert result.all_eight_gates_closed is True
     assert harness.calls == 1
 
 
@@ -414,7 +460,8 @@ def test_exception_after_gate_open_is_ambiguous_and_one_attempt(harness):
     harness.execution_error = RuntimeError("unknown outcome")
     result = harness.run()
     assert result.classification is d8b.Status.SETTLEMENT_OUTCOME_AMBIGUOUS
-    assert result.real_effect_performed is False
+    assert result.real_effect_performed is True
+    assert result.all_eight_gates_closed is True
     assert harness.calls == 1
 
 

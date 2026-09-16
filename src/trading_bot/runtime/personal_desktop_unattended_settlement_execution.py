@@ -147,6 +147,8 @@ class SettlementExecutionResult:
                 and self.classification
                 not in {
                     Status.SETTLEMENT_COMPLETED,
+                    Status.SETTLEMENT_ALREADY_APPLIED,
+                    Status.RECEIPT_RECOVERY_REQUIRED,
                     Status.SETTLEMENT_OUTCOME_AMBIGUOUS,
                 }
             )
@@ -559,15 +561,12 @@ def _require_execution_result(
             is not PaperOperationClassification.ALREADY_APPLIED
         ):
             raise ValueError("D8-B already-applied operation is not exact")
-        if result.executor_called:
-            return Status.SETTLEMENT_OUTCOME_AMBIGUOUS
         return Status.SETTLEMENT_ALREADY_APPLIED
     raise ValueError("D8-B PD4-D status is invalid")
 
 
 def _run(d: DisposableSettlementExecutionDependencies) -> SettlementExecutionResult:
-    attempted = False
-    crossed = False
+    effect_boundary_entered = False
     settlement: _Settlement | None = None
     try:
         reconstructed = _reconstruct(d)
@@ -586,7 +585,8 @@ def _run(d: DisposableSettlementExecutionDependencies) -> SettlementExecutionRes
         pd4d.PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_EXECUTION_EFFECTS_ENABLED = True
         try:
             _require_gates(d, _EXECUTION_OPEN)
-            attempted = True
+            # PD4-D can publish durably before its executor is called or returns.
+            effect_boundary_entered = True
             operation = d.execute(
                 settlement.c1,
                 settlement.original,
@@ -596,8 +596,6 @@ def _run(d: DisposableSettlementExecutionDependencies) -> SettlementExecutionRes
                     settlement.plan.artifact_bytes,
                 ),
             )
-            if type(operation) is pd4d.PersonalDesktopUnattendedPaperOperationResult:
-                crossed = operation.executor_called
         finally:
             pd4d.PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_EXECUTION_EFFECTS_ENABLED = False
         _final_authority(d, settlement.c1, settlement.token)
@@ -608,7 +606,7 @@ def _run(d: DisposableSettlementExecutionDependencies) -> SettlementExecutionRes
             status,
             settlement,
             final_checkpoint_id=operation.final_checkpoint_id,
-            real_effect_performed=crossed,
+            real_effect_performed=effect_boundary_entered,
         )
     except Exception:
         try:
@@ -616,17 +614,17 @@ def _run(d: DisposableSettlementExecutionDependencies) -> SettlementExecutionRes
             closed = True
         except Exception:
             closed = False
-        if attempted:
+        if effect_boundary_entered:
             if settlement is not None and closed:
                 return _result(
                     Status.SETTLEMENT_OUTCOME_AMBIGUOUS,
                     settlement,
-                    real_effect_performed=crossed,
+                    real_effect_performed=True,
                 )
             return SettlementExecutionResult(
                 Status.SETTLEMENT_OUTCOME_AMBIGUOUS,
                 all_eight_gates_closed=closed,
-                real_effect_performed=crossed,
+                real_effect_performed=True,
             )
         return SettlementExecutionResult(Status.BLOCKED, all_eight_gates_closed=closed)
 

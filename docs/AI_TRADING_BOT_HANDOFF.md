@@ -7,14 +7,14 @@
 **D8/D9 development branch:** `feature/pd4-unattended-settlement`  
 **Armed D5 worktree:** `F:\AI\worktrees\ai-trading-bot-personal-desktop`  
 **D7 development worktree:** `F:\AI\worktrees\ai-trading-bot-decision-publication`  
-**D8/D9 planned worktree:** `F:\AI\worktrees\ai-trading-bot-unattended-settlement`  
+**D8/D9 development worktree:** `F:\AI\worktrees\ai-trading-bot-unattended-settlement`  
 **Production/live trading:** NO-GO
 
 > This Git-tracked handoff is the canonical cross-chat resume document. Uploaded
 > copies are mirrors. Prove worktree, branch, HEAD, tree, origin, and clean state
 > before acting. The armed D5 branch/worktree must remain stable while capture-
-> only warm-up continues. D7 source is certified; new settlement source/design
-> work belongs on the isolated D8/D9 branch/worktree.
+> only warm-up continues. D7 source is certified; settlement source/design work
+> belongs on the isolated D8/D9 branch/worktree.
 
 ## 1. Product goal and threat model
 
@@ -81,12 +81,15 @@ pytest 6302 passed, 17 skipped in 1571.33s (0:26:11)
 post-certification docs tip 489b96a97d36fd28822142db9a69f0f0dd2d3d72
 ```
 
-The new isolated D8/D9 branch was created from that docs tip:
+The isolated D8/D9 branch was created from that docs tip and D8-A is now
+accepted:
 
 ```text
-feature/pd4-unattended-settlement
+branch feature/pd4-unattended-settlement
 base HEAD 489b96a97d36fd28822142db9a69f0f0dd2d3d72
-planned worktree F:\AI\worktrees\ai-trading-bot-unattended-settlement
+worktree F:\AI\worktrees\ai-trading-bot-unattended-settlement
+accepted D8-A/R1 HEAD 170b50743458c8c973d472476b9e7abf140b6b1d
+accepted D8-A/R1 TREE b2a202faf45bf61d5e3c1043c69a6cafcb00b6e3
 ```
 
 Development interpreter:
@@ -649,19 +652,45 @@ Branch/worktree:
 ```text
 branch: feature/pd4-unattended-settlement
 base: 489b96a97d36fd28822142db9a69f0f0dd2d3d72
-planned worktree: F:\AI\worktrees\ai-trading-bot-unattended-settlement
+worktree: F:\AI\worktrees\ai-trading-bot-unattended-settlement
 ```
 
-Architecture 114 is source-only and authorizes no real effect. It reuses the
-existing finalized-decision discovery/storage, selected-C3 read authority,
+D8-A read-only settlement qualification source is **ACCEPTED**:
+
+```text
+initial D8-A commit dd57bbc5293a4422bfda902994507fcabcb487d3
+accepted D8-A/R1 commit 170b50743458c8c973d472476b9e7abf140b6b1d
+accepted D8-A/R1 tree   b2a202faf45bf61d5e3c1043c69a6cafcb00b6e3
+R1 focused verification 233 passed
+Ruff check / format-check PASS
+full repository suite NOT RUN (correct intermediate-checkpoint cadence)
+production D8-A invocation NOT RUN
+```
+
+The accepted D8-A boundary independently discovers/replays the finalized
+decision targeting the current completed execution session, rereads current-C1
+selected C3 for the decision session and execution session, revalidates the
+persisted history-C3 evidence, derives `open(E)` only from selected C3(E), and
+reconstructs/replays the exact Architecture-94 final plan. It then uses the
+existing PD4-C read-only startup qualifier for predecessor-sensitive
+Paper-v2/A67/account inspection under the existing mutex rather than duplicating
+that authority.
+
+R1 preserves established PD3 terminal-missing-receipt semantics: recovery
+predecessor `P` and missing application must be exact, while the already
+validated current terminal checkpoint may be a distinct successor `Q`. The
+boundary therefore returns `RECEIPT_RECOVERY_REQUIRED` without opening receipt
+recovery authority. `real_effect_performed` remains structurally false.
+
+Architecture 114 remains source-only and authorizes no real effect. It reuses
+the existing finalized-decision discovery/storage, selected-C3 read authority,
 verified daily-bar open binding, Architecture-94 final-plan completion, PD4-C
 startup qualification, PD4-D unattended execution composition, PD2A mutex,
 Architecture-67 operation/receipt, and Paper-v2 lineage contracts.
 
-Frozen source sequence:
+Remaining frozen source sequence:
 
 ```text
-D8-A  zero-semantic-argument, all-gates-closed read-only settlement qualification
 D8-B  zero-semantic-argument settlement-only production source;
       only unattended-execution gate may later open for one exact call
 D9-A  independent fresh-process all-gates-closed post-settlement reconciliation
@@ -705,7 +734,8 @@ PD4   unattended simulated-paper
   D7-A production qualification                            WAITING FOR 6/6 READY
   D7-C first decision publication                          PROTECTED / UNAUTHORIZED
   Architecture-114 settlement contract                     ACCEPTED / SOURCE-ONLY
-  D8-A settlement qualification source                     NEXT
+  D8-A settlement qualification source                     ACCEPTED
+  D8-B settlement-only production source                   NEXT / EFFECTS CLOSED
   D8-B first real unattended settlement                    FUTURE / PROTECTED
   D9-A independent post-settlement reconciliation           FUTURE / PROTECTED
   D10 bounded unattended simulated-paper soak              FUTURE / PROTECTED
@@ -769,7 +799,8 @@ merge/rebase/force-push/amend/PR metadata changes without explicit approval
 2. Prove exact worktree/branch/HEAD/tree/origin/clean state before edits or
    operator work. Never self-correct a mismatch.
 3. Treat PD1, PD2, PD3, Architecture-110 source foundation, Architectures 111–114,
-   D3/D4, D5-A/B/C, and D7 source certification as established predecessors.
+   D3/D4, D5-A/B/C, D7 source certification, and D8-A/R1 as established
+   predecessors.
 4. Preserve the armed D5 branch at accepted source HEAD/tree while its scheduler
    accumulates warm-up sessions. Do not use that worktree for settlement source.
 5. Preserve the dedicated non-admin Trading principal, C1/P2 authority, PD2A
@@ -782,7 +813,8 @@ merge/rebase/force-push/amend/PR metadata changes without explicit approval
    `bb1de2e7c2933ba3a777523f2a0e2feee5fa8c39` as certified. Wait for natural
    6/6 READY before any protected D7 production qualification/publication.
 8. Continue Architecture-114 work on `feature/pd4-unattended-settlement`.
-   The next source checkpoint is D8-A read-only settlement qualification.
+   D8-A/R1 is accepted; the next source checkpoint is D8-B settlement-only
+   production source preparation with all committed effects closed.
 9. Use Sol High for D8/D9 implementation because it composes Windows security,
    authority, account ordering, A67 durability, and crash/recovery-sensitive
    boundaries. ChatGPT retains exact diff and acceptance authority.

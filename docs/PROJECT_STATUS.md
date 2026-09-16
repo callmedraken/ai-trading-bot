@@ -68,6 +68,8 @@ local worktree: F:\AI\worktrees\ai-trading-bot-unattended-settlement
 base commit: 489b96a97d36fd28822142db9a69f0f0dd2d3d72
 accepted D8-A source HEAD: 170b50743458c8c973d472476b9e7abf140b6b1d
 accepted D8-A source TREE: b2a202faf45bf61d5e3c1043c69a6cafcb00b6e3
+accepted D8-B source HEAD: 260d80f60db9acfd352b1bc89ff963fc2a590a38
+accepted D8-B source TREE: bc4fb96d2ecb30e607262de2c0b268510bd43835
 ```
 
 The earlier PD4 unattended source-foundation certification remains an important
@@ -574,6 +576,34 @@ the missing application must be exact, while the validated terminal account
 checkpoint may be the distinct successor/current terminal `Q`. D8-A reports
 `RECEIPT_RECOVERY_REQUIRED` without opening recovery authority.
 
+D8-B settlement-only production source is **ACCEPTED / EFFECTS CLOSED**:
+
+```text
+initial D8-B commit: f0541eab0a63575c661d79b990cc67c81375391f
+accepted D8-B/R1 commit: 260d80f60db9acfd352b1bc89ff963fc2a590a38
+accepted D8-B/R1 tree:   bc4fb96d2ecb30e607262de2c0b268510bd43835
+R1 focused verification: 134 passed
+Ruff check / format-check: PASS
+git diff --check / git diff --cached --check: PASS
+full repository suite: NOT RUN (correct intermediate-checkpoint cadence)
+production D8-B invocation: NOT RUN
+```
+
+The accepted D8-B boundary independently re-derives current settlement truth,
+reconstructs the exact final plan, and reuses a public verified-plan PD4-D entry
+point so the existing PD2A mutex, invocation publication, Architecture-67
+execution, and durable reconciliation remain authoritative. Committed source
+keeps the unattended-execution gate false. A future separately authorized D8-B
+invocation may temporarily open only that one process-local gate around at most
+one exact PD4-D composition call and restores it in `finally`.
+
+D8-B R1 makes effect accounting conservative: pre-call no-settlement,
+`ALREADY_APPLIED`, `RECEIPT_RECOVERY_REQUIRED`, and blocked paths remain
+`real_effect_performed = false`; after the verified effect gate state is open and
+the one PD4-D call is entered, returned convergence, publication-only/block,
+identity/reconciliation failure, or exception is recorded as having crossed the
+D8-B effect boundary. This diagnostic grants no retry or acceptance authority.
+
 Architecture 114 otherwise reuses, rather than redesigns, the existing
 finalized-decision storage/discovery, selected-C3 read authority, verified
 `open(E)` binding, Architecture-94 final-plan completion, PD4-C startup
@@ -583,7 +613,6 @@ Architecture-67 operation/receipt, and Paper-v2 lineage contracts.
 The remaining source sequence is:
 
 ```text
-D8-B  zero-argument settlement-only production boundary; source effects closed
 D9-A  independent all-gates-closed post-settlement reconciliation
 D9-B  one final broad D8/D9 source certification on the final source tree
 ```
@@ -614,9 +643,9 @@ PD4   unattended simulated-paper source foundation          COMPLETE
   D7-C first pre-open decision publication                  PROTECTED / UNAUTHORIZED
   Architecture 114 D8/D9 settlement contract               ACCEPTED / SOURCE-ONLY
   D8-A read-only settlement qualification source            ACCEPTED
-  D8-B settlement-only production source                    NEXT / EFFECTS CLOSED
+  D8-B settlement-only production source                    ACCEPTED / EFFECTS CLOSED
   D8-B first real unattended Paper-v2 settlement            FUTURE / PROTECTED
-  D9-A independent post-settlement reconciliation           FUTURE / PROTECTED
+  D9-A independent post-settlement reconciliation source    NEXT / READ-ONLY
   D10 bounded unattended simulated-paper soak               FUTURE / PROTECTED
   unattended operational deployment                         NOT YET COMPLETE
 PD5   broker-paper integration                              NOT STARTED

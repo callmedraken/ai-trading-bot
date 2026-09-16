@@ -64,8 +64,10 @@ New D8/D9 settlement source/design work is isolated on:
 
 ```text
 branch: feature/pd4-unattended-settlement
-planned local worktree: F:\AI\worktrees\ai-trading-bot-unattended-settlement
+local worktree: F:\AI\worktrees\ai-trading-bot-unattended-settlement
 base commit: 489b96a97d36fd28822142db9a69f0f0dd2d3d72
+accepted D8-A source HEAD: 170b50743458c8c973d472476b9e7abf140b6b1d
+accepted D8-A source TREE: b2a202faf45bf61d5e3c1043c69a6cafcb00b6e3
 ```
 
 The earlier PD4 unattended source-foundation certification remains an important
@@ -543,19 +545,44 @@ docs/architecture/114-personal-desktop-unattended-paper-settlement-authority.md
 docs/validation/pd4-unattended-settlement-plan.md
 branch: feature/pd4-unattended-settlement
 base: 489b96a97d36fd28822142db9a69f0f0dd2d3d72
-planned worktree: F:\AI\worktrees\ai-trading-bot-unattended-settlement
+worktree: F:\AI\worktrees\ai-trading-bot-unattended-settlement
 ```
 
-Architecture 114 reuses, rather than redesigns, the existing finalized-decision
-storage/discovery, selected-C3 read authority, verified `open(E)` binding,
-Architecture-94 final-plan completion, PD4-C startup qualification, PD4-D
-unattended execution composition, PD2A mutex, Architecture-67 operation/receipt,
-and Paper-v2 lineage contracts.
-
-The source sequence is:
+D8-A read-only settlement qualification source is **ACCEPTED**:
 
 ```text
-D8-A  zero-argument all-gates-closed settlement qualification
+initial D8-A commit: dd57bbc5293a4422bfda902994507fcabcb487d3
+accepted D8-A/R1 commit: 170b50743458c8c973d472476b9e7abf140b6b1d
+accepted D8-A/R1 tree:   b2a202faf45bf61d5e3c1043c69a6cafcb00b6e3
+R1 focused verification: 233 passed
+Ruff check / format-check: PASS
+full repository suite: NOT RUN (correct intermediate-checkpoint cadence)
+production D8-A invocation: NOT RUN
+```
+
+The accepted D8-A boundary independently discovers and replays the finalized
+decision for the current completed execution session, rereads the decision and
+execution selected-C3 evidence under current C1, derives `open(E)` only from the
+execution-session C3 snapshot, reconstructs/replays the exact Architecture-94
+plan, and delegates account/mutex/A67 startup inspection to the existing PD4-C
+read-only qualifier. It exposes only sanitized diagnostics and performs no real
+effect.
+
+R1 corrected the terminal-missing-receipt mapping to preserve the established
+PD3 semantics: the recovery predecessor remains the decision predecessor `P`,
+the missing application must be exact, while the validated terminal account
+checkpoint may be the distinct successor/current terminal `Q`. D8-A reports
+`RECEIPT_RECOVERY_REQUIRED` without opening recovery authority.
+
+Architecture 114 otherwise reuses, rather than redesigns, the existing
+finalized-decision storage/discovery, selected-C3 read authority, verified
+`open(E)` binding, Architecture-94 final-plan completion, PD4-C startup
+qualification, PD4-D unattended execution composition, PD2A mutex,
+Architecture-67 operation/receipt, and Paper-v2 lineage contracts.
+
+The remaining source sequence is:
+
+```text
 D8-B  zero-argument settlement-only production boundary; source effects closed
 D9-A  independent all-gates-closed post-settlement reconciliation
 D9-B  one final broad D8/D9 source certification on the final source tree
@@ -586,7 +613,8 @@ PD4   unattended simulated-paper source foundation          COMPLETE
   D7-A production qualification                             WAITING FOR 6/6 READY
   D7-C first pre-open decision publication                  PROTECTED / UNAUTHORIZED
   Architecture 114 D8/D9 settlement contract               ACCEPTED / SOURCE-ONLY
-  D8-A read-only settlement qualification source            NEXT
+  D8-A read-only settlement qualification source            ACCEPTED
+  D8-B settlement-only production source                    NEXT / EFFECTS CLOSED
   D8-B first real unattended Paper-v2 settlement            FUTURE / PROTECTED
   D9-A independent post-settlement reconciliation           FUTURE / PROTECTED
   D10 bounded unattended simulated-paper soak               FUTURE / PROTECTED

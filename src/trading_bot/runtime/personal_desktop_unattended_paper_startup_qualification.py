@@ -640,7 +640,7 @@ def qualify_personal_desktop_unattended_paper_startup_from_verified_plan(
 
     authority = require_validated_production_authority(authority)
     calendar = BoundMarketCalendar(XNYS_CALENDAR_DESCRIPTOR, NYSEMarketCalendar())
-    inputs = _planning_inputs_from_verified_plan(
+    inputs = personal_desktop_unattended_paper_planning_inputs_from_verified_plan(
         selected_snapshot,
         verified_plan,
         historical_cycle_configuration_payloads,
@@ -681,7 +681,7 @@ def qualify_personal_desktop_unattended_paper_startup_from_verified_plan(
     )
 
 
-def _planning_inputs_from_verified_plan(
+def personal_desktop_unattended_paper_planning_inputs_from_verified_plan(
     selected_snapshot: SelectedC3SnapshotReadResult,
     verified_plan: ManualPaperStrategyPlanArtifactBinding,
     historical_configurations: tuple[bytes, ...],
@@ -727,6 +727,13 @@ def _planning_inputs_from_verified_plan(
         request.metadata,
         tuple(historical_configurations),
     )
+
+
+# Preserve the established internal test seam while the public PD4-D verified-plan
+# wrapper uses the explicit shared name above.
+_planning_inputs_from_verified_plan = (
+    personal_desktop_unattended_paper_planning_inputs_from_verified_plan
+)
 
 
 def _create_disposable_startup_qualification_authority_for_test(

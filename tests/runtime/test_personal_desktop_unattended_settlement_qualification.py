@@ -113,6 +113,7 @@ class Harness(DecisionHarness):
         self.fail_proof = False
         self.startup_state = Startup.HEALTHY_NO_PENDING_INVOCATION
         self.startup_mutation = None
+        self.recovery_terminal_checkpoint_id = UUID(int=12)
         self.events = []
         self.c1_reads = 0
 
@@ -188,7 +189,7 @@ class Harness(DecisionHarness):
                 None,
                 None,
                 None,
-                decision.predecessor_checkpoint_id,
+                self.recovery_terminal_checkpoint_id,
                 None,
                 None,
                 None,
@@ -452,6 +453,28 @@ def test_production_discovery_wrapper_rejects_substituted_binding(harness, monke
 )
 def test_startup_identifier_tampering_blocks(harness, field):
     harness.startup_mutation = lambda result: replace(result, **{field: UUID(int=999)})
+    assert harness.run().classification is d8a.Status.BLOCKED
+
+
+def test_exact_terminal_missing_receipt_uses_distinct_successor(harness):
+    harness.startup_state = Startup.RECEIPT_RECOVERY_REQUIRED
+    predecessor = harness.binding.decision.predecessor_checkpoint_id
+    successor = harness.recovery_terminal_checkpoint_id
+    assert predecessor != successor
+
+    result = harness.run()
+
+    assert result.classification is d8a.Status.RECEIPT_RECOVERY_REQUIRED
+    assert result.account_predecessor_checkpoint_id == predecessor
+    assert result.terminal_checkpoint_id == successor
+    assert result.real_effect_performed is False
+
+
+def test_recovery_must_be_for_the_exact_predecessor(harness):
+    harness.startup_state = Startup.RECEIPT_RECOVERY_REQUIRED
+    harness.startup_mutation = lambda result: replace(
+        result, recovery_predecessor_checkpoint_id=UUID(int=999)
+    )
     assert harness.run().classification is d8a.Status.BLOCKED
 
 

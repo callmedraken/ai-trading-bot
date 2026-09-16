@@ -328,7 +328,6 @@ def _startup_status(
         if (
             startup.recovery_predecessor_checkpoint_id
             != decision.predecessor_checkpoint_id
-            or startup.terminal_checkpoint_id != decision.predecessor_checkpoint_id
             or startup.recovery_missing_application_id != expected_application
         ):
             raise ValueError("D8-A recovery is unrelated to the exact plan")

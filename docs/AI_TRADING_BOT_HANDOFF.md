@@ -81,8 +81,8 @@ pytest 6302 passed, 17 skipped in 1571.33s (0:26:11)
 post-certification docs tip 489b96a97d36fd28822142db9a69f0f0dd2d3d72
 ```
 
-The isolated D8/D9 branch was created from that docs tip and D8-A is now
-accepted:
+The isolated D8/D9 branch was created from that docs tip. D8-A and D8-B source
+are now accepted:
 
 ```text
 branch feature/pd4-unattended-settlement
@@ -90,6 +90,8 @@ base HEAD 489b96a97d36fd28822142db9a69f0f0dd2d3d72
 worktree F:\AI\worktrees\ai-trading-bot-unattended-settlement
 accepted D8-A/R1 HEAD 170b50743458c8c973d472476b9e7abf140b6b1d
 accepted D8-A/R1 TREE b2a202faf45bf61d5e3c1043c69a6cafcb00b6e3
+accepted D8-B/R1 HEAD 260d80f60db9acfd352b1bc89ff963fc2a590a38
+accepted D8-B/R1 TREE bc4fb96d2ecb30e607262de2c0b268510bd43835
 ```
 
 Development interpreter:
@@ -682,24 +684,51 @@ validated current terminal checkpoint may be a distinct successor `Q`. The
 boundary therefore returns `RECEIPT_RECOVERY_REQUIRED` without opening receipt
 recovery authority. `real_effect_performed` remains structurally false.
 
-Architecture 114 remains source-only and authorizes no real effect. It reuses
-the existing finalized-decision discovery/storage, selected-C3 read authority,
-verified daily-bar open binding, Architecture-94 final-plan completion, PD4-C
-startup qualification, PD4-D unattended execution composition, PD2A mutex,
-Architecture-67 operation/receipt, and Paper-v2 lineage contracts.
+D8-B settlement-only production source is **ACCEPTED / EFFECTS CLOSED**:
+
+```text
+initial D8-B commit f0541eab0a63575c661d79b990cc67c81375391f
+accepted D8-B/R1 commit 260d80f60db9acfd352b1bc89ff963fc2a590a38
+accepted D8-B/R1 tree   bc4fb96d2ecb30e607262de2c0b268510bd43835
+R1 focused verification 134 passed
+Ruff check / format-check PASS
+git diff --check / git diff --cached --check PASS
+full repository suite NOT RUN (correct intermediate-checkpoint cadence)
+production D8-B invocation NOT RUN
+```
+
+The accepted D8-B boundary independently re-derives the current completed
+execution session, exact finalized decision, current-C1 C3 evidence, verified
+`open(E)`, and exact Architecture-94 plan rather than consuming D8-A output as
+authority. It reuses the existing PD4-D composition through an explicit
+verified-plan entry point, preserving the existing PD2A mutex, durable
+invocation publication, Architecture-67 operation execution, and final durable
+reconciliation.
+
+Committed source keeps the unattended-execution gate false. A future separately
+authorized D8-B invocation may temporarily open only that one process-local gate
+around at most one exact PD4-D call and restores it in `finally`; there is no
+same-invocation retry and no receipt recovery.
+
+D8-B R1 makes effect accounting conservative. Before the PD4-D effect boundary
+is entered, no-settlement, already-applied, recovery-required, blocked, and open-
+gate verification failure remain `real_effect_performed = false`. Once the open
+gate state is verified and the single PD4-D call is entered, returned
+convergence, publication-only/block, post-call identity failure, or exception is
+recorded as having crossed the D8-B effect boundary. That flag is diagnostic
+only and never grants retry or acceptance authority.
+
+Architecture 114 remains source-only and authorizes no real effect. Receipt
+recovery remains separate. D8 never opens receipt-recovery authority. If
+startup/reconciliation identifies a terminal missing receipt, the result is
+`RECEIPT_RECOVERY_REQUIRED` and the flow stops.
 
 Remaining frozen source sequence:
 
 ```text
-D8-B  zero-semantic-argument settlement-only production source;
-      only unattended-execution gate may later open for one exact call
 D9-A  independent fresh-process all-gates-closed post-settlement reconciliation
 D9-B  one final broad source certification after D8/D9 source is feature-complete
 ```
-
-Receipt recovery remains separate. D8 never opens receipt-recovery authority.
-If startup/reconciliation identifies a terminal missing receipt, the result is
-`RECEIPT_RECOVERY_REQUIRED` and the flow stops.
 
 Intermediate D8/D9 implementation checkpoints use focused tests only. The full
 repository suite is reserved for D9-B after ChatGPT declares the exact source
@@ -735,9 +764,9 @@ PD4   unattended simulated-paper
   D7-C first decision publication                          PROTECTED / UNAUTHORIZED
   Architecture-114 settlement contract                     ACCEPTED / SOURCE-ONLY
   D8-A settlement qualification source                     ACCEPTED
-  D8-B settlement-only production source                   NEXT / EFFECTS CLOSED
+  D8-B settlement-only production source                   ACCEPTED / EFFECTS CLOSED
   D8-B first real unattended settlement                    FUTURE / PROTECTED
-  D9-A independent post-settlement reconciliation           FUTURE / PROTECTED
+  D9-A independent post-settlement reconciliation source   NEXT / READ-ONLY
   D10 bounded unattended simulated-paper soak              FUTURE / PROTECTED
   operational unattended simulated-paper acceptance         NOT YET COMPLETE
 PD5   broker-paper integration                              NOT STARTED
@@ -799,8 +828,8 @@ merge/rebase/force-push/amend/PR metadata changes without explicit approval
 2. Prove exact worktree/branch/HEAD/tree/origin/clean state before edits or
    operator work. Never self-correct a mismatch.
 3. Treat PD1, PD2, PD3, Architecture-110 source foundation, Architectures 111–114,
-   D3/D4, D5-A/B/C, D7 source certification, and D8-A/R1 as established
-   predecessors.
+   D3/D4, D5-A/B/C, D7 source certification, D8-A/R1, and D8-B/R1 as
+   established predecessors.
 4. Preserve the armed D5 branch at accepted source HEAD/tree while its scheduler
    accumulates warm-up sessions. Do not use that worktree for settlement source.
 5. Preserve the dedicated non-admin Trading principal, C1/P2 authority, PD2A
@@ -813,8 +842,8 @@ merge/rebase/force-push/amend/PR metadata changes without explicit approval
    `bb1de2e7c2933ba3a777523f2a0e2feee5fa8c39` as certified. Wait for natural
    6/6 READY before any protected D7 production qualification/publication.
 8. Continue Architecture-114 work on `feature/pd4-unattended-settlement`.
-   D8-A/R1 is accepted; the next source checkpoint is D8-B settlement-only
-   production source preparation with all committed effects closed.
+   D8-A/R1 and D8-B/R1 are accepted; the next source checkpoint is D9-A
+   independent all-gates-closed post-settlement reconciliation.
 9. Use Sol High for D8/D9 implementation because it composes Windows security,
    authority, account ordering, A67 durability, and crash/recovery-sensitive
    boundaries. ChatGPT retains exact diff and acceptance authority.

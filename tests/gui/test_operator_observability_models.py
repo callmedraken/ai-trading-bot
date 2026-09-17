@@ -121,6 +121,17 @@ def test_warmup_view_rejects_selected_session_outside_required_window() -> None:
         )
 
 
+def test_selected_session_rejects_non_ascii_uppercase_symbol() -> None:
+    with pytest.raises(ValueError, match="canonical presentation text"):
+        SelectedC3WarmupSessionView(
+            session_date=date(2026, 9, 15),
+            symbol="SPÅY",
+            close=Decimal("757.39"),
+            snapshot_id=UUID(int=1),
+            selection_id=UUID(int=2),
+        )
+
+
 def test_effect_gate_view_is_closed_only_when_every_gate_is_false() -> None:
     closed = _closed_gates()
     opened = OperatorEffectGateState(

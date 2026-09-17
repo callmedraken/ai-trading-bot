@@ -4,17 +4,17 @@
 **Integration branch:** `develop`  
 **Armed D5 branch:** `feature/personal-desktop-paper-runtime`  
 **D7 certified branch:** `feature/pd4-unattended-decision-publication`  
-**D8/D9 development branch:** `feature/pd4-unattended-settlement`  
+**D8/D9 certified branch:** `feature/pd4-unattended-settlement`  
 **Armed D5 worktree:** `F:\AI\worktrees\ai-trading-bot-personal-desktop`  
-**D7 development worktree:** `F:\AI\worktrees\ai-trading-bot-decision-publication`  
-**D8/D9 development worktree:** `F:\AI\worktrees\ai-trading-bot-unattended-settlement`  
+**D7 worktree:** `F:\AI\worktrees\ai-trading-bot-decision-publication`  
+**D8/D9 worktree:** `F:\AI\worktrees\ai-trading-bot-unattended-settlement`  
 **Production/live trading:** NO-GO
 
 > This Git-tracked handoff is the canonical cross-chat resume document. Uploaded
 > copies are mirrors. Prove worktree, branch, HEAD, tree, origin, and clean state
-> before acting. The armed D5 branch/worktree must remain stable while capture-
-> only warm-up continues. D7 source is certified; settlement source/design work
-> belongs on the isolated D8/D9 branch/worktree.
+> before acting. Keep the armed D5, certified D7, and certified D8/D9 source
+> boundaries stable; use a separate branch/worktree for unrelated parallel
+> product development.
 
 ## 1. Product goal and threat model
 
@@ -41,7 +41,7 @@ physical machine control. The bot still protects against practical ordinary-
 process/configuration/credential/state/duplicate-effect/risk-bypass/recovery
 failures.
 
-## 2. Current repository and deployment provenance
+## 2. Current repository and source provenance
 
 Integration/product baselines:
 
@@ -56,12 +56,12 @@ a810122a96b6fc90da25d71eede8da64b7272c98
 Historical PD4 Architecture-110 source-foundation certification:
 
 ```text
-commit 248cd8de6a3539aab21d5719d96cb7ff1aa0d14c
-tree   5e867f1bfc6d945ad67f6c56be252b534645aeb2
-5588 passed, 17 skipped in 1519.25s (0:25:19)
+HEAD 248cd8de6a3539aab21d5719d96cb7ff1aa0d14c
+TREE 5e867f1bfc6d945ad67f6c56be252b534645aeb2
+5588 passed, 17 skipped in 1519.25s
 ```
 
-The armed Architecture-111/112 D5 capture-warm-up source remains:
+Armed Architecture-111/112 D5 capture-warm-up source:
 
 ```text
 branch feature/personal-desktop-paper-runtime
@@ -71,28 +71,43 @@ TREE   f0591e966463c7e1e66dc00ad76fd895500a076f
 
 Do not alter that armed branch merely to continue development.
 
-The isolated D6/D7 branch reached consolidated source certification at:
+D6/D7 decision-publication source certification:
 
 ```text
 branch feature/pd4-unattended-decision-publication
 certified source HEAD 3dfa9e2cab372f8cb034b90256ed3fba9da6c878
 certified source TREE bb1de2e7c2933ba3a777523f2a0e2feee5fa8c39
-pytest 6302 passed, 17 skipped in 1571.33s (0:26:11)
+pytest 6302 passed, 17 skipped in 1571.33s
 post-certification docs tip 489b96a97d36fd28822142db9a69f0f0dd2d3d72
 ```
 
-The isolated D8/D9 branch was created from that docs tip. D8-A and D8-B source
-are now accepted:
+D8/D9 settlement source certification:
 
 ```text
 branch feature/pd4-unattended-settlement
-base HEAD 489b96a97d36fd28822142db9a69f0f0dd2d3d72
+base 489b96a97d36fd28822142db9a69f0f0dd2d3d72
 worktree F:\AI\worktrees\ai-trading-bot-unattended-settlement
+
 accepted D8-A/R1 HEAD 170b50743458c8c973d472476b9e7abf140b6b1d
 accepted D8-A/R1 TREE b2a202faf45bf61d5e3c1043c69a6cafcb00b6e3
+
 accepted D8-B/R1 HEAD 260d80f60db9acfd352b1bc89ff963fc2a590a38
 accepted D8-B/R1 TREE bc4fb96d2ecb30e607262de2c0b268510bd43835
+
+accepted D9-A / certified final source HEAD
+0df4ccb97a750e5727ef65dae7a365a3c7355254
+
+certified final source TREE
+f6c27fcff1a6cec839d8f6ec395d658dbbbbe36c
 ```
+
+Certification record:
+
+```text
+docs/validation/pd4-d9-settlement-source-certification.md
+```
+
+Docs-only commits after `0df4ccb...` do not alter the certified source boundary.
 
 Development interpreter:
 
@@ -106,7 +121,7 @@ Production interpreter:
 F:\AITradingBot\runtime\python.exe
 ```
 
-Before every bounded local task:
+Before bounded local tasks:
 
 ```text
 git rev-parse --show-toplevel
@@ -125,10 +140,8 @@ reset/rebase/clean.
 Normal pytest collection uses `pyproject.toml`'s `pythonpath = ["src"]`. Do not
 persistently export `PYTHONPATH` for ordinary pytest runs.
 
-Controlled pytest on John's Windows development account must use a fresh
-external basetemp because the default
-`C:\Users\John\AppData\Local\Temp\pytest-of-John` has a known WinError-5 access
-condition:
+Controlled pytest on John's Windows development account uses a fresh external
+basetemp:
 
 ```powershell
 $BaseTemp = "F:\AI\temp\pytest\<purpose>-$([guid]::NewGuid().ToString('N'))"
@@ -136,12 +149,24 @@ New-Item -ItemType Directory -Force 'F:\AI\temp\pytest' | Out-Null
 & $Python -m pytest ... --basetemp="$BaseTemp" -p no:cacheprovider
 ```
 
-Do not globally alter `TEMP` or `TMP` to work around that condition.
+Do not globally alter `TEMP` or `TMP`.
+
+Architecture-77 process-rendezvous tests are a special case: they intentionally
+use a fixed repository-local namespace under
+`.pytest_cache/ai-trading-bot-lifecycle-arbiters-v1` so independently spawned
+processes rendezvous on the same lock path. Do not rewrite that contract to
+follow `--basetemp` merely to avoid a local ACL condition.
+
+During D9-B, the settlement worktree's parent `.pytest_cache` was inaccessible
+to the John development principal. The source was not changed and that cache was
+not deleted, ACL-reset, taken over, or redirected. The already validated split
+certification pattern was used instead: broad nonlegacy tests from the D9
+worktree plus byte-identical legacy Architecture-77 tests from a clean
+integration harness while imports were proven to resolve from D9 source.
 
 Source-checkout operator CLIs that must run independently of cwd or ambient
 package resolution use a reviewed `scripts/` launcher that explicitly selects
-the checkout's `src`. Before an actual Trading-principal host invocation, run an
-import/help probe with the production interpreter against that launcher.
+the checkout's `src`.
 
 ## 4. ChatGPT / Codex workflow
 
@@ -159,28 +184,23 @@ discovery-aware/cross-module bounded work    -> Astra
 native Windows/security/authority/recovery   -> Sol High
 ```
 
-Sol Medium is no longer part of the default routing ladder. Model choice never
-transfers architecture or acceptance authority. Do not use subagents unless the
-user explicitly requests them.
+Model choice never transfers architecture or acceptance authority. No subagents
+unless explicitly requested.
 
-Codex runs focused tests/checks during implementation. Do **not** run the full
-repository suite after every Codex modification. Run one broad certification
-only after ChatGPT has reviewed the exact source and declared that tree final
-for the milestone. If a broad certification exposes a failure, diagnose/fix
-only the affected area and rerun focused verification before asking for the
-broad suite again.
-
-Exact-file stage only; never `git add .` or `git add -A`. Preserve unrelated
-generated/untracked artifacts and historical permission-warning test folders.
+Use focused tests during intermediate implementation. Run one broad
+certification only after the exact source tree is declared final for the
+milestone. Exact-file stage only; never `git add .` or `git add -A`. Preserve
+unrelated generated/untracked artifacts and historical permission-warning test
+folders.
 
 No amend/rebase/merge/force-push/PR-metadata/review-thread changes without
 explicit approval.
 
 ## 5. Standing authorization model
 
-The user has authorized automatically continuing to the next best **safe,
-source-only/read-only** scoped checkpoint when the preceding reviewed checkpoint
-passes. Stop at protected effect boundaries or genuine architecture ambiguity.
+Automatically continue to the next best **safe, source-only/read-only** scoped
+checkpoint when the preceding reviewed checkpoint passes. Stop at protected
+effect boundaries or genuine architecture ambiguity.
 
 This does **not** automatically authorize:
 
@@ -204,40 +224,6 @@ merge/rebase/amend/force-push/PR metadata changes
 
 ## 6. Production identity and C3 lineage
 
-Historical C3 source:
-
-```text
-82ba29ae2c2cc6bb3544077db0ee21868e6d5693
-```
-
-Historical manual C3 acceptance:
-
-```text
-call #5: FAILED / CONFIRMED
-call #6: SUCCEEDED / CONFIRMED / SUCCESS_SELECTED
-```
-
-Selected call #6:
-
-```text
-selection_id: 36d6fbb3-bdec-57e0-a9cf-78dc2b8f7280
-snapshot_id: eba46838-44ae-5bec-97bf-98c6639ae6a7
-SHA-256: 31d82a31a3fbd909f8771820bf47e796a1503264fe0ac6ce0eff7ba163f0767d
-length: 1291
-captured_at: 2026-08-29T09:46:43.769105+00:00
-```
-
-Architecture 111 later introduced a separate closed-by-default unattended
-market-data gate and source-owned zero-argument capture/session derivation. The
-first unattended D3/D4 C3 acceptance capture selected session `2026-09-11`:
-
-```text
-selection_id: 7c42363d-4785-5823-be7e-93bf94426eac
-snapshot_id:  8ddc60ed-3940-5379-a868-b46b9b7c95af
-SHA-256:      704c1d0966acec3489a355fd6ef5369439b07e0e0a8e15c5f68cc2d847aa607f
-length:       1289
-```
-
 Host/deployment:
 
 ```text
@@ -252,19 +238,26 @@ authority DB: F:\AITradingBot\Authority\authority.sqlite3
 credential policy: windows-credential-manager-alpaca-market-data/v2
 ```
 
-## 7. Architecture 94 product composition
-
-Accepted product work:
+Historical manual C3 selected call #6:
 
 ```text
-P1 pure strategy history / deterministic strategy plan
-1028e60b99c27cef0994f40d6ce381392abfb0f8
-
-P2 read-only selected-C3 snapshot authority
-a810122a96b6fc90da25d71eede8da64b7272c98
+selection_id: 36d6fbb3-bdec-57e0-a9cf-78dc2b8f7280
+snapshot_id: eba46838-44ae-5bec-97bf-98c6639ae6a7
+SHA-256: 31d82a31a3fbd909f8771820bf47e796a1503264fe0ac6ce0eff7ba163f0767d
+length: 1291
+captured_at: 2026-08-29T09:46:43.769105+00:00
 ```
 
-Preserve:
+First unattended D3/D4 selected session `2026-09-11`:
+
+```text
+selection_id: 7c42363d-4785-5823-be7e-93bf94426eac
+snapshot_id:  8ddc60ed-3940-5379-a868-b46b9b7c95af
+SHA-256:      704c1d0966acec3489a355fd6ef5369439b07e0e0a8e15c5f68cc2d847aa607f
+length:       1289
+```
+
+## 7. Architecture 94 product composition
 
 ```text
 selected verified C3 snapshot
@@ -278,20 +271,19 @@ selected verified C3 snapshot
 -> Architecture-67 durable transition + receipt
 ```
 
-Architecture 111 adds a two-phase unattended path without replacing the final
-Architecture-94 plan format:
+Architecture 111 adds:
 
 ```text
 selected current C3 close + C3-authoritative history + account predecessor
 -> PreparedManualPaperStrategyDecision
--> durable pre-open decision intent (contains no future execution-session open)
+-> durable pre-open decision intent (no future execution-session open)
 -> later current-C1 selected C3 open for intended execution session
--> existing ManualPaperStrategyPlanArtifactBinding
+-> existing Architecture-94 final plan
 -> existing PD4 / Architecture-67 Paper-v2 authority
 ```
 
 Architecture 114 freezes the zero-argument production composition that consumes
-that already-finalized decision only after its execution session has completed.
+that finalized decision only after its execution session has completed.
 
 ## 8. Paper-v2 deployment
 
@@ -307,22 +299,6 @@ unattended decision namespace:
                       F:\AITradingBot\Paper-v2\runtime\unattended-decisions
 ```
 
-Architecture 113 and D7 source certification have accepted the decision
-qualification/publication/reconciliation source contract. Production D7 remains
-protected. Architecture 114 adds no new account/operation schema; it reuses the
-existing PD4-C/PD4-D/A67 settlement authority and freezes only the outer D8/D9
-composition.
-
-Retained failed v1 state:
-
-```text
-F:\AITradingBot\Paper                    ABSENT
-F:\AITradingBot\.Paper.provisioning-v1  PRESENT / RETAINED / UNTOUCHED
-```
-
-Never rerun the v1 publisher or delete/repair/rename/migrate/reuse the retained
-v1 staging tree as incidental cleanup.
-
 Published Paper-v2 account:
 
 ```text
@@ -330,36 +306,6 @@ paper_account_id:   9415cd7b-bf36-5fba-bd58-a0f99119dc21
 GENESIS checkpoint: 1832a2b5-8b63-501a-8f7d-f1722c32307b
 starting cash:      Decimal("25000")
 GENESIS as_of:      2026-08-29T09:46:43.769105+00:00
-```
-
-Frozen artifacts:
-
-```text
-GENESIS  SHA-256 d1a7ff14425c8a797a952860a1102489a4c81cac2a24a45bc3127eb8eb2e9548  length 533
-anchor   SHA-256 16c4dba01835c5bc2def91f0103ad79c3da0b5d18af72091b4fdd37fe4353c85  length 465
-manifest SHA-256 8fe1d705d59a79207ab6236af71becee0051042dc7b3ecaf23bb7f5531cb0029  length 532
-freeze Git blob b125cbb1c80a827f74018cf2955b9a27ba69fa90
-```
-
-## 9. Completed historical milestones
-
-### PD1 — Paper-v2 authority — COMPLETE
-
-Completion record:
-
-```text
-docs/validation/pd1-personal-desktop-paper-v2-completion.md
-```
-
-### PD2 — reliable supervised manual paper cycle — COMPLETE
-
-Completion records:
-
-```text
-docs/validation/pd2a-paper-account-runtime-mutex-completion.md
-docs/validation/pd2b-supervised-paper-composition-completion.md
-docs/validation/pd2c-supervised-paper-execution-boundary-completion.md
-docs/validation/pd2d2-first-real-paper-operation-completion.md
 ```
 
 First durable operation:
@@ -373,141 +319,56 @@ receipt_status:       COMPLETED
 receipt_outcome:      NO_ACTION
 ```
 
-Final PD2 certification:
+Retained failed v1 state:
 
 ```text
-5146 passed, 17 skipped in 1505.92s
-Ruff check PASS
-Ruff format --check PASS (457 files)
-git diff --check PASS
+F:\AITradingBot\Paper                    ABSENT
+F:\AITradingBot\.Paper.provisioning-v1  PRESENT / RETAINED / UNTOUCHED
 ```
 
-### PD3 — supervised crash/recovery validation — COMPLETE
+Never rerun the v1 publisher or delete/repair/rename/migrate/reuse the retained
+v1 staging tree as incidental cleanup.
 
-Architecture:
+## 9. Historical milestones
 
 ```text
-docs/architecture/109-personal-desktop-paper-receipt-recovery-authority.md
+PD1  Paper-v2 authority                              COMPLETE
+PD2  reliable supervised manual paper cycle         COMPLETE
+PD3  supervised crash/recovery validation           COMPLETE
+PD4  Architecture-110 source foundation             COMPLETE
 ```
 
-Completion record:
+Important certifications:
 
 ```text
-docs/validation/pd3-personal-desktop-receipt-recovery-completion.md
+PD2: 5146 passed, 17 skipped
+PD3: 5285 passed, 17 skipped
+PD4 Architecture-110:
+  HEAD 248cd8de6a3539aab21d5719d96cb7ff1aa0d14c
+  TREE 5e867f1bfc6d945ad67f6c56be252b534645aeb2
+  5588 passed, 17 skipped
 ```
 
-Final accepted PD3 source:
-
-```text
-commit e690ce83d6c53507d9e93dca97bcb79191c62a0b
-tree   522f41115d2079ae777f667a19e5179c1d492e1f
-```
-
-Final PD3 broad certification:
-
-```text
-5285 passed, 17 skipped in 1478.19s
-Ruff check PASS
-Ruff format --check PASS (467 files)
-git diff --check PASS
-worktree/index clean
-```
-
-Real-host acceptance under the intended non-admin Trading account passed with no
-real recovery mutation.
-
-### PD4 Architecture-110 source foundation — COMPLETE
-
-Architecture:
-
-```text
-docs/architecture/110-personal-desktop-unattended-paper-operation-authority.md
-```
-
-Validation/completion records:
-
-```text
-docs/validation/pd4-unattended-personal-desktop-paper-plan.md
-docs/validation/pd4-unattended-personal-desktop-paper-completion.md
-```
-
-Accepted source checkpoints:
-
-```text
-PD4-A    durable unattended invocation model and verification
-PD4-B    durable invocation storage/read/publication/provisioning boundaries
-PD4-C    read-only startup qualification under the same PD2A mutex
-PD4-D    unattended Paper-v2 execution composition with effects closed
-PD4-D-R1 explicit non-private shared composition interfaces
-PD4-E    zero-semantic-argument launcher + frozen scheduler contract
-PD4-F1   production read-only host-validation harness
-PD4-F2   final source certification
-PD4-F3   Trading-principal real-host read-only qualification
-```
-
-Final certified source:
-
-```text
-commit 248cd8de6a3539aab21d5719d96cb7ff1aa0d14c
-tree   5e867f1bfc6d945ad67f6c56be252b534645aeb2
-```
-
-Final broad certification:
-
-```text
-5588 passed, 17 skipped in 1519.25s (0:25:19)
-Ruff check PASS
-Ruff format --check PASS (486 files)
-git diff --check PASS
-git diff --cached --check PASS
-worktree/index clean
-local HEAD == origin feature HEAD
-```
-
-The historical completion record correctly says that Architecture 110 source
-completion alone did **not** authorize operational unattended deployment. Do not
-rewrite it to pretend later D5 deployment evidence existed at that time.
+Historical completion records remain historical; later extensions do not
+rewrite them.
 
 ## 10. Architecture 111 — unattended daily-cycle authority
 
-Architecture and validation plan:
+Frozen rules:
 
-```text
-docs/architecture/111-personal-desktop-unattended-daily-cycle-authority.md
-docs/validation/pd4-unattended-daily-cycle-plan.md
-```
-
-The frozen unattended cycle is two-phase:
-
-> A strategy decision targeting session `E` must be durably finalized strictly
-> before `regular_open(E)`. After `E` is complete, an independently selected C3
-> daily snapshot for `E` supplies the verified daily-bar open used to settle
-> that already-finalized decision; its verified close becomes the newest
-> strategy observation for the following decision.
-
-Important rules:
-
-- scheduler = untrusted wake only; no semantic trading arguments;
-- source-owned v1 XNYS regular open = 09:30 America/New_York;
-- selected-C3 session-indexed read authority; no filesystem/newest-file/caller
-  selection identity;
+- scheduler is an untrusted wake only;
+- XNYS regular open is 09:30 America/New_York;
+- selected-C3 session-indexed read authority is production market-data truth;
 - production rolling history must be C3-selected and consecutive;
 - MA short=3/long=5 requires six consecutive selected C3 sessions before the
   first fully C3-backed unattended decision;
 - the pre-open decision contains no execution-session open;
-- late wake at/after intended open cannot manufacture the missing decision;
+- late wake at/after intended open cannot manufacture a missing decision;
 - `MISSED_DECISION_DEADLINE` and `SESSION_GAP` fail closed;
 - no automatic multi-session catch-up;
 - market-data capture and decision publication use separate effect gates.
 
-## 11. Architecture 112 / D5 — capture-only warm-up
-
-Architecture and validation plan:
-
-```text
-docs/architecture/112-personal-desktop-capture-only-warmup-authority.md
-docs/validation/pd4-d5-capture-only-warmup-plan.md
-```
+## 11. Architecture 112 / D5 — capture-only warm-up ACTIVE at 3/6
 
 D5 uses a distinct zero-semantic-argument capture-only launcher. One wake:
 
@@ -521,231 +382,210 @@ requires all eight gates false
 ```
 
 G5 exceptions/ambiguous outcomes never trigger a second call in-process or a
-blind scheduler retry. D5 never opens the decision-publication or Paper-v2
-effect gates.
+blind scheduler retry. D5 never opens decision-publication or Paper-v2 effect
+gates.
 
-### D5-A — accepted task qualification
-
-Accepted predecessor XML:
+Accepted scheduler deployment evidence:
 
 ```text
+D2 predecessor XML SHA-256:
 da851985d9bfb04c65a83cb64b5441a2f7fd50391924a844749e365ee282d6ec
-```
 
-### D5-B — accepted action-only task mutation
-
-Accepted launcher action:
-
-```text
+D5 action:
 -I F:\AI\worktrees\ai-trading-bot-personal-desktop\scripts\run_personal_desktop_unattended_capture_warmup.py
-```
 
-Accepted post-mutation D5 task XML:
-
-```text
+D5 task XML SHA-256:
 8005373fad791c85776b4a35b662d46e06fec4ea40ac9ebfead9f413715da457
 ```
 
-### D5-C — first scheduled capture-only wake ACCEPTED
-
-Canonical evidence:
+First scheduled D5 capture for `2026-09-14`:
 
 ```text
-session:                2026-09-14
-terminal:               SUCCEEDED
-provider disposition:   CONFIRMED
 selection_id:           dea50bc9-95b4-5f63-ac40-a7353133be53
 attempt_id:             70f5f586-a05b-56c5-adde-bfa5d027864b
 snapshot_id:            b3737822-35ee-5238-a87f-401b4597df46
 artifact SHA-256:       db16bd7d6edda1709aeea64158f8751c02714ed45e9c6441935640e43ffa5487
 artifact identity SHA:  bfd131801558be6cbbed96b1e176c428b98df4e9c6dcccffb77c74acdc4870ba
-account predecessor:    ed4640e5-0630-525d-b916-d50e31e3ba2a
+terminal:               SUCCEEDED
+provider disposition:   CONFIRMED
 ```
 
-Last accepted authoritative strategy history:
+Natural September-16 scheduler wake captured `2026-09-15`:
 
 ```text
-2026-09-11
-2026-09-14
-selected_count = 2/6
+selection_id:           2e633276-abd1-55f0-94a5-f6cca5b56e5e
+session_id:             e0d23ea2-2efd-5f79-9ed3-a7d0298f18cc
+attempt_id:             3866c94b-5a38-5072-a1d4-eb72b4da6617
+terminal_id:            954a78f1-81ae-5e66-b61b-b8b7920da98c
+snapshot_id:            88edd831-0d70-5303-a3c6-b81184f1b0d9
+artifact SHA-256:       7b84b84dc36a239cabc651fe5aca8be9a4e1a73b6f1294e67c795fa114bf42bd
+artifact identity SHA:  ecb64c2aaa1ad469fc3cfa2fef12cd61063feef69352923ff91d8cea2721c161
+terminal:               SUCCEEDED
+provider disposition:   CONFIRMED
 ```
 
-Latest fresh read-only observation:
+Current authoritative history through completed session `2026-09-15`:
+
+```text
+required:
+2026-09-08
+2026-09-09
+2026-09-10
+2026-09-11
+2026-09-14
+2026-09-15
+
+selected:
+2026-09-11
+2026-09-14
+2026-09-15
+
+selected_count = 3/6
+classification = WARMING_UP
+```
+
+Current G6 read-only state:
 
 ```text
 completed session = 2026-09-15
-G6 = CAPTURE_REQUIRED
-market-data classification = CAPTURE_REQUIRED
+G6 = WARMING_UP
+market-data classification = NO_NEW_COMPLETED_SESSION
+selected snapshot = 88edd831-0d70-5303-a3c6-b81184f1b0d9
 real_effect_performed = false
 all eight gates false before and after
 ```
 
-This is an expected wait state. Do not manually start the scheduler, call G5,
-run the D5 warm-up launcher, or backfill `2026-09-15`.
-
-D5 itself is **not complete** until the required six-session suffix becomes
-ready. Expected terminal handoff is `G6 = DECISION_READY`; even then D5 performs
-no publication or Paper-v2 settlement.
-
-## 12. Architecture 113 / D6-D7 — decision publication source CERTIFIED
-
-Architecture and validation plan:
+Scheduler health observed read-only on September 16:
 
 ```text
-docs/architecture/113-personal-desktop-unattended-decision-publication-authority.md
-docs/validation/pd4-unattended-decision-publication-plan.md
+state = Ready
+last run = 2026-09-16 01:30:30
+last result = 0x00000000
+next run = 2026-09-17 01:30:30
+principal = Trading
+run level = Limited
+restart count = 0
 ```
 
-D6 source certification:
+Manual review of the selected C3 artifacts showed one raw SPY OHLCV bar per
+selected session plus provider/capture/integrity evidence. The read-only review
+performed no provider call and no database mutation.
+
+Do not manually start the scheduler, call G5, run the D5 warm-up launcher, or
+backfill missing older sessions. D5 becomes complete only when the rolling
+six-session selected suffix becomes ready naturally.
+
+## 12. Architecture 113 / D6-D7 — decision-publication source CERTIFIED
 
 ```text
-certified D6 source HEAD: fb00e9898c2e5cdd3db27cd91c393f5994c7cca9
-certified D6 source TREE: eef138bb3ed144d153ae60193aaacdcb7584c513
-6007 passed, 17 skipped in 1502.66s
-record: docs/validation/pd4-d6-unattended-decision-publication-source-certification.md
-```
+D6 HEAD fb00e9898c2e5cdd3db27cd91c393f5994c7cca9
+D6 TREE eef138bb3ed144d153ae60193aaacdcb7584c513
+6007 passed, 17 skipped
 
-D7-A accepted source:
-
-```text
-commit c72ca6c8665b62c0b8d4f735fc2261a513cb81d5
-tree   3b05c68ff1487a1c7d5984a200ee9f20d7b92fca
-910 focused tests passed
-production qualification NOT RUN
-```
-
-D7-D accepted source / consolidated D7 certified tree:
-
-```text
-commit 3dfa9e2cab372f8cb034b90256ed3fba9da6c878
-tree   bb1de2e7c2933ba3a777523f2a0e2feee5fa8c39
-593 D7-D focused tests passed
-6302 passed, 17 skipped in 1571.33s (0:26:11)
-Ruff check PASS
-Ruff format --check PASS (532 files)
-git diff --check PASS
-git diff --cached --check PASS
+D7 final source HEAD 3dfa9e2cab372f8cb034b90256ed3fba9da6c878
+D7 final source TREE bb1de2e7c2933ba3a777523f2a0e2feee5fa8c39
+6302 passed, 17 skipped in 1571.33s
 record: docs/validation/pd4-d7-read-only-source-certification.md
 ```
 
-D7 production state:
+Production D7 state:
 
 ```text
-D7-A real-host read-only qualification  NOT RUN / waiting for natural 6/6 READY
-D7-B provisioning                       PROTECTED / conditional only if missing
-D7-C first publication                  PROTECTED / UNAUTHORIZED
-D7-D production reconciliation          NOT RUN
+D7-A real-host qualification  NOT RUN / waiting for natural 6/6 READY
+D7-B provisioning             PROTECTED / conditional only if required
+D7-C first publication        PROTECTED / UNAUTHORIZED
+D7-D production reconciliation NOT RUN
 ```
 
 A G6 or D7-A result is diagnostic only and cannot be reused as D7-C publication
-authority. D7-C must independently rederive production truth.
+authority. D7-C independently rederives production truth.
 
-## 13. Current development checkpoint — Architecture 114 / D8-D9
+## 13. Architecture 114 / D8-D9 — source CERTIFIED
 
-Architecture and validation plan:
-
-```text
-docs/architecture/114-personal-desktop-unattended-paper-settlement-authority.md
-docs/validation/pd4-unattended-settlement-plan.md
-```
-
-Branch/worktree:
+D8-A/R1 accepted:
 
 ```text
-branch: feature/pd4-unattended-settlement
-base: 489b96a97d36fd28822142db9a69f0f0dd2d3d72
-worktree: F:\AI\worktrees\ai-trading-bot-unattended-settlement
+HEAD 170b50743458c8c973d472476b9e7abf140b6b1d
+TREE b2a202faf45bf61d5e3c1043c69a6cafcb00b6e3
+233 focused tests passed
+production qualification NOT RUN
 ```
 
-D8-A read-only settlement qualification source is **ACCEPTED**:
+D8-B/R1 accepted / effects closed:
 
 ```text
-initial D8-A commit dd57bbc5293a4422bfda902994507fcabcb487d3
-accepted D8-A/R1 commit 170b50743458c8c973d472476b9e7abf140b6b1d
-accepted D8-A/R1 tree   b2a202faf45bf61d5e3c1043c69a6cafcb00b6e3
-R1 focused verification 233 passed
-Ruff check / format-check PASS
-full repository suite NOT RUN (correct intermediate-checkpoint cadence)
-production D8-A invocation NOT RUN
+HEAD 260d80f60db9acfd352b1bc89ff963fc2a590a38
+TREE bc4fb96d2ecb30e607262de2c0b268510bd43835
+134 focused tests passed
+production settlement NOT RUN
 ```
 
-The accepted D8-A boundary independently discovers/replays the finalized
-decision targeting the current completed execution session, rereads current-C1
-selected C3 for the decision session and execution session, revalidates the
-persisted history-C3 evidence, derives `open(E)` only from selected C3(E), and
-reconstructs/replays the exact Architecture-94 final plan. It then uses the
-existing PD4-C read-only startup qualifier for predecessor-sensitive
-Paper-v2/A67/account inspection under the existing mutex rather than duplicating
-that authority.
-
-R1 preserves established PD3 terminal-missing-receipt semantics: recovery
-predecessor `P` and missing application must be exact, while the already
-validated current terminal checkpoint may be a distinct successor `Q`. The
-boundary therefore returns `RECEIPT_RECOVERY_REQUIRED` without opening receipt
-recovery authority. `real_effect_performed` remains structurally false.
-
-D8-B settlement-only production source is **ACCEPTED / EFFECTS CLOSED**:
+D9-A independent read-only reconciliation accepted:
 
 ```text
-initial D8-B commit f0541eab0a63575c661d79b990cc67c81375391f
-accepted D8-B/R1 commit 260d80f60db9acfd352b1bc89ff963fc2a590a38
-accepted D8-B/R1 tree   bc4fb96d2ecb30e607262de2c0b268510bd43835
-R1 focused verification 134 passed
-Ruff check / format-check PASS
-git diff --check / git diff --cached --check PASS
-full repository suite NOT RUN (correct intermediate-checkpoint cadence)
-production D8-B invocation NOT RUN
+HEAD 0df4ccb97a750e5727ef65dae7a365a3c7355254
+TREE f6c27fcff1a6cec839d8f6ec395d658dbbbbe36c
+422 focused tests passed
+production reconciliation NOT RUN
 ```
 
-The accepted D8-B boundary independently re-derives the current completed
-execution session, exact finalized decision, current-C1 C3 evidence, verified
-`open(E)`, and exact Architecture-94 plan rather than consuming D8-A output as
-authority. It reuses the existing PD4-D composition through an explicit
-verified-plan entry point, preserving the existing PD2A mutex, durable
-invocation publication, Architecture-67 operation execution, and final durable
-reconciliation.
-
-Committed source keeps the unattended-execution gate false. A future separately
-authorized D8-B invocation may temporarily open only that one process-local gate
-around at most one exact PD4-D call and restores it in `finally`; there is no
-same-invocation retry and no receipt recovery.
-
-D8-B R1 makes effect accounting conservative. Before the PD4-D effect boundary
-is entered, no-settlement, already-applied, recovery-required, blocked, and open-
-gate verification failure remain `real_effect_performed = false`. Once the open
-gate state is verified and the single PD4-D call is entered, returned
-convergence, publication-only/block, post-call identity failure, or exception is
-recorded as having crossed the D8-B effect boundary. That flag is diagnostic
-only and never grants retry or acceptance authority.
-
-Architecture 114 remains source-only and authorizes no real effect. Receipt
-recovery remains separate. D8 never opens receipt-recovery authority. If
-startup/reconciliation identifies a terminal missing receipt, the result is
-`RECEIPT_RECOVERY_REQUIRED` and the flow stops.
-
-Remaining frozen source sequence:
+D9-A independently reconstructs current settlement truth and classifies only:
 
 ```text
-D9-A  independent fresh-process all-gates-closed post-settlement reconciliation
-D9-B  one final broad source certification after D8/D9 source is feature-complete
+RECONCILED
+NOT_APPLIED
+RECEIPT_RECOVERY_REQUIRED
+BLOCKED
 ```
 
-Intermediate D8/D9 implementation checkpoints use focused tests only. The full
-repository suite is reserved for D9-B after ChatGPT declares the exact source
-tree final for the settlement milestone.
+It remains structurally read-only and does not import D8-A/D8-B authority as a
+shortcut.
 
-The protected future production sequence is:
+Final D8/D9 source certification:
+
+```text
+certified HEAD 0df4ccb97a750e5727ef65dae7a365a3c7355254
+certified TREE f6c27fcff1a6cec839d8f6ec395d658dbbbbe36c
+
+broad nonlegacy:         5709 passed
+Architecture-77 legacy:  758 passed
+combined:                6467 passed, 17 skipped
+failures/errors:         0
+
+Ruff check PASS
+Ruff format --check PASS (547 files)
+git diff --check PASS
+git diff --cached --check PASS
+```
+
+The initial monolithic D9-B run was environment-invalid only for the fixed
+Architecture-77 repo-local arbiter namespace because the settlement worktree's
+`.pytest_cache` was inaccessible to John. No source change was required. The
+accepted replacement certification used the clean integration harness for only
+the byte-identical legacy tests while proving all relevant imports came from the
+D9 source tree.
+
+Certification record:
+
+```text
+docs/validation/pd4-d9-settlement-source-certification.md
+```
+
+No real D8/D9 production invocation has occurred.
+
+Protected future production sequence:
 
 ```text
 accepted D7 publication + D7-D reconciliation
--> wait until intended execution session E completes
+-> intended execution session E completes
 -> exact selected C3(E)
--> D8-A fresh Trading read-only qualification
+-> fresh D8-A Trading read-only qualification
 -> explicit approval for one D8-B settlement invocation
--> D9-A fresh independent durable reconciliation
+-> fresh-process D9-A durable reconciliation
 ```
 
 A successful D8 return is not acceptance authority; D9 durable evidence is.
+Receipt recovery remains separate and closed.
 
 ## 14. Roadmap
 
@@ -758,15 +598,16 @@ PD4   unattended simulated-paper
   Architecture-110 source foundation                       COMPLETE
   Architecture-111 daily-cycle source/design               ACCEPTED
   D3/D4 first unattended C3 acceptance                     ACCEPTED
-  Architecture-112 / D5 capture-only warm-up               ACTIVE (2/6; current CAPTURE_REQUIRED for 2026-09-15)
+  Architecture-112 / D5 capture-only warm-up               ACTIVE (3/6; WARMING_UP)
   Architecture-113 / D6-D7 source                          CERTIFIED
-  D7-A production qualification                            WAITING FOR 6/6 READY
+  D7-A production qualification                            WAITING FOR NATURAL 6/6 READY
   D7-C first decision publication                          PROTECTED / UNAUTHORIZED
   Architecture-114 settlement contract                     ACCEPTED / SOURCE-ONLY
   D8-A settlement qualification source                     ACCEPTED
   D8-B settlement-only production source                   ACCEPTED / EFFECTS CLOSED
+  D9-A independent reconciliation source                   ACCEPTED
+  D9-B final D8/D9 source certification                    ACCEPTED
   D8-B first real unattended settlement                    FUTURE / PROTECTED
-  D9-A independent post-settlement reconciliation source   NEXT / READ-ONLY
   D10 bounded unattended simulated-paper soak              FUTURE / PROTECTED
   operational unattended simulated-paper acceptance         NOT YET COMPLETE
 PD5   broker-paper integration                              NOT STARTED
@@ -775,9 +616,16 @@ PD7   personal-desktop live-readiness                       NOT STARTED
 PD8   tiny restricted live -> gradual maturity              NOT STARTED
 ```
 
-Do not move to broker-paper merely because D5 market-data warm-up succeeds.
-The critical path is safe unattended data → safe unattended decision → safe
+Do not move to broker-paper merely because D5 market-data warm-up succeeds. The
+critical path remains safe unattended data → safe unattended decision → safe
 unattended Paper-v2 settlement → operational soak.
+
+Safe parallel development while D5 warms belongs on a separate branch/worktree,
+not the three operational/certified worktrees. A strong next source-only product
+milestone is a read-only operator-observability surface over existing authority:
+D5 warm-up/history, selected-market-data audit, effect-gate state, scheduler
+health, Paper-v2 account/lineage, and D7/D8/D9 readiness. Presentation/GUI code
+must never become alternate trading authority.
 
 ## 15. Effect gates and still-protected actions
 
@@ -794,9 +642,9 @@ PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_EXECUTION_EFFECTS_ENABLED             = Fal
 PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_STORAGE_PROVISIONING_EFFECTS_ENABLED  = False
 ```
 
-Architecture 112 permits the D5 runtime to open only the **process-local**
-market-data gate around exactly one G5 call. That does not authorize ad hoc
-manual provider calls or retries.
+Architecture 112 permits D5 to open only the process-local market-data gate
+around exactly one G5 call. That does not authorize ad hoc manual provider calls
+or retries.
 
 Still protected/not authorized outside exact reviewed checkpoints:
 
@@ -821,41 +669,40 @@ merge/rebase/force-push/amend/PR metadata changes without explicit approval
 ## 16. Resume procedure
 
 1. Read `AGENTS.md`, `docs/PROJECT_STATUS.md`, this handoff,
-   `docs/AI_DEVELOPMENT_WORKFLOW.md`, Architectures 110–114, the PD4 source-
-   foundation completion, the Architecture-111 daily-cycle plan, the D5 plan,
-   the D7 source-certification record, and the Architecture-114 settlement plan
-   before new implementation.
+   `docs/AI_DEVELOPMENT_WORKFLOW.md`, Architectures 110–114, the PD4
+   source-foundation completion, the Architecture-111 daily-cycle plan, the D5
+   plan, D7 certification record, Architecture-114 settlement plan, and D9
+   certification record before new implementation.
 2. Prove exact worktree/branch/HEAD/tree/origin/clean state before edits or
    operator work. Never self-correct a mismatch.
-3. Treat PD1, PD2, PD3, Architecture-110 source foundation, Architectures 111–114,
-   D3/D4, D5-A/B/C, D7 source certification, D8-A/R1, and D8-B/R1 as
-   established predecessors.
-4. Preserve the armed D5 branch at accepted source HEAD/tree while its scheduler
-   accumulates warm-up sessions. Do not use that worktree for settlement source.
-5. Preserve the dedicated non-admin Trading principal, C1/P2 authority, PD2A
-   mutex, Architecture-67 durability/idempotency, and PD3 recovery rules.
-6. Remember the last accepted D5 history is 2/6; the latest read-only observation
-   for completed session `2026-09-15` is `CAPTURE_REQUIRED`. There is no authority
-   to manually capture/backfill that session.
-7. Treat D7 consolidated source
-   `3dfa9e2cab372f8cb034b90256ed3fba9da6c878` /
-   `bb1de2e7c2933ba3a777523f2a0e2feee5fa8c39` as certified. Wait for natural
-   6/6 READY before any protected D7 production qualification/publication.
-8. Continue Architecture-114 work on `feature/pd4-unattended-settlement`.
-   D8-A/R1 and D8-B/R1 are accepted; the next source checkpoint is D9-A
-   independent all-gates-closed post-settlement reconciliation.
-9. Use Sol High for D8/D9 implementation because it composes Windows security,
-   authority, account ordering, A67 durability, and crash/recovery-sensitive
-   boundaries. ChatGPT retains exact diff and acceptance authority.
-10. Use focused tests for intermediate D8/D9 implementation checkpoints. Run one
-    full repository suite only when the final D8/D9 source tree is ready for
-    D9-B certification.
+3. Treat PD1, PD2, PD3, Architecture-110 source foundation, Architectures
+   111–114, D3/D4, D5-A/B/C, D7 source certification, D8-A/R1, D8-B/R1, D9-A,
+   and D9-B source certification as established predecessors.
+4. Preserve armed D5 source `8c2af580... / f0591e96...` while natural captures
+   accumulate. Current accepted history is **3/6**, selected sessions
+   `2026-09-11`, `2026-09-14`, and `2026-09-15`, classification `WARMING_UP`.
+5. Do not manually capture/backfill/start the scheduler. The latest read-only
+   scheduler evidence is healthy and the next normal wake follows the frozen
+   01:30 Pacific schedule.
+6. Preserve D7 certified source `3dfa9e2... / bb1de2e...`; wait for natural 6/6
+   READY before protected D7 production qualification/publication.
+7. Preserve D8/D9 certified source `0df4ccb... / f6c27fc...`. Docs-only branch
+   tips after it do not change the source certification.
+8. Do not run D8 production merely because source is certified. It requires an
+   accepted D7 publication, completed intended execution session, exact selected
+   C3(E), fresh D8-A, explicit approval for one D8-B effect, and fresh D9-A.
+9. D10 operational soak remains future until the first unattended settlement
+   sequence has actually been accepted.
+10. Use a separate branch/worktree for safe parallel product work such as
+    read-only operator observability; do not repurpose D5/D7/D8-D9 operational
+    worktrees.
 11. Stop before any real decision-publication, storage-provisioning, Paper-v2,
     recovery, scheduler, broker, or live effect unless explicitly authorized.
-12. After each accepted checkpoint, update/review this handoff and
-    `docs/PROJECT_STATUS.md` before treating the checkpoint as closed.
-13. Always include and, when safe, automatically begin the next recommended
-    milestone/step after milestone and verification reports.
+12. After each accepted checkpoint, review/update this handoff,
+    `docs/PROJECT_STATUS.md`, and relevant validation/architecture records before
+    treating the checkpoint as closed.
+13. Always include the next recommended milestone/step in milestone and
+    verification reports.
 
 ## 17. Definition of project success
 

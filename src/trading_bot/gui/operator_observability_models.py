@@ -41,12 +41,20 @@ class SelectedC3WarmupSessionView:
             or self.symbol != self.symbol.strip()
             or len(self.symbol) > MAX_OPERATOR_SYMBOL_CHARACTERS
             or any(
-                not (character.isupper() or character.isdigit() or character in ".-")
+                not (
+                    "A" <= character <= "Z"
+                    or "0" <= character <= "9"
+                    or character in ".-"
+                )
                 for character in self.symbol
             )
         ):
             raise ValueError("symbol must be canonical presentation text")
-        if type(self.close) is not Decimal or not self.close.is_finite() or self.close <= 0:
+        if (
+            type(self.close) is not Decimal
+            or not self.close.is_finite()
+            or self.close <= 0
+        ):
             raise ValueError("close must be a positive finite Decimal")
         if type(self.snapshot_id) is not UUID:
             raise TypeError("snapshot_id must be a UUID")
@@ -125,7 +133,10 @@ class OperatorWarmupView:
     def __post_init__(self) -> None:
         if type(self.classification) is not OperatorWarmupClassification:
             raise TypeError("classification must be an OperatorWarmupClassification")
-        if type(self.target_count) is not int or self.target_count != OPERATOR_WARMUP_TARGET_COUNT:
+        if (
+            type(self.target_count) is not int
+            or self.target_count != OPERATOR_WARMUP_TARGET_COUNT
+        ):
             raise ValueError("target_count must equal the frozen six-session target")
 
         try:

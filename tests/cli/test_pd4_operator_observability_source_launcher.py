@@ -19,9 +19,7 @@ def test_operator_snapshot_launcher_is_checkout_and_cwd_independent(
     alternate_cli.mkdir(parents=True)
     (alternate_root / "trading_bot" / "__init__.py").write_text("")
     (alternate_cli / "__init__.py").write_text("")
-    (
-        alternate_cli / "pd4_operator_observability_snapshot.py"
-    ).write_text(
+    (alternate_cli / "pd4_operator_observability_snapshot.py").write_text(
         "def main(argv=None):\n"
         "    print('alternate operator package selected')\n"
         "    return 73\n"
@@ -32,9 +30,7 @@ def test_operator_snapshot_launcher_is_checkout_and_cwd_independent(
     environment = os.environ.copy()
     environment["PYTHONPATH"] = str(alternate_root)
     script = (
-        _ROOT
-        / "scripts"
-        / "run_personal_desktop_operator_observability_snapshot.py"
+        _ROOT / "scripts" / "run_personal_desktop_operator_observability_snapshot.py"
     )
     expected = "Read one effects-closed PD4 operator observability snapshot."
 
@@ -63,9 +59,7 @@ def test_operator_snapshot_launcher_has_no_direct_effect_root() -> None:
         / "trading_bot"
         / "cli"
         / "pd4_operator_observability_snapshot.py",
-        _ROOT
-        / "scripts"
-        / "run_personal_desktop_operator_observability_snapshot.py",
+        _ROOT / "scripts" / "run_personal_desktop_operator_observability_snapshot.py",
     )
     forbidden_calls = {
         "run_personal_desktop_unattended_market_data_capture",

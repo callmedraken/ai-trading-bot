@@ -42,9 +42,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     return _SanitizedArgumentParser(
         prog="run_personal_desktop_operator_observability_snapshot",
-        description=(
-            "Read one effects-closed PD4 operator observability snapshot."
-        ),
+        description=("Read one effects-closed PD4 operator observability snapshot."),
         allow_abbrev=False,
     )
 

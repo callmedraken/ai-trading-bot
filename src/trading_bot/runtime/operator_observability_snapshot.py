@@ -69,9 +69,7 @@ class OperatorPaperPositionView:
             or not self.symbol
             or self.symbol != str(Symbol(self.symbol))
         ):
-            raise OperatorObservabilitySnapshotError(
-                "paper position symbol is invalid"
-            )
+            raise OperatorObservabilitySnapshotError("paper position symbol is invalid")
         for name in ("quantity", "total_cost_basis", "average_cost"):
             value = getattr(self, name)
             if type(value) is not Decimal or not value.is_finite() or value <= 0:
@@ -113,9 +111,7 @@ class OperatorPaperAccountView:
             type(self.realized_profit_loss) is not Decimal
             or not self.realized_profit_loss.is_finite()
         ):
-            raise OperatorObservabilitySnapshotError(
-                "account realized P&L is invalid"
-            )
+            raise OperatorObservabilitySnapshotError("account realized P&L is invalid")
         positions = tuple(self.positions)
         if any(type(item) is not OperatorPaperPositionView for item in positions):
             raise OperatorObservabilitySnapshotError("account positions are invalid")
@@ -128,9 +124,7 @@ class OperatorPaperAccountView:
                 "account lineage edge count is invalid"
             )
         if type(self.receipt_count) is not int or self.receipt_count < 0:
-            raise OperatorObservabilitySnapshotError(
-                "account receipt count is invalid"
-            )
+            raise OperatorObservabilitySnapshotError("account receipt count is invalid")
         object.__setattr__(self, "positions", positions)
 
 
@@ -154,9 +148,7 @@ class OperatorObservabilitySnapshotResult:
             type(self.cycle_classification)
             is not PersonalDesktopUnattendedDailyCycleClassification
         ):
-            raise OperatorObservabilitySnapshotError(
-                "cycle classification is invalid"
-            )
+            raise OperatorObservabilitySnapshotError("cycle classification is invalid")
         if (
             self.completed_session is not None
             and type(self.completed_session) is not TradingSession
@@ -174,9 +166,7 @@ class OperatorObservabilitySnapshotResult:
             self.selected_snapshot_id is not None
             and type(self.selected_snapshot_id) is not UUID
         ):
-            raise OperatorObservabilitySnapshotError(
-                "selected snapshot ID is invalid"
-            )
+            raise OperatorObservabilitySnapshotError("selected snapshot ID is invalid")
         if self.warmup is not None and type(self.warmup) is not OperatorWarmupView:
             raise OperatorObservabilitySnapshotError("warm-up view is invalid")
         if type(self.account) is not OperatorPaperAccountView:
@@ -266,9 +256,7 @@ def _read_snapshot(
 
     after = adapt_effect_gate_state(dependencies.gate_state())
     if not after.all_closed or after != before:
-        raise OperatorObservabilitySnapshotError(
-            "effect-gate state changed during O2"
-        )
+        raise OperatorObservabilitySnapshotError("effect-gate state changed during O2")
 
     return OperatorObservabilitySnapshotResult(
         cycle_classification=cycle.classification,

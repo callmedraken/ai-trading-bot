@@ -110,9 +110,7 @@ def test_main_attention_classification_exits_nonzero(
     monkeypatch.setattr(
         cli_module,
         "read_personal_desktop_operator_observability_snapshot",
-        lambda: _result(
-            PersonalDesktopUnattendedDailyCycleClassification.SESSION_GAP
-        ),
+        lambda: _result(PersonalDesktopUnattendedDailyCycleClassification.SESSION_GAP),
     )
 
     assert main([]) == 6

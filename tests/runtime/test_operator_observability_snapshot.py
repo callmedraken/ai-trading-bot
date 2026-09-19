@@ -72,14 +72,10 @@ def _cycle(
         classification=classification,
         completed_session=TradingSession(date(2026, 9, 18)),
         selected_snapshot_id=(
-            UUID("22222222-2222-4222-8222-222222222222")
-            if selected
-            else None
+            UUID("22222222-2222-4222-8222-222222222222") if selected else None
         ),
         market_data_classification=(
-            _Capture.NO_NEW_COMPLETED_SESSION
-            if selected
-            else _Capture.CAPTURE_REQUIRED
+            _Capture.NO_NEW_COMPLETED_SESSION if selected else _Capture.CAPTURE_REQUIRED
         ),
     )
 
@@ -143,9 +139,7 @@ def test_selected_cycle_includes_adapted_warmup(
     )
     warmup = OperatorWarmupView(
         classification=OperatorWarmupClassification.WARMING_UP,
-        required_sessions=tuple(
-            date(2026, 9, day) for day in (11, 14, 15, 16, 17, 18)
-        ),
+        required_sessions=tuple(date(2026, 9, day) for day in (11, 14, 15, 16, 17, 18)),
         selected_sessions=(),
     )
     sentinel = object()
@@ -163,9 +157,7 @@ def test_selected_cycle_includes_adapted_warmup(
         _dependencies(cycle, window=sentinel)
     )
 
-    assert result.selected_snapshot_id == UUID(
-        "22222222-2222-4222-8222-222222222222"
-    )
+    assert result.selected_snapshot_id == UUID("22222222-2222-4222-8222-222222222222")
     assert result.warmup is warmup
     assert result.gates.all_closed is True
 

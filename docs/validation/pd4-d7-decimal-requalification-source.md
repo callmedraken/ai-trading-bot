@@ -388,3 +388,46 @@ Next safe step: rerun zero-argument D7-A read-only from the same exact certified
 source. If it reports ALREADY_FINALIZED / FINALIZED_IDENTICAL for the accepted
 candidate, treat that as independent durable publication evidence while
 continuing D7-D diagnosis. No republish or D8 action is authorized.
+
+
+## Durable post-publication proof and D7-D admission root cause
+
+A fresh zero-argument D7-A read-only qualification after the successful D7-C
+publication returned:
+
+```text
+classification:                    ALREADY_FINALIZED
+candidate_decision_id:             f2188b5e-e6a4-5398-be41-8867d9268355
+storage_classification:            FINALIZED_IDENTICAL
+completed_session:                 2026-09-18
+selected_history_count:            6
+required_history_count:            6
+selected_snapshot_id:              680b260f-08c9-5923-87bb-b5f0a4701380
+intended_execution_session:        2026-09-21
+account_predecessor_checkpoint_id: ed4640e5-0630-525d-b916-d50e31e3ba2a
+namespace_classification:          PRESENT_VALID
+deadline_open:                     true
+all_eight_gates_closed:            true
+real_effect_performed:             false
+```
+
+The D7-A CLI maps `ALREADY_FINALIZED` to exit code 0. This independently
+proves the published D7 decision is durably present and byte/identity exact.
+No republish is permitted.
+
+Source review then identified the D7-D early-block root cause. Production
+`read_personal_desktop_paper_account()` returns a
+`ValidatedPersonalDesktopPaperAccount` process-local capability, while
+`require_validated_personal_desktop_paper_account()` returns immutable read
+evidence. D7-D currently overwrites the pre-lock capability with that evidence
+and passes the evidence to `supervised_paper_cycle_admission()`. The admission
+boundary explicitly requires the genuine validated capability, so D7-D fails
+at mutex admission before its first diagnostic evidence commit. D7-A correctly
+retains the original pre-lock capability for admission and uses the required
+evidence only for comparison.
+
+Required correction: retain the pre-lock account capability separately, derive
+evidence from it for identity/predecessor comparison, and pass the original
+capability into admission. Do not weaken account provenance or mutex admission.
+D8 remains blocked until corrected D7-D independently reconciles the finalized
+decision.

@@ -4,6 +4,43 @@ This is the canonical high-level project status for AI Trading Bot. Detailed
 subsystem contracts live under `docs/architecture/` and `docs/validation/`;
 `docs/AI_TRADING_BOT_HANDOFF.md` is the canonical cross-chat resume document.
 
+## D5 warm-up — 6/6 READY
+
+Read-only Trading-principal evidence on 2026-09-19 established the exact current
+six-session selected-C3 window:
+
+```text
+classification: READY
+required:
+  2026-09-11
+  2026-09-14
+  2026-09-15
+  2026-09-16
+  2026-09-17
+  2026-09-18
+
+selected:
+  2026-09-11
+  2026-09-14
+  2026-09-15
+  2026-09-16
+  2026-09-17
+  2026-09-18
+
+selected_count: 6
+target_count:   6
+current session: 2026-09-18
+current snapshot: 680b260f-08c9-5923-87bb-b5f0a4701380
+```
+
+All eight effect gates remained false. G5 reported
+`NO_NEW_COMPLETED_SESSION`, confirming the Sep 18 C3 snapshot is already
+durably selected. Do not backfill or force another capture.
+
+The production critical path has therefore moved from waiting for D5 history to
+repairing the read-only historical Paper-v2 configuration reconstruction
+blocker before D7-A.
+
 ## Product objective and deployment profile
 
 Build a conservative automated trading platform for a **closed, single-owner

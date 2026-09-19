@@ -15,8 +15,17 @@ protected and unauthorized; D8-B remains protected/not run. All eight gates
 remain committed false. Earlier checkpoint descriptions below are historical
 where superseded by this current state.
 
-Next safe work: bounded observability/strategy parity review and integration
-preparation. No production work is authorized.
+Bounded review found an inherited ambient-Decimal dependency in averages and
+proposal-ID normalization. Identical inputs produced different IDs at different
+precisions, including in pre-O4 source. Implementation stopped at the production
+identity contract boundary; no source/test change was made. See the
+[review escalation](validation/pd4-operator-observability-o4-review-escalation.md).
+Fresh focused verification: 69 passed; Ruff check/format PASS (14 files).
+
+Next safe milestone: Sol High review of the Decimal/identity compatibility
+contract, then resume unfinished observability hardening/integration preparation.
+No production work is authorized. O4 historical acceptance does not certify
+ambient-context independence or combined-tree integration readiness.
 
 This is the canonical high-level project status for AI Trading Bot. Detailed
 subsystem contracts live under `docs/architecture/` and `docs/validation/`;

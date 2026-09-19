@@ -210,6 +210,15 @@ For incomplete history it reports why no production-ready strategy decision can
 be formed. For complete history it displays the exact deterministic inputs and
 result while remaining explicitly non-authoritative for D7 publication.
 
+## Follow-up review escalation — 2026-09-19
+
+O4 historical source acceptance is recorded above. Follow-up implementation is
+stopped for Sol High review of inherited ambient Decimal arithmetic and
+proposal-ID normalization. See
+[reproduction and remaining phases](pd4-operator-observability-o4-review-escalation.md).
+69 focused tests passed; this does not resolve the identity compatibility issue.
+No source, gate, production composition or operational worktree was changed.
+
 ## Verification cadence
 
 Each O1–O4 checkpoint uses focused tests and Ruff/format/diff checks only.

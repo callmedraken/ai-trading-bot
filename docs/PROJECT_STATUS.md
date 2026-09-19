@@ -728,3 +728,24 @@ The Decimal determinism correction therefore preserved the real D7 candidate
 identity for this cycle. D7-B remains unnecessary. D7-C is now the next
 protected production checkpoint and remains explicitly unauthorized pending
 separate operator approval.
+
+
+## D7-C first attempt — BLOCKED / NO EFFECT
+
+The explicitly approved D7-C first-publication invocation failed closed before
+a decision binding or publication writer was established:
+
+```text
+classification:        BLOCKED
+decision_id:           null
+real_effect_performed: false
+exit code:              6
+```
+
+The immediately preceding D7-A preflight was READY with the accepted candidate.
+Source review isolates a selected-C3 reader-lifetime defect in the shared
+production history composition. No retry occurred and D7-D was not run.
+
+Current checkpoint: repair the shared reader/provenance lifetime contract,
+recertify source, and rerun read-only D7-A. D7-C is again unauthorized pending a
+separate approval after those gates.

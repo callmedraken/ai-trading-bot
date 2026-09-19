@@ -821,3 +821,25 @@ worktree at exact certified source commit
 frozen SHA-256, and raw worktree blob == HEAD blob before running the existing
 zero-argument D7-A launcher under non-admin Trading. D7-B remains a separate
 protected Administrator provisioning effect if D7-A reports NAMESPACE_MISSING.
+
+
+## Operator observability O3 milestone
+
+O3 native Operations GUI is accepted at exact source
+`fd504503d1fb468c0a2791e00d296da983afeb5a` /
+`bb2a19189dc72a939456653db2cbd745fa237822`.
+
+Verification:
+
+```text
+focused pytest: 71 passed in 6.00s
+Ruff check: PASS
+Ruff format --check: 15 files already formatted
+diff checks: PASS
+worktree: clean
+```
+
+The Operations page remains presentation-only and contains no production effect
+controls. The next safe observability checkpoint is O4 deterministic MA3/MA5
+strategy explanation from verified selected-C3 history. D7-C remains protected
+and requires explicit operator approval independently of O4.

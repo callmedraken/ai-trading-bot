@@ -39,12 +39,26 @@ worktree CLEAN
 O1 contains only Qt-free immutable presentation models/adapters and focused
 tests. It performs no production I/O and changes no authority or effect gate.
 
-O2 is active next: build one zero-semantic-argument source-checkout operator
-snapshot command for genuine non-admin `Trading`. It may validate/read C1,
-effects-closed G6 status, selected C3/history, Paper-v2 account/operation state,
-and all eight gate states. It must not call any effectful boundary, alter Task
-Scheduler, publish D7, settle D8, recover receipts, provision storage, or submit
-broker/live orders.
+O2 source is accepted:
+
+```text
+HEAD  70672c65c7ecf0923516da7c2b57934dc950dbc8
+TREE  762dc13000f435c58f31c9750c0cd22aac582840
+32 focused O1+O2 tests passed
+Ruff check/format PASS
+diff checks PASS
+worktree CLEAN
+```
+
+O2 provides one zero-semantic-argument source-checkout operator snapshot command
+for genuine non-admin `Trading`. It validates/reads C1, effects-closed G6
+status, selected C3/history, Paper-v2 account/operation state, and all eight gate
+states. It does not call an effectful boundary, alter Task Scheduler, publish
+D7, settle D8, recover receipts, provision storage, or submit broker/live
+orders.
+
+Next checkpoint: run the accepted O2 command once under the real Trading
+principal and preserve its sanitized JSON evidence.
 
 The observability branch remains separate while the protected natural D5 -> D7
 -> D8/D9 production sequence is validated. After the first accepted unattended

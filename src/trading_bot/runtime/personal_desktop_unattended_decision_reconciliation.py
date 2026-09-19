@@ -245,7 +245,8 @@ def _run(
         token = _token(d)
         c1 = d.validate_c1(d.acquire_c1())
         historical = d.historical_configurations(c1)
-        prelock = d.require_account(d.read_account(c1, historical))
+        prelock_authority = d.read_account(c1, historical)
+        prelock = d.require_account(prelock_authority)
         prelock_anchor = prelock.anchor
         prelock_predecessor = prelock.prior_checkpoint.checkpoint_id
         if (
@@ -253,7 +254,7 @@ def _run(
             != PERSONAL_DESKTOP_FIRST_PAPER_OPERATION_PROFILE.paper_account_id
         ):
             raise ValueError("D7-D requires the exact Paper-v2 account")
-        with d.admission(prelock):
+        with d.admission(prelock_authority):
             _require_gates(d)
             if d.validate_c1(c1) != c1 or _token(d) != token:
                 raise ValueError("D7-D authority/token changed after locking")

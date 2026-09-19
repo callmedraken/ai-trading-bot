@@ -431,3 +431,62 @@ evidence from it for identity/predecessor comparison, and pass the original
 capability into admission. Do not weaken account provenance or mutex admission.
 D8 remains blocked until corrected D7-D independently reconciles the finalized
 decision.
+
+
+## D7-D account-admission capability/evidence source correction — PENDING REVIEW
+
+The D7-D admission correction was prepared on the isolated branch
+`feature/pd4-d7d-admission-fix` from the exact post-publication evidence base:
+
+```text
+base HEAD: dffd701f40b748eae99c7d7e217f5083f7966f4a
+base TREE: 3964371289ad30c8e4967675e96b4acc214ecb87
+```
+
+The defect was an ordering error at the existing account/mutex boundary. D7-D
+converted the genuine process-local `ValidatedPersonalDesktopPaperAccount`
+capability into immutable `PersonalDesktopPaperAccountReadEvidence`, then passed
+that evidence to `supervised_paper_cycle_admission`. The admission boundary
+correctly rejected it because only a registered account capability may derive
+the PD2A mutex.
+
+The correction retains the exact pre-lock capability separately, derives
+immutable evidence from it for account-ID and predecessor comparison, and
+passes only the original capability to the unchanged admission boundary. Every
+post-lock and final account read is still independently performed and required,
+and the pre-lock-to-post-lock predecessor comparison remains fail-closed. No
+account validator, mutex authority, Trading-token check, C1 check, selected-C3
+proof, namespace/storage/discovery proof, or effect gate was weakened.
+
+The disposable D7-D regression seam now mirrors production roles:
+
+- each account read returns a fresh opaque capability;
+- only a registered disposable capability can produce its distinct evidence;
+- admission accepts only the exact pre-lock capability and rejects evidence;
+- three independent evidence reads remain ordered around the mutex;
+- account-identity and predecessor drift still block;
+- unregistered capability provenance blocks before mutex admission.
+
+The corrected success test reaches `RECONCILED` with distinct capability and
+evidence objects. The old source would pass the pre-lock evidence to admission
+and return `BLOCKED`, so this test directly regresses the production failure.
+
+Focused verification completed without any production invocation:
+
+```text
+D7-D reconciliation module: 123 passed
+requested account/mutex/D7-A/D7-C/D7-D/storage/C3/CLI set: 521 passed
+Ruff check: PASS
+Ruff format --check: PASS
+git diff --check: PASS
+git diff --cached --check: PASS (clean index)
+```
+
+No D7-A, D7-C, D7-D production run, D8 run, publication, Paper-v2 mutation,
+recovery, provisioning, scheduler, provider, credential, broker, or live effect
+was performed. All eight committed effect gates remain false. The finalized
+decision is untouched and must not be republished.
+
+Next checkpoint: ChatGPT exact-diff review, followed by replacement full source
+certification. Only after those pass may a separately authorized read-only D7-D
+production rerun be considered. D8 remains blocked.

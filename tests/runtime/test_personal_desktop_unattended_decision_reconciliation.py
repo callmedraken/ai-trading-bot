@@ -6,6 +6,7 @@ import ast
 import copy
 import ctypes
 import inspect
+from contextlib import contextmanager
 from dataclasses import fields, replace
 from datetime import timedelta
 from types import SimpleNamespace
@@ -72,11 +73,66 @@ def prohibit_production_and_effects(monkeypatch):
 class Harness(D7AHarness):
     def __init__(self, monkeypatch):
         super().__init__(monkeypatch)
+        self.account_authorities = []
+        self.account_evidence = {}
+        self.account_evidence_reads = []
+        self.admission_authority = None
+        self.account_identity_drift_at = None
         self.storage_state = d7d.Storage.FINALIZED_IDENTICAL
         self.discovery_state = d7d.Discovery.FINALIZED
         self.discovered_binding = self.binding
         self.discovery_reads = []
         self.discovery_proof_failure = False
+
+    def read_account(self, c1, historical):
+        assert c1 is self.authority
+        assert historical == (b"retained-configuration",)
+        self.account_reads += 1
+        assert self.held is (self.account_reads != 1)
+        self.events.append(f"account:{self.account_reads}")
+        evidence = copy.deepcopy(self.account)
+        if self.drift_at == self.account_reads:
+            evidence.prior_checkpoint = SimpleNamespace(checkpoint_id=UUID(int=1))
+        if self.account_identity_drift_at == self.account_reads:
+            evidence.anchor = SimpleNamespace(paper_account_id="different")
+        authority = object()
+        self.account_authorities.append(authority)
+        self.account_evidence[authority] = evidence
+        return authority
+
+    def require_account(self, authority):
+        if authority not in self.account_evidence:
+            raise ValueError("account capability lacks disposable provenance")
+        evidence = self.account_evidence[authority]
+        self.account_evidence_reads.append(evidence)
+        return evidence
+
+    @contextmanager
+    def admission(self, authority):
+        if not self.account_authorities or authority is not self.account_authorities[0]:
+            raise ValueError("admission requires the genuine pre-lock capability")
+        self.admission_authority = authority
+        assert self.account_reads == 1
+        self.events.append("lock")
+        self.held = True
+        try:
+            yield
+        finally:
+            self.events.append("release")
+            self.held = False
+
+    def build_decision(
+        self, authority, selected, history, account, planning, config, policies
+    ):
+        assert self.held and authority is self.authority
+        assert selected is self.current and history is self.history
+        assert account is self.account_evidence_reads[1]
+        assert account == self.account
+        assert planning == self.current.selected.verification.snapshot.audit.captured_at
+        assert config == daily.personal_desktop_unattended_strategy_config()
+        assert policies == daily.personal_desktop_unattended_paper_policies()
+        self.events.append("decision")
+        return self.binding
 
     def discover_finalized(self, c1, execution):
         assert self.held and c1 is self.authority
@@ -114,7 +170,7 @@ class Harness(D7AHarness):
             now=self.now,
             historical_configurations=lambda c1: (b"retained-configuration",),
             read_account=self.read_account,
-            require_account=lambda account: account,
+            require_account=self.require_account,
             admission=self.admission,
             read_selected=self.read_selected,
             require_selected=self.require_selected,
@@ -149,7 +205,9 @@ def harness(monkeypatch):
     return Harness(monkeypatch)
 
 
-def test_exact_finalized_decision_reconciles_under_mutex(harness):
+def test_exact_finalized_decision_reconciles_with_distinct_capability_and_evidence(
+    harness,
+):
     result = harness.run()
     assert result.classification is Status.RECONCILED
     assert result.expected_decision_id == harness.binding.decision.decision_id
@@ -162,6 +220,20 @@ def test_exact_finalized_decision_reconciles_under_mutex(harness):
     assert harness.account_reads == 3
     assert harness.token_reads == 3
     assert harness.namespace_reads == 2
+    assert result.account_predecessor_checkpoint_id == (
+        harness.account.prior_checkpoint.checkpoint_id
+    )
+    assert harness.admission_authority is harness.account_authorities[0]
+    assert len({id(value) for value in harness.account_authorities}) == 3
+    assert len({id(value) for value in harness.account_evidence_reads}) == 3
+    assert all(
+        authority is not evidence
+        for authority, evidence in zip(
+            harness.account_authorities,
+            harness.account_evidence_reads,
+            strict=True,
+        )
+    )
     assert (
         harness.events.index("account:1")
         < harness.events.index("lock")
@@ -308,18 +380,8 @@ def test_deadline_state_never_invalidates_exact_finalized_reconciliation(
 
 @pytest.mark.parametrize("read", [1, 2, 3])
 def test_account_identity_mismatch_blocks(harness, read):
-    original = harness.read_account
-
-    def changed(c1, historical):
-        account = original(c1, historical)
-        if harness.account_reads == read:
-            return SimpleNamespace(
-                anchor=SimpleNamespace(paper_account_id="different"),
-                prior_checkpoint=account.prior_checkpoint,
-            )
-        return account
-
-    assert harness.run(read_account=changed).classification is Status.BLOCKED
+    harness.account_identity_drift_at = read
+    assert harness.run().classification is Status.BLOCKED
 
 
 @pytest.mark.parametrize("read", [2, 3])
@@ -329,24 +391,22 @@ def test_predecessor_drift_blocks_under_mutex(harness, read):
 
 
 def test_prelock_to_postlock_predecessor_drift_blocks(harness):
-    original = harness.read_account
+    harness.drift_at = 1
+    assert harness.run().classification is Status.BLOCKED
+    assert "lock" in harness.events and "account:2" in harness.events
 
-    def changed(c1, historical):
-        account = original(c1, historical)
-        if harness.account_reads == 1:
-            return SimpleNamespace(
-                anchor=account.anchor,
-                prior_checkpoint=SimpleNamespace(checkpoint_id=UUID(int=1)),
-            )
-        return account
 
-    def admission(prelock):
-        return harness.admission(harness.account)
+def test_account_read_evidence_is_not_a_mutex_admission_capability(harness):
+    with pytest.raises(ValueError, match="genuine pre-lock capability"):
+        with harness.admission(harness.account):
+            pytest.fail("read evidence entered the mutex scope")
+    assert not harness.held and "lock" not in harness.events
 
-    assert (
-        harness.run(read_account=changed, admission=admission).classification
-        is Status.BLOCKED
-    )
+
+def test_unregistered_account_capability_blocks_before_mutex(harness):
+    result = harness.run(read_account=lambda c1, historical: object())
+    assert result.classification is Status.BLOCKED
+    assert harness.account_reads == 0 and "lock" not in harness.events
 
 
 @pytest.mark.parametrize("point", [1, 2, 3])
@@ -542,6 +602,10 @@ def test_production_dependency_wiring_is_read_only(monkeypatch):
     )
     dependencies = d7d._production_dependencies()
     assert dependencies.admission is d7d.supervised_paper_cycle_admission
+    assert (
+        dependencies.require_account
+        is d7d.require_validated_personal_desktop_paper_account
+    )
     assert (
         dependencies.build_decision
         is d7d.build_personal_desktop_unattended_next_decision

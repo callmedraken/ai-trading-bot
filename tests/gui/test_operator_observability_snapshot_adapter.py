@@ -7,6 +7,7 @@ import pytest
 from trading_bot.gui.operator_observability_models import (
     OperatorEffectGateState,
     OperatorOperationsPageStatus,
+    OperatorStrategyExplanationStatus,
     OperatorWarmupClassification,
     OperatorWarmupView,
     SelectedC3WarmupSessionView,
@@ -19,7 +20,6 @@ from trading_bot.market_calendar import TradingSession
 from trading_bot.runtime.operator_observability_snapshot import (
     OperatorObservabilitySnapshotResult,
     OperatorPaperAccountView,
-    OperatorPaperPositionView,
 )
 from trading_bot.runtime.personal_desktop_unattended_daily_cycle import (
     PersonalDesktopUnattendedDailyCycleClassification,
@@ -51,15 +51,26 @@ def _warmup() -> OperatorWarmupView:
         date(2026, 9, 17),
         date(2026, 9, 18),
     )
+    closes = (
+        Decimal("764.29"),
+        Decimal("760.88"),
+        Decimal("757.39"),
+        Decimal("754.05"),
+        Decimal("762.6"),
+        Decimal("761.69"),
+    )
     selected = tuple(
         SelectedC3WarmupSessionView(
             session_date=session,
             symbol="SPY",
-            close=Decimal("760") + Decimal(index),
+            close=close,
             snapshot_id=UUID(int=index),
             selection_id=UUID(int=100 + index),
         )
-        for index, session in enumerate(required, start=1)
+        for index, (session, close) in enumerate(
+            zip(required, closes, strict=True),
+            start=1,
+        )
     )
     return OperatorWarmupView(
         classification=OperatorWarmupClassification.READY,
@@ -84,14 +95,7 @@ def _result() -> OperatorObservabilitySnapshotResult:
             as_of=datetime(2026, 8, 31, 13, 30, tzinfo=UTC),
             cash=Decimal("25000"),
             realized_profit_loss=Decimal("0"),
-            positions=(
-                OperatorPaperPositionView(
-                    symbol="SPY",
-                    quantity=Decimal("2"),
-                    total_cost_basis=Decimal("1500"),
-                    average_cost=Decimal("750"),
-                ),
-            ),
+            positions=(),
             lineage_edge_count=1,
             receipt_count=1,
         ),
@@ -113,7 +117,42 @@ def test_snapshot_adapter_copies_only_bounded_display_facts() -> None:
     assert state.gates is not None and state.gates.all_closed is True
     assert state.account is not None
     assert state.account.cash == Decimal("25000")
-    assert state.account.positions[0].symbol == "SPY"
+    assert state.account.positions == ()
+
+    explanation = state.strategy_explanation
+    assert explanation is not None
+    assert explanation.status is OperatorStrategyExplanationStatus.BUY
+    assert explanation.short_window == 3
+    assert explanation.long_window == 5
+    assert explanation.desired_quantity == Decimal("1")
+    assert explanation.symbol == "SPY"
+    assert explanation.sessions == (
+        date(2026, 9, 11),
+        date(2026, 9, 14),
+        date(2026, 9, 15),
+        date(2026, 9, 16),
+        date(2026, 9, 17),
+        date(2026, 9, 18),
+    )
+    assert explanation.closes == (
+        Decimal("764.29"),
+        Decimal("760.88"),
+        Decimal("757.39"),
+        Decimal("754.05"),
+        Decimal("762.6"),
+        Decimal("761.69"),
+    )
+    assert explanation.previous_short == Decimal(
+        "758.0133333333333333333333333"
+    )
+    assert explanation.previous_long == Decimal("759.842")
+    assert explanation.current_short == Decimal(
+        "759.4466666666666666666666667"
+    )
+    assert explanation.current_long == Decimal("759.322")
+    assert explanation.crossover_side == "BUY"
+    assert explanation.actionable_side == "BUY"
+    assert explanation.invested is False
 
 
 def test_snapshot_adapter_rejects_wrong_type() -> None:

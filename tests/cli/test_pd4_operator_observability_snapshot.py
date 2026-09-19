@@ -68,7 +68,7 @@ def _result(
 
 def test_parser_accepts_no_semantic_arguments() -> None:
     assert build_parser().parse_args([]) is not None
-    with pytest.raises(Exception):
+    with pytest.raises(cli_module._CliUsageError):
         build_parser().parse_args(["--session", "2026-09-18"])
 
 

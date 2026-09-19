@@ -832,3 +832,25 @@ replaces it with read evidence before calling
 `supervised_paper_cycle_admission`. Admission requires the original validated
 capability. Correct that authority ordering, certify the source, then rerun
 D7-D read-only. D8 remains blocked.
+
+
+## D7-D admission-fix source certification — ACCEPTED
+
+Replacement-certified D7 source:
+
+```text
+HEAD:     ca05b2c583f79039e9de64f4a01b8de2ff2ab3ad
+TREE:     d1c3e73eccaba6701bac86f38fb71a99d08ff2d5
+broad:    5540 passed, 17 skipped
+Arch-77:  775 passed
+combined: 6315 passed, 17 skipped
+Ruff/diff checks: PASS
+```
+
+The source preserves genuine account capability through PD2A mutex admission
+while keeping immutable evidence separate for comparisons. No authority or gate
+was weakened.
+
+Next safe production checkpoint is D7-D read-only reconciliation of the already
+durably finalized decision. D7-C must not be rerun. D8 remains blocked pending
+accepted D7-D reconciliation.

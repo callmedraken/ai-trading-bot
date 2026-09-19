@@ -979,3 +979,31 @@ Next: run D7-D read-only from a fresh checkout pinned to the exact certified
 source. Require `RECONCILED`, exact expected/finalized decision identity,
 `FINALIZED_IDENTICAL`, `PRESENT_VALID`, 6/6 history, all eight gates closed,
 and no real effect. Do not republish and do not proceed to D8 before acceptance.
+
+
+## D7 closed
+
+The corrected, replacement-certified D7 source has now passed real production
+D7-D reconciliation:
+
+```text
+classification: RECONCILED
+expected_decision_id:  f2188b5e-e6a4-5398-be41-8867d9268355
+finalized_decision_id: f2188b5e-e6a4-5398-be41-8867d9268355
+selected history: 6/6
+namespace: PRESENT_VALID
+session discovery: FINALIZED
+storage: FINALIZED_IDENTICAL
+all eight gates closed: true
+real effect performed: false
+exit code: 0
+```
+
+D7 is closed. Authoritative executable source remains
+`ca05b2c583f79039e9de64f4a01b8de2ff2ab3ad` /
+`d1c3e73eccaba6701bac86f38fb71a99d08ff2d5`.
+
+Next: review the consolidated D7 branch against current `develop`, then merge
+only with explicit operator approval. After merge, perform post-merge
+verification and forward-integrate the accepted develop source into the D8/D9
+settlement lineage before any D8 effect.

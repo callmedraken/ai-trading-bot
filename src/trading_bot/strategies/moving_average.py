@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 from decimal import Decimal
+from enum import StrEnum
 from uuid import UUID, uuid5
 
 from trading_bot.backtesting import BacktestContext
@@ -44,6 +45,145 @@ class MovingAverageCrossoverConfig:
             )
 
 
+class MovingAverageCrossoverEvaluationStatus(StrEnum):
+    """Deterministic outcome of the crossover arithmetic plus position filter."""
+
+    INSUFFICIENT_HISTORY = "INSUFFICIENT_HISTORY"
+    NO_CROSSOVER = "NO_CROSSOVER"
+    POSITION_FILTERED = "POSITION_FILTERED"
+    BUY = "BUY"
+    SELL = "SELL"
+
+
+@dataclass(frozen=True, slots=True)
+class MovingAverageCrossoverEvaluation:
+    """Pure explanation of the exact arithmetic used by the strategy."""
+
+    status: MovingAverageCrossoverEvaluationStatus
+    evaluated_closes: tuple[Decimal, ...]
+    previous_short: Decimal | None
+    previous_long: Decimal | None
+    current_short: Decimal | None
+    current_long: Decimal | None
+    crossover_side: OrderSide | None
+    actionable_side: OrderSide | None
+    invested: bool
+
+    def __post_init__(self) -> None:
+        if type(self.status) is not MovingAverageCrossoverEvaluationStatus:
+            raise TypeError("status must be exact MovingAverageCrossoverEvaluationStatus")
+        if type(self.evaluated_closes) is not tuple or any(
+            type(value) is not Decimal or not value.is_finite() or value <= 0
+            for value in self.evaluated_closes
+        ):
+            raise ValueError("evaluated_closes must be positive finite Decimals")
+        if type(self.invested) is not bool:
+            raise TypeError("invested must be an exact bool")
+        averages = (
+            self.previous_short,
+            self.previous_long,
+            self.current_short,
+            self.current_long,
+        )
+        if self.status is MovingAverageCrossoverEvaluationStatus.INSUFFICIENT_HISTORY:
+            if any(value is not None for value in averages) or any(
+                value is not None for value in (self.crossover_side, self.actionable_side)
+            ):
+                raise ValueError("insufficient history cannot expose crossover values")
+            return
+        if any(type(value) is not Decimal or not value.is_finite() for value in averages):
+            raise ValueError("complete evaluation requires finite Decimal averages")
+        if self.status is MovingAverageCrossoverEvaluationStatus.NO_CROSSOVER:
+            if self.crossover_side is not None or self.actionable_side is not None:
+                raise ValueError("NO_CROSSOVER cannot expose a side")
+        elif self.status is MovingAverageCrossoverEvaluationStatus.POSITION_FILTERED:
+            if type(self.crossover_side) is not OrderSide or self.actionable_side is not None:
+                raise ValueError("POSITION_FILTERED requires only a raw crossover side")
+        elif self.status is MovingAverageCrossoverEvaluationStatus.BUY:
+            if self.crossover_side is not OrderSide.BUY or self.actionable_side is not OrderSide.BUY:
+                raise ValueError("BUY evaluation side mismatch")
+        elif self.status is MovingAverageCrossoverEvaluationStatus.SELL:
+            if self.crossover_side is not OrderSide.SELL or self.actionable_side is not OrderSide.SELL:
+                raise ValueError("SELL evaluation side mismatch")
+
+
+def evaluate_moving_average_crossover_closes(
+    closes: tuple[Decimal, ...],
+    config: MovingAverageCrossoverConfig,
+    *,
+    invested: bool,
+) -> MovingAverageCrossoverEvaluation:
+    """Explain the exact close-only crossover logic used by the strategy."""
+
+    if type(closes) is not tuple or any(
+        type(value) is not Decimal or not value.is_finite() or value <= 0
+        for value in closes
+    ):
+        raise ValueError("closes must be a tuple of positive finite Decimals")
+    if type(config) is not MovingAverageCrossoverConfig:
+        raise TypeError("config must be an exact MovingAverageCrossoverConfig")
+    if type(invested) is not bool:
+        raise TypeError("invested must be an exact bool")
+
+    required = config.long_window + 1
+    if len(closes) < required:
+        return MovingAverageCrossoverEvaluation(
+            MovingAverageCrossoverEvaluationStatus.INSUFFICIENT_HISTORY,
+            closes,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            invested,
+        )
+
+    evaluated = closes[-required:]
+    previous_short = _average(evaluated[-config.short_window - 1 : -1])
+    previous_long = _average(evaluated[-config.long_window - 1 : -1])
+    current_short = _average(evaluated[-config.short_window :])
+    current_long = _average(evaluated[-config.long_window :])
+
+    side = None
+    if previous_short <= previous_long and current_short > current_long:
+        side = OrderSide.BUY
+    elif previous_short >= previous_long and current_short < current_long:
+        side = OrderSide.SELL
+
+    if side is None:
+        status = MovingAverageCrossoverEvaluationStatus.NO_CROSSOVER
+        actionable = None
+    elif (side is OrderSide.BUY and invested) or (
+        side is OrderSide.SELL and not invested
+    ):
+        status = MovingAverageCrossoverEvaluationStatus.POSITION_FILTERED
+        actionable = None
+    else:
+        status = (
+            MovingAverageCrossoverEvaluationStatus.BUY
+            if side is OrderSide.BUY
+            else MovingAverageCrossoverEvaluationStatus.SELL
+        )
+        actionable = side
+
+    return MovingAverageCrossoverEvaluation(
+        status,
+        evaluated,
+        previous_short,
+        previous_long,
+        current_short,
+        current_long,
+        side,
+        actionable,
+        invested,
+    )
+
+
+def _average(values: tuple[Decimal, ...]) -> Decimal:
+    return sum(values, start=Decimal("0")) / Decimal(len(values))
+
+
 class MovingAverageCrossoverStrategy:
     """Generate proposals only at genuine consecutive-average crossovers."""
 
@@ -64,26 +204,21 @@ class MovingAverageCrossoverStrategy:
             return None
 
         closes = tuple(bar.close for bar in context.history)
-        previous_short = self._average(closes[-self._config.short_window - 1 : -1])
-        previous_long = self._average(closes[-self._config.long_window - 1 : -1])
-        current_short = self._average(closes[-self._config.short_window :])
-        current_long = self._average(closes[-self._config.long_window :])
-
-        side = None
-        if previous_short <= previous_long and current_short > current_long:
-            side = OrderSide.BUY
-        elif previous_short >= previous_long and current_short < current_long:
-            side = OrderSide.SELL
-        if side is None:
-            return None
-
         symbol = context.current_bar.symbol
         position = context.positions.get(symbol)
         invested = position is not None and position.quantity > 0
-        if (side is OrderSide.BUY and invested) or (
-            side is OrderSide.SELL and not invested
-        ):
+        evaluation = evaluate_moving_average_crossover_closes(
+            closes,
+            self._config,
+            invested=invested,
+        )
+        side = evaluation.actionable_side
+        if side is None:
             return None
+        current_short = evaluation.current_short
+        current_long = evaluation.current_long
+        if current_short is None or current_long is None:
+            raise RuntimeError("actionable crossover evaluation lacks current averages")
 
         quantity = (
             self._config.desired_quantity
@@ -103,10 +238,6 @@ class MovingAverageCrossoverStrategy:
             created_at=context.current_bar.timestamp,
             reason=reason,
         )
-
-    @staticmethod
-    def _average(values: tuple[Decimal, ...]) -> Decimal:
-        return sum(values, start=Decimal("0")) / Decimal(len(values))
 
     def _proposal_id(self, context: BacktestContext, side: OrderSide) -> UUID:
         identity = ":".join(

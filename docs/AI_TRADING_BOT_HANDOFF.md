@@ -919,3 +919,30 @@ The exact production candidate is unchanged after the reader-lifetime repair.
 The next checkpoint is again D7-C first-decision publication, but the prior
 approval was consumed by the blocked no-effect attempt. A new explicit approval
 is required before any second D7-C invocation.
+
+
+## Durable D7-C acceptance and D7-D admission defect
+
+Post-publication D7-A independently proves the finalized decision is exact:
+
+```text
+ALREADY_FINALIZED
+candidate:                f2188b5e-e6a4-5398-be41-8867d9268355
+storage:                  FINALIZED_IDENTICAL
+completed session:        2026-09-18
+selected history:         6/6
+namespace:                PRESENT_VALID
+all eight gates closed:   true
+real effect performed:    false
+```
+
+The D7-A CLI returns exit 0 for `ALREADY_FINALIZED`. D7-C is therefore
+durably accepted; do not republish.
+
+D7-D's all-default BLOCKED result is a source bug at mutex admission:
+`read_personal_desktop_paper_account` returns a validated account capability,
+but D7-D immediately replaces it with immutable evidence and passes that
+evidence to `supervised_paper_cycle_admission`, which requires the genuine
+validated capability. Keep capability and evidence separate, use evidence for
+comparison, and pass the capability into admission. D8 remains blocked until a
+corrected, certified D7-D reconciles the durable decision.

@@ -672,3 +672,34 @@ real_effect_performed:             false
 
 D7-B provisioning is not required. D7-C first publication remains a protected
 effect checkpoint and requires explicit operator approval.
+
+
+## D7 replacement source certification — ACCEPTED
+
+A compatibility-first Decimal determinism correction and portable LF checkout
+contract for the frozen first-operation history seed have been forward-ported
+to the D7 lineage and fully certified.
+
+```text
+replacement certified HEAD: acd606a41ac50f172ac62377ce6d4e7c8c4d3a32
+replacement certified TREE: 784695d05865a767ba187adf38fd4924897127a9
+broad non-Architecture-77:   5534 passed, 17 skipped
+Architecture-77 split:       775 passed
+combined:                    6309 passed, 17 skipped
+Ruff/diff checks:            PASS
+worktree/index:              clean
+```
+
+The strategy preserves historical/default Decimal semantics while removing
+ambient-context dependence. The frozen history seed now checks out as canonical
+LF bytes under machine-wide `core.autocrlf=true`:
+
+```text
+length: 1060
+sha256: 40dda54c82324f358d640cce89e467295b8f5b73a32fed76c52e7ca90d398e64
+```
+
+The earlier accepted D7-A result is historical evidence only after this source
+replacement. The next production-side checkpoint is a fresh zero-argument,
+read-only D7-A qualification pinned to the exact replacement certified source.
+D7-C remains protected and unauthorized.

@@ -343,3 +343,48 @@ eligible for publication, but no publication effect was performed.
 The first D7-C approval remains consumed by the earlier effects-closed BLOCKED
 attempt. A second D7-C invocation requires a new explicit operator approval and
 a fresh immediate preflight.
+
+
+## Second approved D7-C publication — PROCESS SUCCESS; D7-D EARLY BLOCKED
+
+After fresh post-fix D7-A preflight passed from certified source
+`8bc6d436142531dec17bf7b960a7ac1eb2e45b09`, one newly approved D7-C
+invocation returned:
+
+```text
+classification:             DECISION_PUBLISHED
+decision_id:                f2188b5e-e6a4-5398-be41-8867d9268355
+selected_session:           2026-09-18
+intended_execution_session: 2026-09-21
+real_effect_performed:      true
+exit code:                  0
+```
+
+No second publication invocation was made.
+
+The immediately following independent D7-D read-only reconciliation returned:
+
+```text
+classification:                    BLOCKED
+completed_session:                 null
+expected_decision_id:              null
+finalized_decision_id:             null
+selected_history_count:            0
+namespace_classification:          null
+storage_classification:            null
+all_eight_gates_closed:            false
+real_effect_performed:             false
+exit code:                         6
+```
+
+Because D7-D retained only its default evidence object, the reconciliation
+failed before its first evidence commit (which occurs only after completed
+session, selected-C3 history, and namespace qualification). This does not by
+itself contradict the D7-C process result, but D8 must not proceed until durable
+publication state is independently proven and the D7-D early-block cause is
+understood.
+
+Next safe step: rerun zero-argument D7-A read-only from the same exact certified
+source. If it reports ALREADY_FINALIZED / FINALIZED_IDENTICAL for the accepted
+candidate, treat that as independent durable publication evidence while
+continuing D7-D diagnosis. No republish or D8 action is authorized.

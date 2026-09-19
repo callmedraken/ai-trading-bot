@@ -7,10 +7,16 @@ from trading_bot.gui.operator_observability_models import (
     OperatorAccountSummaryView,
     OperatorOperationsPageState,
     OperatorOperationsPageStatus,
+    OperatorStrategyExplanationStatus,
+    OperatorStrategyExplanationView,
 )
 from trading_bot.runtime.operator_observability_snapshot import (
     OperatorObservabilitySnapshotResult,
 )
+from trading_bot.runtime.personal_desktop_unattended_daily_cycle import (
+    personal_desktop_unattended_strategy_config,
+)
+from trading_bot.strategies import evaluate_moving_average_crossover_closes
 
 
 class OperatorObservabilitySnapshotAdapterError(ValueError):
@@ -53,6 +59,8 @@ def adapt_operator_observability_snapshot(
         receipt_count=account.receipt_count,
     )
 
+    strategy = _strategy_explanation(result, summary)
+
     return OperatorOperationsPageState(
         status=OperatorOperationsPageStatus.AVAILABLE,
         message=(
@@ -73,4 +81,59 @@ def adapt_operator_observability_snapshot(
         warmup=result.warmup,
         gates=result.gates,
         account=summary,
+        strategy_explanation=strategy,
+    )
+
+
+def _strategy_explanation(
+    result: OperatorObservabilitySnapshotResult,
+    account: OperatorAccountSummaryView,
+) -> OperatorStrategyExplanationView:
+    config = personal_desktop_unattended_strategy_config()
+    warmup = result.warmup
+    selected = () if warmup is None else warmup.selected_sessions
+    symbols = {item.symbol for item in selected}
+    if len(symbols) > 1:
+        raise OperatorObservabilitySnapshotAdapterError(
+            "selected-C3 strategy explanation has multiple symbols"
+        )
+    symbol = next(iter(symbols), None)
+    invested = False
+    if symbol is not None:
+        invested = any(
+            position.symbol == symbol and position.quantity > 0
+            for position in account.positions
+        )
+
+    closes = tuple(item.close for item in selected)
+    evaluation = evaluate_moving_average_crossover_closes(
+        closes,
+        config,
+        invested=invested,
+    )
+    sessions = tuple(item.session_date for item in selected)
+    if len(sessions) > len(evaluation.evaluated_closes):
+        sessions = sessions[-len(evaluation.evaluated_closes) :]
+
+    return OperatorStrategyExplanationView(
+        status=OperatorStrategyExplanationStatus(evaluation.status.value),
+        short_window=config.short_window,
+        long_window=config.long_window,
+        desired_quantity=config.desired_quantity,
+        symbol=symbol,
+        sessions=sessions,
+        closes=evaluation.evaluated_closes,
+        previous_short=evaluation.previous_short,
+        previous_long=evaluation.previous_long,
+        current_short=evaluation.current_short,
+        current_long=evaluation.current_long,
+        crossover_side=(
+            None if evaluation.crossover_side is None else evaluation.crossover_side.value
+        ),
+        actionable_side=(
+            None
+            if evaluation.actionable_side is None
+            else evaluation.actionable_side.value
+        ),
+        invested=evaluation.invested,
     )

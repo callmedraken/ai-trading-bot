@@ -35,7 +35,7 @@ def test_frozen_first_configuration_history_seed_is_exact_checkout_bytes() -> No
     assert not payload.endswith(b"\r\n")
 
     attributes = (_ROOT / ".gitattributes").read_text(encoding="utf-8").splitlines()
-    assert f"{_SEED_RELATIVE_PATH} -text" in attributes
+    assert f"{_SEED_RELATIVE_PATH} text eol=lf" in attributes
 
 
 def test_first_configuration_retains_p2_reader_until_authority_match(

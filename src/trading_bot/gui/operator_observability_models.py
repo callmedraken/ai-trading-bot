@@ -370,7 +370,11 @@ class OperatorStrategyExplanationView:
             self.current_short,
             self.current_long,
         )
+        if len(closes) > self.long_window + 1:
+            raise ValueError("strategy explanation retains too many closes")
         if self.status is OperatorStrategyExplanationStatus.INSUFFICIENT_HISTORY:
+            if len(closes) >= self.long_window + 1:
+                raise ValueError("insufficient-history explanation has enough closes")
             if any(value is not None for value in averages) or any(
                 value is not None
                 for value in (self.crossover_side, self.actionable_side)
@@ -379,6 +383,8 @@ class OperatorStrategyExplanationView:
                     "insufficient-history explanation cannot expose averages or sides"
                 )
         else:
+            if self.symbol is None:
+                raise ValueError("complete strategy explanation requires a symbol")
             if any(
                 type(value) is not Decimal or not value.is_finite()
                 for value in averages
@@ -390,6 +396,23 @@ class OperatorStrategyExplanationView:
                 raise ValueError(
                     "complete strategy explanation requires long_window + 1 closes"
                 )
+            if self.status is OperatorStrategyExplanationStatus.NO_CROSSOVER:
+                if self.crossover_side is not None or self.actionable_side is not None:
+                    raise ValueError("NO_CROSSOVER cannot expose strategy sides")
+            elif self.status is OperatorStrategyExplanationStatus.POSITION_FILTERED:
+                if (
+                    self.crossover_side not in ("BUY", "SELL")
+                    or self.actionable_side is not None
+                ):
+                    raise ValueError(
+                        "POSITION_FILTERED requires only a raw crossover side"
+                    )
+            elif self.status is OperatorStrategyExplanationStatus.BUY:
+                if self.crossover_side != "BUY" or self.actionable_side != "BUY":
+                    raise ValueError("BUY explanation side mismatch")
+            elif self.status is OperatorStrategyExplanationStatus.SELL:
+                if self.crossover_side != "SELL" or self.actionable_side != "SELL":
+                    raise ValueError("SELL explanation side mismatch")
 
         object.__setattr__(self, "sessions", sessions)
         object.__setattr__(self, "closes", closes)

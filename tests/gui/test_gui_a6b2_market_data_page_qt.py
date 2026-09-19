@@ -18,11 +18,13 @@ from trading_bot.gui import (
     ApplicationOverview,
     MarketDataPageState,
     MarketDataPageStatus,
+    OperatorOperationsPageState,
     PaperAccountPageState,
     PaperPageState,
     ResearchPageState,
     VerifiedMarketSnapshotView,
     unavailable_market_data_state,
+    unavailable_operator_operations_state,
     unavailable_paper_account_state,
     unavailable_paper_state,
 )
@@ -86,6 +88,9 @@ class _RecordingService:
 
     def get_paper_account_state(self) -> PaperAccountPageState:
         return unavailable_paper_account_state()
+
+    def get_operator_observability_state(self) -> OperatorOperationsPageState:
+        return unavailable_operator_operations_state()
 
     def load_research_report(self, artifact_path: Path) -> ResearchPageState:
         return MockGuiApplicationService().load_research_report(artifact_path)

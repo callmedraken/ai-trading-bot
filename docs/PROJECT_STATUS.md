@@ -694,3 +694,18 @@ recorded in the canonical status/handoff plus the relevant Architecture/plan.
 
 Docs-only closeouts do not require a new full repository suite when exact diff
 review proves no source/test change.
+
+
+### D7-A qualification checkout note
+
+The certified D7 operational worktree remains clean at docs tip
+`489b96a97d36fd28822142db9a69f0f0dd2d3d72`, whose only delta from the
+certified D7 source `3dfa9e2cab372f8cb034b90256ed3fba9da6c878` is the certification
+document. However, system Git has `core.autocrlf=true` and that frozen worktree's
+first-operation history seed is physically CRLF/1061 bytes even though Git's
+filtered blob is canonical.
+
+Do not rewrite the frozen D7 worktree. Real-host D7-A should use a disposable
+detached qualification worktree at the exact certified source commit, created
+with `core.autocrlf=false` for checkout, and must prove the seed raw worktree
+blob equals the tracked blob before invoking the read-only launcher.

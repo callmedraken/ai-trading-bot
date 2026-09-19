@@ -1,3 +1,5 @@
+import ast
+import inspect
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from uuid import UUID
@@ -12,6 +14,7 @@ from trading_bot.gui.operator_observability_models import (
     OperatorWarmupView,
     SelectedC3WarmupSessionView,
 )
+import trading_bot.gui.operator_observability_snapshot_adapter as snapshot_adapter_module
 from trading_bot.gui.operator_observability_snapshot_adapter import (
     OperatorObservabilitySnapshotAdapterError,
     adapt_operator_observability_snapshot,
@@ -158,3 +161,29 @@ def test_snapshot_adapter_copies_only_bounded_display_facts() -> None:
 def test_snapshot_adapter_rejects_wrong_type() -> None:
     with pytest.raises(OperatorObservabilitySnapshotAdapterError):
         adapt_operator_observability_snapshot(object())  # type: ignore[arg-type]
+
+
+
+def test_o4_adapter_uses_read_only_source_owned_strategy_seam() -> None:
+    source = inspect.getsource(snapshot_adapter_module)
+    tree = ast.parse(source)
+    called_names = {
+        (
+            node.func.id
+            if isinstance(node.func, ast.Name)
+            else node.func.attr
+            if isinstance(node.func, ast.Attribute)
+            else ""
+        )
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+    }
+
+    assert "personal_desktop_unattended_strategy_config" in called_names
+    assert "evaluate_moving_average_crossover_closes" in called_names
+    assert {
+        "publish",
+        "provision",
+        "execute",
+        "run_personal_desktop_unattended_daily_cycle",
+    }.isdisjoint(called_names)

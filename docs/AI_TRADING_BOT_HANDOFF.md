@@ -856,3 +856,33 @@ therefore does not hit this path.
 Next: source-only lifetime fix in an isolated branch, focused tests, full
 replacement certification, then fresh read-only D7-A. D7-C requires a new
 explicit approval after those checks.
+
+
+## Certified D7 selected-C3 reader-lifetime correction
+
+Replacement certified D7 source:
+
+```text
+HEAD: 8bc6d436142531dec17bf7b960a7ac1eb2e45b09
+TREE: 18255e5272728a5bf2b8f8633fff23cf940b77be
+```
+
+Certification:
+
+```text
+5538 passed, 17 skipped outside Architecture-77
+775 passed in the clean Architecture-77 harness
+6313 passed, 17 skipped combined
+Ruff check/format PASS
+diff checks PASS
+worktree/index clean
+```
+
+This source fixes the D7-C/G6 selected-C3 reader lifetime defect without
+weakening process-local permit provenance. The failed first D7-C attempt remains
+effects-closed evidence only.
+
+Next: fresh read-only D7-A from the exact certified source. Require reproduction
+of candidate `f2188b5e-e6a4-5398-be41-8867d9268355`, namespace
+`PRESENT_VALID`, storage `ABSENT`, deadline open, and all eight gates closed.
+Only after that may a new D7-C approval be considered.

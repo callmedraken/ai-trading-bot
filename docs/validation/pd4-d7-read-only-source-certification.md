@@ -83,3 +83,56 @@ Return to the armed D5 worktree and perform a fresh **read-only** D5/G6 readines
 - `SESSION_GAP`, `BLOCKED`, contradictory authority/state, or unexpected source identity: stop and diagnose; do not synthesize history or retry effects.
 
 A future docs-only commit containing this certification record does not alter the certified source identity above and does not require another full repository suite.
+
+
+## Production D7-A read-only qualification — ACCEPTED
+
+A genuine non-admin `DESKTOP-I4DOKM7\Trading` D7-A qualification was run from a
+disposable detached qualification worktree pinned to the exact certified source:
+
+```text
+HEAD: 3dfa9e2cab372f8cb034b90256ed3fba9da6c878
+TREE: bb1de2e7c2933ba3a777523f2a0e2feee5fa8c39
+worktree: clean
+```
+
+The frozen first-operation history-seed checkout was verified byte-for-byte
+before invocation:
+
+```text
+length: 1060
+sha256: 40dda54c82324f358d640cce89e467295b8f5b73a32fed76c52e7ca90d398e64
+HEAD/raw/filtered Git blob:
+a684c024cedfe5bafdf67f0beadf980d116bf1dc
+```
+
+Accepted production D7-A evidence:
+
+```text
+classification:                    READY
+completed_session:                 2026-09-18
+selected_history_count:            6
+required_history_count:            6
+selected_snapshot_id:              680b260f-08c9-5923-87bb-b5f0a4701380
+candidate_decision_id:             f2188b5e-e6a4-5398-be41-8867d9268355
+intended_execution_session:        2026-09-21
+regular_open:                      2026-09-21T13:30:00+00:00
+account_predecessor_checkpoint_id: ed4640e5-0630-525d-b916-d50e31e3ba2a
+namespace_classification:          PRESENT_VALID
+storage_classification:            ABSENT
+deadline_open:                     true
+all_eight_gates_closed:            true
+real_effect_performed:             false
+```
+
+Interpretation:
+
+- D5 warm-up is complete and current history is READY 6/6.
+- The fixed unattended-decision namespace already exists and validates.
+- No D7-B storage provisioning is required.
+- The candidate decision is absent from storage and is presently eligible for
+  first publication.
+- D7-A performed no publication, provisioning, provider, Paper-v2, scheduler,
+  broker, or live effect.
+
+D7-C remains **PROTECTED / UNAUTHORIZED** until explicit operator approval.

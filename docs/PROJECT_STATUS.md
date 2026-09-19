@@ -709,3 +709,21 @@ Do not rewrite the frozen D7 worktree. Real-host D7-A should use a disposable
 detached qualification worktree at the exact certified source commit, created
 with `core.autocrlf=false` for checkout, and must prove the seed raw worktree
 blob equals the tracked blob before invoking the read-only launcher.
+
+
+### Operator observability O3 — ACCEPTED
+
+The native read-only Operations page is accepted at:
+
+```text
+HEAD: fd504503d1fb468c0a2791e00d296da983afeb5a
+TREE: bb2a19189dc72a939456653db2cbd745fa237822
+focused pytest: 71 passed
+Ruff/diff checks: PASS
+worktree: clean
+```
+
+The page presents bounded O2-derived cycle/session state, selected-C3 history,
+all eight gates, Paper-v2 account summary, and strategy readiness. It has no
+production-runtime imports or effect controls. O4 deterministic MA3/MA5 strategy
+explanation is the next observability checkpoint.

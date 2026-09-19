@@ -297,6 +297,104 @@ class OperatorAccountSummaryView:
         object.__setattr__(self, "positions", positions)
 
 
+class OperatorStrategyExplanationStatus(Enum):
+    """Presentation classification from the source-owned crossover evaluator."""
+
+    INSUFFICIENT_HISTORY = "INSUFFICIENT_HISTORY"
+    NO_CROSSOVER = "NO_CROSSOVER"
+    POSITION_FILTERED = "POSITION_FILTERED"
+    BUY = "BUY"
+    SELL = "SELL"
+
+
+@dataclass(frozen=True, slots=True)
+class OperatorStrategyExplanationView:
+    """Exact deterministic MA inputs and result, carrying no publication authority."""
+
+    status: OperatorStrategyExplanationStatus
+    short_window: int
+    long_window: int
+    desired_quantity: Decimal
+    symbol: str | None
+    sessions: tuple[date, ...]
+    closes: tuple[Decimal, ...]
+    previous_short: Decimal | None
+    previous_long: Decimal | None
+    current_short: Decimal | None
+    current_long: Decimal | None
+    crossover_side: str | None
+    actionable_side: str | None
+    invested: bool
+
+    def __post_init__(self) -> None:
+        if type(self.status) is not OperatorStrategyExplanationStatus:
+            raise TypeError("status must be an OperatorStrategyExplanationStatus")
+        if (
+            type(self.short_window) is not int
+            or self.short_window <= 0
+            or type(self.long_window) is not int
+            or self.long_window <= self.short_window
+        ):
+            raise ValueError("strategy windows are invalid")
+        if (
+            type(self.desired_quantity) is not Decimal
+            or not self.desired_quantity.is_finite()
+            or self.desired_quantity <= 0
+        ):
+            raise ValueError("desired_quantity must be a positive finite Decimal")
+        if self.symbol is not None:
+            _require_operator_symbol(self.symbol)
+        sessions = tuple(self.sessions)
+        closes = tuple(self.closes)
+        if len(sessions) != len(closes):
+            raise ValueError("strategy sessions and closes must align")
+        if any(type(value) is not date for value in sessions):
+            raise TypeError("strategy sessions must contain exact dates")
+        if tuple(sorted(sessions)) != sessions or len(set(sessions)) != len(sessions):
+            raise ValueError("strategy sessions must be unique and increasing")
+        if any(
+            type(value) is not Decimal or not value.is_finite() or value <= 0
+            for value in closes
+        ):
+            raise ValueError("strategy closes must be positive finite Decimals")
+        if type(self.invested) is not bool:
+            raise TypeError("invested must be an exact bool")
+        if self.crossover_side not in (None, "BUY", "SELL"):
+            raise ValueError("crossover_side is invalid")
+        if self.actionable_side not in (None, "BUY", "SELL"):
+            raise ValueError("actionable_side is invalid")
+
+        averages = (
+            self.previous_short,
+            self.previous_long,
+            self.current_short,
+            self.current_long,
+        )
+        if self.status is OperatorStrategyExplanationStatus.INSUFFICIENT_HISTORY:
+            if any(value is not None for value in averages) or any(
+                value is not None
+                for value in (self.crossover_side, self.actionable_side)
+            ):
+                raise ValueError(
+                    "insufficient-history explanation cannot expose averages or sides"
+                )
+        else:
+            if any(
+                type(value) is not Decimal or not value.is_finite()
+                for value in averages
+            ):
+                raise ValueError(
+                    "complete strategy explanation requires finite Decimal averages"
+                )
+            if len(closes) != self.long_window + 1:
+                raise ValueError(
+                    "complete strategy explanation requires long_window + 1 closes"
+                )
+
+        object.__setattr__(self, "sessions", sessions)
+        object.__setattr__(self, "closes", closes)
+
+
 @dataclass(frozen=True, slots=True)
 class OperatorOperationsPageState:
     """Immutable state rendered by the native read-only Operations page."""
@@ -310,6 +408,7 @@ class OperatorOperationsPageState:
     warmup: OperatorWarmupView | None = None
     gates: OperatorEffectGateState | None = None
     account: OperatorAccountSummaryView | None = None
+    strategy_explanation: OperatorStrategyExplanationView | None = None
 
     def __post_init__(self) -> None:
         if type(self.status) is not OperatorOperationsPageStatus:
@@ -341,7 +440,12 @@ class OperatorOperationsPageState:
         ):
             raise TypeError("selected_snapshot_id must be a UUID or None")
 
-        details = (self.warmup, self.gates, self.account)
+        details = (
+            self.warmup,
+            self.gates,
+            self.account,
+            self.strategy_explanation,
+        )
         if self.status is OperatorOperationsPageStatus.UNAVAILABLE:
             if any(value is not None for value in details) or any(
                 value is not None
@@ -366,6 +470,13 @@ class OperatorOperationsPageState:
             )
         if self.warmup is not None and type(self.warmup) is not OperatorWarmupView:
             raise TypeError("warmup must be an OperatorWarmupView or None")
+        if (
+            self.strategy_explanation is not None
+            and type(self.strategy_explanation) is not OperatorStrategyExplanationView
+        ):
+            raise TypeError(
+                "strategy_explanation must be an OperatorStrategyExplanationView or None"
+            )
 
     @property
     def strategy_ready(self) -> bool:

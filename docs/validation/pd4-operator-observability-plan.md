@@ -103,6 +103,23 @@ Requirements:
 - explicit unavailable/blocked states rather than fabricated defaults;
 - focused unit tests for all mappings and failure-closed behavior.
 
+Accepted O1 checkpoint:
+
+```text
+HEAD  ee1f44022340563f94f334f897a5e88859f7c6c7
+TREE  76f98eb64a3205a88dcd86a2c541feaaea9939fa
+focused tests: 16 passed
+Ruff check/format: PASS
+diff checks: PASS
+worktree: CLEAN
+```
+
+Acceptance record:
+
+```text
+docs/validation/pd4-operator-observability-o1-acceptance.md
+```
+
 ### O2 — bounded Trading-principal read-only snapshot command
 
 Add one zero-semantic-argument source-checkout operator command that may be run

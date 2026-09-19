@@ -120,8 +120,8 @@ def evaluate_moving_average_crossover_closes(
         for value in closes
     ):
         raise ValueError("closes must be a tuple of positive finite Decimals")
-    if type(config) is not MovingAverageCrossoverConfig:
-        raise TypeError("config must be an exact MovingAverageCrossoverConfig")
+    if not isinstance(config, MovingAverageCrossoverConfig):
+        raise TypeError("config must be a MovingAverageCrossoverConfig")
     if type(invested) is not bool:
         raise TypeError("invested must be an exact bool")
 

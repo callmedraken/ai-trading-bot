@@ -805,3 +805,19 @@ state is uncertain, expose durable evidence, operate under strict real-money
 controls, recover predictably, remain understandable/stoppable by its operator,
 and expose the reviewed system through a polished GUI without giving AI or
 presentation code alternate authority paths.
+
+
+## D7-A qualification checkout portability
+
+Do not mutate `F:\AI\worktrees\ai-trading-bot-decision-publication` merely to
+repair its CRLF working-tree copy of the frozen first-operation history seed.
+Its Git state is clean and its source remains certified, but raw checkout bytes
+are 1061-byte CRLF under machine-wide `core.autocrlf=true`.
+
+For production D7-A read-only qualification, create a disposable detached
+worktree at exact certified source commit
+`3dfa9e2cab372f8cb034b90256ed3fba9da6c878` using a command-local
+`core.autocrlf=false`. Verify HEAD/tree, clean status, 1060-byte frozen seed,
+frozen SHA-256, and raw worktree blob == HEAD blob before running the existing
+zero-argument D7-A launcher under non-admin Trading. D7-B remains a separate
+protected Administrator provisioning effect if D7-A reports NAMESPACE_MISSING.

@@ -26,6 +26,8 @@ from trading_bot.gui import (
     OperatorEffectGateState,
     OperatorOperationsPageState,
     OperatorOperationsPageStatus,
+    OperatorStrategyExplanationStatus,
+    OperatorStrategyExplanationView,
     OperatorWarmupClassification,
     OperatorWarmupView,
     PaperAccountPageState,
@@ -89,6 +91,32 @@ def _warmup() -> OperatorWarmupView:
     )
 
 
+def _strategy_explanation() -> OperatorStrategyExplanationView:
+    return OperatorStrategyExplanationView(
+        status=OperatorStrategyExplanationStatus.BUY,
+        short_window=3,
+        long_window=5,
+        desired_quantity=Decimal("1"),
+        symbol="SPY",
+        sessions=_REQUIRED,
+        closes=(
+            Decimal("764.29"),
+            Decimal("760.88"),
+            Decimal("757.39"),
+            Decimal("754.05"),
+            Decimal("762.6"),
+            Decimal("761.69"),
+        ),
+        previous_short=Decimal("758.0133333333333333333333333"),
+        previous_long=Decimal("759.842"),
+        current_short=Decimal("759.4466666666666666666666667"),
+        current_long=Decimal("759.322"),
+        crossover_side="BUY",
+        actionable_side="BUY",
+        invested=False,
+    )
+
+
 def _state(
     *,
     message: str = "Current production observability snapshot; read-only.",
@@ -113,6 +141,7 @@ def _state(
             lineage_edge_count=1,
             receipt_count=1,
         ),
+        strategy_explanation=_strategy_explanation(),
     )
 
 
@@ -166,7 +195,32 @@ def test_available_page_renders_warmup_gates_account_and_strategy_readiness() ->
     assert page.findChild(QLabel, "operatorCheckpointId").text() == str(_CHECKPOINT_ID)
     assert page.findChild(QLabel, "operatorAccountCash").text() == "25000"
     assert page.findChild(QLabel, "operatorAccountPositionCount").text() == "0"
-    assert "Ready:" in page.findChild(QLabel, "operatorStrategyReadiness").text()
+    assert page.findChild(QLabel, "operatorStrategyReadiness").text() == (
+        "BUY: source-owned SMA 3/5 evaluation."
+    )
+    assert page.findChild(QLabel, "operatorStrategySymbol").text() == "SPY"
+    assert page.findChild(QLabel, "operatorStrategyDesiredQuantity").text() == "1"
+    assert page.findChild(QLabel, "operatorStrategySessions").text() == (
+        "2026-09-11, 2026-09-14, 2026-09-15, "
+        "2026-09-16, 2026-09-17, 2026-09-18"
+    )
+    assert page.findChild(QLabel, "operatorStrategyCloses").text() == (
+        "764.29, 760.88, 757.39, 754.05, 762.6, 761.69"
+    )
+    assert page.findChild(QLabel, "operatorStrategyPreviousShort").text() == (
+        "758.0133333333333333333333333"
+    )
+    assert page.findChild(QLabel, "operatorStrategyPreviousLong").text() == "759.842"
+    assert page.findChild(QLabel, "operatorStrategyCurrentShort").text() == (
+        "759.4466666666666666666666667"
+    )
+    assert page.findChild(QLabel, "operatorStrategyCurrentLong").text() == "759.322"
+    assert page.findChild(QLabel, "operatorStrategyCrossoverSide").text() == "BUY"
+    assert page.findChild(QLabel, "operatorStrategyAccountState").text() == "Flat"
+    assert page.findChild(QLabel, "operatorStrategyActionableSide").text() == "BUY"
+    assert "not D7 publication authority" in page.findChild(
+        QLabel, "operatorStrategyAuthorityNotice"
+    ).text()
     assert page.findChildren(QPushButton) == []
 
 

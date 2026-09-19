@@ -109,14 +109,18 @@ history, Paper-v2 account/lineage facts, and all eight effect gates. It remains
 non-authoritative and does not modify the armed D5, certified D7, or certified
 D8/D9 operational boundaries.
 
-O2 real-host qualification was attempted under genuine non-admin Trading and is
-currently BLOCKED. The command itself remained effects-closed. Read-only stage
-evidence: all eight gates false; C1 PASS; G5 reports NO_NEW_COMPLETED_SESSION for
-2026-09-18 with selected snapshot
-680b260f-08c9-5923-87bb-b5f0a4701380; G6 classification BLOCKED; historical
-configuration resolution fails closed with
-PersonalDesktopHistoricalCycleConfigurationError. Root-cause read-only
-diagnosis is the active checkpoint.
+O2 real-host qualification now reaches the full sanitized snapshot. The Windows
+CRLF portability defect in the frozen first-operation history seed was corrected
+with an explicit text/eol=lf checkout contract plus an exact-byte regression
+test; the seed artifact itself did not change.
+
+Current real-host evidence: all eight gates false; C1 valid; G5
+NO_NEW_COMPLETED_SESSION for 2026-09-18; selected-C3 history READY 6/6; Paper-v2
+account read PASS with cash 25000, no positions, realized P&L 0; O2 reports
+real_effect_performed=false. G6 still classifies BLOCKED downstream. Diagnose
+the remaining G6 tail in order: finalized-decision discovery, authoritative
+history binding, next-decision construction, then read-only publication
+qualification.
 
 ### D8/D9 settlement source — certified/frozen source boundary
 

@@ -798,3 +798,20 @@ The reader-lifetime correction preserves the exact production decision identity.
 The project is again at the protected D7-C publication boundary. The previous
 approval was consumed by the earlier blocked invocation; no second publication
 attempt is authorized without a new explicit approval.
+
+
+## D7-C publication process succeeded; D7-D early reconciliation blocked
+
+The second explicitly approved D7-C invocation returned
+`DECISION_PUBLISHED` for
+`f2188b5e-e6a4-5398-be41-8867d9268355`, with
+`real_effect_performed=true` and exit code 0.
+
+The immediate independent D7-D read-only reconciliation then returned an
+all-default `BLOCKED` result (no completed session, no candidate/finalized ID,
+no namespace/storage evidence, all_eight_gates_closed=false), indicating failure
+before D7-D's first evidence commit.
+
+Do not republish. Do not advance to D8. Next safe checkpoint is another
+read-only D7-A from the exact certified source to independently classify the
+durable decision storage after publication.

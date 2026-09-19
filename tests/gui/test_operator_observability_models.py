@@ -12,6 +12,8 @@ from trading_bot.gui.operator_observability_models import (
     OperatorObservabilityState,
     OperatorOperationsPageState,
     OperatorOperationsPageStatus,
+    OperatorStrategyExplanationStatus,
+    OperatorStrategyExplanationView,
     OperatorWarmupClassification,
     OperatorWarmupView,
     SelectedC3WarmupSessionView,
@@ -245,4 +247,76 @@ def test_unavailable_operations_state_rejects_attached_authority_details() -> No
             status=OperatorOperationsPageStatus.UNAVAILABLE,
             message="Unavailable.",
             gates=_closed_gates(),
+        )
+
+
+
+def test_strategy_explanation_requires_exact_complete_window_for_buy() -> None:
+    explanation = OperatorStrategyExplanationView(
+        status=OperatorStrategyExplanationStatus.BUY,
+        short_window=3,
+        long_window=5,
+        desired_quantity=Decimal("1"),
+        symbol="SPY",
+        sessions=_required(),
+        closes=(
+            Decimal("764.29"),
+            Decimal("760.88"),
+            Decimal("757.39"),
+            Decimal("754.05"),
+            Decimal("762.6"),
+            Decimal("761.69"),
+        ),
+        previous_short=Decimal("758.0133333333333333333333333"),
+        previous_long=Decimal("759.842"),
+        current_short=Decimal("759.4466666666666666666666667"),
+        current_long=Decimal("759.322"),
+        crossover_side="BUY",
+        actionable_side="BUY",
+        invested=False,
+    )
+
+    assert explanation.status is OperatorStrategyExplanationStatus.BUY
+    assert explanation.actionable_side == "BUY"
+
+
+def test_strategy_explanation_incomplete_history_has_no_derived_values() -> None:
+    explanation = OperatorStrategyExplanationView(
+        status=OperatorStrategyExplanationStatus.INSUFFICIENT_HISTORY,
+        short_window=3,
+        long_window=5,
+        desired_quantity=Decimal("1"),
+        symbol="SPY",
+        sessions=(_required()[-1],),
+        closes=(Decimal("761.69"),),
+        previous_short=None,
+        previous_long=None,
+        current_short=None,
+        current_long=None,
+        crossover_side=None,
+        actionable_side=None,
+        invested=False,
+    )
+
+    assert explanation.previous_short is None
+    assert explanation.actionable_side is None
+
+
+def test_strategy_explanation_rejects_complete_status_without_six_closes() -> None:
+    with pytest.raises(ValueError, match="long_window \+ 1 closes"):
+        OperatorStrategyExplanationView(
+            status=OperatorStrategyExplanationStatus.NO_CROSSOVER,
+            short_window=3,
+            long_window=5,
+            desired_quantity=Decimal("1"),
+            symbol="SPY",
+            sessions=(_required()[-1],),
+            closes=(Decimal("761.69"),),
+            previous_short=Decimal("1"),
+            previous_long=Decimal("1"),
+            current_short=Decimal("1"),
+            current_long=Decimal("1"),
+            crossover_side=None,
+            actionable_side=None,
+            invested=False,
         )

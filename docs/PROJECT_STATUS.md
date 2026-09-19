@@ -749,3 +749,26 @@ production history composition. No retry occurred and D7-D was not run.
 Current checkpoint: repair the shared reader/provenance lifetime contract,
 recertify source, and rerun read-only D7-A. D7-C is again unauthorized pending a
 separate approval after those gates.
+
+
+## D7 reader-lifetime replacement certification — ACCEPTED
+
+The selected-C3 reader/provenance lifetime correction is now the replacement
+certified D7 source:
+
+```text
+HEAD:     8bc6d436142531dec17bf7b960a7ac1eb2e45b09
+TREE:     18255e5272728a5bf2b8f8633fff23cf940b77be
+broad:    5538 passed, 17 skipped
+Arch-77:  775 passed
+combined: 6313 passed, 17 skipped
+Ruff/diff checks: PASS
+```
+
+The correction keeps selected-C3 permit validation unchanged while retaining the
+exact issuing P2 readers only for the lifetime of the process-local history
+proof. Releasing the proof restores normal weak-reference expiry.
+
+The next safe production checkpoint is a fresh read-only D7-A qualification
+from this exact source. The previous D7-C approval was consumed by the blocked,
+effects-closed invocation; no retry is authorized.

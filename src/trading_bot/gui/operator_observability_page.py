@@ -364,7 +364,9 @@ class OperatorOperationsPage(QWidget):
             elif state.warmup is None:
                 text = "Unavailable: no selected-C3 history window is attached."
                 status = "unavailable"
-            elif state.warmup.classification is OperatorWarmupClassification.SESSION_GAP:
+            elif (
+                state.warmup.classification is OperatorWarmupClassification.SESSION_GAP
+            ):
                 text = (
                     "Blocked: the required selected-C3 history contains a session gap."
                 )
@@ -499,11 +501,7 @@ class OperatorOperationsPage(QWidget):
 
     @staticmethod
     def _decimal_or_unavailable(value: Decimal | None) -> str:
-        return (
-            "Unavailable"
-            if value is None
-            else format_decimal_for_display(value)
-        )
+        return "Unavailable" if value is None else format_decimal_for_display(value)
 
     def _selectable_value(
         self,

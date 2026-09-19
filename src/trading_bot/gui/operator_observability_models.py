@@ -498,7 +498,8 @@ class OperatorOperationsPageState:
             and type(self.strategy_explanation) is not OperatorStrategyExplanationView
         ):
             raise TypeError(
-                "strategy_explanation must be an OperatorStrategyExplanationView or None"
+                "strategy_explanation must be an "
+                "OperatorStrategyExplanationView or None"
             )
 
     @property

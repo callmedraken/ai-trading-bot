@@ -128,7 +128,9 @@ def _strategy_explanation(
         current_short=evaluation.current_short,
         current_long=evaluation.current_long,
         crossover_side=(
-            None if evaluation.crossover_side is None else evaluation.crossover_side.value
+            None
+            if evaluation.crossover_side is None
+            else evaluation.crossover_side.value
         ),
         actionable_side=(
             None

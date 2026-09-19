@@ -201,8 +201,7 @@ def test_available_page_renders_warmup_gates_account_and_strategy_readiness() ->
     assert page.findChild(QLabel, "operatorStrategySymbol").text() == "SPY"
     assert page.findChild(QLabel, "operatorStrategyDesiredQuantity").text() == "1"
     assert page.findChild(QLabel, "operatorStrategySessions").text() == (
-        "2026-09-11, 2026-09-14, 2026-09-15, "
-        "2026-09-16, 2026-09-17, 2026-09-18"
+        "2026-09-11, 2026-09-14, 2026-09-15, 2026-09-16, 2026-09-17, 2026-09-18"
     )
     assert page.findChild(QLabel, "operatorStrategyCloses").text() == (
         "764.29, 760.88, 757.39, 754.05, 762.6, 761.69"
@@ -218,9 +217,10 @@ def test_available_page_renders_warmup_gates_account_and_strategy_readiness() ->
     assert page.findChild(QLabel, "operatorStrategyCrossoverSide").text() == "BUY"
     assert page.findChild(QLabel, "operatorStrategyAccountState").text() == "Flat"
     assert page.findChild(QLabel, "operatorStrategyActionableSide").text() == "BUY"
-    assert "not D7 publication authority" in page.findChild(
-        QLabel, "operatorStrategyAuthorityNotice"
-    ).text()
+    assert (
+        "not D7 publication authority"
+        in page.findChild(QLabel, "operatorStrategyAuthorityNotice").text()
+    )
     assert page.findChildren(QPushButton) == []
 
 

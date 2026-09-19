@@ -71,7 +71,9 @@ class MovingAverageCrossoverEvaluation:
 
     def __post_init__(self) -> None:
         if type(self.status) is not MovingAverageCrossoverEvaluationStatus:
-            raise TypeError("status must be exact MovingAverageCrossoverEvaluationStatus")
+            raise TypeError(
+                "status must be exact MovingAverageCrossoverEvaluationStatus"
+            )
         if type(self.evaluated_closes) is not tuple or any(
             type(value) is not Decimal or not value.is_finite() or value <= 0
             for value in self.evaluated_closes
@@ -87,23 +89,35 @@ class MovingAverageCrossoverEvaluation:
         )
         if self.status is MovingAverageCrossoverEvaluationStatus.INSUFFICIENT_HISTORY:
             if any(value is not None for value in averages) or any(
-                value is not None for value in (self.crossover_side, self.actionable_side)
+                value is not None
+                for value in (self.crossover_side, self.actionable_side)
             ):
                 raise ValueError("insufficient history cannot expose crossover values")
             return
-        if any(type(value) is not Decimal or not value.is_finite() for value in averages):
+        if any(
+            type(value) is not Decimal or not value.is_finite() for value in averages
+        ):
             raise ValueError("complete evaluation requires finite Decimal averages")
         if self.status is MovingAverageCrossoverEvaluationStatus.NO_CROSSOVER:
             if self.crossover_side is not None or self.actionable_side is not None:
                 raise ValueError("NO_CROSSOVER cannot expose a side")
         elif self.status is MovingAverageCrossoverEvaluationStatus.POSITION_FILTERED:
-            if type(self.crossover_side) is not OrderSide or self.actionable_side is not None:
+            if (
+                type(self.crossover_side) is not OrderSide
+                or self.actionable_side is not None
+            ):
                 raise ValueError("POSITION_FILTERED requires only a raw crossover side")
         elif self.status is MovingAverageCrossoverEvaluationStatus.BUY:
-            if self.crossover_side is not OrderSide.BUY or self.actionable_side is not OrderSide.BUY:
+            if (
+                self.crossover_side is not OrderSide.BUY
+                or self.actionable_side is not OrderSide.BUY
+            ):
                 raise ValueError("BUY evaluation side mismatch")
         elif self.status is MovingAverageCrossoverEvaluationStatus.SELL:
-            if self.crossover_side is not OrderSide.SELL or self.actionable_side is not OrderSide.SELL:
+            if (
+                self.crossover_side is not OrderSide.SELL
+                or self.actionable_side is not OrderSide.SELL
+            ):
                 raise ValueError("SELL evaluation side mismatch")
 
 

@@ -6,6 +6,9 @@ from uuid import UUID
 
 import pytest
 
+from trading_bot.gui import (
+    operator_observability_snapshot_adapter as snapshot_adapter_module,
+)
 from trading_bot.gui.operator_observability_models import (
     OperatorEffectGateState,
     OperatorOperationsPageStatus,
@@ -14,7 +17,6 @@ from trading_bot.gui.operator_observability_models import (
     OperatorWarmupView,
     SelectedC3WarmupSessionView,
 )
-import trading_bot.gui.operator_observability_snapshot_adapter as snapshot_adapter_module
 from trading_bot.gui.operator_observability_snapshot_adapter import (
     OperatorObservabilitySnapshotAdapterError,
     adapt_operator_observability_snapshot,
@@ -145,13 +147,9 @@ def test_snapshot_adapter_copies_only_bounded_display_facts() -> None:
         Decimal("762.6"),
         Decimal("761.69"),
     )
-    assert explanation.previous_short == Decimal(
-        "758.0133333333333333333333333"
-    )
+    assert explanation.previous_short == Decimal("758.0133333333333333333333333")
     assert explanation.previous_long == Decimal("759.842")
-    assert explanation.current_short == Decimal(
-        "759.4466666666666666666666667"
-    )
+    assert explanation.current_short == Decimal("759.4466666666666666666666667")
     assert explanation.current_long == Decimal("759.322")
     assert explanation.crossover_side == "BUY"
     assert explanation.actionable_side == "BUY"
@@ -161,7 +159,6 @@ def test_snapshot_adapter_copies_only_bounded_display_facts() -> None:
 def test_snapshot_adapter_rejects_wrong_type() -> None:
     with pytest.raises(OperatorObservabilitySnapshotAdapterError):
         adapt_operator_observability_snapshot(object())  # type: ignore[arg-type]
-
 
 
 def test_o4_adapter_uses_read_only_source_owned_strategy_seam() -> None:

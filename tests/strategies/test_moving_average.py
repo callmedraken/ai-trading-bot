@@ -167,7 +167,6 @@ def test_evaluation_does_not_mutate_context_positions() -> None:
     assert dict(context.positions) == before
 
 
-
 def test_close_explanation_matches_bullish_strategy_arithmetic() -> None:
     evaluation = evaluate_moving_average_crossover_closes(
         (
@@ -207,10 +206,7 @@ def test_close_explanation_reports_position_filter_without_delaying_signal() -> 
         invested=True,
     )
 
-    assert (
-        evaluation.status
-        is MovingAverageCrossoverEvaluationStatus.POSITION_FILTERED
-    )
+    assert evaluation.status is MovingAverageCrossoverEvaluationStatus.POSITION_FILTERED
     assert evaluation.crossover_side is OrderSide.BUY
     assert evaluation.actionable_side is None
 
@@ -223,8 +219,7 @@ def test_close_explanation_reports_incomplete_history_without_averages() -> None
     )
 
     assert (
-        evaluation.status
-        is MovingAverageCrossoverEvaluationStatus.INSUFFICIENT_HISTORY
+        evaluation.status is MovingAverageCrossoverEvaluationStatus.INSUFFICIENT_HISTORY
     )
     assert evaluation.evaluated_closes == (
         Decimal("10"),

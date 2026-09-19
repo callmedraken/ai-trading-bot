@@ -302,7 +302,7 @@ def test_strategy_explanation_incomplete_history_has_no_derived_values() -> None
 
 
 def test_strategy_explanation_rejects_complete_status_without_six_closes() -> None:
-    with pytest.raises(ValueError, match="long_window \+ 1 closes"):
+    with pytest.raises(ValueError, match=r"long_window \+ 1 closes"):
         OperatorStrategyExplanationView(
             status=OperatorStrategyExplanationStatus.NO_CROSSOVER,
             short_window=3,

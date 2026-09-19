@@ -57,15 +57,23 @@ states. It does not call an effectful boundary, alter Task Scheduler, publish
 D7, settle D8, recover receipts, provision storage, or submit broker/live
 orders.
 
-O2 real-host qualification was attempted under the real non-admin Trading
-principal and is not yet accepted. The launcher remained effects-closed and
-returned VALIDATION_BLOCKED. Follow-up read-only evidence showed all eight gates
-false, C1 valid, G5 NO_NEW_COMPLETED_SESSION for 2026-09-18 with selected
-snapshot 680b260f-08c9-5923-87bb-b5f0a4701380, but G6 BLOCKED because
-resolve_personal_desktop_historical_cycle_configurations fails closed with
-PersonalDesktopHistoricalCycleConfigurationError. Diagnose the resolver inputs
-(read receipt dependencies, unattended invocation sources, frozen first-plan
-reconstruction, exact resolution) before changing source or production state.
+The original O2 real-host blocker was traced to Windows CRLF conversion of the
+frozen first-operation history seed in the observability worktree. The
+repository now pins that path with `text eol=lf`; the frozen artifact itself was
+not changed. Exact-byte regression coverage was added and focused verification
+passed.
+
+The second genuine non-admin Trading O2 invocation now returns the full
+sanitized snapshot: all eight gates false; C1 valid; G5
+NO_NEW_COMPLETED_SESSION for 2026-09-18; selected-C3 history READY 6/6; Paper-v2
+account read PASS with cash 25000, no positions, realized P&L 0; and
+real_effect_performed=false.
+
+G6 still classifies BLOCKED downstream of those successful reads. Diagnose the
+remaining G6 tail in exact order: finalized-decision discovery for the completed
+session, authoritative history binding, next-decision construction, then
+read-only decision-publication qualification. Do not invoke protected D7-C
+during diagnosis.
 
 The observability branch remains separate while the protected natural D5 -> D7
 -> D8/D9 production sequence is validated. After the first accepted unattended

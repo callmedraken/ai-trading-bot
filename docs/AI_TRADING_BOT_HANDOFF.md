@@ -806,3 +806,36 @@ The old D7-A READY result and candidate
 D7-A must run read-only from a disposable checkout pinned to the exact
 replacement source and compare the reconstructed candidate. D7-C remains
 protected and unauthorized.
+
+
+## Replacement D7-A production qualification
+
+Fresh read-only D7-A from exact replacement certified source:
+
+```text
+HEAD: acd606a41ac50f172ac62377ce6d4e7c8c4d3a32
+TREE: 784695d05865a767ba187adf38fd4924897127a9
+```
+
+returned exit code 0 with:
+
+```text
+READY
+candidate:                    f2188b5e-e6a4-5398-be41-8867d9268355
+completed session:            2026-09-18
+selected history:             6/6
+selected snapshot:            680b260f-08c9-5923-87bb-b5f0a4701380
+intended execution session:   2026-09-21
+regular open:                 2026-09-21T13:30:00+00:00
+account predecessor:          ed4640e5-0630-525d-b916-d50e31e3ba2a
+namespace:                    PRESENT_VALID
+storage:                      ABSENT
+deadline open:                true
+all eight gates closed:       true
+real effect performed:        false
+```
+
+The candidate exactly matches the earlier historical D7-A result after the
+Decimal correction. D7-B remains unnecessary. The next step is the protected
+D7-C first publication boundary. It requires explicit operator approval and
+must perform a fresh preflight before any effect.

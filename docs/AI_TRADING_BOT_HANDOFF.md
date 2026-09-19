@@ -773,3 +773,36 @@ D7-B is skipped because the namespace already exists and validates. The next
 production checkpoint is protected D7-C first publication. Do not run D7-C
 without explicit operator approval. After D7-C, run fresh D7-D independent
 read-only reconciliation before accepting publication.
+
+
+## Replacement D7 source certification
+
+Replacement D7 source is accepted at:
+
+```text
+HEAD: acd606a41ac50f172ac62377ce6d4e7c8c4d3a32
+TREE: 784695d05865a767ba187adf38fd4924897127a9
+```
+
+Certification:
+
+```text
+5534 passed, 17 skipped outside Architecture-77
+775 passed in the clean Architecture-77 harness
+6309 passed, 17 skipped combined
+Ruff check/format PASS
+diff checks PASS
+worktree/index clean
+```
+
+The correction freezes moving-average Decimal arithmetic and proposal quantity
+normalization to historical/default Python Decimal semantics and adds the LF
+checkout contract for the frozen strategy-history seed. The seed remains 1060
+bytes with SHA-256
+`40dda54c82324f358d640cce89e467295b8f5b73a32fed76c52e7ca90d398e64`.
+
+The old D7-A READY result and candidate
+`f2188b5e-e6a4-5398-be41-8867d9268355` are historical evidence only. Fresh
+D7-A must run read-only from a disposable checkout pinned to the exact
+replacement source and compare the reconstructed candidate. D7-C remains
+protected and unauthorized.

@@ -526,3 +526,41 @@ lifetime correction, and D7-D account-admission capability-ordering correction.
 Next checkpoint: production D7-D read-only reconciliation from a fresh detached
 checkout pinned to this exact source. No D7-C publication and no D8 action are
 authorized.
+
+
+## Production D7-D reconciliation — ACCEPTED / D7 CLOSED
+
+Fresh production D7-D read-only reconciliation from the exact replacement-certified
+source returned:
+
+```text
+classification:                    RECONCILED
+completed_session:                 2026-09-18
+selected_snapshot_id:              680b260f-08c9-5923-87bb-b5f0a4701380
+selected_history_count:            6
+required_history_count:            6
+expected_decision_id:              f2188b5e-e6a4-5398-be41-8867d9268355
+finalized_decision_id:             f2188b5e-e6a4-5398-be41-8867d9268355
+intended_execution_session:        2026-09-21
+account_predecessor_checkpoint_id: ed4640e5-0630-525d-b916-d50e31e3ba2a
+namespace_classification:          PRESENT_VALID
+session_discovery_classification:  FINALIZED
+storage_classification:            FINALIZED_IDENTICAL
+observed_before_open:               true
+all_eight_gates_closed:            true
+real_effect_performed:             false
+exit code:                         0
+```
+
+This independently reconciles the durable D7-C publication under the corrected
+account-admission ordering. D7 is closed.
+
+Authoritative replacement-certified executable source remains:
+
+```text
+HEAD: ca05b2c583f79039e9de64f4a01b8de2ff2ab3ad
+TREE: d1c3e73eccaba6701bac86f38fb71a99d08ff2d5
+```
+
+Next checkpoint: consolidated D7 merge-readiness review against current
+`develop`. Do not merge until explicitly approved.

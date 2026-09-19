@@ -194,6 +194,14 @@ No buttons on this page may perform production effects.
 
 ### O4 — deterministic strategy preview
 
+**ACCEPTED** at HEAD `2fab48301530a89df21391c047f848eb3fd97272`,
+TREE `f8df06396a5203367bb9b0abdbcfd167bfa46d67`.
+Operator-supplied evidence: 266 focused tests passed; Ruff check/format and both
+diff checks passed; worktree clean. See
+[O4 acceptance](pd4-operator-observability-o4-acceptance.md).
+
+The following describes the accepted scope:
+
 After O1–O3 are accepted, add a read-only strategy explanation based only on
 already-verified selected-C3 history and existing source-owned strategy
 configuration.

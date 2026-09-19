@@ -1,5 +1,23 @@
 # Project Status and Roadmap
 
+## Current observability checkpoint — 2026-09-19
+
+O4 source is accepted at HEAD `2fab48301530a89df21391c047f848eb3fd97272`,
+TREE `f8df06396a5203367bb9b0abdbcfd167bfa46d67`; operator-supplied verification:
+266 focused tests passed, Ruff check/format PASS, both diff checks PASS, clean
+worktree. See [O4 acceptance](validation/pd4-operator-observability-o4-acceptance.md).
+
+Strategy explanation is read-only and uses the source-owned MA3/MA5 evaluator.
+GUI output is non-authoritative for D7. D5 is READY 6/6 through 2026-09-18;
+D7-A is accepted for candidate `f2188b5e-e6a4-5398-be41-8867d9268355`, execution
+session 2026-09-21. Namespace PRESENT_VALID makes D7-B unnecessary. D7-C remains
+protected and unauthorized; D8-B remains protected/not run. All eight gates
+remain committed false. Earlier checkpoint descriptions below are historical
+where superseded by this current state.
+
+Next safe work: bounded observability/strategy parity review and integration
+preparation. No production work is authorized.
+
 This is the canonical high-level project status for AI Trading Bot. Detailed
 subsystem contracts live under `docs/architecture/` and `docs/validation/`;
 `docs/AI_TRADING_BOT_HANDOFF.md` is the canonical cross-chat resume document.

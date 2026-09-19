@@ -703,3 +703,28 @@ The earlier accepted D7-A result is historical evidence only after this source
 replacement. The next production-side checkpoint is a fresh zero-argument,
 read-only D7-A qualification pinned to the exact replacement certified source.
 D7-C remains protected and unauthorized.
+
+
+## Replacement D7-A qualification — ACCEPTED
+
+Fresh read-only D7-A from replacement certified source
+`acd606a41ac50f172ac62377ce6d4e7c8c4d3a32` reproduced the historical
+production candidate exactly:
+
+```text
+classification:             READY
+candidate decision:          f2188b5e-e6a4-5398-be41-8867d9268355
+completed session:           2026-09-18
+execution session:           2026-09-21
+namespace:                   PRESENT_VALID
+storage:                     ABSENT
+deadline open:               true
+all eight gates closed:      true
+real effect performed:       false
+exit code:                   0
+```
+
+The Decimal determinism correction therefore preserved the real D7 candidate
+identity for this cycle. D7-B remains unnecessary. D7-C is now the next
+protected production checkpoint and remains explicitly unauthorized pending
+separate operator approval.

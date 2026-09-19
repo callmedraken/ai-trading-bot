@@ -66,7 +66,9 @@ def adapt_selected_c3_history_window(
     """Map exact selected-C3 history evidence into the bounded warm-up display."""
 
     if type(window) is not SelectedC3StrategyHistoryWindowResult:
-        raise OperatorObservabilityAdapterError("selected-C3 history evidence is invalid")
+        raise OperatorObservabilityAdapterError(
+            "selected-C3 history evidence is invalid"
+        )
     if len(window.required_sessions) != OPERATOR_WARMUP_TARGET_COUNT:
         raise OperatorObservabilityAdapterError(
             "selected-C3 history window is not the frozen six-session profile"

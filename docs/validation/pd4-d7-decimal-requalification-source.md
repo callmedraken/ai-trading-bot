@@ -166,3 +166,44 @@ checkout-level `core.autocrlf=false` workaround.
 D7-B remains unnecessary because the namespace is `PRESENT_VALID`.
 D7-C remains the next protected production effect and is explicitly
 unauthorized until separate operator approval.
+
+
+## First approved D7-C attempt — BLOCKED / EFFECTS-CLOSED
+
+An explicitly approved first D7-C publication attempt was preceded immediately
+by a fresh D7-A preflight from the exact replacement-certified source. The
+preflight passed with the accepted READY candidate
+`f2188b5e-e6a4-5398-be41-8867d9268355`.
+
+The single D7-C invocation then returned:
+
+```text
+classification:             BLOCKED
+decision_id:                null
+selected_session:           null
+intended_execution_session: null
+real_effect_performed:      false
+exit code:                  6
+```
+
+No retry was attempted and D7-D was not run because no durable publication was
+reported. The null decision/session fields together with
+`real_effect_performed=false` place the failure before the publication writer
+or real effect boundary.
+
+Source review identified a process-local P2 reader-lifetime defect in the older
+production history composition: `build_personal_desktop_unattended_c3_history`
+creates the history reader locally, returns selected-C3 permits whose provenance
+is weakly tied to that reader, and then
+`create_personal_desktop_unattended_paper_decision_intent` revalidates those
+permits after the reader can leave scope. D7-A does not exhibit the defect
+because its production dependencies deliberately retain the relevant readers.
+
+The required correction is to preserve the reader/provenance lifetime through
+decision-intent construction without weakening permit validation. Because the
+shared helper is also used outside D7-C, this must be fixed at the shared
+composition boundary rather than bypassed only in the publication launcher.
+
+No second D7-C attempt is authorized by this record. A source correction,
+focused regression, full replacement certification, and fresh read-only D7-A
+qualification are required before another publication approval decision.

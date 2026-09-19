@@ -12,6 +12,25 @@ OPERATOR_WARMUP_TARGET_COUNT = 6
 MAX_OPERATOR_SYMBOL_CHARACTERS = 10
 
 
+def _require_operator_symbol(symbol: str) -> None:
+    if type(symbol) is not str:
+        raise TypeError("symbol must be an exact string")
+    if (
+        not symbol
+        or symbol != symbol.strip()
+        or len(symbol) > MAX_OPERATOR_SYMBOL_CHARACTERS
+        or any(
+            not (
+                "A" <= character <= "Z"
+                or "0" <= character <= "9"
+                or character in ".-"
+            )
+            for character in symbol
+        )
+    ):
+        raise ValueError("symbol must be canonical presentation text")
+
+
 class OperatorWarmupClassification(Enum):
     """Bounded presentation classification for the selected-C3 warm-up window."""
 
@@ -34,22 +53,7 @@ class SelectedC3WarmupSessionView:
     def __post_init__(self) -> None:
         if type(self.session_date) is not date:
             raise TypeError("session_date must be an exact date")
-        if type(self.symbol) is not str:
-            raise TypeError("symbol must be an exact string")
-        if (
-            not self.symbol
-            or self.symbol != self.symbol.strip()
-            or len(self.symbol) > MAX_OPERATOR_SYMBOL_CHARACTERS
-            or any(
-                not (
-                    "A" <= character <= "Z"
-                    or "0" <= character <= "9"
-                    or character in ".-"
-                )
-                for character in self.symbol
-            )
-        ):
-            raise ValueError("symbol must be canonical presentation text")
+        _require_operator_symbol(self.symbol)
         if (
             type(self.close) is not Decimal
             or not self.close.is_finite()
@@ -235,13 +239,7 @@ class OperatorAccountPositionView:
     average_cost: Decimal
 
     def __post_init__(self) -> None:
-        SelectedC3WarmupSessionView(
-            session_date=date.min,
-            symbol=self.symbol,
-            close=Decimal("1"),
-            snapshot_id=UUID(int=0),
-            selection_id=UUID(int=0),
-        )
+        _require_operator_symbol(self.symbol)
         for name in ("quantity", "total_cost_basis", "average_cost"):
             value = getattr(self, name)
             if type(value) is not Decimal or not value.is_finite() or value <= 0:

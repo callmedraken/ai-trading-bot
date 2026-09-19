@@ -51,6 +51,23 @@ post-certification docs tip: 489b96a97d36fd28822142db9a69f0f0dd2d3d72
 Leave this source tree stable until the natural D5 six-session suffix is ready
 and a protected D7 production checkpoint is explicitly entered.
 
+### Operator observability — O1 accepted / O2 active
+
+```text
+branch: feature/pd4-operator-observability
+worktree: F:\AI\worktrees\ai-trading-bot-operator-observability
+O1 accepted HEAD: ee1f44022340563f94f334f897a5e88859f7c6c7
+O1 accepted TREE: 76f98eb64a3205a88dcd86a2c541feaaea9939fa
+```
+
+O1 provides immutable Qt-free view models and pure adapters over already
+verified/read-only selected-C3 history and gate-state evidence. Exact focused
+acceptance: 16 passed; Ruff check/format and diff checks passed; worktree clean.
+O2 is the active side-project checkpoint and adds a zero-semantic-argument,
+Trading-principal read-only operator snapshot command. This branch remains
+non-authoritative and must not modify the armed D5, certified D7, or certified
+D8/D9 operational boundaries.
+
 ### D8/D9 settlement source — certified/frozen source boundary
 
 ```text
@@ -576,6 +593,24 @@ merge/rebase/force-push/amend/PR metadata/review-thread changes without explicit
 - Preserve unrelated generated/untracked reports and historical evidence.
 - No merge/rebase/force-push/amend/PR metadata/review-thread changes without
   explicit approval.
+
+## PD4 operator observability — PARALLEL DEVELOPMENT
+
+O1 is accepted on the isolated observability branch.
+
+```text
+HEAD  ee1f44022340563f94f334f897a5e88859f7c6c7
+TREE  76f98eb64a3205a88dcd86a2c541feaaea9939fa
+16 focused tests passed
+Ruff check/format PASS
+diff checks PASS
+worktree CLEAN
+```
+
+O2 is next: a zero-argument, effects-closed Trading-principal snapshot command
+for D5/G6 status, selected-C3 history, Paper-v2 account/lineage facts, and the
+eight effect gates. It grants no publication, settlement, retry, scheduler, or
+broker authority.
 
 ## Documentation workflow
 

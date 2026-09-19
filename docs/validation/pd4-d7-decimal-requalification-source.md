@@ -490,3 +490,39 @@ decision is untouched and must not be republished.
 Next checkpoint: ChatGPT exact-diff review, followed by replacement full source
 certification. Only after those pass may a separately authorized read-only D7-D
 production rerun be considered. D8 remains blocked.
+
+
+## D7-D admission-fix replacement source certification — ACCEPTED
+
+The capability/evidence ordering correction is replacement-certified at:
+
+```text
+HEAD: ca05b2c583f79039e9de64f4a01b8de2ff2ab3ad
+TREE: d1c3e73eccaba6701bac86f38fb71a99d08ff2d5
+```
+
+Certification evidence:
+
+```text
+broad suite excluding Architecture-77: 5540 passed, 17 skipped
+Architecture-77 clean-harness suite:    775 passed
+combined:                               6315 passed, 17 skipped
+Ruff check:                             PASS
+Ruff format --check:                    PASS (533 files)
+git diff --check:                       PASS
+git diff --cached --check:              PASS
+worktree/index:                         clean
+origin HEAD:                            exact source HEAD
+```
+
+Both Architecture-77 test modules were byte-identical between candidate and
+clean integration harness. Import proof resolved the exercised package and D7-D
+reconciliation module beneath this candidate source tree.
+
+This is now the authoritative replacement-certified D7 source. It includes the
+Decimal determinism correction, LF seed checkout contract, selected-C3 reader
+lifetime correction, and D7-D account-admission capability-ordering correction.
+
+Next checkpoint: production D7-D read-only reconciliation from a fresh detached
+checkout pinned to this exact source. No D7-C publication and no D8 action are
+authorized.

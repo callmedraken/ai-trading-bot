@@ -57,8 +57,15 @@ states. It does not call an effectful boundary, alter Task Scheduler, publish
 D7, settle D8, recover receipts, provision storage, or submit broker/live
 orders.
 
-Next checkpoint: run the accepted O2 command once under the real Trading
-principal and preserve its sanitized JSON evidence.
+O2 real-host qualification was attempted under the real non-admin Trading
+principal and is not yet accepted. The launcher remained effects-closed and
+returned VALIDATION_BLOCKED. Follow-up read-only evidence showed all eight gates
+false, C1 valid, G5 NO_NEW_COMPLETED_SESSION for 2026-09-18 with selected
+snapshot 680b260f-08c9-5923-87bb-b5f0a4701380, but G6 BLOCKED because
+resolve_personal_desktop_historical_cycle_configurations fails closed with
+PersonalDesktopHistoricalCycleConfigurationError. Diagnose the resolver inputs
+(read receipt dependencies, unattended invocation sources, frozen first-plan
+reconstruction, exact resolution) before changing source or production state.
 
 The observability branch remains separate while the protected natural D5 -> D7
 -> D8/D9 production sequence is validated. After the first accepted unattended

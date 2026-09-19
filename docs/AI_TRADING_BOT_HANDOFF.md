@@ -886,3 +886,36 @@ Next: fresh read-only D7-A from the exact certified source. Require reproduction
 of candidate `f2188b5e-e6a4-5398-be41-8867d9268355`, namespace
 `PRESENT_VALID`, storage `ABSENT`, deadline open, and all eight gates closed.
 Only after that may a new D7-C approval be considered.
+
+
+## Post-reader-lifetime-fix D7-A qualification
+
+Fresh read-only qualification from exact certified source:
+
+```text
+HEAD: 8bc6d436142531dec17bf7b960a7ac1eb2e45b09
+TREE: 18255e5272728a5bf2b8f8633fff23cf940b77be
+```
+
+returned exit code 0 and:
+
+```text
+classification:             READY
+candidate:                  f2188b5e-e6a4-5398-be41-8867d9268355
+completed session:          2026-09-18
+selected history:           6/6
+selected snapshot:          680b260f-08c9-5923-87bb-b5f0a4701380
+intended execution session: 2026-09-21
+regular open:               2026-09-21T13:30:00+00:00
+account predecessor:        ed4640e5-0630-525d-b916-d50e31e3ba2a
+namespace:                  PRESENT_VALID
+storage:                    ABSENT
+deadline open:              true
+all eight gates closed:     true
+real effect performed:      false
+```
+
+The exact production candidate is unchanged after the reader-lifetime repair.
+The next checkpoint is again D7-C first-decision publication, but the prior
+approval was consumed by the blocked no-effect attempt. A new explicit approval
+is required before any second D7-C invocation.

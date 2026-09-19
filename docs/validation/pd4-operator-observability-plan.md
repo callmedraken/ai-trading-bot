@@ -160,8 +160,24 @@ no caller-supplied semantic trading arguments.
 
 ### O3 — native GUI Operations page
 
-Add a read-only Operations page to the existing PySide6 GUI using the O1 view
-models/service protocol.
+**ACCEPTED**
+
+```text
+HEAD  fd504503d1fb468c0a2791e00d296da983afeb5a
+TREE  bb2a19189dc72a939456653db2cbd745fa237822
+focused tests: 71 passed
+Ruff check/format: PASS
+diff checks: PASS
+worktree: CLEAN
+```
+
+Acceptance record:
+
+```text
+docs/validation/pd4-operator-observability-o3-acceptance.md
+```
+
+The accepted page is read-only and uses the O1/O2 presentation boundary.
 
 The GUI must consume bounded observability state rather than import production
 private helpers or implement independent trading/authority logic.

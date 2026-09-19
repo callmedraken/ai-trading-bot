@@ -237,6 +237,32 @@ class _SuccessfulReadIssuance:
         raise TypeError("successful P2 read issuances are created by verification")
 
 
+class _SelectedC3SnapshotProvenanceLifetime:
+    """Opaque bounded owner of the exact P2 readers behind retained permits."""
+
+    __slots__ = ("_readers",)
+
+    def __init__(self) -> None:
+        raise TypeError("selected C3 provenance lifetimes are issued by P2")
+
+    def __copy__(self) -> object:
+        raise TypeError("selected C3 provenance lifetimes cannot be copied")
+
+    def __deepcopy__(self, memo: object) -> object:
+        del memo
+        raise TypeError("selected C3 provenance lifetimes cannot be deep-copied")
+
+    def __reduce__(self) -> object:
+        raise TypeError("selected C3 provenance lifetimes cannot be serialized")
+
+    def __reduce_ex__(self, protocol: int) -> object:
+        del protocol
+        raise TypeError("selected C3 provenance lifetimes cannot be pickled")
+
+    def __getstate__(self) -> object:
+        raise TypeError("selected C3 provenance lifetimes cannot be serialized")
+
+
 @dataclass(frozen=True, slots=True)
 class _ReadCoreRegistration:
     reader_ref: weakref.ReferenceType[object]
@@ -410,6 +436,97 @@ def require_selected_c3_snapshot_matches_authority(
             )
         ):
             raise SelectedC3SnapshotReadError("P2 read does not match C1 authority")
+
+
+def retain_selected_c3_snapshot_provenance_lifetime(
+    evidence: tuple[
+        tuple[SelectedC3SnapshotPermit, SelectedC3SnapshotAuditEvidence], ...
+    ],
+    authority: ValidatedProductionAuthority,
+) -> object:
+    """Retain exact validated P2 readers without granting reusable read authority."""
+
+    authority = require_validated_production_authority(authority)
+    return _retain_selected_c3_snapshot_provenance_lifetime(
+        evidence,
+        provenance=_PRODUCTION_CORE_PROVENANCE,
+        authority=authority,
+    )
+
+
+def retain_disposable_selected_c3_snapshot_provenance_lifetime_for_test(
+    evidence: tuple[
+        tuple[SelectedC3SnapshotPermit, SelectedC3SnapshotAuditEvidence], ...
+    ],
+) -> object:
+    """Exercise bounded provenance retention without minting production provenance."""
+
+    return _retain_selected_c3_snapshot_provenance_lifetime(
+        evidence,
+        provenance=_DISPOSABLE_CORE_PROVENANCE,
+        authority=None,
+    )
+
+
+def _retain_selected_c3_snapshot_provenance_lifetime(
+    evidence: tuple[
+        tuple[SelectedC3SnapshotPermit, SelectedC3SnapshotAuditEvidence], ...
+    ],
+    *,
+    provenance: object,
+    authority: ValidatedProductionAuthority | None,
+) -> _SelectedC3SnapshotProvenanceLifetime:
+    if (
+        type(evidence) is not tuple
+        or not evidence
+        or any(
+            type(item) is not tuple
+            or len(item) != 2
+            or type(item[0]) is not SelectedC3SnapshotPermit
+            or type(item[1]) is not SelectedC3SnapshotAuditEvidence
+            for item in evidence
+        )
+    ):
+        raise SelectedC3SnapshotReadError(
+            "selected C3 provenance lifetime evidence is invalid"
+        )
+    readers: list[object] = []
+    seen_permits: list[SelectedC3SnapshotPermit] = []
+    with _PERMIT_REGISTRY_LOCK:
+        for permit, audit in evidence:
+            if any(existing is permit for existing in seen_permits):
+                raise SelectedC3SnapshotReadError(
+                    "selected C3 provenance lifetime contains a duplicate permit"
+                )
+            seen_permits.append(permit)
+            binding = _PERMIT_REGISTRY.get(permit)
+            if not _binding_is_exact(binding, audit, provenance):
+                raise SelectedC3SnapshotReadError(
+                    "selected C3 snapshot permit provenance is invalid"
+                )
+            assert binding is not None
+            if authority is not None and (
+                binding.registration.authority != authority
+                or binding.authority_identity
+                != (
+                    authority.machine_authority_id,
+                    authority.approved_account_sid,
+                    authority.authority_epoch_id,
+                )
+            ):
+                raise SelectedC3SnapshotReadError(
+                    "selected C3 snapshot does not match the consuming authority"
+                )
+            reader = binding.reader_ref()
+            if reader is None:
+                raise SelectedC3SnapshotReadError(
+                    "selected C3 snapshot permit provenance is invalid"
+                )
+            if all(existing is not reader for existing in readers):
+                readers.append(reader)
+        lifetime = object.__new__(_SelectedC3SnapshotProvenanceLifetime)
+        lifetime._readers = tuple(readers)
+    return lifetime
 
 
 def require_disposable_selected_c3_snapshot_matches_identity_for_test(

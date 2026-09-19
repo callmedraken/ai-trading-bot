@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import gc
 import hashlib
 import json
 import pickle
 import sqlite3
 import uuid
+import weakref
 from copy import copy, deepcopy
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
@@ -38,6 +40,7 @@ from trading_bot.runtime.manual_paper_selected_c3_snapshot import (
     open_disposable_selected_c3_snapshot_read_authority_for_test,
     require_disposable_selected_c3_snapshot_permit_for_test,
     require_selected_c3_snapshot_permit,
+    retain_disposable_selected_c3_snapshot_provenance_lifetime_for_test,
 )
 from trading_bot.runtime.verified_c3_daily_bar_open import (
     C3VerifiedDailyBarOpenBindingError,
@@ -710,6 +713,33 @@ def test_success_returns_exact_audit_and_deterministic_read_only_evidence(
     require_disposable_selected_c3_snapshot_permit_for_test(first.permit, first.audit)
     with pytest.raises(SelectedC3SnapshotReadError, match="provenance"):
         require_selected_c3_snapshot_permit(first.permit, first.audit)
+
+
+def test_bounded_lifetime_retains_real_disposable_p2_provenance_then_expires(
+    selected_case,
+) -> None:
+    reader = selected_case.authority
+    selected = reader.read_selected_snapshot(selected_case.ids["selection_id"])
+    reader_ref = weakref.ref(reader)
+    lifetime = retain_disposable_selected_c3_snapshot_provenance_lifetime_for_test(
+        ((selected.permit, selected.audit),)
+    )
+
+    selected_case.authority = None
+    del reader
+    gc.collect()
+    assert reader_ref() is not None
+    require_disposable_selected_c3_snapshot_permit_for_test(
+        selected.permit, selected.audit
+    )
+
+    del lifetime
+    gc.collect()
+    assert reader_ref() is None
+    with pytest.raises(SelectedC3SnapshotReadError, match="provenance"):
+        require_disposable_selected_c3_snapshot_permit_for_test(
+            selected.permit, selected.audit
+        )
 
 
 def test_disposable_verified_open_binding_uses_exact_selected_daily_bar_open(

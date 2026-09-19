@@ -207,3 +207,56 @@ composition boundary rather than bypassed only in the publication launcher.
 No second D7-C attempt is authorized by this record. A source correction,
 focused regression, full replacement certification, and fresh read-only D7-A
 qualification are required before another publication approval decision.
+
+
+## Selected-C3 reader/provenance lifetime source correction — PENDING REVIEW
+
+The shared selected-C3 history composition has been corrected on the isolated
+source branch `feature/pd4-d7c-reader-lifetime-fix`, based exactly on the
+effects-closed failure-record commit:
+
+```text
+base HEAD: bbdc3c3073bdf3c7fe264ec4b9bd5af780dc5c8c
+base TREE: 9b77611533a0944a77c08d5e4d2d8f041721949d
+```
+
+The pre-fix regression reproduced the production failure shape: the shared
+history builder validated all selected-C3 permits while its local P2 reader was
+alive, returned, and then exposed dead weak-reference provenance at downstream
+history-binding revalidation.
+
+The correction adds a bounded, opaque, non-copyable, non-serializable P2
+provenance-lifetime object. The production history factory attaches that object
+to a private `init=False`, `repr=False`, `compare=False` field on the
+process-local `SelectedC3StrategyHistoryBinding`. It strongly retains only the
+exact P2 readers already proven to have issued the six permits in that binding.
+The existing P2 registries remain weak, no global strong registry was added,
+and the ordinary disposable/history binding constructor remains available
+without retained production provenance.
+
+Neither `require_selected_c3_snapshot_matches_authority` nor
+`require_selected_c3_strategy_history_binding` was weakened. Both still
+revalidate the exact permits, audits, readers, cores, registrations, and C1
+identity. Real disposable-P2 lifetime coverage proves that the permit remains
+valid only while the proof-owned lifetime is live and fails normally after that
+lifetime is released and garbage collection removes the issuing reader.
+
+The shared daily-cycle path now consumes the retained history successfully, and
+the D7-C source test reaches decision construction through the real shared
+history composition boundary rather than a non-expiring `SimpleNamespace`
+history reader. The private field is excluded from equality and representation,
+and the decision serializer/identity material is unchanged; the deterministic
+D7 fixture remains byte-identical across independent wake reconstruction.
+
+No D7-A, D7-C, D7-D, D8, scheduler, provider, credential, Paper-v2 mutation,
+broker, or live operation was performed. All eight committed effect gates
+remain false. The historical production candidate remains:
+
+```text
+f2188b5e-e6a4-5398-be41-8867d9268355
+```
+
+Exact reproduction of that real-host candidate remains a required fresh
+read-only D7-A gate after exact-diff review and full replacement source
+certification. This source-fix checkpoint does not authorize another D7-C
+attempt.

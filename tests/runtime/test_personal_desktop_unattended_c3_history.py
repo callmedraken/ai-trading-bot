@@ -526,6 +526,20 @@ def test_valid_history_binding_uses_non_authoritative_inner_seed() -> None:
     )
 
 
+def test_private_provenance_lifetime_is_nonsemantic() -> None:
+    history, current = _valid_chain()
+    verified = history_module._verified_history_seed(history, current, _CONFIG)
+    retained = SelectedC3StrategyHistoryBinding(history, current, verified)
+    disposable = SelectedC3StrategyHistoryBinding(history, current, verified)
+
+    object.__setattr__(retained, "_provenance_lifetime", object())
+
+    assert retained == disposable
+    assert repr(retained) == repr(disposable)
+    field = retained.__dataclass_fields__["_provenance_lifetime"]
+    assert field.init is field.repr is field.compare is False
+
+
 def test_history_gap_is_rejected() -> None:
     history = (
         _session_read(date(2026, 8, 14)),

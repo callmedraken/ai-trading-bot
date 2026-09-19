@@ -37,7 +37,7 @@ from trading_bot.runtime.personal_desktop_unattended_c3_history import (
     SelectedC3StrategyHistoryWindowClassification,
     SessionIndexedSelectedC3SnapshotReadResult,
     WindowsPersonalDesktopUnattendedSelectedC3ReadAuthority,
-    build_selected_c3_strategy_history_binding,
+    build_retained_selected_c3_strategy_history_binding,
 )
 from trading_bot.runtime.personal_desktop_unattended_daily_cycle_timing import (
     next_xnys_execution_session,
@@ -680,7 +680,7 @@ def _build_history_production(
         or window.selected[-1] != current
     ):
         raise ValueError("selected-C3 history-window result is invalid")
-    return build_selected_c3_strategy_history_binding(
+    return build_retained_selected_c3_strategy_history_binding(
         c1, window.selected[:-1], current, config
     )
 

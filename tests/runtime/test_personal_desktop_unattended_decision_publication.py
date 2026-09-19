@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ast
 import ctypes
+import gc
 import inspect
 import threading
 from concurrent.futures import ThreadPoolExecutor
@@ -20,13 +21,13 @@ from trading_bot.runtime import personal_desktop_paper_runtime_output as output
 from trading_bot.runtime import personal_desktop_unattended_daily_cycle as daily
 from trading_bot.runtime import personal_desktop_unattended_decision_publication as d6
 from trading_bot.runtime import (
+    personal_desktop_unattended_paper_decision_intent as intent_module,
+)
+from trading_bot.runtime import (
     personal_desktop_unattended_paper_decision_publication as pub,
 )
 from trading_bot.runtime.personal_desktop_unattended_c3_history import (
-    SelectedC3StrategyHistoryWindowClassification as Window,
-)
-from trading_bot.runtime.personal_desktop_unattended_c3_history import (
-    SelectedC3StrategyHistoryWindowResult,
+    require_selected_c3_strategy_history_binding,
 )
 from trading_bot.runtime.personal_desktop_unattended_daily_cycle_timing import (
     xnys_regular_open,
@@ -41,6 +42,9 @@ from trading_bot.runtime.personal_desktop_unattended_paper_decision_storage impo
     PersonalDesktopUnattendedDecisionStorageReadResult as StorageResult,
 )
 
+from ._selected_c3_history_lifetime import (
+    install_weak_selected_c3_history_reader,
+)
 from .test_personal_desktop_unattended_paper_decision_intent import (
     _decision_binding,
     _session_read,
@@ -649,23 +653,21 @@ def test_exact_history_and_decision_reconstruction_are_wake_time_independent(
             ]
         )
     )
-    window = SelectedC3StrategyHistoryWindowResult(
-        Window.READY,
-        tuple(item.session for item in selected),
-        (*selected[:-1], h.current),
+    reader_refs, _ = install_weak_selected_c3_history_reader(
+        monkeypatch,
+        authority=h.authority,
+        selected=(*selected[:-1], h.current),
+        current=h.current,
+        config=daily.personal_desktop_unattended_strategy_config(),
     )
+
     from .test_manual_paper_strategy_plan import _prior
 
     h.account.prior_checkpoint = _prior()
     monkeypatch.setattr(
-        daily, "require_validated_production_authority", lambda value: value
-    )
-    monkeypatch.setattr(
-        daily,
-        "WindowsPersonalDesktopUnattendedSelectedC3ReadAuthority",
-        lambda c1: SimpleNamespace(
-            inspect_strategy_history_window=lambda current, config: window
-        ),
+        intent_module,
+        "require_selected_c3_strategy_history_binding",
+        require_selected_c3_strategy_history_binding,
     )
     h.build_history = daily.build_personal_desktop_unattended_c3_history
     h.build_decision = daily.build_personal_desktop_unattended_next_decision
@@ -693,6 +695,8 @@ def test_exact_history_and_decision_reconstruction_are_wake_time_independent(
         binding.decision.prepared_decision.planning_at
         == h.current.selected.verification.snapshot.audit.captured_at
     )
+    gc.collect()
+    assert reader_refs and all(reference() is None for reference in reader_refs)
     # A new wake re-derives the same exact artifact, without a previous G6 result.
     h.events.clear()
     h.account_reads = 0

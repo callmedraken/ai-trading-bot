@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import sqlite3
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, time
 from enum import StrEnum
 from uuid import UUID
@@ -23,6 +23,7 @@ from trading_bot.runtime.manual_paper_selected_c3_snapshot import (
     SelectedC3SnapshotReadResult,
     WindowsSelectedC3SnapshotReadAuthority,
     require_selected_c3_snapshot_matches_authority,
+    retain_selected_c3_snapshot_provenance_lifetime,
 )
 from trading_bot.runtime.personal_desktop_unattended_daily_cycle_timing import (
     next_xnys_execution_session,
@@ -140,6 +141,12 @@ class SelectedC3StrategyHistoryBinding:
     history: tuple[SessionIndexedSelectedC3SnapshotReadResult, ...]
     current: SessionIndexedSelectedC3SnapshotReadResult
     verified_seed: VerifiedStrategyHistorySeed
+    _provenance_lifetime: object | None = field(
+        default=None,
+        init=False,
+        repr=False,
+        compare=False,
+    )
 
     def __post_init__(self) -> None:
         try:
@@ -342,6 +349,31 @@ def build_selected_c3_strategy_history_binding(
         )
     verified = _verified_history_seed(retained, current, strategy_config)
     return SelectedC3StrategyHistoryBinding(retained, current, verified)
+
+
+def build_retained_selected_c3_strategy_history_binding(
+    authority: ValidatedProductionAuthority,
+    history: tuple[SessionIndexedSelectedC3SnapshotReadResult, ...],
+    current: SessionIndexedSelectedC3SnapshotReadResult,
+    strategy_config: MovingAverageCrossoverConfig,
+) -> SelectedC3StrategyHistoryBinding:
+    """Build a production history proof that owns its exact P2 provenance lifetime."""
+
+    binding = build_selected_c3_strategy_history_binding(
+        authority,
+        history,
+        current,
+        strategy_config,
+    )
+    lifetime = retain_selected_c3_snapshot_provenance_lifetime(
+        tuple(
+            (item.selected.permit, item.selected.audit)
+            for item in (*binding.history, binding.current)
+        ),
+        authority,
+    )
+    object.__setattr__(binding, "_provenance_lifetime", lifetime)
+    return binding
 
 
 def inspect_selected_c3_strategy_history_window_for_test(

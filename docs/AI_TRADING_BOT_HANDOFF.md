@@ -839,3 +839,20 @@ The candidate exactly matches the earlier historical D7-A result after the
 Decimal correction. D7-B remains unnecessary. The next step is the protected
 D7-C first publication boundary. It requires explicit operator approval and
 must perform a fresh preflight before any effect.
+
+
+## D7-C first approved attempt — fail-closed evidence
+
+Fresh D7-A preflight passed, but the one approved publication invocation
+returned `BLOCKED`, exit 6, with null decision/session fields and
+`real_effect_performed=false`. No retry was attempted; D7-D was not run.
+
+Review identified the shared production selected-C3 history reader lifetime as
+the likely pre-effect failure: permits are weakly bound to their P2 reader, while
+the older history helper lets its local reader leave scope before G4 decision
+construction revalidates the binding. D7-A explicitly retains readers and
+therefore does not hit this path.
+
+Next: source-only lifetime fix in an isolated branch, focused tests, full
+replacement certification, then fresh read-only D7-A. D7-C requires a new
+explicit approval after those checks.

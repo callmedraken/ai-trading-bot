@@ -75,9 +75,11 @@ def _cycle(
             else None
         ),
         market_data_classification=(
-            PersonalDesktopUnattendedMarketDataCaptureClassification.NO_NEW_COMPLETED_SESSION
+            PersonalDesktopUnattendedMarketDataCaptureClassification
+            .NO_NEW_COMPLETED_SESSION
             if selected
-            else PersonalDesktopUnattendedMarketDataCaptureClassification.CAPTURE_REQUIRED
+            else PersonalDesktopUnattendedMarketDataCaptureClassification
+            .CAPTURE_REQUIRED
         ),
     )
 

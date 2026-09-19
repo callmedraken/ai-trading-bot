@@ -875,3 +875,40 @@ exit code: 0
 
 The consolidated D7 lineage is now ready for merge-readiness review against
 current `develop`. No merge is authorized yet.
+
+
+## D7 integrated into develop
+
+PR #8 merged the closed consolidated D7 lineage into `develop`.
+
+Integration merge:
+
+```text
+merge commit: 9cf436be71d2f37820190c2a920692abb8802b82
+tree:         12169f7414a6ccb53db6e27150926bb72e111c72
+```
+
+The merged lineage contains the accepted Decimal determinism, selected-C3
+reader-lifetime, and D7-D account-admission corrections plus the durable D7
+publication/reconciliation records. Certified executable source remains
+`ca05b2c583f79039e9de64f4a01b8de2ff2ab3ad` /
+`d1c3e73eccaba6701bac86f38fb71a99d08ff2d5`.
+
+Branch inventory after integration:
+
+- D7 predecessor/fix branches and the armed personal-desktop runtime are now
+  strictly behind `develop`; no separate merge is needed.
+- older P3-R1/reliable-manual branches are superseded by the accepted Paper-v2 /
+  PD3 authority model and must not be merged.
+- old C2/C3 certification branches contain obsolete certification scaffolding;
+  required source fixes are already carried forward.
+- `feature/pd4-unattended-settlement` remains intentionally unmerged because it
+  predates the final D7 corrections and must be forward-integrated/re-certified.
+- `feature/pd4-operator-observability` is a descendant of that settlement
+  branch and remains intentionally unmerged for the same reason.
+- the old unattended-scheduling-prerequisites branch is superseded by the later
+  Architecture-77+ capture/authority lineage.
+
+Next milestone: forward-integrate current `develop` into a fresh D8/D9
+settlement lineage, exact-diff review the result, and replace settlement source
+certification before any D8 production effect.

@@ -1,3 +1,21 @@
+# AI Trading Bot — Project Development Roadmap & Handoff
+
+**Repository:** `callmedraken/ai-trading-bot`  
+**Integration branch:** `develop`  
+**Armed D5 branch:** `feature/personal-desktop-paper-runtime`  
+**D7 certified branch:** `feature/pd4-unattended-decision-publication`  
+**D8/D9 certified branch:** `feature/pd4-unattended-settlement`  
+**Armed D5 worktree:** `F:\AI\worktrees\ai-trading-bot-personal-desktop`  
+**D7 worktree:** `F:\AI\worktrees\ai-trading-bot-decision-publication`  
+**D8/D9 worktree:** `F:\AI\worktrees\ai-trading-bot-unattended-settlement`  
+**Production/live trading:** NO-GO
+
+> This Git-tracked handoff is the canonical cross-chat resume document. Uploaded
+> copies are mirrors. Prove worktree, branch, HEAD, tree, origin, and clean state
+> before acting. Keep the armed D5, certified D7, and certified D8/D9 source
+> boundaries stable; use a separate branch/worktree for unrelated parallel
+> product development.
+
 ## Parallel operator-observability checkpoint
 
 The isolated side-project branch is:
@@ -33,24 +51,6 @@ The observability branch remains separate while the protected natural D5 -> D7
 end-to-end core cycle, merge the accepted core forward into observability,
 reverify the combined tree, then merge to `develop` only with explicit
 operator approval.
-
-# AI Trading Bot — Project Development Roadmap & Handoff
-
-**Repository:** `callmedraken/ai-trading-bot`  
-**Integration branch:** `develop`  
-**Armed D5 branch:** `feature/personal-desktop-paper-runtime`  
-**D7 certified branch:** `feature/pd4-unattended-decision-publication`  
-**D8/D9 certified branch:** `feature/pd4-unattended-settlement`  
-**Armed D5 worktree:** `F:\AI\worktrees\ai-trading-bot-personal-desktop`  
-**D7 worktree:** `F:\AI\worktrees\ai-trading-bot-decision-publication`  
-**D8/D9 worktree:** `F:\AI\worktrees\ai-trading-bot-unattended-settlement`  
-**Production/live trading:** NO-GO
-
-> This Git-tracked handoff is the canonical cross-chat resume document. Uploaded
-> copies are mirrors. Prove worktree, branch, HEAD, tree, origin, and clean state
-> before acting. Keep the armed D5, certified D7, and certified D8/D9 source
-> boundaries stable; use a separate branch/worktree for unrelated parallel
-> product development.
 
 ## 1. Product goal and threat model
 

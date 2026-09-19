@@ -60,6 +60,15 @@ class MockGuiApplicationService:
                     detail="Production market-data capture is not connected.",
                 ),
                 ComponentStatus(
+                    key="operations",
+                    title="Operations",
+                    status=PresentationStatus.UNAVAILABLE,
+                    detail=(
+                        "Production operator observability is not connected to "
+                        "this GUI service."
+                    ),
+                ),
+                ComponentStatus(
                     key="system",
                     title="System",
                     status=PresentationStatus.INFO,

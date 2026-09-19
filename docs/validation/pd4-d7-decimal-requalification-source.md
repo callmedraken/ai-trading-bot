@@ -260,3 +260,47 @@ Exact reproduction of that real-host candidate remains a required fresh
 read-only D7-A gate after exact-diff review and full replacement source
 certification. This source-fix checkpoint does not authorize another D7-C
 attempt.
+
+
+## Selected-C3 reader-lifetime replacement source certification — ACCEPTED
+
+The reader/provenance lifetime correction is accepted and fully certified at:
+
+```text
+HEAD: 8bc6d436142531dec17bf7b960a7ac1eb2e45b09
+TREE: 18255e5272728a5bf2b8f8633fff23cf940b77be
+```
+
+Certification evidence:
+
+```text
+broad suite excluding Architecture-77: 5538 passed, 17 skipped
+Architecture-77 clean-harness suite:    775 passed
+combined:                               6313 passed, 17 skipped
+Ruff check:                             PASS
+Ruff format --check:                    PASS (533 files)
+git diff --check:                       PASS
+git diff --cached --check:              PASS
+worktree/index:                         clean
+origin HEAD:                            exact source HEAD
+```
+
+Both Architecture-77 test modules were byte-identical between the candidate and
+the clean integration harness. Import proof resolved the exercised
+`trading_bot`, selected-C3 P2, and selected-C3 history modules beneath this
+candidate source tree. No ACL or permission workaround was used.
+
+The frozen strategy-history seed remains:
+
+```text
+byte length: 1060
+sha256: 40dda54c82324f358d640cce89e467295b8f5b73a32fed76c52e7ca90d398e64
+```
+
+This supersedes the earlier replacement-certified source for purposes of the
+next D7-A qualification. The failed D7-C attempt remains accepted fail-closed
+evidence and does not authorize a retry.
+
+Next checkpoint: fresh zero-argument read-only D7-A pinned to this exact source.
+D7-C remains unauthorized pending a new explicit approval after that
+qualification succeeds.

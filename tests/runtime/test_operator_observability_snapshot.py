@@ -29,6 +29,8 @@ from trading_bot.runtime.personal_desktop_unattended_market_data_capture import 
     PersonalDesktopUnattendedMarketDataCaptureClassification,
 )
 
+_Capture = PersonalDesktopUnattendedMarketDataCaptureClassification
+
 
 class _FakeAuthority:
     pass
@@ -75,11 +77,9 @@ def _cycle(
             else None
         ),
         market_data_classification=(
-            PersonalDesktopUnattendedMarketDataCaptureClassification
-            .NO_NEW_COMPLETED_SESSION
+            _Capture.NO_NEW_COMPLETED_SESSION
             if selected
-            else PersonalDesktopUnattendedMarketDataCaptureClassification
-            .CAPTURE_REQUIRED
+            else _Capture.CAPTURE_REQUIRED
         ),
     )
 

@@ -122,6 +122,23 @@ docs/validation/pd4-operator-observability-o1-acceptance.md
 
 ### O2 — bounded Trading-principal read-only snapshot command
 
+**Source accepted.** Real-host Trading-principal qualification is next.
+
+```text
+HEAD  70672c65c7ecf0923516da7c2b57934dc950dbc8
+TREE  762dc13000f435c58f31c9750c0cd22aac582840
+focused O1+O2 tests: 32 passed
+Ruff check/format: PASS
+diff checks: PASS
+worktree: CLEAN
+```
+
+Acceptance record:
+
+```text
+docs/validation/pd4-operator-observability-o2-acceptance.md
+```
+
 Add one zero-semantic-argument source-checkout operator command that may be run
 under the intended non-admin `Trading` principal.
 

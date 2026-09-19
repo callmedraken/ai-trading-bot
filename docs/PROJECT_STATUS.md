@@ -647,3 +647,28 @@ recorded in the canonical status/handoff plus the relevant Architecture/plan.
 
 Docs-only closeouts do not require a new full repository suite when exact diff
 review proves no source/test change.
+
+
+### D7-A production read-only qualification — ACCEPTED
+
+The genuine non-admin Trading-principal D7-A qualification passed from the exact
+certified D7 source tree.
+
+```text
+source HEAD:                       3dfa9e2cab372f8cb034b90256ed3fba9da6c878
+source TREE:                       bb1de2e7c2933ba3a777523f2a0e2feee5fa8c39
+completed session:                 2026-09-18
+selected history:                  READY 6/6
+candidate decision:                f2188b5e-e6a4-5398-be41-8867d9268355
+intended execution session:        2026-09-21
+regular open:                      2026-09-21T13:30:00+00:00
+account predecessor:               ed4640e5-0630-525d-b916-d50e31e3ba2a
+decision namespace:                PRESENT_VALID
+decision storage:                  ABSENT
+deadline open:                     true
+all eight gates closed:            true
+real_effect_performed:             false
+```
+
+D7-B provisioning is not required. D7-C first publication remains a protected
+effect checkpoint and requires explicit operator approval.

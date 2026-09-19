@@ -2,6 +2,7 @@
 
 # ruff: noqa: E402
 
+import inspect
 import os
 from datetime import UTC, date, datetime
 from decimal import Decimal
@@ -34,6 +35,7 @@ from trading_bot.gui import (
     unavailable_paper_account_state,
     unavailable_paper_state,
 )
+import trading_bot.gui.operator_observability_page as operations_page_module
 from trading_bot.gui.main_window import MainWindow
 from trading_bot.gui.mock_service import MockGuiApplicationService
 from trading_bot.gui.operator_observability_page import OperatorOperationsPage
@@ -253,3 +255,14 @@ def test_main_window_acquires_operations_state_once_and_reuses_it() -> None:
 
     assert service.operations_calls == 1
     window.close()
+
+
+
+def test_operations_page_has_no_runtime_or_effect_control_dependency() -> None:
+    source = inspect.getsource(operations_page_module).casefold()
+
+    assert "trading_bot.runtime" not in source
+    assert "qpushbutton" not in source
+    assert "publish" not in source
+    assert "provision" not in source
+    assert "execute" not in source

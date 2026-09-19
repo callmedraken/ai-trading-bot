@@ -202,6 +202,10 @@ class DisposableOperatorObservabilitySnapshotDependencies:
     gate_state: Callable[[], PersonalDesktopUnattendedCaptureWarmupGateState]
     run_cycle: Callable[[], PersonalDesktopUnattendedDailyCycleResult]
     acquire_c1: Callable[[], ValidatedProductionAuthority]
+    validate_c1: Callable[
+        [ValidatedProductionAuthority],
+        ValidatedProductionAuthority,
+    ]
     read_window: Callable[
         [ValidatedProductionAuthority, PersonalDesktopUnattendedDailyCycleResult],
         SelectedC3StrategyHistoryWindowResult | None,
@@ -248,7 +252,9 @@ def _read_snapshot(
             "effects-closed G6 evidence is invalid"
         )
 
-    c1 = require_validated_production_authority(dependencies.acquire_c1())
+    c1 = dependencies.validate_c1(dependencies.acquire_c1())
+    if type(c1) is not ValidatedProductionAuthority:
+        raise OperatorObservabilitySnapshotError("C1 validation result is invalid")
     account = dependencies.read_account(c1)
     if type(account) is not OperatorPaperAccountView:
         raise OperatorObservabilitySnapshotError("account read result is invalid")
@@ -280,6 +286,7 @@ def _production_dependencies() -> DisposableOperatorObservabilitySnapshotDepende
         gate_state=personal_desktop_unattended_capture_warmup_gate_state,
         run_cycle=run_personal_desktop_unattended_daily_cycle,
         acquire_c1=acquire_validated_production_authority,
+        validate_c1=require_validated_production_authority,
         read_window=_read_window_production,
         read_account=_read_account_production,
     )

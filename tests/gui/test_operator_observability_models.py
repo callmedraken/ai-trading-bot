@@ -250,7 +250,6 @@ def test_unavailable_operations_state_rejects_attached_authority_details() -> No
         )
 
 
-
 def test_strategy_explanation_requires_exact_complete_window_for_buy() -> None:
     explanation = OperatorStrategyExplanationView(
         status=OperatorStrategyExplanationStatus.BUY,

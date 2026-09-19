@@ -270,3 +270,173 @@ def test_wrong_account_result_blocks(monkeypatch: pytest.MonkeyPatch) -> None:
 
     with pytest.raises(OperatorObservabilitySnapshotError, match="account read"):
         read_personal_desktop_operator_observability_snapshot_for_test(dependencies)
+
+
+def test_production_window_read_skips_p2_without_selected_snapshot(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    authority = object()
+    calls: list[str] = []
+    monkeypatch.setattr(
+        snapshot_module,
+        "require_validated_production_authority",
+        lambda value: value,
+    )
+    monkeypatch.setattr(
+        snapshot_module,
+        "WindowsPersonalDesktopUnattendedSelectedC3ReadAuthority",
+        lambda value: calls.append("reader"),
+    )
+    cycle = _cycle(
+        PersonalDesktopUnattendedDailyCycleClassification.CAPTURE_REQUIRED,
+        selected=False,
+    )
+
+    assert snapshot_module._read_window_production(authority, cycle) is None
+    assert calls == []
+
+
+def test_production_window_read_requires_g6_snapshot_to_match_p2(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    authority = object()
+    cycle = _cycle(
+        PersonalDesktopUnattendedDailyCycleClassification.WARMING_UP,
+        selected=True,
+    )
+
+    class _Audit:
+        snapshot_id = UUID("33333333-3333-4333-8333-333333333333")
+
+    class _Selected:
+        audit = _Audit()
+
+    class _Current:
+        selected = _Selected()
+
+    class _Reader:
+        def read_selected_snapshot_for_session(
+            self,
+            session: TradingSession,
+        ) -> object:
+            assert session == cycle.completed_session
+            return _Current()
+
+    monkeypatch.setattr(
+        snapshot_module,
+        "require_validated_production_authority",
+        lambda value: value,
+    )
+    monkeypatch.setattr(
+        snapshot_module,
+        "WindowsPersonalDesktopUnattendedSelectedC3ReadAuthority",
+        lambda value: _Reader(),
+    )
+
+    with pytest.raises(OperatorObservabilitySnapshotError, match="does not match P2"):
+        snapshot_module._read_window_production(authority, cycle)
+
+
+def test_production_window_read_returns_exact_reader_window(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    authority = object()
+    cycle = _cycle(
+        PersonalDesktopUnattendedDailyCycleClassification.WARMING_UP,
+        selected=True,
+    )
+    sentinel_window = object()
+    sentinel_config = object()
+
+    class _Audit:
+        snapshot_id = cycle.selected_snapshot_id
+
+    class _Selected:
+        audit = _Audit()
+
+    class _Current:
+        selected = _Selected()
+
+    class _Reader:
+        def read_selected_snapshot_for_session(
+            self,
+            session: TradingSession,
+        ) -> object:
+            assert session == cycle.completed_session
+            return _Current()
+
+        def inspect_strategy_history_window(
+            self,
+            current: object,
+            config: object,
+        ) -> object:
+            assert type(current) is _Current
+            assert config is sentinel_config
+            return sentinel_window
+
+    monkeypatch.setattr(
+        snapshot_module,
+        "require_validated_production_authority",
+        lambda value: value,
+    )
+    monkeypatch.setattr(
+        snapshot_module,
+        "WindowsPersonalDesktopUnattendedSelectedC3ReadAuthority",
+        lambda value: _Reader(),
+    )
+    monkeypatch.setattr(
+        snapshot_module,
+        "personal_desktop_unattended_strategy_config",
+        lambda: sentinel_config,
+    )
+
+    assert snapshot_module._read_window_production(authority, cycle) is sentinel_window
+
+
+def test_production_account_read_uses_resolved_historical_configurations(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    authority = object()
+    registered = object()
+    evidence = object()
+    expected = _account()
+    configurations = (b"configuration-one", b"configuration-two")
+    observed: list[object] = []
+
+    monkeypatch.setattr(
+        snapshot_module,
+        "require_validated_production_authority",
+        lambda value: value,
+    )
+    monkeypatch.setattr(
+        snapshot_module,
+        "resolve_personal_desktop_historical_cycle_configurations",
+        lambda value: configurations,
+    )
+
+    def read_account(
+        value: object,
+        *,
+        historical_cycle_configuration_payloads: tuple[bytes, ...],
+    ) -> object:
+        observed.extend((value, historical_cycle_configuration_payloads))
+        return registered
+
+    monkeypatch.setattr(
+        snapshot_module,
+        "read_personal_desktop_paper_account",
+        read_account,
+    )
+    monkeypatch.setattr(
+        snapshot_module,
+        "require_validated_personal_desktop_paper_account",
+        lambda value: evidence if value is registered else None,
+    )
+    monkeypatch.setattr(
+        snapshot_module,
+        "_adapt_account",
+        lambda value: expected if value is evidence else None,
+    )
+
+    assert snapshot_module._read_account_production(authority) is expected
+    assert observed == [authority, configurations]

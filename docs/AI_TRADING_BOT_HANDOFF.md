@@ -744,3 +744,32 @@ state is uncertain, expose durable evidence, operate under strict real-money
 controls, recover predictably, remain understandable/stoppable by its operator,
 and expose the reviewed system through a polished GUI without giving AI or
 presentation code alternate authority paths.
+
+
+## D7-A production milestone
+
+D7-A production read-only qualification is accepted from exact certified source
+`3dfa9e2cab372f8cb034b90256ed3fba9da6c878` /
+`bb1de2e7c2933ba3a777523f2a0e2feee5fa8c39`.
+
+Accepted evidence:
+
+```text
+completed session:          2026-09-18
+history:                    READY 6/6
+selected snapshot:          680b260f-08c9-5923-87bb-b5f0a4701380
+candidate decision:         f2188b5e-e6a4-5398-be41-8867d9268355
+execution session:          2026-09-21
+regular open:               2026-09-21T13:30:00+00:00
+account predecessor:        ed4640e5-0630-525d-b916-d50e31e3ba2a
+namespace:                  PRESENT_VALID
+storage:                    ABSENT
+deadline open:              true
+all eight gates closed:     true
+real effect performed:      false
+```
+
+D7-B is skipped because the namespace already exists and validates. The next
+production checkpoint is protected D7-C first publication. Do not run D7-C
+without explicit operator approval. After D7-C, run fresh D7-D independent
+read-only reconciliation before accepting publication.

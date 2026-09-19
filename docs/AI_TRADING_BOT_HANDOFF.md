@@ -946,3 +946,36 @@ evidence to `supervised_paper_cycle_admission`, which requires the genuine
 validated capability. Keep capability and evidence separate, use evidence for
 comparison, and pass the capability into admission. D8 remains blocked until a
 corrected, certified D7-D reconciles the durable decision.
+
+
+## Certified D7-D account-admission correction
+
+Replacement-certified D7 source:
+
+```text
+HEAD: ca05b2c583f79039e9de64f4a01b8de2ff2ab3ad
+TREE: d1c3e73eccaba6701bac86f38fb71a99d08ff2d5
+```
+
+Certification:
+
+```text
+5540 passed, 17 skipped outside Architecture-77
+775 passed in clean Architecture-77 harness
+6315 passed, 17 skipped combined
+Ruff check/format PASS
+diff checks PASS
+worktree/index clean
+```
+
+The final D7 lineage now contains the Decimal, LF checkout, selected-C3 reader
+lifetime, and D7-D account-admission ordering corrections.
+
+The durable D7 decision remains:
+`f2188b5e-e6a4-5398-be41-8867d9268355`, already proven
+`FINALIZED_IDENTICAL` by post-publication D7-A.
+
+Next: run D7-D read-only from a fresh checkout pinned to the exact certified
+source. Require `RECONCILED`, exact expected/finalized decision identity,
+`FINALIZED_IDENTICAL`, `PRESENT_VALID`, 6/6 history, all eight gates closed,
+and no real effect. Do not republish and do not proceed to D8 before acceptance.

@@ -2,6 +2,14 @@
 
 from __future__ import annotations
 
+from trading_bot.gui.operator_observability_models import (
+    OPERATOR_WARMUP_TARGET_COUNT,
+    OperatorEffectGateState,
+    OperatorObservabilityState,
+    OperatorWarmupClassification,
+    OperatorWarmupView,
+    SelectedC3WarmupSessionView,
+)
 from trading_bot.market_data import replay_verified_daily_snapshot
 from trading_bot.runtime.personal_desktop_unattended_c3_history import (
     SelectedC3StrategyHistoryWindowClassification,
@@ -10,15 +18,6 @@ from trading_bot.runtime.personal_desktop_unattended_c3_history import (
 )
 from trading_bot.runtime.personal_desktop_unattended_capture_warmup import (
     PersonalDesktopUnattendedCaptureWarmupGateState,
-)
-
-from trading_bot.gui.operator_observability_models import (
-    OPERATOR_WARMUP_TARGET_COUNT,
-    OperatorEffectGateState,
-    OperatorObservabilityState,
-    OperatorWarmupClassification,
-    OperatorWarmupView,
-    SelectedC3WarmupSessionView,
 )
 
 

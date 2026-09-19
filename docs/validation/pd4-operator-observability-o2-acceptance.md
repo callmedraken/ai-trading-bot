@@ -94,3 +94,37 @@ non-admin `DESKTOP-I4DOKM7\Trading` principal. The qualification must keep all
 eight gates false, use the production runtime, and produce only sanitized JSON.
 
 Production/live trading remains **NO-GO**.
+
+
+## Real-host qualification attempt — BLOCKED
+
+A genuine non-elevated `DESKTOP-I4DOKM7\Trading` invocation was attempted
+after source acceptance.
+
+Observed sanitized launcher result:
+
+```json
+{"real_effect_performed":false,"reason":"VALIDATION_BLOCKED","schema":"personal-desktop-operator-observability-snapshot/v1"}
+```
+
+A follow-up read-only stage probe established:
+
+```text
+gates_before                     PASS / all eight false
+G6                               PASS as a call, classification BLOCKED
+completed session                2026-09-18
+G5 market-data classification    NO_NEW_COMPLETED_SESSION
+selected snapshot                680b260f-08c9-5923-87bb-b5f0a4701380
+C1                               PASS
+historical configurations        FAIL
+exception                        PersonalDesktopHistoricalCycleConfigurationError
+message                          historical configuration source inspection failed closed
+```
+
+No effect was performed. This does not revoke O2 source acceptance, but O2
+real-host qualification remains **NOT ACCEPTED** until the underlying historical
+configuration read-only failure is explained and corrected without weakening
+validation.
+
+The same resolver is used by G6 before Paper-v2 account read/history planning,
+so this is an operational G6 blocker as well as an O2 blocker.

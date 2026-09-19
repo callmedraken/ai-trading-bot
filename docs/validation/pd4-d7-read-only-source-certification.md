@@ -136,3 +136,55 @@ Interpretation:
   broker, or live effect.
 
 D7-C remains **PROTECTED / UNAUTHORIZED** until explicit operator approval.
+
+
+## Replacement D7 source certification — ACCEPTED
+
+The historical certification above remains valid evidence for the original D7
+source. A later inherited Decimal-context defect was found during O4 review and
+repaired with a compatibility-first fixed strategy Decimal context. The frozen
+history-seed checkout contract was also made portable with an explicit LF
+`.gitattributes` rule.
+
+The exact replacement certified source is:
+
+```text
+branch: feature/pd4-d7-decimal-requalification
+HEAD:   acd606a41ac50f172ac62377ce6d4e7c8c4d3a32
+TREE:   784695d05865a767ba187adf38fd4924897127a9
+```
+
+Replacement certification evidence:
+
+```text
+broad suite excluding Architecture-77: 5534 passed, 17 skipped
+Architecture-77 clean-harness suite:    775 passed
+combined:                               6309 passed, 17 skipped
+Ruff check:                             PASS
+Ruff format --check:                    PASS (532 files)
+git diff --check:                       PASS
+git diff --cached --check:              PASS
+worktree/index:                         clean
+origin HEAD:                            exact source HEAD
+```
+
+Both Architecture-77 test modules were byte-identical to the clean integration
+harness, and import proof resolved the exercised `trading_bot` modules beneath
+the replacement candidate `src`.
+
+Frozen history-seed checkout evidence at the certified source:
+
+```text
+byte length: 1060
+sha256: 40dda54c82324f358d640cce89e467295b8f5b73a32fed76c52e7ca90d398e64
+worktree ending: LF, not CRLF
+```
+
+The previously accepted production D7-A result and candidate
+`f2188b5e-e6a4-5398-be41-8867d9268355` are now historical evidence only.
+The next production-side checkpoint is a fresh D7-A read-only qualification
+pinned to this exact replacement source. It must independently reconstruct
+current production truth and compare the newly derived candidate with the
+historical candidate.
+
+D7-C remains **PROTECTED / UNAUTHORIZED**.

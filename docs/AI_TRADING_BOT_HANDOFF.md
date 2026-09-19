@@ -1,3 +1,39 @@
+## Parallel operator-observability checkpoint
+
+The isolated side-project branch is:
+
+```text
+branch: feature/pd4-operator-observability
+worktree: F:\AI\worktrees\ai-trading-bot-operator-observability
+```
+
+O1 is accepted:
+
+```text
+HEAD  ee1f44022340563f94f334f897a5e88859f7c6c7
+TREE  76f98eb64a3205a88dcd86a2c541feaaea9939fa
+16 focused tests passed
+Ruff check/format PASS
+diff checks PASS
+worktree CLEAN
+```
+
+O1 contains only Qt-free immutable presentation models/adapters and focused
+tests. It performs no production I/O and changes no authority or effect gate.
+
+O2 is active next: build one zero-semantic-argument source-checkout operator
+snapshot command for genuine non-admin `Trading`. It may validate/read C1,
+effects-closed G6 status, selected C3/history, Paper-v2 account/operation state,
+and all eight gate states. It must not call any effectful boundary, alter Task
+Scheduler, publish D7, settle D8, recover receipts, provision storage, or submit
+broker/live orders.
+
+The observability branch remains separate while the protected natural D5 -> D7
+-> D8/D9 production sequence is validated. After the first accepted unattended
+end-to-end core cycle, merge the accepted core forward into observability,
+reverify the combined tree, then merge to `develop` only with explicit
+operator approval.
+
 # AI Trading Bot — Project Development Roadmap & Handoff
 
 **Repository:** `callmedraken/ai-trading-bot`  

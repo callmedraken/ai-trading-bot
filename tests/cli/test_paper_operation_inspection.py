@@ -28,6 +28,7 @@ from trading_bot.cli.paper_operation_config import (
     PaperOperationInputVerificationCode,
     PaperOperationInputVerificationError,
     VerifiedPaperOperationInputs,
+    adapt_verified_paper_operation_execution_inputs,
     load_verified_paper_operation_inputs,
 )
 from trading_bot.cli.paper_operation_inspection import (
@@ -45,6 +46,7 @@ from trading_bot.runtime import (
     PaperOperationOutcome,
     PaperOperationReceipt,
     PaperOperationStatus,
+    VerifiedPaperOperationExecutionInputs,
     create_paper_operation_intent,
     serialize_paper_operation_receipt,
     verify_paper_account_lineage,
@@ -57,7 +59,8 @@ CALLER_KEY = UUID("4cc8a4ad-f2e9-52e8-a9f8-bf6771b36830")
 class _Fixture:
     config_path: Path
     operation_root: Path
-    inputs: VerifiedPaperOperationInputs
+    inputs: VerifiedPaperOperationExecutionInputs
+    cli_inputs: VerifiedPaperOperationInputs
     checkpoint_path: Path
     snapshot_path: Path
     cycle_path: Path
@@ -174,11 +177,13 @@ def _setup_from_lineage(
     }
     config_path = dependencies / "operation.json"
     config_path.write_bytes(json.dumps(config_tree, separators=(",", ":")).encode())
-    inputs = load_verified_paper_operation_inputs(config_path, calendar())
+    cli_inputs = load_verified_paper_operation_inputs(config_path, calendar())
+    inputs = adapt_verified_paper_operation_execution_inputs(cli_inputs)
     return _Fixture(
         config_path,
         operation_root,
         inputs,
+        cli_inputs,
         paths[terminal_artifact.artifact_id],
         snapshot_path,
         cycle_path,
@@ -247,13 +252,12 @@ def _install_completed_receipt(
         transition.result.snapshot_reference.snapshot_id,
         snapshot_payload,
     )
-    lineage = fixture.inputs.lineage_manifest
     successor_lineage = verify_paper_account_lineage(
-        lineage.genesis_checkpoint,
+        fixture.inputs.prior_genesis_checkpoint,
         transition.successor.checkpoint_id,
-        (*lineage.successor_checkpoints, successor_artifact),
-        (*lineage.cycle_reports, report_artifact),
-        (*lineage.snapshots, snapshot_artifact),
+        (*fixture.inputs.prior_successor_checkpoints, successor_artifact),
+        (*fixture.inputs.prior_cycle_reports, report_artifact),
+        (*fixture.inputs.prior_snapshots, snapshot_artifact),
         calendar(),
     )
     assert successor_lineage.evidence is not None
@@ -263,7 +267,7 @@ def _install_completed_receipt(
         else configuration_evidence
     )
     intent = create_paper_operation_intent(
-        fixture.inputs.config.caller_idempotency_key,
+        fixture.inputs.intent.caller_idempotency_key,
         fixture.inputs.intent.prior_lineage_evidence,
         fixture.inputs.intent.terminal_checkpoint_artifact,
         fixture.inputs.intent.completed_snapshot_artifact,
@@ -446,7 +450,7 @@ def test_foreign_same_key_without_dependencies_is_blocked(tmp_path: Path) -> Non
     fixture = _setup(tmp_path)
     changed_evidence = PaperOperationArtifactEvidence("f" * 64, 17)
     foreign_intent = create_paper_operation_intent(
-        fixture.inputs.config.caller_idempotency_key,
+        fixture.inputs.intent.caller_idempotency_key,
         fixture.inputs.intent.prior_lineage_evidence,
         fixture.inputs.intent.terminal_checkpoint_artifact,
         fixture.inputs.intent.completed_snapshot_artifact,

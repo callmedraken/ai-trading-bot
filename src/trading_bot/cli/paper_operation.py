@@ -1,4 +1,4 @@
-"""Read-only command adapter for one restart-safe paper-operation inspection."""
+"""Command adapter for one explicit restart-safe paper operation."""
 
 from __future__ import annotations
 
@@ -19,6 +19,7 @@ from trading_bot.cli.paper_operation_config import (
     PaperOperationConfigSyntaxError,
     PaperOperationConfigValidationError,
     PaperOperationInputVerificationError,
+    adapt_verified_paper_operation_execution_inputs,
     load_verified_paper_operation_inputs,
 )
 from trading_bot.cli.paper_operation_execution import (
@@ -38,7 +39,7 @@ from trading_bot.market_data import XNYS_CALENDAR_DESCRIPTOR, BoundMarketCalenda
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Inspect one explicit paper operation without writing."
+        description="Inspect or execute one explicit restart-safe paper operation."
     )
     parser.add_argument("--config", required=True, type=Path)
     parser.add_argument("--operation-root", required=True, type=Path)
@@ -54,7 +55,8 @@ def inspect_operation(
 ) -> PaperOperationInspectionResult:
     """Load explicit inputs and inspect one existing operation root read-only."""
     calendar = BoundMarketCalendar(XNYS_CALENDAR_DESCRIPTOR, NYSEMarketCalendar())
-    inputs = load_verified_paper_operation_inputs(config_path, calendar)
+    cli_inputs = load_verified_paper_operation_inputs(config_path, calendar)
+    inputs = adapt_verified_paper_operation_execution_inputs(cli_inputs)
     return inspect_paper_operation_root(operation_root, inputs)
 
 
@@ -68,7 +70,8 @@ def main(argv: list[str] | None = None) -> int:
             XNYS_CALENDAR_DESCRIPTOR,
             NYSEMarketCalendar(),
         )
-        inputs = load_verified_paper_operation_inputs(args.config, calendar)
+        cli_inputs = load_verified_paper_operation_inputs(args.config, calendar)
+        inputs = adapt_verified_paper_operation_execution_inputs(cli_inputs)
         if args.inspect_only:
             inspection = inspect_paper_operation_root(args.operation_root, inputs)
         else:

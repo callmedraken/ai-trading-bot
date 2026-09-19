@@ -18,7 +18,6 @@ from trading_bot.cli.checkpoint_transition_output import (
     inspect_transition_directory,
     validate_output_parent,
 )
-from trading_bot.cli.paper_operation_config import VerifiedPaperOperationInputs
 from trading_bot.runtime import (
     MAX_CHECKPOINTED_PAPER_CYCLE_REPORT_BYTES,
     MAX_PAPER_ACCOUNT_SUCCESSOR_CHECKPOINT_BYTES,
@@ -28,6 +27,7 @@ from trading_bot.runtime import (
     PaperOperationReceipt,
     PaperOperationReceiptVerificationStatus,
     PaperOperationStatus,
+    VerifiedPaperOperationExecutionInputs,
     parse_checkpointed_paper_cycle_report,
     parse_paper_operation_receipt,
     parse_successor_paper_account_checkpoint,
@@ -135,12 +135,12 @@ class _Receipt:
 
 def inspect_paper_operation_root(
     operation_root: Path,
-    inputs: VerifiedPaperOperationInputs,
+    inputs: VerifiedPaperOperationExecutionInputs,
 ) -> PaperOperationInspectionResult:
     """Classify one exact operation without writing or executing a paper cycle."""
     if (
         not isinstance(operation_root, Path)
-        or type(inputs) is not VerifiedPaperOperationInputs
+        or type(inputs) is not VerifiedPaperOperationExecutionInputs
     ):
         raise TypeError("paper-operation inspection arguments are invalid")
     try:
@@ -494,7 +494,7 @@ def inspect_paper_operation_root(
 
 def _verify_receipt(
     retained: _Receipt,
-    inputs: VerifiedPaperOperationInputs,
+    inputs: VerifiedPaperOperationExecutionInputs,
     *,
     report_payload: bytes | None = None,
     checkpoint_payload: bytes | None = None,
@@ -502,10 +502,10 @@ def _verify_receipt(
     result = verify_paper_operation_receipt(
         retained.payload,
         cycle_configuration_payload=inputs.cycle_configuration_payload,
-        prior_genesis_checkpoint=inputs.lineage_manifest.genesis_checkpoint,
-        prior_successor_checkpoints=inputs.lineage_manifest.successor_checkpoints,
-        prior_cycle_reports=inputs.lineage_manifest.cycle_reports,
-        prior_snapshots=inputs.lineage_manifest.snapshots,
+        prior_genesis_checkpoint=inputs.prior_genesis_checkpoint,
+        prior_successor_checkpoints=inputs.prior_successor_checkpoints,
+        prior_cycle_reports=inputs.prior_cycle_reports,
+        prior_snapshots=inputs.prior_snapshots,
         completed_snapshot_payload=inputs.completed_snapshot_payload,
         calendar=_calendar_from_snapshot(inputs),
         transition_report_payload=report_payload,
@@ -516,7 +516,7 @@ def _verify_receipt(
 
 def _foreign_dependencies_available(
     receipt: PaperOperationReceipt,
-    inputs: VerifiedPaperOperationInputs,
+    inputs: VerifiedPaperOperationExecutionInputs,
 ) -> bool:
     return (
         receipt.intent.prior_lineage_evidence == inputs.intent.prior_lineage_evidence
@@ -676,12 +676,12 @@ def _require_parent_identity(parent: OutputParent) -> None:
         raise ValueError("operation root identity changed")
 
 
-def _calendar_from_snapshot(inputs: VerifiedPaperOperationInputs):
+def _calendar_from_snapshot(inputs: VerifiedPaperOperationExecutionInputs):
     return inputs.calendar
 
 
 def _result(
-    inputs: VerifiedPaperOperationInputs,
+    inputs: VerifiedPaperOperationExecutionInputs,
     classification: PaperOperationClassification,
     receipt_path: Path | None,
     code: PaperOperationInspectionCode,

@@ -15,6 +15,10 @@ from pathlib import Path
 from uuid import UUID
 
 from trading_bot.cli.checkpoint_lineage_config import read_safe_regular_file
+from trading_bot.cli.paper_operation_output_capability import (
+    PaperOperationOutputCapability,
+    require_output_capability,
+)
 from trading_bot.market_data import IdentifiedMarketCalendar
 from trading_bot.runtime import (
     MAX_CHECKPOINTED_PAPER_CYCLE_REPORT_BYTES,
@@ -284,6 +288,7 @@ def commit_transition_directory(
     successor: PaperAccountSuccessorCheckpoint,
     successor_payload: bytes,
     verifier: Callable[[bytes, bytes, TransitionCommitVerificationPhase], None],
+    output_capability: PaperOperationOutputCapability | None = None,
 ) -> TransitionDirectoryResult:
     """Commit one preverified transition and preserve every crash-left staging."""
     if (
@@ -300,6 +305,12 @@ def commit_transition_directory(
         or not callable(verifier)
     ):
         raise CheckpointTransitionOutputError("transition commit input is invalid")
+    try:
+        capability = require_output_capability(output_capability)
+    except TypeError as error:
+        raise CheckpointTransitionOutputError(
+            "transition output capability is invalid"
+        ) from error
     application = str(result.application_id)
     if (
         report.evidence.application_id != result.application_id
@@ -313,15 +324,26 @@ def commit_transition_directory(
     final = parent.path / name
     preflight_transition_directory(parent, application_id=application)
     try:
-        os.mkdir(staging)
-    except OSError as error:
+        if capability is None:
+            os.mkdir(staging)
+        else:
+            capability.create_staging_directory(staging)
+            capability.verify_staged_directory(staging)
+    except Exception as error:
         raise CheckpointTransitionOutputError(
             "cannot exclusively create staging directory"
         ) from error
     retained = _lstat_directory(staging, "staging directory")
     identity = (retained.st_dev, retained.st_ino)
-    _write_file(staging / report_name, report_payload)
-    _write_file(staging / checkpoint_name, successor_payload)
+    for path, payload in (
+        (staging / report_name, report_payload),
+        (staging / checkpoint_name, successor_payload),
+    ):
+        if capability is None:
+            _write_file(path, payload)
+        else:
+            capability.write_staged_file(path, payload)
+            capability.verify_staged_file(path)
     _fsync_directory(staging)
     expected = {report_name, checkpoint_name}
     _verify_staging_layout(staging, expected)
@@ -341,14 +363,19 @@ def commit_transition_directory(
         TransitionCommitVerificationPhase.STAGED_REREAD,
     )
     _require_parent(parent)
+    if capability is not None:
+        capability.verify_parent(parent.path)
     _require_directory_identity(staging, identity, "staging directory")
     _reject_collisions(parent.path, {name}, allowed={staging.name})
     if _entry_exists(final):
         raise CheckpointTransitionOutputError("final transition already exists")
     _fsync_directory(parent.path)
     try:
-        os.rename(staging, final)
-    except OSError as error:
+        if capability is None:
+            os.rename(staging, final)
+        else:
+            capability.finalize_directory(staging, final)
+    except Exception as error:
         raise CheckpointTransitionOutputError(
             "cannot finalize staged directory"
         ) from error
@@ -356,6 +383,10 @@ def commit_transition_directory(
     _require_parent(parent)
     _require_directory_identity(final, identity, "final transition directory")
     _verify_staging_layout(final, expected)
+    if capability is not None:
+        capability.verify_finalized_directory(final)
+        capability.verify_finalized_file(final / report_name)
+        capability.verify_finalized_file(final / checkpoint_name)
     finalized_report = _read_commit_regular(
         final / report_name,
         MAX_CHECKPOINTED_PAPER_CYCLE_REPORT_BYTES,

@@ -827,8 +827,10 @@ def require_validated_production_authority(
 def require_open_connection_matches_validated_authority(
     authority: ValidatedProductionAuthority,
     connection: sqlite3.Connection,
+    *,
+    allow_active_transaction: bool = False,
 ) -> ProductionAuthorityEvidence:
-    """Revalidate one retained writable connection against C1 authority."""
+    """Revalidate one retained connection against exact C1 authority."""
 
     require_validated_production_authority(authority)
     if type(connection) is not sqlite3.Connection:
@@ -872,6 +874,7 @@ def require_open_connection_matches_validated_authority(
         bootstrap_digest=authority.bootstrap_digest,
         release_manifest=release_manifest,
         sqlite_build=sqlite_build,
+        allow_active_transaction=allow_active_transaction,
     )
     expected = ProductionAuthorityEvidence(
         database_path=authority.database_path,

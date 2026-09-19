@@ -25,6 +25,10 @@ from trading_bot.cli.paper_operation_execution import (
     PaperOperationExecutionClassification,
     PaperOperationExecutionDiagnosticCode,
     execute_paper_operation_once,
+    recover_paper_operation_receipt_once,
+)
+from trading_bot.cli.paper_operation_output_capability import (
+    PaperOperationOutputCapability,
 )
 from trading_bot.runtime import (
     CheckpointedVerifiedSnapshotPaperCycleInsufficientCashError,
@@ -43,6 +47,60 @@ def _transition_paths(fixture) -> tuple[Path, Path]:
         / f".paper-account-transition-{fixture.inputs.application_id}.staging"
     )
     return final, staging
+
+
+def _filesystem_state(root: Path) -> tuple[tuple[str, str, int, bytes | None], ...]:
+    retained: list[tuple[str, str, int, bytes | None]] = []
+    for path in sorted(root.rglob("*"), key=lambda item: str(item.relative_to(root))):
+        retained.append(
+            (
+                path.relative_to(root).as_posix(),
+                "file" if path.is_file() else "directory",
+                path.stat().st_mtime_ns,
+                path.read_bytes() if path.is_file() else None,
+            )
+        )
+    return tuple(retained)
+
+
+class _RecordingOutputCapability(PaperOperationOutputCapability):
+    def __init__(self, events: list[str]) -> None:
+        self.events = events
+
+    @staticmethod
+    def _kind(path: Path) -> str:
+        return "receipt" if "paper-operations" in str(path) else "transition"
+
+    def verify_parent(self, path: Path) -> None:
+        self.events.append(f"verify-parent:{path.name}")
+        assert path.is_dir()
+
+    def create_staging_directory(self, path: Path) -> None:
+        self.events.append(f"{self._kind(path)}:create-staging")
+        os.mkdir(path)
+
+    def write_staged_file(self, path: Path, payload: bytes) -> None:
+        self.events.append(f"{self._kind(path)}:write-file")
+        with path.open("xb") as stream:
+            assert stream.write(payload) == len(payload)
+            stream.flush()
+            os.fsync(stream.fileno())
+
+    def verify_staged_directory(self, path: Path) -> None:
+        self.events.append(f"{self._kind(path)}:verify-staged-directory")
+
+    def verify_staged_file(self, path: Path) -> None:
+        self.events.append(f"{self._kind(path)}:verify-staged-file")
+
+    def finalize_directory(self, staging: Path, final: Path) -> None:
+        self.events.append(f"{self._kind(staging)}:finalize")
+        os.rename(staging, final)
+
+    def verify_finalized_directory(self, path: Path) -> None:
+        self.events.append(f"{self._kind(path)}:verify-final-directory")
+
+    def verify_finalized_file(self, path: Path) -> None:
+        self.events.append(f"{self._kind(path)}:verify-final-file")
 
 
 def test_pending_execution_invokes_runtime_once_and_commits_exact_layout(
@@ -66,7 +124,6 @@ def test_pending_execution_invokes_runtime_once_and_commits_exact_layout(
         "execute_checkpointed_verified_snapshot_paper_cycle",
         counted,
     )
-
     result = execute_paper_operation_once(
         fixture.operation_root,
         fixture.inputs,
@@ -99,6 +156,87 @@ def test_pending_execution_invokes_runtime_once_and_commits_exact_layout(
     )
     assert repeated.diagnostic_code == "ALREADY_APPLIED"
     assert repeated.receipt_path == result.receipt_path
+
+
+def test_output_capability_hooks_preserve_transition_then_receipt_order(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = _setup(tmp_path)
+    (fixture.operation_root / "paper-operations").mkdir()
+    events: list[str] = []
+    capability = _RecordingOutputCapability(events)
+    from trading_bot.cli import paper_operation_execution as execution_module
+
+    original_successor = execution_module._verify_successor
+    original_receipt = execution_module._verify_completed_receipt
+
+    def verify_successor(*args, **kwargs):  # type: ignore[no-untyped-def]
+        phase = args[6]
+        events.append(f"transition:semantic-{phase.value.lower()}")
+        return original_successor(*args, **kwargs)
+
+    def verify_receipt(*args, **kwargs):  # type: ignore[no-untyped-def]
+        events.append("receipt:semantic")
+        return original_receipt(*args, **kwargs)
+
+    monkeypatch.setattr(execution_module, "_verify_successor", verify_successor)
+    monkeypatch.setattr(execution_module, "_verify_completed_receipt", verify_receipt)
+    result = execute_paper_operation_once(
+        fixture.operation_root,
+        fixture.inputs,
+        output_capability=capability,
+    )
+    assert result.classification is PaperOperationExecutionClassification.COMPLETED
+
+    assert events.index("transition:create-staging") < events.index(
+        "transition:verify-staged-directory"
+    )
+    assert events.index("transition:verify-staged-directory") < events.index(
+        "transition:write-file"
+    )
+    assert events.index("transition:verify-staged-file") < events.index(
+        "transition:semantic-staged"
+    )
+    assert events.index("transition:semantic-staged") < events.index(
+        "transition:finalize"
+    )
+    assert events.index("transition:finalize") < events.index(
+        "transition:verify-final-directory"
+    )
+    assert events.index("transition:verify-final-file") < events.index(
+        "transition:semantic-finalized"
+    )
+
+    receipt_create = events.index("receipt:create-staging")
+    receipt_staged_security = events.index("receipt:verify-staged-file")
+    receipt_finalize = events.index("receipt:finalize")
+    receipt_final_security = events.index("receipt:verify-final-file")
+    staged_receipt_semantic = events.index("receipt:semantic", receipt_create)
+    finalized_receipt_semantic = events.index("receipt:semantic", receipt_finalize)
+    assert receipt_create < receipt_staged_security < staged_receipt_semantic
+    assert staged_receipt_semantic < receipt_finalize < receipt_final_security
+    assert receipt_final_security < finalized_receipt_semantic
+
+
+def test_output_capability_commits_eligible_failed_receipt_after_runtime_attempt(
+    tmp_path: Path,
+) -> None:
+    fixture = _failed_fixture(tmp_path)
+    (fixture.operation_root / "paper-operations").mkdir()
+    events: list[str] = []
+    result = execute_paper_operation_once(
+        fixture.operation_root,
+        fixture.inputs,
+        output_capability=_RecordingOutputCapability(events),
+    )
+    assert (
+        result.classification is PaperOperationExecutionClassification.EXECUTION_FAILED
+    )
+    assert result.diagnostic_code == "INSUFFICIENT_CASH"
+    assert "receipt:create-staging" in events
+    assert "receipt:finalize" in events
+    assert not any(event.startswith("transition:create") for event in events)
 
 
 def test_no_action_still_commits_successor_checkpoint(tmp_path: Path) -> None:
@@ -766,14 +904,13 @@ def test_completed_receipt_passes_full_offline_verification(tmp_path: Path) -> N
     checkpoint_path = next(
         result.transition_path.glob("paper-account-checkpoint-*.json")
     )
-    manifest = fixture.inputs.lineage_manifest
     verification = verify_paper_operation_receipt(
         result.receipt_path.read_bytes(),
         cycle_configuration_payload=fixture.inputs.cycle_configuration_payload,
-        prior_genesis_checkpoint=manifest.genesis_checkpoint,
-        prior_successor_checkpoints=manifest.successor_checkpoints,
-        prior_cycle_reports=manifest.cycle_reports,
-        prior_snapshots=manifest.snapshots,
+        prior_genesis_checkpoint=fixture.inputs.prior_genesis_checkpoint,
+        prior_successor_checkpoints=fixture.inputs.prior_successor_checkpoints,
+        prior_cycle_reports=fixture.inputs.prior_cycle_reports,
+        prior_snapshots=fixture.inputs.prior_snapshots,
         completed_snapshot_payload=fixture.inputs.completed_snapshot_payload,
         calendar=fixture.inputs.calendar,
         transition_report_payload=report_path.read_bytes(),
@@ -850,6 +987,230 @@ def test_crash_after_transition_commit_recovers_byte_identical_receipt(
         item.name: (item.read_bytes(), item.stat().st_mtime_ns)
         for item in transition.iterdir()
     }
+
+
+def test_recovery_only_recovers_byte_identical_receipt_without_transition_changes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    crashed = _setup(tmp_path / "crashed")
+    normal = _setup(tmp_path / "normal")
+    from trading_bot.cli import paper_operation_execution as execution_module
+
+    original_commit = execution_module.commit_paper_operation_receipt
+
+    def crash_before_receipt(*args, **kwargs):
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(
+        execution_module,
+        "commit_paper_operation_receipt",
+        crash_before_receipt,
+    )
+    with pytest.raises(KeyboardInterrupt):
+        execute_paper_operation_once(crashed.operation_root, crashed.inputs)
+    monkeypatch.setattr(
+        execution_module,
+        "commit_paper_operation_receipt",
+        original_commit,
+    )
+    normal_result = execute_paper_operation_once(normal.operation_root, normal.inputs)
+    assert normal_result.receipt_path is not None
+
+    transition, _ = _transition_paths(crashed)
+    transition_before = {
+        item.name: (item.read_bytes(), item.stat().st_mtime_ns)
+        for item in transition.iterdir()
+    }
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("recovery-only API must not execute the paper cycle")
+
+    monkeypatch.setattr(
+        execution_module,
+        "execute_checkpointed_verified_snapshot_paper_cycle",
+        forbidden,
+    )
+    recovered = recover_paper_operation_receipt_once(
+        crashed.operation_root,
+        crashed.inputs,
+        output_capability=None,
+    )
+
+    assert (
+        recovered.classification
+        is PaperOperationExecutionClassification.RECEIPT_RECOVERED
+    )
+    assert recovered.diagnostic_code == "RECEIPT_RECOVERED"
+    assert recovered.receipt_path is not None
+    assert (
+        recovered.receipt_path.read_bytes() == normal_result.receipt_path.read_bytes()
+    )
+    assert transition_before == {
+        item.name: (item.read_bytes(), item.stat().st_mtime_ns)
+        for item in transition.iterdir()
+    }
+
+
+def test_recovery_only_pending_already_applied_and_conflicting_are_zero_write(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pending = _setup(tmp_path / "pending")
+    already = _setup(tmp_path / "already")
+    _install_completed_receipt(already)
+    conflicting = _setup(tmp_path / "conflicting")
+    changed_cycle = _changed_request_cycle(conflicting)
+    _install_completed_receipt(
+        conflicting,
+        transition_cycle_path=changed_cycle,
+        configuration_evidence=(conflicting.inputs.intent.cycle_configuration_artifact),
+    )
+    fixtures = (pending, already, conflicting)
+    before = {
+        fixture.operation_root: _filesystem_state(fixture.operation_root)
+        for fixture in fixtures
+    }
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("recovery-only API must not execute the paper cycle")
+
+    monkeypatch.setattr(
+        "trading_bot.cli.paper_operation_execution."
+        "execute_checkpointed_verified_snapshot_paper_cycle",
+        forbidden,
+    )
+    pending_result = recover_paper_operation_receipt_once(
+        pending.operation_root,
+        pending.inputs,
+        output_capability=None,
+    )
+    already_result = recover_paper_operation_receipt_once(
+        already.operation_root,
+        already.inputs,
+        output_capability=None,
+    )
+    conflicting_result = recover_paper_operation_receipt_once(
+        conflicting.operation_root,
+        conflicting.inputs,
+        output_capability=None,
+    )
+
+    assert (
+        pending_result.classification is PaperOperationExecutionClassification.BLOCKED
+    )
+    assert pending_result.diagnostic_code == "PENDING"
+    assert (
+        already_result.classification
+        is PaperOperationExecutionClassification.ALREADY_APPLIED
+    )
+    assert already_result.diagnostic_code == "ALREADY_APPLIED"
+    assert (
+        conflicting_result.classification
+        is PaperOperationExecutionClassification.CONFLICTING
+    )
+    assert conflicting_result.diagnostic_code == "CALLER_IDEMPOTENCY_CONFLICT"
+    for fixture in fixtures:
+        assert (
+            _filesystem_state(fixture.operation_root) == before[fixture.operation_root]
+        )
+
+
+def test_recovery_only_staging_and_invalid_state_are_zero_write(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    transition_staging = _setup(tmp_path / "transition-staging")
+    _, transition_staging_path = _transition_paths(transition_staging)
+    transition_staging_path.mkdir()
+
+    receipt_staging = _setup(tmp_path / "receipt-staging")
+    receipt_staging_path = (
+        receipt_staging.operation_root
+        / "paper-operations"
+        / f".paper-operation-{receipt_staging.inputs.intent.operation_id}.staging"
+    )
+    receipt_staging_path.mkdir(parents=True)
+
+    invalid = _setup(tmp_path / "invalid")
+    completed = execute_paper_operation_once(invalid.operation_root, invalid.inputs)
+    assert completed.transition_path is not None
+    detached_transition = tmp_path / "detached-transition"
+    completed.transition_path.rename(detached_transition)
+
+    roots = (
+        transition_staging.operation_root,
+        receipt_staging.operation_root,
+        tmp_path,
+    )
+    before = {root: _filesystem_state(root) for root in roots}
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("recovery-only API must not execute the paper cycle")
+
+    monkeypatch.setattr(
+        "trading_bot.cli.paper_operation_execution."
+        "execute_checkpointed_verified_snapshot_paper_cycle",
+        forbidden,
+    )
+    transition_staging_result = recover_paper_operation_receipt_once(
+        transition_staging.operation_root,
+        transition_staging.inputs,
+        output_capability=None,
+    )
+    receipt_staging_result = recover_paper_operation_receipt_once(
+        receipt_staging.operation_root,
+        receipt_staging.inputs,
+        output_capability=None,
+    )
+    invalid_result = recover_paper_operation_receipt_once(
+        invalid.operation_root,
+        invalid.inputs,
+        output_capability=None,
+    )
+
+    assert (
+        transition_staging_result.classification
+        is PaperOperationExecutionClassification.BLOCKED
+    )
+    assert transition_staging_result.diagnostic_code == "TRANSITION_STAGING_EXISTS"
+    assert (
+        receipt_staging_result.classification
+        is PaperOperationExecutionClassification.BLOCKED
+    )
+    assert receipt_staging_result.diagnostic_code == "OPERATION_STAGING_EXISTS"
+    assert (
+        invalid_result.classification is PaperOperationExecutionClassification.BLOCKED
+    )
+    assert invalid_result.diagnostic_code == "BLOCKED_INVALID_OPERATION_STATE"
+    for root in roots:
+        assert _filesystem_state(root) == before[root]
+
+
+def test_recovery_only_invalid_output_capability_blocks_before_inspection(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = _setup(tmp_path)
+    before = _filesystem_state(fixture.operation_root)
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("recovery-only API must not execute the paper cycle")
+
+    monkeypatch.setattr(
+        "trading_bot.cli.paper_operation_execution."
+        "execute_checkpointed_verified_snapshot_paper_cycle",
+        forbidden,
+    )
+    result = recover_paper_operation_receipt_once(
+        fixture.operation_root,
+        fixture.inputs,
+        output_capability=object(),  # type: ignore[arg-type]
+    )
+
+    assert result.classification is PaperOperationExecutionClassification.BLOCKED
+    assert result.diagnostic_code == "OUTPUT_SAFETY_FAILURE"
+    assert _filesystem_state(fixture.operation_root) == before
 
 
 def test_receipt_staging_crash_blocks_recovery_without_runtime(

@@ -1,5 +1,7 @@
 """Public API for deterministic paper portfolio runtime orchestration."""
 
+from importlib import import_module
+
 from trading_bot.runtime.checkpointed_paper_cycle_report import (  # noqa: F401
     CHECKPOINTED_PAPER_CYCLE_REPORT_MATERIAL_VERSION,
     CHECKPOINTED_PAPER_CYCLE_REPORT_NAMESPACE,
@@ -112,6 +114,47 @@ from trading_bot.runtime.exceptions import (  # noqa: F401
     VerifiedSnapshotPaperCycleTemporalError,
     VerifiedSnapshotPaperCycleUniverseError,
 )
+from trading_bot.runtime.manual_paper_selected_c3_snapshot import (  # noqa: F401
+    DisposableSelectedC3SnapshotReadAuthorityForTest,
+    SelectedC3SnapshotAuditEvidence,
+    SelectedC3SnapshotPermit,
+    SelectedC3SnapshotReadError,
+    SelectedC3SnapshotReadResult,
+    WindowsSelectedC3SnapshotReadAuthority,
+    open_disposable_selected_c3_snapshot_read_authority_for_test,
+    require_disposable_selected_c3_snapshot_permit_for_test,
+    require_selected_c3_snapshot_permit,
+)
+from trading_bot.runtime.manual_paper_strategy_plan import (  # noqa: F401
+    ARCHITECTURE94_METADATA_PREFIX,
+    ARCHITECTURE94_STRATEGY_PLAN_BYTE_LENGTH_METADATA_KEY,
+    ARCHITECTURE94_STRATEGY_PLAN_ID_METADATA_KEY,
+    ARCHITECTURE94_STRATEGY_PLAN_SHA256_METADATA_KEY,
+    MANUAL_PAPER_STRATEGY_PLAN_IDENTITY_MATERIAL_VERSION,
+    MANUAL_PAPER_STRATEGY_PLAN_NAMESPACE,
+    MANUAL_PAPER_STRATEGY_PLAN_SCHEMA,
+    MAX_MANUAL_PAPER_BASE_METADATA,
+    MAX_MANUAL_PAPER_STRATEGY_PLAN_BYTES,
+    ManualPaperPriorCheckpointEvidence,
+    ManualPaperSelectedC3Assertion,
+    ManualPaperStrategyDecisionRequest,
+    ManualPaperStrategyPlan,
+    ManualPaperStrategyPlanArtifactBinding,
+    ManualPaperStrategyPlanError,
+    ManualPaperStrategyPlanRequest,
+    ManualPaperStrategyPlanSerializationError,
+    ManualPaperStrategyPlanValidationError,
+    ManualPaperStrategyPlanVerificationError,
+    ManualPaperStrategySignalStatus,
+    PreparedManualPaperStrategyDecision,
+    build_manual_paper_strategy_decision,
+    build_manual_paper_strategy_plan,
+    complete_manual_paper_strategy_plan,
+    parse_manual_paper_strategy_plan,
+    serialize_manual_paper_strategy_plan,
+    verify_manual_paper_strategy_plan,
+    verify_prepared_manual_paper_strategy_decision,
+)
 from trading_bot.runtime.paper_account_checkpoint import (
     MAX_PAPER_ACCOUNT_CHECKPOINT_BYTES,
     MAX_PAPER_ACCOUNT_CHECKPOINT_DECIMAL_CHARACTERS,
@@ -211,6 +254,10 @@ from trading_bot.runtime.paper_operation import (  # noqa: F401
     serialize_paper_operation_receipt,
     verify_paper_operation_receipt,
 )
+from trading_bot.runtime.paper_operation_execution_inputs import (  # noqa: F401
+    PaperOperationExecutionInputsError,
+    VerifiedPaperOperationExecutionInputs,
+)
 from trading_bot.runtime.paper_portfolio import (
     PaperPortfolioCycleDiagnostic,
     PaperPortfolioCycleDiagnosticCode,
@@ -220,6 +267,120 @@ from trading_bot.runtime.paper_portfolio import (
     PaperPortfolioCycleResult,
     PaperPortfolioCycleStatus,
     PaperPortfolioRuntime,
+)
+from trading_bot.runtime.personal_desktop_unattended_market_data_capture import (  # noqa: F401
+    PERSONAL_DESKTOP_UNATTENDED_MARKET_DATA_CAPTURE_EFFECTS_ENABLED,
+    PersonalDesktopUnattendedC3PreflightReadResult,
+    PersonalDesktopUnattendedMarketDataCaptureClassification,
+    PersonalDesktopUnattendedMarketDataCaptureError,
+    PersonalDesktopUnattendedMarketDataCaptureResult,
+    PersonalDesktopUnattendedSelectedC3Evidence,
+    WindowsPersonalDesktopUnattendedC3PreflightAuthority,
+    reconcile_personal_desktop_unattended_market_data_capture,
+    run_personal_desktop_unattended_market_data_capture,
+)
+from trading_bot.runtime.personal_desktop_unattended_paper_decision_intent import (  # noqa: F401
+    MAX_PERSONAL_DESKTOP_UNATTENDED_PAPER_DECISION_INTENT_BYTES,
+    PERSONAL_DESKTOP_UNATTENDED_PAPER_DECISION_IDENTITY_MATERIAL_VERSION,
+    PERSONAL_DESKTOP_UNATTENDED_PAPER_DECISION_INTENT_SCHEMA,
+    PERSONAL_DESKTOP_UNATTENDED_PAPER_DECISION_NAMESPACE,
+    PERSONAL_DESKTOP_UNATTENDED_PAPER_DECISION_POLICY_VERSION,
+    PersonalDesktopUnattendedPaperDecisionC3Evidence,
+    PersonalDesktopUnattendedPaperDecisionIntent,
+    PersonalDesktopUnattendedPaperDecisionIntentArtifactBinding,
+    PersonalDesktopUnattendedPaperDecisionIntentError,
+    PersonalDesktopUnattendedPaperDecisionIntentSerializationError,
+    PersonalDesktopUnattendedPaperDecisionIntentValidationError,
+    PersonalDesktopUnattendedPaperDecisionIntentVerificationError,
+    bind_personal_desktop_unattended_paper_decision_intent,
+    create_personal_desktop_unattended_paper_decision_intent,
+    parse_personal_desktop_unattended_paper_decision_intent,
+    serialize_personal_desktop_unattended_paper_decision_intent,
+    verify_personal_desktop_unattended_paper_decision_intent,
+)
+from trading_bot.runtime.personal_desktop_unattended_paper_decision_publication import (  # noqa: F401
+    PERSONAL_DESKTOP_UNATTENDED_DECISION_PUBLICATION_EFFECTS_ENABLED,
+    PersonalDesktopUnattendedDecisionPublicationDiagnostic,
+    PersonalDesktopUnattendedDecisionPublicationError,
+    PersonalDesktopUnattendedDecisionPublicationQualificationResult,
+    PersonalDesktopUnattendedDecisionPublicationStatus,
+    PreOpenDecisionPublicationPermit,
+    issue_pre_open_decision_publication_permit,
+    qualify_personal_desktop_unattended_decision_publication,
+)
+from trading_bot.runtime.personal_desktop_unattended_paper_decision_storage import (  # noqa: F401
+    PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_DECISIONS,
+    FinalizedUnattendedDecisionForSessionClassification,
+    FinalizedUnattendedDecisionForSessionResult,
+    PersonalDesktopUnattendedDecisionStorageClassification,
+    PersonalDesktopUnattendedDecisionStorageDiagnostic,
+    PersonalDesktopUnattendedDecisionStorageError,
+    PersonalDesktopUnattendedDecisionStorageReadResult,
+    find_finalized_unattended_decision_for_execution_session,
+    read_personal_desktop_unattended_decision_storage,
+    require_finalized_unattended_decision_for_execution_session,
+    require_validated_personal_desktop_unattended_decision_storage_read,
+    unattended_paper_decision_artifact_name,
+    unattended_paper_decision_directory_name,
+)
+from trading_bot.runtime.personal_desktop_unattended_paper_invocation import (  # noqa: F401
+    MAX_PERSONAL_DESKTOP_UNATTENDED_PAPER_INVOCATION_BYTES,
+    MAX_UNATTENDED_PAPER_INVOCATION_BYTES,
+    UNATTENDED_PAPER_INVOCATION_IDENTITY_MATERIAL_VERSION,
+    UNATTENDED_PAPER_INVOCATION_NAMESPACE,
+    UNATTENDED_PAPER_INVOCATION_SCHEMA,
+    UNATTENDED_PAPER_POLICY_VERSION,
+    PersonalDesktopUnattendedPaperInvocation,
+    PersonalDesktopUnattendedPaperInvocationArtifactBinding,
+    PersonalDesktopUnattendedPaperInvocationArtifactEvidence,
+    PersonalDesktopUnattendedPaperInvocationError,
+    PersonalDesktopUnattendedPaperInvocationSerializationError,
+    PersonalDesktopUnattendedPaperInvocationValidationError,
+    PersonalDesktopUnattendedPaperInvocationVerificationError,
+    VerifiedPersonalDesktopUnattendedPaperInvocation,
+    create_personal_desktop_unattended_paper_invocation,
+    derive_personal_desktop_unattended_paper_invocation_id,
+    parse_personal_desktop_unattended_paper_invocation,
+    serialize_personal_desktop_unattended_paper_invocation,
+    verify_personal_desktop_unattended_paper_invocation,
+)
+from trading_bot.runtime.personal_desktop_unattended_paper_invocation_storage import (  # noqa: F401
+    PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_INVOCATIONS,
+    PersonalDesktopUnattendedInvocationStorageClassification,
+    PersonalDesktopUnattendedInvocationStorageDiagnostic,
+    PersonalDesktopUnattendedInvocationStorageError,
+    PersonalDesktopUnattendedInvocationStorageReadResult,
+    read_personal_desktop_unattended_invocation_storage,
+    require_validated_personal_desktop_unattended_invocation_storage_read,
+    unattended_paper_invocation_artifact_name,
+    unattended_paper_invocation_directory_name,
+)
+from trading_bot.runtime.strategy_history_seed import (  # noqa: F401
+    MAX_STRATEGY_HISTORY_SEED_BARS,
+    MAX_STRATEGY_HISTORY_SEED_BYTES,
+    MAX_STRATEGY_HISTORY_SEED_DECIMAL_CHARACTERS,
+    STRATEGY_HISTORY_SEED_IDENTITY_MATERIAL_VERSION,
+    STRATEGY_HISTORY_SEED_NAMESPACE,
+    STRATEGY_HISTORY_SEED_SCHEMA,
+    StrategyHistorySeed,
+    StrategyHistorySeedError,
+    StrategyHistorySeedSerializationError,
+    StrategyHistorySeedSourceClassification,
+    StrategyHistorySeedSourceDescriptor,
+    StrategyHistorySeedVerificationError,
+    VerifiedStrategyHistorySeed,
+    create_strategy_history_seed,
+    parse_strategy_history_seed,
+    serialize_strategy_history_seed,
+    verify_strategy_history_seed,
+)
+from trading_bot.runtime.verified_c3_daily_bar_open import (  # noqa: F401
+    C3VerifiedDailyBarOpenBinding,
+    C3VerifiedDailyBarOpenBindingError,
+    build_c3_verified_daily_bar_open_binding,
+    build_disposable_c3_verified_daily_bar_open_binding_for_test,
+    require_c3_verified_daily_bar_open_binding,
+    require_disposable_c3_verified_daily_bar_open_binding_for_test,
 )
 from trading_bot.runtime.verified_snapshot_execution import (
     VERIFIED_SNAPSHOT_PAPER_CYCLE_RESULT_MATERIAL_VERSION,
@@ -266,7 +427,96 @@ from trading_bot.runtime.verified_snapshot_serialization import (
     verify_verified_snapshot_paper_cycle_report,
 )
 
+from .personal_desktop_unattended_scheduler_contract import (  # noqa: F401
+    PERSONAL_DESKTOP_UNATTENDED_SCHEDULER_CONTRACT,
+    PERSONAL_DESKTOP_UNATTENDED_SCHEDULER_CONTRACT_SCHEMA,
+    PersonalDesktopUnattendedSchedulerContract,
+    is_frozen_personal_desktop_unattended_scheduler_contract,
+    personal_desktop_unattended_scheduler_contract,
+)
+
+_PD4_UNATTENDED_EXECUTION_EXPORTS = frozenset(
+    {
+        "PersonalDesktopUnattendedPaperEffectsDisabledError",
+        "PersonalDesktopUnattendedPaperOperationDiagnostic",
+        "PersonalDesktopUnattendedPaperOperationExecutionError",
+        "PersonalDesktopUnattendedPaperOperationResult",
+        "PersonalDesktopUnattendedPaperOperationStatus",
+        "execute_personal_desktop_unattended_paper_operation",
+    }
+)
+_PD4_UNATTENDED_STARTUP_EXPORTS = frozenset(
+    {
+        "PersonalDesktopUnattendedPaperStartupDiagnostic",
+        "PersonalDesktopUnattendedPaperStartupQualificationResult",
+        "PersonalDesktopUnattendedPaperStartupStatus",
+        "qualify_personal_desktop_unattended_paper_startup",
+        "qualify_personal_desktop_unattended_paper_startup_from_verified_plan",
+    }
+)
+_PD4_G6_EXPORTS = frozenset(
+    {
+        "PERSONAL_DESKTOP_UNATTENDED_DAILY_CYCLE_IDEMPOTENCY_MATERIAL_VERSION",
+        "PERSONAL_DESKTOP_UNATTENDED_DAILY_CYCLE_IDEMPOTENCY_NAMESPACE",
+        "PERSONAL_DESKTOP_UNATTENDED_DAILY_CYCLE_PROFILE_VERSION",
+        "DisposablePersonalDesktopUnattendedDailyCycleDependencies",
+        "PersonalDesktopUnattendedDailyCycleClassification",
+        "PersonalDesktopUnattendedDailyCycleResult",
+        "derive_personal_desktop_unattended_daily_cycle_idempotency_key",
+        "personal_desktop_unattended_paper_policies",
+        "personal_desktop_unattended_strategy_config",
+        "run_personal_desktop_unattended_daily_cycle",
+        "run_personal_desktop_unattended_daily_cycle_for_test",
+        "AuthoritativeC3HistorySessionGap",
+        "InsufficientAuthoritativeC3History",
+        "build_personal_desktop_unattended_c3_history",
+        "build_personal_desktop_unattended_next_decision",
+        "personal_desktop_unattended_effect_gate_state",
+    }
+)
+
+_PD4_D6_EXPORTS = frozenset(
+    {
+        "DisposableUnattendedDecisionPublicationDependencies",
+        "PersonalDesktopUnattendedDecisionPublicationClassification",
+        "PersonalDesktopUnattendedDecisionPublicationResult",
+        "run_personal_desktop_unattended_decision_publication",
+        "run_personal_desktop_unattended_decision_publication_for_test",
+    }
+)
+
+
+def __getattr__(name: str) -> object:
+    """Load PD4 CLI-dependent facade exports only after runtime initialization."""
+
+    if name in _PD4_UNATTENDED_EXECUTION_EXPORTS:
+        module = import_module(
+            ".personal_desktop_unattended_paper_operation_execution", __name__
+        )
+    elif name in _PD4_UNATTENDED_STARTUP_EXPORTS:
+        module = import_module(
+            ".personal_desktop_unattended_paper_startup_qualification", __name__
+        )
+    elif name in _PD4_G6_EXPORTS:
+        module = import_module(".personal_desktop_unattended_daily_cycle", __name__)
+    elif name in _PD4_D6_EXPORTS:
+        module = import_module(
+            ".personal_desktop_unattended_decision_publication", __name__
+        )
+    else:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    value = getattr(module, name)
+    globals()[name] = value
+    return value
+
+
 __all__ = [
+    *sorted(_PD4_D6_EXPORTS),
+    "AuthoritativeC3HistorySessionGap",
+    "InsufficientAuthoritativeC3History",
+    "build_personal_desktop_unattended_c3_history",
+    "build_personal_desktop_unattended_next_decision",
+    "personal_desktop_unattended_effect_gate_state",
     "APPLICATION_ID_METADATA_KEY",
     "CHECKPOINTED_VERIFIED_SNAPSHOT_APPLICATION_MATERIAL_VERSION",
     "CHECKPOINTED_VERIFIED_SNAPSHOT_APPLICATION_NAMESPACE",
@@ -473,6 +723,183 @@ __all__.extend(
         "serialize_successor_paper_account_checkpoint",
         "verify_checkpointed_paper_cycle_report",
         "verify_checkpointed_paper_cycle_successor_edge",
+    ]
+)
+
+__all__.extend(
+    [
+        "MAX_PERSONAL_DESKTOP_UNATTENDED_PAPER_INVOCATION_BYTES",
+        "MAX_UNATTENDED_PAPER_INVOCATION_BYTES",
+        "UNATTENDED_PAPER_INVOCATION_IDENTITY_MATERIAL_VERSION",
+        "UNATTENDED_PAPER_INVOCATION_NAMESPACE",
+        "UNATTENDED_PAPER_INVOCATION_SCHEMA",
+        "UNATTENDED_PAPER_POLICY_VERSION",
+        "PersonalDesktopUnattendedPaperInvocation",
+        "PersonalDesktopUnattendedPaperInvocationArtifactBinding",
+        "PersonalDesktopUnattendedPaperInvocationArtifactEvidence",
+        "PersonalDesktopUnattendedPaperInvocationError",
+        "PersonalDesktopUnattendedPaperInvocationSerializationError",
+        "PersonalDesktopUnattendedPaperInvocationValidationError",
+        "PersonalDesktopUnattendedPaperInvocationVerificationError",
+        "VerifiedPersonalDesktopUnattendedPaperInvocation",
+        "create_personal_desktop_unattended_paper_invocation",
+        "derive_personal_desktop_unattended_paper_invocation_id",
+        "parse_personal_desktop_unattended_paper_invocation",
+        "serialize_personal_desktop_unattended_paper_invocation",
+        "verify_personal_desktop_unattended_paper_invocation",
+        "MAX_PERSONAL_DESKTOP_UNATTENDED_PAPER_DECISION_INTENT_BYTES",
+        "PERSONAL_DESKTOP_UNATTENDED_DECISION_PUBLICATION_EFFECTS_ENABLED",
+        "PERSONAL_DESKTOP_UNATTENDED_MARKET_DATA_CAPTURE_EFFECTS_ENABLED",
+        "PERSONAL_DESKTOP_UNATTENDED_DAILY_CYCLE_IDEMPOTENCY_MATERIAL_VERSION",
+        "PERSONAL_DESKTOP_UNATTENDED_DAILY_CYCLE_IDEMPOTENCY_NAMESPACE",
+        "PERSONAL_DESKTOP_UNATTENDED_DAILY_CYCLE_PROFILE_VERSION",
+        "DisposablePersonalDesktopUnattendedDailyCycleDependencies",
+        "PersonalDesktopUnattendedDailyCycleClassification",
+        "PersonalDesktopUnattendedDailyCycleResult",
+        "PersonalDesktopUnattendedC3PreflightReadResult",
+        "PERSONAL_DESKTOP_UNATTENDED_PAPER_DECISION_IDENTITY_MATERIAL_VERSION",
+        "PERSONAL_DESKTOP_UNATTENDED_PAPER_DECISION_INTENT_SCHEMA",
+        "PERSONAL_DESKTOP_UNATTENDED_PAPER_DECISION_NAMESPACE",
+        "PERSONAL_DESKTOP_UNATTENDED_PAPER_DECISION_POLICY_VERSION",
+        "PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_DECISIONS",
+        "PersonalDesktopUnattendedDecisionPublicationDiagnostic",
+        "PersonalDesktopUnattendedDecisionPublicationError",
+        "PersonalDesktopUnattendedDecisionPublicationQualificationResult",
+        "PersonalDesktopUnattendedDecisionPublicationStatus",
+        "PersonalDesktopUnattendedDecisionStorageClassification",
+        "PersonalDesktopUnattendedDecisionStorageDiagnostic",
+        "PersonalDesktopUnattendedDecisionStorageError",
+        "PersonalDesktopUnattendedDecisionStorageReadResult",
+        "FinalizedUnattendedDecisionForSessionClassification",
+        "FinalizedUnattendedDecisionForSessionResult",
+        "PersonalDesktopUnattendedPaperDecisionC3Evidence",
+        "PersonalDesktopUnattendedMarketDataCaptureClassification",
+        "PersonalDesktopUnattendedMarketDataCaptureError",
+        "PersonalDesktopUnattendedMarketDataCaptureResult",
+        "PersonalDesktopUnattendedSelectedC3Evidence",
+        "PersonalDesktopUnattendedPaperDecisionIntent",
+        "PersonalDesktopUnattendedPaperDecisionIntentArtifactBinding",
+        "PersonalDesktopUnattendedPaperDecisionIntentError",
+        "PersonalDesktopUnattendedPaperDecisionIntentSerializationError",
+        "PersonalDesktopUnattendedPaperDecisionIntentValidationError",
+        "PersonalDesktopUnattendedPaperDecisionIntentVerificationError",
+        "PreOpenDecisionPublicationPermit",
+        "WindowsPersonalDesktopUnattendedC3PreflightAuthority",
+        "bind_personal_desktop_unattended_paper_decision_intent",
+        "create_personal_desktop_unattended_paper_decision_intent",
+        "issue_pre_open_decision_publication_permit",
+        "find_finalized_unattended_decision_for_execution_session",
+        "parse_personal_desktop_unattended_paper_decision_intent",
+        "qualify_personal_desktop_unattended_decision_publication",
+        "read_personal_desktop_unattended_decision_storage",
+        "run_personal_desktop_unattended_market_data_capture",
+        "reconcile_personal_desktop_unattended_market_data_capture",
+        "run_personal_desktop_unattended_daily_cycle",
+        "run_personal_desktop_unattended_daily_cycle_for_test",
+        "derive_personal_desktop_unattended_daily_cycle_idempotency_key",
+        "personal_desktop_unattended_paper_policies",
+        "personal_desktop_unattended_strategy_config",
+        "require_finalized_unattended_decision_for_execution_session",
+        "require_validated_personal_desktop_unattended_decision_storage_read",
+        "serialize_personal_desktop_unattended_paper_decision_intent",
+        "unattended_paper_decision_artifact_name",
+        "unattended_paper_decision_directory_name",
+        "verify_personal_desktop_unattended_paper_decision_intent",
+        "PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_INVOCATIONS",
+        "PersonalDesktopUnattendedInvocationStorageClassification",
+        "PersonalDesktopUnattendedInvocationStorageDiagnostic",
+        "PersonalDesktopUnattendedInvocationStorageError",
+        "PersonalDesktopUnattendedInvocationStorageReadResult",
+        "read_personal_desktop_unattended_invocation_storage",
+        "require_validated_personal_desktop_unattended_invocation_storage_read",
+        "unattended_paper_invocation_artifact_name",
+        "unattended_paper_invocation_directory_name",
+        "PersonalDesktopUnattendedPaperStartupDiagnostic",
+        "PersonalDesktopUnattendedPaperStartupQualificationResult",
+        "PersonalDesktopUnattendedPaperStartupStatus",
+        "qualify_personal_desktop_unattended_paper_startup",
+        "qualify_personal_desktop_unattended_paper_startup_from_verified_plan",
+        "PersonalDesktopUnattendedPaperEffectsDisabledError",
+        "PersonalDesktopUnattendedPaperOperationDiagnostic",
+        "PersonalDesktopUnattendedPaperOperationExecutionError",
+        "PersonalDesktopUnattendedPaperOperationResult",
+        "PersonalDesktopUnattendedPaperOperationStatus",
+        "execute_personal_desktop_unattended_paper_operation",
+        "PERSONAL_DESKTOP_UNATTENDED_SCHEDULER_CONTRACT",
+        "PERSONAL_DESKTOP_UNATTENDED_SCHEDULER_CONTRACT_SCHEMA",
+        "PersonalDesktopUnattendedSchedulerContract",
+        "is_frozen_personal_desktop_unattended_scheduler_contract",
+        "personal_desktop_unattended_scheduler_contract",
+    ]
+)
+
+__all__.extend(
+    [
+        "ARCHITECTURE94_METADATA_PREFIX",
+        "ARCHITECTURE94_STRATEGY_PLAN_BYTE_LENGTH_METADATA_KEY",
+        "ARCHITECTURE94_STRATEGY_PLAN_ID_METADATA_KEY",
+        "ARCHITECTURE94_STRATEGY_PLAN_SHA256_METADATA_KEY",
+        "MANUAL_PAPER_STRATEGY_PLAN_IDENTITY_MATERIAL_VERSION",
+        "MANUAL_PAPER_STRATEGY_PLAN_NAMESPACE",
+        "MANUAL_PAPER_STRATEGY_PLAN_SCHEMA",
+        "MAX_MANUAL_PAPER_BASE_METADATA",
+        "MAX_MANUAL_PAPER_STRATEGY_PLAN_BYTES",
+        "MAX_STRATEGY_HISTORY_SEED_BARS",
+        "MAX_STRATEGY_HISTORY_SEED_BYTES",
+        "MAX_STRATEGY_HISTORY_SEED_DECIMAL_CHARACTERS",
+        "STRATEGY_HISTORY_SEED_IDENTITY_MATERIAL_VERSION",
+        "STRATEGY_HISTORY_SEED_NAMESPACE",
+        "STRATEGY_HISTORY_SEED_SCHEMA",
+        "ManualPaperPriorCheckpointEvidence",
+        "ManualPaperSelectedC3Assertion",
+        "ManualPaperStrategyDecisionRequest",
+        "ManualPaperStrategyPlan",
+        "ManualPaperStrategyPlanArtifactBinding",
+        "ManualPaperStrategyPlanError",
+        "ManualPaperStrategyPlanRequest",
+        "ManualPaperStrategyPlanSerializationError",
+        "ManualPaperStrategyPlanValidationError",
+        "ManualPaperStrategyPlanVerificationError",
+        "ManualPaperStrategySignalStatus",
+        "PreparedManualPaperStrategyDecision",
+        "StrategyHistorySeed",
+        "StrategyHistorySeedError",
+        "StrategyHistorySeedSerializationError",
+        "StrategyHistorySeedSourceClassification",
+        "StrategyHistorySeedSourceDescriptor",
+        "StrategyHistorySeedVerificationError",
+        "VerifiedStrategyHistorySeed",
+        "build_manual_paper_strategy_decision",
+        "build_manual_paper_strategy_plan",
+        "complete_manual_paper_strategy_plan",
+        "create_strategy_history_seed",
+        "parse_manual_paper_strategy_plan",
+        "parse_strategy_history_seed",
+        "serialize_manual_paper_strategy_plan",
+        "serialize_strategy_history_seed",
+        "verify_manual_paper_strategy_plan",
+        "verify_prepared_manual_paper_strategy_decision",
+        "verify_strategy_history_seed",
+    ]
+)
+
+__all__.extend(
+    [
+        "C3VerifiedDailyBarOpenBinding",
+        "C3VerifiedDailyBarOpenBindingError",
+        "DisposableSelectedC3SnapshotReadAuthorityForTest",
+        "SelectedC3SnapshotAuditEvidence",
+        "SelectedC3SnapshotPermit",
+        "SelectedC3SnapshotReadError",
+        "SelectedC3SnapshotReadResult",
+        "WindowsSelectedC3SnapshotReadAuthority",
+        "build_c3_verified_daily_bar_open_binding",
+        "build_disposable_c3_verified_daily_bar_open_binding_for_test",
+        "open_disposable_selected_c3_snapshot_read_authority_for_test",
+        "require_c3_verified_daily_bar_open_binding",
+        "require_disposable_c3_verified_daily_bar_open_binding_for_test",
+        "require_disposable_selected_c3_snapshot_permit_for_test",
+        "require_selected_c3_snapshot_permit",
     ]
 )
 

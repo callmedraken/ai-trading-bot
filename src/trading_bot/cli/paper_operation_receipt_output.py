@@ -13,6 +13,10 @@ from uuid import UUID
 
 from trading_bot.cli.checkpoint_lineage_config import read_safe_regular_file
 from trading_bot.cli.checkpoint_transition_output import OutputParent
+from trading_bot.cli.paper_operation_output_capability import (
+    PaperOperationOutputCapability,
+    require_output_capability,
+)
 from trading_bot.runtime import MAX_PAPER_OPERATION_RECEIPT_BYTES
 
 MAX_OPERATION_DIRECTORY_ENTRIES = 10_000
@@ -50,6 +54,7 @@ def commit_paper_operation_receipt(
     operation_id: UUID,
     receipt_payload: bytes,
     verifier: Callable[[bytes, ReceiptCommitVerificationPhase], None],
+    output_capability: PaperOperationOutputCapability | None = None,
 ) -> PaperOperationReceiptDirectoryResult:
     """Stage, verify, and no-clobber finalize one canonical receipt."""
     if (
@@ -62,8 +67,16 @@ def commit_paper_operation_receipt(
     ):
         raise PaperOperationReceiptOutputError("receipt commit input is invalid")
 
+    try:
+        capability = require_output_capability(output_capability)
+    except TypeError as error:
+        raise PaperOperationReceiptOutputError(
+            "receipt output capability is invalid"
+        ) from error
     _require_output_parent(parent)
-    operations = _ensure_operations_parent(parent)
+    if capability is not None:
+        capability.verify_parent(parent.path)
+    operations = _ensure_operations_parent(parent, capability)
     operation_name = f"paper-operation-{operation_id}"
     staging_name = f".{operation_name}.staging"
     receipt_name = f"paper-operation-receipt-{operation_id}.json"
@@ -72,20 +85,31 @@ def commit_paper_operation_receipt(
     _reject_collisions(operations.path, {operation_name, staging_name})
 
     try:
-        os.mkdir(staging)
-    except OSError as error:
+        if capability is None:
+            os.mkdir(staging)
+        else:
+            capability.create_staging_directory(staging)
+            capability.verify_staged_directory(staging)
+    except Exception as error:
         raise PaperOperationReceiptOutputError(
             "cannot exclusively create receipt staging directory"
         ) from error
     retained = _lstat_directory(staging, "receipt staging directory")
     staging_identity = (retained.st_dev, retained.st_ino)
-    _write_file(staging / receipt_name, receipt_payload)
+    if capability is None:
+        _write_file(staging / receipt_name, receipt_payload)
+    else:
+        capability.write_staged_file(staging / receipt_name, receipt_payload)
+        capability.verify_staged_file(staging / receipt_name)
     _fsync_directory(staging)
     _verify_fixed_layout(staging, receipt_name)
     staged_payload = _read_receipt(staging / receipt_name, "staged receipt")
     verifier(staged_payload, ReceiptCommitVerificationPhase.STAGED_REREAD)
 
     _require_output_parent(parent)
+    if capability is not None:
+        capability.verify_parent(parent.path)
+        capability.verify_parent(operations.path)
     _require_directory(operations, "paper-operations directory")
     _require_directory_identity(staging, staging_identity, "receipt staging directory")
     _verify_fixed_layout(staging, receipt_name)
@@ -102,8 +126,11 @@ def commit_paper_operation_receipt(
         raise PaperOperationReceiptOutputError("final receipt directory already exists")
     _fsync_directory(operations.path)
     try:
-        os.rename(staging, final)
-    except OSError as error:
+        if capability is None:
+            os.rename(staging, final)
+        else:
+            capability.finalize_directory(staging, final)
+    except Exception as error:
         raise PaperOperationReceiptOutputError(
             "cannot finalize staged receipt directory"
         ) from error
@@ -113,6 +140,9 @@ def commit_paper_operation_receipt(
     _require_directory(operations, "paper-operations directory")
     _require_directory_identity(final, staging_identity, "final receipt directory")
     _verify_fixed_layout(final, receipt_name)
+    if capability is not None:
+        capability.verify_finalized_directory(final)
+        capability.verify_finalized_file(final / receipt_name)
     finalized_payload = _read_receipt(final / receipt_name, "finalized receipt")
     verifier(finalized_payload, ReceiptCommitVerificationPhase.FINALIZED_REREAD)
     _require_output_parent(parent)
@@ -130,7 +160,10 @@ def commit_paper_operation_receipt(
     )
 
 
-def _ensure_operations_parent(parent: OutputParent) -> _DirectoryIdentity:
+def _ensure_operations_parent(
+    parent: OutputParent,
+    capability: PaperOperationOutputCapability | None = None,
+) -> _DirectoryIdentity:
     _require_output_parent(parent)
     matches = _casefold_matches(parent.path, OPERATIONS_DIRECTORY_NAME)
     if matches:
@@ -139,6 +172,10 @@ def _ensure_operations_parent(parent: OutputParent) -> _DirectoryIdentity:
                 "paper-operations directory has a case-fold collision"
             )
     else:
+        if capability is not None:
+            raise PaperOperationReceiptOutputError(
+                "paper-operations directory must already exist"
+            )
         try:
             os.mkdir(parent.path / OPERATIONS_DIRECTORY_NAME)
         except OSError as error:
@@ -154,6 +191,8 @@ def _ensure_operations_parent(parent: OutputParent) -> _DirectoryIdentity:
             "paper-operations directory has a case-fold collision"
         )
     path = parent.path / OPERATIONS_DIRECTORY_NAME
+    if capability is not None:
+        capability.verify_parent(path)
     retained = _lstat_directory(path, "paper-operations directory")
     return _DirectoryIdentity(path, retained.st_dev, retained.st_ino)
 

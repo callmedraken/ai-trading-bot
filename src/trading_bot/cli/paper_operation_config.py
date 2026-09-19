@@ -39,6 +39,7 @@ from trading_bot.runtime import (
     PaperAccountLineageVerificationStatus,
     PaperOperationArtifactEvidence,
     PaperOperationIntent,
+    VerifiedPaperOperationExecutionInputs,
     VerifiedPriorCheckpoint,
     create_paper_operation_intent,
     derive_checkpointed_verified_snapshot_application_id,
@@ -162,6 +163,30 @@ class VerifiedPaperOperationInputs:
     cycle_configuration_payload: bytes
     request: CheckpointedVerifiedSnapshotPaperCycleRequest
     calendar: IdentifiedMarketCalendar
+
+
+def adapt_verified_paper_operation_execution_inputs(
+    inputs: VerifiedPaperOperationInputs,
+) -> VerifiedPaperOperationExecutionInputs:
+    """Discard CLI transport paths and retain only verified runtime evidence."""
+    if type(inputs) is not VerifiedPaperOperationInputs:
+        raise TypeError("verified CLI paper-operation inputs are invalid")
+    manifest = inputs.lineage_manifest
+    return VerifiedPaperOperationExecutionInputs(
+        intent=inputs.intent,
+        application_id=inputs.application_id,
+        prior_genesis_checkpoint=manifest.genesis_checkpoint,
+        prior_successor_checkpoints=manifest.successor_checkpoints,
+        prior_cycle_reports=manifest.cycle_reports,
+        prior_snapshots=manifest.snapshots,
+        verified_prior=inputs.verified_prior,
+        terminal_checkpoint_payload=inputs.terminal_checkpoint_payload,
+        completed_snapshot_payload=inputs.completed_snapshot_payload,
+        snapshot_verification=inputs.snapshot_verification,
+        cycle_configuration_payload=inputs.cycle_configuration_payload,
+        request=inputs.request,
+        calendar=inputs.calendar,
+    )
 
 
 def load_paper_operation_config(path: Path) -> PaperOperationConfig:

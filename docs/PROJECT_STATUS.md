@@ -1,851 +1,877 @@
 # Project Status and Roadmap
 
-This document is the canonical high-level status/roadmap for AI Trading Bot. The canonical cross-chat handoff is `docs/AI_TRADING_BOT_HANDOFF.md`; detailed architecture documents remain authoritative for subsystem contracts and historical decisions.
+This is the canonical high-level project status for AI Trading Bot. Detailed
+subsystem contracts live under `docs/architecture/` and `docs/validation/`;
+`docs/AI_TRADING_BOT_HANDOFF.md` is the canonical cross-chat resume document.
 
-## Long-term objective
+## Product objective and deployment profile
 
-Build a conservative automated trading platform that can progress safely from deterministic historical research to simulated paper trading, unattended paper operation, broker-paper operation, restricted live trading, and finally a polished end-user application.
+Build a conservative automated trading platform for a **closed, single-owner
+personal Windows desktop**, progressing through deterministic research,
+supervised simulated paper, unattended simulated paper, broker-paper, long
+paper soak, personal-desktop live-readiness, tiny restricted live operation,
+and a polished GUI.
 
-**Production/live trading: NO-GO.** Live trading remains unavailable until separately reviewed safety, credential, brokerage, reconciliation, operator-control, and acceptance gates are complete.
-
-## Current milestone: reliable manually invoked paper cycle
-
-C1 `ValidatedProductionAuthority` and C2 `WindowsTransactionalAuthority` are reviewed foundations. C3 was the reviewed bridge from C1/C2 authority into real market-data credentials, native Windows child execution, Alpaca transport, staged capture, independent parent verification, publication, and snapshot selection.
-
-C3 is **FULLY COMPLETE / ACCEPTED** at final source head `82ba29ae2c2cc6bb3544077db0ee21868e6d5693`. Controlled production acceptance proved the complete Architecture 82 authority/effect/verification/selection chain. The next product milestone is the reliable manually invoked paper cycle, which consumes the selected verified C3 snapshot without changing C3 authority.
-
-Completed C3 foundations include:
-
-1. immutable capture planning and deterministic request/session identity;
-2. canonical bounded parent/child protocol;
-3. C1/C2/C3 composition with child success treated as evidence rather than authority;
-4. exact Windows Credential Manager targets and Trading-SID verification;
-5. one-shot isolated provider execution with provider-call fence;
-6. native suspended `CreateProcessW` + Job Object containment;
-7. durable C2 process/resume ordering and conservative crash semantics;
-8. bounded child/result observation and cleanup;
-9. parent verification, publication, terminal, and selection path;
-10. manual `production_daily_snapshot_capture` operator boundary;
-11. E3.2 closed transport-stage diagnostics;
-12. E3.3 truthful transport-stage handling and separate HTTP-status semantics;
-13. E3.4 closed sanitized response-metadata sub-classifications;
-14. E3.5 preservation of non-success HTTP status across safe Content-Type variation, durable sanitized HTTP evidence, and stricter successful-response Content-Type diagnostics;
-15. E3.6 fixed `/v2` credential-reference rotation, certified/deployed runtime, and accepted pre-first-effect credential restaging under Architecture 84A;
-16. E3.7 repaired and deployed the Windows final-artifact publication path.
-
-The native ordering remains:
+Stable constraints:
 
 ```text
-CreateProcessW suspended
--> durable C2 execution / PRE_RESUME_READY
--> write canonical child request
--> close request writer
--> commit ResumeIntent
--> ResumeThread exact primary thread once
--> bounded child/process observation
--> cleanup evidence
--> parent verification / terminal / selection
+US stocks / ETFs
+long-only
+no margin / leverage / options / shorts / crypto
+deterministic risk approval
+paper-by-default
+complete auditability
 ```
 
-`RESUME_RECORDED` is lifecycle evidence, not provider-success evidence.
+**Production/live trading remains NO-GO.**
 
-## Frozen authority and runtime facts
+## Primary development lines
 
-- Production Trading account: `DESKTOP-I4DOKM7\Trading`
-- Trading SID: `S-1-5-21-1397534616-3988210162-180023805-1009`
-- Fixed runtime: `F:\AITradingBot\runtime\python.exe`
-- Runtime directory: `F:\AITradingBot\runtime`
-- Production temp: `F:\AITradingBot\temp`
-- Capture output: `F:\AITradingBot\Authority\capture-output`
-- Credential policy: `windows-credential-manager-alpaca-market-data/v2`
-- Credential targets:
-  - `AITradingBot/MarketData/Alpaca/ApiKeyId/v2`
-  - `AITradingBot/MarketData/Alpaca/ApiSecretKey/v2`
-- Frozen production SQL: 118,896 bytes
-- SQL SHA-256: `aa61df2f5db0090f8373222d1f5e492a58f4c10273afacfab45e382bacd4bb58`
-
-## E3.3 certification and prior deployment
-
-E3.3 source certification completed at `bf88890d87ed1734a4634e4b8069ff5232a20994`:
-
-- 3,094 passed, 16 skipped, 0 failed;
-- Ruff check passed;
-- tracked-source Ruff format check passed.
-
-Accepted E3.3 wheel:
-
-- 672,104 bytes;
-- SHA-256 `ed87fcce586a3b2f2477f2b99e6c404d7c42f5cc2ef29e230b12cd8ca7640b3b`;
-- 192 wheel entries / 191 RECORD hashes verified.
-
-The E3.3 runtime was deployed through the sealed-runtime procedure, Trading RX was republished, and the non-admin zero-provider preflight passed.
-
-## E3.4 source certification
-
-Accepted implementation checkpoint:
-
-`134467ecda1ffbb39f48cf68a2d3e9017d1d2f61` — `fix: classify Alpaca response metadata failures`
-
-Certified diff SHA-256:
-
-`6d9232fef1f5dfaf8b1df329e28db20646d108a81b0e1410e2d2d9cd82cdbca6`
-
-Final source certification:
-
-- 3,136 passed, 16 skipped, 0 failed;
-- Ruff check passed;
-- Ruff format check passed across 358 tracked Python files;
-- final `git diff --check` passed.
-
-E3.4 preserves existing validation and authority semantics while adding these sanitized response-metadata classifications:
+The currently armed capture-only warm-up deployment remains on the frozen
+personal-desktop branch/worktree:
 
 ```text
-TRANSPORT_RESPONSE_METADATA_ACQUISITION_FAILED
-TRANSPORT_RESPONSE_METADATA_MALFORMED_FAILED
-TRANSPORT_RESPONSE_METADATA_DUPLICATE_FAILED
-TRANSPORT_RESPONSE_METADATA_CONTENT_ENCODING_FAILED
-TRANSPORT_RESPONSE_METADATA_TRANSFER_ENCODING_FAILED
-TRANSPORT_RESPONSE_METADATA_LENGTH_CONFLICT_FAILED
-TRANSPORT_RESPONSE_METADATA_CONTENT_LENGTH_FAILED
-TRANSPORT_RESPONSE_METADATA_REQUEST_ID_FAILED
-TRANSPORT_RESPONSE_METADATA_CONTENT_TYPE_FAILED
-TRANSPORT_RESPONSE_METADATA_FAILED
+repository: callmedraken/ai-trading-bot
+integration baseline: bd88ee966bff455f9fc897d6cfdfafdd807f27e2
+Architecture-94 P2 base: a810122a96b6fc90da25d71eede8da64b7272c98
+
+D5 deployed/warm-up branch:
+feature/personal-desktop-paper-runtime
+
+D5 deployed/warm-up worktree:
+F:\AI\worktrees\ai-trading-bot-personal-desktop
+
+D5 accepted source HEAD:
+8c2af5801cbc8f4df869b832a3b78b1eaa2f8996
+
+D5 accepted source tree:
+f0591e966463c7e1e66dc00ad76fd895500a076f
 ```
 
-## E3.4 accepted artifact and deployment
-
-Accepted frozen E3.4 wheel:
-
-- source commit: `134467ecda1ffbb39f48cf68a2d3e9017d1d2f61`;
-- source tree: `dcead824eee27b2e93a7391578ef1b321b595c06`;
-- path: `F:\AI\c3-e34-production-wheelhouse-v1\ai_trading_bot-0.1.0-py3-none-any.whl`;
-- length: 673,212 bytes;
-- SHA-256: `b7fdbabeb936c311eeae3509635ec57d40fa999e421dc4e9cd5afb8bbe0848db`;
-- 192 wheel entries / 191 hashed RECORD payloads;
-- production SQL unchanged;
-- exact E3.4 source-file comparisons passed;
-- E3.4 metadata classifications and E3.3 HTTP hierarchy checks passed.
-
-Administrator deployment, Trading RX republication, and the non-admin E3.4 zero-provider preflight were accepted. This is now historical; the fixed runtime has been replaced by the accepted E3.5 artifact described below.
-
-## E3.5 source certification
-
-Provider call #3 exposed a specific real-provider failure: `TRANSPORT_RESPONSE_METADATA_CONTENT_TYPE_FAILED`. Review showed that a safe non-200 response carrying a non-JSON Content-Type could be rejected as metadata failure before preserving its HTTP status. E3.5 hardens that boundary without weakening successful-response parsing or retry authority.
-
-Accepted E3.5 source sequence:
-
-- `8913baf9fd56b2aa921781ab8e837ed10b63c25f` — preserve Alpaca HTTP failure status across safe non-200 Content-Type variation and add closed successful-response Content-Type sub-classifications;
-- `034ed9bedfda698936c51e2560d79bb59694929a` — persist sanitized `http_status` / `provider_request_id` in canonical durable C3 evidence-v2 and expose them only after terminal persistence; harden optional provider-code extraction;
-- `b0e94240291e59ee2214d639d096b4dc5cf7e094` — regression proving historical schema-1 C3 evidence remains accepted and byte-for-byte unchanged by current read-only authority validation.
-
-E3.5 behavior:
-
-- safe non-200 responses with missing, `text/plain`, or `text/html` Content-Type proceed to `AlpacaHttpStatusError` while retaining bounded framing/header protections;
-- provider error codes are parsed only from recognized supported JSON media types and remain optional sanitized diagnostics;
-- successful HTTP 200 responses still require supported JSON Content-Type and strict UTF-8 JSON parsing;
-- new closed successful-response classifications are `...CONTENT_TYPE_MISSING_FAILED`, `...CONTENT_TYPE_MEDIA_TYPE_FAILED`, `...CONTENT_TYPE_CHARSET_FAILED`, and `...CONTENT_TYPE_PARAMETER_FAILED`;
-- the prior broad Content-Type classification remains accepted for compatibility;
-- `HTTP_FAILED` durable evidence requires exact non-200 integer status and optional bounded printable-ASCII request ID; non-HTTP classifications store those fields as null;
-- cleanup/terminal evidence-v2 is stored in the existing opaque JSON+digest columns; production SQL is unchanged;
-- historical schema-1 cleanup/terminal/diagnostic evidence remains valid immutable evidence under current read-only authority validation.
-
-Final E3.5 source certification at `b0e94240291e59ee2214d639d096b4dc5cf7e094`:
-
-- 3,171 passed, 16 skipped, 0 failed;
-- Ruff check passed on `src tests`;
-- Ruff format check passed across 338 tracked source/test Python files;
-- final `git diff --check` passed;
-- tracked working tree clean;
-- frozen production SQL remains 118,896 bytes with SHA-256 `aa61df2f5db0090f8373222d1f5e492a58f4c10273afacfab45e382bacd4bb58`.
-
-**E3.5 source certification is accepted.**
-
-## E3.5 accepted artifact and deployment
-
-The first attempted artifact path (`c3-e35-production-*-v1`) is rejected and must never be used. It was created after an invalid mistyped source SHA prevented a valid export; no valid v1 wheel was produced.
-
-Accepted frozen E3.5 artifact:
-
-- source commit: `b0e94240291e59ee2214d639d096b4dc5cf7e094`;
-- source tree: `8c8d360f944077a777eea529051b0bce1d7de707`;
-- source export: `F:\AI\c3-e35-production-source-v2`;
-- wheel: `F:\AI\c3-e35-production-wheelhouse-v2\ai_trading_bot-0.1.0-py3-none-any.whl`;
-- length: 674,463 bytes;
-- SHA-256: `7c5f44bd2ef28992334094ef46e8b2f5ddd8c502d7086bb4a44d66bf8133edb9`;
-- 192 wheel entries / 191 hashed RECORD payloads;
-- exact `trading_bot` package payload matched the certified Git export byte-for-byte;
-- wheel path/topology checks passed with zero forbidden entries;
-- distribution metadata verified as `ai-trading-bot` 0.1.0, Python `>=3.12`, `py3-none-any`, runtime dependency `tzdata<2027.0,>=2024.1`, optional extras `dev` and `optimization-cpu`;
-- production SQL remained 118,896 bytes with the frozen SHA-256.
-
-Administrator deployment is accepted:
-
-- elevated identity `DESKTOP-I4DOKM7\John` confirmed administrator;
-- exact accepted wheel length/SHA re-proved immediately before install;
-- production runtime quiescent: zero fixed-runtime Python processes;
-- runtime root owner remained Administrators and the prior exact Trading RX publication was present;
-- Trading RX was removed and no Trading ACE remained anywhere in the runtime during replacement;
-- offline/no-index/no-deps/no-cache force-reinstall succeeded;
-- all 191 hashed wheel payloads matched the accepted wheel after installation;
-- installed RECORD topology remained 380 rows: 192 wheel rows plus 188 pip extras, consisting of 185 `.pyc`, `INSTALLER`, `REQUESTED`, and `direct_url.json`;
-- package imported from `F:\AITradingBot\runtime\Lib\site-packages\trading_bot`;
-- E3.3 HTTP exception hierarchy, E3.5 safe provider-code extraction, E3.5 operator HTTP evidence fields, and `HTTP_FAILED` child classification passed installed-runtime smoke checks;
-- production SQL remained frozen at 118,896 bytes / `aa61df2f5db0090f8373222d1f5e492a58f4c10273afacfab45e382bacd4bb58`;
-- SQLite remained 3.50.4;
-- read-only production authority validation returned `VALIDATED`, `INITIALIZED_SUPPORTED`, and exact Trading SID `S-1-5-21-1397534616-3988210162-180023805-1009`;
-- owner normalization processed 12,454 files with zero failures;
-- final runtime root owner is Administrators SID `S-1-5-32-544`;
-- final sealed root ACL contains only SYSTEM and Administrators, both inheritable Full Control;
-- 12,453 descendants inspected with zero ACL anomalies and no Trading ACE remaining;
-- no network operation, Credential Manager read, production child launch, or provider request occurred.
-
-Trading RX republication is accepted:
-
-- runtime remained quiescent with zero fixed-runtime Python processes;
-- pre-publication root remained protected and owned by Administrators;
-- exact pre-publication root ACE set was SYSTEM + Administrators only;
-- root publication became exactly three ACEs: SYSTEM Full Control, Administrators Full Control, Trading inheritable Read & Execute;
-- root owner remained Administrators SID `S-1-5-32-544`;
-- all 12,453 descendants inherited exactly one Trading RX ACE;
-- zero RX topology anomalies were found;
-- no provider request occurred.
-
-The non-admin Trading E3.5 zero-provider preflight is accepted:
-
-- identity exactly `DESKTOP-I4DOKM7\Trading` / expected SID;
-- token non-administrator;
-- fixed runtime Python and installed package location verified;
-- E3.3 HTTP exception hierarchy preserved;
-- non-200 missing/`text/plain`/`text/html` Content-Type handling accepted without losing the known HTTP-status path;
-- HTTP 200 Content-Type diagnostics verified for missing Content-Type, unsupported media type, unsupported charset, invalid parameter form, plus a valid JSON positive control;
-- safe optional provider-code extraction passed malformed/type/range cases;
-- operator `http_status` / `provider_request_id` fields and `HTTP_FAILED` classification verified;
-- production SQL remained frozen at 118,896 bytes / exact SHA-256;
-- runtime write was blocked under Trading;
-- production temp write/read/delete probe passed and cleaned;
-- no Credential Manager read;
-- no network operation;
-- no production child launch;
-- no authority database mutation;
-- no provider request.
-
-**The complete E3.5 deployment + Trading zero-provider preflight checkpoint is accepted.**
-
-## E3.6 `/v2` credential-reference rotation — accepted through local credential proof
-
-Architecture 84 moved new C3 production credential references from `/v1` to fixed `/v2` targets with no runtime selector or fallback. Architecture 84A narrowly permits pairwise `/v2` restaging only before the first `/v2` provider effect; after the first `/v2` provider effect, `/v2` becomes immutable and later rotation requires a new credential-reference version.
-
-Accepted E3.6 source:
-
-- commit: `41de33d3ef8ca22a6418146a6302969e11bbacc1`;
-- tree: `44946d941f698c7290f43e47792e667443668055`;
-- final regression: 3,177 passed, 16 skipped, 0 failed;
-- Ruff check passed on `src tests`;
-- Ruff format check passed across 338 source/test Python files;
-- `git diff --check` passed;
-- production `/v1` credential references under `src/trading_bot` were absent;
-- frozen production SQL remained exact.
-
-Accepted E3.6 artifact:
-
-- source export: `F:\AI\c3-e36-production-source-v1`;
-- rejected failed build wheelhouse: `F:\AI\c3-e36-production-wheelhouse-v1` with zero wheel files;
-- accepted wheel: `F:\AI\c3-e36-production-wheelhouse-v2\ai_trading_bot-0.1.0-py3-none-any.whl`;
-- length: 674,468 bytes;
-- SHA-256: `98971acb4809fc7c5b4286771f64dee55349f083a188086ba5d2c78cd5301a21`;
-- 192 wheel entries / 192 RECORD rows / 191 hashed payloads;
-- 188 package source files matched the certified export exactly;
-- zero forbidden entries;
-- installed production credential contract contains only `/v2` values.
-
-Administrator deployment, Trading RX republication, and corrected non-admin zero-provider preflight are accepted:
-
-- fixed runtime now contains `windows-credential-manager-alpaca-market-data/v2` and the exact two `/v2` targets;
-- `/v1` production fallback is absent and public credential override parameters are absent;
-- production SQL remains 118,896 bytes with the frozen SHA-256;
-- SQLite remains 3.50.4;
-- authority validation remained `VALIDATED / INITIALIZED_SUPPORTED` under the administrator gate;
-- Trading RX topology is exact across all 12,453 descendants;
-- Trading-side signed bootstrap verification binds the exact approved SID;
-- Trading-side production database inspection was read-only with `total_changes=0`;
-- runtime writes were blocked under Trading and production temp remained usable;
-- no Credential Manager read, network request, production child launch, authority mutation, or provider request occurred during deployment/preflight.
-
-Credential staging under the exact non-admin Trading SID then produced one superseded `/v2` pair before any `/v2` provider effect. Architecture 84A classified that first pair `SUPERSEDED_BEFORE_FIRST_PROVIDER_EFFECT`, required both targets to be deleted together, and required all witness gates to be repeated. Restaging subsequently passed:
-
-- superseded key and secret fingerprints matched the known abandoned pair before deletion;
-- both `/v2` targets were deleted and independently proved absent;
-- one replacement Alpaca **Paper** key generation was captured through interactive hidden input;
-- replacement key ID and secret readback reproduced the dashboard-side domain-separated fingerprints and UTF-8 lengths exactly;
-- credential type `Generic` and persistence `LOCAL_MACHINE` passed;
-- dashboard was refreshed/revisited and the replacement key remained current;
-- `FRESH_GENERATED=PASSED`;
-- `LOCAL_EXACT_MATCH=PASSED`;
-- `DASHBOARD_CURRENT=PASSED`;
-- `/v2` real-provider effect count remains zero;
-- no provider/network request occurred during staging/restaging.
-
-**The E3.6 source/artifact/deployment/zero-provider/credential-local-proof checkpoint is accepted.** At that checkpoint the current `/v2` pair was frozen for its first future `/v2` provider effect. Call #5 subsequently used that pair; the first `/v2` effect permanently closed the Architecture 84A staging/restaging window. The `/v2` targets are now immutable historical credential-reference state and must not be regenerated, replaced, deleted, restaged, or modified. Any later credential rotation requires `/v3` or a later explicitly reviewed version.
-
-## C3-E3.7 Windows publication repair and provider call #5 — accepted
-
-E3.7 implementation:
+Do not modify the armed D5 worktree merely to continue development. New D6/D7
+source/design work is isolated on:
 
 ```text
-commit: 137bbe5a83d3bfe1cb62c381026c25e7fefa739a
-message: fix: repair C3 Windows artifact publication
+branch: feature/pd4-unattended-decision-publication
+planned local worktree: F:\AI\worktrees\ai-trading-bot-decision-publication
+base commit: 8c2af5801cbc8f4df869b832a3b78b1eaa2f8996
+base tree:   f0591e966463c7e1e66dc00ad76fd895500a076f
 ```
 
-The implementation replaced the invalid `SetFileInformationByHandle` /
-`FileLinkInfo` publication path with documented `CreateHardLinkW` no-clobber
-publication while preserving retained staging identity verification, casefold
-collision rejection, final reopen identity verification, exact-byte
-reverification, and authority issuance only after successful parent
-verification. The E3.7 Windows publication acceptance gate passed: **1
-passed**.
-
-Provider call #5 was the first real `/v2` provider effect. Calls #1–#4 are
-historical `/v1` lineages. The accepted call-#5 lineage and terminal evidence
-are:
+The earlier PD4 unattended source-foundation certification remains an important
+historical certification boundary:
 
 ```text
-target session date: 2026-08-28
-request window: 2026-08-27 through 2026-08-27
-request digest: c33949931607552c6f06503fadf818972fb4fe153dd2a65a21970e5e879a435e
-session: 7bdad286-c378-5ac9-a1be-05bb685739a8
-attempt: c70afb4c-921b-509e-9231-4d85bb334ca5
-claim: 9edd75a1-38d3-5043-a522-edb034730a24
-reservation: ff1cb0a3-b0f4-5908-812c-a1c4a8a14ed0
-execution: 67400d7e-153f-5c03-a821-4d955b291c2a
-terminal: 736c9432-d374-5cd1-a708-b2e008fa811b
-terminal state: FAILED
-provider disposition: CONFIRMED
-process exit: 6
-child provider classification: SUCCEEDED
-child provider fence: ENTERED
-child process observation: EXITED_ZERO
-result transport: complete
-parent cleanup: complete
-staging cleanup: complete
-artifact verification: PUBLICATION_FAILED
-parent terminal reason: PARENT_ARTIFACT_VERIFICATION_FAILED
-snapshot authority: none issued
-snapshot: null
-selection: none
-capture-output after failure: empty
+final PD4 source-foundation certified commit:
+248cd8de6a3539aab21d5719d96cb7ff1aa0d14c
+
+final PD4 source-foundation certified tree:
+5e867f1bfc6d945ad67f6c56be252b534645aeb2
+
+full suite:
+5588 passed, 17 skipped in 1519.25s (0:25:19)
 ```
 
-The `/v2` credentials and authenticated Alpaca path were remotely accepted;
-the child successfully obtained the daily snapshot. Failure occurred after
-the confirmed provider effect during local parent artifact publication. Call
-#5 is permanently consumed and must never be retried. E3.7 repaired and
-deployed the publication defect exposed by this lineage.
+Later Architectures 111/112 and D5 source/deployment work extend that accepted
+foundation; they do not retroactively change the historical PD4-F certification
+record.
 
-Final repository source certification was accepted:
+Architecture checkpoints now include:
 
 ```text
-3186 passed
-17 skipped
-0 failed
-Ruff check src tests: passed
-Ruff format --check: 358 tracked Python files already formatted
-git diff --check: passed
-final source tree: clean
-frozen production SQL length: 118896
-frozen production SQL SHA-256: aa61df2f5db0090f8373222d1f5e492a58f4c10273afacfab45e382bacd4bb58
+Architecture 102  personal-desktop profile adoption
+Architecture 103  Paper-v2 deployment/provisioning authority
+Architecture 104  supervised A67 execution boundary
+Architecture 105  first-mutation qualification
+Architecture 106  first Paper-v2 execution preparation
+Architecture 107  first Paper-v2 output authority hardening
+Architecture 108  first Paper-v2 post-mutation reconciliation
+Architecture 109  personal-desktop Paper-v2 receipt-recovery authority
+Architecture 110  personal-desktop unattended Paper-v2 operation authority
+Architecture 111  personal-desktop unattended daily-cycle authority
+Architecture 112  personal-desktop capture-only warm-up authority
 ```
 
-Accepted E3.7 release artifact:
+## Mandatory personal-desktop security baseline
+
+- steady-state trading runs under the dedicated non-admin `Trading` account;
+- credentials stay outside source/plain config and use reviewed Windows-backed
+  storage;
+- paper is default; future live requires a separate explicit arming boundary;
+- every executable order passes deterministic risk authority;
+- strategy/optimizer/GUI/AI/scheduler/adapters cannot bypass risk;
+- durable state outranks process-local assumptions;
+- ambiguous provider/broker effects reconcile or fail closed rather than being
+  blindly retried;
+- source-governed runtime/config/state locations use practical least privilege;
+- crash/restart, duplicate invocation, stale input, corruption/conflict, and
+  receipt recovery fail closed unless exact reviewed authority is present.
+
+## C3 production and unattended capture state
+
+Historical C3 release source:
 
 ```text
-source export: F:\AI\c3-e37-production-source-v1
-wheel: F:\AI\c3-e37-production-wheelhouse-v1\ai_trading_bot-0.1.0-py3-none-any.whl
-wheel length: 674358
-wheel SHA-256: b35bbe0adc8f55ea96cc9f9e1852015182d07ed32b98d86cc141129395e431d2
-wheel entries: 192
-RECORD rows: 192
-hashed payloads: 191
-package source files: 188 exact matches
-package source exact-match gate: passed
-production SQL exact: passed
-offline wheel verification: passed
+82ba29ae2c2cc6bb3544077db0ee21868e6d5693
 ```
 
-E3.7 administrator deployment was accepted after the exact wheel was
-re-proved before installation. The production runtime Python process count
-was 0; Trading RX was revoked before replacement; the offline/no-index/no-
-deps/no-cache force reinstall succeeded; all 191 hashed wheel payloads
-matched; the installed E3.7 `CreateHardLinkW` publication implementation was
-verified; the obsolete `FileLinkInfo` path was absent; production SQL
-remained exact; SQLite remained 3.50.4; and production authority validation
-returned `VALIDATED / INITIALIZED_SUPPORTED`. The bootstrap digest was
-`53b8b72ab18b1c477c5eab50857e4dc2d47efc6e74030e380ed6a53387922ae4`; the
-exact Trading SID remained approved. Ownership normalization processed
-12,454 files with 0 failures; 12,453 descendants were inspected; ACL
-anomalies were 0; and the sealed runtime before RX publication contained only
-SYSTEM and Administrators.
-
-Trading RX republication was accepted with the runtime quiescent, the root
-owner still Administrators, the root DACL protected, exact inheritable Trading
-Read & Execute restored, all 12,453 descendants passing RX topology, and
-Trading RX anomalies at 0.
-
-The non-admin Trading E3.7 zero-provider preflight was accepted:
+The earlier manual C3 acceptance established:
 
 ```text
-identity: DESKTOP-I4DOKM7\Trading
-SID: S-1-5-21-1397534616-3988210162-180023805-1009
-administrator: False
-credential policy: windows-credential-manager-alpaca-market-data/v2
-key target: AITradingBot/MarketData/Alpaca/ApiKeyId/v2
-secret target: AITradingBot/MarketData/Alpaca/ApiSecretKey/v2
-/v1 fallback: absent
-E3.7 publication runtime proof: passed
-signed bootstrap verification: passed
-production database inspection: read-only
-durable session count: 5
-call #5 digest mapped exactly to its expected session
-SQLite total_changes: 0
-runtime write: blocked
-production temp read/write/delete: passed
+call #5: FAILED / CONFIRMED
+call #6: SUCCEEDED / CONFIRMED / SUCCESS_SELECTED
 ```
 
-The deployment/preflight zero-effect proof was:
+Selected call #6:
 
 ```text
-CREDENTIAL_MANAGER_READ=False
-NETWORK_OPERATION_PERFORMED=False
-PRODUCTION_CHILD_LAUNCHED=False
-AUTHORITY_DATABASE_MUTATION=False
-PROVIDER_REQUEST_PERFORMED=False
-```
-
-The first `/v2` provider effect has now occurred. The `/v2` staging/restaging
-window is permanently closed, and the current `/v2` targets are immutable
-historical credential-reference state. Do not regenerate, replace, delete,
-restage, or modify `/v2`; any later credential rotation requires `/v3` or a
-later explicitly reviewed version.
-
-## C3 final controlled production acceptance — COMPLETE / ACCEPTED
-
-C3 is **FULLY COMPLETE / ACCEPTED** at final source head
-`82ba29ae2c2cc6bb3544077db0ee21868e6d5693`. This closeout records the final
-controlled production evidence without changing Architecture 82 or any source,
-test, schema, credential, deployment, or runtime artifact.
-
-The accepted source/release context is:
-
-- accepted E3.7 source repair: `137bbe5a83d3bfe1cb62c381026c25e7fefa739a`;
-- frozen production SQL: 118896 bytes, SHA-256
-  `aa61df2f5db0090f8373222d1f5e492a58f4c10273afacfab45e382bacd4bb58`;
-- accepted production wheel: `ai_trading_bot-0.1.0-py3-none-any.whl`,
-  674358 bytes, SHA-256
-  `b35bbe0adc8f55ea96cc9f9e1852015182d07ed32b98d86cc141129395e431d2`;
-- broad source regression: 3186 passed, 17 skipped;
-- Ruff, format, and diff checks were accepted.
-
-The dedicated production identity was `DESKTOP-I4DOKM7\Trading`, SID
-`S-1-5-21-1397534616-3988210162-180023805-1009`, and it was non-administrator.
-The `/v2` credential references are immutable historical production inputs. They
-must not be deleted, overwritten, restaged, or rotated in place; a future
-credential rotation requires a separately reviewed `/v3` or later version.
-
-Historical call #5 remains permanently consumed historical evidence. Its request
-digest was
-`c33949931607552c6f06503fadf818972fb4fe153dd2a65a21970e5e879a435e`; its durable
-terminal remains `FAILED / CONFIRMED` after parent publication failed following a
-successful child/provider path. It is not successful and is not retryable.
-
-Final controlled production call #6:
-
-```text
-ordered universe: SPY
-request window: 2026-08-28 through 2026-08-28
-target session date: 2026-08-29
-authorized XNYS snapshot session: 2026-08-28
-request digest: 67c8e2c81da2467aa0c67328af191038d00858fe153dd0850f59ef786612efad
-session_id: f787e4f6-c3ca-58fe-802b-f068dd474b41
-attempt_id: e809f393-b557-5c6b-8665-78d66822fee8
-claim_id: 487618c1-a5a5-5dd9-971d-a1ea843194c5
-reservation_id: fa5b4538-e475-5a13-9cb2-0d7936232c84
-execution_id: d85a8085-137b-55c2-9679-cddade4a5907
-terminal_id: b4c76e5f-44bb-54ce-a917-3e3223b84107
 selection_id: 36d6fbb3-bdec-57e0-a9cf-78dc2b8f7280
 snapshot_id: eba46838-44ae-5bec-97bf-98c6639ae6a7
-artifact_sha256: 31d82a31a3fbd909f8771820bf47e796a1503264fe0ac6ce0eff7ba163f0767d
-artifact_byte_length: 1291
-status: COMPLETED
-terminal_state: SUCCEEDED
-provider_call_disposition: CONFIRMED
-exit_code: 0
+artifact SHA-256: 31d82a31a3fbd909f8771820bf47e796a1503264fe0ac6ce0eff7ba163f0767d
+artifact byte length: 1291
+captured_at: 2026-08-29T09:46:43.769105+00:00
 ```
 
-The final read-only durable proof was:
+Architecture 111 subsequently froze a separate unattended market-data gate and
+the zero-semantic-argument daily-cycle model. D3/D4 then accepted the first
+unattended C3 capture and read-only reconciliation for session `2026-09-11`:
 
 ```text
-DURABLE_ROW_FOUND=True
-SESSION_STATE=SUCCESS_SELECTED
-ATTEMPT_STATE=SUCCESS_SELECTED
-CLAIM_STATE=COMMITTED
-RESERVATION_STATE=TERMINAL_RECORDED
-EXECUTION_PHASE=TERMINAL_RECORDED
-TERMINAL_STATE=SUCCEEDED
-PROVIDER_DISPOSITION=CONFIRMED
-REQUEST_SHA256=67c8e2c81da2467aa0c67328af191038d00858fe153dd0850f59ef786612efad
-TERMINAL_SNAPSHOT_SHA256=31d82a31a3fbd909f8771820bf47e796a1503264fe0ac6ce0eff7ba163f0767d
-SELECTION_SNAPSHOT_SHA256=31d82a31a3fbd909f8771820bf47e796a1503264fe0ac6ce0eff7ba163f0767d
-DURABLE_MATCH=True
+selection_id: 7c42363d-4785-5823-be7e-93bf94426eac
+snapshot_id:  8ddc60ed-3940-5379-a868-b46b9b7c95af
+artifact SHA-256: 704c1d0966acec3489a355fd6ef5369439b07e0e0a8e15c5f68cc2d847aa607f
+artifact byte length: 1289
 ```
 
-The final artifact/offline proof was:
+Architecture 112 then constrained normal warm-up wakes to exactly one G5 call,
+with only the market-data gate opened process-locally and restored in `finally`.
+No scheduler exit code, process failure, or provider ambiguity grants retry
+authority.
+
+Production identities remain:
 
 ```text
-ARTIFACT_EXISTS=True
-ARTIFACT_BYTES=1291
-ARTIFACT_SHA256=31d82a31a3fbd909f8771820bf47e796a1503264fe0ac6ce0eff7ba163f0767d
-OFFLINE_VERIFY_STATUS=PASS
-SNAPSHOT_ID=eba46838-44ae-5bec-97bf-98c6639ae6a7
-SNAPSHOT_SESSION_DATE=2026-08-28
-SNAPSHOT_SYMBOLS=['SPY']
-ARTIFACT_EVIDENCE_MATCH=True
-OFFLINE_SNAPSHOT_MATCH=True
-C3_COMPLETION_EVIDENCE=True
+host: DESKTOP-I4DOKM7
+Trading account: DESKTOP-I4DOKM7\Trading
+Trading SID: S-1-5-21-1397534616-3988210162-180023805-1009
+machine_authority_id: 223f0d4e-36f9-4b9b-bf0e-febf16fcd3f1
+authority_epoch_id: e6f3de5d-1412-40ad-a022-8b33e72a5f6d
+runtime: F:\AITradingBot\runtime\python.exe
+authority DB: F:\AITradingBot\Authority\authority.sqlite3
+credential policy: windows-credential-manager-alpaca-market-data/v2
 ```
 
-Pre-effect evidence for call #6 confirmed the exact production runtime,
-validated production authority and frozen schema digest, immutable `/v2`
-credential entries readable under the Trading SID, the corrected E3.7
-`CreateHardLinkW` implementation, absence of the obsolete `FileLinkInfo` path,
-a passing same-filesystem publication canary, empty capture output, zero prior
-durable lineage, and no provider/network operation during preflight.
-
-This satisfies Architecture 82's stronger completion criterion: one C1-approved
-Trading process caused at most one C2-authorized provider attempt; secrets
-remained in the contained child on the production effect path; C2 durable
-process/resume fences governed the effect; the parent independently verified and
-published the canonical artifact; the successful terminal was durably selected;
-and independent post-run offline verification passed. C3 completion is not
-merely that Alpaca HTTP worked.
-
-Total actual C3 real-provider effects are now **exactly 6**. All six are
-consumed, call #6 is successful and consumed, and no provider call #7 is
-authorized.
-
-C3 authorizes only the reviewed market-data capture path. It does not authorize
-brokerage credentials, broker reconciliation, order submission/cancel/replace,
-real-money trading, unattended scheduling, automatic retry, automatic recovery,
-or paper-account mutation. Production brokerage and live trading remain
-**NO-GO**.
-
-The next product milestone is the reliable manually invoked paper cycle:
+## Architecture 94 accepted product work
 
 ```text
-verified C3 snapshot
--> strategy
--> proposals
--> deterministic risk
--> paper execution
--> durable before/after evidence
+P1 pure strategy history / deterministic strategy plan
+1028e60b99c27cef0994f40d6ce381392abfb0f8
+
+P2 read-only selected-C3 snapshot authority
+a810122a96b6fc90da25d71eede8da64b7272c98
 ```
 
-This closeout does not design that milestone in detail and does not select a new
-architecture for it.
-
-## GUI track status
-
-The GUI track is integrated through GUI-A7 in this combined source tree. It
-remains a presentation/operator layer that must consume reviewed
-application/service boundaries rather than becoming an alternative trading,
-authority, credential, or recovery engine.
-
-### GUI-A1 through GUI-A4
-
-Accepted GUI foundations include:
-
-- native PySide6 application shell and stable navigation;
-- Qt-free presentation/service contracts;
-- explicit read-only local research-report loading;
-- bounded research result table presentation;
-- deterministic sorting/filtering and report replacement behavior;
-- read-only comparison of two to four research variants;
-- bounded comparison tables/charts with truthful return/drawdown/turnover semantics.
-
-### GUI-A5 — paper-operation inspection: ACCEPTED
-
-Architecture 91 defines a strictly read-only GUI boundary for one exact
-paper-operation inspection result.
-
-Accepted implementation sequence:
-
-- `26833e8326f6cffef2c638543fb3174f1984e85f` — define Architecture 91 and Qt-free paper presentation/service contracts;
-- `b3cdce458a1f884f6d25b6fa82039cc1b31e1015` — formatting-only follow-up;
-- `bb057bc6864c4f340fa05651a4a63245ee491854` — add the concrete Qt-free read-only paper inspection adapter;
-- `fbf8fcb8068fff394bb1b144d1fdddbf3c50e06f` — render the bounded Paper page in Qt;
-- `86f1308dad98e763856fcf5c8504bff26804baf9` — update the older GUI-A2 research test fixture for the expanded GUI service contract;
-- `6f1945172a6e8dad46327a0212c6bce0fac68256` — update the older GUI-A4 comparison test fixture for the expanded GUI service contract.
-
-GUI-A5 accepted behavior:
-
-- presentation scope is exactly one explicit inspected paper-operation root, not history/account/fill/order discovery;
-- classifications are limited to `PENDING`, `ALREADY_APPLIED`, `CONFLICTING`, and `BLOCKED`;
-- the presentation diagnostic vocabulary mirrors the reviewed closed inspection codes;
-- the concrete adapter receives one explicit operation root and already-verified `VerifiedPaperOperationInputs`;
-- GUI widgets do not construct paper-operation authority or enumerate arbitrary roots;
-- inspection/adaptation failures collapse to bounded sanitized `UNAVAILABLE` state without raw exception text;
-- `MainWindow` obtains the paper state once during construction; navigation does not reinspect;
-- the Paper page renders classification, diagnostic, operation/checkpoint/application UUIDs, and optional bounded receipt path only;
-- service-derived text is forced to literal Qt plain text;
-- there are no execute/run/retry/resume/recover/cancel/refresh/open-receipt or other mutation/effect controls;
-- no paper execution, filesystem history scan, production SQLite, C1/C2/C3, Credential Manager, Alpaca, brokerage, scheduler, or production-child path is connected.
-
-Final GUI-A5 acceptance evidence at
-`6f1945172a6e8dad46327a0212c6bce0fac68256`:
-
-- targeted compatibility regression: 2 passed;
-- complete GUI suite: 93 passed;
-- manual visual gate: PASSED for both unavailable and populated read-only Paper presentation;
-- complete repository regression: 2,822 passed, 13 skipped, 0 failed;
-- Ruff check on `src tests`: passed;
-- Ruff format check on `src tests`: 342 files already formatted;
-- `git diff --check`: clean;
-- final GitHub compare from A5b2 to accepted head: exactly 2 commits, 2 test files, 8 added lines, zero production-source changes;
-- known unrelated generated/untracked artifacts and historical permission-warning directories remained untouched.
-
-**GUI-A5 is fully ACCEPTED.**
-
-### GUI-A6 — offline-verified market-snapshot inspection: ACCEPTED
-
-Architecture 92 defines a strictly read-only Market Data presentation boundary
-for one exact local daily-snapshot artifact that has passed the existing offline
-snapshot verifier. The GUI does not claim that this artifact is the active
-production C3-selected snapshot.
-
-Accepted checkpoint sequence:
-
-- `994fa3b6f452cb004d842aaa7f59166c6b1c4d4b` — define Architecture 92;
-- `fd04e40cb1fa9af294e8fe1181446b66f614a715` — add the GUI-A6 validation plan;
-- `3885e0c6e4e576e647e656401891c1a25e7c2d54` — accepted A6a Qt-free presentation/service contract;
-- `e98b84bdb42066ef03593f3134b42dadf520f200` — accepted A6b1 explicit-path offline verification adapter;
-- `f4015e4adefba123c7f3c1f1ee5df70158f6a9db` — accepted A6b2 native Qt Market Data rendering source.
-
-GUI-A6 accepted behavior:
-
-- presentation scope is exactly one explicitly supplied local daily-snapshot artifact;
-- the adapter performs one bounded read of that exact artifact and calls the existing `verify_daily_snapshot(...)` verifier exactly once per state acquisition;
-- only a complete verifier `PASS` becomes `VERIFIED` GUI state;
-- verifier PASS proves canonical snapshot serialization, XNYS calendar/session consistency, complete requested-symbol coverage, canonical accepted-bar evidence, audit hash, deterministic snapshot identity, and optional artifact SHA-256/byte-length evidence;
-- the bounded presentation exposes only snapshot/session identity, retained symbol order, provider identity/operation/feed, artifact digest/size, capture/provider-as-of timestamps, and retained source-payload digest/size/media type;
-- read, parse, verification, model, calendar, or adaptation failures collapse to sanitized `UNAVAILABLE` state without raw exception or diagnostic-detail text;
-- the adapter does not enumerate directories or choose a "latest" artifact;
-- `MainWindow` obtains Market Data state once during construction; navigation does not reread or reverify;
-- service/model-derived Qt text is forced to literal plain text;
-- there are no Capture/Refresh/Retry/Reverify/Select/Publish/Recover/database/credential/provider controls;
-- no network, Alpaca transport, environment credential, Windows Credential Manager, production SQLite, C1/C2/C3 capability, capture, paper execution, strategy, risk, or artifact mutation path is connected;
-- `VERIFIED` means offline verification of the supplied artifact only; it does not mean C3 selected the artifact, that it is newest, or that a capture is authorized.
-
-Final GUI-A6 acceptance evidence at
-`f4015e4adefba123c7f3c1f1ee5df70158f6a9db`:
-
-- A6a contract gate: 8 passed;
-- A6a+A6b1 focused gate: 16 passed;
-- A6b2 focused Qt gate: 24 passed;
-- complete GUI integration suite: 114 passed;
-- manual visual gate: PASSED for both unavailable and populated verified Market Data presentations;
-- complete repository regression: 2,843 passed, 13 skipped, 0 failed;
-- all 13 skips are the repository's expected Windows opt-in/symlink environment skips;
-- Ruff check on `src tests`: passed;
-- Ruff format check on `src tests`: 348 files already formatted;
-- `git diff --check`: clean;
-- final GitHub compare from accepted A5 closeout `a5f5b91efe855e5b2e4e11898e950733001ff10f` to A6 source head: 24 commits, 16 files, all within Architecture 92/A6 presentation, adapter, Qt rendering, validation, and stale GUI test-fixture compatibility scope;
-- no C3/runtime authority, provider credential, production SQLite, strategy, risk, order, or brokerage source changed;
-- known unrelated generated/untracked artifacts and historical permission-warning directories remained untouched.
-
-**GUI-A6 is fully ACCEPTED.**
-
-### GUI-A7 — offline-verified paper-account state: ACCEPTED
-
-Architecture 93 defines a common, strictly read-only presentation boundary for one explicitly supplied, completely offline-verified simulated paper-account checkpoint. The page does not identify the operationally current account, select a latest checkpoint, or add an operational account-selection boundary. The GUI-A7 validation plan is the frozen contract at the validation checkpoint below.
-
-Accepted checkpoint sequence:
-
-- `7b9067d204954ceef16531cff669dee43d1c094b` - Architecture 93;
-- `17deebb5a47995629925d0890eda49b41a6ab6f7` - GUI-A7 validation plan;
-- `6a333ff16f289990bbb870d857496cec17c0e847` - A7a final common presentation contract;
-- `2bcb2d8770cbd80b801d54cb71e3013b14da4f79` - A7b1 GENESIS inspection adapter;
-- `8bb1ebab1d28d337460c41549dfaa2d757317f0a` - A7b2 successor-edge inspection adapter;
-- `b108a039251fbd37baeb0b6931e1fdd4b1c8877c` - A7b3 Qt Paper Account page;
-- `91dad3cbe98c9d02097adba7a0cd8ab2d4736e9a` - A7b3 visual-table refinement;
-- `7fb2e0b014938215e9ab4fbdb1cddde2651fad92` - final Ruff-format-only follow-up and accepted head.
-
-Accepted architecture and behavior:
-
-- one common Qt-free paper-account presentation contract supports completely verified GENESIS and CYCLE_SUCCESSOR states;
-- the GENESIS adapter reads one explicit checkpoint artifact within its existing schema bound and calls `verify_genesis_paper_account_checkpoint(...)` exactly once per acquisition;
-- the successor adapter requires the exact explicit prior checkpoint, verified snapshot, checkpointed-cycle report, and successor checkpoint proof set and calls `verify_checkpointed_paper_cycle_successor_edge(...)` exactly once;
-- a successor checkpoint alone is never sufficient;
-- only complete diagnostic-free exact PASS results become VERIFIED, and all failures collapse to deterministic sanitized UNAVAILABLE;
-- the mapped fields are checkpoint kind/sequence, checkpoint/lineage/account/compact IDs, as-of, cash, cumulative realized P&L, ordered positions, and verifier artifact SHA/byte length;
-- positions preserve verified order and exact Decimal values;
-- Qt receives one immutable `PaperAccountPageState`; `MainWindow` acquires paper-account state exactly once during construction, and navigation does not reacquire or reverify;
-- Paper Account is a dedicated read-only navigation page; presentation states explicitly say Verified Offline and do not claim operational/current-account selection;
-- the positions table is read-only, non-sortable, four-column, uses a hidden vertical row header, and has balanced deterministic column sizing;
-- no execution, resume, retry, recover, refresh, latest-selection, repair, publication, credential, network, brokerage, production SQLite, C1/C2/C3, or artifact-mutation controls or dependencies were added.
-
-Final GUI-A7 acceptance evidence at `7fb2e0b014938215e9ab4fbdb1cddde2651fad92`:
-
-- combined A7a/A7b1/A7b2 focused gate: 73 passed;
-- A7b3 focused Qt/regression gate: 36 passed;
-- complete GUI suite before final visual polish: 199 passed;
-- post-polish focused Paper Account Qt gate: 12 passed;
-- manual visual gate: PASSED for verified GENESIS presentation at normal and minimum-size layouts after table refinement;
-- complete repository regression on the final semantic source tree: 2,928 passed, 13 skipped, 0 failed;
-- all full-suite skips were expected repository Windows opt-in/symlink environment skips;
-- Ruff check on `src/tests` after final formatting: passed;
-- Ruff format check on `src/tests`: 356 files already formatted;
-- `git diff --check`: clean;
-- the final formatting-only commit changed exactly one long raise statement into Ruff multiline form;
-- AST comparison of pre/post-format `paper_account_models.py`: `AST_EQUIVALENT=True`;
-- focused A7 contract after formatting with explicit basetemp: 15 passed;
-- an earlier focused rerun encountered WinError 5 only while pytest attempted to scan `C:\Users\John\AppData\Local\Temp\pytest-of-John`; this was an environment setup failure, not a source/test regression;
-- known unrelated generated/untracked artifacts and historical permission-warning directories remained untouched.
-
-GUI-A7 is fully ACCEPTED at final head `7fb2e0b014938215e9ab4fbdb1cddde2651fad92`. Any subsequent GUI milestone remains a separate architecture/planning decision; this closeout selects no GUI-A8 architecture.
-
-## Consumed real-provider lineages
-
-### August 21, 2026
-
-- session: `4667f0a1-8890-57b9-ae07-98ffc9633ade`
-- attempt ordinal: 0
-- terminal: `FAILED`
-- provider disposition: `CONFIRMED`
-- child classification: `TRANSPORT_FAILED`
-- consumed request digest: `823e9bee88de07bbd6d3384559dd6207ad216e69d46443594f8664fff49854a7`
-
-The duplicate deterministic invocation was blocked before new attempt allocation. This lineage must never be retried.
-
-### August 24, 2026
-
-Fresh request digest:
-
-`ed4cc49dc385486ac5ca623f64e99766247e371c90f29f1ff8fd585841d6b651`
-
-Lineage:
-
-- session: `c78b94a4-963f-5197-9a03-16017ea2203b`
-- attempt: `e1a74104-150c-5ef9-96f3-f9d6d0c8aee0`
-- claim: `2fa4aa8b-b571-5051-b48b-19a658b4fe3b`
-- reservation: `4d49805d-661b-53b2-a8df-ba041323da2f`
-- execution: `5acd937c-35b4-5e68-87cd-afc781872176`
-- terminal: `b4c34eec-81d4-5dad-b01a-34d88fca05d4`
-- terminal state: `FAILED`
-- provider disposition: `CONFIRMED`
-- child classification: `TRANSPORT_RESPONSE_METADATA_FAILED`
-- selection/snapshot/artifact: none
-
-Read-only diagnostics confirmed provider fence entered, complete result transport, process exited zero, complete parent/staging cleanup, valid evidence/diagnostics digests, and `POST_FENCE_CHILD_FAILURE`. The exact rejected metadata condition is not recoverable from the consumed E3.3 lineage. This lineage must never be retried.
-
-### August 25, 2026
-
-Pure planning after the New York-date rollover authorized session `2026-08-25` with fresh request digest:
-
-`b41a85c7b907ccd2a687d9f832d72a85cf152db46c85eaf9665809635ce9674b`
-
-Pre-effect durable freshness was zero. Exactly one real provider effect then produced:
-
-- session: `2420ce3f-4395-504a-8bd6-995fe87055db`
-- attempt: `0cebdb94-0a83-5b46-ac43-979dfc98b168`
-- claim: `7e57b5ee-5ce8-55e6-93f9-62e8f6ab4b4d`
-- reservation: `2dfc0505-f1ad-5b07-b455-c47364e82bf7`
-- execution: `33d5ec52-1bae-5cdb-bb20-7e707cdcf039`
-- terminal: `96dc59fb-f393-5033-beba-ea78470d12ea`
-- terminal state: `FAILED`
-- provider disposition: `CONFIRMED`
-- child classification: `TRANSPORT_RESPONSE_METADATA_CONTENT_TYPE_FAILED`
-- selection/snapshot/artifact: none
-
-Read-only durable diagnostics confirmed provider fence entered, child request/result transport complete, process exited zero, parent/staging cleanup complete, artifact verification not attempted, evidence/diagnostics digests valid, and terminal reason `POST_FENCE_CHILD_FAILURE`. E3.4 therefore succeeded in narrowing the prior broad metadata failure to Content-Type validation. This lineage is permanently consumed and must never be retried.
-
-### August 26, 2026
-
-Pure planning after the New York-date rollover authorized session `2026-08-26` with fresh request digest:
-
-`cccf56d1361ee4df8cf34745f68b32b29c52efdaaa80d2a02d4a32323dedce7f`
-
-Pre-effect durable freshness was zero across `sessions`, `attempts`, `provider_call_claims`, `launch_reservations`, and `terminals`. Exactly one explicitly authorized provider effect then produced:
-
-- session: `32b6765f-d1ae-5d11-81df-b95e82178edf`
-- attempt: `c19975b6-10b4-5893-93a2-aca92e606229`
-- claim: `fa184f7f-85bd-5830-bb96-70ae334a2d2e`
-- reservation: `995883d2-bdc4-5909-9e35-b4e8343beab7`
-- execution: `71ebf7dc-aaf4-504c-a15c-33c7b2afd6bb`
-- terminal: `67defd53-e6b2-5f6e-945e-de51b5846962`
-- terminal state: `FAILED`
-- provider disposition: `CONFIRMED`
-- child classification: `HTTP_FAILED`
-- HTTP status: `401`
-- provider request ID: `1a57fe61031771fc4b0f818c84f9e6e0`
-- selection/snapshot/artifact: none
-
-Read-only durable inspection verified the exact lineage and request digest, attempt/reservation/execution terminal states, provider-call budget 1, provider fence `ENTERED`, complete result transport, `EXITED_ZERO`, complete parent and staging cleanup, valid post-resume/cleanup/terminal evidence digests, terminal evidence schema 2, `artifact_verification=NOT_ATTEMPTED`, terminal reason `POST_FENCE_CHILD_FAILURE`, zero selection rows, exactly four durable sessions total, and SQLite `total_changes=0` during inspection. E3.5 therefore succeeded in preserving the concrete provider HTTP failure that E3.4 previously exposed only as a Content-Type metadata classification. This historical lineage is permanently consumed and must never be retried.
-
-The August 26 provider-effect count was historical evidence for calls #1-#4.
-Call #5 was then consumed as the first `/v2` effect. The final controlled call #6
-is recorded in the C3 acceptance section above, and the current total is now
-exactly 6.
-
-## Historical pre-call #6 planner and review state (superseded)
-
-The planner used exchange-local **calendar-date** reconciliation. Its freshness
-check was pure and read-only, with no Credential Manager read, network/provider
-request, production child launch, or authority mutation. That historical gate
-was superseded by the separately authorized final call #6 documented above.
-
-Call #5 used the fresh XNYS request window `2026-08-27` and target session date
-`2026-08-28`; that failure lineage remains consumed and is not a retry
-candidate. The final call #6 used a distinct request digest, exact session
-mapping, and zero durable lineage before effect.
-
-## Post-C3 boundaries and next product milestone
-
-C3 completion does not authorize unattended operation. Follow-up boundaries
-outside C3 include authoritative scheduling, startup reconciliation, crash
-recovery, health/alerts, stale or missing-data handling, and the selected
-verified snapshot to paper-operation bridge. The next product milestone is the
-reliable manually invoked paper cycle shown above; it must remain separately
-reviewed and does not mutate C3 authority or paper-account state in this
-closeout.
-
----
-## Roadmap after C3
-
-1. **Reliable manual paper cycle** — selected parent-verified snapshot -> strategy -> proposals -> deterministic risk -> paper execution -> durable evidence.
-2. **Unattended paper operation** — authoritative scheduling, startup reconciliation, crash recovery, health/alerts, stale/missing-data fail-closed behavior.
-3. **Long paper soak** — extended unattended operation to expose real operational problems while consequences remain simulated.
-4. **Broker-paper integration** — account/position reads, submit/cancel/replace, broker/fill IDs, partial fills/rejects, reconciliation, idempotency, ambiguous-submit recovery.
-5. **Live-readiness certification** — explicit mode authority, separate live credentials, exact account verification, strict limits, kill switch, outage/halt handling, startup reconciliation, operator-visible state.
-6. **Tiny restricted live** — deliberately small long-only real-money deployment only after live-readiness acceptance.
-7. **Mature operations / deeper AI / polished GUI** — AI remains subordinate to deterministic validation, authority, risk, brokerage, reconciliation, and operator controls.
-
-## Stable product constraints
-
-- US stocks and ETFs;
-- long-only;
-- no margin or leverage;
-- no options;
-- no short selling;
-- no crypto;
-- deterministic risk approval for every order;
-- paper mode by default;
-- complete auditability.
+Preserve the product composition:
+
+```text
+selected verified C3 snapshot
++ explicit deterministic strategy history
++ authoritative paper-account tip
+-> deterministic strategy plan
+-> planner / proposal
+-> deterministic portfolio risk
+-> simulated paper execution
+-> successor checkpoint + full-lineage verification
+-> Architecture-67 durable transition + receipt
+```
+
+Architecture 111 adds a two-phase unattended composition without weakening that
+final plan contract:
+
+```text
+selected current C3 close + C3-authoritative history + account predecessor
+-> PreparedManualPaperStrategyDecision (pre-open; no execution-session open)
+-> durable pre-open decision intent
+-> later selected C3 open for the intended execution session
+-> existing Architecture-94 ManualPaperStrategyPlan
+-> existing PD4 / Architecture-67 Paper-v2 reconciliation and settlement
+```
+
+## Paper-v2 production authority
+
+Fixed paths:
+
+```text
+Paper-v2 root:       F:\AITradingBot\Paper-v2
+A67 operation root: F:\AITradingBot\Paper-v2\runtime
+receipt parent:     F:\AITradingBot\Paper-v2\runtime\paper-operations
+unattended invocation namespace:
+                    F:\AITradingBot\Paper-v2\runtime\unattended-invocations
+future decision namespace from Architecture 111:
+                    F:\AITradingBot\Paper-v2\runtime\unattended-decisions
+```
+
+Architecture 113 and D6 source certification have accepted the decision-
+namespace storage/ACL/publication contract. Real provisioning and publication
+remain separately protected D7 checkpoints.
+
+Published account:
+
+```text
+paper_account_id:   9415cd7b-bf36-5fba-bd58-a0f99119dc21
+GENESIS checkpoint: 1832a2b5-8b63-501a-8f7d-f1722c32307b
+starting cash:      Decimal("25000")
+GENESIS as_of:      2026-08-29T09:46:43.769105+00:00
+```
+
+Frozen publication artifacts:
+
+```text
+GENESIS  SHA-256 d1a7ff14425c8a797a952860a1102489a4c81cac2a24a45bc3127eb8eb2e9548  length 533
+anchor   SHA-256 16c4dba01835c5bc2def91f0103ad79c3da0b5d18af72091b4fdd37fe4353c85  length 465
+manifest SHA-256 8fe1d705d59a79207ab6236af71becee0051042dc7b3ecaf23bb7f5531cb0029  length 532
+freeze Git blob b125cbb1c80a827f74018cf2955b9a27ba69fa90
+```
+
+Retained failed v1 state:
+
+```text
+F:\AITradingBot\Paper                    ABSENT
+F:\AITradingBot\.Paper.provisioning-v1  PRESENT / RETAINED / UNTOUCHED
+```
+
+Never rerun the old v1 publisher or delete, repair, rename, migrate, or reuse
+the retained v1 staging tree as incidental cleanup.
+
+## PD1 — personal-desktop Paper-v2 authority — COMPLETE
+
+Completion record:
+
+```text
+docs/validation/pd1-personal-desktop-paper-v2-completion.md
+```
+
+## PD2 — reliable supervised manual paper cycle — COMPLETE
+
+Completion records:
+
+```text
+docs/validation/pd2a-paper-account-runtime-mutex-completion.md
+docs/validation/pd2b-supervised-paper-composition-completion.md
+docs/validation/pd2c-supervised-paper-execution-boundary-completion.md
+docs/validation/pd2d2-first-real-paper-operation-completion.md
+```
+
+Canonical PD2 state:
+
+```text
+PD2A = COMPLETE
+PD2B = COMPLETE
+PD2C = COMPLETE
+PD2D1 = COMPLETE
+PD2D2 = COMPLETE
+PD2 = COMPLETE
+```
+
+First durable Paper-v2 operation:
+
+```text
+operation_id:         307f769a-f09a-539d-b12d-3fb51b973809
+application_id:       78a1bae8-51ac-5bf0-b159-500768c758fc
+cycle_result_id:      854f133e-d9cd-5a9d-be63-0eb4137787db
+successor checkpoint: ed4640e5-0630-525d-b916-d50e31e3ba2a
+receipt_status:       COMPLETED
+receipt_outcome:      NO_ACTION
+```
+
+Independent post-mutation reconciliation proved:
+
+```text
+result:                    RECONCILED
+lineage_edge_count:        1
+account_cash:              25000
+position_count:            0
+inspection_classification: ALREADY_APPLIED
+inspection_diagnostic:     ALREADY_APPLIED
+```
+
+PD2 final broad certification:
+
+```text
+5146 passed, 17 skipped in 1505.92s
+Ruff check: PASS
+Ruff format --check: PASS (457 files)
+git diff --check: PASS
+```
+
+## PD3 — supervised crash/recovery validation — COMPLETE
+
+Architecture:
+
+```text
+docs/architecture/109-personal-desktop-paper-receipt-recovery-authority.md
+```
+
+Completion record:
+
+```text
+docs/validation/pd3-personal-desktop-receipt-recovery-completion.md
+```
+
+Accepted PD3 source:
+
+```text
+commit e690ce83d6c53507d9e93dca97bcb79191c62a0b
+tree   522f41115d2079ae777f667a19e5179c1d492e1f
+```
+
+Final broad source certification:
+
+```text
+5285 passed, 17 skipped in 1478.19s
+Ruff check: PASS
+Ruff format --check: PASS (467 files)
+git diff --check: PASS
+worktree/index: clean
+```
+
+Real-host read-only acceptance ran under `DESKTOP-I4DOKM7\Trading`, non-elevated,
+and returned healthy completed-account evidence with no recovery mutation.
+
+## PD4 — unattended simulated-paper source foundation — COMPLETE
+
+Architecture 110 source-foundation completion remains historical and accepted:
+
+```text
+completion record:
+docs/validation/pd4-unattended-personal-desktop-paper-completion.md
+
+final certified source commit:
+248cd8de6a3539aab21d5719d96cb7ff1aa0d14c
+
+final certified source tree:
+5e867f1bfc6d945ad67f6c56be252b534645aeb2
+```
+
+Accepted source-foundation checkpoints cover:
+
+```text
+PD4-A    durable unattended invocation identity/model and verification
+PD4-B    durable invocation storage/read/publication/provisioning boundaries
+PD4-C    read-only startup qualification under the same PD2A mutex
+PD4-D    unattended Paper-v2 execution composition with effects closed
+PD4-D-R1 explicit non-private shared composition interfaces
+PD4-E    zero-semantic-argument launcher + frozen scheduler contract
+PD4-F1   genuine production read-only host-validation harness
+PD4-F2   final exact-tree source certification
+PD4-F3   Trading-principal real-host read-only qualification
+```
+
+Final PD4 source-foundation broad certification:
+
+```text
+5588 passed, 17 skipped in 1519.25s (0:25:19)
+Ruff check: PASS
+Ruff format --check: PASS (486 files)
+git diff --check: PASS
+git diff --cached --check: PASS
+worktree/index: clean
+local HEAD == origin feature HEAD: YES
+```
+
+That completion record must remain historical: it correctly states that the
+Architecture-110 source foundation alone did not authorize operational
+unattended deployment.
+
+## PD4 unattended daily-cycle extension — Architecture 111
+
+Architecture 111 and its validation plan are accepted design/source contracts:
+
+```text
+docs/architecture/111-personal-desktop-unattended-daily-cycle-authority.md
+docs/validation/pd4-unattended-daily-cycle-plan.md
+```
+
+Key frozen rules:
+
+- Task Scheduler is an untrusted wake-up source and supplies no semantic trading
+  authority;
+- version-1 regular open is 09:30 America/New_York for the modeled XNYS session;
+- a decision targeting session `E` must be finalized strictly before
+  `regular_open(E)`;
+- the pre-open decision contains no `open(E)` or later market-data fact;
+- after `E` completes, only a current-C1 selected C3 snapshot for `E` may bind
+  its verified daily-bar open for settlement;
+- C3-selected history, not the old offline seed, is production authority;
+- the current MA 3/5 profile requires six consecutive selected C3 sessions
+  before the first fully C3-backed decision;
+- no automatic multi-session catch-up is authorized; an internal history gap is
+  `SESSION_GAP`;
+- unattended market-data capture and decision publication have separate
+  closed-by-default source-owned gates.
+
+## PD4-D5 capture-only warm-up — ACTIVE / FIRST SCHEDULED WAKE ACCEPTED
+
+Architecture and validation plan:
+
+```text
+docs/architecture/112-personal-desktop-capture-only-warmup-authority.md
+docs/validation/pd4-d5-capture-only-warmup-plan.md
+```
+
+D5-A read-only Task Scheduler qualification was accepted. The exact accepted D2
+predecessor task XML SHA-256 was:
+
+```text
+da851985d9bfb04c65a83cb64b5441a2f7fd50391924a844749e365ee282d6ec
+```
+
+D5-B then changed only the existing task launcher action to:
+
+```text
+-I F:\AI\worktrees\ai-trading-bot-personal-desktop\scripts\run_personal_desktop_unattended_capture_warmup.py
+```
+
+The first credential-less mutation call failed authentication. Read-only
+reconciliation proved the installed task remained exactly D2 with the same XML
+hash, so no ambiguous scheduler state was retried blindly. A separately
+credential-aware attempt under the existing D5-B authorization then succeeded.
+The accepted D5 task XML SHA-256 is:
+
+```text
+8005373fad791c85776b4a35b662d46e06fec4ea40ac9ebfead9f413715da457
+```
+
+D5-C first scheduled capture-only wake was accepted with:
+
+```text
+session:                2026-09-14
+terminal:               SUCCEEDED
+provider disposition:   CONFIRMED
+selection_id:           dea50bc9-95b4-5f63-ac40-a7353133be53
+attempt_id:             70f5f586-a05b-56c5-adde-bfa5d027864b
+snapshot_id:            b3737822-35ee-5238-a87f-401b4597df46
+artifact SHA-256:       db16bd7d6edda1709aeea64158f8751c02714ed45e9c6441935640e43ffa5487
+artifact identity SHA:  bfd131801558be6cbbed96b1e176c428b98df4e9c6dcccffb77c74acdc4870ba
+account predecessor:    ed4640e5-0630-525d-b916-d50e31e3ba2a
+```
+
+The authoritative selected warm-up history is currently:
+
+```text
+2026-09-11
+2026-09-14
+selected_count = 2 / 6
+G6 = WARMING_UP
+G5 post-capture = NO_NEW_COMPLETED_SESSION
+```
+
+All eight committed source effect gates were false before and after the accepted
+wake. D5 ordinary wakes may open only the market-data gate process-locally for
+one exact G5 call and must restore it in `finally`; decision publication and all
+Paper-v2 effect gates remain closed.
+
+The armed D5 task should remain untouched while it accumulates sessions
+naturally. Do not manually start it, backfill from the old offline seed, alter
+its source/scheduler contract, or turn a failed/ambiguous provider outcome into
+a blind retry.
+
+## Current milestone — PD4 D7-D source preparation
+
+D6-A through D6-D source certification is **ACCEPTED** under Architecture 113.
+
+```text
+certified D6 source HEAD: fb00e9898c2e5cdd3db27cd91c393f5994c7cca9
+certified D6 source TREE: eef138bb3ed144d153ae60193aaacdcb7584c513
+final full suite: 6007 passed, 17 skipped in 1502.66s
+source-certification completion record:
+docs/validation/pd4-d6-unattended-decision-publication-source-certification.md
+```
+
+The certified source independently reconstructs the current-C1 selected-C3
+six-session MA(3,5), desired-quantity-1 candidate under the PD2A mutex, enforces
+the strict pre-open deadline, and contains the one-shot decision-only
+publication boundary. Source certification authorizes no production effect.
+
+D7-A read-only qualification source preparation is **ACCEPTED**:
+
+```text
+accepted D7-A source commit: c72ca6c8665b62c0b8d4f735fc2261a513cb81d5
+accepted D7-A source tree:   3b05c68ff1487a1c7d5984a200ee9f20d7b92fca
+focused verification:       910 passed
+production qualification:   NOT RUN
+```
+
+The accepted D7-A source adds a separate zero-semantic-argument Trading
+diagnostic boundary and fixed-namespace missing/present/security qualification.
+It issues no permit, opens no writer or effect gate, and performs no
+provisioning, capture, Paper-v2 mutation/recovery, scheduler, broker, or live
+effect. Its sanitized output is not reusable D7-C authority; D7-C must rederive
+production truth independently.
+
+D7-D independent Trading-principal post-publication reconciliation is the
+current source-only checkpoint. It must reconstruct the exact candidate from
+fresh current-C1, selected-C3 history, and Paper-v2 account authority; discover
+and reread the exact finalized decision through genuine same-process provenance;
+and prove the account predecessor remains unchanged under the PD2A mutex. D7-D
+does not apply D7-C's fresh-publication deadline and cannot issue publication or
+other effect authority. No production D7-D invocation is authorized by source
+preparation.
+
+D5 remains armed and unchanged:
+
+```text
+D5 HEAD: 8c2af5801cbc8f4df869b832a3b78b1eaa2f8996
+D5 TREE: f0591e966463c7e1e66dc00ad76fd895500a076f
+latest accepted read-only state: WARMING_UP, 2/6
+selected sessions: 2026-09-11, 2026-09-14
+```
+
+D7-A production qualification is waiting for natural current six-session
+`6/6 READY` history and an open publication deadline. Preserve the armed D5
+worktree/task and do not synthesize history or manually invoke capture.
+
+The protected sequence remains D7-A Trading read-only qualification, conditional
+separately approved D7-B Administrator provisioning if missing, explicitly
+approved D7-C publication, and independent D7-D read-only reconciliation.
+**D7-C remains protected and explicitly unauthorized.** No production D7-A
+qualification, provisioning, publication, or settlement is authorized by this
+source-only preparation checkpoint.
+
+## Primary roadmap
+
+```text
+PD0   personal-desktop profile adoption                     COMPLETE
+PD1   personal-desktop paper-account authority v2           COMPLETE
+PD2   reliable supervised manual paper cycle                COMPLETE
+PD3   supervised crash/recovery validation                  COMPLETE
+PD4   unattended simulated-paper source foundation          COMPLETE
+  G0-G7 daily-cycle source/design foundation                ACCEPTED
+  D3/D4 first unattended C3 capture/reconciliation          ACCEPTED
+  D5 capture-only warm-up                                   ACTIVE (2/6)
+  D6-A through D6-D decision-publication source              ACCEPTED
+  D7-A Trading read-only qualification source               ACCEPTED
+  D7-A production qualification                             WAITING FOR 6/6 READY
+  D7-C first pre-open decision publication                   PROTECTED / UNAUTHORIZED
+  D7-D independent post-publication reconciliation source    CURRENT CHECKPOINT
+  D8/D9 settlement through existing Paper-v2 authority      FUTURE / PROTECTED
+  unattended operational deployment                         NOT YET COMPLETE
+PD5   broker-paper integration                              NOT STARTED
+PD6   broker-paper soak / operational hardening             NOT STARTED
+PD7   personal-desktop live-readiness                       NOT STARTED
+PD8   tiny restricted live -> gradual maturity              NOT STARTED
+```
+
+## Effect gates and protected actions
+
+All eight production gate constants remain committed `False`:
+
+```text
+PERSONAL_DESKTOP_UNATTENDED_MARKET_DATA_CAPTURE_EFFECTS_ENABLED            = False
+PERSONAL_DESKTOP_UNATTENDED_DECISION_PUBLICATION_EFFECTS_ENABLED            = False
+PERSONAL_DESKTOP_PAPER_V2_PRODUCTION_EFFECTS_ENABLED                       = False
+PERSONAL_DESKTOP_PAPER_V2_RECOVERY_EFFECTS_ENABLED                         = False
+PERSONAL_DESKTOP_PAPER_V2_SUPERVISED_EXECUTION_EFFECTS_ENABLED             = False
+PERSONAL_DESKTOP_PAPER_V2_RECEIPT_RECOVERY_EFFECTS_ENABLED                 = False
+PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_EXECUTION_EFFECTS_ENABLED             = False
+PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_STORAGE_PROVISIONING_EFFECTS_ENABLED  = False
+```
+
+The D5 capture-only runtime may temporarily change only the process-local
+market-data gate for exactly one reviewed G5 call. That does not make the
+committed source gate true and does not authorize ad hoc/manual provider calls.
+
+Still protected/not authorized outside their exact reviewed checkpoints:
+
+```text
+manual/ad hoc provider effects or retries outside D5 capture-only authority
+real unattended decision publication before D6/D7 protected acceptance
+real Paper-v2 receipt-recovery mutation
+unattended decision/storage provisioning effect unless separately authorized
+Task Scheduler changes beyond the already accepted D5 task action
+first real unattended Paper-v2 settlement/execution
+broker order submission
+live trading
+old v1 publisher rerun
+v1 staging delete/repair/rename/migration/reuse
+Paper-v2 manual mutation outside reviewed effect checkpoints
+account/group/password changes
+LSA rights/policy changes
+KSP/signing/private-export effects
+merge/rebase/force-push/amend/PR metadata changes without explicit approval
+```
+
+## Workflow invariants
+
+- ChatGPT/Sol owns architecture/security review, exact GitHub diff review, test
+  gates, merge/deployment/production decisions, and next milestones.
+- After a reviewed checkpoint passes, automatically continue to the next safe
+  scoped checkpoint; stop at explicitly protected production/effect boundaries.
+- Tiny scoped status/handoff/docs closeouts are ChatGPT-direct by default.
+- Codex uses Luna Extra High for frozen/local mechanical work, Astra for bounded
+  discovery-aware/cross-module work, and Sol High for native Windows/security/
+  authority/order/crash/recovery and other safety-sensitive implementation.
+- Model choice never transfers architecture or acceptance authority.
+- No subagents unless explicitly requested.
+- Codex runs focused tests/checks during implementation; broad/full
+  certification is normally user-run locally at the final gate.
+- Never `git add .` or `git add -A`; exact-file stage only.
+- Worktree/branch/HEAD/tree mismatch is a STOP; do not self-correct.
+- Controlled Windows pytest uses a fresh external
+  `F:\AI\temp\pytest\<purpose>-<unique>` via explicit `--basetemp` and normally
+  `-p no:cacheprovider`; do not globally change `TEMP`, `TMP`, or persistently
+  set `PYTHONPATH` for normal pytest collection.
+- Source-checkout operator CLIs that must run independently of the current
+  working directory/package environment use a reviewed `scripts/` launcher that
+  selects the checkout `src` explicitly; production-interpreter import probes
+  must exercise that launcher before real-host invocation.
+- Preserve unrelated generated/untracked reports and historical evidence.
+- No merge/rebase/force-push/amend/PR metadata/review-thread changes without
+  explicit approval.
 
 ## Documentation workflow
 
-At every accepted development checkpoint, review and update both:
+At accepted milestones review/update:
 
 ```text
+README.md
 docs/PROJECT_STATUS.md
 docs/AI_TRADING_BOT_HANDOFF.md
+relevant docs/architecture/*
+relevant docs/validation/*
 ```
 
-The Git-tracked pair is authoritative. Project-uploaded copies are context mirrors only. Documentation closeout does not authorize merging, rebasing, force-pushing, amending, resolving review threads, changing PR metadata, or modifying unrelated files.
+Historical subsystem completion records remain historical unless a later
+extension explicitly belongs in them. Current operational extension state is
+recorded in the canonical status/handoff plus the relevant Architecture/plan.
+
+Docs-only closeouts do not require a new full repository suite when exact diff
+review proves no source/test change.
+
+
+### D7-A production read-only qualification — ACCEPTED
+
+The genuine non-admin Trading-principal D7-A qualification passed from the exact
+certified D7 source tree.
+
+```text
+source HEAD:                       3dfa9e2cab372f8cb034b90256ed3fba9da6c878
+source TREE:                       bb1de2e7c2933ba3a777523f2a0e2feee5fa8c39
+completed session:                 2026-09-18
+selected history:                  READY 6/6
+candidate decision:                f2188b5e-e6a4-5398-be41-8867d9268355
+intended execution session:        2026-09-21
+regular open:                      2026-09-21T13:30:00+00:00
+account predecessor:               ed4640e5-0630-525d-b916-d50e31e3ba2a
+decision namespace:                PRESENT_VALID
+decision storage:                  ABSENT
+deadline open:                     true
+all eight gates closed:            true
+real_effect_performed:             false
+```
+
+D7-B provisioning is not required. D7-C first publication remains a protected
+effect checkpoint and requires explicit operator approval.
+
+
+## D7 replacement source certification — ACCEPTED
+
+A compatibility-first Decimal determinism correction and portable LF checkout
+contract for the frozen first-operation history seed have been forward-ported
+to the D7 lineage and fully certified.
+
+```text
+replacement certified HEAD: acd606a41ac50f172ac62377ce6d4e7c8c4d3a32
+replacement certified TREE: 784695d05865a767ba187adf38fd4924897127a9
+broad non-Architecture-77:   5534 passed, 17 skipped
+Architecture-77 split:       775 passed
+combined:                    6309 passed, 17 skipped
+Ruff/diff checks:            PASS
+worktree/index:              clean
+```
+
+The strategy preserves historical/default Decimal semantics while removing
+ambient-context dependence. The frozen history seed now checks out as canonical
+LF bytes under machine-wide `core.autocrlf=true`:
+
+```text
+length: 1060
+sha256: 40dda54c82324f358d640cce89e467295b8f5b73a32fed76c52e7ca90d398e64
+```
+
+The earlier accepted D7-A result is historical evidence only after this source
+replacement. The next production-side checkpoint is a fresh zero-argument,
+read-only D7-A qualification pinned to the exact replacement certified source.
+D7-C remains protected and unauthorized.
+
+
+## Replacement D7-A qualification — ACCEPTED
+
+Fresh read-only D7-A from replacement certified source
+`acd606a41ac50f172ac62377ce6d4e7c8c4d3a32` reproduced the historical
+production candidate exactly:
+
+```text
+classification:             READY
+candidate decision:          f2188b5e-e6a4-5398-be41-8867d9268355
+completed session:           2026-09-18
+execution session:           2026-09-21
+namespace:                   PRESENT_VALID
+storage:                     ABSENT
+deadline open:               true
+all eight gates closed:      true
+real effect performed:       false
+exit code:                   0
+```
+
+The Decimal determinism correction therefore preserved the real D7 candidate
+identity for this cycle. D7-B remains unnecessary. D7-C is now the next
+protected production checkpoint and remains explicitly unauthorized pending
+separate operator approval.
+
+
+## D7-C first attempt — BLOCKED / NO EFFECT
+
+The explicitly approved D7-C first-publication invocation failed closed before
+a decision binding or publication writer was established:
+
+```text
+classification:        BLOCKED
+decision_id:           null
+real_effect_performed: false
+exit code:              6
+```
+
+The immediately preceding D7-A preflight was READY with the accepted candidate.
+Source review isolates a selected-C3 reader-lifetime defect in the shared
+production history composition. No retry occurred and D7-D was not run.
+
+Current checkpoint: repair the shared reader/provenance lifetime contract,
+recertify source, and rerun read-only D7-A. D7-C is again unauthorized pending a
+separate approval after those gates.
+
+
+## D7 reader-lifetime replacement certification — ACCEPTED
+
+The selected-C3 reader/provenance lifetime correction is now the replacement
+certified D7 source:
+
+```text
+HEAD:     8bc6d436142531dec17bf7b960a7ac1eb2e45b09
+TREE:     18255e5272728a5bf2b8f8633fff23cf940b77be
+broad:    5538 passed, 17 skipped
+Arch-77:  775 passed
+combined: 6313 passed, 17 skipped
+Ruff/diff checks: PASS
+```
+
+The correction keeps selected-C3 permit validation unchanged while retaining the
+exact issuing P2 readers only for the lifetime of the process-local history
+proof. Releasing the proof restores normal weak-reference expiry.
+
+The next safe production checkpoint is a fresh read-only D7-A qualification
+from this exact source. The previous D7-C approval was consumed by the blocked,
+effects-closed invocation; no retry is authorized.
+
+
+## Post-reader-lifetime-fix D7-A — ACCEPTED
+
+Fresh read-only D7-A from certified source
+`8bc6d436142531dec17bf7b960a7ac1eb2e45b09` /
+`18255e5272728a5bf2b8f8633fff23cf940b77be` returned:
+
+```text
+READY
+candidate:                f2188b5e-e6a4-5398-be41-8867d9268355
+completed session:        2026-09-18
+selected history:         6/6
+execution session:        2026-09-21
+namespace:                PRESENT_VALID
+storage:                  ABSENT
+deadline open:            true
+all eight gates closed:   true
+real effect performed:    false
+exit code:                0
+```
+
+The reader-lifetime correction preserves the exact production decision identity.
+The project is again at the protected D7-C publication boundary. The previous
+approval was consumed by the earlier blocked invocation; no second publication
+attempt is authorized without a new explicit approval.
+
+
+## D7-C publication process succeeded; D7-D early reconciliation blocked
+
+The second explicitly approved D7-C invocation returned
+`DECISION_PUBLISHED` for
+`f2188b5e-e6a4-5398-be41-8867d9268355`, with
+`real_effect_performed=true` and exit code 0.
+
+The immediate independent D7-D read-only reconciliation then returned an
+all-default `BLOCKED` result (no completed session, no candidate/finalized ID,
+no namespace/storage evidence, all_eight_gates_closed=false), indicating failure
+before D7-D's first evidence commit.
+
+Do not republish. Do not advance to D8. Next safe checkpoint is another
+read-only D7-A from the exact certified source to independently classify the
+durable decision storage after publication.
+
+
+## D7-C durable publication accepted; D7-D source defect isolated
+
+Post-publication D7-A now reports `ALREADY_FINALIZED` and
+`FINALIZED_IDENTICAL` for
+`f2188b5e-e6a4-5398-be41-8867d9268355`, with 6/6 selected history,
+`PRESENT_VALID`, all eight gates closed, and no effect. By CLI contract this
+classification exits 0. D7-C is therefore durably accepted and must never be
+retried for this cycle.
+
+D7-D's early BLOCKED result is explained by a capability/evidence mix-up:
+production account read returns the validated account capability, but D7-D
+replaces it with read evidence before calling
+`supervised_paper_cycle_admission`. Admission requires the original validated
+capability. Correct that authority ordering, certify the source, then rerun
+D7-D read-only. D8 remains blocked.
+
+
+## D7-D admission-fix source certification — ACCEPTED
+
+Replacement-certified D7 source:
+
+```text
+HEAD:     ca05b2c583f79039e9de64f4a01b8de2ff2ab3ad
+TREE:     d1c3e73eccaba6701bac86f38fb71a99d08ff2d5
+broad:    5540 passed, 17 skipped
+Arch-77:  775 passed
+combined: 6315 passed, 17 skipped
+Ruff/diff checks: PASS
+```
+
+The source preserves genuine account capability through PD2A mutex admission
+while keeping immutable evidence separate for comparisons. No authority or gate
+was weakened.
+
+Next safe production checkpoint is D7-D read-only reconciliation of the already
+durably finalized decision. D7-C must not be rerun. D8 remains blocked pending
+accepted D7-D reconciliation.
+
+
+## D7 CLOSED
+
+Production D7-D read-only reconciliation has succeeded:
+
+```text
+RECONCILED
+expected/finalized decision:
+f2188b5e-e6a4-5398-be41-8867d9268355
+selected history: 6/6
+namespace: PRESENT_VALID
+session discovery: FINALIZED
+storage: FINALIZED_IDENTICAL
+all eight gates closed: true
+real effect performed: false
+exit code: 0
+```
+
+The consolidated D7 lineage is now ready for merge-readiness review against
+current `develop`. No merge is authorized yet.

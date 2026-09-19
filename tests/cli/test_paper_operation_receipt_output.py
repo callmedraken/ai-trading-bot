@@ -8,6 +8,9 @@ from uuid import UUID
 import pytest
 
 from trading_bot.cli.checkpoint_transition_output import validate_output_parent
+from trading_bot.cli.paper_operation_output_capability import (
+    PaperOperationOutputCapability,
+)
 from trading_bot.cli.paper_operation_receipt_output import (
     PaperOperationReceiptOutputError,
     ReceiptCommitVerificationPhase,
@@ -48,6 +51,52 @@ def test_commit_creates_exact_parent_layout_and_verifies_both_rereads(
     assert {item.name for item in (tmp_path / "paper-operations").iterdir()} == {
         f"paper-operation-{_OPERATION_ID}"
     }
+
+
+def test_capability_mode_requires_preexisting_operations_parent(
+    tmp_path: Path,
+) -> None:
+    parent = validate_output_parent(tmp_path)
+    events: list[str] = []
+
+    class Capability(PaperOperationOutputCapability):
+        def verify_parent(self, path: Path) -> None:
+            events.append(f"verify:{path.name}")
+
+        def create_staging_directory(self, path: Path) -> None:
+            pytest.fail("missing production parent reached staging create")
+
+        def write_staged_file(self, path: Path, payload: bytes) -> None:
+            pytest.fail("missing production parent reached file write")
+
+        def verify_staged_directory(self, path: Path) -> None:
+            pytest.fail("missing production parent reached staging verification")
+
+        def verify_staged_file(self, path: Path) -> None:
+            pytest.fail("missing production parent reached file verification")
+
+        def finalize_directory(self, staging: Path, final: Path) -> None:
+            pytest.fail("missing production parent reached finalization")
+
+        def verify_finalized_directory(self, path: Path) -> None:
+            pytest.fail("missing production parent reached final verification")
+
+        def verify_finalized_file(self, path: Path) -> None:
+            pytest.fail("missing production parent reached final verification")
+
+    with pytest.raises(
+        PaperOperationReceiptOutputError,
+        match="must already exist",
+    ):
+        commit_paper_operation_receipt(
+            parent,
+            operation_id=_OPERATION_ID,
+            receipt_payload=_PAYLOAD,
+            verifier=lambda payload, phase: None,
+            output_capability=Capability(),
+        )
+    assert not (tmp_path / "paper-operations").exists()
+    assert events == [f"verify:{tmp_path.name}"]
 
 
 def test_staged_verifier_mutation_is_preserved_and_never_finalized(

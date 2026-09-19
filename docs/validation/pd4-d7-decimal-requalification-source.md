@@ -304,3 +304,42 @@ evidence and does not authorize a retry.
 Next checkpoint: fresh zero-argument read-only D7-A pinned to this exact source.
 D7-C remains unauthorized pending a new explicit approval after that
 qualification succeeds.
+
+
+## Post-reader-lifetime-fix production D7-A qualification — ACCEPTED
+
+Fresh zero-argument read-only D7-A was run from a disposable checkout pinned to
+the exact reader-lifetime replacement-certified source:
+
+```text
+HEAD: 8bc6d436142531dec17bf7b960a7ac1eb2e45b09
+TREE: 18255e5272728a5bf2b8f8633fff23cf940b77be
+```
+
+The qualification returned exit code 0 with:
+
+```text
+classification:                    READY
+completed_session:                 2026-09-18
+selected_history_count:            6
+required_history_count:            6
+selected_snapshot_id:              680b260f-08c9-5923-87bb-b5f0a4701380
+candidate_decision_id:             f2188b5e-e6a4-5398-be41-8867d9268355
+intended_execution_session:        2026-09-21
+regular_open:                      2026-09-21T13:30:00+00:00
+account_predecessor_checkpoint_id: ed4640e5-0630-525d-b916-d50e31e3ba2a
+namespace_classification:          PRESENT_VALID
+storage_classification:            ABSENT
+deadline_open:                     true
+all_eight_gates_closed:            true
+real_effect_performed:             false
+exit code:                         0
+```
+
+This reproduces the same accepted candidate after both the Decimal correction
+and selected-C3 reader-lifetime correction. The production state remains
+eligible for publication, but no publication effect was performed.
+
+The first D7-C approval remains consumed by the earlier effects-closed BLOCKED
+attempt. A second D7-C invocation requires a new explicit operator approval and
+a fresh immediate preflight.

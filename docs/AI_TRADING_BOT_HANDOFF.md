@@ -73,6 +73,32 @@ end-to-end core cycle, merge the accepted core forward into observability,
 reverify the combined tree, then merge to `develop` only with explicit
 operator approval.
 
+## Current D5 production history milestone
+
+D5 has reached 6/6 READY through completed XNYS session 2026-09-18.
+
+```text
+required sessions:
+2026-09-11
+2026-09-14
+2026-09-15
+2026-09-16
+2026-09-17
+2026-09-18
+
+selected sessions: exact same six
+current snapshot: 680b260f-08c9-5923-87bb-b5f0a4701380
+classification: READY
+all eight gates: false
+```
+
+The project is no longer waiting for D5 data. However, G6 is currently BLOCKED
+before D7 because historical Paper-v2 configuration reconstruction fails on the
+frozen first-operation history-seed byte check. Receipt dependency discovery
+passes and requires exactly the original 6199-byte first plan; there are no
+unattended invocation sources yet. Diagnose/fix this exact-byte source checkout
+issue without weakening validation or modifying production evidence.
+
 ## 1. Product goal and threat model
 
 Build a conservative automated trading platform for a **closed, single-owner

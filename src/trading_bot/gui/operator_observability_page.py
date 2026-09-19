@@ -17,6 +17,7 @@ from trading_bot.gui.models import format_decimal_for_display
 from trading_bot.gui.operator_observability_models import (
     OperatorOperationsPageState,
     OperatorOperationsPageStatus,
+    OperatorStrategyExplanationStatus,
     OperatorWarmupClassification,
 )
 
@@ -346,37 +347,161 @@ class OperatorOperationsPage(QWidget):
         layout.setSpacing(8)
 
         layout.addWidget(
-            _plain_label("Strategy Readiness", panel, "operatorSectionTitle")
+            _plain_label("Strategy Explanation", panel, "operatorSectionTitle")
         )
 
         state = self._state
-        if state.strategy_ready:
-            text = (
-                "Ready: the complete six-session selected-C3 window is available. "
-                "This display is non-authoritative for decision publication."
-            )
-            status = "ready"
-        elif state.warmup is None:
-            text = "Unavailable: no selected-C3 history window is attached."
-            status = "unavailable"
-        elif state.warmup.classification is OperatorWarmupClassification.SESSION_GAP:
-            text = "Blocked: the required selected-C3 history contains a session gap."
-            status = "blocked"
-        elif state.warmup.classification is OperatorWarmupClassification.BLOCKED:
-            text = "Blocked: selected-C3 history validation failed closed."
-            status = "blocked"
-        else:
-            text = (
-                f"Warming up: {state.warmup.selected_count} of "
-                f"{state.warmup.target_count} required sessions are selected."
-            )
-            status = "unavailable"
+        explanation = state.strategy_explanation
+        if explanation is None:
+            if state.strategy_ready:
+                text = (
+                    "Ready: the complete six-session selected-C3 window is available. "
+                    "Deterministic explanation is not attached to this GUI state."
+                )
+                status = "ready"
+            elif state.warmup is None:
+                text = "Unavailable: no selected-C3 history window is attached."
+                status = "unavailable"
+            elif state.warmup.classification is OperatorWarmupClassification.SESSION_GAP:
+                text = (
+                    "Blocked: the required selected-C3 history contains a session gap."
+                )
+                status = "blocked"
+            elif state.warmup.classification is OperatorWarmupClassification.BLOCKED:
+                text = "Blocked: selected-C3 history validation failed closed."
+                status = "blocked"
+            else:
+                text = (
+                    f"Warming up: {state.warmup.selected_count} of "
+                    f"{state.warmup.target_count} required sessions are selected."
+                )
+                status = "unavailable"
 
-        readiness = _plain_label(text, panel, "operatorStrategyReadiness")
+            readiness = _plain_label(text, panel, "operatorStrategyReadiness")
+            readiness.setProperty("status", status)
+            readiness.setWordWrap(True)
+            layout.addWidget(readiness)
+            return panel
+
+        status = (
+            "ready"
+            if explanation.status
+            in (
+                OperatorStrategyExplanationStatus.BUY,
+                OperatorStrategyExplanationStatus.SELL,
+                OperatorStrategyExplanationStatus.NO_CROSSOVER,
+                OperatorStrategyExplanationStatus.POSITION_FILTERED,
+            )
+            else "unavailable"
+        )
+        readiness = _plain_label(
+            (
+                f"{explanation.status.value}: source-owned SMA "
+                f"{explanation.short_window}/{explanation.long_window} evaluation."
+            ),
+            panel,
+            "operatorStrategyReadiness",
+        )
         readiness.setProperty("status", status)
         readiness.setWordWrap(True)
         layout.addWidget(readiness)
+
+        form = QFormLayout()
+        form.setVerticalSpacing(8)
+        fields = (
+            (
+                "Symbol",
+                explanation.symbol or "Unavailable",
+                "operatorStrategySymbol",
+            ),
+            (
+                "Desired quantity",
+                format_decimal_for_display(explanation.desired_quantity),
+                "operatorStrategyDesiredQuantity",
+            ),
+            (
+                "Evaluated sessions",
+                (
+                    ", ".join(value.isoformat() for value in explanation.sessions)
+                    if explanation.sessions
+                    else "Insufficient history"
+                ),
+                "operatorStrategySessions",
+            ),
+            (
+                "Closing prices",
+                (
+                    ", ".join(
+                        format_decimal_for_display(value)
+                        for value in explanation.closes
+                    )
+                    if explanation.closes
+                    else "Insufficient history"
+                ),
+                "operatorStrategyCloses",
+            ),
+            (
+                f"Previous SMA{explanation.short_window}",
+                self._decimal_or_unavailable(explanation.previous_short),
+                "operatorStrategyPreviousShort",
+            ),
+            (
+                f"Previous SMA{explanation.long_window}",
+                self._decimal_or_unavailable(explanation.previous_long),
+                "operatorStrategyPreviousLong",
+            ),
+            (
+                f"Current SMA{explanation.short_window}",
+                self._decimal_or_unavailable(explanation.current_short),
+                "operatorStrategyCurrentShort",
+            ),
+            (
+                f"Current SMA{explanation.long_window}",
+                self._decimal_or_unavailable(explanation.current_long),
+                "operatorStrategyCurrentLong",
+            ),
+            (
+                "Raw crossover",
+                explanation.crossover_side or "None",
+                "operatorStrategyCrossoverSide",
+            ),
+            (
+                "Account state",
+                "Invested" if explanation.invested else "Flat",
+                "operatorStrategyAccountState",
+            ),
+            (
+                "Actionable strategy side",
+                explanation.actionable_side or "None",
+                "operatorStrategyActionableSide",
+            ),
+        )
+        for field_name, value, object_name in fields:
+            form.addRow(
+                _plain_label(field_name, panel, "operatorFieldLabel"),
+                self._selectable_value(value, panel, object_name),
+            )
+        layout.addLayout(form)
+
+        notice = _plain_label(
+            (
+                "Read-only deterministic explanation only; this value is not "
+                "D7 publication authority."
+            ),
+            panel,
+            "operatorStrategyAuthorityNotice",
+        )
+        notice.setWordWrap(True)
+        layout.addWidget(notice)
         return panel
+
+    @staticmethod
+    def _decimal_or_unavailable(value) -> str:
+        return (
+            "Unavailable"
+            if value is None
+            else format_decimal_for_display(value)
+        )
 
     def _selectable_value(
         self,

@@ -72,8 +72,14 @@ history, Paper-v2 account/lineage facts, and all eight effect gates. It remains
 non-authoritative and does not modify the armed D5, certified D7, or certified
 D8/D9 operational boundaries.
 
-Next observability checkpoint: run O2 once under the genuine non-admin Trading
-principal against the installed production read authorities.
+O2 real-host qualification was attempted under genuine non-admin Trading and is
+currently BLOCKED. The command itself remained effects-closed. Read-only stage
+evidence: all eight gates false; C1 PASS; G5 reports NO_NEW_COMPLETED_SESSION for
+2026-09-18 with selected snapshot
+680b260f-08c9-5923-87bb-b5f0a4701380; G6 classification BLOCKED; historical
+configuration resolution fails closed with
+PersonalDesktopHistoricalCycleConfigurationError. Root-cause read-only
+diagnosis is the active checkpoint.
 
 ### D8/D9 settlement source — certified/frozen source boundary
 

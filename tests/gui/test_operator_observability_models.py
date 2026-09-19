@@ -183,7 +183,6 @@ def test_operator_observability_state_is_frozen() -> None:
         state.gates = _closed_gates()  # type: ignore[misc]
 
 
-
 def _account() -> OperatorAccountSummaryView:
     return OperatorAccountSummaryView(
         paper_account_id="paper-account",

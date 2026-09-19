@@ -27,7 +27,15 @@ from trading_bot.gui.paper_page import PaperPage
 from trading_bot.gui.research_page import ResearchPage
 from trading_bot.gui.services import GuiApplicationService
 
-PAGE_IDS = ("home", "research", "paper", "paper-account", "market-data", "operations", "system")
+PAGE_IDS = (
+    "home",
+    "research",
+    "paper",
+    "paper-account",
+    "market-data",
+    "operations",
+    "system",
+)
 
 _MODE_LABELS = {
     OperatingMode.RESEARCH: "Research",

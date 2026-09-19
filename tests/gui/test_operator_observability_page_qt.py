@@ -18,6 +18,7 @@ pytest.importorskip("PySide6")
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication, QLabel, QPushButton, QTableWidget
 
+import trading_bot.gui.operator_observability_page as operations_page_module
 from trading_bot.gui import (
     ApplicationOverview,
     MarketDataPageState,
@@ -36,7 +37,6 @@ from trading_bot.gui import (
     unavailable_paper_account_state,
     unavailable_paper_state,
 )
-import trading_bot.gui.operator_observability_page as operations_page_module
 from trading_bot.gui.main_window import MainWindow
 from trading_bot.gui.mock_service import MockGuiApplicationService
 from trading_bot.gui.operator_observability_page import OperatorOperationsPage
@@ -163,9 +163,7 @@ def test_available_page_renders_warmup_gates_account_and_strategy_readiness() ->
         "All effect gates closed"
     )
 
-    assert page.findChild(QLabel, "operatorCheckpointId").text() == str(
-        _CHECKPOINT_ID
-    )
+    assert page.findChild(QLabel, "operatorCheckpointId").text() == str(_CHECKPOINT_ID)
     assert page.findChild(QLabel, "operatorAccountCash").text() == "25000"
     assert page.findChild(QLabel, "operatorAccountPositionCount").text() == "0"
     assert "Ready:" in page.findChild(QLabel, "operatorStrategyReadiness").text()
@@ -256,7 +254,6 @@ def test_main_window_acquires_operations_state_once_and_reuses_it() -> None:
 
     assert service.operations_calls == 1
     window.close()
-
 
 
 def test_operations_page_has_no_runtime_or_effect_control_dependency() -> None:

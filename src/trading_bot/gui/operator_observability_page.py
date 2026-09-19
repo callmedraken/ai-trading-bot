@@ -246,9 +246,7 @@ class OperatorOperationsPage(QWidget):
         table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         table.setSortingEnabled(False)
         table.horizontalHeader().setSectionsClickable(False)
-        table.horizontalHeader().setSectionResizeMode(
-            0, QHeaderView.ResizeMode.Stretch
-        )
+        table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         table.horizontalHeader().setSectionResizeMode(
             1, QHeaderView.ResizeMode.ResizeToContents
         )
@@ -284,7 +282,9 @@ class OperatorOperationsPage(QWidget):
             panel,
             "operatorGateSummary",
         )
-        overall.setProperty("status", "verified" if state.gates.all_closed else "blocked")
+        overall.setProperty(
+            "status", "verified" if state.gates.all_closed else "blocked"
+        )
         layout.addWidget(overall)
         return panel
 

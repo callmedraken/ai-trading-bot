@@ -21,9 +21,7 @@ def _require_operator_symbol(symbol: str) -> None:
         or len(symbol) > MAX_OPERATOR_SYMBOL_CHARACTERS
         or any(
             not (
-                "A" <= character <= "Z"
-                or "0" <= character <= "9"
-                or character in ".-"
+                "A" <= character <= "Z" or "0" <= character <= "9" or character in ".-"
             )
             for character in symbol
         )
@@ -286,9 +284,8 @@ class OperatorAccountSummaryView:
         ):
             raise ValueError("realized_profit_loss must be a finite Decimal")
         positions = tuple(self.positions)
-        if (
-            len(positions) > MAX_OPERATOR_POSITIONS
-            or any(type(item) is not OperatorAccountPositionView for item in positions)
+        if len(positions) > MAX_OPERATOR_POSITIONS or any(
+            type(item) is not OperatorAccountPositionView for item in positions
         ):
             raise ValueError("positions are invalid")
         if len({item.symbol for item in positions}) != len(positions):

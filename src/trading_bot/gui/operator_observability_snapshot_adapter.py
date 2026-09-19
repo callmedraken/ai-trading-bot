@@ -56,8 +56,7 @@ def adapt_operator_observability_snapshot(
     return OperatorOperationsPageState(
         status=OperatorOperationsPageStatus.AVAILABLE,
         message=(
-            "Current production observability snapshot; read-only and "
-            "non-authorizing."
+            "Current production observability snapshot; read-only and non-authorizing."
         ),
         cycle_classification=result.cycle_classification.value,
         completed_session=(

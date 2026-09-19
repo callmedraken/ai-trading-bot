@@ -1007,3 +1007,25 @@ Next: review the consolidated D7 branch against current `develop`, then merge
 only with explicit operator approval. After merge, perform post-merge
 verification and forward-integrate the accepted develop source into the D8/D9
 settlement lineage before any D8 effect.
+
+
+## D7 integration completed
+
+The closed D7 lineage was merged through PR #8 into `develop`.
+
+```text
+merge commit: 9cf436be71d2f37820190c2a920692abb8802b82
+tree:         12169f7414a6ccb53db6e27150926bb72e111c72
+```
+
+Post-merge branch inventory found no additional branch that should be merged
+directly into `develop` now. D7 predecessor/fix branches are subsumed. Historical
+P3-R1, reliable-manual, C2/C3 certification, and early scheduling branches are
+superseded and should remain historical. The certified D8/D9 settlement branch
+and its descendant operator-observability branch remain parked because they were
+built before the final D7 corrections.
+
+Next: create a fresh D8/D9 forward-integration branch from current `develop`,
+bring forward only the accepted settlement source, resolve against the final D7
+contracts, review exact diff, and perform replacement certification before any
+D8 production action.

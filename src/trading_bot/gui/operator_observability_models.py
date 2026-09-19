@@ -192,7 +192,9 @@ class OperatorWarmupView:
         """Return required sessions not represented by selected-C3 evidence."""
         selected_dates = {item.session_date for item in self.selected_sessions}
         return tuple(
-            session for session in self.required_sessions if session not in selected_dates
+            session
+            for session in self.required_sessions
+            if session not in selected_dates
         )
 
 

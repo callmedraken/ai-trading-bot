@@ -188,3 +188,33 @@ current production truth and compare the newly derived candidate with the
 historical candidate.
 
 D7-C remains **PROTECTED / UNAUTHORIZED**.
+
+
+## Replacement D7-A read-only qualification — ACCEPTED
+
+Fresh D7-A was rerun from a disposable checkout pinned to replacement certified
+source `acd606a41ac50f172ac62377ce6d4e7c8c4d3a32` /
+`784695d05865a767ba187adf38fd4924897127a9`.
+
+Accepted evidence:
+
+```text
+classification:                    READY
+completed_session:                 2026-09-18
+selected_history_count:            6
+required_history_count:            6
+selected_snapshot_id:              680b260f-08c9-5923-87bb-b5f0a4701380
+candidate_decision_id:             f2188b5e-e6a4-5398-be41-8867d9268355
+intended_execution_session:        2026-09-21
+regular_open:                      2026-09-21T13:30:00+00:00
+account_predecessor_checkpoint_id: ed4640e5-0630-525d-b916-d50e31e3ba2a
+namespace_classification:          PRESENT_VALID
+storage_classification:            ABSENT
+deadline_open:                     true
+all_eight_gates_closed:            true
+real_effect_performed:             false
+exit code:                         0
+```
+
+This exactly reproduces the historical candidate decision ID after the Decimal
+correction. D7-B is still unnecessary. D7-C remains protected and unauthorized.

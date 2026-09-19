@@ -3,15 +3,37 @@
 from __future__ import annotations
 
 import weakref
+from hashlib import sha256
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
 import trading_bot.runtime.personal_desktop_first_paper_configuration as first_config
 
+_ROOT = Path(__file__).resolve().parents[2]
+_SEED_RELATIVE_PATH = (
+    "docs/validation/evidence/pd2d1-spy-strategy-history-seed-2026-08-28.json"
+)
+_SEED_SHA256 = "40dda54c82324f358d640cce89e467295b8f5b73a32fed76c52e7ca90d398e64"
+_SEED_BYTE_LENGTH = 1060
+
 
 class _StopAfterAuthorityMatch(Exception):
     pass
+
+
+def test_frozen_first_configuration_history_seed_is_exact_checkout_bytes() -> None:
+    seed_path = _ROOT / _SEED_RELATIVE_PATH
+    payload = seed_path.read_bytes()
+
+    assert len(payload) == _SEED_BYTE_LENGTH
+    assert sha256(payload).hexdigest() == _SEED_SHA256
+    assert payload.endswith(b"\n")
+    assert not payload.endswith(b"\r\n")
+
+    attributes = (_ROOT / ".gitattributes").read_text(encoding="utf-8").splitlines()
+    assert f"{_SEED_RELATIVE_PATH} text eol=lf" in attributes
 
 
 def test_first_configuration_retains_p2_reader_until_authority_match(

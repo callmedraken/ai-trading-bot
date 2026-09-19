@@ -4,7 +4,7 @@ import json
 import os
 from dataclasses import fields, replace
 from datetime import UTC, date, datetime, time, timedelta
-from decimal import Decimal
+from decimal import ROUND_DOWN, Context, Decimal, localcontext
 from hashlib import sha256
 from uuid import UUID
 
@@ -649,6 +649,23 @@ def test_deterministic_replay_and_nonsemantic_environment_independence(
     assert first.plan.plan_id == second.plan.plan_id == replayed.plan.plan_id
     assert first.artifact_bytes == second.artifact_bytes
     assert os.environ["ARCH94_IRRELEVANT_MODE"] == "different"
+
+
+def test_artifact_semantics_are_independent_of_ambient_decimal_context() -> None:
+    request = _request()
+    market_calendar = calendar()
+
+    with localcontext(Context(prec=28)):
+        historical = build_manual_paper_strategy_plan(request, market_calendar)
+    with localcontext(Context(prec=6, rounding=ROUND_DOWN)):
+        hostile = build_manual_paper_strategy_plan(request, market_calendar)
+
+    assert hostile.plan == historical.plan
+    assert hostile.plan.strategy_proposal == historical.plan.strategy_proposal
+    assert hostile.artifact_bytes == historical.artifact_bytes
+    assert hostile.artifact_sha256 == historical.artifact_sha256
+    assert hostile.artifact_byte_length == historical.artifact_byte_length
+    assert hostile.checkpointed_request == historical.checkpointed_request
 
 
 def test_retains_canonical_paper_account_and_selected_c3_provenance() -> None:

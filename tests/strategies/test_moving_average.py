@@ -1,5 +1,15 @@
 from datetime import UTC, date, datetime
-from decimal import Decimal
+from decimal import (
+    ROUND_DOWN,
+    ROUND_HALF_EVEN,
+    ROUND_UP,
+    Context,
+    Decimal,
+    DivisionByZero,
+    InvalidOperation,
+    Overflow,
+    localcontext,
+)
 from types import MappingProxyType
 from uuid import UUID
 
@@ -14,9 +24,19 @@ from trading_bot.strategies import (
     MovingAverageCrossoverConfigError,
     MovingAverageCrossoverStrategy,
 )
+from trading_bot.strategies import moving_average as moving_average_module
 
 SYMBOL = Symbol("MATEST")
 RUN_ID = UUID("11111111-2222-3333-4444-555555555555")
+GOLDEN_PROPOSAL_ID = UUID("f596497b-11fd-5213-9ccb-9960a4b10ec1")
+GOLDEN_REASON = (
+    "Short SMA (2)=10.5 crossed above long SMA (3)=10.33333333333333333333333333."
+)
+AMBIENT_CONTEXTS = (
+    pytest.param(Context(prec=28, rounding=ROUND_HALF_EVEN), id="historical-default"),
+    pytest.param(Context(prec=6, rounding=ROUND_DOWN), id="low-precision-down"),
+    pytest.param(Context(prec=50, rounding=ROUND_UP), id="high-precision-up"),
+)
 
 
 def make_context(
@@ -79,6 +99,41 @@ def test_config_validation(short: object, long: object, quantity: object) -> Non
 def test_quantity_must_be_decimal() -> None:
     with pytest.raises(MovingAverageCrossoverConfigError, match="Decimal"):
         MovingAverageCrossoverConfig(2, 3, 1)  # type: ignore[arg-type]
+
+
+def test_decimal_subclass_configuration_remains_accepted() -> None:
+    class CompatibleDecimal(Decimal):
+        pass
+
+    quantity = CompatibleDecimal("1.00")
+    config = MovingAverageCrossoverConfig(2, 3, quantity)
+    proposal = MovingAverageCrossoverStrategy(config).evaluate(
+        make_context(["10", "10", "9", "12"])
+    )
+    plain = MovingAverageCrossoverStrategy(
+        MovingAverageCrossoverConfig(2, 3, Decimal("1"))
+    ).evaluate(make_context(["10", "10", "9", "12"]))
+
+    assert config.desired_quantity is quantity
+    assert proposal is not None and plain is not None
+    assert proposal.desired_quantity is quantity
+    assert proposal.proposal_id == plain.proposal_id
+
+
+def test_strategy_decimal_context_freezes_historical_python_defaults() -> None:
+    context = moving_average_module._STRATEGY_DECIMAL_CONTEXT
+
+    assert context.prec == 28
+    assert context.rounding == ROUND_HALF_EVEN
+    assert context.Emin == -999999
+    assert context.Emax == 999999
+    assert context.capitals == 1
+    assert context.clamp == 0
+    assert {signal for signal, trapped in context.traps.items() if trapped} == {
+        InvalidOperation,
+        DivisionByZero,
+        Overflow,
+    }
 
 
 def test_insufficient_history_and_no_crossover_return_none() -> None:
@@ -152,6 +207,25 @@ def test_proposal_ids_are_deterministic_and_include_configuration() -> None:
     assert first is not None and equivalent is not None and different is not None
     assert first.proposal_id == equivalent.proposal_id
     assert first.proposal_id != different.proposal_id
+
+
+@pytest.mark.parametrize("ambient_context", AMBIENT_CONTEXTS)
+def test_golden_proposal_is_ambient_decimal_context_independent(
+    ambient_context: Context,
+) -> None:
+    context = make_context(["10", "10", "9", "12"])
+    strategy = MovingAverageCrossoverStrategy(
+        MovingAverageCrossoverConfig(2, 3, Decimal("1.23456789"))
+    )
+
+    with localcontext(ambient_context):
+        proposal = strategy.evaluate(context)
+
+    assert proposal is not None
+    assert proposal.proposal_id == GOLDEN_PROPOSAL_ID
+    assert proposal.reason == GOLDEN_REASON
+    assert proposal.side is OrderSide.BUY
+    assert proposal.desired_quantity == Decimal("1.23456789")
 
 
 def test_evaluation_does_not_mutate_context_positions() -> None:

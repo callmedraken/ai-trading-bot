@@ -1,7 +1,15 @@
 """Deterministic closing-price moving-average crossover strategy."""
 
 from dataclasses import dataclass
-from decimal import Decimal
+from decimal import (
+    ROUND_HALF_EVEN,
+    Context,
+    Decimal,
+    DivisionByZero,
+    InvalidOperation,
+    Overflow,
+    localcontext,
+)
 from enum import StrEnum
 from uuid import UUID, uuid5
 
@@ -10,10 +18,20 @@ from trading_bot.domain import OrderSide, TradeProposal
 from trading_bot.strategies.exceptions import MovingAverageCrossoverConfigError
 
 _STRATEGY_NAMESPACE = UUID("d3bdd8f2-5506-5e74-b3f8-8e455b67325c")
+_STRATEGY_DECIMAL_CONTEXT = Context(
+    prec=28,
+    rounding=ROUND_HALF_EVEN,
+    Emin=-999999,
+    Emax=999999,
+    capitals=1,
+    clamp=0,
+    traps=[InvalidOperation, DivisionByZero, Overflow],
+)
 
 
 def _canonical_decimal(value: Decimal) -> str:
-    return format(value.normalize(), "f")
+    with localcontext(_STRATEGY_DECIMAL_CONTEXT):
+        return format(value.normalize(), "f")
 
 
 @dataclass(frozen=True, slots=True)
@@ -195,7 +213,8 @@ def evaluate_moving_average_crossover_closes(
 
 
 def _average(values: tuple[Decimal, ...]) -> Decimal:
-    return sum(values, start=Decimal("0")) / Decimal(len(values))
+    with localcontext(_STRATEGY_DECIMAL_CONTEXT):
+        return sum(values, start=Decimal("0")) / Decimal(len(values))
 
 
 class MovingAverageCrossoverStrategy:

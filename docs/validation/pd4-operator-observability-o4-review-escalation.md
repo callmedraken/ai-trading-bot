@@ -1,6 +1,34 @@
 # O4 bounded review: Decimal contract escalation
 
-Date: 2026-09-19. Status: **IMPLEMENTATION STOPPED FOR SOL REVIEW**.
+Date: 2026-09-19. Status: **SOL-APPROVED CORRECTION IMPLEMENTED**.
+
+## Resolution
+
+Sol approved a compatibility-first correction that freezes moving-average
+arithmetic and the strategy's existing `normalize()`-based desired-quantity
+identity rendering to an explicitly constructed strategy-owned Decimal context:
+precision 28, `ROUND_HALF_EVEN`, `Emin=-999999`, `Emax=999999`, capitals 1,
+clamp 0, with `InvalidOperation`, `DivisionByZero`, and `Overflow` trapped.
+Both operations now execute through `localcontext()` and do not consult ambient
+Decimal state or mutable `DefaultContext`.
+
+The correction preserves the namespace, proposal identity-material fields and
+ordering, normal-context proposal IDs and reasons, crossover/equality behavior,
+configured BUY quantity, full-position SELL quantity, and Decimal-subclass
+configuration compatibility. Focused strategy regressions pin the historical
+golden proposal ID `f596497b-11fd-5213-9ccb-9960a4b10ec1` and O4 MA3/MA5 BUY
+vector under normal, low-precision/`ROUND_DOWN`, and high-precision/`ROUND_UP`
+ambient contexts. A pure Architecture-94 regression also proves identical plan,
+artifact, and checkpointed-request semantics under normal and hostile contexts.
+The requested focused strategy, Architecture-94, unattended-decision,
+observability, and CLI regression gate passed with 275 tests; Ruff check and
+Ruff format verification passed across the 12 relevant Python files.
+
+This source correction does not retroactively change O4 acceptance chronology
+or authorize production activity. The accepted D7-A result remains historical
+evidence and must be rerun after controlled forward integration of the corrected
+source. D7-C remains protected and unauthorized; all eight effect gates remain
+false.
 
 ## Checkpoint and scope
 

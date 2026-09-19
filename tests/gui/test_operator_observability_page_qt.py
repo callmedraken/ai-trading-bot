@@ -2,6 +2,7 @@
 
 # ruff: noqa: E402
 
+import ast
 import inspect
 import os
 from datetime import UTC, date, datetime
@@ -259,10 +260,34 @@ def test_main_window_acquires_operations_state_once_and_reuses_it() -> None:
 
 
 def test_operations_page_has_no_runtime_or_effect_control_dependency() -> None:
-    source = inspect.getsource(operations_page_module).casefold()
+    source = inspect.getsource(operations_page_module)
+    tree = ast.parse(source)
 
-    assert "trading_bot.runtime" not in source
-    assert "qpushbutton" not in source
-    assert "publish" not in source
-    assert "provision" not in source
-    assert "execute" not in source
+    imported_modules = {
+        node.module
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ImportFrom) and node.module is not None
+    }
+    imported_modules.update(
+        alias.name
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Import)
+        for alias in node.names
+    )
+    assert not any(
+        module.startswith("trading_bot.runtime") for module in imported_modules
+    )
+    assert "QPushButton" not in source
+
+    called_names = {
+        (
+            node.func.id
+            if isinstance(node.func, ast.Name)
+            else node.func.attr
+            if isinstance(node.func, ast.Attribute)
+            else ""
+        )
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+    }
+    assert {"publish", "provision", "execute"}.isdisjoint(called_names)

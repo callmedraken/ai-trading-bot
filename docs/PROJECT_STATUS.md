@@ -815,3 +815,20 @@ before D7-D's first evidence commit.
 Do not republish. Do not advance to D8. Next safe checkpoint is another
 read-only D7-A from the exact certified source to independently classify the
 durable decision storage after publication.
+
+
+## D7-C durable publication accepted; D7-D source defect isolated
+
+Post-publication D7-A now reports `ALREADY_FINALIZED` and
+`FINALIZED_IDENTICAL` for
+`f2188b5e-e6a4-5398-be41-8867d9268355`, with 6/6 selected history,
+`PRESENT_VALID`, all eight gates closed, and no effect. By CLI contract this
+classification exits 0. D7-C is therefore durably accepted and must never be
+retried for this cycle.
+
+D7-D's early BLOCKED result is explained by a capability/evidence mix-up:
+production account read returns the validated account capability, but D7-D
+replaces it with read evidence before calling
+`supervised_paper_cycle_admission`. Admission requires the original validated
+capability. Correct that authority ordering, certify the source, then rerun
+D7-D read-only. D8 remains blocked.

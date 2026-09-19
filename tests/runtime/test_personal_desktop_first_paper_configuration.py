@@ -11,11 +11,9 @@ import pytest
 
 import trading_bot.runtime.personal_desktop_first_paper_configuration as first_config
 
-
 _ROOT = Path(__file__).resolve().parents[2]
 _SEED_RELATIVE_PATH = (
-    "docs/validation/evidence/"
-    "pd2d1-spy-strategy-history-seed-2026-08-28.json"
+    "docs/validation/evidence/pd2d1-spy-strategy-history-seed-2026-08-28.json"
 )
 _SEED_SHA256 = "40dda54c82324f358d640cce89e467295b8f5b73a32fed76c52e7ca90d398e64"
 _SEED_BYTE_LENGTH = 1060

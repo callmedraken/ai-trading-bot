@@ -1,5 +1,7 @@
 """Native read-only Operations page for bounded PD4 observability state."""
 
+from decimal import Decimal
+
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -496,7 +498,7 @@ class OperatorOperationsPage(QWidget):
         return panel
 
     @staticmethod
-    def _decimal_or_unavailable(value) -> str:
+    def _decimal_or_unavailable(value: Decimal | None) -> str:
         return (
             "Unavailable"
             if value is None

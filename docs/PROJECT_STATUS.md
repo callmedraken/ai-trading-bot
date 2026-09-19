@@ -772,3 +772,29 @@ proof. Releasing the proof restores normal weak-reference expiry.
 The next safe production checkpoint is a fresh read-only D7-A qualification
 from this exact source. The previous D7-C approval was consumed by the blocked,
 effects-closed invocation; no retry is authorized.
+
+
+## Post-reader-lifetime-fix D7-A — ACCEPTED
+
+Fresh read-only D7-A from certified source
+`8bc6d436142531dec17bf7b960a7ac1eb2e45b09` /
+`18255e5272728a5bf2b8f8633fff23cf940b77be` returned:
+
+```text
+READY
+candidate:                f2188b5e-e6a4-5398-be41-8867d9268355
+completed session:        2026-09-18
+selected history:         6/6
+execution session:        2026-09-21
+namespace:                PRESENT_VALID
+storage:                  ABSENT
+deadline open:            true
+all eight gates closed:   true
+real effect performed:    false
+exit code:                0
+```
+
+The reader-lifetime correction preserves the exact production decision identity.
+The project is again at the protected D7-C publication boundary. The previous
+approval was consumed by the earlier blocked invocation; no second publication
+attempt is authorized without a new explicit approval.

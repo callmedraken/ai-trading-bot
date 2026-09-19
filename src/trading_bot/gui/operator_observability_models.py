@@ -319,7 +319,7 @@ class OperatorOperationsPageState:
             raise TypeError("status must be an OperatorOperationsPageStatus")
         if (
             type(self.message) is not str
-            or not self.message
+            or not self.message.strip()
             or len(self.message) > MAX_OPERATOR_MESSAGE_CHARACTERS
         ):
             raise ValueError("message is invalid")

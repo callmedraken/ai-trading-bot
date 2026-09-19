@@ -2,10 +2,38 @@
 
 ## Status and scope
 
-This record describes a source-only D7 requalification candidate. It authorizes
-no production invocation or external effect. Fresh full source certification
-and exact-diff review are required before any new D7-A read-only qualification.
-D7-C remains protected and explicitly unauthorized.
+**ACCEPTED — REPLACEMENT D7 SOURCE CERTIFICATION**
+
+This record now closes the replacement source-certification boundary for the
+D7-A/D7-D source after the Decimal determinism and frozen-seed checkout
+corrections. It authorizes no production publication or other external effect.
+Fresh D7-A remains read-only and D7-C remains protected and explicitly
+unauthorized.
+
+Certified replacement source:
+
+```text
+HEAD: acd606a41ac50f172ac62377ce6d4e7c8c4d3a32
+TREE: 784695d05865a767ba187adf38fd4924897127a9
+```
+
+Certification:
+
+```text
+broad suite excluding Architecture-77: 5534 passed, 17 skipped
+Architecture-77 clean-harness suite:    775 passed
+combined:                               6309 passed, 17 skipped
+Ruff check:                             PASS
+Ruff format --check:                    PASS (532 files)
+git diff --check:                       PASS
+git diff --cached --check:              PASS
+worktree/index:                         clean
+origin HEAD:                            exact source HEAD
+```
+
+Both Architecture-77 test modules were byte-identical between this candidate
+and the clean integration harness. Import proof showed the harness imported the
+candidate source tree. No permission workaround or source mutation was used.
 
 ## Base D7 lineage
 

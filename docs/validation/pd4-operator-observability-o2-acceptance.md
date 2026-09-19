@@ -128,3 +128,50 @@ validation.
 
 The same resolver is used by G6 before Paper-v2 account read/history planning,
 so this is an operational G6 blocker as well as an O2 blocker.
+
+
+## Seed portability correction and second real-host qualification
+
+The Windows checkout defect was reproduced exactly:
+
+```text
+frozen D5 worktree:           1060 bytes / canonical SHA / LF
+observability worktree:       1061 bytes / different SHA / CRLF
+system Git core.autocrlf:     true
+```
+
+The repository now pins the frozen seed checkout contract:
+
+```text
+docs/validation/evidence/pd2d1-spy-strategy-history-seed-2026-08-28.json text eol=lf
+```
+
+A regression test asserts the exact 1060-byte payload, frozen SHA-256, LF-only
+ending, and .gitattributes rule. The frozen seed blob itself was not changed.
+
+After rematerializing the seed to the canonical bytes, focused verification
+passed 27/27 tests. Ruff formatting was applied in commit
+`195d5a98439f17d52348ea488f008024371b6c63`.
+
+A second genuine Trading-principal O2 invocation then succeeded far enough to
+return the full sanitized snapshot:
+
+```text
+completed session:          2026-09-18
+selected C3 history:        READY, 6/6
+Paper-v2 account read:      PASS
+cash:                       25000
+positions:                  none
+realized P&L:               0
+all eight gates:            false
+real_effect_performed:      false
+G5 classification:          NO_NEW_COMPLETED_SESSION
+G6 classification:          BLOCKED
+```
+
+Therefore the historical configuration / seed portability blocker is resolved.
+The remaining blocker is downstream in G6 after current selected-C3 discovery
+and before successful decision-readiness classification. Diagnose the tail in
+exact G6 order: finalized-decision discovery, authoritative history binding,
+next-decision construction, then read-only publication qualification. D7-C
+remains protected and must not be invoked during diagnosis.

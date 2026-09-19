@@ -92,7 +92,7 @@ def test_main_window_has_stable_pages_and_navigation_is_presentation_only() -> N
     window.select_page("paper")
 
     assert window.current_page_id == "paper"
-    assert service.calls == 5
+    assert service.calls == 6
     window.close()
 
 

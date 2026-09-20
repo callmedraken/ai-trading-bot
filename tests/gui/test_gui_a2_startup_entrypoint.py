@@ -7,7 +7,12 @@ import pytest
 
 pytest.importorskip("PySide6")
 
-from trading_bot.gui import OperatorOperationsPageStatus, ResearchReportStatus, app
+from trading_bot.gui import (
+    GuiStartupConfiguration,
+    OperatorOperationsPageStatus,
+    ResearchReportStatus,
+    app,
+)
 
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURE = (
@@ -56,7 +61,9 @@ def test_gui_a2_normal_startup_composes_explicit_report_service(
 def test_gui_a2_startup_defaults_and_missing_path_are_bounded(tmp_path: Path) -> None:
     preview = app.build_startup_service(None).get_research_state()
     missing = app.build_startup_service(
-        tmp_path / "gui-a2-missing-startup-report.json"
+        GuiStartupConfiguration(
+            research_report=tmp_path / "gui-a2-missing-startup-report.json"
+        )
     ).get_research_state()
 
     assert preview.status is ResearchReportStatus.UNAVAILABLE

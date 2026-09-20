@@ -132,6 +132,7 @@ def test_main_window_real_report_operator_text_does_not_claim_mock_shell() -> No
     assert any("no production authority" in text.casefold() for text in texts)
     window.close()
 
+
 def test_system_page_uses_already_acquired_state_without_service_reread() -> None:
     application = _application()
     service = _RecordingService()

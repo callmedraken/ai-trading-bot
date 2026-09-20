@@ -9,8 +9,8 @@ from trading_bot.gui.market_data_models import (
     MarketDataPageState,
     unavailable_market_data_state,
 )
-from trading_bot.gui.models import ApplicationOverview, ResearchPageState
 from trading_bot.gui.mock_service import MockGuiApplicationService
+from trading_bot.gui.models import ApplicationOverview, ResearchPageState
 from trading_bot.gui.operator_observability_models import (
     OperatorOperationsPageState,
     unavailable_operator_operations_state,

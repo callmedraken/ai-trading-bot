@@ -22,8 +22,7 @@ def test_default_configuration_is_fully_read_only_and_unavailable() -> None:
     assert service.get_paper_state().status is PaperPageStatus.UNAVAILABLE
     assert service.get_market_data_state().status is MarketDataPageStatus.UNAVAILABLE
     assert (
-        service.get_paper_account_state().status
-        is PaperAccountPageStatus.UNAVAILABLE
+        service.get_paper_account_state().status is PaperAccountPageStatus.UNAVAILABLE
     )
     assert (
         service.get_operator_observability_state().status
@@ -177,8 +176,7 @@ def test_composite_service_delegates_only_configured_leaf_services(
 
     assert service.get_market_data_state().status is MarketDataPageStatus.UNAVAILABLE
     assert (
-        service.get_paper_account_state().status
-        is PaperAccountPageStatus.UNAVAILABLE
+        service.get_paper_account_state().status is PaperAccountPageStatus.UNAVAILABLE
     )
     assert calls == [
         (
@@ -237,8 +235,7 @@ def test_successor_service_receives_exact_four_paths_and_evidence(
     )
 
     assert (
-        service.get_paper_account_state().status
-        is PaperAccountPageStatus.UNAVAILABLE
+        service.get_paper_account_state().status is PaperAccountPageStatus.UNAVAILABLE
     )
     assert captured == [
         (

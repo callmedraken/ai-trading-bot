@@ -232,4 +232,3 @@ def test_gui_a8_recognized_arguments_are_not_forwarded_to_qt(
     ]
     assert len(captured_qt_argv) == 1
     assert captured_qt_argv[0][1:] == ("-platform", "offscreen")
-

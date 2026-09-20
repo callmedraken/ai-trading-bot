@@ -10,6 +10,7 @@ from trading_bot.gui import (
     OperatorOperationsPageStatus,
     PaperAccountPageStatus,
     PaperPageStatus,
+    PresentationStatus,
     ReadOnlyGuiApplicationService,
     ResearchReportStatus,
 )
@@ -246,3 +247,37 @@ def test_successor_service_receives_exact_four_paths_and_evidence(
             },
         )
     ]
+
+def test_default_overview_includes_all_read_only_pages() -> None:
+    overview = ReadOnlyGuiApplicationService(GuiStartupConfiguration()).get_overview()
+    components = {item.key: item for item in overview.components}
+
+    assert tuple(components) == (
+        "research",
+        "paper",
+        "paper-account",
+        "market-data",
+        "operations",
+        "system",
+    )
+    assert components["paper-account"].status is PresentationStatus.UNAVAILABLE
+    assert components["market-data"].status is PresentationStatus.UNAVAILABLE
+
+
+def test_configured_overview_is_truthful_without_claiming_verification() -> None:
+    overview = ReadOnlyGuiApplicationService(
+        GuiStartupConfiguration(
+            research_report=Path("report.json"),
+            market_data_snapshot=Path("snapshot.json"),
+            paper_account_genesis=Path("genesis.json"),
+        )
+    ).get_overview()
+    components = {item.key: item for item in overview.components}
+
+    assert components["research"].status is PresentationStatus.INFO
+    assert components["paper-account"].status is PresentationStatus.INFO
+    assert components["market-data"].status is PresentationStatus.INFO
+    assert "configured" in components["paper-account"].detail.casefold()
+    assert "configured" in components["market-data"].detail.casefold()
+    assert "verified" not in components["paper-account"].detail.casefold()
+    assert "verified" not in components["market-data"].detail.casefold()

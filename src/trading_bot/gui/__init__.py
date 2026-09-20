@@ -64,6 +64,10 @@ from trading_bot.gui.paper_models import (
 )
 from trading_bot.gui.research_service import CompactReportResearchService
 from trading_bot.gui.services import GuiApplicationService, ResearchReportLoader
+from trading_bot.gui.startup_composition import (
+    GuiStartupConfiguration,
+    ReadOnlyGuiApplicationService,
+)
 from trading_bot.gui.verified_genesis_paper_account_inspection_service import (
     VerifiedGenesisPaperAccountInspectionService,
 )
@@ -79,6 +83,7 @@ __all__ = [
     "ComponentStatus",
     "CompactReportResearchService",
     "GuiApplicationService",
+    "GuiStartupConfiguration",
     "MAX_MARKET_DATA_MESSAGE_CHARACTERS",
     "MAX_MARKET_DATA_PRESENTATION_TEXT_CHARACTERS",
     "MAX_MARKET_DATA_SYMBOL_CHARACTERS",
@@ -122,6 +127,7 @@ __all__ = [
     "ResearchReportView",
     "ResearchResultRow",
     "ResearchReportLoader",
+    "ReadOnlyGuiApplicationService",
     "VerifiedMarketSnapshotView",
     "VerifiedPaperAccountView",
     "VerifiedGenesisPaperAccountInspectionService",

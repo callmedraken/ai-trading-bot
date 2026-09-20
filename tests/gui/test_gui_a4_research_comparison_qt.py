@@ -113,7 +113,7 @@ class _WindowResearchService:
 
     def get_paper_account_state(self) -> PaperAccountPageState:
         return unavailable_paper_account_state()
-		
+
     def get_operator_observability_state(self) -> OperatorOperationsPageState:
         return unavailable_operator_operations_state()
 

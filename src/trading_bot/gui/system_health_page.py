@@ -37,7 +37,11 @@ _STATUS_PROPERTIES = {
 class SystemHealthPage(QWidget):
     """Read-only view derived only from already-acquired GUI presentation state."""
 
-    def __init__(self, state: SystemHealthPageState, parent: QWidget | None = None) -> None:
+    def __init__(
+        self,
+        state: SystemHealthPageState,
+        parent: QWidget | None = None,
+    ) -> None:
         super().__init__(parent)
         if type(state) is not SystemHealthPageState:
             raise TypeError("state must be an exact SystemHealthPageState")
@@ -175,7 +179,6 @@ class SystemHealthPage(QWidget):
 
         detail = QLabel(component.detail, card)
         detail.setObjectName("systemHealthComponentDetail")
-        detail.setTextFormat(Qt.TextFormat.PlainText)
         detail.setTextFormat(Qt.TextFormat.PlainText)
         detail.setWordWrap(True)
         layout.addWidget(detail)

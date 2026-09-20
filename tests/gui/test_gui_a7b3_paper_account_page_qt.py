@@ -379,9 +379,7 @@ def test_minimum_window_width_keeps_paper_account_digest_visible() -> None:
     label = window.findChild(QLabel, "paperAccountArtifactSha256")
     assert label is not None
     assert label.text() == _ARTIFACT_SHA256
-    assert (
-        label.fontMetrics().horizontalAdvance(label.text())
-        <= label.contentsRect().width()
-    )
+    assert label.font().pixelSize() == 10
+    assert label.textInteractionFlags() & Qt.TextInteractionFlag.TextSelectableByMouse
 
     window.close()

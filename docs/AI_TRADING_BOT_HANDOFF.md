@@ -2,8 +2,8 @@
 
 **Repository:** `callmedraken/ai-trading-bot`
 **Integration branch:** `develop`
-**Current source branch:** `feature/operator-observability-o1-forward-integration`
-**Current source worktree:** `F:\AI\worktrees\ai-trading-bot-operator-observability-o1-forward-integration`
+**Recently integrated source branch:** `feature/operator-observability-o1-forward-integration`
+**Recently integrated source worktree:** `F:\AI\worktrees\ai-trading-bot-operator-observability-o1-forward-integration`
 **Armed/historical D5 branch:** `feature/personal-desktop-paper-runtime`
 **Historical D6/D7 branch:** `feature/pd4-unattended-decision-publication`
 **Armed/historical D5 worktree:** `F:\AI\worktrees\ai-trading-bot-personal-desktop`
@@ -47,11 +47,12 @@ Integration/product baselines:
 
 ```text
 current develop integration:
-f7a177db37d6783d4e9865cc5bb98292f4907274
-tree: 8fe7d9175f5286bf6c88924f5dc3829012b13cd2
+c2de20c35a67e7f6c164d25e08dd0d2fc7d52641
+tree: f38913b50e28ec571969050596d7495d55e1cf95
+accepted PR #10 head: 4a397df25fe34fcfb581ea2e4409128a4ed2b168
 accepted PR #9 head: 2df0af89f53f12e4dd42975e36d56794dc1e3c95
 
-current replacement-certified observability source:
+replacement-certified observability executable/source:
 HEAD 4c2a064e31d460dd3c7534fadad6c50204ffcd82
 TREE 9d341fcfd6eb5493887012814c5943850d903744
 
@@ -658,8 +659,8 @@ PD4   unattended simulated-paper
   D7 qualification/publication/reconciliation              COMPLETE
   D7 integration into develop                              COMPLETE
   D8/D9 settlement source integration                      COMPLETE
-  operator observability O1-O4 source                      CERTIFIED / PRE-MERGE
-  operator observability integration                       NEXT SAFE SOURCE CHECKPOINT
+  operator observability O1-O4 source                      COMPLETE
+  operator observability integration                       COMPLETE
   D8-A Trading-principal qualification                     NEXT PROTECTED OPERATIONAL CHECKPOINT
   D8-B effectful settlement                                PROTECTED / UNAUTHORIZED
   operational unattended simulated-paper acceptance        NOT YET COMPLETE
@@ -1125,17 +1126,25 @@ authorization is implied.
 The next protected operational checkpoint is a fresh read-only **D8-A
 Trading-principal qualification** from the current integrated source.
 
-## Operator observability O1-O4 — replacement-certified pre-merge
+## Operator observability O1-O4 — integrated and closed
 
-Current source-development branch:
+Integration/source identity:
 
 ```text
-branch: feature/operator-observability-o1-forward-integration
-base develop HEAD: f7a177db37d6783d4e9865cc5bb98292f4907274
-base develop TREE: 8fe7d9175f5286bf6c88924f5dc3829012b13cd2
-certified HEAD:     4c2a064e31d460dd3c7534fadad6c50204ffcd82
-certified TREE:     9d341fcfd6eb5493887012814c5943850d903744
+historical feature branch: feature/operator-observability-o1-forward-integration
+base develop HEAD:         f7a177db37d6783d4e9865cc5bb98292f4907274
+base develop TREE:         8fe7d9175f5286bf6c88924f5dc3829012b13cd2
+certified source HEAD:     4c2a064e31d460dd3c7534fadad6c50204ffcd82
+certified source TREE:     9d341fcfd6eb5493887012814c5943850d903744
+accepted PR #10 head:      4a397df25fe34fcfb581ea2e4409128a4ed2b168
+merge commit:              c2de20c35a67e7f6c164d25e08dd0d2fc7d52641
+resulting tree:            f38913b50e28ec571969050596d7495d55e1cf95
 ```
+
+GitHub post-merge verification showed the merge is the normal history-preserving
+merge of the accepted PR head and that there is no file/tree difference between
+the PR head and merge result. The certified executable/source identity remains
+the pre-docs source HEAD/TREE above.
 
 O1-O4 are accepted:
 
@@ -1177,8 +1186,9 @@ later D8-A checkpoint for the intended settlement session.
 Completion record:
 `docs/validation/pd4-operator-observability-o1-o4-source-certification.md`.
 
-Next safe source step: review/create the observability PR against current
-`develop` and merge only with explicit operator approval. Next protected
-operational step remains fresh read-only D8-A when the intended session and
-selected-C3 evidence are eligible. D8-B remains protected and unauthorized.
+Operator observability is integrated and closed. The next protected operational
+step remains fresh read-only D8-A only after the intended execution session is
+completed and current selected-C3 evidence for that session exists. The earlier
+`NO_SETTLEMENT_PENDING` invocation remains historical only. D8-B remains
+protected and unauthorized.
 

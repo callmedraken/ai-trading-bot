@@ -2,7 +2,7 @@
 
 ## Status and scope
 
-**ACCEPTED — REPLACEMENT-CERTIFIED SOURCE / PRE-MERGE**
+**ACCEPTED — REPLACEMENT-CERTIFIED SOURCE / INTEGRATED**
 
 This record closes the source-certification boundary for the forward-integrated
 PD4 operator-observability O1-O4 milestone. It is source-only. It authorizes no
@@ -24,8 +24,9 @@ ahead/behind base:      9 / 0
 changed files vs base:  28
 ```
 
-This exact source identity remains authoritative even if a later docs-only
-closeout commit advances the feature branch.
+This exact source identity remains authoritative. The feature branch later
+received docs-only closeout commits and was merged through PR #10; those commits
+do not redefine the certified executable/source identity.
 
 ## Accepted checkpoint lineage
 
@@ -155,14 +156,25 @@ session was completed. It safely returned `NO_SETTLEMENT_PENDING` for completed
 session 2026-09-18 with all gates closed and no real effect. It is historical
 evidence only and does not authorize or satisfy the later D8-A checkpoint.
 
+## Integration closeout
+
+PR #10 was reviewed and merged normally into `develop` with the accepted head
+pinned.
+
+```text
+accepted PR head: 4a397df25fe34fcfb581ea2e4409128a4ed2b168
+merge commit:     c2de20c35a67e7f6c164d25e08dd0d2fc7d52641
+resulting tree:   f38913b50e28ec571969050596d7495d55e1cf95
+```
+
+Post-merge comparison showed one merge commit, zero PR-head file differences,
+and the merge parents were the prior `develop` head and accepted PR #10 head.
+Therefore no broad source-suite rerun was required after merge.
+
 ## Next checkpoint
 
-The next safe source checkpoint is PR review/integration of
-`feature/operator-observability-o1-forward-integration` into current
-`develop`. PR creation or metadata mutation and merge remain explicit operator
-approval boundaries.
-
-The next protected operational checkpoint remains a fresh zero-semantic-
-argument D8-A Trading-principal settlement qualification when the intended
-execution session and selected-C3 evidence are eligible. D8-B effectful
-settlement remains protected and unauthorized.
+Operator observability O1-O4 is integrated and closed. The next protected
+operational checkpoint remains a fresh zero-semantic-argument D8-A
+Trading-principal settlement qualification only after the intended execution
+session is completed and current selected-C3 evidence for that session exists.
+D8-B effectful settlement remains protected and unauthorized.

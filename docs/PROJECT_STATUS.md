@@ -32,15 +32,13 @@ personal-desktop branch/worktree:
 
 ```text
 repository: callmedraken/ai-trading-bot
-current develop integration: f7a177db37d6783d4e9865cc5bb98292f4907274
-current develop tree:        8fe7d9175f5286bf6c88924f5dc3829012b13cd2
+current develop integration: c2de20c35a67e7f6c164d25e08dd0d2fc7d52641
+current develop tree:        f38913b50e28ec571969050596d7495d55e1cf95
+accepted PR #10 head:         4a397df25fe34fcfb581ea2e4409128a4ed2b168
 accepted PR #9 head:          2df0af89f53f12e4dd42975e36d56794dc1e3c95
 
-current source-development branch:
+recent operator-observability branch:
 feature/operator-observability-o1-forward-integration
-
-current source-development worktree:
-F:\AI\worktrees\ai-trading-bot-operator-observability-o1-forward-integration
 
 operator-observability certified source HEAD:
 4c2a064e31d460dd3c7534fadad6c50204ffcd82
@@ -572,8 +570,8 @@ PD4   unattended simulated-paper source foundation          COMPLETE
   D7-D independent post-publication reconciliation source    COMPLETE
   D7 integrated into develop                                COMPLETE
   D8/D9 settlement source integration                       COMPLETE
-  operator observability O1-O4 source                        CERTIFIED / PRE-MERGE
-  operator observability integration                         NEXT SAFE SOURCE CHECKPOINT
+  operator observability O1-O4 source                        COMPLETE
+  operator observability integration                         COMPLETE
   D8-A Trading-principal qualification                       NEXT PROTECTED OPERATIONAL CHECKPOINT
   D8-B effectful settlement                                 PROTECTED / UNAUTHORIZED
   unattended operational deployment                         NOT YET COMPLETE
@@ -1018,12 +1016,12 @@ authorization is implied.
 The next protected operational checkpoint is a fresh read-only **D8-A
 Trading-principal qualification** from the current integrated source.
 
-## Operator observability O1-O4 source — REPLACEMENT-CERTIFIED PRE-MERGE
+## Operator observability O1-O4 integration — CLOSED
 
 The historical operator-observability line was not merged directly. O1-O4 were
-forward-integrated onto current `develop` on
+forward-integrated onto `develop` on
 `feature/operator-observability-o1-forward-integration`, reviewed checkpoint
-by checkpoint, and replacement-certified as a source-only milestone.
+by checkpoint, replacement-certified, and then merged through PR #10.
 
 Certified source identity:
 
@@ -1035,6 +1033,22 @@ certified source tree:   9d341fcfd6eb5493887012814c5943850d903744
 branch commits vs base:  9 ahead / 0 behind
 changed files vs base:   28
 ```
+
+Integration closeout:
+
+```text
+PR:                      #10
+accepted PR head:        4a397df25fe34fcfb581ea2e4409128a4ed2b168
+merge commit:            c2de20c35a67e7f6c164d25e08dd0d2fc7d52641
+resulting tree:          f38913b50e28ec571969050596d7495d55e1cf95
+PR-head -> merge files:  none
+```
+
+The normal history-preserving merge produced exactly the accepted PR-head tree.
+The later docs-only pre-merge closeout had already advanced the branch beyond
+the certified executable/source commit, so the authoritative certified
+executable/source identity remains `4c2a064...` /
+`9d341fcf...`. No broad-suite rerun was required for the merge.
 
 Accepted checkpoints:
 
@@ -1085,10 +1099,10 @@ Safety properties preserved by the accepted source:
 Completion record:
 `docs/validation/pd4-operator-observability-o1-o4-source-certification.md`.
 
-The next safe source checkpoint is PR review/integration of this
-replacement-certified observability branch into `develop`. PR creation,
-metadata changes, and merge remain explicit approval boundaries. The next
-protected operational checkpoint remains a fresh read-only D8-A
-Trading-principal settlement qualification when its intended session/data
-eligibility is satisfied. D8-B effectful settlement remains unauthorized.
+Operator observability O1-O4 is integrated and closed. No further
+operator-observability source action is pending. The next protected operational
+checkpoint remains a fresh read-only D8-A Trading-principal settlement
+qualification only after the intended execution session is completed and the
+required selected-C3 evidence is current and available. D8-B effectful
+settlement remains protected and unauthorized.
 

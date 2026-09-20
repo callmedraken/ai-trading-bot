@@ -248,6 +248,7 @@ def test_successor_service_receives_exact_four_paths_and_evidence(
         )
     ]
 
+
 def test_default_overview_includes_all_read_only_pages() -> None:
     overview = ReadOnlyGuiApplicationService(GuiStartupConfiguration()).get_overview()
     components = {item.key: item for item in overview.components}

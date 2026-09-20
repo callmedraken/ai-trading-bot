@@ -368,6 +368,7 @@ def test_main_window_has_no_compatibility_fallback_for_account_service() -> None
     assert "hasattr" not in source
     assert "AttributeError" not in source
 
+
 def test_minimum_window_width_keeps_paper_account_digest_visible() -> None:
     application = _application()
     window = MainWindow(_RecordingService(_state()))

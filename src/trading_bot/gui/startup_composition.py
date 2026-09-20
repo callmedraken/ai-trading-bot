@@ -192,8 +192,7 @@ class ReadOnlyGuiApplicationService:
             mode=OperatingMode.RESEARCH,
             environment="Local read-only GUI",
             summary=(
-                "Read-only GUI; explicitly selected local artifacts may be "
-                "inspected."
+                "Read-only GUI; explicitly selected local artifacts may be inspected."
             ),
             components=(
                 ComponentStatus(

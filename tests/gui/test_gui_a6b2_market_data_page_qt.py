@@ -200,6 +200,7 @@ def test_navigation_does_not_reinspect_market_data_state() -> None:
     assert service.market_data_calls == 1
     window.close()
 
+
 def test_minimum_window_width_keeps_market_data_digests_visible() -> None:
     application = _application()
     window = MainWindow(_RecordingService(_verified_state()))
@@ -216,6 +217,8 @@ def test_minimum_window_width_keeps_market_data_digests_visible() -> None:
         assert label is not None
         assert label.text() == expected
         assert label.font().pixelSize() == 10
-        assert label.textInteractionFlags() & Qt.TextInteractionFlag.TextSelectableByMouse
+        assert (
+            label.textInteractionFlags() & Qt.TextInteractionFlag.TextSelectableByMouse
+        )
 
     window.close()

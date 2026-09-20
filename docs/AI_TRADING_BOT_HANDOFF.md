@@ -1,13 +1,13 @@
 # AI Trading Bot — Project Development Roadmap & Handoff
 
-**Repository:** `callmedraken/ai-trading-bot`  
-**Integration branch:** `develop`  
-**Current source branch:** `feature/operator-observability-o1-forward-integration`  
-**Current source worktree:** `F:\AI\worktrees\ai-trading-bot-operator-observability-o1-forward-integration`  
-**Armed/historical D5 branch:** `feature/personal-desktop-paper-runtime`  
-**Historical D6/D7 branch:** `feature/pd4-unattended-decision-publication`  
-**Armed/historical D5 worktree:** `F:\AI\worktrees\ai-trading-bot-personal-desktop`  
-**Historical D6/D7 worktree:** `F:\AI\worktrees\ai-trading-bot-decision-publication`  
+**Repository:** `callmedraken/ai-trading-bot`
+**Integration branch:** `develop`
+**Current source branch:** `feature/operator-observability-o1-forward-integration`
+**Current source worktree:** `F:\AI\worktrees\ai-trading-bot-operator-observability-o1-forward-integration`
+**Armed/historical D5 branch:** `feature/personal-desktop-paper-runtime`
+**Historical D6/D7 branch:** `feature/pd4-unattended-decision-publication`
+**Armed/historical D5 worktree:** `F:\AI\worktrees\ai-trading-bot-personal-desktop`
+**Historical D6/D7 worktree:** `F:\AI\worktrees\ai-trading-bot-decision-publication`
 **Production/live trading:** NO-GO
 
 > This Git-tracked handoff is the canonical cross-chat resume document. Uploaded

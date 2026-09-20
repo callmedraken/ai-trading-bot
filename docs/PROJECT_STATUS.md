@@ -32,9 +32,21 @@ personal-desktop branch/worktree:
 
 ```text
 repository: callmedraken/ai-trading-bot
-current develop integration: a18dd765523ddcc55b2a10d312e28410a92b81c7
-current develop tree:        d50cbcfcf800417fe2dc90b9be5957354809a2d9
+current develop integration: f7a177db37d6783d4e9865cc5bb98292f4907274
+current develop tree:        8fe7d9175f5286bf6c88924f5dc3829012b13cd2
 accepted PR #9 head:          2df0af89f53f12e4dd42975e36d56794dc1e3c95
+
+current source-development branch:
+feature/operator-observability-o1-forward-integration
+
+current source-development worktree:
+F:\AI\worktrees\ai-trading-bot-operator-observability-o1-forward-integration
+
+operator-observability certified source HEAD:
+4c2a064e31d460dd3c7534fadad6c50204ffcd82
+
+operator-observability certified source tree:
+9d341fcfd6eb5493887012814c5943850d903744
 Architecture-94 P2 base: a810122a96b6fc90da25d71eede8da64b7272c98
 
 D5 deployed/warm-up branch:
@@ -50,8 +62,8 @@ D5 accepted source tree:
 f0591e966463c7e1e66dc00ad76fd895500a076f
 ```
 
-Do not modify the armed D5 worktree merely to continue development. New D6/D7
-source/design work is isolated on:
+Do not modify the armed D5 worktree merely to continue development. Historical
+D6/D7 source/design work was isolated on:
 
 ```text
 branch: feature/pd4-unattended-decision-publication
@@ -412,7 +424,7 @@ Key frozen rules:
 - unattended market-data capture and decision publication have separate
   closed-by-default source-owned gates.
 
-## PD4-D5 capture-only warm-up — ACTIVE / FIRST SCHEDULED WAKE ACCEPTED
+## Historical PD4-D5 capture-only warm-up — PREDECESSOR ACCEPTED
 
 Architecture and validation plan:
 
@@ -473,10 +485,12 @@ wake. D5 ordinary wakes may open only the market-data gate process-locally for
 one exact G5 call and must restore it in `finally`; decision publication and all
 Paper-v2 effect gates remain closed.
 
-The armed D5 task should remain untouched while it accumulates sessions
-naturally. Do not manually start it, backfill from the old offline seed, alter
-its source/scheduler contract, or turn a failed/ambiguous provider outcome into
-a blind retry.
+The 2/6 block above records an early D5 predecessor state. Later D7
+qualification established the required 6/6 READY history through completed
+session 2026-09-18, and D7 publication/reconciliation subsequently closed and
+integrated. Preserve the historical D5 source/task as evidence; do not modify it
+as incidental cleanup or turn any failed/ambiguous provider outcome into a blind
+retry.
 
 ## Historical milestone — PD4 D7-D source preparation
 
@@ -558,7 +572,9 @@ PD4   unattended simulated-paper source foundation          COMPLETE
   D7-D independent post-publication reconciliation source    COMPLETE
   D7 integrated into develop                                COMPLETE
   D8/D9 settlement source integration                       COMPLETE
-  D8-A Trading-principal qualification                       NEXT PROTECTED CHECKPOINT
+  operator observability O1-O4 source                        CERTIFIED / PRE-MERGE
+  operator observability integration                         NEXT SAFE SOURCE CHECKPOINT
+  D8-A Trading-principal qualification                       NEXT PROTECTED OPERATIONAL CHECKPOINT
   D8-B effectful settlement                                 PROTECTED / UNAUTHORIZED
   unattended operational deployment                         NOT YET COMPLETE
 PD5   broker-paper integration                              NOT STARTED
@@ -1001,3 +1017,78 @@ authorization is implied.
 
 The next protected operational checkpoint is a fresh read-only **D8-A
 Trading-principal qualification** from the current integrated source.
+
+## Operator observability O1-O4 source — REPLACEMENT-CERTIFIED PRE-MERGE
+
+The historical operator-observability line was not merged directly. O1-O4 were
+forward-integrated onto current `develop` on
+`feature/operator-observability-o1-forward-integration`, reviewed checkpoint
+by checkpoint, and replacement-certified as a source-only milestone.
+
+Certified source identity:
+
+```text
+base develop HEAD:       f7a177db37d6783d4e9865cc5bb98292f4907274
+base develop tree:       8fe7d9175f5286bf6c88924f5dc3829012b13cd2
+certified source HEAD:   4c2a064e31d460dd3c7534fadad6c50204ffcd82
+certified source tree:   9d341fcfd6eb5493887012814c5943850d903744
+branch commits vs base:  9 ahead / 0 behind
+changed files vs base:   28
+```
+
+Accepted checkpoints:
+
+```text
+O1  bounded Qt-free observability models/adapters
+O2  zero-semantic-argument read-only production snapshot
+    with retained selected-C3 provenance lifetime
+O3  read-only Operations GUI and unavailable-by-default service wiring
+O4  pure deterministic strategy preview through the current canonical
+    MovingAverageCrossoverStrategy evaluator
+```
+
+Final certification:
+
+```text
+focused O1-O4 gate:                 122 passed
+A4/MainWindow focused regression:    23 passed
+broad non-Architecture-77:         5,789 passed, 17 skipped
+Architecture-77 clean harness:       758 passed
+combined:                          6,547 passed, 17 skipped
+Ruff check:                        PASS
+Ruff format --check:               PASS (564 files)
+git diff --check:                  PASS
+git diff --cached --check:         PASS
+feature worktree/index:            clean
+```
+
+The first Architecture-77 attempt in the feature worktree hit the known fixed
+repository-local `.pytest_cache/ai-trading-bot-lifecycle-arbiters-v1` Windows
+permission condition. No source workaround or cache repair was made. The exact
+certified commit/tree was then exercised from a clean detached certification
+worktree and all 758 Architecture-77 tests passed.
+
+Safety properties preserved by the accepted source:
+
+- GUI startup does not invoke the production O2 snapshot or O4 strategy preview;
+- the default Operations service is deterministic, unavailable, and read-only;
+- GUI state contains bounded presentation values rather than reusable C1,
+  selected-C3, account, settlement, or execution authority;
+- O2 preserves current selected-C3 provenance lifetime requirements;
+- O4 calls the existing canonical strategy evaluator exactly once and preserves
+  current Decimal/proposal identity behavior rather than duplicating strategy
+  arithmetic or identity derivation;
+- all eight committed production effect gates remain false;
+- no production, Trading-principal, provider, settlement, scheduler, broker, or
+  live effect was run for this source milestone.
+
+Completion record:
+`docs/validation/pd4-operator-observability-o1-o4-source-certification.md`.
+
+The next safe source checkpoint is PR review/integration of this
+replacement-certified observability branch into `develop`. PR creation,
+metadata changes, and merge remain explicit approval boundaries. The next
+protected operational checkpoint remains a fresh read-only D8-A
+Trading-principal settlement qualification when its intended session/data
+eligibility is satisfied. D8-B effectful settlement remains unauthorized.
+

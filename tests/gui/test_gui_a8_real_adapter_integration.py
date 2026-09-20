@@ -108,14 +108,10 @@ def test_combined_research_market_data_and_genesis_startup_uses_real_adapters(
         GuiStartupConfiguration(
             research_report=RESEARCH_FIXTURE,
             market_data_snapshot=snapshot_path,
-            market_data_expected_sha256=hashlib.sha256(
-                snapshot_payload
-            ).hexdigest(),
+            market_data_expected_sha256=hashlib.sha256(snapshot_payload).hexdigest(),
             market_data_expected_byte_length=len(snapshot_payload),
             paper_account_genesis=genesis_path,
-            paper_account_expected_sha256=hashlib.sha256(
-                genesis_payload
-            ).hexdigest(),
+            paper_account_expected_sha256=hashlib.sha256(genesis_payload).hexdigest(),
             paper_account_expected_byte_length=len(genesis_payload),
         )
     )
@@ -132,8 +128,7 @@ def test_combined_research_market_data_and_genesis_startup_uses_real_adapters(
     assert paper_account.status is PaperAccountPageStatus.VERIFIED
     assert paper_account.account is not None
     assert (
-        paper_account.account.checkpoint_kind
-        is PaperAccountCheckpointKindView.GENESIS
+        paper_account.account.checkpoint_kind is PaperAccountCheckpointKindView.GENESIS
     )
     assert service.get_paper_state().status is PaperPageStatus.UNAVAILABLE
     assert (
@@ -165,8 +160,7 @@ def test_successor_startup_uses_complete_real_edge_verifier(
     assert state.status is PaperAccountPageStatus.VERIFIED
     assert state.account is not None
     assert (
-        state.account.checkpoint_kind
-        is PaperAccountCheckpointKindView.CYCLE_SUCCESSOR
+        state.account.checkpoint_kind is PaperAccountCheckpointKindView.CYCLE_SUCCESSOR
     )
     assert state.account.sequence == 1
     assert service.get_market_data_state().status is MarketDataPageStatus.UNAVAILABLE
@@ -221,7 +215,4 @@ def test_multi_source_composition_never_discovers_latest_artifacts(
 
     assert service.get_research_state().status is ResearchReportStatus.LOADED
     assert service.get_market_data_state().status is MarketDataPageStatus.VERIFIED
-    assert (
-        service.get_paper_account_state().status
-        is PaperAccountPageStatus.VERIFIED
-    )
+    assert service.get_paper_account_state().status is PaperAccountPageStatus.VERIFIED

@@ -1298,8 +1298,28 @@ C1/C2/C3, credentials, provider network access, paper execution, settlement,
 recovery, scheduler mutation, brokerage, or live effects. Paper Operation and
 Operations remain unavailable under ordinary GUI startup.
 
-GUI-A8 is source-certified and ready for PR review/integration. Do not merge
-without explicit operator approval. After integration, GUI-A9 read-only System
-Health / Audit is the next safe GUI candidate. D8-A remains a separate protected
-operational checkpoint and D8-B remains unauthorized.
+GUI-A8 is integrated and closed through PR #12.
+
+```text
+accepted PR head:     b091c81607e56dbe7e4b937e5264ea9256907385
+merge commit:         eab3a77d30875927c78d15a94c00fb899bc756b2
+resulting merge tree: 6d328f07212bc237e7cfa4a034e68b41febf2fc0
+PR-head -> merge:     no file differences
+```
+
+The authoritative executable/source certification remains
+`f8d90ffedd97594d32e179df845d494bba4df61c` /
+`f5162c47716ed8cb01b519e45be09316bda39bc0`.
+
+Final PR review also recorded one intentional fail-closed limitation: ordinary
+A8 successor startup does not synthesize or discover
+`VerifiedPriorCheckpoint` lineage evidence. A complete successor edge whose
+prior verifies as GENESIS is supported directly; later successor-after-successor
+inspection requires a future separately reviewed boundary that supplies
+already-verified prior lineage evidence. The GUI does not guess or traverse
+lineage to make such a page available.
+
+Next safe GUI milestone: GUI-A9 read-only System Health / Audit. D8-A remains a
+separate protected operational checkpoint; D8-B remains protected and
+unauthorized.
 

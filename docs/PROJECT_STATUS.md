@@ -1242,8 +1242,33 @@ VISUAL_GATE=PASSED
 FULL_REGRESSION=PASSED
 ```
 
-GUI-A8 source is certified and ready for PR review/integration. PR creation and
-merge remain explicit approval boundaries. The next safe GUI candidate after A8
-integration is GUI-A9 read-only System Health / Audit, while the next protected
-PD4 operational checkpoint remains the time/data-gated D8-A qualification.
+GUI-A8 is integrated and closed.
+
+```text
+PR:                      #12
+accepted PR head:        b091c81607e56dbe7e4b937e5264ea9256907385
+merge commit:            eab3a77d30875927c78d15a94c00fb899bc756b2
+resulting merge tree:    6d328f07212bc237e7cfa4a034e68b41febf2fc0
+PR-head -> merge files:  none
+```
+
+The normal history-preserving merge produced exactly the accepted PR-head tree.
+The authoritative GUI-A8 executable/source certification remains
+`f8d90ffedd97594d32e179df845d494bba4df61c` /
+`f5162c47716ed8cb01b519e45be09316bda39bc0`; the later branch closeout and
+this integration closeout are documentation-only and do not require another
+broad suite.
+
+Deep PR review confirmed the ordinary GUI startup path is a fail-closed subset of
+the reviewed adapters. One bounded capability limit is worth preserving
+explicitly: A8 startup does not manufacture or discover a
+`VerifiedPriorCheckpoint`. Therefore the direct successor startup path covers a
+complete successor edge whose prior can be verified as GENESIS; later
+successor-after-successor edges remain unavailable unless a future separately
+reviewed composition boundary supplies already-verified prior lineage evidence.
+This is a safe limitation, not an authority fallback.
+
+The next safe GUI milestone is GUI-A9 read-only System Health / Audit. The next
+protected PD4 operational checkpoint remains the time/data-gated D8-A
+qualification, and D8-B remains unauthorized.
 

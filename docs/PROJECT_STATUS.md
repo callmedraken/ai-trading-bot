@@ -1184,8 +1184,66 @@ proved combined Research + verified Market Data + GENESIS Paper Account,
 successor-edge Paper Account, per-source failure isolation, no directory/latest
 discovery, and continued unavailable Paper/Operations startup behavior.
 
-Next checkpoint: A8d visual certification of default, combined
-Research/Market-Data/GENESIS, and successor Paper Account startup at normal and
-minimum window sizes. After visual PASS, run the final repository-wide source
-certification once.
+A8d visual certification is accepted. The operator-visible checks covered
+default startup, combined Research + verified Market Data + GENESIS Paper
+Account, successor Paper Account, the 1180x760 default window, and the 920x620
+minimum window. A8d found and corrected two presentation defects before
+certification: the Overview omitted Paper Account / showed stale Market Data
+wording, and long SHA-256 values clipped at minimum width. The final visual
+candidate shows truthful configured/offline wording, the complete six-card
+Overview, full successor SHA-256 visibility, stable navigation, and no
+effect controls.
+
+GUI-A8 final source certification:
+
+```text
+certified source HEAD:  f8d90ffedd97594d32e179df845d494bba4df61c
+certified source TREE:  f5162c47716ed8cb01b519e45be09316bda39bc0
+base develop:           f90b0c77e19cb00cbe3813d6b811e9d2cf1b561a
+
+broad non-Architecture-77:  5,826 passed, 17 skipped
+Architecture-77 clean harness: 758 passed
+combined:                   6,584 passed, 17 skipped
+Ruff check:                 PASS
+Ruff format --check:        PASS (567 files)
+git diff --check:           PASS
+git diff --cached --check:  PASS
+feature worktree/index:     clean
+Architecture-77 worktree:   clean, exact certified HEAD/TREE
+visual gate:                PASS
+```
+
+Independent final GitHub review found the branch 26 commits ahead and 0 behind
+its exact base with 15 expected architecture/docs/GUI/test files. The executable
+changes are limited to explicit read-only startup composition, bounded overview
+presentation, startup argument wiring, and minimum-width digest presentation.
+No production O2/C1/C2/C3 acquisition, provider transport, Credential Manager,
+paper execution, settlement/recovery effect, scheduler mutation, brokerage, or
+live effect path was added.
+
+Final GUI-A8 acceptance:
+
+```text
+MULTI_SOURCE_READ_ONLY_COMPOSITION=True
+EXPLICIT_ARTIFACT_SELECTION_ONLY=True
+DIRECTORY_DISCOVERY=False
+LATEST_SELECTION=False
+PRODUCTION_O2_STARTUP=False
+C1_C2_C3_ACCESS=False
+CREDENTIAL_MANAGER_ACCESS=False
+PROVIDER_NETWORK_ACCESS=False
+PAPER_EXECUTION=False
+SETTLEMENT_EFFECT=False
+RECOVERY_EFFECT=False
+SCHEDULER_MUTATION=False
+BROKERAGE_ACCESS=False
+GUI_INTEGRATION=PASSED
+VISUAL_GATE=PASSED
+FULL_REGRESSION=PASSED
+```
+
+GUI-A8 source is certified and ready for PR review/integration. PR creation and
+merge remain explicit approval boundaries. The next safe GUI candidate after A8
+integration is GUI-A9 read-only System Health / Audit, while the next protected
+PD4 operational checkpoint remains the time/data-gated D8-A qualification.
 

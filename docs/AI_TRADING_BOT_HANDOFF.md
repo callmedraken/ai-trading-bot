@@ -1270,8 +1270,36 @@ git diff --check:                                  PASS
 The final A8c commit only reformatted the new integration test; independent
 GitHub diff review found no semantic change.
 
-Next checkpoint: A8d visual certification at the existing 1180x760 default and
-920x620 minimum window sizes for default startup, combined Research + verified
-Market Data + GENESIS Paper Account, and successor Paper Account. After visual
-PASS, perform one final repository-wide source certification.
+A8d and final GUI-A8 source certification are accepted.
+
+```text
+certified source HEAD:  f8d90ffedd97594d32e179df845d494bba4df61c
+certified source TREE:  f5162c47716ed8cb01b519e45be09316bda39bc0
+base develop:           f90b0c77e19cb00cbe3813d6b811e9d2cf1b561a
+
+broad non-Architecture-77:     5,826 passed, 17 skipped
+Architecture-77 clean harness:   758 passed
+combined:                      6,584 passed, 17 skipped
+Ruff check:                    PASS
+Ruff format --check:           PASS (567 files)
+diff checks:                   PASS
+visual gate:                   PASS
+```
+
+Visual certification covered default startup, combined Research + Market Data +
+GENESIS, successor Paper Account, 1180x760 normal size, and 920x620 minimum
+size. The final correction added the missing Paper Account Overview card,
+replaced stale Market Data overview wording with truthful explicit-artifact
+wording, and kept complete SHA-256 values visible/selectable at minimum width.
+
+Independent final GitHub review found 15 expected changed files, 26 commits
+ahead and 0 behind the exact base, with no source path into production O2,
+C1/C2/C3, credentials, provider network access, paper execution, settlement,
+recovery, scheduler mutation, brokerage, or live effects. Paper Operation and
+Operations remain unavailable under ordinary GUI startup.
+
+GUI-A8 is source-certified and ready for PR review/integration. Do not merge
+without explicit operator approval. After integration, GUI-A9 read-only System
+Health / Audit is the next safe GUI candidate. D8-A remains a separate protected
+operational checkpoint and D8-B remains unauthorized.
 

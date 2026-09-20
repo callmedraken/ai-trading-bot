@@ -85,6 +85,7 @@ class SystemHealthPage(QWidget):
             content,
         )
         status.setObjectName("systemHealthOverallStatus")
+        status.setTextFormat(Qt.TextFormat.PlainText)
         status.setProperty(
             "status",
             "ready"
@@ -113,6 +114,7 @@ class SystemHealthPage(QWidget):
 
         heading = QLabel("Presented components", content)
         heading.setObjectName("systemHealthSectionTitle")
+        heading.setTextFormat(Qt.TextFormat.PlainText)
         layout.addWidget(heading)
 
         component_grid = QGridLayout()
@@ -128,6 +130,7 @@ class SystemHealthPage(QWidget):
 
         audit_heading = QLabel("Bounded audit evidence", content)
         audit_heading.setObjectName("systemHealthSectionTitle")
+        audit_heading.setTextFormat(Qt.TextFormat.PlainText)
         layout.addWidget(audit_heading)
 
         if not self._state.audit_entries:
@@ -136,6 +139,7 @@ class SystemHealthPage(QWidget):
                 content,
             )
             empty.setObjectName("systemHealthEmptyAudit")
+            empty.setTextFormat(Qt.TextFormat.PlainText)
             empty.setWordWrap(True)
             layout.addWidget(empty)
         else:
@@ -160,15 +164,18 @@ class SystemHealthPage(QWidget):
 
         title = QLabel(component.title, card)
         title.setObjectName("systemHealthComponentTitle")
+        title.setTextFormat(Qt.TextFormat.PlainText)
         layout.addWidget(title)
 
         status = QLabel(_STATUS_LABELS[component.status], card)
         status.setObjectName("systemHealthComponentStatus")
+        status.setTextFormat(Qt.TextFormat.PlainText)
         status.setProperty("status", _STATUS_PROPERTIES[component.status])
         layout.addWidget(status)
 
         detail = QLabel(component.detail, card)
         detail.setObjectName("systemHealthComponentDetail")
+        detail.setTextFormat(Qt.TextFormat.PlainText)
         detail.setTextFormat(Qt.TextFormat.PlainText)
         detail.setWordWrap(True)
         layout.addWidget(detail)
@@ -190,10 +197,12 @@ class SystemHealthPage(QWidget):
 
         source = QLabel(f"{entry.source} — {entry.evidence_kind}", card)
         source.setObjectName("systemHealthAuditTitle")
+        source.setTextFormat(Qt.TextFormat.PlainText)
         layout.addWidget(source, 0, 0, 1, 2)
 
         id_label = QLabel("Identifier", card)
         id_label.setObjectName("systemHealthFieldLabel")
+        id_label.setTextFormat(Qt.TextFormat.PlainText)
         layout.addWidget(id_label, 1, 0)
 
         identifier = _readonly_value(entry.identifier, card)
@@ -203,6 +212,7 @@ class SystemHealthPage(QWidget):
         if entry.sha256 is not None:
             hash_label = QLabel("SHA-256", card)
             hash_label.setObjectName("systemHealthFieldLabel")
+            hash_label.setTextFormat(Qt.TextFormat.PlainText)
             layout.addWidget(hash_label, 2, 0)
 
             digest = _readonly_value(entry.sha256, card)

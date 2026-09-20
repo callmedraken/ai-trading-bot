@@ -116,7 +116,9 @@ class SystemHealthPageState:
         if len(audit_entries) > MAX_SYSTEM_AUDIT_ENTRIES:
             raise ValueError("audit_entries exceed the presentation count bound")
         if any(type(item) is not SystemAuditEntryView for item in audit_entries):
-            raise TypeError("audit_entries must contain exact SystemAuditEntryView values")
+            raise TypeError(
+                "audit_entries must contain exact SystemAuditEntryView values"
+            )
         identities = tuple(
             (item.source, item.evidence_kind, item.identifier) for item in audit_entries
         )

@@ -15,12 +15,17 @@ from uuid import UUID
 
 import pytest
 from tests.market_data.daily_snapshot_test_support import CAPTURED_AT, SPY, calendar
+from tests.runtime.test_checkpointed_paper_cycle_successor import _edge_artifacts
+from tests.runtime.test_checkpointed_verified_snapshot_execution import _target
 from tests.runtime.test_manual_paper_strategy_plan import (
     _DEFAULT_CONFIG,
     _NEXT_SESSION,
+    _binding,
+    _prior,
     _snapshot,
     _verified_seed,
 )
+from tests.runtime.test_paper_account_lineage_verification import _artifact
 from tests.runtime.test_verified_snapshot_preparation import _policies
 from tests.runtime.test_windows_authority_capability import _production_validation
 
@@ -39,6 +44,7 @@ from trading_bot.runtime import (
     SelectedC3SnapshotReadResult,
     create_genesis_paper_account_checkpoint,
     serialize_paper_account_checkpoint,
+    verified_prior_from_full_lineage,
     verified_prior_from_genesis,
     verify_genesis_paper_account_checkpoint,
     verify_paper_account_lineage,
@@ -58,6 +64,9 @@ from trading_bot.runtime.personal_desktop_paper_account_mutex import (
 )
 from trading_bot.runtime.personal_desktop_paper_account_publication_freeze import (
     PERSONAL_DESKTOP_PAPER_V2_PUBLICATION_FREEZE,
+)
+from trading_bot.runtime.personal_desktop_paper_account_read_authority import (
+    PersonalDesktopPaperAccountReadEvidence,
 )
 from trading_bot.runtime.personal_desktop_paper_account_security import (
     PERSONAL_DESKTOP_PAPER_V2_PRODUCTION_EFFECTS_ENABLED,
@@ -113,6 +122,118 @@ def _post_lock_evidence():  # type: ignore[no-untyped-def]
         reports=(),
         snapshots=(),
     )
+
+
+def _account_with_one_installed_successor() -> PersonalDesktopPaperAccountReadEvidence:
+    genesis_account = _post_lock_evidence()
+    genesis_verification = verify_genesis_paper_account_checkpoint(
+        genesis_account.genesis.payload
+    )
+    _, report, report_payload, _, snapshot_payload, successor, successor_payload = (
+        _edge_artifacts(
+            checkpoint=(genesis_verification, genesis_account.genesis.payload),
+            target=_target("0", "0", "100"),
+        )
+    )
+    successor_artifact = _artifact(
+        PaperAccountLineageArtifactKind.SUCCESSOR_CHECKPOINT,
+        successor.checkpoint_id,
+        successor_payload,
+    )
+    report_artifact = _artifact(
+        PaperAccountLineageArtifactKind.CYCLE_REPORT,
+        report.report_id,
+        report_payload,
+    )
+    snapshot_artifact = _artifact(
+        PaperAccountLineageArtifactKind.DAILY_SNAPSHOT,
+        successor.snapshot_reference.snapshot_id,
+        snapshot_payload,
+    )
+    full = verify_paper_account_lineage(
+        genesis_account.genesis,
+        successor.checkpoint_id,
+        (successor_artifact,),
+        (report_artifact,),
+        (snapshot_artifact,),
+        calendar(),
+    )
+    assert full.status is PaperAccountLineageVerificationStatus.PASS
+    assert full.evidence is not None
+    return PersonalDesktopPaperAccountReadEvidence(
+        genesis_account.anchor,
+        b"",
+        verified_prior_from_full_lineage(full),
+        full.evidence,
+        genesis_account.genesis,
+        (successor_artifact,),
+        (report_artifact,),
+        (snapshot_artifact,),
+        (),
+    )
+
+
+def test_historical_predecessor_prefix_uses_p_when_current_tip_is_q() -> None:
+    account = _account_with_one_installed_successor()
+    prefix = verify_paper_account_lineage(
+        account.genesis,
+        account.genesis.artifact_id,
+        (),
+        (),
+        (),
+        calendar(),
+    )
+    assert prefix.status is PaperAccountLineageVerificationStatus.PASS
+    assert prefix.evidence is not None
+    prior_p = verified_prior_from_full_lineage(prefix)
+    plan = _binding(
+        prior=prior_p,
+        paper_account_id=ACCOUNT_ID,
+        caller_key=str(CALLER_KEY),
+    )
+
+    material = preparation.reconstruct_verified_paper_operation_from_predecessor_prefix(
+        account, _selected_result(), plan, calendar()
+    )
+
+    assert account.lineage.terminal_checkpoint_id == account.successors[0].artifact_id
+    assert account.lineage.terminal_checkpoint_id != prior_p.checkpoint_id
+    assert material.execution_inputs.verified_prior == prior_p
+    assert material.execution_inputs.intent.prior_lineage_evidence == prefix.evidence
+    assert (
+        material.execution_inputs.intent.prior_lineage_evidence.terminal_checkpoint_id
+        == prior_p.checkpoint_id
+    )
+    assert material.execution_inputs.application_id != account.successors[0].artifact_id
+
+
+def test_historical_predecessor_prefix_blocks_absent_or_ambiguous_p() -> None:
+    account = _account_with_one_installed_successor()
+    selected = _selected_result()
+    plan = _binding(
+        prior=_prior(cash="200"),
+        paper_account_id=ACCOUNT_ID,
+        caller_key=str(CALLER_KEY),
+    )
+    with pytest.raises(preparation.SupervisedPaperOperationPreparationError):
+        preparation.reconstruct_verified_paper_operation_from_predecessor_prefix(
+            account, selected, plan, calendar()
+        )
+    malformed = replace(account, successors=(account.successors[0],) * 2)
+    with pytest.raises(preparation.SupervisedPaperOperationPreparationError):
+        preparation.reconstruct_verified_paper_operation_from_predecessor_prefix(
+            malformed, selected, plan, calendar()
+        )
+    valid_plan = _binding(
+        prior=_post_lock_evidence().prior_checkpoint,
+        paper_account_id=ACCOUNT_ID,
+        caller_key=str(CALLER_KEY),
+    )
+    unrelated = replace(account, snapshots=(*account.snapshots, account.snapshots[0]))
+    with pytest.raises(preparation.SupervisedPaperOperationPreparationError):
+        preparation.reconstruct_verified_paper_operation_from_predecessor_prefix(
+            unrelated, selected, valid_plan, calendar()
+        )
 
 
 def _selected_result(

@@ -440,6 +440,7 @@ def test_recovery_required_and_abandoned_mutex_never_reach_any_effect() -> None:
     recovery = _recovery_required()
     result, events, _, _ = _case(recovery_results=[recovery, recovery, recovery])
     assert result.status is _Status.RECEIPT_RECOVERY_REQUIRED
+    assert result.application_id == recovery.missing_application_id
     assert not any(
         event[0]
         in {"build", "storage", "inspect", "open-publisher", "open-output", "execute"}

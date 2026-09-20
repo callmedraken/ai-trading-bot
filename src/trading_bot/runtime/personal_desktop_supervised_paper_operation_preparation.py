@@ -11,7 +11,7 @@ from __future__ import annotations
 import threading
 import weakref
 from contextlib import ExitStack
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import Protocol, Self
 from uuid import UUID
@@ -27,6 +27,7 @@ from trading_bot.runtime.checkpointed_verified_snapshot_execution import (
     CheckpointedVerifiedSnapshotPaperCycleRequest,
     VerifiedPriorCheckpoint,
     derive_checkpointed_verified_snapshot_application_id,
+    verified_prior_from_full_lineage,
 )
 from trading_bot.runtime.manual_paper_selected_c3_snapshot import (
     SelectedC3SnapshotAuditEvidence,
@@ -46,6 +47,8 @@ from trading_bot.runtime.paper_account_lineage_verification import (
     PaperAccountLineageArtifact,
     PaperAccountLineageArtifactEvidence,
     PaperAccountLineageArtifactKind,
+    PaperAccountLineageVerificationStatus,
+    verify_paper_account_lineage,
 )
 from trading_bot.runtime.paper_operation import (
     PaperOperationArtifactEvidence,
@@ -59,6 +62,9 @@ from trading_bot.runtime.personal_desktop_paper_account_authority import (
 )
 from trading_bot.runtime.personal_desktop_paper_account_mutex import (
     PaperAccountMutexState,
+)
+from trading_bot.runtime.personal_desktop_paper_account_read_authority import (
+    PersonalDesktopPaperAccountReadEvidence,
 )
 from trading_bot.runtime.personal_desktop_supervised_paper_cycle import (
     SupervisedPersonalDesktopPaperCycle,
@@ -671,6 +677,106 @@ def reconstruct_verified_paper_operation_from_plan(
         calendar,
     )
     return PreparedPaperOperationMaterial(verified_plan_binding, execution_inputs)
+
+
+def reconstruct_verified_paper_operation_from_predecessor_prefix(
+    current_account: PersonalDesktopPaperAccountReadEvidence,
+    selected_snapshot: SelectedC3SnapshotReadResult,
+    verified_plan_binding: ManualPaperStrategyPlanArtifactBinding,
+    calendar: IdentifiedMarketCalendar,
+) -> PreparedPaperOperationMaterial:
+    """Reverify an installed historical P prefix and derive the original A67 inputs.
+
+    This is an in-memory read-only composition. The current account may end at a
+    successor Q; the operation intent must continue to use its original P tip.
+    """
+
+    if (
+        type(current_account) is not PersonalDesktopPaperAccountReadEvidence
+        or type(verified_plan_binding) is not ManualPaperStrategyPlanArtifactBinding
+    ):
+        raise SupervisedPaperOperationPreparationError(
+            "historical predecessor reconstruction evidence is invalid"
+        )
+    full = current_account.lineage
+    predecessor = verified_plan_binding.plan.prior_checkpoint.checkpoint_id
+    positions = tuple(
+        index
+        for index, checkpoint in enumerate(full.checkpoint_ids)
+        if checkpoint == predecessor
+    )
+    if (
+        len(positions) != 1
+        or len(current_account.successors) != full.edge_count
+        or len(current_account.reports) != full.edge_count
+    ):
+        raise SupervisedPaperOperationPreparationError(
+            "historical predecessor is absent or ambiguous"
+        )
+    verified_full = verify_paper_account_lineage(
+        current_account.genesis,
+        full.terminal_checkpoint_id,
+        current_account.successors,
+        current_account.reports,
+        current_account.snapshots,
+        calendar,
+    )
+    if (
+        verified_full.status is not PaperAccountLineageVerificationStatus.PASS
+        or verified_full.evidence != full
+        or verified_prior_from_full_lineage(verified_full)
+        != current_account.prior_checkpoint
+    ):
+        raise SupervisedPaperOperationPreparationError(
+            "current account lineage does not independently reverify"
+        )
+    index = positions[0]
+    snapshots_by_id = {
+        artifact.artifact_id: artifact for artifact in current_account.snapshots
+    }
+    if len(snapshots_by_id) != len(current_account.snapshots):
+        raise SupervisedPaperOperationPreparationError(
+            "current account snapshot inventory is ambiguous"
+        )
+    prefix_snapshots = tuple(
+        snapshots_by_id[identity]
+        for identity in dict.fromkeys(full.snapshot_ids[:index])
+    )
+    prefix = verify_paper_account_lineage(
+        current_account.genesis,
+        predecessor,
+        current_account.successors[:index],
+        current_account.reports[:index],
+        prefix_snapshots,
+        calendar,
+    )
+    if (
+        prefix.status is not PaperAccountLineageVerificationStatus.PASS
+        or prefix.evidence is None
+        or prefix.evidence.checkpoint_ids != full.checkpoint_ids[: index + 1]
+        or prefix.evidence.application_ids != full.application_ids[:index]
+        or prefix.evidence.cycle_result_ids != full.cycle_result_ids[:index]
+        or prefix.evidence.snapshot_ids != full.snapshot_ids[:index]
+        or prefix.evidence.checkpoint_artifacts
+        != full.checkpoint_artifacts[: index + 1]
+        or prefix.evidence.report_artifacts != full.report_artifacts[:index]
+        or prefix.evidence.snapshot_artifacts != full.snapshot_artifacts[:index]
+    ):
+        raise SupervisedPaperOperationPreparationError(
+            "historical predecessor prefix does not independently reverify"
+        )
+    prefix_account = replace(
+        current_account,
+        prior_checkpoint=verified_prior_from_full_lineage(prefix),
+        lineage=prefix.evidence,
+        successors=current_account.successors[:index],
+        reports=current_account.reports[:index],
+        snapshots=prefix_snapshots,
+        receipts=(),
+    )
+    return reconstruct_verified_paper_operation_from_plan(
+        prefix_account, selected_snapshot, verified_plan_binding, calendar
+    )
 
 
 def _terminal_artifact(

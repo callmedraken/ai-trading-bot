@@ -1272,3 +1272,29 @@ The next safe GUI milestone is GUI-A9 read-only System Health / Audit. The next
 protected PD4 operational checkpoint remains the time/data-gated D8-A
 qualification, and D8-B remains unauthorized.
 
+## GUI-A9 read-only System Health & Audit — ACTIVE
+
+Architecture 116 and its validation plan define the next GUI milestone on:
+
+```text
+branch: feature/gui-a9-system-health-audit
+base develop: 0eb39514ba45f39fb7dc7f02c06a458a56f4fc5e
+architecture: docs/architecture/116-gui-system-health-audit.md
+validation: docs/validation/gui-a9-system-health-audit.md
+```
+
+GUI-A9 derives System Health entirely from presentation state that `MainWindow`
+already acquires through the accepted GUI service boundary. It adds no service
+method, runtime reader, production O2 access, C1/C2/C3 access, filesystem
+discovery, Credential Manager access, provider/broker network call, scheduler
+access, settlement/recovery, or execution effect.
+
+The current A9 source candidate adds immutable Qt-free System Health/Audit
+models, a pure presentation-state adapter, a read-only System Health page,
+MainWindow integration without service rereads, and focused model/adapter/Qt
+tests. The source checkpoint is not accepted until the focused/full GUI and
+static gates pass locally.
+
+Next checkpoint: run the focused A9 test gate, then the complete `tests/gui`
+regression and visual inspection before final repository certification.
+

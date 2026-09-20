@@ -1323,3 +1323,27 @@ Next safe GUI milestone: GUI-A9 read-only System Health / Audit. D8-A remains a
 separate protected operational checkpoint; D8-B remains protected and
 unauthorized.
 
+## GUI-A9 read-only System Health & Audit — active GUI milestone
+
+GUI-A8 is integrated. GUI work continues on:
+
+```text
+branch: feature/gui-a9-system-health-audit
+base develop: 0eb39514ba45f39fb7dc7f02c06a458a56f4fc5e
+```
+
+Architecture 116 freezes A9 as a pure in-memory presentation milestone. The
+System page is upgraded to System Health & Audit by adapting the exact Research,
+Paper Operation, Paper Account, Market Data, and Operations states already
+acquired by `MainWindow`. No new `GuiApplicationService` method is added and
+System navigation must not cause any reread.
+
+Bounded audit evidence is limited to IDs/hashes already present in existing GUI
+models. Paths, receipt paths, exception text, credentials, reusable authority,
+raw C1 evidence, provider bodies, and operational discovery are not carried
+into the A9 state.
+
+The current source candidate is awaiting local focused/full GUI and Ruff gates.
+D8-A remains an independent protected operational checkpoint; D8-B remains
+unauthorized.
+

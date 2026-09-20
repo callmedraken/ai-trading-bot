@@ -1214,3 +1214,29 @@ daily, so the preferred first meaningful attempt is after the normal
 2026-09-22 D5 wake has completed. The earlier `NO_SETTLEMENT_PENDING`
 invocation remains historical only. D8-B remains protected and unauthorized.
 
+## GUI-A8 read-only multi-source composition — active parallel milestone
+
+While D8-A waits for the normal 2026-09-22 D5 wake and selected C3(E), GUI work
+continues safely on:
+
+```text
+branch: feature/gui-a8-read-only-composition
+base develop: f90b0c77e19cb00cbe3813d6b811e9d2cf1b561a
+```
+
+A8a is accepted through Architecture 115 and
+`docs/validation/gui-a8-read-only-multi-source-composition.md`.
+
+The frozen scope is a normal-startup composition layer for already-reviewed
+read-only Research, offline-verified Market Data, and offline-verified Paper
+Account adapters. Input selection is explicit only; no directory discovery or
+operational-current/latest inference is allowed. Paper Operation remains
+unavailable unless already-verified execution inputs are supplied by a future
+reviewed boundary. Ordinary startup must not invoke production O2, C1/C2/C3,
+credentials, provider transport, settlement/recovery, Task Scheduler, brokerage,
+or live effects.
+
+Next checkpoint: A8b Qt-free startup configuration plus composite service and
+focused tests. Luna Extra High is the preferred bounded implementation route
+once the contract is frozen; ChatGPT retains exact diff review and acceptance.
+

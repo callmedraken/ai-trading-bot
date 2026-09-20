@@ -1128,3 +1128,30 @@ first attempt is after the normal 2026-09-22 D5 wake has completed, not merely
 after the wall-clock reaches September 21. The runbook does not authorize D8-B.
 D8-B effectful settlement remains protected and unauthorized.
 
+## GUI-A8 read-only multi-source composition — A8a ARCHITECTURE ACCEPTED
+
+Architecture 115 and its validation plan freeze the next GUI milestone while
+PD4 D8-A remains time/data gated.
+
+```text
+branch: feature/gui-a8-read-only-composition
+base develop: f90b0c77e19cb00cbe3813d6b811e9d2cf1b561a
+A8a architecture: docs/architecture/115-gui-read-only-multi-source-composition.md
+A8 validation: docs/validation/gui-a8-read-only-multi-source-composition.md
+```
+
+GUI-A8 will compose existing reviewed read-only adapters from explicit artifact
+inputs only. It adds no directory discovery, "latest" selection, production O2
+startup, C1/C2/C3 access, provider/credential/broker access, paper execution,
+settlement/recovery effect, scheduler mutation, or D5/D8/D9 operational change.
+
+Ordinary GUI startup will continue to keep Paper Operation and Operations
+unavailable unless a later separately reviewed composition supplies their
+required verified/production boundaries. A8 must not reconstruct
+`VerifiedPaperOperationExecutionInputs` from GUI arguments and must not invoke
+production operator observability under the normal desktop principal.
+
+Next source checkpoint: A8b startup configuration and composite read-only
+service, followed by explicit Market Data / Paper Account startup wiring and GUI
+regression/visual certification.
+

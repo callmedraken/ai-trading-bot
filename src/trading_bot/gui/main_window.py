@@ -396,6 +396,11 @@ class MainWindow(QMainWindow):
             QLabel#marketDataSourcePayloadMediaType {
                 color: #e5e7eb;
             }
+            QLabel#paperAccountArtifactSha256,
+            QLabel#marketDataArtifactSha256,
+            QLabel#marketDataSourcePayloadSha256 {
+                font-size: 10px;
+            }
             QLabel#operatorOperationsStatus[status="verified"],
             QLabel#operatorGateSummary[status="verified"],
             QLabel#operatorStrategyReadiness[status="ready"] {

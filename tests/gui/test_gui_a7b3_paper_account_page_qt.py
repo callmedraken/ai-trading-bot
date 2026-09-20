@@ -367,3 +367,20 @@ def test_main_window_has_no_compatibility_fallback_for_account_service() -> None
 
     assert "hasattr" not in source
     assert "AttributeError" not in source
+
+
+def test_minimum_window_width_keeps_paper_account_digest_visible() -> None:
+    application = _application()
+    window = MainWindow(_RecordingService(_state()))
+    window.resize(920, 620)
+    window.show()
+    window.select_page("paper-account")
+    application.processEvents()
+
+    label = window.findChild(QLabel, "paperAccountArtifactSha256")
+    assert label is not None
+    assert label.text() == _ARTIFACT_SHA256
+    assert label.font().pixelSize() == 10
+    assert label.textInteractionFlags() & Qt.TextInteractionFlag.TextSelectableByMouse
+
+    window.close()

@@ -199,3 +199,26 @@ def test_navigation_does_not_reinspect_market_data_state() -> None:
     assert window.current_page_id == "market-data"
     assert service.market_data_calls == 1
     window.close()
+
+
+def test_minimum_window_width_keeps_market_data_digests_visible() -> None:
+    application = _application()
+    window = MainWindow(_RecordingService(_verified_state()))
+    window.resize(920, 620)
+    window.show()
+    window.select_page("market-data")
+    application.processEvents()
+
+    for object_name, expected in (
+        ("marketDataArtifactSha256", "a" * 64),
+        ("marketDataSourcePayloadSha256", "b" * 64),
+    ):
+        label = window.findChild(QLabel, object_name)
+        assert label is not None
+        assert label.text() == expected
+        assert label.font().pixelSize() == 10
+        assert (
+            label.textInteractionFlags() & Qt.TextInteractionFlag.TextSelectableByMouse
+        )
+
+    window.close()

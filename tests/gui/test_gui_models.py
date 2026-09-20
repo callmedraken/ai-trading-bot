@@ -22,11 +22,13 @@ def test_mock_service_returns_deterministic_overview() -> None:
     assert tuple(item.key for item in first.components) == (
         "research",
         "paper",
+        "paper-account",
         "market-data",
         "operations",
         "system",
     )
     assert first.components[2].status is PresentationStatus.UNAVAILABLE
+    assert first.components[3].status is PresentationStatus.UNAVAILABLE
 
 
 def test_application_overview_rejects_duplicate_component_keys() -> None:

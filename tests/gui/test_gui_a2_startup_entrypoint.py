@@ -7,7 +7,12 @@ import pytest
 
 pytest.importorskip("PySide6")
 
-from trading_bot.gui import OperatorOperationsPageStatus, ResearchReportStatus, app
+from trading_bot.gui import (
+    GuiStartupConfiguration,
+    OperatorOperationsPageStatus,
+    ResearchReportStatus,
+    app,
+)
 
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURE = (
@@ -56,7 +61,9 @@ def test_gui_a2_normal_startup_composes_explicit_report_service(
 def test_gui_a2_startup_defaults_and_missing_path_are_bounded(tmp_path: Path) -> None:
     preview = app.build_startup_service(None).get_research_state()
     missing = app.build_startup_service(
-        tmp_path / "gui-a2-missing-startup-report.json"
+        GuiStartupConfiguration(
+            research_report=tmp_path / "gui-a2-missing-startup-report.json"
+        )
     ).get_research_state()
 
     assert preview.status is ResearchReportStatus.UNAVAILABLE
@@ -112,3 +119,116 @@ def test_gui_startup_never_invokes_production_operator_snapshot(
     assert app.run(argv=()) == 0
     assert len(captured_states) == 1
     assert captured_states[0].status is OperatorOperationsPageStatus.UNAVAILABLE
+
+
+def test_gui_a8_parser_builds_explicit_read_only_configuration() -> None:
+    config, qt_arguments = app._parse_startup_arguments(
+        (
+            "--research-report",
+            str(FIXTURE),
+            "--market-data-snapshot",
+            "snapshot.json",
+            "--market-data-sha256",
+            "a" * 64,
+            "--market-data-byte-length",
+            "123",
+            "--paper-account-genesis",
+            "genesis.json",
+            "--paper-account-sha256",
+            "b" * 64,
+            "--paper-account-byte-length",
+            "456",
+            "-platform",
+            "offscreen",
+        )
+    )
+
+    assert config == GuiStartupConfiguration(
+        research_report=FIXTURE,
+        market_data_snapshot=Path("snapshot.json"),
+        market_data_expected_sha256="a" * 64,
+        market_data_expected_byte_length=123,
+        paper_account_genesis=Path("genesis.json"),
+        paper_account_expected_sha256="b" * 64,
+        paper_account_expected_byte_length=456,
+    )
+    assert qt_arguments == ("-platform", "offscreen")
+
+
+def test_gui_a8_partial_successor_configuration_fails_before_qt(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def _unexpected_qt(*args, **kwargs):
+        raise AssertionError("invalid GUI-A8 configuration must fail before Qt")
+
+    monkeypatch.setattr(app, "QApplication", _unexpected_qt)
+
+    with pytest.raises(SystemExit) as error:
+        app.run(
+            argv=(
+                "--paper-account-prior",
+                "prior.json",
+                "--paper-account-successor",
+                "successor.json",
+            )
+        )
+
+    assert error.value.code == 2
+
+
+def test_gui_a8_recognized_arguments_are_not_forwarded_to_qt(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured_config = []
+    captured_qt_argv = []
+
+    class _Service:
+        pass
+
+    class _Application:
+        def __init__(self, argv: list[str]) -> None:
+            captured_qt_argv.append(tuple(argv))
+
+        def setApplicationName(self, name: str) -> None:
+            assert name == "AI Trading Bot"
+
+        def exec(self) -> int:
+            return 0
+
+    class _Window:
+        def __init__(self, service) -> None:  # type: ignore[no-untyped-def]
+            assert type(service) is _Service
+
+        def show(self) -> None:
+            return None
+
+    def _service(config: GuiStartupConfiguration):
+        captured_config.append(config)
+        return _Service()
+
+    monkeypatch.setattr(app, "QApplication", _Application)
+    monkeypatch.setattr(app, "MainWindow", _Window)
+    monkeypatch.setattr(app, "build_startup_service", _service)
+
+    assert (
+        app.run(
+            argv=(
+                "--market-data-snapshot",
+                "snapshot.json",
+                "--paper-account-genesis",
+                "genesis.json",
+                "-platform",
+                "offscreen",
+            )
+        )
+        == 0
+    )
+
+    assert captured_config == [
+        GuiStartupConfiguration(
+            market_data_snapshot=Path("snapshot.json"),
+            paper_account_genesis=Path("genesis.json"),
+        )
+    ]
+    assert len(captured_qt_argv) == 1
+    assert captured_qt_argv[0][1:] == ("-platform", "offscreen")

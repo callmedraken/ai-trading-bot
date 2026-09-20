@@ -1214,3 +1214,92 @@ daily, so the preferred first meaningful attempt is after the normal
 2026-09-22 D5 wake has completed. The earlier `NO_SETTLEMENT_PENDING`
 invocation remains historical only. D8-B remains protected and unauthorized.
 
+## GUI-A8 read-only multi-source composition — active parallel milestone
+
+While D8-A waits for the normal 2026-09-22 D5 wake and selected C3(E), GUI work
+continues safely on:
+
+```text
+branch: feature/gui-a8-read-only-composition
+base develop: f90b0c77e19cb00cbe3813d6b811e9d2cf1b561a
+```
+
+A8a is accepted through Architecture 115 and
+`docs/validation/gui-a8-read-only-multi-source-composition.md`.
+
+The frozen scope is a normal-startup composition layer for already-reviewed
+read-only Research, offline-verified Market Data, and offline-verified Paper
+Account adapters. Input selection is explicit only; no directory discovery or
+operational-current/latest inference is allowed. Paper Operation remains
+unavailable unless already-verified execution inputs are supplied by a future
+reviewed boundary. Ordinary startup must not invoke production O2, C1/C2/C3,
+credentials, provider transport, settlement/recovery, Task Scheduler, brokerage,
+or live effects.
+
+A8b is accepted at source HEAD
+`f5a0545c147b5f56af125886c77c36a77cec48f4` / tree
+`6381588ff509e9962169338e11c5263a13f98d79`.
+
+Accepted evidence:
+
+```text
+focused A8b + affected adapter/MainWindow regression: 102 passed
+Ruff check: PASS
+Ruff format --check: PASS
+git diff --check: PASS
+final worktree/index: clean before commit; formatter commit pushed normally
+```
+
+The final A8b commit only organized one import block and applied Ruff formatting
+to two test files. It did not change runtime behavior.
+
+A8c is accepted at source HEAD
+`d050538149879d01b1d6f2e251878800d8d49f75` / tree
+`3f26a8977c468da9c45ca55c36fc86b689ab3290`.
+
+Accepted evidence:
+
+```text
+focused A8c + affected adapter/startup regression: 102 passed
+complete tests/gui regression:                    283 passed
+Ruff check src/trading_bot/gui tests/gui:          PASS
+Ruff format --check:                               PASS after formatter-only follow-up
+git diff --check:                                  PASS
+```
+
+The final A8c commit only reformatted the new integration test; independent
+GitHub diff review found no semantic change.
+
+A8d and final GUI-A8 source certification are accepted.
+
+```text
+certified source HEAD:  f8d90ffedd97594d32e179df845d494bba4df61c
+certified source TREE:  f5162c47716ed8cb01b519e45be09316bda39bc0
+base develop:           f90b0c77e19cb00cbe3813d6b811e9d2cf1b561a
+
+broad non-Architecture-77:     5,826 passed, 17 skipped
+Architecture-77 clean harness:   758 passed
+combined:                      6,584 passed, 17 skipped
+Ruff check:                    PASS
+Ruff format --check:           PASS (567 files)
+diff checks:                   PASS
+visual gate:                   PASS
+```
+
+Visual certification covered default startup, combined Research + Market Data +
+GENESIS, successor Paper Account, 1180x760 normal size, and 920x620 minimum
+size. The final correction added the missing Paper Account Overview card,
+replaced stale Market Data overview wording with truthful explicit-artifact
+wording, and kept complete SHA-256 values visible/selectable at minimum width.
+
+Independent final GitHub review found 15 expected changed files, 26 commits
+ahead and 0 behind the exact base, with no source path into production O2,
+C1/C2/C3, credentials, provider network access, paper execution, settlement,
+recovery, scheduler mutation, brokerage, or live effects. Paper Operation and
+Operations remain unavailable under ordinary GUI startup.
+
+GUI-A8 is source-certified and ready for PR review/integration. Do not merge
+without explicit operator approval. After integration, GUI-A9 read-only System
+Health / Audit is the next safe GUI candidate. D8-A remains a separate protected
+operational checkpoint and D8-B remains unauthorized.
+

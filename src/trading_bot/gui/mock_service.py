@@ -54,10 +54,22 @@ class MockGuiApplicationService:
                     ),
                 ),
                 ComponentStatus(
+                    key="paper-account",
+                    title="Paper Account",
+                    status=PresentationStatus.UNAVAILABLE,
+                    detail=(
+                        "No verified paper-account checkpoint is connected to "
+                        "this read-only GUI."
+                    ),
+                ),
+                ComponentStatus(
                     key="market-data",
                     title="Market Data",
                     status=PresentationStatus.UNAVAILABLE,
-                    detail="Production market-data capture is not connected.",
+                    detail=(
+                        "No verified market-data snapshot artifact is connected "
+                        "to this read-only GUI."
+                    ),
                 ),
                 ComponentStatus(
                     key="operations",

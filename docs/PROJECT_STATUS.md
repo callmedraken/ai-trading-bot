@@ -1128,3 +1128,122 @@ first attempt is after the normal 2026-09-22 D5 wake has completed, not merely
 after the wall-clock reaches September 21. The runbook does not authorize D8-B.
 D8-B effectful settlement remains protected and unauthorized.
 
+## GUI-A8 read-only multi-source composition — A8a ARCHITECTURE ACCEPTED
+
+Architecture 115 and its validation plan freeze the next GUI milestone while
+PD4 D8-A remains time/data gated.
+
+```text
+branch: feature/gui-a8-read-only-composition
+base develop: f90b0c77e19cb00cbe3813d6b811e9d2cf1b561a
+A8a architecture: docs/architecture/115-gui-read-only-multi-source-composition.md
+A8 validation: docs/validation/gui-a8-read-only-multi-source-composition.md
+```
+
+GUI-A8 will compose existing reviewed read-only adapters from explicit artifact
+inputs only. It adds no directory discovery, "latest" selection, production O2
+startup, C1/C2/C3 access, provider/credential/broker access, paper execution,
+settlement/recovery effect, scheduler mutation, or D5/D8/D9 operational change.
+
+Ordinary GUI startup will continue to keep Paper Operation and Operations
+unavailable unless a later separately reviewed composition supplies their
+required verified/production boundaries. A8 must not reconstruct
+`VerifiedPaperOperationExecutionInputs` from GUI arguments and must not invoke
+production operator observability under the normal desktop principal.
+
+A8b startup configuration and composite read-only service are accepted at:
+
+```text
+HEAD: f5a0545c147b5f56af125886c77c36a77cec48f4
+TREE: 6381588ff509e9962169338e11c5263a13f98d79
+focused regression: 102 passed
+Ruff check: PASS
+Ruff format --check: PASS
+git diff --check: PASS
+```
+
+The final A8b follow-up is formatting/import-order only; independent diff review
+confirmed no semantic source change. Normal startup remains read-only and keeps
+Paper Operation and production Operations unavailable.
+
+A8c real-adapter integration is accepted at:
+
+```text
+HEAD: d050538149879d01b1d6f2e251878800d8d49f75
+TREE: 3f26a8977c468da9c45ca55c36fc86b689ab3290
+A8c focused/affected regression: 102 passed
+complete GUI regression:         283 passed
+Ruff check:                      PASS
+Ruff format --check:             PASS after formatter-only follow-up
+git diff --check:                PASS
+```
+
+Independent diff review of the final A8c follow-up confirmed it only applied
+Ruff formatting to the new real-adapter integration test. The semantic A8c tree
+proved combined Research + verified Market Data + GENESIS Paper Account,
+successor-edge Paper Account, per-source failure isolation, no directory/latest
+discovery, and continued unavailable Paper/Operations startup behavior.
+
+A8d visual certification is accepted. The operator-visible checks covered
+default startup, combined Research + verified Market Data + GENESIS Paper
+Account, successor Paper Account, the 1180x760 default window, and the 920x620
+minimum window. A8d found and corrected two presentation defects before
+certification: the Overview omitted Paper Account / showed stale Market Data
+wording, and long SHA-256 values clipped at minimum width. The final visual
+candidate shows truthful configured/offline wording, the complete six-card
+Overview, full successor SHA-256 visibility, stable navigation, and no
+effect controls.
+
+GUI-A8 final source certification:
+
+```text
+certified source HEAD:  f8d90ffedd97594d32e179df845d494bba4df61c
+certified source TREE:  f5162c47716ed8cb01b519e45be09316bda39bc0
+base develop:           f90b0c77e19cb00cbe3813d6b811e9d2cf1b561a
+
+broad non-Architecture-77:  5,826 passed, 17 skipped
+Architecture-77 clean harness: 758 passed
+combined:                   6,584 passed, 17 skipped
+Ruff check:                 PASS
+Ruff format --check:        PASS (567 files)
+git diff --check:           PASS
+git diff --cached --check:  PASS
+feature worktree/index:     clean
+Architecture-77 worktree:   clean, exact certified HEAD/TREE
+visual gate:                PASS
+```
+
+Independent final GitHub review found the branch 26 commits ahead and 0 behind
+its exact base with 15 expected architecture/docs/GUI/test files. The executable
+changes are limited to explicit read-only startup composition, bounded overview
+presentation, startup argument wiring, and minimum-width digest presentation.
+No production O2/C1/C2/C3 acquisition, provider transport, Credential Manager,
+paper execution, settlement/recovery effect, scheduler mutation, brokerage, or
+live effect path was added.
+
+Final GUI-A8 acceptance:
+
+```text
+MULTI_SOURCE_READ_ONLY_COMPOSITION=True
+EXPLICIT_ARTIFACT_SELECTION_ONLY=True
+DIRECTORY_DISCOVERY=False
+LATEST_SELECTION=False
+PRODUCTION_O2_STARTUP=False
+C1_C2_C3_ACCESS=False
+CREDENTIAL_MANAGER_ACCESS=False
+PROVIDER_NETWORK_ACCESS=False
+PAPER_EXECUTION=False
+SETTLEMENT_EFFECT=False
+RECOVERY_EFFECT=False
+SCHEDULER_MUTATION=False
+BROKERAGE_ACCESS=False
+GUI_INTEGRATION=PASSED
+VISUAL_GATE=PASSED
+FULL_REGRESSION=PASSED
+```
+
+GUI-A8 source is certified and ready for PR review/integration. PR creation and
+merge remain explicit approval boundaries. The next safe GUI candidate after A8
+integration is GUI-A9 read-only System Health / Audit, while the next protected
+PD4 operational checkpoint remains the time/data-gated D8-A qualification.
+

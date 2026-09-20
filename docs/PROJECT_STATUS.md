@@ -32,7 +32,9 @@ personal-desktop branch/worktree:
 
 ```text
 repository: callmedraken/ai-trading-bot
-integration baseline: bd88ee966bff455f9fc897d6cfdfafdd807f27e2
+current develop integration: a18dd765523ddcc55b2a10d312e28410a92b81c7
+current develop tree:        d50cbcfcf800417fe2dc90b9be5957354809a2d9
+accepted PR #9 head:          2df0af89f53f12e4dd42975e36d56794dc1e3c95
 Architecture-94 P2 base: a810122a96b6fc90da25d71eede8da64b7272c98
 
 D5 deployed/warm-up branch:
@@ -476,7 +478,7 @@ naturally. Do not manually start it, backfill from the old offline seed, alter
 its source/scheduler contract, or turn a failed/ambiguous provider outcome into
 a blind retry.
 
-## Current milestone — PD4 D7-D source preparation
+## Historical milestone — PD4 D7-D source preparation
 
 D6-A through D6-D source certification is **ACCEPTED** under Architecture 113.
 
@@ -509,8 +511,8 @@ provisioning, capture, Paper-v2 mutation/recovery, scheduler, broker, or live
 effect. Its sanitized output is not reusable D7-C authority; D7-C must rederive
 production truth independently.
 
-D7-D independent Trading-principal post-publication reconciliation is the
-current source-only checkpoint. It must reconstruct the exact candidate from
+D7-D independent Trading-principal post-publication reconciliation was the
+then-current source-only checkpoint. It had to reconstruct the exact candidate from
 fresh current-C1, selected-C3 history, and Paper-v2 account authority; discover
 and reread the exact finalized decision through genuine same-process provenance;
 and prove the account predecessor remains unchanged under the PD2A mutex. D7-D
@@ -551,10 +553,13 @@ PD4   unattended simulated-paper source foundation          COMPLETE
   D5 capture-only warm-up                                   ACTIVE (2/6)
   D6-A through D6-D decision-publication source              ACCEPTED
   D7-A Trading read-only qualification source               ACCEPTED
-  D7-A production qualification                             WAITING FOR 6/6 READY
-  D7-C first pre-open decision publication                   PROTECTED / UNAUTHORIZED
-  D7-D independent post-publication reconciliation source    CURRENT CHECKPOINT
-  D8/D9 settlement through existing Paper-v2 authority      FUTURE / PROTECTED
+  D7-A production qualification                             COMPLETE
+  D7-C first pre-open decision publication                   COMPLETE
+  D7-D independent post-publication reconciliation source    COMPLETE
+  D7 integrated into develop                                COMPLETE
+  D8/D9 settlement source integration                       COMPLETE
+  D8-A Trading-principal qualification                       NEXT PROTECTED CHECKPOINT
+  D8-B effectful settlement                                 PROTECTED / UNAUTHORIZED
   unattended operational deployment                         NOT YET COMPLETE
 PD5   broker-paper integration                              NOT STARTED
 PD6   broker-paper soak / operational hardening             NOT STARTED
@@ -909,18 +914,17 @@ Branch inventory after integration:
 - the old unattended-scheduling-prerequisites branch is superseded by the later
   Architecture-77+ capture/authority lineage.
 
-Next milestone: forward-integrate current `develop` into a fresh D8/D9
-settlement lineage, exact-diff review the result, and replace settlement source
-certification before any D8 production effect.
+The follow-on D8/D9 forward integration and post-merge closeout are recorded
+below.
 
 
-## D8/D9 settlement source forward integration — REPLACEMENT-CERTIFIED
+## D8/D9 settlement source forward integration — REPLACEMENT-CERTIFIED PRE-MERGE
 
 The D8/D9 settlement source has now been forward-integrated onto the final D7
 source line and replacement-certified on
 `feature/d8-d9-settlement-forward-integration`. D7 remains integrated and
-closed. This source certification is not a merge into `develop` and authorizes
-no production or live effect.
+closed. This records the pre-merge source-only certification; it authorized no
+production or live effect.
 
 The replacement-certified candidate is:
 
@@ -965,5 +969,35 @@ Branch state and authority remain explicit:
 - D8-B effectful settlement remains unauthorized.
 - No production/live authorization is implied by source certification.
 
-The next protected operational checkpoint after source integration is a fresh
-read-only **D8-A Trading-principal qualification**.
+The post-certification integration step and its closeout are recorded below.
+
+
+## D8/D9 settlement integration — CLOSED
+
+PR #9 was accepted and merged into `develop` as the normal history-preserving
+integration of the accepted D8/D9 settlement source.
+
+```text
+merge/current integration commit: a18dd765523ddcc55b2a10d312e28410a92b81c7
+resulting tree:                   d50cbcfcf800417fe2dc90b9be5957354809a2d9
+accepted PR #9 head:              2df0af89f53f12e4dd42975e36d56794dc1e3c95
+```
+
+The GitHub post-merge comparison proved that `develop` is the normal
+history-preserving merge of PR head `2df0af89...`, with no resulting tree or
+file difference from that accepted head.
+
+D7 is integrated and closed. The replacement-certified executable source
+remains `da093791cf6d879f1b07d605665900c28b9a7e9d`, with certified source tree
+`1c9f6840eeae7feb5456892f9d8119eb45466af9`; the merge does not redefine that
+certified source identity.
+
+The historical `feature/pd4-unattended-settlement` branch remains reference /
+audit history and must not later be merged into `develop`.
+`feature/pd4-operator-observability` remains parked and must later be
+forward-integrated separately onto the accepted current `develop`.
+D8-B effectful settlement remains unauthorized. No production or live
+authorization is implied.
+
+The next protected operational checkpoint is a fresh read-only **D8-A
+Trading-principal qualification** from the current integrated source.

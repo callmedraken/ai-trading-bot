@@ -44,8 +44,10 @@ failures.
 Integration/product baselines:
 
 ```text
-integration develop baseline:
-bd88ee966bff455f9fc897d6cfdfafdd807f27e2
+current develop integration:
+a18dd765523ddcc55b2a10d312e28410a92b81c7
+tree: d50cbcfcf800417fe2dc90b9be5957354809a2d9
+accepted PR #9 head: 2df0af89f53f12e4dd42975e36d56794dc1e3c95
 
 Architecture-94 P2 product base:
 a810122a96b6fc90da25d71eede8da64b7272c98
@@ -568,7 +570,7 @@ D5 itself is **not complete** until the required six-session suffix becomes
 ready. Expected terminal handoff is `G6 = DECISION_READY`; even then D5 performs
 no publication or Paper-v2 settlement.
 
-## 12. Current development checkpoint — D7-D source preparation
+## 12. Historical D7-D source preparation checkpoint
 
 D6-A through D6-D source certification is **ACCEPTED** under Architecture 113.
 
@@ -601,8 +603,8 @@ provisioning, capture, Paper-v2 mutation/recovery, scheduler, broker, or live
 effect. Its sanitized output is not reusable D7-C authority; D7-C must rederive
 production truth independently.
 
-D7-D independent Trading-principal post-publication reconciliation is the
-current source-only checkpoint. It must rederive the exact expected decision
+D7-D independent Trading-principal post-publication reconciliation was the
+then-current source-only checkpoint. It had to rederive the exact expected decision
 from fresh current-C1, selected-C3 history, and Paper-v2 account authority,
 discover and reread the finalized decision through genuine same-process
 provenance, and prove the account predecessor remains unchanged under the PD2A
@@ -1031,13 +1033,13 @@ contracts, review exact diff, and perform replacement certification before any
 D8 production action.
 
 
-## D8/D9 settlement source forward integration — REPLACEMENT-CERTIFIED
+## D8/D9 settlement source forward integration — REPLACEMENT-CERTIFIED PRE-MERGE
 
 The D8/D9 settlement source has now been forward-integrated onto the final D7
 source line and replacement-certified on
 `feature/d8-d9-settlement-forward-integration`. D7 remains integrated and
-closed. This source certification is not a merge into `develop` and authorizes
-no production or live effect.
+closed. This records the pre-merge source-only certification; it authorized no
+production or live effect.
 
 Replacement-certified candidate:
 
@@ -1080,6 +1082,35 @@ forward-integrated separately only after settlement integration is accepted.
 D8-B effectful settlement remains unauthorized, and no production/live
 authorization is implied by source certification.
 
-Next protected checkpoint: after source integration, perform a fresh read-only
-**D8-A Trading-principal qualification** from the exact replacement-certified
-source identity above.
+The post-certification integration step and its closeout are recorded below.
+
+
+## D8/D9 settlement integration — CLOSED
+
+PR #9 was accepted and merged into `develop` as the normal history-preserving
+integration of the accepted D8/D9 settlement source.
+
+```text
+merge/current integration commit: a18dd765523ddcc55b2a10d312e28410a92b81c7
+resulting tree:                   d50cbcfcf800417fe2dc90b9be5957354809a2d9
+accepted PR #9 head:              2df0af89f53f12e4dd42975e36d56794dc1e3c95
+```
+
+The GitHub post-merge comparison proved that `develop` is the normal
+history-preserving merge of PR head `2df0af89...`, with no resulting tree or
+file difference from that accepted head.
+
+D7 is integrated and closed. The replacement-certified executable source
+remains `da093791cf6d879f1b07d605665900c28b9a7e9d`, with certified source tree
+`1c9f6840eeae7feb5456892f9d8119eb45466af9`; the merge does not redefine that
+certified source identity.
+
+The historical `feature/pd4-unattended-settlement` branch remains reference /
+audit history and must not later be merged into `develop`.
+`feature/pd4-operator-observability` remains parked and must later be
+forward-integrated separately onto the accepted current `develop`.
+D8-B effectful settlement remains unauthorized. No production or live
+authorization is implied.
+
+The next protected operational checkpoint is a fresh read-only **D8-A
+Trading-principal qualification** from the current integrated source.

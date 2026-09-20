@@ -1029,3 +1029,57 @@ Next: create a fresh D8/D9 forward-integration branch from current `develop`,
 bring forward only the accepted settlement source, resolve against the final D7
 contracts, review exact diff, and perform replacement certification before any
 D8 production action.
+
+
+## D8/D9 settlement source forward integration — REPLACEMENT-CERTIFIED
+
+The D8/D9 settlement source has now been forward-integrated onto the final D7
+source line and replacement-certified on
+`feature/d8-d9-settlement-forward-integration`. D7 remains integrated and
+closed. This source certification is not a merge into `develop` and authorizes
+no production or live effect.
+
+Replacement-certified candidate:
+
+```text
+candidate files:                       22
+certified source commit:               da093791cf6d879f1b07d605665900c28b9a7e9d
+certified source tree:                 1c9f6840eeae7feb5456892f9d8119eb45466af9
+parent/current-develop integration base:
+                                      252655f690165d74fe9d762810111a399c3ff073
+tracked candidate aggregate diff hash: 79e6317a28ab531df132d14dd4b8b1abd53fda81
+```
+
+Replacement certification passed:
+
+```text
+broad non-Architecture-77:          5,704 passed, 17 skipped
+Architecture-77:                       775 passed, 0 skipped
+total:                               6,479 passed, 17 skipped
+Ruff check:                          PASS
+Ruff format --check:                 PASS (548 files already formatted)
+git diff --check:                    PASS
+git diff --cached --check:           PASS
+frozen history seed length:          1060 bytes
+frozen history seed SHA-256:         40dda54c82324f358d640cce89e467295b8f5b73a32fed76c52e7ca90d398e64
+post-certification candidate snapshot comparison: PASS
+all 22 files:                        byte-for-byte unchanged through certification
+```
+
+The initial final no-change verification stopped because an additional
+hard-coded expected-hash table contained an incorrect expected value for
+`pd4_read_only_settlement_reconciliation.py`. The reported actual hash matched
+its pre-certification snapshot, and no repository mutation occurred. A
+follow-up frozen-candidate integrity verification proved all 22 files
+byte-for-byte unchanged, so no test rerun was required.
+
+The historical `feature/pd4-unattended-settlement` branch remains reference /
+audit history and must not subsequently be merged into `develop`.
+`feature/pd4-operator-observability` remains parked and must be
+forward-integrated separately only after settlement integration is accepted.
+D8-B effectful settlement remains unauthorized, and no production/live
+authorization is implied by source certification.
+
+Next protected checkpoint: after source integration, perform a fresh read-only
+**D8-A Trading-principal qualification** from the exact replacement-certified
+source identity above.

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import threading
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from enum import StrEnum
 from hashlib import sha256
@@ -32,6 +32,9 @@ from trading_bot.market_data import (
 from trading_bot.portfolio import MetadataEntry
 from trading_bot.runtime.manual_paper_selected_c3_snapshot import (
     SelectedC3SnapshotReadResult,
+)
+from trading_bot.runtime.manual_paper_strategy_plan import (
+    ManualPaperStrategyPlanArtifactBinding,
 )
 from trading_bot.runtime.paper_operation import PaperOperationStatus
 from trading_bot.runtime.personal_desktop_paper_account_authority import (
@@ -76,6 +79,7 @@ from .personal_desktop_unattended_paper_startup_qualification import (
     PersonalDesktopUnattendedPaperStartupStatus,
     is_safe_personal_desktop_unattended_invocation_storage_result,
     is_safe_prepared_paper_operation_inspection,
+    personal_desktop_unattended_paper_planning_inputs_from_verified_plan,
     personal_desktop_unattended_paper_startup_production_dependencies,
     personal_desktop_unattended_paper_startup_reconciliation_scope,
     revalidate_personal_desktop_unattended_paper_startup_state,
@@ -200,6 +204,34 @@ class PersonalDesktopUnattendedPaperOperationResult:
             )
         ):
             raise ValueError("successful unattended evidence is incomplete")
+        if (
+            self.status
+            is PersonalDesktopUnattendedPaperOperationStatus.RECEIPT_RECOVERY_REQUIRED
+            and (
+                any(
+                    value is None
+                    for value in (
+                        self.paper_account_id,
+                        self.application_id,
+                        self.predecessor_checkpoint_id,
+                        self.final_checkpoint_id,
+                    )
+                )
+                or any(
+                    value is not None
+                    for value in (
+                        self.selected_snapshot_id,
+                        self.invocation_id,
+                        self.operation_id,
+                        self.execution_classification,
+                        self.final_operation_classification,
+                    )
+                )
+                or self.invocation_published
+                or self.executor_called
+            )
+        ):
+            raise ValueError("unattended receipt-recovery evidence is incomplete")
 
 
 class _Publisher(Protocol):
@@ -294,6 +326,51 @@ def execute_personal_desktop_unattended_paper_operation(
         inputs,
         calendar,
         _production_execution_dependencies(),
+        _issuer=_PRODUCTION_EXECUTION_ISSUER,
+    )
+
+
+def execute_personal_desktop_unattended_paper_operation_from_verified_plan(
+    authority: ValidatedProductionAuthority,
+    selected_snapshot: SelectedC3SnapshotReadResult,
+    verified_plan: ManualPaperStrategyPlanArtifactBinding,
+    *,
+    historical_cycle_configuration_payloads: tuple[bytes, ...] = (),
+) -> PersonalDesktopUnattendedPaperOperationResult:
+    """Execute one exact completed plan through the existing PD4-D composition."""
+
+    calendar = BoundMarketCalendar(XNYS_CALENDAR_DESCRIPTOR, NYSEMarketCalendar())
+    inputs = personal_desktop_unattended_paper_planning_inputs_from_verified_plan(
+        selected_snapshot,
+        verified_plan,
+        historical_cycle_configuration_payloads,
+        calendar,
+    )
+    dependencies = _production_execution_dependencies()
+
+    def reconstruct_plan(
+        account: PersonalDesktopPaperAccountReadEvidence,
+        selected: SelectedC3SnapshotReadResult,
+        unused: PersonalDesktopUnattendedPaperPlanningInputs,
+        current_calendar: IdentifiedMarketCalendar,
+    ) -> PreparedPaperOperationMaterial:
+        del unused
+        return reconstruct_verified_paper_operation_from_plan(
+            account, selected, verified_plan, current_calendar
+        )
+
+    dependencies = replace(
+        dependencies,
+        qualification=replace(
+            dependencies.qualification, build_material=reconstruct_plan
+        ),
+    )
+    return _compose_personal_desktop_unattended_paper_operation(
+        authority,
+        selected_snapshot,
+        inputs,
+        calendar,
+        dependencies,
         _issuer=_PRODUCTION_EXECUTION_ISSUER,
     )
 
@@ -400,7 +477,7 @@ def _compose_personal_desktop_unattended_paper_operation(
                         None,
                         None,
                         None,
-                        None,
+                        public.recovery_missing_application_id,
                         public.recovery_predecessor_checkpoint_id,
                         public.terminal_checkpoint_id,
                         False,

@@ -197,7 +197,6 @@ def _operations(
     return OperatorOperationsPageState(
         OperatorOperationsPageStatus.AVAILABLE,
         "Bounded observability.",
-        selected_snapshot_id=_UUID5,
         gates=gates,
         account=account,
         strategy_preview=preview,
@@ -244,11 +243,13 @@ def test_loaded_verified_sources_copy_only_bounded_audit_identity() -> None:
         SystemComponentStatus.UNAVAILABLE,
     )
     rendered = "\n".join(
-        (
-            entry.source,
-            entry.evidence_kind,
-            entry.identifier,
-            entry.sha256 or "",
+        " | ".join(
+            (
+                entry.source,
+                entry.evidence_kind,
+                entry.identifier,
+                entry.sha256 or "",
+            )
         )
         for entry in state.audit_entries
     )

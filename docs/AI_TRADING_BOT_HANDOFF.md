@@ -1188,9 +1188,18 @@ Completion record:
 
 Operator observability is integrated and closed.
 
-A docs-only D8-A readiness checkpoint is prepared at
-`docs/validation/pd4-d8a-read-only-settlement-readiness.md`. The current
-post-PR-#10 source-inheritance audit found zero changes among the 22
+The docs-only D8-A readiness checkpoint at
+`docs/validation/pd4-d8a-read-only-settlement-readiness.md` was reviewed and
+merged through PR #11.
+
+```text
+accepted PR #11 head: 81200de26467f59e84cb732edaa944e4c262fd60
+merge commit:         e29ee911983044a89efe8e68fd0e45a8907b572e
+merge tree:           d6a1e3a81959e91ae63277c4f1a72db703cad45b
+PR-head -> merge:     no file differences
+```
+
+The current source-inheritance audit found zero changes among the 22
 replacement-certified D8/D9 settlement candidate files. The combined certified
 source `4c2a064e31d460dd3c7534fadad6c50204ffcd82` /
 `9d341fcfd6eb5493887012814c5943850d903744` remains the preferred exact

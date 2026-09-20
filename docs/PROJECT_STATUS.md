@@ -1102,12 +1102,21 @@ Completion record:
 Operator observability O1-O4 is integrated and closed. No further
 operator-observability source action is pending.
 
-While D8-A is waiting on its execution-session/data eligibility, a docs-only
-readiness checkpoint has been prepared at
-`docs/validation/pd4-d8a-read-only-settlement-readiness.md`. A GitHub
-inheritance audit proved that none of the 22 replacement-certified D8/D9
-settlement candidate files changed after settlement certification; the later
-source/test changes are confined to the separately certified
+While D8-A is waiting on its execution-session/data eligibility, the docs-only
+readiness checkpoint at
+`docs/validation/pd4-d8a-read-only-settlement-readiness.md` was reviewed and
+merged through PR #11.
+
+```text
+accepted PR #11 head: 81200de26467f59e84cb732edaa944e4c262fd60
+merge commit:         e29ee911983044a89efe8e68fd0e45a8907b572e
+merge tree:           d6a1e3a81959e91ae63277c4f1a72db703cad45b
+PR-head -> merge:     no file differences
+```
+
+A GitHub inheritance audit proved that none of the 22 replacement-certified
+D8/D9 settlement candidate files changed after settlement certification; the
+later source/test changes are confined to the separately certified
 operator-observability milestone.
 
 The next protected operational checkpoint remains one fresh read-only D8-A

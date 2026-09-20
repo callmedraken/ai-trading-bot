@@ -1199,7 +1199,9 @@ certification supersedes it.
 
 The next protected operational step remains one fresh read-only D8-A only after
 the source-owned calendar derives completed session `2026-09-21` and current
-selected-C3 evidence for that session exists. The earlier
-`NO_SETTLEMENT_PENDING` invocation remains historical only. D8-B remains
-protected and unauthorized.
+selected-C3 evidence for that session exists. The frozen timing policy uses the
+strict previous XNYS session and the accepted D5 task wakes at 01:30 Pacific
+daily, so the preferred first meaningful attempt is after the normal
+2026-09-22 D5 wake has completed. The earlier `NO_SETTLEMENT_PENDING`
+invocation remains historical only. D8-B remains protected and unauthorized.
 

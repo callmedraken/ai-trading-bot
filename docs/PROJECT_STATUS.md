@@ -1113,6 +1113,9 @@ operator-observability milestone.
 The next protected operational checkpoint remains one fresh read-only D8-A
 Trading-principal settlement qualification only after the source-owned calendar
 derives completed session `2026-09-21` and current-C1 selected C3 evidence for
-that session exists. The runbook does not authorize D8-B. D8-B effectful
-settlement remains protected and unauthorized.
+that session exists. Because the frozen timing policy uses the strict previous
+XNYS session and the accepted D5 trigger is 01:30 Pacific daily, the preferred
+first attempt is after the normal 2026-09-22 D5 wake has completed, not merely
+after the wall-clock reaches September 21. The runbook does not authorize D8-B.
+D8-B effectful settlement remains protected and unauthorized.
 

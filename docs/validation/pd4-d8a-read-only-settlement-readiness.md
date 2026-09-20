@@ -63,6 +63,20 @@ The earlier D8-A invocation that observed completed session `2026-09-18` and ret
 
 Do not invoke D8-A merely because the wall-clock date is September 21.
 
+Important frozen-timing detail: `completed_xnys_session_at(...)` uses the
+strict previous modeled XNYS session by New York exchange date. Therefore
+execution session `2026-09-21` is not the D8-A completed session while the
+exchange-local date is still September 21. The accepted D5 task trigger is
+01:30 Pacific daily. The preferred first meaningful D8-A attempt is therefore
+only after the normal **2026-09-22 01:30 Pacific D5 wake** has completed and
+read-only evidence shows selected C3 for `2026-09-21` exists.
+
+There is a deliberate interval after the exchange-local date advances to
+September 22 but before the normal D5 wake/capture completes in which D8-A can
+derive completed session `2026-09-21` yet still return `BLOCKED` because
+selected C3(E) is not available. Do not use that predictable early `BLOCKED`
+state as retry authority and do not manually start D5 to accelerate it.
+
 A real D8-A invocation is eligible only after all of the following are true:
 
 1. the source-owned XNYS calendar derives the current completed session as `2026-09-21`;
@@ -249,7 +263,11 @@ Architecture 114 explicitly places D10 after accepted first D8/D9 settlement. Th
 
 ## Next checkpoint
 
-When the runtime independently derives completed session `2026-09-21` and current selected C3 evidence for that session exists, perform one fresh protected D8-A Trading-principal read-only qualification from the exact accepted source identity.
+After the normal 2026-09-22 D5 wake has completed, and only when read-only
+evidence confirms that the runtime independently derives completed session
+`2026-09-21` and current selected C3 evidence for that session exists, perform
+one fresh protected D8-A Trading-principal read-only qualification from the
+exact accepted source identity.
 
 Then:
 

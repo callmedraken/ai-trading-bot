@@ -1253,7 +1253,25 @@ final worktree/index: clean before commit; formatter commit pushed normally
 The final A8b commit only organized one import block and applied Ruff formatting
 to two test files. It did not change runtime behavior.
 
-Next checkpoint: A8c combined real-adapter integration tests, then full GUI
-regression and visual certification. ChatGPT retains exact diff review and
-acceptance.
+A8c is accepted at source HEAD
+`d050538149879d01b1d6f2e251878800d8d49f75` / tree
+`3f26a8977c468da9c45ca55c36fc86b689ab3290`.
+
+Accepted evidence:
+
+```text
+focused A8c + affected adapter/startup regression: 102 passed
+complete tests/gui regression:                    283 passed
+Ruff check src/trading_bot/gui tests/gui:          PASS
+Ruff format --check:                               PASS after formatter-only follow-up
+git diff --check:                                  PASS
+```
+
+The final A8c commit only reformatted the new integration test; independent
+GitHub diff review found no semantic change.
+
+Next checkpoint: A8d visual certification at the existing 1180x760 default and
+920x620 minimum window sizes for default startup, combined Research + verified
+Market Data + GENESIS Paper Account, and successor Paper Account. After visual
+PASS, perform one final repository-wide source certification.
 

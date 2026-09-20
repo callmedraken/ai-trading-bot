@@ -1166,7 +1166,26 @@ The final A8b follow-up is formatting/import-order only; independent diff review
 confirmed no semantic source change. Normal startup remains read-only and keeps
 Paper Operation and production Operations unavailable.
 
-Next source checkpoint: A8c real-adapter integration for combined Research +
-Market Data + GENESIS/successor Paper Account configurations, followed by the
-full GUI regression and visual gate.
+A8c real-adapter integration is accepted at:
+
+```text
+HEAD: d050538149879d01b1d6f2e251878800d8d49f75
+TREE: 3f26a8977c468da9c45ca55c36fc86b689ab3290
+A8c focused/affected regression: 102 passed
+complete GUI regression:         283 passed
+Ruff check:                      PASS
+Ruff format --check:             PASS after formatter-only follow-up
+git diff --check:                PASS
+```
+
+Independent diff review of the final A8c follow-up confirmed it only applied
+Ruff formatting to the new real-adapter integration test. The semantic A8c tree
+proved combined Research + verified Market Data + GENESIS Paper Account,
+successor-edge Paper Account, per-source failure isolation, no directory/latest
+discovery, and continued unavailable Paper/Operations startup behavior.
+
+Next checkpoint: A8d visual certification of default, combined
+Research/Market-Data/GENESIS, and successor Paper Account startup at normal and
+minimum window sizes. After visual PASS, run the final repository-wide source
+certification once.
 

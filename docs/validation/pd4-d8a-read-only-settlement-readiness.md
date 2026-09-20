@@ -10,7 +10,7 @@ Integration closeout:
 PR:                  #11
 accepted PR head:    81200de26467f59e84cb732edaa944e4c262fd60
 merge commit:        e29ee911983044a89efe8e68fd0e45a8907b572e
-resulting merge tree:d6a1e3a81959e91ae63277c4f1a72db703cad45b
+resulting merge tree: d6a1e3a81959e91ae63277c4f1a72db703cad45b
 PR-head -> merge:    no file differences
 ```
 

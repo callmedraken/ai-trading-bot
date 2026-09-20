@@ -26,6 +26,8 @@ from trading_bot.gui.paper_account_page import PaperAccountPage
 from trading_bot.gui.paper_page import PaperPage
 from trading_bot.gui.research_page import ResearchPage
 from trading_bot.gui.services import GuiApplicationService
+from trading_bot.gui.system_health_adapter import build_system_health_state
+from trading_bot.gui.system_health_page import SystemHealthPage
 
 PAGE_IDS = (
     "home",
@@ -70,6 +72,14 @@ class MainWindow(QMainWindow):
         paper_account_state = service.get_paper_account_state()
         market_data_state = service.get_market_data_state()
         operations_state = service.get_operator_observability_state()
+        system_health_state = build_system_health_state(
+            self._overview,
+            research_state,
+            paper_state,
+            paper_account_state,
+            market_data_state,
+            operations_state,
+        )
         self._page_index = {page_id: index for index, page_id in enumerate(PAGE_IDS)}
 
         self.setWindowTitle("AI Trading Bot")
@@ -96,7 +106,8 @@ class MainWindow(QMainWindow):
         self._stack.addWidget(self._market_data_page)
         self._operations_page = OperatorOperationsPage(operations_state, self)
         self._stack.addWidget(self._operations_page)
-        self._stack.addWidget(self._build_system_page(self._overview))
+        self._system_health_page = SystemHealthPage(system_health_state, self)
+        self._stack.addWidget(self._system_health_page)
 
         layout.addWidget(self._navigation)
         layout.addWidget(self._stack, 1)
@@ -210,47 +221,6 @@ class MainWindow(QMainWindow):
         layout.addWidget(detail)
 
         return card
-
-    def _build_placeholder_page(self, title_text: str, body_text: str) -> QWidget:
-        page = QWidget(self)
-        layout = QVBoxLayout(page)
-        layout.setContentsMargins(36, 32, 36, 32)
-        layout.setSpacing(12)
-
-        title = QLabel(title_text, page)
-        title.setObjectName("pageTitle")
-        layout.addWidget(title)
-
-        body = QLabel(body_text, page)
-        body.setObjectName("summaryLabel")
-        body.setTextFormat(Qt.TextFormat.PlainText)
-        body.setWordWrap(True)
-        body.setAlignment(Qt.AlignmentFlag.AlignTop)
-        layout.addWidget(body)
-        layout.addStretch(1)
-        return page
-
-    def _build_system_page(self, overview: ApplicationOverview) -> QWidget:
-        page = self._build_placeholder_page(
-            "System",
-            (
-                "The GUI is a presentation layer only; it grants no production "
-                "authority."
-            ),
-        )
-        layout = page.layout()
-        if layout is None:
-            raise RuntimeError("system page layout is missing")
-
-        environment = QLabel(f"Environment: {overview.environment}", page)
-        environment.setObjectName("systemDetail")
-        environment.setTextFormat(Qt.TextFormat.PlainText)
-        mode = QLabel(f"Displayed mode: {_MODE_LABELS[overview.mode]}", page)
-        mode.setObjectName("systemDetail")
-        mode.setTextFormat(Qt.TextFormat.PlainText)
-        layout.insertWidget(2, environment)
-        layout.insertWidget(3, mode)
-        return page
 
     def _apply_style(self) -> None:
         self.setStyleSheet(
@@ -452,6 +422,55 @@ class MainWindow(QMainWindow):
                 background: #182235;
                 border: 1px solid #2a3950;
                 border-radius: 8px;
+            }
+            QLabel#systemHealthScope,
+            QLabel#systemHealthMessage,
+            QLabel#systemHealthContext,
+            QLabel#systemHealthComponentDetail,
+            QLabel#systemHealthEmptyAudit {
+                color: #aebbd0;
+            }
+            QLabel#systemHealthOverallStatus[status="ready"],
+            QLabel#systemHealthComponentStatus[status="available"] {
+                color: #86efac;
+                font-weight: 700;
+            }
+            QLabel#systemHealthOverallStatus[status="attention"],
+            QLabel#systemHealthComponentStatus[status="blocked"] {
+                color: #fca5a5;
+                font-weight: 700;
+            }
+            QLabel#systemHealthComponentStatus[status="unavailable"] {
+                color: #fbbf24;
+                font-weight: 700;
+            }
+            QLabel#systemHealthSectionTitle,
+            QLabel#systemHealthComponentTitle,
+            QLabel#systemHealthAuditTitle {
+                color: #f8fafc;
+                font-size: 16px;
+                font-weight: 700;
+            }
+            QLabel#systemHealthFieldLabel {
+                color: #94a3b8;
+                font-weight: 600;
+            }
+            QFrame#systemHealthComponentCard,
+            QFrame#systemHealthAuditCard {
+                background: #182235;
+                border: 1px solid #2a3950;
+                border-radius: 8px;
+            }
+            QLineEdit[readOnly="true"] {
+                background: #0b1220;
+                color: #e5e7eb;
+                border: 1px solid #334155;
+                border-radius: 6px;
+                padding: 5px 7px;
+            }
+            QScrollArea#systemHealthScroll {
+                background: transparent;
+                border: 0;
             }
             QLineEdit#researchFilter {
                 background: #0b1220;

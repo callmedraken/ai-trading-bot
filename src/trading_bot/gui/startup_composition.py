@@ -9,8 +9,13 @@ from trading_bot.gui.market_data_models import (
     MarketDataPageState,
     unavailable_market_data_state,
 )
-from trading_bot.gui.mock_service import MockGuiApplicationService
-from trading_bot.gui.models import ApplicationOverview, ResearchPageState
+from trading_bot.gui.models import (
+    ApplicationOverview,
+    ComponentStatus,
+    OperatingMode,
+    PresentationStatus,
+    ResearchPageState,
+)
 from trading_bot.gui.operator_observability_models import (
     OperatorOperationsPageState,
     unavailable_operator_operations_state,
@@ -132,7 +137,6 @@ class ReadOnlyGuiApplicationService:
         if type(config) is not GuiStartupConfiguration:
             raise TypeError("config must be exactly GuiStartupConfiguration")
         self._config = config
-        self._overview = MockGuiApplicationService().get_overview()
         self._research = (
             None
             if config.research_report is None
@@ -178,8 +182,86 @@ class ReadOnlyGuiApplicationService:
         return None
 
     def get_overview(self) -> ApplicationOverview:
-        """Return the existing bounded GUI overview."""
-        return self._overview
+        """Describe configured read-only sources without inspecting them."""
+        market_configured = self._config.market_data_snapshot is not None
+        paper_account_configured = (
+            self._config.paper_account_genesis is not None
+            or self._config.paper_account_successor is not None
+        )
+        return ApplicationOverview(
+            mode=OperatingMode.RESEARCH,
+            environment="Local read-only GUI",
+            summary=(
+                "Read-only GUI; explicitly selected local artifacts may be "
+                "inspected."
+            ),
+            components=(
+                ComponentStatus(
+                    key="research",
+                    title="Research",
+                    status=PresentationStatus.INFO,
+                    detail=(
+                        "Compact historical reports are presented read-only."
+                        if self._config.research_report is None
+                        else "An explicit local historical report is configured."
+                    ),
+                ),
+                ComponentStatus(
+                    key="paper",
+                    title="Paper Operation",
+                    status=PresentationStatus.INFO,
+                    detail=(
+                        "Paper Operation is read-only; execution controls are not "
+                        "connected."
+                    ),
+                ),
+                ComponentStatus(
+                    key="paper-account",
+                    title="Paper Account",
+                    status=(
+                        PresentationStatus.INFO
+                        if paper_account_configured
+                        else PresentationStatus.UNAVAILABLE
+                    ),
+                    detail=(
+                        "Explicit local paper-account artifacts are configured "
+                        "for offline verification."
+                        if paper_account_configured
+                        else "No verified paper-account checkpoint is connected."
+                    ),
+                ),
+                ComponentStatus(
+                    key="market-data",
+                    title="Market Data",
+                    status=(
+                        PresentationStatus.INFO
+                        if market_configured
+                        else PresentationStatus.UNAVAILABLE
+                    ),
+                    detail=(
+                        "An explicit local market-data snapshot is configured "
+                        "for offline verification."
+                        if market_configured
+                        else "No verified market-data snapshot artifact is connected."
+                    ),
+                ),
+                ComponentStatus(
+                    key="operations",
+                    title="Operations",
+                    status=PresentationStatus.UNAVAILABLE,
+                    detail=(
+                        "Production operator observability is not connected to "
+                        "this GUI service."
+                    ),
+                ),
+                ComponentStatus(
+                    key="system",
+                    title="System",
+                    status=PresentationStatus.INFO,
+                    detail="The GUI is read-only; no production authority is granted.",
+                ),
+            ),
+        )
 
     def get_research_state(self) -> ResearchPageState:
         """Return the configured research report or deterministic unavailable state."""

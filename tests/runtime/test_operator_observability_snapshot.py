@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+import gc
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from uuid import UUID
 
 import pytest
+from tests.runtime._selected_c3_history_lifetime import (
+    install_weak_selected_c3_history_reader,
+)
+from tests.runtime.test_personal_desktop_unattended_c3_history import _valid_chain
 
 import trading_bot.runtime.operator_observability_snapshot as snapshot_module
 from trading_bot.gui.operator_observability_models import (
@@ -12,6 +17,12 @@ from trading_bot.gui.operator_observability_models import (
     OperatorWarmupView,
 )
 from trading_bot.market_calendar import TradingSession
+from trading_bot.runtime import (
+    personal_desktop_unattended_c3_history as history_module,
+)
+from trading_bot.runtime import (
+    personal_desktop_unattended_daily_cycle as daily_cycle,
+)
 from trading_bot.runtime import (
     personal_desktop_unattended_paper_startup_qualification as startup_qualification,
 )
@@ -374,69 +385,99 @@ def test_production_window_read_requires_g6_snapshot_to_match_p2(
         snapshot_module._read_window_production(authority, cycle)
 
 
-def test_production_window_read_retains_reader_for_operation(
+def test_production_window_read_retains_selected_c3_provenance_binding(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    selected_history, current = _valid_chain()
+    selected = (*selected_history, current)
     authority = object()
-    cycle = _cycle(
-        PersonalDesktopUnattendedDailyCycleClassification.WARMING_UP,
-        selected=True,
+    config = snapshot_module.personal_desktop_unattended_strategy_config()
+    reader_refs, require_live_provenance = install_weak_selected_c3_history_reader(
+        monkeypatch,
+        authority=authority,
+        selected=selected,
+        current=current,
+        config=config,
     )
-    sentinel_window = object()
-    sentinel_config = object()
 
-    class _Audit:
-        snapshot_id = cycle.selected_snapshot_id
+    reader_type = daily_cycle.WindowsPersonalDesktopUnattendedSelectedC3ReadAuthority
 
-    class _Selected:
-        audit = _Audit()
+    def read_selected_snapshot_for_session(
+        _reader: object,
+        session: TradingSession,
+    ) -> object:
+        assert session == current.session
+        return current
 
-    class _Current:
-        selected = _Selected()
-
-    class _Reader:
-        def read_selected_snapshot_for_session(
-            self,
-            session: TradingSession,
-        ) -> object:
-            assert session == cycle.completed_session
-            return _Current()
-
-        def inspect_strategy_history_window(
-            self,
-            current: object,
-            config: object,
-        ) -> object:
-            assert type(current) is _Current
-            assert config is sentinel_config
-            return sentinel_window
-
-    retained: list[object] = []
+    monkeypatch.setattr(
+        reader_type,
+        "read_selected_snapshot_for_session",
+        read_selected_snapshot_for_session,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        snapshot_module,
+        "WindowsPersonalDesktopUnattendedSelectedC3ReadAuthority",
+        reader_type,
+    )
     monkeypatch.setattr(
         snapshot_module,
         "require_validated_production_authority",
         lambda value: value,
     )
+    bindings: list[object] = []
+    real_builder = snapshot_module.build_retained_selected_c3_strategy_history_binding
+
+    def build_retained_binding(*args: object) -> object:
+        binding = real_builder(*args)  # type: ignore[arg-type]
+        bindings.append(binding)
+        return binding
+
     monkeypatch.setattr(
         snapshot_module,
-        "WindowsPersonalDesktopUnattendedSelectedC3ReadAuthority",
-        lambda value: _Reader(),
-    )
-    monkeypatch.setattr(
-        snapshot_module,
-        "personal_desktop_unattended_strategy_config",
-        lambda: sentinel_config,
+        "build_retained_selected_c3_strategy_history_binding",
+        build_retained_binding,
     )
 
-    assert (
-        snapshot_module._read_window_production(
-            authority,
-            cycle,
-            retained_readers=retained,  # type: ignore[arg-type]
-        )
-        is sentinel_window
+    cycle = PersonalDesktopUnattendedDailyCycleResult(
+        classification=PersonalDesktopUnattendedDailyCycleClassification.WARMING_UP,
+        completed_session=current.session,
+        selected_snapshot_id=current.selected.audit.snapshot_id,
+        market_data_classification=_Capture.NO_NEW_COMPLETED_SESSION,
     )
-    assert len(retained) == 1
+    dependencies = snapshot_module._production_dependencies()
+    window = dependencies.read_window(authority, cycle)
+
+    assert window is not None
+    assert len(bindings) == 1
+    binding = bindings[0]
+    assert binding._provenance_lifetime is not None  # type: ignore[attr-defined]
+    assert (
+        history_module.require_selected_c3_strategy_history_binding(
+            binding,
+            authority,  # type: ignore[arg-type]
+        )
+        is binding
+    )
+    bindings.clear()
+    del binding
+    gc.collect()
+    assert reader_refs and reader_refs[0]() is not None
+    require_live_provenance(
+        current.selected.permit,
+        current.selected.audit,
+        authority,
+    )
+
+    del dependencies
+    gc.collect()
+    assert reader_refs[0]() is None
+    with pytest.raises(ValueError, match="provenance"):
+        require_live_provenance(
+            current.selected.permit,
+            current.selected.audit,
+            authority,
+        )
 
 
 def test_production_account_read_uses_resolved_historical_configurations(

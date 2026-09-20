@@ -27,8 +27,12 @@ from trading_bot.runtime.personal_desktop_paper_account_read_authority import (
     require_validated_personal_desktop_paper_account,
 )
 from trading_bot.runtime.personal_desktop_unattended_c3_history import (
+    SelectedC3StrategyHistoryBinding,
+    SelectedC3StrategyHistoryWindowClassification,
     SelectedC3StrategyHistoryWindowResult,
     WindowsPersonalDesktopUnattendedSelectedC3ReadAuthority,
+    build_retained_selected_c3_strategy_history_binding,
+    retain_selected_c3_snapshot_provenance_lifetime,
 )
 from trading_bot.runtime.personal_desktop_unattended_capture_warmup import (
     PersonalDesktopUnattendedCaptureWarmupGateState,
@@ -316,9 +320,8 @@ def _read_snapshot(
 
 
 def _production_dependencies() -> DisposableOperatorObservabilitySnapshotDependencies:
-    retained_selected_readers: list[
-        WindowsPersonalDesktopUnattendedSelectedC3ReadAuthority
-    ] = []
+    retained_history_bindings: list[SelectedC3StrategyHistoryBinding] = []
+    retained_partial_provenance: list[object] = []
 
     def read_window(
         authority: ValidatedProductionAuthority,
@@ -327,7 +330,8 @@ def _production_dependencies() -> DisposableOperatorObservabilitySnapshotDepende
         return _read_window_production(
             authority,
             cycle,
-            retained_readers=retained_selected_readers,
+            retained_bindings=retained_history_bindings,
+            retained_provenance=retained_partial_provenance,
         )
 
     return DisposableOperatorObservabilitySnapshotDependencies(
@@ -344,8 +348,8 @@ def _read_window_production(
     authority: ValidatedProductionAuthority,
     cycle: PersonalDesktopUnattendedDailyCycleResult,
     *,
-    retained_readers: list[WindowsPersonalDesktopUnattendedSelectedC3ReadAuthority]
-    | None = None,
+    retained_bindings: list[SelectedC3StrategyHistoryBinding] | None = None,
+    retained_provenance: list[object] | None = None,
 ) -> SelectedC3StrategyHistoryWindowResult | None:
     c1 = require_validated_production_authority(authority)
     if cycle.selected_snapshot_id is None:
@@ -355,17 +359,44 @@ def _read_window_production(
             "selected snapshot lacks completed session"
         )
     reader = WindowsPersonalDesktopUnattendedSelectedC3ReadAuthority(c1)
-    if retained_readers is not None:
-        retained_readers.append(reader)
     current = reader.read_selected_snapshot_for_session(cycle.completed_session)
     if current.selected.audit.snapshot_id != cycle.selected_snapshot_id:
         raise OperatorObservabilitySnapshotError(
             "G6 selected snapshot does not match P2"
         )
-    return reader.inspect_strategy_history_window(
-        current,
-        personal_desktop_unattended_strategy_config(),
-    )
+    config = personal_desktop_unattended_strategy_config()
+    window = reader.inspect_strategy_history_window(current, config)
+    if type(window) is not SelectedC3StrategyHistoryWindowResult:
+        raise OperatorObservabilitySnapshotError(
+            "selected-C3 history-window result is invalid"
+        )
+    if window.classification is SelectedC3StrategyHistoryWindowClassification.READY:
+        if (
+            len(window.selected) != config.long_window + 1
+            or window.selected[-1] != current
+        ):
+            raise OperatorObservabilitySnapshotError(
+                "selected-C3 history-window result is invalid"
+            )
+        binding = build_retained_selected_c3_strategy_history_binding(
+            c1,
+            window.selected[:-1],
+            current,
+            config,
+        )
+        if retained_bindings is not None:
+            retained_bindings.append(binding)
+    elif window.selected and retained_provenance is not None:
+        retained_provenance.append(
+            retain_selected_c3_snapshot_provenance_lifetime(
+                tuple(
+                    (item.selected.permit, item.selected.audit)
+                    for item in window.selected
+                ),
+                c1,
+            )
+        )
+    return window
 
 
 def _read_account_production(

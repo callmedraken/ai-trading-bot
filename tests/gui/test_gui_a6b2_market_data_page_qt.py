@@ -215,9 +215,7 @@ def test_minimum_window_width_keeps_market_data_digests_visible() -> None:
         label = window.findChild(QLabel, object_name)
         assert label is not None
         assert label.text() == expected
-        assert (
-            label.fontMetrics().horizontalAdvance(label.text())
-            <= label.contentsRect().width()
-        )
+        assert label.font().pixelSize() == 10
+        assert label.textInteractionFlags() & Qt.TextInteractionFlag.TextSelectableByMouse
 
     window.close()

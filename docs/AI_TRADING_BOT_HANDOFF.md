@@ -1186,9 +1186,22 @@ later D8-A checkpoint for the intended settlement session.
 Completion record:
 `docs/validation/pd4-operator-observability-o1-o4-source-certification.md`.
 
-Operator observability is integrated and closed. The next protected operational
-step remains fresh read-only D8-A only after the intended execution session is
-completed and current selected-C3 evidence for that session exists. The earlier
-`NO_SETTLEMENT_PENDING` invocation remains historical only. D8-B remains
-protected and unauthorized.
+Operator observability is integrated and closed.
+
+A docs-only D8-A readiness checkpoint is prepared at
+`docs/validation/pd4-d8a-read-only-settlement-readiness.md`. The current
+post-PR-#10 source-inheritance audit found zero changes among the 22
+replacement-certified D8/D9 settlement candidate files. The combined certified
+source `4c2a064e31d460dd3c7534fadad6c50204ffcd82` /
+`9d341fcfd6eb5493887012814c5943850d903744` remains the preferred exact
+source checkout for the first meaningful D8-A unless a later replacement
+certification supersedes it.
+
+The next protected operational step remains one fresh read-only D8-A only after
+the source-owned calendar derives completed session `2026-09-21` and current
+selected-C3 evidence for that session exists. The frozen timing policy uses the
+strict previous XNYS session and the accepted D5 task wakes at 01:30 Pacific
+daily, so the preferred first meaningful attempt is after the normal
+2026-09-22 D5 wake has completed. The earlier `NO_SETTLEMENT_PENDING`
+invocation remains historical only. D8-B remains protected and unauthorized.
 

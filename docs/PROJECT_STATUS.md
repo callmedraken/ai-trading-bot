@@ -1100,9 +1100,22 @@ Completion record:
 `docs/validation/pd4-operator-observability-o1-o4-source-certification.md`.
 
 Operator observability O1-O4 is integrated and closed. No further
-operator-observability source action is pending. The next protected operational
-checkpoint remains a fresh read-only D8-A Trading-principal settlement
-qualification only after the intended execution session is completed and the
-required selected-C3 evidence is current and available. D8-B effectful
-settlement remains protected and unauthorized.
+operator-observability source action is pending.
+
+While D8-A is waiting on its execution-session/data eligibility, a docs-only
+readiness checkpoint has been prepared at
+`docs/validation/pd4-d8a-read-only-settlement-readiness.md`. A GitHub
+inheritance audit proved that none of the 22 replacement-certified D8/D9
+settlement candidate files changed after settlement certification; the later
+source/test changes are confined to the separately certified
+operator-observability milestone.
+
+The next protected operational checkpoint remains one fresh read-only D8-A
+Trading-principal settlement qualification only after the source-owned calendar
+derives completed session `2026-09-21` and current-C1 selected C3 evidence for
+that session exists. Because the frozen timing policy uses the strict previous
+XNYS session and the accepted D5 trigger is 01:30 Pacific daily, the preferred
+first attempt is after the normal 2026-09-22 D5 wake has completed, not merely
+after the wall-clock reaches September 21. The runbook does not authorize D8-B.
+D8-B effectful settlement remains protected and unauthorized.
 

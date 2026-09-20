@@ -376,6 +376,28 @@ class OperatorOperationsPage(QWidget):
         readiness.setProperty("status", status)
         readiness.setWordWrap(True)
         layout.addWidget(readiness)
+        preview = state.strategy_preview
+        preview_message = _plain_label(
+            preview.message, panel, "operatorStrategyPreviewMessage"
+        )
+        preview_message.setWordWrap(True)
+        layout.addWidget(preview_message)
+        if preview.proposal_id is not None:
+            form = QFormLayout()
+            for title, value, name in (
+                (
+                    "Diagnostic proposal ID",
+                    str(preview.proposal_id),
+                    "operatorStrategyProposalId",
+                ),
+                ("Reason", preview.reason, "operatorStrategyReason"),
+                ("Side", preview.side, "operatorStrategySide"),
+                ("Quantity", str(preview.quantity), "operatorStrategyQuantity"),
+            ):
+                label = _plain_label(value, panel, name)
+                label.setWordWrap(True)
+                form.addRow(_plain_label(title, panel, "operatorFieldLabel"), label)
+            layout.addLayout(form)
         return panel
 
     def _selectable_value(

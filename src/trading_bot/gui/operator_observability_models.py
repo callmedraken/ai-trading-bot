@@ -297,6 +297,70 @@ class OperatorAccountSummaryView:
         object.__setattr__(self, "positions", positions)
 
 
+class OperatorStrategyPreviewStatus(Enum):
+    """Diagnostic availability; none of these values authorizes an action."""
+
+    UNAVAILABLE = "UNAVAILABLE"
+    BLOCKED = "BLOCKED"
+    NO_PROPOSAL = "NO_PROPOSAL"
+    PROPOSAL = "PROPOSAL"
+
+
+@dataclass(frozen=True, slots=True)
+class OperatorStrategyPreview:
+    """Bounded display values only; never retains a context or domain proposal."""
+
+    status: OperatorStrategyPreviewStatus = OperatorStrategyPreviewStatus.UNAVAILABLE
+    proposal_id: UUID | None = None
+    reason: str | None = None
+    side: str | None = None
+    quantity: Decimal | None = None
+
+    def __post_init__(self) -> None:
+        if type(self.status) is not OperatorStrategyPreviewStatus:
+            raise TypeError("preview status is invalid")
+        values = (self.proposal_id, self.reason, self.side, self.quantity)
+        if self.status is not OperatorStrategyPreviewStatus.PROPOSAL:
+            if any(value is not None for value in values):
+                raise ValueError("preview without a proposal cannot expose details")
+            return
+        if (
+            type(self.proposal_id) is not UUID
+            or type(self.reason) is not str
+            or not self.reason.strip()
+            or len(self.reason) > MAX_OPERATOR_MESSAGE_CHARACTERS
+            or any(
+                ord(character) < 32 or ord(character) == 127
+                for character in self.reason
+            )
+            or type(self.side) is not str
+            or self.side not in ("BUY", "SELL")
+            or not isinstance(self.quantity, Decimal)
+            or not self.quantity.is_finite()
+            or self.quantity <= 0
+            or len(str(self.quantity)) > MAX_OPERATOR_MESSAGE_CHARACTERS
+        ):
+            raise ValueError("preview proposal details are invalid")
+
+    @property
+    def message(self) -> str:
+        """Fixed messages cannot disclose exception text or authority internals."""
+        return {
+            OperatorStrategyPreviewStatus.UNAVAILABLE: (
+                "Strategy preview unavailable: no diagnostic input supplied."
+            ),
+            OperatorStrategyPreviewStatus.BLOCKED: (
+                "Strategy preview blocked: diagnostic evaluation unavailable."
+            ),
+            OperatorStrategyPreviewStatus.NO_PROPOSAL: (
+                "The current strategy returned no proposal for these diagnostic inputs."
+            ),
+            OperatorStrategyPreviewStatus.PROPOSAL: (
+                "Diagnostic strategy proposal only; no action is authorized."
+            ),
+        }[self.status]
+
+
 @dataclass(frozen=True, slots=True)
 class OperatorOperationsPageState:
     """Immutable state rendered by the native read-only Operations page."""
@@ -310,10 +374,13 @@ class OperatorOperationsPageState:
     warmup: OperatorWarmupView | None = None
     gates: OperatorEffectGateState | None = None
     account: OperatorAccountSummaryView | None = None
+    strategy_preview: OperatorStrategyPreview = OperatorStrategyPreview()
 
     def __post_init__(self) -> None:
         if type(self.status) is not OperatorOperationsPageStatus:
             raise TypeError("status must be an OperatorOperationsPageStatus")
+        if type(self.strategy_preview) is not OperatorStrategyPreview:
+            raise TypeError("strategy_preview must be an exact OperatorStrategyPreview")
         if (
             type(self.message) is not str
             or not self.message.strip()
@@ -343,6 +410,13 @@ class OperatorOperationsPageState:
 
         details = (self.warmup, self.gates, self.account)
         if self.status is OperatorOperationsPageStatus.UNAVAILABLE:
+            if (
+                self.strategy_preview.status
+                is not OperatorStrategyPreviewStatus.UNAVAILABLE
+            ):
+                raise ValueError(
+                    "unavailable Operations state cannot expose preview details"
+                )
             if any(value is not None for value in details) or any(
                 value is not None
                 for value in (

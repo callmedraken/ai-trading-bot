@@ -5,6 +5,7 @@
 import ast
 import inspect
 import os
+from dataclasses import replace
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from pathlib import Path
@@ -17,6 +18,11 @@ pytest.importorskip("PySide6")
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication, QLabel, QPushButton, QTableWidget
+from tests.strategies.test_moving_average import (
+    GOLDEN_PROPOSAL_ID,
+    GOLDEN_REASON,
+    make_context,
+)
 
 import trading_bot.gui.operator_observability_page as operations_page_module
 from trading_bot.gui import (
@@ -39,7 +45,13 @@ from trading_bot.gui import (
 )
 from trading_bot.gui.main_window import MainWindow
 from trading_bot.gui.mock_service import MockGuiApplicationService
+from trading_bot.gui.operator_observability_models import (
+    OperatorStrategyPreview,
+    OperatorStrategyPreviewStatus,
+)
 from trading_bot.gui.operator_observability_page import OperatorOperationsPage
+from trading_bot.gui.operator_strategy_preview import evaluate_operator_strategy_preview
+from trading_bot.strategies import MovingAverageCrossoverConfig
 
 _REQUIRED = (
     date(2026, 9, 11),
@@ -288,3 +300,44 @@ def test_operations_page_has_no_runtime_or_effect_control_dependency() -> None:
         if isinstance(node, ast.Call)
     }
     assert {"publish", "provision", "execute"}.isdisjoint(called_names)
+
+
+def test_preview_renders_current_golden_values_without_evaluation(monkeypatch) -> None:
+    _application()
+    preview = evaluate_operator_strategy_preview(
+        make_context(["10", "10", "9", "12"]),
+        MovingAverageCrossoverConfig(2, 3, Decimal("1.23456789")),
+    )
+    from trading_bot.strategies import MovingAverageCrossoverStrategy
+
+    def forbidden(*args):
+        raise AssertionError("rendering must not evaluate strategy")
+
+    monkeypatch.setattr(MovingAverageCrossoverStrategy, "evaluate", forbidden)
+    page = OperatorOperationsPage(replace(_state(), strategy_preview=preview))
+    for name, expected in (
+        ("operatorStrategyProposalId", str(GOLDEN_PROPOSAL_ID)),
+        ("operatorStrategyReason", GOLDEN_REASON),
+        ("operatorStrategySide", "BUY"),
+        ("operatorStrategyQuantity", "1.23456789"),
+    ):
+        label = page.findChild(QLabel, name)
+        assert label.text() == expected
+        assert label.textFormat() is Qt.TextFormat.PlainText
+    assert page.findChildren(QPushButton) == []
+
+
+@pytest.mark.parametrize(
+    "status",
+    [OperatorStrategyPreviewStatus.UNAVAILABLE, OperatorStrategyPreviewStatus.BLOCKED],
+)
+def test_preview_unavailable_and_blocked_have_only_sanitized_messages(status) -> None:
+    _application()
+    preview = OperatorStrategyPreview(status)
+    page = OperatorOperationsPage(replace(_state(), strategy_preview=preview))
+    assert (
+        page.findChild(QLabel, "operatorStrategyPreviewMessage").text()
+        == preview.message
+    )
+    assert page.findChild(QLabel, "operatorStrategyProposalId") is None
+    assert page.findChildren(QPushButton) == []

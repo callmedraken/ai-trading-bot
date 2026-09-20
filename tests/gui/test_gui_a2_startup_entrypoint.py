@@ -67,7 +67,9 @@ def test_gui_a2_startup_defaults_and_missing_path_are_bounded(tmp_path: Path) ->
 def test_gui_startup_never_invokes_production_operator_snapshot(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    import trading_bot.gui.operator_strategy_preview as preview_module
     import trading_bot.runtime.operator_observability_snapshot as snapshot_module
+    from trading_bot.strategies import MovingAverageCrossoverStrategy
 
     def _unexpected_production_call():
         raise AssertionError("GUI startup must not invoke production O2")
@@ -76,6 +78,14 @@ def test_gui_startup_never_invokes_production_operator_snapshot(
         snapshot_module,
         "read_personal_desktop_operator_observability_snapshot",
         _unexpected_production_call,
+    )
+    monkeypatch.setattr(
+        preview_module,
+        "evaluate_operator_strategy_preview",
+        _unexpected_production_call,
+    )
+    monkeypatch.setattr(
+        MovingAverageCrossoverStrategy, "evaluate", _unexpected_production_call
     )
     captured_states = []
 

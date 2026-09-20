@@ -120,6 +120,7 @@ def test_gui_startup_never_invokes_production_operator_snapshot(
     assert len(captured_states) == 1
     assert captured_states[0].status is OperatorOperationsPageStatus.UNAVAILABLE
 
+
 def test_gui_a8_parser_builds_explicit_read_only_configuration() -> None:
     config, qt_arguments = app._parse_startup_arguments(
         (

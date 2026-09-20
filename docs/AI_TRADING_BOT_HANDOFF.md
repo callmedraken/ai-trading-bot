@@ -1236,7 +1236,24 @@ reviewed boundary. Ordinary startup must not invoke production O2, C1/C2/C3,
 credentials, provider transport, settlement/recovery, Task Scheduler, brokerage,
 or live effects.
 
-Next checkpoint: A8b Qt-free startup configuration plus composite service and
-focused tests. Luna Extra High is the preferred bounded implementation route
-once the contract is frozen; ChatGPT retains exact diff review and acceptance.
+A8b is accepted at source HEAD
+`f5a0545c147b5f56af125886c77c36a77cec48f4` / tree
+`6381588ff509e9962169338e11c5263a13f98d79`.
+
+Accepted evidence:
+
+```text
+focused A8b + affected adapter/MainWindow regression: 102 passed
+Ruff check: PASS
+Ruff format --check: PASS
+git diff --check: PASS
+final worktree/index: clean before commit; formatter commit pushed normally
+```
+
+The final A8b commit only organized one import block and applied Ruff formatting
+to two test files. It did not change runtime behavior.
+
+Next checkpoint: A8c combined real-adapter integration tests, then full GUI
+regression and visual certification. ChatGPT retains exact diff review and
+acceptance.
 

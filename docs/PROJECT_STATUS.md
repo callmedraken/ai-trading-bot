@@ -1151,7 +1151,22 @@ required verified/production boundaries. A8 must not reconstruct
 `VerifiedPaperOperationExecutionInputs` from GUI arguments and must not invoke
 production operator observability under the normal desktop principal.
 
-Next source checkpoint: A8b startup configuration and composite read-only
-service, followed by explicit Market Data / Paper Account startup wiring and GUI
-regression/visual certification.
+A8b startup configuration and composite read-only service are accepted at:
+
+```text
+HEAD: f5a0545c147b5f56af125886c77c36a77cec48f4
+TREE: 6381588ff509e9962169338e11c5263a13f98d79
+focused regression: 102 passed
+Ruff check: PASS
+Ruff format --check: PASS
+git diff --check: PASS
+```
+
+The final A8b follow-up is formatting/import-order only; independent diff review
+confirmed no semantic source change. Normal startup remains read-only and keeps
+Paper Operation and production Operations unavailable.
+
+Next source checkpoint: A8c real-adapter integration for combined Research +
+Market Data + GENESIS/successor Paper Account configurations, followed by the
+full GUI regression and visual gate.
 

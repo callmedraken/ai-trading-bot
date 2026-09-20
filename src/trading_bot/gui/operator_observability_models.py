@@ -3,13 +3,30 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from enum import Enum
 from uuid import UUID
 
 OPERATOR_WARMUP_TARGET_COUNT = 6
 MAX_OPERATOR_SYMBOL_CHARACTERS = 10
+
+
+def _require_operator_symbol(symbol: str) -> None:
+    if type(symbol) is not str:
+        raise TypeError("symbol must be an exact string")
+    if (
+        not symbol
+        or symbol != symbol.strip()
+        or len(symbol) > MAX_OPERATOR_SYMBOL_CHARACTERS
+        or any(
+            not (
+                "A" <= character <= "Z" or "0" <= character <= "9" or character in ".-"
+            )
+            for character in symbol
+        )
+    ):
+        raise ValueError("symbol must be canonical presentation text")
 
 
 class OperatorWarmupClassification(Enum):
@@ -34,22 +51,7 @@ class SelectedC3WarmupSessionView:
     def __post_init__(self) -> None:
         if type(self.session_date) is not date:
             raise TypeError("session_date must be an exact date")
-        if type(self.symbol) is not str:
-            raise TypeError("symbol must be an exact string")
-        if (
-            not self.symbol
-            or self.symbol != self.symbol.strip()
-            or len(self.symbol) > MAX_OPERATOR_SYMBOL_CHARACTERS
-            or any(
-                not (
-                    "A" <= character <= "Z"
-                    or "0" <= character <= "9"
-                    or character in ".-"
-                )
-                for character in self.symbol
-            )
-        ):
-            raise ValueError("symbol must be canonical presentation text")
+        _require_operator_symbol(self.symbol)
         if (
             type(self.close) is not Decimal
             or not self.close.is_finite()
@@ -210,3 +212,176 @@ class OperatorObservabilityState:
             raise TypeError("warmup must be an OperatorWarmupView")
         if type(self.gates) is not OperatorEffectGateState:
             raise TypeError("gates must be an OperatorEffectGateState")
+
+
+MAX_OPERATOR_MESSAGE_CHARACTERS = 1000
+MAX_OPERATOR_ACCOUNT_ID_CHARACTERS = 128
+MAX_OPERATOR_CLASSIFICATION_CHARACTERS = 64
+MAX_OPERATOR_POSITIONS = 128
+
+
+class OperatorOperationsPageStatus(Enum):
+    """Availability of one bounded Operations-page snapshot."""
+
+    UNAVAILABLE = "unavailable"
+    AVAILABLE = "available"
+
+
+@dataclass(frozen=True, slots=True)
+class OperatorAccountPositionView:
+    """Bounded current Paper-v2 position facts for Operations presentation."""
+
+    symbol: str
+    quantity: Decimal
+    total_cost_basis: Decimal
+    average_cost: Decimal
+
+    def __post_init__(self) -> None:
+        _require_operator_symbol(self.symbol)
+        for name in ("quantity", "total_cost_basis", "average_cost"):
+            value = getattr(self, name)
+            if type(value) is not Decimal or not value.is_finite() or value <= 0:
+                raise ValueError(f"{name} must be a positive finite Decimal")
+
+
+@dataclass(frozen=True, slots=True)
+class OperatorAccountSummaryView:
+    """Bounded current Paper-v2 account summary for operator display."""
+
+    paper_account_id: str
+    checkpoint_id: UUID
+    sequence: int
+    as_of: datetime
+    cash: Decimal
+    realized_profit_loss: Decimal
+    positions: tuple[OperatorAccountPositionView, ...]
+    lineage_edge_count: int
+    receipt_count: int
+
+    def __post_init__(self) -> None:
+        if (
+            type(self.paper_account_id) is not str
+            or not self.paper_account_id
+            or self.paper_account_id != self.paper_account_id.strip()
+            or len(self.paper_account_id) > MAX_OPERATOR_ACCOUNT_ID_CHARACTERS
+        ):
+            raise ValueError("paper_account_id is invalid")
+        if type(self.checkpoint_id) is not UUID:
+            raise TypeError("checkpoint_id must be a UUID")
+        if type(self.sequence) is not int or self.sequence < 0:
+            raise ValueError("sequence must be a nonnegative int")
+        if (
+            type(self.as_of) is not datetime
+            or self.as_of.tzinfo is None
+            or self.as_of.utcoffset() is None
+        ):
+            raise ValueError("as_of must be timezone-aware")
+        if type(self.cash) is not Decimal or not self.cash.is_finite() or self.cash < 0:
+            raise ValueError("cash must be a nonnegative finite Decimal")
+        if (
+            type(self.realized_profit_loss) is not Decimal
+            or not self.realized_profit_loss.is_finite()
+        ):
+            raise ValueError("realized_profit_loss must be a finite Decimal")
+        positions = tuple(self.positions)
+        if len(positions) > MAX_OPERATOR_POSITIONS or any(
+            type(item) is not OperatorAccountPositionView for item in positions
+        ):
+            raise ValueError("positions are invalid")
+        if len({item.symbol for item in positions}) != len(positions):
+            raise ValueError("position symbols must be unique")
+        for name in ("lineage_edge_count", "receipt_count"):
+            value = getattr(self, name)
+            if type(value) is not int or value < 0:
+                raise ValueError(f"{name} must be a nonnegative int")
+        object.__setattr__(self, "positions", positions)
+
+
+@dataclass(frozen=True, slots=True)
+class OperatorOperationsPageState:
+    """Immutable state rendered by the native read-only Operations page."""
+
+    status: OperatorOperationsPageStatus
+    message: str
+    cycle_classification: str | None = None
+    completed_session: date | None = None
+    market_data_classification: str | None = None
+    selected_snapshot_id: UUID | None = None
+    warmup: OperatorWarmupView | None = None
+    gates: OperatorEffectGateState | None = None
+    account: OperatorAccountSummaryView | None = None
+
+    def __post_init__(self) -> None:
+        if type(self.status) is not OperatorOperationsPageStatus:
+            raise TypeError("status must be an OperatorOperationsPageStatus")
+        if (
+            type(self.message) is not str
+            or not self.message.strip()
+            or len(self.message) > MAX_OPERATOR_MESSAGE_CHARACTERS
+        ):
+            raise ValueError("message is invalid")
+
+        for name in ("cycle_classification", "market_data_classification"):
+            value = getattr(self, name)
+            if value is not None and (
+                type(value) is not str
+                or not value
+                or value != value.strip()
+                or len(value) > MAX_OPERATOR_CLASSIFICATION_CHARACTERS
+            ):
+                raise ValueError(f"{name} is invalid")
+        if (
+            self.completed_session is not None
+            and type(self.completed_session) is not date
+        ):
+            raise TypeError("completed_session must be an exact date or None")
+        if (
+            self.selected_snapshot_id is not None
+            and type(self.selected_snapshot_id) is not UUID
+        ):
+            raise TypeError("selected_snapshot_id must be a UUID or None")
+
+        details = (self.warmup, self.gates, self.account)
+        if self.status is OperatorOperationsPageStatus.UNAVAILABLE:
+            if any(value is not None for value in details) or any(
+                value is not None
+                for value in (
+                    self.cycle_classification,
+                    self.completed_session,
+                    self.market_data_classification,
+                    self.selected_snapshot_id,
+                )
+            ):
+                raise ValueError("unavailable Operations state cannot expose details")
+            return
+
+        if (
+            type(self.gates) is not OperatorEffectGateState
+            or type(self.account) is not OperatorAccountSummaryView
+        ):
+            raise ValueError("available Operations state requires gates and account")
+        if (self.warmup is None) != (self.selected_snapshot_id is None):
+            raise ValueError(
+                "warmup and selected_snapshot_id must appear together or be absent"
+            )
+        if self.warmup is not None and type(self.warmup) is not OperatorWarmupView:
+            raise TypeError("warmup must be an OperatorWarmupView or None")
+
+    @property
+    def strategy_ready(self) -> bool:
+        """Return whether the displayed selected-C3 window is strategy-ready."""
+        return (
+            self.warmup is not None
+            and self.warmup.classification is OperatorWarmupClassification.READY
+        )
+
+
+def unavailable_operator_operations_state() -> OperatorOperationsPageState:
+    """Return the deterministic safe default for an unconnected Operations page."""
+
+    return OperatorOperationsPageState(
+        status=OperatorOperationsPageStatus.UNAVAILABLE,
+        message=(
+            "Production operator observability is not connected to this GUI service."
+        ),
+    )

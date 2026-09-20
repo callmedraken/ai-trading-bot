@@ -1,5 +1,5 @@
 from dataclasses import FrozenInstanceError
-from datetime import date
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from uuid import UUID
 
@@ -7,11 +7,15 @@ import pytest
 
 from trading_bot.gui.operator_observability_models import (
     OPERATOR_WARMUP_TARGET_COUNT,
+    OperatorAccountSummaryView,
     OperatorEffectGateState,
     OperatorObservabilityState,
+    OperatorOperationsPageState,
+    OperatorOperationsPageStatus,
     OperatorWarmupClassification,
     OperatorWarmupView,
     SelectedC3WarmupSessionView,
+    unavailable_operator_operations_state,
 )
 
 
@@ -177,3 +181,68 @@ def test_operator_observability_state_is_frozen() -> None:
 
     with pytest.raises(FrozenInstanceError):
         state.gates = _closed_gates()  # type: ignore[misc]
+
+
+def _account() -> OperatorAccountSummaryView:
+    return OperatorAccountSummaryView(
+        paper_account_id="paper-account",
+        checkpoint_id=UUID(int=500),
+        sequence=1,
+        as_of=datetime(2026, 8, 31, 13, 30, tzinfo=UTC),
+        cash=Decimal("25000"),
+        realized_profit_loss=Decimal("0"),
+        positions=(),
+        lineage_edge_count=1,
+        receipt_count=1,
+    )
+
+
+def test_operations_available_state_reports_strategy_readiness() -> None:
+    selected = tuple(
+        SelectedC3WarmupSessionView(
+            session_date=session,
+            symbol="SPY",
+            close=Decimal("700") + Decimal(index),
+            snapshot_id=UUID(int=600 + index),
+            selection_id=UUID(int=700 + index),
+        )
+        for index, session in enumerate(_required(), start=1)
+    )
+    warmup = OperatorWarmupView(
+        classification=OperatorWarmupClassification.READY,
+        required_sessions=_required(),
+        selected_sessions=selected,
+    )
+    state = OperatorOperationsPageState(
+        status=OperatorOperationsPageStatus.AVAILABLE,
+        message="Read-only.",
+        cycle_classification="BLOCKED",
+        completed_session=date(2026, 9, 15),
+        market_data_classification="NO_NEW_COMPLETED_SESSION",
+        selected_snapshot_id=UUID(int=606),
+        warmup=warmup,
+        gates=_closed_gates(),
+        account=_account(),
+    )
+
+    assert state.strategy_ready is True
+    assert state.account is not None and state.account.cash == Decimal("25000")
+
+
+def test_unavailable_operations_state_exposes_no_runtime_details() -> None:
+    state = unavailable_operator_operations_state()
+
+    assert state.status is OperatorOperationsPageStatus.UNAVAILABLE
+    assert state.warmup is None
+    assert state.gates is None
+    assert state.account is None
+    assert state.strategy_ready is False
+
+
+def test_unavailable_operations_state_rejects_attached_authority_details() -> None:
+    with pytest.raises(ValueError, match="cannot expose details"):
+        OperatorOperationsPageState(
+            status=OperatorOperationsPageStatus.UNAVAILABLE,
+            message="Unavailable.",
+            gates=_closed_gates(),
+        )

@@ -16,6 +16,7 @@ from trading_bot.gui import (
     CompactReportResearchService,
     MarketDataPageState,
     unavailable_market_data_state,
+    unavailable_operator_operations_state,
 )
 from trading_bot.gui.main_window import MainWindow
 from trading_bot.gui.mock_service import MockGuiApplicationService
@@ -57,6 +58,9 @@ class _GuiA2RecordingService:
 
     def get_paper_account_state(self) -> PaperAccountPageState:
         return unavailable_paper_account_state()
+
+    def get_operator_observability_state(self):
+        return unavailable_operator_operations_state()
 
 
 def _application() -> QApplication:

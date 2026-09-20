@@ -135,11 +135,7 @@ def _paper_component(state: PaperPageState) -> SystemComponentHealthView:
     return SystemComponentHealthView(
         "paper",
         "Paper Operation",
-        (
-            SystemComponentStatus.BLOCKED
-            if blocked
-            else SystemComponentStatus.AVAILABLE
-        ),
+        SystemComponentStatus.BLOCKED if blocked else SystemComponentStatus.AVAILABLE,
         (
             f"Inspection classification: {inspection.classification.value}; "
             f"diagnostic: {inspection.diagnostic.value}."
@@ -209,11 +205,7 @@ def _operations_component(
     return SystemComponentHealthView(
         "operations",
         "Operations",
-        (
-            SystemComponentStatus.BLOCKED
-            if blocked
-            else SystemComponentStatus.AVAILABLE
-        ),
+        SystemComponentStatus.BLOCKED if blocked else SystemComponentStatus.AVAILABLE,
         (
             "Displayed production observability contains an open effect gate or "
             "blocked strategy preview."

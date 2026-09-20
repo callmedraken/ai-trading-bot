@@ -131,3 +131,21 @@ def test_main_window_real_report_operator_text_does_not_claim_mock_shell() -> No
     assert any("read-only" in text.casefold() for text in texts)
     assert any("no production authority" in text.casefold() for text in texts)
     window.close()
+
+def test_system_page_uses_already_acquired_state_without_service_reread() -> None:
+    application = _application()
+    service = _RecordingService()
+    window = MainWindow(service)
+
+    assert application.applicationName() is not None
+    assert service.calls == 6
+
+    window.select_page("system")
+
+    assert service.calls == 6
+    texts = [label.text() for label in window.findChildren(QLabel)]
+    assert "System Health & Audit" in texts
+    assert any("does not establish production readiness" in text for text in texts)
+
+    window.close()
+

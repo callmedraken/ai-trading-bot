@@ -399,7 +399,7 @@ class MainWindow(QMainWindow):
             QLabel#paperAccountArtifactSha256,
             QLabel#marketDataArtifactSha256,
             QLabel#marketDataSourcePayloadSha256 {
-                font-size: 11px;
+                font-size: 10px;
             }
             QLabel#operatorOperationsStatus[status="verified"],
             QLabel#operatorGateSummary[status="verified"],

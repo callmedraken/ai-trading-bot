@@ -21,12 +21,21 @@ from trading_bot.gui.models import (
     OperatingMode,
     PresentationStatus,
 )
+from trading_bot.gui.operator_observability_page import OperatorOperationsPage
 from trading_bot.gui.paper_account_page import PaperAccountPage
 from trading_bot.gui.paper_page import PaperPage
 from trading_bot.gui.research_page import ResearchPage
 from trading_bot.gui.services import GuiApplicationService
 
-PAGE_IDS = ("home", "research", "paper", "paper-account", "market-data", "system")
+PAGE_IDS = (
+    "home",
+    "research",
+    "paper",
+    "paper-account",
+    "market-data",
+    "operations",
+    "system",
+)
 
 _MODE_LABELS = {
     OperatingMode.RESEARCH: "Research",
@@ -60,6 +69,7 @@ class MainWindow(QMainWindow):
         paper_state = service.get_paper_state()
         paper_account_state = service.get_paper_account_state()
         market_data_state = service.get_market_data_state()
+        operations_state = service.get_operator_observability_state()
         self._page_index = {page_id: index for index, page_id in enumerate(PAGE_IDS)}
 
         self.setWindowTitle("AI Trading Bot")
@@ -84,6 +94,8 @@ class MainWindow(QMainWindow):
         self._stack.addWidget(self._paper_account_page)
         self._market_data_page = MarketDataPage(market_data_state, self)
         self._stack.addWidget(self._market_data_page)
+        self._operations_page = OperatorOperationsPage(operations_state, self)
+        self._stack.addWidget(self._operations_page)
         self._stack.addWidget(self._build_system_page(self._overview))
 
         layout.addWidget(self._navigation)
@@ -125,6 +137,7 @@ class MainWindow(QMainWindow):
             "paper": "Paper",
             "paper-account": "Paper Account",
             "market-data": "Market Data",
+            "operations": "Operations",
             "system": "System",
         }
         for page_id in PAGE_IDS:
@@ -382,6 +395,53 @@ class MainWindow(QMainWindow):
             QLabel#marketDataSourcePayloadByteLength,
             QLabel#marketDataSourcePayloadMediaType {
                 color: #e5e7eb;
+            }
+            QLabel#operatorOperationsStatus[status="verified"],
+            QLabel#operatorGateSummary[status="verified"],
+            QLabel#operatorStrategyReadiness[status="ready"] {
+                color: #86efac;
+                font-weight: 700;
+            }
+            QLabel#operatorOperationsStatus[status="unavailable"],
+            QLabel#operatorStrategyReadiness[status="unavailable"] {
+                color: #fbbf24;
+                font-weight: 700;
+            }
+            QLabel#operatorGateSummary[status="blocked"],
+            QLabel#operatorStrategyReadiness[status="blocked"] {
+                color: #fca5a5;
+                font-weight: 700;
+            }
+            QLabel#operatorOperationsMessage, QLabel#operatorWarmupMissing {
+                color: #aebbd0;
+            }
+            QLabel#operatorSectionTitle {
+                font-size: 16px;
+                font-weight: 700;
+                color: #f8fafc;
+            }
+            QLabel#operatorFieldLabel {
+                color: #94a3b8;
+                font-weight: 600;
+            }
+            QFrame#operatorOperationsSummaryPanel,
+            QFrame#operatorWarmupPanel,
+            QFrame#operatorGatePanel,
+            QFrame#operatorAccountPanel,
+            QFrame#operatorStrategyPanel {
+                background: #182235;
+                border: 1px solid #2a3950;
+                border-radius: 8px;
+            }
+            QTableWidget#operatorSelectedC3Table,
+            QTableWidget#operatorEffectGateTable {
+                background: #111827;
+                alternate-background-color: #162033;
+                color: #e5e7eb;
+                gridline-color: #2a3950;
+                border: 1px solid #2a3950;
+                selection-background-color: #25344a;
+                selection-color: #f9fafb;
             }
             QFrame#marketDataDetailPanel {
                 background: #182235;

@@ -5,6 +5,7 @@ from typing import Protocol
 
 from trading_bot.gui.market_data_models import MarketDataPageState
 from trading_bot.gui.models import ApplicationOverview, ResearchPageState
+from trading_bot.gui.operator_observability_models import OperatorOperationsPageState
 from trading_bot.gui.paper_account_models import PaperAccountPageState
 from trading_bot.gui.paper_models import PaperPageState
 
@@ -38,4 +39,8 @@ class GuiApplicationService(ResearchReportLoader, Protocol):
 
     def get_paper_account_state(self) -> PaperAccountPageState:
         """Return bounded read-only verified paper-account presentation state."""
+        ...
+
+    def get_operator_observability_state(self) -> OperatorOperationsPageState:
+        """Return bounded read-only operator-observability presentation state."""
         ...

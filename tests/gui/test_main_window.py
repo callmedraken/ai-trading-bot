@@ -18,6 +18,7 @@ from trading_bot.gui import (
     PaperPageState,
     ResearchPageState,
     unavailable_market_data_state,
+    unavailable_operator_operations_state,
     unavailable_paper_account_state,
     unavailable_paper_state,
 )
@@ -61,6 +62,10 @@ class _RecordingService:
         self.calls += 1
         return unavailable_paper_account_state()
 
+    def get_operator_observability_state(self):
+        self.calls += 1
+        return unavailable_operator_operations_state()
+
 
 def _application() -> QApplication:
     existing = QApplication.instance()
@@ -77,7 +82,7 @@ def test_main_window_has_stable_pages_and_navigation_is_presentation_only() -> N
     assert application.applicationName() is not None
     assert window.page_ids == PAGE_IDS
     assert window.current_page_id == "home"
-    assert service.calls == 5
+    assert service.calls == 6
 
     window.select_page("paper")
     assert window.current_page_id == "paper"
@@ -86,7 +91,7 @@ def test_main_window_has_stable_pages_and_navigation_is_presentation_only() -> N
     window.select_page("paper")
 
     assert window.current_page_id == "paper"
-    assert service.calls == 5
+    assert service.calls == 6
     window.close()
 
 

@@ -13,6 +13,10 @@ from trading_bot.gui.models import (
     PresentationStatus,
     ResearchPageState,
 )
+from trading_bot.gui.operator_observability_models import (
+    OperatorOperationsPageState,
+    unavailable_operator_operations_state,
+)
 from trading_bot.gui.paper_account_models import (
     PaperAccountPageState,
     unavailable_paper_account_state,
@@ -56,6 +60,15 @@ class MockGuiApplicationService:
                     detail="Production market-data capture is not connected.",
                 ),
                 ComponentStatus(
+                    key="operations",
+                    title="Operations",
+                    status=PresentationStatus.UNAVAILABLE,
+                    detail=(
+                        "Production operator observability is not connected to "
+                        "this GUI service."
+                    ),
+                ),
+                ComponentStatus(
                     key="system",
                     title="System",
                     status=PresentationStatus.INFO,
@@ -79,6 +92,10 @@ class MockGuiApplicationService:
     def get_paper_account_state(self) -> PaperAccountPageState:
         """Return the deterministic unavailable paper-account state."""
         return unavailable_paper_account_state()
+
+    def get_operator_observability_state(self) -> OperatorOperationsPageState:
+        """Return the deterministic unavailable Operations state."""
+        return unavailable_operator_operations_state()
 
     def load_research_report(self, artifact_path: Path) -> ResearchPageState:
         """Load one operator-selected report through the application boundary."""
@@ -111,6 +128,10 @@ class ResearchReportGuiApplicationService:
     def get_paper_account_state(self) -> PaperAccountPageState:
         """Return the deterministic unavailable paper-account state."""
         return self._overview_service.get_paper_account_state()
+
+    def get_operator_observability_state(self) -> OperatorOperationsPageState:
+        """Return the deterministic unavailable Operations state."""
+        return unavailable_operator_operations_state()
 
     def load_research_report(self, artifact_path: Path) -> ResearchPageState:
         """Load one operator-selected report through the application boundary."""

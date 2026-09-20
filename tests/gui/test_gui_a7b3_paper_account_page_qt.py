@@ -36,6 +36,7 @@ from trading_bot.gui import (
     ResearchPageState,
     VerifiedPaperAccountView,
     unavailable_market_data_state,
+    unavailable_operator_operations_state,
     unavailable_paper_account_state,
 )
 from trading_bot.gui.main_window import MainWindow
@@ -321,6 +322,9 @@ class _RecordingService:
     def get_market_data_state(self) -> MarketDataPageState:
         return unavailable_market_data_state()
 
+    def get_operator_observability_state(self):
+        return unavailable_operator_operations_state()
+
     def load_research_report(self, artifact_path: Path) -> ResearchPageState:
         return MockGuiApplicationService().load_research_report(artifact_path)
 
@@ -337,6 +341,7 @@ def test_main_window_acquires_paper_account_once_and_navigation_reuses_state() -
         "paper",
         "paper-account",
         "market-data",
+        "operations",
         "system",
     )
     assert window.current_page_id == "home"

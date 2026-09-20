@@ -1,11 +1,13 @@
 # AI Trading Bot — Project Development Roadmap & Handoff
 
-**Repository:** `callmedraken/ai-trading-bot`  
-**Integration branch:** `develop`  
-**Armed D5 branch:** `feature/personal-desktop-paper-runtime`  
-**D6/D7 development branch:** `feature/pd4-unattended-decision-publication`  
-**Armed D5 worktree:** `F:\AI\worktrees\ai-trading-bot-personal-desktop`  
-**D6/D7 development worktree:** `F:\AI\worktrees\ai-trading-bot-decision-publication`
+**Repository:** `callmedraken/ai-trading-bot`
+**Integration branch:** `develop`
+**Current source branch:** `feature/operator-observability-o1-forward-integration`
+**Current source worktree:** `F:\AI\worktrees\ai-trading-bot-operator-observability-o1-forward-integration`
+**Armed/historical D5 branch:** `feature/personal-desktop-paper-runtime`
+**Historical D6/D7 branch:** `feature/pd4-unattended-decision-publication`
+**Armed/historical D5 worktree:** `F:\AI\worktrees\ai-trading-bot-personal-desktop`
+**Historical D6/D7 worktree:** `F:\AI\worktrees\ai-trading-bot-decision-publication`
 **Production/live trading:** NO-GO
 
 > This Git-tracked handoff is the canonical cross-chat resume document. Uploaded
@@ -45,9 +47,13 @@ Integration/product baselines:
 
 ```text
 current develop integration:
-a18dd765523ddcc55b2a10d312e28410a92b81c7
-tree: d50cbcfcf800417fe2dc90b9be5957354809a2d9
+f7a177db37d6783d4e9865cc5bb98292f4907274
+tree: 8fe7d9175f5286bf6c88924f5dc3829012b13cd2
 accepted PR #9 head: 2df0af89f53f12e4dd42975e36d56794dc1e3c95
+
+current replacement-certified observability source:
+HEAD 4c2a064e31d460dd3c7534fadad6c50204ffcd82
+TREE 9d341fcfd6eb5493887012814c5943850d903744
 
 Architecture-94 P2 product base:
 a810122a96b6fc90da25d71eede8da64b7272c98
@@ -566,9 +572,11 @@ wake. The armed task should continue accumulating eligible completed sessions
 naturally. Do not manually start it, backfill history, or modify its source/task
 contract while this evidence is accumulating.
 
-D5 itself is **not complete** until the required six-session suffix becomes
-ready. Expected terminal handoff is `G6 = DECISION_READY`; even then D5 performs
-no publication or Paper-v2 settlement.
+The 2/6 D5 facts above are historical predecessor evidence. Later D7
+qualification reached the required 6/6 READY suffix through completed session
+2026-09-18; D7 publication/reconciliation then closed and D7 was integrated.
+Keep the D5 source/task as historical deployment evidence rather than treating
+this subsection as current warm-up status.
 
 ## 12. Historical D7-D source preparation checkpoint
 
@@ -645,14 +653,16 @@ PD4   unattended simulated-paper
   Architecture-110 source foundation                       COMPLETE
   Architecture-111 daily-cycle source/design               ACCEPTED
   D3/D4 first unattended C3 acceptance                     ACCEPTED
-  Architecture-112 / D5 capture-only warm-up               ACTIVE (2/6)
+  Architecture-112 / D5 capture-only warm-up predecessor   COMPLETE
   Architecture-113 / D6-A through D6-D source              ACCEPTED
-  D7-A Trading read-only qualification source             ACCEPTED
-  D7-A production qualification                           WAITING FOR 6/6 READY
-  D7-C first decision publication                         PROTECTED / UNAUTHORIZED
-  D7-D independent post-publication reconciliation source  CURRENT CHECKPOINT
-  D8/D9 existing-Paper-v2 settlement composition           FUTURE / PROTECTED
-  operational unattended simulated-paper acceptance         NOT YET COMPLETE
+  D7 qualification/publication/reconciliation              COMPLETE
+  D7 integration into develop                              COMPLETE
+  D8/D9 settlement source integration                      COMPLETE
+  operator observability O1-O4 source                      CERTIFIED / PRE-MERGE
+  operator observability integration                       NEXT SAFE SOURCE CHECKPOINT
+  D8-A Trading-principal qualification                     NEXT PROTECTED OPERATIONAL CHECKPOINT
+  D8-B effectful settlement                                PROTECTED / UNAUTHORIZED
+  operational unattended simulated-paper acceptance        NOT YET COMPLETE
 PD5   broker-paper integration                              NOT STARTED
 PD6   broker-paper soak / operational hardening             NOT STARTED
 PD7   personal-desktop live-readiness                       NOT STARTED
@@ -1114,3 +1124,61 @@ authorization is implied.
 
 The next protected operational checkpoint is a fresh read-only **D8-A
 Trading-principal qualification** from the current integrated source.
+
+## Operator observability O1-O4 — replacement-certified pre-merge
+
+Current source-development branch:
+
+```text
+branch: feature/operator-observability-o1-forward-integration
+base develop HEAD: f7a177db37d6783d4e9865cc5bb98292f4907274
+base develop TREE: 8fe7d9175f5286bf6c88924f5dc3829012b13cd2
+certified HEAD:     4c2a064e31d460dd3c7534fadad6c50204ffcd82
+certified TREE:     9d341fcfd6eb5493887012814c5943850d903744
+```
+
+O1-O4 are accepted:
+
+- O1: bounded Qt-free observability models/adapters.
+- O2: zero-semantic-argument read-only production snapshot. The accepted O2
+  correction retains selected-C3 provenance for the full proof lifetime.
+- O3: read-only Operations page/navigation/service wiring. Default GUI startup
+  remains unavailable and does not invoke production O2.
+- O4: pure deterministic strategy preview. It calls the current canonical
+  moving-average evaluator, preserves current Decimal/proposal identity, and
+  returns only bounded presentation scalars. Ordinary evaluation errors fail
+  closed to sanitized `BLOCKED`.
+
+Final exact-tree certification:
+
+```text
+focused O1-O4:                    122 passed
+A4/MainWindow regression:          23 passed
+broad non-Architecture-77:       5,789 passed, 17 skipped
+Architecture-77 clean harness:     758 passed
+combined:                        6,547 passed, 17 skipped
+Ruff check:                      PASS
+Ruff format --check:             PASS (564 files)
+diff checks:                     PASS
+worktree/index:                  clean
+```
+
+The feature-worktree Architecture-77 attempt failed only because the harness's
+fixed repository-local lifecycle-arbiter path was not writable. The exact
+candidate commit/tree passed all 758 tests in a clean detached certification
+worktree; no source mutation or permission workaround was used.
+
+The source certification authorizes no production/effectful action. All eight
+committed effect gates remain false. An earlier safe D8-A invocation while the
+runtime's current completed session was still 2026-09-18 returned
+`NO_SETTLEMENT_PENDING`; that historical read-only result does not satisfy the
+later D8-A checkpoint for the intended settlement session.
+
+Completion record:
+`docs/validation/pd4-operator-observability-o1-o4-source-certification.md`.
+
+Next safe source step: review/create the observability PR against current
+`develop` and merge only with explicit operator approval. Next protected
+operational step remains fresh read-only D8-A when the intended session and
+selected-C3 evidence are eligible. D8-B remains protected and unauthorized.
+

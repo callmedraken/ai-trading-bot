@@ -165,9 +165,9 @@ def test_unavailable_and_blocked_are_sanitized_and_do_not_evaluate(monkeypatch) 
     )
 
 
-def test_evaluation_error_text_never_escapes(monkeypatch) -> None:
+def test_unexpected_evaluation_error_is_sanitized(monkeypatch) -> None:
     def fail(*args):
-        raise ValueError("SECRET <b> C:/private/credential")
+        raise RuntimeError("SECRET <b> C:/private/credential")
 
     monkeypatch.setattr(MovingAverageCrossoverStrategy, "evaluate", fail)
     view = module.evaluate_operator_strategy_preview(
@@ -175,6 +175,9 @@ def test_evaluation_error_text_never_escapes(monkeypatch) -> None:
         MovingAverageCrossoverConfig(2, 3, Decimal("1")),
     )
     assert view == OperatorStrategyPreview(Status.BLOCKED)
+    assert (
+        view.message == "Strategy preview blocked: diagnostic evaluation unavailable."
+    )
     assert "SECRET" not in repr(view) + view.message
 
 

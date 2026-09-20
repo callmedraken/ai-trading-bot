@@ -79,5 +79,5 @@ def evaluate_operator_strategy_preview(
             side=proposal.side.value,
             quantity=proposal.desired_quantity,
         )
-    except (TypeError, ValueError, ArithmeticError):
+    except Exception:
         return OperatorStrategyPreview(OperatorStrategyPreviewStatus.BLOCKED)

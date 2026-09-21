@@ -123,4 +123,3 @@ def test_populated_system_health_page_opens_at_top() -> None:
     assert scroll.verticalScrollBar().value() == 0
 
     page.close()
-

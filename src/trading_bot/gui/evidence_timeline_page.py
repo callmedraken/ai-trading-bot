@@ -130,9 +130,9 @@ class EvidenceTimelinePage(QWidget):
         entries = filter_evidence_timeline_entries(self._state, filter_state)
 
         self._clear_entry_widgets()
-        self._count.setText(
-            f"Showing {len(entries)} of {len(self._state.entries)} entries."
-        )
+        total = len(self._state.entries)
+        noun = "entry" if total == 1 else "entries"
+        self._count.setText(f"Showing {len(entries)} of {total} {noun}.")
 
         if not self._state.entries:
             self._entries_layout.addWidget(

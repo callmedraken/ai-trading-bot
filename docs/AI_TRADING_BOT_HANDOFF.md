@@ -1390,3 +1390,51 @@ authority or effect path was introduced.
 Next safe GUI candidate: GUI-A10 read-only Audit History / Evidence Timeline
 using explicit offline artifacts only. D8-A remains a separate protected
 operational checkpoint; D8-B remains protected and unauthorized.
+
+## GUI-A10 read-only Evidence Timeline — source certified
+
+GUI-A10 is source-certified on:
+
+```text
+branch: feature/gui-a10-evidence-timeline
+base develop: 74039dd4f25affea3086e3ed2703ec2415c8e70a
+HEAD: 6638eea47163fbaa8db3c0fb4bd9c9b5b4ae2e75
+TREE: f5f6809e21b45116a4aa5334a8afdfe7616e1efb
+```
+
+Architecture 117 freezes A10 as a presentation-only Evidence Timeline. The
+timeline is built from the exact Research, Paper Operation, Paper Account,
+Market Data, and Operations states that `MainWindow` already acquires. No new
+`GuiApplicationService` method is added; MainWindow still performs exactly six
+service reads and Evidence navigation adds no reread.
+
+Accepted final evidence:
+
+```text
+focused A10/integration:         68 passed
+complete GUI regression:       314 passed
+broad non-Architecture-77:   5,853 passed, 17 skipped
+Architecture-77 clean harness: 758 passed
+combined:                    6,611 passed, 17 skipped
+Ruff check:                  PASS
+Ruff format --check:        PASS (579 files)
+diff checks:                PASS
+visual gate:                PASS
+```
+
+Visual certification covered the default empty timeline, populated Research +
+Market Data + GENESIS, and a successor Paper Account at 920x620. Timestamped
+entries are deterministic newest-first, untimed evidence follows stably, long
+identifiers/hashes remain selectable, and the initial view stays at the top.
+
+Independent final GitHub review found 16 expected changed files, 25 commits
+ahead and 0 behind the exact base. The A10 source introduces no new runtime I/O
+or discovery and no path into production O2, C1/C2/C3, Credential Manager,
+provider/broker calls, Task Scheduler, paper execution, settlement, recovery,
+or live effects. Research source paths and Paper receipt paths are not retained
+in timeline state.
+
+GUI-A10 is ready for PR review/integration. PR creation and merge remain
+explicit approval boundaries. After integration, resume GUI development
+automatically with the next bounded read-only presentation milestone. D8-A
+remains separate and protected; D8-B remains protected and unauthorized.

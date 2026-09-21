@@ -7,7 +7,7 @@ import pytest
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 pytest.importorskip("PySide6")
 
-from PySide6.QtWidgets import QApplication, QLineEdit, QPushButton
+from PySide6.QtWidgets import QApplication, QLineEdit, QPushButton, QScrollArea
 
 from trading_bot.gui import (
     SystemAuditEntryView,
@@ -86,3 +86,40 @@ def test_system_health_page_minimum_content_width_remains_usable() -> None:
     assert all(field.isReadOnly() for field in fields)
 
     page.close()
+
+def test_populated_system_health_page_opens_at_top() -> None:
+    application = _application()
+    state = SystemHealthPageState(
+        SystemHealthStatus.READ_ONLY_READY,
+        "No explicit blocked component is present; this is not production readiness.",
+        "Local read-only GUI",
+        "Research",
+        (
+            SystemComponentHealthView(
+                "research",
+                "Research",
+                SystemComponentStatus.AVAILABLE,
+                "One explicit historical report is loaded read-only.",
+            ),
+        ),
+        tuple(
+            SystemAuditEntryView(
+                "Audit Source",
+                f"Evidence {index}",
+                f"identifier-{index}",
+                "a" * 64,
+            )
+            for index in range(8)
+        ),
+    )
+    page = SystemHealthPage(state)
+    page.resize(710, 500)
+    page.show()
+    application.processEvents()
+
+    scroll = page.findChild(QScrollArea, "systemHealthScroll")
+    assert scroll is not None
+    assert scroll.verticalScrollBar().value() == 0
+
+    page.close()
+

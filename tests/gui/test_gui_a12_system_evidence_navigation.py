@@ -240,10 +240,13 @@ def test_main_window_system_navigation_reuses_existing_evidence_state() -> None:
     assert source.currentText() == "Research"
     assert search.text() == str(_UUID1)
 
+    evidence_page = window.findChild(EvidenceTimelinePage, "evidenceTimelinePage")
+    assert evidence_page is not None
     readonly = [
-        field.text() for field in window.findChildren(QLineEdit) if field.isReadOnly()
+        field.text()
+        for field in evidence_page.findChildren(QLineEdit)
+        if field.isReadOnly()
     ]
-    assert str(_UUID1) in readonly
-    assert str(_UUID2) not in readonly
+    assert readonly == [str(_UUID1)]
 
     window.close()

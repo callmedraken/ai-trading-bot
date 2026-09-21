@@ -14,9 +14,9 @@ Add the immutable Qt-free navigation target and exact System-source mapper.
 Verify:
 
 - exact `EvidenceTimelineSource` validation;
-- canonical bounded identifier;
+- canonical identifier bounded to the accepted A11 200-character search limit;
 - exact closed source mapping;
-- unknown source fails closed;
+- unknown source or overlong System identifier fails closed;
 - no retained path/hash/runtime object;
 - no I/O import.
 

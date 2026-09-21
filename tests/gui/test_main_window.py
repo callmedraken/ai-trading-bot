@@ -9,7 +9,7 @@ import pytest
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 pytest.importorskip("PySide6")
 
-from PySide6.QtWidgets import QApplication, QLabel
+from PySide6.QtWidgets import QApplication, QComboBox, QLabel, QLineEdit
 
 from trading_bot.gui import (
     ApplicationOverview,
@@ -173,4 +173,14 @@ def test_evidence_page_uses_already_acquired_state_without_service_reread() -> N
     assert "Evidence Timeline" in texts
     assert any("not a durable audit log" in text for text in texts)
 
+    search = window.findChild(QLineEdit, "evidenceTimelineSearch")
+    source = window.findChild(QComboBox, "evidenceTimelineSourceFilter")
+    assert search is not None
+    assert source is not None
+
+    search.setText("report")
+    source.setCurrentText("Research")
+    application.processEvents()
+
+    assert service.calls == 6
     window.close()

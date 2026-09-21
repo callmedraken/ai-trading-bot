@@ -75,7 +75,7 @@ def _research_entries(
         return ()
     report = state.report
     detail = (
-        f"Variant source: {report.variant_source}; rows: {report.row_count}; "
+        f"Loaded compact report with {report.row_count} rows; "
         "no report timestamp is exposed by the GUI model."
     )
     return (

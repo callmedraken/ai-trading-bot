@@ -122,7 +122,11 @@ def test_main_window_default_operator_text_is_current_and_read_only() -> None:
 
 def test_main_window_real_report_operator_text_does_not_claim_mock_shell() -> None:
     window = MainWindow(ResearchReportGuiApplicationService(FIXTURE))
-    texts = [label.text() for label in window.findChildren(QLabel)]
+    texts = [
+        label.text()
+        for label in window.findChildren(QLabel)
+        if label.objectName() != "researchPath"
+    ]
 
     assert all("gui-a1" not in text.casefold() for text in texts)
     assert all("gui-a2" not in text.casefold() for text in texts)

@@ -254,6 +254,15 @@ class ReadOnlyGuiApplicationService:
                     ),
                 ),
                 ComponentStatus(
+                    key="evidence",
+                    title="Evidence",
+                    status=PresentationStatus.INFO,
+                    detail=(
+                        "Timeline is derived from already-acquired read-only "
+                        "presentation evidence."
+                    ),
+                ),
+                ComponentStatus(
                     key="system",
                     title="System",
                     status=PresentationStatus.INFO,

@@ -14,6 +14,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from trading_bot.gui.evidence_timeline_adapter import build_evidence_timeline_state
+from trading_bot.gui.evidence_timeline_page import EvidenceTimelinePage
 from trading_bot.gui.market_data_page import MarketDataPage
 from trading_bot.gui.models import (
     ApplicationOverview,
@@ -36,6 +38,7 @@ PAGE_IDS = (
     "paper-account",
     "market-data",
     "operations",
+    "evidence",
     "system",
 )
 
@@ -72,6 +75,13 @@ class MainWindow(QMainWindow):
         paper_account_state = service.get_paper_account_state()
         market_data_state = service.get_market_data_state()
         operations_state = service.get_operator_observability_state()
+        evidence_timeline_state = build_evidence_timeline_state(
+            research_state,
+            paper_state,
+            paper_account_state,
+            market_data_state,
+            operations_state,
+        )
         system_health_state = build_system_health_state(
             self._overview,
             research_state,
@@ -106,6 +116,11 @@ class MainWindow(QMainWindow):
         self._stack.addWidget(self._market_data_page)
         self._operations_page = OperatorOperationsPage(operations_state, self)
         self._stack.addWidget(self._operations_page)
+        self._evidence_timeline_page = EvidenceTimelinePage(
+            evidence_timeline_state,
+            self,
+        )
+        self._stack.addWidget(self._evidence_timeline_page)
         self._system_health_page = SystemHealthPage(system_health_state, self)
         self._stack.addWidget(self._system_health_page)
 
@@ -149,6 +164,7 @@ class MainWindow(QMainWindow):
             "paper-account": "Paper Account",
             "market-data": "Market Data",
             "operations": "Operations",
+            "evidence": "Evidence",
             "system": "System",
         }
         for page_id in PAGE_IDS:
@@ -469,6 +485,31 @@ class MainWindow(QMainWindow):
                 padding: 5px 7px;
             }
             QScrollArea#systemHealthScroll {
+                background: transparent;
+                border: 0;
+            }
+            QLabel#evidenceTimelineScope,
+            QLabel#evidenceTimelineMessage,
+            QLabel#evidenceTimelineEmpty,
+            QLabel#evidenceTimelineDetail,
+            QLabel#evidenceTimelineTimestamp {
+                color: #aebbd0;
+            }
+            QLabel#evidenceTimelineEntryTitle {
+                color: #f8fafc;
+                font-size: 16px;
+                font-weight: 700;
+            }
+            QLabel#evidenceTimelineFieldLabel {
+                color: #94a3b8;
+                font-weight: 600;
+            }
+            QFrame#evidenceTimelineCard {
+                background: #182235;
+                border: 1px solid #2a3950;
+                border-radius: 8px;
+            }
+            QScrollArea#evidenceTimelineScroll {
                 background: transparent;
                 border: 0;
             }

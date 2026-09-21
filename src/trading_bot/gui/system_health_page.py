@@ -152,6 +152,7 @@ class SystemHealthPage(QWidget):
 
         layout.addStretch(1)
         scroll.setWidget(content)
+        scroll.verticalScrollBar().setValue(0)
 
     def _component_card(
         self,
@@ -229,6 +230,7 @@ class SystemHealthPage(QWidget):
 def _readonly_value(value: str, parent: QWidget) -> QLineEdit:
     field = QLineEdit(value, parent)
     field.setReadOnly(True)
+    field.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
     field.setCursorPosition(0)
     field.setTextMargins(4, 0, 4, 0)
     return field

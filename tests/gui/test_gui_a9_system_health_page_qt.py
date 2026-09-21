@@ -87,6 +87,7 @@ def test_system_health_page_minimum_content_width_remains_usable() -> None:
 
     page.close()
 
+
 def test_populated_system_health_page_opens_at_top() -> None:
     application = _application()
     state = SystemHealthPageState(

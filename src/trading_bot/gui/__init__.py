@@ -68,6 +68,18 @@ from trading_bot.gui.startup_composition import (
     GuiStartupConfiguration,
     ReadOnlyGuiApplicationService,
 )
+from trading_bot.gui.system_health_adapter import build_system_health_state
+from trading_bot.gui.system_health_models import (
+    MAX_SYSTEM_AUDIT_ENTRIES,
+    MAX_SYSTEM_COMPONENTS,
+    MAX_SYSTEM_IDENTIFIER_CHARACTERS,
+    MAX_SYSTEM_TEXT_CHARACTERS,
+    SystemAuditEntryView,
+    SystemComponentHealthView,
+    SystemComponentStatus,
+    SystemHealthPageState,
+    SystemHealthStatus,
+)
 from trading_bot.gui.verified_genesis_paper_account_inspection_service import (
     VerifiedGenesisPaperAccountInspectionService,
 )
@@ -98,6 +110,10 @@ __all__ = [
     "MAX_OPERATOR_SYMBOL_CHARACTERS",
     "OPERATOR_WARMUP_TARGET_COUNT",
     "MAX_PAPER_RECEIPT_PATH_CHARACTERS",
+    "MAX_SYSTEM_AUDIT_ENTRIES",
+    "MAX_SYSTEM_COMPONENTS",
+    "MAX_SYSTEM_IDENTIFIER_CHARACTERS",
+    "MAX_SYSTEM_TEXT_CHARACTERS",
     "MarketDataPageState",
     "MarketDataPageStatus",
     "OperatingMode",
@@ -127,12 +143,18 @@ __all__ = [
     "ResearchReportView",
     "ResearchResultRow",
     "ResearchReportLoader",
+    "SystemAuditEntryView",
+    "SystemComponentHealthView",
+    "SystemComponentStatus",
+    "SystemHealthPageState",
+    "SystemHealthStatus",
     "ReadOnlyGuiApplicationService",
     "VerifiedMarketSnapshotView",
     "VerifiedPaperAccountView",
     "VerifiedGenesisPaperAccountInspectionService",
     "VerifiedSnapshotInspectionService",
     "VerifiedSuccessorPaperAccountInspectionService",
+    "build_system_health_state",
     "format_decimal_for_display",
     "format_percentage_for_display",
     "unavailable_market_data_state",

@@ -1323,3 +1323,52 @@ Next safe GUI milestone: GUI-A9 read-only System Health / Audit. D8-A remains a
 separate protected operational checkpoint; D8-B remains protected and
 unauthorized.
 
+## GUI-A9 read-only System Health & Audit — source certified
+
+GUI-A9 is source-certified on:
+
+```text
+branch: feature/gui-a9-system-health-audit
+base develop: 0eb39514ba45f39fb7dc7f02c06a458a56f4fc5e
+HEAD: 92e08a5d115521c89f5798dc9706ae83c5e9d8d2
+TREE: ce23f4de89bcd9fb65aaaba70ab8d146b2f4a7a1
+```
+
+Architecture 116 freezes A9 as a pure in-memory presentation milestone. The
+System page is upgraded to System Health & Audit by adapting the exact Research,
+Paper Operation, Paper Account, Market Data, and Operations states already
+acquired by `MainWindow`. No new `GuiApplicationService` method is added and
+System navigation causes no reread.
+
+Accepted final evidence:
+
+```text
+broad non-Architecture-77:     5,841 passed, 17 skipped
+Architecture-77 clean harness:   758 passed
+combined:                      6,599 passed, 17 skipped
+Ruff check:                    PASS
+Ruff format --check:           PASS (573 files)
+diff checks:                   PASS
+visual gate:                   PASS
+```
+
+Earlier GUI gates also passed: 49 focused A9 tests, 301 complete GUI tests,
+18 post-format focused tests, 9 formatter sanity tests, and 12 scroll/style
+correction tests.
+
+Visual certification covered default, populated GENESIS, successor/minimum-size,
+and styled ATTENTION states. The final page keeps bounded audit IDs/hashes
+selectable, opens at the top when populated, distinguishes blocked from
+unavailable state, and makes explicit that read-only health is not
+production/trading readiness.
+
+Independent final GitHub review found 13 expected changed files, 24 commits
+ahead and 0 behind the exact base. No source path was added into production O2,
+C1/C2/C3, filesystem discovery, Credential Manager, provider/network access,
+Task Scheduler, paper execution, settlement, recovery, brokerage, or live
+effects. Audit state does not retain research source paths or paper receipt
+paths.
+
+GUI-A9 is ready for PR review/integration. Do not merge without explicit
+operator approval. D8-A remains a separate protected operational checkpoint;
+D8-B remains protected and unauthorized.

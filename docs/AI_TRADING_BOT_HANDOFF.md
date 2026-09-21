@@ -1503,9 +1503,25 @@ C1/C2/C3, Credential Manager, provider/broker call, Task Scheduler, paper/live
 execution, settlement, recovery, durable write, or path/receipt disclosure was
 introduced. Filter changes and Evidence navigation cause zero service rereads.
 
-GUI-A11 is ready for PR review/integration. PR creation and merge remain
-explicit approval boundaries.
+GUI-A11 is integrated and closed through PR #15.
 
-After integration, continue with GUI-A12 read-only System/Evidence
+```text
+accepted PR head:     d092f99e3aefb5823d123271ffa5963245e8ad1e
+merge commit:         65f4edeee9ba4c35121d19e8930af49353049dbf
+resulting merge tree: 74932fdad0d003b057afb6c46c858cee1cc23019
+PR-head -> merge:     no file differences
+```
+
+The authoritative executable/source certification remains
+`2aba51e544d1cf356730ad8bc01a7b909af515ce` /
+`3dd12a94615748d05df784cbaa8ac49576f9d032`.
+
+Final PR review confirmed the Evidence Explorer is pure presentation behavior
+over accepted A10 state, filter changes and Evidence navigation cause zero
+service rereads, A10 ordering is preserved, and no runtime I/O, discovery,
+production authority, credential, scheduler, provider/broker, execution,
+settlement, recovery, durable-write, or path/receipt-disclosure path was added.
+
+Continue automatically with GUI-A12 read-only System/Evidence
 cross-navigation derived only from already-rendered bounded identities. D8-A
 remains separate and protected; D8-B remains protected and unauthorized.

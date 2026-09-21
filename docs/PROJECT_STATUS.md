@@ -1584,11 +1584,31 @@ VISUAL_GATE=PASSED
 FULL_REGRESSION=PASSED
 ```
 
-GUI-A11 source is certified and ready for PR review/integration. PR creation and
-merge remain explicit repository-control boundaries.
+GUI-A11 is integrated and closed through PR #15.
 
-After A11 integration, the next safe GUI candidate is GUI-A12 read-only
-System/Evidence cross-navigation: presentation-only links from already-rendered
-System audit identities to matching Evidence Timeline entries, with no new
-reader, discovery, authority, or effect path. D8-A remains a separate protected
-operational checkpoint and D8-B remains unauthorized.
+```text
+accepted PR head:        d092f99e3aefb5823d123271ffa5963245e8ad1e
+merge commit:            65f4edeee9ba4c35121d19e8930af49353049dbf
+resulting merge tree:    74932fdad0d003b057afb6c46c858cee1cc23019
+PR-head -> merge files:  none
+```
+
+The normal history-preserving merge produced exactly the accepted PR-head tree.
+The authoritative GUI-A11 executable/source certification remains
+`2aba51e544d1cf356730ad8bc01a7b909af515ce` /
+`3dd12a94615748d05df784cbaa8ac49576f9d032`; the later branch closeout and
+this integration closeout are documentation-only and do not require another
+broad suite.
+
+Deep PR review covered all 11 changed files, the Architecture 118 contract,
+Qt-free filter model, Evidence page rendering and widget lifecycle, MainWindow
+integration, tests, certification docs, PR metadata, review threads/comments,
+status/workflow state, and GitHub's synthetic merge. No blocker was found. The
+synthetic merge and actual merge both preserve the accepted PR-head tree
+exactly.
+
+GUI-A12 read-only System/Evidence cross-navigation is the next safe GUI
+milestone: presentation-only links from already-rendered System audit identities
+to matching Evidence Timeline entries, with no new reader, discovery, authority,
+or effect path. D8-A remains a separate protected operational checkpoint and
+D8-B remains unauthorized.

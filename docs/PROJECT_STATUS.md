@@ -1463,9 +1463,30 @@ VISUAL_GATE=PASSED
 FULL_REGRESSION=PASSED
 ```
 
-GUI-A10 source is certified and ready for PR review/integration. PR creation and
-merge remain explicit repository-control boundaries. After A10 integration,
-continue GUI work automatically with the next bounded read-only presentation
-milestone; production discovery and operational controls remain deferred. D8-A
-remains a separate protected operational checkpoint and D8-B remains
-unauthorized.
+GUI-A10 is integrated and closed through PR #14.
+
+```text
+accepted PR head:        ab7f12cfea741747035c6a40e9d70c9860226751
+merge commit:            f14847c99d85bbb415bbbd25120766595cbfcdca
+resulting merge tree:    ca45c5d882c8c20185eb9ab36caa129a949ab8ff
+PR-head -> merge files:  none
+```
+
+The normal history-preserving merge produced exactly the accepted PR-head tree.
+The authoritative GUI-A10 executable/source certification remains
+`6638eea47163fbaa8db3c0fb4bd9c9b5b4ae2e75` /
+`f5f6809e21b45116a4aa5334a8afdfe7616e1efb`; the later branch closeout and
+this integration closeout are documentation-only and do not require another
+broad suite.
+
+Deep PR review confirmed the Evidence Timeline remains presentation-only:
+MainWindow performs the same six service reads once, Evidence navigation adds no
+reread, timed/untimed ordering is deterministic, bounded audit identifiers and
+hashes remain selectable, and Research source paths / Paper receipt paths are
+not retained. No production O2/C1/C2/C3, credential, provider, scheduler,
+execution, settlement, recovery, brokerage, or live-effect path was added.
+
+GUI development should continue automatically with the next bounded read-only
+presentation milestone. Production discovery and operational controls remain
+deferred. D8-A remains a separate protected operational checkpoint and D8-B
+remains unauthorized.

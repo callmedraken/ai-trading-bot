@@ -1434,7 +1434,24 @@ provider/broker calls, Task Scheduler, paper execution, settlement, recovery,
 or live effects. Research source paths and Paper receipt paths are not retained
 in timeline state.
 
-GUI-A10 is ready for PR review/integration. PR creation and merge remain
-explicit approval boundaries. After integration, resume GUI development
-automatically with the next bounded read-only presentation milestone. D8-A
-remains separate and protected; D8-B remains protected and unauthorized.
+GUI-A10 is integrated and closed through PR #14.
+
+```text
+accepted PR head:     ab7f12cfea741747035c6a40e9d70c9860226751
+merge commit:         f14847c99d85bbb415bbbd25120766595cbfcdca
+resulting merge tree: ca45c5d882c8c20185eb9ab36caa129a949ab8ff
+PR-head -> merge:     no file differences
+```
+
+The authoritative executable/source certification remains
+`6638eea47163fbaa8db3c0fb4bd9c9b5b4ae2e75` /
+`f5f6809e21b45116a4aa5334a8afdfe7616e1efb`.
+
+Final PR review confirmed A10 is derived solely from already-acquired GUI
+presentation state, Evidence navigation causes no service reread, timeline
+ordering is deterministic, path/receipt disclosure is excluded, and no
+production/runtime authority or effect path was introduced.
+
+Resume GUI development automatically with the next bounded read-only
+presentation milestone. D8-A remains separate and protected; D8-B remains
+protected and unauthorized.

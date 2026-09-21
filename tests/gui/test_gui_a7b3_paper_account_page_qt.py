@@ -342,6 +342,7 @@ def test_main_window_acquires_paper_account_once_and_navigation_reuses_state() -
         "paper-account",
         "market-data",
         "operations",
+        "evidence",
         "system",
     )
     assert window.current_page_id == "home"

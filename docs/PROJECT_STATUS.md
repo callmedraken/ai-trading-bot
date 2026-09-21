@@ -1381,3 +1381,91 @@ Timeline, using only explicit offline artifacts and already-reviewed
 presentation evidence. Production discovery and operational controls remain
 deferred. D8-A remains a separate protected operational checkpoint and D8-B
 remains unauthorized.
+
+## GUI-A10 read-only Evidence Timeline — SOURCE CERTIFIED
+
+Architecture 117 and its validation plan define GUI-A10 on:
+
+```text
+branch: feature/gui-a10-evidence-timeline
+base develop: 74039dd4f25affea3086e3ed2703ec2415c8e70a
+architecture: docs/architecture/117-gui-read-only-evidence-timeline.md
+validation: docs/validation/gui-a10-evidence-timeline.md
+```
+
+GUI-A10 adds an Evidence Timeline that is derived only from the Research, Paper
+Operation, Paper Account, Market Data, and Operations presentation states
+already acquired by `MainWindow`. It adds no service method and no seventh
+service read. Navigating to Evidence performs no service reread and no I/O.
+
+Final certified executable/source identity:
+
+```text
+HEAD: 6638eea47163fbaa8db3c0fb4bd9c9b5b4ae2e75
+TREE: f5f6809e21b45116a4aa5334a8afdfe7616e1efb
+```
+
+Accepted evidence:
+
+```text
+focused A10/integration gate:      68 passed
+complete GUI regression:          314 passed
+
+broad non-Architecture-77:      5,853 passed, 17 skipped
+Architecture-77 clean harness:    758 passed
+combined final certification:   6,611 passed, 17 skipped
+
+Ruff check:                     PASS
+Ruff format --check:            PASS (579 files)
+git diff --check:               PASS
+git diff --cached --check:      PASS
+feature worktree/index:         clean
+Architecture-77 worktree:       clean, exact certified HEAD/TREE
+visual gate:                    PASS
+```
+
+Visual certification covered the default zero state, combined Research + Market
+Data + GENESIS at normal size, and a successor Paper Account at the existing
+920x620 minimum size. Timestamped evidence is displayed newest-first, untimed
+evidence follows in stable construction order, and identifiers/SHA-256 values
+remain selectable.
+
+Independent final GitHub review found the branch 25 commits ahead and 0 behind
+its exact `develop` base with 16 expected architecture/docs/GUI/test files.
+The executable changes are limited to immutable Evidence Timeline models, a pure
+presentation-state adapter, a read-only Qt page, MainWindow wiring from
+already-acquired state, presentation styling, and the informational Overview
+card. Existing startup adapters remain the only explicit local-artifact readers.
+
+Review confirmed that GUI-A10 does not add filesystem discovery, production O2,
+C1/C2/C3, Credential Manager, provider/broker network access, Task Scheduler,
+paper execution, settlement, recovery, or live effects. Research source paths
+and Paper receipt paths are deliberately not copied into timeline state.
+
+Final GUI-A10 acceptance:
+
+```text
+TIMELINE_FROM_PRESENTATION_ONLY=True
+SERVICE_REREADS_ON_EVIDENCE_NAVIGATION=0
+NEW_RUNTIME_IO=False
+FILESYSTEM_DISCOVERY=False
+PRODUCTION_O2_ACCESS=False
+C1_C2_C3_ACCESS=False
+CREDENTIAL_ACCESS=False
+PROVIDER_NETWORK_ACCESS=False
+SCHEDULER_ACCESS=False
+PAPER_EXECUTION=False
+SETTLEMENT_EFFECT=False
+RECOVERY_EFFECT=False
+BROKERAGE_ACCESS=False
+PATH_OR_RECEIPT_DISCLOSURE=False
+VISUAL_GATE=PASSED
+FULL_REGRESSION=PASSED
+```
+
+GUI-A10 source is certified and ready for PR review/integration. PR creation and
+merge remain explicit repository-control boundaries. After A10 integration,
+continue GUI work automatically with the next bounded read-only presentation
+milestone; production discovery and operational controls remain deferred. D8-A
+remains a separate protected operational checkpoint and D8-B remains
+unauthorized.

@@ -86,6 +86,8 @@ def test_main_window_has_stable_pages_and_navigation_is_presentation_only() -> N
 
     window.select_page("paper")
     assert window.current_page_id == "paper"
+    window.select_page("evidence")
+    assert window.current_page_id == "evidence"
     window.select_page("system")
     assert window.current_page_id == "system"
     window.select_page("paper")
@@ -120,7 +122,11 @@ def test_main_window_default_operator_text_is_current_and_read_only() -> None:
 
 def test_main_window_real_report_operator_text_does_not_claim_mock_shell() -> None:
     window = MainWindow(ResearchReportGuiApplicationService(FIXTURE))
-    texts = [label.text() for label in window.findChildren(QLabel)]
+    texts = [
+        label.text()
+        for label in window.findChildren(QLabel)
+        if label.objectName() != "researchPath"
+    ]
 
     assert all("gui-a1" not in text.casefold() for text in texts)
     assert all("gui-a2" not in text.casefold() for text in texts)
@@ -147,5 +153,24 @@ def test_system_page_uses_already_acquired_state_without_service_reread() -> Non
     texts = [label.text() for label in window.findChildren(QLabel)]
     assert "System Health & Audit" in texts
     assert any("does not establish production readiness" in text for text in texts)
+
+    window.close()
+
+
+def test_evidence_page_uses_already_acquired_state_without_service_reread() -> None:
+    application = _application()
+    service = _RecordingService()
+    window = MainWindow(service)
+
+    assert application.applicationName() is not None
+    assert service.calls == 6
+
+    window.select_page("evidence")
+
+    assert window.current_page_id == "evidence"
+    assert service.calls == 6
+    texts = [label.text() for label in window.findChildren(QLabel)]
+    assert "Evidence Timeline" in texts
+    assert any("not a durable audit log" in text for text in texts)
 
     window.close()

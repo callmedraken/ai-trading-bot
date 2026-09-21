@@ -1,5 +1,14 @@
 """Public, Qt-free presentation contracts for the desktop GUI."""
 
+from trading_bot.gui.evidence_timeline_adapter import build_evidence_timeline_state
+from trading_bot.gui.evidence_timeline_models import (
+    MAX_EVIDENCE_TIMELINE_ENTRIES,
+    MAX_EVIDENCE_TIMELINE_IDENTIFIER_CHARACTERS,
+    MAX_EVIDENCE_TIMELINE_TEXT_CHARACTERS,
+    EvidenceTimelineEntry,
+    EvidenceTimelinePageState,
+    EvidenceTimelineSource,
+)
 from trading_bot.gui.market_data_models import (
     MAX_MARKET_DATA_MESSAGE_CHARACTERS,
     MAX_MARKET_DATA_PRESENTATION_TEXT_CHARACTERS,
@@ -94,8 +103,14 @@ __all__ = [
     "ApplicationOverview",
     "ComponentStatus",
     "CompactReportResearchService",
+    "EvidenceTimelineEntry",
+    "EvidenceTimelinePageState",
+    "EvidenceTimelineSource",
     "GuiApplicationService",
     "GuiStartupConfiguration",
+    "MAX_EVIDENCE_TIMELINE_ENTRIES",
+    "MAX_EVIDENCE_TIMELINE_IDENTIFIER_CHARACTERS",
+    "MAX_EVIDENCE_TIMELINE_TEXT_CHARACTERS",
     "MAX_MARKET_DATA_MESSAGE_CHARACTERS",
     "MAX_MARKET_DATA_PRESENTATION_TEXT_CHARACTERS",
     "MAX_MARKET_DATA_SYMBOL_CHARACTERS",
@@ -154,6 +169,7 @@ __all__ = [
     "VerifiedGenesisPaperAccountInspectionService",
     "VerifiedSnapshotInspectionService",
     "VerifiedSuccessorPaperAccountInspectionService",
+    "build_evidence_timeline_state",
     "build_system_health_state",
     "format_decimal_for_display",
     "format_percentage_for_display",

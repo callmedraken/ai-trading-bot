@@ -259,10 +259,12 @@ def test_default_overview_includes_all_read_only_pages() -> None:
         "paper-account",
         "market-data",
         "operations",
+        "evidence",
         "system",
     )
     assert components["paper-account"].status is PresentationStatus.UNAVAILABLE
     assert components["market-data"].status is PresentationStatus.UNAVAILABLE
+    assert components["evidence"].status is PresentationStatus.INFO
 
 
 def test_configured_overview_is_truthful_without_claiming_verification() -> None:

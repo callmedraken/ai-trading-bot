@@ -75,8 +75,9 @@ def test_evidence_timeline_page_is_read_only_and_has_no_effect_controls() -> Non
     page.close()
 
 
-def test_evidence_timeline_minimum_content_width_and_initial_scroll_are_usable(
-) -> None:
+def test_evidence_timeline_minimum_content_width_and_initial_scroll_are_usable() -> (
+    None
+):
     application = _application()
     entries = tuple(
         EvidenceTimelineEntry(
@@ -125,9 +126,7 @@ def test_evidence_explorer_filters_locally_and_has_distinct_no_match_state() -> 
     application.processEvents()
     assert count.text() == "Showing 1 of 2 entries."
     readonly = [
-        field.text()
-        for field in page.findChildren(QLineEdit)
-        if field.isReadOnly()
+        field.text() for field in page.findChildren(QLineEdit) if field.isReadOnly()
     ]
     assert readonly == ["report-id"]
 

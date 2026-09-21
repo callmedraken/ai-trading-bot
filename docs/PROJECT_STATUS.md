@@ -1490,3 +1490,105 @@ GUI development should continue automatically with the next bounded read-only
 presentation milestone. Production discovery and operational controls remain
 deferred. D8-A remains a separate protected operational checkpoint and D8-B
 remains unauthorized.
+
+## GUI-A11 read-only Evidence Explorer — SOURCE CERTIFIED
+
+Architecture 118 and its validation plan define GUI-A11 on:
+
+```text
+branch: feature/gui-a11-evidence-explorer
+base develop: 269fec43adfe73ffce09f5c83e6218efcb1d0c02
+architecture: docs/architecture/118-gui-read-only-evidence-explorer.md
+validation: docs/validation/gui-a11-evidence-explorer.md
+```
+
+GUI-A11 refines the accepted A10 Evidence Timeline with local-only source
+filtering, bounded case-insensitive text search, match counts, and a distinct
+no-match state. Filtering consumes only the already-built immutable
+`EvidenceTimelinePageState`; it adds no service method, service reread,
+artifact reader, discovery path, authority acquisition, credential access,
+scheduler access, provider/broker call, or execution effect.
+
+Final certified executable/source identity:
+
+```text
+HEAD: 2aba51e544d1cf356730ad8bc01a7b909af515ce
+TREE: 3dd12a94615748d05df784cbaa8ac49576f9d032
+```
+
+Accepted evidence:
+
+```text
+focused A11 gate:                  24 passed
+complete GUI regression:          324 passed
+
+broad non-Architecture-77:      5,863 passed, 17 skipped
+Architecture-77 exact-tree:       758 passed
+combined final certification:   6,621 passed, 17 skipped
+
+Ruff check:                     PASS
+Ruff format --check:            PASS (581 files)
+git diff --check:               PASS
+git diff --cached --check:      PASS
+feature worktree/index:         clean
+Architecture-77 worktree:       clean, detached, exact certified HEAD/TREE
+Architecture-77 basetemp:       fresh external path, cache disabled
+visual gate:                    PASS
+```
+
+The Architecture-77 certification directory already existed when the final
+command block was run, so no claim is made that the worktree itself was newly
+created for this run. Its detached HEAD and tree matched the certified source
+exactly, `git status --short` was empty, and the test run used a fresh external
+`--basetemp` with pytest cache disabled. This satisfies the exact-tree,
+clean-harness requirement without manufacturing repository state.
+
+Visual certification covered the default empty Evidence view, the populated
+Research + Market Data + GENESIS view, source/text filtering at 920x620, and a
+distinct no-match state at 920x620. The `Research` + `report` filter correctly
+matches two of four entries because both visible Research cards contain the
+word `report` in displayed fields.
+
+Independent final GitHub review found the branch 13 commits ahead and 0 behind
+its exact `develop` base with 9 expected architecture/validation/GUI/test
+files. The source diff is limited to the Qt-free local filter contract, Evidence
+page controls/rendering, presentation styling, public Qt-free exports, and
+focused regression coverage.
+
+Review confirmed that the filter preserves the accepted A10 entry ordering,
+matches only already-visible bounded presentation fields, performs no wall-clock
+read or I/O, and causes no `GuiApplicationService` reread. No filesystem
+discovery, production O2, C1/C2/C3, Credential Manager, provider/broker network
+access, Task Scheduler, paper execution, settlement, recovery, durable write, or
+path/receipt disclosure was introduced.
+
+Final GUI-A11 acceptance:
+
+```text
+EXPLORER_FROM_A10_STATE_ONLY=True
+SERVICE_REREADS_ON_FILTER_CHANGE=0
+SERVICE_REREADS_ON_EVIDENCE_NAVIGATION=0
+NEW_RUNTIME_IO=False
+FILESYSTEM_DISCOVERY=False
+PRODUCTION_O2_ACCESS=False
+C1_C2_C3_ACCESS=False
+CREDENTIAL_ACCESS=False
+PROVIDER_NETWORK_ACCESS=False
+SCHEDULER_ACCESS=False
+PAPER_EXECUTION=False
+SETTLEMENT_EFFECT=False
+RECOVERY_EFFECT=False
+BROKERAGE_ACCESS=False
+PATH_OR_RECEIPT_DISCLOSURE=False
+VISUAL_GATE=PASSED
+FULL_REGRESSION=PASSED
+```
+
+GUI-A11 source is certified and ready for PR review/integration. PR creation and
+merge remain explicit repository-control boundaries.
+
+After A11 integration, the next safe GUI candidate is GUI-A12 read-only
+System/Evidence cross-navigation: presentation-only links from already-rendered
+System audit identities to matching Evidence Timeline entries, with no new
+reader, discovery, authority, or effect path. D8-A remains a separate protected
+operational checkpoint and D8-B remains unauthorized.

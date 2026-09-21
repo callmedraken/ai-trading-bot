@@ -1455,3 +1455,57 @@ production/runtime authority or effect path was introduced.
 Resume GUI development automatically with the next bounded read-only
 presentation milestone. D8-A remains separate and protected; D8-B remains
 protected and unauthorized.
+
+## GUI-A11 read-only Evidence Explorer — source certified
+
+GUI-A11 is source-certified on:
+
+```text
+branch: feature/gui-a11-evidence-explorer
+base develop: 269fec43adfe73ffce09f5c83e6218efcb1d0c02
+HEAD: 2aba51e544d1cf356730ad8bc01a7b909af515ce
+TREE: 3dd12a94615748d05df784cbaa8ac49576f9d032
+```
+
+Architecture 118 keeps A11 entirely inside the accepted A10 presentation
+boundary. `EvidenceTimelineFilter` and
+`filter_evidence_timeline_entries(...)` operate only on the immutable A10
+timeline state. The Evidence page adds local search, source filtering, match
+counts, and a distinct no-match state; filtering performs no service call or
+artifact I/O.
+
+Accepted final evidence:
+
+```text
+focused A11:                   24 passed
+complete GUI regression:     324 passed
+broad non-Architecture-77: 5,863 passed, 17 skipped
+Architecture-77 exact-tree:  758 passed
+combined:                  6,621 passed, 17 skipped
+Ruff check:                PASS
+Ruff format --check:       PASS (581 files)
+diff checks:               PASS
+visual gate:               PASS
+```
+
+The final Architecture-77 run used a pre-existing detached certification
+worktree, not a newly-created directory. The worktree was clean and matched the
+certified A11 HEAD/TREE exactly, and pytest used a fresh external basetemp with
+cache disabled.
+
+Visual certification covered empty, populated, filtered/minimum-size, and
+no-match states. Search/source filtering preserves A10 order, identifiers and
+hashes remain selectable, and the read-only/not-authority scope remains visible.
+
+Independent final GitHub review found 9 expected changed files, 13 commits ahead
+and 0 behind the exact base. No new runtime I/O, discovery, production O2,
+C1/C2/C3, Credential Manager, provider/broker call, Task Scheduler, paper/live
+execution, settlement, recovery, durable write, or path/receipt disclosure was
+introduced. Filter changes and Evidence navigation cause zero service rereads.
+
+GUI-A11 is ready for PR review/integration. PR creation and merge remain
+explicit approval boundaries.
+
+After integration, continue with GUI-A12 read-only System/Evidence
+cross-navigation derived only from already-rendered bounded identities. D8-A
+remains separate and protected; D8-B remains protected and unauthorized.

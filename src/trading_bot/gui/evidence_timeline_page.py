@@ -1,11 +1,13 @@
-"""Qt presentation for GUI-A10 read-only Evidence Timeline."""
+"""Qt presentation for GUI-A10/A11 read-only Evidence Timeline."""
 
 from __future__ import annotations
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
+    QComboBox,
     QFrame,
     QGridLayout,
+    QHBoxLayout,
     QLabel,
     QLineEdit,
     QScrollArea,
@@ -13,14 +15,20 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from trading_bot.gui.evidence_explorer import (
+    MAX_EVIDENCE_TIMELINE_FILTER_CHARACTERS,
+    EvidenceTimelineFilter,
+    filter_evidence_timeline_entries,
+)
 from trading_bot.gui.evidence_timeline_models import (
     EvidenceTimelineEntry,
     EvidenceTimelinePageState,
+    EvidenceTimelineSource,
 )
 
 
 class EvidenceTimelinePage(QWidget):
-    """Read-only timeline derived only from already-acquired GUI state."""
+    """Read-only timeline and local explorer over already-acquired GUI state."""
 
     def __init__(
         self,
@@ -32,19 +40,20 @@ class EvidenceTimelinePage(QWidget):
             raise TypeError("state must be an exact EvidenceTimelinePageState")
         self.setObjectName("evidenceTimelinePage")
         self._state = state
+        self._sources = (None, *tuple(EvidenceTimelineSource))
         self._build()
 
     def _build(self) -> None:
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
 
-        scroll = QScrollArea(self)
-        scroll.setObjectName("evidenceTimelineScroll")
-        scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QFrame.Shape.NoFrame)
-        outer.addWidget(scroll)
+        self._scroll = QScrollArea(self)
+        self._scroll.setObjectName("evidenceTimelineScroll")
+        self._scroll.setWidgetResizable(True)
+        self._scroll.setFrameShape(QFrame.Shape.NoFrame)
+        outer.addWidget(self._scroll)
 
-        content = QWidget(scroll)
+        content = QWidget(self._scroll)
         layout = QVBoxLayout(content)
         layout.setContentsMargins(36, 32, 36, 32)
         layout.setSpacing(14)
@@ -72,33 +81,100 @@ class EvidenceTimelinePage(QWidget):
         message.setWordWrap(True)
         layout.addWidget(message)
 
-        if not self._state.entries:
-            empty = QLabel(
-                (
-                    "Configure supported explicit read-only artifacts to populate "
-                    "evidence."
-                ),
-                content,
-            )
-            empty.setObjectName("evidenceTimelineEmpty")
-            empty.setTextFormat(Qt.TextFormat.PlainText)
-            empty.setWordWrap(True)
-            layout.addWidget(empty)
-        else:
-            for index, entry in enumerate(self._state.entries):
-                layout.addWidget(self._entry_card(entry, index, content))
+        explorer_title = QLabel("Evidence explorer", content)
+        explorer_title.setObjectName("evidenceTimelineExplorerTitle")
+        explorer_title.setTextFormat(Qt.TextFormat.PlainText)
+        layout.addWidget(explorer_title)
+
+        controls = QHBoxLayout()
+        controls.setSpacing(10)
+
+        self._search = QLineEdit(content)
+        self._search.setObjectName("evidenceTimelineSearch")
+        self._search.setPlaceholderText("Search displayed evidence")
+        self._search.setMaxLength(MAX_EVIDENCE_TIMELINE_FILTER_CHARACTERS)
+        self._search.setClearButtonEnabled(True)
+        self._search.textChanged.connect(self._refresh_entries)
+        controls.addWidget(self._search, 1)
+
+        self._source = QComboBox(content)
+        self._source.setObjectName("evidenceTimelineSourceFilter")
+        self._source.addItem("All sources")
+        for source in EvidenceTimelineSource:
+            self._source.addItem(source.value)
+        self._source.currentIndexChanged.connect(self._refresh_entries)
+        controls.addWidget(self._source)
+
+        layout.addLayout(controls)
+
+        self._count = QLabel(content)
+        self._count.setObjectName("evidenceTimelineFilterCount")
+        self._count.setTextFormat(Qt.TextFormat.PlainText)
+        layout.addWidget(self._count)
+
+        self._entries_host = QWidget(content)
+        self._entries_host.setObjectName("evidenceTimelineEntriesHost")
+        self._entries_layout = QVBoxLayout(self._entries_host)
+        self._entries_layout.setContentsMargins(0, 0, 0, 0)
+        self._entries_layout.setSpacing(12)
+        layout.addWidget(self._entries_host)
 
         layout.addStretch(1)
-        scroll.setWidget(content)
-        scroll.verticalScrollBar().setValue(0)
+        self._scroll.setWidget(content)
+        self._refresh_entries()
+        self._scroll.verticalScrollBar().setValue(0)
+
+    def _refresh_entries(self) -> None:
+        source = self._sources[self._source.currentIndex()]
+        filter_state = EvidenceTimelineFilter(self._search.text(), source)
+        entries = filter_evidence_timeline_entries(self._state, filter_state)
+
+        self._clear_entry_widgets()
+        total = len(self._state.entries)
+        noun = "entry" if total == 1 else "entries"
+        self._count.setText(f"Showing {len(entries)} of {total} {noun}.")
+
+        if not self._state.entries:
+            self._entries_layout.addWidget(
+                self._empty_label(
+                    "Configure supported explicit read-only artifacts to populate "
+                    "evidence."
+                )
+            )
+            return
+
+        if not entries:
+            self._entries_layout.addWidget(
+                self._empty_label(
+                    "No represented evidence matches the current local filters."
+                )
+            )
+            return
+
+        for index, entry in enumerate(entries):
+            self._entries_layout.addWidget(self._entry_card(entry, index))
+
+    def _clear_entry_widgets(self) -> None:
+        while self._entries_layout.count():
+            item = self._entries_layout.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.setParent(None)
+                widget.deleteLater()
+
+    def _empty_label(self, text: str) -> QLabel:
+        empty = QLabel(text, self._entries_host)
+        empty.setObjectName("evidenceTimelineEmpty")
+        empty.setTextFormat(Qt.TextFormat.PlainText)
+        empty.setWordWrap(True)
+        return empty
 
     def _entry_card(
         self,
         entry: EvidenceTimelineEntry,
         index: int,
-        parent: QWidget,
     ) -> QFrame:
-        card = QFrame(parent)
+        card = QFrame(self._entries_host)
         card.setObjectName("evidenceTimelineCard")
 
         layout = QGridLayout(card)

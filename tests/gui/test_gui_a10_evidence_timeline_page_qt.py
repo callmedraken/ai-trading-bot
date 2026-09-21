@@ -75,9 +75,8 @@ def test_evidence_timeline_page_is_read_only_and_has_no_effect_controls() -> Non
     page.close()
 
 
-def test_evidence_timeline_minimum_content_width_and_initial_scroll_are_usable() -> (
-    None
-):
+def test_evidence_timeline_minimum_content_width_and_initial_scroll_are_usable(
+) -> None:
     application = _application()
     entries = tuple(
         EvidenceTimelineEntry(

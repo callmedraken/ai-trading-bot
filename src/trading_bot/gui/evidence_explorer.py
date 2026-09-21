@@ -25,7 +25,10 @@ class EvidenceTimelineFilter:
             raise TypeError("query must be an exact string")
         if len(self.query) > MAX_EVIDENCE_TIMELINE_FILTER_CHARACTERS:
             raise ValueError("query exceeds the presentation bound")
-        if any(ord(character) < 0x20 or ord(character) == 0x7F for character in self.query):
+        if any(
+            ord(character) < 0x20 or ord(character) == 0x7F
+            for character in self.query
+        ):
             raise ValueError("query contains unsupported control characters")
         if self.source is not None and type(self.source) is not EvidenceTimelineSource:
             raise TypeError("source must be an exact EvidenceTimelineSource or None")

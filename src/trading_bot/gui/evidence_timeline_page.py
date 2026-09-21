@@ -159,6 +159,7 @@ class EvidenceTimelinePage(QWidget):
             item = self._entries_layout.takeAt(0)
             widget = item.widget()
             if widget is not None:
+                widget.setParent(None)
                 widget.deleteLater()
 
     def _empty_label(self, text: str) -> QLabel:

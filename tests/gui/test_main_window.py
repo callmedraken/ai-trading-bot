@@ -152,6 +152,7 @@ def test_system_page_uses_already_acquired_state_without_service_reread() -> Non
 
     window.close()
 
+
 def test_evidence_page_uses_already_acquired_state_without_service_reread() -> None:
     application = _application()
     service = _RecordingService()

@@ -30,6 +30,7 @@ class EvidenceTimelinePage(QWidget):
         super().__init__(parent)
         if type(state) is not EvidenceTimelinePageState:
             raise TypeError("state must be an exact EvidenceTimelinePageState")
+        self.setObjectName("evidenceTimelinePage")
         self._state = state
         self._build()
 

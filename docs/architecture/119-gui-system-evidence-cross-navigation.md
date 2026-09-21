@@ -61,7 +61,11 @@ Requirements:
 
 - source is an exact `EvidenceTimelineSource`;
 - identifier is canonical non-empty bounded text;
-- identifier bound is the accepted A10 evidence identifier bound;
+- identifier must fit the accepted A11 search bound of 200 characters so the
+  exact identifier can be represented without truncation in the existing
+  Evidence search field;
+- System audit entries whose identifiers exceed that bound are not navigable
+  and fail closed with no navigation target;
 - no paths, hashes, runtime objects, handles, credentials, or capabilities are
   retained.
 

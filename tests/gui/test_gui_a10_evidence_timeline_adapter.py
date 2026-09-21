@@ -12,7 +12,6 @@ from trading_bot.gui import (
     OperatorEffectGateState,
     OperatorOperationsPageState,
     OperatorOperationsPageStatus,
-    OperatorStrategyPreview,
     OperatorWarmupClassification,
     OperatorWarmupView,
     PaperAccountCheckpointKindView,
@@ -37,6 +36,7 @@ from trading_bot.gui import (
     unavailable_paper_account_state,
     unavailable_paper_state,
 )
+from trading_bot.gui.operator_observability_models import OperatorStrategyPreview
 
 _UUID1 = UUID("11111111-1111-1111-1111-111111111111")
 _UUID2 = UUID("22222222-2222-2222-2222-222222222222")

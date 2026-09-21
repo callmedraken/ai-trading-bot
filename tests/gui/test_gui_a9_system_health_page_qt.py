@@ -69,7 +69,10 @@ def test_system_health_page_is_read_only_and_exposes_selectable_audit_values() -
     assert all(field.isReadOnly() for field in fields)
     assert fields[0].text() == "12345678-1234-1234-1234-123456789abc"
     assert fields[1].text() == "a" * 64
-    assert page.findChildren(QPushButton) == []
+    buttons = page.findChildren(QPushButton)
+    assert len(buttons) == 1
+    assert buttons[0].objectName() == "systemHealthViewEvidenceButton"
+    assert buttons[0].text() == "View in Evidence"
 
     page.close()
 

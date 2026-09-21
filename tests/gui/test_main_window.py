@@ -149,4 +149,3 @@ def test_system_page_uses_already_acquired_state_without_service_reread() -> Non
     assert any("does not establish production readiness" in text for text in texts)
 
     window.close()
-

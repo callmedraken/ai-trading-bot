@@ -300,6 +300,4 @@ def test_operations_open_gate_or_blocked_preview_sets_attention() -> None:
         assert state.status is SystemHealthStatus.ATTENTION
         component = next(item for item in state.components if item.key == "operations")
         assert component.status is SystemComponentStatus.BLOCKED
-        assert any(
-            entry.identifier == str(_UUID6) for entry in state.audit_entries
-        )
+        assert any(entry.identifier == str(_UUID6) for entry in state.audit_entries)

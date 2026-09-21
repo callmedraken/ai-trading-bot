@@ -1272,9 +1272,9 @@ The next safe GUI milestone is GUI-A9 read-only System Health / Audit. The next
 protected PD4 operational checkpoint remains the time/data-gated D8-A
 qualification, and D8-B remains unauthorized.
 
-## GUI-A9 read-only System Health & Audit — ACTIVE
+## GUI-A9 read-only System Health & Audit — SOURCE CERTIFIED
 
-Architecture 116 and its validation plan define the next GUI milestone on:
+Architecture 116 and its validation plan define GUI-A9 on:
 
 ```text
 branch: feature/gui-a9-system-health-audit
@@ -1289,12 +1289,73 @@ method, runtime reader, production O2 access, C1/C2/C3 access, filesystem
 discovery, Credential Manager access, provider/broker network call, scheduler
 access, settlement/recovery, or execution effect.
 
-The current A9 source candidate adds immutable Qt-free System Health/Audit
-models, a pure presentation-state adapter, a read-only System Health page,
-MainWindow integration without service rereads, and focused model/adapter/Qt
-tests. The source checkpoint is not accepted until the focused/full GUI and
-static gates pass locally.
+Final certified source identity:
 
-Next checkpoint: run the focused A9 test gate, then the complete `tests/gui`
-regression and visual inspection before final repository certification.
+```text
+HEAD: 92e08a5d115521c89f5798dc9706ae83c5e9d8d2
+TREE: ce23f4de89bcd9fb65aaaba70ab8d146b2f4a7a1
+```
 
+Accepted evidence:
+
+```text
+initial focused A9 gate:           49 passed
+complete GUI regression:          301 passed
+post-format focused gate:          18 passed
+formatter follow-up sanity:         9 passed
+scroll/style correction gate:      12 passed
+
+broad non-Architecture-77:      5,841 passed, 17 skipped
+Architecture-77 clean harness:    758 passed
+combined final certification:   6,599 passed, 17 skipped
+
+Ruff check:                     PASS
+Ruff format --check:            PASS (573 files)
+git diff --check:               PASS
+git diff --cached --check:      PASS
+feature worktree/index:         clean
+Architecture-77 worktree:       clean, exact certified HEAD/TREE
+visual gate:                    PASS
+```
+
+Visual certification covered default read-only startup, A8-populated Research +
+Market Data + GENESIS, successor Paper Account at 920x620, and a styled
+ATTENTION/BLOCKED state through the real `MainWindow`. Long audit identifiers
+and SHA-256 values remain selectable, the page opens at the top even when
+populated, unavailable sources remain neutral, and the page never claims
+production/trading readiness or grants authority.
+
+Independent final GitHub review found the branch 24 commits ahead and 0 behind
+its exact `develop` base with 13 expected architecture/docs/GUI/test files.
+The executable changes are limited to immutable System Health/Audit presentation
+models, a pure presentation-state adapter, the read-only Qt page, MainWindow
+wiring from already-acquired states, and presentation styling. MainWindow still
+performs the same six service reads once; System navigation performs no service
+reread.
+
+Final GUI-A9 acceptance:
+
+```text
+SYSTEM_HEALTH_FROM_PRESENTATION_ONLY=True
+SERVICE_REREADS_ON_SYSTEM_NAVIGATION=0
+NEW_RUNTIME_IO=False
+PRODUCTION_O2_ACCESS=False
+C1_C2_C3_ACCESS=False
+CREDENTIAL_ACCESS=False
+PROVIDER_NETWORK_ACCESS=False
+SCHEDULER_ACCESS=False
+PAPER_EXECUTION=False
+SETTLEMENT_EFFECT=False
+RECOVERY_EFFECT=False
+BROKERAGE_ACCESS=False
+AUDIT_EVIDENCE_BOUNDED=True
+PATH_OR_RECEIPT_DISCLOSURE=False
+VISUAL_GATE=PASSED
+FULL_REGRESSION=PASSED
+```
+
+GUI-A9 source is certified and ready for PR review/integration. PR creation and
+merge remain explicit approval boundaries. The next safe GUI candidate after A9
+integration should continue the explicit-offline/read-only audit/history path;
+production discovery and operational controls remain deferred. D8-A remains a
+separate protected operational checkpoint and D8-B remains unauthorized.

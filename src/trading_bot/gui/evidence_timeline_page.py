@@ -74,7 +74,10 @@ class EvidenceTimelinePage(QWidget):
 
         if not self._state.entries:
             empty = QLabel(
-                "Configure supported explicit read-only artifacts to populate evidence.",
+                (
+                    "Configure supported explicit read-only artifacts to populate "
+                    "evidence."
+                ),
                 content,
             )
             empty.setObjectName("evidenceTimelineEmpty")

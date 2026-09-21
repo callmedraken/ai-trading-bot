@@ -174,4 +174,3 @@ def test_evidence_page_uses_already_acquired_state_without_service_reread() -> N
     assert any("not a durable audit log" in text for text in texts)
 
     window.close()
-

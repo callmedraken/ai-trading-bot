@@ -186,8 +186,7 @@ def _operations_entries(
         detail = "Selected snapshot identity from bounded Operations presentation."
         if state.completed_session is not None:
             detail = (
-                f"{detail} Completed session: "
-                f"{state.completed_session.isoformat()}."
+                f"{detail} Completed session: {state.completed_session.isoformat()}."
             )
         entries.append(
             EvidenceTimelineEntry(

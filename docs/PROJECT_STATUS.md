@@ -1354,8 +1354,30 @@ VISUAL_GATE=PASSED
 FULL_REGRESSION=PASSED
 ```
 
-GUI-A9 source is certified and ready for PR review/integration. PR creation and
-merge remain explicit approval boundaries. The next safe GUI candidate after A9
-integration should continue the explicit-offline/read-only audit/history path;
-production discovery and operational controls remain deferred. D8-A remains a
-separate protected operational checkpoint and D8-B remains unauthorized.
+GUI-A9 is integrated and closed through PR #13.
+
+```text
+accepted PR head:        d035b189c7c800a7f36ce92cebe3511f1dc0b5fc
+merge commit:            8d88229bd9936652cea514dd65284734309c51f6
+resulting merge tree:    29af3c95f2d8995da5feca69863c24bb5dcc0522
+PR-head -> merge files:  none
+```
+
+The normal history-preserving merge produced exactly the accepted PR-head tree.
+The authoritative GUI-A9 executable/source certification remains
+`92e08a5d115521c89f5798dc9706ae83c5e9d8d2` /
+`ce23f4de89bcd9fb65aaaba70ab8d146b2f4a7a1`; the later branch closeout and
+this integration closeout are documentation-only and do not require another
+broad suite.
+
+Deep PR review confirmed the System Health & Audit path remains presentation
+only: MainWindow performs the same six service reads once, System navigation
+adds no reread, bounded audit evidence omits source/receipt paths, and no
+production O2/C1/C2/C3, credential, provider, scheduler, execution, settlement,
+recovery, brokerage, or live-effect path was added.
+
+The next safe GUI candidate is GUI-A10 read-only Audit History / Evidence
+Timeline, using only explicit offline artifacts and already-reviewed
+presentation evidence. Production discovery and operational controls remain
+deferred. D8-A remains a separate protected operational checkpoint and D8-B
+remains unauthorized.

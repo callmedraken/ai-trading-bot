@@ -1369,6 +1369,24 @@ Task Scheduler, paper execution, settlement, recovery, brokerage, or live
 effects. Audit state does not retain research source paths or paper receipt
 paths.
 
-GUI-A9 is ready for PR review/integration. Do not merge without explicit
-operator approval. D8-A remains a separate protected operational checkpoint;
-D8-B remains protected and unauthorized.
+GUI-A9 is integrated and closed through PR #13.
+
+```text
+accepted PR head:     d035b189c7c800a7f36ce92cebe3511f1dc0b5fc
+merge commit:         8d88229bd9936652cea514dd65284734309c51f6
+resulting merge tree: 29af3c95f2d8995da5feca69863c24bb5dcc0522
+PR-head -> merge:     no file differences
+```
+
+The authoritative executable/source certification remains
+`92e08a5d115521c89f5798dc9706ae83c5e9d8d2` /
+`ce23f4de89bcd9fb65aaaba70ab8d146b2f4a7a1`.
+
+Final PR review confirmed the A9 page is derived solely from already-acquired
+GUI presentation state, System navigation causes no service reread, audit
+evidence stays bounded to approved IDs/hashes, and no production/runtime
+authority or effect path was introduced.
+
+Next safe GUI candidate: GUI-A10 read-only Audit History / Evidence Timeline
+using explicit offline artifacts only. D8-A remains a separate protected
+operational checkpoint; D8-B remains protected and unauthorized.

@@ -495,10 +495,14 @@ class MainWindow(QMainWindow):
             QLabel#evidenceTimelineTimestamp {
                 color: #aebbd0;
             }
-            QLabel#evidenceTimelineEntryTitle {
+            QLabel#evidenceTimelineEntryTitle,
+            QLabel#evidenceTimelineExplorerTitle {
                 color: #f8fafc;
                 font-size: 16px;
                 font-weight: 700;
+            }
+            QLabel#evidenceTimelineFilterCount {
+                color: #94a3b8;
             }
             QLabel#evidenceTimelineFieldLabel {
                 color: #94a3b8;
@@ -512,6 +516,20 @@ class MainWindow(QMainWindow):
             QScrollArea#evidenceTimelineScroll {
                 background: transparent;
                 border: 0;
+            }
+            QLineEdit#evidenceTimelineSearch,
+            QComboBox#evidenceTimelineSourceFilter {
+                background: #0b1220;
+                color: #e5e7eb;
+                border: 1px solid #334155;
+                border-radius: 7px;
+                padding: 7px 9px;
+            }
+            QComboBox#evidenceTimelineSourceFilter QAbstractItemView {
+                background: #0b1220;
+                color: #e5e7eb;
+                selection-background-color: #25344a;
+                selection-color: #f9fafb;
             }
             QLineEdit#researchFilter {
                 background: #0b1220;

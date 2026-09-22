@@ -1643,9 +1643,26 @@ No new runtime I/O, discovery, production O2, C1/C2/C3, Credential Manager,
 provider/broker call, Task Scheduler, paper/live execution, settlement,
 recovery, durable write, or new path/receipt disclosure was introduced.
 
-GUI-A13 is ready for PR review/integration. PR creation and merge remain
-explicit approval boundaries.
+GUI-A13 is integrated and closed through PR #17.
 
-After integration, continue GUI work automatically with the next bounded
-read-only presentation milestone. D8-A remains separate and protected; D8-B
-remains protected and unauthorized.
+```text
+accepted PR head:     e24fd8ba7dda3020786b320c988d7c3508199412
+merge commit:         12cd178ad7efbe989863587669dd7c00c509b679
+resulting merge tree: fd2e64d0bcc46cefd3b5a1652d6d1a6a4ab45acd
+PR-head -> merge:     no file differences
+```
+
+The authoritative executable/source certification remains
+`df1c2536aef918edbe1dda987904d6040e022ab4` /
+`a6cad1cdfff770483178e3f2b2bdabfcad279f57`.
+
+Final PR review confirmed A13 is presentation-only page coordination over
+already-acquired state, uses a closed Evidence-source -> existing-page mapping,
+causes zero service rereads, preserves A11 filtering and A12 exact targeting,
+and adds no runtime I/O, discovery, authority, credential, scheduler,
+provider/broker, execution, settlement, recovery, durable-write, or new
+path/receipt-disclosure path.
+
+Continue automatically with GUI-A14 read-only Source Page -> Evidence
+cross-navigation using only already-acquired presentation identities. D8-A
+remains separate and protected; D8-B remains protected and unauthorized.

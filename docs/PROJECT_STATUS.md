@@ -2005,3 +2005,41 @@ D9-A                               NOT APPLICABLE YET
 Next: prepare and verify an isolated production qualification checkout/runtime
 for the integrated diagnostic source. Stop before invoking D8-A; a fresh
 production diagnostic rerun remains a separate protected operator approval.
+
+## D8-A diagnostic production preflight accepted — 2026-09-22
+
+The integrated diagnostic source was prepared in a fresh detached production
+qualification checkout and verified under the dedicated non-admin Trading
+principal without invoking D8-A.
+
+```text
+qualification checkout HEAD: 82e2bdc98c1f7076f88802bdba379f416e6634e5
+qualification checkout TREE: f3c6b6b7b4fb635b2959496f1e99aba471540015
+principal: DESKTOP-I4DOKM7\Trading
+SID: S-1-5-21-1397534616-3988210162-180023805-1009
+administrator: false
+production runtime: F:\AITradingBot\runtime\python.exe
+Python: 3.14.3
+completed XNYS session: 2026-09-21
+all eight source-owned effect gates: false
+D8-A invoked: false
+D8-B authorized: false
+```
+
+The integrated checkout was also proven executable/source-equivalent to the
+certified D8-A diagnostic implementation; only the two canonical documentation
+files differ after the certified executable/source commit.
+
+Current boundary:
+
+```text
+D8-A diagnostic source             INTEGRATED / SOURCE CERTIFIED
+D8-A production preflight          PASS
+D8-A diagnostic rerun              AWAITING EXPLICIT OPERATOR APPROVAL
+D8-B                               NOT AUTHORIZED
+D9-A                               NOT APPLICABLE YET
+```
+
+Next: stop at the protected operator-approval boundary. If explicitly approved,
+run exactly one zero-semantic-argument D8-A Trading-principal read-only
+qualification from this checkout and preserve the bounded JSON and exit code.

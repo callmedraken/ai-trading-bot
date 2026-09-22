@@ -1901,3 +1901,70 @@ checkout/runtime for this integrated diagnostic source, including exact source
 identity and Trading-principal/runtime preflight. Do not invoke D8-A during that
 preparation. The diagnostic rerun remains a separate protected operator
 approval.
+
+## D8-A diagnostic production preflight accepted — 2026-09-22
+
+A fresh detached qualification checkout of integrated `develop` passed the
+non-effect production preflight under the dedicated Trading principal.
+
+```text
+checkout:
+F:\AI\worktrees\ai-trading-bot-d8a-diagnostic-production-qualification
+
+HEAD:
+82e2bdc98c1f7076f88802bdba379f416e6634e5
+
+TREE:
+f3c6b6b7b4fb635b2959496f1e99aba471540015
+
+principal:
+DESKTOP-I4DOKM7\Trading
+
+SID:
+S-1-5-21-1397534616-3988210162-180023805-1009
+
+administrator:
+false
+
+approved runtime:
+F:\AITradingBot\runtime\python.exe
+
+Python:
+3.14.3
+
+completed XNYS session:
+2026-09-21
+
+effect gates:
+False,False,False,False,False,False,False,False
+
+D8-A invoked:
+false
+```
+
+The checkout was clean and pinned to the expected integrated HEAD/tree. A
+separate source-equivalence check proved that only
+`docs/AI_TRADING_BOT_HANDOFF.md` and `docs/PROJECT_STATUS.md` differ between
+the certified executable/source commit and integrated `develop`; the D8-A
+runtime/test source remains the certified implementation.
+
+This preflight deliberately did not acquire or reuse public D8-A result
+authority. The reviewed zero-argument D8-A boundary remains responsible for
+fresh current-C1 acquisition, Trading-token validation, selected-C3 reads,
+finalized-decision replay, verified open/plan reconstruction, account
+predecessor checks, and PD4-C startup qualification.
+
+Operational boundary:
+
+```text
+D8-A diagnostic source             INTEGRATED / SOURCE CERTIFIED
+D8-A production preflight          PASS
+D8-A diagnostic rerun              AWAITING EXPLICIT OPERATOR APPROVAL
+D8-B                               NOT AUTHORIZED
+D9-A                               NOT APPLICABLE YET
+```
+
+Next: explicit operator approval may authorize exactly one protected
+zero-semantic-argument D8-A read-only invocation from the prepared checkout.
+Any BLOCKED/validation/contradiction result stops; no retry or mutation follows
+without a new review.

@@ -70,7 +70,9 @@ def test_evidence_timeline_page_is_read_only_and_has_no_effect_controls() -> Non
         "report-id",
     ]
     assert all(field.isReadOnly() for field in fields)
-    assert page.findChildren(QPushButton) == []
+    buttons = page.findChildren(QPushButton, "evidenceTimelineViewSourceButton")
+    assert len(buttons) == 2
+    assert all(button.text() == "View source page" for button in buttons)
 
     page.close()
 

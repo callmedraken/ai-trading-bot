@@ -1969,3 +1969,39 @@ and does not authorize a production D8-A rerun. Next: exact review of this
 docs-only closeout followed by merge-readiness review of
 `feature/pd4-d8a-blocked-diagnostics` against `develop`; stop at the merge
 approval boundary.
+
+## D8-A blocked-startup diagnostics — integrated through PR #18
+
+PR #18 merged the accepted diagnostic branch into `develop` with a normal
+history-preserving merge.
+
+```text
+accepted PR head:     9aa7487b6291b24ba2c95f54e63650dc901f832a
+merge commit:         cc6a4cc919af925a57d093a7fd3007ea877a2231
+resulting merge tree: 3d2379fe56ee31891adbadfb6a981fc7d63cd0ea
+PR-head -> merge:     no file differences
+```
+
+The authoritative executable/source certification remains
+`4aa2fb05331f34407ec2f9a12cf662abe17c08d6` /
+`aacedc5a571d3cf7b08f0d945c83648db4948f58`. The later branch closeout and
+merge add documentation/history only; they do not change the reviewed runtime
+or test source, so no second broad certification is required.
+
+Final review found exactly five changed files, no review comments or unresolved
+threads, no GitHub workflow runs associated with the PR head, and a clean
+synthetic merge whose tree-content comparison against the PR head contained no
+file differences.
+
+Operational boundaries remain unchanged:
+
+```text
+D8-A diagnostic source             INTEGRATED / SOURCE CERTIFIED
+D8-A production diagnostic rerun   NOT AUTHORIZED
+D8-B                               NOT AUTHORIZED
+D9-A                               NOT APPLICABLE YET
+```
+
+Next: prepare and verify an isolated production qualification checkout/runtime
+for the integrated diagnostic source. Stop before invoking D8-A; a fresh
+production diagnostic rerun remains a separate protected operator approval.

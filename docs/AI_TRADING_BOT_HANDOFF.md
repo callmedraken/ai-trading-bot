@@ -1840,3 +1840,64 @@ preflight.
 Next: ChatGPT exact review of this docs-only closeout, then merge-readiness
 review of `feature/pd4-d8a-blocked-diagnostics` against `develop`. Stop at
 the merge approval boundary.
+
+## D8-A blocked-startup diagnostics integration closeout — PR #18
+
+PR #18 (`Preserve bounded D8-A startup diagnostics`) was reviewed and merged
+into `develop` after final source certification.
+
+```text
+base develop:          749aa0082bd6a8e5064415403e530dc4c70f04f2
+accepted PR head:      9aa7487b6291b24ba2c95f54e63650dc901f832a
+merge commit:          cc6a4cc919af925a57d093a7fd3007ea877a2231
+resulting merge tree:  3d2379fe56ee31891adbadfb6a981fc7d63cd0ea
+PR-head -> merge files: none
+```
+
+The PR contained exactly five expected files: the D8-A settlement runtime, its
+runtime and CLI tests, `docs/PROJECT_STATUS.md`, and this handoff. Deep review
+confirmed that the implementation only forwards existing sanitized PD4-C enum
+evidence, preserves the exact startup-status/classification/diagnostic
+contract, adds no extra reader or call, and changes no mutex, recovery,
+authority, ordering, gate, or effect semantics. The CLI remains
+zero-semantic-argument and non-authorizing.
+
+PR review state at merge:
+
+```text
+mergeable:              true
+review submissions:     none
+review comments:        none
+unresolved threads:     none
+PR-head workflow runs:  none
+synthetic merge diff:   no files relative to PR head
+```
+
+The authoritative executable/source certification remains:
+
+```text
+HEAD: 4aa2fb05331f34407ec2f9a12cf662abe17c08d6
+TREE: aacedc5a571d3cf7b08f0d945c83648db4948f58
+broad: 5,975 passed, 17 skipped
+Architecture-77: 713 passed
+combined: 6,688 passed, 17 skipped
+Ruff / format / diff: PASS
+```
+
+The docs-only branch closeout and history-preserving merge do not alter that
+executable/source identity and therefore do not require another broad suite.
+
+Current operational state:
+
+```text
+D8-A diagnostic source             INTEGRATED / SOURCE CERTIFIED
+D8-A production diagnostic rerun   NOT AUTHORIZED
+D8-B                               NOT AUTHORIZED
+D9-A                               NOT APPLICABLE YET
+```
+
+Next checkpoint: prepare and verify an isolated production qualification
+checkout/runtime for this integrated diagnostic source, including exact source
+identity and Trading-principal/runtime preflight. Do not invoke D8-A during that
+preparation. The diagnostic rerun remains a separate protected operator
+approval.

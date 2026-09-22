@@ -1864,3 +1864,42 @@ decision targeting that session remains exact, the Trading principal and
 approved production runtime are in use, and all eight effect gates remain exact
 false. Only after those preconditions are reviewed should one fresh protected
 D8-A read-only qualification be considered. D8-B remains unauthorized.
+
+## D8-A blocked-startup diagnostics — source checkpoint, 2026-09-22
+
+The subsequent protected read-only D8-A run reconstructed completed execution
+session `2026-09-21` and the following exact evidence before PD4-C returned
+`BLOCKED`:
+
+```text
+decision:                    f2188b5e-e6a4-5398-be41-8867d9268355
+decision selected snapshot:  680b260f-08c9-5923-87bb-b5f0a4701380
+execution selected snapshot: bf0ca2a7-1236-5240-9b1e-6c31cf2388ed
+final plan:                  29c880dc-f10e-566c-a6e1-e3d73fa04c69
+account predecessor:         ed4640e5-0630-525d-b916-d50e31e3ba2a
+all eight gates closed:      true
+real_effect_performed:       false
+```
+
+No invocation/application/operation/terminal identity was surfaced. The result
+does not establish the particular blocked startup branch.
+
+The bounded source checkpoint on `feature/pd4-d8a-blocked-diagnostics` starts
+from HEAD `749aa0082bd6a8e5064415403e530dc4c70f04f2` / tree
+`38ae0f8ff96094af59ad951a0eb0445380c3f4d1`. D8-A now carries the existing
+sanitized PD4-C diagnostic, storage classification, operation classification,
+operation diagnostic, and mutex acquisition state as optional `startup_*`
+enum fields. The existing deterministic CLI serializer supports these enums
+without a CLI source change. No reader, call, authority, identity, gate,
+qualification classification, or effect semantics change.
+
+Focused D8-A runtime, PD4-C startup, and D8-A CLI verification: **118 passed**.
+This is an implementation checkpoint pending ChatGPT exact-diff review and
+final certification, not production acceptance. Existing generic early/error
+branches remain indistinguishable; the branch inventory and evidence limits
+are recorded in `docs/AI_TRADING_BOT_HANDOFF.md`.
+
+Next: ChatGPT reviews the exact committed diff, then supplies/accepts final
+local certification before any separately approved D8-A diagnostic rerun.
+D8-A was not rerun during this source task. D8-B remains unauthorized; GUI work
+and the armed D5 deployment remain unchanged.

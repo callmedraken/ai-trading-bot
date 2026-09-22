@@ -1612,3 +1612,100 @@ milestone: presentation-only links from already-rendered System audit identities
 to matching Evidence Timeline entries, with no new reader, discovery, authority,
 or effect path. D8-A remains a separate protected operational checkpoint and
 D8-B remains unauthorized.
+
+## GUI-A12 read-only System / Evidence cross-navigation — SOURCE CERTIFIED
+
+Architecture 119 and its validation plan define GUI-A12 on:
+
+```text
+branch: feature/gui-a12-system-evidence-cross-navigation
+base develop: 360063ddcfce58056c2a7ab1499c9d5d13ae8107
+architecture: docs/architecture/119-gui-system-evidence-cross-navigation.md
+validation: docs/validation/gui-a12-system-evidence-cross-navigation.md
+```
+
+GUI-A12 adds presentation-only cross-navigation from bounded System Health &
+Audit identities into the accepted A11 Evidence Explorer. The navigation target
+contains only a closed Evidence source and exact bounded identifier. MainWindow
+coordinates the page switch and applies the existing Evidence source/search
+controls without adding any service read, artifact read, discovery path,
+authority acquisition, credential access, scheduler access, provider/broker
+call, durable mutation, or execution effect.
+
+Final certified executable/source identity:
+
+```text
+HEAD: dc79e74164345d97163a8a16a8c540cc870778c0
+TREE: 2ee3fde29ea9489e8ae5efbece5bd89371396c11
+```
+
+Accepted evidence:
+
+```text
+focused A12 gate:                  30 passed
+complete GUI regression:          333 passed
+
+broad non-Architecture-77:      5,872 passed, 17 skipped
+Architecture-77 dedicated run:    758 passed
+combined final certification:   6,630 passed, 17 skipped
+
+Ruff check:                     PASS
+Ruff format --check:            PASS (583 files)
+git diff --check:               PASS
+git diff --cached --check:      PASS
+feature worktree/index:         clean
+visual gate:                    PASS
+```
+
+Visual certification covered the populated System Health & Audit view and
+System -> Evidence transitions for both Research and Market Data at the existing
+920x620 minimum size. The navigation control remains visually secondary, the
+read-only/not-authority framing remains visible, the exact source and identifier
+filters are applied, and matching identifier/hash values remain selectable.
+
+Independent final GitHub review found the branch 8 commits ahead and 0 behind
+its exact `develop` base with 9 expected architecture/validation/GUI/test
+files. The source diff is limited to the Qt-free navigation target and closed
+source map, Evidence presentation targeting, System audit navigation controls,
+MainWindow page coordination/styling, and focused regression coverage.
+
+Review confirmed that cross-navigation is exact source + exact identifier.
+Identifiers longer than the accepted A11 200-character search bound fail closed
+instead of being truncated. A System target cannot broaden to another source or
+substring-match another identity: the Evidence page retains a dedicated exact
+navigation target after applying the visible A11 filters and narrows the
+rendered entries to exact source/identifier equality.
+
+MainWindow still performs the existing six service reads. Cross-navigation adds
+zero service rereads and no filesystem discovery, production O2, C1/C2/C3,
+Credential Manager, provider/broker network access, Task Scheduler, paper/live
+execution, settlement, recovery, durable write, or path/receipt disclosure.
+
+Final GUI-A12 acceptance:
+
+```text
+CROSS_NAV_FROM_PRESENTATION_ONLY=True
+SYSTEM_TO_EVIDENCE_EXACT_SOURCE_IDENTIFIER=True
+SERVICE_REREADS_ON_CROSS_NAVIGATION=0
+NEW_RUNTIME_IO=False
+FILESYSTEM_DISCOVERY=False
+PRODUCTION_O2_ACCESS=False
+C1_C2_C3_ACCESS=False
+CREDENTIAL_ACCESS=False
+PROVIDER_NETWORK_ACCESS=False
+SCHEDULER_ACCESS=False
+PAPER_EXECUTION=False
+SETTLEMENT_EFFECT=False
+RECOVERY_EFFECT=False
+BROKERAGE_ACCESS=False
+PATH_OR_RECEIPT_DISCLOSURE=False
+VISUAL_GATE=PASSED
+FULL_REGRESSION=PASSED
+```
+
+GUI-A12 source is certified and ready for PR review/integration. PR creation and
+merge remain explicit repository-control boundaries.
+
+After A12 integration, continue GUI work automatically with the next bounded
+read-only presentation milestone. D8-A remains a separate protected operational
+checkpoint and D8-B remains unauthorized.

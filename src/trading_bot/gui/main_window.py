@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from trading_bot.gui.evidence_navigation import EvidenceNavigationTarget
 from trading_bot.gui.evidence_timeline_adapter import build_evidence_timeline_state
 from trading_bot.gui.evidence_timeline_page import EvidenceTimelinePage
 from trading_bot.gui.market_data_page import MarketDataPage
@@ -122,6 +123,9 @@ class MainWindow(QMainWindow):
         )
         self._stack.addWidget(self._evidence_timeline_page)
         self._system_health_page = SystemHealthPage(system_health_state, self)
+        self._system_health_page.evidence_navigation_requested.connect(
+            self._show_evidence_navigation_target
+        )
         self._stack.addWidget(self._system_health_page)
 
         layout.addWidget(self._navigation)
@@ -150,6 +154,15 @@ class MainWindow(QMainWindow):
         except KeyError as error:
             raise ValueError(f"unknown GUI page: {page_id}") from error
         self._navigation.setCurrentRow(index)
+
+    def _show_evidence_navigation_target(
+        self,
+        target: EvidenceNavigationTarget,
+    ) -> None:
+        if type(target) is not EvidenceNavigationTarget:
+            raise TypeError("target must be an exact EvidenceNavigationTarget")
+        self.select_page("evidence")
+        self._evidence_timeline_page.show_navigation_target(target)
 
     def _build_navigation(self) -> QListWidget:
         navigation = QListWidget(self)
@@ -476,6 +489,18 @@ class MainWindow(QMainWindow):
                 background: #182235;
                 border: 1px solid #2a3950;
                 border-radius: 8px;
+            }
+            QPushButton#systemHealthViewEvidenceButton {
+                background: transparent;
+                color: #93c5fd;
+                border: 1px solid #334155;
+                border-radius: 6px;
+                padding: 5px 9px;
+                font-weight: 600;
+            }
+            QPushButton#systemHealthViewEvidenceButton:hover {
+                background: #1f2937;
+                color: #bfdbfe;
             }
             QLineEdit[readOnly="true"] {
                 background: #0b1220;

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QSignalBlocker, Qt
 from PySide6.QtWidgets import (
     QComboBox,
     QFrame,
@@ -20,6 +20,7 @@ from trading_bot.gui.evidence_explorer import (
     EvidenceTimelineFilter,
     filter_evidence_timeline_entries,
 )
+from trading_bot.gui.evidence_navigation import EvidenceNavigationTarget
 from trading_bot.gui.evidence_timeline_models import (
     EvidenceTimelineEntry,
     EvidenceTimelinePageState,
@@ -41,6 +42,7 @@ class EvidenceTimelinePage(QWidget):
         self.setObjectName("evidenceTimelinePage")
         self._state = state
         self._sources = (None, *tuple(EvidenceTimelineSource))
+        self._navigation_target: EvidenceNavigationTarget | None = None
         self._build()
 
     def _build(self) -> None:
@@ -94,7 +96,7 @@ class EvidenceTimelinePage(QWidget):
         self._search.setPlaceholderText("Search displayed evidence")
         self._search.setMaxLength(MAX_EVIDENCE_TIMELINE_FILTER_CHARACTERS)
         self._search.setClearButtonEnabled(True)
-        self._search.textChanged.connect(self._refresh_entries)
+        self._search.textChanged.connect(self._on_filter_changed)
         controls.addWidget(self._search, 1)
 
         self._source = QComboBox(content)
@@ -102,7 +104,7 @@ class EvidenceTimelinePage(QWidget):
         self._source.addItem("All sources")
         for source in EvidenceTimelineSource:
             self._source.addItem(source.value)
-        self._source.currentIndexChanged.connect(self._refresh_entries)
+        self._source.currentIndexChanged.connect(self._on_filter_changed)
         controls.addWidget(self._source)
 
         layout.addLayout(controls)
@@ -124,10 +126,39 @@ class EvidenceTimelinePage(QWidget):
         self._refresh_entries()
         self._scroll.verticalScrollBar().setValue(0)
 
+    def show_navigation_target(self, target: EvidenceNavigationTarget) -> None:
+        """Show one exact System-audit identity without rereading any service."""
+        if type(target) is not EvidenceNavigationTarget:
+            raise TypeError("target must be an exact EvidenceNavigationTarget")
+
+        source_index = self._sources.index(target.source)
+        source_blocker = QSignalBlocker(self._source)
+        search_blocker = QSignalBlocker(self._search)
+        self._source.setCurrentIndex(source_index)
+        self._search.setText(target.identifier)
+        del search_blocker
+        del source_blocker
+
+        self._navigation_target = target
+        self._refresh_entries()
+        self._scroll.verticalScrollBar().setValue(0)
+
+    def _on_filter_changed(self) -> None:
+        self._navigation_target = None
+        self._refresh_entries()
+
     def _refresh_entries(self) -> None:
         source = self._sources[self._source.currentIndex()]
         filter_state = EvidenceTimelineFilter(self._search.text(), source)
         entries = filter_evidence_timeline_entries(self._state, filter_state)
+        if self._navigation_target is not None:
+            target = self._navigation_target
+            entries = tuple(
+                entry
+                for entry in entries
+                if entry.source is target.source
+                and entry.identifier == target.identifier
+            )
 
         self._clear_entry_widgets()
         total = len(self._state.entries)

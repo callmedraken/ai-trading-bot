@@ -2,17 +2,22 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QFrame,
     QGridLayout,
     QLabel,
     QLineEdit,
+    QPushButton,
     QScrollArea,
     QVBoxLayout,
     QWidget,
 )
 
+from trading_bot.gui.evidence_navigation import (
+    EvidenceNavigationTarget,
+    build_evidence_navigation_target,
+)
 from trading_bot.gui.system_health_models import (
     SystemAuditEntryView,
     SystemComponentHealthView,
@@ -36,6 +41,8 @@ _STATUS_PROPERTIES = {
 
 class SystemHealthPage(QWidget):
     """Read-only view derived only from already-acquired GUI presentation state."""
+
+    evidence_navigation_requested = Signal(object)
 
     def __init__(
         self,
@@ -213,18 +220,32 @@ class SystemHealthPage(QWidget):
         identifier.setObjectName(f"systemHealthAuditIdentifier{index}")
         layout.addWidget(identifier, 1, 1)
 
+        row = 2
         if entry.sha256 is not None:
             hash_label = QLabel("SHA-256", card)
             hash_label.setObjectName("systemHealthFieldLabel")
             hash_label.setTextFormat(Qt.TextFormat.PlainText)
-            layout.addWidget(hash_label, 2, 0)
+            layout.addWidget(hash_label, row, 0)
 
             digest = _readonly_value(entry.sha256, card)
             digest.setObjectName(f"systemHealthAuditSha256{index}")
-            layout.addWidget(digest, 2, 1)
+            layout.addWidget(digest, row, 1)
+            row += 1
+
+        target = build_evidence_navigation_target(entry)
+        if target is not None:
+            navigate = QPushButton("View in Evidence", card)
+            navigate.setObjectName("systemHealthViewEvidenceButton")
+            navigate.clicked.connect(
+                lambda _checked=False, target=target: self._emit_evidence_target(target)
+            )
+            layout.addWidget(navigate, row, 1, alignment=Qt.AlignmentFlag.AlignRight)
 
         layout.setColumnStretch(1, 1)
         return card
+
+    def _emit_evidence_target(self, target: EvidenceNavigationTarget) -> None:
+        self.evidence_navigation_requested.emit(target)
 
 
 def _readonly_value(value: str, parent: QWidget) -> QLineEdit:

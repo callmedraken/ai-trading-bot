@@ -1525,3 +1525,55 @@ settlement, recovery, durable-write, or path/receipt-disclosure path was added.
 Continue automatically with GUI-A12 read-only System/Evidence
 cross-navigation derived only from already-rendered bounded identities. D8-A
 remains separate and protected; D8-B remains protected and unauthorized.
+
+## GUI-A12 read-only System / Evidence cross-navigation — source certified
+
+GUI-A12 is source-certified on:
+
+```text
+branch: feature/gui-a12-system-evidence-cross-navigation
+base develop: 360063ddcfce58056c2a7ab1499c9d5d13ae8107
+HEAD: dc79e74164345d97163a8a16a8c540cc870778c0
+TREE: 2ee3fde29ea9489e8ae5efbece5bd89371396c11
+```
+
+Architecture 119 keeps A12 inside accepted A9-A11 presentation boundaries.
+System audit entries map through a closed source vocabulary into immutable
+`EvidenceNavigationTarget` values containing only source + identifier.
+MainWindow performs the page coordination and reuses the existing Evidence
+Explorer controls; no service reread or artifact I/O occurs.
+
+Accepted final evidence:
+
+```text
+focused A12:                   30 passed
+complete GUI regression:     333 passed
+broad non-Architecture-77: 5,872 passed, 17 skipped
+Architecture-77:             758 passed
+combined:                  6,630 passed, 17 skipped
+Ruff check:                PASS
+Ruff format --check:       PASS (583 files)
+diff checks:               PASS
+visual gate:               PASS
+```
+
+Visual certification covered the populated System page plus Research and Market
+Data System -> Evidence transitions at 920x620. Exact source/identifier filters
+are visibly applied and the resulting Evidence card remains readable/selectable.
+
+Independent final GitHub review found 9 expected changed files, 8 commits ahead
+and 0 behind the exact base. Exact-navigation semantics are preserved with a
+closed System-source map and exact source/identifier equality. Identifiers over
+the accepted A11 200-character search bound fail closed rather than truncating.
+
+No new runtime I/O, discovery, production O2, C1/C2/C3, Credential Manager,
+provider/broker call, Task Scheduler, paper/live execution, settlement,
+recovery, durable write, or path/receipt disclosure was introduced.
+Cross-navigation causes zero service rereads.
+
+GUI-A12 is ready for PR review/integration. PR creation and merge remain
+explicit approval boundaries.
+
+After integration, continue GUI work automatically with the next bounded
+read-only presentation milestone. D8-A remains separate and protected; D8-B
+remains protected and unauthorized.

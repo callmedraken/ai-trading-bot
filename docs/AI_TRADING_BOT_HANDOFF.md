@@ -1663,6 +1663,13 @@ and adds no runtime I/O, discovery, authority, credential, scheduler,
 provider/broker, execution, settlement, recovery, durable-write, or new
 path/receipt-disclosure path.
 
-Continue automatically with GUI-A14 read-only Source Page -> Evidence
-cross-navigation using only already-acquired presentation identities. D8-A
-remains separate and protected; D8-B remains protected and unauthorized.
+Pause the GUI track after GUI-A13 and return to the primary PD4 operational
+track. GUI-A14 remains a future bounded read-only presentation candidate.
+
+Next: obtain fresh read-only post-D5 evidence for the 2026-09-21 execution
+session, then review D8-A eligibility. Do not invoke D8-A merely because the
+wall-clock time is after the 01:30 Pacific D5 wake; first prove the wake/capture
+completed, current-C1 selected C3(2026-09-21) exists, the finalized decision is
+still exact, the Trading principal / approved production runtime are correct,
+and all eight effect gates remain false. D8-A is read-only but still a protected
+operational checkpoint. D8-B remains protected and unauthorized.

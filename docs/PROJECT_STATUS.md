@@ -1852,8 +1852,15 @@ certification docs, PR metadata, reviews/threads/comments, status/workflow
 state, and GitHub's synthetic merge. No blocker was found. The synthetic merge
 and actual merge both preserve the accepted PR-head tree exactly.
 
-GUI-A14 read-only Source Page -> Evidence cross-navigation is the next safe GUI
-milestone: each already-rendered source page may navigate its bounded primary
-identity into the existing exact A12 Evidence targeting path, with no new
-service read, source rediscovery, authority, or effect path. D8-A remains a
-separate protected operational checkpoint and D8-B remains unauthorized.
+GUI work is intentionally paused after GUI-A13 so development can return to
+the primary PD4 operational track. GUI-A14 remains a future safe presentation
+candidate, but it is not the active next milestone.
+
+The active next checkpoint is the previously frozen protected D8-A transition:
+first obtain fresh read-only evidence after the normal 2026-09-22 01:30 Pacific
+D5 wake proving the source-owned calendar derives completed session
+`2026-09-21`, current-C1 selected C3 for `2026-09-21` exists, the finalized
+decision targeting that session remains exact, the Trading principal and
+approved production runtime are in use, and all eight effect gates remain exact
+false. Only after those preconditions are reviewed should one fresh protected
+D8-A read-only qualification be considered. D8-B remains unauthorized.

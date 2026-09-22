@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import QSignalBlocker, Qt
+from PySide6.QtCore import QSignalBlocker, Qt, Signal
 from PySide6.QtWidgets import (
     QComboBox,
     QFrame,
@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QPushButton,
     QScrollArea,
     QVBoxLayout,
     QWidget,
@@ -21,6 +22,10 @@ from trading_bot.gui.evidence_explorer import (
     filter_evidence_timeline_entries,
 )
 from trading_bot.gui.evidence_navigation import EvidenceNavigationTarget
+from trading_bot.gui.evidence_source_navigation import (
+    EvidenceSourcePageTarget,
+    build_evidence_source_page_target,
+)
 from trading_bot.gui.evidence_timeline_models import (
     EvidenceTimelineEntry,
     EvidenceTimelinePageState,
@@ -30,6 +35,8 @@ from trading_bot.gui.evidence_timeline_models import (
 
 class EvidenceTimelinePage(QWidget):
     """Read-only timeline and local explorer over already-acquired GUI state."""
+
+    source_navigation_requested = Signal(object)
 
     def __init__(
         self,
@@ -261,9 +268,21 @@ class EvidenceTimelinePage(QWidget):
         detail.setTextFormat(Qt.TextFormat.PlainText)
         detail.setWordWrap(True)
         layout.addWidget(detail, row, 1)
+        row += 1
+
+        target = build_evidence_source_page_target(entry)
+        navigate = QPushButton("View source page", card)
+        navigate.setObjectName("evidenceTimelineViewSourceButton")
+        navigate.clicked.connect(
+            lambda _checked=False, target=target: self._emit_source_target(target)
+        )
+        layout.addWidget(navigate, row, 1, alignment=Qt.AlignmentFlag.AlignRight)
 
         layout.setColumnStretch(1, 1)
         return card
+
+    def _emit_source_target(self, target: EvidenceSourcePageTarget) -> None:
+        self.source_navigation_requested.emit(target)
 
 
 def _readonly_value(value: str, parent: QWidget) -> QLineEdit:

@@ -9,6 +9,11 @@ from trading_bot.gui.evidence_navigation import (
     EvidenceNavigationTarget,
     build_evidence_navigation_target,
 )
+from trading_bot.gui.evidence_source_navigation import (
+    EvidenceSourcePage,
+    EvidenceSourcePageTarget,
+    build_evidence_source_page_target,
+)
 from trading_bot.gui.evidence_timeline_adapter import build_evidence_timeline_state
 from trading_bot.gui.evidence_timeline_models import (
     MAX_EVIDENCE_TIMELINE_ENTRIES,
@@ -113,6 +118,8 @@ __all__ = [
     "ComponentStatus",
     "CompactReportResearchService",
     "EvidenceNavigationTarget",
+    "EvidenceSourcePage",
+    "EvidenceSourcePageTarget",
     "EvidenceTimelineEntry",
     "EvidenceTimelineFilter",
     "EvidenceTimelinePageState",
@@ -182,6 +189,7 @@ __all__ = [
     "VerifiedSnapshotInspectionService",
     "VerifiedSuccessorPaperAccountInspectionService",
     "build_evidence_navigation_target",
+    "build_evidence_source_page_target",
     "build_evidence_timeline_state",
     "filter_evidence_timeline_entries",
     "build_system_health_state",

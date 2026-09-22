@@ -5,7 +5,7 @@ from __future__ import annotations
 import ast
 import inspect
 from copy import copy, deepcopy
-from dataclasses import fields
+from dataclasses import fields, replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
@@ -66,6 +66,7 @@ OTHER_ACCOUNT_ID = "8415cd7b-bf36-5fba-bd58-a0f99119dc22"
 MISSING_APPLICATION_ID = UUID("60000000-0000-0000-0000-000000000006")
 MISSING_PREDECESSOR_ID = UUID("70000000-0000-0000-0000-000000000007")
 WRONG_OPERATION_ID = UUID("80000000-0000-0000-0000-000000000008")
+BlockedReason = startup.PersonalDesktopUnattendedPaperStartupBlockedReason
 
 
 class _Account:
@@ -357,6 +358,118 @@ def _run(
         disposable, c1, selected, _inputs(), calendar()
     )
     return result, events, disposable
+
+
+@pytest.mark.parametrize(
+    "case,reason",
+    [
+        ("pre_recovery_blocked", BlockedReason.PRE_RECOVERY_BLOCKED),
+        ("pre_recovery_status_invalid", BlockedReason.PRE_RECOVERY_STATUS_INVALID),
+        ("pre_recovery_account_mismatch", BlockedReason.PRE_RECOVERY_ACCOUNT_MISMATCH),
+        ("recovery_mutex_mismatch", BlockedReason.RECOVERY_MUTEX_MISMATCH),
+        (
+            "recovery_held_requalification_drift",
+            BlockedReason.RECOVERY_HELD_REQUALIFICATION_DRIFT,
+        ),
+        (
+            "recovery_final_requalification_drift",
+            BlockedReason.RECOVERY_FINAL_REQUALIFICATION_DRIFT,
+        ),
+        ("healthy_mutex_mismatch", BlockedReason.HEALTHY_MUTEX_MISMATCH),
+        ("post_lock_recovery_mismatch", BlockedReason.POST_LOCK_RECOVERY_MISMATCH),
+        ("post_lock_account_mismatch", BlockedReason.POST_LOCK_ACCOUNT_MISMATCH),
+        ("invocation_storage_unsafe", BlockedReason.INVOCATION_STORAGE_UNSAFE),
+        (
+            "initial_operation_inspection_unsafe",
+            BlockedReason.INITIAL_OPERATION_INSPECTION_UNSAFE,
+        ),
+        ("final_account_drift", BlockedReason.FINAL_ACCOUNT_DRIFT),
+        (
+            "final_operation_inspection_unsafe",
+            BlockedReason.FINAL_OPERATION_INSPECTION_UNSAFE,
+        ),
+        ("exception_collapsed", BlockedReason.EXCEPTION_COLLAPSED),
+    ],
+)
+def test_each_blocked_path_has_one_fixed_sanitized_reason(case, reason):
+    evidence = _post_lock_evidence()
+    required = _recovery_required(evidence)
+    no_recovery = _no_recovery(evidence)
+    invalid = _no_recovery(evidence)
+    object.__setattr__(invalid, "status", "secret/raw/status")
+    scenarios = {
+        "pre_recovery_blocked": {"recovery_results": [_recovery_blocked()]},
+        "pre_recovery_status_invalid": {"recovery_results": [invalid]},
+        "pre_recovery_account_mismatch": {
+            "recovery_results": [
+                replace(no_recovery, paper_account_id=OTHER_ACCOUNT_ID)
+            ]
+        },
+        "recovery_mutex_mismatch": {
+            "recovery_results": [required],
+            "mutex_state": PaperAccountMutexState.ABANDONED_OWNER,
+        },
+        "recovery_held_requalification_drift": {
+            "recovery_results": [required, _recovery_blocked()]
+        },
+        "recovery_final_requalification_drift": {
+            "recovery_results": [required, required, _recovery_blocked()]
+        },
+        "healthy_mutex_mismatch": {
+            "mutex_state": PaperAccountMutexState.ABANDONED_OWNER
+        },
+        "post_lock_recovery_mismatch": {"recovery_results": [no_recovery, required]},
+        "post_lock_account_mismatch": {
+            "account_evidences": [
+                evidence,
+                _changed_account_id(evidence, OTHER_ACCOUNT_ID),
+            ]
+        },
+        "invocation_storage_unsafe": {
+            "storage_classification": (
+                PersonalDesktopUnattendedInvocationStorageClassification.BLOCKED
+            )
+        },
+        "initial_operation_inspection_unsafe": {
+            "operation_classification": PaperOperationClassification.BLOCKED
+        },
+        "final_account_drift": {
+            "account_evidences": [evidence, evidence, _drifted(evidence)]
+        },
+        "final_operation_inspection_unsafe": {
+            "final_operation_classification": (
+                PaperOperationClassification.ALREADY_APPLIED
+            )
+        },
+        "exception_collapsed": {
+            "build_error": RuntimeError("secret/raw/path/credential")
+        },
+    }
+    result, events, _ = _run(**scenarios[case])
+    assert result.status is PersonalDesktopUnattendedPaperStartupStatus.BLOCKED
+    assert result.blocked_reason is reason
+    assert (
+        result.diagnostic
+        is startup.PersonalDesktopUnattendedPaperStartupDiagnostic.QUALIFICATION_BLOCKED
+    )
+    assert "secret" not in repr(result)
+    assert not any(event[0] == "effect" for event in events)
+
+
+def test_blocked_reason_result_contract_rejects_forged_or_inconsistent_values():
+    blocked = startup._blocked_result(BlockedReason.PRE_RECOVERY_BLOCKED)
+    healthy, _, _ = _run()
+    for bad in (
+        None,
+        "PRE_RECOVERY_BLOCKED",
+        startup.PersonalDesktopUnattendedPaperStartupDiagnostic.QUALIFICATION_BLOCKED,
+    ):
+        with pytest.raises(ValueError, match="result is invalid"):
+            replace(blocked, blocked_reason=bad)
+    with pytest.raises(ValueError, match="result is invalid"):
+        replace(healthy, blocked_reason=BlockedReason.PRE_RECOVERY_BLOCKED)
+    with pytest.raises(TypeError):
+        startup._blocked_result()
 
 
 @pytest.mark.parametrize(

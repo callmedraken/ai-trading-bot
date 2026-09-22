@@ -2043,3 +2043,25 @@ D9-A                               NOT APPLICABLE YET
 Next: stop at the protected operator-approval boundary. If explicitly approved,
 run exactly one zero-semantic-argument D8-A Trading-principal read-only
 qualification from this checkout and preserve the bounded JSON and exit code.
+
+## D8-A protected one-shot result and bounded block-reason source checkpoint
+
+Exactly one approved diagnostic D8-A invocation was performed. It returned
+`BLOCKED` (exit 6) for completed execution session `2026-09-21`, decision
+`f2188b5e-e6a4-5398-be41-8867d9268355`, selected decision session
+`2026-09-18`, decision snapshot `680b260f-08c9-5923-87bb-b5f0a4701380`,
+execution snapshot `bf0ca2a7-1236-5240-9b1e-6c31cf2388ed`, final plan
+`29c880dc-f10e-566c-a6e1-e3d73fa04c69`, and account predecessor
+`ed4640e5-0630-525d-b916-d50e31e3ba2a`. PD4-C startup returned `BLOCKED`
+with `QUALIFICATION_BLOCKED`; mutex, storage, operation, invocation, application,
+and terminal checkpoint diagnostics were null. All eight gates were closed,
+`real_effect_performed` was false, and all eight gates remained false afterward.
+
+The authorized invocation is consumed **1/1**. No D8-A retry is authorized.
+D8-B remains unauthorized; D9-A is not applicable.
+
+The source-only checkpoint on `feature/pd4-d8a-block-reason` adds one fixed,
+sanitized PD4-C blocked-reason enum, passes it through D8-A, and validates its
+presence only when PD4-C startup is `BLOCKED`. It distinguishes existing block
+classes on a future separately reviewed result; it does not retroactively
+identify the class of the observed production block or authorize another run.

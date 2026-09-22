@@ -1968,3 +1968,22 @@ Next: explicit operator approval may authorize exactly one protected
 zero-semantic-argument D8-A read-only invocation from the prepared checkout.
 Any BLOCKED/validation/contradiction result stops; no retry or mutation follows
 without a new review.
+
+## D8-A one-shot BLOCKED observation and next source-only diagnostic
+
+The approved diagnostic D8-A invocation was consumed **1/1**. It returned
+`BLOCKED`, exit 6, with completed execution session `2026-09-21`, decision
+`f2188b5e-e6a4-5398-be41-8867d9268355`, selected decision session
+`2026-09-18`, decision snapshot `680b260f-08c9-5923-87bb-b5f0a4701380`,
+execution snapshot `bf0ca2a7-1236-5240-9b1e-6c31cf2388ed`, final plan
+`29c880dc-f10e-566c-a6e1-e3d73fa04c69`, and account predecessor
+`ed4640e5-0630-525d-b916-d50e31e3ba2a`. PD4-C reported startup
+`BLOCKED` / `QUALIFICATION_BLOCKED`. Mutex, storage, operation, invocation,
+application, and terminal checkpoint fields were null. All eight effect gates
+were closed before and after; `real_effect_performed` was false.
+
+No D8-A retry is authorized. D8-B remains unauthorized; D9-A is not applicable.
+The `feature/pd4-d8a-block-reason` source checkpoint adds a bounded enum to
+identify which existing PD4-C blocked path produced a future result, without
+changing startup authority, read counts, ordering, effects, or recovery. It
+cannot retrospectively identify the class of the observed production block.

@@ -80,6 +80,7 @@ from trading_bot.runtime.windows_authority_validation import (
 )
 
 from .personal_desktop_unattended_paper_startup_qualification import (
+    PersonalDesktopUnattendedPaperStartupBlockedReason,
     PersonalDesktopUnattendedPaperStartupDiagnostic,
     PersonalDesktopUnattendedPaperStartupQualificationResult,
     PersonalDesktopUnattendedPaperStartupStatus,
@@ -126,6 +127,9 @@ class SettlementQualificationResult:
     startup_operation_classification: PaperOperationClassification | None = None
     startup_operation_diagnostic: PaperOperationInspectionCode | None = None
     startup_mutex_acquisition_state: PaperAccountMutexState | None = None
+    startup_blocked_reason: (
+        PersonalDesktopUnattendedPaperStartupBlockedReason | None
+    ) = None
 
     def __post_init__(self) -> None:
         startup_mapping = {
@@ -152,6 +156,7 @@ class SettlementQualificationResult:
         }
         startup_diagnostic_fields = (
             self.startup_diagnostic,
+            self.startup_blocked_reason,
             self.startup_storage_classification,
             self.startup_operation_classification,
             self.startup_operation_diagnostic,
@@ -165,6 +170,19 @@ class SettlementQualificationResult:
             and startup_mapping.get(self.startup_status)
             == (self.classification, self.startup_diagnostic)
             and self.all_eight_gates_closed is True
+            and (
+                (
+                    self.startup_status
+                    is PersonalDesktopUnattendedPaperStartupStatus.BLOCKED
+                    and type(self.startup_blocked_reason)
+                    is PersonalDesktopUnattendedPaperStartupBlockedReason
+                )
+                or (
+                    self.startup_status
+                    is not PersonalDesktopUnattendedPaperStartupStatus.BLOCKED
+                    and self.startup_blocked_reason is None
+                )
+            )
         )
         if (
             type(self.classification) is not Status
@@ -202,6 +220,10 @@ class SettlementQualificationResult:
                     (
                         self.startup_diagnostic,
                         PersonalDesktopUnattendedPaperStartupDiagnostic,
+                    ),
+                    (
+                        self.startup_blocked_reason,
+                        PersonalDesktopUnattendedPaperStartupBlockedReason,
                     ),
                     (
                         self.startup_storage_classification,
@@ -528,6 +550,7 @@ def _run(
             startup_operation_classification=startup.operation_classification,
             startup_operation_diagnostic=startup.operation_diagnostic,
             startup_mutex_acquisition_state=startup.mutex_acquisition_state,
+            startup_blocked_reason=startup.blocked_reason,
         )
     except Exception:
         return SettlementQualificationResult(Status.BLOCKED)

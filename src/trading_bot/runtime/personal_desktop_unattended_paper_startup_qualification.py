@@ -109,6 +109,25 @@ class PersonalDesktopUnattendedPaperStartupDiagnostic(StrEnum):
     QUALIFICATION_BLOCKED = "QUALIFICATION_BLOCKED"
 
 
+class PersonalDesktopUnattendedPaperStartupBlockedReason(StrEnum):
+    """Fixed, sanitized class of a PD4-C blocked startup path."""
+
+    PRE_RECOVERY_BLOCKED = "PRE_RECOVERY_BLOCKED"
+    PRE_RECOVERY_STATUS_INVALID = "PRE_RECOVERY_STATUS_INVALID"
+    PRE_RECOVERY_ACCOUNT_MISMATCH = "PRE_RECOVERY_ACCOUNT_MISMATCH"
+    RECOVERY_MUTEX_MISMATCH = "RECOVERY_MUTEX_MISMATCH"
+    RECOVERY_HELD_REQUALIFICATION_DRIFT = "RECOVERY_HELD_REQUALIFICATION_DRIFT"
+    RECOVERY_FINAL_REQUALIFICATION_DRIFT = "RECOVERY_FINAL_REQUALIFICATION_DRIFT"
+    HEALTHY_MUTEX_MISMATCH = "HEALTHY_MUTEX_MISMATCH"
+    POST_LOCK_RECOVERY_MISMATCH = "POST_LOCK_RECOVERY_MISMATCH"
+    POST_LOCK_ACCOUNT_MISMATCH = "POST_LOCK_ACCOUNT_MISMATCH"
+    INVOCATION_STORAGE_UNSAFE = "INVOCATION_STORAGE_UNSAFE"
+    INITIAL_OPERATION_INSPECTION_UNSAFE = "INITIAL_OPERATION_INSPECTION_UNSAFE"
+    FINAL_ACCOUNT_DRIFT = "FINAL_ACCOUNT_DRIFT"
+    FINAL_OPERATION_INSPECTION_UNSAFE = "FINAL_OPERATION_INSPECTION_UNSAFE"
+    EXCEPTION_COLLAPSED = "EXCEPTION_COLLAPSED"
+
+
 @dataclass(frozen=True, slots=True)
 class PersonalDesktopUnattendedPaperStartupQualificationResult:
     """Immutable, sanitized, non-authorizing point-in-time evidence."""
@@ -129,6 +148,7 @@ class PersonalDesktopUnattendedPaperStartupQualificationResult:
     recovery_missing_application_id: UUID | None
     recovery_predecessor_checkpoint_id: UUID | None
     mutex_acquisition_state: PaperAccountMutexState | None
+    blocked_reason: PersonalDesktopUnattendedPaperStartupBlockedReason | None = None
 
     def __post_init__(self) -> None:
         status = self.status
@@ -172,6 +192,15 @@ class PersonalDesktopUnattendedPaperStartupQualificationResult:
             or type(self.diagnostic)
             is not PersonalDesktopUnattendedPaperStartupDiagnostic
             or self.diagnostic is not expected_diagnostic
+            or (
+                status is PersonalDesktopUnattendedPaperStartupStatus.BLOCKED
+                and type(self.blocked_reason)
+                is not PersonalDesktopUnattendedPaperStartupBlockedReason
+            )
+            or (
+                status is not PersonalDesktopUnattendedPaperStartupStatus.BLOCKED
+                and self.blocked_reason is not None
+            )
             or (
                 self.paper_account_id is not None
                 and type(self.paper_account_id) is not str
@@ -383,7 +412,12 @@ class _UnattendedPaperStartupReconciliationScope:
             if type(pre_recovery) is not PaperReceiptRecoveryQualificationResult:
                 raise TypeError("recovery qualification result type is invalid")
             if pre_recovery.status is PaperReceiptRecoveryQualificationStatus.BLOCKED:
-                return _HeldStartupReconciliation(_blocked_result(), captured)
+                return _HeldStartupReconciliation(
+                    _blocked_result(
+                        PersonalDesktopUnattendedPaperStartupBlockedReason.PRE_RECOVERY_BLOCKED
+                    ),
+                    captured,
+                )
             if (
                 pre_recovery.status
                 is PaperReceiptRecoveryQualificationStatus.RECEIPT_RECOVERY_REQUIRED
@@ -393,7 +427,12 @@ class _UnattendedPaperStartupReconciliationScope:
                 pre_recovery.status
                 is not PaperReceiptRecoveryQualificationStatus.NO_RECOVERY_REQUIRED
             ):
-                return _HeldStartupReconciliation(_blocked_result(), captured)
+                return _HeldStartupReconciliation(
+                    _blocked_result(
+                        PersonalDesktopUnattendedPaperStartupBlockedReason.PRE_RECOVERY_STATUS_INVALID
+                    ),
+                    captured,
+                )
             return self._enter_healthy(stack, captured, c1, pre_recovery)
         except BaseException:
             stack.close()
@@ -416,7 +455,11 @@ class _UnattendedPaperStartupReconciliationScope:
             or acquisition.paper_account_id != pre_recovery.paper_account_id
         ):
             return _HeldStartupReconciliation(
-                _blocked_result(mutex_state=acquisition.state), captured
+                _blocked_result(
+                    PersonalDesktopUnattendedPaperStartupBlockedReason.RECOVERY_MUTEX_MISMATCH,
+                    mutex_state=acquisition.state,
+                ),
+                captured,
             )
         revalidate_personal_desktop_unattended_paper_startup_state(
             c1, self._selected, captured, dependencies
@@ -426,7 +469,11 @@ class _UnattendedPaperStartupReconciliationScope:
         )
         if not _same_exact_recovery_required(pre_recovery, held_recovery):
             return _HeldStartupReconciliation(
-                _blocked_result(mutex_state=acquisition.state), captured
+                _blocked_result(
+                    PersonalDesktopUnattendedPaperStartupBlockedReason.RECOVERY_HELD_REQUALIFICATION_DRIFT,
+                    mutex_state=acquisition.state,
+                ),
+                captured,
             )
         revalidate_personal_desktop_unattended_paper_startup_state(
             c1, self._selected, captured, dependencies
@@ -436,7 +483,11 @@ class _UnattendedPaperStartupReconciliationScope:
         )
         if not _same_exact_recovery_required(held_recovery, final_recovery):
             return _HeldStartupReconciliation(
-                _blocked_result(mutex_state=acquisition.state), captured
+                _blocked_result(
+                    PersonalDesktopUnattendedPaperStartupBlockedReason.RECOVERY_FINAL_REQUALIFICATION_DRIFT,
+                    mutex_state=acquisition.state,
+                ),
+                captured,
             )
         revalidate_personal_desktop_unattended_paper_startup_state(
             c1, self._selected, captured, dependencies
@@ -459,7 +510,12 @@ class _UnattendedPaperStartupReconciliationScope:
         pre_evidence = dependencies.require_account(pre_account)
         pre_account_id = pre_evidence.anchor.paper_account_id
         if pre_recovery.paper_account_id != pre_account_id:
-            return _HeldStartupReconciliation(_blocked_result(), captured)
+            return _HeldStartupReconciliation(
+                _blocked_result(
+                    PersonalDesktopUnattendedPaperStartupBlockedReason.PRE_RECOVERY_ACCOUNT_MISMATCH
+                ),
+                captured,
+            )
         admission = dependencies.admit_healthy(pre_account)
         held = stack.enter_context(admission)
         acquisition = _require_acquisition(held)
@@ -468,7 +524,11 @@ class _UnattendedPaperStartupReconciliationScope:
             or acquisition.paper_account_id != pre_account_id
         ):
             return _HeldStartupReconciliation(
-                _blocked_result(mutex_state=acquisition.state), captured
+                _blocked_result(
+                    PersonalDesktopUnattendedPaperStartupBlockedReason.HEALTHY_MUTEX_MISMATCH,
+                    mutex_state=acquisition.state,
+                ),
+                captured,
             )
         revalidate_personal_desktop_unattended_paper_startup_state(
             c1, selected, captured, dependencies
@@ -483,13 +543,21 @@ class _UnattendedPaperStartupReconciliationScope:
             or post_recovery.paper_account_id != pre_account_id
         ):
             return _HeldStartupReconciliation(
-                _blocked_result(mutex_state=acquisition.state), captured
+                _blocked_result(
+                    PersonalDesktopUnattendedPaperStartupBlockedReason.POST_LOCK_RECOVERY_MISMATCH,
+                    mutex_state=acquisition.state,
+                ),
+                captured,
             )
         post_account = dependencies.read_account(c1, inputs.historical_configurations)
         post_evidence = dependencies.require_account(post_account)
         if post_evidence.anchor.paper_account_id != pre_account_id:
             return _HeldStartupReconciliation(
-                _blocked_result(mutex_state=acquisition.state), captured
+                _blocked_result(
+                    PersonalDesktopUnattendedPaperStartupBlockedReason.POST_LOCK_ACCOUNT_MISMATCH,
+                    mutex_state=acquisition.state,
+                ),
+                captured,
             )
         material = dependencies.build_material(
             post_evidence, selected, inputs, self._calendar
@@ -501,6 +569,7 @@ class _UnattendedPaperStartupReconciliationScope:
         ):
             return _HeldStartupReconciliation(
                 _blocked_result(
+                    PersonalDesktopUnattendedPaperStartupBlockedReason.INVOCATION_STORAGE_UNSAFE,
                     paper_account_id=pre_account_id,
                     selected_snapshot_id=selected.audit.snapshot_id,
                     invocation_id=expected.invocation.invocation_id,
@@ -515,6 +584,7 @@ class _UnattendedPaperStartupReconciliationScope:
         if not is_safe_prepared_paper_operation_inspection(inspection, material):
             return _HeldStartupReconciliation(
                 _blocked_from_healthy(
+                    PersonalDesktopUnattendedPaperStartupBlockedReason.INITIAL_OPERATION_INSPECTION_UNSAFE,
                     pre_account_id,
                     selected,
                     expected,
@@ -877,6 +947,7 @@ def _qualify_startup(
             final_evidence = dependencies.require_account(final_account)
             if final_evidence != post_evidence:
                 return _blocked_from_healthy(
+                    PersonalDesktopUnattendedPaperStartupBlockedReason.FINAL_ACCOUNT_DRIFT,
                     paper_account_id,
                     selected,
                     expected,
@@ -895,6 +966,7 @@ def _qualify_startup(
                 )
             ):
                 return _blocked_from_healthy(
+                    PersonalDesktopUnattendedPaperStartupBlockedReason.FINAL_OPERATION_INSPECTION_UNSAFE,
                     paper_account_id,
                     selected,
                     expected,
@@ -919,7 +991,9 @@ def _qualify_startup(
                 acquisition.state,
             )
     except Exception:
-        return _blocked_result()
+        return _blocked_result(
+            PersonalDesktopUnattendedPaperStartupBlockedReason.EXCEPTION_COLLAPSED
+        )
 
 
 def _expected_invocation(
@@ -1131,6 +1205,7 @@ def _recovery_result(
 
 
 def _blocked_from_healthy(
+    reason: PersonalDesktopUnattendedPaperStartupBlockedReason,
     paper_account_id: str,
     selected: SelectedC3SnapshotReadResult,
     expected: PersonalDesktopUnattendedPaperInvocationArtifactBinding,
@@ -1145,6 +1220,7 @@ def _blocked_from_healthy(
         classification = inspection.classification
         diagnostic = inspection.diagnostics[0]
     return _blocked_result(
+        reason,
         paper_account_id=paper_account_id,
         selected_snapshot_id=selected.audit.snapshot_id,
         invocation_id=expected.invocation.invocation_id,
@@ -1161,6 +1237,7 @@ def _blocked_from_healthy(
 
 
 def _blocked_result(
+    reason: PersonalDesktopUnattendedPaperStartupBlockedReason,
     *,
     paper_account_id: str | None = None,
     selected_snapshot_id: UUID | None = None,
@@ -1189,6 +1266,7 @@ def _blocked_result(
         None,
         None,
         mutex_state,
+        reason,
     )
 
 

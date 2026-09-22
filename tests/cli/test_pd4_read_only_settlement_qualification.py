@@ -26,6 +26,7 @@ from trading_bot.runtime.personal_desktop_unattended_paper_invocation_storage im
 )
 
 Diagnostic = startup_module.PersonalDesktopUnattendedPaperStartupDiagnostic
+BlockedReason = startup_module.PersonalDesktopUnattendedPaperStartupBlockedReason
 Startup = startup_module.PersonalDesktopUnattendedPaperStartupStatus
 
 
@@ -57,6 +58,7 @@ def test_semantic_arguments_rejected_before_production(monkeypatch, capsys, args
 def test_bounded_record_and_blocked_exit(monkeypatch, capsys, populated):
     evidence = {
         "startup_diagnostic": Diagnostic.QUALIFICATION_BLOCKED,
+        "startup_blocked_reason": BlockedReason.PRE_RECOVERY_BLOCKED,
         "startup_storage_classification": Storage.FINALIZED_IDENTICAL,
         "startup_operation_classification": PaperOperationClassification.BLOCKED,
         "startup_operation_diagnostic": PaperOperationInspectionCode.INVALID_RECEIPT,
@@ -85,6 +87,7 @@ def test_bounded_record_and_blocked_exit(monkeypatch, capsys, populated):
     assert record["startup_status"] == (Startup.BLOCKED.value if populated else None)
     assert record["all_eight_gates_closed"] is populated
     assert record["real_effect_performed"] is False
+    assert "secret" not in output
     assert not any(
         name in key
         for key in record

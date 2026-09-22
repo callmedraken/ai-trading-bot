@@ -1760,3 +1760,83 @@ Next action: ChatGPT exact-commit/diff review, followed by final local
 certification of the reviewed tree before considering a separately approved
 D8-A diagnostic rerun. Do not infer execution readiness from diagnostic
 fields. D8-A was not rerun during this task; D8-B remains unauthorized.
+
+## D8-A blocked-startup diagnostic source certification accepted — 2026-09-22
+
+ChatGPT exact-diff review accepted the diagnostic pass-through and then required
+one narrow result-contract hardening correction. The final accepted
+executable/source identity is:
+
+```text
+HEAD: 4aa2fb05331f34407ec2f9a12cf662abe17c08d6
+TREE: aacedc5a571d3cf7b08f0d945c83648db4948f58
+```
+
+Chronology:
+
+```text
+bfeb0c9bda3b38803c7bc2474d7a12afb744d64c
+  preserve bounded D8-A startup diagnostics
+
+4aa2fb05331f34407ec2f9a12cf662abe17c08d6
+  enforce D8-A startup result contract mapping
+```
+
+Final accepted certification of that exact executable/source tree:
+
+```text
+broad non-Architecture-77:      5,975 passed, 17 skipped in 574.72s
+Architecture-77 clean harness:    713 passed in 978.23s
+combined:                       6,688 passed, 17 skipped
+Ruff check:                     PASS
+Ruff format --check:            PASS (548 files)
+git diff --check:               PASS
+feature worktree:               clean, exact certified HEAD/TREE
+Architecture-77 harness:        clean, detached, exact certified HEAD/TREE
+pytest basetemps:               fresh external paths, cache disabled
+```
+
+Accepted contract:
+
+- D8-A surfaces only the five already-sanitized PD4-C startup enums:
+  diagnostic, invocation-storage classification, operation classification,
+  operation diagnostic, and mutex acquisition state.
+- `SettlementQualificationResult` requires the exact startup-status ->
+  top-level classification/diagnostic mapping.
+- No startup diagnostic evidence may exist without `startup_status`.
+- Any surfaced startup result requires `all_eight_gates_closed=True`.
+- Generic outer D8-A `BLOCKED` with no startup result remains valid.
+- Partial PD4-C `BLOCKED` storage/operation/mutex evidence remains valid.
+- The CLI remains deterministic, zero-semantic-argument, sanitized, and
+  non-authorizing.
+
+No PD4-C qualification, authority, identity, gate, mutex, ordering, recovery,
+execution, provider/broker, scheduler, or effect semantics changed. No new
+production reader, filesystem discovery, credential/capability surface, C1 raw
+authority, path, handle, or mutation capability was introduced.
+
+The diagnostic fields distinguish existing evidence classes but do not uniquely
+identify every PD4-C `BLOCKED` return site. Generic early/caught failures and
+several mutex-owned failures remain intentionally indistinguishable. Therefore
+the cause of the earlier production `BLOCKED` result cannot be inferred
+retrospectively.
+
+Operational state remains:
+
+```text
+D8-A diagnostic source             SOURCE CERTIFIED
+D8-A production diagnostic rerun   NOT AUTHORIZED
+D8-B                               NOT AUTHORIZED
+D9-A                               NOT APPLICABLE YET
+REAL EFFECT                        FALSE
+ALL 8 GATES                        CLOSED for the prior protected D8-A observation
+```
+
+This closeout is documentation-only and does not change the accepted
+executable/source identity. A fresh production D8-A diagnostic invocation
+remains a separate protected operator approval after integration/source
+preflight.
+
+Next: ChatGPT exact review of this docs-only closeout, then merge-readiness
+review of `feature/pd4-d8a-blocked-diagnostics` against `develop`. Stop at
+the merge approval boundary.

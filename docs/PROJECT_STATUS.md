@@ -1903,3 +1903,69 @@ Next: ChatGPT reviews the exact committed diff, then supplies/accepts final
 local certification before any separately approved D8-A diagnostic rerun.
 D8-A was not rerun during this source task. D8-B remains unauthorized; GUI work
 and the armed D5 deployment remain unchanged.
+
+## D8-A blocked-startup diagnostics — source certification accepted, 2026-09-22
+
+The bounded D8-A blocked-startup diagnostic enhancement is source-certified.
+The accepted executable/source identity remains:
+
+```text
+HEAD: 4aa2fb05331f34407ec2f9a12cf662abe17c08d6
+TREE: aacedc5a571d3cf7b08f0d945c83648db4948f58
+```
+
+Source chronology:
+
+```text
+initial diagnostic pass-through:
+bfeb0c9bda3b38803c7bc2474d7a12afb744d64c
+
+review-driven result-contract correction:
+4aa2fb05331f34407ec2f9a12cf662abe17c08d6
+```
+
+Accepted final certification:
+
+```text
+broad non-Architecture-77:      5,975 passed, 17 skipped in 574.72s
+Architecture-77 clean harness:    713 passed in 978.23s
+combined:                       6,688 passed, 17 skipped
+Ruff check:                     PASS
+Ruff format --check:            PASS (548 files)
+git diff --check:               PASS
+feature worktree:               clean, exact certified HEAD/TREE
+Architecture-77 harness:        clean, detached, exact certified HEAD/TREE
+pytest basetemps:               fresh external paths, cache disabled
+```
+
+The accepted result contract carries only the five existing sanitized PD4-C
+startup enums through D8-A. It enforces the exact startup-status to top-level
+classification/diagnostic mapping, forbids startup diagnostic evidence when
+`startup_status` is absent, and requires all eight gates closed whenever a
+startup result is surfaced. Generic outer D8-A `BLOCKED` remains valid without
+startup evidence, while partial PD4-C `BLOCKED` evidence remains intentionally
+valid.
+
+No additional production reader, filesystem discovery, C1/account/storage or
+operation read, mutex acquisition, credential access, recovery, execution,
+provider/broker call, scheduler action, gate change, or other effect was added.
+The CLI remains zero-semantic-argument and non-authorizing. Existing generic or
+early startup failures remain intentionally indistinguishable, so the cause of
+the earlier production `BLOCKED` result cannot be inferred retrospectively.
+
+Current operational state:
+
+```text
+D8-A diagnostic source:             SOURCE CERTIFIED
+D8-A production diagnostic rerun:   NOT AUTHORIZED
+D8-B:                               NOT AUTHORIZED
+D9-A:                               NOT APPLICABLE YET
+prior protected D8-A real effect:   FALSE
+prior protected D8-A all 8 gates:   CLOSED
+```
+
+This documentation closeout does not alter the certified executable/source tree
+and does not authorize a production D8-A rerun. Next: exact review of this
+docs-only closeout followed by merge-readiness review of
+`feature/pd4-d8a-blocked-diagnostics` against `develop`; stop at the merge
+approval boundary.

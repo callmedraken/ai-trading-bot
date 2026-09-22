@@ -128,6 +128,44 @@ class SettlementQualificationResult:
     startup_mutex_acquisition_state: PaperAccountMutexState | None = None
 
     def __post_init__(self) -> None:
+        startup_mapping = {
+            PersonalDesktopUnattendedPaperStartupStatus.HEALTHY_NO_PENDING_INVOCATION: (
+                Status.EXECUTION_READY,
+                PersonalDesktopUnattendedPaperStartupDiagnostic.VERIFIED_ABSENT_PENDING,
+            ),
+            PersonalDesktopUnattendedPaperStartupStatus.READY_SAME_INVOCATION: (
+                Status.EXECUTION_READY,
+                PersonalDesktopUnattendedPaperStartupDiagnostic.VERIFIED_IDENTICAL_PENDING,
+            ),
+            PersonalDesktopUnattendedPaperStartupStatus.ALREADY_APPLIED: (
+                Status.ALREADY_APPLIED,
+                PersonalDesktopUnattendedPaperStartupDiagnostic.VERIFIED_ALREADY_APPLIED,
+            ),
+            PersonalDesktopUnattendedPaperStartupStatus.RECEIPT_RECOVERY_REQUIRED: (
+                Status.RECEIPT_RECOVERY_REQUIRED,
+                PersonalDesktopUnattendedPaperStartupDiagnostic.VERIFIED_TERMINAL_RECEIPT_MISSING,
+            ),
+            PersonalDesktopUnattendedPaperStartupStatus.BLOCKED: (
+                Status.BLOCKED,
+                PersonalDesktopUnattendedPaperStartupDiagnostic.QUALIFICATION_BLOCKED,
+            ),
+        }
+        startup_diagnostic_fields = (
+            self.startup_diagnostic,
+            self.startup_storage_classification,
+            self.startup_operation_classification,
+            self.startup_operation_diagnostic,
+            self.startup_mutex_acquisition_state,
+        )
+        startup_contract_valid = (
+            self.startup_status is None
+            and all(value is None for value in startup_diagnostic_fields)
+        ) or (
+            type(self.startup_status) is PersonalDesktopUnattendedPaperStartupStatus
+            and startup_mapping.get(self.startup_status)
+            == (self.classification, self.startup_diagnostic)
+            and self.all_eight_gates_closed is True
+        )
         if (
             type(self.classification) is not Status
             or any(
@@ -156,6 +194,7 @@ class SettlementQualificationResult:
                 and type(self.startup_status)
                 is not PersonalDesktopUnattendedPaperStartupStatus
             )
+            or not startup_contract_valid
             or type(self.all_eight_gates_closed) is not bool
             or any(
                 value is not None and type(value) is not expected_type

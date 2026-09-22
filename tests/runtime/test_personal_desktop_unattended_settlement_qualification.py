@@ -304,6 +304,164 @@ def test_zero_argument_production_and_safe_result_shape():
         )
 
 
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("startup_diagnostic", Diagnostic.QUALIFICATION_BLOCKED),
+        ("startup_storage_classification", Storage.BLOCKED),
+        ("startup_operation_classification", PaperOperationClassification.BLOCKED),
+        (
+            "startup_operation_diagnostic",
+            PaperOperationInspectionCode.LINEAGE_CONFLICT,
+        ),
+        ("startup_mutex_acquisition_state", PaperAccountMutexState.OWNED),
+    ],
+)
+def test_startup_evidence_requires_startup_status(field, value):
+    with pytest.raises(ValueError, match="result is invalid"):
+        d8a.SettlementQualificationResult(d8a.Status.BLOCKED, **{field: value})
+
+
+@pytest.mark.parametrize(
+    "startup_status,classification,diagnostic",
+    [
+        (
+            Startup.HEALTHY_NO_PENDING_INVOCATION,
+            d8a.Status.EXECUTION_READY,
+            Diagnostic.VERIFIED_ABSENT_PENDING,
+        ),
+        (
+            Startup.READY_SAME_INVOCATION,
+            d8a.Status.EXECUTION_READY,
+            Diagnostic.VERIFIED_IDENTICAL_PENDING,
+        ),
+        (
+            Startup.ALREADY_APPLIED,
+            d8a.Status.ALREADY_APPLIED,
+            Diagnostic.VERIFIED_ALREADY_APPLIED,
+        ),
+        (
+            Startup.RECEIPT_RECOVERY_REQUIRED,
+            d8a.Status.RECEIPT_RECOVERY_REQUIRED,
+            Diagnostic.VERIFIED_TERMINAL_RECEIPT_MISSING,
+        ),
+        (Startup.BLOCKED, d8a.Status.BLOCKED, Diagnostic.QUALIFICATION_BLOCKED),
+    ],
+)
+def test_startup_status_accepts_exact_result_mapping(
+    startup_status, classification, diagnostic
+):
+    result = d8a.SettlementQualificationResult(
+        classification,
+        startup_status=startup_status,
+        all_eight_gates_closed=True,
+        startup_diagnostic=diagnostic,
+    )
+    assert result.startup_status is startup_status
+
+
+@pytest.mark.parametrize(
+    "startup_status,diagnostic",
+    [
+        (
+            Startup.HEALTHY_NO_PENDING_INVOCATION,
+            Diagnostic.VERIFIED_IDENTICAL_PENDING,
+        ),
+        (Startup.READY_SAME_INVOCATION, Diagnostic.VERIFIED_ABSENT_PENDING),
+        (Startup.ALREADY_APPLIED, Diagnostic.QUALIFICATION_BLOCKED),
+        (
+            Startup.RECEIPT_RECOVERY_REQUIRED,
+            Diagnostic.VERIFIED_ALREADY_APPLIED,
+        ),
+        (Startup.BLOCKED, Diagnostic.VERIFIED_TERMINAL_RECEIPT_MISSING),
+    ],
+)
+def test_startup_status_rejects_exact_diagnostic_mismatch(startup_status, diagnostic):
+    with pytest.raises(ValueError, match="result is invalid"):
+        d8a.SettlementQualificationResult(
+            d8a.Status.BLOCKED,
+            startup_status=startup_status,
+            all_eight_gates_closed=True,
+            startup_diagnostic=diagnostic,
+        )
+
+
+@pytest.mark.parametrize(
+    "startup_status,classification",
+    [
+        (Startup.HEALTHY_NO_PENDING_INVOCATION, d8a.Status.BLOCKED),
+        (Startup.READY_SAME_INVOCATION, d8a.Status.ALREADY_APPLIED),
+        (Startup.ALREADY_APPLIED, d8a.Status.EXECUTION_READY),
+        (
+            Startup.RECEIPT_RECOVERY_REQUIRED,
+            d8a.Status.BLOCKED,
+        ),
+        (Startup.BLOCKED, d8a.Status.RECEIPT_RECOVERY_REQUIRED),
+    ],
+)
+def test_startup_status_rejects_top_level_classification_mismatch(
+    startup_status, classification
+):
+    diagnostics = {
+        Startup.HEALTHY_NO_PENDING_INVOCATION: Diagnostic.VERIFIED_ABSENT_PENDING,
+        Startup.READY_SAME_INVOCATION: Diagnostic.VERIFIED_IDENTICAL_PENDING,
+        Startup.ALREADY_APPLIED: Diagnostic.VERIFIED_ALREADY_APPLIED,
+        Startup.RECEIPT_RECOVERY_REQUIRED: Diagnostic.VERIFIED_TERMINAL_RECEIPT_MISSING,
+        Startup.BLOCKED: Diagnostic.QUALIFICATION_BLOCKED,
+    }
+    with pytest.raises(ValueError, match="result is invalid"):
+        d8a.SettlementQualificationResult(
+            classification,
+            startup_status=startup_status,
+            all_eight_gates_closed=True,
+            startup_diagnostic=diagnostics[startup_status],
+        )
+
+
+@pytest.mark.parametrize(
+    "startup_status,classification,diagnostic",
+    [
+        (
+            Startup.HEALTHY_NO_PENDING_INVOCATION,
+            d8a.Status.EXECUTION_READY,
+            Diagnostic.VERIFIED_ABSENT_PENDING,
+        ),
+        (
+            Startup.READY_SAME_INVOCATION,
+            d8a.Status.EXECUTION_READY,
+            Diagnostic.VERIFIED_IDENTICAL_PENDING,
+        ),
+        (
+            Startup.ALREADY_APPLIED,
+            d8a.Status.ALREADY_APPLIED,
+            Diagnostic.VERIFIED_ALREADY_APPLIED,
+        ),
+        (
+            Startup.RECEIPT_RECOVERY_REQUIRED,
+            d8a.Status.RECEIPT_RECOVERY_REQUIRED,
+            Diagnostic.VERIFIED_TERMINAL_RECEIPT_MISSING,
+        ),
+        (Startup.BLOCKED, d8a.Status.BLOCKED, Diagnostic.QUALIFICATION_BLOCKED),
+    ],
+)
+def test_surfaced_startup_evidence_requires_all_gates_closed(
+    startup_status, classification, diagnostic
+):
+    with pytest.raises(ValueError, match="result is invalid"):
+        d8a.SettlementQualificationResult(
+            classification,
+            startup_status=startup_status,
+            startup_diagnostic=diagnostic,
+        )
+
+
+def test_generic_blocked_result_has_no_startup_evidence():
+    result = d8a.SettlementQualificationResult(d8a.Status.BLOCKED)
+    assert result.startup_status is None
+    assert result.startup_diagnostic is None
+    assert result.all_eight_gates_closed is False
+
+
 @pytest.mark.parametrize("gate", range(8))
 def test_each_initially_open_gate_blocks_before_discovery(harness, gate):
     harness.gates[gate] = True

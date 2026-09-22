@@ -62,11 +62,15 @@ def test_bounded_record_and_blocked_exit(monkeypatch, capsys, populated):
         "startup_operation_diagnostic": PaperOperationInspectionCode.INVALID_RECEIPT,
         "startup_mutex_acquisition_state": PaperAccountMutexState.OWNED,
     }
-    result = d8a.SettlementQualificationResult(
-        d8a.Status.BLOCKED,
-        startup_status=Startup.BLOCKED,
-        all_eight_gates_closed=True,
-        **(evidence if populated else {}),
+    result = (
+        d8a.SettlementQualificationResult(
+            d8a.Status.BLOCKED,
+            startup_status=Startup.BLOCKED,
+            all_eight_gates_closed=True,
+            **evidence,
+        )
+        if populated
+        else d8a.SettlementQualificationResult(d8a.Status.BLOCKED)
     )
     monkeypatch.setattr(
         cli, "qualify_personal_desktop_unattended_settlement", lambda: result
@@ -78,7 +82,8 @@ def test_bounded_record_and_blocked_exit(monkeypatch, capsys, populated):
     for field, value in evidence.items():
         assert record[field] == (value.value if populated else None)
     assert record["classification"] == "BLOCKED"
-    assert record["all_eight_gates_closed"] is True
+    assert record["startup_status"] == (Startup.BLOCKED.value if populated else None)
+    assert record["all_eight_gates_closed"] is populated
     assert record["real_effect_performed"] is False
     assert not any(
         name in key

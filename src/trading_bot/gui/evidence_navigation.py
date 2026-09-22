@@ -56,10 +56,6 @@ def build_evidence_navigation_target(
 
 
 def _identifier_is_navigable(identifier: str) -> bool:
-    return (
-        len(identifier) <= MAX_EVIDENCE_TIMELINE_FILTER_CHARACTERS
-        and not any(
-            ord(character) < 0x20 or ord(character) == 0x7F
-            for character in identifier
-        )
+    return len(identifier) <= MAX_EVIDENCE_TIMELINE_FILTER_CHARACTERS and not any(
+        ord(character) < 0x20 or ord(character) == 0x7F for character in identifier
     )

@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
 )
 
 from trading_bot.gui.evidence_navigation import EvidenceNavigationTarget
+from trading_bot.gui.evidence_source_navigation import EvidenceSourcePageTarget
 from trading_bot.gui.evidence_timeline_adapter import build_evidence_timeline_state
 from trading_bot.gui.evidence_timeline_page import EvidenceTimelinePage
 from trading_bot.gui.market_data_page import MarketDataPage
@@ -121,6 +122,9 @@ class MainWindow(QMainWindow):
             evidence_timeline_state,
             self,
         )
+        self._evidence_timeline_page.source_navigation_requested.connect(
+            self._show_evidence_source_page_target
+        )
         self._stack.addWidget(self._evidence_timeline_page)
         self._system_health_page = SystemHealthPage(system_health_state, self)
         self._system_health_page.evidence_navigation_requested.connect(
@@ -163,6 +167,14 @@ class MainWindow(QMainWindow):
             raise TypeError("target must be an exact EvidenceNavigationTarget")
         self.select_page("evidence")
         self._evidence_timeline_page.show_navigation_target(target)
+
+    def _show_evidence_source_page_target(
+        self,
+        target: EvidenceSourcePageTarget,
+    ) -> None:
+        if type(target) is not EvidenceSourcePageTarget:
+            raise TypeError("target must be an exact EvidenceSourcePageTarget")
+        self.select_page(target.page_id.value)
 
     def _build_navigation(self) -> QListWidget:
         navigation = QListWidget(self)
@@ -499,6 +511,18 @@ class MainWindow(QMainWindow):
                 font-weight: 600;
             }
             QPushButton#systemHealthViewEvidenceButton:hover {
+                background: #1f2937;
+                color: #bfdbfe;
+            }
+            QPushButton#evidenceTimelineViewSourceButton {
+                background: transparent;
+                color: #93c5fd;
+                border: 1px solid #334155;
+                border-radius: 6px;
+                padding: 5px 9px;
+                font-weight: 600;
+            }
+            QPushButton#evidenceTimelineViewSourceButton:hover {
                 background: #1f2937;
                 color: #bfdbfe;
             }

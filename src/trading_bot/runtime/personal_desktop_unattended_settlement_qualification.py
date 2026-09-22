@@ -9,6 +9,10 @@ from enum import StrEnum
 from typing import Any
 from uuid import UUID
 
+from trading_bot.cli.paper_operation_inspection import (
+    PaperOperationClassification,
+    PaperOperationInspectionCode,
+)
 from trading_bot.market_calendar import TradingSession
 from trading_bot.runtime.checkpointed_verified_snapshot_execution import (
     derive_checkpointed_verified_snapshot_application_id,
@@ -26,6 +30,9 @@ from trading_bot.runtime.personal_desktop_first_paper_operation import (
 )
 from trading_bot.runtime.personal_desktop_historical_cycle_configurations import (
     resolve_personal_desktop_historical_cycle_configurations,
+)
+from trading_bot.runtime.personal_desktop_paper_account_mutex import (
+    PaperAccountMutexState,
 )
 from trading_bot.runtime.personal_desktop_paper_account_token import (
     TradingTokenObservation,
@@ -60,6 +67,9 @@ from trading_bot.runtime.personal_desktop_unattended_paper_decision_storage impo
 from trading_bot.runtime.personal_desktop_unattended_paper_invocation import (
     create_personal_desktop_unattended_paper_invocation,
 )
+from trading_bot.runtime.personal_desktop_unattended_paper_invocation_storage import (
+    PersonalDesktopUnattendedInvocationStorageClassification,
+)
 from trading_bot.runtime.verified_c3_daily_bar_open import (
     C3VerifiedDailyBarOpenBinding,
     build_c3_verified_daily_bar_open_binding,
@@ -70,6 +80,7 @@ from trading_bot.runtime.windows_authority_validation import (
 )
 
 from .personal_desktop_unattended_paper_startup_qualification import (
+    PersonalDesktopUnattendedPaperStartupDiagnostic,
     PersonalDesktopUnattendedPaperStartupQualificationResult,
     PersonalDesktopUnattendedPaperStartupStatus,
     qualify_personal_desktop_unattended_paper_startup_from_verified_plan,
@@ -108,8 +119,53 @@ class SettlementQualificationResult:
     startup_status: PersonalDesktopUnattendedPaperStartupStatus | None = None
     all_eight_gates_closed: bool = False
     real_effect_performed: bool = False
+    startup_diagnostic: PersonalDesktopUnattendedPaperStartupDiagnostic | None = None
+    startup_storage_classification: (
+        PersonalDesktopUnattendedInvocationStorageClassification | None
+    ) = None
+    startup_operation_classification: PaperOperationClassification | None = None
+    startup_operation_diagnostic: PaperOperationInspectionCode | None = None
+    startup_mutex_acquisition_state: PaperAccountMutexState | None = None
 
     def __post_init__(self) -> None:
+        startup_mapping = {
+            PersonalDesktopUnattendedPaperStartupStatus.HEALTHY_NO_PENDING_INVOCATION: (
+                Status.EXECUTION_READY,
+                PersonalDesktopUnattendedPaperStartupDiagnostic.VERIFIED_ABSENT_PENDING,
+            ),
+            PersonalDesktopUnattendedPaperStartupStatus.READY_SAME_INVOCATION: (
+                Status.EXECUTION_READY,
+                PersonalDesktopUnattendedPaperStartupDiagnostic.VERIFIED_IDENTICAL_PENDING,
+            ),
+            PersonalDesktopUnattendedPaperStartupStatus.ALREADY_APPLIED: (
+                Status.ALREADY_APPLIED,
+                PersonalDesktopUnattendedPaperStartupDiagnostic.VERIFIED_ALREADY_APPLIED,
+            ),
+            PersonalDesktopUnattendedPaperStartupStatus.RECEIPT_RECOVERY_REQUIRED: (
+                Status.RECEIPT_RECOVERY_REQUIRED,
+                PersonalDesktopUnattendedPaperStartupDiagnostic.VERIFIED_TERMINAL_RECEIPT_MISSING,
+            ),
+            PersonalDesktopUnattendedPaperStartupStatus.BLOCKED: (
+                Status.BLOCKED,
+                PersonalDesktopUnattendedPaperStartupDiagnostic.QUALIFICATION_BLOCKED,
+            ),
+        }
+        startup_diagnostic_fields = (
+            self.startup_diagnostic,
+            self.startup_storage_classification,
+            self.startup_operation_classification,
+            self.startup_operation_diagnostic,
+            self.startup_mutex_acquisition_state,
+        )
+        startup_contract_valid = (
+            self.startup_status is None
+            and all(value is None for value in startup_diagnostic_fields)
+        ) or (
+            type(self.startup_status) is PersonalDesktopUnattendedPaperStartupStatus
+            and startup_mapping.get(self.startup_status)
+            == (self.classification, self.startup_diagnostic)
+            and self.all_eight_gates_closed is True
+        )
         if (
             type(self.classification) is not Status
             or any(
@@ -138,7 +194,27 @@ class SettlementQualificationResult:
                 and type(self.startup_status)
                 is not PersonalDesktopUnattendedPaperStartupStatus
             )
+            or not startup_contract_valid
             or type(self.all_eight_gates_closed) is not bool
+            or any(
+                value is not None and type(value) is not expected_type
+                for value, expected_type in (
+                    (
+                        self.startup_diagnostic,
+                        PersonalDesktopUnattendedPaperStartupDiagnostic,
+                    ),
+                    (
+                        self.startup_storage_classification,
+                        PersonalDesktopUnattendedInvocationStorageClassification,
+                    ),
+                    (
+                        self.startup_operation_classification,
+                        PaperOperationClassification,
+                    ),
+                    (self.startup_operation_diagnostic, PaperOperationInspectionCode),
+                    (self.startup_mutex_acquisition_state, PaperAccountMutexState),
+                )
+            )
             or self.real_effect_performed is not False
             or (
                 self.classification is Status.NO_SETTLEMENT_PENDING
@@ -447,6 +523,11 @@ def _run(
             terminal_checkpoint_id=startup.terminal_checkpoint_id,
             startup_status=startup.status,
             all_eight_gates_closed=True,
+            startup_diagnostic=startup.diagnostic,
+            startup_storage_classification=startup.storage_classification,
+            startup_operation_classification=startup.operation_classification,
+            startup_operation_diagnostic=startup.operation_diagnostic,
+            startup_mutex_acquisition_state=startup.mutex_acquisition_state,
         )
     except Exception:
         return SettlementQualificationResult(Status.BLOCKED)

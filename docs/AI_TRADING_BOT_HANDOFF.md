@@ -1673,3 +1673,170 @@ completed, current-C1 selected C3(2026-09-21) exists, the finalized decision is
 still exact, the Trading principal / approved production runtime are correct,
 and all eight effect gates remain false. D8-A is read-only but still a protected
 operational checkpoint. D8-B remains protected and unauthorized.
+
+## D8-A blocked-startup diagnostic source checkpoint — 2026-09-22
+
+After the preceding operational transition, one protected D8-A read-only run
+reconstructed completed session `2026-09-21`, decision
+`f2188b5e-e6a4-5398-be41-8867d9268355`, decision selected snapshot
+`680b260f-08c9-5923-87bb-b5f0a4701380`, execution selected snapshot
+`bf0ca2a7-1236-5240-9b1e-6c31cf2388ed`, final plan
+`29c880dc-f10e-566c-a6e1-e3d73fa04c69`, and account predecessor
+`ed4640e5-0630-525d-b916-d50e31e3ba2a`. PD4-C then returned `BLOCKED`.
+All eight gates remained closed and `real_effect_performed=false`; no
+invocation/application/operation/terminal identity was surfaced.
+
+The source-only diagnostic checkpoint uses
+`F:\AI\worktrees\ai-trading-bot-d8a-blocked-diagnostics`, branch
+`feature/pd4-d8a-blocked-diagnostics`, starting HEAD
+`749aa0082bd6a8e5064415403e530dc4c70f04f2` / tree
+`38ae0f8ff96094af59ad951a0eb0445380c3f4d1`. Local and remote `origin/develop`
+matched that starting HEAD, and the initial index/worktree were clean.
+
+### Bounded PD4-C BLOCKED branch inventory
+
+Every returned BLOCKED result has diagnostic `QUALIFICATION_BLOCKED`. In the
+table, omitted fields are `None`; M means `mutex_acquisition_state`, S means
+`storage_classification`, and O/D mean `operation_classification` and
+`operation_diagnostic`. These are existing fields, not new branch codes.
+
+| Existing return path | Existing additional evidence |
+| --- | --- |
+| Pre-lock recovery qualification is BLOCKED | None |
+| Pre-lock recovery status is neither recovery-required nor no-recovery-required | None (defensive branch) |
+| Pre-lock recovery/account identity mismatch | None |
+| Recovery-path mutex is not OWNED or has the wrong account | M only |
+| Held recovery requalification differs from pre-lock recovery | M only |
+| Final recovery requalification differs from held recovery | M only |
+| Healthy-path mutex is not OWNED or has the wrong account | M only |
+| Post-lock recovery result has wrong type, status, or account | M only |
+| Post-lock account identity differs from pre-lock account | M only |
+| Invocation storage has wrong type/expected ID or unsafe classification | M and S when the storage result has the exact expected type; account/snapshot/invocation IDs |
+| Initial A67 inspection has wrong type, IDs, classification, or diagnostic | M, S, O/D when inspection has the exact expected type; account/snapshot/invocation/operation/application/terminal IDs |
+| Final account evidence differs from post-lock evidence | M, S, initial O/D; the same bounded IDs |
+| Final A67 inspection differs or is unsafe | M, S, final O/D when exact typed; the same bounded IDs |
+| Any Exception caught by `_qualify_startup`, including validation, replay, reader, admission, incomplete reconciliation, revalidation, result construction, or scope-exit failure | None; existing evidence is discarded by the existing catch |
+
+The verified-plan wrapper's authority/plan/input validation occurs before
+`_qualify_startup`; failures there raise to D8-A's existing generic BLOCKED
+catch and yield no startup result. BaseException outside Exception is not
+converted into a startup BLOCKED result. An exact inspection with no first
+diagnostic would also fall through the existing generic exception catch.
+
+The five surfaced enums distinguish available mutex, invocation-storage, and
+A67 diagnostic classes. They cannot uniquely identify every return site:
+generic early/caught failures collapse together, OWNED-only failures collapse
+together, and some final account/operation drift shares existing safe enum
+values. The observed production result cannot be retrospectively assigned to
+one branch. No authority/mutex/recovery/ordering/effect semantic change is
+needed for this pass-through; deeper discrimination would require separate
+review and is outside this checkpoint.
+
+### Implementation and review boundary
+
+`SettlementQualificationResult` adds exact-type-checked optional
+`startup_diagnostic`, `startup_storage_classification`,
+`startup_operation_classification`, `startup_operation_diagnostic`, and
+`startup_mutex_acquisition_state`. D8-A copies those fields from the already
+validated PD4-C result after the existing final authority/gate checks. No
+classification or identity changes. The CLI already serializes these StrEnum
+values and None deterministically, so its source and zero-argument contract
+remain unchanged. No extra production reader, I/O, discovery, credential,
+capability, mutation, recovery, provider/broker call, or scheduler action is
+introduced.
+
+Focused verification: **118 passed** across the D8-A runtime, PD4-C startup,
+and D8-A CLI modules with a fresh external basetemp and cache disabled. Tests
+cover full/partial diagnostic pass-through, unchanged classifications/IDs and
+dependency call counts, closed gates/no effects, safe JSON, and rejection of
+raw or forged diagnostic data. Broad and Architecture-77 certification have
+not been run for this checkpoint.
+
+After an import-format correction, the CLI module alone passed again:
+**10 passed**. Focused Ruff check and format checks passed for all three
+changed Python files; `git diff --check` passed.
+
+Next action: ChatGPT exact-commit/diff review, followed by final local
+certification of the reviewed tree before considering a separately approved
+D8-A diagnostic rerun. Do not infer execution readiness from diagnostic
+fields. D8-A was not rerun during this task; D8-B remains unauthorized.
+
+## D8-A blocked-startup diagnostic source certification accepted — 2026-09-22
+
+ChatGPT exact-diff review accepted the diagnostic pass-through and then required
+one narrow result-contract hardening correction. The final accepted
+executable/source identity is:
+
+```text
+HEAD: 4aa2fb05331f34407ec2f9a12cf662abe17c08d6
+TREE: aacedc5a571d3cf7b08f0d945c83648db4948f58
+```
+
+Chronology:
+
+```text
+bfeb0c9bda3b38803c7bc2474d7a12afb744d64c
+  preserve bounded D8-A startup diagnostics
+
+4aa2fb05331f34407ec2f9a12cf662abe17c08d6
+  enforce D8-A startup result contract mapping
+```
+
+Final accepted certification of that exact executable/source tree:
+
+```text
+broad non-Architecture-77:      5,975 passed, 17 skipped in 574.72s
+Architecture-77 clean harness:    713 passed in 978.23s
+combined:                       6,688 passed, 17 skipped
+Ruff check:                     PASS
+Ruff format --check:            PASS (548 files)
+git diff --check:               PASS
+feature worktree:               clean, exact certified HEAD/TREE
+Architecture-77 harness:        clean, detached, exact certified HEAD/TREE
+pytest basetemps:               fresh external paths, cache disabled
+```
+
+Accepted contract:
+
+- D8-A surfaces only the five already-sanitized PD4-C startup enums:
+  diagnostic, invocation-storage classification, operation classification,
+  operation diagnostic, and mutex acquisition state.
+- `SettlementQualificationResult` requires the exact startup-status ->
+  top-level classification/diagnostic mapping.
+- No startup diagnostic evidence may exist without `startup_status`.
+- Any surfaced startup result requires `all_eight_gates_closed=True`.
+- Generic outer D8-A `BLOCKED` with no startup result remains valid.
+- Partial PD4-C `BLOCKED` storage/operation/mutex evidence remains valid.
+- The CLI remains deterministic, zero-semantic-argument, sanitized, and
+  non-authorizing.
+
+No PD4-C qualification, authority, identity, gate, mutex, ordering, recovery,
+execution, provider/broker, scheduler, or effect semantics changed. No new
+production reader, filesystem discovery, credential/capability surface, C1 raw
+authority, path, handle, or mutation capability was introduced.
+
+The diagnostic fields distinguish existing evidence classes but do not uniquely
+identify every PD4-C `BLOCKED` return site. Generic early/caught failures and
+several mutex-owned failures remain intentionally indistinguishable. Therefore
+the cause of the earlier production `BLOCKED` result cannot be inferred
+retrospectively.
+
+Operational state remains:
+
+```text
+D8-A diagnostic source             SOURCE CERTIFIED
+D8-A production diagnostic rerun   NOT AUTHORIZED
+D8-B                               NOT AUTHORIZED
+D9-A                               NOT APPLICABLE YET
+REAL EFFECT                        FALSE
+ALL 8 GATES                        CLOSED for the prior protected D8-A observation
+```
+
+This closeout is documentation-only and does not change the accepted
+executable/source identity. A fresh production D8-A diagnostic invocation
+remains a separate protected operator approval after integration/source
+preflight.
+
+Next: ChatGPT exact review of this docs-only closeout, then merge-readiness
+review of `feature/pd4-d8a-blocked-diagnostics` against `develop`. Stop at
+the merge approval boundary.

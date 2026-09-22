@@ -38,6 +38,7 @@ from trading_bot.cli.paper_operation_inspection import (
 )
 from trading_bot.runtime import (
     CheckpointedVerifiedSnapshotPaperCycleStatus,
+    PersonalDesktopUnattendedPaperStartupBlockedReason,
     PersonalDesktopUnattendedPaperStartupQualificationResult,
 )
 from trading_bot.runtime import (
@@ -688,8 +689,14 @@ def test_pd4_c_public_result_is_not_execution_authority_and_result_is_sanitized(
         field.type
         for field in fields(execution.PersonalDesktopUnattendedPaperOperationResult)
     }
+    assert (
+        PersonalDesktopUnattendedPaperStartupBlockedReason
+        is startup.PersonalDesktopUnattendedPaperStartupBlockedReason
+    )
     planning = _inputs()
-    forged = startup._blocked_result()
+    forged = startup._blocked_result(
+        PersonalDesktopUnattendedPaperStartupBlockedReason.PRE_RECOVERY_BLOCKED
+    )
     rejected = execution.execute_personal_desktop_unattended_paper_operation(
         forged,  # type: ignore[arg-type]
         _selected_result(),

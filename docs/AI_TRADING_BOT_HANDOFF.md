@@ -1571,9 +1571,26 @@ provider/broker call, Task Scheduler, paper/live execution, settlement,
 recovery, durable write, or path/receipt disclosure was introduced.
 Cross-navigation causes zero service rereads.
 
-GUI-A12 is ready for PR review/integration. PR creation and merge remain
-explicit approval boundaries.
+GUI-A12 is integrated and closed through PR #16.
 
-After integration, continue GUI work automatically with the next bounded
-read-only presentation milestone. D8-A remains separate and protected; D8-B
-remains protected and unauthorized.
+```text
+accepted PR head:     9123ffee3f48f73cc791de92ae9f90385184fab1
+merge commit:         ae0d34c12e6b1e0633b20c6997afa7769b05ad11
+resulting merge tree: 59f8d6950272bd90c902b3a35495835995fe465b
+PR-head -> merge:     no file differences
+```
+
+The authoritative executable/source certification remains
+`dc79e74164345d97163a8a16a8c540cc870778c0` /
+`2ee3fde29ea9489e8ae5efbece5bd89371396c11`.
+
+Final PR review confirmed A12 is presentation-only page coordination over
+already-acquired state, uses a closed System -> Evidence source map and exact
+identifier equality, fails closed for unsupported/overlong identities, causes
+zero service rereads, and adds no runtime I/O, discovery, authority, credential,
+scheduler, provider/broker, execution, settlement, recovery, durable-write, or
+path/receipt-disclosure path.
+
+Continue automatically with GUI-A13 read-only Evidence -> Source Page
+navigation using only already-acquired presentation state. D8-A remains separate
+and protected; D8-B remains protected and unauthorized.

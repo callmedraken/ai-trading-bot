@@ -1703,9 +1703,32 @@ VISUAL_GATE=PASSED
 FULL_REGRESSION=PASSED
 ```
 
-GUI-A12 source is certified and ready for PR review/integration. PR creation and
-merge remain explicit repository-control boundaries.
+GUI-A12 is integrated and closed through PR #16.
 
-After A12 integration, continue GUI work automatically with the next bounded
-read-only presentation milestone. D8-A remains a separate protected operational
-checkpoint and D8-B remains unauthorized.
+```text
+accepted PR head:        9123ffee3f48f73cc791de92ae9f90385184fab1
+merge commit:            ae0d34c12e6b1e0633b20c6997afa7769b05ad11
+resulting merge tree:    59f8d6950272bd90c902b3a35495835995fe465b
+PR-head -> merge files:  none
+```
+
+The normal history-preserving merge produced exactly the accepted PR-head tree.
+The authoritative GUI-A12 executable/source certification remains
+`dc79e74164345d97163a8a16a8c540cc870778c0` /
+`2ee3fde29ea9489e8ae5efbece5bd89371396c11`; the later branch closeout and
+this integration closeout are documentation-only and do not require another
+broad suite.
+
+Deep PR review covered all 11 changed files, Architecture 119, the Qt-free
+navigation target and closed source mapping, exact Evidence targeting,
+System-page signal/button wiring, MainWindow coordination, widget/filter state
+behavior, focused/regression coverage, certification docs, PR metadata,
+reviews/threads/comments, status/workflow state, and GitHub's synthetic merge.
+No blocker was found. The synthetic merge and actual merge both preserve the
+accepted PR-head tree exactly.
+
+GUI-A13 read-only Evidence -> Source Page navigation is the next safe GUI
+milestone: presentation-only navigation from an Evidence card to its already
+acquired source page, with no service reread, source rediscovery, authority, or
+effect path. D8-A remains a separate protected operational checkpoint and D8-B
+remains unauthorized.

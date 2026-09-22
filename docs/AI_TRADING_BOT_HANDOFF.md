@@ -1594,3 +1594,58 @@ path/receipt-disclosure path.
 Continue automatically with GUI-A13 read-only Evidence -> Source Page
 navigation using only already-acquired presentation state. D8-A remains separate
 and protected; D8-B remains protected and unauthorized.
+
+## GUI-A13 read-only Evidence -> Source Page navigation — source certified
+
+GUI-A13 is source-certified on:
+
+```text
+branch: feature/gui-a13-evidence-source-navigation
+base develop: 9f0f8e01e47c950972d355d42017fc0d08dd0377
+HEAD: df1c2536aef918edbe1dda987904d6040e022ab4
+TREE: a6cad1cdfff770483178e3f2b2bdabfcad279f57
+```
+
+Architecture 120 keeps A13 entirely inside accepted GUI presentation
+boundaries. One immutable `EvidenceSourcePageTarget` maps an existing
+`EvidenceTimelineEntry.source` through a closed enum to the existing Research,
+Paper, Paper Account, Market Data, or Operations page. The target retains no
+identifier/hash/path/runtime object and MainWindow performs only the existing
+presentation-only page selection.
+
+Accepted final evidence:
+
+```text
+focused A13:                   34 passed
+complete GUI regression:     340 passed
+broad non-Architecture-77: 5,879 passed, 17 skipped
+Architecture-77 clean:       758 passed
+combined:                  6,637 passed, 17 skipped
+Ruff check:                PASS
+Ruff format --check:       PASS (585 files)
+diff checks:               PASS
+visual gate:               PASS
+```
+
+Visual certification covered a populated Evidence view at 920x620 and
+Research/Market Data source-page navigation. The destination pages are the
+already-rendered states; A13 does not promise exact-row selection or reacquire
+an artifact. The Research page's existing report-path display is pre-existing
+destination behavior and is not copied into Evidence state by A13.
+
+Independent final GitHub review found 8 expected changed files, 4 commits ahead
+and 0 behind the exact base. Every accepted Evidence source maps to exactly one
+closed destination, mismatched targets fail explicitly, and source navigation
+causes zero service rereads. Existing A11 filtering and A12 exact
+System -> Evidence behavior remain green.
+
+No new runtime I/O, discovery, production O2, C1/C2/C3, Credential Manager,
+provider/broker call, Task Scheduler, paper/live execution, settlement,
+recovery, durable write, or new path/receipt disclosure was introduced.
+
+GUI-A13 is ready for PR review/integration. PR creation and merge remain
+explicit approval boundaries.
+
+After integration, continue GUI work automatically with the next bounded
+read-only presentation milestone. D8-A remains separate and protected; D8-B
+remains protected and unauthorized.

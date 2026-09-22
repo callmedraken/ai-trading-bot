@@ -1732,3 +1732,106 @@ milestone: presentation-only navigation from an Evidence card to its already
 acquired source page, with no service reread, source rediscovery, authority, or
 effect path. D8-A remains a separate protected operational checkpoint and D8-B
 remains unauthorized.
+
+## GUI-A13 read-only Evidence -> Source Page navigation — SOURCE CERTIFIED
+
+Architecture 120 and its validation plan define GUI-A13 on:
+
+```text
+branch: feature/gui-a13-evidence-source-navigation
+base develop: 9f0f8e01e47c950972d355d42017fc0d08dd0377
+architecture: docs/architecture/120-gui-evidence-source-navigation.md
+validation: docs/validation/gui-a13-evidence-source-navigation.md
+```
+
+GUI-A13 adds presentation-only reverse navigation from an existing Evidence
+Timeline card to the already-acquired GUI page corresponding to that Evidence
+source. The target contains only a closed source enum and closed destination
+page enum; it carries no identifier, hash, path, receipt, credential, runtime
+object, handle, or capability.
+
+Final certified executable/source identity:
+
+```text
+HEAD: df1c2536aef918edbe1dda987904d6040e022ab4
+TREE: a6cad1cdfff770483178e3f2b2bdabfcad279f57
+```
+
+Accepted evidence:
+
+```text
+focused A13 gate:                  34 passed
+complete GUI regression:          340 passed
+
+broad non-Architecture-77:      5,879 passed, 17 skipped
+Architecture-77 clean harness:    758 passed
+combined final certification:   6,637 passed, 17 skipped
+
+Ruff check:                     PASS
+Ruff format --check:            PASS (585 files)
+git diff --check:               PASS
+git diff --cached --check:      PASS
+feature worktree/index:         clean
+Architecture-77 worktree:       clean, detached, exact certified HEAD/TREE
+Architecture-77 basetemp:       fresh external path, cache disabled
+visual gate:                    PASS
+```
+
+Visual certification covered the populated Evidence page at 920x620 plus
+Research Evidence -> Research and Market Data Evidence -> Market Data page
+navigation. The `View source page` control remains visually secondary and the
+destination is the already-rendered source page. A13 deliberately makes no
+claim of exact-row selection or source reacquisition.
+
+The Research destination continues to display its pre-existing configured
+report path. A13 does not copy that path into Evidence state and does not add a
+new disclosure path.
+
+Independent final GitHub review found the branch 4 commits ahead and 0 behind
+its exact `develop` base with 8 expected architecture/validation/GUI/test
+files. The source diff is limited to the Qt-free closed source-page mapping and
+target, Evidence-card navigation control/signal, MainWindow page coordination
+and styling, and focused regression coverage.
+
+Review confirmed that every accepted Evidence source maps to exactly one
+existing page ID; mismatched source/page targets fail explicitly; the target
+retains no evidence identity; MainWindow uses only the existing
+presentation-only `select_page(...)` path; and source navigation causes zero
+service rereads. A11 filtering and A12 exact System -> Evidence targeting remain
+covered by the focused and complete GUI regressions.
+
+No new runtime I/O, filesystem discovery, production O2, C1/C2/C3, Credential
+Manager, provider/broker network access, Task Scheduler, paper/live execution,
+settlement, recovery, durable write, or new path/receipt disclosure was
+introduced.
+
+Final GUI-A13 acceptance:
+
+```text
+EVIDENCE_TO_SOURCE_PAGE_PRESENTATION_ONLY=True
+CLOSED_SOURCE_PAGE_MAPPING=True
+SERVICE_REREADS_ON_SOURCE_NAVIGATION=0
+A11_FILTERING_PRESERVED=True
+A12_EXACT_TARGETING_PRESERVED=True
+NEW_RUNTIME_IO=False
+FILESYSTEM_DISCOVERY=False
+PRODUCTION_O2_ACCESS=False
+C1_C2_C3_ACCESS=False
+CREDENTIAL_ACCESS=False
+PROVIDER_NETWORK_ACCESS=False
+SCHEDULER_ACCESS=False
+PAPER_EXECUTION=False
+SETTLEMENT_EFFECT=False
+RECOVERY_EFFECT=False
+BROKERAGE_ACCESS=False
+PATH_OR_RECEIPT_DISCLOSURE=False
+VISUAL_GATE=PASSED
+FULL_REGRESSION=PASSED
+```
+
+GUI-A13 source is certified and ready for PR review/integration. PR creation and
+merge remain explicit repository-control boundaries.
+
+After A13 integration, continue GUI work automatically with the next bounded
+read-only presentation milestone. D8-A remains a separate protected operational
+checkpoint and D8-B remains unauthorized.

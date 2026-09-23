@@ -2119,3 +2119,51 @@ This certification does not identify the earlier production block
 retrospectively and does not authorize another production invocation. Next:
 exact docs-only closeout review and PR/merge-readiness review against
 `develop`. PR creation or merge remains a protected repository action.
+
+## D8-A bounded block-reason diagnostics — integrated through PR #19
+
+PR #19 merged the certified bounded PD4-C/D8-A block-reason checkpoint into
+`develop` after exact PR review.
+
+```text
+base develop:          2d36e864f82a7fbb85b39571c2cebc0c730aaeb6
+accepted PR head:      7be63094d6c287418ebf3bab3794e2b94adfbb09
+merge commit:          37bb82d16d5345edaaf920ab11e0e4a033cf23ba
+resulting merge tree:  f0d911bdb9786429d80947b43066d0964d0d0c32
+PR-head -> merge files: none
+```
+
+Final PR review found the branch mergeable with no review comments, review
+submissions, or unresolved review threads. No GitHub workflow runs were attached
+to the PR head or merge commit. GitHub's synthetic merge and the actual merge
+both preserved the accepted PR-head tree content exactly.
+
+The authoritative executable/source certification remains:
+
+```text
+HEAD: 712b2873b7ec2100fc7ce0062a2c414d31595717
+TREE: 4c485a7557af01a467413625dcb8d2844a8af52f
+broad non-Architecture-77: 6,013 passed, 17 skipped
+Architecture-77: 713 passed
+combined: 6,726 passed, 17 skipped
+Ruff / format / diff: PASS
+```
+
+The certification closeout and merge changed documentation/history only after
+the certified executable/source commit, so no second broad certification is
+required.
+
+Current operational boundary:
+
+```text
+D8-A block-reason source            INTEGRATED / SOURCE CERTIFIED
+D8-A protected diagnostic run       USED 1 / 1 -> BLOCKED
+D8-A retry                          NOT AUTHORIZED
+D8-B                                NOT AUTHORIZED
+D9-A                                NOT APPLICABLE
+```
+
+Next safe checkpoint: prepare a fresh isolated integrated production
+qualification checkout/runtime preflight for the merged block-reason source.
+That preparation must stop before any D8-A invocation. A second protected
+diagnostic run, if later considered, requires a new explicit operator approval.

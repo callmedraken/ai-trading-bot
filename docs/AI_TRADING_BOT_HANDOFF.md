@@ -2056,3 +2056,80 @@ D9-A                                NOT APPLICABLE
 Next: ChatGPT exact review of this docs-only certification closeout, followed by
 PR/merge-readiness review against `develop`. Creating or merging the PR
 remains a separately protected repository action.
+
+## D8-A bounded block-reason diagnostics integration closeout — PR #19
+
+PR #19 (`Add bounded PD4-C blocked startup reasons`) was reviewed and merged
+into `develop`.
+
+```text
+base develop:
+2d36e864f82a7fbb85b39571c2cebc0c730aaeb6
+
+accepted PR head:
+7be63094d6c287418ebf3bab3794e2b94adfbb09
+
+merge commit:
+37bb82d16d5345edaaf920ab11e0e4a033cf23ba
+
+resulting merge tree:
+f0d911bdb9786429d80947b43066d0964d0d0c32
+
+PR-head -> merge:
+no file differences
+```
+
+The PR changed the expected ten files: the PD4-C startup runtime, D8-A
+qualification runtime, runtime facade, five focused/neighboring tests, and the
+two canonical status documents. Review confirmed that each existing explicit
+PD4-C `BLOCKED` branch has exactly one fixed sanitized reason, the existing
+outer `Exception` collapse maps to `EXCEPTION_COLLAPSED`, and D8-A only
+surfaces the reason with an exact typed startup `BLOCKED`.
+
+No production read, dependency call count, branch predicate, mutex lifetime,
+recovery ordering, authority, identity, gate, durable mutation, execution,
+provider/broker, or scheduler semantics changed. The CLI remains
+zero-semantic-argument, deterministic, sanitized, and non-authorizing.
+
+PR state at merge:
+
+```text
+mergeable:             true
+review submissions:    none
+review comments:       none
+unresolved threads:    none
+PR-head workflow runs: none
+merge workflow runs:   none
+synthetic merge diff:  no files relative to PR head
+actual merge diff:     no files relative to PR head
+```
+
+The authoritative executable/source certification remains:
+
+```text
+HEAD: 712b2873b7ec2100fc7ce0062a2c414d31595717
+TREE: 4c485a7557af01a467413625dcb8d2844a8af52f
+focused compatibility: 290 passed
+broad: 6,013 passed, 17 skipped
+Architecture-77: 713 passed
+combined: 6,726 passed, 17 skipped
+Ruff / format / diff: PASS
+```
+
+No second broad suite is required because the later branch closeout and
+history-preserving merge do not alter executable source.
+
+Current boundary:
+
+```text
+D8-A block-reason source            INTEGRATED / SOURCE CERTIFIED
+D8-A protected diagnostic run       USED 1 / 1 -> BLOCKED
+D8-A retry                          NOT AUTHORIZED
+D8-B                                NOT AUTHORIZED
+D9-A                                NOT APPLICABLE
+```
+
+Next checkpoint: prepare and verify a fresh isolated production qualification
+checkout/runtime for the integrated block-reason source. Do not invoke D8-A
+during preparation. Any future diagnostic rerun remains a separate protected
+operator action requiring fresh explicit approval.

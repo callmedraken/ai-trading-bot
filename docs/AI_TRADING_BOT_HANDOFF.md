@@ -2714,3 +2714,46 @@ zero-semantic-argument, all-gates-closed deferred reconciliation boundary by
 adapting the established Architecture-114 D9-A read-only durable convergence
 pattern to Architecture-121 complete-namespace single-deferred discovery. No
 D8-R2 public output may be accepted as authority and no effect is authorized.
+
+
+## Architecture 121 R4 accepted / source-complete
+
+Accepted executable source before docs-only closeout:
+
+```text
+HEAD: c40d857f055c7d9f744b00d7dcd07edb8cc30c20
+TREE: 88a15917dbcd328a847a36dcb967c8b77bde9d8b
+```
+
+R4 / D9-R1 is accepted after exact GitHub review. It is a separate
+fresh-process-compatible, zero-semantic-argument, all-gates-closed read-only
+reconciler. It uses Architecture-121 complete-namespace single-deferred
+discovery and preserves the critical C/E distinction: current completed session
+C is source-derived admission context, while deferred session E owns
+C3(E), `open(E)`, plan, invocation, operation, receipt, and successor
+identities.
+
+Only `RECONCILED` is acceptance evidence. It requires exact durable
+ALREADY_APPLIED operation state, exact completed receipt reverification, exact
+deterministic successor, current account tip/lineage convergence, final
+C1/Trading-token stability, and eight closed gates. Other classifications grant
+no execution or recovery authority.
+
+Focused verification completed with 251 passing tests plus Ruff and diff checks.
+Ordinary Architecture-114 D9-A remained unchanged.
+
+Architecture 121 is source-complete. Broad certification has not yet run.
+
+Operational boundary remains:
+
+```text
+D8-A retry                         NOT AUTHORIZED
+D8-B                               NOT AUTHORIZED
+D8-R2 deferred effect              NOT AUTHORIZED
+D9-A / production D9-R1            NOT AUTHORIZED
+```
+
+Next: use a fresh detached certification worktree at the exact feature HEAD and
+run the persistent certification runner. Its topology includes broad-1,
+broad-2, and the Architecture-77 serial lane. No plain full-suite pytest run is
+needed in addition to that runner.

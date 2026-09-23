@@ -2767,3 +2767,54 @@ all-eight-gates-closed independent reconciliation boundary for the same unique
 deferred decision. It must independently rederive the candidate and exact
 C3/open/plan/invocation/operation/receipt/successor/account-lineage truth, never
 consume D8-R2 output as authority, and perform no effect.
+
+
+## Architecture 121 R4 accepted / source-complete — 2026-09-23
+
+Source checkpoint R4 / D9-R1 is accepted after exact GitHub review.
+
+Accepted executable source before this docs-only closeout:
+
+```text
+branch: feature/pd4-single-deferred-settlement-authority
+HEAD:   c40d857f055c7d9f744b00d7dcd07edb8cc30c20
+TREE:   88a15917dbcd328a847a36dcb967c8b77bde9d8b
+```
+
+D9-R1 is a distinct zero-semantic-argument, read-only, all-eight-gates-closed
+reconciliation boundary. It independently derives the sole finalized deferred
+decision from the complete fixed namespace under current C1 and same-process
+provenance. It reconstructs settlement identity from deferred execution session
+E rather than current completed session C, and reports both E and C.
+
+Only `RECONCILED` is acceptance evidence. `NOT_APPLIED`,
+`RECEIPT_RECOVERY_REQUIRED`, and `BLOCKED` are diagnostic only. R4 performs
+no D8-R2 call, no PD4-D execution, no receipt recovery, no provider/decision
+effect, no scheduler mutation, and no broker/live effect.
+
+Successful reconciliation independently requires exact decision replay,
+current-C1 C3(S) and C3(E), verified `open(E)`, exact Architecture-94 plan,
+deterministic invocation, invocation storage, Architecture-67 operation and
+application identities, exact completed receipt reverification, exact successor
+checkpoint, current account tip, and exact predecessor-to-successor lineage.
+Final C1, Trading token, invocation/operation/account state, and all eight closed
+gates are rechecked before acceptance.
+
+Focused R4 verification:
+
+```text
+Architecture-121 R1/R2/R3/R4 + ordinary D9-A regressions: 251 passed
+Ruff check:                                                   pass
+Ruff format --check:                                         pass
+git diff --check:                                             pass
+git diff --cached --check:                                    pass
+broad repository certification:                               pending
+```
+
+Architecture 121 is now source-complete. No production D8-R2 or D9-R1 invocation
+has occurred and no production effect is authorized.
+
+Next safe checkpoint: final source certification from a fresh clean detached
+checkout of the exact feature HEAD using `scripts/run_test_certification.py`.
+That runner owns the two broad lanes plus the Architecture-77 serial-safety lane
+and source/static evidence. Do not substitute a plain `pytest -q` run.

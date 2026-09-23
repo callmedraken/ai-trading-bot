@@ -2065,3 +2065,57 @@ sanitized PD4-C blocked-reason enum, passes it through D8-A, and validates its
 presence only when PD4-C startup is `BLOCKED`. It distinguishes existing block
 classes on a future separately reviewed result; it does not retroactively
 identify the class of the observed production block or authorize another run.
+
+## D8-A bounded block-reason diagnostics — source certification accepted, 2026-09-22
+
+The bounded PD4-C/D8-A block-reason diagnostic checkpoint is source-certified.
+The accepted executable/source identity is:
+
+```text
+HEAD: 712b2873b7ec2100fc7ce0062a2c414d31595717
+TREE: 4c485a7557af01a467413625dcb8d2844a8af52f
+BASE: 2d36e864f82a7fbb85b39571c2cebc0c730aaeb6
+```
+
+Accepted final certification:
+
+```text
+broad non-Architecture-77:      6,013 passed, 17 skipped in 589.48s
+Architecture-77 clean harness:    713 passed in 977.59s
+combined:                       6,726 passed, 17 skipped
+Ruff check:                     PASS
+Ruff format --check:            PASS (548 files)
+git diff --check:               PASS
+feature worktree:               clean, exact certified HEAD/TREE
+Architecture-77 harness:        clean, detached, exact certified HEAD/TREE
+pytest basetemps:               fresh external paths, cache disabled
+```
+
+The reviewed checkpoint adds only a fixed sanitized PD4-C blocked-reason enum
+and D8-A pass-through/validation. Every existing explicit PD4-C `BLOCKED`
+branch has one fixed enum reason and the existing outer `Exception` collapse
+maps to `EXCEPTION_COLLAPSED`. No branch predicate, dependency call count,
+mutex lifetime, recovery ordering, account/storage/operation read, authority,
+identity, gate, execution, provider/broker, scheduler, or effect semantics were
+changed.
+
+A review-driven compatibility correction also updated the lazy runtime facade
+and two existing neighboring tests to construct the strengthened `BLOCKED`
+result contract explicitly. The final focused compatibility run passed
+**290 tests** before broad certification.
+
+Operational state remains:
+
+```text
+D8-A block-reason source            SOURCE CERTIFIED
+D8-A protected diagnostic run       USED 1 / 1 -> BLOCKED
+D8-A retry                          NOT AUTHORIZED
+D8-B                                NOT AUTHORIZED
+D9-A                                NOT APPLICABLE
+real effect                         FALSE
+```
+
+This certification does not identify the earlier production block
+retrospectively and does not authorize another production invocation. Next:
+exact docs-only closeout review and PR/merge-readiness review against
+`develop`. PR creation or merge remains a protected repository action.

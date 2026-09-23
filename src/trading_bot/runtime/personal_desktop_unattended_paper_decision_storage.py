@@ -6,6 +6,7 @@ import re
 import threading
 import weakref
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from enum import StrEnum
 from uuid import UUID
 
@@ -24,6 +25,9 @@ from trading_bot.runtime.personal_desktop_paper_account_token import (
 )
 from trading_bot.runtime.personal_desktop_unattended_c3_history import (
     WindowsPersonalDesktopUnattendedSelectedC3ReadAuthority,
+)
+from trading_bot.runtime.personal_desktop_unattended_daily_cycle_timing import (
+    completed_xnys_session_at,
 )
 from trading_bot.runtime.personal_desktop_unattended_paper_decision_intent import (
     PersonalDesktopUnattendedPaperDecisionIntent,
@@ -69,6 +73,57 @@ class FinalizedUnattendedDecisionForSessionClassification(StrEnum):
     NONE = "NONE"
     FINALIZED = "FINALIZED"
     BLOCKED = "BLOCKED"
+
+
+class SingleDeferredDecisionClassification(StrEnum):
+    NONE = "NONE"
+    FINALIZED = "FINALIZED"
+    BLOCKED = "BLOCKED"
+
+
+@dataclass(frozen=True, slots=True, eq=False, weakref_slot=True)
+class SingleDeferredDecisionResult:
+    """Bounded complete-namespace evidence, with no reusable public authority."""
+
+    classification: SingleDeferredDecisionClassification
+    current_completed_session: TradingSession | None = None
+    execution_session: TradingSession | None = None
+    decision_id: UUID | None = None
+    binding: PersonalDesktopUnattendedPaperDecisionIntentArtifactBinding | None = None
+
+    def __post_init__(self) -> None:
+        c = SingleDeferredDecisionClassification
+        finalized = self.classification is c.FINALIZED
+        if (
+            type(self.classification) is not c
+            or any(
+                value is not None and type(value) is not TradingSession
+                for value in (self.current_completed_session, self.execution_session)
+            )
+            or (
+                self.classification is c.BLOCKED
+                and self.current_completed_session is not None
+            )
+            or (
+                self.classification is c.NONE and self.current_completed_session is None
+            )
+            or (finalized != (self.execution_session is not None))
+            or (finalized != (self.decision_id is not None))
+            or (finalized != (self.binding is not None))
+            or (
+                finalized
+                and (
+                    type(self.decision_id) is not UUID
+                    or type(self.binding)
+                    is not PersonalDesktopUnattendedPaperDecisionIntentArtifactBinding
+                    or self.binding.decision.decision_id != self.decision_id
+                    or self.binding.decision.intended_execution_session
+                    != self.execution_session
+                    or self.execution_session >= self.current_completed_session
+                )
+            )
+        ):
+            raise ValueError("single deferred decision result is invalid")
 
 
 @dataclass(frozen=True, slots=True, eq=False, weakref_slot=True)
@@ -168,6 +223,150 @@ _SESSION_REGISTRY: weakref.WeakKeyDictionary[
         PersonalDesktopUnattendedPaperDecisionIntentArtifactBinding | None,
     ],
 ] = weakref.WeakKeyDictionary()
+
+
+_DEFERRED_REGISTRY: weakref.WeakKeyDictionary[
+    SingleDeferredDecisionResult,
+    tuple[
+        ValidatedProductionAuthority,
+        PersonalDesktopUnattendedPaperDecisionIntentArtifactBinding | None,
+    ],
+] = weakref.WeakKeyDictionary()
+
+
+def find_single_deferred_unattended_decision(
+    authority: ValidatedProductionAuthority,
+) -> SingleDeferredDecisionResult:
+    """Read the complete fixed namespace and derive the sole prior-session decision."""
+
+    try:
+        c1 = require_validated_production_authority(authority)
+        observer = WindowsTradingTokenObserver()
+        first = observer.observe()
+        require_trading_token(c1.approved_account_sid, first)
+        completed = completed_xnys_session_at(datetime.now(UTC))
+        finalized = _read_complete_fixed_namespace(
+            c1.approved_account_sid,
+            api=WindowsPaperReadNativeApi(),
+            calendar=personal_desktop_unattended_decision_calendar(),
+        )
+        last = observer.observe()
+        require_trading_token(c1.approved_account_sid, last)
+        if last != first or completed_xnys_session_at(datetime.now(UTC)) != completed:
+            raise PersonalDesktopUnattendedDecisionStorageError(
+                "decision read provenance changed"
+            )
+        require_validated_production_authority(c1)
+        result = _single_deferred_result(finalized, completed)
+        if result.classification in {
+            SingleDeferredDecisionClassification.NONE,
+            SingleDeferredDecisionClassification.FINALIZED,
+        }:
+            with _REGISTRY_LOCK:
+                _DEFERRED_REGISTRY[result] = (c1, result.binding)
+        return result
+    except Exception:
+        return SingleDeferredDecisionResult(
+            SingleDeferredDecisionClassification.BLOCKED
+        )
+
+
+def require_single_deferred_unattended_decision(
+    result: SingleDeferredDecisionResult,
+    authority: ValidatedProductionAuthority,
+) -> PersonalDesktopUnattendedPaperDecisionIntentArtifactBinding | None:
+    """Require same-process current-C1 provenance for exact absence or candidate."""
+
+    try:
+        c1 = require_validated_production_authority(authority)
+    except Exception as error:
+        raise PersonalDesktopUnattendedDecisionStorageError(
+            "deferred decision lacks C1 provenance"
+        ) from error
+    if type(result) is not SingleDeferredDecisionResult:
+        raise PersonalDesktopUnattendedDecisionStorageError(
+            "deferred decision lacks C1 provenance"
+        )
+    try:
+        result.__post_init__()
+    except ValueError as error:
+        raise PersonalDesktopUnattendedDecisionStorageError(
+            "deferred decision result is invalid"
+        ) from error
+    with _REGISTRY_LOCK:
+        evidence = _DEFERRED_REGISTRY.get(result)
+    if (
+        result.classification is SingleDeferredDecisionClassification.BLOCKED
+        or evidence is None
+        or evidence[0] != c1
+        or evidence[1] is not result.binding
+    ):
+        raise PersonalDesktopUnattendedDecisionStorageError(
+            "deferred decision lacks C1 provenance"
+        )
+    return evidence[1]
+
+
+def _single_deferred_result(
+    finalized: tuple[PersonalDesktopUnattendedPaperDecisionIntentArtifactBinding, ...],
+    completed: TradingSession,
+) -> SingleDeferredDecisionResult:
+    if not finalized:
+        return SingleDeferredDecisionResult(
+            SingleDeferredDecisionClassification.NONE, completed
+        )
+    if len(finalized) != 1:
+        raise PersonalDesktopUnattendedDecisionStorageError(
+            "exactly one finalized decision is required"
+        )
+    binding = finalized[0]
+    execution = binding.decision.intended_execution_session
+    if execution >= completed:
+        raise PersonalDesktopUnattendedDecisionStorageError("decision is not deferred")
+    return SingleDeferredDecisionResult(
+        SingleDeferredDecisionClassification.FINALIZED,
+        completed,
+        execution,
+        binding.decision.decision_id,
+        binding,
+    )
+
+
+def _find_single_deferred_unattended_decision_for_test(
+    trading_sid: str,
+    observed_at: datetime,
+    *,
+    api: PaperReadNativeApi,
+    observer: TradingTokenObserver,
+    calendar: IdentifiedMarketCalendar,
+) -> SingleDeferredDecisionResult:
+    """Disposable complete-namespace seam; never registers production C1 provenance."""
+
+    try:
+        if api is None or isinstance(api, WindowsPaperReadNativeApi):
+            raise PersonalDesktopUnattendedDecisionStorageError(
+                "fake native API required"
+            )
+        first = observer.observe()
+        require_trading_token(trading_sid, first)
+        try:
+            finalized = _read_complete_fixed_namespace(
+                trading_sid, api=api, calendar=calendar
+            )
+        finally:
+            last = observer.observe()
+            require_trading_token(trading_sid, last)
+            if last != first:
+                raise PersonalDesktopUnattendedDecisionStorageError(
+                    "Trading token changed"
+                )
+        return _single_deferred_result(
+            finalized, completed_xnys_session_at(observed_at)
+        )
+    except Exception:
+        return SingleDeferredDecisionResult(
+            SingleDeferredDecisionClassification.BLOCKED
+        )
 
 
 def unattended_paper_decision_directory_name(

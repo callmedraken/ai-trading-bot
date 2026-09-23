@@ -2570,3 +2570,234 @@ D9-A                                NOT APPLICABLE
 Next safe checkpoint: create a fresh detached integrated production-qualification
 checkout and run only the Trading-principal no-effect preflight. Stop before
 D8-A; any new D8-A invocation requires fresh explicit one-shot authorization.
+
+
+## Architecture 121 single-deferred first-settlement recovery — current checkpoint
+
+The fresh integrated no-effect preflight derived completed XNYS session
+`2026-09-22`. A separate read-only current-C1 durable-decision inspection then
+proved:
+
+```text
+2026-09-21:
+  FINALIZED
+  decision f2188b5e-e6a4-5398-be41-8867d9268355
+  intended execution 2026-09-21
+  selected session 2026-09-18
+  current-C1 provenance verified
+
+2026-09-22:
+  NONE
+  current-C1 provenance verified
+
+all eight gates closed
+D8-A not invoked
+```
+
+Architecture 114 cannot consume the prior-session decision because its ordinary
+D8 boundary requires the decision to target the current completed session.
+Do not run D8-A merely to obtain `NO_SETTLEMENT_PENDING`; that would leave the
+accepted 2026-09-21 decision unresolved.
+
+Architecture 121 freezes a distinct pre-D10 single-deferred recovery boundary.
+It requires a complete fixed-namespace read, exactly one finalized decision
+total, exact current-C1 selected C3 for its original and execution sessions,
+exact verified `open(E)`, exact Architecture-94 plan, compatible current
+Paper-v2 predecessor/startup state, and all normal PD4/A67 safety invariants.
+It authorizes no historical publication, multi-session catch-up, receipt
+recovery, scheduler change, broker effect, or live effect.
+
+Implementation routing: **Sol High** because this changes production authority,
+ordering, and external-effect containment.
+
+Current operational boundary:
+
+```text
+D8-A retry                         NOT AUTHORIZED
+D8-B                               NOT AUTHORIZED
+D8-R2 deferred effect              NOT AUTHORIZED
+D9-A / D9-R1                      NOT APPLICABLE
+```
+
+Next: source-only R1/R2 implementation on
+`feature/pd4-single-deferred-settlement-authority`, focused verification only,
+then exact GitHub review before any broad certification.
+
+
+## Architecture 121 R1/R2 acceptance
+
+Accepted source:
+
+```text
+branch: feature/pd4-single-deferred-settlement-authority
+HEAD:   e3aefe2c8929141d8d68f5fc54d4d744ba02279f
+TREE:   96097f659afbc1c1d9149b4b858b8b63e71d705f
+```
+
+R1/R2 are accepted after exact GitHub review and one provenance correction.
+The correction closes the negative-result authority gap: complete-namespace
+`NONE` is now registered under the exact current C1 and must pass the same
+same-process provenance requirement before D8-R1 may return
+`NO_DEFERRED_SETTLEMENT`. `FINALIZED` behavior remains provenance-bound;
+`BLOCKED`, forged/copied results, and wrong-C1 reuse fail closed.
+
+The accepted D8-R1 remains read-only and zero-semantic-argument. It independently
+reconstructs exact C3/open/plan/startup truth and uses the installed-only
+historical-configuration resolver. Existing Architecture-114 D8-A source and
+semantics remain unchanged.
+
+Focused verification:
+
+```text
+192 focused tests passed
+Ruff check / format --check passed
+git diff --check passed
+staged diff check passed
+broad certification intentionally deferred
+```
+
+Operational boundary is unchanged:
+
+```text
+D8-A retry                         NOT AUTHORIZED
+D8-B                               NOT AUTHORIZED
+D8-R2 deferred effect              NOT AUTHORIZED
+D9-A / D9-R1                      NOT APPLICABLE
+```
+
+Next source checkpoint is R3: implement the effects-closed D8-R2 one-shot
+deferred settlement boundary using the established Architecture-114 D8-B /
+PD4-D effect-containment pattern, but with Architecture-121 source-owned
+single-deferred discovery. It must not consume D8-R1 public output as authority.
+No protected production invocation is authorized by source completion.
+
+
+## Architecture 121 R3 acceptance
+
+Accepted executable source:
+
+```text
+HEAD: 1cc1f9b3d4f500d73b6c13eccadf65868687817a
+TREE: f7cdeab1fc51f1dad2b70acf5ff1121449288b6a
+```
+
+R3 / D8-R2 is accepted after exact review and a narrow correction to effect
+boundary accounting. The process-local unattended-execution gate is opened
+first, the exact one-open/seven-closed vector is verified, and only immediately
+before the existing PD4-D composition call is
+`real_effect_performed` considered crossed. Open-vector verification failure is
+therefore pre-effect `BLOCKED`; any exception, drift, or contradiction after
+the call boundary is ambiguous and grants no retry.
+
+Ordinary Architecture-114 D8-B and existing R1/R2 source remain unchanged.
+
+Focused correction verification:
+
+```text
+149 D8-R2 / ordinary D8-B runtime+CLI tests passed
+Ruff check / format --check passed
+diff checks passed
+broad certification intentionally deferred
+```
+
+Production boundary remains:
+
+```text
+D8-A retry                         NOT AUTHORIZED
+D8-B                               NOT AUTHORIZED
+D8-R2 deferred effect              NOT AUTHORIZED
+D9-A / D9-R1                      NOT APPLICABLE
+```
+
+Next source checkpoint is R4 / D9-R1: implement a distinct fresh-process,
+zero-semantic-argument, all-gates-closed deferred reconciliation boundary by
+adapting the established Architecture-114 D9-A read-only durable convergence
+pattern to Architecture-121 complete-namespace single-deferred discovery. No
+D8-R2 public output may be accepted as authority and no effect is authorized.
+
+
+## Architecture 121 R4 accepted / source-complete
+
+Accepted executable source before docs-only closeout:
+
+```text
+HEAD: c40d857f055c7d9f744b00d7dcd07edb8cc30c20
+TREE: 88a15917dbcd328a847a36dcb967c8b77bde9d8b
+```
+
+R4 / D9-R1 is accepted after exact GitHub review. It is a separate
+fresh-process-compatible, zero-semantic-argument, all-gates-closed read-only
+reconciler. It uses Architecture-121 complete-namespace single-deferred
+discovery and preserves the critical C/E distinction: current completed session
+C is source-derived admission context, while deferred session E owns
+C3(E), `open(E)`, plan, invocation, operation, receipt, and successor
+identities.
+
+Only `RECONCILED` is acceptance evidence. It requires exact durable
+ALREADY_APPLIED operation state, exact completed receipt reverification, exact
+deterministic successor, current account tip/lineage convergence, final
+C1/Trading-token stability, and eight closed gates. Other classifications grant
+no execution or recovery authority.
+
+Focused verification completed with 251 passing tests plus Ruff and diff checks.
+Ordinary Architecture-114 D9-A remained unchanged.
+
+Architecture 121 is source-complete. Broad certification has not yet run.
+
+Operational boundary remains:
+
+```text
+D8-A retry                         NOT AUTHORIZED
+D8-B                               NOT AUTHORIZED
+D8-R2 deferred effect              NOT AUTHORIZED
+D9-A / production D9-R1            NOT AUTHORIZED
+```
+
+Next: use a fresh detached certification worktree at the exact feature HEAD and
+run the persistent certification runner. Its topology includes broad-1,
+broad-2, and the Architecture-77 serial lane. No plain full-suite pytest run is
+needed in addition to that runner.
+
+
+## Architecture 121 final certification — PASS
+
+Final certification was run from a fresh detached checkout of:
+
+```text
+HEAD 8162a9121c1ab2c3340c921a2a765c0b89ac612b
+TREE 4ab2ef4b2e41d9a97fcc2156703d65bfad2c0a1f
+base origin/develop 91392bb3667eac24ebcc613d309b030a766bbfff
+```
+
+Persistent certification runner results:
+
+```text
+broad-1  3015 cases / 3012 pass / 3 skip / 0 fail/error
+broad-2  3019 cases / 3014 pass / 5 skip / 0 fail/error
+serial     935 cases /  926 pass / 9 skip / 0 fail/error
+total     6969 cases / 6952 pass / 17 skip / 0 fail/error
+wall      376.211 s
+```
+
+The serial lane is the required Architecture-77 safety lane, so no additional
+Architecture-77 invocation is needed. Runner-owned source revalidation and
+static checks passed.
+
+Evidence:
+
+```text
+F:\AI\temp\pytest\certification-evidence-29faa0909661480385382d9706d83bb5
+```
+
+Keep the detached certification checkout and evidence until merge acceptance.
+
+Operational authorization remains unchanged:
+
+```text
+D8-A retry                         NOT AUTHORIZED
+D8-B                               NOT AUTHORIZED
+D8-R2 deferred effect              NOT AUTHORIZED
+production D9-R1                   NOT AUTHORIZED
+```
+
+Next checkpoint is exact merge/PR readiness review against current `develop`.

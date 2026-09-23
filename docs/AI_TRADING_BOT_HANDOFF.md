@@ -2844,3 +2844,71 @@ Next: fresh integrated production-qualification checkout -> non-effect
 Trading-principal preflight -> D8-R1 read-only deferred qualification -> stop
 for review. Only after that checkpoint may a separate explicit one-shot D8-R2
 authorization be considered.
+
+
+## Architecture 121 production closeout — RECONCILED
+
+Architecture 121 is fully closed in production.
+
+Integrated qualification identity:
+
+```text
+HEAD 52da6a2f829ea9e9a2ce69140a85240cceeb2641
+TREE 00128551587cb33169547615d65dc5c1f4876033
+principal DESKTOP-I4DOKM7\Trading (non-admin)
+runtime F:\AITradingBot\runtime\python.exe / Python 3.14.3
+```
+
+Fresh D8-R1 independently returned `EXECUTION_READY` for the original deferred
+decision:
+
+```text
+decision f2188b5e-e6a4-5398-be41-8867d9268355
+selected S 2026-09-18
+deferred E 2026-09-21
+current completed C 2026-09-22
+plan 29c880dc-f10e-566c-a6e1-e3d73fa04c69
+invocation a485a31b-a353-50cb-b9d4-db05dd6f6d71
+operation bacd0dfb-b458-57c3-9195-a0fc51b7538c
+application dd4f089a-8e75-588f-b32e-f635ef117085
+predecessor ed4640e5-0630-525d-b916-d50e31e3ba2a
+all eight gates closed
+```
+
+After explicit one-shot operator approval, D8-R2 was invoked exactly once and
+returned `SETTLEMENT_COMPLETED` with
+`real_effect_performed=True`, producing successor checkpoint
+`bc7c695a-0002-5f28-97e7-c58d2a2f97e6`. All eight gates were proven closed
+afterward. No receipt recovery, broker effect, or live effect occurred.
+
+The D8-R2 authorization is permanently consumed for this checkpoint. Never
+rerun it.
+
+Fresh-process D9-R1 then returned `RECONCILED` with:
+
+```text
+invocation storage FINALIZED_IDENTICAL
+operation ALREADY_APPLIED
+receipt COMPLETED
+exact predecessor -> successor convergence
+all eight gates closed
+real_effect_performed False
+```
+
+This is the independent acceptance authority required by Architecture 121.
+The single-deferred recovery checkpoint is complete and grants no ongoing
+historical catch-up authority.
+
+Next milestone is D10 bounded unattended simulated-paper soak. Before changing
+the capture-only installed scheduler or enabling recurring decision/settlement
+effects, freeze a new architecture for:
+
+- concrete soak duration and successful-cycle count;
+- scheduler composition for capture -> decision -> later settlement;
+- late wake / missed pre-open deadline behavior;
+- stale finalized decision handling without automatic multi-session catch-up;
+- duplicate wake / restart / sleep / network/provider ambiguity handling;
+- operator stop/escalation conditions;
+- D10 evidence and graduation criteria.
+
+Broker-paper and live trading remain unauthorized.

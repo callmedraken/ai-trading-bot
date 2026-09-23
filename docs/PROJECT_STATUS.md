@@ -2917,3 +2917,87 @@ from current integrated `develop`, run a non-effect Trading-principal
 preflight, then run D8-R1 read-only single-deferred qualification. Stop before
 D8-R2. Any D8-R2 invocation requires separate explicit one-shot operator
 authorization after the fresh D8-R1 result is reviewed.
+
+
+## Architecture 121 production recovery accepted — D8-R2 / D9-R1
+
+The integrated Architecture-121 production recovery checkpoint completed
+successfully under the dedicated non-admin Trading principal.
+
+Source/host preconditions:
+
+```text
+qualification HEAD: 52da6a2f829ea9e9a2ce69140a85240cceeb2641
+qualification TREE: 00128551587cb33169547615d65dc5c1f4876033
+principal:           DESKTOP-I4DOKM7\Trading
+SID:                 S-1-5-21-1397534616-3988210162-180023805-1009
+Administrator:       False
+runtime:             F:\AITradingBot\runtime\python.exe
+Python:              3.14.3
+```
+
+Fresh D8-R1 read-only qualification returned `EXECUTION_READY` with all eight
+gates closed and exact reviewed identities:
+
+```text
+current completed:   2026-09-22
+deferred execution:  2026-09-21
+selected session:    2026-09-18
+decision:            f2188b5e-e6a4-5398-be41-8867d9268355
+plan:                29c880dc-f10e-566c-a6e1-e3d73fa04c69
+invocation:          a485a31b-a353-50cb-b9d4-db05dd6f6d71
+operation:           bacd0dfb-b458-57c3-9195-a0fc51b7538c
+application:         dd4f089a-8e75-588f-b32e-f635ef117085
+predecessor:         ed4640e5-0630-525d-b916-d50e31e3ba2a
+startup:             HEALTHY_NO_PENDING_INVOCATION
+invocation storage:  ABSENT
+operation state:     PENDING
+real effect:         False
+```
+
+The operator then explicitly authorized exactly one D8-R2 invocation. That
+authorization is consumed and must not be reused.
+
+D8-R2 returned:
+
+```text
+classification:      SETTLEMENT_COMPLETED
+real effect crossed: True
+successor:           bc7c695a-0002-5f28-97e7-c58d2a2f97e6
+post-run gates:      all eight closed
+receipt recovery:    not invoked
+broker/live:         not invoked
+```
+
+A fresh-process D9-R1 reconciliation then independently returned
+`RECONCILED` and proved:
+
+```text
+same decision / plan / invocation / operation / application identities
+invocation storage:  FINALIZED_IDENTICAL
+operation:           ALREADY_APPLIED
+receipt:             COMPLETED
+predecessor:         ed4640e5-0630-525d-b916-d50e31e3ba2a
+successor:           bc7c695a-0002-5f28-97e7-c58d2a2f97e6
+all eight gates:     closed before and after
+real effect in D9:   False
+```
+
+Architecture 121 is therefore operationally complete. Its single-deferred
+recovery authority is exhausted for this checkpoint and grants no continuing
+catch-up or retry authority.
+
+Production boundary after acceptance:
+
+```text
+D8-R2 retry for this checkpoint     PROHIBITED / authorization consumed
+receipt recovery                    NOT AUTHORIZED
+broker-paper                        NOT AUTHORIZED
+live trading                        NOT AUTHORIZED
+current installed scheduler         capture-only until D10 redesign
+```
+
+Next milestone: D10 bounded unattended simulated-paper soak. Before any scheduler
+or daily-cycle effect expansion, freeze the D10 soak duration/success criteria
+and an explicit missed-wake/stale-decision policy. Architecture 111's automatic
+multi-session catch-up prohibition remains controlling.

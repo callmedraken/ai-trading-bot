@@ -2668,3 +2668,56 @@ D9-A / D9-R1                      NOT APPLICABLE
 Next safe checkpoint: implement Architecture-121 source checkpoint R1/R2 on the
 isolated feature branch with Sol High, using focused tests only. No production
 effect or existing protected worktree mutation is authorized.
+
+
+## Architecture 121 R1/R2 accepted — 2026-09-23
+
+Source checkpoints R1 and R2 are accepted after exact GitHub review of the
+implementation and a follow-up current-C1 provenance correction.
+
+Accepted remote source:
+
+```text
+branch: feature/pd4-single-deferred-settlement-authority
+HEAD:   e3aefe2c8929141d8d68f5fc54d4d744ba02279f
+TREE:   96097f659afbc1c1d9149b4b858b8b63e71d705f
+```
+
+R1 now provides a public read-only complete-namespace authority for the
+single-deferred candidate. Successful `NONE` and `FINALIZED` results both
+retain same-process current-C1 provenance; `BLOCKED`, copied/forged results,
+and wrong-C1 reuse fail closed.
+
+R2 is a distinct zero-semantic-argument, read-only D8-R1 qualification. It
+proves the R1 result before accepting either absence or a finalized candidate,
+then independently reconstructs selected C3(S), selected C3(E), verified
+`open(E)`, the exact Architecture-94 final plan, installed-only historical
+configuration dependencies, and PD4-C startup state. Ordinary Architecture-114
+D8-A remains unchanged.
+
+Focused implementation verification after the provenance correction:
+
+```text
+pytest focused R1/R2 + existing D8-A: 192 passed
+Ruff check:                           pass
+Ruff format --check:                  pass
+git diff --check:                     pass
+git diff --cached --check:            pass
+broad repository suite:               not run (not yet final source tree)
+```
+
+Production authorization remains unchanged:
+
+```text
+D8-A retry                         NOT AUTHORIZED
+D8-B                               NOT AUTHORIZED
+D8-R2 deferred effect              NOT AUTHORIZED
+D9-A / D9-R1                      NOT APPLICABLE
+```
+
+Next safe source checkpoint: R3, the effects-closed D8-R2 one-shot deferred
+settlement boundary. R3 must independently repeat source-owned deferred
+reconstruction rather than trust D8-R1 output, reuse the existing PD4-D
+execution composition, permit only the unattended-execution gate to open
+process-locally for at most one composition call, restore it in `finally`, and
+grant no retry or recovery authority. No production invocation is authorized.

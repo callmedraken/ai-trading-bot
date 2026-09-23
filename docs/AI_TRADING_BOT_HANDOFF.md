@@ -2622,3 +2622,51 @@ D9-A / D9-R1                      NOT APPLICABLE
 Next: source-only R1/R2 implementation on
 `feature/pd4-single-deferred-settlement-authority`, focused verification only,
 then exact GitHub review before any broad certification.
+
+
+## Architecture 121 R1/R2 acceptance
+
+Accepted source:
+
+```text
+branch: feature/pd4-single-deferred-settlement-authority
+HEAD:   e3aefe2c8929141d8d68f5fc54d4d744ba02279f
+TREE:   96097f659afbc1c1d9149b4b858b8b63e71d705f
+```
+
+R1/R2 are accepted after exact GitHub review and one provenance correction.
+The correction closes the negative-result authority gap: complete-namespace
+`NONE` is now registered under the exact current C1 and must pass the same
+same-process provenance requirement before D8-R1 may return
+`NO_DEFERRED_SETTLEMENT`. `FINALIZED` behavior remains provenance-bound;
+`BLOCKED`, forged/copied results, and wrong-C1 reuse fail closed.
+
+The accepted D8-R1 remains read-only and zero-semantic-argument. It independently
+reconstructs exact C3/open/plan/startup truth and uses the installed-only
+historical-configuration resolver. Existing Architecture-114 D8-A source and
+semantics remain unchanged.
+
+Focused verification:
+
+```text
+192 focused tests passed
+Ruff check / format --check passed
+git diff --check passed
+staged diff check passed
+broad certification intentionally deferred
+```
+
+Operational boundary is unchanged:
+
+```text
+D8-A retry                         NOT AUTHORIZED
+D8-B                               NOT AUTHORIZED
+D8-R2 deferred effect              NOT AUTHORIZED
+D9-A / D9-R1                      NOT APPLICABLE
+```
+
+Next source checkpoint is R3: implement the effects-closed D8-R2 one-shot
+deferred settlement boundary using the established Architecture-114 D8-B /
+PD4-D effect-containment pattern, but with Architecture-121 source-owned
+single-deferred discovery. It must not consume D8-R1 public output as authority.
+No protected production invocation is authorized by source completion.

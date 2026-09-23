@@ -2622,3 +2622,49 @@ from current integrated `develop` and perform a no-effect preflight under the
 dedicated non-admin Trading principal with the approved production runtime.
 Stop before D8-A. A new D8-A invocation requires separate explicit one-shot
 operator authorization.
+
+
+## Architecture 121 single-deferred first-settlement recovery — docs checkpoint
+
+A fresh Trading-principal read-only inspection after TP2/hygiene established a
+new source-owned timing state:
+
+```text
+current completed XNYS session: 2026-09-22
+2026-09-21 finalized decision:  f2188b5e-e6a4-5398-be41-8867d9268355
+2026-09-21 provenance:          verified under current C1
+2026-09-22 finalized decision:  NONE
+all eight gates:                false
+D8-A invoked:                   false
+```
+
+Ordinary Architecture-114 D8 is intentionally current-completed-session only, so
+it may not silently settle the now-prior 2026-09-21 decision. Running D8-A in
+this state would not resolve that durable pending decision.
+
+Architecture 121 and its validation plan therefore define a separate,
+zero-semantic-argument, **single-deferred first-settlement** recovery authority.
+It may later resolve at most one already-finalized prior decision only after a
+complete fixed-namespace read proves exactly one finalized candidate and all
+existing C1/Trading/C3/open/plan/predecessor/PD4/A67 contracts still hold.
+
+This is not multi-session catch-up: it may not create missed decisions, loop
+over prior sessions, substitute a newer open, or broaden ordinary D8.
+
+```text
+docs/architecture/121-personal-desktop-single-deferred-paper-settlement-authority.md
+docs/validation/pd4-single-deferred-settlement-plan.md
+```
+
+Production authorization remains unchanged:
+
+```text
+D8-A retry                         NOT AUTHORIZED
+D8-B                               NOT AUTHORIZED
+D8-R2 deferred effect              NOT AUTHORIZED
+D9-A / D9-R1                      NOT APPLICABLE
+```
+
+Next safe checkpoint: implement Architecture-121 source checkpoint R1/R2 on the
+isolated feature branch with Sol High, using focused tests only. No production
+effect or existing protected worktree mutation is authorized.

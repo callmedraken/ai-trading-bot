@@ -2570,3 +2570,55 @@ D9-A                                NOT APPLICABLE
 Next safe checkpoint: create a fresh detached integrated production-qualification
 checkout and run only the Trading-principal no-effect preflight. Stop before
 D8-A; any new D8-A invocation requires fresh explicit one-shot authorization.
+
+
+## Architecture 121 single-deferred first-settlement recovery — current checkpoint
+
+The fresh integrated no-effect preflight derived completed XNYS session
+`2026-09-22`. A separate read-only current-C1 durable-decision inspection then
+proved:
+
+```text
+2026-09-21:
+  FINALIZED
+  decision f2188b5e-e6a4-5398-be41-8867d9268355
+  intended execution 2026-09-21
+  selected session 2026-09-18
+  current-C1 provenance verified
+
+2026-09-22:
+  NONE
+  current-C1 provenance verified
+
+all eight gates closed
+D8-A not invoked
+```
+
+Architecture 114 cannot consume the prior-session decision because its ordinary
+D8 boundary requires the decision to target the current completed session.
+Do not run D8-A merely to obtain `NO_SETTLEMENT_PENDING`; that would leave the
+accepted 2026-09-21 decision unresolved.
+
+Architecture 121 freezes a distinct pre-D10 single-deferred recovery boundary.
+It requires a complete fixed-namespace read, exactly one finalized decision
+total, exact current-C1 selected C3 for its original and execution sessions,
+exact verified `open(E)`, exact Architecture-94 plan, compatible current
+Paper-v2 predecessor/startup state, and all normal PD4/A67 safety invariants.
+It authorizes no historical publication, multi-session catch-up, receipt
+recovery, scheduler change, broker effect, or live effect.
+
+Implementation routing: **Sol High** because this changes production authority,
+ordering, and external-effect containment.
+
+Current operational boundary:
+
+```text
+D8-A retry                         NOT AUTHORIZED
+D8-B                               NOT AUTHORIZED
+D8-R2 deferred effect              NOT AUTHORIZED
+D9-A / D9-R1                      NOT APPLICABLE
+```
+
+Next: source-only R1/R2 implementation on
+`feature/pd4-single-deferred-settlement-authority`, focused verification only,
+then exact GitHub review before any broad certification.

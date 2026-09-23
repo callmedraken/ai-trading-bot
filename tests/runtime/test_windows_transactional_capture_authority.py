@@ -16,6 +16,7 @@ import tempfile
 import threading
 import uuid
 from collections.abc import Callable, Iterator
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import AbstractContextManager, contextmanager
 from dataclasses import FrozenInstanceError, dataclass, replace
 from pathlib import Path
@@ -1532,6 +1533,33 @@ def _insert_migration(
     return migration_id
 
 
+_ARCH77_BASELINE_LOCK = threading.Lock()
+_ARCH77_BASELINE_CONNECTION: sqlite3.Connection | None = None
+
+
+def _backup_fresh_harness_baseline(destination: sqlite3.Connection) -> None:
+    """Copy the read-only per-process test template into one fresh file database."""
+
+    global _ARCH77_BASELINE_CONNECTION
+    with _ARCH77_BASELINE_LOCK:
+        if _ARCH77_BASELINE_CONNECTION is None:
+            source = sqlite3.connect(
+                ":memory:", isolation_level=None, check_same_thread=False
+            )
+            try:
+                _install_schema(source)
+                _insert_metadata(source)
+                _insert_migration(source)
+                source.execute("PRAGMA query_only = ON")
+                if source.execute("PRAGMA query_only").fetchone() != (1,):
+                    raise AssertionError("Architecture-77 baseline is not read-only")
+            except BaseException:
+                source.close()
+                raise
+            _ARCH77_BASELINE_CONNECTION = source
+        _ARCH77_BASELINE_CONNECTION.backup(destination)
+
+
 def _require_no_active_transaction(
     connection: sqlite3.Connection | DisposableAuthorityDatabaseForTest,
 ) -> None:
@@ -1658,9 +1686,7 @@ class Architecture77HarnessAuthority:
         connection: sqlite3.Connection | None = None
         try:
             connection = _connect(path)
-            _install_schema(connection)
-            _insert_metadata(connection)
-            _insert_migration(connection)
+            _backup_fresh_harness_baseline(connection)
             instance = cls(
                 connection,
                 root=root,
@@ -3594,6 +3620,148 @@ def _seed_harness_metadata(
         seed.backup(harness._connection)
     finally:
         seed.close()
+
+
+def test_fresh_harness_baseline_matches_direct_seed_contract() -> None:
+    direct = sqlite3.connect(":memory:", isolation_level=None)
+    try:
+        _install_schema(direct)
+        _insert_metadata(direct)
+        _insert_migration(direct)
+        harness = Architecture77HarnessAuthority.create()
+        try:
+            destination = harness._connection
+            schema_sql = "SELECT type, name, tbl_name, sql FROM sqlite_schema"
+            assert sorted(destination.execute(schema_sql).fetchall()) == sorted(
+                direct.execute(schema_sql).fetchall()
+            )
+            assert destination.execute(
+                "SELECT * FROM authority_metadata"
+            ).fetchall() == (
+                direct.execute("SELECT * FROM authority_metadata").fetchall()
+            )
+            assert destination.execute(
+                "SELECT * FROM schema_migrations"
+            ).fetchall() == (
+                direct.execute("SELECT * FROM schema_migrations").fetchall()
+            )
+            assert _database_rows(destination) == _database_rows(direct)
+            assert destination.execute("PRAGMA trusted_schema").fetchone() == (0,)
+            assert destination.execute("PRAGMA foreign_keys").fetchone() == (1,)
+            assert destination.execute("PRAGMA busy_timeout").fetchone() == (5000,)
+            assert destination.execute("PRAGMA query_only").fetchone() == (0,)
+            assert destination.execute("PRAGMA journal_mode").fetchone() == ("delete",)
+            assert not Path(f"{harness.database_path}-wal").exists()
+            assert not Path(f"{harness.database_path}-shm").exists()
+            with _ARCH77_BASELINE_LOCK:
+                baseline = _ARCH77_BASELINE_CONNECTION
+                assert baseline is not None
+                assert baseline.execute("PRAGMA database_list").fetchone()[2] == ""
+                assert baseline.execute("PRAGMA query_only").fetchone() == (1,)
+                assert _database_rows(baseline) == _database_rows(direct)
+                with pytest.raises(sqlite3.OperationalError, match="readonly"):
+                    baseline.execute("DELETE FROM authority_metadata")
+        finally:
+            harness.close()
+    finally:
+        direct.close()
+
+
+def test_fresh_harness_backup_preserves_isolation_lifecycle_and_descriptor() -> None:
+    first = Architecture77HarnessAuthority.create()
+    second = Architecture77HarnessAuthority.create()
+    first_root = first._root
+    try:
+        assert first._root != second._root
+        assert first.database_path != second.database_path
+        assert first.database_path.is_file()
+        assert second.database_path.is_file()
+        assert first._connection is not second._connection
+        assert first._service_token is not second._service_token
+        assert first._core_binding is not second._core_binding
+        assert first._core is not second._core
+        assert first._lifecycle is not second._lifecycle
+        first._connection.execute("CREATE TABLE isolation_probe (value TEXT NOT NULL)")
+        first._connection.execute("INSERT INTO isolation_probe VALUES ('first')")
+        assert first._connection.execute(
+            "SELECT value FROM isolation_probe"
+        ).fetchall() == [("first",)]
+        assert (
+            second._connection.execute(
+                "SELECT name FROM sqlite_schema WHERE name = 'isolation_probe'"
+            ).fetchall()
+            == []
+        )
+        with _ARCH77_BASELINE_LOCK:
+            baseline = _ARCH77_BASELINE_CONNECTION
+            assert baseline is not None
+            assert (
+                baseline.execute(
+                    "SELECT name FROM sqlite_schema WHERE name = 'isolation_probe'"
+                ).fetchall()
+                == []
+            )
+            assert baseline.execute("PRAGMA query_only").fetchone() == (1,)
+        reopened = Architecture77HarnessAuthority.open_from_descriptor(first.descriptor)
+        try:
+            assert reopened.database_path == first.database_path
+            assert reopened._connection.execute(
+                "SELECT value FROM isolation_probe"
+            ).fetchall() == [("first",)]
+        finally:
+            reopened.close()
+        first.close()
+        assert not first_root.exists()
+        assert second.database_path.is_file()
+        second._validate_storage()
+        assert second.create_session(_request())
+    finally:
+        first.close()
+        second.close()
+
+
+def test_concurrent_fresh_harness_backups_keep_baseline_immutable() -> None:
+    barrier = threading.Barrier(6)
+
+    def create_and_mutate(index: int) -> Architecture77HarnessAuthority:
+        barrier.wait(timeout=10)
+        harness = Architecture77HarnessAuthority.create()
+        harness._connection.execute(
+            "CREATE TABLE thread_probe (value INTEGER NOT NULL)"
+        )
+        harness._connection.execute("INSERT INTO thread_probe VALUES (?)", (index,))
+        return harness
+
+    harnesses: list[Architecture77HarnessAuthority] = []
+    try:
+        with ThreadPoolExecutor(max_workers=6) as executor:
+            harnesses = list(executor.map(create_and_mutate, range(6)))
+        assert len({harness._root for harness in harnesses}) == 6
+        assert len({harness.database_path for harness in harnesses}) == 6
+        for index, harness in enumerate(harnesses):
+            assert harness._connection.execute(
+                "SELECT value FROM thread_probe"
+            ).fetchall() == [(index,)]
+            harness._validate_storage()
+        with _ARCH77_BASELINE_LOCK:
+            baseline = _ARCH77_BASELINE_CONNECTION
+            assert baseline is not None
+            assert baseline.execute("PRAGMA query_only").fetchone() == (1,)
+            assert (
+                baseline.execute(
+                    "SELECT name FROM sqlite_schema WHERE name = 'thread_probe'"
+                ).fetchall()
+                == []
+            )
+            assert baseline.execute(
+                "SELECT count(*) FROM authority_metadata"
+            ).fetchone() == (1,)
+            assert baseline.execute(
+                "SELECT count(*) FROM schema_migrations"
+            ).fetchone() == (1,)
+    finally:
+        for harness in harnesses:
+            harness.close()
 
 
 def test_harness_provenance_does_not_survive_same_path_reuse(

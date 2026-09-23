@@ -2721,3 +2721,49 @@ reconstruction rather than trust D8-R1 output, reuse the existing PD4-D
 execution composition, permit only the unattended-execution gate to open
 process-locally for at most one composition call, restore it in `finally`, and
 grant no retry or recovery authority. No production invocation is authorized.
+
+
+## Architecture 121 R3 accepted — 2026-09-23
+
+Source checkpoint R3 is accepted after exact GitHub review and one bounded
+effect-boundary accounting correction.
+
+Accepted executable source:
+
+```text
+branch: feature/pd4-single-deferred-settlement-authority
+HEAD:   1cc1f9b3d4f500d73b6c13eccadf65868687817a
+TREE:   f7cdeab1fc51f1dad2b70acf5ff1121449288b6a
+```
+
+D8-R2 independently reconstructs the source-owned single deferred candidate and
+does not consume D8-R1 output as authority. It requires eight exact closed gates,
+reconstructs exact current-C1 C3/open/plan/startup truth, and reuses the existing
+PD4-D verified-plan execution composition.
+
+The correction moves `real_effect_performed=True` to the exact point
+immediately before the one PD4-D composition call, after the
+unattended-execution-only gate vector has been verified. Failure to verify that
+open vector is now pre-effect `BLOCKED`, performs zero PD4-D calls, reports
+`real_effect_performed=False`, and restores all gates closed. Any uncertainty
+after the exact PD4-D call boundary remains
+`SETTLEMENT_OUTCOME_AMBIGUOUS` and grants no retry authority.
+
+Focused verification for the correction:
+
+```text
+D8-R2 + Architecture-114 D8-B runtime/CLI: 149 passed
+Ruff check:                                  pass
+Ruff format --check:                         pass
+git diff --check:                            pass
+git diff --cached --check:                   pass
+broad repository suite:                      deferred
+```
+
+No production D8-R2 invocation has occurred and none is authorized.
+
+Next safe source checkpoint: R4 / D9-R1, a zero-semantic-argument,
+all-eight-gates-closed independent reconciliation boundary for the same unique
+deferred decision. It must independently rederive the candidate and exact
+C3/open/plan/invocation/operation/receipt/successor/account-lineage truth, never
+consume D8-R2 output as authority, and perform no effect.

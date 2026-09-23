@@ -2670,3 +2670,47 @@ deferred settlement boundary using the established Architecture-114 D8-B /
 PD4-D effect-containment pattern, but with Architecture-121 source-owned
 single-deferred discovery. It must not consume D8-R1 public output as authority.
 No protected production invocation is authorized by source completion.
+
+
+## Architecture 121 R3 acceptance
+
+Accepted executable source:
+
+```text
+HEAD: 1cc1f9b3d4f500d73b6c13eccadf65868687817a
+TREE: f7cdeab1fc51f1dad2b70acf5ff1121449288b6a
+```
+
+R3 / D8-R2 is accepted after exact review and a narrow correction to effect
+boundary accounting. The process-local unattended-execution gate is opened
+first, the exact one-open/seven-closed vector is verified, and only immediately
+before the existing PD4-D composition call is
+`real_effect_performed` considered crossed. Open-vector verification failure is
+therefore pre-effect `BLOCKED`; any exception, drift, or contradiction after
+the call boundary is ambiguous and grants no retry.
+
+Ordinary Architecture-114 D8-B and existing R1/R2 source remain unchanged.
+
+Focused correction verification:
+
+```text
+149 D8-R2 / ordinary D8-B runtime+CLI tests passed
+Ruff check / format --check passed
+diff checks passed
+broad certification intentionally deferred
+```
+
+Production boundary remains:
+
+```text
+D8-A retry                         NOT AUTHORIZED
+D8-B                               NOT AUTHORIZED
+D8-R2 deferred effect              NOT AUTHORIZED
+D9-A / D9-R1                      NOT APPLICABLE
+```
+
+Next source checkpoint is R4 / D9-R1: implement a distinct fresh-process,
+zero-semantic-argument, all-gates-closed deferred reconciliation boundary by
+adapting the established Architecture-114 D9-A read-only durable convergence
+pattern to Architecture-121 complete-namespace single-deferred discovery. No
+D8-R2 public output may be accepted as authority and no effect is authorized.

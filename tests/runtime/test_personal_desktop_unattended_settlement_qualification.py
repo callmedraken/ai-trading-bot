@@ -51,10 +51,12 @@ from trading_bot.runtime.verified_c3_daily_bar_open import (
 )
 
 Diagnostic = startup_module.PersonalDesktopUnattendedPaperStartupDiagnostic
+BlockedReason = startup_module.PersonalDesktopUnattendedPaperStartupBlockedReason
 StartupResult = startup_module.PersonalDesktopUnattendedPaperStartupQualificationResult
 Startup = startup_module.PersonalDesktopUnattendedPaperStartupStatus
 STARTUP_DIAGNOSTIC_FIELDS = (
     "diagnostic",
+    "blocked_reason",
     "storage_classification",
     "operation_classification",
     "operation_diagnostic",
@@ -187,6 +189,7 @@ class Harness(DecisionHarness):
                 None,
                 None,
                 None,
+                BlockedReason.PRE_RECOVERY_BLOCKED,
             )
         elif self.startup_state is Startup.RECEIPT_RECOVERY_REQUIRED:
             result = StartupResult(
@@ -308,6 +311,7 @@ def test_zero_argument_production_and_safe_result_shape():
     "field,value",
     [
         ("startup_diagnostic", Diagnostic.QUALIFICATION_BLOCKED),
+        ("startup_blocked_reason", BlockedReason.PRE_RECOVERY_BLOCKED),
         ("startup_storage_classification", Storage.BLOCKED),
         ("startup_operation_classification", PaperOperationClassification.BLOCKED),
         (
@@ -356,6 +360,11 @@ def test_startup_status_accepts_exact_result_mapping(
         startup_status=startup_status,
         all_eight_gates_closed=True,
         startup_diagnostic=diagnostic,
+        startup_blocked_reason=(
+            BlockedReason.PRE_RECOVERY_BLOCKED
+            if startup_status is Startup.BLOCKED
+            else None
+        ),
     )
     assert result.startup_status is startup_status
 
@@ -415,6 +424,11 @@ def test_startup_status_rejects_top_level_classification_mismatch(
             startup_status=startup_status,
             all_eight_gates_closed=True,
             startup_diagnostic=diagnostics[startup_status],
+            startup_blocked_reason=(
+                BlockedReason.PRE_RECOVERY_BLOCKED
+                if startup_status is Startup.BLOCKED
+                else None
+            ),
         )
 
 
@@ -452,6 +466,11 @@ def test_surfaced_startup_evidence_requires_all_gates_closed(
             classification,
             startup_status=startup_status,
             startup_diagnostic=diagnostic,
+            startup_blocked_reason=(
+                BlockedReason.PRE_RECOVERY_BLOCKED
+                if startup_status is Startup.BLOCKED
+                else None
+            ),
         )
 
 
@@ -459,13 +478,60 @@ def test_generic_blocked_result_has_no_startup_evidence():
     result = d8a.SettlementQualificationResult(d8a.Status.BLOCKED)
     assert result.startup_status is None
     assert result.startup_diagnostic is None
+    assert result.startup_blocked_reason is None
     assert result.all_eight_gates_closed is False
+
+
+@pytest.mark.parametrize("reason", list(BlockedReason))
+def test_d8a_passes_every_bounded_startup_reason_through(harness, reason):
+    harness.startup_state = Startup.BLOCKED
+    harness.startup_mutation = lambda result: replace(result, blocked_reason=reason)
+    result = harness.run()
+    assert result.classification is d8a.Status.BLOCKED
+    assert result.startup_blocked_reason is reason
+    assert result.real_effect_performed is False
+    assert harness.gates == [False] * 8
+
+
+@pytest.mark.parametrize(
+    "status,classification,reason",
+    [
+        (None, d8a.Status.BLOCKED, BlockedReason.PRE_RECOVERY_BLOCKED),
+        (Startup.BLOCKED, d8a.Status.BLOCKED, None),
+        (Startup.BLOCKED, d8a.Status.BLOCKED, "secret/raw/path"),
+        (Startup.BLOCKED, d8a.Status.BLOCKED, Diagnostic.QUALIFICATION_BLOCKED),
+        (
+            Startup.READY_SAME_INVOCATION,
+            d8a.Status.EXECUTION_READY,
+            BlockedReason.PRE_RECOVERY_BLOCKED,
+        ),
+    ],
+)
+def test_blocked_reason_contract_rejects_impossible_or_forged_combinations(
+    status, classification, reason
+):
+    diagnostic = {
+        None: None,
+        Startup.BLOCKED: Diagnostic.QUALIFICATION_BLOCKED,
+        Startup.READY_SAME_INVOCATION: Diagnostic.VERIFIED_IDENTICAL_PENDING,
+    }[status]
+    with pytest.raises(ValueError, match="result is invalid"):
+        d8a.SettlementQualificationResult(
+            classification,
+            startup_status=status,
+            startup_diagnostic=diagnostic,
+            startup_blocked_reason=reason,
+            all_eight_gates_closed=status is not None,
+        )
 
 
 @pytest.mark.parametrize("gate", range(8))
 def test_each_initially_open_gate_blocks_before_discovery(harness, gate):
     harness.gates[gate] = True
-    assert harness.run().classification is d8a.Status.BLOCKED
+    result = harness.run()
+    assert result.classification is d8a.Status.BLOCKED
+    assert result.startup_status is None
+    assert result.startup_blocked_reason is None
     assert "discovery" not in harness.events
 
 
@@ -595,7 +661,8 @@ def test_blocked_startup_preserves_available_evidence_without_promoting(
     assert result.classification is d8a.Status.BLOCKED
     assert result.startup_status is Startup.BLOCKED
     assert result.startup_diagnostic is Diagnostic.QUALIFICATION_BLOCKED
-    for field in STARTUP_DIAGNOSTIC_FIELDS[1:]:
+    assert result.startup_blocked_reason is BlockedReason.PRE_RECOVERY_BLOCKED
+    for field in STARTUP_DIAGNOSTIC_FIELDS[2:]:
         assert getattr(result, f"startup_{field}") is evidence.get(field)
     assert result.all_eight_gates_closed is True
     assert result.real_effect_performed is False

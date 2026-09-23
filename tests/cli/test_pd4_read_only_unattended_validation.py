@@ -53,6 +53,9 @@ _STARTUP = harness.startup_qualification
 PersonalDesktopUnattendedPaperStartupDiagnostic = (
     _STARTUP.PersonalDesktopUnattendedPaperStartupDiagnostic
 )
+PersonalDesktopUnattendedPaperStartupBlockedReason = (
+    _STARTUP.PersonalDesktopUnattendedPaperStartupBlockedReason
+)
 PersonalDesktopUnattendedPaperStartupQualificationResult = (
     _STARTUP.PersonalDesktopUnattendedPaperStartupQualificationResult
 )
@@ -112,6 +115,9 @@ def _result(
             None,
             None,
             None,
+            blocked_reason=(
+                PersonalDesktopUnattendedPaperStartupBlockedReason.PRE_RECOVERY_BLOCKED
+            ),
         )
     if status is PersonalDesktopUnattendedPaperStartupStatus.RECEIPT_RECOVERY_REQUIRED:
         return PersonalDesktopUnattendedPaperStartupQualificationResult(

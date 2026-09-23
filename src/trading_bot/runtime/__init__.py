@@ -447,6 +447,7 @@ _PD4_UNATTENDED_EXECUTION_EXPORTS = frozenset(
 )
 _PD4_UNATTENDED_STARTUP_EXPORTS = frozenset(
     {
+        "PersonalDesktopUnattendedPaperStartupBlockedReason",
         "PersonalDesktopUnattendedPaperStartupDiagnostic",
         "PersonalDesktopUnattendedPaperStartupQualificationResult",
         "PersonalDesktopUnattendedPaperStartupStatus",
@@ -814,6 +815,7 @@ __all__.extend(
         "require_validated_personal_desktop_unattended_invocation_storage_read",
         "unattended_paper_invocation_artifact_name",
         "unattended_paper_invocation_directory_name",
+        "PersonalDesktopUnattendedPaperStartupBlockedReason",
         "PersonalDesktopUnattendedPaperStartupDiagnostic",
         "PersonalDesktopUnattendedPaperStartupQualificationResult",
         "PersonalDesktopUnattendedPaperStartupStatus",

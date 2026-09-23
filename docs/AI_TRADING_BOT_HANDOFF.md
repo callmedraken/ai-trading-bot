@@ -1968,3 +1968,91 @@ Next: explicit operator approval may authorize exactly one protected
 zero-semantic-argument D8-A read-only invocation from the prepared checkout.
 Any BLOCKED/validation/contradiction result stops; no retry or mutation follows
 without a new review.
+
+## D8-A one-shot BLOCKED observation and next source-only diagnostic
+
+The approved diagnostic D8-A invocation was consumed **1/1**. It returned
+`BLOCKED`, exit 6, with completed execution session `2026-09-21`, decision
+`f2188b5e-e6a4-5398-be41-8867d9268355`, selected decision session
+`2026-09-18`, decision snapshot `680b260f-08c9-5923-87bb-b5f0a4701380`,
+execution snapshot `bf0ca2a7-1236-5240-9b1e-6c31cf2388ed`, final plan
+`29c880dc-f10e-566c-a6e1-e3d73fa04c69`, and account predecessor
+`ed4640e5-0630-525d-b916-d50e31e3ba2a`. PD4-C reported startup
+`BLOCKED` / `QUALIFICATION_BLOCKED`. Mutex, storage, operation, invocation,
+application, and terminal checkpoint fields were null. All eight effect gates
+were closed before and after; `real_effect_performed` was false.
+
+No D8-A retry is authorized. D8-B remains unauthorized; D9-A is not applicable.
+The `feature/pd4-d8a-block-reason` source checkpoint adds a bounded enum to
+identify which existing PD4-C blocked path produced a future result, without
+changing startup authority, read counts, ordering, effects, or recovery. It
+cannot retrospectively identify the class of the observed production block.
+
+## D8-A bounded block-reason diagnostics — source certification accepted, 2026-09-22
+
+The source-only checkpoint that gives every existing PD4-C startup `BLOCKED`
+path a fixed sanitized reason is now fully certified.
+
+```text
+initial implementation:
+c7e6759b6847fc8bd5c1c5f48470059cb784cee9
+
+review-driven compatibility correction:
+712b2873b7ec2100fc7ce0062a2c414d31595717
+
+final executable/source tree:
+4c485a7557af01a467413625dcb8d2844a8af52f
+
+base develop:
+2d36e864f82a7fbb85b39571c2cebc0c730aaeb6
+```
+
+Final accepted verification:
+
+```text
+focused compatibility verification: 290 passed
+broad non-Architecture-77:         6,013 passed, 17 skipped in 589.48s
+Architecture-77 clean harness:       713 passed in 977.59s
+combined:                          6,726 passed, 17 skipped
+Ruff check:                        PASS
+Ruff format --check:               PASS (548 files)
+git diff --check:                  PASS
+feature worktree:                  clean, exact certified HEAD/TREE
+Architecture-77 harness:           clean, detached, exact certified HEAD/TREE
+pytest basetemps:                  fresh external paths, cache disabled
+```
+
+Accepted diagnostic contract:
+
+- `PersonalDesktopUnattendedPaperStartupBlockedReason` is a fixed `StrEnum`.
+- Every existing explicit PD4-C `BLOCKED` return requires exactly one reason.
+- The existing fail-closed outer `except Exception` returns
+  `EXCEPTION_COLLAPSED`; raw exception type/text is not surfaced.
+- Non-`BLOCKED` startup results carry no blocked reason.
+- D8-A surfaces the reason only with an exact PD4-C `BLOCKED` startup result.
+- Generic outer D8-A `BLOCKED` still has no startup status/reason.
+- The lazy `trading_bot.runtime` facade exports the new sibling enum.
+- The CLI remains deterministic, zero-semantic-argument, sanitized, and
+  non-authorizing.
+
+No production call, read count, branch predicate, mutex scope, recovery step,
+ordering, identity derivation, authority, gate, durable mutation, execution,
+provider/broker call, or scheduler behavior changed.
+
+The previously approved production diagnostic invocation remains consumed
+**1/1** and returned `BLOCKED`; this new source cannot retroactively classify
+that already-completed run.
+
+Current operational boundary:
+
+```text
+D8-A block-reason source            SOURCE CERTIFIED
+D8-A protected diagnostic run       USED 1 / 1 -> BLOCKED
+D8-A retry                          NOT AUTHORIZED
+D8-B                                NOT AUTHORIZED
+D9-A                                NOT APPLICABLE
+```
+
+Next: ChatGPT exact review of this docs-only certification closeout, followed by
+PR/merge-readiness review against `develop`. Creating or merging the PR
+remains a separately protected repository action.

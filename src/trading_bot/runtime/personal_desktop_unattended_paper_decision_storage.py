@@ -229,7 +229,7 @@ _DEFERRED_REGISTRY: weakref.WeakKeyDictionary[
     SingleDeferredDecisionResult,
     tuple[
         ValidatedProductionAuthority,
-        PersonalDesktopUnattendedPaperDecisionIntentArtifactBinding,
+        PersonalDesktopUnattendedPaperDecisionIntentArtifactBinding | None,
     ],
 ] = weakref.WeakKeyDictionary()
 
@@ -258,7 +258,10 @@ def find_single_deferred_unattended_decision(
             )
         require_validated_production_authority(c1)
         result = _single_deferred_result(finalized, completed)
-        if result.classification is SingleDeferredDecisionClassification.FINALIZED:
+        if result.classification in {
+            SingleDeferredDecisionClassification.NONE,
+            SingleDeferredDecisionClassification.FINALIZED,
+        }:
             with _REGISTRY_LOCK:
                 _DEFERRED_REGISTRY[result] = (c1, result.binding)
         return result
@@ -271,8 +274,8 @@ def find_single_deferred_unattended_decision(
 def require_single_deferred_unattended_decision(
     result: SingleDeferredDecisionResult,
     authority: ValidatedProductionAuthority,
-) -> PersonalDesktopUnattendedPaperDecisionIntentArtifactBinding:
-    """Require same-process current-C1 provenance for the exact candidate binding."""
+) -> PersonalDesktopUnattendedPaperDecisionIntentArtifactBinding | None:
+    """Require same-process current-C1 provenance for exact absence or candidate."""
 
     try:
         c1 = require_validated_production_authority(authority)
@@ -293,8 +296,7 @@ def require_single_deferred_unattended_decision(
     with _REGISTRY_LOCK:
         evidence = _DEFERRED_REGISTRY.get(result)
     if (
-        type(result) is not SingleDeferredDecisionResult
-        or result.classification is not SingleDeferredDecisionClassification.FINALIZED
+        result.classification is SingleDeferredDecisionClassification.BLOCKED
         or evidence is None
         or evidence[0] != c1
         or evidence[1] is not result.binding

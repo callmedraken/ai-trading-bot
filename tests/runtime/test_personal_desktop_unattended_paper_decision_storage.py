@@ -417,10 +417,12 @@ def test_single_deferred_requires_stable_genuine_trading_token(monkeypatch):
     )
 
 
-def test_single_deferred_public_read_registers_only_current_c1(monkeypatch):
+@pytest.mark.parametrize("finalized", [False, True])
+def test_single_deferred_public_read_registers_only_current_c1(monkeypatch, finalized):
     binding = _decision_binding(monkeypatch)
     api = _empty_api()
-    _put_final(api, binding)
+    if finalized:
+        _put_final(api, binding)
     c1 = type("C1", (), {"approved_account_sid": SID})()
     monkeypatch.setattr(
         storage, "require_validated_production_authority", lambda value: value
@@ -438,7 +440,12 @@ def test_single_deferred_public_read_registers_only_current_c1(monkeypatch):
         ),
     )
     result = storage.find_single_deferred_unattended_decision(c1)
-    assert result.classification is Deferred.FINALIZED
+    expected = Deferred.FINALIZED if finalized else Deferred.NONE
+    assert result.classification is expected
+    if finalized:
+        assert result.binding == binding
+    else:
+        assert result.binding is None
     assert (
         storage.require_single_deferred_unattended_decision(result, c1)
         is result.binding
@@ -450,3 +457,10 @@ def test_single_deferred_public_read_registers_only_current_c1(monkeypatch):
     forged = replace(result)
     with pytest.raises(PersonalDesktopUnattendedDecisionStorageError):
         storage.require_single_deferred_unattended_decision(forged, c1)
+    api.overrides[security.PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_DECISIONS] = (
+        "unknown",
+    )
+    blocked = storage.find_single_deferred_unattended_decision(c1)
+    assert blocked.classification is Deferred.BLOCKED
+    with pytest.raises(PersonalDesktopUnattendedDecisionStorageError):
+        storage.require_single_deferred_unattended_decision(blocked, c1)

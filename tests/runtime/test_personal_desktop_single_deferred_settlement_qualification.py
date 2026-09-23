@@ -148,6 +148,17 @@ def test_candidate_state_mapping(harness, state, expected):
     result = harness.run()
     assert result.classification is expected
     assert "startup" not in harness.events
+    assert ("deferred-proof" in harness.events) is (state is Discovery.NONE)
+
+
+def test_unproven_none_is_blocked_before_absence_classification(harness):
+    harness.discovery_state = Discovery.NONE
+    harness.deferred_proof_failure = True
+    assert harness.run().classification is d8r.Status.BLOCKED
+    assert harness.events.index("deferred-discovery") < harness.events.index(
+        "deferred-proof"
+    )
+    assert "startup" not in harness.events
 
 
 def test_current_c1_proof_and_token_drift_block(harness):

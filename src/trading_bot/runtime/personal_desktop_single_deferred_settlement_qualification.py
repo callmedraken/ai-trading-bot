@@ -486,8 +486,9 @@ def _run(
             or discovery.classification is Discovery.BLOCKED
         ):
             raise ValueError("D8-R1 complete decision discovery is blocked")
+        binding = d.require_discovery(c1, discovery)
         if discovery.classification is Discovery.NONE:
-            if discovery.binding is not None:
+            if binding is not None or discovery.binding is not None:
                 raise ValueError("D8-R1 NONE discovery carries a decision")
             _final_authority(d, c1, token)
             return DeferredSettlementQualificationResult(
@@ -495,7 +496,6 @@ def _run(
                 current_completed_session=completed,
                 all_eight_gates_closed=True,
             )
-        binding = d.require_discovery(c1, discovery)
         if (
             binding is not discovery.binding
             or type(binding)

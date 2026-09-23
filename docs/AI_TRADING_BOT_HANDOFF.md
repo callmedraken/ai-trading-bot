@@ -2133,3 +2133,32 @@ Next checkpoint: prepare and verify a fresh isolated production qualification
 checkout/runtime for the integrated block-reason source. Do not invoke D8-A
 during preparation. Any future diagnostic rerun remains a separate protected
 operator action requiring fresh explicit approval.
+
+## D8-A block-reason integrated production checkout prepared — 2026-09-22
+
+The post-PR integrated production qualification checkout is ready:
+
+```text
+F:\AI\worktrees\ai-trading-bot-d8a-block-reason-production-qualification
+HEAD: 7a5a69cca3c93f73590620c96d7225884d59d049
+TREE: 8caa955309f5f073209bbfdb65e1d34bd54b0e1a
+```
+
+The preparation verified exact `origin/develop`, exact tree identity, and that
+only the two canonical documentation files differ after the certified
+executable/source commit. Required production D8-A entry points are present.
+No D8-A invocation occurred.
+
+Operational boundary remains:
+
+```text
+D8-A block-reason source            INTEGRATED / SOURCE CERTIFIED
+integrated production checkout      PREPARED
+D8-A protected diagnostic run       USED 1 / 1 -> BLOCKED
+D8-A retry                          NOT AUTHORIZED
+D8-B                                NOT AUTHORIZED
+D9-A                                NOT APPLICABLE
+```
+
+Next: run the non-effect Trading-principal/runtime/gate preflight from this
+checkout. Do not invoke D8-A during that preflight.

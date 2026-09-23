@@ -2167,3 +2167,32 @@ Next safe checkpoint: prepare a fresh isolated integrated production
 qualification checkout/runtime preflight for the merged block-reason source.
 That preparation must stop before any D8-A invocation. A second protected
 diagnostic run, if later considered, requires a new explicit operator approval.
+
+## D8-A block-reason integrated production checkout prepared — 2026-09-22
+
+A fresh detached production qualification checkout for the integrated
+block-reason source was prepared successfully.
+
+```text
+checkout:
+F:\AI\worktrees\ai-trading-bot-d8a-block-reason-production-qualification
+
+HEAD:
+7a5a69cca3c93f73590620c96d7225884d59d049
+
+TREE:
+8caa955309f5f073209bbfdb65e1d34bd54b0e1a
+
+integrated executable/source equivalence:
+PASS
+```
+
+The checkout was created from exact integrated `develop`, is clean, and the
+integrated executable/source was proven equivalent to the certified source.
+D8-A was not invoked. The previous diagnostic invocation remains consumed 1/1,
+no D8-A retry is authorized, and D8-B remains unauthorized.
+
+Next safe checkpoint: under the dedicated non-admin Trading principal, verify
+the approved production Python runtime, exact checkout identity, source-owned
+completed-session observation, and all eight effect gates. Stop before any
+D8-A invocation.

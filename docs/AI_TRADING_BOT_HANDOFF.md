@@ -2162,3 +2162,70 @@ D9-A                                NOT APPLICABLE
 
 Next: run the non-effect Trading-principal/runtime/gate preflight from this
 checkout. Do not invoke D8-A during that preflight.
+
+## D8-A block-reason integrated production preflight accepted — 2026-09-22
+
+The integrated block-reason source passed the fresh Trading-principal/runtime
+preflight from:
+
+```text
+F:\AI\worktrees\ai-trading-bot-d8a-block-reason-production-qualification
+
+HEAD:
+7a5a69cca3c93f73590620c96d7225884d59d049
+
+TREE:
+8caa955309f5f073209bbfdb65e1d34bd54b0e1a
+```
+
+Observed preflight state:
+
+```text
+principal:
+DESKTOP-I4DOKM7\Trading
+
+SID:
+S-1-5-21-1397534616-3988210162-180023805-1009
+
+administrator:
+false
+
+runtime:
+F:\AITradingBot\runtime\python.exe
+
+Python:
+3.14.3
+
+completed XNYS session:
+2026-09-21
+
+effect gates:
+False,False,False,False,False,False,False,False
+
+D8-A invoked during preflight:
+false
+```
+
+This is a non-effect preflight only. The previous protected diagnostic run
+remains consumed 1/1 and returned `BLOCKED`.
+
+The integrated source is now technically ready for a separately authorized
+diagnostic rerun whose sole purpose would be to surface the new fixed
+`startup_blocked_reason` if PD4-C blocks again. No new authorization is implied
+by source certification, integration, or this preflight.
+
+Operational boundary:
+
+```text
+D8-A block-reason source            INTEGRATED / SOURCE CERTIFIED
+integrated production preflight     PASS
+prior D8-A diagnostic run           USED 1 / 1 -> BLOCKED
+new D8-A diagnostic authorization   NOT YET GRANTED
+D8-B                                NOT AUTHORIZED
+D9-A                                NOT APPLICABLE
+```
+
+Next: explicit operator approval may authorize exactly one new protected
+zero-semantic-argument read-only D8-A diagnostic invocation from this prepared
+checkout. Any BLOCKED/validation/recovery-required/other terminal result stops
+and requires review before any further action.

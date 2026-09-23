@@ -2196,3 +2196,46 @@ Next safe checkpoint: under the dedicated non-admin Trading principal, verify
 the approved production Python runtime, exact checkout identity, source-owned
 completed-session observation, and all eight effect gates. Stop before any
 D8-A invocation.
+
+## D8-A block-reason integrated production preflight accepted — 2026-09-22
+
+The fresh integrated block-reason production qualification checkout passed the
+non-effect preflight under the dedicated non-admin Trading principal.
+
+```text
+checkout HEAD: 7a5a69cca3c93f73590620c96d7225884d59d049
+checkout TREE: 8caa955309f5f073209bbfdb65e1d34bd54b0e1a
+principal: DESKTOP-I4DOKM7\Trading
+SID: S-1-5-21-1397534616-3988210162-180023805-1009
+administrator: false
+production runtime: F:\AITradingBot\runtime\python.exe
+Python: 3.14.3
+completed XNYS session: 2026-09-21
+all eight source-owned effect gates: false
+D8-A invoked during preflight: false
+```
+
+The previously approved diagnostic D8-A invocation remains consumed 1/1 and
+returned `BLOCKED`. This preflight does not itself authorize another D8-A run.
+
+The environment is now suitable for considering a new protected diagnostic
+authorization because the integrated source is source-certified, the exact
+qualification checkout is clean, the dedicated Trading principal and approved
+runtime are confirmed, the current completed session remains 2026-09-21, and
+all eight effect gates are closed.
+
+Current boundary:
+
+```text
+D8-A block-reason source            INTEGRATED / SOURCE CERTIFIED
+integrated production preflight     PASS
+prior D8-A diagnostic run           USED 1 / 1 -> BLOCKED
+new D8-A diagnostic authorization   NOT YET GRANTED
+D8-B                                NOT AUTHORIZED
+D9-A                                NOT APPLICABLE
+```
+
+Next: stop at the protected operator boundary. A new D8-A invocation may occur
+only after fresh explicit approval for exactly one zero-semantic-argument,
+read-only diagnostic run from the prepared checkout. Any result stops; no retry,
+repair, recovery, mutation, or D8-B follows automatically.

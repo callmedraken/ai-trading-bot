@@ -337,17 +337,18 @@ def test_token_c1_and_final_gate_drift_block(harness):
     assert harness.calls == 0
 
 
-def test_open_gate_verification_failure_is_ambiguous_without_call(harness):
+def test_open_gate_verification_failure_blocks_without_call(harness):
     def reject_open():
         if pd4d.PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_EXECUTION_EFFECTS_ENABLED:
             return (False,) * 8
         return harness.gate_state()
 
     result = harness.run(gate_state=reject_open)
-    assert result.classification is d8r2.Status.SETTLEMENT_OUTCOME_AMBIGUOUS
-    assert result.real_effect_performed is True
+    assert result.classification is d8r2.Status.BLOCKED
+    assert result.real_effect_performed is False
     assert result.all_eight_gates_closed is True
     assert harness.calls == 0
+    assert harness.gate_state() == (False,) * 8
 
 
 def test_post_call_token_or_c1_drift_is_ambiguous_without_retry(harness):

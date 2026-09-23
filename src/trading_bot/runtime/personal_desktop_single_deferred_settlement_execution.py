@@ -584,10 +584,10 @@ def _run(
             return _result(settlement.status, settlement, final_checkpoint_id=final)
         _final_authority(d, settlement.c1, settlement.token)
         pd4d.PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_EXECUTION_EFFECTS_ENABLED = True
-        effect_boundary_entered = True
         try:
             _require_gates(d, _EXECUTION_OPEN)
             # PD4-D can publish durably before its executor is called or returns.
+            effect_boundary_entered = True
             operation = d.execute(
                 settlement.c1,
                 settlement.original,

@@ -223,6 +223,7 @@ At the final source-certification boundary:
 - ChatGPT supplies the exact local commands;
 - the user runs the broad/full suite once, plus required lint/format/diff and
   frozen-artifact identity checks;
+- do not request broad/full certification until exact remote/PR review has established that the current executable/source tree is intended to be final; review-driven source corrections return to focused verification first;
 - if the environment invalidates the run, repair the environment first and do
   not treat the resulting cascade as a source defect;
 - after a clean certification, do not rerun the full suite unless source code

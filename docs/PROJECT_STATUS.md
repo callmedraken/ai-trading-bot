@@ -2314,3 +2314,106 @@ real effect                         FALSE
 Next: implement and certify the configuration-domain correction on an isolated
 source branch. No further production D8-A invocation is permitted until that
 source change has passed exact review and certification.
+
+## PD4 startup configuration-domain correction integrated — 2026-09-22
+
+PR #20 (`Fix startup historical configuration domain`) was accepted and merged
+after exact PR review and one final complete source-certification run.
+
+Certified source:
+
+```text
+feature HEAD:
+249b8da68a9a4bd13e64d27ea95072b2766f6516
+
+feature TREE:
+e370589cb6fa4c738ce3d61dc08b37d2915d1266
+
+complete certification:
+6,729 passed
+17 skipped
+0 failed
+0 errors
+6,746 total cases
+
+test modules:
+245
+
+parallel topology:
+2 broad lanes + 1 serial safety lane
+
+broad lane 1:
+120 modules / 229.222 s
+
+broad lane 2:
+120 modules / 331.842 s
+
+serial safety lane:
+5 modules / 1,066.370 s
+
+overall wall time:
+1,066.667 s
+
+Ruff check:
+PASS
+
+Ruff format --check:
+PASS (548 files already formatted)
+
+git diff --check:
+PASS
+```
+
+The serial lane contained the five previously classified Windows/global-state
+safety modules, including Architecture-77. The candidate HEAD/tree remained
+exact and clean before and after certification.
+
+PR #20 merged with:
+
+```text
+merge commit:
+50a3b03b8544f1bd5d640bdf6c7ef6311e62b5f7
+
+resulting TREE:
+e370589cb6fa4c738ce3d61dc08b37d2915d1266
+```
+
+The resulting merge tree is byte-for-byte identical to the certified feature
+tree, so no post-merge broad-suite rerun is required.
+
+The correction preserves the intended configuration domains:
+
+```text
+pre-effect/startup account truth:
+installed receipt configuration dependencies only
+
+candidate operation:
+verified plan remains separate
+
+post-effect/already-applied reconciliation:
+installed historical configurations + current plan when the installed receipt
+may legitimately reference that plan
+```
+
+The strict account reader, historical resolver, receipt-recovery qualifier,
+authority checks, mutex ordering, effect gates, and production mutation
+boundaries were not weakened.
+
+The protected production boundary remains unchanged:
+
+```text
+latest D8-A diagnostic run          USED 1 / 1 -> PRE_RECOVERY_BLOCKED
+D8-A retry                          NOT AUTHORIZED
+D8-B                                NOT AUTHORIZED
+D9-A                                NOT APPLICABLE
+```
+
+Test-performance benchmarking also established that two broad processes provide
+the useful concurrency gain while four provide essentially no additional
+benefit and greater setup variability. Architecture-77 remains serial pending a
+separate harness/performance milestone.
+
+Next safe milestone: implement persistent certification-performance support on
+a separate branch. Keep the 2-broad + serial-safety topology, add explicit
+inventory/completion accounting, and investigate Architecture-77 setup cost
+without weakening coverage or parallelizing its shared arbiter namespace.

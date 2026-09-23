@@ -2304,3 +2304,92 @@ real effect                         FALSE
 Next: implement and certify the configuration-domain correction on an isolated
 source branch. No further production D8-A invocation is permitted until that
 source change has passed exact review and certification.
+
+## PD4 startup configuration-domain correction integrated — 2026-09-22
+
+The configuration-domain regression fix has completed source certification and
+integration.
+
+PR:
+
+```text
+#20
+Fix startup historical configuration domain
+```
+
+Certified source:
+
+```text
+HEAD:
+249b8da68a9a4bd13e64d27ea95072b2766f6516
+
+TREE:
+e370589cb6fa4c738ce3d61dc08b37d2915d1266
+```
+
+Final complete certification covered all 245 `test_*.py` modules in disjoint
+partitions:
+
+```text
+broad lane 1:   120 modules / 229.222 s
+broad lane 2:   120 modules / 331.842 s
+serial lane:      5 modules / 1,066.370 s
+
+total cases:    6,746
+passed:         6,729
+skipped:           17
+failed:             0
+errors:             0
+wall time:      1,066.667 s
+
+Ruff check:          PASS
+Ruff format check:   PASS (548 files already formatted)
+git diff --check:    PASS
+```
+
+The serial safety lane retains Architecture-77 plus the four other
+Windows/native/acceptance-sensitive modules identified by the concurrency
+audit. No test module was omitted or duplicated.
+
+The benchmark preceding certification showed:
+
+```text
+representative broad sequential:       181.005 s
+representative broad, 2 processes:     118.020 s
+representative broad, 4 processes:     117.311 s
+Architecture-77 sample alone:           75.290 s
+Architecture-77 + 2 broad processes:   117.521 s
+Architecture-77 + 4 broad processes:   121.077 s
+```
+
+Two broad processes are therefore the current preferred concurrency level.
+Architecture-77 remains serial because its shared lifecycle-arbiter namespace
+has not been proven safe for unrestricted per-test parallelism.
+
+PR #20 merged as:
+
+```text
+50a3b03b8544f1bd5d640bdf6c7ef6311e62b5f7
+TREE e370589cb6fa4c738ce3d61dc08b37d2915d1266
+```
+
+The merge tree exactly equals the certified feature tree. Do not rerun the full
+suite merely because the history-preserving merge occurred.
+
+Operational safety state remains:
+
+```text
+D8-A diagnostic authorization          CONSUMED 1 / 1
+last D8-A result                       PRE_RECOVERY_BLOCKED
+D8-A retry                             NOT AUTHORIZED
+D8-B                                   NOT AUTHORIZED
+D9-A                                   NOT APPLICABLE
+```
+
+No production rerun is implied by this source integration.
+
+Next milestone: create a separate test-certification-performance branch. The
+bounded goal is to make the measured 2-broad + serial-safety topology
+repeatable, add exact inventory/completion evidence, and investigate the
+Architecture-77 schema/setup bottleneck while preserving its lock and
+crash/recovery safety contracts.

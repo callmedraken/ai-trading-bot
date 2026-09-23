@@ -2818,3 +2818,44 @@ Next safe checkpoint: final source certification from a fresh clean detached
 checkout of the exact feature HEAD using `scripts/run_test_certification.py`.
 That runner owns the two broad lanes plus the Architecture-77 serial-safety lane
 and source/static evidence. Do not substitute a plain `pytest -q` run.
+
+
+## Architecture 121 final source certification — PASS
+
+The source-complete Architecture-121 branch was certified from a fresh detached
+checkout at the exact accepted feature identity:
+
+```text
+HEAD: 8162a9121c1ab2c3340c921a2a765c0b89ac612b
+TREE: 4ab2ef4b2e41d9a97fcc2156703d65bfad2c0a1f
+base origin/develop: 91392bb3667eac24ebcc613d309b030a766bbfff
+```
+
+The persistent certification runner executed its reviewed three-lane topology:
+
+```text
+broad-1: 3015 cases, 3012 passed, 3 skipped, 0 failed/errors
+broad-2: 3019 cases, 3014 passed, 5 skipped, 0 failed/errors
+serial:    935 cases,  926 passed, 9 skipped, 0 failed/errors
+
+total:    6969 cases, 6952 passed, 17 skipped, 0 failed/errors
+wall:     376.211 seconds
+```
+
+The serial lane is the Architecture-77 safety lane; no separate Architecture-77
+rerun is required. The runner also reverified exact source identity after test
+execution and ran repository Ruff check, Ruff format check, and
+`git diff --check` as part of certification.
+
+Evidence directory:
+
+```text
+F:\AI\temp\pytest\certification-evidence-29faa0909661480385382d9706d83bb5
+```
+
+The certification worktree and evidence remain preserved pending merge review.
+
+Architecture 121 is now source-complete and source-certified. Certification does
+not authorize D8-R2 or any production effect.
+
+Next checkpoint: exact feature-vs-`develop` merge review / PR creation.

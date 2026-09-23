@@ -2757,3 +2757,47 @@ Next: use a fresh detached certification worktree at the exact feature HEAD and
 run the persistent certification runner. Its topology includes broad-1,
 broad-2, and the Architecture-77 serial lane. No plain full-suite pytest run is
 needed in addition to that runner.
+
+
+## Architecture 121 final certification — PASS
+
+Final certification was run from a fresh detached checkout of:
+
+```text
+HEAD 8162a9121c1ab2c3340c921a2a765c0b89ac612b
+TREE 4ab2ef4b2e41d9a97fcc2156703d65bfad2c0a1f
+base origin/develop 91392bb3667eac24ebcc613d309b030a766bbfff
+```
+
+Persistent certification runner results:
+
+```text
+broad-1  3015 cases / 3012 pass / 3 skip / 0 fail/error
+broad-2  3019 cases / 3014 pass / 5 skip / 0 fail/error
+serial     935 cases /  926 pass / 9 skip / 0 fail/error
+total     6969 cases / 6952 pass / 17 skip / 0 fail/error
+wall      376.211 s
+```
+
+The serial lane is the required Architecture-77 safety lane, so no additional
+Architecture-77 invocation is needed. Runner-owned source revalidation and
+static checks passed.
+
+Evidence:
+
+```text
+F:\AI\temp\pytest\certification-evidence-29faa0909661480385382d9706d83bb5
+```
+
+Keep the detached certification checkout and evidence until merge acceptance.
+
+Operational authorization remains unchanged:
+
+```text
+D8-A retry                         NOT AUTHORIZED
+D8-B                               NOT AUTHORIZED
+D8-R2 deferred effect              NOT AUTHORIZED
+production D9-R1                   NOT AUTHORIZED
+```
+
+Next checkpoint is exact merge/PR readiness review against current `develop`.

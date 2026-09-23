@@ -229,6 +229,27 @@ At the final source-certification boundary:
 - after a clean certification, do not rerun the full suite unless source code
   changes.
 
+The accepted complete-certification topology uses three concurrent, explicit
+pytest processes: two file-level broad lanes and one serial safety lane. The
+five current serial modules are a conservative safety boundary:
+
+```text
+tests/runtime/test_windows_transactional_capture_authority.py
+tests/runtime/test_windows_authority_schema.py
+tests/runtime/test_windows_authority.py
+tests/runtime/test_windows_effectful_capture_native_acceptance.py
+tests/acceptance/test_windows_authority_provisioning_acceptance.py
+```
+
+Architecture-77 remains serial; unrestricted parallel safety has not been
+established. `scripts/run_test_certification.py` admits an exact clean source
+identity, proves full module coverage and disjoint partitions, saves the plan,
+and runs the lanes with separate temporary directories and evidence. Use its
+`--plan` mode to inspect a clean checkout without launching pytest. During
+iteration, run only focused verification; complete certification follows exact
+GitHub/PR review when the source tree is intended final. A merge needs no
+second complete run when its resulting tree exactly equals the certified tree.
+
 ### Windows pytest temporary-directory rule
 
 On John's Windows development account, pytest commands that may use `tmp_path`

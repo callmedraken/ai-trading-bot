@@ -464,7 +464,7 @@ def _reconstruct(
         c1,
         original.selected,
         plan,
-        historical_cycle_configuration_payloads=(*historical, plan.artifact_bytes),
+        historical_cycle_configuration_payloads=historical,
     )
     status = _startup_status(startup, binding, plan)
     _final_authority(d, c1, token)
@@ -591,10 +591,7 @@ def _run(d: DisposableSettlementExecutionDependencies) -> SettlementExecutionRes
                 settlement.c1,
                 settlement.original,
                 settlement.plan,
-                historical_cycle_configuration_payloads=(
-                    *settlement.historical,
-                    settlement.plan.artifact_bytes,
-                ),
+                historical_cycle_configuration_payloads=settlement.historical,
             )
         finally:
             pd4d.PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_EXECUTION_EFFECTS_ENABLED = False

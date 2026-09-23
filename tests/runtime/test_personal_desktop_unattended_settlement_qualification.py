@@ -167,7 +167,8 @@ class Harness(DecisionHarness):
     def startup(self, c1, original, plan, *, historical_cycle_configuration_payloads):
         assert c1 is self.authority
         assert original == self.current.selected
-        assert historical_cycle_configuration_payloads[-1] == plan.artifact_bytes
+        assert historical_cycle_configuration_payloads == (b"retained-configuration",)
+        assert plan.artifact_bytes not in historical_cycle_configuration_payloads
         self.events.append("startup")
         decision = self.binding.decision
         application = derive_checkpointed_verified_snapshot_application_id(

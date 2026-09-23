@@ -806,10 +806,9 @@ def _require_read_only_stability(
     revalidate_personal_desktop_unattended_paper_startup_state(
         c1, selected, captured, dependencies.qualification
     )
-    configurations = _configuration_dependencies(
-        inputs.historical_configurations, material.plan_binding.artifact_bytes
+    final_read = dependencies.qualification.read_account(
+        c1, inputs.historical_configurations
     )
-    final_read = dependencies.qualification.read_account(c1, configurations)
     final_account = dependencies.qualification.require_account(final_read)
     if (
         final_account.anchor.paper_account_id != account_id

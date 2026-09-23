@@ -5,6 +5,7 @@ from types import SimpleNamespace
 from uuid import UUID
 
 import pytest
+from tests.runtime.test_manual_paper_strategy_plan import _binding
 
 from trading_bot.runtime import personal_desktop_paper_account_mutex as mutex
 from trading_bot.runtime import personal_desktop_paper_account_security as security
@@ -70,6 +71,31 @@ def test_healthy_fully_verified_account_needs_no_recovery():
     assert result.terminal_checkpoint_id == case.successors[-1].artifact_id
     assert result.missing_application_id is None
     assert result.predecessor_checkpoint_id is None
+    assert not case.api.handles
+
+
+def test_unreferenced_verified_candidate_blocks_pre_recovery_account_read():
+    case = memory_case(1, no_action=True)
+    candidate = _binding()
+    historical = case.configurations
+    assert candidate.artifact_bytes not in historical
+
+    over_inclusive = (*historical, candidate.artifact_bytes)
+    blocked = qualify(case, configurations=over_inclusive)
+    assert blocked.status is (
+        qualification.PaperReceiptRecoveryQualificationStatus.BLOCKED
+    )
+    with pytest.raises(
+        PersonalDesktopPaperAccountError, match="unrecognized historical"
+    ):
+        read_case(case, configurations=over_inclusive)
+
+    healthy = qualify(case, configurations=historical)
+    assert healthy.status is (
+        qualification.PaperReceiptRecoveryQualificationStatus.NO_RECOVERY_REQUIRED
+    )
+    assert healthy.paper_account_id == case.anchor.paper_account_id
+    assert read_case(case, configurations=historical).anchor == case.anchor
     assert not case.api.handles
 
 

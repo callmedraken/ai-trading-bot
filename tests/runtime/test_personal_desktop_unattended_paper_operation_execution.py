@@ -429,6 +429,9 @@ def test_disabled_pending_finishes_read_only_without_effect_construction() -> No
         result, execution.PersonalDesktopUnattendedPaperEffectsDisabledError
     )
     assert int(state["read_count"]) == 3
+    assert [event[1] for event in events if event[0] == "account-read"] == [
+        _inputs().historical_configurations
+    ] * 3
     assert sum(event[0] == "storage" for event in events) == 2
     assert sum(event[0] == "inspect" for event in events) == 2
     assert not any(
@@ -504,6 +507,12 @@ def test_absent_pending_publishes_once_closes_rereads_then_executes_once() -> No
     assert (
         state["material"].plan_binding.artifact_bytes
         in [event[1] for event in events if event[0] == "account-read"][-1]
+    )
+    account_reads = [event[1] for event in events if event[0] == "account-read"]
+    assert account_reads[:-1] == [_inputs().historical_configurations] * 2
+    assert account_reads[-1] == execution._configuration_dependencies(
+        _inputs().historical_configurations,
+        state["material"].plan_binding.artifact_bytes,
     )
     assert execution._configuration_dependencies(
         (b"same", b"other", b"same"), b"same"

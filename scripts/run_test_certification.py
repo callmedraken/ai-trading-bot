@@ -3,6 +3,7 @@
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -104,6 +105,63 @@ def _git(root: Path, *arguments: str) -> str:
     return result.stdout.strip()
 
 
+def _resolve_live_origin_branch_sha(root: Path, tracking_ref: str) -> str:
+    """Resolve one exact origin branch without updating local refs."""
+    if not isinstance(tracking_ref, str) or not tracking_ref.startswith("origin/"):
+        raise CertificationError("Feature ref must be an origin tracking ref")
+    branch = tracking_ref.removeprefix("origin/")
+    if not branch:
+        raise CertificationError("Origin tracking ref must name a branch")
+    remote_ref = f"refs/heads/{branch}"
+    try:
+        validated = subprocess.run(
+            ["git", "check-ref-format", remote_ref],
+            cwd=root,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+    except OSError as error:
+        raise CertificationError(
+            f"Could not validate origin tracking ref {tracking_ref}: {error}"
+        ) from error
+    if validated.returncode:
+        raise CertificationError(f"Malformed origin tracking ref: {tracking_ref}")
+
+    try:
+        result = subprocess.run(
+            ["git", "ls-remote", "--exit-code", "origin", remote_ref],
+            cwd=root,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+    except OSError as error:
+        raise CertificationError(
+            f"Live origin query failed for {remote_ref}: {error}"
+        ) from error
+    if result.returncode:
+        if result.returncode == 2 and not result.stdout:
+            raise CertificationError(f"Live origin branch is missing: {remote_ref}")
+        raise CertificationError(
+            f"git ls-remote failed for {remote_ref}: {result.stderr.strip()}"
+        )
+
+    lines = result.stdout.splitlines()
+    if len(lines) != 1 or result.stdout not in {lines[0], f"{lines[0]}\n"}:
+        raise CertificationError(
+            f"Malformed live origin response for {remote_ref}: expected one ref"
+        )
+    fields = lines[0].split("\t")
+    if (
+        len(fields) != 2
+        or fields[1] != remote_ref
+        or re.fullmatch(r"(?:[0-9a-f]{40}|[0-9a-f]{64})", fields[0]) is None
+    ):
+        raise CertificationError(f"Malformed live origin response for {remote_ref}")
+    return fields[0]
+
+
 def verify_source(args: argparse.Namespace) -> dict[str, str]:
     """Prove the requested checkout and its clean source identity."""
     root = args.root.resolve(strict=True)
@@ -115,6 +173,7 @@ def verify_source(args: argparse.Namespace) -> dict[str, str]:
         "head": _git(root, "rev-parse", "HEAD"),
         "tree": _git(root, "show", "-s", "--format=%T", "HEAD"),
         "base_head": _git(root, "rev-parse", "origin/develop"),
+        "live_base_head": _resolve_live_origin_branch_sha(root, "origin/develop"),
     }
     expected = {
         "head": args.expected_head,
@@ -126,7 +185,12 @@ def verify_source(args: argparse.Namespace) -> dict[str, str]:
     if args.expected_feature_ref:
         actual["feature_ref"] = args.expected_feature_ref
         actual["feature_head"] = _git(root, "rev-parse", args.expected_feature_ref)
+        actual["live_feature_head"] = _resolve_live_origin_branch_sha(
+            root, args.expected_feature_ref
+        )
         expected["feature_head"] = args.expected_feature_head
+        expected["live_feature_head"] = args.expected_feature_head
+    expected["live_base_head"] = args.expected_base_head
     for key, value in expected.items():
         if actual[key] != value:
             raise CertificationError(

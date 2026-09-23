@@ -20,6 +20,13 @@ from tests.runtime.test_manual_paper_strategy_plan import (
     _binding,
     _verified_seed,
 )
+from tests.runtime.test_personal_desktop_paper_account_read_authority import (
+    MACHINE,
+    Observer,
+    memory_case,
+    read_case,
+)
+from tests.runtime.test_personal_desktop_paper_account_security import SID
 from tests.runtime.test_personal_desktop_supervised_paper_operation_preparation import (
     ACCOUNT_ID,
     CALLER_KEY,
@@ -55,6 +62,7 @@ from trading_bot.runtime.personal_desktop_paper_receipt_recovery_qualification i
     PaperReceiptRecoveryQualificationDiagnostic,
     PaperReceiptRecoveryQualificationResult,
     PaperReceiptRecoveryQualificationStatus,
+    _qualify_personal_desktop_paper_receipt_recovery_for_test,
 )
 from trading_bot.runtime.personal_desktop_unattended_paper_invocation_storage import (
     PersonalDesktopUnattendedInvocationStorageClassification,
@@ -229,6 +237,8 @@ def _run(
     fail_c1_call: int | None = None,
     fail_p2_call: int | None = None,
     build_error: Exception | None = None,
+    installed_case: object | None = None,
+    historical_configurations: tuple[bytes, ...] | None = None,
 ):  # type: ignore[no-untyped-def]
     events: list[object] = []
     evidence = _post_lock_evidence()
@@ -257,10 +267,21 @@ def _run(
 
     def qualify(authority, configurations):  # type: ignore[no-untyped-def]
         events.append(("recovery", authority, configurations))
+        if installed_case is not None:
+            return _qualify_personal_desktop_paper_receipt_recovery_for_test(
+                MACHINE,
+                SID,
+                api=installed_case.api,
+                observer=Observer(),
+                calendar=calendar(),
+                configurations=configurations,
+            )
         return recoveries.pop(0)
 
     def read(authority, configurations):  # type: ignore[no-untyped-def]
         events.append(("account-read", authority, configurations))
+        if installed_case is not None:
+            return _Account(read_case(installed_case, configurations=configurations))
         return accounts.pop(0)
 
     def require_account(account):  # type: ignore[no-untyped-def]
@@ -355,9 +376,49 @@ def _run(
         dependencies
     )
     result = startup._qualify_personal_desktop_unattended_paper_startup_for_test(
-        disposable, c1, selected, _inputs(), calendar()
+        disposable,
+        c1,
+        selected,
+        replace(
+            _inputs(),
+            historical_configurations=(
+                _inputs().historical_configurations
+                if historical_configurations is None
+                else historical_configurations
+            ),
+        ),
+        calendar(),
     )
     return result, events, disposable
+
+
+def test_installed_receipt_dependency_domain_controls_pre_recovery_startup() -> None:
+    case = memory_case(1, no_action=True)
+    candidate = _binding(caller_key=str(CALLER_KEY))
+    historical = case.configurations
+    assert candidate.artifact_bytes not in historical
+
+    blocked, blocked_events, _ = _run(
+        installed_case=case,
+        historical_configurations=(*historical, candidate.artifact_bytes),
+    )
+    assert blocked.status is PersonalDesktopUnattendedPaperStartupStatus.BLOCKED
+    assert blocked.blocked_reason is BlockedReason.PRE_RECOVERY_BLOCKED
+    assert not any(
+        event[0] in {"account-read", "healthy-admission", "build"}
+        for event in blocked_events
+    )
+
+    progressed, healthy_events, _ = _run(
+        installed_case=case,
+        historical_configurations=historical,
+        mutex_account_id=case.anchor.paper_account_id,
+        build_error=ValueError("stop after healthy read-only admission"),
+    )
+    assert progressed.blocked_reason is not BlockedReason.PRE_RECOVERY_BLOCKED
+    assert any(event[0] == "account-read" for event in healthy_events)
+    assert any(event[0] == "healthy-admission" for event in healthy_events)
+    assert any(event[0] == "build" for event in healthy_events)
 
 
 @pytest.mark.parametrize(

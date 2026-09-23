@@ -14,6 +14,7 @@ from uuid import UUID
 import pytest
 
 from trading_bot.runtime import PersonalDesktopUnattendedPaperStartupStatus
+from trading_bot.runtime import personal_desktop_unattended_daily_cycle as daily_cycle
 from trading_bot.runtime.personal_desktop_unattended_daily_cycle import (
     DisposablePersonalDesktopUnattendedDailyCycleDependencies,
     PersonalDesktopUnattendedDailyCycleClassification,
@@ -457,6 +458,54 @@ def test_production_entry_is_zero_argument_and_all_eight_gates_are_false() -> No
         == ()
     )
     assert _all_eight_gate_state() == (False,) * 8
+
+
+def test_pending_production_startup_receives_installed_configurations_only(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pending = _decision_binding(monkeypatch)
+    original = _session_read(date(2026, 8, 24), 105)
+    execution = _session_read(_COMPLETED, 106)
+    authority = object()
+    opened = object()
+    plan = SimpleNamespace(artifact_bytes=b"candidate-plan")
+    historical = (b"installed-configuration",)
+    calls: list[str] = []
+    monkeypatch.setattr(
+        daily_cycle, "require_validated_production_authority", lambda value: value
+    )
+    monkeypatch.setattr(
+        daily_cycle,
+        "build_c3_verified_daily_bar_open_binding",
+        lambda selected, c1: opened,
+    )
+    monkeypatch.setattr(
+        daily_cycle, "complete_manual_paper_strategy_plan", lambda *args: plan
+    )
+    monkeypatch.setattr(daily_cycle, "_require_completed_plan", lambda *args: None)
+
+    def startup(c1, selected, candidate, *, historical_cycle_configuration_payloads):
+        assert c1 is authority
+        assert selected is original.selected
+        assert candidate is plan
+        assert historical_cycle_configuration_payloads == historical
+        calls.append("startup")
+        return SimpleNamespace(
+            status=PersonalDesktopUnattendedPaperStartupStatus.READY_SAME_INVOCATION,
+            invocation_id=UUID(int=1),
+            operation_id=UUID(int=2),
+        )
+
+    monkeypatch.setattr(
+        daily_cycle,
+        "qualify_personal_desktop_unattended_paper_startup_from_verified_plan",
+        startup,
+    )
+    result = daily_cycle._settle_pending_production(
+        authority, original, execution, pending, historical
+    )
+    assert calls == ["startup"]
+    assert result.configuration_payload == plan.artifact_bytes
 
 
 @pytest.mark.parametrize("armed_index", range(8))

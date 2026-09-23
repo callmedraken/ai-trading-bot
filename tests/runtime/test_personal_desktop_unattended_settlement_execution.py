@@ -75,7 +75,8 @@ class Harness(QualificationHarness):
         assert self.gate_state() == (False,) * 6 + (True, False)
         assert c1 is self.authority
         assert selected is self.current.selected
-        assert historical_cycle_configuration_payloads[-1] == plan.artifact_bytes
+        assert historical_cycle_configuration_payloads == (b"retained-configuration",)
+        assert plan.artifact_bytes not in historical_cycle_configuration_payloads
         if self.execution_error is not None:
             raise self.execution_error
         startup = self.startup(
@@ -196,7 +197,7 @@ def test_pd4d_verified_plan_wrapper_uses_existing_composition(harness, monkeypat
     def compose(authority, selected, inputs, calendar, dependencies, *, _issuer):
         assert authority is harness.authority
         assert selected is harness.current.selected
-        assert inputs.historical_configurations[-1] == plan.artifact_bytes
+        assert inputs.historical_configurations == (b"retained-configuration",)
         assert (
             dependencies.qualification.build_material(
                 expected, selected, inputs, calendar
@@ -217,7 +218,7 @@ def test_pd4d_verified_plan_wrapper_uses_existing_composition(harness, monkeypat
             harness.authority,
             harness.current.selected,
             plan,
-            historical_cycle_configuration_payloads=(plan.artifact_bytes,),
+            historical_cycle_configuration_payloads=(b"retained-configuration",),
         )
         is expected
     )

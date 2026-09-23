@@ -645,7 +645,7 @@ def _settle_pending_production(
         c1,
         original_selected.selected,
         plan,
-        historical_cycle_configuration_payloads=(*historical, plan.artifact_bytes),
+        historical_cycle_configuration_payloads=historical,
     )
     return _SettlementResult(
         startup.status,

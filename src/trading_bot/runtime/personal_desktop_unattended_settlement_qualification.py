@@ -526,7 +526,7 @@ def _run(
             c1,
             original.selected,
             plan,
-            historical_cycle_configuration_payloads=(*historical, plan.artifact_bytes),
+            historical_cycle_configuration_payloads=historical,
         )
         status = _startup_status(startup, binding, plan)
         _final_authority(d, c1, token)

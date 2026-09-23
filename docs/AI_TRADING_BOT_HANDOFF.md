@@ -2393,3 +2393,98 @@ bounded goal is to make the measured 2-broad + serial-safety topology
 repeatable, add exact inventory/completion evidence, and investigate the
 Architecture-77 schema/setup bottleneck while preserving its lock and
 crash/recovery safety contracts.
+
+## TP1 persistent certification runner integrated — 2026-09-22
+
+TP1 is complete and integrated.
+
+PR #21 added the repository-owned persistent certification runner and merged as:
+
+```text
+merge commit:
+73be0088efbeafa83d730e94ee7bac1c21da19ed
+
+resulting TREE:
+9c7e6267915e2dca70f1d7865b02870b2cf8201c
+```
+
+The resulting merge tree is exactly the already certified TP1 feature tree.
+
+Final TP1 certification:
+
+```text
+feature HEAD:
+54cc6894266805f25c891f11bea6a0c3d122295d
+
+feature TREE:
+9c7e6267915e2dca70f1d7865b02870b2cf8201c
+
+modules:
+246
+
+cases:
+6,771 total
+6,754 passed
+17 skipped
+0 failed
+0 errors
+
+broad-1:
+120 modules / 210.758 s
+
+broad-2:
+121 modules / 342.995 s
+
+serial:
+5 modules / 1,017.753 s
+
+wall:
+1,020.648 s
+```
+
+The persistent runner provides:
+
+```text
+- exact clean source admission
+- local tracking-ref checks
+- live origin/develop and feature-head checks
+- deterministic two-way broad partitioning
+- exact inventory/disjointness proof
+- one serial safety lane
+- independent external basetemps
+- per-lane logs and JUnit evidence
+- machine-readable results.json
+- child-process failure propagation
+- final Ruff / format / diff checks
+- repeated final source and live-origin proof
+- --plan mode without pytest execution
+```
+
+Current serial safety allowlist remains:
+
+```text
+tests/runtime/test_windows_transactional_capture_authority.py
+tests/runtime/test_windows_authority_schema.py
+tests/runtime/test_windows_authority.py
+tests/runtime/test_windows_effectful_capture_native_acceptance.py
+tests/acceptance/test_windows_authority_provisioning_acceptance.py
+```
+
+Architecture-77 remains serial. TP1 does not establish unrestricted
+Architecture-77 parallel safety.
+
+The protected production boundary is unchanged:
+
+```text
+D8-A authorization                 CONSUMED 1 / 1
+last D8-A result                   PRE_RECOVERY_BLOCKED
+D8-A retry                         NOT AUTHORIZED
+D8-B                               NOT AUTHORIZED
+D9-A                               NOT APPLICABLE
+```
+
+Next development milestone: TP2, a read-only-first performance analysis of the
+serial safety lane. Focus first on Architecture-77 schema/database setup cost.
+Any optimization must preserve lifecycle-arbiter identity, Windows subprocess
+and crash/recovery behavior, fresh mutable test state, and existing safety
+assertions.

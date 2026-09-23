@@ -2417,3 +2417,88 @@ Next safe milestone: implement persistent certification-performance support on
 a separate branch. Keep the 2-broad + serial-safety topology, add explicit
 inventory/completion accounting, and investigate Architecture-77 setup cost
 without weakening coverage or parallelizing its shared arbiter namespace.
+
+## TP1 persistent certification runner integrated — 2026-09-22
+
+TP1 completed the persistent certification-runner milestone and was integrated
+through PR #21 (`Add persistent parallel test certification runner`).
+
+Certified source:
+
+```text
+feature HEAD:
+54cc6894266805f25c891f11bea6a0c3d122295d
+
+feature TREE:
+9c7e6267915e2dca70f1d7865b02870b2cf8201c
+
+test modules:
+246
+
+complete certification:
+6,771 total cases
+6,754 passed
+17 skipped
+0 failed
+0 errors
+
+broad lane 1:
+120 modules / 210.758 s
+
+broad lane 2:
+121 modules / 342.995 s
+
+serial safety lane:
+5 modules / 1,017.753 s
+
+overall wall time:
+1,020.648 s
+```
+
+The runner now owns the accepted complete-certification topology:
+
+```text
+two file-level broad lanes
++
+one serial Windows/global-state safety lane
+```
+
+It discovers the complete `tests/**/test_*.py` inventory, proves exact
+disjoint coverage, preserves the five-module serial safety allowlist, launches
+the three pytest processes with separate external basetemps/logs/JUnit
+evidence, propagates child failures, aggregates machine-readable evidence, and
+runs final Ruff/format/diff plus source-identity checks.
+
+Source admission and final proof validate both local tracking refs and the live
+origin branch heads using exact `git ls-remote --exit-code` queries. A stale
+local `origin/develop` or feature tracking ref therefore cannot make a moved
+live remote appear certified.
+
+PR #21 merged as:
+
+```text
+73be0088efbeafa83d730e94ee7bac1c21da19ed
+TREE 9c7e6267915e2dca70f1d7865b02870b2cf8201c
+```
+
+The merge tree exactly equals the certified feature tree, so no post-merge
+complete-suite rerun is required.
+
+Architecture-77 remains serial. TP1 did not alter production code, Windows
+arbiter semantics, crash/recovery contracts, effect gates, or protected
+operator boundaries.
+
+Production authorization remains unchanged:
+
+```text
+latest D8-A diagnostic run          USED 1 / 1 -> PRE_RECOVERY_BLOCKED
+D8-A retry                          NOT AUTHORIZED
+D8-B                                NOT AUTHORIZED
+D9-A                                NOT APPLICABLE
+```
+
+Next milestone: TP2 serial-safety performance analysis. Profile the five-module
+serial lane—especially Architecture-77's repeated schema/database setup—and
+identify a bounded optimization that preserves lock identity, subprocess,
+crash/recovery, and authority semantics. Do not parallelize Architecture-77 or
+change its harness behavior without separate safety review.

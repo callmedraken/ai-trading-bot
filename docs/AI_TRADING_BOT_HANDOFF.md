@@ -2229,3 +2229,78 @@ Next: explicit operator approval may authorize exactly one new protected
 zero-semantic-argument read-only D8-A diagnostic invocation from this prepared
 checkout. Any BLOCKED/validation/recovery-required/other terminal result stops
 and requires review before any further action.
+
+## D8-A block-reason one-shot result — PRE_RECOVERY_BLOCKED, 2026-09-22
+
+One newly approved protected zero-semantic-argument D8-A diagnostic invocation
+was consumed exactly once from the integrated block-reason qualification
+checkout.
+
+```text
+exit code:                         6
+classification:                    BLOCKED
+completed_execution_session:       2026-09-21
+decision_id:                       f2188b5e-e6a4-5398-be41-8867d9268355
+decision_selected_session:         2026-09-18
+decision_selected_snapshot_id:     680b260f-08c9-5923-87bb-b5f0a4701380
+execution_selected_snapshot_id:    bf0ca2a7-1236-5240-9b1e-6c31cf2388ed
+final_plan_id:                     29c880dc-f10e-566c-a6e1-e3d73fa04c69
+account_predecessor_checkpoint_id: ed4640e5-0630-525d-b916-d50e31e3ba2a
+startup_status:                    BLOCKED
+startup_diagnostic:                QUALIFICATION_BLOCKED
+startup_blocked_reason:            PRE_RECOVERY_BLOCKED
+startup_mutex_acquisition_state:   null
+startup_storage_classification:    null
+startup_operation_classification:  null
+startup_operation_diagnostic:      null
+invocation_id:                     null
+operation_id:                      null
+application_id:                    null
+terminal_checkpoint_id:            null
+all_eight_gates_closed:            true
+real_effect_performed:             false
+post-run gates:                    all eight false
+```
+
+The exact bounded reason proves PD4-C stopped because its initial
+`qualify_personal_desktop_paper_receipt_recovery(...)` call returned
+`BLOCKED`, before any PD2A mutex acquisition or unattended invocation-storage
+inspection.
+
+Exact source review then identified a concrete configuration-domain mismatch:
+
+- `resolve_personal_desktop_historical_cycle_configurations()` returns exactly
+  the configuration payloads referenced by already-installed receipts.
+- The Paper-v2 account/recovery reader rejects extra unreferenced configuration
+  payloads.
+- D8-A, D8-B reconstruction, and the G6 pending-settlement composition append
+  the new candidate `plan.artifact_bytes` before entering PD4-C startup.
+- PD4-C forwards that whole tuple into the pre-recovery/account-read boundary,
+  even though the candidate plan is not yet an installed receipt dependency.
+- PD4-D already has a separate post-run `_configuration_dependencies()`
+  composition that adds the current plan only when final account verification
+  can legitimately require the newly installed receipt dependency.
+
+This provides a source-level explanation consistent with the observed
+`PRE_RECOVERY_BLOCKED` result. The next checkpoint is a source-only correction
+that keeps the startup/pre-effect historical configuration set installed-only
+and adds the candidate/current plan only at the existing post-run verification
+boundary.
+
+No production retry, repair, recovery, mutation, D8-B, or D9-A action is
+authorized by this result.
+
+Current boundary:
+
+```text
+D8-A block-reason source            INTEGRATED / SOURCE CERTIFIED
+latest D8-A diagnostic run          USED 1 / 1 -> PRE_RECOVERY_BLOCKED
+D8-A retry                          NOT AUTHORIZED
+D8-B                                NOT AUTHORIZED
+D9-A                                NOT APPLICABLE
+real effect                         FALSE
+```
+
+Next: implement and certify the configuration-domain correction on an isolated
+source branch. No further production D8-A invocation is permitted until that
+source change has passed exact review and certification.

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from datetime import UTC, datetime
 
 import pytest
 from tests.runtime.test_personal_desktop_paper_account_security import (
@@ -21,6 +22,9 @@ from trading_bot.runtime.personal_desktop_unattended_paper_decision_storage impo
     FinalizedUnattendedDecisionForSessionClassification,
     PersonalDesktopUnattendedDecisionStorageClassification,
     PersonalDesktopUnattendedDecisionStorageError,
+)
+from trading_bot.runtime.personal_desktop_unattended_paper_decision_storage import (
+    SingleDeferredDecisionClassification as Deferred,
 )
 
 from .test_personal_desktop_unattended_paper_decision_intent import (
@@ -317,3 +321,132 @@ def test_session_discovery_rejects_c3_evidence_from_wrong_current_c1(
             binding,
             object(),  # type: ignore[arg-type]
         )
+
+
+def _deferred(api, *, observer=None, observed_at=None):
+    return storage._find_single_deferred_unattended_decision_for_test(
+        SID,
+        observed_at or datetime(2026, 8, 27, 12, tzinfo=UTC),
+        api=api,
+        observer=observer or Observer(),
+        calendar=_calendar(),
+    )
+
+
+def test_single_deferred_complete_namespace_zero_one_multiple_and_no_writes(
+    monkeypatch,
+):
+    first = _decision_binding(monkeypatch, caller_key="first")
+    second = _decision_binding(monkeypatch, caller_key="second")
+    empty = _empty_api()
+    assert _deferred(empty).classification is Deferred.NONE
+    api = _empty_api()
+    _put_final(api, first)
+    result = _deferred(api)
+    assert result.classification is Deferred.FINALIZED
+    assert result.binding == first
+    assert result.execution_session == first.decision.intended_execution_session
+    assert result.execution_session < result.current_completed_session
+    with pytest.raises(PersonalDesktopUnattendedDecisionStorageError):
+        storage.require_single_deferred_unattended_decision(result, object())
+    _put_final(api, second)
+    assert _deferred(api).classification is Deferred.BLOCKED
+    assert not any(
+        call[0] in {"write", "create", "rename", "delete"} for call in api.calls
+    )
+
+
+@pytest.mark.parametrize(
+    "bad", ["staging", "unknown", "malformed", "conflict", "missing"]
+)
+def test_single_deferred_rejects_invalid_complete_namespace(monkeypatch, bad):
+    first = _decision_binding(monkeypatch, caller_key="first")
+    second = _decision_binding(monkeypatch, caller_key="second")
+    api = _empty_api() if bad != "missing" else MemoryReadApi()
+    api.trading_runtime = True
+    if bad == "staging":
+        api.put(_directory(first, staging=True))
+    elif bad == "unknown":
+        api.overrides[security.PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_DECISIONS] = (
+            "unknown",
+        )
+    elif bad == "malformed":
+        directory = _put_final(api, first)
+        api.put(
+            directory
+            + "\\"
+            + storage.unattended_paper_decision_artifact_name(
+                first.decision.decision_id
+            ),
+            b"not-canonical-json",
+        )
+    elif bad == "conflict":
+        _put_final(api, second, directory_binding=first)
+    assert _deferred(api).classification is Deferred.BLOCKED
+
+
+@pytest.mark.parametrize(
+    "observed_at",
+    [
+        datetime(2026, 8, 25, 12, tzinfo=UTC),
+        datetime(2026, 8, 26, 12, tzinfo=UTC),
+    ],
+)
+def test_single_deferred_rejects_current_or_future_candidate(monkeypatch, observed_at):
+    binding = _decision_binding(monkeypatch)
+    api = _empty_api()
+    _put_final(api, binding)
+    assert _deferred(api, observed_at=observed_at).classification is Deferred.BLOCKED
+
+
+def test_single_deferred_requires_stable_genuine_trading_token(monkeypatch):
+    from .test_personal_desktop_unattended_paper_invocation_storage import _token
+
+    binding = _decision_binding(monkeypatch)
+    api = _empty_api()
+    _put_final(api, binding)
+    assert (
+        _deferred(api, observer=Observer(_token(elevated=True))).classification
+        is Deferred.BLOCKED
+    )
+    assert (
+        _deferred(
+            api, observer=Observer(_token(), _token(groups=(("S-1-1-0", 0),)))
+        ).classification
+        is Deferred.BLOCKED
+    )
+
+
+def test_single_deferred_public_read_registers_only_current_c1(monkeypatch):
+    binding = _decision_binding(monkeypatch)
+    api = _empty_api()
+    _put_final(api, binding)
+    c1 = type("C1", (), {"approved_account_sid": SID})()
+    monkeypatch.setattr(
+        storage, "require_validated_production_authority", lambda value: value
+    )
+    monkeypatch.setattr(storage, "WindowsTradingTokenObserver", Observer)
+    monkeypatch.setattr(storage, "WindowsPaperReadNativeApi", lambda: api)
+    monkeypatch.setattr(
+        storage, "personal_desktop_unattended_decision_calendar", _calendar
+    )
+    monkeypatch.setattr(
+        storage,
+        "completed_xnys_session_at",
+        lambda observed: storage.TradingSession(
+            binding.decision.intended_execution_session.session_date.replace(day=26)
+        ),
+    )
+    result = storage.find_single_deferred_unattended_decision(c1)
+    assert result.classification is Deferred.FINALIZED
+    assert (
+        storage.require_single_deferred_unattended_decision(result, c1)
+        is result.binding
+    )
+    with pytest.raises(PersonalDesktopUnattendedDecisionStorageError):
+        storage.require_single_deferred_unattended_decision(
+            result, type("C1", (), {"approved_account_sid": SID})()
+        )
+    forged = replace(result)
+    with pytest.raises(PersonalDesktopUnattendedDecisionStorageError):
+        storage.require_single_deferred_unattended_decision(forged, c1)

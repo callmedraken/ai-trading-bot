@@ -2801,3 +2801,46 @@ production D9-R1                   NOT AUTHORIZED
 ```
 
 Next checkpoint is exact merge/PR readiness review against current `develop`.
+
+
+## Architecture 121 merged — PR #23
+
+PR #23, `PD4: add single-deferred settlement recovery authority`, merged into
+`develop` after exact code review and final certification.
+
+```text
+feature head: 1a647ed20184608c6beedd5421ad52ab8707f7ed
+merge commit: 01748a2ea3449c0756e67ca1ccad24cfb9215fef
+merge tree:   0768365b2c64be4b80fe4a4db2d72c184eeb94b5
+```
+
+The merge commit has parents `91392bb...` and `1a647ed...`; its tree is
+identical to the feature head and the feature-to-merge comparison contains zero
+changed files. No merge-time source drift occurred.
+
+Final source certification:
+
+```text
+source HEAD 8162a9121c1ab2c3340c921a2a765c0b89ac612b
+source TREE 4ab2ef4b2e41d9a97fcc2156703d65bfad2c0a1f
+6969 cases / 6952 pass / 17 skip / 0 fail/error
+Architecture-77 serial lane included
+```
+
+The post-certification feature commit was docs-only, so the executable
+certification remains valid.
+
+Operational boundary remains:
+
+```text
+D8-A retry                         NOT AUTHORIZED
+D8-B                               NOT AUTHORIZED
+D8-R2 deferred effect              NOT AUTHORIZED
+production D9-R1                   NOT AUTHORIZED
+broker/live                        NOT AUTHORIZED
+```
+
+Next: fresh integrated production-qualification checkout -> non-effect
+Trading-principal preflight -> D8-R1 read-only deferred qualification -> stop
+for review. Only after that checkpoint may a separate explicit one-shot D8-R2
+authorization be considered.

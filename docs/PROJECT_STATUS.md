@@ -2859,3 +2859,61 @@ Architecture 121 is now source-complete and source-certified. Certification does
 not authorize D8-R2 or any production effect.
 
 Next checkpoint: exact feature-vs-`develop` merge review / PR creation.
+
+
+## Architecture 121 merged — PR #23
+
+Architecture 121 was merged into `develop` after exact PR review.
+
+```text
+PR:       #23
+feature:  1a647ed20184608c6beedd5421ad52ab8707f7ed
+merge:    01748a2ea3449c0756e67ca1ccad24cfb9215fef
+tree:     0768365b2c64be4b80fe4a4db2d72c184eeb94b5
+```
+
+The merge tree is byte-identical to the reviewed feature tree; feature-to-merge
+comparison has zero changed files. The executable source was previously
+certified at source HEAD
+`8162a9121c1ab2c3340c921a2a765c0b89ac612b`; the only later feature commit was
+documentation-only.
+
+PR review state at merge:
+
+```text
+mergeable_state: clean
+behind develop:  0
+review comments: 0
+review threads:  0
+workflow runs:   0
+```
+
+Final certification remains authoritative:
+
+```text
+6969 cases
+6952 passed
+17 skipped
+0 failed/errors
+Architecture-77 serial lane included
+wall 376.211 s
+```
+
+No broad-suite rerun is required for the merge because the exact merged source
+tree was already certified and the merge introduced no source difference.
+
+Production authorization is still unchanged:
+
+```text
+D8-A retry                         NOT AUTHORIZED
+D8-B                               NOT AUTHORIZED
+D8-R2 deferred effect              NOT AUTHORIZED
+production D9-R1                   NOT AUTHORIZED
+broker/live                        NOT AUTHORIZED
+```
+
+Next safe checkpoint: create a fresh detached production-qualification checkout
+from current integrated `develop`, run a non-effect Trading-principal
+preflight, then run D8-R1 read-only single-deferred qualification. Stop before
+D8-R2. Any D8-R2 invocation requires separate explicit one-shot operator
+authorization after the fresh D8-R1 result is reviewed.

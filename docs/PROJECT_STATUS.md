@@ -2497,8 +2497,80 @@ D8-B                                NOT AUTHORIZED
 D9-A                                NOT APPLICABLE
 ```
 
-Next milestone: TP2 serial-safety performance analysis. Profile the five-module
-serial lane—especially Architecture-77's repeated schema/database setup—and
-identify a bounded optimization that preserves lock identity, subprocess,
-crash/recovery, and authority semantics. Do not parallelize Architecture-77 or
-change its harness behavior without separate safety review.
+## TP2 serial-safety performance optimization integrated — 2026-09-23
+
+TP2 completed the bounded Architecture-77 harness optimization and was
+integrated through PR #22 (`Speed up Architecture-77 test harness
+initialization`).
+
+Certified source and merge:
+
+```text
+feature HEAD:
+d2c4f55004cec5db1e1b1ba14ae26290c900efa7
+
+feature TREE:
+e59777ecf4c68af606656c7d5adfee477cdc6e52
+
+merge commit:
+145a641f5e6cf12df6325b3bb5742b9e5c118285
+
+resulting develop TREE:
+e59777ecf4c68af606656c7d5adfee477cdc6e52
+```
+
+The implementation is confined to the Architecture-77 test harness. A locked,
+per-process, read-only in-memory SQLite baseline is created from the existing
+packaged schema/metadata/migration helpers and backed up into each fresh
+file-backed harness database. Fresh roots, database files, connections,
+service/core bindings, lifecycle state, descriptor reopen behavior, provenance,
+cleanup, and storage validation remain independent. Production code, direct
+schema-installation tests, process/crash/recovery behavior, effect gates, and
+acceptance opt-ins are unchanged.
+
+Focused Architecture-77 verification:
+
+```text
+716 passed in 207.22 s
+```
+
+Final repository certification:
+
+```text
+6,774 total cases
+6,757 passed
+17 skipped
+0 failed
+0 errors
+
+broad-1: 3,047 cases; 235.542 s
+broad-2: 2,792 cases; 386.564 s
+serial: 935 cases; 386.579 s
+wall: 389.763 s
+```
+
+TP1 certification wall time was 1,020.648 s, so TP2 reduced complete
+certification wall time by about 62 percent while preserving the serial safety
+lane. The actual PR merge tree exactly matched the certified feature tree, so
+the merge did not require another broad certification run.
+
+Post-merge repository hygiene safely removed 33 integrated historical
+worktrees without force deletion. The main development checkout is again
+`F:\AI\ai-trading-bot` on current `develop`. Protected production
+qualification, the armed personal-desktop runtime, unique-history branches, and
+worktrees containing retained local artifacts remain preserved for explicit
+inspection.
+
+Production authorization is unchanged:
+
+```text
+D8-A retry                         NOT AUTHORIZED
+D8-B                               NOT AUTHORIZED
+D9-A                               NOT APPLICABLE
+```
+
+Next safe checkpoint: finish inspection of the intentionally preserved
+unique-history/artifact-bearing worktrees. After repository hygiene is closed,
+any return to D8-A requires a fresh integrated production-qualification
+checkout, a no-effect preflight under the Trading principal/runtime, and new
+explicit one-invocation operator authorization.

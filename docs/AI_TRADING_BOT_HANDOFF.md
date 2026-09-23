@@ -2483,8 +2483,65 @@ D8-B                               NOT AUTHORIZED
 D9-A                               NOT APPLICABLE
 ```
 
-Next development milestone: TP2, a read-only-first performance analysis of the
-serial safety lane. Focus first on Architecture-77 schema/database setup cost.
-Any optimization must preserve lifecycle-arbiter identity, Windows subprocess
-and crash/recovery behavior, fresh mutable test state, and existing safety
-assertions.
+## TP2 serial-safety performance optimization integrated — 2026-09-23
+
+TP2 is complete and integrated through PR #22 (`Speed up Architecture-77 test
+harness initialization`).
+
+```text
+certified feature HEAD:
+d2c4f55004cec5db1e1b1ba14ae26290c900efa7
+
+certified / resulting TREE:
+e59777ecf4c68af606656c7d5adfee477cdc6e52
+
+merge commit:
+145a641f5e6cf12df6325b3bb5742b9e5c118285
+```
+
+Architecture-77 now seeds fresh harness databases by backing up a locked,
+per-process, read-only in-memory baseline built with the existing schema,
+metadata, and migration helpers. The optimization remains test-only. Every
+harness still receives an independent root, physical database, SQLite
+connection, service/core binding, lifecycle, mutable state, descriptor reopen
+path, validation, and cleanup. Direct schema-installation coverage and all
+production authority/security/effect code are unchanged.
+
+Validation:
+
+```text
+Architecture-77:
+716 passed in 207.22 s
+
+complete certification:
+6,774 cases
+6,757 passed
+17 skipped
+0 failed
+0 errors
+wall 389.763 s
+```
+
+The TP1 complete-certification wall time was 1,020.648 s. TP2 reduced the wall
+time by about 62 percent. GitHub's actual PR #22 merge produced the exact
+certified tree, so no post-merge broad rerun was required.
+
+Repository-hygiene follow-up removed 33 integrated historical worktrees using
+non-forced removal. `F:\AI\ai-trading-bot` is again the normal development
+checkout on current `develop`. The armed personal-desktop runtime, current and
+historical production-qualification/provenance checkouts, unique-history
+branches, and artifact-bearing worktrees were intentionally preserved pending
+explicit inspection.
+
+Protected operational state remains unchanged:
+
+```text
+D8-A retry                         NOT AUTHORIZED
+D8-B                               NOT AUTHORIZED
+D9-A                               NOT APPLICABLE
+```
+
+Next safe checkpoint: complete the preserved-worktree/unique-history review.
+A future D8-A attempt requires a fresh integrated production-qualification
+checkout and no-effect Trading-principal preflight, followed by new explicit
+one-invocation operator authorization.

@@ -2569,8 +2569,56 @@ D8-B                               NOT AUTHORIZED
 D9-A                               NOT APPLICABLE
 ```
 
-Next safe checkpoint: finish inspection of the intentionally preserved
-unique-history/artifact-bearing worktrees. After repository hygiene is closed,
-any return to D8-A requires a fresh integrated production-qualification
-checkout, a no-effect preflight under the Trading principal/runtime, and new
-explicit one-invocation operator authorization.
+## Repository hygiene closeout — 2026-09-23
+
+The post-TP2 worktree audit is complete. Historical integrated development,
+certification, GUI, P3, paper, observability, settlement, and final-wheel
+worktrees were removed only after proving tracked/index cleanliness and either
+integrated ancestry or superseded historical status. Generated build/egg-info
+artifacts were removed only after exact path classification; non-forced Git
+worktree removal was used throughout.
+
+The remaining registered worktrees are intentionally limited to:
+
+```text
+F:\AI\ai-trading-bot
+  current develop workspace
+
+F:\AI\c3-e37-production-source-v1
+  retained production provenance
+
+F:\AI\worktrees\ai-trading-bot-d8a-block-reason-production-qualification
+  latest protected D8-A qualification state
+
+F:\AI\worktrees\ai-trading-bot-d8a-diagnostic-production-qualification
+  retained historical D8-A diagnostic qualification state
+
+F:\AI\worktrees\ai-trading-bot-d8a-production-qualification
+  retained historical D8-A qualification state
+
+F:\AI\worktrees\ai-trading-bot-personal-desktop
+  armed D5 personal-desktop runtime
+```
+
+The parallel GUI line through A13 is already fully contained in `develop`;
+no GUI branch remains to merge. Historical branch refs may remain for provenance
+even when their worktrees were removed.
+
+An empty, unregistered TP2 filesystem directory may remain temporarily if
+Windows still holds a directory handle. It is not a Git worktree and has no
+repository-authority significance.
+
+Production authorization is unchanged:
+
+```text
+latest D8-A diagnostic run          USED 1 / 1 -> PRE_RECOVERY_BLOCKED
+D8-A retry                          NOT AUTHORIZED
+D8-B                                NOT AUTHORIZED
+D9-A                                NOT APPLICABLE
+```
+
+Next safe checkpoint: prepare a fresh detached production-qualification checkout
+from current integrated `develop` and perform a no-effect preflight under the
+dedicated non-admin Trading principal with the approved production runtime.
+Stop before D8-A. A new D8-A invocation requires separate explicit one-shot
+operator authorization.

@@ -2541,7 +2541,32 @@ D8-B                               NOT AUTHORIZED
 D9-A                               NOT APPLICABLE
 ```
 
-Next safe checkpoint: complete the preserved-worktree/unique-history review.
-A future D8-A attempt requires a fresh integrated production-qualification
-checkout and no-effect Trading-principal preflight, followed by new explicit
-one-invocation operator authorization.
+## Repository hygiene closeout — 2026-09-23
+
+The post-TP2 worktree consolidation is complete. Historical integrated,
+certification, GUI, paper, P3, observability, settlement, and final-wheel
+worktrees were removed only after tracked/index cleanliness and ancestry or
+supersession were established. The remaining registered worktrees are the
+current `develop` workspace, the armed personal-desktop runtime, retained C3-E37
+production provenance, and three deliberately retained D8-A
+production-qualification/provenance states.
+
+The GUI A1-A13 lineage is fully integrated in `develop`; no parallel GUI merge
+remains pending. Historical branch refs are retained as Git history where useful
+without keeping unnecessary worktrees.
+
+An empty unregistered TP2 directory may remain on disk while held open by
+Windows; it is not part of Git worktree state.
+
+Operational boundary remains:
+
+```text
+latest D8-A diagnostic run          USED 1 / 1 -> PRE_RECOVERY_BLOCKED
+D8-A retry                          NOT AUTHORIZED
+D8-B                                NOT AUTHORIZED
+D9-A                                NOT APPLICABLE
+```
+
+Next safe checkpoint: create a fresh detached integrated production-qualification
+checkout and run only the Trading-principal no-effect preflight. Stop before
+D8-A; any new D8-A invocation requires fresh explicit one-shot authorization.

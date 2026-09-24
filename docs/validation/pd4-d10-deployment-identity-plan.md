@@ -89,3 +89,21 @@ Only after separate explicit operator approval and exact review of P4 evidence m
 Any inability to verify the exact signed deployment identity is BLOCKED.
 
 Do not fall back to `.git`, scheduler state, environment variables, caller HEAD/TREE values, unsigned local manifests, or process memory.
+
+
+## Architecture-124 prerequisite and A1/A2 revision
+
+A3 stopped at the pre-source circular trust boundary. Architecture 124 now
+precedes A3/A4.
+
+Before continuing A3:
+
+- revise the attestation source root to `F:\AITradingBot\D10\source`;
+- add exact launch-guard byte length and SHA-256 to the canonical attestation;
+- revise the certification builder to bind the tracked guard source separately
+  from the sealed second-stage executable manifest;
+- revise the scheduler contract to invoke the fixed installed guard using the
+  exact isolated/no-site/no-bytecode-cache argument vector.
+
+The existing A1/A2 canonical and HEAD-tree/blob proofs remain required. Broad
+certification remains deferred.

@@ -3318,3 +3318,21 @@ The existing `F:\\` volume root is only a parent-boundary observation: exact loc
 P124-1 has not run. It remains a separate protected host checkpoint. No production runtime, D10 root, scheduler, signing, lease, provider, settlement, broker-paper, or live effect was changed or authorized. Broad certification remains deferred until the final D10 source tree.
 
 Next source checkpoint: Sol High A124-5 Architecture-123 A4 defense-in-depth integration. P124-1 must be accepted before D10 activation.
+
+## Architecture 124 A124-5 — ACCEPTED
+
+Exact GitHub review accepted the Architecture-123 A4 governed-source deployment re-verifier integration.
+
+```text
+HEAD c59e9f390bb03e6b33d3035b623c37688a3c25db
+TREE 6c421398dc76a0e1fe67651a9cfcc00f9d835376
+focused overlapping verification 196 passed
+final targeted A124-5 verification 9 passed
+Ruff / format / diff checks PASS
+```
+
+The accepted second-stage A4 boundary reacquires current C1/Trading provenance, freshly rereads fixed D10 trust material, verifies the detached signature and source-owned attestation identity, re-verifies complete sealed-source inventory and bytes, rechecks trust/principal drift, and emits only sanitized same-process deployment provenance. Copied/reconstructed evidence is rejected. The A124-3 guard remains the first trust boundary; caller/environment assertions cannot substitute for A4.
+
+The second-stage launcher invokes A4 before any future effectful D10 controller. The activation lease remains unimplemented and therefore fail-closed. No P124-1 host qualification, provisioning, signing/publication, scheduler mutation, provider/publication/settlement/recovery, broker-paper, or live effect occurred or is authorized. Broad certification remains deferred until the final D10 source tree.
+
+Next source checkpoint: Sol High A124-6 / Architecture-123 A5 activation-lease source implementation. P124-1 and all protected deployment checkpoints remain separate and require explicit review/authorization before D10 activation.

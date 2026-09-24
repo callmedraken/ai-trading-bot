@@ -52,3 +52,26 @@ Use disposable/source tests for weekend/holiday, sleep/late StartWhenAvailable, 
 ## Re-evaluation
 
 At seven calendar days, stop and review. Broker-paper and live remain separately unauthorized.
+
+
+## Activation-lease checkpoint before the recurring controller
+
+The first source checkpoint is accepted after canonical namespace-order
+correction. Before implementing the effectful one-wake controller, add a
+source-only D10 activation-lease authority.
+
+Required source work:
+
+- immutable canonical lease model for activation UTC and exact activation + 7
+  day expiry;
+- deterministic soak identity bound to source HEAD/TREE, scheduler contract,
+  Trading SID, and production Python identity;
+- fixed source-owned path and strict security/ACL contract;
+- native-safe zero-caller-path read/verification boundary;
+- create-only/atomic deployment material builder for the later protected D10-B
+  deployment step;
+- no scheduler mutation and no lease write in ordinary source tests;
+- expired/absent/malformed/conflicting lease yields no effect authority.
+
+The later D10 controller must read this lease itself. Task Scheduler end time is
+defense in depth and may not be the sole expiry authority.

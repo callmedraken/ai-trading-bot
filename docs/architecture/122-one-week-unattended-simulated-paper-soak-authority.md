@@ -104,3 +104,44 @@ Tests must prove zero semantic scheduler arguments, an exact seven-day bound, so
 ## Exit
 
 After one calendar week, stop and re-evaluate. Elapsed time alone authorizes no next trading mode.
+
+
+## Runtime activation-lease authority
+
+Source review of the first D10 checkpoint exposed a required authority boundary
+before the recurring controller can be implemented: the zero-argument runtime
+must be able to prove the seven-day activation/end interval without trusting a
+scheduler wake, scheduler history, a caller argument, ambient environment, or
+process memory.
+
+The Task Scheduler end boundary remains required as defense in depth, but it is
+not sufficient authority by itself.
+
+Architecture 122 therefore requires one fixed source-owned D10 activation lease.
+The lease is created only at the later explicitly approved D10 deployment
+checkpoint and is read-only to the scheduled controller.
+
+Required lease facts are:
+
+- schema/version;
+- accepted activation UTC instant;
+- exact end UTC instant equal to activation plus seven days;
+- exact certified source HEAD and TREE;
+- exact D10 scheduler-contract identity/version;
+- exact Trading SID;
+- exact production Python identity/version;
+- a unique D10 soak identity derived deterministically from the canonical lease
+  facts.
+
+The lease location, ACL/ownership contract, atomic create/finalize behavior,
+canonical serialization, native-safe read path, and deployment writer must be
+source-frozen before D10 scheduler mutation.
+
+The scheduled controller accepts no lease facts from CLI arguments or
+environment variables. On every wake it must independently read and verify the
+fixed lease, compare current UTC time against the lease interval, and perform no
+effect when the lease is absent, malformed, conflicting, not yet active, or
+expired.
+
+The lease is not renewable in place. Extending the soak requires a new reviewed
+bounded authorization after the current week is closed.

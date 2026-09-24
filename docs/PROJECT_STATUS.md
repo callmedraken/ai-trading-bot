@@ -3016,3 +3016,33 @@ New docs:
 Late wakes may proceed only while ordinary source-owned session/pre-open rules still hold. Stale finalized decisions, missed decision deadlines, or session gaps stop the soak; there is no automatic Architecture-121 reuse or multi-session catch-up.
 
 Next safe checkpoint: Sol High source implementation of Architecture-122 S1-S4 on feature/pd4-d10-one-week-soak-authority, focused tests only, no scheduler mutation or production effect.
+
+
+## Architecture 122 first source checkpoint — accepted
+
+Accepted source after exact GitHub review and canonical-order correction:
+
+```text
+HEAD: 96dc3d6c7b9ebad2510d09a88b057a9ff8df4bbb
+TREE: 10dcaf1d2a58364a4d456ddd3649a1a3f151fb6f
+focused correction verification: 62 passed
+```
+
+The D10 complete decision namespace is now canonicalized by execution-session
+date then decision ID before C3 verification, public evidence construction, and
+same-process provenance registration. Reversed native directory enumeration no
+longer changes D10 evidence or creates false namespace drift. The existing
+native fixed-namespace reader and Architecture-111/114/121 behavior remain
+unchanged.
+
+The first checkpoint's one-week window, scheduler specification, complete
+historical settlement audit, and canonical namespace inventory are accepted.
+Broad certification remains deferred until the final Architecture-122 source
+tree.
+
+Review also identified the next required source authority: the recurring
+zero-argument controller cannot safely enforce expiry from Task Scheduler alone.
+Before the effectful controller, implement a fixed source-owned D10 activation
+lease that binds activation/end time to the certified source/deployment identity
+and is independently reverified on every wake. No scheduler mutation or
+production effect is authorized.

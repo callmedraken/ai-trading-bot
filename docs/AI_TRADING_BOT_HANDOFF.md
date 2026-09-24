@@ -2939,3 +2939,36 @@ git checkout -b feature/pd4-d10-one-week-soak-authority --track origin/feature/p
 
 Do not assume `git switch` is supported unless a later environment check
 explicitly verifies it.
+
+
+## Architecture 122 first source checkpoint accepted
+
+Exact accepted source:
+
+```text
+HEAD 96dc3d6c7b9ebad2510d09a88b057a9ff8df4bbb
+TREE 10dcaf1d2a58364a4d456ddd3649a1a3f151fb6f
+```
+
+The prior D10 namespace-order review finding is closed. The new complete
+decision inventory canonicalizes finalized bindings by execution-session date,
+then decision ID, before C3 checks/public evidence/provenance registration.
+Focused correction verification reported 62 passing tests plus Ruff and diff
+checks.
+
+Checkpoint contents now accepted:
+- pure exact seven-day UTC soak window;
+- source-only bounded D10 scheduler deployment spec;
+- native-safe complete finalized-decision namespace read;
+- read-only historical settlement audit that distinguishes reconciled retained
+  history from stale unresolved work.
+
+Do not run broad certification yet.
+
+Next required source checkpoint is a fixed D10 activation lease. The scheduler
+is still an untrusted wake source and its end boundary cannot be the sole
+runtime expiry authority. The zero-argument controller must independently read
+a fixed, verified activation/end lease on every wake before any recurring
+effect is implemented.
+
+No scheduler mutation or production D10 effect is authorized.

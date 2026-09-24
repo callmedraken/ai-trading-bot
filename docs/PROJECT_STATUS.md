@@ -3219,3 +3219,37 @@ integration tests). Broad certification remains deferred. Next source
 checkpoint: A124-3 pre-source signature/complete sealed-manifest verification
 and no-source-on-failure orchestration, subject to exact review of this
 checkpoint. A124-4/P124-1 runtime security qualification remains separate.
+
+## Architecture 124 A124-2 — ACCEPTED
+
+Exact GitHub review accepted the fixed D10 Windows security/native-read source checkpoint.
+
+Accepted source:
+
+```text
+HEAD 24c04173b6bc96cb2ec57d4f57199b62ed2ee7f7
+TREE 5a34f3a73dbbe3daf98558d2d872f2910bbf4261
+focused verification 734 passed, 2 skipped
+Ruff / format / diff checks PASS
+```
+
+The accepted checkpoint freezes the measured production package path
+`F:\AITradingBot\runtime\Lib\site-packages` as path identity only, keeps the
+D10 trust/source namespace separate from Architecture 77, and provides a
+stdlib-only no-follow Windows read/security substrate with exact owner/DACL,
+final-path, local-NTFS, reserved-name, bounded same-handle trust-read, and
+sealed-source admission checks. It has no top-level action and authorizes no
+production D10 access, signing, scheduler mutation, activation, provider,
+decision-publication, settlement, broker-paper, or live effect.
+
+A124-4/P124-1 still must independently prove the production interpreter,
+stdlib, and exact runtime package directory are Administrator/SYSTEM controlled
+and non-writable/non-replaceable by Trading. The seven-day D10 soak has not
+started.
+
+Next source checkpoint: Sol High A124-3. Implement the self-contained pre-source
+guard orchestration: pinned D10 signature verification, strict canonical
+attestation/manifest validation, complete sealed-source inventory verification,
+same-handle byte hashing with final drift checks, and fail-closed launch of at
+most one exact second-stage command only after every pre-source check succeeds.
+Broad certification remains deferred until the final D10 source tree.

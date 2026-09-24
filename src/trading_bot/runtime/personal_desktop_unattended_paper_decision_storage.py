@@ -595,6 +595,15 @@ def read_complete_personal_desktop_unattended_decision_namespace(
             api=WindowsPaperReadNativeApi(),
             calendar=personal_desktop_unattended_decision_calendar(),
         )
+        finalized = tuple(
+            sorted(
+                finalized,
+                key=lambda binding: (
+                    binding.decision.intended_execution_session.session_date,
+                    binding.decision.decision_id,
+                ),
+            )
+        )
         for binding in finalized:
             _require_decision_c3_matches_current_authority(binding, c1)
         last = observer.observe()

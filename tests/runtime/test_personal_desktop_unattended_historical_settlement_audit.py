@@ -594,3 +594,125 @@ def test_historical_per_decision_reconstruction_accepts_exact_completed_edge(
         ),
     )
     audit._reconcile_one(d, harness.authority, expected.binding, account)
+
+
+def _complete_namespace_fixture(monkeypatch, bindings):
+    api = _empty_api()
+    payload_bindings = {}
+    names = []
+    for binding in bindings:
+        decision_id = binding.decision.decision_id
+        name = storage.unattended_paper_decision_directory_name(decision_id)
+        directory = PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_DECISIONS + "\\" + name
+        payload = decision_id.bytes
+        api.put(directory)
+        api.put(
+            directory
+            + "\\"
+            + storage.unattended_paper_decision_artifact_name(decision_id),
+            payload,
+        )
+        payload_bindings[payload] = binding
+        names.append(name)
+    c1 = SimpleNamespace(approved_account_sid=SID)
+    monkeypatch.setattr(
+        storage, "require_validated_production_authority", lambda value: value
+    )
+    monkeypatch.setattr(storage, "WindowsPaperReadNativeApi", lambda: api)
+    monkeypatch.setattr(storage, "WindowsTradingTokenObserver", Observer)
+    monkeypatch.setattr(
+        storage,
+        "verify_personal_desktop_unattended_paper_decision_intent",
+        lambda payload, _calendar: payload_bindings[payload],
+    )
+    monkeypatch.setattr(
+        storage,
+        "_require_decision_c3_matches_current_authority",
+        lambda _binding, _c1: None,
+    )
+    return api, c1, tuple(names)
+
+
+def test_complete_namespace_canonicalizes_opposite_native_enumeration_orders(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    old = _fake_binding(24, 9)
+    new = _fake_binding(25, 1)
+    api, c1, names = _complete_namespace_fixture(monkeypatch, (new, old))
+    api.overrides[PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_DECISIONS] = names
+    first = storage.read_complete_personal_desktop_unattended_decision_namespace(c1)
+    api.overrides[PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_DECISIONS] = names[::-1]
+    second = storage.read_complete_personal_desktop_unattended_decision_namespace(c1)
+    expected = (
+        FinalizedDecisionIdentity(old.decision.intended_execution_session, UUID(int=9)),
+        FinalizedDecisionIdentity(new.decision.intended_execution_session, UUID(int=1)),
+    )
+    assert first.classification is second.classification is Namespace.VALID
+    assert first.decisions == second.decisions == expected
+    for result in (first, second):
+        assert storage.require_complete_personal_desktop_unattended_decision_namespace(
+            result, c1
+        ) == (old, new)
+    assert not any(
+        call[0] in {"write", "create", "rename", "delete"} for call in api.calls
+    )
+
+
+def test_historical_audit_reread_ignores_native_enumeration_order(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    old = _fake_binding(24, 9)
+    middle = _fake_binding(25, 1)
+    current = _fake_binding(26, 5)
+    bindings = (current, middle, old)
+    api, c1, names = _complete_namespace_fixture(monkeypatch, bindings)
+    original = _dependencies(monkeypatch, bindings)
+    account = original.read_account(original.acquire_c1(), (b"config",))
+    reads = []
+
+    def discover(value):
+        assert value is c1
+        api.overrides[PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_DECISIONS] = (
+            names if not reads else names[::-1]
+        )
+        reads.append(1)
+        return storage.read_complete_personal_desktop_unattended_decision_namespace(c1)
+
+    d = replace(
+        original,
+        acquire_c1=lambda: c1,
+        discover=discover,
+        require_discovery=storage.require_complete_personal_desktop_unattended_decision_namespace,
+        read_account=lambda *_: account,
+    )
+    visited = []
+    monkeypatch.setattr(
+        audit,
+        "_reconcile_one",
+        lambda _d, _c1, binding, _account: visited.append(binding.decision.decision_id),
+    )
+    result = audit.audit_personal_desktop_historical_settlements_for_test(d)
+    assert reads == [1, 1]
+    assert result.classification is Status.RECONCILED_HISTORY
+    assert result.reconciled_decision_ids == (UUID(int=9), UUID(int=1))
+    assert result.current_decision_id == UUID(int=5)
+    assert visited == [UUID(int=9), UUID(int=1)]
+    assert result.all_eight_gates_closed and not result.real_effect_performed
+
+
+@pytest.mark.parametrize("duplicate", ["session", "identity"])
+def test_complete_namespace_duplicate_session_or_identity_blocks(
+    monkeypatch: pytest.MonkeyPatch, duplicate: str
+) -> None:
+    first = _fake_binding(24, 1)
+    bindings = (first, _fake_binding(24, 2)) if duplicate == "session" else (first,)
+    api, c1, names = _complete_namespace_fixture(monkeypatch, bindings)
+    if duplicate == "identity":
+        api.overrides[PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_DECISIONS] = names * 2
+    result = storage.read_complete_personal_desktop_unattended_decision_namespace(c1)
+    assert result.classification is Namespace.BLOCKED
+    assert result.decisions == ()
+    with pytest.raises(storage.PersonalDesktopUnattendedDecisionStorageError):
+        storage.require_complete_personal_desktop_unattended_decision_namespace(
+            result, c1
+        )

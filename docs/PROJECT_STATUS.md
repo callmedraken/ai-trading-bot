@@ -3155,3 +3155,39 @@ docs/validation/pd4-d10-sealed-launch-guard-plan.md
 Next source checkpoint: Sol High A124-1 only — revise pure scheduler/attestation/
 builder contracts for the sealed guard and source root. No Windows
 provisioning, signing, scheduler mutation, activation, or trading effect.
+
+
+## Architecture 124 A124-1 — ACCEPTED
+
+Exact reviewed source:
+
+```text
+HEAD: 26745e619588f6c997bdde826b9bc8d42ef7474f
+TREE: b88984a0c5c2c315e714211e7ed01feca43682c7
+focused verification: 87 passed
+Ruff / format / diff checks: PASS
+```
+
+Exact GitHub review accepted:
+- scheduler target changed from the mutable worktree to the fixed installed
+  pre-source guard;
+- exact `-I -S -B -X pycache_prefix=...` guard and second-stage argument
+  contracts;
+- sealed source root `F:\AITradingBot\D10\source`;
+- Architecture-123 v2 attestation with exact guard path/length/SHA-256 binding;
+- deterministic v2 deployment ID;
+- A2 builder HEAD-blob proof for the guard, kept separate from the executable
+  manifest;
+- the second-stage launcher remains mandatory in that manifest;
+- real-branch builder remains fail-closed until both future scripts are tracked.
+
+Broad certification remains deferred.
+
+Review also froze one follow-on launch detail: because the second-stage child
+retains `-S`, its verified launcher must explicitly add only the sealed
+source package root and fixed protected production-runtime site-packages path
+before importing trading modules; it must not process `.pth`/sitecustomize/
+usercustomize startup hooks.
+
+Next source checkpoint: A124-2 fixed D10 Windows path/security/native-read
+contracts only. No provisioning or production effect.

@@ -145,3 +145,20 @@ STOP rather than weaken the contract if:
 - source snapshot cannot be made immutable to Trading;
 - signed attestation cannot bind the exact guard and source deployment;
 - any verification failure could still reach second-stage source execution.
+
+
+## Second-stage dependency bootstrap requirement
+
+Before A124-3 is accepted, tests must prove that the verified second-stage
+launcher can run under `-I -S -B` without relying on automatic `site`
+initialization.
+
+The launcher must explicitly add only:
+- the sealed `source\src` path;
+- the fixed protected production-runtime site-packages path.
+
+It must not invoke `site.main()` or execute `.pth`/sitecustomize/
+usercustomize startup hooks.
+
+A124-4 host qualification must prove the fixed runtime package directory is
+Administrator/SYSTEM controlled and non-writable by Trading.

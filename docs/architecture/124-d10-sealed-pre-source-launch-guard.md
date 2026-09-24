@@ -229,3 +229,34 @@ Source acceptance requires tests proving:
 
 Architecture 124 completion alone authorizes no production deployment or D10
 effect.
+
+
+## Verified second-stage import bootstrap
+
+The second-stage child intentionally retains `-S`. This means normal
+site-package path initialization does not occur automatically.
+
+That is desirable before the sealed launcher executes, but the trading runtime
+still requires the repository's reviewed third-party runtime dependencies
+(notably `tzdata` on Windows for IANA `zoneinfo` data).
+
+Therefore the future verified second-stage launcher must itself perform one
+source-owned import bootstrap before importing any `trading_bot` module:
+
+1. require the exact fixed production interpreter;
+2. add only the sealed source package root
+   `F:\AITradingBot\D10\source\src`;
+3. add only the fixed protected production runtime site-packages directory
+   belonging to `F:\AITradingBot\runtime`;
+4. do not call `site.main()`;
+5. do not process `.pth`, `sitecustomize`, or `usercustomize`;
+6. only then import the verified D10/trading modules.
+
+The production-Python substrate qualification therefore covers not only the
+interpreter/stdlib but the exact fixed runtime package directory used by this
+bootstrap. Trading must not be able to create, replace, rename, delete, or
+modify files there.
+
+The guard remains stdlib-only. This bootstrap occurs only after the guard has
+verified the sealed source deployment and launched the verified second-stage
+script.

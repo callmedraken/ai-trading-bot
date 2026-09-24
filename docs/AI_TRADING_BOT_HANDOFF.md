@@ -3076,3 +3076,34 @@ modify it, D10 remains BLOCKED.
 Next: Sol High A124-1 pure source revision only — scheduler target/arguments,
 attestation guard fields/source-root revision, and certification-builder
 revision. Do not implement production provisioning or effects yet.
+
+
+## Architecture 124 A124-1 accepted
+
+Accepted:
+
+```text
+HEAD 26745e619588f6c997bdde826b9bc8d42ef7474f
+TREE b88984a0c5c2c315e714211e7ed01feca43682c7
+focused tests 87 passed
+```
+
+The D10 scheduler now targets only the fixed installed guard. Architecture-123
+deployment attestation v2 binds the sealed source root, exact guard path,
+guard byte length/SHA-256, fixed second-stage launcher, scheduler schema,
+Trading SID, production Python, manifest digest/count, and deterministic
+deployment ID.
+
+The certification builder independently binds the future tracked guard bytes to
+their certified HEAD blob while excluding the guard from the sealed-source
+executable manifest.
+
+A follow-on import rule is frozen for A124-3: because the verified second-stage
+command retains `-S`, its verified launcher must explicitly add only the
+sealed `source\src` directory and the fixed protected production-runtime
+site-packages directory, without calling `site.main()` or processing startup
+hooks. A124-4 must prove that runtime package directory is non-writable by
+Trading.
+
+Next: Sol High A124-2 Windows security/native read contract. No real D10 root,
+signing, scheduler mutation, activation, or trading effect.

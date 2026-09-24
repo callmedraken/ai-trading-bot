@@ -159,6 +159,17 @@ milestone.
 
 ## Git workflow
 
+The Windows development machine currently has an older Git installation that
+does not support `git switch`. Operator commands for this repository must use
+the compatible `git checkout` forms instead:
+
+- existing branch: `git checkout <branch>`
+- create a local branch tracking an existing remote branch:
+  `git checkout -b <branch> --track origin/<branch>`
+
+Do not emit `git switch` commands unless a later environment check proves the
+installed Git supports them.
+
 The main integration branch is `develop`.
 
 Use focused branches such as:

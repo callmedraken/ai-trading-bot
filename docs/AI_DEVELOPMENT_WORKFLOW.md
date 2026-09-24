@@ -250,6 +250,14 @@ iteration, run only focused verification; complete certification follows exact
 GitHub/PR review when the source tree is intended final. A merge needs no
 second complete run when its resulting tree exactly equals the certified tree.
 
+### Local Git compatibility rule
+
+The Windows development machine currently uses an older Git version where
+`git switch` is unavailable. Repository/operator instructions must use
+`git checkout` for branch changes and `git checkout -b <branch> --track
+origin/<branch>` when creating a local tracking branch. Do not assume
+`git switch` support unless a later environment check explicitly proves it.
+
 ### Windows pytest temporary-directory rule
 
 On John's Windows development account, pytest commands that may use `tmp_path`

@@ -2925,3 +2925,17 @@ A wake may compose at most one capture, one current-session settlement, and one 
 The current capture-only scheduled task is unchanged until source implementation/certification and later explicit D10-B scheduler-mutation approval.
 
 Next: Sol High implementation of Architecture-122 S1-S4 on feature/pd4-d10-one-week-soak-authority, focused tests only.
+
+
+## Local Git compatibility note
+
+The Windows development machine's installed Git is old enough that `git switch`
+is not available. Future ready-to-run operator commands must use compatible
+`git checkout` syntax instead. For the D10 feature branch, use:
+
+```powershell
+git checkout -b feature/pd4-d10-one-week-soak-authority --track origin/feature/pd4-d10-one-week-soak-authority
+```
+
+Do not assume `git switch` is supported unless a later environment check
+explicitly verifies it.

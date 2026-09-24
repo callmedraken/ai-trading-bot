@@ -3377,3 +3377,25 @@ Frozen stop behavior includes BLOCKED, SESSION_GAP, MISSED_DECISION_DEADLINE, ST
 No P124-1, broad certification, provisioning, lease/signing publication, scheduler mutation, provider effect, decision publication, settlement, recovery, broker-paper, or live operation was performed by this source checkpoint.
 
 Architecture-122 S1/S2/S3 controller integration is accepted; S4 scheduler source was already frozen. Next checkpoint: S5 final exact-tree D10 source certification using the persistent repository certification runner, including the Architecture-77 serial lane. Protected P124-* deployment remains blocked until certification is accepted.
+
+## Architecture 122 S5 final D10 source certification — ACCEPTED
+
+The frozen executable D10 source commit was certified in a clean detached worktree using the persistent three-lane repository certification runner.
+
+```text
+CERTIFIED SOURCE HEAD acee8f80e947bcaefd79fa2c44531e8bbdf4cd0c
+CERTIFIED SOURCE TREE e2850c86adc83b70ab11f6db9e421e8584832c98
+broad-1 3229 cases / 3225 passed / 4 skipped / 0 failed / 0 errors
+broad-2 3219 cases / 3215 passed / 4 skipped / 0 failed / 0 errors
+serial    935 cases / 926 passed / 9 skipped / 0 failed / 0 errors
+TOTAL     7383 cases / 7366 passed / 17 skipped / 0 failed / 0 errors
+wall 453.655 s
+```
+
+The certification runner completed with status PASS, exact HEAD/TREE unchanged, clean final certification worktree, all three pytest lanes successful, and repository static checks successful as required by the runner. Evidence was retained outside the worktree at `F:\\AI\\temp\\pytest\\certification-evidence-84ff507f5d964f5ba347eadf3e529e55`.
+
+The later docs-only feature-branch closeout remains separate from executable certification. The certified deployment identity remains the exact executable source commit/tree above; docs-only acceptance commits do not redefine it.
+
+S5 is accepted. No P124-1 host qualification, D10 provisioning, signing/trust publication, activation lease publication, scheduler mutation, provider/publication/settlement/recovery, broker-paper, or live effect occurred during certification.
+
+Next boundary: P124-1 production-Python substrate qualification. Before executing that protected host checkpoint, use a reviewed native collector/harness implementing the already-frozen A124-4 evidence contract; do not substitute ad-hoc ACL/path checks or weaken any acceptance requirement.

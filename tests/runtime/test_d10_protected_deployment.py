@@ -930,6 +930,8 @@ def test_preparation_tools_have_no_scheduler_or_trading_effect_imports() -> None
         "live_trading",
         "portfolio",
         "order_execution",
+        "d10_python_substrate_windows",
+        "run_personal_desktop_d10_launch_guard",
     )
     imports = []
     trees = {}

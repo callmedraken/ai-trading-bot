@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import ctypes
 import hashlib
+import ntpath
 import os
 from ctypes import wintypes
+from dataclasses import dataclass
 
-from scripts import d10_python_substrate_windows as substrate
-from scripts import run_personal_desktop_d10_launch_guard as guard
 from scripts.d10_protected_deployment import (
     D10_GUARD,
     D10_GUARD_INSTALLING,
@@ -28,7 +28,6 @@ from scripts.d10_protected_deployment import (
     NativeObject,
     validate_source_relative_path,
 )
-from trading_bot.runtime import personal_desktop_d10_python_substrate as substrate_model
 from trading_bot.runtime.personal_desktop_d10_deployment_identity import (
     D10_LAUNCHER_RELATIVE_PATH,
 )
@@ -41,7 +40,10 @@ WRITE_DAC = 0x00040000
 WRITE_OWNER = 0x00080000
 SE_DACL_PROTECTED_SET = 0x80000000
 SYSTEM32 = r"C:\Windows\System32"
-PUBLIC_KEY = guard.D10_PUBLIC_KEY
+PUBLIC_KEY = bytes.fromhex(
+    "04a73d90064e8b97e4a8373f48cac44718eb375ca52581233d614365294164efba"
+    "40c6758f0f4cc455f6b2bf9b222696f9bc83c91ddf625fd01de46a6e7cd9c52e"
+)
 
 
 class _SecurityAttributes(ctypes.Structure):
@@ -50,6 +52,65 @@ class _SecurityAttributes(ctypes.Structure):
         ("descriptor", ctypes.c_void_p),
         ("inherit", wintypes.BOOL),
     ]
+
+
+class _ByHandleInfo(ctypes.Structure):
+    _fields_ = [
+        ("attributes", wintypes.DWORD),
+        ("creation_low", wintypes.DWORD),
+        ("creation_high", wintypes.DWORD),
+        ("access_low", wintypes.DWORD),
+        ("access_high", wintypes.DWORD),
+        ("write_low", wintypes.DWORD),
+        ("write_high", wintypes.DWORD),
+        ("volume_serial", wintypes.DWORD),
+        ("size_high", wintypes.DWORD),
+        ("size_low", wintypes.DWORD),
+        ("links", wintypes.DWORD),
+        ("file_index_high", wintypes.DWORD),
+        ("file_index_low", wintypes.DWORD),
+    ]
+
+
+class _AclSizeInformation(ctypes.Structure):
+    _fields_ = [
+        ("ace_count", wintypes.DWORD),
+        ("acl_bytes_in_use", wintypes.DWORD),
+        ("acl_bytes_free", wintypes.DWORD),
+    ]
+
+
+class _AceHeader(ctypes.Structure):
+    _fields_ = [
+        ("ace_type", ctypes.c_ubyte),
+        ("ace_flags", ctypes.c_ubyte),
+        ("ace_size", wintypes.WORD),
+    ]
+
+
+class _AccessAce(ctypes.Structure):
+    _fields_ = [
+        ("header", _AceHeader),
+        ("mask", wintypes.DWORD),
+        ("sid_start", wintypes.DWORD),
+    ]
+
+
+@dataclass(frozen=True, slots=True)
+class _ObjectFacts:
+    final_path: str
+    directory: bool
+    attributes: int
+    owner: str
+    protected: bool
+    aces: tuple[Ace, ...]
+    drive_type: int
+    volume_root: str
+    filesystem: str
+    volume_serial: int
+    file_index: int
+    links: int
+    size: int
 
 
 class WindowsDeploymentBackend:
@@ -469,30 +530,308 @@ class WindowsDeploymentBackend:
         if not move(installing_path, final_path):
             raise DeploymentBlocked("create_only_atomic_publication_failed")
 
-    def _read_pinned_file(self, handle: int, size: int) -> bytes:
-        if size == 0:
-            return b""
-        if not 0 < size <= 1024 * 1024 * 1024:
-            raise DeploymentBlocked("native_source_size_bound")
-        seek = guard._win_dll("kernel32").SetFilePointerEx
-        seek.argtypes = [
+    def _allowed_object_path(self, path: str, *, directory: bool) -> bool:
+        if type(path) is not str or ntpath.normpath(path) != path:
+            return False
+        if directory:
+            if path in {D10_PARENT, D10_ROOT, D10_SOURCE}:
+                return True
+            prefix = D10_SOURCE + "\\"
+            if not path.startswith(prefix):
+                return False
+            relative = path[len(prefix) :].replace("\\", "/")
+            if relative in {"src", "scripts", "src/trading_bot"}:
+                return True
+            if relative.startswith("src/trading_bot/"):
+                try:
+                    validate_source_relative_path(relative + "/__directory_probe__.py")
+                except DeploymentBlocked:
+                    return False
+                return True
+            return False
+        if path == D10_GUARD or path in TRUST_FINAL_PATHS:
+            return True
+        prefix = D10_SOURCE + "\\"
+        if not path.startswith(prefix):
+            return False
+        relative = path[len(prefix) :].replace("\\", "/")
+        try:
+            validate_source_relative_path(relative)
+        except DeploymentBlocked:
+            return False
+        return True
+
+    def _open_existing(self, path: str, *, directory: bool) -> int:
+        if not self._allowed_object_path(path, directory=directory):
+            raise DeploymentBlocked("native_open_path_unreviewed")
+        create = self._bind(
+            self._kernel,
+            "CreateFileW",
+            [
+                ctypes.c_wchar_p,
+                wintypes.DWORD,
+                wintypes.DWORD,
+                ctypes.c_void_p,
+                wintypes.DWORD,
+                wintypes.DWORD,
+                wintypes.HANDLE,
+            ],
             wintypes.HANDLE,
-            ctypes.c_longlong,
-            ctypes.c_void_p,
+        )
+        handle = create(
+            path,
+            0x0001 | 0x0080 | READ_CONTROL | 0x00100000,
+            0x00000001,
+            None,
+            3,
+            FILE_FLAG_OPEN_REPARSE_POINT
+            | (FILE_FLAG_BACKUP_SEMANTICS if directory else 0),
+            None,
+        )
+        if handle in (None, 0, ctypes.c_void_p(-1).value):
+            raise DeploymentBlocked("native_open_object_failed")
+        return int(handle)
+
+    def _close_handle(self, handle: int) -> None:
+        close = self._bind(
+            self._kernel, "CloseHandle", [wintypes.HANDLE], wintypes.BOOL
+        )
+        if not close(handle):
+            raise DeploymentBlocked("native_handle_close_failed")
+
+    def _local_free(self, pointer: object) -> None:
+        free = self._bind(self._kernel, "LocalFree", [ctypes.c_void_p], ctypes.c_void_p)
+        if free(pointer):
+            raise DeploymentBlocked("native_local_allocation_release_failed")
+
+    def _sid_string(self, sid: object) -> str:
+        value = ctypes.c_wchar_p()
+        convert = self._bind(
+            self._advapi,
+            "ConvertSidToStringSidW",
+            [ctypes.c_void_p, ctypes.POINTER(ctypes.c_wchar_p)],
+            wintypes.BOOL,
+        )
+        if not convert(sid, ctypes.byref(value)) or not value.value:
+            raise DeploymentBlocked("native_sid_conversion_failed")
+        try:
+            return value.value
+        finally:
+            self._local_free(ctypes.cast(value, ctypes.c_void_p))
+
+    def _security_facts(self, handle: int) -> tuple[str, bool, tuple[Ace, ...]]:
+        owner, dacl, descriptor = (
+            ctypes.c_void_p(),
+            ctypes.c_void_p(),
+            ctypes.c_void_p(),
+        )
+        get_security = self._bind(
+            self._advapi,
+            "GetSecurityInfo",
+            [
+                wintypes.HANDLE,
+                wintypes.DWORD,
+                wintypes.DWORD,
+                ctypes.POINTER(ctypes.c_void_p),
+                ctypes.c_void_p,
+                ctypes.POINTER(ctypes.c_void_p),
+                ctypes.c_void_p,
+                ctypes.POINTER(ctypes.c_void_p),
+            ],
             wintypes.DWORD,
-        ]
-        seek.restype = wintypes.BOOL
+        )
+        status = get_security(
+            handle,
+            1,
+            1 | 4,
+            ctypes.byref(owner),
+            None,
+            ctypes.byref(dacl),
+            None,
+            ctypes.byref(descriptor),
+        )
+        if status or not owner.value or not dacl.value or not descriptor.value:
+            raise DeploymentBlocked("native_security_descriptor_unavailable")
+        try:
+            control, revision = wintypes.WORD(), wintypes.DWORD()
+            get_control = self._bind(
+                self._advapi,
+                "GetSecurityDescriptorControl",
+                [
+                    ctypes.c_void_p,
+                    ctypes.POINTER(wintypes.WORD),
+                    ctypes.POINTER(wintypes.DWORD),
+                ],
+                wintypes.BOOL,
+            )
+            if not get_control(
+                descriptor, ctypes.byref(control), ctypes.byref(revision)
+            ):
+                raise DeploymentBlocked("native_security_control_unavailable")
+            size = _AclSizeInformation()
+            get_acl_info = self._bind(
+                self._advapi,
+                "GetAclInformation",
+                [ctypes.c_void_p, ctypes.c_void_p, wintypes.DWORD, wintypes.DWORD],
+                wintypes.BOOL,
+            )
+            if not get_acl_info(dacl, ctypes.byref(size), ctypes.sizeof(size), 2):
+                raise DeploymentBlocked("native_acl_inventory_unavailable")
+            get_ace = self._bind(
+                self._advapi,
+                "GetAce",
+                [ctypes.c_void_p, wintypes.DWORD, ctypes.POINTER(ctypes.c_void_p)],
+                wintypes.BOOL,
+            )
+            aces = []
+            for index in range(size.ace_count):
+                pointer = ctypes.c_void_p()
+                if not get_ace(dacl, index, ctypes.byref(pointer)) or not pointer.value:
+                    raise DeploymentBlocked("native_acl_entry_unavailable")
+                header = ctypes.cast(pointer, ctypes.POINTER(_AceHeader)).contents
+                if header.ace_type in (0, 1):
+                    access = ctypes.cast(pointer, ctypes.POINTER(_AccessAce)).contents
+                    sid = self._sid_string(ctypes.c_void_p(pointer.value + 8))
+                    mask = int(access.mask)
+                else:
+                    sid, mask = "UNSUPPORTED-ACE", 0
+                aces.append(Ace(sid, mask, int(header.ace_type), int(header.ace_flags)))
+            return (
+                self._sid_string(owner),
+                bool(control.value & 0x1000),
+                tuple(aces),
+            )
+        finally:
+            self._local_free(descriptor)
+
+    def _inspect(self, handle: int) -> _ObjectFacts:
+        get_final = self._bind(
+            self._kernel,
+            "GetFinalPathNameByHandleW",
+            [wintypes.HANDLE, ctypes.c_wchar_p, wintypes.DWORD, wintypes.DWORD],
+            wintypes.DWORD,
+        )
+        final_buffer = ctypes.create_unicode_buffer(32768)
+        length = get_final(handle, final_buffer, len(final_buffer), 0)
+        if (
+            not length
+            or length >= len(final_buffer)
+            or not final_buffer.value.startswith("\\\\?\\")
+        ):
+            raise DeploymentBlocked("native_final_path_unavailable")
+        final_path = final_buffer.value[4:]
+        info = _ByHandleInfo()
+        get_info = self._bind(
+            self._kernel,
+            "GetFileInformationByHandle",
+            [wintypes.HANDLE, ctypes.POINTER(_ByHandleInfo)],
+            wintypes.BOOL,
+        )
+        if not get_info(handle, ctypes.byref(info)):
+            raise DeploymentBlocked("native_handle_identity_unavailable")
+        volume_root = ctypes.create_unicode_buffer(32768)
+        get_volume_path = self._bind(
+            self._kernel,
+            "GetVolumePathNameW",
+            [ctypes.c_wchar_p, ctypes.c_wchar_p, wintypes.DWORD],
+            wintypes.BOOL,
+        )
+        if not get_volume_path(final_path, volume_root, len(volume_root)):
+            raise DeploymentBlocked("native_volume_root_unavailable")
+        drive_type_fn = self._bind(
+            self._kernel, "GetDriveTypeW", [ctypes.c_wchar_p], wintypes.UINT
+        )
+        drive_type = int(drive_type_fn(volume_root.value))
+        filesystem = ctypes.create_unicode_buffer(64)
+        serial = wintypes.DWORD()
+        get_volume_info = self._bind(
+            self._kernel,
+            "GetVolumeInformationW",
+            [
+                ctypes.c_wchar_p,
+                ctypes.c_wchar_p,
+                wintypes.DWORD,
+                ctypes.POINTER(wintypes.DWORD),
+                ctypes.c_void_p,
+                ctypes.c_void_p,
+                ctypes.c_wchar_p,
+                wintypes.DWORD,
+            ],
+            wintypes.BOOL,
+        )
+        if (
+            not get_volume_info(
+                volume_root.value,
+                None,
+                0,
+                ctypes.byref(serial),
+                None,
+                None,
+                filesystem,
+                len(filesystem),
+            )
+            or serial.value != info.volume_serial
+        ):
+            raise DeploymentBlocked("native_volume_identity_unavailable")
+        owner, protected, aces = self._security_facts(handle)
+        attributes = int(info.attributes)
+        return _ObjectFacts(
+            final_path,
+            bool(attributes & 0x10),
+            attributes,
+            owner,
+            protected,
+            aces,
+            drive_type,
+            volume_root.value,
+            filesystem.value,
+            int(info.volume_serial),
+            (int(info.file_index_high) << 32) | int(info.file_index_low),
+            int(info.links),
+            (int(info.size_high) << 32) | int(info.size_low),
+        )
+
+    def _native_facts(self, path: str, facts: _ObjectFacts) -> NativeObject:
+        return NativeObject(
+            path,
+            facts.final_path,
+            facts.directory,
+            facts.owner,
+            facts.protected,
+            facts.aces,
+            bool(facts.attributes & 0x400),
+            facts.drive_type,
+            facts.volume_root,
+            facts.filesystem,
+            facts.volume_serial,
+            facts.file_index,
+            facts.links,
+            facts.size,
+        )
+
+    def _read_pinned_file(self, handle: int, size: int) -> bytes:
+        if type(size) is not int or not 0 <= size <= 1024 * 1024 * 1024:
+            raise DeploymentBlocked("native_source_size_bound")
+        seek = self._bind(
+            self._kernel,
+            "SetFilePointerEx",
+            [wintypes.HANDLE, ctypes.c_longlong, ctypes.c_void_p, wintypes.DWORD],
+            wintypes.BOOL,
+        )
         if not seek(handle, 0, None, 0):
             raise DeploymentBlocked("native_source_seek_failed")
-        read = guard._win_dll("kernel32").ReadFile
-        read.argtypes = [
-            wintypes.HANDLE,
-            ctypes.c_void_p,
-            wintypes.DWORD,
-            ctypes.POINTER(wintypes.DWORD),
-            ctypes.c_void_p,
-        ]
-        read.restype = wintypes.BOOL
+        read = self._bind(
+            self._kernel,
+            "ReadFile",
+            [
+                wintypes.HANDLE,
+                ctypes.c_void_p,
+                wintypes.DWORD,
+                ctypes.POINTER(wintypes.DWORD),
+                ctypes.c_void_p,
+            ],
+            wintypes.BOOL,
+        )
         content = bytearray()
         remaining = size
         while remaining:
@@ -508,127 +847,52 @@ class WindowsDeploymentBackend:
         return bytes(content)
 
     def read_file(self, path: str, limit: int) -> CheckedFile:
-        if not (
-            path == D10_GUARD
-            or path in TRUST_FINAL_PATHS
-            or path.startswith(D10_SOURCE + "\\")
-        ):
+        if not self._allowed_object_path(path, directory=False):
             raise DeploymentBlocked("native_read_path_unreviewed")
-        native = guard._Native()
+        handle = self._open_existing(path, directory=False)
         try:
-            handle = native.open(path, directory=False)
-            try:
-                before = native.inspect(handle)
-                from scripts.d10_protected_deployment import require_native_object
+            before = self._inspect(handle)
+            item = self._native_facts(path, before)
+            from scripts.d10_protected_deployment import require_native_object
 
-                item = self._native_facts(path, before, directory=False)
-                require_native_object(item, path, directory=False)
-                if item.size > limit:
-                    raise DeploymentBlocked("native_read_size_bound")
-                data = self._read_pinned_file(handle, item.size)
-                after = native.inspect(handle)
-                if before != after or len(data) != item.size:
-                    raise DeploymentBlocked("native_read_identity_or_size_drift")
-                return CheckedFile(item, data, True)
-            finally:
-                native.close(handle)
+            require_native_object(item, path, directory=False)
+            if item.size > limit:
+                raise DeploymentBlocked("native_read_size_bound")
+            data = self._read_pinned_file(handle, item.size)
+            after = self._inspect(handle)
+            if before != after or len(data) != item.size:
+                raise DeploymentBlocked("native_read_identity_or_size_drift")
+            return CheckedFile(item, data, True)
         except DeploymentBlocked:
             raise
         except Exception:
             raise DeploymentBlocked("native_file_read_or_identity_failed") from None
-
-    def _native_facts(
-        self, path: str, facts: object, *, directory: bool
-    ) -> NativeObject:
-        return NativeObject(
-            path,
-            facts.final_path,
-            bool(facts.attributes & guard.FILE_ATTRIBUTE_DIRECTORY),
-            facts.owner,
-            facts.protected,
-            tuple(Ace(a.sid, a.mask, a.ace_type, a.flags) for a in facts.aces),
-            bool(facts.attributes & guard.FILE_ATTRIBUTE_REPARSE_POINT),
-            facts.drive_type,
-            facts.volume_root,
-            facts.filesystem,
-            facts.volume_serial,
-            facts.file_index,
-            facts.links,
-            facts.size,
-        )
+        finally:
+            self._close_handle(handle)
 
     def list_directory(self, path: str) -> CheckedDirectory:
+        if not self._allowed_object_path(path, directory=True):
+            raise DeploymentBlocked("native_inventory_path_unreviewed")
+        handle = self._open_existing(path, directory=True)
         try:
-            return self._list_directory_checked(path)
+            before = self._inspect(handle)
+            item = self._native_facts(path, before)
+            from scripts.d10_protected_deployment import require_native_object
+
+            require_native_object(item, path, directory=True)
+            names = self._list_names(path)
+            after = self._inspect(handle)
+            if before != after:
+                raise DeploymentBlocked("native_directory_identity_drift")
+            return CheckedDirectory(item, names, True)
         except DeploymentBlocked:
             raise
         except Exception:
             raise DeploymentBlocked(
                 "native_directory_read_or_identity_failed"
             ) from None
-
-    def _list_directory_checked(self, path: str) -> CheckedDirectory:
-        if path == D10_PARENT:
-            handle = substrate._open(path)
-            try:
-                before, _ = substrate._inspect(path, handle)
-                q = substrate_model
-                if (
-                    before.final_path != path
-                    or before.kind is not q.Kind.DIRECTORY
-                    or before.reparse
-                    or before.owner_sid != q.ADMIN
-                    or not before.dacl_protected
-                    or before.aces
-                    != (
-                        q.Ace(q.ADMIN, q.ALL_ACCESS),
-                        q.Ace(q.SYSTEM, q.ALL_ACCESS),
-                        q.Ace(q.TRADING, q.DIRECTORY_READ),
-                    )
-                    or before.drive_type != 3
-                    or before.volume_root != "F:\\"
-                    or before.filesystem != "NTFS"
-                    or before.links != 1
-                ):
-                    raise DeploymentBlocked("d10_parent_security_drift")
-                names = self._list_names(path)
-                after, _ = substrate._inspect(path, handle)
-                if before != after:
-                    raise DeploymentBlocked("d10_parent_identity_drift")
-                item = NativeObject(
-                    path,
-                    path,
-                    True,
-                    before.owner_sid,
-                    before.dacl_protected,
-                    tuple(Ace(a.sid, a.mask, a.ace_type, a.flags) for a in before.aces),
-                    False,
-                    before.drive_type,
-                    before.volume_root,
-                    before.filesystem,
-                    before.volume_serial,
-                    before.file_index,
-                    before.links,
-                    0,
-                )
-                return CheckedDirectory(item, names, True)
-            finally:
-                substrate._close(handle)
-
-        if path == D10_ROOT or path == D10_SOURCE or path.startswith(D10_SOURCE + "\\"):
-            native = guard._Native()
-            handle = native.open(path, directory=True)
-            try:
-                before = native.inspect(handle)
-                item = self._native_facts(path, before, directory=True)
-                names = native.listdir(path)
-                after = native.inspect(handle)
-                if before != after:
-                    raise DeploymentBlocked("native_directory_identity_drift")
-                return CheckedDirectory(item, names, True)
-            finally:
-                native.close(handle)
-        raise DeploymentBlocked("native_inventory_path_unreviewed")
+        finally:
+            self._close_handle(handle)
 
     def _list_names(self, path: str) -> tuple[str, ...]:
         class Data(ctypes.Structure):

@@ -3210,3 +3210,22 @@ acceptance criteria for the fixed interpreter, stdlib/search-path substrate, and
 `F:\AITradingBot\runtime\Lib\site-packages`; do not perform protected host
 qualification yet. P124-1 remains a later explicit administrator/Trading host
 checkpoint.
+
+## Architecture 124 A124-4 — ACCEPTED
+
+Exact GitHub review accepted the corrected production-Python substrate qualification contract.
+
+```text
+HEAD e7b0c969b4a6901546c25882fc2da545e6d2dd47
+TREE 3ff2ed9bcf490570817343a27ed2a33762874546
+correction verification 115 passed, 96 deselected
+Ruff / format / diff checks PASS
+```
+
+The accepted source-only contract freezes Python `F:\\AITradingBot\\runtime\\python.exe` at 3.14.3, the runtime root, and exact site-packages path. It requires protected runtime ancestry/subtree evidence, explicit Trading read+execute without mutation rights, effective mutation/rename denial, exact present-XOR-absent proof for optional DLLs/python314.zip roots, configuration absence, exact isolated import behavior, and complete runtime/System32 dependency transcripts.
+
+The existing `F:\\` volume root is only a parent-boundary observation: exact local-volume/final-path identity plus effective Trading denial are required; the exact protected three-ACE policy begins at `F:\\AITradingBot` and applies recursively through the admitted runtime tree.
+
+P124-1 has not run. It remains a separate protected host checkpoint. No production runtime, D10 root, scheduler, signing, lease, provider, settlement, broker-paper, or live effect was changed or authorized. Broad certification remains deferred until the final D10 source tree.
+
+Next source checkpoint: Sol High A124-5 Architecture-123 A4 defense-in-depth integration. P124-1 must be accepted before D10 activation.

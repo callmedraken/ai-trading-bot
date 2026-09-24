@@ -162,3 +162,86 @@ usercustomize startup hooks.
 
 A124-4 host qualification must prove the fixed runtime package directory is
 Administrator/SYSTEM controlled and non-writable by Trading.
+
+## A124-4 frozen production-Python substrate acceptance
+
+A124-4 is a source-only, read-only acceptance model in
+src/trading_bot/runtime/personal_desktop_d10_python_substrate.py. It never
+opens the production runtime. Its typed QualificationEvidence is input to a
+later protected P124-1 native collector; a caller-built instance is not
+authority. QualificationResult contains fixed paths, version, accepted search
+roots and a count, with no handle, raw ACL, token, or reusable capability.
+P124-1 must retain a native transcript for operator review. This result
+does not authorize a D10 launch.
+
+The source-owned identity is exactly F:\AITradingBot\runtime\python.exe,
+Python 3.14.3, runtime F:\AITradingBot\runtime, and package path
+F:\AITradingBot\runtime\Lib\site-packages. The package path was measured under
+-I -S and is path identity only until P124-1 proves it protected. A different
+interpreter, version, runtime prefix, drive, or package directory requires
+architecture review and a newly signed Architecture-123 attestation. The
+P124-1 signed-attestation input must match this exact path and version.
+
+P124-1 must collect and preserve these observations:
+
+1. Under Administrator, open F:\, F:\AITradingBot, and every object in the
+   entire F:\AITradingBot\runtime subtree by native no-follow handles. Pin
+   parents and children, reject reparse points and hard-linked files, inspect
+   GetFinalPathNameByHandleW, object kind, file ID, volume serial, fixed local
+   NTFS volume, owner SID, DACL-protected control bit, and complete ACE
+   type/order/flags/masks. Enumerate every directory's direct names, reject
+   case collisions, require an exact parent-child inventory, and re-inspect
+   pinned identities before closing. Any inaccessible, unknown, redirecting,
+   or changed object blocks acceptance. The volume parent is included because
+   Trading must not be able to rename/replace the root through it. The strong
+   rule is recursive: every existing runtime file and directory, including
+   Lib, DLLs if present, python314.zip if present, site-packages, stdlib,
+   extension modules, and DLLs, must have an Administrator or SYSTEM owner,
+   protected DACL, and exact reviewed ACE policy (Administrators and SYSTEM
+   full control; Trading read/execute only).
+2. Prove effective rights under the actual non-admin local Trading token/SID
+   for every admitted object and its parents. Trading must lack file and
+   directory write/append, add-file/add-subdirectory, delete, delete-child,
+   rename/replace, WRITE_DAC, WRITE_OWNER, and any equivalent generic or
+   inherited right. The read-only access check must include the token's
+   enabled groups and privileges; a simple Trading ACE scan is insufficient.
+   A mismatched token or indeterminate access check blocks. ACL/owner checks
+   and Trading access checks must agree. Administrator or SYSTEM may maintain
+   the installation only outside an active D10 interval.
+3. Use native no-follow absence probes to prove parent/runtime pyvenv.cfg and
+   runtime python._pth, python3._pth, python314._pth absent. Complete runtime
+   enumeration must reject every other ._pth or pyvenv.cfg anywhere under
+   runtime. If an equivalent path-configuration mechanism exists, stop for
+   architecture review. python314.zip and DLLs may be actual protected runtime
+   objects or proved absent with no-follow probes. A nonexistent zip path in
+   sys.path is not itself a security proof.
+4. Invoke only the fixed executable with exact guard startup switches
+   -I -S -B -X pycache_prefix=F:\AITradingBot\D10\no-pycache in a read-only
+   diagnostic that does not import the D10 guard or trading source. Capture
+   exact sys.executable, prefix, base_prefix, version, sys.flags,
+   pycache_prefix, ordered sys.path, sysconfig purelib and platlib, and
+   origins/final paths of every builtin, frozen, stdlib, extension and
+   guard-import dependency under that startup behavior. The only admitted
+   filesystem import/search roots are fixed runtime root, Lib, DLLs, and
+   python314.zip; each actual root must appear in protected native inventory,
+   and each missing candidate needs exact absence proof. The current
+   directory, user site, environment path, sealed source, package directory,
+   and alternate installation may not appear before the guard. Actual guard
+   extension/DLL loads must resolve to protected runtime objects. Windows
+   OS/KnownDLL loads are a separate P124-1 transcript: exact final paths, OS
+   directory provenance, protected owner/DACL, and Trading effective denial
+   must be independently reviewed. Only DLLs directly beneath the fixed
+   C:\Windows\System32 directory are admissible; a different Windows
+   installation path or unknown OS DLL redirection blocks.
+5. Re-observe runtime/security facts after the diagnostic, including directory
+   inventories and configuration absence. Signed A123 Python path/version,
+   source-owned constants, native transcript, and Trading token proof must
+   agree. Any mismatch or collection error is a STOP.
+
+The later verified launcher may append only exact qualified site-packages after
+sealed-source verification. Qualification does not call site.main(), execute
+.pth, or run site customization; -S remains set. A124-4 performs no D10 root
+provisioning, signing, lease, scheduler, provider, publication, settlement,
+broker-paper, or live operation and does not extend Architecture-77 fixed
+authority objects. P124-1 is a separate protected host checkpoint; D10 remains
+blocked until its native evidence is accepted.

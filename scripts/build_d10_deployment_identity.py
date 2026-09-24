@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import re
 import stat
 import subprocess
 from dataclasses import dataclass
@@ -35,12 +36,25 @@ class D10BuildResult:
     certified_source_tree: str
 
 
-def _git(root: Path, *arguments: str) -> bytes:
+@dataclass(frozen=True, slots=True)
+class _HeadBlob:
+    relative_path: str
+    mode: str
+    oid: str
+
+
+def _git(root: Path, *arguments: str, input_bytes: bytes | None = None) -> bytes:
     result = subprocess.run(
         ["git", "-C", str(root), *arguments],
         capture_output=True,
         check=False,
-        env={**os.environ, "GIT_OPTIONAL_LOCKS": "0"},
+        input=input_bytes,
+        env={
+            key: value
+            for key, value in os.environ.items()
+            if not key.upper().startswith("GIT_")
+        }
+        | {"GIT_OPTIONAL_LOCKS": "0"},
     )
     if result.returncode:
         raise DeploymentIdentityError(f"Git verification failed: {arguments[0]}")
@@ -69,33 +83,42 @@ def _regular_no_reparse(path: Path, *, directory: bool = False) -> None:
         )
 
 
-def _tracked_governed_paths(root: Path) -> set[str]:
-    paths: set[str] = set()
-    for record in _git(root, "ls-files", "--stage", "-z").split(b"\x00"):
+def _tracked_governed_paths(root: Path) -> dict[str, _HeadBlob]:
+    """Read the authoritative governed blob inventory from the certified HEAD."""
+    paths: dict[str, _HeadBlob] = {}
+    for record in _git(root, "ls-tree", "-r", "-z", "--full-tree", "HEAD").split(
+        b"\x00"
+    ):
         if not record:
             continue
         try:
             metadata, raw_path = record.split(b"\t", 1)
-            mode, _oid, stage = metadata.split(b" ")
+            mode, kind, raw_oid = metadata.split(b" ")
             path = raw_path.decode("utf-8")
+            oid = raw_oid.decode("ascii")
         except (ValueError, UnicodeError) as exc:
-            raise DeploymentIdentityError("invalid tracked inventory") from exc
+            raise DeploymentIdentityError("invalid HEAD tree inventory") from exc
         if not (
-            path.startswith("src/trading_bot/") or path == D10_LAUNCHER_RELATIVE_PATH
+            path.casefold().startswith("src/trading_bot/")
+            or path.casefold() == D10_LAUNCHER_RELATIVE_PATH.casefold()
         ):
             continue
         canonical_relative_path(path)
-        if mode not in (b"100644", b"100755") or stage != b"0":
+        if (
+            mode not in (b"100644", b"100755")
+            or kind != b"blob"
+            or re.fullmatch(r"[0-9a-f]{40}", oid) is None
+        ):
             raise DeploymentIdentityError(
-                "governed Git object is not a regular stage-zero file"
+                "governed HEAD object is not a regular SHA-1 blob"
             )
         if path in paths:
-            raise DeploymentIdentityError("duplicate tracked governed path")
-        paths.add(path)
+            raise DeploymentIdentityError("duplicate HEAD governed path")
+        paths[path] = _HeadBlob(path, mode.decode("ascii"), oid)
     if D10_LAUNCHER_RELATIVE_PATH not in paths:
-        raise DeploymentIdentityError("D10 launcher is not tracked")
+        raise DeploymentIdentityError("D10 launcher is not tracked in HEAD")
     if len(paths) != len({path.casefold() for path in paths}):
-        raise DeploymentIdentityError("casefold-colliding governed inventory")
+        raise DeploymentIdentityError("casefold-colliding governed HEAD inventory")
     return paths
 
 
@@ -158,14 +181,26 @@ def build_d10_deployment_identity(
         )
     tracked = _tracked_governed_paths(repository_root)
     local = _local_governed_paths(repository_root)
-    if tracked != local:
+    if set(tracked) != local:
         raise DeploymentIdentityError("tracked and local governed inventories differ")
     entries = []
-    for relative in sorted(tracked):
+    for relative, head_blob in sorted(tracked.items()):
         path = repository_root / relative
         _regular_no_reparse(path)
         data = path.read_bytes()
         _regular_no_reparse(path)
+        try:
+            local_blob_oid = (
+                _git(repository_root, "hash-object", "--stdin", input_bytes=data)
+                .decode("ascii")
+                .strip()
+            )
+        except UnicodeError as exc:
+            raise DeploymentIdentityError("invalid local Git blob identity") from exc
+        if local_blob_oid != head_blob.oid:
+            raise DeploymentIdentityError(
+                "local governed bytes do not match certified HEAD blob"
+            )
         entries.append(
             ExecutableManifestEntry(
                 relative, len(data), hashlib.sha256(data).hexdigest()
@@ -173,7 +208,7 @@ def build_d10_deployment_identity(
         )
     if _git(repository_root, "status", "--porcelain=v1", "-z", "--untracked-files=all"):
         raise DeploymentIdentityError("certification checkout changed during build")
-    if _local_governed_paths(repository_root) != tracked:
+    if _local_governed_paths(repository_root) != set(tracked):
         raise DeploymentIdentityError("governed inventory changed during build")
     manifest = ExecutableManifest(EXECUTABLE_MANIFEST_SCHEMA, tuple(entries))
     attestation = build_deployment_attestation(

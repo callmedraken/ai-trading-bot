@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+import stat
 import subprocess
 import uuid
 from dataclasses import replace
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from scripts.build_d10_deployment_identity import build_d10_deployment_identity
@@ -191,6 +193,7 @@ def _build(root: Path, head: str, tree: str):
 def test_builder_stable_order_digest_and_byte_tamper(tmp_path: Path) -> None:
     root = tmp_path / "repo"
     head, tree = _checkout(root)
+    first_blob = builder._tracked_governed_paths(root)["src/trading_bot/a.py"].oid
     first = _build(root, head, tree)
     parsed = parse_executable_manifest(first.executable_manifest_bytes)
     assert [e.relative_path for e in parsed.entries] == sorted(
@@ -215,6 +218,8 @@ def test_builder_stable_order_digest_and_byte_tamper(tmp_path: Path) -> None:
         _git(root, "rev-parse", "HEAD"),
         _git(root, "show", "-s", "--format=%T", "HEAD"),
     )
+    second_blob = builder._tracked_governed_paths(root)["src/trading_bot/a.py"].oid
+    assert first_blob != second_blob
     assert first.executable_manifest_sha256 != second.executable_manifest_sha256
 
 
@@ -319,3 +324,155 @@ def test_entry_field_set_and_unicode_rejected() -> None:
     data["entries"][0]["relative_path"] = "src/trading_bot/\ud800.py"
     with pytest.raises(DeploymentIdentityError):
         canonical_json_bytes(data)
+
+
+def test_governed_inventory_is_from_head_not_staged_index(tmp_path: Path) -> None:
+    root = tmp_path / "repo"
+    head, tree = _checkout(root)
+    certified = builder._tracked_governed_paths(root)
+    assert certified["src/trading_bot/a.py"].oid == _git(
+        root, "rev-parse", "HEAD:src/trading_bot/a.py"
+    )
+    staged = root / "src/trading_bot/added.py"
+    staged.write_bytes(b"staged only")
+    _git(root, "add", "src/trading_bot/added.py")
+    assert builder._tracked_governed_paths(root) == certified
+    assert "src/trading_bot/added.py" not in certified
+    with pytest.raises(DeploymentIdentityError, match="dirty"):
+        _build(root, head, tree)
+
+
+def test_local_blob_tamper_blocks_when_status_seam_reports_clean(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = tmp_path / "repo"
+    head, tree = _checkout(root)
+    (root / "src/trading_bot/a.py").write_bytes(b"b")
+    real_git = builder._git
+
+    def status_clean(repo: Path, *args: str, input_bytes: bytes | None = None) -> bytes:
+        if args[0] == "status":
+            return b""
+        return real_git(repo, *args, input_bytes=input_bytes)
+
+    monkeypatch.setattr(builder, "_git", status_clean)
+    with pytest.raises(DeploymentIdentityError, match="HEAD blob"):
+        _build(root, head, tree)
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"GIT_DIR": "invalid-git-dir"},
+        {"GIT_WORK_TREE": "invalid-work-tree"},
+        {"GIT_INDEX_FILE": "invalid-index"},
+        {"GIT_OBJECT_DIRECTORY": "invalid-objects"},
+        {"GIT_ALTERNATE_OBJECT_DIRECTORIES": "invalid-alternates"},
+        {
+            "GIT_CONFIG_COUNT": "1",
+            "GIT_CONFIG_KEY_0": "core.bare",
+            "GIT_CONFIG_VALUE_0": "true",
+        },
+    ],
+)
+def test_inherited_git_overrides_cannot_redirect_builder(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, overrides: dict[str, str]
+) -> None:
+    root = tmp_path / "repo"
+    head, tree = _checkout(root)
+    expected = _build(root, head, tree)
+    for key, value in overrides.items():
+        monkeypatch.setenv(key, value)
+    observed = _build(root, head, tree)
+    assert observed == expected
+
+
+def test_builder_hashes_stdin_without_writing_git_objects(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = tmp_path / "repo"
+    head, tree = _checkout(root)
+    objects = root / ".git" / "objects"
+    before = {
+        path.relative_to(objects) for path in objects.rglob("*") if path.is_file()
+    }
+    real_git = builder._git
+    calls: list[tuple[str, ...]] = []
+
+    def record(repo: Path, *args: str, input_bytes: bytes | None = None) -> bytes:
+        calls.append(args)
+        return real_git(repo, *args, input_bytes=input_bytes)
+
+    monkeypatch.setattr(builder, "_git", record)
+    result = _build(root, head, tree)
+    after = {path.relative_to(objects) for path in objects.rglob("*") if path.is_file()}
+    assert before == after
+    assert calls.count(("hash-object", "--stdin")) == result.executable_file_count
+    assert ("ls-tree", "-r", "-z", "--full-tree", "HEAD") in calls
+    assert all("-w" not in args for args in calls)
+
+
+def test_case_collision_and_symlink_like_governed_state_block(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = tmp_path / "repo"
+    head, tree = _checkout(root)
+    real_git = builder._git
+    oid = builder._tracked_governed_paths(root)["src/trading_bot/a.py"].oid
+
+    def colliding_tree(
+        repo: Path, *args: str, input_bytes: bytes | None = None
+    ) -> bytes:
+        data = real_git(repo, *args, input_bytes=input_bytes)
+        if args[0] == "ls-tree":
+            return data + f"100644 blob {oid}\tsrc/trading_bot/A.py\0".encode()
+        return data
+
+    monkeypatch.setattr(builder, "_git", colliding_tree)
+    with pytest.raises(DeploymentIdentityError, match="casefold"):
+        _build(root, head, tree)
+    monkeypatch.setattr(builder, "_git", real_git)
+
+    def symlink_tree(repo: Path, *args: str, input_bytes: bytes | None = None) -> bytes:
+        data = real_git(repo, *args, input_bytes=input_bytes)
+        if args[0] == "ls-tree":
+            old = f"100644 blob {oid}\tsrc/trading_bot/a.py".encode()
+            return data.replace(old, old.replace(b"100644", b"120000"), 1)
+        return data
+
+    monkeypatch.setattr(builder, "_git", symlink_tree)
+    with pytest.raises(DeploymentIdentityError, match="regular"):
+        _build(root, head, tree)
+    monkeypatch.setattr(builder, "_git", real_git)
+
+    local_file = root / "src/trading_bot/a.py"
+    real_lstat = Path.lstat
+
+    def symlink_like(path: Path):
+        if path == local_file:
+            return SimpleNamespace(st_mode=stat.S_IFLNK, st_file_attributes=0)
+        return real_lstat(path)
+
+    monkeypatch.setattr(Path, "lstat", symlink_like)
+    with pytest.raises(DeploymentIdentityError, match="no-reparse"):
+        _build(root, head, tree)
+
+
+def test_head_case_variant_of_governed_root_is_rejected(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = tmp_path / "repo"
+    head, tree = _checkout(root)
+    real_git = builder._git
+
+    def wrong_case_tree(
+        repo: Path, *args: str, input_bytes: bytes | None = None
+    ) -> bytes:
+        data = real_git(repo, *args, input_bytes=input_bytes)
+        if args[0] == "ls-tree":
+            return data.replace(b"src/trading_bot/a.py", b"src/Trading_Bot/a.py", 1)
+        return data
+
+    monkeypatch.setattr(builder, "_git", wrong_case_tree)
+    with pytest.raises(DeploymentIdentityError, match="governed"):
+        _build(root, head, tree)

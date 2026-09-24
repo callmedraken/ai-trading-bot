@@ -6,6 +6,8 @@ import ast
 import hashlib
 import json
 import sys
+import uuid
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -14,6 +16,17 @@ import pytest
 from scripts import run_personal_desktop_d10_launch_guard as guard
 from trading_bot.runtime import (
     personal_desktop_unattended_one_week_soak_scheduler_contract as scheduler,
+)
+from trading_bot.runtime.personal_desktop_d10_activation_lease import (
+    D10_ACTIVATION_LEASE_INSTALLING_PATH,
+    D10_ACTIVATION_LEASE_PATH,
+    D10_ACTIVATION_LEASE_TEMP_PATH,
+    D10_SCHEDULER_CONTRACT_ID,
+    D10_SOAK_ID_NAMESPACE,
+    build_activation_lease_model,
+)
+from trading_bot.runtime.personal_desktop_d10_activation_lease import (
+    canonical_json_bytes as lease_canonical_json_bytes,
 )
 from trading_bot.runtime.personal_desktop_d10_deployment_identity import (
     EXECUTABLE_MANIFEST_SCHEMA,
@@ -101,14 +114,22 @@ def test_fixed_paths_and_measured_runtime_package_root() -> None:
         guard.D10_PRODUCTION_SITE_PACKAGES
         == r"F:\AITradingBot\runtime\Lib\site-packages"
     )
+    assert guard.D10_ACTIVATION_LEASE == D10_ACTIVATION_LEASE_PATH
+    assert guard.D10_ACTIVATION_LEASE_INSTALLING == D10_ACTIVATION_LEASE_INSTALLING_PATH
+    assert guard.D10_ACTIVATION_LEASE_TEMP == D10_ACTIVATION_LEASE_TEMP_PATH
     assert guard._INSTALLING == (
         guard.D10_LAUNCH_GUARD + ".installing",
         guard.D10_ATTESTATION + ".installing",
         guard.D10_SIGNATURE + ".installing",
         guard.D10_MANIFEST + ".installing",
         guard.D10_SOURCE_ROOT + ".installing",
+        D10_ACTIVATION_LEASE_INSTALLING_PATH,
     )
-    assert guard._ABSENT[-1] == guard.D10_CACHE_PREFIX
+    assert guard._ABSENT[-2:] == (
+        D10_ACTIVATION_LEASE_TEMP_PATH,
+        guard.D10_CACHE_PREFIX,
+    )
+    assert guard.D10_SCHEDULER_CONTRACT_ID == D10_SCHEDULER_CONTRACT_ID
 
     assert guard.D10_LAUNCH_GUARD == str(scheduler.D10_LAUNCH_GUARD)
     assert guard.D10_SOURCE_ROOT == str(scheduler.D10_SOURCE_ROOT)
@@ -345,6 +366,7 @@ def test_stdlib_only_no_effects_and_arch77_separation() -> None:
         "re",
         "contextlib",
         "dataclasses",
+        "datetime",
         "hashlib",
         "json",
         "subprocess",
@@ -715,12 +737,62 @@ def test_a1243_account_drift_blocks_before_trust_read(
     assert native.paths == {}
 
 
-def test_a1243_exact_one_child_and_zero_child_failure(
+def _sample_deployment() -> guard.VerifiedDeploymentFacts:
+    return guard.VerifiedDeploymentFacts(
+        deployment_id="12345678-1234-5678-1234-567812345678",
+        attestation_sha256="a" * 64,
+        certified_source_head="b" * 40,
+        certified_source_tree="c" * 40,
+        executable_file_count=2,
+        schema=guard.D10_ATTESTATION_SCHEMA,
+        signing_key_id=guard.D10_SIGNING_KEY_ID,
+        source_root=guard.D10_SOURCE_ROOT,
+        launch_guard=guard.D10_LAUNCH_GUARD,
+        launcher=guard.D10_SECOND_STAGE_LAUNCHER,
+        scheduler_contract_schema=guard.D10_SCHEDULER_SCHEMA,
+        approved_trading_sid=guard.TRADING_SID,
+        production_python=guard.D10_PRODUCTION_PYTHON,
+        production_python_version=guard.D10_PRODUCTION_PYTHON_VERSION,
+    )
+
+
+def _sample_lease_bytes(
+    deployment: guard.VerifiedDeploymentFacts,
+    *,
+    activation: datetime = datetime(2026, 9, 24, 18, 15, 30, 123456, tzinfo=UTC),
+    **changes: object,
+) -> bytes:
+    model = build_activation_lease_model(
+        deployment_id=deployment.deployment_id,
+        attestation_sha256=deployment.attestation_sha256,
+        accepted_activation_utc=activation,
+        certified_source_head=deployment.certified_source_head,
+        certified_source_tree=deployment.certified_source_tree,
+    )
+    value = model.to_dict()
+    value.update(changes)
+    material = {key: item for key, item in value.items() if key != "soak_id"}
+    value["soak_id"] = str(
+        uuid.uuid5(
+            D10_SOAK_ID_NAMESPACE,
+            lease_canonical_json_bytes(material).decode("utf-8"),
+        )
+    )
+    return lease_canonical_json_bytes(value)
+
+
+def test_a1246_guard_requires_deployment_and_active_lease_before_one_child(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    deployment = _sample_deployment()
+    activation = datetime(2026, 9, 24, 18, 15, 30, 123456, tzinfo=UTC)
+    data = [_sample_lease_bytes(deployment, activation=activation)]
+    observed = [activation]
     calls: list[tuple[object, object]] = []
-    monkeypatch.setattr(guard, "_verify_pre_source", lambda: None)
-    monkeypatch.setattr(guard, "_require_active_lease", lambda: None)
+    monkeypatch.setattr(guard, "_verify_pre_source", lambda: deployment)
+    monkeypatch.setattr(guard, "_read_fixed_activation_lease_bytes", lambda: data[0])
+    monkeypatch.setattr(guard, "_trusted_runtime_utc_now", lambda: observed[0])
+    monkeypatch.setattr(guard, "require_trading_principal", lambda: None)
     monkeypatch.setattr(
         guard,
         "_sanitized_environment",
@@ -752,11 +824,106 @@ def test_a1243_exact_one_child_and_zero_child_failure(
             },
         )
     ]
+
+    failures = [
+        (b"{", activation, "malformed"),
+        (
+            _sample_lease_bytes(
+                deployment, activation=activation - timedelta(seconds=1)
+            ),
+            activation - timedelta(seconds=2),
+            "before_start",
+        ),
+        (
+            _sample_lease_bytes(deployment, activation=activation),
+            activation + timedelta(days=7),
+            "exact_end",
+        ),
+        (
+            _sample_lease_bytes(deployment, activation=activation),
+            activation + timedelta(days=7, microseconds=1),
+            "expired",
+        ),
+        (
+            _sample_lease_bytes(
+                deployment,
+                activation=activation,
+                deployment_id="22345678-1234-5678-1234-567812345678",
+            ),
+            activation,
+            "deployment",
+        ),
+        (
+            _sample_lease_bytes(
+                deployment, activation=activation, attestation_sha256="d" * 64
+            ),
+            activation,
+            "attestation",
+        ),
+        (
+            _sample_lease_bytes(
+                deployment, activation=activation, certified_source_head="e" * 40
+            ),
+            activation,
+            "source_head",
+        ),
+        (
+            _sample_lease_bytes(
+                deployment, activation=activation, certified_source_tree="f" * 40
+            ),
+            activation,
+            "source_tree",
+        ),
+        (
+            _sample_lease_bytes(
+                deployment, activation=activation, scheduler_contract_schema="other/v1"
+            ),
+            activation,
+            "scheduler_schema",
+        ),
+        (
+            _sample_lease_bytes(
+                deployment, activation=activation, scheduler_contract_id="0" * 64
+            ),
+            activation,
+            "scheduler_id",
+        ),
+        (
+            _sample_lease_bytes(
+                deployment, activation=activation, trading_sid="S-1-5-18"
+            ),
+            activation,
+            "sid",
+        ),
+        (
+            _sample_lease_bytes(
+                deployment,
+                activation=activation,
+                production_python=r"F:\wrong\python.exe",
+            ),
+            activation,
+            "python",
+        ),
+        (
+            _sample_lease_bytes(
+                deployment, activation=activation, production_python_version="3.14.4"
+            ),
+            activation,
+            "python_version",
+        ),
+    ]
+    for invalid, instant, _reason in failures:
+        data[0] = invalid
+        observed[0] = instant
+        calls.clear()
+        assert guard.main() == 1
+        assert not calls
+
     calls.clear()
     monkeypatch.setattr(
         guard,
         "_verify_pre_source",
-        lambda: (_ for _ in ()).throw(guard.GuardBlocked("drift")),
+        lambda: (_ for _ in ()).throw(guard.GuardBlocked("deployment mismatch")),
     )
     assert guard.main() == 1
     assert not calls
@@ -916,11 +1083,17 @@ def test_a1243_standard_account_proof_is_mandatory(
     assert calls == [guard.TRADING_SID]
 
 
-def test_a1243_unimplemented_lease_prevents_real_launch(
+def test_a1246_absent_lease_prevents_real_launch(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    deployment = _sample_deployment()
     calls: list[object] = []
-    monkeypatch.setattr(guard, "_verify_pre_source", lambda: None)
+    monkeypatch.setattr(guard, "_verify_pre_source", lambda: deployment)
+    monkeypatch.setattr(
+        guard,
+        "_read_fixed_activation_lease_bytes",
+        lambda: (_ for _ in ()).throw(guard.GuardBlocked("lease absent")),
+    )
     monkeypatch.setattr(
         guard.subprocess, "run", lambda *args, **kwargs: calls.append(args)
     )
@@ -1106,7 +1279,7 @@ def test_a1245_reverification_fails_closed(
         verifier.verify_d10_deployment()
 
 
-def test_a1245_second_stage_calls_verifier_before_any_future_effect(
+def test_a1246_second_stage_requires_deployment_and_active_lease_before_controller(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from scripts import run_personal_desktop_unattended_one_week_soak as launcher
@@ -1120,27 +1293,62 @@ def test_a1245_second_stage_calls_verifier_before_any_future_effect(
         path=["stdlib"],
     )
     monkeypatch.setattr(launcher, "sys", runtime)
-    called: list[str] = []
+    deployment = object()
+    lease = object()
+    called: list[tuple[str, object | None, object | None]] = []
     monkeypatch.setattr(
-        verifier, "verify_d10_deployment", lambda: called.append("verify") or object()
+        verifier,
+        "verify_d10_deployment",
+        lambda: called.append(("verify deployment", None, None)) or deployment,
     )
     monkeypatch.setattr(
         verifier,
         "require_verified_d10_deployment",
-        lambda value: called.append("provenance") or value,
+        lambda value: called.append(("deployment provenance", value, None)) or value,
+    )
+    monkeypatch.setattr(
+        verifier,
+        "verify_d10_activation_lease",
+        lambda value: called.append(("verify lease", value, None)) or lease,
+    )
+    monkeypatch.setattr(
+        verifier,
+        "require_verified_d10_activation_lease",
+        lambda value, bound: called.append(("lease provenance", value, bound)) or value,
     )
     assert launcher.main() == 1
-    assert called == ["verify", "provenance"]
+    assert called == [
+        ("verify deployment", None, None),
+        ("deployment provenance", deployment, None),
+        ("verify lease", deployment, None),
+        ("lease provenance", lease, deployment),
+    ]
+
     called.clear()
+
+    def reject_lease(value: object) -> object:
+        called.append(("verify lease", value, None))
+        raise verifier.ActivationLeaseVerificationBlocked("expired")
+
+    monkeypatch.setattr(verifier, "verify_d10_activation_lease", reject_lease)
     runtime.path = ["stdlib"]
-
-    def reject() -> object:
-        called.append("verify")
-        raise verifier.DeploymentVerificationBlocked("failed")
-
-    monkeypatch.setattr(verifier, "verify_d10_deployment", reject)
     assert launcher.main() == 1
-    assert called == ["verify"]
+    assert [item[0] for item in called] == [
+        "verify deployment",
+        "deployment provenance",
+        "verify lease",
+    ]
+
+    called.clear()
+
+    def reject_deployment() -> object:
+        called.append(("verify deployment", None, None))
+        raise verifier.DeploymentVerificationBlocked("deployment mismatch")
+
+    monkeypatch.setattr(verifier, "verify_d10_deployment", reject_deployment)
+    runtime.path = ["stdlib"]
+    assert launcher.main() == 1
+    assert [item[0] for item in called] == ["verify deployment"]
 
 
 def test_a1245_zero_argument_fixed_second_stage_runtime(
@@ -1179,3 +1387,388 @@ def test_a1245_zero_argument_fixed_second_stage_runtime(
     monkeypatch.setattr(verifier, "__file__", r"F:\AI\mutable\verifier.py")
     with pytest.raises(verifier.DeploymentVerificationBlocked):
         verifier._require_second_stage_runtime()
+
+
+def test_a1246_fixed_lease_read_pins_read_only_object_and_reserved_names(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    native = FakeNative()
+    native.data[guard.D10_ACTIVATION_LEASE] = b"canonical lease"
+    monkeypatch.setattr(guard, "require_trading_principal", lambda: None)
+    assert guard._read_fixed_activation_lease_bytes(native) == b"canonical lease"
+    assert set(native.paths.values()) == {guard.D10_ROOT, guard.D10_ACTIVATION_LEASE}
+    assert native.read_handles == [
+        next(
+            handle
+            for handle, path in native.paths.items()
+            if path == guard.D10_ACTIVATION_LEASE
+        )
+    ]
+    assert native.probed == [
+        guard.D10_ACTIVATION_LEASE_INSTALLING,
+        guard.D10_ACTIVATION_LEASE_TEMP,
+        guard.D10_ACTIVATION_LEASE_INSTALLING,
+        guard.D10_ACTIVATION_LEASE_TEMP,
+    ]
+    assert set(native.closed) == set(native.paths)
+    assert native.inspections[guard.D10_ROOT] == 2
+    assert native.inspections[guard.D10_ACTIVATION_LEASE] == 2
+
+
+@pytest.mark.parametrize(
+    "path",
+    [guard.D10_ACTIVATION_LEASE_INSTALLING, guard.D10_ACTIVATION_LEASE_TEMP],
+)
+def test_a1246_reserved_lease_state_blocks(
+    monkeypatch: pytest.MonkeyPatch, path: str
+) -> None:
+    native = FakeNative()
+    native.data[guard.D10_ACTIVATION_LEASE] = b"lease"
+    native.present.add(path)
+    monkeypatch.setattr(guard, "require_trading_principal", lambda: None)
+    with pytest.raises(guard.GuardBlocked):
+        guard._read_fixed_activation_lease_bytes(native)
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"final_path": r"F:\AITradingBot\D10\other.json"},
+        {"attributes": guard.FILE_ATTRIBUTE_REPARSE_POINT},
+        {"attributes": guard.FILE_ATTRIBUTE_DIRECTORY},
+        {"drive_type": 4},
+        {"volume_root": "E:\\"},
+        {"filesystem": "ReFS"},
+        {"links": 2},
+        {"owner": guard.SYSTEM_SID},
+        {"protected": False},
+        {
+            "aces": (
+                *guard.FILE_POLICY.aces[:2],
+                guard.Ace(guard.TRADING_SID, guard.TRADING_FILE_READ | 2),
+            )
+        },
+    ],
+)
+def test_a1246_lease_final_path_kind_and_acl_drift_block(
+    monkeypatch: pytest.MonkeyPatch, change: dict[str, object]
+) -> None:
+    native = FakeNative()
+    native.data[guard.D10_ACTIVATION_LEASE] = b"lease"
+    native.overrides[guard.D10_ACTIVATION_LEASE] = change
+    monkeypatch.setattr(guard, "require_trading_principal", lambda: None)
+    with pytest.raises(guard.GuardBlocked):
+        guard._read_fixed_activation_lease_bytes(native)
+    assert set(native.closed) == set(native.paths)
+
+
+@pytest.mark.parametrize(
+    "field",
+    ["file_index", "volume_serial", "size", "owner", "aces"],
+)
+def test_a1246_lease_final_reinspection_drift_blocks(
+    monkeypatch: pytest.MonkeyPatch, field: str
+) -> None:
+    native = FakeNative()
+    native.data[guard.D10_ACTIVATION_LEASE] = b"lease"
+    values = {
+        "file_index": 99,
+        "volume_serial": 99,
+        "size": 99,
+        "owner": guard.SYSTEM_SID,
+        "aces": tuple(reversed(guard.FILE_POLICY.aces)),
+    }
+    native.after[guard.D10_ACTIVATION_LEASE] = {field: values[field]}
+    monkeypatch.setattr(guard, "require_trading_principal", lambda: None)
+    with pytest.raises(guard.GuardBlocked):
+        guard._read_fixed_activation_lease_bytes(native)
+
+
+def test_a1246_lease_native_open_is_no_follow_and_read_only(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[object, ...]] = []
+
+    class Function:
+        argtypes = None
+        restype = None
+
+        def __call__(self, *args: object) -> int:
+            calls.append(args)
+            return 7
+
+    class Kernel:
+        CreateFileW = Function()
+
+    monkeypatch.setattr(guard, "_win_dll", lambda _: Kernel())
+    assert guard._Native().open(guard.D10_ACTIVATION_LEASE, directory=False) == 7
+    args = calls[0]
+    assert args[0] == guard.D10_ACTIVATION_LEASE
+    assert args[1] == (
+        guard.FILE_READ_DATA
+        | guard.FILE_READ_ATTRIBUTES
+        | guard.READ_CONTROL
+        | guard.SYNCHRONIZE
+    )
+    assert args[2] == 1
+    assert args[4] == 3
+    assert args[5] & guard.FILE_FLAG_OPEN_REPARSE_POINT
+
+
+def test_a1246_parser_matches_model_and_rejects_bad_bytes() -> None:
+    deployment = _sample_deployment()
+    encoded = _sample_lease_bytes(deployment)
+    model = build_activation_lease_model(
+        deployment_id=deployment.deployment_id,
+        attestation_sha256=deployment.attestation_sha256,
+        accepted_activation_utc=datetime(2026, 9, 24, 18, 15, 30, 123456, tzinfo=UTC),
+        certified_source_head=deployment.certified_source_head,
+        certified_source_tree=deployment.certified_source_tree,
+    )
+    assert encoded == model.canonical_bytes()
+    assert guard._parse_active_lease_facts(encoded, deployment)[0] == model.to_dict()
+    with pytest.raises(guard.GuardBlocked):
+        guard._parse_active_lease_facts(
+            encoded.replace(b'"schema":', b'"schema":"x","schema":', 1), deployment
+        )
+    extra = model.to_dict()
+    extra["extra"] = True
+    with pytest.raises(guard.GuardBlocked):
+        guard._parse_active_lease_facts(lease_canonical_json_bytes(extra), deployment)
+
+
+def test_a1246_launch_gate_has_no_caller_clock_or_path_inputs() -> None:
+    import inspect
+
+    assert not inspect.signature(guard.main).parameters
+    assert guard._read_fixed_activation_lease_bytes.__defaults__ == (None,)
+    assert (
+        len(
+            inspect.signature(
+                guard.verify_fixed_activation_lease_for_second_stage
+            ).parameters
+        )
+        == 0
+    )
+
+
+def _verified_facts_from_model(
+    lease, state: str = "ACTIVE"
+) -> guard.VerifiedActivationLeaseFacts:
+    return guard.VerifiedActivationLeaseFacts(
+        state=state,
+        deployment_id=lease.deployment_id,
+        attestation_sha256=lease.attestation_sha256,
+        soak_id=lease.soak_id,
+        accepted_activation_utc=(
+            f"{lease.accepted_activation_utc.year:04d}-"
+            f"{lease.accepted_activation_utc.month:02d}-"
+            f"{lease.accepted_activation_utc.day:02d}T"
+            f"{lease.accepted_activation_utc.hour:02d}:"
+            f"{lease.accepted_activation_utc.minute:02d}:"
+            f"{lease.accepted_activation_utc.second:02d}."
+            f"{lease.accepted_activation_utc.microsecond:06d}Z"
+        ),
+        end_utc=(
+            f"{lease.end_utc.year:04d}-{lease.end_utc.month:02d}-"
+            f"{lease.end_utc.day:02d}T{lease.end_utc.hour:02d}:"
+            f"{lease.end_utc.minute:02d}:{lease.end_utc.second:02d}."
+            f"{lease.end_utc.microsecond:06d}Z"
+        ),
+        certified_source_head=lease.certified_source_head,
+        certified_source_tree=lease.certified_source_tree,
+        scheduler_contract_schema=lease.scheduler_contract_schema,
+        scheduler_contract_id=lease.scheduler_contract_id,
+        trading_sid=lease.trading_sid,
+        production_python=lease.production_python,
+        production_python_version=lease.production_python_version,
+    )
+
+
+def test_a1246_a4_independent_lease_reread_and_noncopyable_provenance(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from dataclasses import replace
+
+    native = FullNative()
+    verifier = _mock_a1245_verification(monkeypatch, native)
+    deployment = verifier.verify_d10_deployment()
+    activation = datetime(2026, 9, 24, 18, 15, 30, 123456, tzinfo=UTC)
+    model = verifier.build_d10_activation_lease(deployment, activation)
+    publication_bytes = verifier.build_d10_activation_lease_bytes(
+        deployment, activation
+    )
+    assert publication_bytes == model.canonical_bytes()
+    facts = _verified_facts_from_model(model)
+    rereads: list[int] = []
+    monkeypatch.setattr(
+        guard,
+        "verify_fixed_activation_lease_for_second_stage",
+        lambda: rereads.append(1) or facts,
+    )
+    monkeypatch.setattr(verifier, "_trusted_runtime_utc_now", lambda: activation)
+    assert verifier.verify_d10_activation_lease(deployment) is not None
+    assert rereads == [1]
+    evidence = verifier.verify_d10_activation_lease(deployment)
+    assert (
+        verifier.require_verified_d10_activation_lease(evidence, deployment) is evidence
+    )
+    assert rereads == [1, 1]
+    with pytest.raises(verifier.ActivationLeaseVerificationBlocked):
+        verifier.require_verified_d10_activation_lease(replace(evidence), deployment)
+    with pytest.raises(verifier.ActivationLeaseVerificationBlocked):
+        verifier.verify_d10_activation_lease(replace(deployment))
+    with pytest.raises(verifier.DeploymentVerificationBlocked):
+        verifier.require_verified_d10_activation_lease(evidence, replace(deployment))
+    monkeypatch.setattr(
+        verifier,
+        "_trusted_runtime_utc_now",
+        lambda: model.end_utc,
+    )
+    with pytest.raises(verifier.ActivationLeaseVerificationBlocked):
+        verifier.require_verified_d10_activation_lease(evidence, deployment)
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        "deployment_id",
+        "attestation_sha256",
+        "certified_source_head",
+        "certified_source_tree",
+        "scheduler_contract_schema",
+        "scheduler_contract_id",
+        "trading_sid",
+        "production_python",
+        "production_python_version",
+    ],
+)
+def test_a1246_a4_rejects_lease_identity_or_runtime_mismatch(
+    monkeypatch: pytest.MonkeyPatch, field: str
+) -> None:
+    from dataclasses import replace
+
+    native = FullNative()
+    verifier = _mock_a1245_verification(monkeypatch, native)
+    deployment = verifier.verify_d10_deployment()
+    model = verifier.build_d10_activation_lease(
+        deployment, datetime(2026, 9, 24, 18, 15, 30, 123456, tzinfo=UTC)
+    )
+    changed = {
+        "deployment_id": "22345678-1234-5678-1234-567812345678",
+        "attestation_sha256": "d" * 64,
+        "certified_source_head": "e" * 40,
+        "certified_source_tree": "f" * 40,
+        "scheduler_contract_schema": "other/v1",
+        "scheduler_contract_id": "0" * 64,
+        "trading_sid": "S-1-5-18",
+        "production_python": r"F:\wrong\python.exe",
+        "production_python_version": "3.14.4",
+    }[field]
+    facts = replace(_verified_facts_from_model(model), **{field: changed})
+    monkeypatch.setattr(
+        guard, "verify_fixed_activation_lease_for_second_stage", lambda: facts
+    )
+    monkeypatch.setattr(
+        verifier, "_trusted_runtime_utc_now", lambda: model.accepted_activation_utc
+    )
+    with pytest.raises(verifier.ActivationLeaseVerificationBlocked):
+        verifier.verify_d10_activation_lease(deployment)
+
+
+def test_a1246_pre_source_lease_time_interval_is_start_inclusive_end_exclusive(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    deployment = _sample_deployment()
+    activation = datetime(2026, 9, 24, 18, 15, 30, 123456, tzinfo=UTC)
+    end = activation + timedelta(days=7)
+    data = [_sample_lease_bytes(deployment, activation=activation)]
+    observed = [activation]
+    monkeypatch.setattr(guard, "_read_fixed_activation_lease_bytes", lambda: data[0])
+    monkeypatch.setattr(guard, "_trusted_runtime_utc_now", lambda: observed[0])
+    monkeypatch.setattr(guard, "require_trading_principal", lambda: None)
+    guard._require_active_lease(deployment)
+    observed[0] = end - timedelta(microseconds=1)
+    guard._require_active_lease(deployment)
+    observed[0] = activation - timedelta(microseconds=1)
+    with pytest.raises(guard.GuardBlocked):
+        guard._require_active_lease(deployment)
+    observed[0] = end
+    with pytest.raises(guard.GuardBlocked):
+        guard._require_active_lease(deployment)
+    observed[0] = end + timedelta(microseconds=1)
+    with pytest.raises(guard.GuardBlocked):
+        guard._require_active_lease(deployment)
+
+
+def test_a1246_second_stage_guard_independently_rereads_fixed_active_lease(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    native = FullNative()
+    monkeypatch.setattr(guard, "require_trading_principal", lambda: None)
+    monkeypatch.setattr(guard, "_verify_d10_signature", lambda *_args: None)
+    monkeypatch.setattr(guard, "_require_runtime", lambda _attestation: None)
+    deployment = guard._verify_pre_source(native)
+    activation = datetime(2026, 9, 24, 18, 15, 30, 123456, tzinfo=UTC)
+    native.data[guard.D10_ACTIVATION_LEASE] = _sample_lease_bytes(
+        deployment, activation=activation
+    )
+    monkeypatch.setattr(guard, "_Native", lambda: native)
+    monkeypatch.setattr(
+        guard, "_require_runtime_for_second_stage_lease", lambda _attestation: None
+    )
+    monkeypatch.setattr(guard, "_trusted_runtime_utc_now", lambda: activation)
+    proof = guard.verify_fixed_activation_lease_for_second_stage()
+    assert proof.state == "ACTIVE"
+    assert proof.deployment_id == deployment.deployment_id
+    assert proof.attestation_sha256 == deployment.attestation_sha256
+    assert (
+        proof.soak_id
+        == build_activation_lease_model(
+            deployment_id=deployment.deployment_id,
+            attestation_sha256=deployment.attestation_sha256,
+            accepted_activation_utc=activation,
+            certified_source_head=deployment.certified_source_head,
+            certified_source_tree=deployment.certified_source_tree,
+        ).soak_id
+    )
+    assert (
+        sum(
+            native.paths[handle] == guard.D10_ACTIVATION_LEASE
+            for handle in native.read_handles
+        )
+        == 2
+    )
+    assert all(handle in native.closed for handle in native.read_handles)
+    assert set(native.closed) == set(native.paths)
+
+
+@pytest.mark.parametrize(
+    "drift",
+    ["executable", "version", "flags", "cache", "argv"],
+)
+def test_a1246_second_stage_python_identity_mismatch_blocks(
+    monkeypatch: pytest.MonkeyPatch, drift: str
+) -> None:
+    runtime = SimpleNamespace(
+        executable=guard.D10_PRODUCTION_PYTHON,
+        version_info=(3, 14, 3),
+        flags=SimpleNamespace(isolated=1, no_site=1, dont_write_bytecode=1),
+        pycache_prefix=guard.D10_CACHE_PREFIX,
+        argv=[guard.D10_SECOND_STAGE_LAUNCHER],
+    )
+    if drift == "executable":
+        runtime.executable = r"F:\wrong\python.exe"
+    elif drift == "version":
+        runtime.version_info = (3, 14, 4)
+    elif drift == "flags":
+        runtime.flags.no_site = 0
+    elif drift == "cache":
+        runtime.pycache_prefix = r"F:\wrong\cache"
+    else:
+        runtime.argv = ["caller-selected"]
+    monkeypatch.setattr(guard, "sys", runtime)
+    with pytest.raises(guard.GuardBlocked):
+        guard._require_runtime_for_second_stage_lease(
+            {"production_python_version": guard.D10_PRODUCTION_PYTHON_VERSION}
+        )

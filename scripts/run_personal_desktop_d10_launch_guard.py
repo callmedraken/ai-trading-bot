@@ -14,12 +14,16 @@ import uuid
 from contextlib import ExitStack
 from ctypes import wintypes
 from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 
 D10_ROOT = r"F:\AITradingBot\D10"
 D10_LAUNCH_GUARD = D10_ROOT + r"\launch-guard.py"
 D10_ATTESTATION = D10_ROOT + r"\deployment.attestation.json"
 D10_SIGNATURE = D10_ROOT + r"\deployment.attestation.sig"
 D10_MANIFEST = D10_ROOT + r"\executable-manifest.json"
+D10_ACTIVATION_LEASE = D10_ROOT + r"\activation.lease.json"
+D10_ACTIVATION_LEASE_INSTALLING = D10_ACTIVATION_LEASE + ".installing"
+D10_ACTIVATION_LEASE_TEMP = D10_ACTIVATION_LEASE + ".tmp"
 D10_SOURCE_ROOT = D10_ROOT + r"\source"
 D10_SOURCE_PACKAGE_ROOT = D10_SOURCE_ROOT + r"\src"
 D10_SECOND_STAGE_LAUNCHER = (
@@ -33,6 +37,13 @@ D10_SCHEDULER_SCHEMA = "personal-desktop-one-week-soak-scheduler-contract/v2"
 D10_MANIFEST_SCHEMA = "personal-desktop-d10-executable-manifest/v1"
 D10_ATTESTATION_SCHEMA = "personal-desktop-d10-deployment-attestation/v2"
 D10_SIGNING_KEY_ID = "AITradingBot/D10/DeploymentAttestation/v2"
+D10_ACTIVATION_LEASE_SCHEMA = "personal-desktop-d10-activation-lease/v1"
+D10_SCHEDULER_CONTRACT_ID = (
+    "f8efc16fe53609f3c0b1e86211cb4563907321dc5b7bcbd9b34676b35c5f2096"
+)
+D10_SOAK_ID_NAMESPACE = uuid.UUID("b33bd736-2dc4-5c7f-9f71-b38fdd392521")
+D10_PRODUCTION_PYTHON_VERSION = "3.14.3"
+ACTIVATION_LEASE_LIMIT = 64 * 1024
 D10_PUBLIC_KEY = bytes.fromhex(
     "04a73d90064e8b97e4a8373f48cac44718eb375ca52581233d614365294164efba"
     "40c6758f0f4cc455f6b2bf9b222696f9bc83c91ddf625fd01de46a6e7cd9c52e"
@@ -44,9 +55,12 @@ SYSTEM_SID = "S-1-5-18"
 
 _DIRECTORIES = (D10_ROOT, D10_SOURCE_ROOT)
 _TRUST_FILES = (D10_LAUNCH_GUARD, D10_ATTESTATION, D10_SIGNATURE, D10_MANIFEST)
-_INSTALLING = tuple(path + ".installing" for path in (*_TRUST_FILES, D10_SOURCE_ROOT))
-_ABSENT = (*_INSTALLING, D10_CACHE_PREFIX)
-_FIXED = frozenset((*_DIRECTORIES, *_TRUST_FILES))
+_INSTALLING = tuple(
+    path + ".installing"
+    for path in (*_TRUST_FILES, D10_SOURCE_ROOT, D10_ACTIVATION_LEASE)
+)
+_ABSENT = (*_INSTALLING, D10_ACTIVATION_LEASE_TEMP, D10_CACHE_PREFIX)
+_FIXED = frozenset((*_DIRECTORIES, *_TRUST_FILES, D10_ACTIVATION_LEASE))
 _FILE_LIMITS = {
     D10_LAUNCH_GUARD: 512 * 1024,
     D10_ATTESTATION: 64 * 1024,
@@ -102,6 +116,26 @@ _ATTESTATION_FIELDS = frozenset(
 )
 _MANIFEST_FIELDS = frozenset({"schema", "entries"})
 _ENTRY_FIELDS = frozenset({"relative_path", "byte_length", "sha256"})
+_LEASE_FIELDS = frozenset(
+    {
+        "schema",
+        "deployment_id",
+        "attestation_sha256",
+        "accepted_activation_utc",
+        "end_utc",
+        "certified_source_head",
+        "certified_source_tree",
+        "scheduler_contract_schema",
+        "scheduler_contract_id",
+        "trading_sid",
+        "production_python",
+        "production_python_version",
+        "soak_id",
+    }
+)
+_LEASE_TIMESTAMP = re.compile(
+    r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}Z\Z"
+)
 _PRIVILEGED_GROUP_SIDS = frozenset(
     {f"S-1-5-32-{rid}" for rid in (544, 548, 549, 550, 551, 552)}
 )
@@ -756,6 +790,37 @@ class _Native:
         return digest.hexdigest()
 
 
+def _read_fixed_activation_lease_bytes(native: _Native | None = None) -> bytes:
+    """Read the one fixed lease through pinned no-follow D10 objects."""
+    require_trading_principal()
+    backend = _Native() if native is None else native
+    with ExitStack() as stack:
+        for path in (D10_ACTIVATION_LEASE_INSTALLING, D10_ACTIVATION_LEASE_TEMP):
+            backend.require_absent(path)
+        root_handle = backend.open(D10_ROOT, directory=True)
+        stack.callback(backend.close, root_handle)
+        root_before = backend.inspect(root_handle)
+        _require_facts(D10_ROOT, True, root_before)
+        lease_handle = backend.open(D10_ACTIVATION_LEASE, directory=False)
+        stack.callback(backend.close, lease_handle)
+        lease_before = backend.inspect(lease_handle)
+        _require_facts(D10_ACTIVATION_LEASE, False, lease_before)
+        if not 0 < lease_before.size <= ACTIVATION_LEASE_LIMIT:
+            raise GuardBlocked("D10 activation lease size is out of bounds")
+        data = backend.read_exact(lease_handle, lease_before.size)
+        if type(data) is not bytes or len(data) != lease_before.size:
+            raise GuardBlocked("D10 activation lease read length differs")
+        for path in (D10_ACTIVATION_LEASE_INSTALLING, D10_ACTIVATION_LEASE_TEMP):
+            backend.require_absent(path)
+        root_after = backend.inspect(root_handle)
+        lease_after = backend.inspect(lease_handle)
+        _require_facts(D10_ROOT, True, root_after)
+        _require_facts(D10_ACTIVATION_LEASE, False, lease_after)
+        _stable(root_before, root_after)
+        _stable(lease_before, lease_after)
+        return data
+
+
 def _token_information(token: int, information_class: int) -> ctypes.Array:
     get = _win_dll("advapi32").GetTokenInformation
     get.argtypes = [
@@ -1252,7 +1317,12 @@ def _parse_attestation(data: bytes) -> dict[str, object]:
         raise GuardBlocked("D10 attestation counts differ")
     version = attestation["production_python_version"]
     match = _VERSION.fullmatch(version) if type(version) is str else None
-    if match is None or int(match[1]) != 3 or int(match[2]) < 12:
+    if (
+        match is None
+        or int(match[1]) != 3
+        or int(match[2]) < 12
+        or version != D10_PRODUCTION_PYTHON_VERSION
+    ):
         raise GuardBlocked("D10 production Python version differs")
     material = {
         key: value for key, value in attestation.items() if key != "deployment_id"
@@ -1270,11 +1340,127 @@ def _parse_attestation(data: bytes) -> dict[str, object]:
     return attestation
 
 
+def _parse_lease_timestamp(value: object) -> datetime:
+    if type(value) is not str or _LEASE_TIMESTAMP.fullmatch(value) is None:
+        raise GuardBlocked("D10 activation lease timestamp is not canonical UTC")
+    try:
+        parsed = datetime.fromisoformat(value[:-1] + "+00:00").replace(tzinfo=UTC)
+    except ValueError as exc:
+        raise GuardBlocked("D10 activation lease timestamp is invalid") from exc
+    canonical = (
+        f"{parsed.year:04d}-{parsed.month:02d}-{parsed.day:02d}T"
+        f"{parsed.hour:02d}:{parsed.minute:02d}:{parsed.second:02d}."
+        f"{parsed.microsecond:06d}Z"
+    )
+    if canonical != value:
+        raise GuardBlocked("D10 activation lease timestamp is not canonical UTC")
+    return parsed
+
+
+def _parse_active_lease_facts(
+    data: bytes, deployment: VerifiedDeploymentFacts
+) -> tuple[dict[str, object], datetime, datetime]:
+    lease = _parse_canonical(data, _LEASE_FIELDS)
+    if (
+        lease["schema"] != D10_ACTIVATION_LEASE_SCHEMA
+        or type(lease["deployment_id"]) is not str
+        or lease["deployment_id"] != deployment.deployment_id
+        or type(lease["attestation_sha256"]) is not str
+        or lease["attestation_sha256"] != deployment.attestation_sha256
+        or lease["certified_source_head"] != deployment.certified_source_head
+        or lease["certified_source_tree"] != deployment.certified_source_tree
+        or lease["scheduler_contract_schema"] != D10_SCHEDULER_SCHEMA
+        or lease["scheduler_contract_id"] != D10_SCHEDULER_CONTRACT_ID
+        or lease["trading_sid"] != TRADING_SID
+        or lease["production_python"] != D10_PRODUCTION_PYTHON
+        or lease["production_python_version"] != D10_PRODUCTION_PYTHON_VERSION
+    ):
+        raise GuardBlocked("D10 activation lease identity differs from deployment")
+    try:
+        parsed_deployment_id = uuid.UUID(lease["deployment_id"])
+    except (TypeError, ValueError, AttributeError) as exc:
+        raise GuardBlocked("D10 activation lease deployment ID is malformed") from exc
+    if str(parsed_deployment_id) != lease["deployment_id"]:
+        raise GuardBlocked("D10 activation lease deployment ID is not canonical")
+    if not all(
+        _hex(lease[key], _SHA256)
+        for key in ("attestation_sha256", "scheduler_contract_id")
+    ):
+        raise GuardBlocked("D10 activation lease digest is malformed")
+    if not all(
+        _hex(lease[key], _GIT_OID)
+        for key in ("certified_source_head", "certified_source_tree")
+    ):
+        raise GuardBlocked("D10 activation lease source audit facts are malformed")
+    if not all(
+        type(lease[key]) is str
+        for key in (
+            "schema",
+            "deployment_id",
+            "attestation_sha256",
+            "certified_source_head",
+            "certified_source_tree",
+            "scheduler_contract_schema",
+            "scheduler_contract_id",
+            "trading_sid",
+            "production_python",
+            "production_python_version",
+            "soak_id",
+        )
+    ):
+        raise GuardBlocked("D10 activation lease field type differs")
+    activation = _parse_lease_timestamp(lease["accepted_activation_utc"])
+    end = _parse_lease_timestamp(lease["end_utc"])
+    try:
+        expected_end = activation + timedelta(days=7)
+    except OverflowError as exc:
+        raise GuardBlocked("D10 activation lease interval is out of range") from exc
+    if end != expected_end:
+        raise GuardBlocked("D10 activation lease interval is not exactly seven days")
+    try:
+        parsed_soak_id = uuid.UUID(lease["soak_id"])
+    except (TypeError, ValueError, AttributeError) as exc:
+        raise GuardBlocked("D10 activation lease soak ID is malformed") from exc
+    material = {key: value for key, value in lease.items() if key != "soak_id"}
+    expected_soak_id = str(
+        uuid.uuid5(D10_SOAK_ID_NAMESPACE, _canonical_json(material).decode("utf-8"))
+    )
+    if str(parsed_soak_id) != lease["soak_id"] or lease["soak_id"] != expected_soak_id:
+        raise GuardBlocked("D10 activation lease soak ID differs")
+    return lease, activation, end
+
+
+def _trusted_runtime_utc_now() -> datetime:
+    """Internal clock seam: production callers cannot select the observed time."""
+    instant = datetime.now(UTC)
+    if type(instant) is not datetime or instant.tzinfo is not UTC:
+        raise GuardBlocked("D10 trusted runtime UTC clock is unavailable")
+    return instant
+
+
+def _require_runtime_for_second_stage_lease(
+    attestation: dict[str, object],
+) -> None:
+    if (
+        sys.executable != D10_PRODUCTION_PYTHON
+        or ".".join(str(part) for part in sys.version_info[:3])
+        != attestation["production_python_version"]
+        or attestation["production_python_version"] != D10_PRODUCTION_PYTHON_VERSION
+        or not (
+            sys.flags.isolated and sys.flags.no_site and sys.flags.dont_write_bytecode
+        )
+        or sys.pycache_prefix != D10_CACHE_PREFIX
+        or sys.argv != [D10_SECOND_STAGE_LAUNCHER]
+    ):
+        raise GuardBlocked("D10 activation lease runtime differs")
+
+
 def _require_runtime(attestation: dict[str, object]) -> None:
     if (
         sys.executable != D10_PRODUCTION_PYTHON
         or ".".join(str(part) for part in sys.version_info[:3])
         != attestation["production_python_version"]
+        or attestation["production_python_version"] != D10_PRODUCTION_PYTHON_VERSION
         or not (
             sys.flags.isolated and sys.flags.no_site and sys.flags.dont_write_bytecode
         )
@@ -1374,7 +1560,9 @@ def _verify_sealed_source(
     _inventory(entries, native)
 
 
-def _verify_pre_source(native: _Native | None = None) -> None:
+def _verify_pre_source(
+    native: _Native | None = None,
+) -> VerifiedDeploymentFacts:
     backend = _Native() if native is None else native
     require_trading_principal()
     material = _read_fixed_trust_material(backend)
@@ -1395,6 +1583,22 @@ def _verify_pre_source(native: _Native | None = None) -> None:
     if _read_fixed_trust_material(backend) != material:
         raise GuardBlocked("D10 trust material drifted")
     require_trading_principal()
+    return VerifiedDeploymentFacts(
+        deployment_id=attestation["deployment_id"],
+        attestation_sha256=hashlib.sha256(material.attestation).hexdigest(),
+        certified_source_head=attestation["certified_source_head"],
+        certified_source_tree=attestation["certified_source_tree"],
+        executable_file_count=attestation["executable_file_count"],
+        schema=attestation["schema"],
+        signing_key_id=attestation["signing_key_id"],
+        source_root=attestation["source_root"],
+        launch_guard=attestation["launch_guard"],
+        launcher=attestation["launcher"],
+        scheduler_contract_schema=attestation["scheduler_contract_schema"],
+        approved_trading_sid=attestation["approved_trading_sid"],
+        production_python=attestation["production_python"],
+        production_python_version=attestation["production_python_version"],
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -1456,6 +1660,98 @@ def verify_fixed_deployment_for_second_stage() -> VerifiedDeploymentFacts:
     )
 
 
+@dataclass(frozen=True, slots=True)
+class VerifiedActivationLeaseFacts:
+    """Sanitized ACTIVE lease facts for the governed-source A4 composition."""
+
+    state: str
+    deployment_id: str
+    attestation_sha256: str
+    soak_id: str
+    accepted_activation_utc: str
+    end_utc: str
+    certified_source_head: str
+    certified_source_tree: str
+    scheduler_contract_schema: str
+    scheduler_contract_id: str
+    trading_sid: str
+    production_python: str
+    production_python_version: str
+
+
+def _require_active_lease(deployment: VerifiedDeploymentFacts) -> None:
+    """Require a fresh fixed lease bound to this just-verified deployment."""
+    if type(deployment) is not VerifiedDeploymentFacts:
+        raise GuardBlocked("D10 deployment evidence is unavailable")
+    lease_bytes = _read_fixed_activation_lease_bytes()
+    _lease, activation, end = _parse_active_lease_facts(lease_bytes, deployment)
+    observed = _trusted_runtime_utc_now()
+    if not activation <= observed < end:
+        raise GuardBlocked("D10 activation lease is not ACTIVE")
+    require_trading_principal()
+
+
+def verify_fixed_activation_lease_for_second_stage() -> VerifiedActivationLeaseFacts:
+    """Independently reread fixed signed identity and ACTIVE lease for A4."""
+    require_trading_principal()
+    material = _read_fixed_trust_material()
+    _verify_d10_signature(material.attestation, material.signature)
+    attestation = _parse_attestation(material.attestation)
+    if (
+        len(material.guard) != attestation["launch_guard_byte_length"]
+        or hashlib.sha256(material.guard).hexdigest()
+        != attestation["launch_guard_sha256"]
+        or hashlib.sha256(material.manifest).hexdigest()
+        != attestation["executable_manifest_sha256"]
+        or len(_parse_manifest(material.manifest))
+        != attestation["executable_file_count"]
+    ):
+        raise GuardBlocked("D10 lease deployment trust facts differ")
+    _require_runtime_for_second_stage_lease(attestation)
+    deployment = VerifiedDeploymentFacts(
+        deployment_id=attestation["deployment_id"],
+        attestation_sha256=hashlib.sha256(material.attestation).hexdigest(),
+        certified_source_head=attestation["certified_source_head"],
+        certified_source_tree=attestation["certified_source_tree"],
+        executable_file_count=attestation["executable_file_count"],
+        schema=attestation["schema"],
+        signing_key_id=attestation["signing_key_id"],
+        source_root=attestation["source_root"],
+        launch_guard=attestation["launch_guard"],
+        launcher=attestation["launcher"],
+        scheduler_contract_schema=attestation["scheduler_contract_schema"],
+        approved_trading_sid=attestation["approved_trading_sid"],
+        production_python=attestation["production_python"],
+        production_python_version=attestation["production_python_version"],
+    )
+    lease_bytes = _read_fixed_activation_lease_bytes()
+    lease, activation, end = _parse_active_lease_facts(lease_bytes, deployment)
+    observed = _trusted_runtime_utc_now()
+    if not activation <= observed < end:
+        raise GuardBlocked("D10 activation lease is not ACTIVE")
+    if (
+        _read_fixed_activation_lease_bytes() != lease_bytes
+        or _read_fixed_trust_material() != material
+    ):
+        raise GuardBlocked("D10 activation lease or deployment trust drifted")
+    require_trading_principal()
+    return VerifiedActivationLeaseFacts(
+        state="ACTIVE",
+        deployment_id=deployment.deployment_id,
+        attestation_sha256=deployment.attestation_sha256,
+        soak_id=lease["soak_id"],
+        accepted_activation_utc=lease["accepted_activation_utc"],
+        end_utc=lease["end_utc"],
+        certified_source_head=lease["certified_source_head"],
+        certified_source_tree=lease["certified_source_tree"],
+        scheduler_contract_schema=lease["scheduler_contract_schema"],
+        scheduler_contract_id=lease["scheduler_contract_id"],
+        trading_sid=lease["trading_sid"],
+        production_python=lease["production_python"],
+        production_python_version=lease["production_python_version"],
+    )
+
+
 def _sanitized_environment() -> dict[str, str]:
     kernel = _win_dll("kernel32")
     get_windows = kernel.GetWindowsDirectoryW
@@ -1468,16 +1764,11 @@ def _sanitized_environment() -> dict[str, str]:
     return {"SystemRoot": value.value, "WINDIR": value.value}
 
 
-def _require_active_lease() -> None:
-    """A later source checkpoint supplies the reviewed signed lease proof."""
-    raise GuardBlocked("D10 activation lease gate is not implemented")
-
-
 def main() -> int:
     """Fail closed; launch one exact child only after every pre-source proof."""
     try:
-        _verify_pre_source()
-        _require_active_lease()
+        deployment = _verify_pre_source()
+        _require_active_lease(deployment)
         environment = _sanitized_environment()
         command = [
             D10_PRODUCTION_PYTHON,

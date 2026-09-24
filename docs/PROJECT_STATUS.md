@@ -3355,3 +3355,25 @@ The pre-source guard now requires both verified deployment identity and an ACTIV
 The publication model remains create-only and non-renewable in place; ordinary runtime has no writer. No real lease was created or published, P124-1 was not run, Task Scheduler was not mutated, and no provider/publication/settlement/recovery/broker-paper/live effect occurred. Broad certification remains deferred until the final D10 source tree.
 
 Architecture 124 source prerequisites A124-1 through A124-6 are now accepted. Next safe source checkpoint is Architecture-122 recurring one-wake controller composition (S1/S2/S3 integration), still source-only and fail-closed; protected P124-1/P124-2/... remain separate and require explicit approval before deployment.
+
+## Architecture 122 D10 one-wake controller — ACCEPTED
+
+Exact GitHub review accepted the recurring one-wake D10 simulated-paper controller integration.
+
+```text
+HEAD acee8f80e947bcaefd79fa2c44531e8bbdf4cd0c
+TREE e2850c86adc83b70ab11f6db9e421e8584832c98
+focused Architecture-122/111/114/121 verification 526 passed
+focused A124-5/A124-6 verification 49 passed, 126 deselected
+Ruff / format / diff checks PASS
+```
+
+The accepted zero-argument second-stage path preserves genuine same-process A124-5 deployment and A124-6 ACTIVE-lease provenance and passes those exact objects into the D10 controller. The controller admits only with all eight gates closed and revalidates deployment, lease, current C1/Trading authority, and frozen scheduler identity before effects.
+
+One wake now follows the frozen Architecture-122 order: optional source-derived C3 capture, closed-gate daily-cycle reconstruction, historical settlement audit, at most one eligible current-session settlement, independent settlement reconciliation, fresh post-settlement daily-cycle reconstruction and historical audit, at most one next-session pre-open decision publication, independent publication reconciliation, and bounded sanitized evidence. Provider, settlement, and publication attempts are each capped at one; receipt recovery, historical catch-up, and broker/live calls remain zero. All exits restore and prove all eight gates closed.
+
+Frozen stop behavior includes BLOCKED, SESSION_GAP, MISSED_DECISION_DEADLINE, STALE_UNRESOLVED_DECISION, provider ambiguity, RECEIPT_RECOVERY_REQUIRED, authority/deployment/lease/gate drift, and ambiguous effect results. Historical finalized decisions are admitted only through the existing independent already-applied/receipt/lineage audit boundary; Architecture-121 recovery is not automatically reused.
+
+No P124-1, broad certification, provisioning, lease/signing publication, scheduler mutation, provider effect, decision publication, settlement, recovery, broker-paper, or live operation was performed by this source checkpoint.
+
+Architecture-122 S1/S2/S3 controller integration is accepted; S4 scheduler source was already frozen. Next checkpoint: S5 final exact-tree D10 source certification using the persistent repository certification runner, including the Architecture-77 serial lane. Protected P124-* deployment remains blocked until certification is accepted.

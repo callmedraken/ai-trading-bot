@@ -85,3 +85,15 @@ Do not resume the activation lease or recurring controller until Architecture
 The production runtime may not read `.git`, trust scheduler state, environment
 variables, or accept caller-supplied HEAD/TREE as authority. The lease binds the
 verified deployment ID and signed-attestation digest instead.
+
+
+## Architecture-124 launch prerequisite
+
+The scheduler-deployment checkpoint is revised before implementation: the
+capture-only task must eventually target the fixed sealed Architecture-124
+launch guard, not a source-tree D10 script.
+
+Do not resume the activation lease, one-wake controller deployment, or scheduler
+mutation until the sealed source snapshot, launch guard, production-Python
+substrate qualification, and Architecture-123 deployment identity verification
+are accepted.

@@ -11,7 +11,7 @@ from trading_bot.runtime import personal_desktop_d10_python_substrate as q
 
 
 def _node(path: str, kind: q.Kind, children: tuple[str, ...] = ()) -> q.ObjectEvidence:
-    read = q.DIRECTORY_READ if kind is q.Kind.DIRECTORY else q.FILE_READ
+    read = q.DIRECTORY_READ if kind is q.Kind.DIRECTORY else q.FILE_READ_EXECUTE
     return q.ObjectEvidence(
         path,
         path,
@@ -55,7 +55,7 @@ def evidence() -> q.QualificationEvidence:
         q.ROOT + r"\D10\no-pycache",
         (q.ZIP, q.DLLS, q.LIB),
         (q.PYTHON,),
-        (),
+        (r"C:\Windows\System32\kernel32.dll",),
         q.SITE_PACKAGES,
         q.SITE_PACKAGES,
         False,
@@ -73,9 +73,12 @@ def evidence() -> q.QualificationEvidence:
         True,
         True,
         tuple(
-            q.TradingAccessEvidence(item.path, q.MUTATION_MASK, 0) for item in objects
+            q.TradingAccessEvidence(item.path, q.MUTATION_MASK, 0, True)
+            for item in objects
         ),
-        False,
+        True,
+        True,
+        True,
     )
 
 
@@ -116,7 +119,6 @@ def test_fixed_paths_and_sanitized_result() -> None:
         (q.PYTHON, {"reparse": True}),
         (q.PYTHON, {"links": 2}),
         (q.ROOT, {"owner_sid": q.TRADING}),
-        (q.VOLUME, {"dacl_protected": False}),
         (q.RUNTIME, {"children": ("python.exe",)}),
         (q.RUNTIME, {"aces": (q.Ace(q.TRADING, q.ALL_ACCESS),)}),
         (q.SITE_PACKAGES, {"owner_sid": q.TRADING}),
@@ -154,7 +156,9 @@ def test_missing_trading_effective_denial_fails_closed() -> None:
         q.qualify_python_substrate(
             replace(
                 evidence(),
-                trading_access=(q.TradingAccessEvidence(q.PYTHON, q.MUTATION_MASK, 0),),
+                trading_access=(
+                    q.TradingAccessEvidence(q.PYTHON, q.MUTATION_MASK, 0, True),
+                ),
             )
         )
 
@@ -272,3 +276,160 @@ def test_trading_effective_mutation_access_fails_closed(field: str, value: int) 
     )
     with pytest.raises(q.SubstrateBlocked):
         q.qualify_python_substrate(replace(ev, trading_access=access))
+
+
+def test_python_execute_is_required_by_explicit_policy() -> None:
+    ev = evidence()
+    item = next(item for item in ev.objects if item.path == q.PYTHON)
+    no_execute = item.aces[:-1] + (q.Ace(q.TRADING, q.FILE_READ),)
+    with pytest.raises(q.SubstrateBlocked):
+        q.qualify_python_substrate(_change_node(ev, q.PYTHON, aces=no_execute))
+
+
+def test_reviewed_file_read_execute_has_no_mutation_authority() -> None:
+    ev = evidence()
+    item = next(item for item in ev.objects if item.path == q.PYTHON)
+    assert item.aces[-1] == q.Ace(q.TRADING, q.FILE_READ_EXECUTE)
+    assert q.FILE_READ_EXECUTE & 0x20
+    assert q.FILE_READ_EXECUTE & q.MUTATION_MASK == 0
+    assert q.qualify_python_substrate(ev).python == q.PYTHON
+
+
+@pytest.mark.parametrize("mask", [0x2, 0x4, 0x40, 0x10000, 0x40000, 0x80000])
+def test_python_trading_mutation_right_blocks(mask: int) -> None:
+    ev = evidence()
+    item = next(item for item in ev.objects if item.path == q.PYTHON)
+    aces = item.aces[:-1] + (q.Ace(q.TRADING, q.FILE_READ_EXECUTE | mask),)
+    with pytest.raises(q.SubstrateBlocked):
+        q.qualify_python_substrate(_change_node(ev, q.PYTHON, aces=aces))
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"final_path": r"F:\Other"},
+        {"drive_type": 4},
+        {"volume_root": "G:\\"},
+    ],
+)
+def test_volume_parent_identity_must_be_exact(change: dict[str, object]) -> None:
+    with pytest.raises(q.SubstrateBlocked):
+        q.qualify_python_substrate(_change_node(evidence(), q.VOLUME, **change))
+
+
+def test_volume_explicit_trading_mutation_contradicts_denial() -> None:
+    ev = evidence()
+    item = next(item for item in ev.objects if item.path == q.VOLUME)
+    aces = item.aces + (q.Ace(q.TRADING, 0x2),)
+    with pytest.raises(q.SubstrateBlocked):
+        q.qualify_python_substrate(_change_node(ev, q.VOLUME, aces=aces))
+
+
+def test_broad_volume_acl_with_effective_denial_is_accepted() -> None:
+    ev = evidence()
+    broad = (
+        q.Ace(q.ADMIN, q.ALL_ACCESS),
+        q.Ace(q.SYSTEM, q.ALL_ACCESS),
+        q.Ace("S-1-5-32-545", q.DIRECTORY_READ),
+        q.Ace(q.TRADING, q.DIRECTORY_READ),
+    )
+    modified = _change_node(ev, q.VOLUME, dacl_protected=False, aces=broad)
+    assert q.qualify_python_substrate(modified).python == q.PYTHON
+
+
+@pytest.mark.parametrize("path", [q.VOLUME, q.ROOT])
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"granted_mask": 0x2},
+        {"granted_mask": 0x40},
+        {"granted_mask": 0x10000},
+        {"granted_mask": 0x40000},
+        {"granted_mask": 0x80000},
+        {"rename_replace_denied": False},
+    ],
+)
+def test_replaceable_parent_blocks(path: str, change: dict[str, object]) -> None:
+    ev = evidence()
+    access = tuple(
+        replace(entry, **change) if entry.path == path else entry
+        for entry in ev.trading_access
+    )
+    with pytest.raises(q.SubstrateBlocked):
+        q.qualify_python_substrate(replace(ev, trading_access=access))
+
+
+def _present_optional(
+    ev: q.QualificationEvidence, path: str
+) -> q.QualificationEvidence:
+    kind = q.Kind.DIRECTORY if path == q.DLLS else q.Kind.FILE
+    runtime = next(item for item in ev.objects if item.path == q.RUNTIME)
+    updated = _change_node(
+        ev, q.RUNTIME, children=runtime.children + (path.rsplit("\\", 1)[-1],)
+    )
+    return replace(updated, objects=updated.objects + (_node(path, kind),))
+
+
+@pytest.mark.parametrize("path", [q.DLLS, q.ZIP])
+def test_optional_root_present_and_absent_is_contradictory(path: str) -> None:
+    with pytest.raises(q.SubstrateBlocked):
+        q.qualify_python_substrate(_present_optional(evidence(), path))
+
+
+@pytest.mark.parametrize("path", [q.DLLS, q.ZIP])
+def test_optional_root_state_must_be_proven(path: str) -> None:
+    ev = evidence()
+    with pytest.raises(q.SubstrateBlocked):
+        q.qualify_python_substrate(
+            replace(
+                ev,
+                absent_search_roots=tuple(
+                    item for item in ev.absent_search_roots if item != path
+                ),
+            )
+        )
+
+
+@pytest.mark.parametrize("path", [q.DLLS, q.ZIP])
+def test_protected_present_optional_root_is_accepted(path: str) -> None:
+    ev = _present_optional(evidence(), path)
+    access = ev.trading_access + (
+        q.TradingAccessEvidence(path, q.MUTATION_MASK, 0, True),
+    )
+    ev = replace(
+        ev,
+        absent_search_roots=tuple(
+            item for item in ev.absent_search_roots if item != path
+        ),
+        trading_access=access,
+    )
+    assert q.qualify_python_substrate(ev).python == q.PYTHON
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"system_dlls_reviewed": False},
+        {"system_dll_transcript_complete": False},
+        {"runtime_dependency_transcript_complete": False},
+    ],
+)
+def test_missing_transcript_completeness_blocks(changes: dict[str, object]) -> None:
+    with pytest.raises(q.SubstrateBlocked):
+        q.qualify_python_substrate(replace(evidence(), **changes))
+
+
+def test_empty_system_dll_transcript_blocks() -> None:
+    ev = evidence()
+    with pytest.raises(q.SubstrateBlocked):
+        q.qualify_python_substrate(
+            replace(ev, imports=replace(ev.imports, loaded_system_dlls=()))
+        )
+
+
+def test_empty_runtime_dependency_transcript_blocks() -> None:
+    ev = evidence()
+    with pytest.raises(q.SubstrateBlocked):
+        q.qualify_python_substrate(
+            replace(ev, imports=replace(ev.imports, loaded_runtime_files=()))
+        )

@@ -192,13 +192,19 @@ P124-1 must collect and preserve these observations:
    type/order/flags/masks. Enumerate every directory's direct names, reject
    case collisions, require an exact parent-child inventory, and re-inspect
    pinned identities before closing. Any inaccessible, unknown, redirecting,
-   or changed object blocks acceptance. The volume parent is included because
-   Trading must not be able to rename/replace the root through it. The strong
-   rule is recursive: every existing runtime file and directory, including
+   or changed object blocks acceptance. The F:\ volume parent is included
+   because Trading must not be able to rename/replace the root through it. Its
+   exact local-volume/final-path identity and effective Trading denial are
+   required, but its existing DACL need not match the three-ACE runtime policy
+   or be protected. The strong rule starts at F:\AITradingBot and is recursive:
+   the protected root and every existing runtime file and directory, including
    Lib, DLLs if present, python314.zip if present, site-packages, stdlib,
    extension modules, and DLLs, must have an Administrator or SYSTEM owner,
    protected DACL, and exact reviewed ACE policy (Administrators and SYSTEM
-   full control; Trading read/execute only).
+   full control; Trading read/execute only). Files use explicit Trading
+   read+execute mask 0x001200A9, including python.exe; directories use
+   0x001200A9 for read/traverse. Neither mask grants write, append, delete,
+   delete-child, WRITE_DAC, or WRITE_OWNER.
 2. Prove effective rights under the actual non-admin local Trading token/SID
    for every admitted object and its parents. Trading must lack file and
    directory write/append, add-file/add-subdirectory, delete, delete-child,
@@ -206,15 +212,21 @@ P124-1 must collect and preserve these observations:
    inherited right. The read-only access check must include the token's
    enabled groups and privileges; a simple Trading ACE scan is insufficient.
    A mismatched token or indeterminate access check blocks. ACL/owner checks
-   and Trading access checks must agree. Administrator or SYSTEM may maintain
+   and Trading access checks must agree. The native transcript must
+   explicitly establish rename/replace denial for the volume parent, root,
+   and every admitted object; an untested operation is not a denial.
+   Administrator or SYSTEM may maintain
    the installation only outside an active D10 interval.
 3. Use native no-follow absence probes to prove parent/runtime pyvenv.cfg and
    runtime python._pth, python3._pth, python314._pth absent. Complete runtime
    enumeration must reject every other ._pth or pyvenv.cfg anywhere under
    runtime. If an equivalent path-configuration mechanism exists, stop for
-   architecture review. python314.zip and DLLs may be actual protected runtime
-   objects or proved absent with no-follow probes. A nonexistent zip path in
-   sys.path is not itself a security proof.
+   architecture review. For each of python314.zip and DLLs, exactly one
+   native state is required: protected-present in the complete inventory XOR
+   proven-absent by a no-follow probe. Both or neither block, whether or not
+   the path appears in sys.path. Every sys.path candidate must match its exact
+   proven state. A nonexistent zip path in sys.path is not itself a security
+   proof.
 4. Invoke only the fixed executable with exact guard startup switches
    -I -S -B -X pycache_prefix=F:\AITradingBot\D10\no-pycache in a read-only
    diagnostic that does not import the D10 guard or trading source. Capture
@@ -232,7 +244,11 @@ P124-1 must collect and preserve these observations:
    directory provenance, protected owner/DACL, and Trading effective denial
    must be independently reviewed. Only DLLs directly beneath the fixed
    C:\Windows\System32 directory are admissible; a different Windows
-   installation path or unknown OS DLL redirection blocks.
+   installation path or unknown OS DLL redirection blocks. P124-1 must attest
+   completeness of the Windows/KnownDLL transcript and of the runtime/import
+   dependency observation, including builtin/frozen and guard-import coverage.
+   Empty or incomplete loaded-DLL or runtime-file collections block; a
+   collector returning no rows is not proof that no dependency existed.
 5. Re-observe runtime/security facts after the diagnostic, including directory
    inventories and configuration absence. Signed A123 Python path/version,
    source-owned constants, native transcript, and Trading token proof must

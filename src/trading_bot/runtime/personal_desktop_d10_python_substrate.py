@@ -22,6 +22,7 @@ ADMIN = "S-1-5-32-544"
 SYSTEM = "S-1-5-18"
 ALL_ACCESS = 0x001F01FF
 FILE_READ = 0x00120089
+FILE_READ_EXECUTE = FILE_READ | 0x00000020
 DIRECTORY_READ = 0x001200A9
 FLAGS = ("-I", "-S", "-B", "-X", r"pycache_prefix=F:\AITradingBot\D10\no-pycache")
 CONFIG_NAMES = (
@@ -95,6 +96,7 @@ class TradingAccessEvidence:
     path: str
     tested_mask: int
     granted_mask: int
+    rename_replace_denied: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -113,9 +115,11 @@ class QualificationEvidence:
     # create/write/append/delete/delete-child/rename/WRITE_DAC/WRITE_OWNER
     # on every admitted object and its parents.
     trading_access: tuple[TradingAccessEvidence, ...]
-    # Exact OS DLL paths, final paths, owner/DACL and Trading denial are a
-    # protected P124-1 acceptance input, not inferred from this source model.
+    # These flags attest complete protected P124-1 observations, not just
+    # successful parsing of whatever rows a collector happened to return.
     system_dlls_reviewed: bool
+    system_dll_transcript_complete: bool
+    runtime_dependency_transcript_complete: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -154,7 +158,7 @@ def _canonical(path: str) -> bool:
 
 
 def _expected_aces(kind: Kind) -> tuple[Ace, ...]:
-    read = DIRECTORY_READ if kind is Kind.DIRECTORY else FILE_READ
+    read = DIRECTORY_READ if kind is Kind.DIRECTORY else FILE_READ_EXECUTE
     return (Ace(ADMIN, ALL_ACCESS), Ace(SYSTEM, ALL_ACCESS), Ace(TRADING, read))
 
 
@@ -197,12 +201,31 @@ def qualify_python_substrate(evidence: QualificationEvidence) -> QualificationRe
             and item.file_index > 0,
             "local NTFS no-follow identity differs",
         )
-        _require(
-            item.owner_sid in (ADMIN, SYSTEM)
-            and item.dacl_protected is True
-            and item.aces == _expected_aces(item.kind),
-            "owner or protected DACL differs",
-        )
+        if path != VOLUME:
+            _require(
+                item.owner_sid in (ADMIN, SYSTEM)
+                and item.dacl_protected is True
+                and item.aces == _expected_aces(item.kind),
+                "owner or protected DACL differs",
+            )
+        else:
+            # The existing volume root may have a broader host policy. Its
+            # identity and actual Trading mutation denial are checked below.
+            _require(
+                type(item.owner_sid) is str
+                and bool(item.owner_sid)
+                and type(item.dacl_protected) is bool
+                and type(item.aces) is tuple
+                and all(type(ace) is Ace for ace in item.aces)
+                and item.owner_sid != TRADING
+                and not any(
+                    ace.sid == TRADING
+                    and ace.ace_type == 0
+                    and ace.mask & (MUTATION_MASK | 0x50000000)
+                    for ace in item.aces
+                ),
+                "volume parent security observation incomplete",
+            )
         _require(
             item.links >= 1 and (item.kind is Kind.DIRECTORY or item.links == 1),
             "hard link or object kind differs",
@@ -263,6 +286,7 @@ def qualify_python_substrate(evidence: QualificationEvidence) -> QualificationRe
             type(entry) is TradingAccessEvidence
             and entry.tested_mask == MUTATION_MASK
             and entry.granted_mask == 0
+            and entry.rename_replace_denied is True
             for entry in evidence.trading_access
         ),
         "Trading mutation denial incomplete",
@@ -310,6 +334,18 @@ def qualify_python_substrate(evidence: QualificationEvidence) -> QualificationRe
         and len(evidence.absent_search_roots) == len(set(evidence.absent_search_roots)),
         "unreviewed absent search candidate",
     )
+    for path, kind in ((ZIP, Kind.FILE), (DLLS, Kind.DIRECTORY)):
+        present = path.casefold() in by_path
+        absent = path in evidence.absent_search_roots
+        _require(
+            present != absent, "optional search root state unproven or contradictory"
+        )
+        if present:
+            item = by_path[path.casefold()]
+            _require(
+                item.path == path and item.kind is kind,
+                "optional search root identity or kind differs",
+            )
     for path in imports.sys_path:
         _require(
             path.casefold() in by_path or path in evidence.absent_search_roots,
@@ -317,6 +353,9 @@ def qualify_python_substrate(evidence: QualificationEvidence) -> QualificationRe
         )
     _require(
         type(imports.loaded_runtime_files) is tuple
+        and evidence.runtime_dependency_transcript_complete is True
+        and PYTHON in imports.loaded_runtime_files
+        and len(imports.loaded_runtime_files) == len(set(imports.loaded_runtime_files))
         and all(
             _canonical(path)
             and path.casefold() in by_path
@@ -327,7 +366,10 @@ def qualify_python_substrate(evidence: QualificationEvidence) -> QualificationRe
     )
     _require(
         type(imports.loaded_system_dlls) is tuple
-        and (not imports.loaded_system_dlls or evidence.system_dlls_reviewed)
+        and evidence.system_dlls_reviewed is True
+        and evidence.system_dll_transcript_complete is True
+        and bool(imports.loaded_system_dlls)
+        and len(imports.loaded_system_dlls) == len(set(imports.loaded_system_dlls))
         and all(
             type(path) is str
             and ntpath.dirname(path).casefold() == SYSTEM32.casefold()

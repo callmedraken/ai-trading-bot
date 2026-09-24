@@ -260,3 +260,19 @@ modify files there.
 The guard remains stdlib-only. This bootstrap occurs only after the guard has
 verified the sealed source deployment and launched the verified second-stage
 script.
+
+## 12. Protected deployment execution-order clarification
+
+The P124 labels identify protected acceptance responsibilities; they are not a requirement to execute the numbered host actions in numeric order.
+
+P124-1 intentionally requires the exact detached-signed Architecture-123 attestation as an input to the production-Python substrate qualification. Because that signed trust material does not exist until the sealed deployment has been provisioned and its attestation has been externally signed/published, the protected operator execution order after S5 is:
+
+```text
+P124-2 sealed D10 source/guard provisioning
+P124-3 detached signing and trust publication
+P124-1 production-Python substrate qualification
+P124-4 Trading guard qualification
+P124-5 activation lease + scheduler mutation
+```
+
+P124-2 and P124-3 remain inert preparation steps: they do not execute the guard, create an activation lease, mutate Task Scheduler, or authorize market-data, decision-publication, settlement, broker-paper, or live effects. P124-1 must PASS before P124-4 or P124-5 may proceed. If P124-1 blocks after trust publication, the published deployment remains inactive and D10 activation is prohibited.

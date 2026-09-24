@@ -3399,3 +3399,22 @@ The later docs-only feature-branch closeout remains separate from executable cer
 S5 is accepted. No P124-1 host qualification, D10 provisioning, signing/trust publication, activation lease publication, scheduler mutation, provider/publication/settlement/recovery, broker-paper, or live effect occurred during certification.
 
 Next boundary: P124-1 production-Python substrate qualification. Before executing that protected host checkpoint, use a reviewed native collector/harness implementing the already-frozen A124-4 evidence contract; do not substitute ad-hoc ACL/path checks or weaken any acceptance requirement.
+
+## P124-1 native collector source checkpoint — ACCEPTED
+
+Exact GitHub review accepted the source-only P124-1 native collector tooling.
+
+```text
+SOURCE COMMIT faed23027533daaa959ea5e01380c6669897f703
+TREE          218ce32ecc9870453b808c971ef579be28f842a1
+focused verification 158 passed
+Ruff / format / staged diff checks PASS
+```
+
+The accepted tooling is outside the certified governed D10 executable source and therefore does not redefine the S5 certified deployment identity `acee8f80e947bcaefd79fa2c44531e8bbdf4cd0c` / `e2850c86adc83b70ab11f6db9e421e8584832c98`. It collects the frozen A124-4 Administrator inventory/security evidence, actual Trading-token effective-rights evidence, exact isolated interpreter/runtime dependency evidence, System32/KnownDLL evidence, before/after stability proof, and a bounded deterministic transcript, then passes the assembled evidence to the existing QualificationEvidence / qualify_python_substrate policy unchanged.
+
+Exact review confirmed one sequencing dependency rather than a collector defect: the collector intentionally verifies the fixed detached-signed A123 attestation, so P124-1 cannot run before that signed trust material exists. The Architecture-124 protected operator order is therefore clarified as P124-2 -> P124-3 -> P124-1 -> P124-4 -> P124-5. P124-2/P124-3 remain inert preparation only; P124-1 must PASS before guard qualification, activation, scheduler mutation, or any D10 effect.
+
+No protected host qualification, D10 provisioning, signing/trust publication, activation lease publication, scheduler mutation, provider/publication/settlement/recovery, broker-paper, or live effect was performed by this source checkpoint.
+
+Next safe work is preparation/review of the protected P124-2/P124-3 operator tooling and exact certified deployment material. Do not execute P124-2 or P124-3 without separate operator approval.

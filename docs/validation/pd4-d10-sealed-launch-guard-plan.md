@@ -261,3 +261,17 @@ provisioning, signing, lease, scheduler, provider, publication, settlement,
 broker-paper, or live operation and does not extend Architecture-77 fixed
 authority objects. P124-1 is a separate protected host checkpoint; D10 remains
 blocked until its native evidence is accepted.
+
+## P124 protected execution dependency
+
+The source-only P124-1 collector accepted after S5 verifies a real detached-signed Architecture-123 attestation from the fixed D10 trust root. Therefore P124-1 cannot execute before those fixed trust objects exist.
+
+For the protected operator phase, retain the checkpoint labels but use this dependency order:
+
+1. **P124-2** — provision the sealed guard/source snapshot and reviewed protected D10 namespace; no execution or scheduler mutation.
+2. **P124-3** — externally sign the exact certified attestation and publish the attestation/signature/manifest through the reviewed create-only path; no activation or scheduler mutation.
+3. **P124-1** — run the reviewed Administrator/Trading native substrate collector against the fixed production runtime and the now-existing signed attestation; require PASS and retain its transcript.
+4. **P124-4** — under non-admin Trading, perform the no-effect guard qualification against the signed deployment.
+5. **P124-5** — only after separate approval and all prior acceptance evidence, publish the activation lease and mutate the capture-only scheduler to the fixed guard.
+
+This ordering does not weaken the production-Python prerequisite: P124-1 still must PASS before any guard qualification, activation lease, scheduler mutation, or D10 effect. P124-2/P124-3 artifacts are inert if P124-1 later blocks.

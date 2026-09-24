@@ -171,3 +171,31 @@ Any executable source change requires closing the current soak authority, new so
 Source acceptance requires tests proving canonical JSON/field sets, deterministic deployment ID, HEAD/tree shape validation, canonical file ordering independent of filesystem enumeration, unsafe/duplicate/case-colliding paths blocked, missing/extra/file-byte drift blocked, manifest tamper blocked, bad signature/key/schema blocked, wrong SID/Python/root/launcher/scheduler schema blocked, native path/security/reparse/identity/content drift blocked, same-process provenance cannot be reconstructed, no `.git` read in the production verifier, and no scheduler/provider/publication/settlement/recovery/broker/live effect.
 
 Architecture 123 source completion authorizes no signing, provisioning, scheduler mutation, activation lease, or D10 trading effect.
+
+
+## Architecture 124 pre-source prerequisite
+
+A3 implementation exposed a circular trust boundary: the old scheduler target
+would execute source-tree Python before an in-process verifier could prove that
+source.
+
+Architecture 124 is therefore a mandatory predecessor to A3/A4 deployment
+identity enforcement.
+
+The signed deployment model is revised as follows:
+
+- recurring D10 source is deployed to sealed
+  `F:\AITradingBot\D10\source`, not executed from the mutable Git worktree;
+- Task Scheduler invokes fixed protected
+  `F:\AITradingBot\D10\launch-guard.py`;
+- the deployment attestation additionally binds exact launch-guard byte length
+  and SHA-256;
+- the pre-source guard verifies signed deployment/source identity before any
+  `trading_bot` module or D10 source launcher is imported/executed;
+- Architecture-123 A4 remains an in-source defense-in-depth re-verifier, not the
+  first trust boundary.
+
+The previously accepted A1/A2 implementation must receive a narrow source-model
+revision for these guard/source-root fields before it is used to build final D10
+deployment material. Its existing canonicalization, HEAD-tree/blob proof, and
+Git-environment hardening remain valid.

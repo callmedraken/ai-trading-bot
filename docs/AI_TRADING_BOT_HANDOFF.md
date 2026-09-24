@@ -2912,3 +2912,16 @@ effects, freeze a new architecture for:
 - D10 evidence and graduation criteria.
 
 Broker-paper and live trading remain unauthorized.
+
+
+## D10 one-week soak decision
+
+The operator chose one calendar week of unattended simulated-paper operation followed by review.
+
+Architecture 122 freezes seven days from accepted activation, no automatic extension, no automatic graduation, Paper-v2 only, and broker/live unavailable.
+
+A wake may compose at most one capture, one current-session settlement, and one next-session pre-open publication, with effects closed and durable reconciliation between stages. Stale decisions, missed deadlines, session gaps, recovery requirements, provider ambiguity, account drift, or authority/gate drift stop the soak.
+
+The current capture-only scheduled task is unchanged until source implementation/certification and later explicit D10-B scheduler-mutation approval.
+
+Next: Sol High implementation of Architecture-122 S1-S4 on feature/pd4-d10-one-week-soak-authority, focused tests only.

@@ -1,0 +1,102 @@
+# Architecture 122 — One-Week Bounded Unattended Simulated-Paper Soak Authority
+
+Status: frozen D10 design checkpoint. This document does not authorize scheduler mutation or recurring effects.
+
+## Scope and operator decision
+
+Run unattended simulated Paper-v2 for exactly one calendar week from accepted activation, then stop and re-evaluate.
+
+The soak is evidence gathering only. It does not automatically graduate the project to broker-paper.
+
+Duration policy:
+- 7 calendar days from accepted activation.
+- No automatic extension.
+- No automatic graduation.
+- Paper-v2 only; broker-paper and live remain unavailable.
+
+## Controlling contracts
+
+Architecture 122 composes Architectures 77/82, 94, 102-114, 121, and the Architecture-111 two-phase daily cycle without weakening them.
+
+The scheduler remains a zero-semantic-argument wake-up source. C3 remains the unattended daily-bar authority. Decision publication and Paper-v2 execution remain separately gated. Receipt recovery remains separately authorized. No missed session may become an automatic multi-session catch-up.
+
+## One-week window
+
+Deployment must prove the activation instant, end instant equal to activation plus seven calendar days, exact source HEAD/TREE, Trading principal SID, production Python identity, and scheduler contract identity.
+
+The scheduled D10 task must not produce effectful wakes after the end boundary. If the end boundary cannot be enforced deterministically, deployment stops rather than relying on manual disablement.
+
+## One wake
+
+A normal wake may perform at most this ordered sequence:
+
+1. Fresh C1, Trading token, source and gate validation.
+2. Source-derived completed-session C3 capture if required.
+3. Close the market-data gate.
+4. Read-only daily-cycle reconstruction.
+5. Settle at most one finalized decision targeting the exact current completed session, if eligible.
+6. Close the unattended-execution gate.
+7. Independent all-gates-closed settlement reconciliation.
+8. Independently reconstruct the next pre-open decision.
+9. Publish at most one exact decision only while its pre-open deadline remains valid.
+10. Close the decision-publication gate.
+11. Independent all-gates-closed decision reconciliation.
+12. Emit bounded soak evidence.
+
+Every stage re-reads source-owned durable truth. An effect result never becomes authority for the next effect.
+
+Per-wake fresh-effect budgets:
+- C3 provider attempt: at most one.
+- Paper-v2 settlement attempt: at most one.
+- Decision publication attempt: at most one.
+- Receipt recovery attempts: zero.
+- Historical catch-up loops: zero.
+- Broker/live calls: zero.
+
+## Late wakes and stale state
+
+A late wake may continue only when ordinary source-derived session and pre-open rules still hold.
+
+If the next intended decision deadline has passed and no exact decision was finalized, return MISSED_DECISION_DEADLINE and stop the soak. Do not create the missed decision later.
+
+If a finalized decision targets a session strictly older than the current completed session, ordinary D10 must not settle it. Treat that as stale finalized state, stop, and require operator review. Architecture 121 is not automatically reused.
+
+If history or durable state implies more than one trading session would require retrospective fresh work, return SESSION_GAP and stop. Do not synthesize, skip, or backfill.
+
+## Duplicate wake, restart, and overlap
+
+Scheduler overlap controls are defense in depth. Authoritative duplicate safety remains current-C1 reconstruction, durable decision storage, PD2A mutex, Architecture-67 deterministic identities, invocation storage, receipts, and account lineage.
+
+A restarted or duplicate process may observe already-completed durable work and return an idempotent/read-only classification. It may not derive retry authority from the previous process result.
+
+## Stop conditions
+
+Stop the soak for operator review on BLOCKED, SESSION_GAP, MISSED_DECISION_DEADLINE, provider attempt ambiguity, RECEIPT_RECOVERY_REQUIRED, stale finalized decision, conflicting or malformed durable state, account predecessor/tip/lineage contradiction, C1 or Trading-token drift, effect-gate drift, unexpected scheduler/source identity, an ambiguous effect result, or a source upgrade during the active soak.
+
+A stop condition does not restart or extend the seven-day window automatically.
+
+## Evidence
+
+Every wake must emit bounded operator-readable evidence for source/runtime identity, observed time and completed session, capture state, decision identities, plan/invocation/operation/application identities, checkpoint identities, reconciliation state, effect crossings, final closed-gate proof, and any stop reason.
+
+Evidence must not expose credentials, raw authority objects, reusable capabilities, or native handles.
+
+## End-of-week review
+
+At the seven-day end boundary, recurring D10 effect authority closes before review.
+
+Review scheduled wakes, eligible XNYS sessions, captures, publications, settlements, independent reconciliations, no-effect/idempotent wakes, all stop or ambiguity events, provider/network behavior, sleep/reboot/duplicate-wake observations, Paper-v2 positions/trades/performance, and audit completeness.
+
+The review may accept PD4 operational evidence, extend simulated-paper under a new bounded authorization, correct and repeat, or remain in simulated paper. It may not automatically enable broker-paper.
+
+## Source/deployment separation
+
+Source implementation and certification come before scheduler mutation. The existing capture-only task remains unchanged until a later explicit D10 deployment approval.
+
+## Acceptance criteria
+
+Tests must prove zero semantic scheduler arguments, an exact seven-day bound, source-owned session derivation, ordered effect/reconciliation composition, one-attempt limits, finally-restored gates, stale/missed/session-gap fail-closed behavior, diagnostic-only receipt recovery, duplicate/restart convergence, no broker/live path, sanitized evidence, and unchanged Architecture-111/114/121 semantics.
+
+## Exit
+
+After one calendar week, stop and re-evaluate. Elapsed time alone authorizes no next trading mode.

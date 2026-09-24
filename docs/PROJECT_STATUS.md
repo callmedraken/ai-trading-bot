@@ -3001,3 +3001,18 @@ Next milestone: D10 bounded unattended simulated-paper soak. Before any schedule
 or daily-cycle effect expansion, freeze the D10 soak duration/success criteria
 and an explicit missed-wake/stale-decision policy. Architecture 111's automatic
 multi-session catch-up prohibition remains controlling.
+
+
+## D10 decision — one-week simulated-paper soak
+
+The operator selected the next milestone: exactly one calendar week of unattended simulated Paper-v2, followed by re-evaluation.
+
+Architecture 122 freezes a seven-day duration, no automatic extension, no automatic graduation, and no broker/live authority. The installed scheduler remains capture-only until Architecture-122 source is implemented, certified, and a later scheduler mutation is explicitly approved.
+
+New docs:
+- docs/architecture/122-one-week-unattended-simulated-paper-soak-authority.md
+- docs/validation/pd4-d10-one-week-soak-plan.md
+
+Late wakes may proceed only while ordinary source-owned session/pre-open rules still hold. Stale finalized decisions, missed decision deadlines, or session gaps stop the soak; there is no automatic Architecture-121 reuse or multi-session catch-up.
+
+Next safe checkpoint: Sol High source implementation of Architecture-122 S1-S4 on feature/pd4-d10-one-week-soak-authority, focused tests only, no scheduler mutation or production effect.

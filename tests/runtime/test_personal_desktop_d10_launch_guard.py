@@ -1316,13 +1316,24 @@ def test_a1246_second_stage_requires_deployment_and_active_lease_before_controll
         "require_verified_d10_activation_lease",
         lambda value, bound: called.append(("lease provenance", value, bound)) or value,
     )
-    assert launcher.main() == 1
+    from trading_bot.runtime import personal_desktop_unattended_one_week_soak as soak
+
+    controller_calls: list[tuple[object, object]] = []
+    evidence = SimpleNamespace(outcome=soak.D10WakeOutcome.NO_ACTION)
+    monkeypatch.setattr(
+        soak,
+        "run_personal_desktop_unattended_one_week_soak",
+        lambda source, active: controller_calls.append((source, active)) or evidence,
+    )
+    monkeypatch.setattr(soak, "serialize_d10_wake_evidence", lambda _value: "{}")
+    assert launcher.main() == 0
     assert called == [
         ("verify deployment", None, None),
         ("deployment provenance", deployment, None),
         ("verify lease", deployment, None),
         ("lease provenance", lease, deployment),
     ]
+    assert controller_calls == [(deployment, lease)]
 
     called.clear()
 

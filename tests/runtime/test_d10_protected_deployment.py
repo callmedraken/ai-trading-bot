@@ -441,6 +441,139 @@ def test_wrong_and_dirty_checkout_are_rejected_by_existing_builder(
         monkeypatch.undo()
 
 
+def _mock_administrator_backend(
+    *,
+    elevation: int = 1,
+    member: int = 1,
+    failure: str | None = None,
+):
+    import ctypes
+    from ctypes import wintypes
+
+    from scripts.d10_protected_deployment_windows import WindowsDeploymentBackend
+
+    backend = object.__new__(WindowsDeploymentBackend)
+    backend._kernel = object()
+    backend._advapi = object()
+    events: list[tuple[object, ...]] = []
+
+    def open_token(process, access, output):
+        events.append(("open", process, access))
+        if failure == "open":
+            return False
+        ctypes.cast(output, ctypes.POINTER(wintypes.HANDLE))[0] = 0x5100
+        return True
+
+    def get_info(token, info_class, output, size, returned):
+        events.append(("elevation", token.value, info_class, size))
+        if failure == "information":
+            return False
+        ctypes.cast(output, ctypes.POINTER(wintypes.DWORD))[0] = elevation
+        ctypes.cast(returned, ctypes.POINTER(wintypes.DWORD))[0] = (
+            0 if failure == "short_elevation" else ctypes.sizeof(wintypes.DWORD)
+        )
+        return True
+
+    def duplicate(token, level, output):
+        events.append(("duplicate", token.value, level))
+        if failure == "duplicate":
+            return False
+        value = 0x5100 if failure == "aliased_token" else 0x5200
+        ctypes.cast(output, ctypes.POINTER(wintypes.HANDLE))[0] = value
+        return True
+
+    def convert(sid, output):
+        events.append(("sid", sid))
+        ctypes.cast(output, ctypes.POINTER(ctypes.c_void_p))[0] = 0x5300
+        return failure != "sid"
+
+    def check(token, sid, output):
+        events.append(("membership", token.value, sid.value))
+        if failure == "membership":
+            return False
+        ctypes.cast(output, ctypes.POINTER(wintypes.BOOL))[0] = member
+        return True
+
+    def free(sid):
+        events.append(("free", sid.value))
+        return 0x5300 if failure == "free" else None
+
+    def close(handle):
+        events.append(("close", handle.value))
+        return failure != "close" or handle.value != 0x5200
+
+    functions = {
+        "GetCurrentProcess": lambda: 0x5000,
+        "OpenProcessToken": open_token,
+        "GetTokenInformation": get_info,
+        "DuplicateToken": duplicate,
+        "ConvertStringSidToSidW": convert,
+        "CheckTokenMembership": check,
+        "LocalFree": free,
+        "CloseHandle": close,
+    }
+    backend._bind = lambda _lib, name, _args, _result: functions[name]
+    return backend, events
+
+
+@pytest.mark.parametrize(
+    ("elevation", "member", "failure", "allowed"),
+    [
+        (1, 1, None, True),
+        (0, 1, None, False),
+        (1, 0, None, False),
+        (1, 1, "duplicate", False),
+        (1, 1, "membership", False),
+        (1, 1, "information", False),
+        (1, 1, "short_elevation", False),
+        (2, 1, None, False),
+        (1, 2, None, False),
+        (1, 1, "sid", False),
+        (1, 1, "aliased_token", False),
+        (1, 1, "free", False),
+        (1, 1, "close", False),
+        (1, 1, "open", False),
+    ],
+)
+def test_native_administrator_proof_uses_process_primary_and_duplicate_only(
+    elevation: int, member: int, failure: str | None, allowed: bool
+) -> None:
+    backend, events = _mock_administrator_backend(
+        elevation=elevation, member=member, failure=failure
+    )
+    if allowed:
+        backend.require_administrator()
+    else:
+        with pytest.raises(d.DeploymentBlocked):
+            backend.require_administrator()
+
+    assert events[0] == ("open", 0x5000, 0x0008 | 0x0002)
+    if failure == "open":
+        assert events == [("open", 0x5000, 0x0008 | 0x0002)]
+        return
+    assert ("elevation", 0x5100, 20, 4) in events
+    assert events.count(("close", 0x5100)) == 1
+    if failure in {"information", "short_elevation"} or elevation == 2:
+        assert not any(row[0] == "duplicate" for row in events)
+        return
+    assert ("duplicate", 0x5100, 2) in events
+    if failure == "duplicate":
+        assert not any(row[0] == "membership" for row in events)
+        return
+    if failure == "aliased_token":
+        assert events.count(("close", 0x5100)) == 1
+        assert not any(row[0] == "membership" for row in events)
+        return
+    assert events.count(("close", 0x5200)) == 1
+    assert events.index(("close", 0x5200)) < events.index(("close", 0x5100))
+    assert events.count(("free", 0x5300)) == 1
+    if failure == "sid":
+        assert not any(row[0] == "membership" for row in events)
+    else:
+        assert ("membership", 0x5200, 0x5300) in events
+        assert ("membership", 0x5100, 0x5300) not in events
+
+
 def test_native_create_paths_are_fixed_and_manifest_bound() -> None:
     from scripts.d10_protected_deployment_windows import WindowsDeploymentBackend
 

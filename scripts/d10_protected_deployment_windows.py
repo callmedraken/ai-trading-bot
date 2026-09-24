@@ -190,17 +190,24 @@ class WindowsDeploymentBackend:
         return function
 
     def require_administrator(self) -> None:
-        token = wintypes.HANDLE()
-        open_token = self._bind(
-            self._advapi,
-            "OpenProcessToken",
-            [wintypes.HANDLE, wintypes.DWORD, ctypes.POINTER(wintypes.HANDLE)],
-            wintypes.BOOL,
-        )
-        process = self._bind(self._kernel, "GetCurrentProcess", [], wintypes.HANDLE)
-        if not open_token(process(), 0x0008 | 0x0001, ctypes.byref(token)):
-            raise DeploymentBlocked("administrator_token_unavailable")
+        primary = wintypes.HANDLE()
+        impersonation = wintypes.HANDLE()
+        admin_sid = ctypes.c_void_p()
         try:
+            open_token = self._bind(
+                self._advapi,
+                "OpenProcessToken",
+                [wintypes.HANDLE, wintypes.DWORD, ctypes.POINTER(wintypes.HANDLE)],
+                wintypes.BOOL,
+            )
+            process = self._bind(self._kernel, "GetCurrentProcess", [], wintypes.HANDLE)
+            current_process = process()
+            if not current_process:
+                raise DeploymentBlocked("administrator_process_invalid")
+            if not open_token(current_process, 0x0008 | 0x0002, ctypes.byref(primary)):
+                raise DeploymentBlocked("administrator_token_unavailable")
+            if not primary.value:
+                raise DeploymentBlocked("administrator_token_invalid")
             elevated, returned = wintypes.DWORD(), wintypes.DWORD()
             get_info = self._bind(
                 self._advapi,
@@ -215,14 +222,28 @@ class WindowsDeploymentBackend:
                 wintypes.BOOL,
             )
             if not get_info(
-                token,
+                primary,
                 20,
                 ctypes.byref(elevated),
                 ctypes.sizeof(elevated),
                 ctypes.byref(returned),
             ):
                 raise DeploymentBlocked("administrator_elevation_unavailable")
-            admin_sid = ctypes.c_void_p()
+            if returned.value != ctypes.sizeof(elevated) or elevated.value not in (
+                0,
+                1,
+            ):
+                raise DeploymentBlocked("administrator_elevation_invalid")
+            duplicate = self._bind(
+                self._advapi,
+                "DuplicateToken",
+                [wintypes.HANDLE, ctypes.c_int, ctypes.POINTER(wintypes.HANDLE)],
+                wintypes.BOOL,
+            )
+            if not duplicate(primary, 2, ctypes.byref(impersonation)):
+                raise DeploymentBlocked("administrator_duplication_failed")
+            if not impersonation.value or impersonation.value == primary.value:
+                raise DeploymentBlocked("administrator_impersonation_invalid")
             convert = self._bind(
                 self._advapi,
                 "ConvertStringSidToSidW",
@@ -233,27 +254,56 @@ class WindowsDeploymentBackend:
 
             if not convert(ADMINISTRATORS_SID, ctypes.byref(admin_sid)):
                 raise DeploymentBlocked("administrator_sid_unavailable")
-            try:
-                member = wintypes.BOOL()
-                check = self._bind(
-                    self._advapi,
-                    "CheckTokenMembership",
-                    [wintypes.HANDLE, ctypes.c_void_p, ctypes.POINTER(wintypes.BOOL)],
-                    wintypes.BOOL,
-                )
-                if not check(token, admin_sid, ctypes.byref(member)):
-                    raise DeploymentBlocked("administrator_membership_unavailable")
-                if not elevated.value or not member.value:
-                    raise DeploymentBlocked("administrator_required")
-            finally:
-                self._bind(
-                    self._kernel, "LocalFree", [ctypes.c_void_p], ctypes.c_void_p
-                )(admin_sid)
+            if not admin_sid.value:
+                raise DeploymentBlocked("administrator_sid_invalid")
+            member = wintypes.BOOL()
+            check = self._bind(
+                self._advapi,
+                "CheckTokenMembership",
+                [wintypes.HANDLE, ctypes.c_void_p, ctypes.POINTER(wintypes.BOOL)],
+                wintypes.BOOL,
+            )
+            if not check(impersonation, admin_sid, ctypes.byref(member)):
+                raise DeploymentBlocked("administrator_membership_unavailable")
+            if member.value not in (0, 1):
+                raise DeploymentBlocked("administrator_membership_invalid")
+            if not elevated.value or not member.value:
+                raise DeploymentBlocked("administrator_required")
+        except DeploymentBlocked:
+            raise
+        except Exception:
+            raise DeploymentBlocked("administrator_native_failure") from None
         finally:
-            if not self._bind(
-                self._kernel, "CloseHandle", [wintypes.HANDLE], wintypes.BOOL
-            )(token):
-                raise DeploymentBlocked("administrator_token_close_failed")
+            cleanup_failed = False
+            if admin_sid.value:
+                try:
+                    cleanup_failed |= bool(
+                        self._bind(
+                            self._kernel,
+                            "LocalFree",
+                            [ctypes.c_void_p],
+                            ctypes.c_void_p,
+                        )(admin_sid)
+                    )
+                except Exception:
+                    cleanup_failed = True
+            for handle in (impersonation, primary):
+                if handle.value and (
+                    handle is primary or handle.value != primary.value
+                ):
+                    try:
+                        cleanup_failed |= not bool(
+                            self._bind(
+                                self._kernel,
+                                "CloseHandle",
+                                [wintypes.HANDLE],
+                                wintypes.BOOL,
+                            )(handle)
+                        )
+                    except Exception:
+                        cleanup_failed = True
+            if cleanup_failed:
+                raise DeploymentBlocked("administrator_cleanup_failed")
 
     def _open_absence(self, path: str):
         if path not in {

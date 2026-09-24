@@ -2972,3 +2972,32 @@ a fixed, verified activation/end lease on every wake before any recurring
 effect is implemented.
 
 No scheduler mutation or production D10 effect is authorized.
+
+
+## D10 source identity blocker / Architecture 123
+
+The activation-lease task correctly stopped with no source changes: there was no
+runtime boundary capable of proving deployed source HEAD/TREE independently of
+`.git`. A lease that merely contains Git IDs is not sufficient authority.
+
+Architecture 123 resolves this through a separately signed deployment identity:
+
+- fixed Administrator-protected `F:\AITradingBot\D10` trust root;
+- canonical complete executable-file manifest;
+- detached-signed canonical deployment attestation binding certified HEAD/TREE,
+  manifest digest, fixed source root/launcher, scheduler schema, Trading SID,
+  and production Python;
+- zero-argument Trading runtime verifier that checks the signature and actual
+  deployed executable bytes without reading `.git`;
+- the later activation lease binds the verified deployment ID plus attestation
+  digest.
+
+Architecture 77's exact Authority root/object set is not widened.
+
+Private signing material remains external/non-exportable. Signing,
+provisioning, scheduler mutation, activation, broker-paper, and live remain
+unauthorized.
+
+Next source checkpoint: Sol High A1/A2 only — canonical manifest/attestation
+models plus the build-time clean-checkout manifest generator. Native runtime
+verification follows in A3/A4.

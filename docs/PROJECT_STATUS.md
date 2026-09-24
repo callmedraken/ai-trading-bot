@@ -3119,3 +3119,39 @@ Next checkpoint: Architecture-123 A3 fixed Windows-native D10 trust-root and
 read/security boundary. A3 remains source-only and must also freeze the
 production policy for transient Python bytecode/cache artifacts before A4 can
 treat executable inventory as runtime authority.
+
+
+## D10 pre-source bootstrap blocker — accepted / Architecture 124 opened
+
+Architecture-123 A3 stopped with no source changes because the prior D10
+scheduler target would execute unverified source-tree Python before an
+in-process A4 verifier could establish deployment identity.
+
+Python isolated mode alone does not remove cached-bytecode/import execution
+before that verifier, so this is an accepted fail-closed architecture blocker.
+
+Architecture 124 freezes the resolution:
+
+- recurring D10 source is deployed as a sealed Administrator-owned read-only
+  snapshot at `F:\AITradingBot\D10\source`;
+- Task Scheduler invokes fixed protected
+  `F:\AITradingBot\D10\launch-guard.py`, not the source-tree launcher;
+- guard startup uses `-I -S -B -X
+  pycache_prefix=F:\AITradingBot\D10\no-pycache`;
+- the signed Architecture-123 attestation binds guard digest/length and the
+  sealed source root;
+- the guard verifies signed deployment identity and later ACTIVE lease status
+  before any governed D10 source is executed;
+- the fixed production Python runtime becomes an explicit protected pre-source
+  substrate that must be qualified before activation.
+
+New docs:
+
+```text
+docs/architecture/124-d10-sealed-pre-source-launch-guard.md
+docs/validation/pd4-d10-sealed-launch-guard-plan.md
+```
+
+Next source checkpoint: Sol High A124-1 only — revise pure scheduler/attestation/
+builder contracts for the sealed guard and source root. No Windows
+provisioning, signing, scheduler mutation, activation, or trading effect.

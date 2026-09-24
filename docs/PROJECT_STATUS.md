@@ -3191,3 +3191,31 @@ usercustomize startup hooks.
 
 Next source checkpoint: A124-2 fixed D10 Windows path/security/native-read
 contracts only. No provisioning or production effect.
+
+## Architecture 124 A124-2 — fixed D10 security/native-read source checkpoint
+
+A read-only host probe of the fixed production interpreter under -I -S
+reported Python 3.14.3, executable and prefix
+F:\AITradingBot\runtime\python.exe / F:\AITradingBot\runtime, and identical
+purelib and platlib paths:
+
+F:\AITradingBot\runtime\Lib\site-packages
+
+This establishes the exact second-stage package-path identity only. It is not
+A124-4/P124-1 acceptance of interpreter, stdlib, runtime directory, or package
+ACL/security. That protected host qualification remains required before D10
+activation.
+
+The self-contained A124-2 guard source now freezes D10 paths and reserved
+installing/cache names, exact Administrator/SYSTEM/Trading protected DACL
+policies, Trading token checks, ctypes no-follow/final-path/NTFS/ACL inspection,
+same-handle bounded pinned reads, and sealed-source path admission. It imports
+stdlib only and performs no top-level action, signature verification, source
+enumeration, second-stage launch, provisioning, scheduler mutation, or trading
+effect. Architecture-77 fixed objects and policies remain unchanged.
+
+Focused verification: 734 passed, 2 skipped (the two opt-in native mutex
+integration tests). Broad certification remains deferred. Next source
+checkpoint: A124-3 pre-source signature/complete sealed-manifest verification
+and no-source-on-failure orchestration, subject to exact review of this
+checkpoint. A124-4/P124-1 runtime security qualification remains separate.

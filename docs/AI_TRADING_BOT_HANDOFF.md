@@ -3107,3 +3107,26 @@ Trading.
 
 Next: Sol High A124-2 Windows security/native read contract. No real D10 root,
 signing, scheduler mutation, activation, or trading effect.
+
+## Architecture 124 A124-2 source implementation
+
+The read-only -I -S production runtime probe measured both purelib and platlib
+as F:\AITradingBot\runtime\Lib\site-packages under the fixed
+F:\AITradingBot\runtime\python.exe (Python 3.14.3). A124-2 freezes that exact
+path for the later second-stage import bootstrap. The probe proves path identity
+only; A124-4/P124-1 must still prove the runtime, stdlib, and package directory
+are Administrator/SYSTEM controlled and non-writable/non-replaceable by Trading.
+
+The standalone scripts/run_personal_desktop_d10_launch_guard.py now contains
+fixed D10 trust/source/cache paths, exact owner/protected-DACL read policies,
+current local non-admin Trading SID checks, ctypes no-follow inspection and
+bounded pinned trust reads, installing/cache absence probes, and canonical
+sealed-source admission. No project/third-party import or top-level action
+occurs in the guard. It cannot launch a child or perform production effects.
+Architecture-77 source/policies were not changed.
+
+Focused A124-2/A123/A122/Windows security verification: 734 passed, 2 skipped;
+the skipped tests are opt-in native mutex integrations. Broad certification
+remains deferred. Next: exact review of A124-2, then A124-3 pre-source signed
+attestation and complete sealed-source verification. Protected A124-4/P124-1
+host qualification remains a separate prerequisite to activation.

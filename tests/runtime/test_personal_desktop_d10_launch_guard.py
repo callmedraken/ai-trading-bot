@@ -3,13 +3,23 @@
 from __future__ import annotations
 
 import ast
+import hashlib
+import json
+import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
 from scripts import run_personal_desktop_d10_launch_guard as guard
 from trading_bot.runtime import (
     personal_desktop_unattended_one_week_soak_scheduler_contract as scheduler,
+)
+from trading_bot.runtime.personal_desktop_d10_deployment_identity import (
+    EXECUTABLE_MANIFEST_SCHEMA,
+    ExecutableManifest,
+    ExecutableManifestEntry,
+    build_deployment_attestation,
 )
 
 
@@ -267,6 +277,7 @@ def test_wrong_trading_principal_blocks(
 ) -> None:
     monkeypatch.setattr(guard, "_current_token_facts", lambda: token)
     monkeypatch.setattr(guard, "_resolved_local_trading_sid", lambda: local)
+    monkeypatch.setattr(guard, "_require_standard_account", lambda _: None)
     with pytest.raises(guard.GuardBlocked):
         guard.require_trading_principal()
 
@@ -334,8 +345,13 @@ def test_stdlib_only_no_effects_and_arch77_separation() -> None:
         "re",
         "contextlib",
         "dataclasses",
+        "hashlib",
+        "json",
+        "subprocess",
+        "sys",
+        "uuid",
     }
-    assert not imports & {"site", "trading_bot", "subprocess", "scripts"}
+    assert not imports & {"site", "trading_bot", "scripts"}
     forbidden_calls = {
         "WriteFile",
         "CreateProcessW",
@@ -346,7 +362,7 @@ def test_stdlib_only_no_effects_and_arch77_separation() -> None:
         "site.main",
     }
     assert not any(name in source for name in forbidden_calls)
-    assert not any(
+    assert any(
         isinstance(node, ast.If)
         and isinstance(node.test, ast.Compare)
         and "__name__" in ast.unparse(node.test)
@@ -425,3 +441,588 @@ def test_native_open_uses_no_follow_and_read_only_access(
     assert args[2] == 1  # FILE_SHARE_READ
     assert args[4] == 3  # OPEN_EXISTING
     assert args[5] & guard.FILE_FLAG_OPEN_REPARSE_POINT
+
+
+class FullNative(FakeNative):
+    def __init__(self) -> None:
+        super().__init__()
+        self.extra: dict[str, set[str]] = {}
+        self.hash_handles: list[int] = []
+        self.data[guard._source_path("src/trading_bot/mod.py")] = b"module"
+        self.data[guard.D10_SECOND_STAGE_LAUNCHER] = b"launcher"
+        self.data[guard.D10_LAUNCH_GUARD] = b"guard source"
+        self.data[guard.D10_SIGNATURE] = b"x" * 64
+        self.make_signed_material()
+
+    def make_signed_material(self, **changes: object) -> None:
+        entries = tuple(
+            ExecutableManifestEntry(
+                relative,
+                len(self.data[guard._source_path(relative)]),
+                hashlib.sha256(self.data[guard._source_path(relative)]).hexdigest(),
+            )
+            for relative in (
+                "scripts/run_personal_desktop_unattended_one_week_soak.py",
+                "src/trading_bot/mod.py",
+            )
+        )
+        manifest = ExecutableManifest(EXECUTABLE_MANIFEST_SCHEMA, entries)
+        values = dict(
+            certified_source_head="a" * 40,
+            certified_source_tree="b" * 40,
+            production_python_version=".".join(map(str, sys.version_info[:3])),
+            launch_guard_byte_length=len(self.data[guard.D10_LAUNCH_GUARD]),
+            launch_guard_sha256=hashlib.sha256(
+                self.data[guard.D10_LAUNCH_GUARD]
+            ).hexdigest(),
+            executable_manifest_sha256=manifest.digest,
+            executable_file_count=len(entries),
+        )
+        values.update(changes)
+        self.data[guard.D10_MANIFEST] = manifest.canonical_bytes()
+        self.data[guard.D10_ATTESTATION] = build_deployment_attestation(
+            **values
+        ).canonical_bytes()
+
+    def listdir(self, path: str) -> tuple[str, ...]:
+        prefix = path + chr(92)
+        names: set[str] = set()
+        for filepath in self.data:
+            if filepath.startswith(prefix):
+                names.add(filepath[len(prefix) :].split(chr(92), 1)[0])
+        return tuple(sorted(names | self.extra.get(path, set())))
+
+    def hash_exact(self, handle: int, size: int) -> str:
+        self.hash_handles.append(handle)
+        data = self.data[self.paths[handle]]
+        if len(data) != size:
+            raise guard.GuardBlocked("fake same-handle size drift")
+        return hashlib.sha256(data).hexdigest()
+
+
+def _admit(monkeypatch: pytest.MonkeyPatch, native: FullNative) -> None:
+    monkeypatch.setattr(guard, "require_trading_principal", lambda: None)
+    monkeypatch.setattr(guard, "_verify_d10_signature", lambda *args: None)
+    monkeypatch.setattr(guard, "_require_runtime", lambda _: None)
+    guard._verify_pre_source(native)
+
+
+def test_a1243_complete_inventory_and_same_handle_hash(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    native = FullNative()
+    _admit(monkeypatch, native)
+    assert len(native.hash_handles) == 2
+    assert all(native.paths[handle] in native.data for handle in native.hash_handles)
+    assert set(native.hash_handles) <= set(native.closed)
+    assert set(native.closed) == set(native.paths)
+    assert native.inspections[guard.D10_LAUNCH_GUARD] == 4
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        "schema",
+        "signing_key_id",
+        "source_root",
+        "launch_guard",
+        "launcher",
+        "scheduler_contract_schema",
+        "approved_trading_sid",
+        "production_python",
+        "production_python_version",
+        "certified_source_head",
+        "certified_source_tree",
+        "deployment_id",
+        "executable_manifest_sha256",
+        "executable_file_count",
+        "launch_guard_byte_length",
+        "launch_guard_sha256",
+    ],
+)
+def test_a1243_wrong_attestation_fact_blocks(
+    monkeypatch: pytest.MonkeyPatch,
+    field: str,
+) -> None:
+    native = FullNative()
+    value = json.loads(native.data[guard.D10_ATTESTATION])
+    value[field] = "wrong"
+    native.data[guard.D10_ATTESTATION] = guard._canonical_json(value)
+    with pytest.raises(guard.GuardBlocked):
+        _admit(monkeypatch, native)
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        lambda data: data + b" ",
+        lambda data: data.replace(
+            b',"launcher":', b',"launcher":"duplicate","launcher":'
+        ),
+        lambda data: b"\xef\xbb\xbf" + data,
+        lambda data: data.replace(b'"schema":', b'"extra":1,"schema":'),
+    ],
+)
+def test_a1243_noncanonical_or_duplicate_attestation_blocks(
+    monkeypatch: pytest.MonkeyPatch,
+    mutation,
+) -> None:
+    native = FullNative()
+    native.data[guard.D10_ATTESTATION] = mutation(native.data[guard.D10_ATTESTATION])
+    with pytest.raises(guard.GuardBlocked):
+        _admit(monkeypatch, native)
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        lambda data: data + b" ",
+        lambda data: data.replace(b',"schema":', b',"schema":"duplicate","schema":'),
+        lambda data: data.replace(b'"relative_path":', b'"other":1,"relative_path":'),
+        lambda data: data.replace(
+            b'"schema":"personal-desktop-d10-executable-manifest/v1"', b'"schema":"bad"'
+        ),
+    ],
+)
+def test_a1243_manifest_canonical_schema_and_fields_block(
+    monkeypatch: pytest.MonkeyPatch,
+    mutation,
+) -> None:
+    native = FullNative()
+    native.data[guard.D10_MANIFEST] = mutation(native.data[guard.D10_MANIFEST])
+    with pytest.raises(guard.GuardBlocked):
+        _admit(monkeypatch, native)
+
+
+@pytest.mark.parametrize(
+    "relative",
+    [
+        "src/trading_bot/../bad.py",
+        "src/trading_bot/.git/config",
+        "src/trading_bot/__pycache__/x.pyc",
+        "src/trading_bot/x.pyo",
+        "src/trading_bot/x.py:ads",
+        "src/trading_bot/con.py",
+    ],
+)
+def test_a1243_unsafe_manifest_path_blocks(relative: str) -> None:
+    with pytest.raises(guard.GuardBlocked):
+        guard._source_path(relative)
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [
+        ".git",
+        "__pycache__",
+        "unexpected",
+        "mod.pyc",
+        "mod.pyo",
+        "MOD.py",
+    ],
+)
+def test_a1243_extra_or_case_colliding_inventory_blocks(
+    monkeypatch: pytest.MonkeyPatch,
+    extra: str,
+) -> None:
+    native = FullNative()
+    native.extra[guard.D10_SOURCE_ROOT + r"\src\trading_bot"] = {extra}
+    with pytest.raises(guard.GuardBlocked):
+        _admit(monkeypatch, native)
+
+
+def test_a1243_missing_inventory_blocks(monkeypatch: pytest.MonkeyPatch) -> None:
+    native = FullNative()
+    del native.data[guard._source_path("src/trading_bot/mod.py")]
+    with pytest.raises(guard.GuardBlocked):
+        _admit(monkeypatch, native)
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"attributes": guard.FILE_ATTRIBUTE_REPARSE_POINT},
+        {"links": 2},
+        {"owner": guard.SYSTEM_SID},
+    ],
+)
+def test_a1243_source_security_blocks(
+    monkeypatch: pytest.MonkeyPatch,
+    change: dict[str, object],
+) -> None:
+    native = FullNative()
+    native.overrides[guard._source_path("src/trading_bot/mod.py")] = change
+    with pytest.raises(guard.GuardBlocked):
+        _admit(monkeypatch, native)
+
+
+def test_a1243_same_handle_source_drift_blocks(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    native = FullNative()
+    native.after[guard._source_path("src/trading_bot/mod.py")] = {"size": 99}
+    with pytest.raises(guard.GuardBlocked):
+        _admit(monkeypatch, native)
+
+
+def test_a1243_guard_and_manifest_digest_mismatch_block(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    native = FullNative()
+    native.data[guard.D10_LAUNCH_GUARD] += b"!"
+    with pytest.raises(guard.GuardBlocked):
+        _admit(monkeypatch, native)
+    native = FullNative()
+    native.data[guard.D10_MANIFEST] += b" "
+    with pytest.raises(guard.GuardBlocked):
+        _admit(monkeypatch, native)
+
+
+def test_a1243_signature_precedes_attestation_parse(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    native = FullNative()
+    native.data[guard.D10_ATTESTATION] = b"invalid"
+    calls: list[str] = []
+    monkeypatch.setattr(guard, "require_trading_principal", lambda: None)
+
+    def reject(*_args: object) -> None:
+        calls.append("signature")
+        raise guard.GuardBlocked("signature rejected")
+
+    monkeypatch.setattr(guard, "_verify_d10_signature", reject)
+    monkeypatch.setattr(guard, "_parse_attestation", lambda _: calls.append("parse"))
+    with pytest.raises(guard.GuardBlocked):
+        guard._verify_pre_source(native)
+    assert calls == ["signature"]
+
+
+def test_a1243_account_drift_blocks_before_trust_read(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    native = FullNative()
+    monkeypatch.setattr(
+        guard, "_current_token_facts", lambda: (guard.TRADING_SID, False, False)
+    )
+    monkeypatch.setattr(guard, "_resolved_local_trading_sid", lambda: guard.TRADING_SID)
+    monkeypatch.setattr(
+        guard,
+        "_require_standard_account",
+        lambda _: (_ for _ in ()).throw(guard.GuardBlocked("privileged group")),
+    )
+    with pytest.raises(guard.GuardBlocked):
+        guard._verify_pre_source(native)
+    assert native.paths == {}
+
+
+def test_a1243_exact_one_child_and_zero_child_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[object, object]] = []
+    monkeypatch.setattr(guard, "_verify_pre_source", lambda: None)
+    monkeypatch.setattr(guard, "_require_active_lease", lambda: None)
+    monkeypatch.setattr(
+        guard,
+        "_sanitized_environment",
+        lambda: {"SystemRoot": r"C:\Windows", "WINDIR": r"C:\Windows"},
+    )
+
+    def child(command, **kwargs):
+        calls.append((command, kwargs))
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(guard.subprocess, "run", child)
+    assert guard.main() == 0
+    assert calls == [
+        (
+            [
+                guard.D10_PRODUCTION_PYTHON,
+                "-I",
+                "-S",
+                "-B",
+                "-X",
+                f"pycache_prefix={guard.D10_CACHE_PREFIX}",
+                guard.D10_SECOND_STAGE_LAUNCHER,
+            ],
+            {
+                "check": False,
+                "cwd": guard.D10_ROOT,
+                "env": {"SystemRoot": r"C:\Windows", "WINDIR": r"C:\Windows"},
+                "close_fds": True,
+            },
+        )
+    ]
+    calls.clear()
+    monkeypatch.setattr(
+        guard,
+        "_verify_pre_source",
+        lambda: (_ for _ in ()).throw(guard.GuardBlocked("drift")),
+    )
+    assert guard.main() == 1
+    assert not calls
+
+
+def test_a1243_second_stage_bootstrap_is_fixed_and_fail_closed() -> None:
+    path = (
+        Path(__file__).parents[2]
+        / "scripts"
+        / "run_personal_desktop_unattended_one_week_soak.py"
+    )
+    source = path.read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    assert "site.main" not in source
+    assert ".pth" not in source
+    assert "sitecustomize" not in source
+    assert "usercustomize" not in source
+    assert "F:\\AITradingBot\\D10\\source\\src" in source
+    assert "F:\\AITradingBot\\runtime\\Lib\\site-packages" in source
+    assert any(
+        isinstance(node, ast.ImportFrom)
+        and node.module
+        == "trading_bot.runtime.personal_desktop_unattended_one_week_soak_scheduler_contract"  # noqa: E501
+        for node in ast.walk(tree)
+    )
+
+
+def test_a1243_native_cng_positive_and_adversarial_signature() -> None:
+    """Use an ephemeral CNG test key; no signing secret enters the repository."""
+    import ctypes
+    import os
+    from ctypes import wintypes
+
+    if os.name != "nt":
+        pytest.skip("Windows CNG only")
+    bcrypt = ctypes.WinDLL("bcrypt", use_last_error=True)
+    algorithm = ctypes.c_void_p()
+    key = ctypes.c_void_p()
+    open_algorithm = bcrypt.BCryptOpenAlgorithmProvider
+    open_algorithm.argtypes = [
+        ctypes.POINTER(ctypes.c_void_p),
+        ctypes.c_wchar_p,
+        ctypes.c_wchar_p,
+        wintypes.ULONG,
+    ]
+    open_algorithm.restype = ctypes.c_long
+    generate = bcrypt.BCryptGenerateKeyPair
+    generate.argtypes = [
+        ctypes.c_void_p,
+        ctypes.POINTER(ctypes.c_void_p),
+        wintypes.ULONG,
+        wintypes.ULONG,
+    ]
+    generate.restype = ctypes.c_long
+    finalize = bcrypt.BCryptFinalizeKeyPair
+    finalize.argtypes = [ctypes.c_void_p, wintypes.ULONG]
+    finalize.restype = ctypes.c_long
+    export = bcrypt.BCryptExportKey
+    export.argtypes = [
+        ctypes.c_void_p,
+        ctypes.c_void_p,
+        ctypes.c_wchar_p,
+        ctypes.c_void_p,
+        wintypes.ULONG,
+        ctypes.POINTER(wintypes.ULONG),
+        wintypes.ULONG,
+    ]
+    export.restype = ctypes.c_long
+    sign = bcrypt.BCryptSignHash
+    sign.argtypes = [
+        ctypes.c_void_p,
+        ctypes.c_void_p,
+        ctypes.c_void_p,
+        wintypes.ULONG,
+        ctypes.c_void_p,
+        wintypes.ULONG,
+        ctypes.POINTER(wintypes.ULONG),
+        wintypes.ULONG,
+    ]
+    sign.restype = ctypes.c_long
+    try:
+        assert open_algorithm(ctypes.byref(algorithm), "ECDSA_P256", None, 0) == 0
+        assert generate(algorithm, ctypes.byref(key), 256, 0) == 0
+        assert finalize(key, 0) == 0
+        size = wintypes.ULONG()
+        assert export(key, None, "ECCPUBLICBLOB", None, 0, ctypes.byref(size), 0) == 0
+        assert size.value == 72
+        blob = (ctypes.c_ubyte * size.value)()
+        assert (
+            export(key, None, "ECCPUBLICBLOB", blob, size.value, ctypes.byref(size), 0)
+            == 0
+        )
+        public = b"\x04" + bytes(blob)[8:]
+        data = b"A124-3 ephemeral detached signature vector"
+        digest = (ctypes.c_ubyte * 32).from_buffer_copy(hashlib.sha256(data).digest())
+        signature_size = wintypes.ULONG()
+        assert (
+            sign(key, None, digest, 32, None, 0, ctypes.byref(signature_size), 0) == 0
+        )
+        assert signature_size.value == 64
+        signature = (ctypes.c_ubyte * 64)()
+        assert (
+            sign(key, None, digest, 32, signature, 64, ctypes.byref(signature_size), 0)
+            == 0
+        )
+        raw = bytes(signature)
+        guard._verify_d10_signature(data, raw, public)
+        with pytest.raises(guard.GuardBlocked):
+            guard._verify_d10_signature(data + b"!", raw, public)
+        with pytest.raises(guard.GuardBlocked):
+            guard._verify_d10_signature(data, raw[:-1], public)
+        with pytest.raises(guard.GuardBlocked):
+            guard._verify_d10_signature(
+                data, raw[:1] + bytes([raw[1] ^ 1]) + raw[2:], public
+            )
+        with pytest.raises(guard.GuardBlocked):
+            guard._verify_d10_signature(data, raw, b"\x04" + b"\x00" * 64)
+    finally:
+        if key.value:
+            assert bcrypt.BCryptDestroyKey(key) == 0
+        if algorithm.value:
+            assert bcrypt.BCryptCloseAlgorithmProvider(algorithm, 0) == 0
+
+
+def test_a1243_runtime_mismatch_blocks(monkeypatch: pytest.MonkeyPatch) -> None:
+    native = FullNative()
+    value = guard._parse_attestation(native.data[guard.D10_ATTESTATION])
+    fake = SimpleNamespace(
+        executable=guard.D10_PRODUCTION_PYTHON,
+        version_info=(3, 12, 0),
+        flags=SimpleNamespace(isolated=1, no_site=1, dont_write_bytecode=1),
+        pycache_prefix=guard.D10_CACHE_PREFIX,
+        argv=[guard.D10_LAUNCH_GUARD],
+    )
+    monkeypatch.setattr(guard, "sys", fake)
+    with pytest.raises(guard.GuardBlocked):
+        guard._require_runtime(value)
+    fake.version_info = tuple(map(int, value["production_python_version"].split(".")))
+    guard._require_runtime(value)
+    fake.flags = SimpleNamespace(isolated=1, no_site=0, dont_write_bytecode=1)
+    with pytest.raises(guard.GuardBlocked):
+        guard._require_runtime(value)
+
+
+def test_a1243_standard_account_proof_is_mandatory(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[str] = []
+    monkeypatch.setattr(
+        guard, "_current_token_facts", lambda: (guard.TRADING_SID, False, False)
+    )
+    monkeypatch.setattr(guard, "_resolved_local_trading_sid", lambda: guard.TRADING_SID)
+    monkeypatch.setattr(
+        guard, "_require_standard_account", lambda sid: calls.append(sid)
+    )
+    guard.require_trading_principal()
+    assert calls == [guard.TRADING_SID]
+
+
+def test_a1243_unimplemented_lease_prevents_real_launch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[object] = []
+    monkeypatch.setattr(guard, "_verify_pre_source", lambda: None)
+    monkeypatch.setattr(
+        guard.subprocess, "run", lambda *args, **kwargs: calls.append(args)
+    )
+    assert guard.main() == 1
+    assert not calls
+
+
+def test_a1243_second_stage_bootstrap_adds_only_fixed_paths(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from scripts import run_personal_desktop_unattended_one_week_soak as launcher
+
+    runtime = SimpleNamespace(
+        executable=guard.D10_PRODUCTION_PYTHON,
+        argv=[guard.D10_SECOND_STAGE_LAUNCHER],
+        flags=SimpleNamespace(isolated=1, no_site=1, dont_write_bytecode=1),
+        pycache_prefix=guard.D10_CACHE_PREFIX,
+        path=["stdlib"],
+    )
+    monkeypatch.setattr(launcher, "sys", runtime)
+    assert launcher.main() == 1
+    assert runtime.path == [
+        guard.D10_SOURCE_PACKAGE_ROOT,
+        "stdlib",
+        guard.D10_PRODUCTION_SITE_PACKAGES,
+    ]
+    runtime.path = ["stdlib"]
+    runtime.flags = SimpleNamespace(isolated=1, no_site=0, dont_write_bytecode=1)
+    assert launcher.main() == 1
+    assert runtime.path == ["stdlib"]
+
+
+@pytest.mark.parametrize(
+    ("privilege", "group_sid", "blocked"),
+    [
+        (1, "S-1-5-32-545", False),
+        (2, "S-1-5-32-545", True),
+        (1, "S-1-5-32-544", True),
+        (1, "S-1-5-21-1-2-3-512", True),
+    ],
+)
+def test_a1243_standalone_win32_account_and_group_proof(
+    monkeypatch: pytest.MonkeyPatch,
+    privilege: int,
+    group_sid: str,
+    blocked: bool,
+) -> None:
+    import ctypes
+    from ctypes import wintypes
+
+    class UserInfo1(ctypes.Structure):
+        _fields_ = [
+            ("name", ctypes.c_wchar_p),
+            ("password", ctypes.c_wchar_p),
+            ("password_age", wintypes.DWORD),
+            ("privilege", wintypes.DWORD),
+            ("home_dir", ctypes.c_wchar_p),
+            ("comment", ctypes.c_wchar_p),
+            ("flags", wintypes.DWORD),
+            ("script_path", ctypes.c_wchar_p),
+        ]
+
+    class LocalGroupInfo0(ctypes.Structure):
+        _fields_ = [("name", ctypes.c_wchar_p)]
+
+    user = UserInfo1(privilege=privilege)
+    groups = (LocalGroupInfo0 * 1)(LocalGroupInfo0("A group"))
+
+    class Function:
+        def __init__(self, value):
+            self.value = value
+            self.argtypes = None
+            self.restype = None
+
+        def __call__(self, *args):
+            return self.value(*args)
+
+    def info(_server, _name, _level, pointer):
+        ctypes.cast(
+            pointer, ctypes.POINTER(ctypes.c_void_p)
+        ).contents.value = ctypes.addressof(user)
+        return 0
+
+    def local_groups(_server, _name, _level, _flags, pointer, _length, read, total):
+        ctypes.cast(
+            pointer, ctypes.POINTER(ctypes.c_void_p)
+        ).contents.value = ctypes.addressof(groups)
+        ctypes.cast(read, ctypes.POINTER(wintypes.DWORD)).contents.value = 1
+        ctypes.cast(total, ctypes.POINTER(wintypes.DWORD)).contents.value = 1
+        return 0
+
+    netapi = SimpleNamespace(
+        NetUserGetInfo=Function(info),
+        NetUserGetLocalGroups=Function(local_groups),
+        NetApiBufferFree=Function(lambda _buffer: 0),
+    )
+    monkeypatch.setattr(
+        guard, "_win_dll", lambda name: netapi if name == "netapi32" else None
+    )
+    monkeypatch.setattr(guard, "_lookup_account_sid", lambda _name: group_sid)
+    if blocked:
+        with pytest.raises(guard.GuardBlocked):
+            guard._require_standard_account(guard.TRADING_SID)
+    else:
+        guard._require_standard_account(guard.TRADING_SID)

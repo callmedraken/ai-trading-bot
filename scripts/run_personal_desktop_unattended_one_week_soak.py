@@ -39,7 +39,16 @@ def main() -> int:
 
     if not is_frozen_one_week_soak_scheduler_contract(D10_SCHEDULER_CONTRACT):
         return 1
-    # The effectful D10 controller is a later checkpoint.
+    from trading_bot.runtime.personal_desktop_d10_deployment_verifier import (  # noqa: E402
+        require_verified_d10_deployment,
+        verify_d10_deployment,
+    )
+
+    try:
+        require_verified_d10_deployment(verify_d10_deployment())
+    except Exception:
+        return 1
+    # The activation lease and effectful D10 controller are later checkpoints.
     return 1
 
 

@@ -1397,6 +1397,65 @@ def _verify_pre_source(native: _Native | None = None) -> None:
     require_trading_principal()
 
 
+@dataclass(frozen=True, slots=True)
+class VerifiedDeploymentFacts:
+    """Sanitized facts from one fresh fixed D10 deployment proof."""
+
+    deployment_id: str
+    attestation_sha256: str
+    certified_source_head: str
+    certified_source_tree: str
+    executable_file_count: int
+    schema: str
+    signing_key_id: str
+    source_root: str
+    launch_guard: str
+    launcher: str
+    scheduler_contract_schema: str
+    approved_trading_sid: str
+    production_python: str
+    production_python_version: str
+
+
+def verify_fixed_deployment_for_second_stage() -> VerifiedDeploymentFacts:
+    """Fresh no-follow A4 proof after the pre-source guard admitted the child."""
+    require_trading_principal()
+    native = _Native()
+    material = _read_fixed_trust_material(native)
+    _verify_d10_signature(material.attestation, material.signature)
+    attestation = _parse_attestation(material.attestation)
+    entries = _parse_manifest(material.manifest)
+    if (
+        len(material.guard) != attestation["launch_guard_byte_length"]
+        or hashlib.sha256(material.guard).hexdigest()
+        != attestation["launch_guard_sha256"]
+        or len(entries) != attestation["executable_file_count"]
+        or hashlib.sha256(material.manifest).hexdigest()
+        != attestation["executable_manifest_sha256"]
+    ):
+        raise GuardBlocked("D10 signed guard or manifest identity differs")
+    _verify_sealed_source(entries, native)
+    if _read_fixed_trust_material(native) != material:
+        raise GuardBlocked("D10 trust material drifted")
+    require_trading_principal()
+    return VerifiedDeploymentFacts(
+        deployment_id=attestation["deployment_id"],
+        attestation_sha256=hashlib.sha256(material.attestation).hexdigest(),
+        certified_source_head=attestation["certified_source_head"],
+        certified_source_tree=attestation["certified_source_tree"],
+        executable_file_count=attestation["executable_file_count"],
+        schema=attestation["schema"],
+        signing_key_id=attestation["signing_key_id"],
+        source_root=attestation["source_root"],
+        launch_guard=attestation["launch_guard"],
+        launcher=attestation["launcher"],
+        scheduler_contract_schema=attestation["scheduler_contract_schema"],
+        approved_trading_sid=attestation["approved_trading_sid"],
+        production_python=attestation["production_python"],
+        production_python_version=attestation["production_python_version"],
+    )
+
+
 def _sanitized_environment() -> dict[str, str]:
     kernel = _win_dll("kernel32")
     get_windows = kernel.GetWindowsDirectoryW

@@ -1026,3 +1026,156 @@ def test_a1243_standalone_win32_account_and_group_proof(
             guard._require_standard_account(guard.TRADING_SID)
     else:
         guard._require_standard_account(guard.TRADING_SID)
+
+
+def _mock_a1245_verification(
+    monkeypatch: pytest.MonkeyPatch, native: FullNative
+) -> object:
+    from trading_bot.runtime import personal_desktop_d10_deployment_verifier as verifier
+
+    c1 = object()
+    monkeypatch.setattr(verifier, "_require_second_stage_runtime", lambda: None)
+    monkeypatch.setattr(verifier, "_fixed_guard", lambda: guard)
+    monkeypatch.setattr(verifier, "acquire_validated_production_authority", lambda: c1)
+    monkeypatch.setattr(
+        verifier, "require_validated_production_authority", lambda value: value
+    )
+    monkeypatch.setattr(guard, "require_trading_principal", lambda: None)
+    monkeypatch.setattr(guard, "_Native", lambda: native)
+    monkeypatch.setattr(guard, "_verify_d10_signature", lambda *args: None)
+    return verifier
+
+
+def test_a1245_independent_reread_and_same_process_provenance(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from dataclasses import replace
+
+    native = FullNative()
+    verifier = _mock_a1245_verification(monkeypatch, native)
+    proof = verifier.verify_d10_deployment()
+    assert (
+        proof.attestation_sha256
+        == hashlib.sha256(native.data[guard.D10_ATTESTATION]).hexdigest()
+    )
+    assert proof.executable_file_count == 2
+    assert verifier.require_verified_d10_deployment(proof) is proof
+    assert len(native.hash_handles) == 2
+    for path in guard._TRUST_FILES:
+        assert sum(native.paths[handle] == path for handle in native.read_handles) == 2
+    with pytest.raises(verifier.DeploymentVerificationBlocked):
+        verifier.require_verified_d10_deployment(replace(proof))
+    object.__setattr__(proof, "deployment_id", "forged")
+    with pytest.raises(verifier.DeploymentVerificationBlocked):
+        verifier.require_verified_d10_deployment(proof)
+
+
+@pytest.mark.parametrize(
+    "drift", ["signature", "manifest", "source", "inventory", "version", "c1"]
+)
+def test_a1245_reverification_fails_closed(
+    monkeypatch: pytest.MonkeyPatch, drift: str
+) -> None:
+    native = FullNative()
+    verifier = _mock_a1245_verification(monkeypatch, native)
+    if drift == "signature":
+
+        def reject(*args: object) -> None:
+            raise guard.GuardBlocked("signature rejected")
+
+        monkeypatch.setattr(guard, "_verify_d10_signature", reject)
+    elif drift == "manifest":
+        native.data[guard.D10_MANIFEST] = b"{}"
+    elif drift == "source":
+        native.data[guard._source_path("src/trading_bot/mod.py")] = b"changed"
+    elif drift == "inventory":
+        native.extra[guard.D10_SOURCE_ROOT] = {"extra.py"}
+    elif drift == "version":
+        native.make_signed_material(production_python_version="3.14.4")
+    else:
+        first = object()
+        second = object()
+        observations = iter((first, second))
+        monkeypatch.setattr(
+            verifier,
+            "acquire_validated_production_authority",
+            lambda: next(observations),
+        )
+    monkeypatch.setenv("D10_GUARD_PASSED", "1")
+    with pytest.raises(verifier.DeploymentVerificationBlocked):
+        verifier.verify_d10_deployment()
+
+
+def test_a1245_second_stage_calls_verifier_before_any_future_effect(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from scripts import run_personal_desktop_unattended_one_week_soak as launcher
+    from trading_bot.runtime import personal_desktop_d10_deployment_verifier as verifier
+
+    runtime = SimpleNamespace(
+        executable=guard.D10_PRODUCTION_PYTHON,
+        argv=[guard.D10_SECOND_STAGE_LAUNCHER],
+        flags=SimpleNamespace(isolated=1, no_site=1, dont_write_bytecode=1),
+        pycache_prefix=guard.D10_CACHE_PREFIX,
+        path=["stdlib"],
+    )
+    monkeypatch.setattr(launcher, "sys", runtime)
+    called: list[str] = []
+    monkeypatch.setattr(
+        verifier, "verify_d10_deployment", lambda: called.append("verify") or object()
+    )
+    monkeypatch.setattr(
+        verifier,
+        "require_verified_d10_deployment",
+        lambda value: called.append("provenance") or value,
+    )
+    assert launcher.main() == 1
+    assert called == ["verify", "provenance"]
+    called.clear()
+    runtime.path = ["stdlib"]
+
+    def reject() -> object:
+        called.append("verify")
+        raise verifier.DeploymentVerificationBlocked("failed")
+
+    monkeypatch.setattr(verifier, "verify_d10_deployment", reject)
+    assert launcher.main() == 1
+    assert called == ["verify"]
+
+
+def test_a1245_zero_argument_fixed_second_stage_runtime(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import inspect
+    from pathlib import PureWindowsPath
+
+    from trading_bot.runtime import personal_desktop_d10_deployment_verifier as verifier
+
+    assert not inspect.signature(verifier.verify_d10_deployment).parameters
+    expected_file = str(
+        PureWindowsPath(verifier.D10_SOURCE_ROOT)
+        / "src"
+        / "trading_bot"
+        / "runtime"
+        / "personal_desktop_d10_deployment_verifier.py"
+    )
+    runtime = SimpleNamespace(
+        executable=guard.D10_PRODUCTION_PYTHON,
+        argv=[guard.D10_SECOND_STAGE_LAUNCHER],
+        flags=SimpleNamespace(isolated=1, no_site=1, dont_write_bytecode=1),
+        pycache_prefix=guard.D10_CACHE_PREFIX,
+    )
+    monkeypatch.setattr(verifier, "__file__", expected_file)
+    monkeypatch.setattr(verifier, "sys", runtime)
+    verifier._require_second_stage_runtime()
+    runtime.argv = ["caller-selected"]
+    with pytest.raises(verifier.DeploymentVerificationBlocked):
+        verifier._require_second_stage_runtime()
+    runtime.argv = [guard.D10_SECOND_STAGE_LAUNCHER]
+    runtime.flags.no_site = 0
+    with pytest.raises(verifier.DeploymentVerificationBlocked):
+        verifier._require_second_stage_runtime()
+    runtime.flags.no_site = 1
+    monkeypatch.setattr(verifier, "__file__", r"F:\AI\mutable\verifier.py")
+    with pytest.raises(verifier.DeploymentVerificationBlocked):
+        verifier._require_second_stage_runtime()

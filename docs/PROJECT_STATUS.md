@@ -3075,3 +3075,47 @@ docs/validation/pd4-d10-deployment-identity-plan.md
 Next safe checkpoint: Sol High Architecture-123 A1/A2 canonical models and
 certification builder only. No production signing, provisioning, scheduler
 mutation, activation lease, or trading effect.
+
+
+## Architecture 123 A1/A2 — ACCEPTED
+
+Exact accepted source:
+
+```text
+HEAD: 1ba65d02315d45a1c92d60665a40a61b78abbe53
+TREE: 2a9c4de06de5e60476844854807b61ac05e237bb
+focused verification: 52 passed
+Ruff check: PASS
+Ruff format --check: PASS
+git diff --check: PASS
+git diff --cached --check: PASS
+```
+
+Exact GitHub review accepted the canonical deployment identity models and
+certification-only builder after the A2 blob-binding correction.
+
+Accepted A1/A2 invariants:
+
+- manifest schema is strict canonical UTF-8 JSON with exact governed entries;
+- attestation schema and deterministic UUID5 deployment identity are exact;
+- authoritative governed inventory comes from `git ls-tree ... HEAD`, not the
+  index or filesystem enumeration;
+- each local governed file is hashed with non-writing `git hash-object --stdin`
+  and must equal the exact blob OID in certified HEAD before its bytes feed the
+  manifest SHA-256;
+- expected HEAD/tree and clean checkout/inventory checks remain required;
+- inherited `GIT_*` overrides are stripped from certification Git subprocesses;
+- no Git object is written;
+- no signing, provisioning, scheduler mutation, activation, provider,
+  publication, settlement, recovery, broker, or live effect exists.
+
+The current feature tree intentionally cannot yet produce a real deployment
+manifest because the future D10 launcher is not tracked. This is expected until
+the controller/launcher source exists.
+
+Broad certification remains deferred.
+
+Next checkpoint: Architecture-123 A3 fixed Windows-native D10 trust-root and
+read/security boundary. A3 remains source-only and must also freeze the
+production policy for transient Python bytecode/cache artifacts before A4 can
+treat executable inventory as runtime authority.

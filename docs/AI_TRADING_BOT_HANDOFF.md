@@ -3001,3 +3001,44 @@ unauthorized.
 Next source checkpoint: Sol High A1/A2 only — canonical manifest/attestation
 models plus the build-time clean-checkout manifest generator. Native runtime
 verification follows in A3/A4.
+
+
+## Architecture 123 A1/A2 accepted
+
+Accepted source:
+
+```text
+HEAD 1ba65d02315d45a1c92d60665a40a61b78abbe53
+TREE 2a9c4de06de5e60476844854807b61ac05e237bb
+focused: 52 passed
+```
+
+A1 canonical manifest/attestation models and the A2 certification builder are
+accepted after exact GitHub review.
+
+Critical A2 proof is now direct:
+
+```text
+certified HEAD/tree
+-> git ls-tree HEAD exact governed blob OIDs
+-> local bytes
+-> non-writing git hash-object --stdin == HEAD blob OID
+-> byte length + SHA-256 executable manifest
+-> deterministic unsigned deployment attestation
+```
+
+The certification builder strips inherited `GIT_*` variables and keeps clean
+checkout plus complete local-inventory checks. It writes no Git object and does
+not sign or provision anything.
+
+The real branch still lacks the future tracked D10 launcher, so a deployable
+manifest cannot yet be built. That is expected.
+
+Next source checkpoint is Architecture-123 A3: the dedicated fixed
+`F:\AITradingBot\D10` Windows-native trust-root/security/read contract.
+Before A4 runtime executable verification, freeze an explicit policy for
+`__pycache__` / `.pyc` and other transient bytecode so unverified alternate
+execution artifacts cannot undermine the signed source manifest.
+
+No production signing/provisioning, activation lease, scheduler mutation, or
+trading effect is authorized.

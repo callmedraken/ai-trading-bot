@@ -3046,3 +3046,32 @@ Before the effectful controller, implement a fixed source-owned D10 activation
 lease that binds activation/end time to the certified source/deployment identity
 and is independently reverified on every wake. No scheduler mutation or
 production effect is authorized.
+
+
+## D10 runtime source-identity blocker — accepted / Architecture 123 opened
+
+The activation-lease implementation stopped without changes because the current
+repository can certify HEAD/TREE through Git but has no production runtime
+boundary that independently proves the deployed executable identity without
+trusting `.git`.
+
+This is an accepted fail-closed blocker.
+
+Architecture 123 freezes the resolution: an Administrator-protected fixed D10
+trust root contains a canonical executable-file manifest, canonical deployment
+attestation, and detached P-256 signature. The signed attestation binds the
+externally certified source HEAD/TREE to the manifest digest and fixed runtime
+identities. On every wake the Trading runtime independently verifies both the
+signature and the actual deployed executable bytes; production runtime never
+reads `.git`.
+
+New docs:
+
+```text
+docs/architecture/123-d10-runtime-deployment-identity-attestation.md
+docs/validation/pd4-d10-deployment-identity-plan.md
+```
+
+Next safe checkpoint: Sol High Architecture-123 A1/A2 canonical models and
+certification builder only. No production signing, provisioning, scheduler
+mutation, activation lease, or trading effect.

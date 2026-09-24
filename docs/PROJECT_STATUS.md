@@ -3431,3 +3431,26 @@ P124-3 accepts only the exact D10 key identity and P-256/SHA-256/P1363 protocol 
 This is implementation pending exact source review, not protected checkpoint acceptance. P124-2, P124-3, and P124-1 were not run; the production D10 root, activation lease, and Task Scheduler were not touched. No signing, trust publication, provider, settlement, broker-paper, or live operation occurred. Focused P124-2/P124-3 and directly overlapping deployment-identity/launch-guard verification completed with 289 passed; Ruff check, Ruff format check, and diff checks passed. Broad certification was not rerun. The protected order remains P124-2 -> P124-3 -> P124-1 -> P124-4 -> P124-5, and P124-1 must PASS before P124-4 or P124-5.
 
 Next step: review the exact feature commit/diff and focused verification. Do not run the P124 tools from this source-review checkpoint.
+
+## P124-2/P124-3 protected deployment tooling — ACCEPTED
+
+Exact GitHub review accepted the source-only P124-2 sealed-deployment provisioning tooling and P124-3 external-signing/trust-publication boundary, including the additive Windows Administrator-token correction.
+
+```text
+IMPLEMENTATION HEAD ae54168377fe1791af147c5867f87f955f371c07
+CORRECTION HEAD     486196e48700955539b6e972455964ac3e6c9df7
+CORRECTION TREE     16a58beb2df4f8af379c4d747fcdf95a8b35f80f
+initial focused verification 289 passed
+correction focused verification 66 passed
+Ruff / format / staged diff checks PASS
+```
+
+The tooling remains outside the frozen governed D10 executable deployment and does not redefine certified source identity `acee8f80e947bcaefd79fa2c44531e8bbdf4cd0c` / `e2850c86adc83b70ab11f6db9e421e8584832c98`.
+
+P124-2 admits only that certified source, binds writes to the exact Architecture-123 manifest, provisions only the fixed D10 guard/source namespace with protected Administrator/SYSTEM/Trading ACLs, uses create-only same-volume publication, and reopens final objects to verify native identity, inventory and bytes. P124-3 uses an external non-exportable signer port, fixed D10 key/protocol identity, independent detached-signature verification, create-only trust publication with attestation last, and final native/byte re-verification. Neither boundary grants activation, scheduler, provider, settlement, broker-paper, or live authority.
+
+The Windows deployment adapter now proves Administrator authority by reading TokenElevation from the current-process primary token, duplicating that token with SecurityImpersonation, and performing CheckTokenMembership only against the duplicate. The primary token is opened with TOKEN_QUERY|TOKEN_DUPLICATE; both handles and the allocated SID are fail-closed cleanup resources.
+
+No protected P124-2, P124-3, or P124-1 operation was executed by these source checkpoints. Production D10 state, signing material, activation lease, Task Scheduler, and trading/provider surfaces remain untouched.
+
+Next source-only prerequisite: freeze and review the concrete external signer/operator mechanism for the already-accepted P124-3 signer port. Do not execute protected provisioning until that signer mechanism is accepted and the operator sequence is explicitly authorized.

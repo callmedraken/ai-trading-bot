@@ -20,22 +20,45 @@ from trading_bot.runtime.personal_desktop_unattended_scheduler_contract import (
     build_personal_desktop_unattended_scheduler_deployment_spec,
 )
 
-D10_SCHEDULER_CONTRACT_SCHEMA = "personal-desktop-one-week-soak-scheduler-contract/v1"
+D10_SCHEDULER_CONTRACT_SCHEMA = "personal-desktop-one-week-soak-scheduler-contract/v2"
 D10_SCHEDULER_DEPLOYMENT_SPEC_SCHEMA = (
-    "personal-desktop-one-week-soak-scheduler-deployment-spec/v1"
+    "personal-desktop-one-week-soak-scheduler-deployment-spec/v2"
 )
-D10_LAUNCHER = PureWindowsPath(
-    r"F:\AI\worktrees\ai-trading-bot-personal-desktop\scripts"
-    r"\run_personal_desktop_unattended_one_week_soak.py"
+D10_ROOT = PureWindowsPath(r"F:\AITradingBot\D10")
+D10_LAUNCH_GUARD = D10_ROOT / "launch-guard.py"
+D10_SOURCE_ROOT = D10_ROOT / "source"
+D10_SECOND_STAGE_LAUNCHER = (
+    D10_SOURCE_ROOT / "scripts" / "run_personal_desktop_unattended_one_week_soak.py"
+)
+D10_CACHE_PREFIX = D10_ROOT / "no-pycache"
+D10_GUARD_SOURCE_RELATIVE_PATH = "scripts/run_personal_desktop_d10_launch_guard.py"
+D10_LAUNCHER_SOURCE_RELATIVE_PATH = (
+    "scripts/run_personal_desktop_unattended_one_week_soak.py"
+)
+D10_INTERPRETER_ARGUMENTS = (
+    "-I",
+    "-S",
+    "-B",
+    "-X",
+    f"pycache_prefix={D10_CACHE_PREFIX}",
+)
+D10_GUARD_ARGUMENTS = (*D10_INTERPRETER_ARGUMENTS, str(D10_LAUNCH_GUARD))
+D10_SECOND_STAGE_ARGUMENTS = (
+    *D10_INTERPRETER_ARGUMENTS,
+    str(D10_SECOND_STAGE_LAUNCHER),
 )
 
 _D5 = capture_contract.personal_desktop_unattended_capture_warmup_scheduler_contract()
 D10_SCHEDULER_CONTRACT = replace(
     _D5,
     schema=D10_SCHEDULER_CONTRACT_SCHEMA,
-    launcher=D10_LAUNCHER,
+    interpreter_arguments=D10_INTERPRETER_ARGUMENTS,
+    launcher=D10_LAUNCH_GUARD,
+    working_directory=D10_ROOT,
 )
-_REVIEWED_DIFFERENCES = frozenset({"schema", "launcher"})
+_REVIEWED_DIFFERENCES = frozenset(
+    {"schema", "interpreter_arguments", "launcher", "working_directory"}
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -53,7 +76,8 @@ class OneWeekSoakSchedulerDeploymentSpec:
                 build_personal_desktop_unattended_scheduler_deployment_spec(
                     self.window.activation_utc
                 ),
-                arguments=("-I", str(D10_LAUNCHER)),
+                arguments=D10_GUARD_ARGUMENTS,
+                working_directory=D10_ROOT,
             )
             if type(self.window) is OneWeekSoakWindow
             else None
@@ -70,7 +94,7 @@ class OneWeekSoakSchedulerDeploymentSpec:
             or self.task.start_boundary.astimezone(self.window.activation_utc.tzinfo)
             >= self.window.end_utc
             or self.task.semantic_arguments
-            or self.task.arguments != ("-I", str(D10_LAUNCHER))
+            or self.task.arguments != D10_GUARD_ARGUMENTS
             or self.task.restart_on_failure
             or self.task.restart_count != 0
         ):
@@ -103,7 +127,7 @@ def build_one_week_soak_scheduler_deployment_spec(
     base = build_personal_desktop_unattended_scheduler_deployment_spec(
         window.activation_utc
     )
-    task = replace(base, arguments=("-I", str(D10_LAUNCHER)))
+    task = replace(base, arguments=D10_GUARD_ARGUMENTS, working_directory=D10_ROOT)
     return OneWeekSoakSchedulerDeploymentSpec(
         D10_SCHEDULER_DEPLOYMENT_SPEC_SCHEMA,
         task,

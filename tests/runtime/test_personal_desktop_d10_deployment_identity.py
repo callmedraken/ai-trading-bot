@@ -16,8 +16,11 @@ from scripts.build_d10_deployment_identity import build_d10_deployment_identity
 
 from scripts import build_d10_deployment_identity as builder
 from trading_bot.runtime.personal_desktop_d10_deployment_identity import (
+    D10_GUARD_RELATIVE_PATH,
     D10_LAUNCHER_RELATIVE_PATH,
-    DEPLOYMENT_ID_NAMESPACE_V1,
+    D10_SOURCE_ROOT,
+    DEPLOYMENT_ATTESTATION_SCHEMA,
+    DEPLOYMENT_ID_NAMESPACE_V2,
     EXECUTABLE_MANIFEST_SCHEMA,
     DeploymentIdentityError,
     ExecutableManifest,
@@ -46,6 +49,8 @@ def attestation(**changes: object):
         "certified_source_head": HEAD,
         "certified_source_tree": TREE,
         "production_python_version": "3.12.10",
+        "launch_guard_byte_length": 5,
+        "launch_guard_sha256": DIGEST,
         "executable_manifest_sha256": DIGEST,
         "executable_file_count": 2,
     }
@@ -62,7 +67,7 @@ def test_canonical_round_trip_and_uuid_material() -> None:
     item = attestation()
     assert item.deployment_id == str(
         uuid.uuid5(
-            DEPLOYMENT_ID_NAMESPACE_V1,
+            DEPLOYMENT_ID_NAMESPACE_V2,
             canonical_json_bytes(item.authority_dict()).decode("utf-8"),
         )
     )
@@ -96,6 +101,24 @@ def test_exact_fields_and_attestation_canonical_bytes() -> None:
         parse_deployment_attestation(canonical_json_bytes(data))
     with pytest.raises(DeploymentIdentityError):
         parse_deployment_attestation(attestation().canonical_bytes() + b" ")
+    assert set(json.loads(attestation().canonical_bytes())) == {
+        "schema",
+        "signing_key_id",
+        "certified_source_head",
+        "certified_source_tree",
+        "source_root",
+        "launch_guard",
+        "launch_guard_byte_length",
+        "launch_guard_sha256",
+        "launcher",
+        "scheduler_contract_schema",
+        "approved_trading_sid",
+        "production_python",
+        "production_python_version",
+        "executable_manifest_sha256",
+        "executable_file_count",
+        "deployment_id",
+    }
 
 
 @pytest.mark.parametrize(
@@ -131,6 +154,8 @@ def test_duplicates_casefold_order_and_bool_rejected() -> None:
         ExecutableManifestEntry(D10_LAUNCHER_RELATIVE_PATH, True, DIGEST)
     with pytest.raises(DeploymentIdentityError):
         attestation(executable_file_count=True)
+    with pytest.raises(DeploymentIdentityError):
+        attestation(launch_guard_byte_length=True)
 
 
 @pytest.mark.parametrize(
@@ -139,6 +164,8 @@ def test_duplicates_casefold_order_and_bool_rejected() -> None:
         ("certified_source_head", "A" * 40),
         ("certified_source_tree", "b" * 39),
         ("source_root", "C:\\wrong"),
+        ("launch_guard", "C:\\wrong"),
+        ("launch_guard_sha256", "A" * 64),
         ("launcher", "wrong"),
         ("signing_key_id", "wrong"),
         ("scheduler_contract_schema", "wrong"),
@@ -170,6 +197,7 @@ def _checkout(root: Path) -> tuple[str, str]:
         ("src/trading_bot/a.py", b"a"),
         ("src/trading_bot/runtime/schema/r.json", b"{}"),
         (D10_LAUNCHER_RELATIVE_PATH, b"launcher"),
+        (D10_GUARD_RELATIVE_PATH, b"guard"),
     ):
         target = root / path
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -235,6 +263,7 @@ def test_builder_stable_order_digest_and_byte_tamper(tmp_path: Path) -> None:
         "wrong-head",
         "wrong-tree",
         "missing-launcher",
+        "missing-guard",
     ],
 )
 def test_builder_fails_closed_on_checkout_drift(tmp_path: Path, change: str) -> None:
@@ -256,6 +285,8 @@ def test_builder_fails_closed_on_checkout_drift(tmp_path: Path, change: str) -> 
         (root / "src/trading_bot/a.py").write_bytes(b"changed")
     elif change == "missing-launcher":
         (root / D10_LAUNCHER_RELATIVE_PATH).unlink()
+    elif change == "missing-guard":
+        (root / D10_GUARD_RELATIVE_PATH).unlink()
     elif change == "wrong-head":
         head = "f" * 40
     else:
@@ -407,7 +438,7 @@ def test_builder_hashes_stdin_without_writing_git_objects(
     result = _build(root, head, tree)
     after = {path.relative_to(objects) for path in objects.rglob("*") if path.is_file()}
     assert before == after
-    assert calls.count(("hash-object", "--stdin")) == result.executable_file_count
+    assert calls.count(("hash-object", "--stdin")) == result.executable_file_count + 1
     assert ("ls-tree", "-r", "-z", "--full-tree", "HEAD") in calls
     assert all("-w" not in args for args in calls)
 
@@ -475,4 +506,145 @@ def test_head_case_variant_of_governed_root_is_rejected(
 
     monkeypatch.setattr(builder, "_git", wrong_case_tree)
     with pytest.raises(DeploymentIdentityError, match="governed"):
+        _build(root, head, tree)
+
+
+def test_v2_attestation_rejects_v1_material_and_wrong_id() -> None:
+    item = attestation()
+    assert item.schema == DEPLOYMENT_ATTESTATION_SCHEMA
+    assert item.source_root == D10_SOURCE_ROOT
+    old = item.to_dict()
+    old["schema"] = "personal-desktop-d10-deployment-attestation/v1"
+    old["signing_key_id"] = "AITradingBot/D10/DeploymentAttestation/v1"
+    old.pop("launch_guard")
+    old.pop("launch_guard_byte_length")
+    old.pop("launch_guard_sha256")
+    with pytest.raises(DeploymentIdentityError):
+        parse_deployment_attestation(canonical_json_bytes(old))
+    with pytest.raises(DeploymentIdentityError, match="schema"):
+        parse_deployment_attestation(
+            canonical_json_bytes(item.to_dict() | {"schema": old["schema"]})
+        )
+
+
+def test_guard_length_and_digest_are_uuid_authority() -> None:
+    original = attestation()
+    longer = attestation(launch_guard_byte_length=6)
+    changed_digest = attestation(launch_guard_sha256=hashlib.sha256(b"y").hexdigest())
+    assert (
+        len(
+            {original.deployment_id, longer.deployment_id, changed_digest.deployment_id}
+        )
+        == 3
+    )
+    for field, value in (
+        ("launch_guard_byte_length", 6),
+        ("launch_guard_sha256", hashlib.sha256(b"y").hexdigest()),
+    ):
+        with pytest.raises(DeploymentIdentityError, match="deployment ID"):
+            replace(original, **{field: value})
+        tampered = original.to_dict()
+        tampered[field] = value
+        with pytest.raises(DeploymentIdentityError, match="deployment ID"):
+            parse_deployment_attestation(canonical_json_bytes(tampered))
+    with pytest.raises(DeploymentIdentityError):
+        attestation(launch_guard_byte_length=-1)
+
+
+def test_guard_bytes_are_head_bound_but_outside_source_manifest(tmp_path: Path) -> None:
+    root = tmp_path / "repo"
+    head, tree = _checkout(root)
+    guard = root / D10_GUARD_RELATIVE_PATH
+    first = _build(root, head, tree)
+    first_attestation = parse_deployment_attestation(
+        first.unsigned_deployment_attestation_bytes
+    )
+    first_manifest = parse_executable_manifest(first.executable_manifest_bytes)
+    assert D10_GUARD_RELATIVE_PATH not in {
+        entry.relative_path for entry in first_manifest.entries
+    }
+    assert D10_LAUNCHER_RELATIVE_PATH in {
+        entry.relative_path for entry in first_manifest.entries
+    }
+    assert first_attestation.launch_guard_byte_length == len(b"guard")
+    assert first_attestation.launch_guard_sha256 == hashlib.sha256(b"guard").hexdigest()
+    assert builder._tracked_governed_paths(root)[D10_GUARD_RELATIVE_PATH].oid == _git(
+        root, "rev-parse", "HEAD:" + D10_GUARD_RELATIVE_PATH
+    )
+    guard.write_bytes(b"guard changed")
+    with pytest.raises(DeploymentIdentityError, match="dirty"):
+        _build(root, head, tree)
+    _git(root, "add", D10_GUARD_RELATIVE_PATH)
+    _git(root, "commit", "-qm", "changed guard")
+    second = _build(
+        root,
+        _git(root, "rev-parse", "HEAD"),
+        _git(root, "show", "-s", "--format=%T", "HEAD"),
+    )
+    second_attestation = parse_deployment_attestation(
+        second.unsigned_deployment_attestation_bytes
+    )
+    assert first.executable_manifest_bytes == second.executable_manifest_bytes
+    assert first.executable_manifest_sha256 == second.executable_manifest_sha256
+    assert (
+        first_attestation.launch_guard_sha256 != second_attestation.launch_guard_sha256
+    )
+    assert first.deployment_id != second.deployment_id
+
+
+def test_guard_blob_tamper_blocks_even_if_status_reports_clean(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = tmp_path / "repo"
+    head, tree = _checkout(root)
+    (root / D10_GUARD_RELATIVE_PATH).write_bytes(b"changed")
+    real_git = builder._git
+
+    def status_clean(repo: Path, *args: str, input_bytes: bytes | None = None) -> bytes:
+        if args[0] == "status":
+            return b""
+        return real_git(repo, *args, input_bytes=input_bytes)
+
+    monkeypatch.setattr(builder, "_git", status_clean)
+    with pytest.raises(DeploymentIdentityError, match="HEAD blob"):
+        _build(root, head, tree)
+
+
+@pytest.mark.parametrize(
+    "missing", [D10_GUARD_RELATIVE_PATH, D10_LAUNCHER_RELATIVE_PATH]
+)
+def test_missing_future_script_in_certified_head_blocks(
+    tmp_path: Path, missing: str
+) -> None:
+    root = tmp_path / "repo"
+    _checkout(root)
+    _git(root, "rm", "-q", missing)
+    _git(root, "commit", "-qm", "remove future script")
+    with pytest.raises(DeploymentIdentityError, match="not tracked in HEAD"):
+        _build(
+            root,
+            _git(root, "rev-parse", "HEAD"),
+            _git(root, "show", "-s", "--format=%T", "HEAD"),
+        )
+
+
+def test_guard_head_object_must_be_regular_blob(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = tmp_path / "repo"
+    head, tree = _checkout(root)
+    real_git = builder._git
+    guard_oid = builder._tracked_governed_paths(root)[D10_GUARD_RELATIVE_PATH].oid
+
+    def symlink_guard_tree(
+        repo: Path, *args: str, input_bytes: bytes | None = None
+    ) -> bytes:
+        data = real_git(repo, *args, input_bytes=input_bytes)
+        if args[0] == "ls-tree":
+            record = f"100644 blob {guard_oid}\t{D10_GUARD_RELATIVE_PATH}".encode()
+            return data.replace(record, record.replace(b"100644", b"120000"), 1)
+        return data
+
+    monkeypatch.setattr(builder, "_git", symlink_guard_tree)
+    with pytest.raises(DeploymentIdentityError, match="regular"):
         _build(root, head, tree)

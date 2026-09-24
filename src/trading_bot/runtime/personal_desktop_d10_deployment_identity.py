@@ -9,19 +9,26 @@ import uuid
 from dataclasses import dataclass
 
 from trading_bot.runtime.personal_desktop_unattended_one_week_soak_scheduler_contract import (  # noqa: E501
-    D10_LAUNCHER,
+    D10_GUARD_SOURCE_RELATIVE_PATH,
+    D10_LAUNCH_GUARD,
+    D10_LAUNCHER_SOURCE_RELATIVE_PATH,
     D10_SCHEDULER_CONTRACT,
     D10_SCHEDULER_CONTRACT_SCHEMA,
+    D10_SECOND_STAGE_LAUNCHER,
     is_frozen_one_week_soak_scheduler_contract,
+)
+from trading_bot.runtime.personal_desktop_unattended_one_week_soak_scheduler_contract import (  # noqa: E501
+    D10_SOURCE_ROOT as D10_SEALED_SOURCE_ROOT,
 )
 
 EXECUTABLE_MANIFEST_SCHEMA = "personal-desktop-d10-executable-manifest/v1"
-DEPLOYMENT_ATTESTATION_SCHEMA = "personal-desktop-d10-deployment-attestation/v1"
-D10_SIGNING_KEY_ID = "AITradingBot/D10/DeploymentAttestation/v1"
-D10_SOURCE_ROOT = r"F:\AI\worktrees\ai-trading-bot-personal-desktop"
+DEPLOYMENT_ATTESTATION_SCHEMA = "personal-desktop-d10-deployment-attestation/v2"
+D10_SIGNING_KEY_ID = "AITradingBot/D10/DeploymentAttestation/v2"
+D10_SOURCE_ROOT = str(D10_SEALED_SOURCE_ROOT)
 D10_PRODUCTION_PYTHON = r"F:\AITradingBot\runtime\python.exe"
-D10_LAUNCHER_RELATIVE_PATH = f"scripts/{D10_LAUNCHER.name}"
-DEPLOYMENT_ID_NAMESPACE_V1 = uuid.UUID("63292a1f-3a7e-5123-9d82-25bc3535d32d")
+D10_GUARD_RELATIVE_PATH = D10_GUARD_SOURCE_RELATIVE_PATH
+D10_LAUNCHER_RELATIVE_PATH = D10_LAUNCHER_SOURCE_RELATIVE_PATH
+DEPLOYMENT_ID_NAMESPACE_V2 = uuid.UUID("703b383a-ee31-5ffb-8f61-09cb8edf146e")
 
 _SHA256 = re.compile(r"[0-9a-f]{64}\Z")
 _GIT_OID = re.compile(r"[0-9a-f]{40}\Z")
@@ -36,6 +43,9 @@ _ATTESTATION_FIELDS = frozenset(
         "certified_source_head",
         "certified_source_tree",
         "source_root",
+        "launch_guard",
+        "launch_guard_byte_length",
+        "launch_guard_sha256",
         "launcher",
         "scheduler_contract_schema",
         "approved_trading_sid",
@@ -195,6 +205,9 @@ class DeploymentAttestation:
     certified_source_head: str
     certified_source_tree: str
     source_root: str
+    launch_guard: str
+    launch_guard_byte_length: int
+    launch_guard_sha256: str
     launcher: str
     scheduler_contract_schema: str
     approved_trading_sid: str
@@ -219,8 +232,10 @@ class DeploymentAttestation:
             not is_frozen_one_week_soak_scheduler_contract(D10_SCHEDULER_CONTRACT)
             or type(self.source_root) is not str
             or self.source_root != D10_SOURCE_ROOT
+            or type(self.launch_guard) is not str
+            or self.launch_guard != str(D10_LAUNCH_GUARD)
             or type(self.launcher) is not str
-            or self.launcher != str(D10_LAUNCHER)
+            or self.launcher != str(D10_SECOND_STAGE_LAUNCHER)
             or type(self.scheduler_contract_schema) is not str
             or self.scheduler_contract_schema != D10_SCHEDULER_CONTRACT_SCHEMA
             or type(self.approved_trading_sid) is not str
@@ -233,6 +248,16 @@ class DeploymentAttestation:
             raise DeploymentIdentityError(
                 "attestation differs from source-owned D10 contract"
             )
+        if (
+            type(self.launch_guard_byte_length) is not int
+            or self.launch_guard_byte_length < 0
+        ):
+            raise DeploymentIdentityError("invalid launch guard byte length")
+        if (
+            type(self.launch_guard_sha256) is not str
+            or _SHA256.fullmatch(self.launch_guard_sha256) is None
+        ):
+            raise DeploymentIdentityError("invalid launch guard digest")
         version = (
             _PYTHON_VERSION.fullmatch(self.production_python_version)
             if type(self.production_python_version) is str
@@ -265,6 +290,9 @@ class DeploymentAttestation:
             "certified_source_head": self.certified_source_head,
             "certified_source_tree": self.certified_source_tree,
             "source_root": self.source_root,
+            "launch_guard": self.launch_guard,
+            "launch_guard_byte_length": self.launch_guard_byte_length,
+            "launch_guard_sha256": self.launch_guard_sha256,
             "launcher": self.launcher,
             "scheduler_contract_schema": self.scheduler_contract_schema,
             "approved_trading_sid": self.approved_trading_sid,
@@ -275,10 +303,10 @@ class DeploymentAttestation:
         }
 
     def expected_id(self) -> str:
-        """UUID5 of all authority fields in canonical JSON under the v1 namespace."""
+        """UUID5 of all authority fields in canonical JSON under the v2 namespace."""
         return str(
             uuid.uuid5(
-                DEPLOYMENT_ID_NAMESPACE_V1,
+                DEPLOYMENT_ID_NAMESPACE_V2,
                 canonical_json_bytes(self.authority_dict()).decode("utf-8"),
             )
         )
@@ -295,6 +323,8 @@ def build_deployment_attestation(
     certified_source_head: str,
     certified_source_tree: str,
     production_python_version: str,
+    launch_guard_byte_length: int,
+    launch_guard_sha256: str,
     executable_manifest_sha256: str,
     executable_file_count: int,
 ) -> DeploymentAttestation:
@@ -305,7 +335,10 @@ def build_deployment_attestation(
         "certified_source_head": certified_source_head,
         "certified_source_tree": certified_source_tree,
         "source_root": D10_SOURCE_ROOT,
-        "launcher": str(D10_LAUNCHER),
+        "launch_guard": str(D10_LAUNCH_GUARD),
+        "launch_guard_byte_length": launch_guard_byte_length,
+        "launch_guard_sha256": launch_guard_sha256,
+        "launcher": str(D10_SECOND_STAGE_LAUNCHER),
         "scheduler_contract_schema": D10_SCHEDULER_CONTRACT_SCHEMA,
         "approved_trading_sid": D10_SCHEDULER_CONTRACT.principal_sid,
         "production_python": D10_PRODUCTION_PYTHON,
@@ -315,7 +348,7 @@ def build_deployment_attestation(
     }
     deployment_id = str(
         uuid.uuid5(
-            DEPLOYMENT_ID_NAMESPACE_V1, canonical_json_bytes(fields).decode("utf-8")
+            DEPLOYMENT_ID_NAMESPACE_V2, canonical_json_bytes(fields).decode("utf-8")
         )
     )
     return DeploymentAttestation(**fields, deployment_id=deployment_id)

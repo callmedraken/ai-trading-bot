@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from trading_bot.runtime.personal_desktop_d10_deployment_identity import (
+    D10_GUARD_RELATIVE_PATH,
     D10_LAUNCHER_RELATIVE_PATH,
     EXECUTABLE_MANIFEST_SCHEMA,
     DeploymentIdentityError,
@@ -101,9 +102,11 @@ def _tracked_governed_paths(root: Path) -> dict[str, _HeadBlob]:
         if not (
             path.casefold().startswith("src/trading_bot/")
             or path.casefold() == D10_LAUNCHER_RELATIVE_PATH.casefold()
+            or path.casefold() == D10_GUARD_RELATIVE_PATH.casefold()
         ):
             continue
-        canonical_relative_path(path)
+        if path != D10_GUARD_RELATIVE_PATH:
+            canonical_relative_path(path)
         if (
             mode not in (b"100644", b"100755")
             or kind != b"blob"
@@ -117,6 +120,8 @@ def _tracked_governed_paths(root: Path) -> dict[str, _HeadBlob]:
         paths[path] = _HeadBlob(path, mode.decode("ascii"), oid)
     if D10_LAUNCHER_RELATIVE_PATH not in paths:
         raise DeploymentIdentityError("D10 launcher is not tracked in HEAD")
+    if D10_GUARD_RELATIVE_PATH not in paths:
+        raise DeploymentIdentityError("D10 launch guard is not tracked in HEAD")
     if len(paths) != len({path.casefold() for path in paths}):
         raise DeploymentIdentityError("casefold-colliding governed HEAD inventory")
     return paths
@@ -141,6 +146,9 @@ def _local_governed_paths(root: Path) -> set[str]:
     launcher = root / D10_LAUNCHER_RELATIVE_PATH
     _regular_no_reparse(launcher)
     paths.add(D10_LAUNCHER_RELATIVE_PATH)
+    guard = root / D10_GUARD_RELATIVE_PATH
+    _regular_no_reparse(guard)
+    paths.add(D10_GUARD_RELATIVE_PATH)
     if len(paths) != len({path.casefold() for path in paths}):
         raise DeploymentIdentityError("casefold-colliding local inventory")
     return paths
@@ -184,6 +192,7 @@ def build_d10_deployment_identity(
     if set(tracked) != local:
         raise DeploymentIdentityError("tracked and local governed inventories differ")
     entries = []
+    guard_data: bytes | None = None
     for relative, head_blob in sorted(tracked.items()):
         path = repository_root / relative
         _regular_no_reparse(path)
@@ -201,20 +210,27 @@ def build_d10_deployment_identity(
             raise DeploymentIdentityError(
                 "local governed bytes do not match certified HEAD blob"
             )
-        entries.append(
-            ExecutableManifestEntry(
-                relative, len(data), hashlib.sha256(data).hexdigest()
+        if relative == D10_GUARD_RELATIVE_PATH:
+            guard_data = data
+        else:
+            entries.append(
+                ExecutableManifestEntry(
+                    relative, len(data), hashlib.sha256(data).hexdigest()
+                )
             )
-        )
     if _git(repository_root, "status", "--porcelain=v1", "-z", "--untracked-files=all"):
         raise DeploymentIdentityError("certification checkout changed during build")
     if _local_governed_paths(repository_root) != set(tracked):
         raise DeploymentIdentityError("governed inventory changed during build")
+    if guard_data is None:
+        raise DeploymentIdentityError("D10 launch guard bytes are missing")
     manifest = ExecutableManifest(EXECUTABLE_MANIFEST_SCHEMA, tuple(entries))
     attestation = build_deployment_attestation(
         certified_source_head=expected_head,
         certified_source_tree=expected_tree,
         production_python_version=production_python_version,
+        launch_guard_byte_length=len(guard_data),
+        launch_guard_sha256=hashlib.sha256(guard_data).hexdigest(),
         executable_manifest_sha256=manifest.digest,
         executable_file_count=len(entries),
     )

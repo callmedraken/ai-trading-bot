@@ -86,12 +86,17 @@ def test_d10_contract_diff_is_exact_and_zero_semantic_arguments() -> None:
         for field in fields(d5)
         if getattr(d5, field.name) != getattr(d10, field.name)
     }
-    assert changed == {"schema", "launcher"}
+    assert changed == {
+        "schema",
+        "interpreter_arguments",
+        "launcher",
+        "working_directory",
+    }
     assert d10_contract.is_frozen_one_week_soak_scheduler_contract(d10)
     assert not d10_contract.is_frozen_one_week_soak_scheduler_contract(
         replace(d10, restart_count=1)
     )
-    assert d10.launcher == d10_contract.D10_LAUNCHER
+    assert d10.launcher == d10_contract.D10_LAUNCH_GUARD
     assert d10.production_interpreter == PureWindowsPath(
         r"F:\AITradingBot\runtime\python.exe"
     )
@@ -99,7 +104,7 @@ def test_d10_contract_diff_is_exact_and_zero_semantic_arguments() -> None:
     assert d10.run_level == "LeastPrivilege"
     assert d10.task_scheduler_run_level == "LUA"
     assert d10.semantic_arguments == ()
-    assert d10.interpreter_arguments == ("-I",)
+    assert d10.interpreter_arguments == d10_contract.D10_INTERPRETER_ARGUMENTS
     assert d10.restart_on_failure is False
     assert d10.restart_count == 0
     assert d10.multiple_instances_policy == "IgnoreNew"
@@ -112,8 +117,9 @@ def test_deployment_spec_bounds_trigger_at_exact_end() -> None:
     assert spec.end_boundary.astimezone(UTC) == spec.window.end_utc
     assert spec.task.start_boundary.astimezone(UTC) > activation
     assert spec.task.start_boundary.astimezone(UTC) < spec.window.end_utc
-    assert spec.task.arguments == ("-I", str(d10_contract.D10_LAUNCHER))
+    assert spec.task.arguments == d10_contract.D10_GUARD_ARGUMENTS
     assert spec.task.semantic_arguments == ()
+    assert spec.task.working_directory == d10_contract.D10_ROOT
     assert spec.task.scheduler_owned_environment == ()
     assert spec.task.start_when_available
     with pytest.raises(ValueError):
@@ -122,6 +128,42 @@ def test_deployment_spec_bounds_trigger_at_exact_end() -> None:
         replace(spec, end_boundary=spec.window.end_utc)
     with pytest.raises(ValueError):
         replace(spec, task=replace(spec.task, principal="wrong"))
+    with pytest.raises(ValueError):
+        replace(spec, task=replace(spec.task, arguments=("-I", "wrong")))
+
+
+def test_sealed_d10_paths_and_exact_two_stage_commands() -> None:
+    assert str(d10_contract.D10_ROOT) == r"F:\AITradingBot\D10"
+    assert str(d10_contract.D10_SOURCE_ROOT) == r"F:\AITradingBot\D10\source"
+    assert str(d10_contract.D10_LAUNCH_GUARD) == r"F:\AITradingBot\D10\launch-guard.py"
+    assert str(d10_contract.D10_CACHE_PREFIX) == r"F:\AITradingBot\D10\no-pycache"
+    assert d10_contract.D10_GUARD_SOURCE_RELATIVE_PATH == (
+        "scripts/run_personal_desktop_d10_launch_guard.py"
+    )
+    assert d10_contract.D10_LAUNCHER_SOURCE_RELATIVE_PATH == (
+        "scripts/run_personal_desktop_unattended_one_week_soak.py"
+    )
+    assert d10_contract.D10_GUARD_ARGUMENTS == (
+        "-I",
+        "-S",
+        "-B",
+        "-X",
+        r"pycache_prefix=F:\AITradingBot\D10\no-pycache",
+        r"F:\AITradingBot\D10\launch-guard.py",
+    )
+    assert d10_contract.D10_SECOND_STAGE_ARGUMENTS == (
+        "-I",
+        "-S",
+        "-B",
+        "-X",
+        r"pycache_prefix=F:\AITradingBot\D10\no-pycache",
+        r"F:\AITradingBot\D10\source\scripts\run_personal_desktop_unattended_one_week_soak.py",
+    )
+    assert (
+        d10_contract.D10_SCHEDULER_CONTRACT.working_directory == d10_contract.D10_ROOT
+    )
+    assert r"F:\AI\worktrees" not in " ".join(d10_contract.D10_GUARD_ARGUMENTS)
+    assert r"F:\AI\worktrees" not in " ".join(d10_contract.D10_SECOND_STAGE_ARGUMENTS)
 
 
 def test_direct_window_model_rejects_non_utc_fields() -> None:

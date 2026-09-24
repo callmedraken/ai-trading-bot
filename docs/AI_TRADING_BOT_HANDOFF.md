@@ -3247,3 +3247,22 @@ The accepted second-stage A4 boundary reacquires current C1/Trading provenance, 
 The second-stage launcher invokes A4 before any future effectful D10 controller. The activation lease remains unimplemented and therefore fail-closed. No P124-1 host qualification, provisioning, signing/publication, scheduler mutation, provider/publication/settlement/recovery, broker-paper, or live effect occurred or is authorized. Broad certification remains deferred until the final D10 source tree.
 
 Next source checkpoint: Sol High A124-6 / Architecture-123 A5 activation-lease source implementation. P124-1 and all protected deployment checkpoints remain separate and require explicit review/authorization before D10 activation.
+
+## Architecture 124 A124-6 — ACCEPTED
+
+Exact GitHub review accepted the D10 activation-lease source authority and its pre-source / governed-source integration.
+
+```text
+HEAD 37d38571d31fa93bd36834ce2e591c7f4f897fea
+TREE 22f1753889216894c2c3a11a23188fb68556dd8d
+focused verification 270 passed
+Ruff / format / diff checks PASS
+```
+
+The accepted lease schema is `personal-desktop-d10-activation-lease/v1` at fixed path `F:\\AITradingBot\\D10\\activation.lease.json`, with reserved `.installing` and `.tmp` names. Canonical lease facts bind deployment ID, signed-attestation SHA-256, certified HEAD/TREE audit facts, exact scheduler identity, Trading SID, production Python identity/version, accepted UTC activation, exact activation+7-day end, and deterministic UUID5 soak identity. ACTIVE is start-inclusive and end-exclusive; absence, malformed/conflicting state, identity mismatch, not-yet-active, or expiry blocks.
+
+The pre-source guard now requires both verified deployment identity and an ACTIVE fixed lease before launching the single fixed second-stage child. The governed-source boundary independently rereads deployment/lease state and binds ACTIVE lease evidence to genuine same-process A124-5 deployment provenance. Copied/reconstructed evidence does not grant authority.
+
+The publication model remains create-only and non-renewable in place; ordinary runtime has no writer. No real lease was created or published, P124-1 was not run, Task Scheduler was not mutated, and no provider/publication/settlement/recovery/broker-paper/live effect occurred. Broad certification remains deferred until the final D10 source tree.
+
+Architecture 124 source prerequisites A124-1 through A124-6 are now accepted. Next safe source checkpoint is Architecture-122 recurring one-wake controller composition (S1/S2/S3 integration), still source-only and fail-closed; protected P124-1/P124-2/... remain separate and require explicit approval before deployment.

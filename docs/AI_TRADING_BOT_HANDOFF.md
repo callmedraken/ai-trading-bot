@@ -3042,3 +3042,37 @@ execution artifacts cannot undermine the signed source manifest.
 
 No production signing/provisioning, activation lease, scheduler mutation, or
 trading effect is authorized.
+
+
+## Architecture 124 — sealed pre-source D10 launch guard
+
+Architecture-123 A3 correctly stopped without changes. The old scheduler target
+could execute source-tree Python/imported bytecode before deployment identity
+was proven, so an in-source A4 verifier cannot be the first trust boundary.
+
+Frozen resolution:
+
+```text
+Task Scheduler
+-> F:\AITradingBot\runtime\python.exe
+   -I -S -B
+   -X pycache_prefix=F:\AITradingBot\D10\no-pycache
+   F:\AITradingBot\D10\launch-guard.py
+-> verify signed Architecture-123 deployment + sealed source
+-> later verify ACTIVE one-week lease
+-> exactly one child using the same isolation/cache policy
+-> F:\AITradingBot\D10\source\scripts\run_personal_desktop_unattended_one_week_soak.py
+```
+
+The recurring D10 source is a sealed Administrator-owned snapshot, not a mutable
+Git worktree. Trading has read-only access. The signed attestation must bind the
+guard byte length/SHA-256 plus sealed source root. A4 remains defense-in-depth
+inside the already verified source.
+
+The production Python runtime/stdlib is now an explicit pre-source trusted
+substrate and requires its own protected host qualification; if Trading can
+modify it, D10 remains BLOCKED.
+
+Next: Sol High A124-1 pure source revision only — scheduler target/arguments,
+attestation guard fields/source-root revision, and certification-builder
+revision. Do not implement production provisioning or effects yet.

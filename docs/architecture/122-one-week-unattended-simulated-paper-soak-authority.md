@@ -59,7 +59,11 @@ A late wake may continue only when ordinary source-derived session and pre-open 
 
 If the next intended decision deadline has passed and no exact decision was finalized, return MISSED_DECISION_DEADLINE and stop the soak. Do not create the missed decision later.
 
-If a finalized decision targets a session strictly older than the current completed session, ordinary D10 must not settle it. Treat that as stale finalized state, stop, and require operator review. Architecture 121 is not automatically reused.
+Historical finalized decision artifacts are retained after successful settlement, so their mere presence is not stale state.
+
+D10 must distinguish already-reconciled historical decisions from an unresolved prior-session decision. Before any new settlement or publication effect, it must prove that every finalized decision older than the current completed session is already durably converged: exact invocation storage is finalized-identical, the expected Architecture-67 operation is already applied, the completed receipt verifies, and the Paper-v2 lineage contains the exact deterministic successor.
+
+If any prior finalized decision is not independently proven reconciled, classify STALE_UNRESOLVED_DECISION, stop the soak, and require operator review. Ordinary D10 must not settle that prior decision. Architecture 121 is not automatically reused.
 
 If history or durable state implies more than one trading session would require retrospective fresh work, return SESSION_GAP and stop. Do not synthesize, skip, or backfill.
 
@@ -71,7 +75,7 @@ A restarted or duplicate process may observe already-completed durable work and 
 
 ## Stop conditions
 
-Stop the soak for operator review on BLOCKED, SESSION_GAP, MISSED_DECISION_DEADLINE, provider attempt ambiguity, RECEIPT_RECOVERY_REQUIRED, stale finalized decision, conflicting or malformed durable state, account predecessor/tip/lineage contradiction, C1 or Trading-token drift, effect-gate drift, unexpected scheduler/source identity, an ambiguous effect result, or a source upgrade during the active soak.
+Stop the soak for operator review on BLOCKED, SESSION_GAP, MISSED_DECISION_DEADLINE, provider attempt ambiguity, RECEIPT_RECOVERY_REQUIRED, STALE_UNRESOLVED_DECISION, conflicting or malformed durable state, account predecessor/tip/lineage contradiction, C1 or Trading-token drift, effect-gate drift, unexpected scheduler/source identity, an ambiguous effect result, or a source upgrade during the active soak.
 
 A stop condition does not restart or extend the seven-day window automatically.
 
@@ -95,7 +99,7 @@ Source implementation and certification come before scheduler mutation. The exis
 
 ## Acceptance criteria
 
-Tests must prove zero semantic scheduler arguments, an exact seven-day bound, source-owned session derivation, ordered effect/reconciliation composition, one-attempt limits, finally-restored gates, stale/missed/session-gap fail-closed behavior, diagnostic-only receipt recovery, duplicate/restart convergence, no broker/live path, sanitized evidence, and unchanged Architecture-111/114/121 semantics.
+Tests must prove zero semantic scheduler arguments, an exact seven-day bound, source-owned session derivation, ordered effect/reconciliation composition, one-attempt limits, finally-restored gates, stale-unresolved/missed/session-gap fail-closed behavior, diagnostic-only receipt recovery, duplicate/restart convergence, no broker/live path, sanitized evidence, and unchanged Architecture-111/114/121 semantics.
 
 ## Exit
 

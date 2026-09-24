@@ -18,7 +18,7 @@ S1 — D10 orchestration
 Add a zero-semantic-argument controller that composes only reviewed public boundaries. Order: capture if required; read-only daily-cycle truth; at most one current-session settlement; fresh read-only settlement reconciliation; at most one next-session pre-open publication; fresh read-only decision reconciliation; final all-gates-closed evidence. No catch-up loop.
 
 S2 — stale and missed-session admission
-Add explicit fail-closed handling for stale finalized decisions, missed decision deadlines, and session gaps. Architecture-121 recovery is never called automatically.
+Add explicit fail-closed handling for unresolved prior-session finalized decisions, missed decision deadlines, and session gaps. Historical finalized decisions that are independently proven already-applied with exact completed receipt/successor lineage are benign retained audit history. Any older decision not proven reconciled is STALE_UNRESOLVED_DECISION. Architecture-121 recovery is never called automatically.
 
 S3 — bounded window and evidence
 Add source models for activation, exact seven-day end boundary, active/expired state, sanitized per-wake evidence, and a cumulative read-only summary.
@@ -43,7 +43,7 @@ D10-E end-of-week closeout: prove no further D10 effects can occur, collect evid
 
 ## Focused tests
 
-Cover zero arguments; all gates closed on entry/final exit; only one gate open at a time; provider/settlement/publication one-attempt limits; no receipt recovery; stale decision, missed deadline, and session gap stop behavior; duplicate/restart convergence; already-applied and already-finalized idempotency; ambiguity prevents same-wake retry; exact timezone-safe seven-day expiry; expired soak has no effect; scheduler end boundary equals activation plus seven days; sanitized evidence; and existing D5/D7/D8/D9/Architecture-121 regressions.
+Cover zero arguments; all gates closed on entry/final exit; only one gate open at a time; provider/settlement/publication one-attempt limits; no receipt recovery; reconciled historical decisions remain benign; stale-unresolved decision, missed deadline, and session gap stop behavior; duplicate/restart convergence; already-applied and already-finalized idempotency; ambiguity prevents same-wake retry; exact timezone-safe seven-day expiry; expired soak has no effect; scheduler end boundary equals activation plus seven days; sanitized evidence; and existing D5/D7/D8/D9/Architecture-121 regressions.
 
 ## Fault exercises
 

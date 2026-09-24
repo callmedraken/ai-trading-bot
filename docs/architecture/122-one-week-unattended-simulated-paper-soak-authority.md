@@ -145,3 +145,16 @@ expired.
 
 The lease is not renewable in place. Extending the soak requires a new reviewed
 bounded authorization after the current week is closed.
+
+
+## Deployment identity prerequisite
+
+The activation-lease implementation correctly stopped because the repository
+had no runtime-verifiable mapping from certified Git HEAD/TREE to deployed
+executable bytes without trusting `.git`.
+
+Architecture 123 is therefore a mandatory predecessor. D10 runtime authority
+requires the fixed detached-signed deployment attestation and complete
+executable-file manifest defined there. The activation lease binds the verified
+deployment ID and attestation digest; HEAD/TREE strings alone are never runtime
+authority.

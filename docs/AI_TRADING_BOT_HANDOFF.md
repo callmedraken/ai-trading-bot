@@ -3164,3 +3164,49 @@ attestation/manifest validation, complete sealed-source inventory verification,
 same-handle byte hashing with final drift checks, and fail-closed launch of at
 most one exact second-stage command only after every pre-source check succeeds.
 Broad certification remains deferred until the final D10 source tree.
+
+## Architecture 124 A124-3 — ACCEPTED
+
+Exact GitHub review accepted the sealed D10 pre-source guard checkpoint.
+
+Accepted source:
+
+```text
+HEAD 0099634d598484f40f113ff36e2377dffea1deec
+TREE 6cbcc50afa6652274f9fa86e5c62179547b36faf
+guard-focused verification 122 passed, then 4 account-proof tests passed
+overlapping A123/A122/Windows verification 319 passed, 2 expected skips
+Ruff / format / diff checks PASS
+```
+
+The reviewed guard remains stdlib-only before governed-source verification and
+now verifies the fixed D10 Trading account baseline, protected trust/source
+objects, P-256/SHA-256 raw P1363 detached signature, canonical v2 attestation,
+canonical v1 executable manifest, signed guard length/SHA-256, complete sealed
+source inventory, and every governed file's exact bytes through its already
+opened no-follow handle with final drift checks.
+
+The tracked second-stage launcher enforces the exact production interpreter and
+`-I -S -B` / fixed pycache-prefix startup contract, then adds only
+`F:\AITradingBot\D10\source\src` and
+`F:\AITradingBot\runtime\Lib\site-packages` before the first
+`trading_bot` import. It does not invoke `site.main()` or process
+`.pth`/sitecustomize/usercustomize startup hooks.
+
+Real second-stage launch remains deliberately fail-closed because the
+Architecture-122 ACTIVE lease gate is still an unimplemented blocker. This
+checkpoint does not provision `F:\AITradingBot\D10`, sign or publish trust
+material, qualify the production runtime, modify Task Scheduler, start the
+seven-day soak, or authorize provider/publication/settlement/broker/live
+effects. Architecture-77 remains unchanged.
+
+No GitHub status checks were attached to this branch commit; acceptance is based
+on exact source/diff review plus the reported focused local verification above.
+Broad certification remains deferred until the final D10 source tree is frozen.
+
+Next source checkpoint: Sol High A124-4 production-Python substrate
+qualification contract. Define exact read-only evidence and fail-closed
+acceptance criteria for the fixed interpreter, stdlib/search-path substrate, and
+`F:\AITradingBot\runtime\Lib\site-packages`; do not perform protected host
+qualification yet. P124-1 remains a later explicit administrator/Trading host
+checkpoint.

@@ -75,3 +75,13 @@ Required source work:
 
 The later D10 controller must read this lease itself. Task Scheduler end time is
 defense in depth and may not be the sole expiry authority.
+
+
+## Architecture-123 prerequisite
+
+Do not resume the activation lease or recurring controller until Architecture
+123 provides the runtime-verifiable signed deployment identity.
+
+The production runtime may not read `.git`, trust scheduler state, environment
+variables, or accept caller-supplied HEAD/TREE as authority. The lease binds the
+verified deployment ID and signed-attestation digest instead.

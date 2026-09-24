@@ -3329,3 +3329,16 @@ Exact review confirmed one sequencing dependency rather than a collector defect:
 No protected host qualification, D10 provisioning, signing/trust publication, activation lease publication, scheduler mutation, provider/publication/settlement/recovery, broker-paper, or live effect was performed by this source checkpoint.
 
 Next safe work is preparation/review of the protected P124-2/P124-3 operator tooling and exact certified deployment material. Do not execute P124-2 or P124-3 without separate operator approval.
+
+
+## P124-2/P124-3 protected deployment tooling - IMPLEMENTED, source review pending
+
+This feature branch prepares separate source-only operator boundaries for P124-2 sealed guard/source provisioning and P124-3 external signing/trust publication. The tools reuse the Architecture-123 certification builder and its canonical manifest/attestation models. They admit only certified executable HEAD `acee8f80e947bcaefd79fa2c44531e8bbdf4cd0c` and TREE `e2850c86adc83b70ab11f6db9e421e8584832c98`; that executable source identity remains frozen.
+
+P124-2 is a fixed-root Administrator operation with an explicit execution switch. It binds writes to the exact manifest inventory, uses create-only staging and same-volume publication, applies the protected Administrator/SYSTEM/Trading ACL when each object is created, then reopens final objects to verify native path/type/security, exact inventory, and bytes. It refuses reserved, partial, installing, lease, cache, or trust state and emits a bounded sanitized transcript.
+
+P124-3 accepts only the exact D10 key identity and P-256/SHA-256/P1363 protocol through an external non-exportable signer port. It independently rebuilds and admits the clean certified source identity, verifies the detached signature before writing, publishes only the attestation, signature, and executable manifest through fixed create-only installing/final paths, then reopens and verifies all final bytes and native identity. No private-key material is accepted by the request model.
+
+This is implementation pending exact source review, not protected checkpoint acceptance. P124-2, P124-3, and P124-1 were not run; the production D10 root, activation lease, and Task Scheduler were not touched. No signing, trust publication, provider, settlement, broker-paper, or live operation occurred. Focused P124-2/P124-3 and directly overlapping deployment-identity/launch-guard verification completed with 289 passed; Ruff check, Ruff format check, and diff checks passed. Broad certification was not rerun. The protected order remains P124-2 -> P124-3 -> P124-1 -> P124-4 -> P124-5, and P124-1 must PASS before P124-4 or P124-5.
+
+Next step: review the exact feature commit/diff and focused verification. Do not run the P124 tools from this source-review checkpoint.

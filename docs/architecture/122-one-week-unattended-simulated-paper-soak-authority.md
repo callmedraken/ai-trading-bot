@@ -158,3 +158,26 @@ requires the fixed detached-signed deployment attestation and complete
 executable-file manifest defined there. The activation lease binds the verified
 deployment ID and attestation digest; HEAD/TREE strings alone are never runtime
 authority.
+
+
+## Architecture 124 launch-contract revision
+
+The original D10 scheduler target that pointed directly at the source-tree
+launcher is superseded before any production deployment.
+
+The final D10 scheduler must invoke the fixed sealed pre-source guard defined by
+Architecture 124:
+
+```text
+F:\AITradingBot\runtime\python.exe
+-I -S -B
+-X pycache_prefix=F:\AITradingBot\D10\no-pycache
+F:\AITradingBot\D10\launch-guard.py
+```
+
+The guard, not Task Scheduler, verifies deployment identity and ACTIVE lease
+state before launching the sealed second-stage D10 source.
+
+The deployed trading source root is fixed at
+`F:\AITradingBot\D10\source`; recurring D10 authority no longer runs from a
+mutable Git worktree.

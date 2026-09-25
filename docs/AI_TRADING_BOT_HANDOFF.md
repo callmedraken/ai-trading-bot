@@ -3532,3 +3532,26 @@ Historical S5 HEAD `acee8f80e947bcaefd79fa2c44531e8bbdf4cd0c` and tree
 longer deployable after this governed source change. Next: exact A125-2
 commit/diff review, then fresh S5-R1 exact-tree certification and acceptance.
 All P124 protected execution remains blocked until S5-R1 acceptance.
+
+## S5-R1 first attempt — FAILED; import-order correction pending review
+
+The first S5-R1 certification attempt used detached worktree
+`F:\AI\worktrees\ai-trading-bot-s5r1-aaf164b` at exact HEAD
+`aaf164b527d0b329b90035fe5f1c30c95c0875de` / TREE
+`2b1a52a3a379c0ea28dd293ce5fc8f0f99b15633`. Failed evidence is
+preserved at `F:\AI\temp\pytest\s5r1-certification-evidence-20260924-223614`.
+Broad-1 encountered one circular-import collection error in
+`tests/portfolio_analytics/test_optimized_simulation.py`; broad-2 completed
+3372 passed / 2 skipped, and serial completed 926 passed / 9 skipped. There
+were no test failures. Source identity remained unchanged during that attempt,
+and no P124 or other protected operation occurred.
+
+The eager analytics import of the public simulation package already existed in
+historical accepted S5 source at `acee8f80e947bcaefd79fa2c44531e8bbdf4cd0c`.
+This is a pre-existing import-order defect, not an A125-2 trust migration
+regression. The narrow correction defers the concrete runtime type import to
+request validation and retains its real-class `isinstance` guard. This source
+tree differs from the failed certification tree; that evidence cannot certify
+the correction. Next: exact correction review, then a completely fresh S5-R1
+exact-tree certification. P124 protected execution remains blocked until
+S5-R1 acceptance.

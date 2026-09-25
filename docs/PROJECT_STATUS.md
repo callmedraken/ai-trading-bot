@@ -3493,3 +3493,23 @@ occurred.
 
 Next step: exact source/diff review of this A125-1 checkpoint. Do not execute
 P125-1 until it is separately authorized after source review.
+
+## Architecture 125 A125-1 signing-key bootstrap — ACCEPTED
+
+Exact GitHub review accepted the source-only Windows CNG D10 v3 key-enrollment boundary and concrete ExternalSigner, including the additive native correction.
+
+```text
+IMPLEMENTATION HEAD a0547d2ef3b110f77d5998f6d4349d6504d94989
+CORRECTION HEAD     9e3f744d3533788679a833c589c8d3c1a028aac1
+CORRECTION TREE     dc5d597fb582390105c6c190ef443e91662c02f2
+focused verification 117 passed
+Ruff / format / diff checks PASS
+```
+
+The accepted source freezes Microsoft Software Key Storage Provider, machine-scoped persisted key `AITradingBot-D10-DeploymentAttestation-v3`, logical identity `AITradingBot/D10/DeploymentAttestation/v3`, ECDSA P-256 signing-only usage, zero export policy, create-only enrollment, and protected Administrator/SYSTEM-only key security with Trading absent. Enrollment exports only the validated public P-256 point and bounded sanitized evidence; no private-key material or generic key-selection surface is exposed.
+
+The native correction recognizes only exact `NTE_NOT_FOUND` and `NTE_BAD_KEYSET` as positive persisted-key absence and keeps every other NCryptOpenKey error fail-closed. Security-descriptor readback now requests only OWNER|GROUP|DACL plus NCRYPT_SILENT_FLAG, removing unnecessary SACL privilege dependency while retaining exact protected-DACL/ACE verification.
+
+A125-1 source acceptance creates no production key and does not alter the currently pinned v2 D10 trust anchor. The historical S5 identity `acee8f80e947bcaefd79fa2c44531e8bbdf4cd0c` / `e2850c86adc83b70ab11f6db9e421e8584832c98` remains accepted but is not deployable until the v3 transition completes.
+
+Next protected checkpoint: P125-1 native creation of the fixed non-exportable v3 key. It requires separate explicit operator authorization. After P125-1 evidence is reviewed, A125-2 must pin the observed v3 public point/key ID and S5-R1 must recertify the resulting exact executable tree before P124-2/P124-3 may execute.

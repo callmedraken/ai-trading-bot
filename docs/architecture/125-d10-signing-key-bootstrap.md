@@ -214,3 +214,36 @@ ChatGPT review may A125-2 pin the returned public point.
 This source correction has not run the production read-only qualification or
 mutated the persisted key. That qualification remains the next separately
 authorized protected checkpoint.
+
+## 7. Accepted read-only qualification and A125-2 migration
+
+The separately authorized qualification of the existing persisted v3
+machine key is accepted as read-only PASS evidence (reason: None). Its exact
+qualified SEC1 P-256 public point is:
+
+```text
+04f2e83034f58cc1e27b1ff6511df503c31d4103782b2992ee64ebb7a9e734a3548c5daaa5e5c69e83c2f2c2c825c26b61efd356680eed3d60822585c04493ba61
+```
+
+Public-key SHA-256: `fb22627f6d01d63ecfcc02dbe6e34a5529bdde30ceb0fcb8037eead6f0c56b1e`.
+Evidence directory: `F:\AI\temp\a125-existing-key-qualification-20260924-215835`.
+The repository remained at HEAD
+`9c6475c9e5736697878e9f7a225ed090a04f5c35` and tree
+`d7cc1df327f37bc531a3b32917d815e993cd889d` during qualification.
+The qualification did not mutate the key, sign, or execute any P124 operation.
+
+A125-2 pins only this qualified point and logical key ID
+`AITradingBot/D10/DeploymentAttestation/v3` in the governed deployment
+identity, pre-source launch guard, P124-3 verifier, and P124-1 signed-attestation
+verifier. This is source-only. The deployment-attestation schema and deployment
+UUID namespace remain v2; the separate Architecture-77 bootstrap trust anchor
+remains unchanged. The old D10 v2 key is historical and cannot authorize a new
+deployment.
+
+Historical S5 HEAD `acee8f80e947bcaefd79fa2c44531e8bbdf4cd0c` and tree
+`e2850c86adc83b70ab11f6db9e421e8584832c98` remain accepted historical
+evidence but are no longer deployable after the governed source change. Fresh
+S5-R1 exact-tree certification and acceptance are mandatory next. All P124
+protected execution remains blocked until S5-R1 acceptance. A125-2 itself
+performs no signing, production key access, protected deployment, scheduler
+mutation, or trading/provider effect.

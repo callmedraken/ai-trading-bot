@@ -498,7 +498,7 @@ def test_transcript_contains_no_private_output_path_or_native_private_export_api
     assert "NCryptImportKey" not in source
 
 
-def test_signer_identity_is_future_v3_and_frozen_protocol() -> None:
+def test_signer_identity_matches_required_v3_protocol() -> None:
     identity = cng.WindowsCngExternalSigner().identity
 
     assert type(identity) is deployment.SigningIdentity
@@ -507,7 +507,8 @@ def test_signer_identity_is_future_v3_and_frozen_protocol() -> None:
     assert identity.digest_algorithm == "SHA-256"
     assert identity.signature_encoding == "IEEE-P1363"
     assert identity.private_key_exportable is False
-    assert cng.SIGNING_KEY_ID != deployment.D10_SIGNING_KEY_ID
+    assert cng.SIGNING_KEY_ID == deployment.D10_SIGNING_KEY_ID
+    deployment.require_signer_identity(identity)
 
 
 def test_signer_opens_only_fixed_machine_key_revalidates_and_signs_one_digest() -> None:

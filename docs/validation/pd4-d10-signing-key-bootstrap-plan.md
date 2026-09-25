@@ -155,3 +155,34 @@ are diagnostics only; they and raw binary serialization are not authority
 requirements. No production qualification has run and no production key
 mutation occurred in this source checkpoint. The read-only qualification
 remains the next separately authorized protected checkpoint.
+
+## F. Accepted qualification and A125-2 source-only result
+
+The separately authorized qualification of the existing persisted v3
+machine key is accepted as read-only PASS evidence (reason: None). Its exact
+qualified SEC1 P-256 public point is:
+
+```text
+04f2e83034f58cc1e27b1ff6511df503c31d4103782b2992ee64ebb7a9e734a3548c5daaa5e5c69e83c2f2c2c825c26b61efd356680eed3d60822585c04493ba61
+```
+
+Public-key SHA-256: `fb22627f6d01d63ecfcc02dbe6e34a5529bdde30ceb0fcb8037eead6f0c56b1e`.
+Evidence directory: `F:\AI\temp\a125-existing-key-qualification-20260924-215835`.
+The repository remained at HEAD
+`9c6475c9e5736697878e9f7a225ed090a04f5c35` and tree
+`d7cc1df327f37bc531a3b32917d815e993cd889d` during qualification.
+The qualification did not mutate the key, sign, or execute any P124 operation.
+
+A125-2 migrates the governed D10 signing identity to
+`AITradingBot/D10/DeploymentAttestation/v3` and pins exactly the qualified
+point in the launch guard, P124-3 verifier, and P124-1 verifier. Focused tests
+must prove all three copies and their digest, reject v2 D10 authority, and
+preserve the independent Architecture-77 bootstrap anchor. The attestation
+schema and deployment UUID namespace remain v2. No production CNG key is
+accessed in this source checkpoint.
+
+Historical S5 HEAD `acee8f80e947bcaefd79fa2c44531e8bbdf4cd0c` and tree
+`e2850c86adc83b70ab11f6db9e421e8584832c98` stay accepted but cannot
+authorize protected deployment after this governed source change. The next gate
+is fresh S5-R1 exact-tree certification and acceptance. P124-2, P124-3,
+P124-1, P124-4, and P124-5 remain blocked until that acceptance.

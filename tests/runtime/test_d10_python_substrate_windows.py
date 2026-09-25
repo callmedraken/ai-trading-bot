@@ -245,13 +245,19 @@ def test_signed_a123_input_comes_from_fixed_paths_and_verified_bytes(
             production_python_version=q.VERSION,
         ),
     )
+    assert a.D10_SIGNING_KEY_ID == "AITradingBot/D10/DeploymentAttestation/v3"
     result = w.collect_signed_a123_identity()
     assert reads == [(w._D10_ATTESTATION, 64 * 1024), (w._D10_SIGNATURE, 64)]
     assert result.attestation_sha256 == hashlib.sha256(b"attestation").hexdigest()
     assert result.signature_verified and result.signing_key_id_verified
 
 
-def test_wrong_signed_key_id_blocks(monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.parametrize(
+    "wrong_key_id", ["wrong", "AITradingBot/D10/DeploymentAttestation/v2"]
+)
+def test_wrong_signed_key_id_blocks(
+    monkeypatch: pytest.MonkeyPatch, wrong_key_id: str
+) -> None:
     from types import SimpleNamespace
 
     from trading_bot.runtime import personal_desktop_d10_deployment_identity as a
@@ -261,7 +267,7 @@ def test_wrong_signed_key_id_blocks(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         a,
         "parse_deployment_attestation",
-        lambda data: SimpleNamespace(signing_key_id="wrong"),
+        lambda data: SimpleNamespace(signing_key_id=wrong_key_id),
     )
     with pytest.raises(w.NativeFailure, match="key identity"):
         w.collect_signed_a123_identity()

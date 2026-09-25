@@ -18,6 +18,7 @@ from scripts import build_d10_deployment_identity as builder
 from trading_bot.runtime.personal_desktop_d10_deployment_identity import (
     D10_GUARD_RELATIVE_PATH,
     D10_LAUNCHER_RELATIVE_PATH,
+    D10_SIGNING_KEY_ID,
     D10_SOURCE_ROOT,
     DEPLOYMENT_ATTESTATION_SCHEMA,
     DEPLOYMENT_ID_NAMESPACE_V2,
@@ -56,6 +57,40 @@ def attestation(**changes: object):
     }
     fields.update(changes)
     return build_deployment_attestation(**fields)
+
+
+def test_v3_signing_key_is_exact_v2_schema_namespace_authority() -> None:
+    item = attestation()
+    assert D10_SIGNING_KEY_ID == "AITradingBot/D10/DeploymentAttestation/v3"
+    assert item.signing_key_id == D10_SIGNING_KEY_ID
+    assert (
+        DEPLOYMENT_ATTESTATION_SCHEMA
+        == "personal-desktop-d10-deployment-attestation/v2"
+    )
+    assert item.schema == DEPLOYMENT_ATTESTATION_SCHEMA
+    assert DEPLOYMENT_ID_NAMESPACE_V2 == uuid.UUID(
+        "703b383a-ee31-5ffb-8f61-09cb8edf146e"
+    )
+    assert item.authority_dict()["signing_key_id"] == D10_SIGNING_KEY_ID
+
+    old_id = "AITradingBot/D10/DeploymentAttestation/v2"
+    old_authority = item.authority_dict() | {"signing_key_id": old_id}
+    old_deployment_id = str(
+        uuid.uuid5(
+            DEPLOYMENT_ID_NAMESPACE_V2,
+            canonical_json_bytes(old_authority).decode("utf-8"),
+        )
+    )
+    assert item.deployment_id != old_deployment_id
+    with pytest.raises(DeploymentIdentityError, match="signing key ID"):
+        replace(item, signing_key_id=old_id)
+    with pytest.raises(DeploymentIdentityError, match="signing key ID"):
+        parse_deployment_attestation(
+            canonical_json_bytes(
+                item.to_dict()
+                | {"signing_key_id": old_id, "deployment_id": old_deployment_id}
+            )
+        )
 
 
 def test_canonical_round_trip_and_uuid_material() -> None:

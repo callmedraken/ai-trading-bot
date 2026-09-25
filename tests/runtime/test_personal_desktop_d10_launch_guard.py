@@ -36,6 +36,48 @@ from trading_bot.runtime.personal_desktop_d10_deployment_identity import (
 )
 
 
+def test_v3_public_point_is_exact_and_bootstrap_trust_is_unchanged() -> None:
+    from scripts import d10_protected_deployment_windows as deployment_windows
+    from scripts import d10_python_substrate_windows as substrate_windows
+    from trading_bot.runtime import personal_desktop_d10_deployment_identity as identity
+    from trading_bot.runtime.windows_authority import PRODUCTION_PINNED_BOOTSTRAP_KEYS
+
+    approved = bytes.fromhex(
+        "04f2e83034f58cc1e27b1ff6511df503c31d4103782b2992ee64ebb7a9e734a3"
+        "548c5daaa5e5c69e83c2f2c2c825c26b61efd356680eed3d60822585c04493ba61"
+    )
+    legacy = bytes.fromhex(
+        "04a73d90064e8b97e4a8373f48cac44718eb375ca52581233d614365294164efba"
+        "40c6758f0f4cc455f6b2bf9b222696f9bc83c91ddf625fd01de46a6e7cd9c52e"
+    )
+    assert (
+        guard.D10_SIGNING_KEY_ID
+        == identity.D10_SIGNING_KEY_ID
+        == ("AITradingBot/D10/DeploymentAttestation/v3")
+    )
+    assert (
+        guard.D10_ATTESTATION_SCHEMA == "personal-desktop-d10-deployment-attestation/v2"
+    )
+    for point in (
+        guard.D10_PUBLIC_KEY,
+        deployment_windows.PUBLIC_KEY,
+        substrate_windows._PUBLIC_KEY,
+    ):
+        assert point == approved
+        assert len(point) == 65
+        assert point[0] == 0x04
+        assert point != legacy
+        assert hashlib.sha256(point).hexdigest() == (
+            "fb22627f6d01d63ecfcc02dbe6e34a5529bdde30ceb0fcb8037eead6f0c56b1e"
+        )
+    assert deployment_windows.PUBLIC_KEY == guard.D10_PUBLIC_KEY
+    assert substrate_windows._PUBLIC_KEY == guard.D10_PUBLIC_KEY
+    bootstrap = PRODUCTION_PINNED_BOOTSTRAP_KEYS.keys
+    assert len(bootstrap) == 1
+    assert bootstrap[0].key_id == "AITradingBot/Authority/Bootstrap/v1"
+    assert bootstrap[0].public_key == legacy
+
+
 class FakeNative:
     def __init__(self) -> None:
         self.paths: dict[int, str] = {}
@@ -1783,3 +1825,14 @@ def test_a1246_second_stage_python_identity_mismatch_blocks(
         guard._require_runtime_for_second_stage_lease(
             {"production_python_version": guard.D10_PRODUCTION_PYTHON_VERSION}
         )
+
+
+def test_a1252_guard_rejects_legacy_v2_signing_identity(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    native = FullNative()
+    attestation = json.loads(native.data[guard.D10_ATTESTATION])
+    attestation["signing_key_id"] = "AITradingBot/D10/DeploymentAttestation/v2"
+    native.data[guard.D10_ATTESTATION] = guard._canonical_json(attestation)
+    with pytest.raises(guard.GuardBlocked):
+        _admit(monkeypatch, native)

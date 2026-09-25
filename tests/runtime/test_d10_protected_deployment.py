@@ -615,6 +615,28 @@ def test_native_create_paths_are_fixed_and_manifest_bound() -> None:
             candidate.bind_source_inventory(tuple(sorted((*inventory, invalid))))
 
 
+def test_p1243_v3_signer_and_windows_verifier_identity_agree() -> None:
+    from scripts import d10_protected_deployment_windows as windows
+    from scripts import d10_signing_key_windows as cng
+
+    signer_identity = cng.WindowsCngExternalSigner().identity
+    assert d.D10_SIGNING_KEY_ID == "AITradingBot/D10/DeploymentAttestation/v3"
+    assert windows.WindowsCngVerifier.key_id == d.D10_SIGNING_KEY_ID
+    d.require_signer_identity(signer_identity)
+    with pytest.raises(
+        d.DeploymentBlocked, match="signing_identity_or_protocol_mismatch"
+    ):
+        d.require_signer_identity(
+            d.SigningIdentity(
+                "AITradingBot/D10/DeploymentAttestation/v2",
+                d.SIGNATURE_ALGORITHM,
+                d.SIGNATURE_HASH,
+                d.SIGNATURE_ENCODING,
+                False,
+            )
+        )
+
+
 def test_native_policy_matches_frozen_guard_security_and_verification_key() -> None:
     from scripts.d10_protected_deployment_windows import PUBLIC_KEY
 

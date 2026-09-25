@@ -23,7 +23,7 @@ from trading_bot.runtime.personal_desktop_unattended_one_week_soak_scheduler_con
 
 EXECUTABLE_MANIFEST_SCHEMA = "personal-desktop-d10-executable-manifest/v1"
 DEPLOYMENT_ATTESTATION_SCHEMA = "personal-desktop-d10-deployment-attestation/v2"
-D10_SIGNING_KEY_ID = "AITradingBot/D10/DeploymentAttestation/v2"
+D10_SIGNING_KEY_ID = "AITradingBot/D10/DeploymentAttestation/v3"
 D10_SOURCE_ROOT = str(D10_SEALED_SOURCE_ROOT)
 D10_PRODUCTION_PYTHON = r"F:\AITradingBot\runtime\python.exe"
 D10_GUARD_RELATIVE_PATH = D10_GUARD_SOURCE_RELATIVE_PATH

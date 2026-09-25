@@ -36,7 +36,7 @@ D10_PRODUCTION_SITE_PACKAGES = r"F:\AITradingBot\runtime\Lib\site-packages"
 D10_SCHEDULER_SCHEMA = "personal-desktop-one-week-soak-scheduler-contract/v2"
 D10_MANIFEST_SCHEMA = "personal-desktop-d10-executable-manifest/v1"
 D10_ATTESTATION_SCHEMA = "personal-desktop-d10-deployment-attestation/v2"
-D10_SIGNING_KEY_ID = "AITradingBot/D10/DeploymentAttestation/v2"
+D10_SIGNING_KEY_ID = "AITradingBot/D10/DeploymentAttestation/v3"
 D10_ACTIVATION_LEASE_SCHEMA = "personal-desktop-d10-activation-lease/v1"
 D10_SCHEDULER_CONTRACT_ID = (
     "f8efc16fe53609f3c0b1e86211cb4563907321dc5b7bcbd9b34676b35c5f2096"
@@ -45,8 +45,8 @@ D10_SOAK_ID_NAMESPACE = uuid.UUID("b33bd736-2dc4-5c7f-9f71-b38fdd392521")
 D10_PRODUCTION_PYTHON_VERSION = "3.14.3"
 ACTIVATION_LEASE_LIMIT = 64 * 1024
 D10_PUBLIC_KEY = bytes.fromhex(
-    "04a73d90064e8b97e4a8373f48cac44718eb375ca52581233d614365294164efba"
-    "40c6758f0f4cc455f6b2bf9b222696f9bc83c91ddf625fd01de46a6e7cd9c52e"
+    "04f2e83034f58cc1e27b1ff6511df503c31d4103782b2992ee64ebb7a9e734a3"
+    "548c5daaa5e5c69e83c2f2c2c825c26b61efd356680eed3d60822585c04493ba61"
 )
 D10_DEPLOYMENT_ID_NAMESPACE = uuid.UUID("703b383a-ee31-5ffb-8f61-09cb8edf146e")
 TRADING_SID = "S-1-5-21-1397534616-3988210162-180023805-1009"

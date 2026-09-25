@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import ctypes
+import sys
 from dataclasses import replace
+from types import SimpleNamespace
 
 import pytest
 
@@ -157,7 +160,6 @@ def test_fixed_diagnostic_command_and_complete_mock_transcript(
 ) -> None:
     import json
     import subprocess
-    from types import SimpleNamespace
 
     from scripts import d10_python_substrate_harness as h
 
@@ -196,7 +198,6 @@ def test_diagnostic_missing_or_unreviewed_observation_blocks(
 ) -> None:
     import json
     import subprocess
-    from types import SimpleNamespace
 
     raw = _diagnostic_json() | changed
     monkeypatch.setattr(
@@ -225,7 +226,6 @@ def test_signed_a123_input_comes_from_fixed_paths_and_verified_bytes(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     import hashlib
-    from types import SimpleNamespace
 
     from trading_bot.runtime import personal_desktop_d10_deployment_identity as a
 
@@ -263,7 +263,6 @@ def test_signed_a123_input_comes_from_fixed_paths_and_verified_bytes(
 def test_wrong_signed_key_id_blocks(
     monkeypatch: pytest.MonkeyPatch, wrong_key_id: str
 ) -> None:
-    from types import SimpleNamespace
 
     from trading_bot.runtime import personal_desktop_d10_deployment_identity as a
 
@@ -295,105 +294,477 @@ def test_qualification_failure_produces_nonzero_operator_result(
     assert w.main(["--trading-pid", "123", "--output", r"C:\evidence.json"]) == 2
 
 
-@pytest.mark.parametrize("disabled_admin_group", [False, True])
-def test_actual_trading_token_facts_are_read_from_accesscheck_token(
+def _native_token_seams(
     monkeypatch: pytest.MonkeyPatch,
-    disabled_admin_group: bool,
+    *,
+    sid: str = q.TRADING,
+    groups: tuple[tuple[str, int], ...] = ((q.TRADING, 4),),
+    privileges: tuple[tuple[str, int], ...] = (("SeChangeNotifyPrivilege", 2),),
+    elevated: bool = False,
+) -> list[int]:
+    closed: list[int] = []
+    monkeypatch.setattr(w, "_open_process", lambda pid: 101)
+    monkeypatch.setattr(w, "_open_process_token", lambda process: 102)
+    monkeypatch.setattr(w, "_duplicate_token", lambda primary: 103)
+    monkeypatch.setattr(w, "_close", closed.append)
+    monkeypatch.setattr(w, "_token_user", lambda token: sid)
+    monkeypatch.setattr(w, "_token_groups", lambda token: groups)
+    monkeypatch.setattr(w, "_token_privileges", lambda token: privileges)
+    monkeypatch.setattr(w, "_token_elevated", lambda token: elevated)
+    monkeypatch.setitem(sys.modules, "win32api", None)
+    monkeypatch.setitem(sys.modules, "win32security", None)
+    return closed
+
+
+def test_actual_trading_token_facts_and_handle_lifetime(
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    import sys
-    from types import SimpleNamespace
-
-    class Handle:
-        closed = False
-
-        def Close(self) -> None:
-            self.closed = True
-
-    process = Handle()
-    primary = Handle()
-    duplicate = Handle()
-    token_user = 1
-    token_groups = 2
-    token_privileges = 3
-    token_elevation = 4
-
-    def information(token: object, kind: int) -> object:
-        assert token is duplicate
-        if kind == token_user:
-            return ("trading", 0)
-        if kind == token_groups:
-            return [("trading", 4), *([("admin", 0)] if disabled_admin_group else [])]
-        if kind == token_privileges:
-            return [("notify", 2)]
-        return 0
-
-    security = SimpleNamespace(
-        TOKEN_QUERY=8,
-        TOKEN_DUPLICATE=2,
-        SecurityImpersonation=2,
-        TokenUser=token_user,
-        TokenGroups=token_groups,
-        TokenPrivileges=token_privileges,
-        TokenElevation=token_elevation,
-        OpenProcessToken=lambda handle, rights: primary,
-        DuplicateToken=lambda token, level: duplicate,
-        GetTokenInformation=information,
-        ConvertSidToStringSid=lambda value: q.ADMIN if value == "admin" else q.TRADING,
-        LookupPrivilegeName=lambda system, luid: "SeChangeNotifyPrivilege",
-    )
-    api = SimpleNamespace(OpenProcess=lambda rights, inherit, pid: process)
-    monkeypatch.setitem(sys.modules, "win32api", api)
-    monkeypatch.setitem(sys.modules, "win32security", security)
-    if disabled_admin_group:
-        with pytest.raises(w.NativeFailure, match="Trading token acquisition failed"):
-            w._trading_token(123)
-        return
+    closed = _native_token_seams(monkeypatch)
     pinned, facts = w._trading_token(123)
-    assert pinned is duplicate
+    assert pinned == 103
     assert facts.sid == q.TRADING
     assert facts.enabled_groups == (q.TRADING,)
     assert facts.enabled_privileges == ("SeChangeNotifyPrivilege",)
-    assert process.closed and primary.closed
-    assert not duplicate.closed
+    assert facts.groups_complete and facts.privileges_complete
+    assert closed == [102, 101]
+    w._close(pinned)
+    assert closed == [102, 101, 103]
 
 
-def test_missing_bypass_traverse_privilege_blocks_native_token(
+@pytest.mark.parametrize(
+    ("changes", "reason"),
+    [
+        ({"sid": q.ADMIN}, "not exact non-admin Trading"),
+        ({"elevated": True}, "not exact non-admin Trading"),
+        ({"groups": ((q.TRADING, 4), (q.ADMIN, 4))}, "not exact non-admin Trading"),
+        ({"groups": ((q.TRADING, 4), (q.ADMIN, 0))}, "not exact non-admin Trading"),
+        ({"privileges": ()}, "bypass-traverse privilege missing"),
+        *[
+            (
+                {
+                    "privileges": (
+                        ("SeChangeNotifyPrivilege", 2),
+                        (dangerous, 2),
+                    )
+                },
+                "enabled bypass privilege",
+            )
+            for dangerous in (
+                "SeBackupPrivilege",
+                "SeRestorePrivilege",
+                "SeTakeOwnershipPrivilege",
+                "SeSecurityPrivilege",
+                "SeDebugPrivilege",
+            )
+        ],
+    ],
+)
+def test_trading_token_policy_blocks_and_closes(
     monkeypatch: pytest.MonkeyPatch,
+    changes: dict[str, object],
+    reason: str,
 ) -> None:
-    import sys
-    from types import SimpleNamespace
+    closed = _native_token_seams(monkeypatch, **changes)
+    with pytest.raises(
+        w.NativeFailure, match="Trading token acquisition failed"
+    ) as error:
+        w._trading_token(123)
+    assert reason in str(error.value.__cause__)
+    assert closed == [102, 101, 103]
 
-    class Handle:
-        def Close(self) -> None:
-            pass
 
-    handle = Handle()
-    security = SimpleNamespace(
-        TOKEN_QUERY=8,
-        TOKEN_DUPLICATE=2,
-        SecurityImpersonation=2,
-        TokenUser=1,
-        TokenGroups=2,
-        TokenPrivileges=3,
-        TokenElevation=4,
-        OpenProcessToken=lambda process, rights: handle,
-        DuplicateToken=lambda token, level: handle,
-        GetTokenInformation=lambda token, kind: {
-            1: ("trading", 0),
-            2: [("trading", 4)],
-            3: [],
-            4: 0,
-        }[kind],
-        ConvertSidToStringSid=lambda value: q.TRADING,
-    )
-    monkeypatch.setitem(
-        sys.modules,
-        "win32api",
-        SimpleNamespace(OpenProcess=lambda rights, inherit, pid: handle),
-    )
-    monkeypatch.setitem(sys.modules, "win32security", security)
+@pytest.mark.parametrize(
+    "failed_seam",
+    [
+        "_open_process",
+        "_open_process_token",
+        "_duplicate_token",
+        "_token_user",
+        "_token_groups",
+        "_token_privileges",
+        "_token_elevated",
+    ],
+)
+def test_trading_native_failure_closes_every_acquired_handle(
+    monkeypatch: pytest.MonkeyPatch, failed_seam: str
+) -> None:
+    closed = _native_token_seams(monkeypatch)
+
+    def fail(*args: object) -> None:
+        raise w.NativeFailure("native failure")
+
+    monkeypatch.setattr(w, failed_seam, fail)
     with pytest.raises(w.NativeFailure, match="Trading token acquisition failed"):
         w._trading_token(123)
+    expected = {
+        "_open_process": [],
+        "_open_process_token": [101],
+        "_duplicate_token": [102, 101],
+    }.get(failed_seam, [102, 101, 103])
+    assert closed == expected
+
+
+def test_native_open_and_duplicate_use_only_reviewed_rights(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(w, "_dll", lambda name: object())
+    calls: list[tuple[object, ...]] = []
+
+    def bind(_dll: object, name: str, _args: object, _result: object) -> object:
+        if name == "OpenProcess":
+
+            def open_process(rights: int, inherit: bool, pid: int) -> int:
+                calls.append((name, rights, inherit, pid))
+                return 101
+
+            return open_process
+        if name in ("OpenProcessToken", "DuplicateToken"):
+
+            def token_call(handle: int, rights: int, output: object) -> int:
+                calls.append((name, handle, rights))
+                ctypes.cast(
+                    output, ctypes.POINTER(w.wintypes.HANDLE)
+                ).contents.value = 102 if name == "OpenProcessToken" else 103
+                return 1
+
+            return token_call
+        raise AssertionError(name)
+
+    monkeypatch.setattr(w, "_bind", bind)
+    assert w._open_process(123) == 101
+    assert w._open_process_token(101) == 102
+    assert w._duplicate_token(102) == 103
+    assert calls == [
+        ("OpenProcess", w.PROCESS_QUERY_LIMITED_INFORMATION, False, 123),
+        ("OpenProcessToken", 101, w.TOKEN_QUERY | w.TOKEN_DUPLICATE),
+        ("DuplicateToken", 102, 2),
+    ]
+
+
+def test_native_privilege_name_lookup_uses_allocated_buffer_length(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(w, "_dll", lambda name: object())
+    monkeypatch.setattr(w.ctypes, "get_last_error", lambda: w.ERROR_INSUFFICIENT_BUFFER)
+
+    def lookup(_system: object, luid: object, name: object, length: object) -> int:
+        count = ctypes.cast(length, ctypes.POINTER(w.wintypes.DWORD))
+        assert ctypes.cast(luid, ctypes.POINTER(w.Luid)).contents.low == 7
+        if name is None:
+            count.contents.value = 24
+            return 0
+        assert count.contents.value == 25
+        name.value = "SeChangeNotifyPrivilege"
+        count.contents.value = len(name.value)
+        return 1
+
+    monkeypatch.setattr(w, "_bind", lambda dll, name, args, result: lookup)
+    assert w._lookup_privilege_name(w.Luid(7, 0)) == "SeChangeNotifyPrivilege"
+
+
+def test_token_information_native_probe_and_read_failures(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def bind(_dll: object, name: str, _args: object, _result: object) -> object:
+        assert name == "GetTokenInformation"
+
+        def get(
+            _token: object,
+            _kind: object,
+            buffer: object,
+            _size: object,
+            returned: object,
+        ) -> int:
+            if buffer is None:
+                ctypes.cast(
+                    returned, ctypes.POINTER(w.wintypes.DWORD)
+                ).contents.value = 4
+                return 0
+            return 0
+
+        return get
+
+    monkeypatch.setattr(w, "_dll", lambda name: object())
+    monkeypatch.setattr(w, "_bind", bind)
+    monkeypatch.setattr(w.ctypes, "get_last_error", lambda: w.ERROR_INSUFFICIENT_BUFFER)
+    with pytest.raises(w.NativeFailure, match="GetTokenInformation failed"):
+        w._token_information(103, w.TOKEN_USER)
+
+
+@pytest.mark.parametrize("kind", [w.TOKEN_USER, w.TOKEN_GROUPS, w.TOKEN_PRIVILEGES])
+def test_incomplete_token_class_blocks(
+    monkeypatch: pytest.MonkeyPatch, kind: int
+) -> None:
+    monkeypatch.setattr(
+        w, "_token_information", lambda token, info: (ctypes.create_string_buffer(1), 1)
+    )
+    with pytest.raises(w.NativeFailure, match="incomplete"):
+        {
+            w.TOKEN_USER: w._token_user,
+            w.TOKEN_GROUPS: w._token_groups,
+            w.TOKEN_PRIVILEGES: w._token_privileges,
+        }[kind](103)
+
+
+@pytest.mark.parametrize(
+    ("kind", "offset", "entry_size"),
+    [
+        (
+            w.TOKEN_GROUPS,
+            w.TokenGroups.groups.offset,
+            ctypes.sizeof(w.SidAndAttributes),
+        ),
+        (
+            w.TOKEN_PRIVILEGES,
+            w.TokenPrivileges.privileges.offset,
+            ctypes.sizeof(w.LuidAndAttributes),
+        ),
+    ],
+)
+def test_token_count_cannot_exceed_native_buffer(
+    monkeypatch: pytest.MonkeyPatch, kind: int, offset: int, entry_size: int
+) -> None:
+    buffer = ctypes.create_string_buffer(offset + entry_size)
+    ctypes.cast(buffer, ctypes.POINTER(w.wintypes.DWORD)).contents.value = 2
+    monkeypatch.setattr(
+        w, "_token_information", lambda token, info: (buffer, len(buffer))
+    )
+    with pytest.raises(w.NativeFailure, match="count incomplete"):
+        (w._token_groups if kind == w.TOKEN_GROUPS else w._token_privileges)(103)
+
+
+def test_token_user_sid_pointer_must_remain_inside_native_buffer(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    buffer = ctypes.create_string_buffer(ctypes.sizeof(w.SidAndAttributes))
+    ctypes.cast(buffer, ctypes.POINTER(w.SidAndAttributes)).contents.sid = 1
+    monkeypatch.setattr(
+        w, "_token_information", lambda token, info: (buffer, len(buffer))
+    )
+    with pytest.raises(w.NativeFailure, match="SID pointer outside"):
+        w._token_user(103)
+
+
+@pytest.mark.parametrize("converted", [True, False])
+def test_native_sid_conversion_allocation_is_freed(
+    monkeypatch: pytest.MonkeyPatch, converted: bool
+) -> None:
+    text = ctypes.create_unicode_buffer(q.TRADING)
+    freed: list[int] = []
+    monkeypatch.setattr(w, "_dll", lambda name: object())
+
+    def bind(_dll: object, name: str, _args: object, _result: object) -> object:
+        if name == "ConvertSidToStringSidW":
+
+            def convert(sid: object, output: object) -> int:
+                ctypes.cast(
+                    output, ctypes.POINTER(ctypes.c_void_p)
+                ).contents.value = ctypes.addressof(text)
+                return int(converted)
+
+            return convert
+        if name == "LocalFree":
+            return lambda allocation: freed.append(allocation.value) or None
+        raise AssertionError(name)
+
+    monkeypatch.setattr(w, "_bind", bind)
+    if converted:
+        assert w._sid(123) == q.TRADING
+    else:
+        with pytest.raises(w.NativeFailure, match="ConvertSidToStringSidW failed"):
+            w._sid(123)
+    assert freed == [ctypes.addressof(text)]
+
+
+def test_native_token_classes_parse_complete_enabled_inventory(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    user_offset = ctypes.sizeof(w.SidAndAttributes)
+    user = ctypes.create_string_buffer(user_offset + 12)
+    ctypes.cast(user, ctypes.POINTER(w.SidAndAttributes)).contents.sid = (
+        ctypes.addressof(user) + user_offset
+    )
+    groups_offset = w.TokenGroups.groups.offset
+    group_size = ctypes.sizeof(w.SidAndAttributes)
+    groups = ctypes.create_string_buffer(groups_offset + 2 * group_size + 24)
+    ctypes.cast(groups, ctypes.POINTER(w.wintypes.DWORD)).contents.value = 2
+    for index, attributes in enumerate((w.SE_GROUP_ENABLED, 0)):
+        entry = ctypes.cast(
+            ctypes.byref(groups, groups_offset + index * group_size),
+            ctypes.POINTER(w.SidAndAttributes),
+        ).contents
+        entry.sid = (
+            ctypes.addressof(groups) + groups_offset + 2 * group_size + 12 * index
+        )
+        entry.attributes = attributes
+    privilege_offset = w.TokenPrivileges.privileges.offset
+    privilege_size = ctypes.sizeof(w.LuidAndAttributes)
+    privileges = ctypes.create_string_buffer(privilege_offset + 2 * privilege_size)
+    ctypes.cast(privileges, ctypes.POINTER(w.wintypes.DWORD)).contents.value = 2
+    for index, attributes in enumerate((w.SE_PRIVILEGE_ENABLED, 0)):
+        entry = ctypes.cast(
+            ctypes.byref(privileges, privilege_offset + index * privilege_size),
+            ctypes.POINTER(w.LuidAndAttributes),
+        ).contents
+        entry.luid.low = index + 1
+        entry.attributes = attributes
+    elevation = ctypes.create_string_buffer(ctypes.sizeof(w.wintypes.DWORD))
+    observations = {
+        w.TOKEN_USER: user,
+        w.TOKEN_GROUPS: groups,
+        w.TOKEN_PRIVILEGES: privileges,
+        w.TOKEN_ELEVATION: elevation,
+    }
+    monkeypatch.setattr(
+        w,
+        "_token_information",
+        lambda token, kind: (observations[kind], len(observations[kind])),
+    )
+    monkeypatch.setattr(
+        w,
+        "_sid_in_token_buffer",
+        lambda buffer, length, pointer: (
+            q.ADMIN
+            if buffer is groups
+            and pointer > ctypes.addressof(groups) + groups_offset + 2 * group_size
+            else q.TRADING
+        ),
+    )
+    seen: list[int] = []
+    monkeypatch.setattr(
+        w,
+        "_lookup_privilege_name",
+        lambda luid: seen.append(luid.low) or "SeChangeNotifyPrivilege",
+    )
+    assert w._token_user(103) == q.TRADING
+    assert w._token_groups(103) == ((q.TRADING, w.SE_GROUP_ENABLED), (q.ADMIN, 0))
+    assert w._token_privileges(103) == (("SeChangeNotifyPrivilege", 2),)
+    assert seen == [1]
+    assert w._token_elevated(103) is False
+
+
+def test_trading_cleanup_failure_blocks_result(monkeypatch: pytest.MonkeyPatch) -> None:
+    _native_token_seams(monkeypatch)
+
+    def close(handle: int) -> None:
+        if handle == 102:
+            raise w.NativeFailure("CloseHandle failed")
+
+    monkeypatch.setattr(w, "_close", close)
+    with pytest.raises(w.NativeFailure, match="Trading token acquisition failed"):
+        w._trading_token(123)
+
+
+def test_administrator_membership_api_failure_frees_sid_and_handles(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    closed: list[int] = []
+    freed: list[int] = []
+    monkeypatch.setattr(w, "_dll", lambda name: object())
+    monkeypatch.setattr(w, "_open_process_token", lambda process: 201)
+    monkeypatch.setattr(w, "_duplicate_token", lambda primary: 202)
+    monkeypatch.setattr(w, "_token_elevated", lambda primary: True)
+    monkeypatch.setattr(w, "_close", closed.append)
+
+    def bind(_dll: object, name: str, _args: object, _result: object) -> object:
+        if name == "GetCurrentProcess":
+            return lambda: 999
+        if name == "ConvertStringSidToSidW":
+
+            def convert(sid: str, output: object) -> int:
+                ctypes.cast(
+                    output, ctypes.POINTER(ctypes.c_void_p)
+                ).contents.value = 303
+                return 1
+
+            return convert
+        if name == "LocalFree":
+            return lambda pointer: freed.append(pointer.value) or None
+        if name == "CheckTokenMembership":
+            return lambda token, sid, member: 0
+        raise AssertionError(name)
+
+    monkeypatch.setattr(w, "_bind", bind)
+    with pytest.raises(w.NativeFailure, match="Administrator token proof unavailable"):
+        w.require_administrator()
+    assert freed == [303]
+    assert closed == [202, 201]
+
+
+@pytest.mark.parametrize(
+    ("elevated", "member", "accepted"),
+    [(True, True, True), (False, True, False), (True, False, False)],
+)
+def test_administrator_proof_requires_both_facts_and_cleans_up(
+    monkeypatch: pytest.MonkeyPatch, elevated: bool, member: bool, accepted: bool
+) -> None:
+    closed: list[int] = []
+    freed: list[int] = []
+    monkeypatch.setattr(w, "_dll", lambda name: object())
+    monkeypatch.setattr(w, "_open_process_token", lambda process: 201)
+    monkeypatch.setattr(w, "_duplicate_token", lambda primary: 202)
+    monkeypatch.setattr(w, "_token_elevated", lambda primary: elevated)
+    monkeypatch.setattr(w, "_close", closed.append)
+    monkeypatch.setitem(sys.modules, "win32api", None)
+    monkeypatch.setitem(sys.modules, "win32security", None)
+
+    def bind(_dll: object, name: str, _args: object, _result: object) -> object:
+        if name == "GetCurrentProcess":
+            return lambda: 999
+        if name == "ConvertStringSidToSidW":
+
+            def convert(sid: str, output: object) -> int:
+                assert sid == q.ADMIN
+                ctypes.cast(
+                    output, ctypes.POINTER(ctypes.c_void_p)
+                ).contents.value = 303
+                return 1
+
+            return convert
+        if name == "CheckTokenMembership":
+
+            def check(token: int, sid: object, output: object) -> int:
+                assert token == 202
+                assert sid.value == 303
+                ctypes.cast(
+                    output, ctypes.POINTER(w.wintypes.BOOL)
+                ).contents.value = int(member)
+                return 1
+
+            return check
+        if name == "LocalFree":
+            return lambda pointer: freed.append(pointer.value) or None
+        raise AssertionError(name)
+
+    monkeypatch.setattr(w, "_bind", bind)
+    if accepted:
+        w.require_administrator()
+    else:
+        with pytest.raises(
+            w.NativeFailure, match="Administrator token proof unavailable"
+        ):
+            w.require_administrator()
+    assert closed == [202, 201]
+    assert freed == [303]
+
+
+def test_administrator_duplication_failure_closes_primary(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    closed: list[int] = []
+    monkeypatch.setattr(w, "_dll", lambda name: object())
+    monkeypatch.setattr(w, "_bind", lambda dll, name, args, result: lambda: 999)
+    monkeypatch.setattr(w, "_open_process_token", lambda process: 201)
+    monkeypatch.setattr(w, "_token_elevated", lambda primary: True)
+    monkeypatch.setattr(
+        w,
+        "_duplicate_token",
+        lambda primary: (_ for _ in ()).throw(w.NativeFailure("duplicate")),
+    )
+    monkeypatch.setattr(w, "_close", closed.append)
+    with pytest.raises(w.NativeFailure, match="Administrator token proof unavailable"):
+        w.require_administrator()
+    assert closed == [201]
 
 
 def test_windows_api_failure_blocks_without_native_fallback() -> None:

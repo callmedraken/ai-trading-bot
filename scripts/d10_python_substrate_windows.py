@@ -34,6 +34,17 @@ SE_DACL_PROTECTED = 0x1000
 ERROR_FILE_NOT_FOUND = 2
 ERROR_PATH_NOT_FOUND = 3
 INVALID_HANDLE = ctypes.c_void_p(-1).value
+PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+TOKEN_DUPLICATE = 0x0002
+TOKEN_QUERY = 0x0008
+TOKEN_USER = 1
+TOKEN_GROUPS = 2
+TOKEN_PRIVILEGES = 3
+TOKEN_ELEVATION = 20
+SE_GROUP_ENABLED = 0x4
+SE_PRIVILEGE_ENABLED = 0x2
+ERROR_INSUFFICIENT_BUFFER = 122
+MAX_TOKEN_INFORMATION = 1024 * 1024
 
 
 class NativeFailure(h.CollectionBlocked):
@@ -74,6 +85,26 @@ class AceHeader(ctypes.Structure):
     ]
 
 
+class SidAndAttributes(ctypes.Structure):
+    _fields_ = [("sid", ctypes.c_void_p), ("attributes", wintypes.DWORD)]
+
+
+class TokenGroups(ctypes.Structure):
+    _fields_ = [("count", wintypes.DWORD), ("groups", SidAndAttributes * 1)]
+
+
+class Luid(ctypes.Structure):
+    _fields_ = [("low", wintypes.DWORD), ("high", wintypes.LONG)]
+
+
+class LuidAndAttributes(ctypes.Structure):
+    _fields_ = [("luid", Luid), ("attributes", wintypes.DWORD)]
+
+
+class TokenPrivileges(ctypes.Structure):
+    _fields_ = [("count", wintypes.DWORD), ("privileges", LuidAndAttributes * 1)]
+
+
 def _check(ok: object, name: str) -> None:
     if not ok:
         raise NativeFailure(f"{name} failed: {ctypes.get_last_error()}")
@@ -104,14 +135,18 @@ def _sid(pointer: object) -> str:
         wintypes.BOOL,
     )
     value = ctypes.c_wchar_p()
-    _check(convert(pointer, ctypes.byref(value)), "ConvertSidToStringSidW")
+    converted = convert(pointer, ctypes.byref(value))
     try:
+        _check(converted, "ConvertSidToStringSidW")
         if not value.value:
             raise NativeFailure("empty SID")
         return value.value
     finally:
-        free = _bind(_dll("kernel32"), "LocalFree", [ctypes.c_void_p], ctypes.c_void_p)
-        free(ctypes.cast(value, ctypes.c_void_p))
+        if value.value:
+            free = _bind(
+                _dll("kernel32"), "LocalFree", [ctypes.c_void_p], ctypes.c_void_p
+            )
+            _local_free(free, ctypes.cast(value, ctypes.c_void_p))
 
 
 def _security(handle: int) -> tuple[str, bool, tuple[q.Ace, ...]]:
@@ -561,82 +596,262 @@ def _access_check(descriptor: int, token: int, desired: int) -> tuple[int, bool]
     return int(granted.value), bool(status.value)
 
 
-def _trading_token(pid: int) -> tuple[object, h.TokenObservation]:
+def _open_process(pid: int) -> int:
+    open_process = _bind(
+        _dll("kernel32"),
+        "OpenProcess",
+        [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD],
+        wintypes.HANDLE,
+    )
+    handle = open_process(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+    if not handle or handle == INVALID_HANDLE:
+        raise NativeFailure("OpenProcess failed")
+    return int(handle)
+
+
+def _open_process_token(process: int) -> int:
+    open_token = _bind(
+        _dll("advapi32"),
+        "OpenProcessToken",
+        [wintypes.HANDLE, wintypes.DWORD, ctypes.POINTER(wintypes.HANDLE)],
+        wintypes.BOOL,
+    )
+    token = wintypes.HANDLE()
+    opened = open_token(process, TOKEN_QUERY | TOKEN_DUPLICATE, ctypes.byref(token))
+    if not opened and token.value:
+        _close(int(token.value))
+    _check(opened, "OpenProcessToken")
+    if not token.value:
+        raise NativeFailure("OpenProcessToken returned a null handle")
+    return int(token.value)
+
+
+def _duplicate_token(primary: int) -> int:
+    duplicate = _bind(
+        _dll("advapi32"),
+        "DuplicateToken",
+        [wintypes.HANDLE, ctypes.c_int, ctypes.POINTER(wintypes.HANDLE)],
+        wintypes.BOOL,
+    )
+    token = wintypes.HANDLE()
+    duplicated = duplicate(primary, 2, ctypes.byref(token))
+    if not duplicated and token.value and token.value != primary:
+        _close(int(token.value))
+    _check(duplicated, "DuplicateToken")
+    if not token.value or token.value == primary:
+        raise NativeFailure("DuplicateToken returned an invalid handle")
+    return int(token.value)
+
+
+def _token_information(token: int, information_class: int) -> tuple[object, int]:
+    get = _bind(
+        _dll("advapi32"),
+        "GetTokenInformation",
+        [
+            wintypes.HANDLE,
+            ctypes.c_int,
+            ctypes.c_void_p,
+            wintypes.DWORD,
+            ctypes.POINTER(wintypes.DWORD),
+        ],
+        wintypes.BOOL,
+    )
+    required = wintypes.DWORD()
+    if get(token, information_class, None, 0, ctypes.byref(required)):
+        raise NativeFailure("GetTokenInformation unexpected probe success")
+    if (
+        ctypes.get_last_error() != ERROR_INSUFFICIENT_BUFFER
+        or not required.value
+        or required.value > MAX_TOKEN_INFORMATION
+    ):
+        raise NativeFailure("GetTokenInformation size unavailable")
+    buffer = ctypes.create_string_buffer(required.value)
+    returned = wintypes.DWORD()
+    _check(
+        get(
+            token,
+            information_class,
+            buffer,
+            len(buffer),
+            ctypes.byref(returned),
+        ),
+        "GetTokenInformation",
+    )
+    if not returned.value or returned.value > len(buffer):
+        raise NativeFailure("GetTokenInformation length invalid")
+    return buffer, returned.value
+
+
+def _sid_in_token_buffer(buffer: object, length: int, pointer: int) -> str:
+    base = ctypes.addressof(buffer)
+    if not pointer or pointer < base or pointer >= base + length:
+        raise NativeFailure("token SID pointer outside information")
+    available = base + length - pointer
+    if (
+        available < 8
+        or 8 + 4 * ctypes.c_ubyte.from_address(pointer + 1).value > available
+    ):
+        raise NativeFailure("token SID incomplete")
+    advapi = _dll("advapi32")
+    valid = _bind(advapi, "IsValidSid", [ctypes.c_void_p], wintypes.BOOL)
+    _check(valid(pointer), "IsValidSid")
+    get_length = _bind(advapi, "GetLengthSid", [ctypes.c_void_p], wintypes.DWORD)
+    sid_length = get_length(pointer)
+    if not sid_length or sid_length > base + length - pointer:
+        raise NativeFailure("token SID length outside information")
+    return _sid(pointer)
+
+
+def _token_user(token: int) -> str:
+    buffer, length = _token_information(token, TOKEN_USER)
+    if length < ctypes.sizeof(SidAndAttributes):
+        raise NativeFailure("TokenUser incomplete")
+    user = ctypes.cast(buffer, ctypes.POINTER(SidAndAttributes)).contents
+    return _sid_in_token_buffer(buffer, length, user.sid)
+
+
+def _token_groups(token: int) -> tuple[tuple[str, int], ...]:
+    buffer, length = _token_information(token, TOKEN_GROUPS)
+    offset = TokenGroups.groups.offset
+    if length < offset:
+        raise NativeFailure("TokenGroups incomplete")
+    count = ctypes.cast(buffer, ctypes.POINTER(wintypes.DWORD)).contents.value
+    size = ctypes.sizeof(SidAndAttributes)
+    if count > (length - offset) // size:
+        raise NativeFailure("TokenGroups count incomplete")
+    return tuple(
+        (
+            _sid_in_token_buffer(
+                buffer,
+                length,
+                ctypes.cast(
+                    ctypes.byref(buffer, offset + index * size),
+                    ctypes.POINTER(SidAndAttributes),
+                ).contents.sid,
+            ),
+            ctypes.cast(
+                ctypes.byref(buffer, offset + index * size),
+                ctypes.POINTER(SidAndAttributes),
+            ).contents.attributes,
+        )
+        for index in range(count)
+    )
+
+
+def _lookup_privilege_name(luid: Luid) -> str:
+    lookup = _bind(
+        _dll("advapi32"),
+        "LookupPrivilegeNameW",
+        [
+            ctypes.c_wchar_p,
+            ctypes.POINTER(Luid),
+            ctypes.c_wchar_p,
+            ctypes.POINTER(wintypes.DWORD),
+        ],
+        wintypes.BOOL,
+    )
+    length = wintypes.DWORD()
+    if lookup(None, ctypes.byref(luid), None, ctypes.byref(length)):
+        raise NativeFailure("LookupPrivilegeNameW unexpected probe success")
+    if (
+        ctypes.get_last_error() != ERROR_INSUFFICIENT_BUFFER
+        or not length.value
+        or length.value > 256
+    ):
+        raise NativeFailure("LookupPrivilegeNameW size unavailable")
+    name = ctypes.create_unicode_buffer(length.value + 1)
+    length.value = len(name)
+    _check(
+        lookup(None, ctypes.byref(luid), name, ctypes.byref(length)),
+        "LookupPrivilegeNameW",
+    )
+    if not name.value or length.value > len(name) - 1:
+        raise NativeFailure("LookupPrivilegeNameW name invalid")
+    return name.value
+
+
+def _token_privileges(token: int) -> tuple[tuple[str, int], ...]:
+    buffer, length = _token_information(token, TOKEN_PRIVILEGES)
+    offset = TokenPrivileges.privileges.offset
+    if length < offset:
+        raise NativeFailure("TokenPrivileges incomplete")
+    count = ctypes.cast(buffer, ctypes.POINTER(wintypes.DWORD)).contents.value
+    size = ctypes.sizeof(LuidAndAttributes)
+    if count > (length - offset) // size:
+        raise NativeFailure("TokenPrivileges count incomplete")
+    result = []
+    for index in range(count):
+        entry = ctypes.cast(
+            ctypes.byref(buffer, offset + index * size),
+            ctypes.POINTER(LuidAndAttributes),
+        ).contents
+        if entry.attributes & SE_PRIVILEGE_ENABLED:
+            result.append((_lookup_privilege_name(entry.luid), entry.attributes))
+    return tuple(result)
+
+
+def _token_elevated(token: int) -> bool:
+    buffer, length = _token_information(token, TOKEN_ELEVATION)
+    if length != ctypes.sizeof(wintypes.DWORD):
+        raise NativeFailure("TokenElevation length invalid")
+    value = ctypes.cast(buffer, ctypes.POINTER(wintypes.DWORD)).contents.value
+    if value not in (0, 1):
+        raise NativeFailure("TokenElevation value invalid")
+    return bool(value)
+
+
+def _trading_token(pid: int) -> tuple[int, h.TokenObservation]:
     """Pin an actual non-admin Trading process token; PID is only a lookup hint."""
     if type(pid) is not int or pid <= 0:
         raise NativeFailure("Trading process ID invalid")
     try:
-        import win32api
-        import win32security
-
-        process = win32api.OpenProcess(0x1000, False, pid)
-        try:
-            token = win32security.OpenProcessToken(
-                process, win32security.TOKEN_QUERY | win32security.TOKEN_DUPLICATE
+        with ExitStack() as owned:
+            with ExitStack() as temporary:
+                process = _open_process(pid)
+                temporary.callback(_close, process)
+                primary = _open_process_token(process)
+                temporary.callback(_close, primary)
+                duplicate = _duplicate_token(primary)
+                owned.callback(_close, duplicate)
+            sid = _token_user(duplicate)
+            groups = _token_groups(duplicate)
+            all_groups = tuple(group_sid for group_sid, _ in groups)
+            enabled_groups = tuple(
+                sorted(
+                    group_sid
+                    for group_sid, attributes in groups
+                    if attributes & SE_GROUP_ENABLED
+                )
             )
-        finally:
-            process.Close()
-        try:
-            duplicate = win32security.DuplicateToken(
-                token, win32security.SecurityImpersonation
+            enabled_privileges = tuple(
+                sorted(name for name, _ in _token_privileges(duplicate))
             )
-        finally:
-            token.Close()
-        sid = win32security.ConvertSidToStringSid(
-            win32security.GetTokenInformation(duplicate, win32security.TokenUser)[0]
-        )
-        groups = win32security.GetTokenInformation(duplicate, win32security.TokenGroups)
-        all_groups = tuple(
-            win32security.ConvertSidToStringSid(group_sid)
-            for group_sid, _attributes in groups
-        )
-        enabled_groups = tuple(
-            sorted(
-                win32security.ConvertSidToStringSid(group_sid)
-                for group_sid, attributes in groups
-                if attributes & 0x4
+            elevated = _token_elevated(duplicate)
+            member_admin = q.ADMIN in all_groups
+            dangerous = {
+                "SeBackupPrivilege",
+                "SeRestorePrivilege",
+                "SeTakeOwnershipPrivilege",
+                "SeSecurityPrivilege",
+                "SeDebugPrivilege",
+            }
+            if dangerous.intersection(enabled_privileges):
+                raise NativeFailure("Trading token has enabled bypass privilege")
+            if "SeChangeNotifyPrivilege" not in enabled_privileges:
+                raise NativeFailure("Trading bypass-traverse privilege missing")
+            facts = h.TokenObservation(
+                sid,
+                not member_admin and not elevated,
+                elevated,
+                enabled_groups,
+                enabled_privileges,
+                True,
+                True,
             )
-        )
-        privileges = win32security.GetTokenInformation(
-            duplicate, win32security.TokenPrivileges
-        )
-        enabled_privileges = tuple(
-            sorted(
-                win32security.LookupPrivilegeName(None, luid)
-                for luid, attributes in privileges
-                if attributes & 0x2
-            )
-        )
-        elevated = bool(
-            win32security.GetTokenInformation(duplicate, win32security.TokenElevation)
-        )
-        member_admin = q.ADMIN in all_groups
-        dangerous = {
-            "SeBackupPrivilege",
-            "SeRestorePrivilege",
-            "SeTakeOwnershipPrivilege",
-            "SeSecurityPrivilege",
-            "SeDebugPrivilege",
-        }
-        if dangerous.intersection(enabled_privileges):
-            duplicate.Close()
-            raise NativeFailure("Trading token has enabled bypass privilege")
-        if "SeChangeNotifyPrivilege" not in enabled_privileges:
-            duplicate.Close()
-            raise NativeFailure("Trading bypass-traverse privilege missing")
-        facts = h.TokenObservation(
-            sid,
-            not member_admin and not elevated,
-            elevated,
-            enabled_groups,
-            enabled_privileges,
-            True,
-            True,
-        )
-        if facts.sid != q.TRADING or not facts.non_admin or facts.elevated:
-            duplicate.Close()
-            raise NativeFailure("process token is not exact non-admin Trading")
-        return duplicate, facts
+            if facts.sid != q.TRADING or not facts.non_admin or facts.elevated:
+                raise NativeFailure("process token is not exact non-admin Trading")
+            owned.pop_all()
+            return duplicate, facts
     except Exception as exc:
         raise NativeFailure("Trading token acquisition failed") from exc
 
@@ -709,7 +924,7 @@ def collect_trading_access(
                     raise NativeFailure("Trading-side pinned security identity drift")
             return h.TradingObservation(facts, tuple(rows))
     finally:
-        token.Close()
+        _close(token)
 
 
 _DIAGNOSTIC_CODE = r"""
@@ -957,7 +1172,7 @@ def collect_system_dlls(
         raise NativeFailure("duplicate System32 DLL path")
     token, facts = _trading_token(trading_pid)
     if facts.sid != q.TRADING:
-        token.Close()
+        _close(token)
         raise NativeFailure("Trading SID differs")
     try:
         with ExitStack() as stack:
@@ -1044,7 +1259,7 @@ def collect_system_dlls(
                 parent, parent_access, tuple(rows), True, True, True
             )
     finally:
-        token.Close()
+        _close(token)
 
 
 _PUBLIC_KEY = bytes.fromhex(
@@ -1250,27 +1465,57 @@ def collect_signed_a123_identity() -> h.SignedA123Identity:
 
 
 def require_administrator() -> None:
-    """Require an elevated Administrator token for the native inventory phase."""
+    """Require elevation and effective Administrator membership on this process."""
     try:
-        import win32api
-        import win32security
-
-        process = win32api.GetCurrentProcess()
-        token = win32security.OpenProcessToken(process, win32security.TOKEN_QUERY)
-        try:
-            elevated = bool(
-                win32security.GetTokenInformation(token, win32security.TokenElevation)
+        with ExitStack() as owned:
+            current_process = _bind(
+                _dll("kernel32"), "GetCurrentProcess", [], wintypes.HANDLE
+            )()
+            if not current_process:
+                raise NativeFailure("GetCurrentProcess failed")
+            primary = _open_process_token(current_process)
+            owned.callback(_close, primary)
+            elevated = _token_elevated(primary)
+            impersonation = _duplicate_token(primary)
+            owned.callback(_close, impersonation)
+            convert = _bind(
+                _dll("advapi32"),
+                "ConvertStringSidToSidW",
+                [ctypes.c_wchar_p, ctypes.POINTER(ctypes.c_void_p)],
+                wintypes.BOOL,
             )
-            admin_sid = win32security.CreateWellKnownSid(
-                win32security.WinBuiltinAdministratorsSid, None
+            admin_sid = ctypes.c_void_p()
+            converted = convert(q.ADMIN, ctypes.byref(admin_sid))
+            if admin_sid.value:
+                free = _bind(
+                    _dll("kernel32"), "LocalFree", [ctypes.c_void_p], ctypes.c_void_p
+                )
+                owned.callback(_local_free, free, admin_sid)
+            _check(converted, "ConvertStringSidToSidW")
+            if not admin_sid.value:
+                raise NativeFailure("Administrator SID invalid")
+            check = _bind(
+                _dll("advapi32"),
+                "CheckTokenMembership",
+                [wintypes.HANDLE, ctypes.c_void_p, ctypes.POINTER(wintypes.BOOL)],
+                wintypes.BOOL,
             )
-            admin = bool(win32security.CheckTokenMembership(None, admin_sid))
-        finally:
-            token.Close()
+            member = wintypes.BOOL()
+            _check(
+                check(impersonation, admin_sid, ctypes.byref(member)),
+                "CheckTokenMembership",
+            )
+            if member.value not in (0, 1):
+                raise NativeFailure("Administrator membership invalid")
+            if not elevated or not member.value:
+                raise NativeFailure("elevated Administrator token required")
     except Exception as exc:
         raise NativeFailure("Administrator token proof unavailable") from exc
-    if not elevated or not admin:
-        raise NativeFailure("elevated Administrator token required")
+
+
+def _local_free(free: object, pointer: object) -> None:
+    if free(pointer):
+        raise NativeFailure("LocalFree failed")
 
 
 class WindowsCollector:

@@ -21,6 +21,11 @@ def _node(path: str, kind: q.Kind) -> q.ObjectEvidence:
         (
             q.Ace(q.ADMIN, q.ALL_ACCESS),
             q.Ace(q.SYSTEM, q.ALL_ACCESS),
+        )
+        if path == q.ROOT
+        else (
+            q.Ace(q.ADMIN, q.ALL_ACCESS),
+            q.Ace(q.SYSTEM, q.ALL_ACCESS),
             q.Ace(q.TRADING, mask),
         ),
         False,
@@ -290,8 +295,10 @@ def test_qualification_failure_produces_nonzero_operator_result(
     assert w.main(["--trading-pid", "123", "--output", r"C:\evidence.json"]) == 2
 
 
+@pytest.mark.parametrize("disabled_admin_group", [False, True])
 def test_actual_trading_token_facts_are_read_from_accesscheck_token(
     monkeypatch: pytest.MonkeyPatch,
+    disabled_admin_group: bool,
 ) -> None:
     import sys
     from types import SimpleNamespace
@@ -315,7 +322,7 @@ def test_actual_trading_token_facts_are_read_from_accesscheck_token(
         if kind == token_user:
             return ("trading", 0)
         if kind == token_groups:
-            return [("trading", 4)]
+            return [("trading", 4), *([("admin", 0)] if disabled_admin_group else [])]
         if kind == token_privileges:
             return [("notify", 2)]
         return 0
@@ -331,12 +338,16 @@ def test_actual_trading_token_facts_are_read_from_accesscheck_token(
         OpenProcessToken=lambda handle, rights: primary,
         DuplicateToken=lambda token, level: duplicate,
         GetTokenInformation=information,
-        ConvertSidToStringSid=lambda value: q.TRADING,
+        ConvertSidToStringSid=lambda value: q.ADMIN if value == "admin" else q.TRADING,
         LookupPrivilegeName=lambda system, luid: "SeChangeNotifyPrivilege",
     )
     api = SimpleNamespace(OpenProcess=lambda rights, inherit, pid: process)
     monkeypatch.setitem(sys.modules, "win32api", api)
     monkeypatch.setitem(sys.modules, "win32security", security)
+    if disabled_admin_group:
+        with pytest.raises(w.NativeFailure, match="Trading token acquisition failed"):
+            w._trading_token(123)
+        return
     pinned, facts = w._trading_token(123)
     assert pinned is duplicate
     assert facts.sid == q.TRADING
@@ -344,6 +355,45 @@ def test_actual_trading_token_facts_are_read_from_accesscheck_token(
     assert facts.enabled_privileges == ("SeChangeNotifyPrivilege",)
     assert process.closed and primary.closed
     assert not duplicate.closed
+
+
+def test_missing_bypass_traverse_privilege_blocks_native_token(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import sys
+    from types import SimpleNamespace
+
+    class Handle:
+        def Close(self) -> None:
+            pass
+
+    handle = Handle()
+    security = SimpleNamespace(
+        TOKEN_QUERY=8,
+        TOKEN_DUPLICATE=2,
+        SecurityImpersonation=2,
+        TokenUser=1,
+        TokenGroups=2,
+        TokenPrivileges=3,
+        TokenElevation=4,
+        OpenProcessToken=lambda process, rights: handle,
+        DuplicateToken=lambda token, level: handle,
+        GetTokenInformation=lambda token, kind: {
+            1: ("trading", 0),
+            2: [("trading", 4)],
+            3: [],
+            4: 0,
+        }[kind],
+        ConvertSidToStringSid=lambda value: q.TRADING,
+    )
+    monkeypatch.setitem(
+        sys.modules,
+        "win32api",
+        SimpleNamespace(OpenProcess=lambda rights, inherit, pid: handle),
+    )
+    monkeypatch.setitem(sys.modules, "win32security", security)
+    with pytest.raises(w.NativeFailure, match="Trading token acquisition failed"):
+        w._trading_token(123)
 
 
 def test_windows_api_failure_blocks_without_native_fallback() -> None:

@@ -586,6 +586,10 @@ def _trading_token(pid: int) -> tuple[object, h.TokenObservation]:
             win32security.GetTokenInformation(duplicate, win32security.TokenUser)[0]
         )
         groups = win32security.GetTokenInformation(duplicate, win32security.TokenGroups)
+        all_groups = tuple(
+            win32security.ConvertSidToStringSid(group_sid)
+            for group_sid, _attributes in groups
+        )
         enabled_groups = tuple(
             sorted(
                 win32security.ConvertSidToStringSid(group_sid)
@@ -606,7 +610,7 @@ def _trading_token(pid: int) -> tuple[object, h.TokenObservation]:
         elevated = bool(
             win32security.GetTokenInformation(duplicate, win32security.TokenElevation)
         )
-        member_admin = q.ADMIN in enabled_groups
+        member_admin = q.ADMIN in all_groups
         dangerous = {
             "SeBackupPrivilege",
             "SeRestorePrivilege",
@@ -617,6 +621,9 @@ def _trading_token(pid: int) -> tuple[object, h.TokenObservation]:
         if dangerous.intersection(enabled_privileges):
             duplicate.Close()
             raise NativeFailure("Trading token has enabled bypass privilege")
+        if "SeChangeNotifyPrivilege" not in enabled_privileges:
+            duplicate.Close()
+            raise NativeFailure("Trading bypass-traverse privilege missing")
         facts = h.TokenObservation(
             sid,
             not member_admin and not elevated,

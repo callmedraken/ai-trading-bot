@@ -34,10 +34,7 @@ def provision_sealed_deployment(
     """Install only the fixed sealed guard/source namespace, create-only."""
     backend.require_administrator()
     material = d.build_certified_material(repository_root)
-    parent = backend.list_directory(d.D10_PARENT)
-    d.require_native_object(parent.identity, d.D10_PARENT, directory=True)
-    if parent.stable is not True:
-        raise d.DeploymentBlocked("d10_parent_identity_unstable")
+    d.require_parent(backend)
 
     # Bind every source write to the exact manifest before touching the D10 namespace.
     backend.bind_source_inventory(tuple(item.relative_path for item in material.files))

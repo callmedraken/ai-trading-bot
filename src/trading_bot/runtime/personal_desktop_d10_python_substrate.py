@@ -109,6 +109,9 @@ class QualificationEvidence:
     signed_a123_version: str
     trading_token_sid: str
     trading_token_non_admin: bool
+    trading_token_elevated: bool
+    trading_enabled_groups: tuple[str, ...]
+    trading_enabled_privileges: tuple[str, ...]
     native_no_follow: bool
     native_pinned_and_rechecked: bool
     # The protected collector must prove actual effective Trading denial of
@@ -157,6 +160,10 @@ def _canonical(path: str) -> bool:
     )
 
 
+def _parent_aces() -> tuple[Ace, ...]:
+    return (Ace(ADMIN, ALL_ACCESS), Ace(SYSTEM, ALL_ACCESS))
+
+
 def _expected_aces(kind: Kind) -> tuple[Ace, ...]:
     read = DIRECTORY_READ if kind is Kind.DIRECTORY else FILE_READ_EXECUTE
     return (Ace(ADMIN, ALL_ACCESS), Ace(SYSTEM, ALL_ACCESS), Ace(TRADING, read))
@@ -170,8 +177,14 @@ def qualify_python_substrate(evidence: QualificationEvidence) -> QualificationRe
         "native collection proof absent",
     )
     _require(
-        evidence.trading_token_sid == TRADING and evidence.trading_token_non_admin,
-        "Trading identity differs",
+        evidence.trading_token_sid == TRADING
+        and evidence.trading_token_non_admin is True
+        and evidence.trading_token_elevated is False
+        and type(evidence.trading_enabled_groups) is tuple
+        and ADMIN not in evidence.trading_enabled_groups
+        and type(evidence.trading_enabled_privileges) is tuple
+        and "SeChangeNotifyPrivilege" in evidence.trading_enabled_privileges,
+        "Trading identity or bypass-traverse privilege differs",
     )
     _require(
         evidence.signed_a123_python == PYTHON
@@ -201,7 +214,15 @@ def qualify_python_substrate(evidence: QualificationEvidence) -> QualificationRe
             and item.file_index > 0,
             "local NTFS no-follow identity differs",
         )
-        if path != VOLUME:
+        if path == ROOT:
+            _require(
+                item.kind is Kind.DIRECTORY
+                and item.owner_sid == ADMIN
+                and item.dacl_protected is True
+                and item.aces == _parent_aces(),
+                "protected deployment parent policy differs",
+            )
+        elif path != VOLUME:
             _require(
                 item.owner_sid in (ADMIN, SYSTEM)
                 and item.dacl_protected is True

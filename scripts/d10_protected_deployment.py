@@ -407,7 +407,36 @@ def expected_policy(directory: bool) -> tuple[str, bool, tuple[Ace, ...]]:
     )
 
 
+def expected_parent_policy() -> tuple[str, bool, tuple[Ace, ...]]:
+    return (
+        ADMINISTRATORS_SID,
+        True,
+        (Ace(ADMINISTRATORS_SID, FILE_ALL_ACCESS), Ace(SYSTEM_SID, FILE_ALL_ACCESS)),
+    )
+
+
+def require_parent_native_object(item: NativeObject) -> None:
+    owner, protected, aces = expected_parent_policy()
+    if (
+        type(item) is not NativeObject
+        or item.path != D10_PARENT
+        or item.final_path != D10_PARENT
+        or item.directory is not True
+        or item.reparse is not False
+        or item.drive_type != 3
+        or item.volume_root != "F:\\"
+        or item.filesystem != "NTFS"
+        or item.owner_sid != owner
+        or item.dacl_protected is not protected
+        or item.aces != aces
+        or item.links != 1
+    ):
+        raise DeploymentBlocked("d10_parent_policy_mismatch")
+
+
 def require_native_object(item: NativeObject, path: str, *, directory: bool) -> None:
+    if path == D10_PARENT:
+        raise DeploymentBlocked("d10_object_path_policy_mismatch")
     owner, protected, aces = expected_policy(directory)
     if (
         type(item) is not NativeObject
@@ -494,11 +523,11 @@ def verify_snapshot(
         require_file(backend.read_file(path, max(1, len(item.data))), path, item.data)
 
 
-def _require_parent(backend: DeploymentBackend) -> None:
+def require_parent(backend: DeploymentBackend) -> None:
     checked = backend.list_directory(D10_PARENT)
     if type(checked) is not CheckedDirectory or checked.stable is not True:
         raise DeploymentBlocked("d10_parent_identity_unstable")
-    require_native_object(checked.identity, D10_PARENT, directory=True)
+    require_parent_native_object(checked.identity)
 
 
 def verify_provisioned_state(
@@ -508,7 +537,7 @@ def verify_provisioned_state(
     trust_bytes: tuple[bytes, bytes, bytes] | None = None,
 ) -> None:
     """Reopen fixed final objects; require exact owner/DACL, inventory, and bytes."""
-    _require_parent(backend)
+    require_parent(backend)
     root_children = {"launch-guard.py", "source"}
     if trust_bytes is not None:
         root_children.update(

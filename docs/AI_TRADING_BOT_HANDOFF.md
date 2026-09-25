@@ -3644,3 +3644,37 @@ certified Git identity, and governed executable source were not changed. No
 P124, signing, CNG, production, scheduler, or trading operation occurred.
 P124-2 remains blocked pending exact review of the committed pin transition
 and this canonical-material evidence.
+
+## P124-2 protected-parent reconciliation — source-only correction
+
+The separately authorized P124-2 attempt reached protected execution and
+BLOCKED at `native_path_type_acl_or_identity_drift` before any D10 create.
+Evidence: `F:\AI\temp\p1242-provision-continuation-20260925-001413`.
+Read-only diagnosis confirmed `F:\AITradingBot\D10` absent and all D10
+final, reserved, and installing names absent. No production D10 object was
+created. That authorization is consumed; no retry is authorized.
+
+Architecture 78 and accepted Architecture-103/PD1 history already freeze
+`F:\AITradingBot` as the Administrators/SYSTEM-only protected deployment
+parent. The three-ACE Trading-readable D10 policy starts at
+`F:\AITradingBot\D10`; the three-ACE runtime policy starts at
+`F:\AITradingBot\runtime`. The outer parent retains exactly two ordered
+Administrators/SYSTEM full-control ACEs, Administrators ownership, and a
+protected DACL, with no Trading ACE. Trading reaches fixed permitted
+children via the actual token's enabled SeChangeNotifyPrivilege, which grants
+bypass traverse, not parent listing or mutation. P124-1 still requires
+complete effective Trading mutation/delete/rename/WRITE_DAC/WRITE_OWNER
+denial. No parent ACL migration is required or authorized.
+
+This checkpoint corrects the source-only P124-2 parent verifier, Windows
+path-policy dispatch, test oracle, and P124-1 ROOT qualification, and adds an
+inert, opt-in disposable ACL rehearsal restricted to `F:\AI\temp`. The
+rehearsal and all P124 checkpoints remain unrun in this source task. S5-R1
+HEAD `b28409ebca1d484ededb7cef3ed47847e764b753` / TREE
+`0f2fbc3cce47e2fec478bd9343ab34bb2a367519` remains valid historical
+evidence only. Because P124-1 governed source changed, the corrected tree
+requires fresh S5-R2 exact-tree certification. After acceptance, advance
+operator HEAD/TREE pins, rebuild canonical manifest/attestation/deployment ID,
+produce a new byte-exact deployment checkout, and obtain a PASS disposable
+host ACL rehearsal before considering a separately authorized P124-2 retry.
+No protected run or retry is authorized by this checkpoint.

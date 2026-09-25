@@ -114,7 +114,11 @@ def _builder(root: Path, expected: dict[str, bytes]):
 def _native(
     path: str, *, directory: bool, bad: dict[str, str] | None = None, size: int = 0
 ) -> d.NativeObject:
-    owner, protected, aces = d.expected_policy(directory)
+    owner, protected, aces = (
+        d.expected_parent_policy()
+        if path == d.D10_PARENT
+        else d.expected_policy(directory)
+    )
     item = d.NativeObject(
         path,
         path,
@@ -139,6 +143,15 @@ def _native(
                 item = replace(item, links=2)
             elif value == "acl":
                 item = replace(item, aces=())
+            elif value == "trading":
+                item = replace(
+                    item,
+                    aces=(*item.aces, d.Ace(d.TRADING_SID, d.TRADING_DIRECTORY_READ)),
+                )
+            elif value == "missing_admin":
+                item = replace(item, aces=item.aces[1:])
+            elif value == "missing_system":
+                item = replace(item, aces=item.aces[:1])
             elif value == "owner":
                 item = replace(item, owner_sid=d.SYSTEM_SID)
             elif value == "path":
@@ -640,6 +653,86 @@ def test_p1243_v3_signer_and_windows_verifier_identity_agree() -> None:
                 False,
             )
         )
+
+
+def test_windows_list_directory_dispatches_exact_parent_and_d10_policies(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from scripts import d10_protected_deployment_windows as windows
+
+    backend = object.__new__(windows.WindowsDeploymentBackend)
+    monkeypatch.setattr(backend, "_open_existing", lambda path, directory: 7)
+    monkeypatch.setattr(backend, "_inspect", lambda handle: "same-handle-facts")
+    monkeypatch.setattr(backend, "_list_names", lambda path: ())
+    monkeypatch.setattr(backend, "_close_handle", lambda handle: None)
+    observed = _native(d.D10_PARENT, directory=True)
+    monkeypatch.setattr(backend, "_native_facts", lambda path, facts: observed)
+    assert backend.list_directory(d.D10_PARENT).identity == observed
+    observed = _native(d.D10_ROOT, directory=True)
+    assert backend.list_directory(d.D10_ROOT).identity == observed
+    observed = replace(observed, aces=d.expected_parent_policy()[2])
+    with pytest.raises(
+        d.DeploymentBlocked, match="native_path_type_acl_or_identity_drift"
+    ):
+        backend.list_directory(d.D10_ROOT)
+    observed = replace(
+        _native(d.D10_PARENT, directory=True), aces=d.expected_policy(True)[2]
+    )
+    with pytest.raises(d.DeploymentBlocked, match="d10_parent_policy_mismatch"):
+        backend.list_directory(d.D10_PARENT)
+
+
+def test_exact_parent_policy_and_d10_directory_policy_are_distinct() -> None:
+    parent = _native(d.D10_PARENT, directory=True)
+    root = _native(d.D10_ROOT, directory=True)
+    assert len(parent.aces) == 2
+    assert len(root.aces) == 3
+    d.require_parent_native_object(parent)
+    d.require_native_object(root, d.D10_ROOT, directory=True)
+    with pytest.raises(d.DeploymentBlocked, match="d10_object_path_policy_mismatch"):
+        d.require_native_object(parent, d.D10_PARENT, directory=True)
+    with pytest.raises(d.DeploymentBlocked, match="d10_parent_policy_mismatch"):
+        d.require_parent_native_object(
+            replace(root, path=d.D10_PARENT, final_path=d.D10_PARENT)
+        )
+    with pytest.raises(
+        d.DeploymentBlocked, match="native_path_type_acl_or_identity_drift"
+    ):
+        d.require_native_object(
+            replace(root, aces=parent.aces), d.D10_ROOT, directory=True
+        )
+
+
+@pytest.mark.parametrize(
+    "drift",
+    [
+        "trading",
+        "missing_admin",
+        "missing_system",
+        "owner",
+        "dacl",
+        "reparse",
+        "path",
+        "hardlink",
+    ],
+)
+def test_parent_drift_blocks_before_d10_create(tmp_path: Path, drift: str) -> None:
+    files = _checkout(tmp_path)
+    backend = FakeBackend(bad={d.D10_PARENT: drift})
+    with pytest.raises(d.DeploymentBlocked, match="d10_parent_policy_mismatch"):
+        _provision(tmp_path, backend, files)
+    assert d.D10_ROOT not in backend.objects
+    assert not any(operation == "mkdir" for operation, _ in backend.operations)
+
+
+def test_final_reverification_uses_parent_policy(tmp_path: Path) -> None:
+    files = _checkout(tmp_path)
+    backend = FakeBackend()
+    _provision(tmp_path, backend, files)
+    _, material = _prepared(tmp_path)
+    backend.bad[d.D10_PARENT] = "trading"
+    with pytest.raises(d.DeploymentBlocked, match="d10_parent_policy_mismatch"):
+        d.verify_provisioned_state(backend, material)
 
 
 def test_native_policy_matches_frozen_guard_security_and_verification_key() -> None:

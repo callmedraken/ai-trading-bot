@@ -196,21 +196,30 @@ P124-1 must collect and preserve these observations:
    because Trading must not be able to rename/replace the root through it. Its
    exact local-volume/final-path identity and effective Trading denial are
    required, but its existing DACL need not match the three-ACE runtime policy
-   or be protected. The strong rule starts at F:\AITradingBot and is recursive:
-   the protected root and every existing runtime file and directory, including
-   Lib, DLLs if present, python314.zip if present, site-packages, stdlib,
-   extension modules, and DLLs, must have an Administrator or SYSTEM owner,
-   protected DACL, and exact reviewed ACE policy (Administrators and SYSTEM
-   full control; Trading read/execute only). Files use explicit Trading
-   read+execute mask 0x001200A9, including python.exe; directories use
-   0x001200A9 for read/traverse. Neither mask grants write, append, delete,
-   delete-child, WRITE_DAC, or WRITE_OWNER.
+   or be protected. F:\AITradingBot is the already accepted protected
+   deployment parent: exact Administrators owner, protected DACL, and exactly
+   two ordered allow ACEs (Administrators then SYSTEM, flags 0, each mask
+   0x001F01FF). It has no Trading ACE. The three-ACE runtime policy begins at
+   F:\AITradingBot\runtime and applies recursively to every existing runtime
+   file and directory, including Lib, DLLs if present, python314.zip if
+   present, site-packages, stdlib, extension modules, and DLLs. Those objects
+   retain the reviewed Administrators/SYSTEM full-control and Trading
+   read/execute policy. Files use explicit Trading read+execute mask
+   0x001200A9, including python.exe; directories use 0x001200A9 for
+   read/traverse. Neither mask grants write, append, delete, delete-child,
+   WRITE_DAC, or WRITE_OWNER.
 2. Prove effective rights under the actual non-admin local Trading token/SID
    for every admitted object and its parents. Trading must lack file and
    directory write/append, add-file/add-subdirectory, delete, delete-child,
    rename/replace, WRITE_DAC, WRITE_OWNER, and any equivalent generic or
    inherited right. The read-only access check must include the token's
    enabled groups and privileges; a simple Trading ACE scan is insufficient.
+   The actual exact-SID, non-admin, non-elevated Trading token must have
+   SeChangeNotifyPrivilege enabled for bypass-traverse access to fixed permitted
+   descendants. Administrators group membership and the existing dangerous
+   bypass/mutation privileges remain disallowed. Bypass traverse grants neither
+   parent listing nor mutation; effective mutation/delete/rename/WRITE_DAC/
+   WRITE_OWNER denial remains mandatory for every admitted object and parent.
    A mismatched token or indeterminate access check blocks. ACL/owner checks
    and Trading access checks must agree. The native transcript must
    explicitly establish rename/replace denial for the volume parent, root,

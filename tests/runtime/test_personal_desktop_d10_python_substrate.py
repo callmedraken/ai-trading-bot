@@ -21,6 +21,11 @@ def _node(path: str, kind: q.Kind, children: tuple[str, ...] = ()) -> q.ObjectEv
         (
             q.Ace(q.ADMIN, q.ALL_ACCESS),
             q.Ace(q.SYSTEM, q.ALL_ACCESS),
+        )
+        if path == q.ROOT
+        else (
+            q.Ace(q.ADMIN, q.ALL_ACCESS),
+            q.Ace(q.SYSTEM, q.ALL_ACCESS),
             q.Ace(q.TRADING, read),
         ),
         False,
@@ -70,6 +75,9 @@ def evidence() -> q.QualificationEvidence:
         q.VERSION,
         q.TRADING,
         True,
+        False,
+        (q.TRADING,),
+        ("SeChangeNotifyPrivilege",),
         True,
         True,
         tuple(
@@ -149,6 +157,27 @@ def test_trading_mutation_ace_fails_closed(mask: int) -> None:
     aces = item.aces[:-1] + (q.Ace(q.TRADING, mask),)
     with pytest.raises(q.SubstrateBlocked):
         q.qualify_python_substrate(_change_node(evidence(), q.RUNTIME, aces=aces))
+
+
+def test_root_parent_requires_two_exact_aces_and_admin_owner() -> None:
+    ev = evidence()
+    parent = next(item for item in ev.objects if item.path == q.ROOT)
+    assert len(parent.aces) == 2
+    q.qualify_python_substrate(ev)
+    for aces in (
+        (*parent.aces, q.Ace(q.TRADING, q.DIRECTORY_READ)),
+        parent.aces[:1],
+        parent.aces[1:],
+    ):
+        with pytest.raises(q.SubstrateBlocked, match="protected deployment parent"):
+            q.qualify_python_substrate(_change_node(ev, q.ROOT, aces=aces))
+    with pytest.raises(q.SubstrateBlocked, match="protected deployment parent"):
+        q.qualify_python_substrate(_change_node(ev, q.ROOT, owner_sid=q.SYSTEM))
+
+
+def test_missing_bypass_traverse_privilege_blocks_pure_qualification() -> None:
+    with pytest.raises(q.SubstrateBlocked, match="bypass-traverse"):
+        q.qualify_python_substrate(replace(evidence(), trading_enabled_privileges=()))
 
 
 def test_missing_trading_effective_denial_fails_closed() -> None:

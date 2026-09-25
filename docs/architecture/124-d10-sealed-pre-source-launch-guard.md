@@ -32,6 +32,18 @@ The guard is an Administrator-owned, protected-DACL, non-reparse regular file.
 Trading has read/execute-required access but no create/write/delete/rename,
 WRITE_DAC, or WRITE_OWNER authority in the D10 root.
 
+The pre-existing `F:\AITradingBot` deployment parent retains the accepted
+Architecture-78/103/PD1 policy: Administrators owner, protected DACL, exactly
+ordered Administrators and SYSTEM allow ACEs with flags 0 and full-control
+mask 0x001F01FF, and no Trading ACE. Architecture-124's three-ACE
+Trading-readable policy begins at `F:\AITradingBot\D10`, including its guard,
+source descendants, and trust files; it does not apply to the outer parent.
+Trading reaches exact permitted descendants through its qualified enabled
+SeChangeNotifyPrivilege (Windows bypass traverse), without parent listing or
+mutation rights. P124-1 still proves effective create/write/delete/rename,
+WRITE_DAC, and WRITE_OWNER denial on the parent and admitted objects. No parent
+ACL migration is required or authorized.
+
 The guard is installed from the exact certified repository guard bytes during a
 later protected administrator deployment checkpoint. Its byte length and
 SHA-256 digest are bound into the signed Architecture-123 deployment
@@ -276,3 +288,21 @@ P124-5 activation lease + scheduler mutation
 ```
 
 P124-2 and P124-3 remain inert preparation steps: they do not execute the guard, create an activation lease, mutate Task Scheduler, or authorize market-data, decision-publication, settlement, broker-paper, or live effects. P124-1 must PASS before P124-4 or P124-5 may proceed. If P124-1 blocks after trust publication, the published deployment remains inactive and D10 activation is prohibited.
+
+## Protected P124-2 blocked attempt and source reconciliation
+
+The separately authorized P124-2 attempt at
+`F:\AI\temp\p1242-provision-continuation-20260925-001413` reached protected
+execution and blocked with `native_path_type_acl_or_identity_drift` before any
+D10 create. Read-only diagnosis confirmed `F:\AITradingBot\D10` and every
+D10 final, reserved, and installing name absent. No production D10 object was
+created. The attempt authorization is consumed; no retry is authorized.
+The source-only correction separates the protected two-ACE outer parent from
+three-ACE D10 objects, corrects Windows early path-policy dispatch and P124-1
+ROOT qualification, and requires the actual Trading token's enabled
+SeChangeNotifyPrivilege. An inert, explicitly opted-in ACL rehearsal under
+`F:\AI\temp` must later PASS before any new P124-2 consideration. The
+historical S5-R1 HEAD/TREE pins remain unchanged; governed P124-1 source has
+changed, so a fresh S5-R2 exact-tree certification, new operator pins,
+manifest, attestation, deployment ID, and byte-exact deployment checkout are
+mandatory before a separately authorized protected attempt.

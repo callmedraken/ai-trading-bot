@@ -927,9 +927,15 @@ class WindowsDeploymentBackend:
         try:
             before = self._inspect(handle)
             item = self._native_facts(path, before)
-            from scripts.d10_protected_deployment import require_native_object
+            from scripts.d10_protected_deployment import (
+                require_native_object,
+                require_parent_native_object,
+            )
 
-            require_native_object(item, path, directory=True)
+            if path == D10_PARENT:
+                require_parent_native_object(item)
+            else:
+                require_native_object(item, path, directory=True)
             names = self._list_names(path)
             after = self._inspect(handle)
             if before != after:

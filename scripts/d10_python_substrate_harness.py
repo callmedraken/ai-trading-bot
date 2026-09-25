@@ -207,8 +207,9 @@ def _access(
         and token.elevated is False
         and token.groups_complete is True
         and token.privileges_complete is True
-        and q.ADMIN not in token.enabled_groups,
-        "actual non-admin Trading token unproven",
+        and q.ADMIN not in token.enabled_groups
+        and "SeChangeNotifyPrivilege" in token.enabled_privileges,
+        "actual non-admin Trading token or bypass-traverse privilege unproven",
     )
     _require(len(observation.access) == len(paths), "Trading coverage count")
     seen: set[str] = set()
@@ -462,6 +463,9 @@ def collect(collector: Collector) -> bytes:
             signed.version,
             trading.token.sid,
             trading.token.non_admin,
+            trading.token.elevated,
+            trading.token.enabled_groups,
+            trading.token.enabled_privileges,
             before.no_follow,
             before.pinned_and_rechecked,
             tuple(sorted(access, key=lambda item: item.path)),

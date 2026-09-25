@@ -22,6 +22,11 @@ def _node(path: str, kind: q.Kind, children: tuple[str, ...] = ()) -> q.ObjectEv
         (
             q.Ace(q.ADMIN, q.ALL_ACCESS),
             q.Ace(q.SYSTEM, q.ALL_ACCESS),
+        )
+        if path == q.ROOT
+        else (
+            q.Ace(q.ADMIN, q.ALL_ACCESS),
+            q.Ace(q.SYSTEM, q.ALL_ACCESS),
             q.Ace(q.TRADING, read),
         ),
         False,
@@ -69,7 +74,9 @@ def _fixture() -> tuple[
         True,
         True,
     )
-    token = h.TokenObservation(q.TRADING, True, False, (q.TRADING,), (), True, True)
+    token = h.TokenObservation(
+        q.TRADING, True, False, (q.TRADING,), ("SeChangeNotifyPrivilege",), True, True
+    )
     trading = h.TradingObservation(
         token,
         tuple(
@@ -407,6 +414,16 @@ def test_non_system32_dll_blocks() -> None:
     )
     collector.dlls = replace(collector.dlls, dlls=(bad,))
     with pytest.raises(h.CollectionBlocked):
+        h.collect(collector)
+
+
+def test_missing_bypass_traverse_privilege_blocks_harness() -> None:
+    collector = MockCollector()
+    collector.trading_value = replace(
+        collector.trading_value,
+        token=replace(collector.trading_value.token, enabled_privileges=()),
+    )
+    with pytest.raises(h.CollectionBlocked, match="bypass-traverse"):
         h.collect(collector)
 
 

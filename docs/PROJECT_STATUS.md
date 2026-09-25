@@ -3454,3 +3454,42 @@ The Windows deployment adapter now proves Administrator authority by reading Tok
 No protected P124-2, P124-3, or P124-1 operation was executed by these source checkpoints. Production D10 state, signing material, activation lease, Task Scheduler, and trading/provider surfaces remain untouched.
 
 Next source-only prerequisite: freeze and review the concrete external signer/operator mechanism for the already-accepted P124-3 signer port. Do not execute protected provisioning until that signer mechanism is accepted and the operator sequence is explicitly authorized.
+
+
+## Architecture 125 A125-1 D10 signing-key bootstrap - IMPLEMENTED, source review pending
+
+The source-only Architecture-125 implementation adds a fixed Windows CNG
+enrollment boundary and concrete v3 ExternalSigner in
+scripts/d10_signing_key_windows.py, with pure/mock CNG tests. The exact fixed
+identity is provider Microsoft Software Key Storage Provider, persisted
+machine key AITradingBot-D10-DeploymentAttestation-v3, future logical key ID
+AITradingBot/D10/DeploymentAttestation/v3, and ECDSA P-256. Usage is signing
+only, export policy is zero, and the source-owned protected security descriptor
+allows only BUILTIN Administrators and SYSTEM; the Trading SID is absent.
+
+The protected prepare_d10_signing_key() contract requires elevation, checks
+the fixed name before create-only enrollment, applies and rereads security
+before finalization, finalizes once, reopens and verifies every property, and
+exports only a validated public SEC1 point. Its deterministic transcript is
+bounded and contains only public key/evidence and PASS/BLOCKED status. The
+signer revalidates provider, key, scope, usage, export and security properties
+on every digest sign and uses the accepted SHA-256/P1363 protocol. Native key
+creation and native enrollment were not run.
+
+Focused mock CNG plus overlapping deployment verification: 106 passed.
+Ruff check, Ruff format check, and git diff --check passed. Broad
+certification was not run.
+
+The current S5 source certification remains historically accepted but cannot
+be deployed until A125 completes. P125-1 remains a separately authorized
+protected key-creation checkpoint. After reviewed P125-1 evidence, A125-2 and
+fresh exact-tree S5-R1 are mandatory; P124-2/P124-3 remain blocked until the
+v3 public key is pinned and recertified. The current v2 verifier constants were
+not changed.
+
+No P125-1/P124-2/P124-3/P124-1 operation, production signing, trust-file
+publication, scheduler mutation, D10 root access, or trading/provider effect
+occurred.
+
+Next step: exact source/diff review of this A125-1 checkpoint. Do not execute
+P125-1 until it is separately authorized after source review.

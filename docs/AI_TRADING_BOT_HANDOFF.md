@@ -3365,3 +3365,37 @@ The Windows deployment adapter now proves Administrator authority by reading Tok
 No protected P124-2, P124-3, or P124-1 operation was executed by these source checkpoints. Production D10 state, signing material, activation lease, Task Scheduler, and trading/provider surfaces remain untouched.
 
 Next source-only prerequisite: freeze and review the concrete external signer/operator mechanism for the already-accepted P124-3 signer port. Do not execute protected provisioning until that signer mechanism is accepted and the operator sequence is explicitly authorized.
+
+
+## Architecture 125 A125-1 D10 signing-key bootstrap - IMPLEMENTED, source review pending
+
+A125-1 adds the fixed Windows CNG D10 v3 enrollment/operator boundary and
+WindowsCngExternalSigner in scripts/d10_signing_key_windows.py. The key
+contract freezes Microsoft Software Key Storage Provider, persisted machine
+key AITradingBot-D10-DeploymentAttestation-v3, logical key ID
+AITradingBot/D10/DeploymentAttestation/v3, ECDSA P-256, signing-only usage,
+zero private export policy, and the exact protected
+O:BAG:SYD:P(A;;FA;;;SY)(A;;FA;;;BA) descriptor. Trading is absent from the
+key DACL. Enrollment returns only the public point and bounded deterministic
+evidence; the signer rereads every frozen property and DACL before each
+32-byte SHA-256 digest sign, requires 64-byte canonical P1363, and fails closed
+on cleanup errors.
+
+Focused mock CNG and overlapping deployment tests passed: 106 passed.
+Ruff check/format and git diff --check passed. No native enrollment ran.
+
+The S5 source tree acee8f80e947bcaefd79fa2c44531e8bbdf4cd0c /
+e2850c86adc83b70ab11f6db9e421e8584832c98 remains historically accepted but
+cannot be deployed until A125 completes. P125-1 is a separately authorized
+protected key-creation checkpoint. After ChatGPT reviews its public evidence,
+A125-2 must pin v3 identity/public key and update P124 verifier constants;
+fresh exact-tree S5-R1 is mandatory. P124-2/P124-3 remain blocked until that
+public key is pinned and recertified. No current D10 public key or v2 constant
+changed in A125-1.
+
+No production key was created. P125-1/P124-2/P124-3/P124-1, production
+attestation signing, trust publication, D10 root access, scheduler mutation,
+provider, settlement, broker-paper, and live effects were not performed.
+
+Next: exact source/diff review for A125-1. Keep all protected key/deployment
+checkpoints blocked until separately authorized.

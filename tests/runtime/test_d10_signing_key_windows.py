@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import ctypes
 import hashlib
 import json
 from pathlib import Path
@@ -532,3 +533,153 @@ def test_fixed_source_has_no_trust_publication_or_trading_effect_imports() -> No
         "D10_ACTIVATION_LEASE",
     ):
         assert forbidden not in source
+
+
+@pytest.mark.parametrize(
+    ("status", "expected"),
+    [
+        (cng._STATUS_NOT_FOUND, cng._KeyNotFound),
+        (cng._STATUS_BAD_KEYSET, cng._KeyNotFound),
+        (0x80090005, cng._Blocked),
+    ],
+)
+def test_native_open_key_classifies_only_exact_absence_and_closes_error_handle(
+    status: int, expected: type[Exception]
+) -> None:
+    api = cng._WindowsCngApi.__new__(cng._WindowsCngApi)
+    api._ncrypt = object()
+    closed: list[int] = []
+
+    def open_key(provider, output, name, legacy_spec, flags):
+        assert provider.value == 1
+        assert name == cng.KEY_NAME
+        assert legacy_spec == 0
+        assert flags == cng.NCRYPT_MACHINE_KEY_FLAG
+        ctypes.cast(output, ctypes.POINTER(ctypes.c_void_p))[0] = 41
+        return status
+
+    api._bind = lambda library, name, args, result: open_key
+    api.close = closed.append
+
+    with pytest.raises(expected):
+        api.open_key(1, cng.KEY_NAME, cng.NCRYPT_MACHINE_KEY_FLAG)
+
+    assert closed == [41]
+
+
+@pytest.mark.parametrize(
+    ("user_status", "machine_status"),
+    [
+        (cng._STATUS_NOT_FOUND, cng._STATUS_NOT_FOUND),
+        (cng._STATUS_NOT_FOUND, cng._STATUS_BAD_KEYSET),
+        (cng._STATUS_BAD_KEYSET, cng._STATUS_NOT_FOUND),
+        (cng._STATUS_BAD_KEYSET, cng._STATUS_BAD_KEYSET),
+    ],
+)
+def test_enrollment_creates_only_after_native_absence_in_both_scopes(
+    user_status: int, machine_status: int
+) -> None:
+    native = cng._WindowsCngApi.__new__(cng._WindowsCngApi)
+    native._ncrypt = object()
+    statuses = {0: user_status, cng.NCRYPT_MACHINE_KEY_FLAG: machine_status}
+
+    def open_key(provider, output, name, legacy_spec, flags):
+        assert provider.value == 1
+        assert name == cng.KEY_NAME
+        assert legacy_spec == 0
+        assert not ctypes.cast(output, ctypes.POINTER(ctypes.c_void_p))[0]
+        return statuses[flags]
+
+    native._bind = lambda library, name, args, result: open_key
+
+    class NativeProbeCng(FakeCng):
+        def open_key(self, provider: object, key_name: str, flags: int) -> object:
+            if self.created:
+                return super().open_key(provider, key_name, flags)
+            self.calls.append(("open_key", provider, key_name, flags))
+            return native.open_key(1, key_name, flags)
+
+    api = NativeProbeCng()
+    result = cng._prepare_with_api(api)
+
+    assert result.status == "PASS"
+    assert [call[3] for call in api.calls if call[0] == "open_key"] == [
+        0,
+        cng.NCRYPT_MACHINE_KEY_FLAG,
+        cng.NCRYPT_MACHINE_KEY_FLAG,
+    ]
+    assert len([call for call in api.calls if call[0] == "create_key"]) == 1
+    assert api.finalize_count == 1
+
+
+def test_native_security_readback_uses_owner_group_dacl_without_sacl() -> None:
+    api = cng._WindowsCngApi.__new__(cng._WindowsCngApi)
+    api._ncrypt = object()
+    api._advapi = object()
+    property_flags: list[int] = []
+    conversion_flags: list[int] = []
+    output_buffer = ctypes.create_unicode_buffer(cng.KEY_SECURITY_DESCRIPTOR_SDDL)
+
+    def get_property(handle, name, buffer, size, received, flags):
+        assert handle.value == 17
+        assert name == cng.PROPERTY_SECURITY_DESCRIPTOR
+        property_flags.append(flags)
+        if buffer is None:
+            assert size == 0
+        else:
+            assert size == 20
+            ctypes.memmove(buffer, bytes(20), 20)
+        ctypes.cast(received, ctypes.POINTER(ctypes.c_uint32))[0] = 20
+        return 0
+
+    def convert(descriptor, revision, flags, output, length):
+        assert revision == 1
+        conversion_flags.append(flags)
+        ctypes.cast(output, ctypes.POINTER(ctypes.c_wchar_p))[0] = ctypes.cast(
+            output_buffer, ctypes.c_wchar_p
+        )
+        return 1
+
+    def bind(library, name, args, result):
+        if name == "NCryptGetProperty":
+            return get_property
+        assert name == "ConvertSecurityDescriptorToStringSecurityDescriptorW"
+        return convert
+
+    api._bind = bind
+    api._free_local = lambda pointer: None
+
+    assert api.get_security_descriptor_sddl(17) == cng.KEY_SECURITY_DESCRIPTOR_SDDL
+    exact_flags = (
+        cng.OWNER_SECURITY_INFORMATION
+        | cng.GROUP_SECURITY_INFORMATION
+        | cng.DACL_SECURITY_INFORMATION
+    )
+    assert property_flags == [
+        exact_flags | cng.NCRYPT_SILENT_FLAG,
+        exact_flags | cng.NCRYPT_SILENT_FLAG,
+    ]
+    assert conversion_flags == [exact_flags]
+    assert exact_flags & cng.SACL_SECURITY_INFORMATION == 0
+    assert "D:P" in cng.KEY_SECURITY_DESCRIPTOR_SDDL
+
+
+@pytest.mark.parametrize(
+    "descriptor",
+    [
+        "O:BAG:SYD:(A;;FA;;;SY)(A;;FA;;;BA)",
+        "O:BAG:SYD:P(A;;FA;;;SY)(A;;FA;;;BA)(A;;FA;;;BU)",
+        f"O:BAG:SYD:P(A;;FA;;;SY)(A;;FA;;;BA)(A;;FA;;;{deployment.TRADING_SID})",
+    ],
+)
+def test_security_readback_rejects_unprotected_or_extra_aces(
+    descriptor: str,
+) -> None:
+    api = FakeCng()
+    api.descriptor_after_set = descriptor
+
+    result = cng._prepare_with_api(api)
+
+    assert result.status == "BLOCKED"
+    assert result.reason_code == "cng_security_descriptor_mismatch"
+    assert api.finalize_count == 0

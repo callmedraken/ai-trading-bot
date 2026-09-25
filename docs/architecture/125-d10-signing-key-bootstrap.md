@@ -169,17 +169,31 @@ This is host-observed frozen provider representation, not a general
 normalization or permission to accept arbitrary mask supersets. The primary
 group is pinned for drift detection only; it does not grant key access.
 Trading is not an ACE trustee. No extra, inherited, deny, object, callback,
-unknown, malformed, or differently ordered ACE is accepted. The source
-qualification contract requires ACL revision 2 and a false DACL-defaulted bit;
-the production native ACL revision remains to be proven by the read-only
-qualification. Missing control, SID, ACL, or
-ACE data blocks.
+unknown, malformed, or differently ordered ACE is accepted. A further
+read-only native diagnostic of the exact persisted attempt-#2 object found
+security-descriptor revision 1; control exactly 0x9004 (DACL present,
+DACL protected, self-relative, and no other flags); owner, group, and DACL
+defaulted flags all false; ACL revision 2; and two ACEs. ACE 0 was type 0,
+flags 0, size 20, mask 0xD01F01FF, SID S-1-5-18. ACE 1 was type 0, flags 0,
+size 24, mask 0xD01F01FF, SID S-1-5-32-544. The control word is now an
+exact drift requirement, not a required-bit subset. Any additional or
+missing bit blocks. Owner/group native defaulted outputs must be false
+independently of the control-word check. Missing control, SID, ACL, or ACE
+data blocks.
+
+The same diagnostic observed acl_bytes_in_use=52, acl_bytes_free=0, and
+binary descriptor SHA-256
+ba4b328efe2fd3df0160302a957c641eed40dd40f4b3a31c955f300d51290d04.
+Those byte counts and the binary hash are diagnostic evidence only, not
+authority requirements; raw binary serialization is not pinned. The earlier
+37add57b... value is an SDDL serialization hash, also diagnostic only.
 
 The implementation reads the binary NCRYPT_SECURITY_DESCR_PROPERTY and uses
 GetSecurityDescriptorControl/Owner/Group/Dacl, GetAclInformation, GetAce,
 ConvertSidToStringSidW, validity checks, and LocalFree. An immutable
-SecurityFacts model carries owner/group SIDs, control, DACL state, ACL revision,
-ACE count, and ordered ACE type/flags/mask/SID records. The same verifier is
+SecurityFacts model carries descriptor revision, owner/group SIDs and native
+defaulted outputs, exact control, DACL state, ACL revision, ACE count, and
+ordered ACE type/flags/mask/SID records. The same verifier is
 used after enrollment reopen, by the read-only recovery qualification, and
 before every future ExternalSigner signature. Exact SDDL string equality is
 not a fallback.
@@ -196,3 +210,7 @@ prepare_d10_signing_key() remains create-only and blocks on any existing fixed
 name. No third enrollment attempt is planned. The recovery function has not
 been executed against the production key. Only after its PASS evidence and
 ChatGPT review may A125-2 pin the returned public point.
+
+This source correction has not run the production read-only qualification or
+mutated the persisted key. That qualification remains the next separately
+authorized protected checkpoint.

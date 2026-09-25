@@ -45,7 +45,10 @@ def _security(
     *,
     owner: str = cng.OWNER_SID,
     group: str = cng.PERSISTED_GROUP_SID,
-    control: int = (cng.SE_DACL_PRESENT | cng.SE_DACL_PROTECTED | cng.SE_SELF_RELATIVE),
+    control: int = cng.PERSISTED_SECURITY_CONTROL,
+    descriptor_revision: int = 1,
+    owner_defaulted: bool = False,
+    group_defaulted: bool = False,
     present: bool = True,
     defaulted: bool = False,
     revision: int = cng.ACL_REVISION,
@@ -60,8 +63,11 @@ def _security(
         )
     )
     return cng.SecurityFacts(
+        descriptor_revision,
         owner,
+        owner_defaulted,
         group,
+        group_defaulted,
         control,
         present,
         defaulted,
@@ -330,9 +336,14 @@ def test_security_descriptor_is_protected_admin_system_only() -> None:
     assert result.status == "PASS"
     transcript = json.loads(result.transcript)
     security = transcript["persisted_security"]
+    assert security["descriptor_revision"] == 1
     assert security["owner_sid"] == cng.OWNER_SID
+    assert security["owner_defaulted"] is False
     assert security["group_sid"] == cng.PERSISTED_GROUP_SID
-    assert security["control"] & cng.SE_DACL_PROTECTED
+    assert security["group_defaulted"] is False
+    assert security["control"] == cng.PERSISTED_SECURITY_CONTROL == 0x9004
+    assert security["dacl_defaulted"] is False
+    assert security["acl_revision"] == 2
     assert security["aces"] == [
         {"type": 0, "flags": 0, "mask": 0xD01F01FF, "sid": cng.SYSTEM_SID},
         {"type": 0, "flags": 0, "mask": 0xD01F01FF, "sid": cng.OWNER_SID},
@@ -739,6 +750,9 @@ def test_enrollment_creates_only_after_native_absence_in_both_scopes(
         _security(owner=cng.SYSTEM_SID),
         _security(group=cng.SYSTEM_SID),
         _security(group=deployment.TRADING_SID),
+        _security(descriptor_revision=2),
+        _security(owner_defaulted=True),
+        _security(group_defaulted=True),
         _security(control=cng.SE_DACL_PRESENT | cng.SE_SELF_RELATIVE),
         _security(present=False),
         _security(defaulted=True),
@@ -802,6 +816,27 @@ def test_frozen_structural_security_drift_blocks_export_and_sign(
         cng._sign_with_api(FakeCng(persisted=True, security=facts), _request())
 
 
+@pytest.mark.parametrize(
+    "bit", [1 << shift for shift in range(16) if not 0x9004 & (1 << shift)]
+)
+def test_each_extra_control_bit_blocks_recovery_and_sign(bit: int) -> None:
+    facts = _security(control=cng.PERSISTED_SECURITY_CONTROL | bit)
+    api = FakeCng(persisted=True, security=facts)
+    assert cng._qualify_existing_with_api(api).status == "BLOCKED"
+    assert not any(call[0] == "export_public" for call in api.calls)
+    with pytest.raises(deployment.DeploymentBlocked):
+        cng._sign_with_api(FakeCng(persisted=True, security=facts), _request())
+
+
+@pytest.mark.parametrize(
+    "bit", [cng.SE_DACL_PRESENT, cng.SE_DACL_PROTECTED, cng.SE_SELF_RELATIVE]
+)
+def test_each_missing_control_bit_blocks(bit: int) -> None:
+    facts = _security(control=cng.PERSISTED_SECURITY_CONTROL & ~bit)
+    with pytest.raises(cng._Blocked, match="cng_security_descriptor_mismatch"):
+        cng._verify_security_facts(facts)
+
+
 def test_frozen_structural_security_exact_mask_passes() -> None:
     result = cng._qualify_existing_with_api(FakeCng(persisted=True))
     assert result.status == "PASS"
@@ -852,6 +887,10 @@ def test_recovery_is_read_only_and_exports_after_full_verification() -> None:
     assert security_read < export
     facts = json.loads(result.transcript)
     assert facts["schema"].endswith("attempt2-read-only-qualification/v1")
+    assert facts["persisted_security"]["descriptor_revision"] == 1
+    assert facts["persisted_security"]["owner_defaulted"] is False
+    assert facts["persisted_security"]["group_defaulted"] is False
+    assert facts["persisted_security"]["control"] == 0x9004
     assert facts["persisted_security"]["aces"][0]["mask"] == 0xD01F01FF
     assert len(result.transcript) <= cng.MAX_ENROLLMENT_TRANSCRIPT_BYTES
     assert (
@@ -948,8 +987,13 @@ def test_native_binary_descriptor_parsing_and_cleanup_failure() -> None:
     api._read_property = read_property
     facts = api.get_security_facts(17)
     cng._verify_security_facts(facts)
+    assert facts.descriptor_revision == 1
     assert facts.owner_sid == cng.OWNER_SID
+    assert facts.owner_defaulted is False
     assert facts.group_sid == cng.PERSISTED_GROUP_SID
+    assert facts.group_defaulted is False
+    assert facts.control == 0x9004
+    assert facts.dacl_defaulted is False
     assert facts.acl_revision == 2
     assert facts.aces[0].access_mask == 0xD01F01FF
     assert flags_seen == [cng.NCRYPT_SILENT_FLAG | cng.SECURITY_DESCRIPTOR_INFORMATION]

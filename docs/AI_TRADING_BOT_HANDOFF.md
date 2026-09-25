@@ -3484,3 +3484,20 @@ new qualification has not been run against it. Next: exact source review and
 focused verification; after acceptance, separately authorized read-only
 qualification may provide public point evidence. Only after PASS and ChatGPT
 review may A125-2 pin the public point. P124 checkpoints remain blocked.
+
+## Architecture 125 attempt-#2 structural freeze - source correction pending review
+
+Further read-only native evidence from the existing persisted v3 key confirms
+descriptor revision 1, control exactly 0x9004 (DACL present, protected, and
+self-relative with no extra bits), owner/group/DACL defaulted false, and ACL
+revision 2. The two ordered allowed ACEs remain SYSTEM then Administrators,
+both type 0, flags 0, mask 0xD01F01FF (observed sizes 20 and 24). The source
+verifier now requires exact 0x9004 equality and independently checks native
+owner/group defaulted outputs. PASS recovery evidence includes these fields.
+Observed acl_bytes_in_use=52, acl_bytes_free=0, and binary descriptor SHA-256
+ba4b328efe2fd3df0160302a957c641eed40dd40f4b3a31c955f300d51290d04
+are diagnostic only, not authority requirements; raw serialization is not
+pinned. This source correction has not run production qualification or mutated
+the persisted key. After exact source review, read-only qualification remains
+the next separately authorized protected checkpoint. A125-2 and all P124
+checkpoints remain blocked.

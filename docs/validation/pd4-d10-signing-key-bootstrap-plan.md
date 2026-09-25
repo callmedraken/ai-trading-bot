@@ -133,3 +133,25 @@ against the real key during this source checkpoint. After exact source review,
 a separately authorized read-only production qualification may return public
 evidence. Only a PASS and ChatGPT review may feed A125-2. P124-2/P124-3/
 P124-1 remain blocked.
+
+### Exact attempt-#2 control and defaulted-field freeze
+
+A further read-only native diagnostic of the existing persisted key observed
+descriptor revision 1, control exactly 0x9004 (DACL present, protected, and
+self-relative with no extra flags), owner/group/DACL defaulted false, ACL
+revision 2, and two ordered allow ACEs: SYSTEM type 0/flags 0/size 20/
+mask 0xD01F01FF, then Administrators type 0/flags 0/size 24/
+mask 0xD01F01FF. Exact owner/group and SID facts remain those in section E.
+The control word is an equality requirement, not a required-bit subset.
+Tests must block every extra control bit, each missing required bit, wrong
+descriptor revision, and either native owner/group defaulted output.
+Native synthetic parsing must report all of these frozen fields. The shared
+verifier must block drift before public export or signing, and PASS recovery
+evidence must include them.
+
+Observed acl_bytes_in_use=52, acl_bytes_free=0, and binary descriptor
+SHA-256 ba4b328efe2fd3df0160302a957c641eed40dd40f4b3a31c955f300d51290d04
+are diagnostics only; they and raw binary serialization are not authority
+requirements. No production qualification has run and no production key
+mutation occurred in this source checkpoint. The read-only qualification
+remains the next separately authorized protected checkpoint.

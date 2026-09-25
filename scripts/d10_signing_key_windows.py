@@ -68,6 +68,7 @@ PERSISTED_GROUP_SID = "S-1-5-21-1397534616-3988210162-180023805-1005"
 SYSTEM_SID = "S-1-5-18"
 REQUESTED_FULL_ACCESS_MASK = 0x001F01FF
 PERSISTED_ACCESS_MASK = 0xD01F01FF
+PERSISTED_SECURITY_CONTROL = 0x9004
 SE_DACL_PRESENT = 0x0004
 SE_DACL_PROTECTED = 0x1000
 SE_SELF_RELATIVE = 0x8000
@@ -107,8 +108,11 @@ class SecurityAce:
 
 @dataclass(frozen=True, slots=True)
 class SecurityFacts:
+    descriptor_revision: int
     owner_sid: str
+    owner_defaulted: bool
     group_sid: str
+    group_defaulted: bool
     control: int
     dacl_present: bool
     dacl_defaulted: bool
@@ -150,12 +154,14 @@ def _verify_security_facts(facts: SecurityFacts) -> None:
     )
     if (
         type(facts) is not SecurityFacts
+        or type(facts.descriptor_revision) is not int
+        or facts.descriptor_revision != 1
         or facts.owner_sid != OWNER_SID
+        or facts.owner_defaulted is not False
         or facts.group_sid != PERSISTED_GROUP_SID
+        or facts.group_defaulted is not False
         or type(facts.control) is not int
-        or not 0 <= facts.control <= 0xFFFF
-        or facts.control & (SE_DACL_PRESENT | SE_DACL_PROTECTED | SE_SELF_RELATIVE)
-        != (SE_DACL_PRESENT | SE_DACL_PROTECTED | SE_SELF_RELATIVE)
+        or facts.control != PERSISTED_SECURITY_CONTROL
         or facts.dacl_present is not True
         or facts.dacl_defaulted is not False
         or facts.acl_revision != ACL_REVISION
@@ -402,8 +408,11 @@ def _transcript(
     }
     if security is not None and status == "PASS":
         facts["persisted_security"] = {
+            "descriptor_revision": security.descriptor_revision,
             "owner_sid": security.owner_sid,
+            "owner_defaulted": security.owner_defaulted,
             "group_sid": security.group_sid,
+            "group_defaulted": security.group_defaulted,
             "control": security.control,
             "dacl_present": security.dacl_present,
             "dacl_defaulted": security.dacl_defaulted,
@@ -1053,6 +1062,8 @@ class _WindowsCngApi:
         )
         if not get_control(descriptor, ctypes.byref(control), ctypes.byref(revision)):
             raise _Blocked("cng_security_descriptor_malformed")
+        if revision.value != raw[0]:
+            raise _Blocked("cng_security_descriptor_malformed")
         owner, group, dacl = ctypes.c_void_p(), ctypes.c_void_p(), ctypes.c_void_p()
         owner_defaulted, group_defaulted = wintypes.BOOL(), wintypes.BOOL()
         for function_name, output, defaulted in (
@@ -1154,8 +1165,11 @@ class _WindowsCngApi:
         if expected_ace_address != dacl.value + size.acl_bytes_in_use:
             raise _Blocked("cng_security_descriptor_malformed")
         return SecurityFacts(
+            int(raw[0]),
             self._sid_string(owner, start, end),
+            bool(owner_defaulted.value),
             self._sid_string(group, start, end),
+            bool(group_defaulted.value),
             int(control.value),
             bool(present.value),
             bool(dacl_defaulted.value),

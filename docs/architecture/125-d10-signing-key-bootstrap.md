@@ -41,8 +41,8 @@ O:BAG:SYD:P(A;;FA;;;SY)(A;;FA;;;BA)
 It has BUILTIN Administrators as owner, SYSTEM as primary group, a protected
 DACL, and only SYSTEM and BUILTIN Administrators full-control ACEs. The D10
 Trading SID is absent. The complete descriptor and protected state are read
-back after setting and after reopening. Inability to set or exactly verify it
-blocks the operation.
+back on the finalized, reopened persisted machine key. Inability to set or
+exactly verify it blocks the operation.
 
 The key remains Administrator/SYSTEM controlled. Trading has no key access.
 The signing API does not accept caller-selected provider, key name, algorithm,
@@ -61,14 +61,17 @@ Importing the module has no native side effects. The function:
    or inaccessible state blocks.
 4. Creates the fixed algorithm/name with NCRYPT_MACHINE_KEY_FLAG and without
    NCRYPT_OVERWRITE_KEY_FLAG.
-5. Immediately sets and reads back the exact protected Administrator/SYSTEM
-   descriptor before key finalization.
-6. Sets signing-only usage and export-policy zero.
-7. Calls NCryptFinalizeKey exactly once.
-8. Closes the creation handle, reopens the persisted key under the same fixed
-   machine identity, and rereads the provider, name, algorithm/group, P-256
-   size, machine-key type, usage, export policy, and complete security
-   descriptor.
+5. Sets the exact protected Administrator/SYSTEM descriptor before key
+   finalization, followed by signing-only usage and export-policy zero. There
+   is no descriptor readback on the unfinalized creation handle.
+6. Calls NCryptFinalizeKey exactly once.
+7. Closes the creation handle and reopens the fixed persisted key with
+   NCRYPT_MACHINE_KEY_FLAG.
+8. On the finalized, reopened key, authoritatively reads back the exact
+   provider, name, ECDSA_P256/ECDSA algorithm, 256-bit P-256 size, machine-key
+   type, signing-only usage, zero export policy, and full OWNER|GROUP|DACL
+   descriptor: protected DACL, Administrators owner, SYSTEM primary group,
+   only SYSTEM and Administrators full-control ACEs, and Trading absent.
 9. Exports only the public ECCPUBLICBLOB, validates its P-256 point, and
    normalizes it to the verifier's 65-byte uncompressed SEC1 point
    04 || X || Y.
@@ -86,7 +89,17 @@ A failed or ambiguous step returns BLOCKED. Every CNG handle and native
 allocation is released once; any cleanup ambiguity also blocks. A failure after
 create-only key creation is not rolled back by deleting or replacing the
 persisted name. The operator must retain the blocked transcript and resolve
-state through a separately reviewed procedure.
+state through a separately reviewed procedure. Successful descriptor setting
+alone cannot produce PASS or permit public-key export; complete reopened-state
+verification is required first.
+
+The first protected P125-1 attempt returned BLOCKED with
+`cng_security_descriptor_unavailable` during the pre-finalization readback.
+Read-only post-attempt diagnosis opened the Microsoft Software Key Storage
+Provider and observed `Security Descr Support = DWORD 1`; the fixed key name
+returned `NTE_BAD_KEYSET (0x80090016)` in both user and machine scopes. No v3
+key persisted, no public key was produced, and no P124 operation occurred.
+This evidence is not a P125-1 PASS or authorization for another attempt.
 
 ## 4. Concrete P124-3 ExternalSigner implementation
 

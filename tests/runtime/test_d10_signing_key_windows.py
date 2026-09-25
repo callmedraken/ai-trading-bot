@@ -58,6 +58,8 @@ class FakeCng:
         self.descriptor = descriptor or cng.KEY_SECURITY_DESCRIPTOR_SDDL
         self.descriptor_after_set: str | None = None
         self.provider_name = provider_name or cng.PROVIDER_NAME
+        self.key_provider_name = self.provider_name
+        self.fail_security_read = False
         self.public_blob = _public_blob() if public_blob is None else public_blob
         self.signature = _signature() if signature is None else signature
         self.admin = admin
@@ -140,10 +142,16 @@ class FakeCng:
 
     def get_provider_name(self, key: object) -> str:
         self.calls.append(("get_provider_name", key))
-        return self.provider_name
+        assert key in {"reopened_key", "persisted_key"}
+        return self.key_provider_name
 
     def get_security_descriptor_sddl(self, key: object) -> str:
         self.calls.append(("get_security", key))
+        assert key in {"reopened_key", "persisted_key"}
+        if key == "reopened_key":
+            assert self.finalized
+        if self.fail_security_read:
+            raise OSError("security read failed")
         return self.descriptor
 
     def finalize_key(self, key: object, flags: int) -> None:
@@ -218,10 +226,46 @@ def test_enrollment_uses_fixed_machine_p256_sign_only_nonexportable_key() -> Non
         ),
     ]
     assert api.finalize_count == 1
-    assert api.calls.index(
+    set_security = api.calls.index(
         ("set_security", "created_key", cng.KEY_SECURITY_DESCRIPTOR_SDDL)
-    ) < api.calls.index(("finalize", "created_key", cng.NCRYPT_SILENT_FLAG))
-    assert ("export_public", "reopened_key", cng.PUBLIC_KEY_BLOB_TYPE) in api.calls
+    )
+    finalize = api.calls.index(("finalize", "created_key", cng.NCRYPT_SILENT_FLAG))
+    close_created = api.calls.index(("close", "created_key"))
+    reopen = api.calls.index(
+        ("open_key", "provider", cng.KEY_NAME, cng.NCRYPT_MACHINE_KEY_FLAG),
+        finalize,
+    )
+    verify_provider = api.calls.index(("get_provider_name", "reopened_key"))
+    verify_security = api.calls.index(("get_security", "reopened_key"))
+    export = api.calls.index(
+        ("export_public", "reopened_key", cng.PUBLIC_KEY_BLOB_TYPE)
+    )
+    assert set_security < finalize < close_created < reopen < verify_provider
+    assert all(
+        api.calls.index(("set_property", *prop)) < finalize for prop in set_props
+    )
+    assert not any(call == ("get_security", "created_key") for call in api.calls)
+    assert {handle for handle, _ in api.property_reads if handle != "provider"} == {
+        "reopened_key"
+    }
+    assert ("get_provider_name", "created_key") not in api.calls
+    assert {
+        name for handle, name in api.property_reads if handle == "reopened_key"
+    } == {
+        cng.PROPERTY_NAME,
+        cng.PROPERTY_ALGORITHM,
+        cng.PROPERTY_ALGORITHM_GROUP,
+        cng.PROPERTY_LENGTH,
+        cng.PROPERTY_KEY_TYPE,
+        cng.PROPERTY_KEY_USAGE,
+        cng.PROPERTY_EXPORT_POLICY,
+    }
+    assert all(
+        api.calls.index(("get_property", "reopened_key", name, cng.NCRYPT_SILENT_FLAG))
+        < verify_security
+        for name in api.key_properties
+    )
+    assert verify_security < export
     assert len(api.closed) == len(set(api.closed)) == 3
 
 
@@ -298,7 +342,36 @@ def test_wrong_provider_identity_blocks_enrollment() -> None:
     assert not any(call[0] == "create_key" for call in api.calls)
 
 
-def test_security_descriptor_drift_blocks_before_finalization() -> None:
+def test_reopened_provider_mismatch_blocks_public_export() -> None:
+    api = FakeCng()
+    api.key_provider_name = "Another Key Storage Provider"
+
+    result = cng._prepare_with_api(api)
+
+    assert result.status == "BLOCKED"
+    assert result.reason_code == "cng_provider_identity_mismatch"
+    assert api.finalize_count == 1
+    assert ("get_provider_name", "reopened_key") in api.calls
+    assert not any(call[0] == "export_public" for call in api.calls)
+    assert len([call for call in api.calls if call[0] == "create_key"]) == 1
+
+
+def test_reopened_security_read_failure_blocks_without_retry_or_delete() -> None:
+    api = FakeCng()
+    api.fail_security_read = True
+
+    result = cng._prepare_with_api(api)
+
+    assert result.status == "BLOCKED"
+    assert result.reason_code == "cng_security_descriptor_unavailable"
+    assert api.finalize_count == 1
+    assert ("get_security", "reopened_key") in api.calls
+    assert not any(call[0] in {"export_public", "delete_key"} for call in api.calls)
+    assert len([call for call in api.calls if call[0] == "create_key"]) == 1
+    assert len([call for call in api.calls if call[0] == "open_key"]) == 3
+
+
+def test_security_descriptor_drift_blocks_after_reopen() -> None:
     api = FakeCng()
     api.descriptor_after_set = "O:SYD:P(A;;FA;;;SY)"
 
@@ -306,8 +379,12 @@ def test_security_descriptor_drift_blocks_before_finalization() -> None:
 
     assert result.status == "BLOCKED"
     assert result.reason_code == "cng_security_descriptor_mismatch"
-    assert api.finalize_count == 0
-    assert not any(call[0] == "export_public" for call in api.calls)
+    assert api.finalize_count == 1
+    assert api.calls.index(("close", "created_key")) < api.calls.index(
+        ("get_security", "reopened_key")
+    )
+    assert not any(call[0] in {"export_public", "delete_key"} for call in api.calls)
+    assert len([call for call in api.calls if call[0] == "create_key"]) == 1
 
 
 def test_public_ecc_blob_normalizes_to_canonical_sec1_point() -> None:
@@ -499,6 +576,17 @@ def test_enrollment_and_signer_cleanup_failures_block() -> None:
     assert result.status == "BLOCKED"
     assert result.reason_code == "cng_cleanup_failed"
 
+    creation_close = FakeCng()
+    creation_close.fail_close.add("created_key")
+    result = cng._prepare_with_api(creation_close)
+    assert result.status == "BLOCKED"
+    assert result.reason_code == "cng_cleanup_failed"
+    assert creation_close.finalize_count == 1
+    assert len([call for call in creation_close.calls if call[0] == "open_key"]) == 2
+    assert not any(
+        call[0] in {"export_public", "delete_key"} for call in creation_close.calls
+    )
+
     signer = FakeCng(persisted=True)
     signer.fail_close.add("persisted_key")
     with pytest.raises(deployment.DeploymentBlocked, match="cleanup"):
@@ -682,4 +770,6 @@ def test_security_readback_rejects_unprotected_or_extra_aces(
 
     assert result.status == "BLOCKED"
     assert result.reason_code == "cng_security_descriptor_mismatch"
-    assert api.finalize_count == 0
+    assert api.finalize_count == 1
+    assert ("get_security", "reopened_key") in api.calls
+    assert not any(call[0] == "export_public" for call in api.calls)

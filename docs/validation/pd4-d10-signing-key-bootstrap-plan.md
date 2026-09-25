@@ -12,10 +12,13 @@ current governed v2 key ID/public key and P124 verifier constants unchanged.
 The P125-1 operator contract is source-owned and zero-argument. It requires
 elevated Administrator; opens only Microsoft Software Key Storage Provider;
 proves the fixed name absent; creates only a machine-scoped ECDSA P-256 key
-without overwrite; applies exact signing-only usage, zero export policy and
-the protected Administrator/SYSTEM security descriptor; finalizes once;
-reopens and verifies every property; and exports only a valid public P-256
-point. It returns only a bounded canonical transcript and public material.
+without overwrite; sets the exact protected Administrator/SYSTEM descriptor,
+signing-only usage, and zero export policy before finalization; finalizes once;
+closes the creation handle; reopens the fixed persisted machine key; then
+reads back the exact OWNER|GROUP|DACL descriptor and all frozen properties
+before exporting a valid public P-256 point. The unfinalized creation handle
+has no descriptor readback. A successful set alone cannot yield PASS. It
+returns only a bounded canonical transcript and public material.
 It never creates or publishes D10 trust files.
 
 The concrete ExternalSigner opens the same fixed machine key and verifies all
@@ -30,8 +33,13 @@ Tests must cover:
 
 - Exact provider, key name, ECDSA_P256, machine creation/open flags, no
   overwrite, and existing user- or machine-scoped name blocking.
-- Administrator requirement, signing-only usage, export-policy zero, and
-  exact protected owner/group/DACL with Trading absent.
+- Administrator requirement; exact descriptor, signing-only usage, and zero
+  export policy set before the single finalize; creation handle closed before
+  machine reopen; no descriptor read on the creation handle.
+- Authoritative readback on the reopened key of provider, persisted name,
+  ECDSA_P256/ECDSA, 256-bit P-256, machine scope, signing-only usage, zero
+  export policy, and exact protected owner/group/DACL with Trading absent,
+  all before public export.
 - Readback mismatch; wrong provider/name/algorithm/group/curve/size/scope;
   exportable or archive-enabled policy; incorrect key usage; descriptor drift.
 - Public-only ECC blob export, valid SEC1 normalization, malformed blob,
@@ -61,8 +69,15 @@ state during P125-1.
 
 Stop on existing name, non-Administrator context, unexpected provider or key
 property, security descriptor mismatch, malformed public blob, ambiguous native
-result, or cleanup failure. Do not delete, replace, or retry over uncertain key
-state.
+result, or cleanup failure. A post-finalization verification failure remains
+BLOCKED. Do not delete, replace, or retry over uncertain key state.
+
+The first protected P125-1 attempt is BLOCKED evidence, not PASS: reason
+`cng_security_descriptor_unavailable` at pre-finalization readback, no public
+key, and no P124 operation. A read-only post-attempt diagnostic found the
+provider openable with `Security Descr Support = DWORD 1`, while both user and
+machine fixed-key opens returned `NTE_BAD_KEYSET (0x80090016)`. No key
+persisted. A second protected attempt is outside this source correction.
 
 ## C. A125-2 public-key migration and S5-R1
 

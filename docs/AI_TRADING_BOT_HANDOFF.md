@@ -3419,3 +3419,29 @@ The native correction recognizes only exact `NTE_NOT_FOUND` and `NTE_BAD_KEYSET`
 A125-1 source acceptance creates no production key and does not alter the currently pinned v2 D10 trust anchor. The historical S5 identity `acee8f80e947bcaefd79fa2c44531e8bbdf4cd0c` / `e2850c86adc83b70ab11f6db9e421e8584832c98` remains accepted but is not deployable until the v3 transition completes.
 
 Next protected checkpoint: P125-1 native creation of the fixed non-exportable v3 key. It requires separate explicit operator authorization. After P125-1 evidence is reviewed, A125-2 must pin the observed v3 public point/key ID and S5-R1 must recertify the resulting exact executable tree before P124-2/P124-3 may execute.
+
+## Architecture 125 P125-1 first protected attempt — BLOCKED; source correction pending review
+
+The first protected P125-1 attempt returned `BLOCKED` with reason
+`cng_security_descriptor_unavailable` at the pre-finalization descriptor
+readback. It produced no public key. Read-only post-attempt diagnosis opened
+the Microsoft Software Key Storage Provider and found
+`Security Descr Support = DWORD 1`; fixed-name opens in both user and machine
+scopes returned `NTE_BAD_KEYSET (0x80090016)`. No v3 persisted key survived.
+No P124 operation occurred. This evidence is not a P125-1 PASS.
+
+This additive source correction sets the exact protected descriptor,
+signing-only usage, and zero export policy before the single finalization.
+It then closes the creation handle, reopens the fixed machine key, and
+requires authoritative readback of every frozen provider, identity,
+algorithm, scope, policy, and OWNER|GROUP|DACL security fact before public
+ECCPUBLICBLOB export or PASS. No descriptor read is attempted on the
+unfinalized creation handle. Any post-finalization mismatch or cleanup
+failure remains BLOCKED; the operator path has no delete, overwrite, or
+retry. The current governed v2 trust anchor is unchanged.
+
+This checkpoint is source-only. A second P125-1 attempt, A125-2 migration,
+P124-2/P124-3/P124-1, production signing, trust publication, D10 root access,
+Task Scheduler mutation, and trading/provider effects were not performed.
+The correction requires exact source review before any separately authorized
+protected attempt.

@@ -365,12 +365,6 @@ def _prepare_with_api(api: _CngApi) -> EnrollmentResult:
             api.set_security_descriptor(created, KEY_SECURITY_DESCRIPTOR_SDDL)
         except Exception:
             raise _Blocked("cng_security_descriptor_set_failed") from None
-        try:
-            descriptor = api.get_security_descriptor_sddl(created)
-        except Exception:
-            raise _Blocked("cng_security_descriptor_unavailable") from None
-        if type(descriptor) is not str or descriptor != KEY_SECURITY_DESCRIPTOR_SDDL:
-            raise _Blocked("cng_security_descriptor_mismatch")
 
         for name, value in (
             (PROPERTY_KEY_USAGE, _uint32(NCRYPT_ALLOW_SIGNING_FLAG)),

@@ -3540,3 +3540,15 @@ P124-2/P124-3/P124-1, production signing, trust publication, D10 root access,
 Task Scheduler mutation, and trading/provider effects were not performed.
 The correction requires exact source review before any separately authorized
 protected attempt.
+
+## Architecture 125 A125-1R lifecycle correction — ACCEPTED
+
+Exact GitHub review accepted the additive correction at `3b86f50621dd0ac2a3d52d878da6957350d5c2fa` / tree `6062d8c39554f89d92a53eb25eb8b32a78f6ee9a` after the first protected P125-1 attempt blocked on pre-finalization security-descriptor readback.
+
+The corrected enrollment order is now create -> set exact security descriptor + signing-only usage + zero export policy -> finalize exactly once -> close creation handle -> reopen the exact machine key -> verify provider/name/algorithm/group/length/scope/usage/export/security -> export only the public ECC blob. No security-descriptor read occurs on the unfinalized handle. Post-finalization verification remains fail-closed with no delete, overwrite, or retry path.
+
+Focused verification reported 119 passed across the A125 signing-key and directly overlapping protected-deployment tests, with Ruff, format and diff gates passing. Exact review found no remaining source blocker for a second protected enrollment attempt. Microsoft CNG documentation matches the corrected create/set-properties/finalize lifecycle, machine-key scope, property/security-descriptor readback model, public ECC export format and handle-release requirements.
+
+P125-1 attempt #1 remains BLOCKED evidence only: `cng_security_descriptor_unavailable`, no public key, and post-attempt read-only diagnosis returned `NTE_BAD_KEYSET` for both user and machine scopes, so no v3 key persisted. No P124 operation occurred.
+
+The user separately approved exactly one P125-1 attempt #2 after this source review. That approval does not authorize P124-2, P124-3, P124-1, A125-2, scheduler mutation, deployment signing/publication, or any trading effect. If attempt #2 blocks after finalization, do not rerun or delete/replace the persisted key; preserve evidence for recovery review.

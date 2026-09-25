@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ast
 import hashlib
+import json
 import os
 import subprocess
 from dataclasses import replace
@@ -101,8 +102,8 @@ def _builder(root: Path, expected: dict[str, bytes]):
     def build(**kwargs):
         assert kwargs == {
             "repository_root": root,
-            "expected_head": d.CERTIFIED_SOURCE_HEAD,
-            "expected_tree": d.CERTIFIED_SOURCE_TREE,
+            "expected_head": "b28409ebca1d484ededb7cef3ed47847e764b753",
+            "expected_tree": "0f2fbc3cce47e2fec478bd9343ab34bb2a367519",
             "production_python_version": d.PRODUCTION_PYTHON_VERSION,
         }
         return result
@@ -328,10 +329,14 @@ def test_exact_certified_identity_canonical_artifacts_and_guard_bytes(
 ) -> None:
     files = _checkout(tmp_path)
     material = d.build_certified_material(tmp_path, builder=_builder(tmp_path, files))
-    assert d.CERTIFIED_SOURCE_HEAD == "acee8f80e947bcaefd79fa2c44531e8bbdf4cd0c"
-    assert d.CERTIFIED_SOURCE_TREE == "e2850c86adc83b70ab11f6db9e421e8584832c98"
+    assert d.CERTIFIED_SOURCE_HEAD == "b28409ebca1d484ededb7cef3ed47847e764b753"
+    assert d.CERTIFIED_SOURCE_TREE == "0f2fbc3cce47e2fec478bd9343ab34bb2a367519"
+    assert d.CERTIFIED_SOURCE_HEAD != "acee8f80e947bcaefd79fa2c44531e8bbdf4cd0c"
+    assert d.CERTIFIED_SOURCE_TREE != "e2850c86adc83b70ab11f6db9e421e8584832c98"
     assert material.build.certified_source_head == d.CERTIFIED_SOURCE_HEAD
     assert material.build.certified_source_tree == d.CERTIFIED_SOURCE_TREE
+    assert material.attestation.certified_source_head == d.CERTIFIED_SOURCE_HEAD
+    assert material.attestation.certified_source_tree == d.CERTIFIED_SOURCE_TREE
     assert material.guard_bytes == files[D10_GUARD_RELATIVE_PATH]
     assert (
         parse_executable_manifest(
@@ -743,6 +748,9 @@ def test_p1242_create_only_exact_manifest_snapshot_and_deterministic_transcript(
     )
     assert b'"activation_authority":"NONE"' in result1.transcript
     assert b'"scheduler_authority":"NONE"' in result1.transcript
+    transcript = json.loads(result1.transcript)
+    assert transcript["certified_source_head"] == d.CERTIFIED_SOURCE_HEAD
+    assert transcript["certified_source_tree"] == d.CERTIFIED_SOURCE_TREE
 
 
 @pytest.mark.parametrize(
@@ -811,6 +819,9 @@ def test_p1243_publishes_only_canonical_trust_bytes_and_verifies_signature(
         paths=d.TRUST_FINAL_PATHS,
         signature=_signature(),
     )
+    transcript = json.loads(result.transcript)
+    assert transcript["certified_source_head"] == d.CERTIFIED_SOURCE_HEAD
+    assert transcript["certified_source_tree"] == d.CERTIFIED_SOURCE_TREE
 
 
 @pytest.mark.parametrize(

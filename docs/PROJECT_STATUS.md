@@ -3648,3 +3648,92 @@ validation while retaining the real-class `isinstance` guard. It changes the
 source tree, so the failed S5-R1 evidence cannot certify the correction. After
 exact review, a completely fresh S5-R1 exact-tree certification is mandatory.
 P124 protected execution remains blocked pending S5-R1 acceptance.
+
+## S5-R1 accepted certification and D10 operator-pin transition
+
+S5-R1 is **ACCEPTED** for certified HEAD
+`b28409ebca1d484ededb7cef3ed47847e764b753` and TREE
+`0f2fbc3cce47e2fec478bd9343ab34bb2a367519`. The accepted tree includes
+the import-cycle correction. Its preserved certification checkout is
+`F:\AI\worktrees\ai-trading-bot-s5r1-b28409e`; evidence is at
+`F:\AI\temp\pytest\s5r1-certification-evidence-b28409e-20260924-232342`.
+Broad-1: 3411 cases, 3407 passed, 4 skipped; broad-2: 3276 cases, 3272
+passed, 4 skipped; serial: 935 cases, 926 passed, 9 skipped. Total: 7622
+cases, 7605 passed, 17 skipped, 0 failures/errors in 460.573 seconds. Ruff
+check, Ruff format, and `git diff --check` passed; the final certification
+worktree was clean. The first `aaf164b` S5-R1 attempt remains preserved
+FAILED historical evidence and does not certify this tree.
+
+This post-certification source checkpoint advances only the non-governed
+protected-deployment operator HEAD/TREE pins and their focused tests. The
+accepted S5-R1 checkout remains immutable; no governed executable source is
+changed. P124 protected execution has not occurred. P124-2 remains blocked
+pending exact review of the committed pin transition and canonical-material
+evidence.
+
+The first read-only material preflight found ignored Python `__pycache__`
+files under the preserved checkout's `src/trading_bot` tree. Git reports a
+clean checkout, but the builder rejects the extra local governed inventory.
+No material was admitted, signed, or published. Preserve the checkout while
+the recovery path is reviewed; do not run P124-2 or P124-3.
+
+A second read-only preflight used a new detached deployment-material checkout at
+`F:\AI\worktrees\ai-trading-bot-d10-deploy-b28409e`, at the same exact
+certified HEAD/TREE. It was Git-clean and contained zero `__pycache__`
+directories, `.pyc` files, or `.pyo` files before and after the attempt.
+The updated operator module loaded from the development worktree. The builder
+again blocked before material admission: 304 of 307 governed checkout files
+had local bytes different from their certified Git blobs. The machine's
+`core.autocrlf=true` converted LF blob bytes to CRLF checkout bytes, which
+ordinary Git status still reports as clean. The new checkout was not modified
+or used for tests. No manifest or attestation output was accepted; no
+production or P124 effect occurred. P124-2 remains blocked pending an
+authorized cache-free, byte-exact material checkout and successful preflight.
+
+### Byte-exact D10 deployment-material preflight — PASS
+
+The three physical checkout roles are now distinct:
+
+1. `F:\AI\worktrees\ai-trading-bot-s5r1-b28409e` remains the preserved
+   successful S5-R1 certification/test checkout. Its ignored Python test-cache
+   artifacts prevent direct deployment-material admission; it was not changed.
+2. `F:\AI\worktrees\ai-trading-bot-d10-deploy-b28409e` remains preserved
+   failed diagnostic evidence. It is at the same certified HEAD/TREE, Git-clean
+   and cache-free, but global `core.autocrlf=true` made 304 of 307 local
+   governed files differ from their raw HEAD blobs. The builder correctly
+   blocked; this checkout must not be used for P124.
+3. `F:\AI\worktrees\ai-trading-bot-d10-deploy-b28409e-byteexact` is the
+   new detached deployment-material checkout at certified HEAD
+   `b28409ebca1d484ededb7cef3ed47847e764b753` and TREE
+   `0f2fbc3cce47e2fec478bd9343ab34bb2a367519`. It was created with
+   process-local `core.autocrlf=false` and `core.eol=lf` overrides. Its
+   preflight and post-preflight Git status were empty. Both physical scans
+   found zero `__pycache__` directories, zero `.pyc`, and zero `.pyo`
+   files. Independent raw HEAD-blob audits before and after the build found
+   exactly 307 governed files, no missing/extra files, and zero mismatches.
+   No tests or Ruff checks ran in this checkout. Preserve it for later
+   P124-2 review/execution only if exact review accepts this evidence.
+
+The modified development-worktree operator module was loaded explicitly and
+`build_certified_material()` returned canonical material from only the new
+byte-exact checkout. Its guard bytes equaled the raw HEAD-controlled guard
+blob. Public read-only outputs:
+
+```text
+executable manifest SHA-256:
+beb8db948d04bff0be1ebeb0e57bccc3c3342b3bd932e9734a16a3153dad6ed4
+executable file count: 306
+total executable bytes: 5388863
+unsigned attestation SHA-256:
+5c03364511f242ffa4af5cc867b506c65478453531f5aff26f2a0262be6b98e1
+deployment_id: ea8ef18f-eda9-51bf-8bb8-4f4a19826828
+launch-guard SHA-256:
+3b28d0ffeede06a4785a903dbf6a48c12204651ce8a3c2f80cd6a1428efd8d1a
+signing_key_id: AITradingBot/D10/DeploymentAttestation/v3
+```
+
+The builder, `.gitattributes`, global/repository Git configuration, S5-R1
+certified Git identity, and governed executable source were not changed. No
+P124, signing, CNG, production, scheduler, or trading operation occurred.
+P124-2 remains blocked pending exact review of the committed pin transition
+and this canonical-material evidence.

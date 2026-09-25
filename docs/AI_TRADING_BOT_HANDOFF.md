@@ -3678,3 +3678,56 @@ operator HEAD/TREE pins, rebuild canonical manifest/attestation/deployment ID,
 produce a new byte-exact deployment checkout, and obtain a PASS disposable
 host ACL rehearsal before considering a separately authorized P124-2 retry.
 No protected run or retry is authorized by this checkpoint.
+
+## S5-R2 accepted certification and byte-exact D10 material preflight
+
+S5-R2 is **ACCEPTED** for certified HEAD
+`ead270918f0ed6a17605aa02bb0313b73e27cdfa` and TREE
+`65f062aadf330388774afb84f48ef1ded6001142`. Evidence is preserved at
+`F:\AI\temp\pytest\s5r2-certification-evidence-ead2709-20260925-010159`;
+the certification checkout is
+`F:\AI\worktrees\ai-trading-bot-s5r2-ead2709`. Broad-1: 3833 cases,
+3829 passed, 4 skipped; broad-2: 2873 cases, 2869 passed, 4 skipped;
+serial: 935 cases, 926 passed, 9 skipped. Total: 7641 cases, 7624 passed,
+17 skipped, 0 failures/errors in 363.692 seconds. Ruff check, Ruff format,
+`git diff --check`, and final exact source HEAD/TREE checks passed.
+The Architecture-124 protected-parent correction is included in this certified
+tree. S5-R1 and its P124 failure/preflight evidence remain historical only.
+
+This source-only checkpoint changes the active non-governed
+`scripts/d10_protected_deployment.py` operator HEAD/TREE pins from S5-R1 to
+S5-R2, with focused tests; governed executable source is unchanged. A new
+detached byte-exact deployment-source checkout was created using only
+process-local `core.autocrlf=false` and `core.eol=lf` at
+`F:\AI\worktrees\ai-trading-bot-d10-deploy-ead2709-byteexact`. Its exact
+HEAD/TREE, detached state, and empty Git status were verified before and after
+material construction. Global/repository Git configuration hashes were
+unchanged. No pytest or Ruff command ran in this checkout.
+
+Independent preflight and post-preflight raw `git ls-tree HEAD` versus
+`git hash-object --no-filters` audits found exactly 307 governed files,
+zero missing/extra files, and zero raw blob mismatches. Both scans found zero
+`__pycache__` directories, `.pyc`, and `.pyo` files. The modified operator
+module loaded only from the development worktree; builder imports resolved
+there, while the builder's repository root was only the byte-exact checkout.
+Read-only canonical material construction passed, including exact
+manifest/attestation bytes and certified identity, manifest digest, and the
+Git-controlled launch-guard bytes. Public results:
+
+```text
+executable manifest SHA-256: 4dbb2651b428db4a43e7529b0ffa51ab276437b97baac1586ff22bac29d93758
+executable file count: 306
+total executable bytes: 5389754
+unsigned attestation SHA-256: 508995ee20911dbd82d73b1b1f017d40b471d5d03bafc2da248d0eb866097f24
+deployment_id: 0d6bc843-dfc1-5537-ba34-6ec1cc833758
+launch-guard SHA-256: 3b28d0ffeede06a4785a903dbf6a48c12204651ce8a3c2f80cd6a1428efd8d1a
+signing_key_id: AITradingBot/D10/DeploymentAttestation/v3
+```
+
+No disposable ACL rehearsal has run. During this checkpoint, no P124-1 through P124-5,
+production signing/CNG access, protected D10 deployment, scheduler mutation,
+or provider/trading effect occurred. P124-2 remains blocked; the prior
+attempt's authorization was consumed and no retry is authorized. Next gates:
+exact review of this checkpoint, separately authorized disposable ACL
+rehearsal, and bounded read-only P124-1 host preflight before any protected
+retry consideration. Preserve the byte-exact checkout for later review.

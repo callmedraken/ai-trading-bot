@@ -3457,3 +3457,30 @@ Focused verification reported 119 passed across the A125 signing-key and directl
 P125-1 attempt #1 remains BLOCKED evidence only: `cng_security_descriptor_unavailable`, no public key, and post-attempt read-only diagnosis returned `NTE_BAD_KEYSET` for both user and machine scopes, so no v3 key persisted. No P124 operation occurred.
 
 The user separately approved exactly one P125-1 attempt #2 after this source review. That approval does not authorize P124-2, P124-3, P124-1, A125-2, scheduler mutation, deployment signing/publication, or any trading effect. If attempt #2 blocks after finalization, do not rerun or delete/replace the persisted key; preserve evidence for recovery review.
+
+
+## Architecture 125 P125-1 attempt #2 — persisted key; read-only recovery source pending
+
+Attempt #1 blocked on pre-finalization descriptor read and left no persisted
+v3 key. Attempt #2 finalized and persisted the fixed Microsoft Software KSP
+machine key but returned BLOCKED (cng_security_descriptor_mismatch) and no
+public key because exact SDDL text equality rejected the provider's persisted
+representation. Read-only inspection found the user-scope key absent, the
+machine key's fixed name, ECDSA_P256/ECDSA, 256-bit length, machine type 0x20,
+signing usage 0x02, and zero export policy. Owner is S-1-5-32-544; observed
+primary group is S-1-5-21-1397534616-3988210162-180023805-1005. Its
+protected DACL has only SYSTEM and Administrators allow ACEs, in that order,
+with zero flags and exact 0xD01F01FF masks. Trading has no ACE. The primary
+group is a frozen drift fact, not an access grant. The requested FA mask was
+0x001F01FF; the observed provider mask is pinned exactly, without accepting
+arbitrary supersets. The observed SDDL SHA-256 is
+37add57ba665ea9c87b586574ad54b831f3aa6534720d4cc4215d0300d84ad91.
+
+Architecture 125 is amended to use native binary structural security-descriptor
+verification for this exact object, shared by enrollment readback, a distinct
+read-only attempt-#2 qualification boundary, and the ExternalSigner. No third
+enrollment attempt is planned. The existing key is preserved untouched. The
+new qualification has not been run against it. Next: exact source review and
+focused verification; after acceptance, separately authorized read-only
+qualification may provide public point evidence. Only after PASS and ChatGPT
+review may A125-2 pin the public point. P124 checkpoints remain blocked.

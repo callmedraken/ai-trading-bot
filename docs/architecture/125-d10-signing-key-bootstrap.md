@@ -1,7 +1,7 @@
 # Architecture 125 - D10 Signing-Key Bootstrap and CNG External Signer
 
-Status: design frozen; A125-1 source implementation is separate from protected
-key creation. This document authorizes no production key creation, signing,
+Status: amended after P125-1 attempt #2 for read-only recovery of the existing
+persisted v3 key. This document authorizes no further key creation, signing,
 trust publication, deployment, scheduler mutation, or trading effect.
 
 ## 1. Purpose and key transition
@@ -38,11 +38,13 @@ The source-owned security descriptor is exactly:
 
 O:BAG:SYD:P(A;;FA;;;SY)(A;;FA;;;BA)
 
-It has BUILTIN Administrators as owner, SYSTEM as primary group, a protected
-DACL, and only SYSTEM and BUILTIN Administrators full-control ACEs. The D10
-Trading SID is absent. The complete descriptor and protected state are read
-back on the finalized, reopened persisted machine key. Inability to set or
-exactly verify it blocks the operation.
+It requests BUILTIN Administrators as owner, SYSTEM as primary group, a
+protected DACL, and only SYSTEM and BUILTIN Administrators full-control ACEs.
+The D10 Trading SID is absent. Microsoft Software KSP persisted a different
+primary-group representation and expanded the requested FA mask. Persisted
+authority is verified from the binary security descriptor using native Windows
+APIs and the exact frozen structural contract in section 6. SDDL text is
+never parsed as authority.
 
 The key remains Administrator/SYSTEM controlled. Trading has no key access.
 The signing API does not accept caller-selected provider, key name, algorithm,
@@ -70,8 +72,7 @@ Importing the module has no native side effects. The function:
 8. On the finalized, reopened key, authoritatively reads back the exact
    provider, name, ECDSA_P256/ECDSA algorithm, 256-bit P-256 size, machine-key
    type, signing-only usage, zero export policy, and full OWNER|GROUP|DACL
-   descriptor: protected DACL, Administrators owner, SYSTEM primary group,
-   only SYSTEM and Administrators full-control ACEs, and Trading absent.
+   descriptor using the exact native structural contract in section 6.
 9. Exports only the public ECCPUBLICBLOB, validates its P-256 point, and
    normalizes it to the verifier's 65-byte uncompressed SEC1 point
    04 || X || Y.
@@ -111,8 +112,8 @@ ECDSA-P256/SHA-256/IEEE-P1363, and private_key_exportable=False.
 For every sign_digest call it requires Administrator, opens only the fixed
 Microsoft Software KSP and fixed machine key, then rereads and verifies all
 provider, name, algorithm/group, curve/size, machine-scope, signing-usage,
-zero-export-policy, and protected security-descriptor facts before signing.
-It accepts only the exact SigningRequest carrying a 32-byte SHA-256 digest
+zero-export-policy, and the section 6 native structural security facts
+before signing. It accepts only the exact SigningRequest carrying a 32-byte SHA-256 digest
 and the frozen v3 protocol. It passes that exact digest once to
 NCryptSignHash, requires exactly 64 bytes of IEEE-P1363 r || s, and applies
 the existing scalar-canonicality check before returning a detached signature.
@@ -143,3 +144,55 @@ key ID/public key are historical after migration; they are not a fallback.
 
 A125-1 does not run P125-1, P124-2, P124-3, or P124-1, and does not change the
 currently pinned D10 public key.
+
+
+## 6. Attempt-#2 persisted-object security amendment and recovery
+
+P125-1 attempt #1 blocked on a pre-finalization descriptor read and left no
+persisted key. Attempt #2 finalized and persisted the fixed machine key, then
+blocked only because exact SDDL serialization equality rejected the Microsoft
+Software KSP representation. It returned no public key. A read-only inspection
+found the user-scope fixed name absent; the machine key had exact name
+AITradingBot-D10-DeploymentAttestation-v3, ECDSA_P256/ECDSA, 256 bits,
+machine key type 0x20, signing-only usage 0x02, export policy zero, and the
+Microsoft Software Key Storage Provider.
+
+The write-time request remains
+O:BAG:SYD:P(A;;FA;;;SY)(A;;FA;;;BA), where FA is 0x001F01FF. The frozen
+persisted object has owner S-1-5-32-544 (BUILTIN\Administrators), primary
+group S-1-5-21-1397534616-3988210162-180023805-1005, a present non-NULL
+protected DACL, and exactly two ordered ACCESS_ALLOWED ACEs with flags zero:
+SYSTEM S-1-5-18 then BUILTIN\Administrators S-1-5-32-544. Each mask is
+exactly 0xD01F01FF. The observed serialized descriptor SHA-256 is
+37add57ba665ea9c87b586574ad54b831f3aa6534720d4cc4215d0300d84ad91.
+This is host-observed frozen provider representation, not a general
+normalization or permission to accept arbitrary mask supersets. The primary
+group is pinned for drift detection only; it does not grant key access.
+Trading is not an ACE trustee. No extra, inherited, deny, object, callback,
+unknown, malformed, or differently ordered ACE is accepted. The source
+qualification contract requires ACL revision 2 and a false DACL-defaulted bit;
+the production native ACL revision remains to be proven by the read-only
+qualification. Missing control, SID, ACL, or
+ACE data blocks.
+
+The implementation reads the binary NCRYPT_SECURITY_DESCR_PROPERTY and uses
+GetSecurityDescriptorControl/Owner/Group/Dacl, GetAclInformation, GetAce,
+ConvertSidToStringSidW, validity checks, and LocalFree. An immutable
+SecurityFacts model carries owner/group SIDs, control, DACL state, ACL revision,
+ACE count, and ordered ACE type/flags/mask/SID records. The same verifier is
+used after enrollment reopen, by the read-only recovery qualification, and
+before every future ExternalSigner signature. Exact SDDL string equality is
+not a fallback.
+
+The new zero-argument
+qualify_existing_d10_signing_key_after_attempt2() is a distinct read-only
+recovery boundary. It requires elevated Administrator, opens only the fixed
+provider, proves the user-scope name absent and machine-scope name present,
+verifies every frozen provider/crypto/security fact, and only then exports
+ECCPUBLICBLOB and validates the P-256 public point. Its bounded public-only
+transcript has a distinct recovery schema. It never creates, sets, finalizes,
+deletes, signs, publishes, or touches scheduler/trading/provider state.
+prepare_d10_signing_key() remains create-only and blocks on any existing fixed
+name. No third enrollment attempt is planned. The recovery function has not
+been executed against the production key. Only after its PASS evidence and
+ChatGPT review may A125-2 pin the returned public point.

@@ -63,6 +63,16 @@ SYSTEM32 = r"C:\Windows\System32"
 # Owner BUILTIN\Administrators, group SYSTEM, protected DACL, and only SYSTEM
 # and BUILTIN\Administrators full-control ACEs. Trading is deliberately absent.
 KEY_SECURITY_DESCRIPTOR_SDDL = "O:BAG:SYD:P(A;;FA;;;SY)(A;;FA;;;BA)"
+OWNER_SID = "S-1-5-32-544"
+PERSISTED_GROUP_SID = "S-1-5-21-1397534616-3988210162-180023805-1005"
+SYSTEM_SID = "S-1-5-18"
+REQUESTED_FULL_ACCESS_MASK = 0x001F01FF
+PERSISTED_ACCESS_MASK = 0xD01F01FF
+SE_DACL_PRESENT = 0x0004
+SE_DACL_PROTECTED = 0x1000
+SE_SELF_RELATIVE = 0x8000
+ACL_REVISION = 2
+ACCESS_ALLOWED_ACE_TYPE = 0
 
 _P256_FIELD = int(
     "FFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFF", 16
@@ -87,6 +97,75 @@ class _KeyAlreadyExists(Exception):
     """Create-only key creation lost a race to an existing name."""
 
 
+@dataclass(frozen=True, slots=True)
+class SecurityAce:
+    ace_type: int
+    ace_flags: int
+    access_mask: int
+    trustee_sid: str
+
+
+@dataclass(frozen=True, slots=True)
+class SecurityFacts:
+    owner_sid: str
+    group_sid: str
+    control: int
+    dacl_present: bool
+    dacl_defaulted: bool
+    acl_revision: int
+    ace_count: int
+    aces: tuple[SecurityAce, ...]
+
+
+class _AclSizeInformation(ctypes.Structure):
+    _fields_ = [
+        ("ace_count", wintypes.DWORD),
+        ("acl_bytes_in_use", wintypes.DWORD),
+        ("acl_bytes_free", wintypes.DWORD),
+    ]
+
+
+class _AclHeader(ctypes.Structure):
+    _fields_ = [
+        ("revision", ctypes.c_ubyte),
+        ("sbz1", ctypes.c_ubyte),
+        ("acl_size", wintypes.WORD),
+        ("ace_count", wintypes.WORD),
+        ("sbz2", wintypes.WORD),
+    ]
+
+
+class _AceHeader(ctypes.Structure):
+    _fields_ = [
+        ("ace_type", ctypes.c_ubyte),
+        ("ace_flags", ctypes.c_ubyte),
+        ("ace_size", wintypes.WORD),
+    ]
+
+
+def _verify_security_facts(facts: SecurityFacts) -> None:
+    expected = (
+        SecurityAce(ACCESS_ALLOWED_ACE_TYPE, 0, PERSISTED_ACCESS_MASK, SYSTEM_SID),
+        SecurityAce(ACCESS_ALLOWED_ACE_TYPE, 0, PERSISTED_ACCESS_MASK, OWNER_SID),
+    )
+    if (
+        type(facts) is not SecurityFacts
+        or facts.owner_sid != OWNER_SID
+        or facts.group_sid != PERSISTED_GROUP_SID
+        or type(facts.control) is not int
+        or not 0 <= facts.control <= 0xFFFF
+        or facts.control & (SE_DACL_PRESENT | SE_DACL_PROTECTED | SE_SELF_RELATIVE)
+        != (SE_DACL_PRESENT | SE_DACL_PROTECTED | SE_SELF_RELATIVE)
+        or facts.dacl_present is not True
+        or facts.dacl_defaulted is not False
+        or facts.acl_revision != ACL_REVISION
+        or facts.ace_count != 2
+        or type(facts.aces) is not tuple
+        or facts.aces != expected
+    ):
+        raise _Blocked("cng_security_descriptor_mismatch")
+
+
 class _CngApi(Protocol):
     """Private seam: names, flags and property values come from this module."""
 
@@ -102,7 +181,7 @@ class _CngApi(Protocol):
     def set_security_descriptor(self, key: object, sddl: str) -> None: ...
     def get_property(self, handle: object, name: str, flags: int = 0) -> bytes: ...
     def get_provider_name(self, key: object) -> str: ...
-    def get_security_descriptor_sddl(self, key: object) -> str: ...
+    def get_security_facts(self, key: object) -> SecurityFacts: ...
     def finalize_key(self, key: object, flags: int) -> None: ...
     def export_public_key(self, key: object, blob_type: str) -> bytes: ...
     def sign_hash(self, key: object, digest: bytes) -> bytes: ...
@@ -231,7 +310,7 @@ def _verify_provider(api: _CngApi, provider: object) -> None:
         raise _Blocked("cng_security_descriptor_unsupported")
 
 
-def _verify_key(api: _CngApi, key: object) -> None:
+def _verify_key(api: _CngApi, key: object) -> SecurityFacts:
     try:
         provider_name = api.get_provider_name(key)
     except Exception:
@@ -263,11 +342,11 @@ def _verify_key(api: _CngApi, key: object) -> None:
     if any(actual != expected for actual, expected in properties):
         raise _Blocked("cng_key_property_mismatch")
     try:
-        descriptor = api.get_security_descriptor_sddl(key)
+        facts = api.get_security_facts(key)
     except Exception:
         raise _Blocked("cng_security_descriptor_unavailable") from None
-    if type(descriptor) is not str or descriptor != KEY_SECURITY_DESCRIPTOR_SDDL:
-        raise _Blocked("cng_security_descriptor_mismatch")
+    _verify_security_facts(facts)
+    return facts
 
 
 def normalize_public_key_blob(blob: bytes) -> bytes:
@@ -291,29 +370,55 @@ def normalize_public_key_blob(blob: bytes) -> bytes:
 
 
 def _transcript(
-    status: str, public_key: bytes | None, reason_code: str | None
+    status: str,
+    public_key: bytes | None,
+    reason_code: str | None,
+    *,
+    recovery: bool = False,
+    security: SecurityFacts | None = None,
 ) -> bytes:
     facts: dict[str, object] = {
         "algorithm": ALGORITHM_ID,
         "curve": CURVE_NAME,
-        "export_policy": "NONE",
+        "export_policy": 0,
         "key_name": KEY_NAME,
         "key_size_bits": KEY_SIZE_BITS,
-        "key_usage": ["SIGN"],
-        "machine_scoped": True,
+        "key_type": NCRYPT_MACHINE_KEY_FLAG,
+        "key_usage": NCRYPT_ALLOW_SIGNING_FLAG,
         "provider": PROVIDER_NAME,
-        "schema": "personal-desktop-d10-signing-key-enrollment/v1",
-        "security_descriptor_sddl": KEY_SECURITY_DESCRIPTOR_SDDL,
+        "schema": (
+            "personal-desktop-d10-signing-key-attempt2-read-only-qualification/v1"
+            if recovery
+            else "personal-desktop-d10-signing-key-enrollment/v2"
+        ),
+        "requested_sddl": KEY_SECURITY_DESCRIPTOR_SDDL,
+        "requested_full_access_mask": REQUESTED_FULL_ACCESS_MASK,
         "signing_key_id": SIGNING_KEY_ID,
         "status": status,
-        "system_access": "FULL_CONTROL",
-        "trading_access": "NONE",
-        "administrators_access": "FULL_CONTROL",
         "public_key_sec1_hex": public_key.hex() if public_key is not None else None,
         "public_key_sha256": (
             hashlib.sha256(public_key).hexdigest() if public_key is not None else None
         ),
     }
+    if security is not None and status == "PASS":
+        facts["persisted_security"] = {
+            "owner_sid": security.owner_sid,
+            "group_sid": security.group_sid,
+            "control": security.control,
+            "dacl_present": security.dacl_present,
+            "dacl_defaulted": security.dacl_defaulted,
+            "acl_revision": security.acl_revision,
+            "ace_count": security.ace_count,
+            "aces": [
+                {
+                    "type": ace.ace_type,
+                    "flags": ace.ace_flags,
+                    "mask": ace.access_mask,
+                    "sid": ace.trustee_sid,
+                }
+                for ace in security.aces
+            ],
+        }
     if reason_code is not None:
         facts["reason_code"] = reason_code
     encoded = json.dumps(
@@ -325,14 +430,21 @@ def _transcript(
 
 
 def _enrollment_result(
-    status: str, public_key: bytes | None = None, reason_code: str | None = None
+    status: str,
+    public_key: bytes | None = None,
+    reason_code: str | None = None,
+    *,
+    recovery: bool = False,
+    security: SecurityFacts | None = None,
 ) -> EnrollmentResult:
     public_hash = hashlib.sha256(public_key).hexdigest() if public_key else None
     return EnrollmentResult(
         status,
         public_key,
         public_hash,
-        _transcript(status, public_key, reason_code),
+        _transcript(
+            status, public_key, reason_code, recovery=recovery, security=security
+        ),
         reason_code,
     )
 
@@ -340,6 +452,7 @@ def _enrollment_result(
 def _prepare_with_api(api: _CngApi) -> EnrollmentResult:
     resources = _HandleSet(api)
     public_key: bytes | None = None
+    security: SecurityFacts | None = None
     reason: str | None = None
     try:
         try:
@@ -386,7 +499,7 @@ def _prepare_with_api(api: _CngApi) -> EnrollmentResult:
         resources.close_key(created)
 
         reopened = resources.open_key(provider, NCRYPT_MACHINE_KEY_FLAG)
-        _verify_key(api, reopened)
+        security = _verify_key(api, reopened)
         try:
             blob = api.export_public_key(reopened, PUBLIC_KEY_BLOB_TYPE)
         except Exception:
@@ -404,7 +517,7 @@ def _prepare_with_api(api: _CngApi) -> EnrollmentResult:
 
     if reason is not None:
         return _enrollment_result("BLOCKED", reason_code=reason)
-    return _enrollment_result("PASS", public_key=public_key)
+    return _enrollment_result("PASS", public_key=public_key, security=security)
 
 
 def prepare_d10_signing_key() -> EnrollmentResult:
@@ -416,6 +529,65 @@ def prepare_d10_signing_key() -> EnrollmentResult:
     except Exception:
         return _enrollment_result("BLOCKED", reason_code="native_cng_unavailable")
     return _prepare_with_api(api)
+
+
+def _qualify_existing_with_api(api: _CngApi) -> EnrollmentResult:
+    """Read-only recovery for the frozen attempt-#2 persisted object."""
+    resources = _HandleSet(api)
+    public_key: bytes | None = None
+    security: SecurityFacts | None = None
+    reason: str | None = None
+    try:
+        try:
+            api.require_administrator()
+        except Exception:
+            raise _Blocked("administrator_required") from None
+        provider = resources.open_provider()
+        _verify_provider(api, provider)
+        try:
+            user_key = resources.open_key(provider, 0)
+        except _KeyNotFound:
+            pass
+        else:
+            resources.close_key(user_key)
+            raise _Blocked("fixed_user_key_already_exists")
+        try:
+            machine_key = resources.open_key(provider, NCRYPT_MACHINE_KEY_FLAG)
+        except _KeyNotFound:
+            raise _Blocked("fixed_machine_key_absent") from None
+        security = _verify_key(api, machine_key)
+        try:
+            blob = api.export_public_key(machine_key, PUBLIC_KEY_BLOB_TYPE)
+        except Exception:
+            raise _Blocked("public_key_export_failed") from None
+        public_key = normalize_public_key_blob(blob)
+    except _Blocked as error:
+        reason = error.code
+    except Exception:
+        reason = "native_operation_failed"
+    finally:
+        if resources.close_all():
+            reason = "cng_cleanup_failed"
+    if reason is not None:
+        return _enrollment_result("BLOCKED", reason_code=reason, recovery=True)
+    return _enrollment_result(
+        "PASS", public_key=public_key, recovery=True, security=security
+    )
+
+
+def qualify_existing_d10_signing_key_after_attempt2() -> EnrollmentResult:
+    """Explicit zero-argument read-only recovery boundary; never enrolls or signs."""
+    if os.name != "nt":
+        return _enrollment_result(
+            "BLOCKED", reason_code="windows_cng_required", recovery=True
+        )
+    try:
+        api = _WindowsCngApi()
+    except Exception:
+        return _enrollment_result(
+            "BLOCKED", reason_code="native_cng_unavailable", recovery=True
+        )
+    return _qualify_existing_with_api(api)
 
 
 def _validate_signing_request(request: object) -> deployment.SigningRequest:
@@ -813,7 +985,36 @@ class _WindowsCngApi:
             self.close(int(provider_handle.value))
         return provider_name
 
-    def get_security_descriptor_sddl(self, key: object) -> str:
+    def _sid_string(self, pointer: ctypes.c_void_p, start: int, end: int) -> str:
+        address = pointer.value
+        if not address or address < start or address + 8 > end:
+            raise _Blocked("cng_security_descriptor_malformed")
+        prefix = ctypes.string_at(address, 8)
+        sid_length = 8 + 4 * prefix[1]
+        if prefix[0] != 1 or sid_length > 68 or address + sid_length > end:
+            raise _Blocked("cng_security_descriptor_malformed")
+        is_valid = self._bind(
+            self._advapi, "IsValidSid", [ctypes.c_void_p], wintypes.BOOL
+        )
+        if not is_valid(pointer):
+            raise _Blocked("cng_security_descriptor_malformed")
+        output = ctypes.c_wchar_p()
+        convert = self._bind(
+            self._advapi,
+            "ConvertSidToStringSidW",
+            [ctypes.c_void_p, ctypes.POINTER(ctypes.c_wchar_p)],
+            wintypes.BOOL,
+        )
+        if not convert(pointer, ctypes.byref(output)) or not output.value:
+            if output.value:
+                self._free_local(ctypes.cast(output, ctypes.c_void_p))
+            raise _Blocked("cng_security_descriptor_malformed")
+        try:
+            return output.value
+        finally:
+            self._free_local(ctypes.cast(output, ctypes.c_void_p))
+
+    def get_security_facts(self, key: object) -> SecurityFacts:
         raw = self._read_property(
             key,
             PROPERTY_SECURITY_DESCRIPTOR,
@@ -821,38 +1022,147 @@ class _WindowsCngApi:
         )
         if not 20 <= len(raw) <= MAX_NATIVE_PROPERTY_BYTES:
             raise _Blocked("cng_security_descriptor_size_invalid")
+        if raw[0] != 1 or not int.from_bytes(raw[2:4], "little") & SE_SELF_RELATIVE:
+            raise _Blocked("cng_security_descriptor_malformed")
+        for field_offset in (4, 8, 16):
+            offset = int.from_bytes(raw[field_offset : field_offset + 4], "little")
+            if offset < 20 or offset > len(raw) - 8:
+                raise _Blocked("cng_security_descriptor_malformed")
         buffer = (ctypes.c_ubyte * len(raw)).from_buffer_copy(raw)
-        convert = self._bind(
+        start = ctypes.addressof(buffer)
+        end = start + len(raw)
+        descriptor = ctypes.c_void_p(start)
+        valid_sd = self._bind(
             self._advapi,
-            "ConvertSecurityDescriptorToStringSecurityDescriptorW",
+            "IsValidSecurityDescriptor",
+            [ctypes.c_void_p],
+            wintypes.BOOL,
+        )
+        if not valid_sd(descriptor):
+            raise _Blocked("cng_security_descriptor_malformed")
+        control, revision = wintypes.WORD(), wintypes.DWORD()
+        get_control = self._bind(
+            self._advapi,
+            "GetSecurityDescriptorControl",
             [
                 ctypes.c_void_p,
-                wintypes.DWORD,
-                wintypes.DWORD,
-                ctypes.POINTER(ctypes.c_wchar_p),
+                ctypes.POINTER(wintypes.WORD),
                 ctypes.POINTER(wintypes.DWORD),
             ],
             wintypes.BOOL,
         )
-        output, output_length = ctypes.c_wchar_p(), wintypes.DWORD()
-        if (
-            not convert(
-                buffer,
-                1,
-                SECURITY_DESCRIPTOR_INFORMATION,
-                ctypes.byref(output),
-                ctypes.byref(output_length),
-            )
-            or not output.value
+        if not get_control(descriptor, ctypes.byref(control), ctypes.byref(revision)):
+            raise _Blocked("cng_security_descriptor_malformed")
+        owner, group, dacl = ctypes.c_void_p(), ctypes.c_void_p(), ctypes.c_void_p()
+        owner_defaulted, group_defaulted = wintypes.BOOL(), wintypes.BOOL()
+        for function_name, output, defaulted in (
+            ("GetSecurityDescriptorOwner", owner, owner_defaulted),
+            ("GetSecurityDescriptorGroup", group, group_defaulted),
         ):
-            if output:
-                self._free_local(ctypes.cast(output, ctypes.c_void_p))
-            raise _Blocked("cng_security_descriptor_decode_failed")
-        try:
-            result = output.value
-        finally:
-            self._free_local(ctypes.cast(output, ctypes.c_void_p))
-        return result
+            function = self._bind(
+                self._advapi,
+                function_name,
+                [
+                    ctypes.c_void_p,
+                    ctypes.POINTER(ctypes.c_void_p),
+                    ctypes.POINTER(wintypes.BOOL),
+                ],
+                wintypes.BOOL,
+            )
+            if not function(descriptor, ctypes.byref(output), ctypes.byref(defaulted)):
+                raise _Blocked("cng_security_descriptor_malformed")
+        present, dacl_defaulted = wintypes.BOOL(), wintypes.BOOL()
+        get_dacl = self._bind(
+            self._advapi,
+            "GetSecurityDescriptorDacl",
+            [
+                ctypes.c_void_p,
+                ctypes.POINTER(wintypes.BOOL),
+                ctypes.POINTER(ctypes.c_void_p),
+                ctypes.POINTER(wintypes.BOOL),
+            ],
+            wintypes.BOOL,
+        )
+        if not get_dacl(
+            descriptor,
+            ctypes.byref(present),
+            ctypes.byref(dacl),
+            ctypes.byref(dacl_defaulted),
+        ):
+            raise _Blocked("cng_security_descriptor_malformed")
+        if not present.value or not dacl.value or not start <= dacl.value <= end - 8:
+            raise _Blocked("cng_security_descriptor_malformed")
+        header = ctypes.cast(dacl, ctypes.POINTER(_AclHeader)).contents
+        if (
+            header.acl_size < 8
+            or dacl.value + header.acl_size > end
+            or header.revision != ACL_REVISION
+            or header.sbz1 != 0
+            or header.sbz2 != 0
+        ):
+            raise _Blocked("cng_security_descriptor_malformed")
+        valid_acl = self._bind(
+            self._advapi, "IsValidAcl", [ctypes.c_void_p], wintypes.BOOL
+        )
+        if not valid_acl(dacl):
+            raise _Blocked("cng_security_descriptor_malformed")
+        size = _AclSizeInformation()
+        get_acl_info = self._bind(
+            self._advapi,
+            "GetAclInformation",
+            [ctypes.c_void_p, ctypes.c_void_p, wintypes.DWORD, wintypes.DWORD],
+            wintypes.BOOL,
+        )
+        if not get_acl_info(dacl, ctypes.byref(size), ctypes.sizeof(size), 2):
+            raise _Blocked("cng_security_descriptor_malformed")
+        if (
+            size.ace_count != header.ace_count
+            or size.acl_bytes_in_use > header.acl_size
+            or size.acl_bytes_in_use < 8
+            or size.ace_count > 2
+        ):
+            raise _Blocked("cng_security_descriptor_malformed")
+        get_ace = self._bind(
+            self._advapi,
+            "GetAce",
+            [ctypes.c_void_p, wintypes.DWORD, ctypes.POINTER(ctypes.c_void_p)],
+            wintypes.BOOL,
+        )
+        aces = []
+        expected_ace_address = dacl.value + 8
+        for index in range(size.ace_count):
+            pointer = ctypes.c_void_p()
+            if not get_ace(dacl, index, ctypes.byref(pointer)) or not pointer.value:
+                raise _Blocked("cng_security_descriptor_malformed")
+            if pointer.value != expected_ace_address:
+                raise _Blocked("cng_security_descriptor_malformed")
+            ace = ctypes.cast(pointer, ctypes.POINTER(_AceHeader)).contents
+            ace_end = pointer.value + ace.ace_size
+            if ace.ace_size < 16 or ace_end > dacl.value + size.acl_bytes_in_use:
+                raise _Blocked("cng_security_descriptor_malformed")
+            sid_prefix = ctypes.string_at(pointer.value + 8, 8)
+            if ace.ace_size != 16 + 4 * sid_prefix[1]:
+                raise _Blocked("cng_security_descriptor_malformed")
+            if ace.ace_type != ACCESS_ALLOWED_ACE_TYPE:
+                raise _Blocked("cng_security_descriptor_mismatch")
+            mask = int.from_bytes(ctypes.string_at(pointer.value + 4, 4), "little")
+            sid = self._sid_string(
+                ctypes.c_void_p(pointer.value + 8), pointer.value + 8, ace_end
+            )
+            aces.append(SecurityAce(ace.ace_type, ace.ace_flags, mask, sid))
+            expected_ace_address = ace_end
+        if expected_ace_address != dacl.value + size.acl_bytes_in_use:
+            raise _Blocked("cng_security_descriptor_malformed")
+        return SecurityFacts(
+            self._sid_string(owner, start, end),
+            self._sid_string(group, start, end),
+            int(control.value),
+            bool(present.value),
+            bool(dacl_defaulted.value),
+            int(header.revision),
+            int(size.ace_count),
+            tuple(aces),
+        )
 
     def finalize_key(self, key: object, flags: int) -> None:
         if flags != NCRYPT_SILENT_FLAG:

@@ -15,9 +15,9 @@ proves the fixed name absent; creates only a machine-scoped ECDSA P-256 key
 without overwrite; sets the exact protected Administrator/SYSTEM descriptor,
 signing-only usage, and zero export policy before finalization; finalizes once;
 closes the creation handle; reopens the fixed persisted machine key; then
-reads back the exact OWNER|GROUP|DACL descriptor and all frozen properties
-before exporting a valid public P-256 point. The unfinalized creation handle
-has no descriptor readback. A successful set alone cannot yield PASS. It
+reads back the OWNER|GROUP|DACL binary descriptor through native structural
+verification and all frozen properties before exporting a valid public P-256
+point. The unfinalized creation handle has no descriptor readback. A successful set alone cannot yield PASS. It
 returns only a bounded canonical transcript and public material.
 It never creates or publishes D10 trust files.
 
@@ -102,3 +102,34 @@ This source-only checkpoint does not execute P125-1, P124-2, P124-3, or
 P124-1; sign a production attestation; touch F:\AITradingBot; access the
 production D10 root; mutate Task Scheduler; or perform market-provider,
 settlement, broker-paper, or live effects.
+
+
+## E. Attempt-#2 read-only recovery source checkpoint
+
+P125-1 attempt #1 blocked on pre-finalization security readback and left no
+persisted key. Attempt #2 finalized the fixed machine key but returned BLOCKED
+and no public key because its exact SDDL serialization differed. Read-only
+inspection found the fixed user key absent and the persisted machine key's
+provider, algorithm, group, size, type 0x20, usage 0x02, and export policy zero
+correct. Its owner is S-1-5-32-544; observed primary group is
+S-1-5-21-1397534616-3988210162-180023805-1005. The protected DACL has
+exactly two zero-flag allowed ACEs ordered SYSTEM then Administrators, both
+mask 0xD01F01FF. Requested FA was 0x001F01FF. The persisted mask and group
+are pinned exact host observations, not general normalization rules; primary
+group is not an access grant. Trading has no ACE.
+
+Source validation must use only pure/mock/native-adapter seams. Verify malformed
+native descriptor/ACL/SID/ACE/control and cleanup failure block; exact owner,
+group, protected DACL, ACL revision, ACE order/type/flags/trustees/masks;
+provider and all cryptographic properties; and public export only after
+verification. Verify the distinct recovery function has no create/set/finalize/
+delete/sign route, enrollment still blocks an existing key, and signer uses the
+same verifier before signing. Run focused signing-key and directly overlapping
+protected-deployment tests, changed-file Ruff check/format check, and diff
+checks using fresh F:\AI\temp\pytest\<unique> with -p no:cacheprovider.
+
+No third enrollment attempt is planned. Do not run recovery qualification
+against the real key during this source checkpoint. After exact source review,
+a separately authorized read-only production qualification may return public
+evidence. Only a PASS and ChatGPT review may feed A125-2. P124-2/P124-3/
+P124-1 remain blocked.

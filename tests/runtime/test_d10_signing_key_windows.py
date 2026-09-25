@@ -4,6 +4,8 @@ import ast
 import ctypes
 import hashlib
 import json
+import os
+from ctypes import wintypes
 from pathlib import Path
 
 import pytest
@@ -39,6 +41,36 @@ def _signature(r: int = 1, s: int = 1) -> bytes:
     return r.to_bytes(32, "big") + s.to_bytes(32, "big")
 
 
+def _security(
+    *,
+    owner: str = cng.OWNER_SID,
+    group: str = cng.PERSISTED_GROUP_SID,
+    control: int = (cng.SE_DACL_PRESENT | cng.SE_DACL_PROTECTED | cng.SE_SELF_RELATIVE),
+    present: bool = True,
+    defaulted: bool = False,
+    revision: int = cng.ACL_REVISION,
+    aces: tuple[cng.SecurityAce, ...] | None = None,
+) -> cng.SecurityFacts:
+    frozen_aces = (
+        aces
+        if aces is not None
+        else (
+            cng.SecurityAce(0, 0, cng.PERSISTED_ACCESS_MASK, cng.SYSTEM_SID),
+            cng.SecurityAce(0, 0, cng.PERSISTED_ACCESS_MASK, cng.OWNER_SID),
+        )
+    )
+    return cng.SecurityFacts(
+        owner,
+        group,
+        control,
+        present,
+        defaulted,
+        revision,
+        len(frozen_aces),
+        frozen_aces,
+    )
+
+
 class FakeCng:
     def __init__(
         self,
@@ -46,7 +78,7 @@ class FakeCng:
         existing_scopes: tuple[int, ...] = (),
         persisted: bool = False,
         overrides: dict[str, bytes] | None = None,
-        descriptor: str | None = None,
+        security: cng.SecurityFacts | None = None,
         provider_name: str | None = None,
         public_blob: bytes | None = None,
         signature: bytes | None = None,
@@ -55,8 +87,8 @@ class FakeCng:
         self.existing_scopes = set(existing_scopes)
         self.persisted = persisted
         self.overrides = overrides or {}
-        self.descriptor = descriptor or cng.KEY_SECURITY_DESCRIPTOR_SDDL
-        self.descriptor_after_set: str | None = None
+        self.security = security or _security()
+        self.security_after_set: cng.SecurityFacts | None = None
         self.provider_name = provider_name or cng.PROVIDER_NAME
         self.key_provider_name = self.provider_name
         self.fail_security_read = False
@@ -125,7 +157,7 @@ class FakeCng:
         self.calls.append(("set_security", key, sddl))
         assert key == "created_key"
         assert sddl == cng.KEY_SECURITY_DESCRIPTOR_SDDL
-        self.descriptor = self.descriptor_after_set or sddl
+        self.security = self.security_after_set or _security()
 
     def get_property(self, handle: object, name: str, flags: int = 0) -> bytes:
         self.calls.append(("get_property", handle, name, flags))
@@ -145,14 +177,14 @@ class FakeCng:
         assert key in {"reopened_key", "persisted_key"}
         return self.key_provider_name
 
-    def get_security_descriptor_sddl(self, key: object) -> str:
+    def get_security_facts(self, key: object) -> cng.SecurityFacts:
         self.calls.append(("get_security", key))
         assert key in {"reopened_key", "persisted_key"}
         if key == "reopened_key":
             assert self.finalized
         if self.fail_security_read:
             raise OSError("security read failed")
-        return self.descriptor
+        return self.security
 
     def finalize_key(self, key: object, flags: int) -> None:
         self.calls.append(("finalize", key, flags))
@@ -163,7 +195,7 @@ class FakeCng:
 
     def export_public_key(self, key: object, blob_type: str) -> bytes:
         self.calls.append(("export_public", key, blob_type))
-        assert key == "reopened_key"
+        assert key in {"reopened_key", "persisted_key"}
         assert blob_type == cng.PUBLIC_KEY_BLOB_TYPE
         return self.public_blob
 
@@ -293,18 +325,19 @@ def test_elevation_is_required_before_provider_or_key_access() -> None:
 
 
 def test_security_descriptor_is_protected_admin_system_only() -> None:
-    api = FakeCng()
-    result = cng._prepare_with_api(api)
+    result = cng._prepare_with_api(FakeCng())
 
     assert result.status == "PASS"
     transcript = json.loads(result.transcript)
-    assert transcript["security_descriptor_sddl"] == (
-        "O:BAG:SYD:P(A;;FA;;;SY)(A;;FA;;;BA)"
-    )
-    assert transcript["administrators_access"] == "FULL_CONTROL"
-    assert transcript["system_access"] == "FULL_CONTROL"
-    assert transcript["trading_access"] == "NONE"
-    assert deployment.TRADING_SID not in transcript["security_descriptor_sddl"]
+    security = transcript["persisted_security"]
+    assert security["owner_sid"] == cng.OWNER_SID
+    assert security["group_sid"] == cng.PERSISTED_GROUP_SID
+    assert security["control"] & cng.SE_DACL_PROTECTED
+    assert security["aces"] == [
+        {"type": 0, "flags": 0, "mask": 0xD01F01FF, "sid": cng.SYSTEM_SID},
+        {"type": 0, "flags": 0, "mask": 0xD01F01FF, "sid": cng.OWNER_SID},
+    ]
+    assert deployment.TRADING_SID not in result.transcript.decode()
 
 
 @pytest.mark.parametrize(
@@ -373,7 +406,7 @@ def test_reopened_security_read_failure_blocks_without_retry_or_delete() -> None
 
 def test_security_descriptor_drift_blocks_after_reopen() -> None:
     api = FakeCng()
-    api.descriptor_after_set = "O:SYD:P(A;;FA;;;SY)"
+    api.security_after_set = _security(owner=cng.SYSTEM_SID)
 
     result = cng._prepare_with_api(api)
 
@@ -700,76 +733,274 @@ def test_enrollment_creates_only_after_native_absence_in_both_scopes(
     assert api.finalize_count == 1
 
 
-def test_native_security_readback_uses_owner_group_dacl_without_sacl() -> None:
-    api = cng._WindowsCngApi.__new__(cng._WindowsCngApi)
-    api._ncrypt = object()
-    api._advapi = object()
-    property_flags: list[int] = []
-    conversion_flags: list[int] = []
-    output_buffer = ctypes.create_unicode_buffer(cng.KEY_SECURITY_DESCRIPTOR_SDDL)
+@pytest.mark.parametrize(
+    "facts",
+    [
+        _security(owner=cng.SYSTEM_SID),
+        _security(group=cng.SYSTEM_SID),
+        _security(group=deployment.TRADING_SID),
+        _security(control=cng.SE_DACL_PRESENT | cng.SE_SELF_RELATIVE),
+        _security(present=False),
+        _security(defaulted=True),
+        _security(revision=4),
+        _security(aces=()),
+        _security(aces=(cng.SecurityAce(0, 0, 0xD01F01FF, cng.SYSTEM_SID),)),
+        _security(
+            aces=(
+                cng.SecurityAce(0, 0, 0xD01F01FF, cng.OWNER_SID),
+                cng.SecurityAce(0, 0, 0xD01F01FF, cng.SYSTEM_SID),
+            )
+        ),
+        _security(
+            aces=(
+                cng.SecurityAce(1, 0, 0xD01F01FF, cng.SYSTEM_SID),
+                cng.SecurityAce(0, 0, 0xD01F01FF, cng.OWNER_SID),
+            )
+        ),
+        _security(
+            aces=(
+                cng.SecurityAce(0, 0x10, 0xD01F01FF, cng.SYSTEM_SID),
+                cng.SecurityAce(0, 0, 0xD01F01FF, cng.OWNER_SID),
+            )
+        ),
+        _security(
+            aces=(
+                cng.SecurityAce(0, 0, 0x001F01FF, cng.SYSTEM_SID),
+                cng.SecurityAce(0, 0, 0xD01F01FF, cng.OWNER_SID),
+            )
+        ),
+        _security(
+            aces=(
+                cng.SecurityAce(0, 0, 0xF01F01FF, cng.SYSTEM_SID),
+                cng.SecurityAce(0, 0, 0xD01F01FF, cng.OWNER_SID),
+            )
+        ),
+        _security(
+            aces=(
+                cng.SecurityAce(0, 0, 0xD01F01FF, cng.SYSTEM_SID),
+                cng.SecurityAce(0, 0, 0xD01F01FF, deployment.TRADING_SID),
+            )
+        ),
+        _security(
+            aces=(
+                cng.SecurityAce(0, 0, 0xD01F01FF, cng.SYSTEM_SID),
+                cng.SecurityAce(0, 0, 0xD01F01FF, cng.OWNER_SID),
+                cng.SecurityAce(0, 0, 0xD01F01FF, "S-1-5-32-545"),
+            )
+        ),
+    ],
+)
+def test_frozen_structural_security_drift_blocks_export_and_sign(
+    facts: cng.SecurityFacts,
+) -> None:
+    api = FakeCng(persisted=True, security=facts)
+    result = cng._qualify_existing_with_api(api)
+    assert result.status == "BLOCKED"
+    assert result.public_key is None
+    assert not any(call[0] == "export_public" for call in api.calls)
+    with pytest.raises(deployment.DeploymentBlocked):
+        cng._sign_with_api(FakeCng(persisted=True, security=facts), _request())
 
-    def get_property(handle, name, buffer, size, received, flags):
-        assert handle.value == 17
-        assert name == cng.PROPERTY_SECURITY_DESCRIPTOR
-        property_flags.append(flags)
-        if buffer is None:
-            assert size == 0
-        else:
-            assert size == 20
-            ctypes.memmove(buffer, bytes(20), 20)
-        ctypes.cast(received, ctypes.POINTER(ctypes.c_uint32))[0] = 20
-        return 0
 
-    def convert(descriptor, revision, flags, output, length):
-        assert revision == 1
-        conversion_flags.append(flags)
-        ctypes.cast(output, ctypes.POINTER(ctypes.c_wchar_p))[0] = ctypes.cast(
-            output_buffer, ctypes.c_wchar_p
-        )
-        return 1
-
-    def bind(library, name, args, result):
-        if name == "NCryptGetProperty":
-            return get_property
-        assert name == "ConvertSecurityDescriptorToStringSecurityDescriptorW"
-        return convert
-
-    api._bind = bind
-    api._free_local = lambda pointer: None
-
-    assert api.get_security_descriptor_sddl(17) == cng.KEY_SECURITY_DESCRIPTOR_SDDL
-    exact_flags = (
-        cng.OWNER_SECURITY_INFORMATION
-        | cng.GROUP_SECURITY_INFORMATION
-        | cng.DACL_SECURITY_INFORMATION
-    )
-    assert property_flags == [
-        exact_flags | cng.NCRYPT_SILENT_FLAG,
-        exact_flags | cng.NCRYPT_SILENT_FLAG,
-    ]
-    assert conversion_flags == [exact_flags]
-    assert exact_flags & cng.SACL_SECURITY_INFORMATION == 0
-    assert "D:P" in cng.KEY_SECURITY_DESCRIPTOR_SDDL
+def test_frozen_structural_security_exact_mask_passes() -> None:
+    result = cng._qualify_existing_with_api(FakeCng(persisted=True))
+    assert result.status == "PASS"
+    assert result.public_key == b"\x04" + _public_blob()[8:]
 
 
 @pytest.mark.parametrize(
-    "descriptor",
+    ("existing_scopes", "persisted", "reason"),
     [
-        "O:BAG:SYD:(A;;FA;;;SY)(A;;FA;;;BA)",
-        "O:BAG:SYD:P(A;;FA;;;SY)(A;;FA;;;BA)(A;;FA;;;BU)",
-        f"O:BAG:SYD:P(A;;FA;;;SY)(A;;FA;;;BA)(A;;FA;;;{deployment.TRADING_SID})",
+        ((0,), True, "fixed_user_key_already_exists"),
+        ((), False, "fixed_machine_key_absent"),
     ],
 )
-def test_security_readback_rejects_unprotected_or_extra_aces(
-    descriptor: str,
+def test_recovery_requires_absent_user_and_present_machine_key(
+    existing_scopes: tuple[int, ...], persisted: bool, reason: str
 ) -> None:
-    api = FakeCng()
-    api.descriptor_after_set = descriptor
+    api = FakeCng(existing_scopes=existing_scopes, persisted=persisted)
+    result = cng._qualify_existing_with_api(api)
+    assert result.reason_code == reason
+    assert not any(
+        call[0]
+        in {
+            "create_key",
+            "set_property",
+            "set_security",
+            "finalize",
+            "sign_hash",
+            "export_public",
+        }
+        for call in api.calls
+    )
 
-    result = cng._prepare_with_api(api)
 
-    assert result.status == "BLOCKED"
-    assert result.reason_code == "cng_security_descriptor_mismatch"
-    assert api.finalize_count == 1
-    assert ("get_security", "reopened_key") in api.calls
-    assert not any(call[0] == "export_public" for call in api.calls)
+def test_recovery_is_read_only_and_exports_after_full_verification() -> None:
+    api = FakeCng(persisted=True)
+    result = cng._qualify_existing_with_api(api)
+    assert result.status == "PASS"
+    assert result.public_key == b"\x04" + _public_blob()[8:]
+    assert not any(
+        call[0]
+        in {"create_key", "set_property", "set_security", "finalize", "sign_hash"}
+        for call in api.calls
+    )
+    security_read = api.calls.index(("get_security", "persisted_key"))
+    export = api.calls.index(
+        ("export_public", "persisted_key", cng.PUBLIC_KEY_BLOB_TYPE)
+    )
+    assert security_read < export
+    facts = json.loads(result.transcript)
+    assert facts["schema"].endswith("attempt2-read-only-qualification/v1")
+    assert facts["persisted_security"]["aces"][0]["mask"] == 0xD01F01FF
+    assert len(result.transcript) <= cng.MAX_ENROLLMENT_TRANSCRIPT_BYTES
+    assert (
+        result.transcript
+        == cng._qualify_existing_with_api(FakeCng(persisted=True)).transcript
+    )
+
+
+def test_recovery_property_and_cleanup_failures_block() -> None:
+    for name, value in (
+        (cng.PROPERTY_NAME, _wide("other")),
+        (cng.PROPERTY_ALGORITHM, _wide("ECDSA_P384")),
+        (cng.PROPERTY_ALGORITHM_GROUP, _wide("ECDH")),
+        (cng.PROPERTY_LENGTH, _u32(384)),
+        (cng.PROPERTY_KEY_TYPE, _u32(0)),
+        (cng.PROPERTY_KEY_USAGE, _u32(3)),
+        (cng.PROPERTY_EXPORT_POLICY, _u32(1)),
+    ):
+        api = FakeCng(persisted=True, overrides={name: value})
+        assert cng._qualify_existing_with_api(api).status == "BLOCKED"
+        assert not any(call[0] == "export_public" for call in api.calls)
+    api = FakeCng(persisted=True)
+    api.fail_close.add("persisted_key")
+    assert cng._qualify_existing_with_api(api).reason_code == "cng_cleanup_failed"
+
+
+def test_recovery_entry_point_does_not_reference_mutating_methods() -> None:
+    source = Path(cng.__file__).read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    for name in (
+        "_qualify_existing_with_api",
+        "qualify_existing_d10_signing_key_after_attempt2",
+    ):
+        function = next(
+            node
+            for node in tree.body
+            if isinstance(node, ast.FunctionDef) and node.name == name
+        )
+        calls = {
+            node.func.attr
+            for node in ast.walk(function)
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+        }
+        assert calls.isdisjoint(
+            {
+                "create_key",
+                "set_property",
+                "set_security_descriptor",
+                "finalize_key",
+                "sign_hash",
+            }
+        )
+    assert "NCryptDeleteKey" not in source
+    assert "NCryptImportKey" not in source
+
+
+@pytest.mark.skipif(os.name != "nt", reason="synthetic native Windows descriptor")
+def test_native_binary_descriptor_parsing_and_cleanup_failure() -> None:
+    sddl = (
+        "O:BAG:S-1-5-21-1397534616-3988210162-180023805-1005"
+        "D:P(A;;0xD01F01FF;;;SY)(A;;0xD01F01FF;;;BA)"
+    )
+    advapi = ctypes.WinDLL(r"C:\Windows\System32\advapi32.dll", use_last_error=True)
+    kernel = ctypes.WinDLL(r"C:\Windows\System32\kernel32.dll", use_last_error=True)
+    convert = advapi.ConvertStringSecurityDescriptorToSecurityDescriptorW
+    convert.argtypes = [
+        ctypes.c_wchar_p,
+        wintypes.DWORD,
+        ctypes.POINTER(ctypes.c_void_p),
+        ctypes.POINTER(wintypes.DWORD),
+    ]
+    convert.restype = wintypes.BOOL
+    descriptor, length = ctypes.c_void_p(), wintypes.DWORD()
+    assert convert(sddl, 1, ctypes.byref(descriptor), ctypes.byref(length))
+    try:
+        raw = ctypes.string_at(descriptor, length.value)
+    finally:
+        local_free = kernel.LocalFree
+        local_free.argtypes = [ctypes.c_void_p]
+        local_free.restype = ctypes.c_void_p
+        assert not local_free(descriptor)
+
+    api = cng._WindowsCngApi.__new__(cng._WindowsCngApi)
+    api._advapi = advapi
+    api._kernel = kernel
+    flags_seen: list[int] = []
+
+    def read_property(key: object, name: str, flags: int) -> bytes:
+        assert key == 17
+        assert name == cng.PROPERTY_SECURITY_DESCRIPTOR
+        flags_seen.append(flags)
+        return raw
+
+    api._read_property = read_property
+    facts = api.get_security_facts(17)
+    cng._verify_security_facts(facts)
+    assert facts.owner_sid == cng.OWNER_SID
+    assert facts.group_sid == cng.PERSISTED_GROUP_SID
+    assert facts.acl_revision == 2
+    assert facts.aces[0].access_mask == 0xD01F01FF
+    assert flags_seen == [cng.NCRYPT_SILENT_FLAG | cng.SECURITY_DESCRIPTOR_INFORMATION]
+    assert cng.SECURITY_DESCRIPTOR_INFORMATION & cng.SACL_SECURITY_INFORMATION == 0
+
+    acl_offset = int.from_bytes(raw[16:20], "little")
+    first_ace = acl_offset + 8
+    for offset, replacement in (
+        (0, bytes([2])),  # descriptor revision
+        (16, bytes(4)),  # NULL DACL
+        (16, (0xFFFFFFFF).to_bytes(4, "little")),  # out-of-buffer ACL
+        (2, bytes([0, 0])),  # descriptor control
+        (acl_offset, bytes([0])),  # ACL revision
+        (acl_offset + 4, bytes([3, 0])),  # wrong ACE inventory
+        (first_ace, bytes([1])),  # deny ACE
+        (first_ace + 1, bytes([0x10])),  # inherited ACE
+        (first_ace + 2, bytes([4, 0])),  # truncated ACE
+        (first_ace + 4, (0x001F01FF).to_bytes(4, "little")),
+        (first_ace + 8, bytes([2])),  # invalid SID revision
+    ):
+        malformed = bytearray(raw)
+        malformed[offset : offset + len(replacement)] = replacement
+        api._read_property = lambda key, name, flags, data=bytes(malformed): data
+        with pytest.raises(cng._Blocked):
+            cng._verify_security_facts(api.get_security_facts(17))
+
+    api._read_property = lambda key, name, flags: bytes(len(raw))
+    with pytest.raises(cng._Blocked, match="malformed"):
+        api.get_security_facts(17)
+
+    api._read_property = read_property
+    api._free_local = lambda pointer: (_ for _ in ()).throw(
+        cng._Blocked("cng_cleanup_failed")
+    )
+    with pytest.raises(cng._Blocked, match="cleanup"):
+        api.get_security_facts(17)
+
+
+def test_signer_rechecks_native_security_for_every_digest() -> None:
+    api = FakeCng(persisted=True)
+    cng._sign_with_api(api, _request())
+    api.closed.clear()  # Fake handles are names reused across separate opens.
+    api.security = _security(group=deployment.TRADING_SID)
+    with pytest.raises(
+        deployment.DeploymentBlocked, match="security_descriptor_mismatch"
+    ):
+        cng._sign_with_api(api, _request())
+    assert len(api.sign_digests) == 1
+    assert [
+        call for call in api.calls if call == ("get_security", "persisted_key")
+    ] == [
+        ("get_security", "persisted_key"),
+        ("get_security", "persisted_key"),
+    ]

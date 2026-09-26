@@ -608,12 +608,10 @@ def test_native_token_classes_parse_complete_enabled_inventory(
         ).contents
         entry.luid.low = index + 1
         entry.attributes = attributes
-    elevation = ctypes.create_string_buffer(ctypes.sizeof(w.wintypes.DWORD))
     observations = {
         w.TOKEN_USER: user,
         w.TOKEN_GROUPS: groups,
         w.TOKEN_PRIVILEGES: privileges,
-        w.TOKEN_ELEVATION: elevation,
     }
     monkeypatch.setattr(
         w,
@@ -640,7 +638,72 @@ def test_native_token_classes_parse_complete_enabled_inventory(
     assert w._token_groups(103) == ((q.TRADING, w.SE_GROUP_ENABLED), (q.ADMIN, 0))
     assert w._token_privileges(103) == (("SeChangeNotifyPrivilege", 2),)
     assert seen == [1]
-    assert w._token_elevated(103) is False
+
+
+@pytest.mark.parametrize(
+    ("elevation_value", "returned_length", "api_success", "expected"),
+    [
+        pytest.param(0, 4, True, False, id="not-elevated"),
+        pytest.param(1, 4, True, True, id="elevated"),
+        pytest.param(0, 4, False, "GetTokenInformation failed", id="api-failure"),
+        pytest.param(0, 0, True, "TokenElevation length invalid", id="wrong-length"),
+        pytest.param(2, 4, True, "TokenElevation value invalid", id="invalid-value"),
+    ],
+)
+def test_token_elevation_reads_fixed_dword_without_sizing_probe(
+    monkeypatch: pytest.MonkeyPatch,
+    elevation_value: int,
+    returned_length: int,
+    api_success: bool,
+    expected: bool | str,
+) -> None:
+    def generic_info(_token: int, _kind: int) -> None:
+        raise AssertionError("TokenElevation used generic sizing helper")
+
+    monkeypatch.setattr(w, "_token_information", generic_info)
+    monkeypatch.setattr(
+        w, "_dll", lambda name: object() if name == "advapi32" else None
+    )
+    monkeypatch.setattr(w.ctypes, "get_last_error", lambda: 5)
+    calls: list[tuple[int, int, int]] = []
+
+    def bind(_dll: object, name: str, args: object, result: object) -> object:
+        assert name == "GetTokenInformation"
+        assert args == [
+            w.wintypes.HANDLE,
+            ctypes.c_int,
+            ctypes.c_void_p,
+            w.wintypes.DWORD,
+            ctypes.POINTER(w.wintypes.DWORD),
+        ]
+        assert result is w.wintypes.BOOL
+
+        def get(
+            token: int,
+            information_class: int,
+            output: object,
+            size: int,
+            returned: object,
+        ) -> int:
+            calls.append((token, information_class, size))
+            assert output is not None
+            ctypes.cast(
+                output, ctypes.POINTER(w.wintypes.DWORD)
+            ).contents.value = elevation_value
+            ctypes.cast(
+                returned, ctypes.POINTER(w.wintypes.DWORD)
+            ).contents.value = returned_length
+            return int(api_success)
+
+        return get
+
+    monkeypatch.setattr(w, "_bind", bind)
+    if isinstance(expected, str):
+        with pytest.raises(w.NativeFailure, match=expected):
+            w._token_elevated(103)
+    else:
+        assert w._token_elevated(103) is expected
+    assert calls == [(103, w.TOKEN_ELEVATION, ctypes.sizeof(w.wintypes.DWORD))]
 
 
 def test_trading_cleanup_failure_blocks_result(monkeypatch: pytest.MonkeyPatch) -> None:

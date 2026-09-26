@@ -791,13 +791,35 @@ def _token_privileges(token: int) -> tuple[tuple[str, int], ...]:
 
 
 def _token_elevated(token: int) -> bool:
-    buffer, length = _token_information(token, TOKEN_ELEVATION)
-    if length != ctypes.sizeof(wintypes.DWORD):
+    get = _bind(
+        _dll("advapi32"),
+        "GetTokenInformation",
+        [
+            wintypes.HANDLE,
+            ctypes.c_int,
+            ctypes.c_void_p,
+            wintypes.DWORD,
+            ctypes.POINTER(wintypes.DWORD),
+        ],
+        wintypes.BOOL,
+    )
+    elevation = wintypes.DWORD()
+    returned = wintypes.DWORD()
+    _check(
+        get(
+            token,
+            TOKEN_ELEVATION,
+            ctypes.byref(elevation),
+            ctypes.sizeof(elevation),
+            ctypes.byref(returned),
+        ),
+        "GetTokenInformation",
+    )
+    if returned.value != ctypes.sizeof(elevation):
         raise NativeFailure("TokenElevation length invalid")
-    value = ctypes.cast(buffer, ctypes.POINTER(wintypes.DWORD)).contents.value
-    if value not in (0, 1):
+    if elevation.value not in (0, 1):
         raise NativeFailure("TokenElevation value invalid")
-    return bool(value)
+    return bool(elevation.value)
 
 
 def _trading_token(pid: int) -> tuple[int, h.TokenObservation]:

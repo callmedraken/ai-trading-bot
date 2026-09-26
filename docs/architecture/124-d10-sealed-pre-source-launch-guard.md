@@ -40,9 +40,20 @@ Trading-readable policy begins at `F:\AITradingBot\D10`, including its guard,
 source descendants, and trust files; it does not apply to the outer parent.
 Trading reaches exact permitted descendants through its qualified enabled
 SeChangeNotifyPrivilege (Windows bypass traverse), without parent listing or
-mutation rights. P124-1 still proves effective create/write/delete/rename,
-WRITE_DAC, and WRITE_OWNER denial on the parent and admitted objects. No parent
-ACL migration is required or authorized.
+mutation rights on protected objects. P124-1 applies two distinct effective-access
+policies. The volume parent `F:\` retains its exact native local-NTFS,
+no-follow/final-path identity, complete and stable ACL/owner observation, and
+the `F:\AITradingBot` child identity. The actual Trading token must lack
+FILE_DELETE_CHILD, WRITE_DAC, and WRITE_OWNER on `F:\`. Other volume-root
+create, metadata-write, or DELETE-on-the-volume-object rights do not establish
+authority to delete, rename, or replace `F:\AITradingBot`: Windows requires
+DELETE on that child or FILE_DELETE_CHILD on its parent for child
+deletion/rename. `F:\AITradingBot` and every protected runtime descendant
+retain full zero-grant MUTATION_MASK, DELETE and parent FILE_DELETE_CHILD/
+replacement denial, WRITE_DAC/WRITE_OWNER denial, and their exact ACL/owner
+policies. Complete token-group/privilege accounting and ACL re-read agreement
+remain mandatory for both policies. No parent ACL migration is required or
+authorized.
 
 The guard is installed from the exact certified repository guard bytes during a
 later protected administrator deployment checkpoint. Its byte length and

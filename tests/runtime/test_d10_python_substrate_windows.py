@@ -130,6 +130,61 @@ def test_operator_output_must_not_be_production_root(
         w.main(["--trading-pid", "1", "--output", q.ROOT + r"\proof.json"])
 
 
+def test_native_volume_observation_retains_unrelated_grants(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from scripts import d10_python_substrate_harness as h
+
+    paths = (q.VOLUME, q.ROOT, q.RUNTIME)
+    facts = h.TokenObservation(
+        q.TRADING, True, False, (q.TRADING,), ("SeChangeNotifyPrivilege",), True, True
+    )
+    closed: list[object] = []
+    monkeypatch.setattr(w, "_trading_token", lambda pid: (103, facts))
+    monkeypatch.setattr(w, "_fixed", lambda path: None)
+    monkeypatch.setattr(w, "_open", lambda path: path)
+    monkeypatch.setattr(w, "_close", closed.append)
+    monkeypatch.setattr(
+        w,
+        "_inspect",
+        lambda path, handle: (_node(path, q.Kind.DIRECTORY), 0x10),
+    )
+    monkeypatch.setattr(w, "_descriptor", lambda handle: handle)
+    monkeypatch.setattr(
+        w, "_security", lambda handle: (q.ADMIN, True, (q.Ace(q.ADMIN, q.ALL_ACCESS),))
+    )
+    monkeypatch.setattr(w, "_dll", lambda name: object())
+    monkeypatch.setattr(w, "_bind", lambda dll, name, args, result: lambda ptr: None)
+
+    def access_check(descriptor: str, token: int, desired: int) -> tuple[int, bool]:
+        assert token == 103
+        if desired == 0x02000000:
+            return (0x00010116 if descriptor == q.VOLUME else 0, True)
+        if desired == q.MUTATION_MASK:
+            return (0, False)
+        if desired == 0x00010000:
+            return (0x00010000, descriptor == q.VOLUME)
+        if desired == 0x40:
+            return (0, False)
+        raise AssertionError(desired)
+
+    monkeypatch.setattr(w, "_access_check", access_check)
+    result = w.collect_trading_access(paths, 123)
+    volume = result.access[0]
+    assert volume.evidence.policy is q.AccessPolicy.VOLUME_NAMESPACE
+    assert volume.evidence.granted_mask == 0x00010116
+    assert volume.evidence.rename_replace_denied
+    assert volume.rename_access_status
+    assert not volume.replace_access_status
+    assert volume.token_groups_accounted and volume.token_privileges_accounted
+    assert volume.acl_agrees
+    assert all(
+        row.evidence.policy is q.AccessPolicy.PROTECTED_OBJECT
+        for row in result.access[1:]
+    )
+    assert closed[-1] == 103
+
+
 def _diagnostic_json() -> dict[str, object]:
     from scripts import d10_python_substrate_harness as h
 

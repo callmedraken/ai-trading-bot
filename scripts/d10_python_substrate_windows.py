@@ -917,6 +917,7 @@ def collect_trading_access(
                     finally:
                         free(parent_descriptor)
                     granted = maximum & q.MUTATION_MASK
+                    policy = q.access_policy_for_path(path)
                     owner, protected, aces = _security(handles[path])
                     owner_again, protected_again, aces_again = _security(handles[path])
                     rows.append(
@@ -925,7 +926,10 @@ def collect_trading_access(
                                 path,
                                 q.MUTATION_MASK,
                                 granted,
-                                not delete_status and not replace_status,
+                                not replace_status
+                                if policy is q.AccessPolicy.VOLUME_NAMESPACE
+                                else not delete_status and not replace_status,
+                                policy,
                             ),
                             True,
                             exact_status,
@@ -1224,7 +1228,11 @@ def collect_system_dlls(
             ):
                 raise NativeFailure("Trading can mutate System32 parent")
             parent_access = q.TradingAccessEvidence(
-                q.SYSTEM32, q.MUTATION_MASK, 0, True
+                q.SYSTEM32,
+                q.MUTATION_MASK,
+                0,
+                True,
+                q.AccessPolicy.PROTECTED_OBJECT,
             )
             rows: list[h.SystemDll] = []
             handles: dict[str, int] = {}

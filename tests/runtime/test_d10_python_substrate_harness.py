@@ -81,7 +81,13 @@ def _fixture() -> tuple[
         token,
         tuple(
             h.NativeAccess(
-                q.TradingAccessEvidence(item.path, q.MUTATION_MASK, 0, True),
+                q.TradingAccessEvidence(
+                    item.path,
+                    q.MUTATION_MASK,
+                    0,
+                    True,
+                    q.access_policy_for_path(item.path),
+                ),
                 True,
                 False,
                 False,
@@ -133,7 +139,9 @@ def _fixture() -> tuple[
             99,
             1,
         ),
-        q.TradingAccessEvidence(q.SYSTEM32, q.MUTATION_MASK, 0, True),
+        q.TradingAccessEvidence(
+            q.SYSTEM32, q.MUTATION_MASK, 0, True, q.AccessPolicy.PROTECTED_OBJECT
+        ),
         (
             h.SystemDll(
                 imports.loaded_system_dlls[0],
@@ -194,6 +202,8 @@ def test_complete_evidence_and_deterministic_transcript() -> None:
     collector = MockCollector()
     first = h.collect(collector)
     assert b'"status":"PASS"' in first
+    assert b'"schema":"personal-desktop-p124-1-native-transcript/v2"' in first
+    assert b'"policy":"volume_namespace"' in first
     assert first == h.collect(MockCollector())
     assert collector.calls == [
         "inventory",
@@ -243,7 +253,7 @@ def test_reobservation_drift_blocks() -> None:
 @pytest.mark.parametrize(
     ("field", "value"),
     [
-        ("granted_mask", 1),
+        ("granted_mask", 0x40),
         ("tested_mask", 1),
         ("rename_replace_denied", False),
     ],
@@ -258,6 +268,106 @@ def test_effective_mutation_denial_required(field: str, value: object) -> None:
     )
     with pytest.raises(h.CollectionBlocked):
         h.collect(collector)
+
+
+def _volume_access(
+    collector: MockCollector, *, grant: int, replace_status: bool = False
+) -> None:
+    rows = tuple(
+        replace(
+            row,
+            evidence=replace(
+                row.evidence,
+                granted_mask=grant,
+                rename_replace_denied=not replace_status,
+            ),
+            rename_access_status=bool(grant & 0x10000),
+            replace_access_status=replace_status,
+        )
+        if row.evidence.path == q.VOLUME
+        else row
+        for row in collector.trading_value.access
+    )
+    collector.trading_value = replace(collector.trading_value, access=rows)
+
+
+def test_group_derived_volume_create_rights_do_not_block() -> None:
+    collector = MockCollector()
+    group = "S-1-5-32-545"
+    collector.trading_value = replace(
+        collector.trading_value,
+        token=replace(
+            collector.trading_value.token,
+            enabled_groups=(q.TRADING, group),
+        ),
+    )
+    rows = tuple(
+        replace(
+            row,
+            evidence=replace(
+                row.evidence,
+                aces=row.evidence.aces + (q.Ace(group, 0x00010116),),
+            ),
+            ace_count=row.ace_count + 1,
+        )
+        if row.evidence.path == q.VOLUME
+        else row
+        for row in collector.before.objects
+    )
+    collector.before = replace(collector.before, objects=rows)
+    collector.after = collector.before
+    _volume_access(collector, grant=0x00010116)
+    assert b'"status":"PASS"' in h.collect(collector)
+
+
+@pytest.mark.parametrize("grant", [0x40, 0x40000, 0x80000])
+def test_volume_namespace_grant_blocks_harness(grant: int) -> None:
+    collector = MockCollector()
+    _volume_access(collector, grant=grant, replace_status=grant == 0x40)
+    with pytest.raises(h.CollectionBlocked):
+        h.collect(collector)
+
+
+@pytest.mark.parametrize("grant", [0x40, 0x40000, 0x80000])
+def test_group_derived_volume_namespace_right_blocks(grant: int) -> None:
+    collector = MockCollector()
+    group = "S-1-5-32-545"
+    collector.trading_value = replace(
+        collector.trading_value,
+        token=replace(
+            collector.trading_value.token,
+            enabled_groups=(q.TRADING, group),
+        ),
+    )
+    rows = tuple(
+        replace(
+            row,
+            evidence=replace(
+                row.evidence, aces=row.evidence.aces + (q.Ace(group, grant),)
+            ),
+            ace_count=row.ace_count + 1,
+        )
+        if row.evidence.path == q.VOLUME
+        else row
+        for row in collector.before.objects
+    )
+    collector.before = replace(collector.before, objects=rows)
+    collector.after = collector.before
+    _volume_access(collector, grant=grant, replace_status=grant == 0x40)
+    with pytest.raises(h.CollectionBlocked):
+        h.collect(collector)
+
+
+def test_volume_parent_replacement_or_acl_disagreement_blocks() -> None:
+    for change in ({"replace_access_status": True}, {"acl_agrees": False}):
+        collector = MockCollector()
+        rows = tuple(
+            replace(row, **change) if row.evidence.path == q.VOLUME else row
+            for row in collector.trading_value.access
+        )
+        collector.trading_value = replace(collector.trading_value, access=rows)
+        with pytest.raises(h.CollectionBlocked):
+            h.collect(collector)
 
 
 def test_qualification_rejection_blocks() -> None:
@@ -373,7 +483,9 @@ def test_optional_root_present_and_absent_is_contradictory() -> None:
         access=(
             *collector.trading_value.access,
             h.NativeAccess(
-                q.TradingAccessEvidence(q.ZIP, q.MUTATION_MASK, 0, True),
+                q.TradingAccessEvidence(
+                    q.ZIP, q.MUTATION_MASK, 0, True, q.AccessPolicy.PROTECTED_OBJECT
+                ),
                 True,
                 False,
                 False,
@@ -453,11 +565,11 @@ def test_access_check_indeterminate_blocks() -> None:
 )
 def test_trading_access_indeterminacy_blocks(change: dict[str, object]) -> None:
     collector = MockCollector()
-    first = collector.trading_value.access[0]
-    collector.trading_value = replace(
-        collector.trading_value,
-        access=(replace(first, **change), *collector.trading_value.access[1:]),
+    access = tuple(
+        replace(row, **change) if row.evidence.path == q.ROOT else row
+        for row in collector.trading_value.access
     )
+    collector.trading_value = replace(collector.trading_value, access=access)
     with pytest.raises(h.CollectionBlocked):
         h.collect(collector)
 

@@ -171,7 +171,9 @@ opens the production runtime. Its typed QualificationEvidence is input to a
 later protected P124-1 native collector; a caller-built instance is not
 authority. QualificationResult contains fixed paths, version, accepted search
 roots and a count, with no handle, raw ACL, token, or reusable capability.
-P124-1 must retain a native transcript for operator review. This result
+P124-1 must retain a native transcript for operator review. The corrected
+transcript schema is v2 and records the explicit volume-namespace or
+protected-object access policy for each effective-access row. This result
 does not authorize a D10 launch.
 
 The source-owned identity is exactly F:\AITradingBot\runtime\python.exe,
@@ -193,11 +195,13 @@ P124-1 must collect and preserve these observations:
    case collisions, require an exact parent-child inventory, and re-inspect
    pinned identities before closing. Any inaccessible, unknown, redirecting,
    or changed object blocks acceptance. The F:\ volume parent is included
-   because Trading must not be able to rename/replace the root through it. Its
-   exact local-volume/final-path identity and effective Trading denial are
-   required, but its existing DACL need not match the three-ACE runtime policy
-   or be protected. F:\AITradingBot is the already accepted protected
-   deployment parent: exact Administrators owner, protected DACL, and exactly
+   because Trading must not be able to rename/replace the
+   F:\AITradingBot child through it. Its exact local-NTFS volume/final-path
+   identity, complete/stable ACL and owner observation, and the child's
+   presence/identity are required. Its existing DACL need not match the
+   three-ACE runtime policy or be protected. F:\AITradingBot is the already
+   accepted protected deployment parent: exact Administrators owner, protected
+   DACL, and exactly
    two ordered allow ACEs (Administrators then SYSTEM, flags 0, each mask
    0x001F01FF). It has no Trading ACE. The three-ACE runtime policy begins at
    F:\AITradingBot\runtime and applies recursively to every existing runtime
@@ -209,21 +213,31 @@ P124-1 must collect and preserve these observations:
    read/traverse. Neither mask grants write, append, delete, delete-child,
    WRITE_DAC, or WRITE_OWNER.
 2. Prove effective rights under the actual non-admin local Trading token/SID
-   for every admitted object and its parents. Trading must lack file and
-   directory write/append, add-file/add-subdirectory, delete, delete-child,
-   rename/replace, WRITE_DAC, WRITE_OWNER, and any equivalent generic or
-   inherited right. The read-only access check must include the token's
+   for every admitted object and its parents. Use an explicit volume-parent
+   namespace policy for F:\: actual Trading FILE_DELETE_CHILD, WRITE_DAC,
+   and WRITE_OWNER must all be denied. A grant of unrelated volume-root
+   add-file/add-subdirectory, write-metadata, or DELETE on the volume-root
+   object itself does not fail that policy. For F:\AITradingBot and every
+   protected runtime descendant, retain the strict full MUTATION_MASK
+   zero-grant policy: Trading must lack file and directory write/append,
+   add-file/add-subdirectory, delete, delete-child, rename/replace,
+   WRITE_DAC, WRITE_OWNER, and any equivalent generic or inherited right.
+   Deleting/renaming F:\AITradingBot requires DELETE on that child or
+   FILE_DELETE_CHILD on F:\; both must be denied. The read-only access
+   check must include the token's
    enabled groups and privileges; a simple Trading ACE scan is insufficient.
    The actual exact-SID, non-admin, non-elevated Trading token must have
    SeChangeNotifyPrivilege enabled for bypass-traverse access to fixed permitted
    descendants. Administrators group membership and the existing dangerous
    bypass/mutation privileges remain disallowed. Bypass traverse grants neither
-   parent listing nor mutation; effective mutation/delete/rename/WRITE_DAC/
-   WRITE_OWNER denial remains mandatory for every admitted object and parent.
-   A mismatched token or indeterminate access check blocks. ACL/owner checks
-   and Trading access checks must agree. The native transcript must
-   explicitly establish rename/replace denial for the volume parent, root,
-   and every admitted object; an untested operation is not a denial.
+   parent listing nor protected-object mutation. A mismatched token or
+   indeterminate access check blocks. ACL/owner checks and Trading access
+   checks must agree for both policies, including complete group/privilege
+   accounting and stable ACL re-read. The native transcript must explicitly
+   establish F:\AITradingBot child replacement denial through the volume
+   parent's FILE_DELETE_CHILD check, plus DELETE and parent
+   FILE_DELETE_CHILD/replace denial for the root and every admitted
+   protected object; an untested operation is not a denial.
    Administrator or SYSTEM may maintain
    the installation only outside an active D10 interval.
 3. Use native no-follow absence probes to prove parent/runtime pyvenv.cfg and

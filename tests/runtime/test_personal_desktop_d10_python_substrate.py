@@ -81,7 +81,9 @@ def evidence() -> q.QualificationEvidence:
         True,
         True,
         tuple(
-            q.TradingAccessEvidence(item.path, q.MUTATION_MASK, 0, True)
+            q.TradingAccessEvidence(
+                item.path, q.MUTATION_MASK, 0, True, q.access_policy_for_path(item.path)
+            )
             for item in objects
         ),
         True,
@@ -186,7 +188,13 @@ def test_missing_trading_effective_denial_fails_closed() -> None:
             replace(
                 evidence(),
                 trading_access=(
-                    q.TradingAccessEvidence(q.PYTHON, q.MUTATION_MASK, 0, True),
+                    q.TradingAccessEvidence(
+                        q.PYTHON,
+                        q.MUTATION_MASK,
+                        0,
+                        True,
+                        q.AccessPolicy.PROTECTED_OBJECT,
+                    ),
                 ),
             )
         )
@@ -346,12 +354,46 @@ def test_volume_parent_identity_must_be_exact(change: dict[str, object]) -> None
         q.qualify_python_substrate(_change_node(evidence(), q.VOLUME, **change))
 
 
-def test_volume_explicit_trading_mutation_contradicts_denial() -> None:
+def test_volume_parent_allows_unrelated_root_rights() -> None:
     ev = evidence()
-    item = next(item for item in ev.objects if item.path == q.VOLUME)
-    aces = item.aces + (q.Ace(q.TRADING, 0x2),)
+    volume = next(item for item in ev.objects if item.path == q.VOLUME)
+    ev = _change_node(
+        ev,
+        q.VOLUME,
+        dacl_protected=False,
+        aces=volume.aces + (q.Ace(q.TRADING, 0x00010116),),
+    )
+    access = tuple(
+        replace(entry, granted_mask=0x00010116) if entry.path == q.VOLUME else entry
+        for entry in ev.trading_access
+    )
+    assert (
+        q.qualify_python_substrate(replace(ev, trading_access=access)).python
+        == q.PYTHON
+    )
+
+
+@pytest.mark.parametrize("mask", [0x40, 0x40000, 0x80000])
+def test_volume_namespace_right_blocks(mask: int) -> None:
+    ev = evidence()
+    access = tuple(
+        replace(entry, granted_mask=mask) if entry.path == q.VOLUME else entry
+        for entry in ev.trading_access
+    )
     with pytest.raises(q.SubstrateBlocked):
-        q.qualify_python_substrate(_change_node(ev, q.VOLUME, aces=aces))
+        q.qualify_python_substrate(replace(ev, trading_access=access))
+
+
+def test_volume_policy_label_mismatch_blocks() -> None:
+    ev = evidence()
+    access = tuple(
+        replace(entry, policy=q.AccessPolicy.PROTECTED_OBJECT)
+        if entry.path == q.VOLUME
+        else entry
+        for entry in ev.trading_access
+    )
+    with pytest.raises(q.SubstrateBlocked):
+        q.qualify_python_substrate(replace(ev, trading_access=access))
 
 
 def test_broad_volume_acl_with_effective_denial_is_accepted() -> None:
@@ -366,7 +408,7 @@ def test_broad_volume_acl_with_effective_denial_is_accepted() -> None:
     assert q.qualify_python_substrate(modified).python == q.PYTHON
 
 
-@pytest.mark.parametrize("path", [q.VOLUME, q.ROOT])
+@pytest.mark.parametrize("path", [q.ROOT, q.RUNTIME, q.PYTHON])
 @pytest.mark.parametrize(
     "change",
     [
@@ -378,10 +420,22 @@ def test_broad_volume_acl_with_effective_denial_is_accepted() -> None:
         {"rename_replace_denied": False},
     ],
 )
-def test_replaceable_parent_blocks(path: str, change: dict[str, object]) -> None:
+def test_protected_object_mutation_or_replacement_blocks(
+    path: str, change: dict[str, object]
+) -> None:
     ev = evidence()
     access = tuple(
         replace(entry, **change) if entry.path == path else entry
+        for entry in ev.trading_access
+    )
+    with pytest.raises(q.SubstrateBlocked):
+        q.qualify_python_substrate(replace(ev, trading_access=access))
+
+
+def test_volume_parent_child_replace_denial_required() -> None:
+    ev = evidence()
+    access = tuple(
+        replace(entry, rename_replace_denied=False) if entry.path == q.VOLUME else entry
         for entry in ev.trading_access
     )
     with pytest.raises(q.SubstrateBlocked):
@@ -423,7 +477,9 @@ def test_optional_root_state_must_be_proven(path: str) -> None:
 def test_protected_present_optional_root_is_accepted(path: str) -> None:
     ev = _present_optional(evidence(), path)
     access = ev.trading_access + (
-        q.TradingAccessEvidence(path, q.MUTATION_MASK, 0, True),
+        q.TradingAccessEvidence(
+            path, q.MUTATION_MASK, 0, True, q.AccessPolicy.PROTECTED_OBJECT
+        ),
     )
     ev = replace(
         ev,

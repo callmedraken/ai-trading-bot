@@ -17,6 +17,7 @@ ZIP = RUNTIME + r"\python314.zip"
 VERSION = "3.14.3"
 SYSTEM32 = r"C:\Windows\System32"
 MUTATION_MASK = 0x000D0156
+VOLUME_NAMESPACE_MASK = 0x000C0040  # FILE_DELETE_CHILD | WRITE_DAC | WRITE_OWNER
 TRADING = "S-1-5-21-1397534616-3988210162-180023805-1009"
 ADMIN = "S-1-5-32-544"
 SYSTEM = "S-1-5-18"
@@ -42,6 +43,11 @@ class SubstrateBlocked(ValueError):
 class Kind(StrEnum):
     DIRECTORY = "directory"
     FILE = "file"
+
+
+class AccessPolicy(StrEnum):
+    VOLUME_NAMESPACE = "volume_namespace"
+    PROTECTED_OBJECT = "protected_object"
 
 
 @dataclass(frozen=True, slots=True)
@@ -96,7 +102,10 @@ class TradingAccessEvidence:
     path: str
     tested_mask: int
     granted_mask: int
+    # For VOLUME_NAMESPACE this means its protected child cannot be replaced;
+    # for PROTECTED_OBJECT it includes DELETE on the object and parent child-delete.
     rename_replace_denied: bool
+    policy: AccessPolicy
 
 
 @dataclass(frozen=True, slots=True)
@@ -114,9 +123,8 @@ class QualificationEvidence:
     trading_enabled_privileges: tuple[str, ...]
     native_no_follow: bool
     native_pinned_and_rechecked: bool
-    # The protected collector must prove actual effective Trading denial of
-    # create/write/append/delete/delete-child/rename/WRITE_DAC/WRITE_OWNER
-    # on every admitted object and its parents.
+    # The volume parent requires namespace-protection denial; ROOT and every
+    # runtime descendant require the full zero-mutation policy.
     trading_access: tuple[TradingAccessEvidence, ...]
     # These flags attest complete protected P124-1 observations, not just
     # successful parsing of whatever rows a collector happened to return.
@@ -167,6 +175,36 @@ def _parent_aces() -> tuple[Ace, ...]:
 def _expected_aces(kind: Kind) -> tuple[Ace, ...]:
     read = DIRECTORY_READ if kind is Kind.DIRECTORY else FILE_READ_EXECUTE
     return (Ace(ADMIN, ALL_ACCESS), Ace(SYSTEM, ALL_ACCESS), Ace(TRADING, read))
+
+
+def access_policy_for_path(path: str) -> AccessPolicy:
+    """Select the explicit effective-access contract for a governed path."""
+    return (
+        AccessPolicy.VOLUME_NAMESPACE
+        if path == VOLUME
+        else AccessPolicy.PROTECTED_OBJECT
+    )
+
+
+def trading_access_denied(entry: TradingAccessEvidence) -> bool:
+    """Check the complete tested mask against the path's declared policy."""
+    if type(entry) is not TradingAccessEvidence:
+        return False
+    policy = access_policy_for_path(entry.path)
+    denied_mask = (
+        VOLUME_NAMESPACE_MASK
+        if policy is AccessPolicy.VOLUME_NAMESPACE
+        else MUTATION_MASK
+    )
+    return (
+        entry.policy is policy
+        and entry.tested_mask == MUTATION_MASK
+        and type(entry.granted_mask) is int
+        and entry.granted_mask >= 0
+        and entry.granted_mask & ~MUTATION_MASK == 0
+        and entry.granted_mask & denied_mask == 0
+        and entry.rename_replace_denied is True
+    )
 
 
 def qualify_python_substrate(evidence: QualificationEvidence) -> QualificationResult:
@@ -231,20 +269,14 @@ def qualify_python_substrate(evidence: QualificationEvidence) -> QualificationRe
             )
         else:
             # The existing volume root may have a broader host policy. Its
-            # identity and actual Trading mutation denial are checked below.
+            # namespace-protection rights are checked against the actual token.
             _require(
                 type(item.owner_sid) is str
                 and bool(item.owner_sid)
                 and type(item.dacl_protected) is bool
                 and type(item.aces) is tuple
                 and all(type(ace) is Ace for ace in item.aces)
-                and item.owner_sid != TRADING
-                and not any(
-                    ace.sid == TRADING
-                    and ace.ace_type == 0
-                    and ace.mask & (MUTATION_MASK | 0x50000000)
-                    for ace in item.aces
-                ),
+                and item.owner_sid != TRADING,
                 "volume parent security observation incomplete",
             )
         _require(
@@ -304,10 +336,7 @@ def qualify_python_substrate(evidence: QualificationEvidence) -> QualificationRe
         )
         and {entry.path.casefold() for entry in evidence.trading_access} == set(by_path)
         and all(
-            type(entry) is TradingAccessEvidence
-            and entry.tested_mask == MUTATION_MASK
-            and entry.granted_mask == 0
-            and entry.rename_replace_denied is True
+            type(entry) is TradingAccessEvidence and trading_access_denied(entry)
             for entry in evidence.trading_access
         ),
         "Trading mutation denial incomplete",

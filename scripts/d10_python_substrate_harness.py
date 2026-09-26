@@ -15,7 +15,7 @@ from typing import Protocol
 
 from trading_bot.runtime import personal_desktop_d10_python_substrate as q
 
-SCHEMA = "personal-desktop-p124-1-native-transcript/v1"
+SCHEMA = "personal-desktop-p124-1-native-transcript/v2"
 MAX_OBJECTS = 100_000
 MAX_DEPENDENCIES = 4_096
 MAX_TRANSCRIPT_BYTES = 32 * 1024 * 1024
@@ -73,7 +73,9 @@ class NativeAccess:
     evidence: q.TradingAccessEvidence
     access_check_succeeded: bool
     mutation_access_status: bool
+    # DELETE on the volume object may succeed; protected objects must deny it.
     rename_access_status: bool
+    # Parent FILE_DELETE_CHILD must deny replacement in both policies.
     replace_access_status: bool
     token_groups_accounted: bool
     token_privileges_accounted: bool
@@ -219,12 +221,13 @@ def _access(
         _require(path in paths and path not in seen, "AccessCheck path coverage")
         seen.add(path)
         _require(
-            row.evidence.tested_mask == q.MUTATION_MASK
-            and row.evidence.granted_mask == 0
-            and row.evidence.rename_replace_denied is True
+            q.trading_access_denied(row.evidence)
             and row.access_check_succeeded is True
             and row.mutation_access_status is False
-            and row.rename_access_status is False
+            and (
+                row.evidence.policy is q.AccessPolicy.VOLUME_NAMESPACE
+                or row.rename_access_status is False
+            )
             and row.replace_access_status is False
             and row.token_groups_accounted is True
             and row.token_privileges_accounted is True
@@ -341,7 +344,7 @@ def _plain(value: object) -> object:
         return {key: _plain(item) for key, item in value.items()}
     if isinstance(value, (tuple, list)):
         return [_plain(item) for item in value]
-    if isinstance(value, q.Kind):
+    if isinstance(value, (q.Kind, q.AccessPolicy)):
         return value.value
     if type(value) in (str, int, bool) or value is None:
         return value

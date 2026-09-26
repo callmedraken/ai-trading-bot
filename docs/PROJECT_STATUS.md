@@ -3877,3 +3877,54 @@ host/account/ACL/package mutation. Do not install pywin32 and do not run
 P124-1/P124-2/P124-3. If the corrected read-only preflight passes, review that
 host evidence before advancing the non-governed deployment HEAD/TREE pins from
 S5-R2 to S5-R3 and rebuilding byte-exact canonical deployment material.
+
+
+## S5-R4 accepted certification - TokenElevation native correction
+
+S5-R4 is ACCEPTED for certified HEAD
+`981251fe02eecf4b355e42e4605e7d535dedee4d` and TREE
+`7dc31cb85494da606e76a570a4e1c85d7ed54812`.
+
+This bounded correction changes only
+`scripts/d10_python_substrate_windows.py` and
+`tests/runtime/test_d10_python_substrate_windows.py`. TokenElevation is now
+read directly into a fixed DWORD with GetTokenInformation. The generic
+variable-sized token-information helper remains unchanged for TokenUser,
+TokenGroups, and TokenPrivileges. API failure, wrong returned length, and
+elevation values outside 0/1 remain fail-closed.
+
+Focused verification before commit reported 62 passing tests for
+`tests/runtime/test_d10_python_substrate_windows.py`, with Ruff check,
+Ruff format --check, and git diff --check passing.
+
+Fresh S5-R4 certification then passed from:
+`F:\AI\worktrees\ai-trading-bot-s5r4-981251f`
+
+Accepted evidence:
+`F:\AI\temp\pytest\s5r4-certification-evidence-981251f-20260925-175435`
+
+Certification totals:
+
+```text
+broad-1: 3512 cases, 3508 passed, 4 skipped, 0 failed/errors
+broad-2: 3232 cases, 3228 passed, 4 skipped, 0 failed/errors
+serial:    935 cases,  926 passed, 9 skipped, 0 failed/errors
+total:    7679 cases, 7662 passed, 17 skipped, 0 failed/errors
+wall: 366.172 seconds
+```
+
+The prior S5-R3 read-only preflight remains historical BLOCKED evidence at
+`F:\AI\temp\p1241-readonly-s5r3-20260925-172522`. It blocked during
+Administrator TokenElevation collection before any Trading token candidate was
+evaluated. Signed A123 remained intentionally skipped and no protected P124
+operation ran.
+
+No P124-1/P124-2/P124-3 operation, account or ACL mutation, package
+installation, signing, scheduler mutation, or trading/provider effect occurred
+during S5-R4.
+
+Next resume point: after separate explicit authorization, retry the same bounded
+read-only P124-1 host/token preflight using the accepted S5-R4 collector. The
+retry remains diagnostic only, must continue to skip signed-A123/D10 trust
+reads, and must stop for review on PASS or BLOCKED before any later protected
+checkpoint.

@@ -3800,3 +3800,50 @@ advancing the non-governed protected-deployment HEAD/TREE pins from S5-R2 to
 S5-R3 and rebuilding byte-exact canonical deployment material. Only after those
 later reviews should a new P124-2 retry authorization be considered. P124-3 and
 actual P124-1 remain later in the frozen protected order.
+
+
+## 2026-09-25 S5-R4 acceptance and next resume point
+
+Accepted source and certification:
+
+```text
+S5-R4 HEAD: 981251fe02eecf4b355e42e4605e7d535dedee4d
+S5-R4 TREE: 7dc31cb85494da606e76a570a4e1c85d7ed54812
+certification checkout: F:\AI\worktrees\ai-trading-bot-s5r4-981251f
+evidence: F:\AI\temp\pytest\s5r4-certification-evidence-981251f-20260925-175435
+total: 7679
+passed: 7662
+skipped: 17
+failed: 0
+errors: 0
+wall: 366.172 seconds
+```
+
+S5-R4 fixes only the TokenElevation collection defect exposed by the first
+bounded S5-R3 read-only host/token preflight. The native collector now queries
+TokenElevation directly into a fixed DWORD, validates exact returned length and
+0/1 value, and does not route TokenElevation through the generic variable-size
+token-information sizing helper. TokenUser, TokenGroups, TokenPrivileges,
+Trading SID/group/privilege policy, Administrator membership proof, access
+masks, and cleanup semantics are otherwise unchanged.
+
+Focused verification before commit: 62 passed, Ruff check PASS, Ruff format
+--check PASS, git diff --check PASS.
+
+Historical preflight evidence remains:
+`F:\AI\temp\p1241-readonly-s5r3-20260925-172522`
+
+That run BLOCKED at `administrator_proof` with
+`GetTokenInformation size unavailable`. It never reached Trading-token
+evaluation. Signed A123 was intentionally skipped. Do not reinterpret it as a
+Trading account failure.
+
+Operational state remains fail-closed. No protected P124 operation or production
+mutation occurred during the source correction or certification. The earlier
+P124-2 authorization remains consumed.
+
+Immediate next step: obtain fresh explicit authorization for one retry of the
+bounded read-only P124-1 host/token preflight using S5-R4. The retry must make no
+host/account/ACL/package mutation, must still skip signed-A123/D10 trust reads,
+and must stop after producing evidence for review. Actual P124-1, P124-2, and
+P124-3 remain unauthorized.

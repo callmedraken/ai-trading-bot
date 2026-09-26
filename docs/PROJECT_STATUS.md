@@ -4558,3 +4558,106 @@ read-only against the production D10 trust set and the already-passed S5-R8
 runtime/token substrate. This read-only checkpoint is covered by the standing
 continuation authorization. It must not mutate D10, sign again, create an
 activation lease, modify Task Scheduler, access provider credentials, or trade.
+
+
+## 2026-09-26 S5-R9 signed-input reobservation correction certified
+
+The first full signed-trust P124-1 attempt remained read-only and BLOCKED at
+the fixed signed-input reread with:
+
+```text
+P124-1 collection blocked: fixed signed input identity drift
+```
+
+Evidence:
+
+```text
+F:\AI\temp\p1241-signed-s5r8-20260926-162213
+```
+
+A dedicated read-only host diagnostic then proved that both installed trust
+files retained exact content and stable object identity while only their
+last-access timestamps changed as a consequence of being read:
+
+```text
+diagnostic evidence:
+F:\AI\temp\p1241-signed-input-drift-20260926-163211
+
+deployment.attestation.json SHA-256:
+a12ab7788120934ca928919a01b4cfc7a3f6f307fad79ab13a6bfff189aeb3f3
+
+deployment.attestation.sig SHA-256:
+7ae83e28bcd8ab7cb59ab990a7f3b3191f485621aa83f5431f7f25fc32c8b4eb
+
+for both files:
+full BY_HANDLE_FILE_INFORMATION equality: false
+stable identity equality: true
+changed fields: access_low / access_high only
+```
+
+The correction is:
+
+```text
+source commit:
+87eb8dfd260507b7be959bf7e0d1d292ee1a33ff
+
+source tree:
+2af403b9ab5fa2afdad7b1e97db13bc4a909349c
+
+subject:
+fix: ignore volatile signed-input access time
+```
+
+Only these files changed:
+
+```text
+scripts/d10_python_substrate_windows.py
+tests/runtime/test_d10_python_substrate_windows.py
+```
+
+The same-handle signed-input reread now excludes only the volatile last-access
+timestamp fields. It continues to require equality of attributes, creation
+time, write time, volume serial, file size, link count, and file index.
+Regression tests independently prove access-time drift is admitted and each
+retained stable fact still blocks when changed.
+
+Focused certification:
+
+```text
+302 passed in 3.25s
+Ruff check: PASS
+Ruff format --check: PASS
+git diff --check: PASS
+```
+
+Full certification evidence:
+
+```text
+F:\AI\temp\pytest\p1241-signed-input-fix-cert-20260926-163841
+```
+
+Full certification result:
+
+```text
+7768 passed
+11 skipped
+0 failed
+0 errors
+861.89 seconds
+
+Ruff check: PASS
+Ruff format --check: PASS
+git diff --check: PASS
+validation worktree status: clean
+```
+
+This correction changes only the P124-1 operator-side qualification logic and
+its tests. It does not change the already sealed S5-R8 executable deployment
+identity, P124-2 source/guard snapshot, P124-3 trust bytes, signing key, or
+signature.
+
+Next checkpoint: retry the full signed-trust P124-1 qualification read-only,
+using corrected operator source `87eb8df...` while retaining sealed/certified
+deployment identity `86f1021... / cfa45581...`. The retry is covered by the
+standing continuation authorization. It grants no activation, scheduler,
+provider, broker, or trading authority.

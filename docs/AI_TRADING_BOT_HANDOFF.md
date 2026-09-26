@@ -4464,3 +4464,79 @@ It must consume the installed Architecture-123 trust files, verify the detached
 signature/public-key identity and exact manifest/attestation/source/guard
 binding, re-prove the production Python/token/native substrate, and stop for
 review on PASS or BLOCKED. It grants no activation or scheduler authority.
+
+
+## 2026-09-26 S5-R9 certification PASS; retry signed P124-1 next
+
+The first full signed-trust P124-1 run was read-only and blocked because the
+signed-input reader compared the complete `BY_HANDLE_FILE_INFORMATION`
+structure before/after a read. A read-only diagnostic proved both trust files
+remained byte-exact and stable in path/object identity, while only
+`access_low/access_high` changed.
+
+Diagnostic:
+
+```text
+F:\AI\temp\p1241-signed-input-drift-20260926-163211
+```
+
+The trust files still matched the accepted P124-3 identities:
+
+```text
+attestation:
+a12ab7788120934ca928919a01b4cfc7a3f6f307fad79ab13a6bfff189aeb3f3
+
+signature:
+7ae83e28bcd8ab7cb59ab990a7f3b3191f485621aa83f5431f7f25fc32c8b4eb
+```
+
+Accepted correction:
+
+```text
+HEAD:
+87eb8dfd260507b7be959bf7e0d1d292ee1a33ff
+
+TREE:
+2af403b9ab5fa2afdad7b1e97db13bc4a909349c
+
+fix: ignore volatile signed-input access time
+```
+
+The correction ignores only last-access timestamp movement during the
+same-handle signed-input reread. Attributes, creation/write time, volume
+serial, size, link count, and file index remain mandatory stable facts.
+
+Certification:
+
+```text
+focused:
+302 passed in 3.25s
+
+full:
+7768 passed
+11 skipped
+0 failed/errors
+861.89s
+
+Ruff check: PASS
+Ruff format --check: PASS
+git diff --check: PASS
+clean detached validation worktree
+
+evidence:
+F:\AI\temp\pytest\p1241-signed-input-fix-cert-20260926-163841
+```
+
+Important identity split:
+
+- sealed/certified deployment source remains
+  `86f1021d... / cfa45581...`;
+- corrected P124-1 operator/collector source is
+  `87eb8dfd... / 2af403b9...`;
+- P124-2 and P124-3 remain accepted and MUST NOT be rerun;
+- installed signed trust bytes remain accepted and unchanged.
+
+NEXT: rerun only the bounded read-only full signed-trust P124-1 qualification
+from the corrected operator source. On PASS, close out P124-1 before entering
+P124-4/P124-5 activation/scheduler work. No activation lease, scheduler,
+provider/broker, or trading effect is authorized by the P124-1 retry.

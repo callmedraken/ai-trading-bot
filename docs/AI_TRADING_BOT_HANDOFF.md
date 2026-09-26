@@ -3762,8 +3762,8 @@ cleanup defect.
 
 S5-R3 certification attempt #1 used the same exact HEAD/TREE but an incorrectly
 constructed checkout with process-local `core.autocrlf=false` and
-`core.eol=lf`. That altered the working-tree bytes of historical JSON fixtures
-whose digest sentinel expects ordinary Windows CRLF checkout bytes. Exactly one
+`core.eol=lf`. That altered working-tree bytes of historical JSON fixtures whose
+digest sentinel expects ordinary Windows CRLF checkout bytes. Exactly one
 unrelated fixture digest test failed; the P124-1 change did not fail. Preserve
 that evidence as environmental failure evidence:
 

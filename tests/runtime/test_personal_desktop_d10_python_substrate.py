@@ -12,21 +12,22 @@ from trading_bot.runtime import personal_desktop_d10_python_substrate as q
 
 def _node(path: str, kind: q.Kind, children: tuple[str, ...] = ()) -> q.ObjectEvidence:
     read = q.DIRECTORY_READ if kind is q.Kind.DIRECTORY else q.FILE_READ_EXECUTE
+    flags = 0x03 if path == q.RUNTIME else 0x13 if kind is q.Kind.DIRECTORY else 0x10
     return q.ObjectEvidence(
         path,
         path,
         kind,
         q.ADMIN,
-        True,
+        path in (q.VOLUME, q.ROOT, q.RUNTIME),
         (
             q.Ace(q.ADMIN, q.ALL_ACCESS),
             q.Ace(q.SYSTEM, q.ALL_ACCESS),
         )
         if path == q.ROOT
         else (
-            q.Ace(q.ADMIN, q.ALL_ACCESS),
-            q.Ace(q.SYSTEM, q.ALL_ACCESS),
-            q.Ace(q.TRADING, read),
+            q.Ace(q.SYSTEM, q.ALL_ACCESS, flags=flags),
+            q.Ace(q.ADMIN, q.ALL_ACCESS, flags=flags),
+            q.Ace(q.TRADING, read, flags=flags),
         ),
         False,
         3,
@@ -143,6 +144,75 @@ def test_fixed_paths_and_sanitized_result() -> None:
     assert not hasattr(result, "authority")
 
 
+def test_exact_runtime_inheritance_tree_is_accepted() -> None:
+    ev = evidence()
+    root, directory, file = (
+        next(item for item in ev.objects if item.path == path)
+        for path in (q.RUNTIME, q.LIB, q.PYTHON)
+    )
+    assert root.dacl_protected and [ace.flags for ace in root.aces] == [0x03] * 3
+    assert not directory.dacl_protected
+    assert [ace.flags for ace in directory.aces] == [0x13] * 3
+    assert not file.dacl_protected
+    assert [ace.flags for ace in file.aces] == [0x10] * 3
+    assert q.qualify_python_substrate(ev).protected_object_count == 6
+
+
+def test_runtime_anchor_rejects_non_inheritable_or_extra_access() -> None:
+    ev = evidence()
+    anchor = next(item for item in ev.objects if item.path == q.RUNTIME)
+    aces = anchor.aces
+    changes = (
+        {"dacl_protected": False},
+        {"aces": tuple(replace(ace, flags=0) for ace in aces)},
+        {"aces": tuple(replace(ace, flags=0x13) for ace in aces)},
+        {"aces": (aces[1], aces[0], aces[2])},
+        {"aces": (replace(aces[0], mask=0x001200A9), *aces[1:])},
+        {"aces": (*aces[:2], replace(aces[2], sid="S-1-5-32-545"))},
+        {"aces": (*aces[:2], replace(aces[2], ace_type=1))},
+        {"aces": (*aces, aces[2])},
+    )
+    for change in changes:
+        with pytest.raises(q.SubstrateBlocked):
+            q.qualify_python_substrate(_change_node(ev, q.RUNTIME, **change))
+
+
+def test_runtime_directory_rejects_explicit_or_wrong_inheritance() -> None:
+    ev = evidence()
+    directory = next(item for item in ev.objects if item.path == q.LIB)
+    aces = directory.aces
+    changes = (
+        {"dacl_protected": True},
+        {"aces": tuple(replace(ace, flags=0x03) for ace in aces)},
+        {"aces": tuple(replace(ace, flags=0x10) for ace in aces)},
+        {"aces": tuple(replace(ace, flags=0x1B) for ace in aces)},
+        {"aces": tuple(replace(ace, flags=0x17) for ace in aces)},
+        {"aces": (*aces, q.Ace(q.TRADING, q.DIRECTORY_READ, flags=0x13))},
+        {"aces": (*aces[:2], replace(aces[2], mask=q.ALL_ACCESS))},
+        {"aces": (*aces[:2], replace(aces[2], ace_type=1))},
+    )
+    for change in changes:
+        with pytest.raises(q.SubstrateBlocked):
+            q.qualify_python_substrate(_change_node(ev, q.LIB, **change))
+
+
+def test_runtime_file_rejects_explicit_or_wrong_inheritance() -> None:
+    ev = evidence()
+    file = next(item for item in ev.objects if item.path == q.PYTHON)
+    aces = file.aces
+    changes = (
+        {"dacl_protected": True},
+        {"aces": tuple(replace(ace, flags=0) for ace in aces)},
+        {"aces": tuple(replace(ace, flags=0x13) for ace in aces)},
+        {"aces": (*aces, q.Ace(q.TRADING, q.FILE_READ_EXECUTE, flags=0))},
+        {"aces": (*aces[:2], replace(aces[2], mask=q.ALL_ACCESS))},
+        {"aces": (*aces[:2], replace(aces[2], ace_type=1))},
+    )
+    for change in changes:
+        with pytest.raises(q.SubstrateBlocked):
+            q.qualify_python_substrate(_change_node(ev, q.PYTHON, **change))
+
+
 def test_dynamic_runtime_final_maps_to_one_protected_file_case_insensitively() -> None:
     inventory_path = q.RUNTIME + r"\VCRUNTIME140.dll"
     native_final = q.RUNTIME + r"\vcruntime140.dll"
@@ -167,7 +237,8 @@ def test_case_colliding_runtime_inventory_remains_blocked() -> None:
         (q.PYTHON, {"final_path": r"\\server\share\python.exe"}),
         (q.PYTHON, {"final_path": r"\\?\F:\AITradingBot\runtime\python.exe"}),
         (q.PYTHON, {"owner_sid": q.TRADING}),
-        (q.PYTHON, {"dacl_protected": False}),
+        # Descendants must inherit from the protected anchor; protecting one blocks.
+        (q.PYTHON, {"dacl_protected": True}),
         (q.PYTHON, {"reparse": True}),
         (q.PYTHON, {"links": 2}),
         (q.ROOT, {"owner_sid": q.TRADING}),
@@ -217,6 +288,19 @@ def test_root_parent_requires_two_exact_aces_and_admin_owner() -> None:
             q.qualify_python_substrate(_change_node(ev, q.ROOT, aces=aces))
     with pytest.raises(q.SubstrateBlocked, match="protected deployment parent"):
         q.qualify_python_substrate(_change_node(ev, q.ROOT, owner_sid=q.SYSTEM))
+
+
+def test_deployment_parent_still_rejects_changed_flags_order_or_mask() -> None:
+    ev = evidence()
+    parent = next(item for item in ev.objects if item.path == q.ROOT)
+    for change in (
+        {"dacl_protected": False},
+        {"aces": (replace(parent.aces[0], flags=0x03), parent.aces[1])},
+        {"aces": tuple(reversed(parent.aces))},
+        {"aces": (replace(parent.aces[0], mask=q.DIRECTORY_READ), parent.aces[1])},
+    ):
+        with pytest.raises(q.SubstrateBlocked, match="protected deployment parent"):
+            q.qualify_python_substrate(_change_node(ev, q.ROOT, **change))
 
 
 def test_missing_bypass_traverse_privilege_blocks_pure_qualification() -> None:
@@ -368,7 +452,7 @@ def test_python_execute_is_required_by_explicit_policy() -> None:
 def test_reviewed_file_read_execute_has_no_mutation_authority() -> None:
     ev = evidence()
     item = next(item for item in ev.objects if item.path == q.PYTHON)
-    assert item.aces[-1] == q.Ace(q.TRADING, q.FILE_READ_EXECUTE)
+    assert item.aces[-1] == q.Ace(q.TRADING, q.FILE_READ_EXECUTE, flags=0x10)
     assert q.FILE_READ_EXECUTE & 0x20
     assert q.FILE_READ_EXECUTE & q.MUTATION_MASK == 0
     assert q.qualify_python_substrate(ev).python == q.PYTHON

@@ -14,21 +14,22 @@ from trading_bot.runtime import personal_desktop_d10_python_substrate as q
 
 def _node(path: str, kind: q.Kind, children: tuple[str, ...] = ()) -> q.ObjectEvidence:
     read = q.DIRECTORY_READ if kind is q.Kind.DIRECTORY else q.FILE_READ_EXECUTE
+    flags = 0x03 if path == q.RUNTIME else 0x13 if kind is q.Kind.DIRECTORY else 0x10
     return q.ObjectEvidence(
         path,
         path,
         kind,
         q.ADMIN,
-        True,
+        path in (q.VOLUME, q.ROOT, q.RUNTIME),
         (
             q.Ace(q.ADMIN, q.ALL_ACCESS),
             q.Ace(q.SYSTEM, q.ALL_ACCESS),
         )
         if path == q.ROOT
         else (
-            q.Ace(q.ADMIN, q.ALL_ACCESS),
-            q.Ace(q.SYSTEM, q.ALL_ACCESS),
-            q.Ace(q.TRADING, read),
+            q.Ace(q.SYSTEM, q.ALL_ACCESS, flags=flags),
+            q.Ace(q.ADMIN, q.ALL_ACCESS, flags=flags),
+            q.Ace(q.TRADING, read, flags=flags),
         ),
         False,
         3,
@@ -270,6 +271,18 @@ def test_complete_evidence_and_deterministic_transcript() -> None:
     assert b'"status":"PASS"' in first
     assert b'"schema":"personal-desktop-p124-1-native-transcript/v4"' in first
     assert b'"policy":"volume_namespace"' in first
+    transcript = json.loads(first)
+    rows = {
+        row["evidence"]["path"]: row["evidence"]
+        for row in transcript["before"]["objects"]
+    }
+    for path, protected, flags in (
+        (q.RUNTIME, True, 0x03),
+        (q.LIB, False, 0x13),
+        (q.PYTHON, False, 0x10),
+    ):
+        assert rows[path]["dacl_protected"] is protected
+        assert [ace["flags"] for ace in rows[path]["aces"]] == [flags] * 3
     assert first == h.collect(MockCollector())
     assert collector.calls == [
         "inventory",
@@ -530,7 +543,8 @@ def test_unknown_native_capability_cannot_serialize() -> None:
         (q.PYTHON, {"reparse": True}),
         (q.PYTHON, {"links": 2}),
         (q.PYTHON, {"owner_sid": q.TRADING}),
-        (q.PYTHON, {"dacl_protected": False}),
+        # An inherited runtime file must have an unprotected DACL.
+        (q.PYTHON, {"dacl_protected": True}),
         (q.PYTHON, {"aces": (q.Ace(q.TRADING, q.ALL_ACCESS),)}),
         (q.RUNTIME, {"children": ("Lib", "lib", "python.exe")}),
         (q.RUNTIME, {"children": ("Lib",)}),
@@ -802,7 +816,8 @@ def test_trading_access_indeterminacy_blocks(change: dict[str, object]) -> None:
     "change",
     [
         {"owner_sid": q.SYSTEM},
-        {"dacl_protected": False},
+        # Before/after drift to a protected file DACL must be detected.
+        {"dacl_protected": True},
         {"aces": (q.Ace(q.TRADING, q.ALL_ACCESS),)},
         {"file_index": 999},
     ],

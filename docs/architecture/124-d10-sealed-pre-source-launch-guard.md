@@ -48,7 +48,7 @@ FILE_DELETE_CHILD, WRITE_DAC, and WRITE_OWNER on `F:\`. Other volume-root
 create, metadata-write, or DELETE-on-the-volume-object rights do not establish
 authority to delete, rename, or replace `F:\AITradingBot`: Windows requires
 DELETE on that child or FILE_DELETE_CHILD on its parent for child
-deletion/rename. `F:\AITradingBot` and every protected runtime descendant
+deletion/rename. `F:\AITradingBot` and every runtime object
 retain full zero-grant MUTATION_MASK, DELETE and parent FILE_DELETE_CHILD/
 replacement denial, WRITE_DAC/WRITE_OWNER denial, and their exact ACL/owner
 policies. Complete token-group/privilege accounting and ACL re-read agreement
@@ -135,6 +135,20 @@ any module from the sealed source snapshot before verification succeeds.
 
 If the installed production Python runtime cannot be proven non-writable by
 Trading, D10 remains BLOCKED.
+
+The runtime root is a protected inheritance trust anchor, distinct from the
+protected two-ACE `F:\AITradingBot` deployment parent. The root has exactly
+three explicit inheritable ALLOW ACEs ordered SYSTEM, Administrators, Trading,
+with masks 0x001F01FF, 0x001F01FF, and 0x001200A9 and flags 0x03 each.
+Directories strictly below it have unprotected DACLs containing only the
+same three ordered ACEs with flags 0x13 each; files strictly below it have
+unprotected DACLs containing only those ACEs with flags 0x10 each. The owner
+throughout is Administrators or SYSTEM. No descendant explicit, extra, or deny
+ACE is accepted. The complete no-follow inventory, pinned parent linkage,
+case-collision rejection, same-handle security re-observation, and matching
+before/after inventories prove ancestry to the protected anchor. Actual
+Trading mutation and replacement denial remains independently required for
+every object and parent.
 
 ### P124-1 Windows path identity
 

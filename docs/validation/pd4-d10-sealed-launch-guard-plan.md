@@ -230,22 +230,34 @@ P124-1 must collect and preserve these observations:
    accepted protected deployment parent: exact Administrators owner, protected
    DACL, and exactly
    two ordered allow ACEs (Administrators then SYSTEM, flags 0, each mask
-   0x001F01FF). It has no Trading ACE. The three-ACE runtime policy begins at
-   F:\AITradingBot\runtime and applies recursively to every existing runtime
-   file and directory, including Lib, DLLs if present, python314.zip if
-   present, site-packages, stdlib, extension modules, and DLLs. Those objects
-   retain the reviewed Administrators/SYSTEM full-control and Trading
-   read/execute policy. Files use explicit Trading read+execute mask
-   0x001200A9, including python.exe; directories use 0x001200A9 for
-   read/traverse. Neither mask grants write, append, delete, delete-child,
-   WRITE_DAC, or WRITE_OWNER.
+   0x001F01FF). It has no Trading ACE. F:\AITradingBot\runtime is the
+   protected inheritance trust anchor: it is a directory owned by
+   Administrators or SYSTEM, with exactly three explicit ALLOW ACEs ordered
+   SYSTEM, Administrators, Trading. Their masks are respectively 0x001F01FF,
+   0x001F01FF, and 0x001200A9, and every ACE has flags exactly 0x03
+   (OBJECT_INHERIT_ACE | CONTAINER_INHERIT_ACE). Every directory strictly
+   below it has an unprotected DACL with only those ordered inherited ACEs
+   and masks, each with flags exactly 0x13 (OI | CI | INHERITED_ACE). Every
+   file strictly below it has an unprotected DACL with only those ordered
+   inherited ACEs and masks, each with flags exactly 0x10 (INHERITED_ACE).
+   No explicit, extra, deny, inherit-only, no-propagate, or other ACE/flag is
+   accepted. This covers Lib, DLLs if present, python314.zip if present,
+   site-packages, stdlib, extension modules, and DLLs. Trading receives only
+   read/execute or read/traverse, never mutation authority.
+
+   Unprotected descendants are accepted only through exhaustive no-follow
+   enumeration and pinned ancestry to the protected runtime root, exact parent
+   file-index linkage, case-collision rejection, same-handle identity and
+   security re-observation, and before/after inventory equality. The exact
+   inherited ACEs permit no explicit addition. Actual Trading mutation and
+   replacement denial is independently proven for each object and parent.
 2. Prove effective rights under the actual non-admin local Trading token/SID
    for every admitted object and its parents. Use an explicit volume-parent
    namespace policy for F:\: actual Trading FILE_DELETE_CHILD, WRITE_DAC,
    and WRITE_OWNER must all be denied. A grant of unrelated volume-root
    add-file/add-subdirectory, write-metadata, or DELETE on the volume-root
    object itself does not fail that policy. For F:\AITradingBot and every
-   protected runtime descendant, retain the strict full MUTATION_MASK
+   runtime object, retain the strict full MUTATION_MASK
    zero-grant policy: Trading must lack file and directory write/append,
    add-file/add-subdirectory, delete, delete-child, rename/replace,
    WRITE_DAC, WRITE_OWNER, and any equivalent generic or inherited right.

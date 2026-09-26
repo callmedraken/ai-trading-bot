@@ -172,9 +172,14 @@ def _parent_aces() -> tuple[Ace, ...]:
     return (Ace(ADMIN, ALL_ACCESS), Ace(SYSTEM, ALL_ACCESS))
 
 
-def _expected_aces(kind: Kind) -> tuple[Ace, ...]:
+def _runtime_aces(kind: Kind, *, root: bool = False) -> tuple[Ace, ...]:
     read = DIRECTORY_READ if kind is Kind.DIRECTORY else FILE_READ_EXECUTE
-    return (Ace(ADMIN, ALL_ACCESS), Ace(SYSTEM, ALL_ACCESS), Ace(TRADING, read))
+    flags = 0x03 if root else 0x13 if kind is Kind.DIRECTORY else 0x10
+    return (
+        Ace(SYSTEM, ALL_ACCESS, flags=flags),
+        Ace(ADMIN, ALL_ACCESS, flags=flags),
+        Ace(TRADING, read, flags=flags),
+    )
 
 
 def access_policy_for_path(path: str) -> AccessPolicy:
@@ -260,12 +265,20 @@ def qualify_python_substrate(evidence: QualificationEvidence) -> QualificationRe
                 and item.aces == _parent_aces(),
                 "protected deployment parent policy differs",
             )
+        elif path == RUNTIME:
+            _require(
+                item.kind is Kind.DIRECTORY
+                and item.owner_sid in (ADMIN, SYSTEM)
+                and item.dacl_protected is True
+                and item.aces == _runtime_aces(item.kind, root=True),
+                "runtime inheritance anchor differs",
+            )
         elif path != VOLUME:
             _require(
                 item.owner_sid in (ADMIN, SYSTEM)
-                and item.dacl_protected is True
-                and item.aces == _expected_aces(item.kind),
-                "owner or protected DACL differs",
+                and item.dacl_protected is False
+                and item.aces == _runtime_aces(item.kind),
+                "runtime inherited DACL differs",
             )
         else:
             # The existing volume root may have a broader host policy. Its

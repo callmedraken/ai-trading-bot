@@ -4365,3 +4365,90 @@ provisioning would create protected production objects beneath
 mutation and therefore requires fresh explicit operator authorization under the
 standing authorization policy. P124-3 signing/trust publication remains a
 separate later explicit authorization boundary.
+
+
+## 2026-09-26 P124-2 sealed D10 provisioning accepted
+
+The first protected S5-R8 P124-2 production deployment operation completed
+successfully and was independently reverified read-only.
+
+Preserved evidence:
+
+```text
+F:\AI\temp\p1242-s5r8-20260926-155405
+```
+
+Native P124-2 transcript:
+
+```text
+schema: personal-desktop-d10-protected-deployment/v1
+operation: P124-2
+status: PASS
+certified source HEAD:
+86f1021d244bf62bcf5a0f457c30eb98b998de90
+certified source TREE:
+cfa455811f6bd1b3373a66f6716afca9dbd254df
+executable files: 306
+executable bytes: 5,391,245
+manifest SHA-256:
+e4aa71ebbe269837adfd277fbcd8b7ae05e1051343276de2449177587fe7b60a
+launch guard SHA-256:
+3b28d0ffeede06a4785a903dbf6a48c12204651ce8a3c2f80cd6a1428efd8d1a
+unsigned attestation SHA-256:
+a12ab7788120934ca928919a01b4cfc7a3f6f307fad79ab13a6bfff189aeb3f3
+native reverification: PASS
+activation authority: NONE
+scheduler authority: NONE
+trading authority: NONE
+```
+
+Published protected production paths were exactly:
+
+```text
+F:\AITradingBot\D10
+F:\AITradingBot\D10\launch-guard.py
+F:\AITradingBot\D10\source
+```
+
+The original PowerShell wrapper encountered a post-process display bug after
+the native P124-2 child had already completed: reading an empty redirected file
+with `Get-Content -Raw` returned null and the wrapper called `.Trim()`.
+P124-2 was not rerun. A separate read-only continuation consumed the preserved
+native transcript and then launched the independently pinned read-only final
+verifier.
+
+Read-only post-verification also passed:
+
+```text
+schema: p1242-s5r8-readonly-postverify/v1
+status: PASS
+native_reverification: PASS
+deployment ID:
+2fd79986-fb50-5fe4-800a-2d4aa5e7307c
+trust final paths: ABSENT_AND_VERIFIED
+activation lease: ABSENT_AND_VERIFIED
+cache prefix: ABSENT_AND_VERIFIED
+signing: NOT_RUN
+scheduler: NOT_RUN
+provider: NOT_RUN
+trading: NOT_RUN
+```
+
+Preserved native transcript SHA-256:
+
+```text
+2b177355f3a42da861680f77e2a570153bac846dfe3c8ce70f16a12f2a611ce0
+```
+
+P124-2 therefore closes as PASS. The sealed S5-R8 source snapshot and
+launch guard now exist under the reviewed protected D10 namespace. Signed
+Architecture-123 trust material is still absent; no activation lease exists;
+Task Scheduler was not changed; no credential, provider, broker, paper, or
+live trading effect occurred.
+
+Next milestone: P124-3 detached signing and create-only publication of the
+three Architecture-123 trust files. This is a distinct higher-security-risk
+boundary because it uses the non-exportable CNG private signing identity and
+publishes production trust material. It requires a fresh explicit operator
+authorization before execution. After P124-3 passes, the next read-only gate
+is full signed-trust P124-1 qualification.

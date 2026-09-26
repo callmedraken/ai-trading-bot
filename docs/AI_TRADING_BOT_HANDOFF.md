@@ -4313,3 +4313,88 @@ one-shot operation to P124-2 only, use the exact S5-R8 material above, publish
 no signed trust files, make no scheduler changes, perform no provider/trading
 effect, preserve evidence, and stop for review whether PASS or BLOCKED.
 P124-3 signing/trust publication requires a separate later authorization.
+
+
+## 2026-09-26 P124-2 PASS; signed trust remains absent
+
+Protected S5-R8 P124-2 sealed deployment has now completed successfully.
+
+Evidence:
+
+```text
+F:\AI\temp\p1242-s5r8-20260926-155405
+```
+
+Accepted native result:
+
+```text
+operation: P124-2
+status: PASS
+source HEAD: 86f1021d244bf62bcf5a0f457c30eb98b998de90
+source TREE: cfa455811f6bd1b3373a66f6716afca9dbd254df
+manifest:
+e4aa71ebbe269837adfd277fbcd8b7ae05e1051343276de2449177587fe7b60a
+files / bytes: 306 / 5,391,245
+guard:
+3b28d0ffeede06a4785a903dbf6a48c12204651ce8a3c2f80cd6a1428efd8d1a
+unsigned attestation:
+a12ab7788120934ca928919a01b4cfc7a3f6f307fad79ab13a6bfff189aeb3f3
+native reverification: PASS
+activation/scheduler/trading authority: NONE
+```
+
+Published final namespace:
+
+```text
+F:\AITradingBot\D10
+F:\AITradingBot\D10\launch-guard.py
+F:\AITradingBot\D10\source
+```
+
+The initial operator wrapper failed only after the protected child process had
+finished, because an empty redirected file produced null under PowerShell
+`Get-Content -Raw` and the helper called `.Trim()`. The protected operation
+was not repeated. The preserved transcript was recovered and validated, then
+the separate read-only post-verifier passed.
+
+Final read-only state:
+
+```text
+deployment ID:
+2fd79986-fb50-5fe4-800a-2d4aa5e7307c
+native reverification: PASS
+trust final paths: ABSENT_AND_VERIFIED
+activation lease: ABSENT_AND_VERIFIED
+cache prefix: ABSENT_AND_VERIFIED
+P124 operation in verifier: NOT_RUN
+signing: NOT_RUN
+scheduler: NOT_RUN
+provider: NOT_RUN
+trading: NOT_RUN
+```
+
+Transcript SHA-256:
+
+```text
+2b177355f3a42da861680f77e2a570153bac846dfe3c8ce70f16a12f2a611ce0
+```
+
+Current authority state:
+
+- accepted/certified governed source remains S5-R8
+  `86f1021d... / cfa45581...`;
+- P124-2 sealed source/guard provisioning: PASS;
+- signed A123 trust files: absent;
+- P124-3 signing/trust publication: not run;
+- actual full signed-trust P124-1: not run;
+- activation lease / scheduler mutation: not run;
+- provider/broker/trading effects: not run.
+
+NEXT: P124-3 is a separate protected boundary. It will invoke the reviewed
+non-exportable CNG signing identity and publish exactly
+`deployment.attestation.json`, `deployment.attestation.sig`, and
+`executable-manifest.json` create-only under the already sealed D10 root.
+Require fresh explicit authorization before P124-3 because this is signing and
+production trust publication. After a verified P124-3 PASS, proceed to the
+read-only full signed-trust P124-1 qualification before any activation lease
+or scheduler change.

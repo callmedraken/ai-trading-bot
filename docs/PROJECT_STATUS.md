@@ -3838,12 +3838,11 @@ preserving the frozen Architecture-124 token semantics. The commit changes only
 `tests/runtime/test_d10_python_substrate_windows.py`.
 
 The first S5-R3 certification attempt is preserved as **FAILED environmental
-evidence**, not a source regression. That retry checkout was created with
-process-local `core.autocrlf=false` / `core.eol=lf`; the historical
-schema-v2 audit fixture digest sentinel intentionally matches the ordinary
-Windows CRLF checkout bytes, so one unrelated fixture test failed. No source
-file was changed to address that failure. Failed-attempt evidence is preserved
-at:
+evidence**, not a source regression. That checkout was created with
+process-local `core.autocrlf=false` / `core.eol=lf`; the historical schema-v2
+audit fixture digest sentinel intentionally matches ordinary Windows CRLF
+checkout bytes, so one unrelated fixture test failed. No source file was changed
+to address that failure. Failed-attempt evidence is preserved at:
 
 `F:\\AI\\temp\\pytest\\s5r3-certification-evidence-82f2119-20260925-140029`
 

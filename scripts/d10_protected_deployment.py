@@ -27,8 +27,8 @@ from trading_bot.runtime.personal_desktop_d10_deployment_identity import (
     parse_executable_manifest,
 )
 
-CERTIFIED_SOURCE_HEAD = "ead270918f0ed6a17605aa02bb0313b73e27cdfa"
-CERTIFIED_SOURCE_TREE = "65f062aadf330388774afb84f48ef1ded6001142"
+CERTIFIED_SOURCE_HEAD = "86f1021d244bf62bcf5a0f457c30eb98b998de90"
+CERTIFIED_SOURCE_TREE = "cfa455811f6bd1b3373a66f6716afca9dbd254df"
 PRODUCTION_PYTHON_VERSION = "3.14.3"
 D10_PARENT = r"F:\AITradingBot"
 D10_ROOT = D10_PARENT + r"\D10"

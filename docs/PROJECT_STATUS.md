@@ -4268,3 +4268,100 @@ provisioning until the refreshed S5-R8 deployment material is reviewed; P124-3
 signing/trust publication remains a separate higher-risk authorization; the
 full signed-trust P124-1 qualification follows only after the exact protected
 deployment and signed trust material exist.
+
+
+## 2026-09-26 S5-R8 protected-deployment material refresh accepted
+
+The non-governed P124-2/P124-3 protected-deployment source pins are now
+refreshed from S5-R2 to the accepted S5-R8 governed source.
+
+Accepted source-only pin commit:
+
+```text
+HEAD: 6039b76f9895b02cefe65e282520b7d66e7153d5
+TREE: 09673702e728ded7e1ca527467041c49079b44f2
+PARENT: c905491b5d46dba8fbcfc30c139ca0e2e2dc1c21
+subject: chore: refresh D10 deployment pins to S5-R8
+```
+
+Exact GitHub review found only two changed files:
+
+```text
+scripts/d10_protected_deployment.py
+tests/runtime/test_d10_protected_deployment.py
+```
+
+The implementation change is limited to the certified-source pins and their
+focused test expectations:
+
+```text
+CERTIFIED_SOURCE_HEAD =
+86f1021d244bf62bcf5a0f457c30eb98b998de90
+
+CERTIFIED_SOURCE_TREE =
+cfa455811f6bd1b3373a66f6716afca9dbd254df
+```
+
+No governed executable source changed. Focused verification passed 141 tests;
+Ruff check, Ruff format check, and git diff --check passed. No broad
+certification was required for this non-governed pin-only transition.
+
+Fresh byte-exact S5-R8 deployment checkout:
+
+```text
+F:\AI\worktrees\ai-trading-bot-d10-deploy-86f1021-byteexact
+HEAD: 86f1021d244bf62bcf5a0f457c30eb98b998de90
+TREE: cfa455811f6bd1b3373a66f6716afca9dbd254df
+state: detached / clean
+alternate bytecode/cache artifacts: none
+```
+
+The read-only governed raw-blob audit observed 307 governed blobs with zero
+mismatches. Independent GitHub tree inspection confirmed 307 governed blobs,
+306 executable-manifest files, no casefold collision, launcher presence, and
+5,391,245 executable bytes. Independent GitHub retrieval of the launch guard
+confirmed 68,411 bytes and SHA-256
+`3b28d0ffeede06a4785a903dbf6a48c12204651ce8a3c2f80cd6a1428efd8d1a`.
+
+Accepted unsigned S5-R8 deployment material:
+
+```text
+executable manifest SHA-256:
+e4aa71ebbe269837adfd277fbcd8b7ae05e1051343276de2449177587fe7b60a
+
+executable files / total bytes:
+306 / 5,391,245
+
+launch guard bytes / SHA-256:
+68,411 /
+3b28d0ffeede06a4785a903dbf6a48c12204651ce8a3c2f80cd6a1428efd8d1a
+
+unsigned attestation bytes / SHA-256:
+1,010 /
+a12ab7788120934ca928919a01b4cfc7a3f6f307fad79ab13a6bfff189aeb3f3
+
+deployment ID:
+2fd79986-fb50-5fe4-800a-2d4aa5e7307c
+
+signing key ID:
+AITradingBot/D10/DeploymentAttestation/v3
+```
+
+The canonical attestation SHA-256 and deterministic deployment ID were
+independently recomputed from the reviewed Architecture-123 authority fields,
+the S5-R8 HEAD/TREE, verified guard identity, and the reported canonical
+manifest digest; both matched exactly. The manifest digest itself was produced
+by the existing reviewed builder against the byte-exact checkout and passed
+the independent raw-blob audit.
+
+No signing, CNG private-key operation, P124 protected operation, production
+D10 filesystem mutation, ACL/account/privilege/package mutation, scheduler
+mutation, credential mutation, provider/broker call, or trading effect
+occurred.
+
+Immediate next boundary: a retry of P124-2 sealed D10 source/guard
+provisioning would create protected production objects beneath
+`F:\AITradingBot\D10`. That is a materially higher-security-risk host
+mutation and therefore requires fresh explicit operator authorization under the
+standing authorization policy. P124-3 signing/trust publication remains a
+separate later explicit authorization boundary.

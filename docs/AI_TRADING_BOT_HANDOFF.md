@@ -4218,3 +4218,98 @@ or trading effect is authorized by this read-only PASS. Under the standing
 workflow, the source-only pin/material refresh may proceed without another
 approval; stop for fresh explicit authorization before the first protected D10
 filesystem mutation or signing/trust-publication boundary.
+
+
+## 2026-09-26 S5-R8 deployment material refresh accepted; P124-2 is next gated boundary
+
+The source-only P124 protected-deployment pin transition is accepted.
+
+```text
+pin commit HEAD: 6039b76f9895b02cefe65e282520b7d66e7153d5
+TREE: 09673702e728ded7e1ca527467041c49079b44f2
+PARENT: c905491b5d46dba8fbcfc30c139ca0e2e2dc1c21
+
+certified governed source HEAD:
+86f1021d244bf62bcf5a0f457c30eb98b998de90
+
+certified governed source TREE:
+cfa455811f6bd1b3373a66f6716afca9dbd254df
+```
+
+Exact GitHub diff: only
+`scripts/d10_protected_deployment.py` and
+`tests/runtime/test_d10_protected_deployment.py`; only the stale S5-R2
+certified-source constants and matching focused test expectations changed.
+Governed executable source was unchanged.
+
+Focused verification:
+
+```text
+pytest: 141 passed
+Ruff check: PASS
+Ruff format --check: PASS
+git diff --check: PASS
+```
+
+Fresh byte-exact deployment source:
+
+```text
+F:\AI\worktrees\ai-trading-bot-d10-deploy-86f1021-byteexact
+HEAD: 86f1021d244bf62bcf5a0f457c30eb98b998de90
+TREE: cfa455811f6bd1b3373a66f6716afca9dbd254df
+clean: yes
+__pycache__/.pyc/.pyo: none
+governed blobs: 307
+raw-blob mismatches: 0
+```
+
+Canonical unsigned deployment material:
+
+```text
+manifest SHA-256:
+e4aa71ebbe269837adfd277fbcd8b7ae05e1051343276de2449177587fe7b60a
+
+executable files / bytes:
+306 / 5,391,245
+
+launch guard:
+68,411 bytes
+3b28d0ffeede06a4785a903dbf6a48c12204651ce8a3c2f80cd6a1428efd8d1a
+
+unsigned attestation:
+1,010 bytes
+a12ab7788120934ca928919a01b4cfc7a3f6f307fad79ab13a6bfff189aeb3f3
+
+deployment ID:
+2fd79986-fb50-5fe4-800a-2d4aa5e7307c
+
+signing key ID:
+AITradingBot/D10/DeploymentAttestation/v3
+```
+
+Independent GitHub tree checks confirmed the 307/306 inventory counts, exact
+5,391,245 executable byte total, casefold uniqueness, launcher presence, and
+guard size. Independent guard-byte hashing matched the frozen guard digest.
+Reconstruction of the canonical Architecture-123 attestation from the reviewed
+authority fields and manifest digest reproduced both the 1,010-byte
+attestation SHA-256 and deployment ID exactly.
+
+The prior S5-R2 deployment checkout/material must not be reused.
+
+Authority state:
+- S5-R8 governed source is certified and its real-host read-only substrate
+  preflight passed.
+- S5-R8 deployment pins/material are refreshed and accepted.
+- actual signed-trust P124-1 has not run;
+- P124-2 has not been retried;
+- P124-3/signing has not run;
+- no scheduler/provider/broker/trading effect occurred.
+
+NEXT: P124-2 is now the first materially higher-risk boundary. A retry would
+mutate the protected production namespace by creating/sealing
+`F:\AITradingBot\D10`, its guard, and its source snapshot. Do not run it
+without fresh explicit operator authorization. If authorized, scope the
+one-shot operation to P124-2 only, use the exact S5-R8 material above, publish
+no signed trust files, make no scheduler changes, perform no provider/trading
+effect, preserve evidence, and stop for review whether PASS or BLOCKED.
+P124-3 signing/trust publication requires a separate later authorization.

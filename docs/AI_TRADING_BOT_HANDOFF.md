@@ -1,4 +1,4 @@
-# AI Trading Bot â€” Project Development Roadmap & Handoff
+# AI Trading Bot — Project Development Roadmap & Handoff
 
 **Repository:** `callmedraken/ai-trading-bot`
 **Integration branch:** `develop`
@@ -21,9 +21,9 @@
 Build a conservative automated trading platform for a **closed, single-owner
 personal Windows desktop**:
 
-**deterministic research â†’ supervised simulated paper â†’ unattended simulated
-paper â†’ broker-paper â†’ long paper soak â†’ personal-desktop live-readiness â†’ tiny
-restricted live â†’ mature operation â†’ polished GUI.**
+**deterministic research → supervised simulated paper → unattended simulated
+paper → broker-paper → long paper soak → personal-desktop live-readiness → tiny
+restricted live → mature operation → polished GUI.**
 
 Stable constraints:
 
@@ -333,7 +333,7 @@ freeze Git blob b125cbb1c80a827f74018cf2955b9a27ba69fa90
 
 ## 9. Completed historical milestones
 
-### PD1 â€” Paper-v2 authority â€” COMPLETE
+### PD1 — Paper-v2 authority — COMPLETE
 
 Completion record:
 
@@ -341,7 +341,7 @@ Completion record:
 docs/validation/pd1-personal-desktop-paper-v2-completion.md
 ```
 
-### PD2 â€” reliable supervised manual paper cycle â€” COMPLETE
+### PD2 — reliable supervised manual paper cycle — COMPLETE
 
 Completion records:
 
@@ -372,7 +372,7 @@ Ruff format --check PASS (457 files)
 git diff --check PASS
 ```
 
-### PD3 â€” supervised crash/recovery validation â€” COMPLETE
+### PD3 — supervised crash/recovery validation — COMPLETE
 
 Architecture:
 
@@ -406,7 +406,7 @@ worktree/index clean
 Real-host acceptance under the intended non-admin Trading account passed with no
 real recovery mutation.
 
-### PD4 Architecture-110 source foundation â€” COMPLETE
+### PD4 Architecture-110 source foundation — COMPLETE
 
 Architecture:
 
@@ -458,7 +458,7 @@ The historical completion record correctly says that Architecture 110 source
 completion alone did **not** authorize operational unattended deployment. Do not
 rewrite it to pretend later D5 deployment evidence existed at that time.
 
-## 10. Architecture 111 â€” unattended daily-cycle authority
+## 10. Architecture 111 — unattended daily-cycle authority
 
 Architecture and validation plan:
 
@@ -490,7 +490,7 @@ Important rules:
 - no automatic multi-session catch-up;
 - market-data capture and decision publication use separate effect gates.
 
-## 11. Architecture 112 / D5 â€” capture-only warm-up
+## 11. Architecture 112 / D5 — capture-only warm-up
 
 Architecture and validation plan:
 
@@ -514,7 +514,7 @@ G5 exceptions/ambiguous outcomes never trigger a second call in-process or a
 blind scheduler retry. D5 never opens the decision-publication or Paper-v2
 effect gates.
 
-### D5-A â€” accepted task qualification
+### D5-A — accepted task qualification
 
 The installed task matched the frozen D2 contract. Accepted predecessor XML:
 
@@ -522,7 +522,7 @@ The installed task matched the frozen D2 contract. Accepted predecessor XML:
 da851985d9bfb04c65a83cb64b5441a2f7fd50391924a844749e365ee282d6ec
 ```
 
-### D5-B â€” accepted action-only task mutation
+### D5-B — accepted action-only task mutation
 
 The reviewed mutation changed only the launcher action to:
 
@@ -542,7 +542,7 @@ Accepted post-mutation D5 task XML:
 8005373fad791c85776b4a35b662d46e06fec4ea40ac9ebfead9f413715da457
 ```
 
-### D5-C â€” first scheduled capture-only wake ACCEPTED
+### D5-C — first scheduled capture-only wake ACCEPTED
 
 Canonical evidence:
 
@@ -671,8 +671,8 @@ PD8   tiny restricted live -> gradual maturity              NOT STARTED
 ```
 
 Do not move to broker-paper merely because D5 market-data warm-up succeeds.
-The critical path is safe unattended data â†’ safe unattended decision â†’ safe
-unattended Paper-v2 settlement â†’ operational soak.
+The critical path is safe unattended data → safe unattended decision → safe
+unattended Paper-v2 settlement → operational soak.
 
 ## 14. Effect gates and still-protected actions
 
@@ -716,7 +716,7 @@ merge/rebase/force-push/amend/PR metadata changes without explicit approval
 ## 15. Resume procedure
 
 1. Read `AGENTS.md`, `docs/PROJECT_STATUS.md`, this handoff,
-   `docs/AI_DEVELOPMENT_WORKFLOW.md`, Architectures 110â€“112, the PD4 source-
+   `docs/AI_DEVELOPMENT_WORKFLOW.md`, Architectures 110–112, the PD4 source-
    foundation completion, the Architecture-111 daily-cycle plan, and the
    Architecture-112 D5 plan before new implementation.
 2. Prove exact worktree/branch/HEAD/tree/origin/clean state before edits or
@@ -854,7 +854,7 @@ D7-C first publication boundary. It requires explicit operator approval and
 must perform a fresh preflight before any effect.
 
 
-## D7-C first approved attempt â€” fail-closed evidence
+## D7-C first approved attempt — fail-closed evidence
 
 Fresh D7-A preflight passed, but the one approved publication invocation
 returned `BLOCKED`, exit 6, with null decision/session fields and
@@ -1044,7 +1044,7 @@ contracts, review exact diff, and perform replacement certification before any
 D8 production action.
 
 
-## D8/D9 settlement source forward integration â€” REPLACEMENT-CERTIFIED PRE-MERGE
+## D8/D9 settlement source forward integration — REPLACEMENT-CERTIFIED PRE-MERGE
 
 The D8/D9 settlement source has now been forward-integrated onto the final D7
 source line and replacement-certified on
@@ -1096,7 +1096,7 @@ authorization is implied by source certification.
 The post-certification integration step and its closeout are recorded below.
 
 
-## D8/D9 settlement integration â€” CLOSED
+## D8/D9 settlement integration — CLOSED
 
 PR #9 was accepted and merged into `develop` as the normal history-preserving
 integration of the accepted D8/D9 settlement source.
@@ -1126,7 +1126,7 @@ authorization is implied.
 The next protected operational checkpoint is a fresh read-only **D8-A
 Trading-principal qualification** from the current integrated source.
 
-## Operator observability O1-O4 â€” integrated and closed
+## Operator observability O1-O4 — integrated and closed
 
 Integration/source identity:
 
@@ -1214,7 +1214,7 @@ daily, so the preferred first meaningful attempt is after the normal
 2026-09-22 D5 wake has completed. The earlier `NO_SETTLEMENT_PENDING`
 invocation remains historical only. D8-B remains protected and unauthorized.
 
-## GUI-A8 read-only multi-source composition â€” active parallel milestone
+## GUI-A8 read-only multi-source composition — active parallel milestone
 
 While D8-A waits for the normal 2026-09-22 D5 wake and selected C3(E), GUI work
 continues safely on:
@@ -1323,7 +1323,7 @@ Next safe GUI milestone: GUI-A9 read-only System Health / Audit. D8-A remains a
 separate protected operational checkpoint; D8-B remains protected and
 unauthorized.
 
-## GUI-A9 read-only System Health & Audit â€” source certified
+## GUI-A9 read-only System Health & Audit — source certified
 
 GUI-A9 is source-certified on:
 
@@ -1391,7 +1391,7 @@ Next safe GUI candidate: GUI-A10 read-only Audit History / Evidence Timeline
 using explicit offline artifacts only. D8-A remains a separate protected
 operational checkpoint; D8-B remains protected and unauthorized.
 
-## GUI-A10 read-only Evidence Timeline â€” source certified
+## GUI-A10 read-only Evidence Timeline — source certified
 
 GUI-A10 is source-certified on:
 
@@ -1456,7 +1456,7 @@ Resume GUI development automatically with the next bounded read-only
 presentation milestone. D8-A remains separate and protected; D8-B remains
 protected and unauthorized.
 
-## GUI-A11 read-only Evidence Explorer â€” source certified
+## GUI-A11 read-only Evidence Explorer — source certified
 
 GUI-A11 is source-certified on:
 
@@ -1526,7 +1526,7 @@ Continue automatically with GUI-A12 read-only System/Evidence
 cross-navigation derived only from already-rendered bounded identities. D8-A
 remains separate and protected; D8-B remains protected and unauthorized.
 
-## GUI-A12 read-only System / Evidence cross-navigation â€” source certified
+## GUI-A12 read-only System / Evidence cross-navigation — source certified
 
 GUI-A12 is source-certified on:
 
@@ -1595,7 +1595,7 @@ Continue automatically with GUI-A13 read-only Evidence -> Source Page
 navigation using only already-acquired presentation state. D8-A remains separate
 and protected; D8-B remains protected and unauthorized.
 
-## GUI-A13 read-only Evidence -> Source Page navigation â€” source certified
+## GUI-A13 read-only Evidence -> Source Page navigation — source certified
 
 GUI-A13 is source-certified on:
 
@@ -1674,7 +1674,7 @@ still exact, the Trading principal / approved production runtime are correct,
 and all eight effect gates remain false. D8-A is read-only but still a protected
 operational checkpoint. D8-B remains protected and unauthorized.
 
-## D8-A blocked-startup diagnostic source checkpoint â€” 2026-09-22
+## D8-A blocked-startup diagnostic source checkpoint — 2026-09-22
 
 After the preceding operational transition, one protected D8-A read-only run
 reconstructed completed session `2026-09-21`, decision
@@ -1761,7 +1761,7 @@ certification of the reviewed tree before considering a separately approved
 D8-A diagnostic rerun. Do not infer execution readiness from diagnostic
 fields. D8-A was not rerun during this task; D8-B remains unauthorized.
 
-## D8-A blocked-startup diagnostic source certification accepted â€” 2026-09-22
+## D8-A blocked-startup diagnostic source certification accepted — 2026-09-22
 
 ChatGPT exact-diff review accepted the diagnostic pass-through and then required
 one narrow result-contract hardening correction. The final accepted
@@ -1841,7 +1841,7 @@ Next: ChatGPT exact review of this docs-only closeout, then merge-readiness
 review of `feature/pd4-d8a-blocked-diagnostics` against `develop`. Stop at
 the merge approval boundary.
 
-## D8-A blocked-startup diagnostics integration closeout â€” PR #18
+## D8-A blocked-startup diagnostics integration closeout — PR #18
 
 PR #18 (`Preserve bounded D8-A startup diagnostics`) was reviewed and merged
 into `develop` after final source certification.
@@ -1902,7 +1902,7 @@ identity and Trading-principal/runtime preflight. Do not invoke D8-A during that
 preparation. The diagnostic rerun remains a separate protected operator
 approval.
 
-## D8-A diagnostic production preflight accepted â€” 2026-09-22
+## D8-A diagnostic production preflight accepted — 2026-09-22
 
 A fresh detached qualification checkout of integrated `develop` passed the
 non-effect production preflight under the dedicated Trading principal.
@@ -1988,7 +1988,7 @@ identify which existing PD4-C blocked path produced a future result, without
 changing startup authority, read counts, ordering, effects, or recovery. It
 cannot retrospectively identify the class of the observed production block.
 
-## D8-A bounded block-reason diagnostics â€” source certification accepted, 2026-09-22
+## D8-A bounded block-reason diagnostics — source certification accepted, 2026-09-22
 
 The source-only checkpoint that gives every existing PD4-C startup `BLOCKED`
 path a fixed sanitized reason is now fully certified.
@@ -2057,7 +2057,7 @@ Next: ChatGPT exact review of this docs-only certification closeout, followed by
 PR/merge-readiness review against `develop`. Creating or merging the PR
 remains a separately protected repository action.
 
-## D8-A bounded block-reason diagnostics integration closeout â€” PR #19
+## D8-A bounded block-reason diagnostics integration closeout — PR #19
 
 PR #19 (`Add bounded PD4-C blocked startup reasons`) was reviewed and merged
 into `develop`.
@@ -2134,7 +2134,7 @@ checkout/runtime for the integrated block-reason source. Do not invoke D8-A
 during preparation. Any future diagnostic rerun remains a separate protected
 operator action requiring fresh explicit approval.
 
-## D8-A block-reason integrated production checkout prepared â€” 2026-09-22
+## D8-A block-reason integrated production checkout prepared — 2026-09-22
 
 The post-PR integrated production qualification checkout is ready:
 
@@ -2163,7 +2163,7 @@ D9-A                                NOT APPLICABLE
 Next: run the non-effect Trading-principal/runtime/gate preflight from this
 checkout. Do not invoke D8-A during that preflight.
 
-## D8-A block-reason integrated production preflight accepted â€” 2026-09-22
+## D8-A block-reason integrated production preflight accepted — 2026-09-22
 
 The integrated block-reason source passed the fresh Trading-principal/runtime
 preflight from:
@@ -2230,7 +2230,7 @@ zero-semantic-argument read-only D8-A diagnostic invocation from this prepared
 checkout. Any BLOCKED/validation/recovery-required/other terminal result stops
 and requires review before any further action.
 
-## D8-A block-reason one-shot result â€” PRE_RECOVERY_BLOCKED, 2026-09-22
+## D8-A block-reason one-shot result — PRE_RECOVERY_BLOCKED, 2026-09-22
 
 One newly approved protected zero-semantic-argument D8-A diagnostic invocation
 was consumed exactly once from the integrated block-reason qualification
@@ -2305,7 +2305,7 @@ Next: implement and certify the configuration-domain correction on an isolated
 source branch. No further production D8-A invocation is permitted until that
 source change has passed exact review and certification.
 
-## PD4 startup configuration-domain correction integrated â€” 2026-09-22
+## PD4 startup configuration-domain correction integrated — 2026-09-22
 
 The configuration-domain regression fix has completed source certification and
 integration.
@@ -2394,7 +2394,7 @@ repeatable, add exact inventory/completion evidence, and investigate the
 Architecture-77 schema/setup bottleneck while preserving its lock and
 crash/recovery safety contracts.
 
-## TP1 persistent certification runner integrated â€” 2026-09-22
+## TP1 persistent certification runner integrated — 2026-09-22
 
 TP1 is complete and integrated.
 
@@ -2483,7 +2483,7 @@ D8-B                               NOT AUTHORIZED
 D9-A                               NOT APPLICABLE
 ```
 
-## TP2 serial-safety performance optimization integrated â€” 2026-09-23
+## TP2 serial-safety performance optimization integrated — 2026-09-23
 
 TP2 is complete and integrated through PR #22 (`Speed up Architecture-77 test
 harness initialization`).
@@ -2541,7 +2541,7 @@ D8-B                               NOT AUTHORIZED
 D9-A                               NOT APPLICABLE
 ```
 
-## Repository hygiene closeout â€” 2026-09-23
+## Repository hygiene closeout — 2026-09-23
 
 The post-TP2 worktree consolidation is complete. Historical integrated,
 certification, GUI, paper, P3, observability, settlement, and final-wheel
@@ -2572,7 +2572,7 @@ checkout and run only the Trading-principal no-effect preflight. Stop before
 D8-A; any new D8-A invocation requires fresh explicit one-shot authorization.
 
 
-## Architecture 121 single-deferred first-settlement recovery â€” current checkpoint
+## Architecture 121 single-deferred first-settlement recovery — current checkpoint
 
 The fresh integrated no-effect preflight derived completed XNYS session
 `2026-09-22`. A separate read-only current-C1 durable-decision inspection then
@@ -2759,7 +2759,7 @@ broad-2, and the Architecture-77 serial lane. No plain full-suite pytest run is
 needed in addition to that runner.
 
 
-## Architecture 121 final certification â€” PASS
+## Architecture 121 final certification — PASS
 
 Final certification was run from a fresh detached checkout of:
 
@@ -2803,7 +2803,7 @@ production D9-R1                   NOT AUTHORIZED
 Next checkpoint is exact merge/PR readiness review against current `develop`.
 
 
-## Architecture 121 merged â€” PR #23
+## Architecture 121 merged — PR #23
 
 PR #23, `PD4: add single-deferred settlement recovery authority`, merged into
 `develop` after exact code review and final certification.
@@ -2846,7 +2846,7 @@ for review. Only after that checkpoint may a separate explicit one-shot D8-R2
 authorization be considered.
 
 
-## Architecture 121 production closeout â€” RECONCILED
+## Architecture 121 production closeout — RECONCILED
 
 Architecture 121 is fully closed in production.
 
@@ -2998,7 +2998,7 @@ Private signing material remains external/non-exportable. Signing,
 provisioning, scheduler mutation, activation, broker-paper, and live remain
 unauthorized.
 
-Next source checkpoint: Sol High A1/A2 only â€” canonical manifest/attestation
+Next source checkpoint: Sol High A1/A2 only — canonical manifest/attestation
 models plus the build-time clean-checkout manifest generator. Native runtime
 verification follows in A3/A4.
 
@@ -3044,7 +3044,7 @@ No production signing/provisioning, activation lease, scheduler mutation, or
 trading effect is authorized.
 
 
-## Architecture 124 â€” sealed pre-source D10 launch guard
+## Architecture 124 — sealed pre-source D10 launch guard
 
 Architecture-123 A3 correctly stopped without changes. The old scheduler target
 could execute source-tree Python/imported bytecode before deployment identity
@@ -3073,7 +3073,7 @@ The production Python runtime/stdlib is now an explicit pre-source trusted
 substrate and requires its own protected host qualification; if Trading can
 modify it, D10 remains BLOCKED.
 
-Next: Sol High A124-1 pure source revision only â€” scheduler target/arguments,
+Next: Sol High A124-1 pure source revision only — scheduler target/arguments,
 attestation guard fields/source-root revision, and certification-builder
 revision. Do not implement production provisioning or effects yet.
 
@@ -3131,7 +3131,7 @@ remains deferred. Next: exact review of A124-2, then A124-3 pre-source signed
 attestation and complete sealed-source verification. Protected A124-4/P124-1
 host qualification remains a separate prerequisite to activation.
 
-## Architecture 124 A124-2 â€” ACCEPTED
+## Architecture 124 A124-2 — ACCEPTED
 
 Exact GitHub review accepted the fixed D10 Windows security/native-read source checkpoint.
 
@@ -3165,7 +3165,7 @@ same-handle byte hashing with final drift checks, and fail-closed launch of at
 most one exact second-stage command only after every pre-source check succeeds.
 Broad certification remains deferred until the final D10 source tree.
 
-## Architecture 124 A124-3 â€” ACCEPTED
+## Architecture 124 A124-3 — ACCEPTED
 
 Exact GitHub review accepted the sealed D10 pre-source guard checkpoint.
 
@@ -3211,7 +3211,7 @@ acceptance criteria for the fixed interpreter, stdlib/search-path substrate, and
 qualification yet. P124-1 remains a later explicit administrator/Trading host
 checkpoint.
 
-## Architecture 124 A124-4 â€” ACCEPTED
+## Architecture 124 A124-4 — ACCEPTED
 
 Exact GitHub review accepted the corrected production-Python substrate qualification contract.
 
@@ -3230,7 +3230,7 @@ P124-1 has not run. It remains a separate protected host checkpoint. No producti
 
 Next source checkpoint: Sol High A124-5 Architecture-123 A4 defense-in-depth integration. P124-1 must be accepted before D10 activation.
 
-## Architecture 124 A124-5 â€” ACCEPTED
+## Architecture 124 A124-5 — ACCEPTED
 
 Exact GitHub review accepted the Architecture-123 A4 governed-source deployment re-verifier integration.
 
@@ -3248,7 +3248,7 @@ The second-stage launcher invokes A4 before any future effectful D10 controller.
 
 Next source checkpoint: Sol High A124-6 / Architecture-123 A5 activation-lease source implementation. P124-1 and all protected deployment checkpoints remain separate and require explicit review/authorization before D10 activation.
 
-## Architecture 124 A124-6 â€” ACCEPTED
+## Architecture 124 A124-6 — ACCEPTED
 
 Exact GitHub review accepted the D10 activation-lease source authority and its pre-source / governed-source integration.
 
@@ -3267,7 +3267,7 @@ The publication model remains create-only and non-renewable in place; ordinary r
 
 Architecture 124 source prerequisites A124-1 through A124-6 are now accepted. Next safe source checkpoint is Architecture-122 recurring one-wake controller composition (S1/S2/S3 integration), still source-only and fail-closed; protected P124-1/P124-2/... remain separate and require explicit approval before deployment.
 
-## Architecture 122 D10 one-wake controller â€” ACCEPTED
+## Architecture 122 D10 one-wake controller — ACCEPTED
 
 Exact GitHub review accepted the recurring one-wake D10 simulated-paper controller integration.
 
@@ -3289,7 +3289,7 @@ No P124-1, broad certification, provisioning, lease/signing publication, schedul
 
 Architecture-122 S1/S2/S3 controller integration is accepted; S4 scheduler source was already frozen. Next checkpoint: S5 final exact-tree D10 source certification using the persistent repository certification runner, including the Architecture-77 serial lane. Protected P124-* deployment remains blocked until certification is accepted.
 
-## Architecture 122 S5 final D10 source certification â€” ACCEPTED
+## Architecture 122 S5 final D10 source certification — ACCEPTED
 
 The frozen executable D10 source commit was certified in a clean detached worktree using the persistent three-lane repository certification runner.
 
@@ -3311,7 +3311,7 @@ S5 is accepted. No P124-1 host qualification, D10 provisioning, signing/trust pu
 
 Next boundary: P124-1 production-Python substrate qualification. Before executing that protected host checkpoint, use a reviewed native collector/harness implementing the already-frozen A124-4 evidence contract; do not substitute ad-hoc ACL/path checks or weaken any acceptance requirement.
 
-## P124-1 native collector source checkpoint â€” ACCEPTED
+## P124-1 native collector source checkpoint — ACCEPTED
 
 Exact GitHub review accepted the source-only P124-1 native collector tooling.
 
@@ -3343,7 +3343,7 @@ This is implementation pending exact source review, not protected checkpoint acc
 
 Next step: review the exact feature commit/diff and focused verification. Do not run the P124 tools from this source-review checkpoint.
 
-## P124-2/P124-3 protected deployment tooling â€” ACCEPTED
+## P124-2/P124-3 protected deployment tooling — ACCEPTED
 
 Exact GitHub review accepted the source-only P124-2 sealed-deployment provisioning tooling and P124-3 external-signing/trust-publication boundary, including the additive Windows Administrator-token correction.
 
@@ -3400,7 +3400,7 @@ provider, settlement, broker-paper, and live effects were not performed.
 Next: exact source/diff review for A125-1. Keep all protected key/deployment
 checkpoints blocked until separately authorized.
 
-## Architecture 125 A125-1 signing-key bootstrap â€” ACCEPTED
+## Architecture 125 A125-1 signing-key bootstrap — ACCEPTED
 
 Exact GitHub review accepted the source-only Windows CNG D10 v3 key-enrollment boundary and concrete ExternalSigner, including the additive native correction.
 
@@ -3420,7 +3420,7 @@ A125-1 source acceptance creates no production key and does not alter the curren
 
 Next protected checkpoint: P125-1 native creation of the fixed non-exportable v3 key. It requires separate explicit operator authorization. After P125-1 evidence is reviewed, A125-2 must pin the observed v3 public point/key ID and S5-R1 must recertify the resulting exact executable tree before P124-2/P124-3 may execute.
 
-## Architecture 125 P125-1 first protected attempt â€” BLOCKED; source correction pending review
+## Architecture 125 P125-1 first protected attempt — BLOCKED; source correction pending review
 
 The first protected P125-1 attempt returned `BLOCKED` with reason
 `cng_security_descriptor_unavailable` at the pre-finalization descriptor
@@ -3446,7 +3446,7 @@ Task Scheduler mutation, and trading/provider effects were not performed.
 The correction requires exact source review before any separately authorized
 protected attempt.
 
-## Architecture 125 A125-1R lifecycle correction â€” ACCEPTED
+## Architecture 125 A125-1R lifecycle correction — ACCEPTED
 
 Exact GitHub review accepted the additive correction at `3b86f50621dd0ac2a3d52d878da6957350d5c2fa` / tree `6062d8c39554f89d92a53eb25eb8b32a78f6ee9a` after the first protected P125-1 attempt blocked on pre-finalization security-descriptor readback.
 
@@ -3459,7 +3459,7 @@ P125-1 attempt #1 remains BLOCKED evidence only: `cng_security_descriptor_unavai
 The user separately approved exactly one P125-1 attempt #2 after this source review. That approval does not authorize P124-2, P124-3, P124-1, A125-2, scheduler mutation, deployment signing/publication, or any trading effect. If attempt #2 blocks after finalization, do not rerun or delete/replace the persisted key; preserve evidence for recovery review.
 
 
-## Architecture 125 P125-1 attempt #2 — persisted key; read-only recovery source pending
+## Architecture 125 P125-1 attempt #2 � persisted key; read-only recovery source pending
 
 Attempt #1 blocked on pre-finalization descriptor read and left no persisted
 v3 key. Attempt #2 finalized and persisted the fixed Microsoft Software KSP
@@ -3503,7 +3503,7 @@ the next separately authorized protected checkpoint. A125-2 and all P124
 checkpoints remain blocked.
 
 
-## Architecture 125 A125-2 D10 v3 trust migration â€” SOURCE ONLY
+## Architecture 125 A125-2 D10 v3 trust migration — SOURCE ONLY
 
 The separately authorized qualification of the existing persisted v3
 machine key is accepted as read-only PASS evidence (reason: None). Its exact
@@ -3533,7 +3533,7 @@ longer deployable after this governed source change. Next: exact A125-2
 commit/diff review, then fresh S5-R1 exact-tree certification and acceptance.
 All P124 protected execution remains blocked until S5-R1 acceptance.
 
-## S5-R1 first attempt â€” FAILED; import-order correction pending review
+## S5-R1 first attempt — FAILED; import-order correction pending review
 
 The first S5-R1 certification attempt used detached worktree
 `F:\AI\worktrees\ai-trading-bot-s5r1-aaf164b` at exact HEAD
@@ -3597,7 +3597,7 @@ or used for tests. No manifest or attestation output was accepted; no
 production or P124 effect occurred. P124-2 remains blocked pending an
 authorized cache-free, byte-exact material checkout and successful preflight.
 
-### Byte-exact D10 deployment-material preflight â€” PASS
+### Byte-exact D10 deployment-material preflight — PASS
 
 The three physical checkout roles are now distinct:
 
@@ -3645,7 +3645,7 @@ P124, signing, CNG, production, scheduler, or trading operation occurred.
 P124-2 remains blocked pending exact review of the committed pin transition
 and this canonical-material evidence.
 
-## P124-2 protected-parent reconciliation — source-only correction
+## P124-2 protected-parent reconciliation � source-only correction
 
 The separately authorized P124-2 attempt reached protected execution and
 BLOCKED at `native_path_type_acl_or_identity_drift` before any D10 create.
@@ -3731,82 +3731,3 @@ attempt's authorization was consumed and no retry is authorized. Next gates:
 exact review of this checkpoint, separately authorized disposable ACL
 rehearsal, and bounded read-only P124-1 host preflight before any protected
 retry consideration. Preserve the byte-exact checkout for later review.
-
-
-## 2026-09-25 S5-R3 acceptance and current resume point
-
-Accepted certified source:
-
-```text
-branch: feature/pd4-d10-one-week-soak-authority
-S5-R3 HEAD: 82f211983e50c5221656b7b9ebba66e3b609f5b2
-S5-R3 TREE: 1a530cbffaaf7a5e68ebe3e53341c5ecb12ad134
-source commit subject: fix: replace P124-1 pywin32 token proof
-changed files only:
-  scripts/d10_python_substrate_windows.py
-  tests/runtime/test_d10_python_substrate_windows.py
-```
-
-The correction removes the undeclared/ambient `pywin32` dependency from the
-P124-1 Windows collector. Trading-token acquisition, token-user/group/privilege
-inventory, elevation proof, impersonation-token lifetime, dangerous privilege
-rejection, required `SeChangeNotifyPrivilege`, and current-process
-Administrator proof now use bounded native `ctypes`/Win32 APIs. The frozen
-Architecture-124 semantics were preserved, including blocking any occurrence of
-the Administrators SID in the complete Trading group inventory.
-
-Focused implementation verification reported 275 passing tests with Ruff check,
-Ruff format check, and `git diff --check` passing before the source checkpoint.
-Exact source review found no blocking native parsing, bounds, handle-lifetime, or
-cleanup defect.
-
-S5-R3 certification attempt #1 used the same exact HEAD/TREE but an incorrectly
-constructed checkout with process-local `core.autocrlf=false` and
-`core.eol=lf`. That altered working-tree bytes of historical JSON fixtures whose
-digest sentinel expects ordinary Windows CRLF checkout bytes. Exactly one
-unrelated fixture digest test failed; the P124-1 change did not fail. Preserve
-that evidence as environmental failure evidence:
-
-`F:\\AI\\temp\\pytest\\s5r3-certification-evidence-82f2119-20260925-140029`
-
-S5-R3 certification attempt #2 used a fresh detached checkout with normal
-Windows checkout semantics and **PASSED** at the same exact HEAD/TREE:
-
-```text
-checkout: F:\AI\worktrees\ai-trading-bot-s5r3-82f2119-r2
-evidence: F:\AI\temp\pytest\s5r3-certification-r2-evidence-82f2119-20260925-170139
-broad-1: 3547 cases / 3543 passed / 4 skipped
-broad-2: 3192 cases / 3188 passed / 4 skipped
-serial:    935 cases /  926 passed / 9 skipped
-total:    7674 cases / 7657 passed / 17 skipped / 0 failed / 0 errors
-wall: 371.67 seconds
-```
-
-The certification runner's `passed` state also requires its post-test/final
-source identity checks plus Ruff check, Ruff format `--check`, and
-`git diff --check` to succeed. S5-R3 is therefore the current accepted governed
-source boundary.
-
-Operational state remains fail-closed. No protected P124 operation ran during
-the correction or certification. Do not install `pywin32` to make the collector
-work, do not modify Trading account/group/privilege state, do not change
-production ACLs, and do not run P124-1/P124-2/P124-3. The earlier P124-2
-protected authorization was consumed by its blocked attempt and has not been
-renewed.
-
-### Immediate next step
-
-Before any new protected deployment attempt, obtain separate authorization for a
-bounded **read-only P124-1 host/token preflight** using the accepted S5-R3
-collector. It should reuse the prior read-only preflight scope, continue to skip
-signed-A123/D10 trust reads, preserve evidence under `F:\AI\temp`, and make no
-host/account/ACL/package mutation. The purpose is now to determine the actual
-Trading-token and host-substrate result with the native collector instead of the
-previous pre-token `win32api` import failure.
-
-If that corrected read-only preflight passes, review the evidence before
-advancing the non-governed protected-deployment HEAD/TREE pins from S5-R2 to
-S5-R3 and rebuilding the byte-exact canonical deployment material. Only after
-those later source/material reviews should a new P124-2 retry authorization even
-be considered. P124-3 and actual P124-1 remain later in the frozen protected
-order.

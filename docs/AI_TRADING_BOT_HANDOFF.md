@@ -3847,3 +3847,61 @@ bounded read-only P124-1 host/token preflight using S5-R4. The retry must make n
 host/account/ACL/package mutation, must still skip signed-A123/D10 trust reads,
 and must stop after producing evidence for review. Actual P124-1, P124-2, and
 P124-3 remain unauthorized.
+
+
+## 2026-09-25 S5-R5 accepted certification and immediate resume point
+
+Accepted governed source on
+`feature/pd4-d10-one-week-soak-authority`: HEAD
+`d73b8d4bbd6f1e58601a8c7c6bdf2b5e1fbf39a6`, TREE
+`780ea70880b36f268ce3aab211fa23471add3e6c`.
+
+S5-R5 certification **PASSED**. Evidence:
+`F:\AI\temp\pytest\s5r5-certification-evidence-d73b8d4-20260925-220905`.
+
+```text
+broad-1: 3555 cases / 3552 passed / 3 skipped
+broad-2: 3209 cases / 3204 passed / 5 skipped
+serial:    935 cases /  926 passed / 9 skipped
+total:    7699 cases / 7682 passed / 17 skipped / 0 failed / 0 errors
+wall: 343.054 seconds
+```
+
+The S5-R5 volume-parent correction applies explicit `VOLUME_NAMESPACE` policy
+at `F:\`: Trading must lack `FILE_DELETE_CHILD`, `WRITE_DAC`, and
+`WRITE_OWNER`, while unrelated volume-root create/metadata/`DELETE` rights
+may exist. `F:\AITradingBot` and runtime descendants still require zero-grant
+`MUTATION_MASK` and replacement denial. Transcript schema is v2.
+
+Historical diagnostics:
+
+- S5-R3 preflight
+  `F:\AI\temp\p1241-readonly-s5r3-20260925-172522` blocked at
+  `administrator_proof` on the TokenElevation collector defect. It produced
+  no Trading-token verdict.
+- S5-R4 preflight
+  `F:\AI\temp\p1241-readonly-s5r4-20260925-181712` admitted the actual
+  Trading token and then blocked at `trading_access`. The token was SID
+  `S-1-5-21-1397534616-3988210162-180023805-1009`, non-admin,
+  non-elevated, with complete groups/privileges and enabled
+  `SeChangeNotifyPrivilege`; no prohibited Administrator membership or
+  dangerous enabled privilege was present.
+- S5-R4 access breakdown
+  `F:\AI\temp\p1241-access-breakdown-s5r4-20260925-204420`: only `F:\`
+  failed the old policy. Results were `tested_mask=0x000D0156`,
+  `granted_mask=0x00010116`, `rename_replace_denied=False`,
+  `mutation_access_status=False`, `rename_access_status=True`,
+  `replace_access_status=False`, `token_groups_accounted=True`,
+  `token_privileges_accounted=True`, and `acl_agrees=True`.
+
+Fail-closed status remains in effect. No P124 operation, ACL/account mutation,
+signing, scheduler change, package installation, or provider/trading effect
+occurred during the S5-R5 correction, certification, or docs closeout. All
+prior diagnostic authorizations are consumed; the prior P124-2 authorization
+is consumed; actual P124-1, P124-2, and P124-3 remain unauthorized.
+
+Immediate next step: obtain fresh explicit authorization for one bounded
+read-only P124-1 host/token preflight using this certified S5-R5 source. The
+preflight must skip signed-A123/D10 trust reads, make no ACL/account/package/
+scheduler/signing/trading mutation, and stop for review on PASS or BLOCKED.
+Its result is not actual P124-1 acceptance.

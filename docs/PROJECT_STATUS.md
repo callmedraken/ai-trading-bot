@@ -4068,3 +4068,69 @@ stop for review on either PASS or BLOCKED. A PASS is diagnostic evidence only,
 not actual P124-1 acceptance. If the corrected preflight passes, review that
 evidence before advancing protected-deployment source pins/materials or
 considering any separately authorized P124-2 retry.
+
+
+## 2026-09-26 S5-R7 accepted certification and next resume point
+
+S5-R7 is **ACCEPTED** for certified governed source on
+`feature/pd4-d10-one-week-soak-authority`:
+
+```text
+HEAD: 6923bbf48249dc519e60c62d3474923496221c6d
+TREE: 8f75c55d10118c74e39c2ca1ebaecaab350a757c
+certification checkout:
+F:\AI\worktrees\ai-trading-bot-s5r7-6923bbf
+evidence:
+F:\AI\temp\pytest\s5r7-certification-evidence-6923bbf-20260926-122416
+```
+
+Certification passed:
+
+```text
+broad-1: 3483 cases / 3478 passed / 5 skipped / 0 failed/errors
+broad-2: 3344 cases / 3341 passed / 3 skipped / 0 failed/errors
+serial:    935 cases /  926 passed / 9 skipped / 0 failed/errors
+total:    7762 cases / 7745 passed / 17 skipped / 0 failed / 0 errors
+wall: 432.023 seconds
+```
+
+S5-R7 corrects the System32 DLL hard-link policy exposed after S5-R6 advanced
+the real-host preflight through `runtime_diagnostic`. Governed files in
+`F:\AITradingBot\runtime` still require exactly one link. Direct
+System32/KnownDLL DLLs instead require a genuine non-reparse file and a
+positive native integer link count; a count greater than one alone is accepted
+and retained as `link_count` in the sanitized transcript. All S5-R6
+reported-path/native-final case-only rules, direct-child and `.dll` checks,
+fixed exact System32 parent identity, native no-follow inspection, owner/DACL
+proof, actual Trading mutation and file-delete denial, parent replacement
+denial, and same-handle drift checks remain mandatory. Transcript schema is v4.
+
+Historical host evidence preceding this correction remains preserved:
+
+- S5-R6 bounded read-only host/token preflight:
+  `F:\AI\temp\p1241-readonly-s5r6-20260926-020113`.
+  It passed Administrator proof, actual Trading-token admission, before
+  inventory, Trading effective-access checks, and `runtime_diagnostic`, then
+  BLOCKED at `system_dlls` with
+  `NativeFailure: System32 DLL object differs`.
+- Narrow read-only System32 object breakdown:
+  `F:\AI\temp\p1241-system32-object-s5r6-20260926-022953`.
+  The first blocker was
+  `C:\WINDOWS\SYSTEM32\VERSION.dll` -> native final
+  `C:\Windows\System32\version.dll`, kind=file, reparse=false,
+  links=2, file_index=14073748836239009, volume_serial=605222665.
+  The only violated condition was the old exactly-one-link requirement.
+
+Both S5-R6 diagnostic authorizations are consumed. The earlier P124-2
+authorization remains consumed. Actual P124-1, P124-2, and P124-3 remain
+unauthorized. No ACL/account/privilege/package mutation, signing/trust
+publication, scheduler mutation, broker/provider effect, or trading effect
+occurred during S5-R7 implementation or certification.
+
+Immediate resume point: obtain fresh explicit authorization for one bounded
+read-only P124-1 host/token preflight using the certified S5-R7 source. It must
+still skip signed-A123/D10 trust reads, perform no production mutation, and
+stop for review on PASS or BLOCKED. A PASS is diagnostic evidence only, not
+actual P124-1 acceptance. If it passes, review that evidence before advancing
+protected-deployment source pins/materials or considering any separately
+authorized P124-2 retry.

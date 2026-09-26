@@ -3978,3 +3978,80 @@ stop for review on PASS or BLOCKED. The result is diagnostic evidence only and
 must not be treated as actual P124-1 acceptance. If it passes, review the
 evidence before updating protected-deployment pins/canonical material or
 considering any separately authorized P124-2 retry.
+
+
+## 2026-09-26 S5-R7 accepted certification and immediate resume point
+
+Accepted governed source:
+
+```text
+branch: feature/pd4-d10-one-week-soak-authority
+S5-R7 HEAD: 6923bbf48249dc519e60c62d3474923496221c6d
+S5-R7 TREE: 8f75c55d10118c74e39c2ca1ebaecaab350a757c
+certification checkout: F:\AI\worktrees\ai-trading-bot-s5r7-6923bbf
+evidence: F:\AI\temp\pytest\s5r7-certification-evidence-6923bbf-20260926-122416
+```
+
+S5-R7 certification **PASSED**:
+
+```text
+broad-1: 3483 cases / 3478 passed / 5 skipped
+broad-2: 3344 cases / 3341 passed / 3 skipped
+serial:    935 cases /  926 passed / 9 skipped
+total:    7762 cases / 7745 passed / 17 skipped / 0 failed / 0 errors
+wall: 432.023 seconds
+```
+
+S5-R7 fixes the System32 DLL object blocker revealed after S5-R6 successfully
+crossed `runtime_diagnostic`. Protected runtime files under
+`F:\AITradingBot\runtime` still require exactly one hard link. Dynamic
+direct System32 DLLs instead require a genuine non-reparse file and a positive
+integer native link count; counts above one are admitted and retained as
+`link_count` in the transcript. The System32 parent remains exact. Dynamic
+reported/native path differences remain case-only. Direct-child, `.dll`,
+no-follow, owner/DACL, actual Trading mutation/delete denial, parent
+replacement denial, and re-observation/drift rules remain fail-closed.
+Transcript schema is v4.
+
+Preserved diagnostic progression:
+
+```text
+S5-R6 preflight:
+F:\AI\temp\p1241-readonly-s5r6-20260926-020113
+result: BLOCKED at system_dlls
+runtime_diagnostic: passed
+error: NativeFailure: System32 DLL object differs
+signed A123/D10 trust: skipped
+P124 operation: not run
+
+S5-R6 System32 object breakdown:
+F:\AI\temp\p1241-system32-object-s5r6-20260926-022953
+reported: C:\WINDOWS\SYSTEM32\VERSION.dll
+native final: C:\Windows\System32\version.dll
+kind: file
+reparse: false
+links: 2
+file_index: 14073748836239009
+volume_serial: 605222665
+only violation: link_count_is_not_one
+```
+
+The actual Trading-token facts remain the previously admitted exact SID
+`S-1-5-21-1397534616-3988210162-180023805-1009`, non-admin,
+non-elevated, complete groups/privileges, enabled
+`SeChangeNotifyPrivilege`, no Administrators membership, and no dangerous
+enabled privilege.
+
+Fail-closed status remains in effect. Both S5-R6 diagnostic authorizations are
+consumed, the earlier P124-2 authorization remains consumed, and actual
+P124-1/P124-2/P124-3 remain unauthorized. No ACL/account/privilege/package
+mutation, signing/trust publication, scheduler mutation, broker/provider
+effect, or trading effect occurred during S5-R7 source work or certification.
+
+Immediate next step: obtain fresh explicit authorization for one bounded
+read-only P124-1 host/token preflight using the certified S5-R7 source.
+Continue to skip signed-A123/D10 trust reads, make no host or production
+mutation, and stop for review on PASS or BLOCKED. The result is diagnostic
+evidence only and must not be treated as actual P124-1 acceptance. If it
+passes, review the evidence before updating protected-deployment pins/canonical
+material or considering any separately authorized P124-2 retry.

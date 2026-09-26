@@ -3731,3 +3731,72 @@ attempt's authorization was consumed and no retry is authorized. Next gates:
 exact review of this checkpoint, separately authorized disposable ACL
 rehearsal, and bounded read-only P124-1 host preflight before any protected
 retry consideration. Preserve the byte-exact checkout for later review.
+
+
+## 2026-09-25 S5-R3 acceptance and current resume point
+
+Accepted certified source:
+
+```text
+branch: feature/pd4-d10-one-week-soak-authority
+S5-R3 HEAD: 82f211983e50c5221656b7b9ebba66e3b609f5b2
+S5-R3 TREE: 1a530cbffaaf7a5e68ebe3e53341c5ecb12ad134
+subject: fix: replace P124-1 pywin32 token proof
+changed files only:
+  scripts/d10_python_substrate_windows.py
+  tests/runtime/test_d10_python_substrate_windows.py
+```
+
+The correction removes the undeclared/ambient pywin32 dependency from the
+P124-1 Windows collector. Trading-token acquisition, token user/group/privilege
+inventory, elevation proof, impersonation-token lifetime, dangerous privilege
+rejection, required SeChangeNotifyPrivilege, and current-process Administrator
+proof now use bounded native ctypes/Win32 APIs. Frozen Architecture-124 token
+semantics were preserved.
+
+Focused implementation verification reported 275 passing tests with Ruff check,
+Ruff format check, and git diff --check passing before the source checkpoint.
+Exact source review found no blocking native parsing, bounds, handle-lifetime, or
+cleanup defect.
+
+S5-R3 attempt 1 used the same exact HEAD/TREE but an incorrectly constructed
+checkout with process-local core.autocrlf=false and core.eol=lf. That changed
+historical JSON fixture working-tree bytes from ordinary Windows CRLF to LF and
+caused exactly one unrelated digest-sentinel failure. Preserve that evidence:
+`F:\AI\temp\pytest\s5r3-certification-evidence-82f2119-20260925-140029`.
+
+S5-R3 attempt 2 used a fresh detached checkout with normal Windows checkout
+semantics and PASSED at the same exact HEAD/TREE:
+
+```text
+checkout: F:\AI\worktrees\ai-trading-bot-s5r3-82f2119-r2
+evidence: F:\AI\temp\pytest\s5r3-certification-r2-evidence-82f2119-20260925-170139
+broad-1: 3547 cases / 3543 passed / 4 skipped
+broad-2: 3192 cases / 3188 passed / 4 skipped
+serial:    935 cases /  926 passed / 9 skipped
+total:    7674 cases / 7657 passed / 17 skipped / 0 failed / 0 errors
+wall: 371.67 seconds
+```
+
+The certification runner's PASS also requires post-test/final source identity
+checks plus Ruff check, Ruff format --check, and git diff --check to succeed.
+S5-R3 is therefore the current accepted governed source boundary.
+
+Operational state remains fail-closed. No protected P124 operation ran during
+the correction or certification. Do not install pywin32, modify Trading
+account/group/privilege state, change production ACLs, or run
+P124-1/P124-2/P124-3. The earlier P124-2 protected authorization was consumed by
+its blocked attempt and has not been renewed.
+
+Immediate next step: obtain separate authorization for a bounded read-only
+P124-1 host/token preflight using the accepted S5-R3 collector. Reuse the prior
+read-only scope, continue to skip signed-A123/D10 trust reads, preserve evidence
+under F:\AI\temp, and make no host/account/ACL/package mutation. Its purpose is
+to obtain the actual Trading-token and host-substrate result with the native
+collector instead of the previous pre-token win32api import failure.
+
+If that corrected read-only preflight passes, review the evidence before
+advancing the non-governed protected-deployment HEAD/TREE pins from S5-R2 to
+S5-R3 and rebuilding byte-exact canonical deployment material. Only after those
+later reviews should a new P124-2 retry authorization be considered. P124-3 and
+actual P124-1 remain later in the frozen protected order.

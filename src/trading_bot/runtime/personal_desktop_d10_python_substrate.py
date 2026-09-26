@@ -151,7 +151,7 @@ def _require(condition: bool, reason: str) -> None:
 
 
 def _canonical(path: str) -> bool:
-    if type(path) is not str or not path.startswith(VOLUME):
+    if type(path) is not str or not path.casefold().startswith(VOLUME.casefold()):
         return False
     if path != ntpath.normpath(path) or path.startswith("\\\\"):
         return False

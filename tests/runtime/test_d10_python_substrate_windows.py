@@ -118,6 +118,204 @@ def test_fixed_system32_direct_dll_admitted() -> None:
     w._fixed(q.SYSTEM32 + r"\kernel32.dll")
 
 
+def test_fixed_inspect_still_rejects_case_only_final_path_difference(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        w, "_native_final_path", lambda handle: q.RUNTIME + r"\python.EXE"
+    )
+    monkeypatch.setattr(
+        w,
+        "_inspect_final",
+        lambda *args: pytest.fail("fixed inspection must stop before identity read"),
+    )
+    with pytest.raises(w.NativeFailure, match="final native path differs"):
+        w._inspect(q.PYTHON, 1)
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        q.RUNTIME + r"\..\D10\module.pyd",
+        q.RUNTIME + r"\module.pyd:stream",
+        q.RUNTIME + r"\module.pyd.",
+        q.RUNTIME + "\\module.pyd ",
+        r"\\server\share\module.pyd",
+        r"F:\Other\module.pyd",
+        q.SYSTEM32 + r"\sub\kernel32.dll",
+        q.SYSTEM32 + r"\kernel32.dll:stream",
+    ],
+)
+def test_dynamic_reported_path_syntax_fails_closed(path: str) -> None:
+    with pytest.raises(w.NativeFailure):
+        w._runtime_reported_path(path)
+
+
+def test_runtime_report_path_opens_exact_spelling_and_retains_native_final(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    reported = q.RUNTIME + r"\VCRUNTIME140.dll"
+    final_path = q.RUNTIME + r"\vcruntime140.dll"
+    opened: list[str] = []
+
+    monkeypatch.setattr(
+        w, "_open_runtime_reported", lambda path: opened.append(path) or 5
+    )
+    monkeypatch.setattr(
+        w,
+        "_inspect_runtime_reported",
+        lambda path, handle: (
+            replace(_node(path, q.Kind.FILE), final_path=final_path),
+            0x80,
+        ),
+    )
+    monkeypatch.setattr(w, "_close", lambda handle: None)
+
+    assert w._diagnostic_path(reported) == final_path
+    assert opened == [reported]
+
+
+@pytest.mark.parametrize(
+    ("final_path", "message"),
+    [
+        (q.RUNTIME + r"\other.dll", "beyond case"),
+        (r"F:\Other\VCRUNTIME140.dll", "fixed native namespace"),
+        (q.RUNTIME + r"\Lib\vcruntime140.dll", "beyond case"),
+    ],
+)
+def test_runtime_reported_path_rejects_non_case_final_difference(
+    monkeypatch: pytest.MonkeyPatch, final_path: str, message: str
+) -> None:
+    reported = q.RUNTIME + r"\VCRUNTIME140.dll"
+    monkeypatch.setattr(w, "_native_final_path", lambda handle: final_path)
+    monkeypatch.setattr(
+        w,
+        "_inspect_final",
+        lambda *args: pytest.fail("mismatched final path must be rejected"),
+    )
+    with pytest.raises(w.NativeFailure, match=message):
+        w._inspect_runtime_reported(reported, 1)
+
+
+def test_runtime_reported_path_accepts_only_case_difference_and_retains_final(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    reported = q.RUNTIME + r"\VCRUNTIME140.dll"
+    final_path = q.RUNTIME + r"\vcruntime140.dll"
+    evidence = replace(_node(reported, q.Kind.FILE), final_path=final_path)
+    monkeypatch.setattr(w, "_native_final_path", lambda handle: final_path)
+    monkeypatch.setattr(
+        w, "_inspect_final", lambda path, final, handle: (evidence, 0x80)
+    )
+
+    item, attributes = w._inspect_runtime_reported(reported, 1)
+    assert item.path == reported
+    assert item.final_path == final_path
+    assert attributes == 0x80
+
+
+def test_system32_reported_case_difference_is_direct_child_only(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    reported = q.SYSTEM32 + r"\KERNEL32.DLL"
+    final_path = q.SYSTEM32 + r"\kernel32.dll"
+    evidence = replace(_node(reported, q.Kind.FILE), final_path=final_path)
+    monkeypatch.setattr(w, "_native_final_path", lambda handle: final_path)
+    monkeypatch.setattr(
+        w, "_inspect_final", lambda path, final, handle: (evidence, 0x80)
+    )
+
+    item, _ = w._inspect_system32_reported(reported, 1)
+    assert item.path == reported
+    assert item.final_path == final_path
+    for invalid in (
+        q.SYSTEM32 + r"\sub\kernel32.dll",
+        q.SYSTEM32 + r"\kernel32.dll:stream",
+        r"C:\Windows\SysWOW64\kernel32.dll",
+        q.SYSTEM32 + r"\kernel32.dll",
+    ):
+        if invalid == q.SYSTEM32 + r"\kernel32.dll":
+            native_final = q.SYSTEM32 + r"\user32.dll"
+            monkeypatch.setattr(
+                w, "_native_final_path", lambda handle, final=native_final: final
+            )
+        with pytest.raises(w.NativeFailure):
+            w._inspect_system32_reported(invalid, 1)
+
+
+def test_native_system32_collection_preserves_reported_and_final_paths(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from scripts import d10_python_substrate_harness as h
+
+    reported = q.SYSTEM32 + r"\KERNEL32.DLL"
+    final_path = q.SYSTEM32 + r"\kernel32.dll"
+    facts = h.TokenObservation(
+        q.TRADING, True, False, (q.TRADING,), ("SeChangeNotifyPrivilege",), True, True
+    )
+    parent = replace(
+        _node(q.SYSTEM32, q.Kind.DIRECTORY),
+        owner_sid=q.SYSTEM,
+        volume_root="C:\\",
+    )
+    dll = replace(_node(reported, q.Kind.FILE), final_path=final_path)
+    opened: list[str] = []
+    monkeypatch.setattr(w, "_trading_token", lambda pid: (103, facts))
+    monkeypatch.setattr(w, "_open", lambda path: path)
+    monkeypatch.setattr(
+        w, "_open_system32_reported", lambda path: opened.append(path) or path
+    )
+    monkeypatch.setattr(
+        w,
+        "_inspect",
+        lambda path, handle: (parent, 0x10),
+    )
+    monkeypatch.setattr(
+        w,
+        "_inspect_system32_reported",
+        lambda path, handle: (dll, 0x80),
+    )
+    monkeypatch.setattr(w, "_descriptor", lambda handle: 19)
+    monkeypatch.setattr(w, "_access_check", lambda *args: (0, False))
+    monkeypatch.setattr(w, "_bind", lambda *args: lambda pointer: None)
+    monkeypatch.setattr(w, "_close", lambda handle: None)
+
+    observation = w.collect_system_dlls((reported,), 123)
+    assert opened == [reported]
+    assert observation.parent.path == q.SYSTEM32
+    assert observation.parent.final_path == q.SYSTEM32
+    assert observation.dlls[0].path == reported
+    assert observation.dlls[0].final_path == final_path
+
+
+def test_fixed_signed_input_final_path_remains_exact(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    path = w._D10_ATTESTATION
+    case_variant = path.replace("\\D10\\", "\\d10\\")
+
+    def create_file(requested: str, *args: object) -> int:
+        assert requested == path
+        return 17
+
+    def final_path(handle: int, buffer: object, size: int, flags: int) -> int:
+        buffer.value = "\\\\?\\" + case_variant
+        return len(buffer.value)
+
+    def bind(dll: object, name: str, args: list[object], result: object) -> object:
+        if name == "CreateFileW":
+            return create_file
+        if name == "GetFinalPathNameByHandleW":
+            return final_path
+        raise AssertionError(name)
+
+    monkeypatch.setattr(w, "_dll", lambda name: object())
+    monkeypatch.setattr(w, "_bind", bind)
+    monkeypatch.setattr(w, "_close", lambda handle: None)
+    with pytest.raises(w.NativeFailure, match="fixed signed input final path differs"):
+        w._read_fixed_signed_input(path, 1024)
+
+
 def test_wrong_signed_input_name_blocks() -> None:
     with pytest.raises(w.NativeFailure):
         w._read_fixed_signed_input(q.ROOT + r"\D10\other.json", 1024)
@@ -231,12 +429,68 @@ def test_fixed_diagnostic_command_and_complete_mock_transcript(
         )
 
     monkeypatch.setattr(subprocess, "run", run)
+    monkeypatch.setattr(w, "_diagnostic_path", lambda path: path)
     diagnostic = w.collect_diagnostic()
     assert calls == [(q.PYTHON, *q.FLAGS, "-c")]
     assert diagnostic.guard_imports_covered == h.GUARD_IMPORTS
     assert diagnostic.imports.loaded_system_dlls == (
         r"C:\Windows\System32\kernel32.dll",
     )
+
+
+def test_diagnostic_keeps_reported_and_native_dynamic_spellings(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import json
+    import subprocess
+
+    runtime_rows = (
+        (
+            q.RUNTIME + r"\VCRUNTIME140.dll",
+            q.RUNTIME + r"\vcruntime140.dll",
+            "vcruntime",
+        ),
+        (
+            q.RUNTIME + r"\python3.DLL",
+            q.RUNTIME + r"\python3.dll",
+            "python3",
+        ),
+    )
+    system_reported = q.SYSTEM32 + r"\KERNEL32.DLL"
+    raw = _diagnostic_json()
+    raw["dependencies"] = [
+        *raw["dependencies"],
+        *[[name, reported] for reported, _, name in runtime_rows],
+    ]
+    raw["loaded_modules"] = [
+        q.PYTHON,
+        *(reported for reported, _, _ in runtime_rows),
+        system_reported,
+    ]
+    final_by_report = {q.PYTHON: q.PYTHON}
+    final_by_report.update({reported: final for reported, final, _ in runtime_rows})
+    monkeypatch.setattr(
+        subprocess,
+        "run",
+        lambda argv, **kwargs: SimpleNamespace(
+            returncode=0,
+            stdout=json.dumps(raw).encode("utf-8"),
+            stderr=b"",
+        ),
+    )
+    monkeypatch.setattr(w, "_diagnostic_path", lambda path: final_by_report[path])
+
+    diagnostic = w.collect_diagnostic()
+    for reported, final_path, name in runtime_rows:
+        dependency = next(row for row in diagnostic.dependencies if row.name == name)
+        assert dependency.origin == reported
+        assert dependency.final_path == final_path
+        mapping = next(
+            row for row in diagnostic.runtime_mappings if row.reported_path == reported
+        )
+        assert mapping.final_path == final_path
+        assert final_path in diagnostic.imports.loaded_runtime_files
+    assert diagnostic.imports.loaded_system_dlls == (system_reported,)
 
 
 @pytest.mark.parametrize(
@@ -255,6 +509,7 @@ def test_diagnostic_missing_or_unreviewed_observation_blocks(
     import subprocess
 
     raw = _diagnostic_json() | changed
+    monkeypatch.setattr(w, "_diagnostic_path", lambda path: path)
     monkeypatch.setattr(
         subprocess,
         "run",

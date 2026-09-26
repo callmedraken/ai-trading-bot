@@ -45,6 +45,11 @@ SE_GROUP_ENABLED = 0x4
 SE_PRIVILEGE_ENABLED = 0x2
 ERROR_INSUFFICIENT_BUFFER = 122
 MAX_TOKEN_INFORMATION = 1024 * 1024
+_DOS_DEVICE_NAMES = frozenset(
+    {"con", "prn", "aux", "nul", "conin$", "conout$"}
+    | {f"com{index}" for index in range(1, 10)}
+    | {f"lpt{index}" for index in range(1, 10)}
+)
 
 
 class NativeFailure(h.CollectionBlocked):
@@ -273,8 +278,47 @@ def _fixed(path: str) -> None:
     raise NativeFailure("path outside fixed runtime inventory")
 
 
-def _open(path: str) -> int:
-    _fixed(path)
+def _reported_path(path: str, root: str, *, direct_child: bool = False) -> None:
+    """Validate a loader-reported spelling inside one frozen Windows namespace."""
+    if (
+        type(path) is not str
+        or path.startswith("\\\\")
+        or path != ntpath.normpath(path)
+        or not path.casefold().startswith(root.casefold() + "\\")
+    ):
+        raise NativeFailure("reported path outside fixed native namespace")
+    parts = path[len(root) + 1 :].split("\\")
+    if not parts or (direct_child and len(parts) != 1):
+        raise NativeFailure("reported path is not an admitted direct child")
+    for part in parts:
+        stem = part.split(".", 1)[0].casefold()
+        numbered_device = (
+            len(stem) == 4
+            and stem[:3] in ("com", "lpt")
+            and (stem[3].isdigit() or stem[3] in "¹²³")
+        )
+        if (
+            part in ("", ".", "..")
+            or ":" in part
+            or part.endswith((" ", "."))
+            or stem in _DOS_DEVICE_NAMES
+            or numbered_device
+        ):
+            raise NativeFailure("malformed reported path component")
+
+
+def _runtime_reported_path(path: str) -> None:
+    _reported_path(path, q.RUNTIME)
+
+
+def _system32_reported_path(path: str) -> None:
+    _reported_path(path, q.SYSTEM32, direct_child=True)
+    if not ntpath.basename(path).casefold().endswith(".dll"):
+        raise NativeFailure("reported System32 module is not a DLL")
+
+
+def _native_open(path: str) -> int:
+    """Open an already-validated path with the collector's no-follow policy."""
     kernel = _dll("kernel32")
     create = _bind(
         kernel,
@@ -304,12 +348,27 @@ def _open(path: str) -> int:
     return int(handle)
 
 
+def _open(path: str) -> int:
+    _fixed(path)
+    return _native_open(path)
+
+
+def _open_runtime_reported(path: str) -> int:
+    _runtime_reported_path(path)
+    return _native_open(path)
+
+
+def _open_system32_reported(path: str) -> int:
+    _system32_reported_path(path)
+    return _native_open(path)
+
+
 def _close(handle: int) -> None:
     close = _bind(_dll("kernel32"), "CloseHandle", [wintypes.HANDLE], wintypes.BOOL)
     _check(close(handle), "CloseHandle")
 
 
-def _inspect(path: str, handle: int) -> tuple[q.ObjectEvidence, int]:
+def _native_final_path(handle: int) -> str:
     kernel = _dll("kernel32")
     get_final = _bind(
         kernel,
@@ -321,9 +380,11 @@ def _inspect(path: str, handle: int) -> tuple[q.ObjectEvidence, int]:
     length = get_final(handle, buffer, len(buffer), 0)
     if not length or length >= len(buffer) or not buffer.value.startswith("\\\\?\\"):
         raise NativeFailure("final native path unavailable")
-    final = buffer.value[4:]
-    if final != path:
-        raise NativeFailure("final native path differs")
+    return buffer.value[4:]
+
+
+def _inspect_final(path: str, final: str, handle: int) -> tuple[q.ObjectEvidence, int]:
+    kernel = _dll("kernel32")
     info = ByHandleInfo()
     get_info = _bind(
         kernel,
@@ -387,6 +448,37 @@ def _inspect(path: str, handle: int) -> tuple[q.ObjectEvidence, int]:
         int(info.links),
     )
     return evidence, int(info.attributes)
+
+
+def _inspect(path: str, handle: int) -> tuple[q.ObjectEvidence, int]:
+    final = _native_final_path(handle)
+    if final != path:
+        raise NativeFailure("final native path differs")
+    return _inspect_final(path, final, handle)
+
+
+def _paths_equal_modulo_case(left: str, right: str) -> bool:
+    return ntpath.normcase(ntpath.normpath(left)) == ntpath.normcase(
+        ntpath.normpath(right)
+    )
+
+
+def _inspect_runtime_reported(path: str, handle: int) -> tuple[q.ObjectEvidence, int]:
+    _runtime_reported_path(path)
+    final = _native_final_path(handle)
+    _runtime_reported_path(final)
+    if not _paths_equal_modulo_case(path, final):
+        raise NativeFailure("runtime native final path differs beyond case")
+    return _inspect_final(path, final, handle)
+
+
+def _inspect_system32_reported(path: str, handle: int) -> tuple[q.ObjectEvidence, int]:
+    _system32_reported_path(path)
+    final = _native_final_path(handle)
+    _system32_reported_path(final)
+    if not _paths_equal_modulo_case(path, final):
+        raise NativeFailure("System32 native final path differs beyond case")
+    return _inspect_final(path, final, handle)
 
 
 def _children(path: str) -> tuple[str, ...]:
@@ -1037,17 +1129,19 @@ sys.stdout.write(json.dumps(result, sort_keys=True, separators=(",", ":")))
 
 def _diagnostic_path(path: str) -> str:
     """Resolve a reported runtime file through a fresh native no-follow handle."""
-    if path.startswith(q.ZIP + "\\"):
-        path = q.ZIP
-    _fixed(path)
-    handle = _open(path)
+    _runtime_reported_path(path)
+    open_path = path
+    if path.casefold().startswith(q.ZIP.casefold() + "\\"):
+        open_path = path[: len(q.ZIP)]
+        _runtime_reported_path(open_path)
+    handle = _open_runtime_reported(open_path)
     try:
-        item, _ = _inspect(path, handle)
+        item, _ = _inspect_runtime_reported(open_path, handle)
         if item.kind is not q.Kind.FILE:
             raise NativeFailure("diagnostic dependency is not a file")
     finally:
         _close(handle)
-    return path
+    return item.final_path
 
 
 def collect_diagnostic() -> h.Diagnostic:
@@ -1128,6 +1222,7 @@ def collect_diagnostic() -> h.Diagnostic:
         raise NativeFailure("mapped module transcript empty")
     dependencies: list[h.Dependency] = []
     runtime_files: set[str] = {q.PYTHON}
+    runtime_mappings: list[h.RuntimeModulePath] = []
     for pair in raw["dependencies"]:
         if (
             type(pair) is not list
@@ -1148,13 +1243,12 @@ def collect_diagnostic() -> h.Diagnostic:
     for path in raw["loaded_modules"]:
         if type(path) is not str:
             raise NativeFailure("mapped module path malformed")
-        if path == q.PYTHON:
-            continue
-        if path.startswith(q.RUNTIME + "\\"):
-            runtime_files.add(_diagnostic_path(path))
-        elif ntpath.dirname(path).casefold() == q.SYSTEM32.casefold():
-            if not path.casefold().endswith(".dll"):
-                raise NativeFailure("non-DLL System32 module")
+        if path.casefold().startswith(q.RUNTIME.casefold() + "\\"):
+            final = _diagnostic_path(path)
+            runtime_files.add(final)
+            runtime_mappings.append(h.RuntimeModulePath(path, final))
+        elif path.casefold().startswith(q.SYSTEM32.casefold() + "\\"):
+            _system32_reported_path(path)
             system_dlls.add(path)
         else:
             raise NativeFailure("mapped module outside reviewed runtime/System32")
@@ -1185,16 +1279,21 @@ def collect_diagnostic() -> h.Diagnostic:
         h.GUARD_IMPORTS,
         True,
         not raw["site_main_called"] and not raw["pth_processed"],
+        tuple(
+            sorted(
+                runtime_mappings, key=lambda row: (row.reported_path, row.final_path)
+            )
+        ),
     )
 
 
 def collect_system_dlls(
     paths: tuple[str, ...], trading_pid: int
 ) -> h.SystemDllObservation:
-    """Read exact direct System32 DLLs and test actual Trading effective rights."""
+    """Read direct System32 loader paths and test actual Trading effective rights."""
     if not paths or len(paths) > h.MAX_DEPENDENCIES:
         raise NativeFailure("System32 DLL count bound")
-    if len(paths) != len(set(paths)):
+    if len(paths) != len({path.casefold() for path in paths}):
         raise NativeFailure("duplicate System32 DLL path")
     token, facts = _trading_token(trading_pid)
     if facts.sid != q.TRADING:
@@ -1238,16 +1337,11 @@ def collect_system_dlls(
             handles: dict[str, int] = {}
             observed: dict[str, q.ObjectEvidence] = {}
             for path in sorted(paths):
-                if ntpath.dirname(
-                    path
-                ).casefold() != q.SYSTEM32.casefold() or not ntpath.basename(
-                    path
-                ).casefold().endswith(".dll"):
-                    raise NativeFailure("DLL is not direct System32 child")
-                handle = _open(path)
+                _system32_reported_path(path)
+                handle = _open_system32_reported(path)
                 stack.callback(_close, handle)
                 handles[path] = handle
-                item, _ = _inspect(path, handle)
+                item, _ = _inspect_system32_reported(path, handle)
                 observed[path] = item
                 if item.kind is not q.Kind.FILE or item.links != 1:
                     raise NativeFailure("System32 DLL object differs")
@@ -1283,7 +1377,7 @@ def collect_system_dlls(
             if parent != _inspect(q.SYSTEM32, parent_handle)[0]:
                 raise NativeFailure("System32 parent identity/security drift")
             for path, handle in handles.items():
-                if _inspect(path, handle)[0] != observed[path]:
+                if _inspect_system32_reported(path, handle)[0] != observed[path]:
                     raise NativeFailure("System32 DLL identity/security drift")
             return h.SystemDllObservation(
                 parent, parent_access, tuple(rows), True, True, True

@@ -104,6 +104,31 @@ def _change_node(
     )
 
 
+def _add_runtime_file(
+    ev: q.QualificationEvidence, path: str, *, loaded_final: str | None = None
+) -> q.QualificationEvidence:
+    runtime = next(item for item in ev.objects if item.path == q.RUNTIME)
+    updated = _change_node(
+        ev,
+        q.RUNTIME,
+        children=(*runtime.children, path.rsplit("\\", 1)[-1]),
+    )
+    item = _node(path, q.Kind.FILE)
+    access = q.TradingAccessEvidence(
+        path, q.MUTATION_MASK, 0, True, q.AccessPolicy.PROTECTED_OBJECT
+    )
+    runtime_files = {*ev.imports.loaded_runtime_files}
+    runtime_files.add(loaded_final or path)
+    return replace(
+        updated,
+        objects=(*updated.objects, item),
+        imports=replace(
+            updated.imports, loaded_runtime_files=tuple(sorted(runtime_files))
+        ),
+        trading_access=(*updated.trading_access, access),
+    )
+
+
 def test_fixed_paths_and_sanitized_result() -> None:
     result = q.qualify_python_substrate(evidence())
     assert result == q.QualificationResult(
@@ -116,6 +141,23 @@ def test_fixed_paths_and_sanitized_result() -> None:
     )
     assert not hasattr(result, "handle")
     assert not hasattr(result, "authority")
+
+
+def test_dynamic_runtime_final_maps_to_one_protected_file_case_insensitively() -> None:
+    inventory_path = q.RUNTIME + r"\VCRUNTIME140.dll"
+    native_final = q.RUNTIME + r"\vcruntime140.dll"
+    ev = _add_runtime_file(evidence(), inventory_path, loaded_final=native_final)
+
+    result = q.qualify_python_substrate(ev)
+    assert result.protected_object_count == 7
+
+
+def test_case_colliding_runtime_inventory_remains_blocked() -> None:
+    ev = _add_runtime_file(evidence(), q.RUNTIME + r"\VCRUNTIME140.dll")
+    ev = _add_runtime_file(ev, q.RUNTIME + r"\vcruntime140.dll")
+
+    with pytest.raises(q.SubstrateBlocked):
+        q.qualify_python_substrate(ev)
 
 
 @pytest.mark.parametrize(

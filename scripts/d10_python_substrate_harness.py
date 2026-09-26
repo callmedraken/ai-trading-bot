@@ -15,7 +15,7 @@ from typing import Protocol
 
 from trading_bot.runtime import personal_desktop_d10_python_substrate as q
 
-SCHEMA = "personal-desktop-p124-1-native-transcript/v2"
+SCHEMA = "personal-desktop-p124-1-native-transcript/v3"
 MAX_OBJECTS = 100_000
 MAX_DEPENDENCIES = 4_096
 MAX_TRANSCRIPT_BYTES = 32 * 1024 * 1024
@@ -32,6 +32,11 @@ GUARD_IMPORTS = (
     "subprocess",
     "sys",
     "uuid",
+)
+_DOS_DEVICE_NAMES = frozenset(
+    {"con", "prn", "aux", "nul", "conin$", "conout$"}
+    | {f"com{index}" for index in range(1, 10)}
+    | {f"lpt{index}" for index in range(1, 10)}
 )
 
 
@@ -97,6 +102,12 @@ class Dependency:
 
 
 @dataclass(frozen=True, slots=True)
+class RuntimeModulePath:
+    reported_path: str
+    final_path: str
+
+
+@dataclass(frozen=True, slots=True)
 class Diagnostic:
     imports: q.ImportEvidence
     argv: tuple[str, ...]
@@ -104,6 +115,7 @@ class Diagnostic:
     guard_imports_covered: tuple[str, ...]
     runtime_files_complete: bool
     site_hooks_not_processed: bool
+    runtime_mappings: tuple[RuntimeModulePath, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -153,6 +165,57 @@ class Collector(Protocol):
 def _require(condition: bool, reason: str) -> None:
     if not condition:
         raise CollectionBlocked(reason)
+
+
+def _valid_reported_path(path: str, root: str, *, direct_child: bool = False) -> bool:
+    if (
+        type(path) is not str
+        or path.startswith("\\\\")
+        or path != ntpath.normpath(path)
+        or not path.casefold().startswith(root.casefold() + "\\")
+    ):
+        return False
+    parts = path[len(root) + 1 :].split("\\")
+    if not parts or (direct_child and len(parts) != 1):
+        return False
+    for part in parts:
+        stem = part.split(".", 1)[0].casefold()
+        numbered_device = (
+            len(stem) == 4
+            and stem[:3] in ("com", "lpt")
+            and (stem[3].isdigit() or stem[3] in "¹²³")
+        )
+        if (
+            part in ("", ".", "..")
+            or ":" in part
+            or part.endswith((" ", "."))
+            or stem in _DOS_DEVICE_NAMES
+            or numbered_device
+        ):
+            return False
+    return True
+
+
+def _valid_runtime_path(path: str) -> bool:
+    return _valid_reported_path(path, q.RUNTIME)
+
+
+def _valid_system32_path(path: str) -> bool:
+    return _valid_reported_path(path, q.SYSTEM32, direct_child=True) and (
+        ntpath.basename(path).casefold().endswith(".dll")
+    )
+
+
+def _same_path_modulo_case(left: str, right: str) -> bool:
+    return ntpath.normcase(ntpath.normpath(left)) == ntpath.normcase(
+        ntpath.normpath(right)
+    )
+
+
+def _zip_module_origin(path: str) -> bool:
+    return _valid_runtime_path(path) and path.casefold().startswith(
+        q.ZIP.casefold() + "\\"
+    )
 
 
 def _objects(snapshot: NativeSnapshot) -> tuple[q.ObjectEvidence, ...]:
@@ -260,16 +323,51 @@ def _diagnostic(value: Diagnostic) -> q.ImportEvidence:
                 "builtin/frozen origin",
             )
         else:
+            origin_is_runtime = _valid_runtime_path(row.origin)
+            final_is_runtime = _valid_runtime_path(row.final_path)
+            ordinary_path_matches = (
+                origin_is_runtime
+                and final_is_runtime
+                and _same_path_modulo_case(row.origin, row.final_path)
+            )
+            zip_path_matches = (
+                _zip_module_origin(row.origin)
+                and final_is_runtime
+                and _same_path_modulo_case(row.final_path, q.ZIP)
+            )
             _require(
                 row.final_path is not None
-                and row.final_path.startswith(q.RUNTIME + "\\")
-                and (
-                    row.origin == row.final_path
-                    or (row.final_path == q.ZIP and row.origin.startswith(q.ZIP + "\\"))
-                ),
+                and final_is_runtime
+                and (ordinary_path_matches or zip_path_matches),
                 "runtime dependency final path",
             )
             runtime_files.add(row.final_path)
+    _require(
+        type(value.runtime_mappings) is tuple
+        and bool(value.runtime_mappings)
+        and len(value.runtime_mappings) <= MAX_DEPENDENCIES
+        and all(
+            type(row) is RuntimeModulePath
+            and _valid_runtime_path(row.reported_path)
+            and _valid_runtime_path(row.final_path)
+            and _same_path_modulo_case(row.reported_path, row.final_path)
+            for row in value.runtime_mappings
+        ),
+        "runtime loader path transcript invalid",
+    )
+    _require(
+        any(
+            _same_path_modulo_case(row.final_path, q.PYTHON)
+            for row in value.runtime_mappings
+        ),
+        "fixed interpreter loader mapping absent",
+    )
+    _require(
+        {row.final_path.casefold() for row in value.runtime_mappings}.issubset(
+            {path.casefold() for path in value.imports.loaded_runtime_files}
+        ),
+        "runtime loader final path omitted from dependency inventory",
+    )
     _require(set(GUARD_IMPORTS).issubset(names), "guard import transcript incomplete")
     _require(
         runtime_files.issubset(set(value.imports.loaded_runtime_files))
@@ -312,16 +410,17 @@ def _system_dlls(value: SystemDllObservation, imports: q.ImportEvidence) -> None
     )
     paths = {row.path for row in value.dlls}
     _require(
-        len(paths) == len(value.dlls) and paths == set(imports.loaded_system_dlls),
+        len(paths) == len(value.dlls)
+        and len({path.casefold() for path in paths}) == len(paths)
+        and paths == set(imports.loaded_system_dlls),
         "System32 loaded-DLL inventory differs",
     )
     for row in value.dlls:
         _require(
             type(row) is SystemDll
-            and row.path == row.final_path
-            and ntpath.dirname(row.path) == q.SYSTEM32
-            and ntpath.basename(row.path).casefold().endswith(".dll")
-            and ":" not in ntpath.basename(row.path)
+            and _valid_system32_path(row.path)
+            and _valid_system32_path(row.final_path)
+            and _same_path_modulo_case(row.path, row.final_path)
             and row.owner_sid != q.TRADING
             and bool(row.owner_sid)
             and bool(row.aces)

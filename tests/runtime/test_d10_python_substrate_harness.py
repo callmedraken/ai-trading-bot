@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import ntpath
 from dataclasses import replace
 
@@ -121,7 +122,13 @@ def _fixture() -> tuple[
         h.Dependency(name, "builtin", None, "builtin") for name in h.GUARD_IMPORTS
     )
     diagnostic = h.Diagnostic(
-        imports, (q.PYTHON, *q.FLAGS, "-c"), deps, h.GUARD_IMPORTS, True, True
+        imports,
+        (q.PYTHON, *q.FLAGS, "-c"),
+        deps,
+        h.GUARD_IMPORTS,
+        True,
+        True,
+        (h.RuntimeModulePath(q.PYTHON, q.PYTHON),),
     )
     dlls = h.SystemDllObservation(
         q.ObjectEvidence(
@@ -198,11 +205,69 @@ class MockCollector:
         return self.signed
 
 
+def _add_runtime_inventory_file(collector: MockCollector, path: str) -> None:
+    node = _node(path, q.Kind.FILE)
+    rows: list[h.NativeObject] = []
+    runtime_parent: q.ObjectEvidence | None = None
+    for row in collector.before.objects:
+        if row.evidence.path == q.RUNTIME:
+            runtime_parent = replace(
+                row.evidence, children=(*row.evidence.children, ntpath.basename(path))
+            )
+            row = replace(row, evidence=runtime_parent)
+        rows.append(row)
+    assert runtime_parent is not None
+    rows.append(h.NativeObject(node, 0x80, len(node.aces), runtime_parent.file_index))
+    collector.before = replace(collector.before, objects=tuple(rows))
+    collector.after = collector.before
+    access = h.NativeAccess(
+        q.TradingAccessEvidence(
+            path, q.MUTATION_MASK, 0, True, q.AccessPolicy.PROTECTED_OBJECT
+        ),
+        True,
+        False,
+        False,
+        False,
+        True,
+        True,
+        True,
+    )
+    collector.trading_value = replace(
+        collector.trading_value,
+        access=(*collector.trading_value.access, access),
+    )
+
+
+def _add_runtime_dependency(
+    collector: MockCollector, name: str, reported: str, final_path: str
+) -> None:
+    imports = replace(
+        collector.diagnostic_value.imports,
+        loaded_runtime_files=tuple(
+            sorted(
+                {*collector.diagnostic_value.imports.loaded_runtime_files, final_path}
+            )
+        ),
+    )
+    collector.diagnostic_value = replace(
+        collector.diagnostic_value,
+        imports=imports,
+        dependencies=(
+            *collector.diagnostic_value.dependencies,
+            h.Dependency(name, reported, final_path, "runtime"),
+        ),
+        runtime_mappings=(
+            *collector.diagnostic_value.runtime_mappings,
+            h.RuntimeModulePath(reported, final_path),
+        ),
+    )
+
+
 def test_complete_evidence_and_deterministic_transcript() -> None:
     collector = MockCollector()
     first = h.collect(collector)
     assert b'"status":"PASS"' in first
-    assert b'"schema":"personal-desktop-p124-1-native-transcript/v2"' in first
+    assert b'"schema":"personal-desktop-p124-1-native-transcript/v3"' in first
     assert b'"policy":"volume_namespace"' in first
     assert first == h.collect(MockCollector())
     assert collector.calls == [
@@ -214,6 +279,81 @@ def test_complete_evidence_and_deterministic_transcript() -> None:
         "signed",
     ]
     assert b"handle" not in first and b"credential" not in first
+
+
+@pytest.mark.parametrize(
+    ("name", "reported_name", "final_name"),
+    [
+        ("vcruntime", "VCRUNTIME140.dll", "vcruntime140.dll"),
+        ("python3", "python3.DLL", "python3.dll"),
+    ],
+)
+def test_runtime_loader_spelling_and_native_final_are_retained(
+    name: str, reported_name: str, final_name: str
+) -> None:
+    collector = MockCollector()
+    reported = ntpath.join(q.RUNTIME, reported_name)
+    final_path = ntpath.join(q.RUNTIME, final_name)
+    _add_runtime_inventory_file(collector, reported)
+    _add_runtime_dependency(collector, name, reported, final_path)
+
+    transcript = json.loads(h.collect(collector))
+    dependency = next(
+        row for row in transcript["diagnostic"]["dependencies"] if row["name"] == name
+    )
+    mapping = next(
+        row
+        for row in transcript["diagnostic"]["runtime_mappings"]
+        if row["reported_path"] == reported
+    )
+    assert dependency["origin"] == reported
+    assert dependency["final_path"] == final_path
+    assert mapping["reported_path"] == reported
+    assert mapping["final_path"] == final_path
+
+
+@pytest.mark.parametrize(
+    ("reported", "final_path"),
+    [
+        (q.RUNTIME + r"\VCRUNTIME140.dll", q.RUNTIME + r"\other.dll"),
+        (q.RUNTIME + r"\VCRUNTIME140.dll", r"F:\Other\VCRUNTIME140.dll"),
+        (
+            q.RUNTIME + r"\VCRUNTIME140.dll",
+            q.RUNTIME + r"\Lib\vcruntime140.dll",
+        ),
+        (
+            q.RUNTIME + r"\..\D10\VCRUNTIME140.dll",
+            q.RUNTIME + r"\vcruntime140.dll",
+        ),
+        (
+            q.RUNTIME + r"\VCRUNTIME140.dll:stream",
+            q.RUNTIME + r"\vcruntime140.dll",
+        ),
+        (
+            q.RUNTIME + r"\VCRUNTIME140.dll.",
+            q.RUNTIME + r"\vcruntime140.dll",
+        ),
+        (
+            r"\\server\share\VCRUNTIME140.dll",
+            q.RUNTIME + r"\vcruntime140.dll",
+        ),
+    ],
+)
+def test_runtime_dependency_requires_case_only_native_final(
+    reported: str, final_path: str
+) -> None:
+    collector = MockCollector()
+    _add_runtime_dependency(collector, "runtime-file", reported, final_path)
+    with pytest.raises(h.CollectionBlocked):
+        h._diagnostic(collector.diagnostic_value)
+
+
+def test_runtime_inventory_case_collision_still_blocks() -> None:
+    collector = MockCollector()
+    _add_runtime_inventory_file(collector, q.RUNTIME + r"\VCRUNTIME140.dll")
+    _add_runtime_inventory_file(collector, q.RUNTIME + r"\vcruntime140.dll")
+    with pytest.raises(h.CollectionBlocked, match="case-colliding"):
+        h.collect(collector)
 
 
 @pytest.mark.parametrize(
@@ -529,6 +669,60 @@ def test_non_system32_dll_blocks() -> None:
         h.collect(collector)
 
 
+def test_system32_loader_case_difference_is_retained_and_admitted() -> None:
+    collector = MockCollector()
+    reported = q.SYSTEM32 + r"\KERNEL32.DLL"
+    final_path = q.SYSTEM32 + r"\kernel32.dll"
+    collector.diagnostic_value = replace(
+        collector.diagnostic_value,
+        imports=replace(
+            collector.diagnostic_value.imports, loaded_system_dlls=(reported,)
+        ),
+    )
+    collector.dlls = replace(
+        collector.dlls,
+        dlls=(replace(collector.dlls.dlls[0], path=reported, final_path=final_path),),
+    )
+
+    transcript = json.loads(h.collect(collector))
+    row = transcript["system_dlls"]["dlls"][0]
+    assert row["path"] == reported
+    assert row["final_path"] == final_path
+    assert transcript["system_dlls"]["parent"]["final_path"] == q.SYSTEM32
+
+
+@pytest.mark.parametrize(
+    ("reported", "final_path"),
+    [
+        (q.SYSTEM32 + r"\kernel32.dll", q.SYSTEM32 + r"\user32.dll"),
+        (
+            q.SYSTEM32 + r"\kernel32.dll",
+            r"C:\Windows\SysWOW64\kernel32.dll",
+        ),
+        (
+            q.SYSTEM32 + r"\sub\kernel32.dll",
+            q.SYSTEM32 + r"\sub\kernel32.dll",
+        ),
+    ],
+)
+def test_system32_report_and_final_must_be_same_direct_dll(
+    reported: str, final_path: str
+) -> None:
+    collector = MockCollector()
+    collector.diagnostic_value = replace(
+        collector.diagnostic_value,
+        imports=replace(
+            collector.diagnostic_value.imports, loaded_system_dlls=(reported,)
+        ),
+    )
+    collector.dlls = replace(
+        collector.dlls,
+        dlls=(replace(collector.dlls.dlls[0], path=reported, final_path=final_path),),
+    )
+    with pytest.raises(h.CollectionBlocked):
+        h.collect(collector)
+
+
 def test_missing_bypass_traverse_privilege_blocks_harness() -> None:
     collector = MockCollector()
     collector.trading_value = replace(
@@ -607,6 +801,14 @@ def test_system32_parent_security_must_be_reviewable() -> None:
     collector.dlls = replace(
         collector.dlls,
         parent_access=replace(collector.dlls.parent_access, granted_mask=1),
+    )
+    with pytest.raises(h.CollectionBlocked):
+        h.collect(collector)
+
+    collector = MockCollector()
+    collector.dlls = replace(
+        collector.dlls,
+        parent=replace(collector.dlls.parent, final_path=q.SYSTEM32.lower()),
     )
     with pytest.raises(h.CollectionBlocked):
         h.collect(collector)

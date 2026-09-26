@@ -172,9 +172,10 @@ later protected P124-1 native collector; a caller-built instance is not
 authority. QualificationResult contains fixed paths, version, accepted search
 roots and a count, with no handle, raw ACL, token, or reusable capability.
 P124-1 must retain a native transcript for operator review. The corrected
-transcript schema is v2 and records the explicit volume-namespace or
-protected-object access policy for each effective-access row. This result
-does not authorize a D10 launch.
+transcript schema is v3 and records the explicit volume-namespace or
+protected-object access policy for each effective-access row, as well as the
+distinct loader-reported and handle-derived path spellings for dynamic module
+and DLL observations. This result does not authorize a D10 launch.
 
 The source-owned identity is exactly F:\AITradingBot\runtime\python.exe,
 Python 3.14.3, runtime F:\AITradingBot\runtime, and package path
@@ -183,6 +184,23 @@ F:\AITradingBot\runtime\Lib\site-packages. The package path was measured under
 interpreter, version, runtime prefix, drive, or package directory requires
 architecture review and a newly signed Architecture-123 attestation. The
 P124-1 signed-attestation input must match this exact path and version.
+
+Fixed governed paths retain exact native final-path semantics, including
+F:\, F:\AITradingBot, F:\AITradingBot\runtime, the fixed production
+python.exe, the fixed C:\Windows\System32 parent, and fixed signed D10
+inputs. Dynamic Python module origins and GetModuleFileNameExW runtime and
+direct System32 DLL paths are syntax-checked against their frozen namespace,
+opened by the existing native no-follow path, and compared with the native
+final path from that handle. Reported spelling may differ from native final
+spelling only by Windows filename case; equality is normalized and
+case-insensitive, and any directory, basename, volume, or other non-case
+difference blocks. The actual native final spelling is retained separately in
+the transcript. Runtime final paths must map case-insensitively to exactly one
+protected runtime inventory file. The complete runtime inventory's
+case-collision rejection remains mandatory. The System32 parent remains an
+exact fixed path; direct-child-only .dll, owner/DACL, Trading effective
+denial, no-follow identity, and re-observation/drift requirements are
+unchanged.
 
 P124-1 must collect and preserve these observations:
 
@@ -263,9 +281,12 @@ P124-1 must collect and preserve these observations:
    directory, user site, environment path, sealed source, package directory,
    and alternate installation may not appear before the guard. Actual guard
    extension/DLL loads must resolve to protected runtime objects. Windows
-   OS/KnownDLL loads are a separate P124-1 transcript: exact final paths, OS
-   directory provenance, protected owner/DACL, and Trading effective denial
-   must be independently reviewed. Only DLLs directly beneath the fixed
+   OS/KnownDLL loads are a separate P124-1 transcript: the fixed System32
+   parent identity remains exact, while a dynamically reported direct-child
+   DLL path may differ from its handle-derived final path only by Windows
+   filename case. Keep reported and native final spellings separately, with
+   OS directory provenance, protected owner/DACL, and Trading effective denial
+   independently reviewed. Only DLLs directly beneath the fixed
    C:\Windows\System32 directory are admissible; a different Windows
    installation path or unknown OS DLL redirection blocks. P124-1 must attest
    completeness of the Windows/KnownDLL transcript and of the runtime/import

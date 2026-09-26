@@ -136,6 +136,28 @@ any module from the sealed source snapshot before verification succeeds.
 If the installed production Python runtime cannot be proven non-writable by
 Trading, D10 remains BLOCKED.
 
+### P124-1 Windows path identity
+
+Fixed governed paths retain exact final-path identity: `F:\`,
+`F:\AITradingBot`, `F:\AITradingBot\runtime`, the fixed production
+`python.exe`, the fixed `C:\Windows\System32` parent, and fixed signed D10
+inputs must still match their configured final spelling exactly. The native
+collector's fixed-path `_inspect()` check remains exact.
+
+Paths reported dynamically by Python module `__spec__.origin` and by
+`GetModuleFileNameExW` for runtime or direct System32 DLL mappings are checked
+against their frozen permitted namespace, then opened through the native
+no-follow path. Their reported spelling and handle-derived native final path
+are separate transcript values. They may differ only by Windows path
+case: normalized case-insensitive equality is required, while any directory,
+basename, drive, volume, or other non-case difference blocks qualification.
+The actual native final spelling is retained in dependency and DLL evidence.
+Runtime final paths must resolve case-insensitively to exactly one file in the
+complete protected runtime inventory. Case-colliding inventory names remain a
+blocking condition. The System32 parent remains an exact fixed identity, and
+direct-child, `.dll`, no-follow, security, effective-denial, and drift checks
+remain unchanged.
+
 ## 6. Guard verification sequence
 
 Before any governed trading source is imported or executed, the guard:

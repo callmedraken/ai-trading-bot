@@ -4055,3 +4055,110 @@ mutation, and stop for review on PASS or BLOCKED. The result is diagnostic
 evidence only and must not be treated as actual P124-1 acceptance. If it
 passes, review the evidence before updating protected-deployment pins/canonical
 material or considering any separately authorized P124-2 retry.
+
+
+## 2026-09-26 S5-R8 accepted certification and immediate resume point
+
+Accepted governed source:
+
+```text
+branch: feature/pd4-d10-one-week-soak-authority
+S5-R8 HEAD: 86f1021d244bf62bcf5a0f457c30eb98b998de90
+S5-R8 TREE: cfa455811f6bd1b3373a66f6716afca9dbd254df
+certification checkout: F:\AI\worktrees\ai-trading-bot-s5r8-86f1021
+evidence: F:\AI\temp\pytest\s5r8-certification-evidence-86f1021-20260926-143224
+```
+
+S5-R8 certification **PASSED**:
+
+```text
+broad-1: 3490 cases / 3485 passed / 5 skipped
+broad-2: 3342 cases / 3339 passed / 3 skipped
+serial:    935 cases /  926 passed / 9 skipped
+total:    7767 cases / 7750 passed / 17 skipped / 0 failed / 0 errors
+wall: 417.486 seconds
+```
+
+S5-R8 fixes the final pure-policy blocker exposed by the S5-R7 read-only
+preflight. The runtime security contract now matches the complete observed
+inheritance tree without weakening actual access denial:
+
+```text
+F:\AITradingBot
+  protected deployment parent
+  exact Administrators/SYSTEM flags-0 two-ACE policy unchanged
+
+F:\AITradingBot\runtime
+  protected inheritance trust anchor
+  SYSTEM          FULL         flags 0x03
+  Administrators  FULL         flags 0x03
+  Trading         READ/EXECUTE flags 0x03
+
+runtime descendant directories
+  unprotected DACL
+  exact inherited SYSTEM/Administrators/Trading shape
+  flags 0x13
+
+runtime descendant files
+  unprotected DACL
+  exact inherited SYSTEM/Administrators/Trading shape
+  flags 0x10
+```
+
+The exact runtime masks remain SYSTEM/Administrators 0x001F01FF and Trading
+0x001200A9. No extra principal, wrong order/mask, deny or explicit descendant
+ACE, unexpected flag, or protected descendant is accepted. Complete native
+inventory, pinned ancestry, case-collision rejection, reparse/hard-link/path
+controls, same-handle security re-observation, before/after equality, and
+actual Trading mutation/delete/replacement denial remain required. Transcript
+schema remains `personal-desktop-p124-1-native-transcript/v4`.
+
+Preserved diagnostic progression:
+
+```text
+S5-R7 read-only preflight:
+F:\AI\temp\p1241-readonly-s5r7-20260926-125701
+result: BLOCKED only at pure_policy_without_signed_a123
+runtime_diagnostic: passed
+system_dlls: passed
+signed A123/D10 trust: skipped
+P124 operation: not run
+
+first runtime ACL breakdown:
+F:\AI\temp\p1241-runtime-acl-s5r7-20260926-135351
+first object: F:\AITradingBot\runtime
+owner: Administrators
+DACL protected: true
+only issue: ordered ACE tuple differed from old flags-0 model
+
+full runtime ACL census:
+F:\AI\temp\p1241-runtime-acl-census-s5r7-20260926-135901
+runtime objects: 12,512
+ACL shapes: 3
+root: 1 object, protected, flags 0x03
+directories: 643, inherited/unprotected, flags 0x13
+files: 11,868, inherited/unprotected, flags 0x10
+```
+
+No unexpected principal, deny ACE, wrong Trading mask, wrong
+Administrators/SYSTEM mask, INHERIT_ONLY ACE, or owner outside the trusted
+Administrators/SYSTEM set was observed in the census.
+
+Fail-closed authority status remains: actual P124-1/P124-2/P124-3 are not
+authorized by any diagnostic result; the old P124-2 authorization was consumed;
+no signing/trust publication, ACL/account/privilege/package mutation, scheduler
+mutation, broker/provider effect, or trading effect occurred.
+
+Standing workflow update: routine read-only diagnostics, source review/tests,
+broad source certification, and canonical docs closeout may continue by
+default inside an already established boundary. Stop for fresh explicit
+authorization only before a genuinely new or materially higher-security-risk
+boundary such as host security mutation, signing/trust publication, scheduler
+or credential mutation, protected deployment mutation, provider/broker effect,
+live trading, or destructive recovery.
+
+Immediate next step: run one bounded read-only S5-R8 P124-1 host/token
+preflight against the certified S5-R8 source. Continue to skip signed-A123/D10
+trust reads, make no host mutation, and stop for review on PASS or BLOCKED.
+The result is diagnostic evidence only and must not be treated as actual
+P124-1 acceptance.

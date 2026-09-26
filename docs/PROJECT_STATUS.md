@@ -4134,3 +4134,84 @@ stop for review on PASS or BLOCKED. A PASS is diagnostic evidence only, not
 actual P124-1 acceptance. If it passes, review that evidence before advancing
 protected-deployment source pins/materials or considering any separately
 authorized P124-2 retry.
+
+
+## 2026-09-26 S5-R8 accepted certification and next resume point
+
+S5-R8 is **ACCEPTED** for certified governed source on
+`feature/pd4-d10-one-week-soak-authority`:
+
+```text
+HEAD: 86f1021d244bf62bcf5a0f457c30eb98b998de90
+TREE: cfa455811f6bd1b3373a66f6716afca9dbd254df
+certification checkout:
+F:\AI\worktrees\ai-trading-bot-s5r8-86f1021
+evidence:
+F:\AI\temp\pytest\s5r8-certification-evidence-86f1021-20260926-143224
+```
+
+Certification passed:
+
+```text
+broad-1: 3490 cases / 3485 passed / 5 skipped / 0 failed/errors
+broad-2: 3342 cases / 3339 passed / 3 skipped / 0 failed/errors
+serial:    935 cases /  926 passed / 9 skipped / 0 failed/errors
+total:    7767 cases / 7750 passed / 17 skipped / 0 failed / 0 errors
+wall: 417.486 seconds
+```
+
+S5-R8 corrects the pure P124-1 runtime ACL model to match the complete
+read-only real-host census while preserving the security boundary. The
+protected deployment parent `F:\AITradingBot` remains unchanged with its
+exact protected two-ACE flags-0 policy. `F:\AITradingBot\runtime` is now
+the protected inheritance trust anchor with exactly SYSTEM, Administrators,
+and Trading ALLOW ACEs, masks 0x001F01FF, 0x001F01FF, and 0x001200A9, flags
+0x03. Runtime descendant directories require the corresponding unprotected
+inherited three-ACE shape with flags 0x13; runtime descendant files require the
+unprotected inherited three-ACE shape with flags 0x10. Extra principals,
+wrong masks/order, deny or explicit descendant ACEs, unexpected flags, or
+protected descendants block qualification. Complete no-follow enumeration,
+pinned parent linkage, case-collision rejection, same-handle security
+re-observation, before/after inventory equality, and independent actual
+Trading mutation/replacement denial remain mandatory. Native transcript schema
+remains v4.
+
+The real-host evidence that led to S5-R8 is preserved:
+
+- S5-R7 bounded read-only host/token preflight:
+  `F:\AI\temp\p1241-readonly-s5r7-20260926-125701`.
+  It passed Administrator proof, actual Trading-token admission, before
+  inventory, Trading effective access, runtime diagnostic, System32 DLL
+  collection, and after inventory, then BLOCKED only at
+  `pure_policy_without_signed_a123` with
+  `SubstrateBlocked: owner or protected DACL differs`.
+- First-object runtime ACL breakdown:
+  `F:\AI\temp\p1241-runtime-acl-s5r7-20260926-135351`.
+  The first mismatch was `F:\AITradingBot\runtime`, owner Administrators,
+  protected DACL, exact masks/principals, with explicit inheritance flags 0x03
+  and SYSTEM before Administrators.
+- Complete runtime ACL census:
+  `F:\AI\temp\p1241-runtime-acl-census-s5r7-20260926-135901`.
+  It observed 12,512 runtime objects and exactly three ACL shapes:
+  one protected runtime root with flags 0x03, 643 inherited directories with
+  flags 0x13, and 11,868 inherited files with flags 0x10. No unexpected
+  principal, deny ACE, wrong Trading mask, wrong Administrators/SYSTEM mask,
+  INHERIT_ONLY ACE, or owner outside Administrators/SYSTEM was observed.
+
+No host mutation, signed-A123/D10 trust read, actual P124-1, P124-2, P124-3,
+scheduler mutation, provider/broker effect, or trading effect occurred during
+these diagnostics or S5-R8 source/certification work.
+
+Operator standing workflow now treats routine continuation inside an already
+reviewed read-only/source-only boundary as authorized by default. A new
+explicit authorization is required only for a genuinely new or materially
+higher-security-risk boundary such as ACL/account/privilege mutation,
+signing/trust publication, scheduler mutation, credential change, protected
+deployment mutation, provider/broker effect, live trading, or destructive
+recovery.
+
+Immediate resume point: run one bounded read-only S5-R8 P124-1 host/token
+preflight against the certified S5-R8 source. It must still skip signed-A123/
+D10 trust reads, perform no host mutation, and stop for review on PASS or
+BLOCKED. A PASS is diagnostic evidence only and is not actual P124-1
+acceptance.

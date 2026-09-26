@@ -440,6 +440,70 @@ def test_fixed_signed_input_final_path_remains_exact(
         w._read_fixed_signed_input(path, 1024)
 
 
+def test_signed_input_reobservation_ignores_only_last_access_time() -> None:
+    before = w.ByHandleInfo()
+    before.attributes = 32
+    before.creation_low = 11
+    before.creation_high = 12
+    before.access_low = 13
+    before.access_high = 14
+    before.write_low = 15
+    before.write_high = 16
+    before.volume_serial = 17
+    before.size_high = 18
+    before.size_low = 19
+    before.links = 1
+    before.file_index_high = 20
+    before.file_index_low = 21
+
+    after = w.ByHandleInfo()
+    ctypes.memmove(ctypes.byref(after), ctypes.byref(before), ctypes.sizeof(before))
+    after.access_low = 999
+    after.access_high = 1000
+
+    assert bytes(before) != bytes(after)
+    assert w._signed_input_reobservation(before) == w._signed_input_reobservation(after)
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        "attributes",
+        "creation_low",
+        "creation_high",
+        "write_low",
+        "write_high",
+        "volume_serial",
+        "size_high",
+        "size_low",
+        "links",
+        "file_index_high",
+        "file_index_low",
+    ],
+)
+def test_signed_input_reobservation_blocks_stable_fact_drift(field: str) -> None:
+    before = w.ByHandleInfo()
+    before.attributes = 32
+    before.creation_low = 11
+    before.creation_high = 12
+    before.access_low = 13
+    before.access_high = 14
+    before.write_low = 15
+    before.write_high = 16
+    before.volume_serial = 17
+    before.size_high = 18
+    before.size_low = 19
+    before.links = 1
+    before.file_index_high = 20
+    before.file_index_low = 21
+
+    after = w.ByHandleInfo()
+    ctypes.memmove(ctypes.byref(after), ctypes.byref(before), ctypes.sizeof(before))
+    setattr(after, field, int(getattr(after, field)) + 1)
+
+    assert w._signed_input_reobservation(before) != w._signed_input_reobservation(after)
+
+
 def test_wrong_signed_input_name_blocks() -> None:
     with pytest.raises(w.NativeFailure):
         w._read_fixed_signed_input(q.ROOT + r"\D10\other.json", 1024)

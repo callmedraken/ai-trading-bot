@@ -1400,6 +1400,23 @@ _D10_ATTESTATION = q.ROOT + r"\D10\deployment.attestation.json"
 _D10_SIGNATURE = q.ROOT + r"\D10\deployment.attestation.sig"
 
 
+def _signed_input_reobservation(info: ByHandleInfo) -> tuple[int, ...]:
+    """Stable same-handle facts; last-access time may change because of this read."""
+    return (
+        int(info.attributes),
+        int(info.creation_low),
+        int(info.creation_high),
+        int(info.write_low),
+        int(info.write_high),
+        int(info.volume_serial),
+        int(info.size_high),
+        int(info.size_low),
+        int(info.links),
+        int(info.file_index_high),
+        int(info.file_index_low),
+    )
+
+
 def _read_fixed_signed_input(path: str, limit: int) -> bytes:
     if path not in (_D10_ATTESTATION, _D10_SIGNATURE):
         raise NativeFailure("unreviewed signed input path")
@@ -1479,7 +1496,7 @@ def _read_fixed_signed_input(path: str, limit: int) -> bytes:
             raise NativeFailure("fixed signed input short read")
         second = ByHandleInfo()
         _check(get_info(handle, ctypes.byref(second)), "GetFileInformationByHandle")
-        if bytes(info) != bytes(second):
+        if _signed_input_reobservation(info) != _signed_input_reobservation(second):
             raise NativeFailure("fixed signed input identity drift")
         return buffer.raw
     finally:

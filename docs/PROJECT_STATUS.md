@@ -4215,3 +4215,56 @@ preflight against the certified S5-R8 source. It must still skip signed-A123/
 D10 trust reads, perform no host mutation, and stop for review on PASS or
 BLOCKED. A PASS is diagnostic evidence only and is not actual P124-1
 acceptance.
+
+
+## 2026-09-26 S5-R8 real-host read-only preflight PASS
+
+The bounded S5-R8 P124-1 host/token preflight completed successfully:
+
+```text
+certified source HEAD:
+86f1021d244bf62bcf5a0f457c30eb98b998de90
+
+certified source TREE:
+cfa455811f6bd1b3373a66f6716afca9dbd254df
+
+evidence:
+F:\AI\temp\p1241-readonly-s5r8-20260926-151219
+
+status: PASS
+stage: complete
+selected Trading PID: 11456
+native transcript schema: personal-desktop-p124-1-native-transcript/v4
+protected/runtime object count: 12514
+signed A123 / D10 trust: SKIPPED_BY_READ_ONLY_PREFLIGHT
+actual P124 operation: NOT_RUN
+```
+
+Both discovered Trading-owned processes were admitted as the exact Trading
+SID, non-admin and non-elevated, with enabled `SeChangeNotifyPrivilege` and
+no dangerous enabled privilege. The preflight passed Administrator proof,
+complete native before inventory, actual Trading effective-access checks,
+isolated production-Python runtime diagnostic, System32 DLL qualification,
+complete after-inventory equality, and the corrected S5-R8 pure qualification
+policy.
+
+This PASS closes the read-only substrate-diagnosis loop. It is diagnostic
+evidence only: signed Architecture-123/D10 trust was deliberately not read,
+and actual P124-1 was not run. No ACL/account/privilege/package mutation,
+signing, protected D10 provisioning, scheduler mutation, provider/broker
+effect, or trading effect occurred.
+
+The previously generated S5-R2 protected-deployment material is now stale
+because the accepted governed source advanced to S5-R8. Before any P124-2
+retry, refresh the non-governed P124-2/P124-3 certified-source pins to S5-R8,
+construct a fresh byte-exact S5-R8 deployment checkout, independently audit
+the governed blobs, and rebuild/read-only-verify the canonical executable
+manifest and unsigned deployment attestation for the S5-R8 source. Do not
+reuse the S5-R2 manifest, attestation digest, deployment ID, or deployment
+checkout.
+
+The protected checkpoint order remains fail-closed: no P124-2 protected D10
+provisioning until the refreshed S5-R8 deployment material is reviewed; P124-3
+signing/trust publication remains a separate higher-risk authorization; the
+full signed-trust P124-1 qualification follows only after the exact protected
+deployment and signed trust material exist.

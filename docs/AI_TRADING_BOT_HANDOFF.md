@@ -4162,3 +4162,59 @@ preflight against the certified S5-R8 source. Continue to skip signed-A123/D10
 trust reads, make no host mutation, and stop for review on PASS or BLOCKED.
 The result is diagnostic evidence only and must not be treated as actual
 P124-1 acceptance.
+
+
+## 2026-09-26 S5-R8 real-host preflight PASS and resume point
+
+The bounded read-only host/token preflight against the certified S5-R8 source
+passed completely:
+
+```text
+source HEAD: 86f1021d244bf62bcf5a0f457c30eb98b998de90
+source TREE: cfa455811f6bd1b3373a66f6716afca9dbd254df
+evidence: F:\AI\temp\p1241-readonly-s5r8-20260926-151219
+
+status: PASS
+stage: complete
+selected PID: 11456
+native transcript: personal-desktop-p124-1-native-transcript/v4
+protected/runtime object count: 12514
+signed A123: SKIPPED_BY_READ_ONLY_PREFLIGHT
+P124 operation: NOT_RUN
+```
+
+Both Trading candidates (conhost PID 11456 and PowerShell PID 20268) were
+admitted as the exact Trading SID, non-admin, non-elevated, with enabled
+SeChangeNotifyPrivilege. Administrator proof, before inventory, Trading
+effective-access denial, runtime diagnostic, System32 DLL review, after
+inventory equality, and pure S5-R8 qualification all passed.
+
+This result proves the real host/runtime substrate now satisfies the frozen
+read-only S5-R8 contract. It does not prove signed D10 trust and does not
+constitute actual P124-1 acceptance.
+
+Important stale material boundary: the existing byte-exact deployment checkout
+and canonical manifest/unsigned-attestation values were built for S5-R2
+(ead270918f0ed6a17605aa02bb0313b73e27cdfa), not S5-R8. They must not be used
+for a P124-2 retry.
+
+Immediate next source-only checkpoint:
+
+1. update the non-governed `scripts/d10_protected_deployment.py` certified
+   source HEAD/TREE pins from S5-R2 to the accepted S5-R8
+   `86f1021d... / cfa45581...`;
+2. update the focused pin tests only as required;
+3. create a fresh byte-exact S5-R8 deployment-source checkout using
+   process-local LF checkout semantics;
+4. independently raw-blob-audit the governed inventory against certified HEAD;
+5. rebuild and read-only verify the executable manifest, guard identity,
+   deterministic deployment ID, and unsigned canonical attestation;
+6. commit/push only the narrow source-pin/test change; canonical status/handoff
+   closeout remains ChatGPT/Sol-owned after exact review.
+
+No protected D10 provisioning, signing/CNG, signed trust publication, actual
+P124-1/P124-2/P124-3, scheduler mutation, credential mutation, provider call,
+or trading effect is authorized by this read-only PASS. Under the standing
+workflow, the source-only pin/material refresh may proceed without another
+approval; stop for fresh explicit authorization before the first protected D10
+filesystem mutation or signing/trust-publication boundary.

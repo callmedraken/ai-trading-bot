@@ -231,6 +231,7 @@ def test_system32_reported_case_difference_is_direct_child_only(
     for invalid in (
         q.SYSTEM32 + r"\sub\kernel32.dll",
         q.SYSTEM32 + r"\kernel32.dll:stream",
+        q.SYSTEM32 + r"\kernel32.exe",
         r"C:\Windows\SysWOW64\kernel32.dll",
         q.SYSTEM32 + r"\kernel32.dll",
     ):
@@ -243,13 +244,13 @@ def test_system32_reported_case_difference_is_direct_child_only(
             w._inspect_system32_reported(invalid, 1)
 
 
-def test_native_system32_collection_preserves_reported_and_final_paths(
+def _system32_collection_seams(
     monkeypatch: pytest.MonkeyPatch,
-) -> None:
+    dll: q.ObjectEvidence,
+    inspections: tuple[q.ObjectEvidence, ...] | None = None,
+) -> list[str]:
     from scripts import d10_python_substrate_harness as h
 
-    reported = q.SYSTEM32 + r"\KERNEL32.DLL"
-    final_path = q.SYSTEM32 + r"\kernel32.dll"
     facts = h.TokenObservation(
         q.TRADING, True, False, (q.TRADING,), ("SeChangeNotifyPrivilege",), True, True
     )
@@ -258,27 +259,41 @@ def test_native_system32_collection_preserves_reported_and_final_paths(
         owner_sid=q.SYSTEM,
         volume_root="C:\\",
     )
-    dll = replace(_node(reported, q.Kind.FILE), final_path=final_path)
     opened: list[str] = []
+    inspection_index = 0
+
+    def inspect_dll(path: str, handle: int) -> tuple[q.ObjectEvidence, int]:
+        nonlocal inspection_index
+        item = dll
+        if inspections is not None:
+            item = inspections[min(inspection_index, len(inspections) - 1)]
+        inspection_index += 1
+        return item, 0x80
+
+    def access_check(descriptor: int, token: int, desired: int) -> tuple[int, bool]:
+        return 0, False
+
     monkeypatch.setattr(w, "_trading_token", lambda pid: (103, facts))
     monkeypatch.setattr(w, "_open", lambda path: path)
     monkeypatch.setattr(
         w, "_open_system32_reported", lambda path: opened.append(path) or path
     )
-    monkeypatch.setattr(
-        w,
-        "_inspect",
-        lambda path, handle: (parent, 0x10),
-    )
-    monkeypatch.setattr(
-        w,
-        "_inspect_system32_reported",
-        lambda path, handle: (dll, 0x80),
-    )
+    monkeypatch.setattr(w, "_inspect", lambda path, handle: (parent, 0x10))
+    monkeypatch.setattr(w, "_inspect_system32_reported", inspect_dll)
     monkeypatch.setattr(w, "_descriptor", lambda handle: 19)
-    monkeypatch.setattr(w, "_access_check", lambda *args: (0, False))
+    monkeypatch.setattr(w, "_access_check", access_check)
     monkeypatch.setattr(w, "_bind", lambda *args: lambda pointer: None)
     monkeypatch.setattr(w, "_close", lambda handle: None)
+    return opened
+
+
+def test_native_system32_collection_preserves_reported_and_final_paths(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    reported = q.SYSTEM32 + r"\KERNEL32.DLL"
+    final_path = q.SYSTEM32 + r"\kernel32.dll"
+    dll = replace(_node(reported, q.Kind.FILE), final_path=final_path)
+    opened = _system32_collection_seams(monkeypatch, dll)
 
     observation = w.collect_system_dlls((reported,), 123)
     assert opened == [reported]
@@ -286,6 +301,115 @@ def test_native_system32_collection_preserves_reported_and_final_paths(
     assert observation.parent.final_path == q.SYSTEM32
     assert observation.dlls[0].path == reported
     assert observation.dlls[0].final_path == final_path
+    assert observation.dlls[0].link_count == 1
+
+
+@pytest.mark.parametrize("link_count", [1, 2])
+def test_native_system32_collection_admits_positive_link_counts(
+    monkeypatch: pytest.MonkeyPatch, link_count: int
+) -> None:
+    path = q.SYSTEM32 + r"\kernel32.dll"
+    dll = replace(_node(path, q.Kind.FILE), links=link_count)
+    _system32_collection_seams(monkeypatch, dll)
+
+    observation = w.collect_system_dlls((path,), 123)
+    assert observation.dlls[0].link_count == link_count
+
+
+@pytest.mark.parametrize("link_count", [0, -1, True, None, "2", 2.0])
+def test_native_system32_collection_rejects_invalid_link_counts(
+    monkeypatch: pytest.MonkeyPatch, link_count: object
+) -> None:
+    path = q.SYSTEM32 + r"\kernel32.dll"
+    dll = replace(_node(path, q.Kind.FILE), links=link_count)
+    _system32_collection_seams(monkeypatch, dll)
+
+    with pytest.raises(w.NativeFailure, match="System32 DLL object differs"):
+        w.collect_system_dlls((path,), 123)
+
+
+@pytest.mark.parametrize(
+    ("field", "value"), [("kind", q.Kind.DIRECTORY), ("reparse", True)]
+)
+def test_native_system32_collection_requires_non_reparse_file(
+    monkeypatch: pytest.MonkeyPatch, field: str, value: object
+) -> None:
+    path = q.SYSTEM32 + r"\kernel32.dll"
+    dll = replace(_node(path, q.Kind.FILE), **{field: value})
+    _system32_collection_seams(monkeypatch, dll)
+
+    with pytest.raises(w.NativeFailure, match="System32 DLL object differs"):
+        w.collect_system_dlls((path,), 123)
+
+
+def test_system32_native_handle_inspection_rejects_reparse_object(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def get_info(handle: int, info_pointer: object) -> int:
+        info = ctypes.cast(info_pointer, ctypes.POINTER(w.ByHandleInfo)).contents
+        info.attributes = w.FILE_ATTRIBUTE_REPARSE_POINT
+        return 1
+
+    monkeypatch.setattr(w, "_dll", lambda name: object())
+    monkeypatch.setattr(w, "_bind", lambda *args: get_info)
+
+    with pytest.raises(w.NativeFailure, match="reparse object"):
+        w._inspect_final(
+            q.SYSTEM32 + r"\kernel32.dll",
+            q.SYSTEM32 + r"\kernel32.dll",
+            17,
+        )
+
+
+def test_system32_parent_native_final_path_remains_exact(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(w, "_native_final_path", lambda handle: q.SYSTEM32.lower())
+    monkeypatch.setattr(
+        w,
+        "_inspect_final",
+        lambda *args: pytest.fail("fixed System32 parent path must remain exact"),
+    )
+
+    with pytest.raises(w.NativeFailure, match="final native path differs"):
+        w._inspect(q.SYSTEM32, 17)
+
+
+@pytest.mark.parametrize("failing_check", range(1, 8))
+def test_native_system32_trading_mutation_and_delete_denials_are_required(
+    monkeypatch: pytest.MonkeyPatch, failing_check: int
+) -> None:
+    path = q.SYSTEM32 + r"\kernel32.dll"
+    dll = replace(_node(path, q.Kind.FILE), links=2)
+    _system32_collection_seams(monkeypatch, dll)
+    checks = 0
+
+    def access_check(descriptor: int, token: int, desired: int) -> tuple[int, bool]:
+        nonlocal checks
+        checks += 1
+        if checks != failing_check:
+            return 0, False
+        if desired == 0x02000000:
+            return q.MUTATION_MASK, False
+        return 0, True
+
+    monkeypatch.setattr(w, "_access_check", access_check)
+
+    with pytest.raises(w.NativeFailure):
+        w.collect_system_dlls((path,), 123)
+    assert checks == (4 if failing_check <= 4 else 7)
+
+
+def test_native_system32_link_count_drift_during_reobservation_blocks(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    path = q.SYSTEM32 + r"\kernel32.dll"
+    initial = replace(_node(path, q.Kind.FILE), links=2)
+    changed = replace(initial, links=3)
+    _system32_collection_seams(monkeypatch, initial, (initial, changed))
+
+    with pytest.raises(w.NativeFailure, match="System32 DLL identity/security drift"):
+        w.collect_system_dlls((path,), 123)
 
 
 def test_fixed_signed_input_final_path_remains_exact(

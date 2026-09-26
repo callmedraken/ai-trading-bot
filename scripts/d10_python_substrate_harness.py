@@ -15,7 +15,7 @@ from typing import Protocol
 
 from trading_bot.runtime import personal_desktop_d10_python_substrate as q
 
-SCHEMA = "personal-desktop-p124-1-native-transcript/v3"
+SCHEMA = "personal-desktop-p124-1-native-transcript/v4"
 MAX_OBJECTS = 100_000
 MAX_DEPENDENCIES = 4_096
 MAX_TRANSCRIPT_BYTES = 32 * 1024 * 1024
@@ -122,6 +122,7 @@ class Diagnostic:
 class SystemDll:
     path: str
     final_path: str
+    link_count: int
     owner_sid: str
     dacl_protected: bool
     aces: tuple[q.Ace, ...]
@@ -421,6 +422,8 @@ def _system_dlls(value: SystemDllObservation, imports: q.ImportEvidence) -> None
             and _valid_system32_path(row.path)
             and _valid_system32_path(row.final_path)
             and _same_path_modulo_case(row.path, row.final_path)
+            and type(row.link_count) is int
+            and row.link_count >= 1
             and row.owner_sid != q.TRADING
             and bool(row.owner_sid)
             and bool(row.aces)

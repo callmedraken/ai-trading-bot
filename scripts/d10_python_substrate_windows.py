@@ -1343,7 +1343,12 @@ def collect_system_dlls(
                 handles[path] = handle
                 item, _ = _inspect_system32_reported(path, handle)
                 observed[path] = item
-                if item.kind is not q.Kind.FILE or item.links != 1:
+                if (
+                    item.kind is not q.Kind.FILE
+                    or item.reparse is not False
+                    or type(item.links) is not int
+                    or item.links < 1
+                ):
                     raise NativeFailure("System32 DLL object differs")
                 descriptor = _descriptor(handle)
                 try:
@@ -1365,6 +1370,7 @@ def collect_system_dlls(
                     h.SystemDll(
                         path,
                         item.final_path,
+                        item.links,
                         item.owner_sid,
                         item.dacl_protected,
                         item.aces,

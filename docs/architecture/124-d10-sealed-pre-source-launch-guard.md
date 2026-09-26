@@ -153,10 +153,17 @@ case: normalized case-insensitive equality is required, while any directory,
 basename, drive, volume, or other non-case difference blocks qualification.
 The actual native final spelling is retained in dependency and DLL evidence.
 Runtime final paths must resolve case-insensitively to exactly one file in the
-complete protected runtime inventory. Case-colliding inventory names remain a
-blocking condition. The System32 parent remains an exact fixed identity, and
-direct-child, `.dll`, no-follow, security, effective-denial, and drift checks
-remain unchanged.
+complete protected runtime inventory. Case-colliding inventory names and
+runtime files with a hard-link count other than one remain blocking. Windows
+System32/KnownDLL DLLs may legitimately have multiple NTFS hard links: their
+positive native link count is retained in the sanitized transcript, and a
+count greater than one alone does not block qualification. An invalid, zero,
+negative, unavailable, or indeterminate System32 link count blocks; same-handle
+re-observation must detect link-count drift. The System32 parent remains an
+exact fixed identity. Direct-child and `.dll` qualification, native no-follow
+opening, non-reparse file identity, owner/DACL proof, actual Trading mutation
+and file-delete denial, parent replacement denial, and drift checks remain
+mandatory.
 
 ## 6. Guard verification sequence
 

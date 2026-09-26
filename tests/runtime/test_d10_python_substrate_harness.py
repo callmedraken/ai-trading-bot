@@ -153,6 +153,7 @@ def _fixture() -> tuple[
             h.SystemDll(
                 imports.loaded_system_dlls[0],
                 imports.loaded_system_dlls[0],
+                1,
                 q.SYSTEM,
                 True,
                 (q.Ace(q.SYSTEM, q.ALL_ACCESS),),
@@ -267,7 +268,7 @@ def test_complete_evidence_and_deterministic_transcript() -> None:
     collector = MockCollector()
     first = h.collect(collector)
     assert b'"status":"PASS"' in first
-    assert b'"schema":"personal-desktop-p124-1-native-transcript/v3"' in first
+    assert b'"schema":"personal-desktop-p124-1-native-transcript/v4"' in first
     assert b'"policy":"volume_namespace"' in first
     assert first == h.collect(MockCollector())
     assert collector.calls == [
@@ -689,6 +690,35 @@ def test_system32_loader_case_difference_is_retained_and_admitted() -> None:
     assert row["path"] == reported
     assert row["final_path"] == final_path
     assert transcript["system_dlls"]["parent"]["final_path"] == q.SYSTEM32
+
+
+@pytest.mark.parametrize("link_count", [1, 2])
+def test_system32_positive_link_count_is_retained_in_v4_transcript(
+    link_count: int,
+) -> None:
+    collector = MockCollector()
+    collector.dlls = replace(
+        collector.dlls,
+        dlls=(replace(collector.dlls.dlls[0], link_count=link_count),),
+    )
+
+    transcript = json.loads(h.collect(collector))
+    assert transcript["schema"] == "personal-desktop-p124-1-native-transcript/v4"
+    assert transcript["system_dlls"]["dlls"][0]["link_count"] == link_count
+
+
+@pytest.mark.parametrize("link_count", [0, -1, True, False, "2", 2.0, None])
+def test_system32_non_positive_or_non_integer_link_count_blocks(
+    link_count: object,
+) -> None:
+    collector = MockCollector()
+    collector.dlls = replace(
+        collector.dlls,
+        dlls=(replace(collector.dlls.dlls[0], link_count=link_count),),
+    )
+
+    with pytest.raises(h.CollectionBlocked):
+        h.collect(collector)
 
 
 @pytest.mark.parametrize(

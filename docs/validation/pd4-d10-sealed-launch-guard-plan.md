@@ -171,11 +171,12 @@ opens the production runtime. Its typed QualificationEvidence is input to a
 later protected P124-1 native collector; a caller-built instance is not
 authority. QualificationResult contains fixed paths, version, accepted search
 roots and a count, with no handle, raw ACL, token, or reusable capability.
-P124-1 must retain a native transcript for operator review. The corrected
-transcript schema is v3 and records the explicit volume-namespace or
-protected-object access policy for each effective-access row, as well as the
-distinct loader-reported and handle-derived path spellings for dynamic module
-and DLL observations. This result does not authorize a D10 launch.
+P124-1 must retain a native transcript for operator review. The transcript
+schema is v4 and records the explicit volume-namespace or protected-object
+access policy for each effective-access row, the distinct loader-reported and
+handle-derived path spellings for dynamic module and DLL observations, and the
+native link count for each System32 DLL. This result does not authorize a D10
+launch.
 
 The source-owned identity is exactly F:\AITradingBot\runtime\python.exe,
 Python 3.14.3, runtime F:\AITradingBot\runtime, and package path
@@ -197,16 +198,24 @@ case-insensitive, and any directory, basename, volume, or other non-case
 difference blocks. The actual native final spelling is retained separately in
 the transcript. Runtime final paths must map case-insensitively to exactly one
 protected runtime inventory file. The complete runtime inventory's
-case-collision rejection remains mandatory. The System32 parent remains an
-exact fixed path; direct-child-only .dll, owner/DACL, Trading effective
-denial, no-follow identity, and re-observation/drift requirements are
-unchanged.
+case-collision rejection and exactly-one-link requirement for runtime files
+remain mandatory. Windows System32/KnownDLL DLLs may legitimately have
+multiple NTFS hard links. Their positive native link count is observed and
+retained in the transcript; a count greater than one alone is not a blocker.
+An invalid, zero, negative, unavailable, or indeterminate System32 link count
+blocks, and same-handle re-observation must detect link-count drift. The
+System32 parent remains an exact fixed path; direct-child-only .dll,
+non-reparse file identity, owner/DACL, actual Trading mutation and file-delete
+denial, parent mutation and FILE_DELETE_CHILD replacement denial, no-follow
+opening, and all other drift checks remain mandatory.
 
 P124-1 must collect and preserve these observations:
 
 1. Under Administrator, open F:\, F:\AITradingBot, and every object in the
    entire F:\AITradingBot\runtime subtree by native no-follow handles. Pin
-   parents and children, reject reparse points and hard-linked files, inspect
+   parents and children, reject reparse points throughout and hard-linked
+   files within the governed runtime subtree (each runtime file must have
+   exactly one link), inspect
    GetFinalPathNameByHandleW, object kind, file ID, volume serial, fixed local
    NTFS volume, owner SID, DACL-protected control bit, and complete ACE
    type/order/flags/masks. Enumerate every directory's direct names, reject

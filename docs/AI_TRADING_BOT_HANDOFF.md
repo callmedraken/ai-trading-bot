@@ -4398,3 +4398,69 @@ Require fresh explicit authorization before P124-3 because this is signing and
 production trust publication. After a verified P124-3 PASS, proceed to the
 read-only full signed-trust P124-1 qualification before any activation lease
 or scheduler change.
+
+
+## 2026-09-26 P124-3 PASS; full signed-trust P124-1 is next
+
+The protected P124-3 boundary is complete.
+
+Evidence:
+
+```text
+F:\AI\temp\p1243-s5r8-20260926-161326
+```
+
+Published trust set:
+
+```text
+F:\AITradingBot\D10\deployment.attestation.json
+F:\AITradingBot\D10\deployment.attestation.sig
+F:\AITradingBot\D10\executable-manifest.json
+```
+
+Accepted identities:
+
+```text
+source HEAD:
+86f1021d244bf62bcf5a0f457c30eb98b998de90
+
+source TREE:
+cfa455811f6bd1b3373a66f6716afca9dbd254df
+
+manifest SHA-256:
+e4aa71ebbe269837adfd277fbcd8b7ae05e1051343276de2449177587fe7b60a
+
+unsigned attestation SHA-256:
+a12ab7788120934ca928919a01b4cfc7a3f6f307fad79ab13a6bfff189aeb3f3
+
+deployment ID:
+2fd79986-fb50-5fe4-800a-2d4aa5e7307c
+
+signing key ID:
+AITradingBot/D10/DeploymentAttestation/v3
+
+public key SHA-256:
+fb22627f6d01d63ecfcc02dbe6e34a5529bdde30ceb0fcb8037eead6f0c56b1e
+
+signature SHA-256:
+7ae83e28bcd8ab7cb59ab990a7f3b3191f485621aa83f5431f7f25fc32c8b4eb
+```
+
+Native P124-3 and separate read-only post-verification both passed. Trust
+installing names are absent. The activation lease and cache prefix remain
+absent. No key enrollment/deletion/private export, scheduler mutation,
+provider/broker call, or trading effect occurred.
+
+Current protected checkpoint state:
+
+- P124-2 sealed source/guard provisioning: PASS;
+- P124-3 signed trust publication: PASS;
+- S5-R8 runtime/token read-only substrate qualification: PASS;
+- full signed-trust P124-1 qualification: not yet run;
+- P124-4/P124-5 activation/scheduler work: not run.
+
+NEXT: perform one bounded read-only full signed-trust P124-1 qualification.
+It must consume the installed Architecture-123 trust files, verify the detached
+signature/public-key identity and exact manifest/attestation/source/guard
+binding, re-prove the production Python/token/native substrate, and stop for
+review on PASS or BLOCKED. It grants no activation or scheduler authority.

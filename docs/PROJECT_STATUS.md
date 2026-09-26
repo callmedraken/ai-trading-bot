@@ -4452,3 +4452,109 @@ boundary because it uses the non-exportable CNG private signing identity and
 publishes production trust material. It requires a fresh explicit operator
 authorization before execution. After P124-3 passes, the next read-only gate
 is full signed-trust P124-1 qualification.
+
+
+## 2026-09-26 P124-3 signed trust publication accepted
+
+Protected P124-3 completed successfully and was independently reverified
+read-only.
+
+Evidence:
+
+```text
+F:\AI\temp\p1243-s5r8-20260926-161326
+```
+
+Native protected operation:
+
+```text
+schema: personal-desktop-d10-protected-deployment/v1
+operation: P124-3
+status: PASS
+
+certified source HEAD:
+86f1021d244bf62bcf5a0f457c30eb98b998de90
+
+certified source TREE:
+cfa455811f6bd1b3373a66f6716afca9dbd254df
+
+manifest SHA-256:
+e4aa71ebbe269837adfd277fbcd8b7ae05e1051343276de2449177587fe7b60a
+
+launch guard SHA-256:
+3b28d0ffeede06a4785a903dbf6a48c12204651ce8a3c2f80cd6a1428efd8d1a
+
+unsigned attestation SHA-256:
+a12ab7788120934ca928919a01b4cfc7a3f6f307fad79ab13a6bfff189aeb3f3
+
+signing key ID:
+AITradingBot/D10/DeploymentAttestation/v3
+
+signature protocol:
+ECDSA-P256 / SHA-256 / IEEE-P1363
+
+signature bytes:
+64
+
+signature SHA-256:
+7ae83e28bcd8ab7cb59ab990a7f3b3191f485621aa83f5431f7f25fc32c8b4eb
+
+native reverification:
+PASS
+
+activation authority:
+NONE
+
+scheduler authority:
+NONE
+
+trading authority:
+NONE
+```
+
+Published trust files are exactly:
+
+```text
+F:\AITradingBot\D10\deployment.attestation.json
+F:\AITradingBot\D10\deployment.attestation.sig
+F:\AITradingBot\D10\executable-manifest.json
+```
+
+Independent read-only post-verification passed:
+
+```text
+schema: p1243-s5r8-readonly-postverify/v1
+status: PASS
+deployment ID:
+2fd79986-fb50-5fe4-800a-2d4aa5e7307c
+detached signature verification: PASS
+native reverification: PASS
+trust final paths: PRESENT_EXACT_AND_VERIFIED
+trust installing paths: ABSENT_AND_VERIFIED
+activation lease: ABSENT_AND_VERIFIED
+cache prefix: ABSENT_AND_VERIFIED
+public key SHA-256:
+fb22627f6d01d63ecfcc02dbe6e34a5529bdde30ceb0fcb8037eead6f0c56b1e
+key enrollment: NOT_RUN
+private key export: NOT_RUN
+scheduler: NOT_RUN
+provider: NOT_RUN
+trading: NOT_RUN
+```
+
+Preserved P124-3 transcript SHA-256:
+
+```text
+8d64da555a325c98fee7594dbb5fb897c7d0bffe08b869171538157017f07e7d
+```
+
+P124-3 therefore closes as PASS. The exact S5-R8 Architecture-123 trust set
+now exists and verifies under the frozen v3 public key. No activation lease,
+cache prefix, scheduler mutation, provider/broker call, or trading effect
+occurred.
+
+Immediate next checkpoint: run the full signed-trust P124-1 qualification
+read-only against the production D10 trust set and the already-passed S5-R8
+runtime/token substrate. This read-only checkpoint is covered by the standing
+continuation authorization. It must not mutate D10, sign again, create an
+activation lease, modify Task Scheduler, access provider credentials, or trade.

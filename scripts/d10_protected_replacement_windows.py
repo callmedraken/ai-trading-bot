@@ -2198,6 +2198,13 @@ class _FixedRetiredDeletionNative(_WindowsReplacementReader):
             ):
                 raise AdmissionBlocked("cleanup_pinned_file_read")
             data.extend(buffer.raw[: received.value])
+        probe = ctypes.create_string_buffer(1)
+        received = wintypes.DWORD()
+        if (
+            not read(handle, probe, 1, ctypes.byref(received), None)
+            or received.value != 0
+        ):
+            raise AdmissionBlocked("cleanup_pinned_file_trailing_data")
         return bytes(data)
 
     def _set_disposition(self, handle: int) -> bool:
@@ -2219,7 +2226,10 @@ def _cleanup_identity_exact(
         require_parent_native_object(observed)
     else:
         require_native_object(observed, expected.path, directory=expected.directory)
-    if replace(observed, size=expected.size) != expected:
+    exact_observed = (
+        replace(observed, size=expected.size) if expected.directory else observed
+    )
+    if exact_observed != expected:
         raise AdmissionBlocked("cleanup_pinned_identity_drift")
 
 

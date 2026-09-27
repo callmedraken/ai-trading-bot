@@ -653,7 +653,14 @@ def test_cleanup_full_plan_and_absent_post_proof(
 
 @pytest.mark.parametrize(
     "change",
-    ["missing_file", "unexpected", "acl", "canonical_unsigned", "staging", "scheduler"],
+    [
+        "missing_file",
+        "unexpected",
+        "acl",
+        "canonical_unsigned",
+        "staging",
+        "scheduler",
+    ],
 )
 def test_cleanup_closed_classification(
     monkeypatch: pytest.MonkeyPatch, change: str
@@ -733,7 +740,19 @@ def test_disposition_uses_only_legacy_handle_class() -> None:
 
 
 @pytest.mark.parametrize(
-    "failure", ["", "bytes", "disposition", "close", "parent_after", "absent"]
+    "failure",
+    [
+        "",
+        "size",
+        "bytes",
+        "trailing",
+        "trailing_many",
+        "truncated",
+        "disposition",
+        "close",
+        "parent_after",
+        "absent",
+    ],
 )
 def test_cleanup_step_commit_point_is_exclusive_and_fail_closed(
     monkeypatch: pytest.MonkeyPatch, failure: str
@@ -748,6 +767,7 @@ def test_cleanup_step_commit_point_is_exclusive_and_fail_closed(
     names = observation.plan.children_of(parent_path)
     backend = object.__new__(w._FixedRetiredDeletionNative)
     backend._targets = {item.path: item for item in observation.plan.targets}
+    backend._kernel = object()
     calls: list[str] = []
 
     def opened(path: str, *, parent: bool, directory: bool) -> int:
@@ -756,7 +776,13 @@ def test_cleanup_step_commit_point_is_exclusive_and_fail_closed(
         return 1 if parent else 2
 
     def inspected(handle: int, path: str) -> d.NativeObject:
-        return parent_item if handle == 1 else target_item
+        if handle == 1:
+            return parent_item
+        return (
+            replace(target_item, size=target_item.size + 1)
+            if failure == "size"
+            else target_item
+        )
 
     inventory_calls = 0
 
@@ -770,13 +796,37 @@ def test_cleanup_step_commit_point_is_exclusive_and_fail_closed(
             return tuple(name for name in names if name != Path(target.path).name)
         return names
 
-    def file_bytes(handle: int, size: int) -> bytes:
-        assert handle == 2 and size == target.byte_length
-        return b"wrong" if failure == "bytes" else native.files[target.path]
+    original_bytes = native.files[target.path]
+    data = (
+        b"X" + original_bytes[1:]
+        if failure == "bytes"
+        else original_bytes + b"x"
+        if failure == "trailing"
+        else original_bytes + b"xyz"
+        if failure == "trailing_many"
+        else original_bytes[:-1]
+        if failure == "truncated"
+        else original_bytes
+    )
+    cursor = 0
+
+    def read(handle, buffer, count, received, overlapped):
+        nonlocal cursor
+        assert handle == 2 and overlapped is None
+        chunk = data[cursor : cursor + count]
+        ctypes.memmove(buffer, chunk, len(chunk))
+        ctypes.cast(received, ctypes.POINTER(w.wintypes.DWORD)).contents.value = len(
+            chunk
+        )
+        cursor += len(chunk)
+        return True
 
     def disposition(handle: int) -> bool:
         calls.append("disposition")
-        return failure != "disposition"
+        if failure == "disposition":
+            return False
+        native.files.pop(target.path)
+        return True
 
     def close(handle: int) -> None:
         calls.append("close_target" if handle == 2 else "close_parent")
@@ -786,7 +836,7 @@ def test_cleanup_step_commit_point_is_exclusive_and_fail_closed(
     monkeypatch.setattr(backend, "_cleanup_open", opened)
     monkeypatch.setattr(backend, "_inspect", inspected)
     monkeypatch.setattr(backend, "_pinned_names", inventory)
-    monkeypatch.setattr(backend, "_pinned_file", file_bytes)
+    monkeypatch.setattr(backend, "_bind", lambda library, name, args, result: read)
     monkeypatch.setattr(backend, "_set_disposition", disposition)
     monkeypatch.setattr(backend, "_close", close)
     monkeypatch.setattr(backend, "absent", lambda path: failure != "absent")
@@ -798,8 +848,9 @@ def test_cleanup_step_commit_point_is_exclusive_and_fail_closed(
     )
     assert calls[:2] == ["parent_open", "exclusive_target_open"]
     assert calls.count("close_target") == 1
-    if failure == "bytes":
+    if failure in ("size", "bytes", "trailing", "trailing_many", "truncated"):
         assert "disposition" not in calls
+        assert target.path in native.files
     if failure == "close":
         assert calls.count("close_target") == 1
 

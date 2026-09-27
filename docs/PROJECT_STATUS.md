@@ -4917,3 +4917,53 @@ c5cc0b01301600daf17f1114f4451dca2c9d7a1f
 certified S5-R10 source TREE:
 bfacfadaa14315d2d378abcc0f1e4bc7c42034f1
 ```
+
+
+### S5-R10 unsigned deployment material — ACCEPTED
+
+The post-certification S5-R10 source/material refresh is accepted as a
+source-only/read-only checkpoint.
+
+```text
+certified source HEAD:
+c5cc0b01301600daf17f1114f4451dca2c9d7a1f
+certified source TREE:
+bfacfadaa14315d2d378abcc0f1e4bc7c42034f1
+
+operator pin HEAD:
+19c585519daefad917d6326b5180177b63f8e7f0
+operator pin TREE:
+ab0dccdea1e0e6646ba3b68b3afb725a553f68cc
+
+governed raw audit:
+307 HEAD / 307 local / 0 missing / 0 extra / 0 blob mismatch / 0 cache
+
+manifest:
+306 files
+51542 bytes canonical JSON
+5391245 executable bytes
+SHA-256 e4aa71ebbe269837adfd277fbcd8b7ae05e1051343276de2449177587fe7b60a
+
+launch guard:
+69259 bytes
+SHA-256 37d78c65800a315a12049b6c278addf609589d121e15d31dd9064dc8ec427298
+
+unsigned attestation:
+1010 bytes
+SHA-256 4e4e44d4129876454bd5d9559af7358f2600466f9291c6626f92e173d541f2c2
+
+deployment ID:
+9f3d111b-25bb-5ee4-9abf-f5215a32b826
+
+evidence:
+F:\AI\temp\d10-s5r10-material-20260926-202753
+```
+
+No protected D10 host mutation or signing occurred. The installed S5-R8
+deployment/trust remains inactive and stale relative to S5-R10.
+
+NEXT: Sol High design-only freeze/review of the explicit protected
+S5-R8 -> S5-R10 D10 replacement procedure. Do not run existing P124-2 over the
+present D10 root, and do not delete/rename/replace the old D10 tree until that
+replacement contract is separately reviewed and a protected checkpoint is
+explicitly authorized.

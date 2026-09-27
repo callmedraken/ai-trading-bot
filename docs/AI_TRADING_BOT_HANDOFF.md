@@ -4734,3 +4734,94 @@ Any later protected replacement must be a separately reviewed high-risk
 checkpoint. It must not treat deletion/rename of the old D10 deployment as
 incidental cleanup and must not open activation, scheduler, provider, broker,
 paper, or live-trading authority.
+
+
+## S5-R10 unsigned deployment-material acceptance — 2026-09-26
+
+The safe source/material checkpoint after the S5-R10 pin refresh is ACCEPTED.
+
+Exact admitted inputs:
+
+```text
+certified byte-exact source HEAD:
+c5cc0b01301600daf17f1114f4451dca2c9d7a1f
+
+certified byte-exact source TREE:
+bfacfadaa14315d2d378abcc0f1e4bc7c42034f1
+
+operator/pin HEAD:
+19c585519daefad917d6326b5180177b63f8e7f0
+
+operator/pin TREE:
+ab0dccdea1e0e6646ba3b68b3afb725a553f68cc
+```
+
+Independent raw governed-blob audit:
+
+```text
+governed HEAD files: 307
+local governed files: 307
+missing: []
+extra: []
+raw blob mismatches: []
+cache artifacts: []
+```
+
+Accepted unsigned S5-R10 deployment material:
+
+```text
+executable manifest SHA-256:
+e4aa71ebbe269837adfd277fbcd8b7ae05e1051343276de2449177587fe7b60a
+manifest byte length: 51542
+manifest/executable file count: 306
+manifest/executable total bytes: 5391245
+
+launch guard byte length: 69259
+launch guard SHA-256:
+37d78c65800a315a12049b6c278addf609589d121e15d31dd9064dc8ec427298
+
+unsigned attestation byte length: 1010
+unsigned attestation SHA-256:
+4e4e44d4129876454bd5d9559af7358f2600466f9291c6626f92e173d541f2c2
+
+deployment ID:
+9f3d111b-25bb-5ee4-9abf-f5215a32b826
+
+signing key ID:
+AITradingBot/D10/DeploymentAttestation/v3
+
+production Python:
+F:\AITradingBot\runtime\python.exe
+production Python version: 3.14.3
+```
+
+Evidence directory:
+
+```text
+F:\AI\temp\d10-s5r10-material-20260926-202753
+```
+
+Both source worktrees remained clean after reconstruction. No signing, protected
+D10 mutation, activation lease, Task Scheduler mutation, provider call,
+decision publication, settlement, broker-paper, or live-trading effect
+occurred.
+
+Operator-safety rule retained: substantial protected/high-risk orchestration
+belongs in reviewed `.ps1`/`.py` files rather than giant interactive
+PowerShell/Python pastes. Structured data should use files/stdin rather than
+JSON argv; native stdout/stderr redirection, PowerShell null/singleton behavior,
+and explicit process exit handling must be deliberate. The canonical local
+folder for these operator/helper scripts is:
+
+```text
+F:\Users\John\Downloads
+```
+
+The next safe checkpoint is **Sol High design-only**: freeze and review an
+explicit protected S5-R8 -> S5-R10 D10 replacement procedure. The existing
+P124-2 primitive remains create-only for an absent D10 root and must not be
+used as an in-place replacement primitive. Any later Administrator mutation
+requires separate explicit authorization and must prove the old D10 deployment
+inactive, preserve the protected parent/security model, avoid ambiguous partial
+replacement state, and keep activation/scheduler/provider/trading authority
+closed.

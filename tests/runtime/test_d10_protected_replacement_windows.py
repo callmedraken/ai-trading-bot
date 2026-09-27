@@ -1,8 +1,9 @@
-"""Fake-boundary tests for the read-only P125-R1B native admission adapter."""
+"""Fake-boundary tests for P125 native admission and fixed mutations."""
 
 from __future__ import annotations
 
 import ast
+import ctypes
 import hashlib
 import inspect
 import io
@@ -12,6 +13,7 @@ from dataclasses import fields, replace
 from pathlib import Path
 
 import pytest
+from scripts.d10_protected_deployment_windows import WindowsReplacementStagingBackend
 
 from scripts import d10_protected_deployment as d
 from scripts import d10_protected_replacement as r
@@ -23,6 +25,7 @@ from trading_bot.runtime.personal_desktop_d10_deployment_identity import (
     ExecutableManifest,
     ExecutableManifestEntry,
     build_deployment_attestation,
+    parse_executable_manifest,
 )
 
 
@@ -647,3 +650,493 @@ def test_admission_rejects_parent_case_collision_and_absence_conflict(
     native.directories[r.RETIRED_PATH] = ()
     with pytest.raises(w.AdmissionBlocked):
         w._observe_admission(native, object(), _runner(_record()))
+
+
+def test_staging_writer_is_fixed_and_excludes_trust_and_lease() -> None:
+    writer = object.__new__(WindowsReplacementStagingBackend)
+    writer._source_files = frozenset()
+    writer._source_directories = frozenset()
+    writer.bind_source_inventory(
+        tuple(sorted((D10_LAUNCHER_RELATIVE_PATH, "src/trading_bot/__init__.py")))
+    )
+    assert writer._allowed_directory_create(r.STAGING_PATH)
+    assert writer._allowed_directory_create(r.STAGING_PATH + r"\source.installing")
+    assert writer._allowed_file_create(r.STAGING_PATH + r"\launch-guard.py.installing")
+    assert writer._allowed_file_create(
+        r.STAGING_PATH + r"\source.installing\src\trading_bot\__init__.py"
+    )
+    for rejected in (
+        r.CANONICAL_PATH,
+        r.STAGING_PATH + r"\activation.lease.json",
+        r.STAGING_PATH + r"\deployment.attestation.json.installing",
+        r.STAGING_PATH + r"\source.installing\..\escape.py",
+    ):
+        assert not writer._allowed_directory_create(rejected)
+        assert not writer._allowed_file_create(rejected)
+    assert not writer._allowed_file_create(d.TRUST_INSTALLING_PATHS[0])
+    assert w._WindowsReplacementReader._allowed(r.STAGING_PATH, directory=None)
+    assert not w._WindowsReplacementReader._allowed(
+        r.STAGING_PATH + r"\..\elsewhere", directory=None
+    )
+
+
+def test_rename_source_open_requests_delete_and_no_follow() -> None:
+    reader = object.__new__(w._WindowsReplacementReader)
+    reader._kernel = object()
+    seen: list[tuple[object, ...]] = []
+
+    def create(*args):
+        seen.append(args)
+        return 41
+
+    reader._bind = lambda _lib, name, _args, _result: (
+        create if name == "CreateFileW" else None
+    )
+    assert reader._open_rename_source(r.CANONICAL_PATH) == 41
+    path, access, share, _, disposition, flags, _ = seen[0]
+    assert path == r.CANONICAL_PATH
+    assert access & 0x00010000  # DELETE
+    assert share == 1
+    assert disposition == 3
+    assert flags & 0x00200000  # no follow
+    assert flags & 0x02000000  # directory backup semantics
+    assert reader._open_rename_parent() == 41
+    parent_path, parent_access, parent_share, _, parent_disposition, parent_flags, _ = (
+        seen[1]
+    )
+    assert parent_path == r.PARENT_PATH
+    assert parent_access & 0x0004  # FILE_ADD_SUBDIRECTORY
+    assert parent_access & 0x0020  # FILE_TRAVERSE
+    assert parent_share == 1
+    assert parent_disposition == 3
+    assert parent_flags & 0x00200000
+    assert parent_flags & 0x02000000
+    with pytest.raises(w.AdmissionBlocked, match="rename_source_path_unreviewed"):
+        reader._open_rename_source(r.RETIRED_PATH)
+
+
+class FakeRenameNative:
+    def __init__(self, step: r.RenameStep) -> None:
+        self.source_path, self.destination_path = w._fixed_rename_paths(step)
+        self.parent = _native(r.PARENT_PATH, directory=True)
+        self.source = _native(self.source_path, directory=True)
+        self.old_source = self.source
+        self.events: list[tuple[object, ...]] = []
+        self.renamed = False
+        self.collision = False
+        self.native_false = False
+        self.native_exception = False
+        self.pre_drift = False
+        self.post_drift = False
+        self.parent_pre_drift = False
+        self.parent_post_drift = False
+        self.close_failure = False
+        self.source_inspections = 0
+        self.parent_inspections = 0
+        self._kernel = object()
+
+    def require_administrator(self) -> None:
+        self.events.append(("administrator",))
+
+    def list_directory(self, path: str) -> d.CheckedDirectory:
+        if path == r.RETIRED_PATH:
+            return d.CheckedDirectory(
+                replace(self.old_source, path=path, final_path=path), (), True
+            )
+        assert path == r.PARENT_PATH
+        return d.CheckedDirectory(
+            self.parent,
+            (
+                r.RETIRED_PATH.rsplit("\\", 1)[-1],
+                r.STAGING_PATH.rsplit("\\", 1)[-1],
+            ),
+            True,
+        )
+
+    def _open_rename_parent(self) -> int:
+        self.events.append(("open_parent", r.PARENT_PATH))
+        return 11
+
+    def _open_rename_source(self, path: str) -> int:
+        self.events.append(("open_source", path))
+        assert path == self.source_path
+        return 22
+
+    def _inspect(self, handle: int, path: str) -> d.NativeObject:
+        self.events.append(("inspect", handle, path))
+        if handle == 11:
+            self.parent_inspections += 1
+            if self.parent_pre_drift and self.parent_inspections == 2:
+                return replace(self.parent, file_index=self.parent.file_index + 1)
+            if self.parent_post_drift and self.parent_inspections == 3:
+                return replace(self.parent, file_index=self.parent.file_index + 1)
+            return self.parent
+        assert handle == 22 and path == self.source_path
+        self.source_inspections += 1
+        if self.pre_drift and self.source_inspections == 2:
+            return replace(self.source, file_index=self.source.file_index + 1)
+        if self.renamed:
+            result = replace(self.source, final_path=self.destination_path)
+            if self.post_drift:
+                result = replace(result, aces=())
+            return result
+        return self.source
+
+    def absent(self, path: str) -> bool:
+        self.events.append(("absent", path))
+        assert path == self.destination_path
+        return not self.collision
+
+    def _bind(self, _library, name, _args, _result):
+        assert name == "SetFileInformationByHandle"
+
+        def rename(handle, info_class, pointer, size):
+            info = ctypes.cast(pointer, ctypes.POINTER(w._FileRenameInfo)).contents
+            name_bytes = ctypes.string_at(
+                ctypes.addressof(info) + w._FileRenameInfo.file_name.offset,
+                info.file_name_length,
+            )
+            leaf = name_bytes.decode("utf-16-le")
+            self.events.append(
+                (
+                    "rename",
+                    handle,
+                    info_class,
+                    info.replace_if_exists,
+                    info.root_directory,
+                    leaf,
+                    size,
+                )
+            )
+            if self.native_exception:
+                raise OSError("ambiguous native call")
+            if self.native_false:
+                return False
+            self.renamed = True
+            return True
+
+        return rename
+
+    def _close(self, handle: int) -> None:
+        self.events.append(("close", handle))
+        if self.close_failure:
+            raise OSError("close uncertain")
+
+
+@pytest.mark.parametrize(
+    "step",
+    [r.RenameStep.OLD_TO_RETIRED, r.RenameStep.STAGING_TO_CANONICAL],
+)
+def test_handle_pinned_fixed_rename_success(step: r.RenameStep) -> None:
+    native = FakeRenameNative(step)
+    outcome = w._rename_fixed_step(native, step, native.source, native.parent)
+    assert outcome is r.MutationOutcome.SUCCESS
+    rename = next(event for event in native.events if event[0] == "rename")
+    assert rename[1:6] == (
+        22,
+        3,
+        0,
+        11,
+        native.destination_path.rsplit("\\", 1)[-1],
+    )
+    assert all(
+        event[0] != "close" for event in native.events[: native.events.index(rename)]
+    )
+    assert native.events.index(rename) > next(
+        index
+        for index, event in enumerate(native.events)
+        if event == ("inspect", 22, native.source_path)
+    )
+    assert ("inspect", 22, native.source_path) in native.events[
+        native.events.index(rename) + 1 :
+    ]
+    assert native.events[-2:] == [("close", 22), ("close", 11)]
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [
+        "collision",
+        "native_false",
+        "native_exception",
+        "pre_drift",
+        "post_drift",
+        "parent_pre_drift",
+        "parent_post_drift",
+        "close_failure",
+        "volume",
+    ],
+)
+def test_rename_uncertainty_is_indeterminate_without_retry(failure: str) -> None:
+    native = FakeRenameNative(r.RenameStep.OLD_TO_RETIRED)
+    if failure == "volume":
+        native.source = replace(native.source, volume_serial=18)
+    else:
+        setattr(native, failure, True)
+    assert (
+        w._rename_fixed_step(
+            native, r.RenameStep.OLD_TO_RETIRED, native.source, native.parent
+        )
+        is r.MutationOutcome.INDETERMINATE
+    )
+    assert len([event for event in native.events if event[0] == "rename"]) <= 1
+    assert native.events[-2:] == [("close", 22), ("close", 11)]
+
+
+def test_fixed_rename_rejects_unknown_step_and_wrong_admitted_identity() -> None:
+    with pytest.raises(w.AdmissionBlocked, match="rename_step_unreviewed"):
+        w._fixed_rename_paths("F:\\arbitrary")
+    native = FakeRenameNative(r.RenameStep.OLD_TO_RETIRED)
+    assert (
+        w._rename_fixed_step(
+            native,
+            r.RenameStep.OLD_TO_RETIRED,
+            replace(native.source, file_index=999),
+            native.parent,
+        )
+        is r.MutationOutcome.INDETERMINATE
+    )
+    assert not any(event[0] == "rename" for event in native.events)
+
+
+def _rename_admission(native: FakeRenameNative) -> w.AdmissionObservation:
+    facts = r.AdmissionFacts(*([True] * len(fields(r.AdmissionFacts))))
+    scheduler = w._observe_d5_scheduler(_runner(_record()))
+    return w.AdmissionObservation(
+        r.NamespaceObservation(
+            r.RootObservation(r.CANONICAL_PATH, True, r.OLD_IDENTITY),
+            r.RootObservation(r.STAGING_PATH, True, r.NEW_IDENTITY),
+            r.RootObservation(r.RETIRED_PATH, False),
+        ),
+        facts,
+        scheduler,
+        native.parent,
+        native.source,
+        _native(r.STAGING_PATH, directory=True),
+    )
+
+
+def test_fixed_session_requires_first_step_then_allows_second_in_same_invocation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    native = FakeRenameNative(r.RenameStep.OLD_TO_RETIRED)
+    admission = _rename_admission(native)
+    monkeypatch.setattr(w, "_observe_admission", lambda *_args: admission)
+    session = w._FixedRenameSession(native, admission, object(), object())
+    with pytest.raises(w.AdmissionBlocked, match="rename_step_not_ready"):
+        session.publish_staged_root()
+    assert session.retire_old_root() is r.MutationOutcome.SUCCESS
+    assert session.result.phase is r.Phase.READY_TO_PUBLISH_NEW
+    assert len([event for event in native.events if event[0] == "rename"]) == 1
+    native.source_path, native.destination_path = w._fixed_rename_paths(
+        r.RenameStep.STAGING_TO_CANONICAL
+    )
+    native.source = admission.new_native
+    native.renamed = False
+    native.source_inspections = 0
+    monkeypatch.setattr(w, "_verify_old", lambda *_args: (object(), 17))
+    monkeypatch.setattr(w, "_verify_new", lambda *_args: 17)
+    monkeypatch.setattr(w, "_observe_d5_scheduler", lambda *_args: admission.scheduler)
+    assert session.publish_staged_root() is r.MutationOutcome.SUCCESS
+    assert session.result.phase is r.Phase.VERIFY_PUBLICATION
+    assert len([event for event in native.events if event[0] == "rename"]) == 2
+
+
+def test_indeterminate_first_step_blocks_second_and_retry(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    native = FakeRenameNative(r.RenameStep.OLD_TO_RETIRED)
+    native.native_false = True
+    admission = _rename_admission(native)
+    monkeypatch.setattr(w, "_observe_admission", lambda *_args: admission)
+    session = w._FixedRenameSession(native, admission, object(), object())
+    assert session.retire_old_root() is r.MutationOutcome.INDETERMINATE
+    assert session.result.phase is r.Phase.BLOCKED
+    with pytest.raises(w.AdmissionBlocked, match="rename_step_not_ready"):
+        session.retire_old_root()
+    with pytest.raises(w.AdmissionBlocked, match="rename_step_not_ready"):
+        session.publish_staged_root()
+    assert len([event for event in native.events if event[0] == "rename"]) == 1
+
+
+def test_rename_session_cannot_start_without_verified_staging() -> None:
+    native = FakeRenameNative(r.RenameStep.OLD_TO_RETIRED)
+    admission = _rename_admission(native)
+    with pytest.raises(w.AdmissionBlocked, match="rename_session_admission_incomplete"):
+        w._FixedRenameSession(
+            native, replace(admission, new_native=None), object(), object()
+        )
+    assert native.events == []
+
+
+class FakeStagingWriter:
+    def __init__(self, native: FakeNative) -> None:
+        self.native = native
+        self.events: list[tuple[object, ...]] = []
+        self.corrupt_guard = False
+
+    def bind_source_inventory(self, paths: tuple[str, ...]) -> None:
+        self.events.append(("bind", paths))
+
+    def _child(self, path: str, *, add: bool) -> None:
+        parent, leaf = path.rsplit("\\", 1)
+        children = set(self.native.directories[parent])
+        if add:
+            children.add(leaf)
+        else:
+            children.remove(leaf)
+        self.native.directories[parent] = tuple(sorted(children))
+
+    def create_directory(self, path: str) -> None:
+        self.events.append(("directory", path))
+        assert path not in self.native.directories
+        self.native.directories[path] = ()
+        self._child(path, add=True)
+
+    def create_file(self, path: str, data: bytes) -> None:
+        self.events.append(("file", path, data))
+        assert path not in self.native.files
+        self.native.files[path] = (
+            b"wrong"
+            if self.corrupt_guard and path.endswith("launch-guard.py.installing")
+            else data
+        )
+        self._child(path, add=True)
+
+    def publish_create_only(self, installing: str, final: str) -> None:
+        self.events.append(("publish", installing, final))
+        assert final not in self.native.files and final not in self.native.directories
+        if installing in self.native.files:
+            self.native.files[final] = self.native.files.pop(installing)
+        else:
+            for mapping in (self.native.directories, self.native.files):
+                moved = {
+                    final + key[len(installing) :]: value
+                    for key, value in mapping.items()
+                    if key == installing or key.startswith(installing + "\\")
+                }
+                for key in tuple(mapping):
+                    if key == installing or key.startswith(installing + "\\"):
+                        del mapping[key]
+                mapping.update(moved)
+        self._child(installing, add=False)
+        self._child(final, add=True)
+
+
+def _staging_fixture(
+    monkeypatch: pytest.MonkeyPatch,
+) -> tuple[FakeNative, d.CertifiedMaterial, FakeStagingWriter]:
+    native = _full_native(monkeypatch)
+    for mapping in (native.directories, native.files):
+        for path in tuple(mapping):
+            if path == r.STAGING_PATH or path.startswith(r.STAGING_PATH + "\\"):
+                del mapping[path]
+    native.directories[r.PARENT_PATH] = ("D10",)
+    manifest = parse_executable_manifest(
+        native.files[r.CANONICAL_PATH + r"\executable-manifest.json"]
+    )
+    guard = b"new guard"
+    attestation = build_deployment_attestation(
+        certified_source_head=r.NEW_IDENTITY.certified_source_head,
+        certified_source_tree=r.NEW_IDENTITY.certified_source_tree,
+        production_python_version="3.14.3",
+        launch_guard_byte_length=len(guard),
+        launch_guard_sha256=hashlib.sha256(guard).hexdigest(),
+        executable_manifest_sha256=manifest.digest,
+        executable_file_count=len(manifest.entries),
+    )
+    files = tuple(
+        d.SourceFile(
+            entry.relative_path,
+            native.files[
+                r.CANONICAL_PATH + "\\source\\" + entry.relative_path.replace("/", "\\")
+            ],
+            entry.sha256,
+        )
+        for entry in manifest.entries
+    )
+    material = d.CertifiedMaterial(object(), manifest, attestation, files, guard)
+    return native, material, FakeStagingWriter(native)
+
+
+def test_staging_constructs_exact_guard_source_only_and_reverifies(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    native, material, writer = _staging_fixture(monkeypatch)
+    w._construct_fixed_staging(
+        material, writer, native, FakeVerifier(), _runner(_record())
+    )
+    assert native.directories[r.STAGING_PATH] == ("launch-guard.py", "source")
+    assert native.files[r.STAGING_PATH + r"\launch-guard.py"] == material.guard_bytes
+    assert not any(
+        name in path
+        for path in (*native.files, *native.directories)
+        if path.startswith(r.STAGING_PATH + "\\")
+        for name in ("deployment.attestation", "activation.lease", "no-pycache")
+    )
+    assert (
+        "publish",
+        r.STAGING_PATH + r"\source.installing",
+        r.STAGING_PATH + r"\source",
+    ) in writer.events
+    assert writer.events[-1] == (
+        "publish",
+        r.STAGING_PATH + r"\launch-guard.py.installing",
+        r.STAGING_PATH + r"\launch-guard.py",
+    )
+    assert any(
+        call == ("file", r.STAGING_PATH + r"\launch-guard.py") for call in native.calls
+    )
+    assert r.CANONICAL_PATH in native.directories
+
+
+def test_staging_existing_or_wrong_material_blocks_without_writes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    native, material, writer = _staging_fixture(monkeypatch)
+    native.directories[r.STAGING_PATH] = ()
+    with pytest.raises(w.AdmissionBlocked):
+        w._construct_fixed_staging(
+            material, writer, native, FakeVerifier(), _runner(_record())
+        )
+    assert writer.events == []
+    native.directories.pop(r.STAGING_PATH)
+    with pytest.raises(w.AdmissionBlocked, match="staging_material_identity"):
+        w._construct_fixed_staging(
+            replace(material, guard_bytes=b"wrong"),
+            writer,
+            native,
+            FakeVerifier(),
+            _runner(_record()),
+        )
+    assert writer.events == []
+
+
+def test_unexpected_replacement_sibling_blocks_staging_before_write(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    native, material, writer = _staging_fixture(monkeypatch)
+    native.directories[r.PARENT_PATH] = ("D10", "D10.replacement-unreviewed")
+    with pytest.raises(
+        w.AdmissionBlocked, match="replacement_reserved_sibling_conflict"
+    ):
+        w._construct_fixed_staging(
+            material, writer, native, FakeVerifier(), _runner(_record())
+        )
+    assert writer.events == []
+
+
+def test_staging_reverification_failure_leaves_partial_state_for_review(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    native, material, writer = _staging_fixture(monkeypatch)
+    writer.corrupt_guard = True
+    with pytest.raises(w.AdmissionBlocked, match="new_guard_identity"):
+        w._construct_fixed_staging(
+            material, writer, native, FakeVerifier(), _runner(_record())
+        )
+    assert r.STAGING_PATH in native.directories
+    assert r.CANONICAL_PATH in native.directories
+    assert not any(
+        event[0] in ("delete", "rollback", "rename_root") for event in writer.events
+    )

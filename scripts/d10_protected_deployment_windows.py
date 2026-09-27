@@ -11,12 +11,10 @@ from dataclasses import dataclass
 
 from scripts.d10_protected_deployment import (
     D10_GUARD,
-    D10_GUARD_INSTALLING,
     D10_PARENT,
     D10_ROOT,
     D10_SIGNING_KEY_ID,
     D10_SOURCE,
-    D10_SOURCE_INSTALLING,
     P1242_RESERVED_PATHS,
     P1243_RESERVED_PATHS,
     TRUST_FINAL_PATHS,
@@ -28,6 +26,7 @@ from scripts.d10_protected_deployment import (
     NativeObject,
     validate_source_relative_path,
 )
+from scripts.d10_protected_replacement import STAGING_PATH
 from trading_bot.runtime.personal_desktop_d10_deployment_identity import (
     D10_LAUNCHER_RELATIVE_PATH,
 )
@@ -116,6 +115,8 @@ class _ObjectFacts:
 class WindowsDeploymentBackend:
     """Fixed-root Administrator writer. No path or namespace is caller selected."""
 
+    _creation_root = D10_ROOT
+
     def __init__(self) -> None:
         if os.name != "nt":
             raise DeploymentBlocked("windows_native_backend_required")
@@ -155,31 +156,33 @@ class WindowsDeploymentBackend:
             raise DeploymentBlocked(
                 "source_inventory_binding_launcher_or_package_missing"
             )
-        directories = {D10_SOURCE_INSTALLING}
+        source_installing = self._creation_root + r"\source.installing"
+        directories = {source_installing}
         for relative in relative_paths:
             parts = relative.split("/")
-            parent = D10_SOURCE_INSTALLING
+            parent = source_installing
             for component in parts[:-1]:
                 parent += "\\" + component
                 directories.add(parent)
         if not self._source_files and not self._source_directories:
             self._source_files = frozenset(
-                D10_SOURCE_INSTALLING + "\\" + path.replace("/", "\\")
+                source_installing + "\\" + path.replace("/", "\\")
                 for path in relative_paths
             )
             self._source_directories = frozenset(directories)
         elif self._source_files != frozenset(
-            D10_SOURCE_INSTALLING + "\\" + path.replace("/", "\\")
+            source_installing + "\\" + path.replace("/", "\\")
             for path in relative_paths
         ) or self._source_directories != frozenset(directories):
             raise DeploymentBlocked("source_inventory_binding_conflict")
 
     def _allowed_directory_create(self, path: str) -> bool:
-        return path == D10_ROOT or path in self._source_directories
+        return path == self._creation_root or path in self._source_directories
 
     def _allowed_file_create(self, path: str) -> bool:
         return (
-            path in {D10_GUARD_INSTALLING, *TRUST_INSTALLING_PATHS}
+            path == self._creation_root + r"\launch-guard.py.installing"
+            or (self._creation_root == D10_ROOT and path in TRUST_INSTALLING_PATHS)
             or path in self._source_files
         )
 
@@ -565,10 +568,17 @@ class WindowsDeploymentBackend:
 
     def publish_create_only(self, installing_path: str, final_path: str) -> None:
         allowed = {
-            (D10_GUARD_INSTALLING, D10_GUARD),
-            (D10_SOURCE_INSTALLING, D10_SOURCE),
-            *zip(TRUST_INSTALLING_PATHS, TRUST_FINAL_PATHS, strict=True),
+            (
+                self._creation_root + r"\launch-guard.py.installing",
+                self._creation_root + r"\launch-guard.py",
+            ),
+            (
+                self._creation_root + r"\source.installing",
+                self._creation_root + r"\source",
+            ),
         }
+        if self._creation_root == D10_ROOT:
+            allowed.update(zip(TRUST_INSTALLING_PATHS, TRUST_FINAL_PATHS, strict=True))
         if (installing_path, final_path) not in allowed:
             raise DeploymentBlocked("atomic_publication_path_unreviewed")
         move = self._bind(
@@ -1002,6 +1012,12 @@ class WindowsDeploymentBackend:
             )(handle):
                 raise DeploymentBlocked("native_find_close_failed")
         return tuple(sorted(names))
+
+
+class WindowsReplacementStagingBackend(WindowsDeploymentBackend):
+    """The same create-only writer confined to the fixed P125 staging root."""
+
+    _creation_root = STAGING_PATH
 
 
 class WindowsCngVerifier:

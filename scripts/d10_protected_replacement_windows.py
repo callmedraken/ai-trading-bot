@@ -1,4 +1,4 @@
-"""Read-only native admission for the one Architecture-125 D10 replacement.
+"""Native admission and fixed mutation primitives for one D10 replacement.
 
 Importing this module performs no host observation. The only scheduler transport
 is the reviewed, fixed Architecture-126 COM helper beside this source file.
@@ -15,7 +15,7 @@ import re
 import subprocess
 from concurrent.futures import ThreadPoolExecutor
 from ctypes import wintypes
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Protocol
 
@@ -26,15 +26,21 @@ from scripts.d10_protected_deployment import (
     MAX_MANIFEST_BYTES,
     MAX_SIGNATURE_BYTES,
     Ace,
+    CertifiedMaterial,
     CheckedDirectory,
     CheckedFile,
+    DeploymentBlocked,
     NativeObject,
+    build_certified_material,
     require_directory,
     require_native_object,
     require_parent_native_object,
     verify_signature,
 )
-from scripts.d10_protected_deployment_windows import WindowsCngVerifier
+from scripts.d10_protected_deployment_windows import (
+    WindowsCngVerifier,
+    WindowsReplacementStagingBackend,
+)
 from trading_bot.runtime.personal_desktop_d10_deployment_identity import (
     D10_LAUNCHER_RELATIVE_PATH,
     ExecutableManifest,
@@ -53,6 +59,18 @@ MAX_SCHEDULER_STDOUT = 16 * 1024
 MAX_SCHEDULER_STDERR = 256
 MAX_XML_BYTES = 1024 * 1024
 _SHA256 = re.compile(r"[0-9a-f]{64}\Z")
+_DELETE = 0x00010000
+_READ_CONTROL = 0x00020000
+_SYNCHRONIZE = 0x00100000
+_FILE_LIST_DIRECTORY = 0x0001
+_FILE_ADD_SUBDIRECTORY = 0x0004
+_FILE_TRAVERSE = 0x0020
+_FILE_READ_ATTRIBUTES = 0x0080
+_FILE_SHARE_READ = 0x00000001
+_OPEN_EXISTING = 3
+_FILE_FLAG_OPEN_REPARSE_POINT = 0x00200000
+_FILE_FLAG_BACKUP_SEMANTICS = 0x02000000
+_FILE_RENAME_INFO_CLASS = 3
 
 _EXPECTED_SCHEDULER = {
     "task_path": r"\AITradingBot-PD4-UnattendedPaper-v1",
@@ -247,6 +265,9 @@ class AdmissionObservation:
     namespace: replacement.NamespaceObservation
     facts: replacement.AdmissionFacts
     scheduler: SchedulerObservation
+    parent_native: NativeObject | None = None
+    old_native: NativeObject | None = None
+    new_native: NativeObject | None = None
 
 
 class _RecordingNative:
@@ -302,6 +323,15 @@ def _expect_absent(native: ReadOnlyNative, path: str) -> None:
         raise AdmissionBlocked("fixed_path_present_or_indeterminate")
 
 
+def _require_reserved_siblings(names: tuple[str, ...], admitted: set[str]) -> None:
+    if any(
+        name.casefold().startswith(("d10.replacement-", "d10.retired-"))
+        and name not in admitted
+        for name in names
+    ):
+        raise AdmissionBlocked("replacement_reserved_sibling_conflict")
+
+
 def _snapshot(native: ReadOnlyNative, root: str, manifest: ExecutableManifest) -> int:
     source = root + r"\source"
     directories: dict[str, set[str]] = {source: set()}
@@ -342,9 +372,12 @@ def _snapshot(native: ReadOnlyNative, root: str, manifest: ExecutableManifest) -
 
 
 def _verify_old(
-    native: ReadOnlyNative, verifier: object
+    native: ReadOnlyNative,
+    verifier: object,
+    root: str = replacement.CANONICAL_PATH,
 ) -> tuple[ExecutableManifest, int]:
-    root = replacement.CANONICAL_PATH
+    if root not in (replacement.CANONICAL_PATH, replacement.RETIRED_PATH):
+        raise AdmissionBlocked("old_root_path_unreviewed")
     identity = replacement.OLD_IDENTITY
     serial = _checked_directory(
         native,
@@ -462,6 +495,7 @@ def _observe_once(
         or replacement.RETIRED_PATH.rsplit("\\", 1)[-1] in names
     ):
         raise AdmissionBlocked("replacement_parent_namespace")
+    _require_reserved_siblings(names, {replacement.STAGING_PATH.rsplit("\\", 1)[-1]})
     _expect_absent(native, replacement.RETIRED_PATH)
     manifest, old_serial = _verify_old(native, verifier)
     new_serial = _verify_new(native, manifest)
@@ -549,13 +583,162 @@ def _observe_admission(
     )
     if not facts.all_exact():
         raise AdmissionBlocked("admission_facts_incomplete")
-    return AdmissionObservation(second, facts, scheduler_second)
+    by_path = {item.path: item for item in second_native.objects}
+    return AdmissionObservation(
+        second,
+        facts,
+        scheduler_second,
+        by_path.get(replacement.PARENT_PATH),
+        by_path.get(replacement.CANONICAL_PATH),
+        by_path.get(replacement.STAGING_PATH),
+    )
 
 
 def observe_admission() -> AdmissionObservation:
     """Observe fixed native paths and Task Scheduler; accept no caller evidence."""
     return _observe_admission(
         _WindowsReplacementReader(), WindowsCngVerifier(), _run_scheduler_bounded
+    )
+
+
+def _require_s5_r10_material(material: CertifiedMaterial) -> None:
+    identity = replacement.NEW_IDENTITY
+    if type(material) is not CertifiedMaterial:
+        raise AdmissionBlocked("staging_material_type")
+    manifest = material.manifest
+    attestation = material.attestation
+    if (
+        manifest.digest != identity.manifest_sha256
+        or len(manifest.entries) != identity.executable_file_count
+        or sum(entry.byte_length for entry in manifest.entries)
+        != identity.executable_total_bytes
+        or len(material.guard_bytes) != identity.guard_byte_length
+        or hashlib.sha256(material.guard_bytes).hexdigest() != identity.guard_sha256
+        or attestation.deployment_id != identity.deployment_id
+        or attestation.certified_source_head != identity.certified_source_head
+        or attestation.certified_source_tree != identity.certified_source_tree
+        or attestation.executable_manifest_sha256 != manifest.digest
+        or attestation.executable_file_count != len(manifest.entries)
+        or attestation.launch_guard_byte_length != len(material.guard_bytes)
+        or attestation.launch_guard_sha256 != identity.guard_sha256
+        or hashlib.sha256(attestation.canonical_bytes()).hexdigest()
+        != identity.unsigned_attestation_sha256
+        or tuple(item.relative_path for item in material.files)
+        != tuple(entry.relative_path for entry in manifest.entries)
+    ):
+        raise AdmissionBlocked("staging_material_identity")
+    for item, entry in zip(material.files, manifest.entries, strict=True):
+        if (
+            type(item.data) is not bytes
+            or len(item.data) != entry.byte_length
+            or hashlib.sha256(item.data).hexdigest() != entry.sha256
+            or item.sha256 != entry.sha256
+        ):
+            raise AdmissionBlocked("staging_material_bytes")
+
+
+def _construct_fixed_staging(
+    material: CertifiedMaterial,
+    writer: WindowsReplacementStagingBackend,
+    reader: ReadOnlyNative,
+    verifier: object,
+    scheduler_run: object,
+) -> None:
+    """Test seam; create only the fixed inert S5-R10 staging payload."""
+    _require_s5_r10_material(material)
+    try:
+        reader.require_administrator()
+        parent = reader.list_directory(replacement.PARENT_PATH)
+        if type(parent) is not CheckedDirectory or parent.stable is not True:
+            raise AdmissionBlocked("staging_parent_unstable")
+        require_parent_native_object(parent.identity)
+        names = parent.children
+        if (
+            type(names) is not tuple
+            or len(names) != len(set(names))
+            or len(names) != len({name.casefold() for name in names})
+            or replacement.CANONICAL_PATH.rsplit("\\", 1)[-1] not in names
+            or replacement.STAGING_PATH.rsplit("\\", 1)[-1] in names
+            or replacement.RETIRED_PATH.rsplit("\\", 1)[-1] in names
+        ):
+            raise AdmissionBlocked("staging_namespace_conflict")
+        _require_reserved_siblings(names, set())
+        _expect_absent(reader, replacement.STAGING_PATH)
+        _expect_absent(reader, replacement.RETIRED_PATH)
+        old_manifest, old_serial = _verify_old(reader, verifier)
+        if (
+            old_manifest.digest != material.manifest.digest
+            or old_serial != parent.identity.volume_serial
+            or _FROZEN_PRIOR_P1245_LINEAGE
+            != (
+                replacement.OLD_DEPLOYMENT_ID,
+                replacement.NEW_DEPLOYMENT_ID,
+                "NOT_RUN_NO_D10_ACTIVATION_OR_SCHEDULER_MUTATION",
+            )
+        ):
+            raise AdmissionBlocked("staging_old_lineage_or_volume")
+        for name in (
+            "activation.lease.json",
+            "activation.lease.json.installing",
+            "activation.lease.json.tmp",
+            "no-pycache",
+        ):
+            _expect_absent(reader, replacement.CANONICAL_PATH + "\\" + name)
+        scheduler = _observe_d5_scheduler(scheduler_run)
+        writer.bind_source_inventory(
+            tuple(entry.relative_path for entry in material.manifest.entries)
+        )
+        root = replacement.STAGING_PATH
+        installing = root + r"\source.installing"
+        writer.create_directory(root)
+        writer.create_directory(installing)
+        directories: set[str] = set()
+        for entry in material.manifest.entries:
+            parent_path = installing
+            for component in entry.relative_path.split("/")[:-1]:
+                parent_path += "\\" + component
+                directories.add(parent_path)
+        for directory in sorted(directories, key=lambda path: (path.count("\\"), path)):
+            writer.create_directory(directory)
+        for item in material.files:
+            writer.create_file(
+                installing + "\\" + item.relative_path.replace("/", "\\"),
+                item.data,
+            )
+        writer.publish_create_only(installing, root + r"\source")
+        writer.create_file(root + r"\launch-guard.py.installing", material.guard_bytes)
+        writer.publish_create_only(
+            root + r"\launch-guard.py.installing", root + r"\launch-guard.py"
+        )
+        if _verify_new(reader, material.manifest) != old_serial:
+            raise AdmissionBlocked("staging_volume_drift")
+        final_parent = reader.list_directory(replacement.PARENT_PATH)
+        if (
+            type(final_parent) is not CheckedDirectory
+            or final_parent.stable is not True
+            or final_parent.identity != parent.identity
+            or replacement.STAGING_PATH.rsplit("\\", 1)[-1] not in final_parent.children
+            or _observe_d5_scheduler(scheduler_run) != scheduler
+        ):
+            raise AdmissionBlocked("staging_postverification_drift")
+        _require_reserved_siblings(
+            final_parent.children, {replacement.STAGING_PATH.rsplit("\\", 1)[-1]}
+        )
+    except (AdmissionBlocked, DeploymentBlocked):
+        raise
+    except Exception:
+        raise AdmissionBlocked("staging_native_indeterminate") from None
+
+
+def construct_fixed_staging(repository_root: Path) -> None:
+    """Build exact certified bytes, then create and reverify fixed staging."""
+    material = build_certified_material(repository_root)
+    _construct_fixed_staging(
+        material,
+        WindowsReplacementStagingBackend(),
+        _WindowsReplacementReader(),
+        WindowsCngVerifier(),
+        _run_scheduler_bounded,
     )
 
 
@@ -648,11 +831,13 @@ class _WindowsReplacementReader:
             return False
         if path == replacement.PARENT_PATH:
             return directory is True
-        if path == replacement.RETIRED_PATH:
-            return directory is None
-        for root in (replacement.CANONICAL_PATH, replacement.STAGING_PATH):
+        for root in (
+            replacement.CANONICAL_PATH,
+            replacement.STAGING_PATH,
+            replacement.RETIRED_PATH,
+        ):
             if path == root:
-                return directory is True
+                return directory in (True, None)
             if not path.startswith(root + "\\"):
                 continue
             relative = path[len(root) + 1 :]
@@ -806,6 +991,73 @@ class _WindowsReplacementReader:
             if directory is None and ctypes.get_last_error() in (2, 3):
                 return None
             raise AdmissionBlocked("native_open_unavailable")
+        return int(handle)
+
+    def _open_rename_source(self, path: str) -> int:
+        if path not in (replacement.CANONICAL_PATH, replacement.STAGING_PATH):
+            raise AdmissionBlocked("rename_source_path_unreviewed")
+        create = self._bind(
+            self._kernel,
+            "CreateFileW",
+            [
+                ctypes.c_wchar_p,
+                wintypes.DWORD,
+                wintypes.DWORD,
+                ctypes.c_void_p,
+                wintypes.DWORD,
+                wintypes.DWORD,
+                wintypes.HANDLE,
+            ],
+            wintypes.HANDLE,
+        )
+        handle = create(
+            path,
+            _DELETE
+            | _READ_CONTROL
+            | _SYNCHRONIZE
+            | _FILE_LIST_DIRECTORY
+            | _FILE_READ_ATTRIBUTES,
+            _FILE_SHARE_READ,
+            None,
+            _OPEN_EXISTING,
+            _FILE_FLAG_OPEN_REPARSE_POINT | _FILE_FLAG_BACKUP_SEMANTICS,
+            None,
+        )
+        if handle in (None, 0, ctypes.c_void_p(-1).value):
+            raise AdmissionBlocked("rename_source_open_unavailable")
+        return int(handle)
+
+    def _open_rename_parent(self) -> int:
+        create = self._bind(
+            self._kernel,
+            "CreateFileW",
+            [
+                ctypes.c_wchar_p,
+                wintypes.DWORD,
+                wintypes.DWORD,
+                ctypes.c_void_p,
+                wintypes.DWORD,
+                wintypes.DWORD,
+                wintypes.HANDLE,
+            ],
+            wintypes.HANDLE,
+        )
+        handle = create(
+            replacement.PARENT_PATH,
+            _FILE_LIST_DIRECTORY
+            | _FILE_ADD_SUBDIRECTORY
+            | _FILE_TRAVERSE
+            | _FILE_READ_ATTRIBUTES
+            | _READ_CONTROL
+            | _SYNCHRONIZE,
+            _FILE_SHARE_READ,
+            None,
+            _OPEN_EXISTING,
+            _FILE_FLAG_OPEN_REPARSE_POINT | _FILE_FLAG_BACKUP_SEMANTICS,
+            None,
+        )
+        if handle in (None, 0, ctypes.c_void_p(-1).value):
+            raise AdmissionBlocked("rename_parent_open_unavailable")
         return int(handle)
 
     def _close(self, handle: int) -> None:
@@ -1114,5 +1366,252 @@ class _WindowsReplacementReader:
                 raise AdmissionBlocked("native_directory_identity_drift")
         finally:
             self._close(handle)
+
         self._reopen_matches(path, True, before)
         return CheckedDirectory(before, tuple(sorted(names)), True)
+
+
+class _FileRenameInfo(ctypes.Structure):
+    _fields_ = [
+        ("replace_if_exists", ctypes.c_ubyte),
+        ("root_directory", ctypes.c_void_p),
+        ("file_name_length", wintypes.DWORD),
+        ("file_name", ctypes.c_ubyte * 1),
+    ]
+
+
+def _fixed_rename_paths(step: replacement.RenameStep) -> tuple[str, str]:
+    if step is replacement.RenameStep.OLD_TO_RETIRED:
+        return replacement.CANONICAL_PATH, replacement.RETIRED_PATH
+    if step is replacement.RenameStep.STAGING_TO_CANONICAL:
+        return replacement.STAGING_PATH, replacement.CANONICAL_PATH
+    raise AdmissionBlocked("rename_step_unreviewed")
+
+
+def _fixed_rename_info(step: replacement.RenameStep, parent_handle: int):
+    _, destination = _fixed_rename_paths(step)
+    leaf = destination.rsplit("\\", 1)[-1]
+    if (
+        type(parent_handle) is not int
+        or parent_handle in (0, ctypes.c_void_p(-1).value)
+        or not leaf
+        or any(character in leaf for character in "\\/:\x00")
+    ):
+        raise AdmissionBlocked("rename_destination_invalid")
+    encoded = leaf.encode("utf-16-le")
+    offset = _FileRenameInfo.file_name.offset
+    buffer = ctypes.create_string_buffer(
+        ctypes.sizeof(_FileRenameInfo) + len(encoded) + 2
+    )
+    info = _FileRenameInfo.from_buffer(buffer)
+    info.replace_if_exists = 0
+    info.root_directory = parent_handle
+    info.file_name_length = len(encoded)
+    ctypes.memmove(ctypes.addressof(buffer) + offset, encoded, len(encoded))
+    return buffer
+
+
+def _set_fixed_rename(
+    native: _WindowsReplacementReader,
+    step: replacement.RenameStep,
+    source_handle: int,
+    parent_handle: int,
+) -> bool:
+    info = _fixed_rename_info(step, parent_handle)
+    set_information = native._bind(
+        native._kernel,
+        "SetFileInformationByHandle",
+        [wintypes.HANDLE, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD],
+        wintypes.BOOL,
+    )
+    return bool(
+        set_information(
+            source_handle, _FILE_RENAME_INFO_CLASS, ctypes.byref(info), len(info)
+        )
+    )
+
+
+def _rename_fixed_step(
+    native: _WindowsReplacementReader,
+    step: replacement.RenameStep,
+    expected_source: NativeObject,
+    expected_parent: NativeObject,
+) -> replacement.MutationOutcome:
+    """One handle-pinned rename; any uncertainty consumes this attempt."""
+    source_path, destination_path = _fixed_rename_paths(step)
+    parent_handle: int | None = None
+    source_handle: int | None = None
+    outcome = replacement.MutationOutcome.INDETERMINATE
+    cleanup_ambiguous = False
+    try:
+        if (
+            type(expected_source) is not NativeObject
+            or type(expected_parent) is not NativeObject
+        ):
+            raise AdmissionBlocked("rename_admitted_identity_missing")
+        parent_handle = native._open_rename_parent()
+        source_handle = native._open_rename_source(source_path)
+        parent_before = native._inspect(parent_handle, replacement.PARENT_PATH)
+        source_before = native._inspect(source_handle, source_path)
+        require_parent_native_object(parent_before)
+        require_native_object(source_before, source_path, directory=True)
+        if (
+            parent_before != expected_parent
+            or source_before != expected_source
+            or source_before.volume_serial != parent_before.volume_serial
+            or source_before.volume_root != parent_before.volume_root
+        ):
+            raise AdmissionBlocked("rename_pinned_identity_drift")
+        if native.absent(destination_path) is not True:
+            raise AdmissionBlocked("rename_destination_present")
+        if (
+            native._inspect(parent_handle, replacement.PARENT_PATH) != parent_before
+            or native._inspect(source_handle, source_path) != source_before
+        ):
+            raise AdmissionBlocked("rename_pre_call_drift")
+        if not _set_fixed_rename(native, step, source_handle, parent_handle):
+            raise AdmissionBlocked("rename_native_false")
+        expected_after = replace(source_before, final_path=destination_path)
+        if (
+            native._inspect(source_handle, source_path) != expected_after
+            or native._inspect(parent_handle, replacement.PARENT_PATH) != parent_before
+        ):
+            raise AdmissionBlocked("rename_post_call_drift")
+        outcome = replacement.MutationOutcome.SUCCESS
+    except Exception:
+        outcome = replacement.MutationOutcome.INDETERMINATE
+    finally:
+        for handle in (source_handle, parent_handle):
+            if handle is not None:
+                try:
+                    native._close(handle)
+                except Exception:
+                    cleanup_ambiguous = True
+    return replacement.MutationOutcome.INDETERMINATE if cleanup_ambiguous else outcome
+
+
+class _FixedRenameSession:
+    """Expose two fixed steps only in one freshly admitted invocation."""
+
+    def __init__(
+        self,
+        native: _WindowsReplacementReader,
+        admission: AdmissionObservation,
+        verifier: object,
+        scheduler_run: object,
+    ) -> None:
+        if (
+            type(admission) is not AdmissionObservation
+            or type(admission.facts) is not replacement.AdmissionFacts
+            or not admission.facts.all_exact()
+            or type(admission.parent_native) is not NativeObject
+            or type(admission.old_native) is not NativeObject
+            or type(admission.new_native) is not NativeObject
+        ):
+            raise AdmissionBlocked("rename_session_admission_incomplete")
+        result = replacement.begin_replacement(admission.namespace, admission.facts)
+        if result.phase is not replacement.Phase.READY_TO_RETIRE_OLD:
+            raise AdmissionBlocked("rename_session_not_ready")
+        self._native = native
+        self._admission = admission
+        self._verifier = verifier
+        self._scheduler_run = scheduler_run
+        self.result = result
+
+    def retire_old_root(self) -> replacement.MutationOutcome:
+        if self.result.phase is not replacement.Phase.READY_TO_RETIRE_OLD:
+            raise AdmissionBlocked("rename_step_not_ready")
+        outcome = replacement.MutationOutcome.INDETERMINATE
+        try:
+            fresh = _observe_admission(
+                self._native, self._verifier, self._scheduler_run
+            )
+            if (
+                fresh.namespace != self._admission.namespace
+                or fresh.facts != self._admission.facts
+                or fresh.scheduler != self._admission.scheduler
+                or fresh.parent_native != self._admission.parent_native
+                or fresh.old_native != self._admission.old_native
+                or fresh.new_native != self._admission.new_native
+            ):
+                raise AdmissionBlocked("rename_final_admission_drift")
+            outcome = _rename_fixed_step(
+                self._native,
+                replacement.RenameStep.OLD_TO_RETIRED,
+                fresh.old_native,
+                fresh.parent_native,
+            )
+        except Exception:
+            outcome = replacement.MutationOutcome.INDETERMINATE
+        self.result = replacement.record_rename(
+            self.result, replacement.RenameStep.OLD_TO_RETIRED, outcome
+        )
+        return outcome
+
+    def publish_staged_root(self) -> replacement.MutationOutcome:
+        if self.result.phase is not replacement.Phase.READY_TO_PUBLISH_NEW:
+            raise AdmissionBlocked("rename_step_not_ready")
+        outcome = replacement.MutationOutcome.INDETERMINATE
+        try:
+            self._native.require_administrator()
+            parent = self._native.list_directory(replacement.PARENT_PATH)
+            require_parent_native_object(parent.identity)
+            names = parent.children
+            if (
+                parent.stable is not True
+                or parent.identity != self._admission.parent_native
+                or type(names) is not tuple
+                or len(names) != len(set(names))
+                or len(names) != len({name.casefold() for name in names})
+                or replacement.CANONICAL_PATH.rsplit("\\", 1)[-1] in names
+                or replacement.STAGING_PATH.rsplit("\\", 1)[-1] not in names
+                or replacement.RETIRED_PATH.rsplit("\\", 1)[-1] not in names
+            ):
+                raise AdmissionBlocked("rename_second_namespace_drift")
+            _require_reserved_siblings(
+                names,
+                {
+                    replacement.STAGING_PATH.rsplit("\\", 1)[-1],
+                    replacement.RETIRED_PATH.rsplit("\\", 1)[-1],
+                },
+            )
+            _expect_absent(self._native, replacement.CANONICAL_PATH)
+            manifest, old_serial = _verify_old(
+                self._native, self._verifier, replacement.RETIRED_PATH
+            )
+            retired = self._native.list_directory(replacement.RETIRED_PATH)
+            expected_retired = replace(
+                self._admission.old_native,
+                path=replacement.RETIRED_PATH,
+                final_path=replacement.RETIRED_PATH,
+            )
+            if (
+                type(retired) is not CheckedDirectory
+                or retired.stable is not True
+                or retired.identity != expected_retired
+                or _verify_new(self._native, manifest) != old_serial
+                or old_serial != parent.identity.volume_serial
+                or _observe_d5_scheduler(self._scheduler_run)
+                != self._admission.scheduler
+            ):
+                raise AdmissionBlocked("rename_second_admission_drift")
+            outcome = _rename_fixed_step(
+                self._native,
+                replacement.RenameStep.STAGING_TO_CANONICAL,
+                self._admission.new_native,
+                self._admission.parent_native,
+            )
+        except Exception:
+            outcome = replacement.MutationOutcome.INDETERMINATE
+        self.result = replacement.record_rename(
+            self.result, replacement.RenameStep.STAGING_TO_CANONICAL, outcome
+        )
+        return outcome
+
+
+def begin_fixed_rename_session() -> _FixedRenameSession:
+    """Fresh read-only admission; return only in-process fixed-step authority."""
+    native = _WindowsReplacementReader()
+    verifier = WindowsCngVerifier()
+    admission = _observe_admission(native, verifier, _run_scheduler_bounded)
+    return _FixedRenameSession(native, admission, verifier, _run_scheduler_bounded)

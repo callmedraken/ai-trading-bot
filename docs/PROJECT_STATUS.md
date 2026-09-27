@@ -5134,3 +5134,35 @@ NEXT: resume P125-R1C source-only native staging/rename primitives in the
 existing F:\AI\worktrees\ai-trading-bot-p125-r1c worktree after docs-only
 fast-forward.
 
+### P125-R1C staging + handle-pinned root rename primitives — ACCEPTED
+
+Accepted remote source:
+
+    HEAD 188644ccad2a07d0f9f8c0228f2f750397801026
+    TREE 6b7fe708f0f32a42886fd8d83f3fc03bc99457b5
+    parent 67b19f9d62d3696e34651fb0270672123efd9027
+
+Exactly three files changed: the protected deployment Windows backend, P125
+Windows replacement adapter, and focused tests.
+
+Exact review accepts the fixed S5-R10 guard/source-only staging construction
+and complete reverification plus the two handle-pinned, same-volume,
+destination-absent FileRenameInfo root renames. The source and protected parent
+remain pinned and reverified across each native call; ReplaceIfExists is false;
+native/identity/cleanup ambiguity is INDETERMINATE and creates no retry or
+rollback authority.
+
+Reported verification: 277 passed / 2 skipped, including a final 85-test P125
+lane; Ruff check/format and diff checks PASS; ordinary push and final clean
+state PASS.
+
+No protected operation or broad certification ran.
+
+Do not run the proposed broad certification yet. Architecture 125 is not
+source-complete: the explicit replacement operator/post-publication verifier
+and retired-tree cleanup source/tests remain before the P125 source
+review/certification gate.
+
+NEXT: P125-R1D source-only replacement operator + post-publication
+verification/transcript. No real F:\AITradingBot mutation is authorized.
+

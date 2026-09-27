@@ -5174,3 +5174,90 @@ F:\AI\worktrees\ai-trading-bot-p125-r1c worktree through this docs-only
 commit and resume the same Sol High R1C source implementation. Broad
 certification remains deferred.
 
+## 2026-09-26 P125-R1C staging + handle-pinned rename primitives — ACCEPTED
+
+Exact accepted remote source identity:
+
+    HEAD:
+    188644ccad2a07d0f9f8c0228f2f750397801026
+
+    TREE:
+    6b7fe708f0f32a42886fd8d83f3fc03bc99457b5
+
+    parent:
+    67b19f9d62d3696e34651fb0270672123efd9027
+
+Exact changed files:
+
+    scripts/d10_protected_deployment_windows.py
+    scripts/d10_protected_replacement_windows.py
+    tests/runtime/test_d10_protected_replacement_windows.py
+
+Exact GitHub review accepted the complete R1C source, including the bounded
+extension of the reviewed create-only P124 writer through the dedicated
+WindowsReplacementStagingBackend and the complete P125 native mutation surface.
+
+Accepted staging properties:
+
+- only the fixed Architecture-125 S5-R10 staging root is admitted;
+- certified S5-R10 material is revalidated against the frozen deployment
+  identity before writes;
+- canonical S5-R8 signed trust, parent policy, inactive lineage, lease/cache
+  absence, scheduler predecessor, and same-volume facts are checked before
+  staging creation;
+- only guard/source material is created; trust, lease, cache, and scheduler
+  state are excluded;
+- source files are flushed through the accepted protected create-only writer;
+- final staging inventory, bytes, ACL/owner, no-reparse, single-link,
+  local-NTFS/volume identity, parent identity, and scheduler state are
+  reverified;
+- failure leaves partial staging state for explicit review rather than
+  automatic cleanup.
+
+Accepted rename properties:
+
+- only canonical -> fixed retired and staging -> canonical are expressible;
+- the verified source directory handle remains pinned through mutation;
+- the exact protected F:\AITradingBot parent handle remains pinned;
+- source and parent are re-inspected immediately before mutation;
+- SetFileInformationByHandle(FileRenameInfo) is used with
+  ReplaceIfExists=false;
+- RootDirectory is the pinned parent handle and FileName is only the fixed
+  destination leaf;
+- destination absence and same-volume identity are required;
+- native success is followed by same-handle final-path/object/security
+  reverification before SUCCESS;
+- false/exception/drift/cleanup ambiguity produces INDETERMINATE;
+- an indeterminate step cannot be automatically retried or followed by the
+  second step;
+- second-step admission proves exact retired S5-R8, exact staging S5-R10,
+  absent canonical root, unchanged scheduler, parent, and volume;
+- no rollback, deletion, signing, activation, scheduler mutation, provider,
+  paper, broker, or live effect is implemented.
+
+Reported focused evidence:
+
+    277 passed / 2 skipped across directly affected P125/P124/Windows-authority tests
+    final P125 lane: 85 passed
+    Ruff check: PASS
+    Ruff format --check: PASS
+    git diff --check: PASS
+    staged diff check: PASS
+    ordinary push: PASS
+    final worktree/index: clean
+
+No real protected mutation and no broad certification occurred.
+
+Broad three-lane certification is deliberately NOT run at R1C. Architecture
+125 still requires the explicit replacement operator/post-publication evidence
+surface and the separately gated retired-tree cleanup source/tests before the
+P125 source review/certification gate is source-complete.
+
+NEXT: P125-R1D source-only replacement operator and post-publication
+verification/evidence. Add the reviewed explicit Administrator entry point
+scripts/p125_replace_d10.py around the already accepted staging/admission/
+rename primitives, exact final NEW_CANONICAL verification, and bounded
+deterministic terminal transcript. Do not execute it against F:\AITradingBot.
+Recovery, retired-tree deletion, signing, activation, scheduler mutation,
+provider, paper, broker, and live effects remain unavailable.
+

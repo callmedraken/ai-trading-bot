@@ -845,6 +845,32 @@ def _token_information(token: int, information_class: int) -> ctypes.Array:
     return buffer
 
 
+def _token_scalar_dword(token: int, information_class: int) -> int:
+    """Query a fixed-size DWORD token class without a zero-length size probe."""
+    get = _win_dll("advapi32").GetTokenInformation
+    get.argtypes = [
+        wintypes.HANDLE,
+        wintypes.DWORD,
+        ctypes.c_void_p,
+        wintypes.DWORD,
+        ctypes.POINTER(wintypes.DWORD),
+    ]
+    get.restype = wintypes.BOOL
+    value = wintypes.DWORD()
+    returned = wintypes.DWORD()
+    if not get(
+        token,
+        information_class,
+        ctypes.byref(value),
+        ctypes.sizeof(value),
+        ctypes.byref(returned),
+    ):
+        raise _error("GetTokenInformation(scalar)")
+    if returned.value != ctypes.sizeof(value):
+        raise GuardBlocked("Windows token scalar length is invalid")
+    return int(value.value)
+
+
 def _current_token_facts() -> tuple[str, bool, bool]:
     advapi = _win_dll("advapi32")
     kernel = _win_dll("kernel32")
@@ -871,10 +897,10 @@ def _current_token_facts() -> tuple[str, bool, bool]:
         if not user.sid:
             raise GuardBlocked("Windows token user SID is absent")
         user_sid = _sid_string(user.sid)
-        elevation_bytes = _token_information(token, 20)
-        elevated = bool(
-            ctypes.cast(elevation_bytes, ctypes.POINTER(wintypes.DWORD)).contents.value
-        )
+        elevation_value = _token_scalar_dword(token, 20)
+        if elevation_value not in (0, 1):
+            raise GuardBlocked("Windows token elevation value is invalid")
+        elevated = bool(elevation_value)
 
         convert = advapi.ConvertStringSidToSidW
         convert.argtypes = [ctypes.c_wchar_p, ctypes.POINTER(ctypes.c_void_p)]

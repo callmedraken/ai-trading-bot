@@ -1110,6 +1110,71 @@ def test_a1243_runtime_mismatch_blocks(monkeypatch: pytest.MonkeyPatch) -> None:
         guard._require_runtime(value)
 
 
+def test_token_scalar_dword_uses_exact_buffer_without_size_probe(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import ctypes
+    from ctypes import wintypes
+
+    calls: list[tuple[int, int, int, bool]] = []
+
+    class Function:
+        argtypes = None
+        restype = None
+
+        def __call__(
+            self,
+            token: int,
+            information_class: int,
+            buffer: object,
+            length: int,
+            returned: object,
+        ) -> int:
+            calls.append((int(token), int(information_class), int(length), buffer is None))
+            assert buffer is not None
+            assert length == ctypes.sizeof(wintypes.DWORD)
+            ctypes.cast(buffer, ctypes.POINTER(wintypes.DWORD)).contents.value = 0
+            ctypes.cast(returned, ctypes.POINTER(wintypes.DWORD)).contents.value = (
+                ctypes.sizeof(wintypes.DWORD)
+            )
+            return 1
+
+    fake = SimpleNamespace(GetTokenInformation=Function())
+    monkeypatch.setattr(guard, "_win_dll", lambda name: fake)
+
+    assert guard._token_scalar_dword(7, 20) == 0
+    assert calls == [(7, 20, ctypes.sizeof(wintypes.DWORD), False)]
+
+
+def test_token_scalar_dword_rejects_wrong_returned_length(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import ctypes
+    from ctypes import wintypes
+
+    class Function:
+        argtypes = None
+        restype = None
+
+        def __call__(
+            self,
+            _token: int,
+            _information_class: int,
+            buffer: object,
+            _length: int,
+            returned: object,
+        ) -> int:
+            ctypes.cast(buffer, ctypes.POINTER(wintypes.DWORD)).contents.value = 1
+            ctypes.cast(returned, ctypes.POINTER(wintypes.DWORD)).contents.value = 0
+            return 1
+
+    fake = SimpleNamespace(GetTokenInformation=Function())
+    monkeypatch.setattr(guard, "_win_dll", lambda name: fake)
+
+    with pytest.raises(guard.GuardBlocked, match="scalar length"):
+        guard._token_scalar_dword(7, 20)
+
+
 def test_a1243_standard_account_proof_is_mandatory(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

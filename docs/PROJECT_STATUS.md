@@ -5059,3 +5059,28 @@ NEXT: resume P125-R1B source-only/read-only implementation after the local
 F:\AI\worktrees\ai-trading-bot-p125-r1b worktree fast-forwards this docs-only
 checkpoint.
 
+### P125-R1B exact review — CORRECTION REQUIRED
+
+Remote source commit 75731f070e155b758a44e5d4486a12c4f24f2b46 /
+tree 360021dd5108c81a6a563d1d7a119b17a719c303 was reviewed exactly.
+
+The source surface is bounded to the fixed COM helper, read-only Windows
+admission adapter, and focused tests. Reported focused verification was 75
+passing tests plus Ruff/format/PowerShell-parse/diff checks.
+
+Acceptance is blocked on two narrow corrections:
+
+- SID-form Task Scheduler principals must still resolve through Windows
+  account translation; raw SecurityIdentifier construction/text equality is
+  insufficient for the Architecture-126 unresolvable-principal rule.
+- AdmissionFacts must not be generated as eleven unconditional True values.
+  The Architecture-125 no-prior-P124-5 fact is a frozen source-owned fact for
+  this one-time lineage and must be represented/bound explicitly alongside the
+  fresh exact old-D10, D5-scheduler, and activation/cache-absence proofs.
+
+No R1B closeout or broad certification is accepted yet.
+
+NEXT: one bounded Sol High R1B correction commit in the existing
+F:\AI\worktrees\ai-trading-bot-p125-r1b worktree after docs-only
+fast-forward.
+

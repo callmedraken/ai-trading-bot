@@ -5002,3 +5002,63 @@ F:\AI\worktrees\ai-trading-bot-p125-r1b worktree to this docs-only commit
 and resume the same Sol High P125-R1B source implementation. Broad certification
 remains deferred.
 
+## 2026-09-26 P125-R1B exact source review — CORRECTION REQUIRED
+
+Reviewed source commit:
+
+    HEAD:
+    75731f070e155b758a44e5d4486a12c4f24f2b46
+
+    TREE:
+    360021dd5108c81a6a563d1d7a119b17a719c303
+
+    parent:
+    30b853d21dd621a8c40757bc7fcaae17ad5d0b39
+
+The branch is exactly one source commit ahead of the Architecture-126 design
+base and changes only:
+
+    scripts/d10_p125_d5_scheduler_observe.ps1
+    scripts/d10_protected_replacement_windows.py
+    tests/runtime/test_d10_protected_replacement_windows.py
+
+Most of the R1B implementation matches the frozen boundary: fixed-path
+no-follow native reads, exact ACL/volume/inventory/byte checks, old signed-trust
+verification, exact S5-R10 staging verification, bounded fixed PowerShell
+transport, exact D5 semantic projection, and repeated native/scheduler
+revalidation are present.
+
+Exact review found two blocking acceptance corrections:
+
+1. the scheduler helper accepts a SID-form Principal.UserId by constructing a
+   SecurityIdentifier and comparing the text, without proving that the SID is
+   still resolvable through Windows account translation. Architecture 126
+   requires unresolvable/deleted identities to block;
+
+2. the native adapter constructs all eleven AdmissionFacts through one blanket
+   True generator. In particular it does not explicitly bind the Architecture
+   125 source-owned fact that P124-5 activation/scheduler mutation never
+   completed. That fact must be explicit and lineage-bound rather than silently
+   manufactured.
+
+Architecture 125/126 are clarified by the docs-only correction immediately
+after this source review. The source commit is therefore NOT yet accepted and
+no R1B closeout is recorded.
+
+Reported focused evidence for the reviewed bytes remains useful:
+
+    75 directly affected tests passed
+    Ruff check: PASS
+    Ruff format --check: PASS
+    PowerShell syntax parse: PASS
+    diff checks: PASS
+    pushed worktree/index: clean
+
+No real Task Scheduler read, protected-host observation/mutation, or broad
+certification occurred.
+
+NEXT: fast-forward the existing F:\AI\worktrees\ai-trading-bot-p125-r1b
+worktree through the docs-only clarification, make one bounded Sol High
+correction commit for the two findings above, rerun focused R1B verification,
+and push normally. Do not start a new worktree or protected operation.
+

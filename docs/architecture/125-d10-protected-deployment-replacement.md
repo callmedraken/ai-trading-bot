@@ -97,6 +97,22 @@ Before any protected namespace mutation, the operator must independently prove:
    this proof must use the Architecture-126 COM-first read-only observation contract; raw XML hash equality is not scheduler authority;
 7. no source-owned observation indicates D10 P124-5 activation or scheduler mutation ever completed.
 
+For this one-time S5-R8 -> S5-R10 replacement lineage, item 7 is a frozen
+historical source fact, not a caller assertion and not a host-state inference.
+The accepted project status/handoff at the Architecture-125 freeze records that
+P124-5 was not run and that no D10 activation lease or D10 scheduler mutation
+occurred. The implementation must represent this as an explicit source-owned
+closed value for this exact lineage; it must not manufacture the fact by
+blanket-setting every AdmissionFacts field to true.
+
+That frozen historical fact may contribute
+`no_prior_d10_activation_or_scheduler_mutation=True` only when the same fresh
+admission also proves the exact historical S5-R8 canonical deployment, exact D5
+capture-only scheduler predecessor, and absent activation/cache objects. Any
+future accepted P124-5 execution, or any replacement lineage after this one,
+invalidates this frozen fact and requires a new reviewed architecture/source
+identity before protected replacement may proceed.
+
 An absent, unreadable, conflicting, partially activated, or indeterminate condition blocks before the first mutation.
 
 The scheduler proof is part of replacement admission even though Task Scheduler is not trading authority. It prevents replacing executable bytes while a D10 wake source could legitimately target the canonical D10 root.

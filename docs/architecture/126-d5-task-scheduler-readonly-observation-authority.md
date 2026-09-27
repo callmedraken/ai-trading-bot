@@ -200,8 +200,15 @@ one preferred spelling.
 It must resolve the returned identity through Windows account/SID translation
 and require the resulting SID string to equal the frozen Trading SID exactly.
 
+If COM returns a SID-form `UserId`, constructing a
+`SecurityIdentifier` object from that string is not sufficient. The helper
+must still prove that the SID resolves through Windows account translation
+(for example SID -> NTAccount -> SID) and that the round-tripped SID is exactly
+the frozen Trading SID. This prevents a deleted/unresolvable principal SID from
+being accepted merely because its text still equals the historical SID.
+
 A missing identity, unresolvable identity, group/service identity, different
-SID, ambiguous translation, or translation exception blocks.
+SID, ambiguous translation, translation exception, or failed round trip blocks.
 
 The transport record exposes only the resolved SID, not reusable credentials.
 

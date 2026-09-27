@@ -5191,3 +5191,21 @@ contract/operator/tests are implemented and accepted.
 
 NEXT: P125-R1E source-only retired-tree cleanup.
 
+### P125-R1E retired-cleanup destructive contract — FROZEN
+
+R1E stopped correctly before edits at the deletion-policy boundary.
+
+Architecture 125 now freezes handle-pinned
+SetFileInformationByHandle(FileDispositionInfo, DeleteFile=TRUE) deletion,
+exclusive destructive target handles, pinned direct-parent verification, a
+manifest-bound immutable bottom-up cleanup plan, positive close+absence proof
+for every committed target, and fail-closed indeterminate semantics.
+
+Same-invocation continuation is allowed only after each exact per-target
+SUCCESS. A later PARTIAL_RETIRED state never resumes automatically and requires
+a separate future recovery checkpoint. RETIRED_ABSENT may close idempotently
+only after full fresh post-cleanup proof.
+
+NEXT: resume P125-R1E source-only cleanup implementation in
+F:\AI\worktrees\ai-trading-bot-p125-r1e after docs-only fast-forward.
+

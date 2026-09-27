@@ -305,6 +305,171 @@ After P124-3 PASS, a P125 retirement-cleanup operation may be considered. It mus
 
 Only then may a fixed-path, native no-follow, manifest-bound bottom-up deletion of the retired S5-R8 tree occur. Partial cleanup never affects canonical S5-R10 and is recoverable only by exact read-only reclassification.
 
+### 10.1 Frozen retired-tree deletion mechanism
+
+The retirement cleanup uses the legacy handle-based Windows disposition
+contract already present in the reviewed native runtime:
+
+- targets are opened with `CreateFileW` using `FILE_FLAG_OPEN_REPARSE_POINT`;
+- directory targets additionally use `FILE_FLAG_BACKUP_SEMANTICS`;
+- the target handle requests `DELETE`, `READ_CONTROL`,
+  `FILE_READ_ATTRIBUTES`, and `SYNCHRONIZE`;
+- file targets additionally request the read access needed to re-hash the exact
+  expected bytes through the same pinned handle;
+- directory targets additionally request the list/traverse access needed to
+  prove the exact expected child inventory through the same pinned handle;
+- the destructive target handle uses share mode 0. Failure to obtain exclusive
+  access blocks rather than broadening the sharing contract;
+- deletion is requested only with
+  `SetFileInformationByHandle(FileDispositionInfo)` and
+  `FILE_DISPOSITION_INFO.DeleteFile = TRUE`;
+- `FileDispositionInfoEx`, POSIX-delete semantics, `DeleteFileW`,
+  `RemoveDirectoryW`, shell recursion, generic recursive deletion, and
+  caller-selected deletion paths are not P125 authorities.
+
+The object verified is the object marked for deletion. A target is not reopened
+by pathname for the destructive call after its verified handle is closed.
+
+The direct parent directory is also opened no-follow and retained across each
+delete step. It is re-inspected immediately before the disposition call and
+again after the target handle is closed. The parent handle may use the
+read/list rights and sharing necessary to remain open while the child is
+deleted, but it grants no caller-selected mutation authority.
+
+For a file target, the pinned destructive handle must reproduce the exact
+frozen byte length and SHA-256 already admitted for that path before
+`DeleteFile=TRUE`.
+
+For a directory target, the pinned destructive handle must reproduce the exact
+expected child inventory before `DeleteFile=TRUE`. The retired root and every
+subdirectory are therefore deleted only after all expected children have been
+positively deleted.
+
+### 10.2 Frozen cleanup plan and ordering
+
+Before the first destructive call, the operator performs a complete fresh
+cleanup admission and freezes one immutable in-process cleanup plan.
+
+The plan is constructed only from source-owned fixed paths plus the exact,
+already verified historical S5-R8 signed manifest/trust identity. Untrusted
+directory enumeration may validate the plan but never generates deletion
+targets.
+
+The plan contains exactly:
+
+1. every historical S5-R8 source file named by the verified executable
+   manifest;
+2. the fixed historical launch guard;
+3. the fixed historical attestation and detached signature;
+4. the fixed historical executable manifest;
+5. every source directory implied by the manifest paths;
+6. the fixed retired `source` directory;
+7. the fixed retired root.
+
+No other target may enter the plan.
+
+Deletion order is deterministic and bottom-up:
+
+1. source files in canonical manifest-path order;
+2. launch guard;
+3. attestation;
+4. detached signature;
+5. executable manifest last among files;
+6. implied source directories deepest-first, with deterministic ordinal
+   tie-breaking;
+7. `source`;
+8. retired root last.
+
+The manifest is retained until all manifest-bound files have been positively
+deleted. Once deletion begins, the frozen in-process plan, not a newly observed
+directory inventory, determines the remaining targets.
+
+### 10.3 Per-target commit point
+
+One delete step is SUCCESS only when all of the following hold:
+
+1. the fixed direct parent and fixed target are opened no-follow;
+2. both pinned handles reproduce the admitted native identity/security/volume
+   facts immediately before mutation;
+3. the target reproduces its exact expected bytes or exact empty/expected
+   directory inventory;
+4. `SetFileInformationByHandle(FileDispositionInfo, DeleteFile=TRUE)`
+   returns success;
+5. the target handle closes successfully;
+6. while the verified parent handle remains open, a fresh direct-parent
+   inventory omits the exact target leaf;
+7. a fresh no-follow open of the exact target is absent, with absence accepted
+   only together with the still-exact direct-parent proof;
+8. the direct-parent handle still reproduces the exact admitted parent
+   identity/security/volume facts.
+
+Only then may the same invocation advance to the next frozen target.
+
+A false native return, exception, target-handle close ambiguity, unexpected
+continued presence, parent drift, or inability to prove exact absence is
+INDETERMINATE. The current invocation stops immediately and does not retry the
+same target, skip it, reconstruct it, roll back prior deletions, or continue to
+later targets.
+
+Windows documents FileDispositionInfo as marking the opened object for deletion
+when the handle is closed and requires DELETE access for DeleteFile=TRUE. P125
+treats successful handle close plus independent parent/path absence proof as
+the commit point; it does not treat the disposition call alone as deletion
+proof.
+
+### 10.4 Partial cleanup and later invocations
+
+Same-invocation forward progress is allowed only after each prior target has
+reached the exact SUCCESS commit point above. This is continuation of one
+admitted cleanup operation, not retry authority.
+
+A later invocation must begin with fresh read-only classification:
+
+- FULL_RETIRED: the complete exact S5-R8 retired tree is still present. The
+  ordinary cleanup may start again after all cleanup admission facts are
+  freshly reproved.
+- PARTIAL_RETIRED: the retired root exists but is not the complete exact S5-R8
+  tree. Even if the remaining objects are a clean subset of the frozen plan,
+  the ordinary cleanup MUST NOT continue. It returns
+  SEPARATE_RECOVERY_REQUIRED.
+- RETIRED_ABSENT: the retired root is absent. If every post-cleanup invariant is
+  freshly exact, the operator may return an idempotent read-only cleanup PASS;
+  it performs no mutation.
+- CONFLICTING: any unexpected object, identity/security drift, unclassifiable
+  namespace, or ambiguous observation blocks.
+
+R1E does not implement a PARTIAL_RETIRED recovery command. Any future recovery
+authority is a separate reviewed checkpoint.
+
+### 10.5 Cleanup admission and final proof
+
+Before FULL_RETIRED deletion begins, the cleanup operator must freshly prove:
+
+- canonical S5-R10 is exact and its P124-3 signed trust verifies exactly under
+  the frozen production key;
+- canonical activation lease/installing/tmp and cache objects are absent;
+- the D5 Task Scheduler predecessor remains exact;
+- the protected `F:\AITradingBot` parent remains exact;
+- retired S5-R8 guard/source/manifest/attestation/signature are exact and the
+  historical signature verifies;
+- retired inventory equals the frozen plan exactly, including case;
+- canonical and retired roots are on the same accepted local NTFS volume;
+- no staging root and no unexpected replacement/retired sibling exists.
+
+After the retired root SUCCESS step, cleanup PASS requires two fresh matching
+read-only observations proving:
+
+- retired root absent;
+- canonical S5-R10 signed deployment still exact;
+- canonical activation/cache still absent;
+- D5 scheduler predecessor still exact;
+- protected parent still exact;
+- staging absent;
+- no unexpected replacement/retired sibling exists.
+
+No cleanup step grants signing, activation, scheduler, provider, paper, broker,
+or trading authority.
+
 P124-1 full signed production-Python substrate qualification occurs only after the retired-tree cleanup PASS, so its protected-host inventory does not need to admit an obsolete sibling deployment.
 
 ## 11. Protected execution sequence after this design

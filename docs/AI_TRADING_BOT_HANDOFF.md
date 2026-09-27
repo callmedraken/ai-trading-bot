@@ -5341,3 +5341,51 @@ retired S5-R8 tree using the Architecture-125 no-follow, manifest-bound,
 bottom-up contract; canonical D10 must be untouchable. No protected cleanup is
 authorized by the source checkpoint.
 
+## 2026-09-27 P125-R1E cleanup deletion architecture gap resolved
+
+P125-R1E correctly stopped before edits because Architecture 125 had not frozen
+the destructive Windows deletion mechanism, handle lifetime, per-delete commit
+point, or later-invocation continuation policy.
+
+Architecture 125 now freezes the retired-tree cleanup contract.
+
+The deletion primitive is handle-pinned
+SetFileInformationByHandle(FileDispositionInfo) with DeleteFile=TRUE, using an
+exact fixed no-follow target handle with DELETE access and an exact pinned
+direct-parent handle. Path-only DeleteFileW/RemoveDirectoryW, FileDispositionInfoEx
+POSIX semantics, shell recursion, generic recursive delete, and caller-selected
+paths are forbidden.
+
+The complete exact S5-R8 retired inventory is converted before mutation into one
+immutable source-owned/manifest-bound cleanup plan. Targets are deleted
+deterministically bottom-up; the manifest is retained until all manifest-bound
+files are positively deleted.
+
+One target deletion is committed only after the disposition call succeeds, the
+target handle closes successfully, the still-pinned direct parent remains
+exact, direct-parent inventory omits the leaf, and an exact no-follow path probe
+confirms absence. Any native/close/post-delete ambiguity is INDETERMINATE and
+stops the invocation with no retry, skip, rollback, repair, or later-target
+continuation.
+
+Same-invocation continuation is allowed only after each prior target has a
+positive commit proof.
+
+Later invocations classify cleanup state as FULL_RETIRED, PARTIAL_RETIRED,
+RETIRED_ABSENT, or CONFLICTING. FULL_RETIRED may freshly readmit the ordinary
+cleanup. PARTIAL_RETIRED always requires a separate reviewed recovery command;
+R1E does not implement it. RETIRED_ABSENT may produce an idempotent read-only
+PASS only after complete fresh post-cleanup verification.
+
+Cleanup admission independently requires exact P124-3 signed S5-R10 canonical
+trust, exact historical S5-R8 retired trust/tree, activation/cache absence,
+exact D5 scheduler, exact protected parent/same NTFS volume, staging absence,
+and no unexpected replacement/retired sibling.
+
+No source or protected mutation occurred in this docs checkpoint.
+
+NEXT: fast-forward the existing
+F:\AI\worktrees\ai-trading-bot-p125-r1e worktree through this docs-only
+commit and resume the same bounded R1E source implementation. Broad
+certification remains deferred until R1E source acceptance.
+

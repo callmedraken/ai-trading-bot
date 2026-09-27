@@ -4825,3 +4825,55 @@ requires separate explicit authorization and must prove the old D10 deployment
 inactive, preserve the protected parent/security model, avoid ambiguous partial
 replacement state, and keep activation/scheduler/provider/trading authority
 closed.
+
+## 2026-09-26 Architecture 125 frozen — inactive S5-R8 -> S5-R10 protected replacement
+
+The accepted S5-R10 unsigned material checkpoint is now followed by a Sol High
+design-only replacement contract:
+
+    docs/architecture/125-d10-protected-deployment-replacement.md
+
+Architecture 125 keeps the existing P124-2 primitive create-only. It does not
+reinterpret P124-2 as an upgrade operation.
+
+The frozen replacement design requires:
+
+- exact native verification that the canonical D10 tree is the accepted inactive
+  S5-R8 deployment;
+- exact proof that activation/cache/reserved objects remain absent;
+- exact proof that the scheduler is still the D5 capture-only predecessor, not
+  the D10 guard action;
+- construction and full verification of the accepted S5-R10 guard/source under
+  one fixed protected staging root before the old root is touched;
+- two destination-absent same-volume renames: old canonical D10 to a fixed
+  S5-R8 retired root, then exact S5-R10 staging to canonical D10;
+- no overwrite, no automatic rollback, and no optimistic retry after an
+  indeterminate rename;
+- explicit read-only classification of crash-window namespace states;
+- no trust, lease, cache, scheduler, provider, paper, broker, or live effect in
+  the replacement operation.
+
+A successful replacement intentionally leaves the historical S5-R8 deployment
+under its fixed protected retired path and leaves canonical S5-R10 unsigned and
+inactive. P124-3 then publishes new S5-R10 trust. Destruction of the retired
+S5-R8 tree is a separate protected cleanup checkpoint after new signed trust is
+verified and before the next full signed P124-1 qualification.
+
+Revised safe sequence:
+
+    P125-R1 source implementation
+    -> source review/certification
+    -> separately authorized protected P125 replacement
+    -> P124-3 S5-R10 trust publication
+    -> separately authorized P125 retired-tree cleanup
+    -> full signed-trust P124-1
+    -> P124-4
+    -> P124-5 only after separate approval
+
+No Administrator mutation is authorized by the Architecture-125 design commit.
+
+NEXT: P125-R1 source-only implementation under Sol High. Keep protected-host
+mutation closed. Substantial operator orchestration must remain in reviewed
+.py/.ps1 files with short PowerShell launch commands; the canonical local
+operator/helper-script folder is F:\Users\John\Downloads.
+

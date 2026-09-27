@@ -4967,3 +4967,34 @@ S5-R8 -> S5-R10 D10 replacement procedure. Do not run existing P124-2 over the
 present D10 root, and do not delete/rename/replace the old D10 tree until that
 replacement contract is separately reviewed and a protected checkpoint is
 explicitly authorized.
+
+### Architecture 125 — inactive D10 protected replacement design FROZEN
+
+The S5-R10 material checkpoint is accepted and the next design-only security
+boundary is now frozen in
+docs/architecture/125-d10-protected-deployment-replacement.md.
+
+The design does not widen P124-2. P124-2 remains create-only for an absent
+canonical D10 root.
+
+Architecture 125 freezes one explicit inactive S5-R8 -> S5-R10 replacement
+lineage with:
+
+- exact old S5-R8 identity admission;
+- exact accepted S5-R10 material admission;
+- D5 capture-only scheduler proof and absent activation-lease/cache proof;
+- fixed protected staging and retired namespaces;
+- complete S5-R10 staging verification before old-root mutation;
+- old-canonical -> retired followed by new-staging -> canonical same-volume
+  destination-absent renames;
+- fail-closed crash-window classification;
+- no automatic retry after an indeterminate rename;
+- no rollback to historical S5-R8 as error cleanup;
+- no trust/signing/activation/scheduler/provider/trading effect in replacement;
+- separate post-P124-3 retired-tree cleanup before the next full P124-1
+  qualification.
+
+NEXT: P125-R1 source-only implementation and focused verification. A protected
+replacement remains separately approval-gated and is not authorized by this
+design checkpoint.
+

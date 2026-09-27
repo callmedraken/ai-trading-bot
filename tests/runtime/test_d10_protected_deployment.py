@@ -102,8 +102,8 @@ def _builder(root: Path, expected: dict[str, bytes]):
     def build(**kwargs):
         assert kwargs == {
             "repository_root": root,
-            "expected_head": "86f1021d244bf62bcf5a0f457c30eb98b998de90",
-            "expected_tree": "cfa455811f6bd1b3373a66f6716afca9dbd254df",
+            "expected_head": "c5cc0b01301600daf17f1114f4451dca2c9d7a1f",
+            "expected_tree": "bfacfadaa14315d2d378abcc0f1e4bc7c42034f1",
             "production_python_version": d.PRODUCTION_PYTHON_VERSION,
         }
         return result
@@ -342,8 +342,8 @@ def test_exact_certified_identity_canonical_artifacts_and_guard_bytes(
 ) -> None:
     files = _checkout(tmp_path)
     material = d.build_certified_material(tmp_path, builder=_builder(tmp_path, files))
-    assert d.CERTIFIED_SOURCE_HEAD == "86f1021d244bf62bcf5a0f457c30eb98b998de90"
-    assert d.CERTIFIED_SOURCE_TREE == "cfa455811f6bd1b3373a66f6716afca9dbd254df"
+    assert d.CERTIFIED_SOURCE_HEAD == "c5cc0b01301600daf17f1114f4451dca2c9d7a1f"
+    assert d.CERTIFIED_SOURCE_TREE == "bfacfadaa14315d2d378abcc0f1e4bc7c42034f1"
     assert d.CERTIFIED_SOURCE_HEAD != "acee8f80e947bcaefd79fa2c44531e8bbdf4cd0c"
     assert d.CERTIFIED_SOURCE_TREE != "e2850c86adc83b70ab11f6db9e421e8584832c98"
     assert d.CERTIFIED_SOURCE_HEAD != "b28409ebca1d484ededb7cef3ed47847e764b753"

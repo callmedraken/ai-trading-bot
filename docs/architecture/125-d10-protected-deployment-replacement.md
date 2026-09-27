@@ -189,7 +189,58 @@ After final revalidation, the only allowed namespace mutation sequence is:
     F:\AITradingBot\D10.replacement-9f3d111b-25bb-5ee4-9abf-f5215a32b826.installing
       -> F:\AITradingBot\D10
 
-Both are same-volume MoveFileW-style renames with destination absence required and no overwrite semantics.
+Both are same-volume destination-absent renames with no overwrite semantics.
+
+The exact native publication mechanism is handle-pinned, following the already
+accepted Architecture-78 authority-publication pattern rather than a path-only
+`MoveFileW` call:
+
+1. the source directory for the current rename step is opened with
+   `FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_BACKUP_SEMANTICS` and the access
+   required for handle-based rename, including `DELETE`;
+2. that source handle remains open from its final no-follow identity/security/
+   volume verification through the rename call;
+3. the already verified `F:\AITradingBot` parent is also held by an open
+   no-follow directory handle across the rename;
+4. immediately before mutation, the implementation re-inspects both open
+   handles and requires the exact previously admitted source identity and exact
+   protected parent identity to remain unchanged;
+5. publication uses `SetFileInformationByHandle(..., FileRenameInfo, ...)`
+   on the still-open source handle, not `MoveFileW`;
+6. `FILE_RENAME_INFO.ReplaceIfExists` is exactly false;
+7. `FILE_RENAME_INFO.RootDirectory` is the still-open verified
+   `F:\AITradingBot` parent handle and `FileName` is only the fixed,
+   source-owned destination leaf for that rename step;
+8. no absolute/caller-selected destination is accepted by the mutation
+   primitive;
+9. after native success and before either pinned handle is closed, the source
+   handle is re-inspected and must now resolve to the exact fixed destination
+   while preserving the same volume serial/file identity/security facts; the
+   parent handle must also still match its admitted identity;
+10. only that verified native-success result may be reported as
+    `MutationOutcome.SUCCESS`.
+
+A source handle opened and verified earlier but closed before a path-based
+rename is not sufficient for P125. The object verified is the object renamed.
+
+A native false return, exception, unavailable result, post-call identity
+mismatch, cleanup/handle-close ambiguity, or any inability to prove that the
+pinned object became the exact fixed destination is
+`MutationOutcome.INDETERMINATE`. The ordinary replacement state machine
+never retries such a mutation automatically.
+
+The destination-absence precheck remains required, but it is defense in depth:
+kernel-level no-replace behavior is the authoritative collision guard at the
+rename call. If the destination appears after precheck,
+`ReplaceIfExists = FALSE` must cause the rename to fail rather than replacing
+it.
+
+This contract deliberately makes no additional directory-entry durability
+claim beyond the accepted Architecture-78 model. Staging file contents must be
+flushed before they are admitted, but no extra user-mode directory flush is
+invented for the rename. Abrupt process/system failure at any publication
+window is handled by the Architecture-125 namespace classifier on the next
+invocation; uncertainty never creates retry authority.
 
 There is intentionally no attempt to make the two renames transactionally atomic as a pair. Safety comes from the fact that every intermediate namespace state is non-authoritative:
 

@@ -5134,3 +5134,43 @@ mutation, provider, paper, broker, or live effect. Stop for architecture review
 if the exact native mutation/durability contract is not already determined by
 Architecture 125 and the accepted P124 create-only primitives.
 
+## 2026-09-26 P125-R1C rename-identity blocker resolved
+
+P125-R1C correctly stopped before edits because Architecture 125 said
+"MoveFileW-style" without freezing whether the verified source object had to
+remain pinned through mutation.
+
+Exact review found that the repository already has an accepted precedent in
+Architecture 78 / windows_authority_security: unpublished protected authority
+objects retain their native handle through no-follow verification and are
+published with handle-based FileRenameInfo, ReplaceIfExists=false.
+
+Architecture 125 is now tightened to require the same class of object-binding
+for the D10 root renames, with an additional pinned verified
+F:\AITradingBot parent handle used as FILE_RENAME_INFO.RootDirectory.
+
+Frozen P125 rename contract:
+
+- no path-only MoveFileW publication;
+- source directory opened no-follow with DELETE and kept open from final
+  verification through mutation;
+- protected F:\AITradingBot parent handle remains open and verified;
+- SetFileInformationByHandle(FileRenameInfo) operates on the pinned source;
+- RootDirectory is the pinned parent handle;
+- FileName is only the exact fixed destination leaf;
+- ReplaceIfExists=false;
+- source and parent handles are re-inspected immediately before mutation;
+- after API success, source handle must resolve to the exact destination with
+  the same native object/volume/security identity before SUCCESS is reported;
+- false/exception/post-call ambiguity is INDETERMINATE and grants no retry;
+- no extra directory-entry durability claim is invented; crash/power-loss
+  uncertainty is resolved only by later namespace classification.
+
+No source, host, scheduler, provider, or trading effect occurred in this docs
+checkpoint.
+
+NEXT: fast-forward the existing
+F:\AI\worktrees\ai-trading-bot-p125-r1c worktree through this docs-only
+commit and resume the same Sol High R1C source implementation. Broad
+certification remains deferred.
+

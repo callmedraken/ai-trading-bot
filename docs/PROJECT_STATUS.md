@@ -5113,3 +5113,24 @@ S5-R10 staging construction/reverification plus the two fixed destination-
 absent same-volume rename primitives. No protected operator execution or other
 effect is authorized.
 
+### P125-R1C rename identity contract — FROZEN
+
+R1C stopped correctly before implementation at the handle-vs-path rename
+boundary.
+
+Architecture 125 now explicitly requires handle-pinned publication:
+SetFileInformationByHandle(FileRenameInfo) on the still-open verified source
+directory, with ReplaceIfExists=false and a still-open verified
+F:\AITradingBot parent handle as RootDirectory. The destination is only the
+fixed source-owned leaf. The source object must remain pinned from final
+no-follow verification through rename and must re-inspect as the exact
+destination before SUCCESS.
+
+Any API/identity/cleanup ambiguity is INDETERMINATE and cannot be retried
+automatically. No extra directory-entry durability guarantee is claimed;
+later namespace classification owns crash/power-loss ambiguity.
+
+NEXT: resume P125-R1C source-only native staging/rename primitives in the
+existing F:\AI\worktrees\ai-trading-bot-p125-r1c worktree after docs-only
+fast-forward.
+

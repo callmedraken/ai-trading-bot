@@ -5166,3 +5166,28 @@ review/certification gate.
 NEXT: P125-R1D source-only replacement operator + post-publication
 verification/transcript. No real F:\AITradingBot mutation is authorized.
 
+### P125-R1D replacement operator + post-publication evidence — ACCEPTED
+
+Accepted source identity:
+
+    HEAD 752f3fb2de01ed1db468b3ded8f4743a4006c9c0
+    TREE fefc1f35a16927e3cbf365d8a5b226e51bce0e53
+    parent 28b84f32b1f13088c9f0fc84299eb1b51c7a5266
+
+The explicit P125 replacement entry point, namespace classifier, ordered
+replacement orchestration, post-publication verification, and terminal
+transcripts were exactly reviewed and accepted.
+
+Reported focused verification: 145 passed; Ruff check/format and diff checks
+PASS; ordinary push and final clean state PASS. An exploratory overlapping
+deployment-test attempt encountered 57 WinError-5 pytest temp setup errors;
+the final bounded P125 lane passed.
+
+No protected replacement ran.
+
+Do NOT run broad three-lane certification yet. The Architecture-125 source
+surface is not complete until the separately gated retired-S5-R8 cleanup
+contract/operator/tests are implemented and accepted.
+
+NEXT: P125-R1E source-only retired-tree cleanup.
+

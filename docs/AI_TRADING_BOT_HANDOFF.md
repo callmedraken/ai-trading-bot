@@ -5261,3 +5261,83 @@ deterministic terminal transcript. Do not execute it against F:\AITradingBot.
 Recovery, retired-tree deletion, signing, activation, scheduler mutation,
 provider, paper, broker, and live effects remain unavailable.
 
+## 2026-09-26 P125-R1D replacement operator + post-publication evidence — ACCEPTED
+
+Exact accepted remote source identity:
+
+    HEAD:
+    752f3fb2de01ed1db468b3ded8f4743a4006c9c0
+
+    TREE:
+    fefc1f35a16927e3cbf365d8a5b226e51bce0e53
+
+    parent:
+    28b84f32b1f13088c9f0fc84299eb1b51c7a5266
+
+Exact changed files:
+
+    scripts/d10_protected_replacement.py
+    scripts/d10_protected_replacement_windows.py
+    scripts/p125_replace_d10.py
+    tests/runtime/test_d10_protected_replacement.py
+    tests/runtime/test_d10_protected_replacement_windows.py
+    tests/runtime/test_p125_replace_d10.py
+
+Exact GitHub review accepted the complete R1D diff and operator surface.
+
+Accepted properties include:
+
+- import/CLI remain inert unless --execute-protected-p125-r1 is explicitly
+  supplied;
+- initial namespace classification is stable, fixed-path, and fail-closed;
+- CLEAN_INITIAL may create only the fixed staging payload, then requires fresh
+  full admission;
+- OLD_CANONICAL proceeds only through fresh exact admission;
+- OLD_RETIRED and NEW_CANONICAL require separate recovery and never continue
+  automatically;
+- CONFLICTING blocks;
+- staging failures are reclassified and emitted through a closed STAGING_FAILED
+  result without cleanup/repair;
+- rename execution is exactly old->retired followed by staging->canonical;
+- either indeterminate rename terminates the invocation with no retry,
+  rollback, cleanup, signing, activation, or scheduler authority;
+- VERIFY_PUBLICATION now records NEW_CANONICAL only after the accepted
+  handle-pinned second rename has itself proven native success and exact
+  same-handle final destination;
+- independent post-publication observation proves exact S5-R10 canonical,
+  exact S5-R8 retired tree, staging absence, canonical trust absence,
+  activation/cache absence, exact D5 scheduler predecessor, protected parent,
+  same local NTFS volume, and absence of unexpected replacement/retired
+  siblings;
+- post-publication facts are explicit and every one is required before PASS;
+- terminal transcripts remain deterministic, bounded, sanitized, and explicitly
+  carry activation/scheduler/trading/retirement-cleanup authority = NONE.
+
+Reported focused evidence:
+
+    145 focused tests passed
+    Ruff check: PASS
+    Ruff format --check: PASS
+    git diff --check: PASS
+    staged diff check: PASS
+    ordinary push: PASS
+    final worktree/index: clean
+
+An exploratory run that also included test_d10_protected_deployment.py hit
+57 pytest setup errors caused by WinError 5 while creating its temp directory.
+Those were environment/setup errors rather than an accepted test failure; the
+final requested P125 focused lane passed.
+
+No protected replacement was executed.
+
+Broad three-lane certification remains deferred. Architecture 125 still
+requires the separate retired-S5-R8 cleanup source/operator/tests before the
+P125 source review/certification gate is complete.
+
+NEXT: P125-R1E source-only retired-S5-R8 cleanup implementation under Sol High.
+It must remain separately gated from replacement and executable only after
+exact signed S5-R10 trust publication is proven. It may delete only the fixed
+retired S5-R8 tree using the Architecture-125 no-follow, manifest-bound,
+bottom-up contract; canonical D10 must be untouchable. No protected cleanup is
+authorized by the source checkpoint.
+

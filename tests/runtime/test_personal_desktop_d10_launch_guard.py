@@ -1130,7 +1130,9 @@ def test_token_scalar_dword_uses_exact_buffer_without_size_probe(
             length: int,
             returned: object,
         ) -> int:
-            calls.append((int(token), int(information_class), int(length), buffer is None))
+            calls.append(
+                (int(token), int(information_class), int(length), buffer is None)
+            )
             assert buffer is not None
             assert length == ctypes.sizeof(wintypes.DWORD)
             ctypes.cast(buffer, ctypes.POINTER(wintypes.DWORD)).contents.value = 0

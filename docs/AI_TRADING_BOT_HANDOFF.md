@@ -4623,3 +4623,82 @@ Current progression:
 NEXT: perform the bounded P124-4 Trading guard qualification against the
 accepted signed-trust runtime. Keep P124-5 activation/scheduler mutation
 strictly separate.
+
+
+## 2026-09-26 S5-R10 certification PASS; deployment refresh required
+
+The P124-4 Trading-principal read-only qualification exposed a production guard
+bug before any source launch or production mutation:
+
+```text
+GetTokenInformation(size) failed (24)
+```
+
+The installed guard incorrectly used a zero-length size probe for fixed-size
+`TokenElevation`. The accepted correction queries the scalar directly with an
+exact DWORD buffer, validates the returned length, and preserves all existing
+non-admin/elevation fail-closed checks.
+
+Final certified source:
+
+```text
+HEAD:
+c5cc0b01301600daf17f1114f4451dca2c9d7a1f
+
+TREE:
+bfacfadaa14315d2d378abcc0f1e4bc7c42034f1
+```
+
+Focused final-tree verification:
+
+```text
+320 passed
+Ruff check: PASS
+Ruff format --check: PASS
+git diff --check: PASS
+clean worktree
+```
+
+Canonical full certification used the persistent three-lane runner rather than
+plain pytest:
+
+```text
+evidence:
+F:\AI\temp\pytest\p1244-token-fix-3lane-20260926-174138
+
+broad-1:
+3085 passed / 6 skipped / 0 failed/errors
+
+broad-2:
+3753 passed / 2 skipped / 0 failed/errors
+
+serial:
+926 passed / 9 skipped / 0 failed/errors
+
+TOTAL:
+7764 passed
+17 skipped
+0 failed/errors
+433.784 s wall
+```
+
+The earlier 848.12-second plain full-suite run is valid supplemental evidence
+but is not the canonical certification record because it bypassed the reviewed
+three-lane topology.
+
+Important deployment state:
+
+- prior P124-2 sealed deployment: historically PASS for S5-R8;
+- prior P124-3 signed trust: historically PASS for S5-R8;
+- prior full signed-trust P124-1: historically PASS for S5-R8/S5-R9 operator;
+- current corrected P124-4 guard source: certified at S5-R10;
+- current installed D10 guard/trust set is stale relative to S5-R10;
+- P124-4 must not be retried against the stale installed guard;
+- activation lease and scheduler mutation remain absent/not run.
+
+NEXT: refresh the non-governed deployment pins to the S5-R10 certified
+HEAD/TREE, create a fresh byte-exact deployment checkout, raw-audit governed
+blobs, and rebuild the unsigned deployment material. This refresh is source-only
+and read-only with respect to the protected host. After that material is
+accepted, repeat protected P124-2 then P124-3, then full signed-trust P124-1,
+before retrying P124-4.

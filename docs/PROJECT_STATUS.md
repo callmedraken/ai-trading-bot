@@ -4766,3 +4766,110 @@ Next milestone: P124-4 Trading guard qualification. This remains a bounded
 qualification checkpoint and must not create an activation lease or modify
 Task Scheduler. P124-5 remains the later activation-lease/scheduler mutation
 boundary and requires separate high-risk review before execution.
+
+
+## 2026-09-26 S5-R10 P124-4 token-elevation correction certified
+
+The first Trading-principal P124-4 qualification remained read-only and
+BLOCKED inside the installed launch guard at the Windows token-elevation query:
+
+```text
+GetTokenInformation(size) failed (24)
+```
+
+The root cause was the launch guard applying the variable-length two-call
+`GetTokenInformation` size-probe pattern to fixed-size `TokenElevation`.
+Windows returned `ERROR_BAD_LENGTH` for the zero-length size probe.
+
+Accepted source correction:
+
+```text
+behavior commit:
+db14471e31c108582b56b7b861958615ed2101c3
+
+format follow-up:
+4b58f7c0f26054089f02e0dd54b1db2869406302
+
+final certified HEAD:
+c5cc0b01301600daf17f1114f4451dca2c9d7a1f
+
+final certified TREE:
+bfacfadaa14315d2d378abcc0f1e4bc7c42034f1
+```
+
+The correction changes the guard to query `TokenElevation` directly through
+an exact DWORD-sized buffer, requires the returned byte count to match exactly,
+and continues to reject scalar values other than 0 or 1. Variable-size token
+classes retain the existing two-call pattern.
+
+Focused verification on the final tree:
+
+```text
+320 passed
+Ruff check: PASS
+Ruff format --check: PASS
+git diff --check: PASS
+clean detached worktree
+```
+
+An initial plain full-suite run also passed but was not accepted as the canonical
+certification topology:
+
+```text
+7764 passed
+17 skipped
+0 failed/errors
+848.12 seconds
+```
+
+Canonical three-lane certification then passed through
+`scripts/run_test_certification.py`:
+
+```text
+evidence:
+F:\AI\temp\pytest\p1244-token-fix-3lane-20260926-174138
+
+broad-1:
+3091 cases
+3085 passed
+6 skipped
+0 failed/errors
+429.118 seconds
+
+broad-2:
+3755 cases
+3753 passed
+2 skipped
+0 failed/errors
+429.131 seconds
+
+serial:
+935 cases
+926 passed
+9 skipped
+0 failed/errors
+429.155 seconds
+
+TOTAL:
+7781 cases
+7764 passed
+17 skipped
+0 failed
+0 errors
+
+wall:
+433.784 seconds
+```
+
+The persistent three-lane certification topology remains mandatory for final
+repository certification. Plain `pytest -q` must not substitute for the
+reviewed runner.
+
+Because this source correction changes
+`scripts/run_personal_desktop_d10_launch_guard.py`, the previously sealed
+P124-2/P124-3 deployment/trust set is now historical and must not be reused for
+the corrected P124-4 path. The next checkpoint is a fresh certified deployment
+material rebuild pinned to `c5cc0b0... / bfacfada...`, followed by a new
+protected P124-2 -> P124-3 -> full signed-trust P124-1 sequence before retrying
+P124-4. No production D10 mutation or signing occurs during the material
+refresh itself.

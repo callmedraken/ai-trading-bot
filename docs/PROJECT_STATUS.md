@@ -4661,3 +4661,108 @@ using corrected operator source `87eb8df...` while retaining sealed/certified
 deployment identity `86f1021... / cfa45581...`. The retry is covered by the
 standing continuation authorization. It grants no activation, scheduler,
 provider, broker, or trading authority.
+
+
+## 2026-09-26 full signed-trust P124-1 qualification accepted
+
+The corrected full signed-trust P124-1 qualification completed successfully
+using the certified S5-R9 operator correction while preserving the sealed
+S5-R8 deployment identity.
+
+Evidence:
+
+```text
+F:\AI\temp\p1241-signed-retry-87eb8df-20260926-165835
+```
+
+Accepted operator source:
+
+```text
+HEAD:
+87eb8dfd260507b7be959bf7e0d1d292ee1a33ff
+
+TREE:
+2af403b9ab5fa2afdad7b1e97db13bc4a909349c
+```
+
+Sealed deployment identity remained:
+
+```text
+HEAD:
+86f1021d244bf62bcf5a0f457c30eb98b998de90
+
+TREE:
+cfa455811f6bd1b3373a66f6716afca9dbd254df
+```
+
+Installed trust bytes admitted before qualification:
+
+```text
+attestation SHA-256:
+a12ab7788120934ca928919a01b4cfc7a3f6f307fad79ab13a6bfff189aeb3f3
+
+signature SHA-256:
+7ae83e28bcd8ab7cb59ab990a7f3b3191f485621aa83f5431f7f25fc32c8b4eb
+```
+
+Canonical P124-1 result:
+
+```text
+schema:
+personal-desktop-p124-1-native-transcript/v4
+
+status:
+PASS
+
+signed attestation SHA-256:
+a12ab7788120934ca928919a01b4cfc7a3f6f307fad79ab13a6bfff189aeb3f3
+
+detached signature verified:
+True
+
+signing key ID verified:
+True
+
+production Python:
+F:\AITradingBot\runtime\python.exe
+
+Python version:
+3.14.3
+
+protected/runtime objects:
+12514
+
+before/after objects:
+12514 / 12514
+
+Trading SID:
+S-1-5-21-1397534616-3988210162-180023805-1009
+
+Trading non-admin:
+True
+
+Trading elevated:
+False
+
+Trading enabled privileges:
+SeChangeNotifyPrivilege
+```
+
+Transcript SHA-256:
+
+```text
+3b501c1ef2dfce909af7e4d04855400099c104ce27b3782da416a523dd1213b4
+```
+
+No P124-2 or P124-3 rerun occurred. No D10 mutation, signing, activation
+lease, Task Scheduler mutation, provider/broker call, or trading effect
+occurred.
+
+The signed-trust P124-1 gate therefore closes as PASS. The host now has all
+accepted prerequisites through sealed deployment, signed trust publication,
+and full runtime/token/native qualification.
+
+Next milestone: P124-4 Trading guard qualification. This remains a bounded
+qualification checkpoint and must not create an activation lease or modify
+Task Scheduler. P124-5 remains the later activation-lease/scheduler mutation
+boundary and requires separate high-risk review before execution.

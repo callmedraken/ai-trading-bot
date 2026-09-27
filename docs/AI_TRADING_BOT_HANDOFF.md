@@ -4540,3 +4540,86 @@ NEXT: rerun only the bounded read-only full signed-trust P124-1 qualification
 from the corrected operator source. On PASS, close out P124-1 before entering
 P124-4/P124-5 activation/scheduler work. No activation lease, scheduler,
 provider/broker, or trading effect is authorized by the P124-1 retry.
+
+
+## 2026-09-26 full signed-trust P124-1 PASS
+
+The corrected signed-trust P124-1 retry passed.
+
+Evidence:
+
+```text
+F:\AI\temp\p1241-signed-retry-87eb8df-20260926-165835
+```
+
+Operator identity:
+
+```text
+87eb8dfd260507b7be959bf7e0d1d292ee1a33ff
+2af403b9ab5fa2afdad7b1e97db13bc4a909349c
+```
+
+Sealed deployment identity remains:
+
+```text
+86f1021d244bf62bcf5a0f457c30eb98b998de90
+cfa455811f6bd1b3373a66f6716afca9dbd254df
+```
+
+Accepted P124-1 result:
+
+```text
+schema:
+personal-desktop-p124-1-native-transcript/v4
+
+status:
+PASS
+
+transcript SHA-256:
+3b501c1ef2dfce909af7e4d04855400099c104ce27b3782da416a523dd1213b4
+
+signed attestation:
+a12ab7788120934ca928919a01b4cfc7a3f6f307fad79ab13a6bfff189aeb3f3
+
+detached signature verified:
+True
+
+signing key ID verified:
+True
+
+Python:
+F:\AITradingBot\runtime\python.exe
+
+version:
+3.14.3
+
+protected/runtime objects:
+12514
+
+before/after:
+12514 / 12514
+
+Trading SID:
+S-1-5-21-1397534616-3988210162-180023805-1009
+
+Trading non-admin / elevated:
+True / False
+
+enabled privileges:
+SeChangeNotifyPrivilege
+```
+
+P124-2/P124-3 were not rerun. D10 mutation, signing, activation lease,
+scheduler mutation, provider/broker access, and trading effects remained NONE.
+
+Current progression:
+
+- P124-2 sealed deployment: PASS;
+- P124-3 signed trust publication: PASS;
+- full signed-trust P124-1: PASS;
+- P124-4 Trading guard qualification: next;
+- P124-5 activation lease / scheduler mutation: not run.
+
+NEXT: perform the bounded P124-4 Trading guard qualification against the
+accepted signed-trust runtime. Keep P124-5 activation/scheduler mutation
+strictly separate.

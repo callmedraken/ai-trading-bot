@@ -5494,3 +5494,44 @@ HEAD/TREE using the canonical broad lane 1 + broad lane 2 + five serial
 Windows/global-state modules. After certification PASS, return the complete
 evidence path and lane totals for review before any protected host mutation.
 
+## 2026-09-27 P125-R1F D5 observer transport/COM representation correction — FROZEN
+
+The first authorized P125 protected-replacement preflight stopped before any
+D10 mutation at the Architecture-126 scheduler observer.
+
+Two independent read-only diagnostics established:
+
+1. the fixed helper could not start because Windows PowerShell applied its
+   default script-restriction behavior while every persisted execution-policy
+   scope reported Undefined;
+2. direct Task Scheduler COM observation succeeded and matched the frozen D5
+   predecessor in every projected semantic field except the exact Arguments
+   string, which Windows exposed as:
+
+       -I "F:\AI\worktrees\ai-trading-bot-personal-desktop\scripts\run_personal_desktop_unattended_capture_warmup.py"
+
+Historical project evidence also contains an accepted later Administrator
+readback of that same quoted installed representation. The older docs-only D5
+summary used an unquoted human-readable action notation; it was not sufficient
+to freeze the exact later COM serialization.
+
+Architecture 126 is corrected as follows:
+
+- the only allowed helper transport is fixed Windows PowerShell with
+  -NoProfile -NonInteractive -ExecutionPolicy Bypass -File <exact helper>;
+- Bypass is process-scoped and may not modify persistent execution-policy
+  state;
+- the exact expected COM Arguments string is the quoted-launcher form above;
+- comparison remains ordinal/exact; no quote normalization is introduced;
+- every other D5 semantic predicate is unchanged;
+- the historical XML hash remains diagnostic only and current XML digest drift
+  is not an admission predicate.
+
+No Task Scheduler mutation and no D10 mutation occurred.
+
+The previously certified R1E branch remains pinned at
+e279b6febfdfcd2024e1c19ef2a18a1f8f242b47 / tree
+01d0004c28794053505691aba805845b54bb274f. This correction lives on a child
+branch and requires focused verification plus a replacement canonical
+three-lane certification before protected P125 replacement may be reconsidered.
+

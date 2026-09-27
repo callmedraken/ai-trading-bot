@@ -5234,3 +5234,21 @@ passes and its evidence is reviewed.
 NEXT: fast-forward this docs-only closeout locally, then run
 scripts/run_test_certification.py against the exact R1E closeout HEAD/TREE.
 
+### P125-R1F scheduler observer compatibility correction — FROZEN
+
+Protected P125 preflight stopped safely before mutation.
+
+Read-only diagnosis proved the fixed Architecture-126 helper was blocked by
+Windows PowerShell's effective script execution policy, while direct COM
+observation matched the accepted D5 predecessor except that Action.Arguments is
+the accepted quoted-launcher representation.
+
+Architecture 126 now freezes fixed process-scoped
+`-ExecutionPolicy Bypass` for the exact reviewed helper and requires exact
+quoted COM Arguments. No quote normalization and no scheduler mutation are
+allowed.
+
+The certified R1E identity remains untouched. R1F must be implemented,
+reviewed, and canonically recertified before another protected replacement
+attempt.
+

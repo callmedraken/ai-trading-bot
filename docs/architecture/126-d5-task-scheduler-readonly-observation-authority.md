@@ -54,11 +54,25 @@ The helper must:
     credential, registry, filesystem, or other mutation.
 
 The Python P125 adapter may invoke only this reviewed helper at its exact
-source path. It must use a fixed PowerShell executable, `-NoProfile` and
-`-NonInteractive`, no caller-selected script path, and no semantic
-arguments. Native process exit status is checked before stdout is parsed.
-Nonzero exit, empty stdout, malformed output, unexpected stderr disposition,
-oversized output, or extra records fail closed.
+source path. The exact child-process command line is frozen as:
+
+    C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe
+      -NoProfile
+      -NonInteractive
+      -ExecutionPolicy Bypass
+      -File <exact reviewed helper path>
+
+`-ExecutionPolicy Bypass` is process-scoped transport configuration for this
+one fixed reviewed helper. It does not modify MachinePolicy, UserPolicy,
+CurrentUser, LocalMachine, or any persistent PowerShell policy, and it grants
+no scheduler or D10 mutation authority. It is required because the accepted
+host may otherwise apply the Windows PowerShell default Restricted policy even
+when every persisted execution-policy scope reports Undefined.
+
+No caller-selected executable, helper path, execution-policy value, task
+identity, or semantic argument is accepted. Native process exit status is
+checked before stdout is parsed. Nonzero exit, empty stdout, malformed output,
+unexpected stderr disposition, oversized output, or extra records fail closed.
 
 `Get-ScheduledTask`, `Get-ScheduledTaskInfo`, `schtasks.exe`, direct
 registry reads, direct reads of `C:\Windows\System32\Tasks`, WMI/CIM task
@@ -102,7 +116,7 @@ Actions:
     F:\AITradingBot\runtime\python.exe
 
     Arguments:
-    -I F:\AI\worktrees\ai-trading-bot-personal-desktop\scripts\run_personal_desktop_unattended_capture_warmup.py
+    -I "F:\AI\worktrees\ai-trading-bot-personal-desktop\scripts\run_personal_desktop_unattended_capture_warmup.py"
 
     WorkingDirectory:
     F:\AI\worktrees\ai-trading-bot-personal-desktop
@@ -110,6 +124,14 @@ Actions:
 Comparison is ordinal and exact after COM returns the strings. The observer
 must not trim, quote-normalize, path-normalize, environment-expand, token-split,
 or otherwise repair a different registered action into equality.
+
+The quoted launcher path above is the frozen COM representation. Architecture
+126 originally copied the unquoted human-readable D5 action notation into this
+field. Later exact Administrator COM readback of the accepted installed D5 task
+showed the launcher path quoted, and the protected P125 preflight reproduced
+that same quoted COM value while every other frozen D5 semantic field matched.
+The correction therefore changes the expected exact COM representation; it does
+not normalize arbitrary quoting and does not mutate Task Scheduler.
 
 Triggers:
 

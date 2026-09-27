@@ -12,6 +12,7 @@ import json
 import ntpath
 import os
 import re
+import struct
 import subprocess
 from concurrent.futures import ThreadPoolExecutor
 from ctypes import wintypes
@@ -25,6 +26,7 @@ from scripts.d10_protected_deployment import (
     MAX_GUARD_BYTES,
     MAX_MANIFEST_BYTES,
     MAX_SIGNATURE_BYTES,
+    MAX_SOURCE_FILE_BYTES,
     Ace,
     CertifiedMaterial,
     CheckedDirectory,
@@ -270,6 +272,16 @@ class AdmissionObservation:
     new_native: NativeObject | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class CleanupObservation:
+    state: replacement.CleanupState
+    plan: replacement.RetiredCleanupPlan | None = None
+    parent_native: NativeObject | None = None
+    parent_children: tuple[str, ...] = ()
+    scheduler: SchedulerObservation | None = None
+    admitted_objects: tuple[NativeObject, ...] = ()
+
+
 class _RecordingNative:
     """Keep native identity evidence from one complete observation pass."""
 
@@ -480,6 +492,293 @@ def _verify_new(
     ):
         _expect_absent(native, root + "\\" + name)
     return serial
+
+
+def _verify_signed_new(
+    native: ReadOnlyNative, verifier: object
+) -> tuple[ExecutableManifest, int]:
+    """Independently prove canonical P124-3 signed S5-R10 trust and source."""
+    root = replacement.CANONICAL_PATH
+    identity = replacement.NEW_IDENTITY
+    serial = _checked_directory(
+        native,
+        root,
+        {
+            "source",
+            "launch-guard.py",
+            "deployment.attestation.json",
+            "deployment.attestation.sig",
+            "executable-manifest.json",
+        },
+    ).volume_serial
+    manifest_bytes = _checked_file(
+        native, root + r"\executable-manifest.json", MAX_MANIFEST_BYTES
+    )
+    if hashlib.sha256(manifest_bytes).hexdigest() != identity.manifest_sha256:
+        raise AdmissionBlocked("signed_canonical_manifest_digest")
+    manifest = parse_executable_manifest(manifest_bytes)
+    if (
+        len(manifest.entries) != identity.executable_file_count
+        or sum(entry.byte_length for entry in manifest.entries)
+        != identity.executable_total_bytes
+    ):
+        raise AdmissionBlocked("signed_canonical_manifest_inventory")
+    guard = _checked_file(native, root + r"\launch-guard.py", MAX_GUARD_BYTES)
+    if (
+        len(guard) != identity.guard_byte_length
+        or hashlib.sha256(guard).hexdigest() != identity.guard_sha256
+    ):
+        raise AdmissionBlocked("signed_canonical_guard_identity")
+    attestation_bytes = _checked_file(
+        native, root + r"\deployment.attestation.json", MAX_ATTESTATION_BYTES
+    )
+    expected_attestation = build_deployment_attestation(
+        certified_source_head=identity.certified_source_head,
+        certified_source_tree=identity.certified_source_tree,
+        production_python_version="3.14.3",
+        launch_guard_byte_length=identity.guard_byte_length,
+        launch_guard_sha256=identity.guard_sha256,
+        executable_manifest_sha256=manifest.digest,
+        executable_file_count=len(manifest.entries),
+    )
+    if (
+        expected_attestation.deployment_id != identity.deployment_id
+        or attestation_bytes != expected_attestation.canonical_bytes()
+        or hashlib.sha256(attestation_bytes).hexdigest()
+        != identity.unsigned_attestation_sha256
+    ):
+        raise AdmissionBlocked("signed_canonical_attestation_identity")
+    signature = _checked_file(
+        native, root + r"\deployment.attestation.sig", MAX_SIGNATURE_BYTES
+    )
+    verify_signature(verifier, attestation_bytes, signature)
+    if _snapshot(native, root, manifest) != serial:
+        raise AdmissionBlocked("signed_canonical_source_volume")
+    for name in (
+        "activation.lease.json",
+        "activation.lease.json.installing",
+        "activation.lease.json.tmp",
+        "no-pycache",
+        "launch-guard.py.installing",
+        "source.installing",
+        "deployment.attestation.json.installing",
+        "deployment.attestation.sig.installing",
+        "executable-manifest.json.installing",
+    ):
+        _expect_absent(native, root + "\\" + name)
+    return manifest, serial
+
+
+def _retired_subset(
+    native: ReadOnlyNative, verifier: object, parent_serial: int
+) -> tuple[replacement.CleanupState, replacement.RetiredCleanupPlan | None]:
+    """Classify only the fixed retired namespace; no observed name becomes a target."""
+    root = replacement.RETIRED_PATH
+    checked = native.list_directory(root)
+    if type(checked) is not CheckedDirectory or checked.stable is not True:
+        raise AdmissionBlocked("retired_root_unstable")
+    require_native_object(checked.identity, root, directory=True)
+    if checked.identity.volume_serial != parent_serial:
+        raise AdmissionBlocked("retired_volume_drift")
+    fixed = {
+        "source",
+        "launch-guard.py",
+        "deployment.attestation.json",
+        "deployment.attestation.sig",
+        "executable-manifest.json",
+    }
+    names = checked.children
+    if (
+        type(names) is not tuple
+        or len(names) != len(set(names))
+        or len(names) != len({name.casefold() for name in names})
+        or not set(names) <= fixed
+    ):
+        raise AdmissionBlocked("retired_unexpected_inventory")
+    for name in fixed - set(names):
+        _expect_absent(native, root + "\\" + name)
+    manifest: ExecutableManifest | None = None
+    if "executable-manifest.json" in names:
+        manifest_bytes = _checked_file(
+            native, root + r"\executable-manifest.json", MAX_MANIFEST_BYTES
+        )
+        if (
+            hashlib.sha256(manifest_bytes).hexdigest()
+            != replacement.OLD_IDENTITY.manifest_sha256
+        ):
+            raise AdmissionBlocked("retired_manifest_drift")
+        manifest = parse_executable_manifest(manifest_bytes)
+        if (
+            len(manifest.entries) != replacement.OLD_IDENTITY.executable_file_count
+            or sum(e.byte_length for e in manifest.entries)
+            != replacement.OLD_IDENTITY.executable_total_bytes
+        ):
+            raise AdmissionBlocked("retired_manifest_inventory_drift")
+    elif "source" in names:
+        # The manifest is deleted only after every source file and source dir.
+        raise AdmissionBlocked("retired_manifest_missing_with_source")
+    for name, limit, digest in (
+        ("launch-guard.py", MAX_GUARD_BYTES, replacement.OLD_IDENTITY.guard_sha256),
+        (
+            "deployment.attestation.json",
+            MAX_ATTESTATION_BYTES,
+            replacement.OLD_IDENTITY.unsigned_attestation_sha256,
+        ),
+        (
+            "deployment.attestation.sig",
+            MAX_SIGNATURE_BYTES,
+            replacement.OLD_IDENTITY.detached_signature_sha256,
+        ),
+    ):
+        if (
+            name in names
+            and hashlib.sha256(
+                _checked_file(native, root + "\\" + name, limit)
+            ).hexdigest()
+            != digest
+        ):
+            raise AdmissionBlocked("retired_trust_byte_drift")
+    if "deployment.attestation.sig" in names and "deployment.attestation.json" in names:
+        verify_signature(
+            verifier,
+            _checked_file(
+                native, root + r"\deployment.attestation.json", MAX_ATTESTATION_BYTES
+            ),
+            _checked_file(
+                native, root + r"\deployment.attestation.sig", MAX_SIGNATURE_BYTES
+            ),
+        )
+    source_complete = "source" in names
+    if manifest is not None and "source" in names:
+        source = root + r"\source"
+        directories: dict[str, set[str]] = {source: set()}
+        for entry in manifest.entries:
+            parts = entry.relative_path.split("/")
+            parent = source
+            for part in parts[:-1]:
+                directories[parent].add(part)
+                parent += "\\" + part
+                directories.setdefault(parent, set())
+            directories[parent].add(parts[-1])
+        observed_names: dict[str, tuple[str, ...]] = {}
+        for path in sorted(directories, key=lambda item: (item.count("\\"), item)):
+            if path != source:
+                parent_path = ntpath.dirname(path)
+                if ntpath.basename(path) not in observed_names.get(parent_path, ()):
+                    _expect_absent(native, path)
+                    source_complete = False
+                    continue
+            directory = native.list_directory(path)
+            if type(directory) is not CheckedDirectory or directory.stable is not True:
+                raise AdmissionBlocked("retired_source_directory_unstable")
+            require_native_object(directory.identity, path, directory=True)
+            if (
+                directory.identity.volume_serial != parent_serial
+                or type(directory.children) is not tuple
+                or not set(directory.children) <= directories[path]
+                or len(directory.children) != len(set(directory.children))
+                or len(directory.children)
+                != len({name.casefold() for name in directory.children})
+            ):
+                raise AdmissionBlocked("retired_source_inventory_conflict")
+            observed_names[path] = directory.children
+            if set(directory.children) != directories[path]:
+                source_complete = False
+        for entry in manifest.entries:
+            path = source + "\\" + entry.relative_path.replace("/", "\\")
+            parent_path = ntpath.dirname(path)
+            if ntpath.basename(path) not in observed_names.get(parent_path, ()):
+                _expect_absent(native, path)
+                source_complete = False
+                continue
+            checked_file = _checked_file(native, path, max(1, entry.byte_length))
+            if (
+                len(checked_file) != entry.byte_length
+                or hashlib.sha256(checked_file).hexdigest() != entry.sha256
+            ):
+                raise AdmissionBlocked("retired_source_byte_drift")
+    if set(names) != fixed or not source_complete:
+        return replacement.CleanupState.PARTIAL_RETIRED, None
+    full_manifest, serial = _verify_old(native, verifier, root)
+    if serial != parent_serial:
+        raise AdmissionBlocked("retired_full_volume_drift")
+    attestation = _checked_file(
+        native, root + r"\deployment.attestation.json", MAX_ATTESTATION_BYTES
+    )
+    signature = _checked_file(
+        native, root + r"\deployment.attestation.sig", MAX_SIGNATURE_BYTES
+    )
+    return (
+        replacement.CleanupState.FULL_RETIRED,
+        replacement.build_retired_cleanup_plan(full_manifest, attestation, signature),
+    )
+
+
+def _cleanup_once(
+    native: ReadOnlyNative, verifier: object, scheduler_run: object
+) -> CleanupObservation:
+    native.require_administrator()
+    parent = native.list_directory(replacement.PARENT_PATH)
+    if type(parent) is not CheckedDirectory or parent.stable is not True:
+        raise AdmissionBlocked("cleanup_parent_unstable")
+    require_parent_native_object(parent.identity)
+    names = parent.children
+    canonical_leaf = ntpath.basename(replacement.CANONICAL_PATH)
+    retired_leaf = ntpath.basename(replacement.RETIRED_PATH)
+    staging_leaf = ntpath.basename(replacement.STAGING_PATH)
+    if (
+        type(names) is not tuple
+        or len(names) != len(set(names))
+        or len(names) != len({name.casefold() for name in names})
+        or canonical_leaf not in names
+        or staging_leaf in names
+    ):
+        raise AdmissionBlocked("cleanup_parent_namespace")
+    _require_reserved_siblings(
+        names, {retired_leaf} if retired_leaf in names else set()
+    )
+    _expect_absent(native, replacement.STAGING_PATH)
+    manifest, canonical_serial = _verify_signed_new(native, verifier)
+    if (
+        manifest.digest != replacement.NEW_IDENTITY.manifest_sha256
+        or canonical_serial != parent.identity.volume_serial
+    ):
+        raise AdmissionBlocked("cleanup_canonical_volume")
+    retired_absent = native.absent(replacement.RETIRED_PATH) is True
+    if retired_absent != (retired_leaf not in names):
+        raise AdmissionBlocked("cleanup_retired_parent_drift")
+    if retired_absent:
+        state, plan = replacement.CleanupState.RETIRED_ABSENT, None
+    else:
+        state, plan = _retired_subset(native, verifier, parent.identity.volume_serial)
+    scheduler = _observe_d5_scheduler(scheduler_run)
+    final_parent = native.list_directory(replacement.PARENT_PATH)
+    if (
+        type(final_parent) is not CheckedDirectory
+        or final_parent.stable is not True
+        or final_parent != parent
+    ):
+        raise AdmissionBlocked("cleanup_parent_revalidation_drift")
+    return CleanupObservation(state, plan, parent.identity, names, scheduler)
+
+
+def _observe_cleanup(
+    native: ReadOnlyNative, verifier: object, scheduler_run: object
+) -> CleanupObservation:
+    try:
+        first_native, second_native = _RecordingNative(native), _RecordingNative(native)
+        first = _cleanup_once(first_native, verifier, scheduler_run)
+        second = _cleanup_once(second_native, verifier, scheduler_run)
+        if first != second or first_native.objects != second_native.objects:
+            raise AdmissionBlocked("cleanup_two_read_drift")
+        by_path: dict[str, NativeObject] = {}
+        for item in second_native.objects:
+            if item.path in by_path and item != by_path[item.path]:
+                raise AdmissionBlocked("cleanup_intra_read_identity_drift")
+            by_path[item.path] = item
+        return replace(second, admitted_objects=tuple(second_native.objects))
+    except Exception:
+        return CleanupObservation(replacement.CleanupState.CONFLICTING)
 
 
 def _observe_once(
@@ -1748,6 +2047,350 @@ class _WindowsReplacementReader:
 
         self._reopen_matches(path, True, before)
         return CheckedDirectory(before, tuple(sorted(names)), True)
+
+
+class _FileDispositionInfo(ctypes.Structure):
+    _fields_ = [("delete_file", ctypes.c_ubyte)]
+
+
+class _FixedRetiredDeletionNative(_WindowsReplacementReader):
+    """Exclusive, no-follow disposition only for one freshly admitted plan."""
+
+    def __init__(self, plan: replacement.RetiredCleanupPlan) -> None:
+        if type(plan) is not replacement.RetiredCleanupPlan:
+            raise AdmissionBlocked("cleanup_plan_unreviewed")
+        super().__init__()
+        self._plan = plan
+        self._targets = {target.path: target for target in plan.targets}
+        self._parents = {replacement.PARENT_PATH} | {
+            target.path for target in plan.targets if target.directory
+        }
+
+    def _cleanup_open(self, path: str, *, parent: bool, directory: bool) -> int:
+        if parent:
+            if path not in self._parents or not self._allowed(path, directory=True):
+                raise AdmissionBlocked("cleanup_parent_path_unreviewed")
+            access = (
+                _FILE_LIST_DIRECTORY
+                | _FILE_TRAVERSE
+                | _FILE_READ_ATTRIBUTES
+                | _READ_CONTROL
+                | _SYNCHRONIZE
+            )
+            share = _FILE_SHARE_READ | 2 | 4
+        else:
+            target = self._targets.get(path)
+            if (
+                target is None
+                or target.directory is not directory
+                or not self._allowed(path, directory=directory)
+            ):
+                raise AdmissionBlocked("cleanup_target_path_unreviewed")
+            access = _DELETE | _READ_CONTROL | _FILE_READ_ATTRIBUTES | _SYNCHRONIZE
+            access |= (_FILE_LIST_DIRECTORY | _FILE_TRAVERSE) if directory else 0x0001
+            share = 0
+        create = self._bind(
+            self._kernel,
+            "CreateFileW",
+            [
+                ctypes.c_wchar_p,
+                wintypes.DWORD,
+                wintypes.DWORD,
+                ctypes.c_void_p,
+                wintypes.DWORD,
+                wintypes.DWORD,
+                wintypes.HANDLE,
+            ],
+            wintypes.HANDLE,
+        )
+        handle = create(
+            path,
+            access,
+            share,
+            None,
+            _OPEN_EXISTING,
+            _FILE_FLAG_OPEN_REPARSE_POINT | _FILE_FLAG_BACKUP_SEMANTICS,
+            None,
+        )
+        if handle in (None, 0, ctypes.c_void_p(-1).value):
+            raise AdmissionBlocked("cleanup_exclusive_open_unavailable")
+        return int(handle)
+
+    def _pinned_names(self, handle: int) -> tuple[str, ...]:
+        get_info = self._bind(
+            self._kernel,
+            "GetFileInformationByHandleEx",
+            [wintypes.HANDLE, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD],
+            wintypes.BOOL,
+        )
+        names: list[str] = []
+        info_class = 11  # FileIdBothDirectoryRestartInfo; then class 10 to resume.
+        while True:
+            buffer = ctypes.create_string_buffer(65536)
+            if not get_info(handle, info_class, buffer, len(buffer)):
+                if ctypes.get_last_error() == 18:  # ERROR_NO_MORE_FILES
+                    break
+                raise AdmissionBlocked("cleanup_pinned_inventory_unavailable")
+            info_class = 10
+            raw = buffer.raw
+            offset = 0
+            while True:
+                if offset + 104 > len(raw):
+                    raise AdmissionBlocked("cleanup_pinned_inventory_bounds")
+                next_offset, name_length = (
+                    struct.unpack_from("<I", raw, offset)[0],
+                    struct.unpack_from("<I", raw, offset + 60)[0],
+                )
+                if (
+                    name_length % 2
+                    or not name_length
+                    or offset + 104 + name_length > len(raw)
+                    or (next_offset and 104 + name_length > next_offset)
+                ):
+                    raise AdmissionBlocked("cleanup_pinned_name_bounds")
+                try:
+                    name = raw[offset + 104 : offset + 104 + name_length].decode(
+                        "utf-16-le", errors="strict"
+                    )
+                except UnicodeError:
+                    raise AdmissionBlocked("cleanup_pinned_name_encoding") from None
+                if name not in (".", ".."):
+                    if (
+                        not name
+                        or name.endswith((" ", "."))
+                        or any(char in name for char in "\\/:\x00")
+                        or name.casefold() in {item.casefold() for item in names}
+                    ):
+                        raise AdmissionBlocked("cleanup_pinned_name_invalid")
+                    names.append(name)
+                    if len(names) > 4096:
+                        raise AdmissionBlocked("cleanup_pinned_inventory_bound")
+                if next_offset == 0:
+                    break
+                if next_offset < 104 or offset + next_offset >= len(raw):
+                    raise AdmissionBlocked("cleanup_pinned_entry_bounds")
+                offset += next_offset
+        return tuple(sorted(names))
+
+    def _pinned_file(self, handle: int, expected_size: int) -> bytes:
+        if not 0 <= expected_size <= MAX_SOURCE_FILE_BYTES:
+            raise AdmissionBlocked("cleanup_pinned_file_bound")
+        read = self._bind(
+            self._kernel,
+            "ReadFile",
+            [
+                wintypes.HANDLE,
+                ctypes.c_void_p,
+                wintypes.DWORD,
+                ctypes.POINTER(wintypes.DWORD),
+                ctypes.c_void_p,
+            ],
+            wintypes.BOOL,
+        )
+        data = bytearray()
+        while len(data) < expected_size:
+            count = min(expected_size - len(data), 1024 * 1024)
+            buffer = ctypes.create_string_buffer(count)
+            received = wintypes.DWORD()
+            if (
+                not read(handle, buffer, count, ctypes.byref(received), None)
+                or not 0 < received.value <= count
+            ):
+                raise AdmissionBlocked("cleanup_pinned_file_read")
+            data.extend(buffer.raw[: received.value])
+        return bytes(data)
+
+    def _set_disposition(self, handle: int) -> bool:
+        info = _FileDispositionInfo(1)
+        set_info = self._bind(
+            self._kernel,
+            "SetFileInformationByHandle",
+            [wintypes.HANDLE, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD],
+            wintypes.BOOL,
+        )
+        return bool(set_info(handle, 4, ctypes.byref(info), ctypes.sizeof(info)))
+
+
+def _cleanup_identity_exact(
+    native: _FixedRetiredDeletionNative, handle: int, expected: NativeObject
+) -> None:
+    observed = native._inspect(handle, expected.path)
+    if expected.path == replacement.PARENT_PATH:
+        require_parent_native_object(observed)
+    else:
+        require_native_object(observed, expected.path, directory=expected.directory)
+    if replace(observed, size=expected.size) != expected:
+        raise AdmissionBlocked("cleanup_pinned_identity_drift")
+
+
+def _delete_fixed_target(
+    native: _FixedRetiredDeletionNative,
+    target: replacement.RetiredCleanupTarget,
+    parent_identity: NativeObject,
+    target_identity: NativeObject,
+    expected_parent_names: tuple[str, ...],
+    expected_target_names: tuple[str, ...],
+) -> replacement.MutationOutcome:
+    """One attempt only. Any uncertain native result permanently stops this session."""
+    parent_handle: int | None = None
+    target_handle: int | None = None
+    target_close_attempted = False
+    outcome = replacement.MutationOutcome.INDETERMINATE
+    try:
+        if (
+            type(target) is not replacement.RetiredCleanupTarget
+            or native._targets.get(target.path) != target
+            or ntpath.dirname(target.path) != parent_identity.path
+            or target_identity.path != target.path
+            or ntpath.basename(target.path) not in expected_parent_names
+        ):
+            raise AdmissionBlocked("cleanup_step_plan_mismatch")
+        parent_handle = native._cleanup_open(
+            parent_identity.path, parent=True, directory=True
+        )
+        target_handle = native._cleanup_open(
+            target.path, parent=False, directory=target.directory
+        )
+        _cleanup_identity_exact(native, parent_handle, parent_identity)
+        _cleanup_identity_exact(native, target_handle, target_identity)
+        if native._pinned_names(parent_handle) != expected_parent_names:
+            raise AdmissionBlocked("cleanup_parent_inventory_drift")
+        if target.directory:
+            if (
+                native._pinned_names(target_handle) != expected_target_names
+                or expected_target_names
+            ):
+                raise AdmissionBlocked("cleanup_target_inventory_drift")
+        else:
+            if (
+                target.byte_length != target_identity.size
+                or hashlib.sha256(
+                    native._pinned_file(target_handle, target.byte_length)
+                ).hexdigest()
+                != target.sha256
+            ):
+                raise AdmissionBlocked("cleanup_target_byte_drift")
+        _cleanup_identity_exact(native, parent_handle, parent_identity)
+        _cleanup_identity_exact(native, target_handle, target_identity)
+        if not native._set_disposition(target_handle):
+            raise AdmissionBlocked("cleanup_disposition_false")
+        target_close_attempted = True
+        native._close(target_handle)
+        target_handle = None
+        expected_after = tuple(
+            name
+            for name in expected_parent_names
+            if name != ntpath.basename(target.path)
+        )
+        if native._pinned_names(parent_handle) != expected_after:
+            raise AdmissionBlocked("cleanup_parent_post_inventory")
+        if native.absent(target.path) is not True:
+            raise AdmissionBlocked("cleanup_target_post_presence")
+        _cleanup_identity_exact(native, parent_handle, parent_identity)
+        outcome = replacement.MutationOutcome.SUCCESS
+    except Exception:
+        outcome = replacement.MutationOutcome.INDETERMINATE
+    finally:
+        if target_handle is not None and not target_close_attempted:
+            try:
+                native._close(target_handle)
+            except Exception:
+                outcome = replacement.MutationOutcome.INDETERMINATE
+        if parent_handle is not None:
+            try:
+                native._close(parent_handle)
+            except Exception:
+                outcome = replacement.MutationOutcome.INDETERMINATE
+    return outcome
+
+
+class _FixedRetiredCleanupSession:
+    def __init__(
+        self, observation: CleanupObservation, native: _FixedRetiredDeletionNative
+    ):
+        if (
+            observation.state is not replacement.CleanupState.FULL_RETIRED
+            or type(observation.plan) is not replacement.RetiredCleanupPlan
+            or type(observation.parent_native) is not NativeObject
+        ):
+            raise AdmissionBlocked("cleanup_session_not_admitted")
+        self.plan = observation.plan
+        self._native = native
+        self._admitted = {item.path: item for item in observation.admitted_objects}
+        self._admitted[replacement.PARENT_PATH] = observation.parent_native
+        for target in self.plan.targets:
+            if (
+                target.path not in self._admitted
+                or ntpath.dirname(target.path) not in self._admitted
+            ):
+                raise AdmissionBlocked("cleanup_plan_identity_missing")
+        self._parent_names = observation.parent_children
+        self.completed_targets = 0
+        self._stopped = False
+
+    def delete_next(self) -> replacement.MutationOutcome:
+        if self._stopped or self.completed_targets >= len(self.plan.targets):
+            raise AdmissionBlocked("cleanup_session_exhausted")
+        target = self.plan.targets[self.completed_targets]
+        parent = ntpath.dirname(target.path)
+        deleted = {item.path for item in self.plan.targets[: self.completed_targets]}
+        if parent == replacement.PARENT_PATH:
+            names = tuple(
+                name
+                for name in self._parent_names
+                if name != ntpath.basename(replacement.RETIRED_PATH)
+                or replacement.RETIRED_PATH not in deleted
+            )
+        else:
+            names = tuple(
+                name
+                for name in self.plan.children_of(parent)
+                if parent + "\\" + name not in deleted
+            )
+        child_names = (
+            ()
+            if not target.directory
+            else tuple(
+                name
+                for name in self.plan.children_of(target.path)
+                if target.path + "\\" + name not in deleted
+            )
+        )
+        result = _delete_fixed_target(
+            self._native,
+            target,
+            self._admitted[parent],
+            self._admitted[target.path],
+            tuple(sorted(names)),
+            tuple(sorted(child_names)),
+        )
+        if result is replacement.MutationOutcome.SUCCESS:
+            self.completed_targets += 1
+        else:
+            self._stopped = True
+        return result
+
+
+def begin_fixed_retired_cleanup_session() -> tuple[
+    CleanupObservation, _FixedRetiredCleanupSession | None
+]:
+    """Open a cleanup session only after fresh protected admission."""
+    native = _WindowsReplacementReader()
+    observation = _observe_cleanup(native, WindowsCngVerifier(), _run_scheduler_bounded)
+    if observation.state is not replacement.CleanupState.FULL_RETIRED:
+        return observation, None
+    assert observation.plan is not None
+    return observation, _FixedRetiredCleanupSession(
+        observation, _FixedRetiredDeletionNative(observation.plan)
+    )
+
+
+def observe_retired_cleanup_post() -> bool:
+    """Fresh independent two-pass proof after root deletion or idempotent absence."""
+    observation = _observe_cleanup(
+        _WindowsReplacementReader(), WindowsCngVerifier(), _run_scheduler_bounded
+    )
+    return observation.state is replacement.CleanupState.RETIRED_ABSENT
 
 
 class _FileRenameInfo(ctypes.Structure):

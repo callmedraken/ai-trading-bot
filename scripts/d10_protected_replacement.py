@@ -6,9 +6,16 @@ the host, perform a rename, or grant protected-operation authority.
 
 from __future__ import annotations
 
+import hashlib
 import json
+import ntpath
+import re
 from dataclasses import dataclass, fields
 from enum import StrEnum
+
+from trading_bot.runtime.personal_desktop_d10_deployment_identity import (
+    ExecutableManifest,
+)
 
 PARENT_PATH = r"F:\AITradingBot"
 CANONICAL_PATH = PARENT_PATH + r"\D10"
@@ -499,3 +506,252 @@ def verify_publication(
     return ReplacementResult(
         Phase.PASS, NamespaceState.NEW_CANONICAL, result.completed_renames
     )
+
+
+_HEX_SHA256 = re.compile(r"[0-9a-f]{64}\Z")
+
+
+class CleanupState(StrEnum):
+    FULL_RETIRED = "FULL_RETIRED"
+    PARTIAL_RETIRED = "PARTIAL_RETIRED"
+    RETIRED_ABSENT = "RETIRED_ABSENT"
+    CONFLICTING = "CONFLICTING"
+
+
+class CleanupPhase(StrEnum):
+    PASS = "PASS"
+    BLOCKED = "BLOCKED"
+
+
+class CleanupBlockReason(StrEnum):
+    NAMESPACE_CONFLICT = "NAMESPACE_CONFLICT"
+    SEPARATE_RECOVERY_REQUIRED = "SEPARATE_RECOVERY_REQUIRED"
+    ADMISSION_FAILED = "ADMISSION_FAILED"
+    INDETERMINATE_DELETE = "INDETERMINATE_DELETE"
+    POST_CLEANUP_VERIFICATION_FAILED = "POST_CLEANUP_VERIFICATION_FAILED"
+
+
+@dataclass(frozen=True, slots=True)
+class RetiredCleanupTarget:
+    path: str
+    directory: bool
+    byte_length: int | None = None
+    sha256: str | None = None
+
+    def __post_init__(self) -> None:
+        if (
+            type(self.path) is not str
+            or (
+                self.path != RETIRED_PATH
+                and not self.path.startswith(RETIRED_PATH + "\\")
+            )
+            or ntpath.normpath(self.path) != self.path
+            or type(self.directory) is not bool
+            or (
+                self.directory
+                and (self.byte_length is not None or self.sha256 is not None)
+            )
+            or (
+                not self.directory
+                and (
+                    type(self.byte_length) is not int
+                    or self.byte_length < 0
+                    or type(self.sha256) is not str
+                    or _HEX_SHA256.fullmatch(self.sha256) is None
+                )
+            )
+        ):
+            raise ValueError("retired cleanup target is outside the fixed lineage")
+
+
+@dataclass(frozen=True, slots=True)
+class RetiredCleanupPlan:
+    targets: tuple[RetiredCleanupTarget, ...]
+    directory_children: tuple[tuple[str, tuple[str, ...]], ...]
+    manifest_sha256: str
+
+    def __post_init__(self) -> None:
+        if (
+            type(self.targets) is not tuple
+            or not self.targets
+            or any(type(target) is not RetiredCleanupTarget for target in self.targets)
+            or type(self.directory_children) is not tuple
+            or any(
+                type(item) is not tuple or len(item) != 2
+                for item in self.directory_children
+            )
+        ):
+            raise ValueError("retired cleanup plan is not exact")
+        paths = tuple(target.path for target in self.targets)
+        directory_paths = {target.path for target in self.targets if target.directory}
+        children = dict(self.directory_children)
+        if (
+            self.targets[-1] != RetiredCleanupTarget(RETIRED_PATH, True)
+            or len(paths) != len(set(paths))
+            or len(paths) != len({path.casefold() for path in paths})
+            or len(children) != len(self.directory_children)
+            or set(children) != directory_paths
+            or any(
+                type(names) is not tuple
+                or names != tuple(sorted(names))
+                or len(names) != len(set(names))
+                for names in children.values()
+            )
+            or self.manifest_sha256 != OLD_IDENTITY.manifest_sha256
+        ):
+            raise ValueError("retired cleanup plan is not exact")
+
+    def children_of(self, path: str) -> tuple[str, ...]:
+        return dict(self.directory_children)[path]
+
+
+def build_retired_cleanup_plan(
+    manifest: ExecutableManifest,
+    attestation_bytes: bytes,
+    signature_bytes: bytes,
+) -> RetiredCleanupPlan:
+    """Freeze only the historical signed-manifest targets, in deletion order."""
+    if (
+        type(manifest) is not ExecutableManifest
+        or manifest.digest != OLD_IDENTITY.manifest_sha256
+        or len(manifest.entries) != OLD_IDENTITY.executable_file_count
+        or sum(entry.byte_length for entry in manifest.entries)
+        != OLD_IDENTITY.executable_total_bytes
+        or type(attestation_bytes) is not bytes
+        or not attestation_bytes
+        or hashlib.sha256(attestation_bytes).hexdigest()
+        != OLD_IDENTITY.unsigned_attestation_sha256
+        or type(signature_bytes) is not bytes
+        or len(signature_bytes) != 64
+        or hashlib.sha256(signature_bytes).hexdigest()
+        != OLD_IDENTITY.detached_signature_sha256
+    ):
+        raise ValueError("historical signed manifest or trust is not exact")
+    source = RETIRED_PATH + r"\source"
+    directories: set[str] = set()
+    targets: list[RetiredCleanupTarget] = []
+    for entry in manifest.entries:
+        parts = entry.relative_path.split("/")
+        if not parts or any(part in ("", ".", "..") for part in parts):
+            raise ValueError("manifest path is not a fixed source target")
+        parent = source
+        for part in parts[:-1]:
+            parent += "\\" + part
+            directories.add(parent)
+        targets.append(
+            RetiredCleanupTarget(
+                source + "\\" + entry.relative_path.replace("/", "\\"),
+                False,
+                entry.byte_length,
+                entry.sha256,
+            )
+        )
+    targets.extend(
+        (
+            RetiredCleanupTarget(
+                RETIRED_PATH + r"\launch-guard.py",
+                False,
+                OLD_IDENTITY.guard_byte_length,
+                OLD_IDENTITY.guard_sha256,
+            ),
+            RetiredCleanupTarget(
+                RETIRED_PATH + r"\deployment.attestation.json",
+                False,
+                len(attestation_bytes),
+                OLD_IDENTITY.unsigned_attestation_sha256,
+            ),
+            RetiredCleanupTarget(
+                RETIRED_PATH + r"\deployment.attestation.sig",
+                False,
+                len(signature_bytes),
+                OLD_IDENTITY.detached_signature_sha256,
+            ),
+            RetiredCleanupTarget(
+                RETIRED_PATH + r"\executable-manifest.json",
+                False,
+                len(manifest.canonical_bytes()),
+                OLD_IDENTITY.manifest_sha256,
+            ),
+        )
+    )
+    targets.extend(
+        RetiredCleanupTarget(path, True)
+        for path in sorted(directories, key=lambda path: (-path.count("\\"), path))
+    )
+    targets.extend(
+        (RetiredCleanupTarget(source, True), RetiredCleanupTarget(RETIRED_PATH, True))
+    )
+    children: dict[str, list[str]] = {
+        target.path: [] for target in targets if target.directory
+    }
+    for target in targets:
+        if target.path == RETIRED_PATH:
+            continue
+        parent = ntpath.dirname(target.path)
+        if parent not in children:
+            raise ValueError("manifest target parent is not in the fixed plan")
+        children[parent].append(ntpath.basename(target.path))
+    return RetiredCleanupPlan(
+        tuple(targets),
+        tuple((path, tuple(sorted(names))) for path, names in sorted(children.items())),
+        manifest.digest,
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class CleanupResult:
+    phase: CleanupPhase
+    state: CleanupState
+    completed_targets: int = 0
+    reason_code: CleanupBlockReason | None = None
+
+    def __post_init__(self) -> None:
+        if (
+            type(self.phase) is not CleanupPhase
+            or type(self.state) is not CleanupState
+            or type(self.completed_targets) is not int
+            or not 0 <= self.completed_targets <= 4096
+            or (
+                self.phase is CleanupPhase.PASS
+                and (
+                    self.state is not CleanupState.RETIRED_ABSENT
+                    or self.reason_code is not None
+                )
+            )
+            or (
+                self.phase is CleanupPhase.BLOCKED
+                and type(self.reason_code) is not CleanupBlockReason
+            )
+        ):
+            raise ValueError("cleanup result contains unrecognized evidence")
+
+    def canonical_transcript(self) -> bytes:
+        """Emit only closed cleanup facts; never expose native observations."""
+        passed = self.phase is CleanupPhase.PASS
+        value: dict[str, object] = {
+            "schema": "personal-desktop-d10-retired-cleanup/v1",
+            "operation": "P125-R1E",
+            "status": self.phase.value,
+            "cleanup_state": self.state.value,
+            "completed_targets": self.completed_targets,
+            "old_deployment_id": OLD_DEPLOYMENT_ID,
+            "new_deployment_id": NEW_DEPLOYMENT_ID,
+            "retired_path": RETIRED_PATH,
+            "retired_path_disposition": "ABSENT" if passed else "UNVERIFIED",
+            "canonical_signed_trust_disposition": "VERIFIED"
+            if passed
+            else "UNVERIFIED",
+            "scheduler_disposition": "D5_CAPTURE_ONLY_PREDECESSOR"
+            if passed
+            else "UNVERIFIED",
+            "activation_disposition": "ABSENT" if passed else "UNVERIFIED",
+            "activation_authority": "NONE",
+            "scheduler_authority": "NONE",
+            "trading_authority": "NONE",
+        }
+        if self.phase is CleanupPhase.BLOCKED:
+            value["reason_code"] = self.reason_code.value
+        return (
+            json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+            + "\n"
+        ).encode("ascii")

@@ -598,6 +598,367 @@ def _fixed_post_native(
     return native, admission
 
 
+def _signed_cleanup_native(monkeypatch: pytest.MonkeyPatch) -> FakeNative:
+    native, _ = _fixed_post_native(monkeypatch)
+    source = r.RETIRED_PATH
+    destination = r.CANONICAL_PATH
+    native.directories[destination] = native.directories[source]
+    manifest_bytes = native.files[source + r"\executable-manifest.json"]
+    native.files[destination + r"\executable-manifest.json"] = manifest_bytes
+    manifest = parse_executable_manifest(manifest_bytes)
+    identity = r.NEW_IDENTITY
+    attestation = build_deployment_attestation(
+        certified_source_head=identity.certified_source_head,
+        certified_source_tree=identity.certified_source_tree,
+        production_python_version="3.14.3",
+        launch_guard_byte_length=identity.guard_byte_length,
+        launch_guard_sha256=identity.guard_sha256,
+        executable_manifest_sha256=manifest.digest,
+        executable_file_count=len(manifest.entries),
+    )
+    native.files[destination + r"\deployment.attestation.json"] = (
+        attestation.canonical_bytes()
+    )
+    native.files[destination + r"\deployment.attestation.sig"] = b"s" * 64
+    return native
+
+
+def test_cleanup_full_plan_and_absent_post_proof(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    native = _signed_cleanup_native(monkeypatch)
+    observation = w._observe_cleanup(native, FakeVerifier(), _runner(_record()))
+    assert observation.state is r.CleanupState.FULL_RETIRED
+    assert observation.plan is not None
+    paths = [target.path for target in observation.plan.targets]
+    assert paths[-1] == r.RETIRED_PATH
+    assert paths[-2] == r.RETIRED_PATH + r"\source"
+    assert paths.index(r.RETIRED_PATH + r"\executable-manifest.json") < paths.index(
+        r.RETIRED_PATH + r"\source"
+    )
+    assert all(
+        path == r.RETIRED_PATH or path.startswith(r.RETIRED_PATH + "\\")
+        for path in paths
+    )
+    for mapping in (native.directories, native.files):
+        for path in tuple(mapping):
+            if path == r.RETIRED_PATH or path.startswith(r.RETIRED_PATH + "\\"):
+                del mapping[path]
+    native.directories[r.PARENT_PATH] = (r.CANONICAL_PATH.rsplit("\\", 1)[-1],)
+    assert (
+        w._observe_cleanup(native, FakeVerifier(), _runner(_record())).state
+        is r.CleanupState.RETIRED_ABSENT
+    )
+
+
+@pytest.mark.parametrize(
+    "change",
+    ["missing_file", "unexpected", "acl", "canonical_unsigned", "staging", "scheduler"],
+)
+def test_cleanup_closed_classification(
+    monkeypatch: pytest.MonkeyPatch, change: str
+) -> None:
+    native = _signed_cleanup_native(monkeypatch)
+    run = _runner(_record())
+    if change == "missing_file":
+        path = r.RETIRED_PATH + r"\launch-guard.py"
+        del native.files[path]
+        native.directories[r.RETIRED_PATH] = tuple(
+            name
+            for name in native.directories[r.RETIRED_PATH]
+            if name != "launch-guard.py"
+        )
+    elif change == "unexpected":
+        native.directories[r.RETIRED_PATH] += ("unexpected",)
+    elif change == "acl":
+        native.bad[r.RETIRED_PATH] = "acl"
+    elif change == "canonical_unsigned":
+        del native.files[r.CANONICAL_PATH + r"\deployment.attestation.sig"]
+    elif change == "staging":
+        native.directories[r.PARENT_PATH] += (r.STAGING_PATH.rsplit("\\", 1)[-1],)
+    else:
+        run = _runner(_record(first=_scheduler_read(enabled=False)))
+    observed = w._observe_cleanup(native, FakeVerifier(), run)
+    assert observed.state is (
+        r.CleanupState.PARTIAL_RETIRED
+        if change == "missing_file"
+        else r.CleanupState.CONFLICTING
+    )
+
+
+def test_cleanup_session_stops_on_indeterminate(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    native = _signed_cleanup_native(monkeypatch)
+    observation = w._observe_cleanup(native, FakeVerifier(), _runner(_record()))
+    assert observation.plan is not None
+    backend = object.__new__(w._FixedRetiredDeletionNative)
+    backend._plan = observation.plan
+    backend._targets = {target.path: target for target in observation.plan.targets}
+    backend._parents = {r.PARENT_PATH} | {
+        target.path for target in observation.plan.targets if target.directory
+    }
+    session = w._FixedRetiredCleanupSession(observation, backend)
+    monkeypatch.setattr(
+        w, "_delete_fixed_target", lambda *args: r.MutationOutcome.INDETERMINATE
+    )
+    assert session.delete_next() is r.MutationOutcome.INDETERMINATE
+    assert session.completed_targets == 0
+    with pytest.raises(w.AdmissionBlocked):
+        session.delete_next()
+
+
+def test_disposition_uses_only_legacy_handle_class() -> None:
+    class Kernel:
+        def __init__(self):
+            self.SetFileInformationByHandle = self.set_information
+
+        @staticmethod
+        def set_information(handle, info_class, info, size):
+            assert handle == 123
+            assert info_class == 4
+            assert size == ctypes.sizeof(w._FileDispositionInfo)
+            assert (
+                ctypes.cast(
+                    info, ctypes.POINTER(w._FileDispositionInfo)
+                ).contents.delete_file
+                == 1
+            )
+            return 1
+
+    native = object.__new__(w._FixedRetiredDeletionNative)
+    native._kernel = Kernel()
+    native._bind = lambda library, name, args, result: getattr(library, name)
+    assert native._set_disposition(123)
+
+
+@pytest.mark.parametrize(
+    "failure", ["", "bytes", "disposition", "close", "parent_after", "absent"]
+)
+def test_cleanup_step_commit_point_is_exclusive_and_fail_closed(
+    monkeypatch: pytest.MonkeyPatch, failure: str
+) -> None:
+    native = _signed_cleanup_native(monkeypatch)
+    observation = w._observe_cleanup(native, FakeVerifier(), _runner(_record()))
+    assert observation.plan is not None
+    target = observation.plan.targets[0]
+    admitted = {item.path: item for item in observation.admitted_objects}
+    parent_path = str(Path(target.path).parent)
+    parent_item, target_item = admitted[parent_path], admitted[target.path]
+    names = observation.plan.children_of(parent_path)
+    backend = object.__new__(w._FixedRetiredDeletionNative)
+    backend._targets = {item.path: item for item in observation.plan.targets}
+    calls: list[str] = []
+
+    def opened(path: str, *, parent: bool, directory: bool) -> int:
+        calls.append("parent_open" if parent else "exclusive_target_open")
+        assert path == (parent_path if parent else target.path)
+        return 1 if parent else 2
+
+    def inspected(handle: int, path: str) -> d.NativeObject:
+        return parent_item if handle == 1 else target_item
+
+    inventory_calls = 0
+
+    def inventory(handle: int) -> tuple[str, ...]:
+        nonlocal inventory_calls
+        assert handle == 1
+        inventory_calls += 1
+        if inventory_calls == 2:
+            if failure == "parent_after":
+                return names
+            return tuple(name for name in names if name != Path(target.path).name)
+        return names
+
+    def file_bytes(handle: int, size: int) -> bytes:
+        assert handle == 2 and size == target.byte_length
+        return b"wrong" if failure == "bytes" else native.files[target.path]
+
+    def disposition(handle: int) -> bool:
+        calls.append("disposition")
+        return failure != "disposition"
+
+    def close(handle: int) -> None:
+        calls.append("close_target" if handle == 2 else "close_parent")
+        if handle == 2 and failure == "close":
+            raise w.AdmissionBlocked("ambiguous_close")
+
+    monkeypatch.setattr(backend, "_cleanup_open", opened)
+    monkeypatch.setattr(backend, "_inspect", inspected)
+    monkeypatch.setattr(backend, "_pinned_names", inventory)
+    monkeypatch.setattr(backend, "_pinned_file", file_bytes)
+    monkeypatch.setattr(backend, "_set_disposition", disposition)
+    monkeypatch.setattr(backend, "_close", close)
+    monkeypatch.setattr(backend, "absent", lambda path: failure != "absent")
+    outcome = w._delete_fixed_target(
+        backend, target, parent_item, target_item, names, ()
+    )
+    assert outcome is (
+        r.MutationOutcome.SUCCESS if not failure else r.MutationOutcome.INDETERMINATE
+    )
+    assert calls[:2] == ["parent_open", "exclusive_target_open"]
+    assert calls.count("close_target") == 1
+    if failure == "bytes":
+        assert "disposition" not in calls
+    if failure == "close":
+        assert calls.count("close_target") == 1
+
+
+def test_cleanup_operator_runs_frozen_plan_once(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from scripts import p125_retire_old_d10 as op
+
+    native = _signed_cleanup_native(monkeypatch)
+    observation = w._observe_cleanup(native, FakeVerifier(), _runner(_record()))
+    assert observation.plan is not None
+
+    class Session:
+        plan = observation.plan
+        completed_targets = 0
+        stop_at = -1
+
+        def delete_next(self) -> r.MutationOutcome:
+            if self.completed_targets == self.stop_at:
+                return r.MutationOutcome.INDETERMINATE
+            self.completed_targets += 1
+            return r.MutationOutcome.SUCCESS
+
+    class Operations:
+        def __init__(self, session: Session):
+            self.session = session
+            self.post_calls = 0
+
+        def begin_fixed_retired_cleanup_session(self):
+            return observation, self.session
+
+        def observe_retired_cleanup_post(self) -> bool:
+            self.post_calls += 1
+            return True
+
+    operations = Operations(Session())
+    result = op.run_cleanup(operations)
+    assert result.phase is r.CleanupPhase.PASS
+    assert result.completed_targets == len(observation.plan.targets)
+    assert operations.post_calls == 1
+    stopped = Session()
+    stopped.stop_at = 1
+    operations = Operations(stopped)
+    result = op.run_cleanup(operations)
+    assert result.reason_code is r.CleanupBlockReason.INDETERMINATE_DELETE
+    assert result.completed_targets == 1
+    assert operations.post_calls == 0
+
+
+def test_cleanup_exclusive_native_open_contract(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    native = _signed_cleanup_native(monkeypatch)
+    observation = w._observe_cleanup(native, FakeVerifier(), _runner(_record()))
+    assert observation.plan is not None
+    backend = object.__new__(w._FixedRetiredDeletionNative)
+    backend._targets = {target.path: target for target in observation.plan.targets}
+    backend._parents = {r.PARENT_PATH} | {
+        target.path for target in observation.plan.targets if target.directory
+    }
+    calls: list[tuple[object, ...]] = []
+
+    def create(*args):
+        calls.append(args)
+        return 123
+
+    backend._kernel = object()
+    backend._bind = lambda library, name, args, result: create
+    target = observation.plan.targets[0]
+    backend._cleanup_open(target.path, parent=False, directory=False)
+    backend._cleanup_open(str(Path(target.path).parent), parent=True, directory=True)
+    assert calls[0][1] & w._DELETE
+    assert calls[0][2] == 0
+    assert calls[0][5] & w._FILE_FLAG_OPEN_REPARSE_POINT
+    assert not (calls[1][1] & w._DELETE)
+    assert calls[1][2] == 7
+    with pytest.raises(w.AdmissionBlocked):
+        backend._cleanup_open(r.CANONICAL_PATH, parent=False, directory=True)
+
+
+def test_cleanup_directory_inventory_uses_pinned_handle() -> None:
+    import struct
+
+    native = object.__new__(w._FixedRetiredDeletionNative)
+    native._kernel = object()
+    classes: list[int] = []
+    encoded = "x.py".encode("utf-16-le")
+    entry = bytearray(104 + len(encoded))
+    struct.pack_into("<I", entry, 60, len(encoded))
+    entry[104:] = encoded
+
+    def get_info(handle, info_class, buffer, length):
+        assert handle == 123 and length == 65536
+        classes.append(info_class)
+        if info_class == 11:
+            ctypes.memmove(buffer, bytes(entry), len(entry))
+            return 1
+        ctypes.set_last_error(18)
+        return 0
+
+    native._bind = lambda library, name, args, result: get_info
+    assert native._pinned_names(123) == ("x.py",)
+    assert classes == [11, 10]
+
+
+def test_cleanup_partial_source_subset_and_volume_conflict(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    native = _signed_cleanup_native(monkeypatch)
+    source = r.RETIRED_PATH + r"\source"
+    leaf = D10_LAUNCHER_RELATIVE_PATH.split("/")[-1]
+    native.directories[source + r"\scripts"] = ()
+    del native.files[source + "\\scripts\\" + leaf]
+    assert (
+        w._observe_cleanup(native, FakeVerifier(), _runner(_record())).state
+        is r.CleanupState.PARTIAL_RETIRED
+    )
+    native.serial_overrides[r.RETIRED_PATH] = 18
+    assert (
+        w._observe_cleanup(native, FakeVerifier(), _runner(_record())).state
+        is r.CleanupState.CONFLICTING
+    )
+
+
+def test_cleanup_two_pass_identity_drift_blocks(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    native = _signed_cleanup_native(monkeypatch)
+    original = native.list_directory
+    parent_reads = 0
+
+    def drifting(path: str) -> d.CheckedDirectory:
+        nonlocal parent_reads
+        result = original(path)
+        if path == r.PARENT_PATH:
+            parent_reads += 1
+            if parent_reads > 2:
+                return replace(
+                    result, identity=replace(result.identity, file_index=9000)
+                )
+        return result
+
+    monkeypatch.setattr(native, "list_directory", drifting)
+    assert (
+        w._observe_cleanup(native, FakeVerifier(), _runner(_record())).state
+        is r.CleanupState.CONFLICTING
+    )
+
+
+def test_cleanup_plan_rejects_canonical_or_traversal_targets() -> None:
+    for path in (
+        r.CANONICAL_PATH + r"\source\x.py",
+        r.RETIRED_PATH + r"\source\..\x.py",
+    ):
+        with pytest.raises(ValueError):
+            r.RetiredCleanupTarget(path, False, 1, "a" * 64)
+
+
 def _published_test_result() -> r.ReplacementResult:
     ready = r.begin_replacement(
         r.NamespaceObservation(

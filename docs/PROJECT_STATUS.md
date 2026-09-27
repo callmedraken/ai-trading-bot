@@ -5084,3 +5084,32 @@ NEXT: one bounded Sol High R1B correction commit in the existing
 F:\AI\worktrees\ai-trading-bot-p125-r1b worktree after docs-only
 fast-forward.
 
+### P125-R1B read-only native admission — ACCEPTED
+
+Accepted source identity:
+
+    HEAD 406ccd677927b2d1865673e00c623b14d01ca22e
+    TREE cb80a20d22fc594ab2350f1c3a3d83c842829f20
+    parent f196e7853a5780cb260d62b9c8bfb73ad2f5f80d
+
+The complete corrected R1B source was exactly reviewed. The accepted boundary
+adds only the fixed D5 Schedule.Service COM observation helper, the native
+read-only Architecture-125 admission adapter, and focused tests.
+
+The corrected helper round-trips SID-form principals through Windows account
+translation. The adapter constructs AdmissionFacts explicitly and binds the
+one-time S5-R8 -> S5-R10 P124-5-not-run status as a source-owned frozen lineage
+fact rather than caller evidence.
+
+Reported verification: 234 focused tests PASS; PowerShell syntax parse, Ruff
+check/format, diff checks, ordinary push, and final clean state PASS. The
+requested pytest temp location initially hit sandbox permissions; the
+authorized retry passed. Broad certification remains deferred.
+
+No real Task Scheduler/protected-host observation or mutation occurred.
+
+NEXT: P125-R1C source-only native mutation primitives under Sol High: fixed
+S5-R10 staging construction/reverification plus the two fixed destination-
+absent same-volume rename primitives. No protected operator execution or other
+effect is authorized.
+

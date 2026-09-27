@@ -5062,3 +5062,75 @@ worktree through the docs-only clarification, make one bounded Sol High
 correction commit for the two findings above, rerun focused R1B verification,
 and push normally. Do not start a new worktree or protected operation.
 
+## 2026-09-26 P125-R1B read-only native admission — ACCEPTED
+
+Exact accepted remote source identity:
+
+    HEAD:
+    406ccd677927b2d1865673e00c623b14d01ca22e
+
+    TREE:
+    cb80a20d22fc594ab2350f1c3a3d83c842829f20
+
+    parent:
+    f196e7853a5780cb260d62b9c8bfb73ad2f5f80d
+
+Exact accepted source/test files:
+
+    scripts/d10_p125_d5_scheduler_observe.ps1
+    scripts/d10_protected_replacement_windows.py
+    tests/runtime/test_d10_protected_replacement_windows.py
+
+The complete R1B source was re-reviewed after the bounded correction, not only
+the correction diff.
+
+Accepted properties include:
+
+- fixed zero-argument Schedule.Service COM helper for only the frozen D5 task;
+- SID-form and account-name principals both require Windows account/SID
+  translation to the exact Trading SID;
+- exact D5 semantic projection and stable two-read COM/XML evidence;
+- bounded fixed PowerShell subprocess transport with no stdin or
+  caller-selected semantic arguments;
+- fixed native path allowlist under the Architecture-125 canonical/staging/
+  retired namespace;
+- native no-follow, local-NTFS, exact final-path, owner/protected-DACL,
+  non-reparse, single-link, volume, inventory, and byte verification;
+- exact historical S5-R8 canonical signed-trust verification;
+- exact accepted S5-R10 staging guard/source verification with trust,
+  activation/cache, and installing objects absent;
+- two complete fresh native admission passes plus independent scheduler
+  observations before a successful AdmissionObservation;
+- explicit named AdmissionFacts construction;
+- explicit source-owned one-time S5-R8 -> S5-R10 P124-5-not-run lineage fact;
+- no mutation API, staging write, rename, deletion, signing, activation,
+  scheduler mutation, provider, Paper-v2, broker-paper, or live effect.
+
+Reported focused acceptance evidence:
+
+    234 focused tests passed
+    final three correction tests passed after final test edit
+    PowerShell syntax parse: PASS
+    Ruff check: PASS
+    Ruff format --check: PASS
+    git diff --check: PASS
+    staged diff check: PASS
+    ordinary push: PASS
+    final worktree/index: clean
+
+The initially requested pytest temp location encountered sandbox permissions;
+the authorized retry passed. No broad certification was run because the full
+P125 source tree is not yet intended final.
+
+No real Task Scheduler observation, protected-host observation, protected D10
+mutation, or trading/provider effect occurred during R1B.
+
+NEXT: P125-R1C source-only native mutation primitives under Sol High. Freeze
+the fixed S5-R10 staging creation/write/reverification and the two fixed
+same-volume destination-absent rename primitives without yet adding or running
+a protected replacement operator. R1C must not expose arbitrary-path mutation,
+automatic recovery, rollback, deletion, signing, activation, scheduler
+mutation, provider, paper, broker, or live effect. Stop for architecture review
+if the exact native mutation/durability contract is not already determined by
+Architecture 125 and the accepted P124 create-only primitives.
+

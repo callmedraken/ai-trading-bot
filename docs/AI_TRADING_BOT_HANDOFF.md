@@ -4877,3 +4877,25 @@ mutation closed. Substantial operator orchestration must remain in reviewed
 .py/.ps1 files with short PowerShell launch commands; the canonical local
 operator/helper-script folder is F:\Users\John\Downloads.
 
+## 2026-09-26 workflow clarification — docs-only closeout local catch-up
+
+The canonical AI workflow now explicitly records the long-standing docs-closeout
+synchronization rule. When ChatGPT directly advances the reviewed remote feature
+branch only through accepted docs/status/handoff commits, the local worktree may
+be intentionally behind by those known commits. Before any subsequent local or
+Codex work, prove the exact branch, tracked/index-clean state, exact known
+pre-closeout local HEAD, exact reviewed remote docs-closeout HEAD, and ancestry;
+then fast-forward only and reverify exact HEAD/tree/clean state.
+
+This is not permission to repair an unexpected mismatch. Any state outside that
+proven known-behind case remains a STOP with no reset/rebase/normal merge/clean
+or branch switching.
+
+The automatic-continuation rule remains paired with this synchronization gate:
+after accepted docs closeout and successful local catch-up, proceed directly to
+the next safe checkpoint until an explicit protected/repository-control approval
+boundary is reached.
+
+NEXT remains P125-R1 source-only implementation on the dedicated P125 branch
+after the local branch/worktree synchronization gate is satisfied.
+

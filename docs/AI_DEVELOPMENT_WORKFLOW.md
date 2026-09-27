@@ -207,6 +207,38 @@ when the exact resulting source tree was already certified. If the resulting
 tree differs from the certified source tree, use the appropriate final
 certification gate before accepting the milestone.
 
+## Docs-only closeout local catch-up
+
+When ChatGPT directly creates accepted docs/status/handoff closeout commits on
+the active remote feature branch, the local worktree may intentionally be one
+or more reviewed docs-only commits behind. That expected state is not treated
+as a generic mismatch to repair.
+
+Before any next local or Codex work:
+
+1. enter the exact intended worktree and prove the tracked worktree/index is
+   clean;
+2. prove the current local branch is the expected branch;
+3. fetch the exact remote branch;
+4. prove the remote HEAD is the exact reviewed docs-closeout HEAD;
+5. prove the local HEAD is either already that HEAD or the exact known
+   pre-closeout accepted HEAD and an ancestor of the reviewed remote HEAD;
+6. only in that known-behind case, fast-forward with `git merge --ff-only`
+   (or equivalently `git pull --ff-only` when the same exact remote/branch has
+   already been proven);
+7. verify final local HEAD/tree equal the expected remote HEAD/tree and the
+   tracked worktree/index remains clean; and
+8. continue automatically into the next safe checkpoint when no protected or
+   repository-control approval boundary is crossed.
+
+Any other branch, HEAD, ancestry, remote, tracked/index, or fast-forward result
+is a STOP condition. Do not reset, rebase, normal-merge, force-update, switch,
+clean, delete artifacts, or otherwise manufacture the expected state.
+
+This is the narrow exception that reconciles the startup STOP rule with direct
+remote docs closeouts: fast-forward synchronization is mandatory only after the
+exact known docs-only-behind state has itself been proven.
+
 ## Testing and certification
 
 During iteration:

@@ -4998,3 +4998,16 @@ NEXT: P125-R1 source-only implementation and focused verification. A protected
 replacement remains separately approval-gated and is not authorized by this
 design checkpoint.
 
+### Workflow clarification — docs-only closeout synchronization
+
+The canonical workflow now explicitly requires the established local catch-up
+step after ChatGPT-direct remote docs closeouts: exact known pre-closeout local
+HEAD + exact reviewed remote docs HEAD + clean tracked/index state + proven
+ancestry -> fast-forward only -> exact final HEAD/tree/clean verification ->
+automatic continuation to the next safe checkpoint.
+
+Unexpected state remains fail-closed and must not be repaired with reset,
+rebase, normal merge, clean, branch switching, or force operations.
+
+P125-R1 remains the next source-only implementation checkpoint.
+

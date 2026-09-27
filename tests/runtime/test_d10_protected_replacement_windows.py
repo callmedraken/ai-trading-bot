@@ -274,7 +274,13 @@ def test_scheduler_process_capture_is_bounded_without_real_task(
 
 
 def _native(
-    path: str, *, directory: bool, serial: int = 17, bad: str = "", size: int = 0
+    path: str,
+    *,
+    directory: bool,
+    serial: int = 17,
+    bad: str = "",
+    size: int = 0,
+    file_index: int | None = None,
 ) -> d.NativeObject:
     owner, protected, aces = (
         d.expected_parent_policy()
@@ -293,7 +299,7 @@ def _native(
         "F:\\",
         "NTFS",
         serial,
-        1000 + len(path),
+        1000 + len(path) if file_index is None else file_index,
         1,
         size,
     )
@@ -315,6 +321,7 @@ class FakeNative:
         self.bad: dict[str, str] = {}
         self.serial = 17
         self.serial_overrides: dict[str, int] = {}
+        self.file_index_overrides: dict[str, int] = {}
         self.calls: list[tuple[str, str]] = []
         self.parent_index = 1000 + len(r.PARENT_PATH)
 
@@ -330,6 +337,7 @@ class FakeNative:
             directory=True,
             serial=self.serial_overrides.get(path, self.serial),
             bad=self.bad.get(path, ""),
+            file_index=self.file_index_overrides.get(path),
         )
         if path == r.PARENT_PATH:
             item = replace(item, file_index=self.parent_index)
@@ -558,6 +566,185 @@ def _full_native(monkeypatch: pytest.MonkeyPatch) -> FakeNative:
         manifest.canonical_bytes()
     )
     return native
+
+
+def _move_fake_root(native: FakeNative, source: str, destination: str) -> None:
+    native.file_index_overrides[destination] = native.file_index_overrides.get(
+        source, 1000 + len(source)
+    )
+    for mapping in (native.directories, native.files):
+        moved = {
+            destination + path[len(source) :]: value
+            for path, value in mapping.items()
+            if path == source or path.startswith(source + "\\")
+        }
+        for path in tuple(mapping):
+            if path == source or path.startswith(source + "\\"):
+                del mapping[path]
+        mapping.update(moved)
+
+
+def _fixed_post_native(
+    monkeypatch: pytest.MonkeyPatch,
+) -> tuple[FakeNative, w.AdmissionObservation]:
+    native = _full_native(monkeypatch)
+    admission = w._observe_admission(native, FakeVerifier(), _runner(_record()))
+    _move_fake_root(native, r.CANONICAL_PATH, r.RETIRED_PATH)
+    _move_fake_root(native, r.STAGING_PATH, r.CANONICAL_PATH)
+    native.directories[r.PARENT_PATH] = (
+        r.CANONICAL_PATH.rsplit("\\", 1)[-1],
+        r.RETIRED_PATH.rsplit("\\", 1)[-1],
+    )
+    return native, admission
+
+
+def _published_test_result() -> r.ReplacementResult:
+    ready = r.begin_replacement(
+        r.NamespaceObservation(
+            r.RootObservation(r.CANONICAL_PATH, True, r.OLD_IDENTITY),
+            r.RootObservation(r.STAGING_PATH, True, r.NEW_IDENTITY),
+            r.RootObservation(r.RETIRED_PATH, False),
+            unexpected_reserved_names_absent=True,
+        ),
+        r.AdmissionFacts(*([True] * len(fields(r.AdmissionFacts)))),
+    )
+    retired = r.record_rename(
+        ready, r.RenameStep.OLD_TO_RETIRED, r.MutationOutcome.SUCCESS
+    )
+    return r.record_rename(
+        retired, r.RenameStep.STAGING_TO_CANONICAL, r.MutationOutcome.SUCCESS
+    )
+
+
+def test_namespace_reader_classifies_all_exact_fixed_states(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    native = _full_native(monkeypatch)
+    assert (
+        r.classify_namespace(w._observe_namespace(native, FakeVerifier()))
+        is r.NamespaceState.OLD_CANONICAL
+    )
+
+    for mapping in (native.directories, native.files):
+        for path in tuple(mapping):
+            if path == r.STAGING_PATH or path.startswith(r.STAGING_PATH + "\\"):
+                del mapping[path]
+    native.directories[r.PARENT_PATH] = (r.CANONICAL_PATH.rsplit("\\", 1)[-1],)
+    assert (
+        r.classify_namespace(w._observe_namespace(native, FakeVerifier()))
+        is r.NamespaceState.CLEAN_INITIAL
+    )
+
+    native, _ = _fixed_post_native(monkeypatch)
+    assert (
+        r.classify_namespace(w._observe_namespace(native, FakeVerifier()))
+        is r.NamespaceState.NEW_CANONICAL
+    )
+    _move_fake_root(native, r.CANONICAL_PATH, r.STAGING_PATH)
+    native.directories[r.PARENT_PATH] = (
+        r.STAGING_PATH.rsplit("\\", 1)[-1],
+        r.RETIRED_PATH.rsplit("\\", 1)[-1],
+    )
+    assert (
+        r.classify_namespace(w._observe_namespace(native, FakeVerifier()))
+        is r.NamespaceState.OLD_RETIRED
+    )
+
+
+def test_namespace_reader_blocks_partial_staging_and_unexpected_siblings(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    native = _full_native(monkeypatch)
+    native.files[r.STAGING_PATH + r"\launch-guard.py"] = b"partial"
+    assert (
+        r.classify_namespace(w._observe_namespace(native, FakeVerifier()))
+        is r.NamespaceState.CONFLICTING
+    )
+    native.files[r.STAGING_PATH + r"\launch-guard.py"] = b"new guard"
+    native.directories[r.PARENT_PATH] += ("D10.replacement-unreviewed",)
+    assert (
+        r.classify_namespace(w._observe_namespace(native, FakeVerifier()))
+        is r.NamespaceState.CONFLICTING
+    )
+
+
+def test_post_publication_reader_proves_all_exact_facts_twice(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    native, admission = _fixed_post_native(monkeypatch)
+    namespace, facts = w._observe_post_publication(
+        native, FakeVerifier(), _runner(_record()), admission
+    )
+    assert r.classify_namespace(namespace) is r.NamespaceState.NEW_CANONICAL
+    assert facts == r.PostPublicationFacts(
+        new_canonical_exact=True,
+        staging_absent=True,
+        old_retired_exact=True,
+        canonical_trust_absent=True,
+        activation_and_cache_absent=True,
+        d5_capture_only_scheduler_exact=True,
+        protected_parent_exact=True,
+        same_local_ntfs_volume=True,
+        unexpected_reserved_names_absent=True,
+    )
+
+
+@pytest.mark.parametrize(
+    "drift",
+    [
+        "canonical",
+        "staging",
+        "retired",
+        "trust",
+        "lease",
+        "cache",
+        "scheduler",
+        "parent",
+        "volume",
+        "canonical_native_identity",
+        "retired_native_identity",
+        "unexpected_sibling",
+    ],
+)
+def test_post_publication_drift_never_produces_pass(
+    monkeypatch: pytest.MonkeyPatch, drift: str
+) -> None:
+    native, admission = _fixed_post_native(monkeypatch)
+    scheduler_run = _runner(_record())
+    if drift == "canonical":
+        native.files[r.CANONICAL_PATH + r"\launch-guard.py"] = b"wrong"
+    elif drift == "staging":
+        native.directories[r.STAGING_PATH] = ()
+        native.directories[r.PARENT_PATH] += (r.STAGING_PATH.rsplit("\\", 1)[-1],)
+    elif drift == "retired":
+        native.files[r.RETIRED_PATH + r"\deployment.attestation.sig"] = b"wrong"
+    elif drift == "trust":
+        native.files[r.CANONICAL_PATH + r"\deployment.attestation.json"] = b"bad"
+        native.directories[r.CANONICAL_PATH] += ("deployment.attestation.json",)
+    elif drift == "lease":
+        native.files[r.CANONICAL_PATH + r"\activation.lease.json"] = b"bad"
+        native.directories[r.CANONICAL_PATH] += ("activation.lease.json",)
+    elif drift == "cache":
+        native.directories[r.CANONICAL_PATH + r"\no-pycache"] = ()
+        native.directories[r.CANONICAL_PATH] += ("no-pycache",)
+    elif drift == "scheduler":
+        scheduler_run = _runner(_record(first=_scheduler_read(enabled=False)))
+    elif drift == "parent":
+        native.parent_index += 1
+    elif drift == "volume":
+        native.serial_overrides[r.CANONICAL_PATH] = 18
+    elif drift == "canonical_native_identity":
+        native.file_index_overrides[r.CANONICAL_PATH] += 1
+    elif drift == "retired_native_identity":
+        native.file_index_overrides[r.RETIRED_PATH] += 1
+    elif drift == "unexpected_sibling":
+        native.directories[r.PARENT_PATH] += ("D10.retired-unreviewed",)
+
+    namespace, facts = w._observe_post_publication(
+        native, FakeVerifier(), scheduler_run, admission
+    )
+    result = r.verify_publication(_published_test_result(), namespace, facts)
+    assert result.phase is r.Phase.BLOCKED
 
 
 def test_complete_fake_native_admission_and_closed_facts(
@@ -907,6 +1094,7 @@ def _rename_admission(native: FakeRenameNative) -> w.AdmissionObservation:
             r.RootObservation(r.CANONICAL_PATH, True, r.OLD_IDENTITY),
             r.RootObservation(r.STAGING_PATH, True, r.NEW_IDENTITY),
             r.RootObservation(r.RETIRED_PATH, False),
+            unexpected_reserved_names_absent=True,
         ),
         facts,
         scheduler,
@@ -1088,6 +1276,33 @@ def test_staging_constructs_exact_guard_source_only_and_reverifies(
         call == ("file", r.STAGING_PATH + r"\launch-guard.py") for call in native.calls
     )
     assert r.CANONICAL_PATH in native.directories
+
+
+def test_public_staging_wrapper_uses_only_certified_source_and_fixed_surfaces(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repository_root = Path(r"C:\\certified\\source")
+    material = object()
+    backend = object()
+    reader = object()
+    verifier = object()
+    scheduler = object()
+    created: list[object] = []
+    calls: list[tuple[object, ...]] = []
+
+    monkeypatch.setattr(
+        w, "build_certified_material", lambda root: (created.append(root), material)[1]
+    )
+    monkeypatch.setattr(w, "WindowsReplacementStagingBackend", lambda: backend)
+    monkeypatch.setattr(w, "_WindowsReplacementReader", lambda: reader)
+    monkeypatch.setattr(w, "WindowsCngVerifier", lambda: verifier)
+    monkeypatch.setattr(w, "_run_scheduler_bounded", scheduler)
+    monkeypatch.setattr(w, "_construct_fixed_staging", lambda *args: calls.append(args))
+
+    w.construct_fixed_staging(repository_root)
+
+    assert created == [repository_root]
+    assert calls == [(material, backend, reader, verifier, scheduler)]
 
 
 def test_staging_existing_or_wrong_material_blocks_without_writes(

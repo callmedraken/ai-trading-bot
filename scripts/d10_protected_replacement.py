@@ -85,6 +85,7 @@ class NamespaceObservation:
     canonical: RootObservation
     staging: RootObservation
     retired: RootObservation
+    unexpected_reserved_names_absent: bool
 
 
 def _exact_identity(observed: DeploymentIdentity, expected: DeploymentIdentity) -> bool:
@@ -96,7 +97,10 @@ def _exact_identity(observed: DeploymentIdentity, expected: DeploymentIdentity) 
 
 def classify_namespace(observation: NamespaceObservation) -> NamespaceState:
     """Classify only exact path/identity triples; every other input conflicts."""
-    if type(observation) is not NamespaceObservation:
+    if (
+        type(observation) is not NamespaceObservation
+        or observation.unexpected_reserved_names_absent is not True
+    ):
         return NamespaceState.CONFLICTING
     roots = (observation.canonical, observation.staging, observation.retired)
     paths = (CANONICAL_PATH, STAGING_PATH, RETIRED_PATH)
@@ -170,6 +174,8 @@ class PostPublicationFacts:
     activation_and_cache_absent: bool
     d5_capture_only_scheduler_exact: bool
     protected_parent_exact: bool
+    same_local_ntfs_volume: bool
+    unexpected_reserved_names_absent: bool
 
     def all_exact(self) -> bool:
         return all(
@@ -182,6 +188,8 @@ class PostPublicationFacts:
                 self.activation_and_cache_absent,
                 self.d5_capture_only_scheduler_exact,
                 self.protected_parent_exact,
+                self.same_local_ntfs_volume,
+                self.unexpected_reserved_names_absent,
             )
         )
 
@@ -237,6 +245,7 @@ class BlockReason(StrEnum):
     INVALID_TRANSITION = "INVALID_TRANSITION"
     INDETERMINATE_MUTATION = "INDETERMINATE_MUTATION"
     POST_PUBLICATION_VERIFICATION_FAILED = "POST_PUBLICATION_VERIFICATION_FAILED"
+    STAGING_FAILED = "STAGING_FAILED"
 
 
 @dataclass(frozen=True, slots=True)
@@ -261,7 +270,7 @@ class ReplacementResult:
                 (RenameStep.OLD_TO_RETIRED,),
             ),
             Phase.VERIFY_PUBLICATION: (
-                NamespaceState.OLD_RETIRED,
+                NamespaceState.NEW_CANONICAL,
                 (RenameStep.OLD_TO_RETIRED, RenameStep.STAGING_TO_CANONICAL),
             ),
             Phase.PASS: (
@@ -304,9 +313,14 @@ class ReplacementResult:
                 },
                 BlockReason.POST_PUBLICATION_VERIFICATION_FAILED: {
                     (
-                        NamespaceState.OLD_RETIRED,
+                        NamespaceState.NEW_CANONICAL,
                         (RenameStep.OLD_TO_RETIRED, RenameStep.STAGING_TO_CANONICAL),
                     ),
+                },
+                BlockReason.STAGING_FAILED: {
+                    (NamespaceState.CLEAN_INITIAL, ()),
+                    (NamespaceState.OLD_CANONICAL, ()),
+                    (NamespaceState.CONFLICTING, ()),
                 },
             }
             if (
@@ -445,7 +459,7 @@ def record_rename(
         )
     return ReplacementResult(
         Phase.VERIFY_PUBLICATION,
-        NamespaceState.OLD_RETIRED,
+        NamespaceState.NEW_CANONICAL,
         (RenameStep.OLD_TO_RETIRED, RenameStep.STAGING_TO_CANONICAL),
     )
 

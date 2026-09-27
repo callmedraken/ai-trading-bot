@@ -23,6 +23,7 @@ def _namespace(canonical: str, staging: str, retired: str) -> r.NamespaceObserva
         _root(r.CANONICAL_PATH, canonical),
         _root(r.STAGING_PATH, staging),
         _root(r.RETIRED_PATH, retired),
+        unexpected_reserved_names_absent=True,
     )
 
 
@@ -31,7 +32,7 @@ def _admission() -> r.AdmissionFacts:
 
 
 def _post_publication() -> r.PostPublicationFacts:
-    return r.PostPublicationFacts(*(True for _ in range(7)))
+    return r.PostPublicationFacts(*(True for _ in range(9)))
 
 
 def _ready() -> r.ReplacementResult:
@@ -138,6 +139,12 @@ def test_partial_and_indeterminate_observations_conflict() -> None:
         is r.NamespaceState.CONFLICTING
     )
     assert r.classify_namespace(None) is r.NamespaceState.CONFLICTING
+    assert (
+        r.classify_namespace(
+            replace(observation, unexpected_reserved_names_absent=False)
+        )
+        is r.NamespaceState.CONFLICTING
+    )
     wrong_numeric_type = replace(
         observation,
         canonical=r.RootObservation(
@@ -235,7 +242,7 @@ def test_pass_needs_post_publication_reverification_and_has_no_rollback() -> Non
         replace(_post_publication(), canonical_trust_absent=False),
     )
     assert failed.phase is r.Phase.BLOCKED
-    assert failed.highest_definitely_completed_state is r.NamespaceState.OLD_RETIRED
+    assert failed.highest_definitely_completed_state is r.NamespaceState.NEW_CANONICAL
     assert failed.completed_renames == (
         r.RenameStep.OLD_TO_RETIRED,
         r.RenameStep.STAGING_TO_CANONICAL,
@@ -322,3 +329,22 @@ def test_intermediate_and_forged_result_cannot_claim_pass() -> None:
             r.CANONICAL_PATH,
             replace_existing=True,
         )
+
+
+@pytest.mark.parametrize(
+    "state",
+    [
+        r.NamespaceState.CLEAN_INITIAL,
+        r.NamespaceState.OLD_CANONICAL,
+        r.NamespaceState.CONFLICTING,
+    ],
+)
+def test_staging_failure_transcript_keeps_exact_highest_state(
+    state: r.NamespaceState,
+) -> None:
+    blocked = r.ReplacementResult(
+        r.Phase.BLOCKED, state, reason_code=r.BlockReason.STAGING_FAILED
+    )
+    payload = json.loads(blocked.canonical_transcript())
+    assert payload["reason_code"] == "STAGING_FAILED"
+    assert payload["highest_definitely_completed_namespace_state"] == state.value

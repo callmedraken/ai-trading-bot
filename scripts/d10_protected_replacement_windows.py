@@ -436,8 +436,13 @@ def _verify_old(
     return manifest, serial
 
 
-def _verify_new(native: ReadOnlyNative, manifest: ExecutableManifest) -> int:
-    root = replacement.STAGING_PATH
+def _verify_new(
+    native: ReadOnlyNative,
+    manifest: ExecutableManifest,
+    root: str = replacement.STAGING_PATH,
+) -> int:
+    if root not in (replacement.CANONICAL_PATH, replacement.STAGING_PATH):
+        raise AdmissionBlocked("new_root_path_unreviewed")
     identity = replacement.NEW_IDENTITY
     serial = _checked_directory(
         native, root, {"source", "launch-guard.py"}
@@ -522,6 +527,7 @@ def _observe_once(
                 replacement.STAGING_PATH, True, replacement.NEW_IDENTITY
             ),
             replacement.RootObservation(replacement.RETIRED_PATH, False),
+            unexpected_reserved_names_absent=True,
         ),
         old_serial,
     )
@@ -598,6 +604,379 @@ def observe_admission() -> AdmissionObservation:
     """Observe fixed native paths and Task Scheduler; accept no caller evidence."""
     return _observe_admission(
         _WindowsReplacementReader(), WindowsCngVerifier(), _run_scheduler_bounded
+    )
+
+
+def _unobserved_namespace() -> replacement.NamespaceObservation:
+    return replacement.NamespaceObservation(
+        replacement.RootObservation(replacement.CANONICAL_PATH, None),
+        replacement.RootObservation(replacement.STAGING_PATH, None),
+        replacement.RootObservation(replacement.RETIRED_PATH, None),
+        unexpected_reserved_names_absent=False,
+    )
+
+
+def _namespace_once(
+    native: ReadOnlyNative, verifier: object
+) -> tuple[replacement.NamespaceObservation, int | None]:
+    native.require_administrator()
+    parent = native.list_directory(replacement.PARENT_PATH)
+    if type(parent) is not CheckedDirectory or parent.stable is not True:
+        raise AdmissionBlocked("namespace_parent_unstable")
+    require_parent_native_object(parent.identity)
+    names = parent.children
+    fixed_names = {
+        replacement.CANONICAL_PATH.rsplit("\\", 1)[-1],
+        replacement.STAGING_PATH.rsplit("\\", 1)[-1],
+        replacement.RETIRED_PATH.rsplit("\\", 1)[-1],
+    }
+    names_exact = (
+        type(names) is tuple
+        and all(type(name) is str for name in names)
+        and len(names) == len(set(names))
+        and len(names) == len({name.casefold() for name in names})
+    )
+    if not names_exact:
+        raise AdmissionBlocked("namespace_parent_inventory_invalid")
+    reserved_names_exact = not any(
+        name.casefold().startswith(("d10.replacement-", "d10.retired-"))
+        and name not in fixed_names
+        for name in names
+    ) and all(
+        name == fixed
+        for name in names
+        for fixed in fixed_names
+        if name.casefold() == fixed.casefold()
+    )
+    paths = (
+        replacement.CANONICAL_PATH,
+        replacement.STAGING_PATH,
+        replacement.RETIRED_PATH,
+    )
+    present: dict[str, bool] = {}
+    for path in paths:
+        absent = native.absent(path)
+        if type(absent) is not bool:
+            raise AdmissionBlocked("namespace_root_presence_indeterminate")
+        is_present = not absent
+        listed = path.rsplit("\\", 1)[-1] in names
+        if listed is not is_present:
+            raise AdmissionBlocked("namespace_parent_root_drift")
+        present[path] = is_present
+
+    old_manifest: ExecutableManifest | None = None
+    old_path: str | None = None
+    old_serial: int | None = None
+    for path in (replacement.CANONICAL_PATH, replacement.RETIRED_PATH):
+        if not present[path]:
+            continue
+        try:
+            candidate, serial = _verify_old(native, verifier, path)
+        except (AdmissionBlocked, DeploymentBlocked):
+            continue
+        if serial != parent.identity.volume_serial:
+            continue
+        old_manifest, old_path, old_serial = candidate, path, serial
+        break
+
+    roots: dict[str, replacement.RootObservation] = {}
+    for path in paths:
+        if not present[path]:
+            roots[path] = replacement.RootObservation(path, False)
+            continue
+        if path == old_path:
+            roots[path] = replacement.RootObservation(
+                path, True, replacement.OLD_IDENTITY
+            )
+            continue
+        identity = None
+        if old_manifest is not None and path in (
+            replacement.CANONICAL_PATH,
+            replacement.STAGING_PATH,
+        ):
+            try:
+                serial = _verify_new(native, old_manifest, path)
+            except (AdmissionBlocked, DeploymentBlocked):
+                pass
+            else:
+                if serial == old_serial == parent.identity.volume_serial:
+                    identity = replacement.NEW_IDENTITY
+        roots[path] = replacement.RootObservation(path, True, identity)
+    return (
+        replacement.NamespaceObservation(
+            roots[replacement.CANONICAL_PATH],
+            roots[replacement.STAGING_PATH],
+            roots[replacement.RETIRED_PATH],
+            unexpected_reserved_names_absent=reserved_names_exact,
+        ),
+        old_serial,
+    )
+
+
+def _observe_namespace(
+    native: ReadOnlyNative, verifier: object
+) -> replacement.NamespaceObservation:
+    """Return only two matching, complete fixed-path namespace observations."""
+    try:
+        first_native = _RecordingNative(native)
+        first, first_serial = _namespace_once(first_native, verifier)
+        second_native = _RecordingNative(native)
+        second, second_serial = _namespace_once(second_native, verifier)
+        if (
+            first != second
+            or first_serial != second_serial
+            or first_native.objects != second_native.objects
+        ):
+            return _unobserved_namespace()
+        return second
+    except Exception:
+        return _unobserved_namespace()
+
+
+def observe_namespace() -> replacement.NamespaceObservation:
+    """Classify the fixed namespace using only stable native read operations."""
+    return _observe_namespace(_WindowsReplacementReader(), WindowsCngVerifier())
+
+
+def _post_publication_once(
+    native: ReadOnlyNative,
+    verifier: object,
+    scheduler_run: object,
+    admission: AdmissionObservation,
+) -> tuple[
+    replacement.NamespaceObservation,
+    replacement.PostPublicationFacts,
+    SchedulerObservation,
+]:
+    native.require_administrator()
+    parent = native.list_directory(replacement.PARENT_PATH)
+    if type(parent) is not CheckedDirectory or parent.stable is not True:
+        raise AdmissionBlocked("post_parent_unstable")
+    require_parent_native_object(parent.identity)
+    names = parent.children
+    if (
+        type(names) is not tuple
+        or any(type(name) is not str for name in names)
+        or len(names) != len(set(names))
+        or len(names) != len({name.casefold() for name in names})
+    ):
+        raise AdmissionBlocked("post_parent_inventory_invalid")
+    canonical_leaf = replacement.CANONICAL_PATH.rsplit("\\", 1)[-1]
+    staging_leaf = replacement.STAGING_PATH.rsplit("\\", 1)[-1]
+    retired_leaf = replacement.RETIRED_PATH.rsplit("\\", 1)[-1]
+    reserved_names_exact = (
+        canonical_leaf in names
+        and retired_leaf in names
+        and staging_leaf not in names
+        and not any(
+            name.casefold().startswith(("d10.replacement-", "d10.retired-"))
+            and name != retired_leaf
+            for name in names
+        )
+        and all(
+            name == fixed
+            for name in names
+            for fixed in (canonical_leaf, staging_leaf, retired_leaf)
+            if name.casefold() == fixed.casefold()
+        )
+    )
+
+    staging_absent = native.absent(replacement.STAGING_PATH) is True
+    if not staging_absent:
+        raise AdmissionBlocked("post_staging_present")
+    manifest, retired_serial = _verify_old(native, verifier, replacement.RETIRED_PATH)
+    canonical_serial = _verify_new(native, manifest, replacement.CANONICAL_PATH)
+    trust_paths = tuple(
+        replacement.CANONICAL_PATH + "\\" + name
+        for name in (
+            "deployment.attestation.json",
+            "deployment.attestation.sig",
+            "executable-manifest.json",
+            "deployment.attestation.json.installing",
+            "deployment.attestation.sig.installing",
+            "executable-manifest.json.installing",
+        )
+    )
+    lease_cache_paths = tuple(
+        replacement.CANONICAL_PATH + "\\" + name
+        for name in (
+            "activation.lease.json",
+            "activation.lease.json.installing",
+            "activation.lease.json.tmp",
+            "no-pycache",
+        )
+    )
+    canonical_trust_absent = all(native.absent(path) is True for path in trust_paths)
+    activation_and_cache_absent = all(
+        native.absent(path) is True for path in lease_cache_paths
+    )
+    scheduler = _observe_d5_scheduler(scheduler_run)
+
+    result = _post_publication_result(
+        native,
+        admission,
+        parent.identity,
+        names,
+        retired_serial,
+        canonical_serial,
+        canonical_trust_absent,
+        activation_and_cache_absent,
+        scheduler,
+        reserved_names_exact,
+    )
+    final_parent = native.list_directory(replacement.PARENT_PATH)
+    if (
+        type(final_parent) is not CheckedDirectory
+        or final_parent.stable is not True
+        or final_parent.identity != parent.identity
+        or final_parent.children != names
+    ):
+        raise AdmissionBlocked("post_parent_revalidation_drift")
+    return result
+
+
+def _post_publication_result(
+    native: ReadOnlyNative,
+    admission: AdmissionObservation,
+    parent_identity: NativeObject,
+    names: tuple[str, ...],
+    retired_serial: int,
+    canonical_serial: int,
+    canonical_trust_absent: bool,
+    activation_and_cache_absent: bool,
+    scheduler: SchedulerObservation,
+    reserved_names_exact: bool,
+) -> tuple[
+    replacement.NamespaceObservation,
+    replacement.PostPublicationFacts,
+    SchedulerObservation,
+]:
+    if not reserved_names_exact:
+        _require_reserved_siblings(
+            names, {replacement.RETIRED_PATH.rsplit("\\", 1)[-1]}
+        )
+    canonical = native.list_directory(replacement.CANONICAL_PATH)
+    retired = native.list_directory(replacement.RETIRED_PATH)
+    if (
+        type(canonical) is not CheckedDirectory
+        or canonical.stable is not True
+        or type(retired) is not CheckedDirectory
+        or retired.stable is not True
+    ):
+        raise AdmissionBlocked("post_root_identity_unstable")
+    expected_new = replace(
+        admission.new_native,
+        path=replacement.CANONICAL_PATH,
+        final_path=replacement.CANONICAL_PATH,
+    )
+    expected_old = replace(
+        admission.old_native,
+        path=replacement.RETIRED_PATH,
+        final_path=replacement.RETIRED_PATH,
+    )
+    new_exact = canonical.identity == expected_new
+    old_exact = retired.identity == expected_old
+    same_volume = (
+        parent_identity.volume_serial
+        == canonical.identity.volume_serial
+        == retired.identity.volume_serial
+        and parent_identity.volume_root
+        == canonical.identity.volume_root
+        == retired.identity.volume_root
+        and parent_identity.filesystem
+        == canonical.identity.filesystem
+        == retired.identity.filesystem
+        == "NTFS"
+        and parent_identity.drive_type
+        == canonical.identity.drive_type
+        == retired.identity.drive_type
+        == 3
+    )
+    parent_exact = parent_identity == admission.parent_native
+    new_exact = new_exact and canonical_serial == parent_identity.volume_serial
+    old_exact = old_exact and retired_serial == parent_identity.volume_serial
+    scheduler_exact = dict(scheduler.semantics) == _EXPECTED_SCHEDULER
+    namespace = replacement.NamespaceObservation(
+        replacement.RootObservation(
+            replacement.CANONICAL_PATH,
+            True,
+            replacement.NEW_IDENTITY if new_exact else None,
+        ),
+        replacement.RootObservation(replacement.STAGING_PATH, False),
+        replacement.RootObservation(
+            replacement.RETIRED_PATH,
+            True,
+            replacement.OLD_IDENTITY if old_exact else None,
+        ),
+        unexpected_reserved_names_absent=reserved_names_exact,
+    )
+    facts = replacement.PostPublicationFacts(
+        new_canonical_exact=new_exact,
+        staging_absent=True,
+        old_retired_exact=old_exact,
+        canonical_trust_absent=canonical_trust_absent,
+        activation_and_cache_absent=activation_and_cache_absent,
+        d5_capture_only_scheduler_exact=scheduler_exact,
+        protected_parent_exact=parent_exact,
+        same_local_ntfs_volume=same_volume,
+        unexpected_reserved_names_absent=reserved_names_exact,
+    )
+    return namespace, facts, scheduler
+
+
+def _false_post_publication() -> tuple[
+    replacement.NamespaceObservation, replacement.PostPublicationFacts
+]:
+    return (
+        _unobserved_namespace(),
+        replacement.PostPublicationFacts(
+            new_canonical_exact=False,
+            staging_absent=False,
+            old_retired_exact=False,
+            canonical_trust_absent=False,
+            activation_and_cache_absent=False,
+            d5_capture_only_scheduler_exact=False,
+            protected_parent_exact=False,
+            same_local_ntfs_volume=False,
+            unexpected_reserved_names_absent=False,
+        ),
+    )
+
+
+def _observe_post_publication(
+    native: ReadOnlyNative,
+    verifier: object,
+    scheduler_run: object,
+    admission: AdmissionObservation,
+) -> tuple[
+    replacement.NamespaceObservation,
+    replacement.PostPublicationFacts,
+]:
+    try:
+        first_native = _RecordingNative(native)
+        first = _post_publication_once(first_native, verifier, scheduler_run, admission)
+        second_native = _RecordingNative(native)
+        second = _post_publication_once(
+            second_native, verifier, scheduler_run, admission
+        )
+        if first != second or first_native.objects != second_native.objects:
+            raise AdmissionBlocked("post_publication_revalidation_drift")
+        return second[0], second[1]
+    except Exception:
+        return _false_post_publication()
+
+
+def observe_post_publication(
+    admission: AdmissionObservation,
+) -> tuple[replacement.NamespaceObservation, replacement.PostPublicationFacts]:
+    """Independently reobserve every fixed post-publication fact twice."""
+    if type(admission) is not AdmissionObservation:
+        return _false_post_publication()
+    return _observe_post_publication(
+        _WindowsReplacementReader(),
+        WindowsCngVerifier(),
+        _run_scheduler_bounded,
+        admission,
     )
 
 
@@ -1517,6 +1896,11 @@ class _FixedRenameSession:
         self._verifier = verifier
         self._scheduler_run = scheduler_run
         self.result = result
+
+    @property
+    def admission(self) -> AdmissionObservation:
+        """Expose the immutable read-only proof needed for final verification."""
+        return self._admission
 
     def retire_old_root(self) -> replacement.MutationOutcome:
         if self.result.phase is not replacement.Phase.READY_TO_RETIRE_OLD:

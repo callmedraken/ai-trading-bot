@@ -4899,3 +4899,58 @@ boundary is reached.
 NEXT remains P125-R1 source-only implementation on the dedicated P125 branch
 after the local branch/worktree synchronization gate is satisfied.
 
+## 2026-09-26 P125-R1A pure replacement contract accepted
+
+Exact reviewed source commit:
+
+    HEAD:
+    eaaa4435de7968ce6640bb87ca4b52d9b4be04e6
+
+    TREE:
+    ef9e06583bef617add830230de69dcc15534d37b
+
+    PARENT:
+    0f8f1e8dd9bc470918f8cbc3210953495875761a
+
+Exact changed files:
+
+    scripts/d10_protected_replacement.py
+    tests/runtime/test_d10_protected_replacement.py
+
+GitHub exact review accepted the pure Architecture-125 state/authority contract.
+It source-owns the frozen S5-R8 and S5-R10 deployment identities and fixed
+canonical/staging/retired paths; classifies CLEAN_INITIAL, OLD_CANONICAL,
+OLD_RETIRED, NEW_CANONICAL, and CONFLICTING; requires complete admission facts
+before the first rename; exposes only the two destination-absent renames in the
+frozen order; converts indeterminate mutation outcomes into terminal BLOCKED
+results with no retry authority; requires fresh post-publication verification;
+and emits deterministic sanitized terminal transcripts with activation,
+scheduler, trading, and retirement-cleanup authority all NONE.
+
+The module is pure/source-only: it performs no filesystem/native Windows access,
+Task Scheduler I/O, signing, protected D10 mutation, provider call, paper effect,
+broker effect, or live effect.
+
+Focused implementation evidence reported by Codex and preserved through the
+docs-divergence rebase:
+
+    17 focused tests passed
+    Ruff check: PASS
+    Ruff format --check: PASS
+    git diff --check: PASS
+    final worktree/index: clean
+
+The reconciliation rebase preserved the exact source and test Git blobs before
+ordinary push; the reviewed remote source commit therefore contains the same
+tested bytes.
+
+Broad three-lane certification is intentionally deferred. P125-R1A is not the
+final Architecture-125 executable/source tree.
+
+NEXT: P125-R1B source-only native read/admission boundary under Sol High. Add
+the dedicated Windows adapter needed to observe the fixed canonical/staging/
+retired namespaces, parent/security facts, reserved/activation/cache absence,
+and the exact D5 capture-only scheduler predecessor. R1B must remain read-only:
+no staging creation, rename, delete, signing, lease, scheduler mutation,
+provider, paper, broker, or live effect.
+

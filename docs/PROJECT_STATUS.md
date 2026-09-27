@@ -5011,3 +5011,27 @@ rebase, normal merge, clean, branch switching, or force operations.
 
 P125-R1 remains the next source-only implementation checkpoint.
 
+### P125-R1A pure replacement contract — ACCEPTED
+
+Reviewed remote identity:
+
+    HEAD eaaa4435de7968ce6640bb87ca4b52d9b4be04e6
+    TREE ef9e06583bef617add830230de69dcc15534d37b
+    parent 0f8f1e8dd9bc470918f8cbc3210953495875761a
+
+Exactly two files were added: the pure Architecture-125 replacement contract
+and its focused tests. The accepted contract freezes the old/new deployment
+identities and paths, exact namespace classifier, fail-closed admission facts,
+ordered destination-absent rename plans, indeterminate-mutation no-retry rule,
+fresh post-publication verification, and sanitized zero-authority transcripts.
+
+Focused evidence: 17 tests passed; Ruff check/format and git diff check passed.
+The rebase used to place the commit after the docs-only workflow closeout
+preserved the exact source/test blobs. No protected or external effect occurred.
+
+Broad three-lane certification remains deferred until the complete P125 source
+tree is intended final.
+
+NEXT: P125-R1B source-only/read-only Windows admission adapter under Sol High.
+No protected mutation is authorized.
+

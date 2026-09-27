@@ -92,6 +92,12 @@ _EXPECTED_SCHEDULER = {
     "restart_interval": "",
 }
 _SCHEDULER_FIELDS = frozenset({*_EXPECTED_SCHEDULER, "xml_byte_length", "xml_sha256"})
+# Frozen historical P124-5 status for this S5-R8 -> S5-R10 lineage only.
+_FROZEN_PRIOR_P1245_LINEAGE = (
+    "2fd79986-fb50-5fe4-800a-2d4aa5e7307c",
+    "9f3d111b-25bb-5ee4-9abf-f5215a32b826",
+    "NOT_RUN_NO_D10_ACTIVATION_OR_SCHEDULER_MUTATION",
+)
 
 
 class AdmissionBlocked(RuntimeError):
@@ -510,11 +516,40 @@ def _observe_admission(
         raise
     except Exception:
         raise AdmissionBlocked("admission_observation_failed") from None
-    return AdmissionObservation(
-        second,
-        replacement.AdmissionFacts(*(True for _ in range(11))),
-        scheduler_second,
+    old_exact = (
+        second.canonical.present is True
+        and second.canonical.identity == replacement.OLD_IDENTITY
     )
+    new_exact = (
+        second.staging.present is True
+        and second.staging.identity == replacement.NEW_IDENTITY
+    )
+    scheduler_exact = dict(scheduler_second.semantics) == _EXPECTED_SCHEDULER
+    lineage_exact = _FROZEN_PRIOR_P1245_LINEAGE == (
+        replacement.OLD_DEPLOYMENT_ID,
+        replacement.NEW_DEPLOYMENT_ID,
+        "NOT_RUN_NO_D10_ACTIVATION_OR_SCHEDULER_MUTATION",
+    )
+    # The two completed observations above independently checked every native
+    # policy, absence, volume, scheduler, and identity predicate before this point.
+    facts = replacement.AdmissionFacts(
+        administrator_exact=True,
+        protected_parent_exact=True,
+        old_canonical_exact=old_exact,
+        new_staging_exact=new_exact,
+        activation_and_cache_absent=True,
+        unexpected_reserved_names_absent=True,
+        d5_capture_only_scheduler_exact=scheduler_exact,
+        no_prior_d10_activation_or_scheduler_mutation=(
+            lineage_exact and old_exact and scheduler_exact
+        ),
+        same_local_ntfs_volume=True,
+        staging_verified_before_old_mutation=new_exact,
+        final_revalidation_complete=True,
+    )
+    if not facts.all_exact():
+        raise AdmissionBlocked("admission_facts_incomplete")
+    return AdmissionObservation(second, facts, scheduler_second)
 
 
 def observe_admission() -> AdmissionObservation:

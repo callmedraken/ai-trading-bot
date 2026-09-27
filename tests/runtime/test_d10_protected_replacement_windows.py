@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import ast
 import hashlib
 import inspect
 import io
 import json
 import subprocess
-from dataclasses import replace
+from dataclasses import fields, replace
 from pathlib import Path
 
 import pytest
@@ -180,6 +181,44 @@ def test_helper_source_is_fixed_com_read_only_and_excludes_diagnostics() -> None
         "Get-ScheduledTask",
     ):
         assert forbidden not in adapter
+
+
+def test_sid_form_principal_requires_windows_round_trip() -> None:
+    helper = w.SCHEDULER_HELPER.read_text(encoding="utf-8")
+    sid_branch = helper.split("if ($userId -match '^S-1-') {", 1)[1].split(
+        "} else {", 1
+    )[0]
+    assert "SecurityIdentifier]::new($userId)" in sid_branch
+    assert "$sid.Translate([System.Security.Principal.NTAccount])" in sid_branch
+    assert (
+        "$account.Translate([System.Security.Principal.SecurityIdentifier])"
+        in sid_branch
+    )
+    assert sid_branch.index("$sid.Translate(") < sid_branch.index("$account.Translate(")
+    assert "$resolvedSid = $sid.Value" in helper
+    frozen_sid = "S-1-5-21-1397534616-3988210162-180023805-1009"
+    assert f"if ($resolvedSid -ne '{frozen_sid}')" in helper
+
+
+def test_frozen_prior_p1245_lineage_and_explicit_admission_fields() -> None:
+    assert w._FROZEN_PRIOR_P1245_LINEAGE == (
+        "2fd79986-fb50-5fe4-800a-2d4aa5e7307c",
+        "9f3d111b-25bb-5ee4-9abf-f5215a32b826",
+        "NOT_RUN_NO_D10_ACTIVATION_OR_SCHEDULER_MUTATION",
+    )
+    source = ast.parse(Path(w.__file__).read_text(encoding="utf-8"))
+    constructions = [
+        node
+        for node in ast.walk(source)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "AdmissionFacts"
+    ]
+    assert len(constructions) == 1
+    assert constructions[0].args == []
+    assert {keyword.arg for keyword in constructions[0].keywords} == {
+        field.name for field in fields(r.AdmissionFacts)
+    }
 
 
 def test_scheduler_process_capture_is_bounded_without_real_task(
@@ -529,6 +568,29 @@ def test_complete_fake_native_admission_and_closed_facts(
         operation in {"administrator", "directory", "file", "absent"}
         for operation, _ in native.calls
     )
+
+
+def test_invalid_frozen_prior_p1245_status_cannot_admit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    native = _full_native(monkeypatch)
+    monkeypatch.setattr(
+        w,
+        "_FROZEN_PRIOR_P1245_LINEAGE",
+        (*w._FROZEN_PRIOR_P1245_LINEAGE[:2], "P1245_COMPLETED"),
+    )
+    original_facts = r.AdmissionFacts
+    constructed: list[dict[str, object]] = []
+
+    def record_facts(**values: object) -> r.AdmissionFacts:
+        constructed.append(values)
+        return original_facts(**values)
+
+    monkeypatch.setattr(r, "AdmissionFacts", record_facts)
+    with pytest.raises(w.AdmissionBlocked, match="admission_facts_incomplete"):
+        w._observe_admission(native, FakeVerifier(), _runner(_record()))
+    assert len(constructed) == 1
+    assert constructed[0]["no_prior_d10_activation_or_scheduler_mutation"] is False
 
 
 @pytest.mark.parametrize(

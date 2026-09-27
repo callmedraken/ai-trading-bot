@@ -19,6 +19,8 @@ try {
         if ([string]::IsNullOrEmpty($userId)) { throw 'principal unavailable' }
         if ($userId -match '^S-1-') {
             $sid = [System.Security.Principal.SecurityIdentifier]::new($userId)
+            $account = $sid.Translate([System.Security.Principal.NTAccount])
+            $sid = $account.Translate([System.Security.Principal.SecurityIdentifier])
         } else {
             $account = [System.Security.Principal.NTAccount]::new($userId)
             $sid = $account.Translate([System.Security.Principal.SecurityIdentifier])

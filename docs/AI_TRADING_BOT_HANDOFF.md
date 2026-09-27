@@ -5389,3 +5389,108 @@ F:\AI\worktrees\ai-trading-bot-p125-r1e worktree through this docs-only
 commit and resume the same bounded R1E source implementation. Broad
 certification remains deferred until R1E source acceptance.
 
+## 2026-09-27 P125-R1E guarded retired S5-R8 cleanup — ACCEPTED
+
+Exact accepted corrected remote source identity:
+
+    HEAD:
+    eb7db33c3dab2ac20c8c460001acc3947491d38a
+
+    TREE:
+    52f97b38987185ffe686c2dd703e8201badfa7ff
+
+    parent:
+    2d59ef3730daf753a1de58f15be0b2d4451be10e
+
+R1E source lineage:
+
+    architecture base:
+    8699ce7ec390bd71f9ca088753dc0de52fd92e3f
+
+    first implementation checkpoint:
+    2d59ef3730daf753a1de58f15be0b2d4451be10e
+
+    exact corrective checkpoint:
+    eb7db33c3dab2ac20c8c460001acc3947491d38a
+
+Complete corrected R1E source was reviewed, not only the corrective diff.
+
+Exact R1E changed source/test surface from the architecture base:
+
+    scripts/d10_protected_replacement.py
+    scripts/d10_protected_replacement_windows.py
+    scripts/p125_retire_old_d10.py
+    tests/runtime/test_d10_protected_replacement_windows.py
+    tests/runtime/test_p125_retire_old_d10.py
+
+Accepted properties include:
+
+- import/CLI are inert without the exact protected-cleanup flag;
+- no caller-selected cleanup target/path exists;
+- cleanup admission independently proves exact signed S5-R10 canonical trust,
+  inactive lease/cache state, exact D5 scheduler predecessor, exact protected
+  parent, same local NTFS volume, staging absence, exact historical S5-R8
+  retired trust/tree, and reserved-sibling absence;
+- cleanup state is closed to FULL_RETIRED, PARTIAL_RETIRED, RETIRED_ABSENT, or
+  CONFLICTING;
+- PARTIAL_RETIRED grants no ordinary continuation and requires a separate
+  recovery checkpoint;
+- RETIRED_ABSENT is read-only/idempotent and still requires fresh post-cleanup
+  proof;
+- the deletion plan is immutable, fixed-retired-root only, historical
+  signed-manifest bound, deterministic, and bottom-up;
+- untrusted enumeration validates the plan but does not generate mutation
+  paths;
+- canonical D10 cannot enter the deletion plan;
+- every destructive target is opened no-follow with the frozen access/share
+  contract, while its direct parent remains pinned;
+- files are required to match exact admitted native size, exact bytes/hash, and
+  a same-handle EOF probe before disposition;
+- the corrective checkpoint closes the reviewed trailing-byte gap: the native
+  file size may no longer be normalized away, and correct-prefix-plus-extra
+  bytes cannot reach the disposition call;
+- directories require exact expected pinned inventory and are deleted only
+  after their expected children have positively disappeared;
+- deletion uses only SetFileInformationByHandle(FileDispositionInfo,
+  DeleteFile=TRUE), never FileDispositionInfoEx/POSIX deletion, DeleteFileW,
+  RemoveDirectoryW, shell recursion, generic recursive deletion, or glob-based
+  targets;
+- per-target SUCCESS requires successful disposition, successful target-handle
+  close, pinned-parent inventory omission, fresh exact target absence, and
+  final pinned-parent identity proof;
+- any native/read/identity/disposition/close/post-delete ambiguity is
+  INDETERMINATE and permanently stops that invocation with no retry, skip,
+  rollback, recreation, or later-target continuation;
+- same-invocation forward progress occurs only after each prior target reached
+  its exact positive commit point;
+- final cleanup PASS requires fresh two-pass RETIRED_ABSENT observation while
+  signed S5-R10 canonical trust, inactivity, exact D5 scheduler, protected
+  parent, staging absence, and reserved namespace remain exact;
+- transcript remains bounded and source-owned with activation/scheduler/trading
+  authority explicitly NONE.
+
+Reported focused evidence on the corrected tree:
+
+    174 focused tests passed
+    Ruff check: PASS
+    Ruff format --check: PASS
+    git diff --check: PASS
+    staged diff check: PASS
+    ordinary corrective push: PASS
+    remote HEAD/TREE == local HEAD/TREE
+    final worktree/index: clean
+
+No protected cleanup was executed.
+
+P125 R1A through R1E source implementation is now complete enough for the
+canonical three-lane source certification gate. Do not perform the protected
+replacement, P124-3 trust publication, or retired-tree cleanup until that gate
+passes and ChatGPT reviews its evidence.
+
+NEXT: fast-forward the existing
+F:\AI\worktrees\ai-trading-bot-p125-r1e worktree through this docs-only
+closeout and run scripts/run_test_certification.py against that exact resulting
+HEAD/TREE using the canonical broad lane 1 + broad lane 2 + five serial
+Windows/global-state modules. After certification PASS, return the complete
+evidence path and lane totals for review before any protected host mutation.
+

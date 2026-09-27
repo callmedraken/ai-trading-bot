@@ -5209,3 +5209,28 @@ only after full fresh post-cleanup proof.
 NEXT: resume P125-R1E source-only cleanup implementation in
 F:\AI\worktrees\ai-trading-bot-p125-r1e after docs-only fast-forward.
 
+### P125-R1E guarded retired S5-R8 cleanup — ACCEPTED
+
+Accepted corrected source identity:
+
+    HEAD eb7db33c3dab2ac20c8c460001acc3947491d38a
+    TREE 52f97b38987185ffe686c2dd703e8201badfa7ff
+    parent 2d59ef3730daf753a1de58f15be0b2d4451be10e
+
+The complete R1E cleanup contract/operator/native adapter and tests were exactly
+reviewed. The follow-up EOF correction closes the trailing-byte gap by requiring
+exact pinned native file size plus a same-handle EOF probe before any
+FileDispositionInfo deletion.
+
+Reported corrected focused verification: 174 PASS; Ruff check/format and diff
+checks PASS; ordinary push and final clean state PASS.
+
+No protected cleanup ran.
+
+P125 R1A-R1E source is now ready for the canonical three-lane certification
+gate. No protected replacement/signing/cleanup is authorized until that gate
+passes and its evidence is reviewed.
+
+NEXT: fast-forward this docs-only closeout locally, then run
+scripts/run_test_certification.py against the exact R1E closeout HEAD/TREE.
+

@@ -4873,3 +4873,47 @@ material rebuild pinned to `c5cc0b0... / bfacfada...`, followed by a new
 protected P124-2 -> P124-3 -> full signed-trust P124-1 sequence before retrying
 P124-4. No production D10 mutation or signing occurs during the material
 refresh itself.
+
+
+### S5-R10 redeployment sequencing correction
+
+The S5-R10 material refresh does **not** authorize blindly rerunning the existing
+P124-2 provisioning command over the currently installed D10 tree. The current
+P124-2 implementation is intentionally create-only and begins by requiring
+`F:\AITradingBot\D10` to be absent. The accepted S5-R8 D10 tree is present.
+
+Therefore the immediate safe sequence is:
+
+```text
+S5-R10 certified source
+-> refresh operator pins
+-> fresh byte-exact S5-R10 deployment checkout
+-> raw governed-blob audit
+-> rebuild and accept unsigned S5-R10 deployment material
+-> separately freeze/review the protected D10 replacement procedure
+-> only then perform any Administrator mutation of the existing D10 tree
+```
+
+Do not delete, rename, replace, or otherwise mutate the installed D10 tree as
+an incidental step. Any replacement path must explicitly prove D10 inactive,
+preserve the accepted parent/ACL/security model, replace the old sealed
+guard/source/trust set without an ambiguous partial state, and leave activation
+lease/scheduler/provider/trading authority closed. The existing P124-2
+create-only operation remains valid for an absent-root initial deployment; it
+is not an in-place upgrade primitive.
+
+The source-only deployment pin refresh is:
+
+```text
+operator pin commit:
+19c585519daefad917d6326b5180177b63f8e7f0
+
+operator pin tree:
+ab0dccdea1e0e6646ba3b68b3afb725a553f68cc
+
+certified S5-R10 source HEAD:
+c5cc0b01301600daf17f1114f4451dca2c9d7a1f
+
+certified S5-R10 source TREE:
+bfacfadaa14315d2d378abcc0f1e4bc7c42034f1
+```

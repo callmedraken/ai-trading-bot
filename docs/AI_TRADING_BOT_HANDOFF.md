@@ -4702,3 +4702,35 @@ blobs, and rebuild the unsigned deployment material. This refresh is source-only
 and read-only with respect to the protected host. After that material is
 accepted, repeat protected P124-2 then P124-3, then full signed-trust P124-1,
 before retrying P124-4.
+
+
+### Important correction: S5-R10 requires a reviewed replacement path
+
+Do not rerun the existing P124-2 command against the installed S5-R8 D10 tree.
+The current P124-2 operator is create-only and requires
+`F:\AITradingBot\D10` absent before creating anything. The S5-R8 D10 tree is
+present and remains inactive because no activation lease or scheduler mutation
+was performed.
+
+Proceed only through the safe source/material work first:
+
+```text
+pin refresh:
+19c585519daefad917d6326b5180177b63f8e7f0
+ab0dccdea1e0e6646ba3b68b3afb725a553f68cc
+
+certified source:
+c5cc0b01301600daf17f1114f4451dca2c9d7a1f
+bfacfadaa14315d2d378abcc0f1e4bc7c42034f1
+
+-> fresh byte-exact checkout
+-> governed raw-blob audit
+-> unsigned material reconstruction
+-> accept material
+-> design/review explicit protected replacement procedure
+```
+
+Any later protected replacement must be a separately reviewed high-risk
+checkpoint. It must not treat deletion/rename of the old D10 deployment as
+incidental cleanup and must not open activation, scheduler, provider, broker,
+paper, or live-trading authority.

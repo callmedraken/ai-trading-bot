@@ -4954,3 +4954,51 @@ and the exact D5 capture-only scheduler predecessor. R1B must remain read-only:
 no staging creation, rename, delete, signing, lease, scheduler mutation,
 provider, paper, broker, or live effect.
 
+## 2026-09-26 P125-R1B scheduler-observation blocker resolved — Architecture 126 frozen
+
+P125-R1B correctly stopped before implementation because Architecture 125
+required exact D5 scheduler-predecessor proof but did not freeze an observation
+mechanism.
+
+Architecture 126 now freezes that missing boundary:
+
+    docs/architecture/126-d5-task-scheduler-readonly-observation-authority.md
+
+The decision deliberately follows the accepted D5-A operational lesson:
+Task Scheduler COM is the semantic source of truth, while XML serialization is
+supporting evidence only.
+
+The source observer must use one reviewed zero-argument PowerShell helper that
+connects locally through Schedule.Service, reads only the fixed
+\AITradingBot-PD4-UnattendedPaper-v1 task, resolves the principal through
+Windows to the exact Trading SID, and emits a bounded semantic record. The
+Python adapter independently validates every field and exact type.
+
+The exact accepted D5 semantics are frozen, including one Exec action to
+F:\AITradingBot\runtime\python.exe with the capture-warmup launcher, one
+daily trigger beginning 2026-09-15T01:30:00, Password/LUA Trading principal,
+IgnoreNew, StartWhenAvailable/WakeToRun, no retries, and the accepted power,
+network, hidden, priority, and one-hour execution-limit settings.
+
+The historical accepted D5 XML hash
+8005373fad791c85776b4a35b662d46e06fec4ea40ac9ebfead9f413715da457
+remains historical evidence only. The original D5 work did not freeze one
+reproducible raw-byte extraction/canonicalization protocol, and earlier D5
+probes proved XML omission/default serialization can differ while semantics are
+unchanged. P125 therefore must not use that historical raw hash as authority.
+
+For bounded current evidence, the COM XML string is UTF-8 encoded without BOM
+exactly as returned and hashed, with no trimming/normalization. A stable
+two-read COM observation requires both semantic projections and current XML
+digest/length pairs to remain identical. The current XML digest is diagnostic;
+semantic COM equality to the frozen D5 contract is the admission predicate.
+
+No Task Scheduler mutation, real scheduler read, D10 mutation, signing,
+activation, provider, paper, broker, or live effect is authorized by this docs
+checkpoint.
+
+NEXT: fast-forward the existing
+F:\AI\worktrees\ai-trading-bot-p125-r1b worktree to this docs-only commit
+and resume the same Sol High P125-R1B source implementation. Broad certification
+remains deferred.
+

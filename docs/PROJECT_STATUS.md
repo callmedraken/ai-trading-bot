@@ -5035,3 +5035,27 @@ tree is intended final.
 NEXT: P125-R1B source-only/read-only Windows admission adapter under Sol High.
 No protected mutation is authorized.
 
+### Architecture 126 — D5 Task Scheduler read-only observation FROZEN
+
+P125-R1B stopped correctly at an underspecified scheduler-observation boundary.
+Architecture 126 now freezes the missing read-only mechanism.
+
+P125 uses a reviewed zero-argument Windows PowerShell helper backed by Task
+Scheduler COM Schedule.Service for semantic observation of only the fixed D5
+task. Principal text is resolved to the exact Trading SID. The source-owned D5
+principal/action/trigger/settings projection is compared exactly and is the
+scheduler admission authority.
+
+The accepted historical D5 XML SHA-256
+8005373fad791c85776b4a35b662d46e06fec4ea40ac9ebfead9f413715da457
+is retained as legacy evidence, not an admission predicate, because the original
+D5 sequence did not freeze one raw-byte extraction/canonicalization protocol.
+Current COM XML is hashed only as stable bounded diagnostic evidence across two
+fresh reads.
+
+No mutation/effect is authorized.
+
+NEXT: resume P125-R1B source-only/read-only implementation after the local
+F:\AI\worktrees\ai-trading-bot-p125-r1b worktree fast-forwards this docs-only
+checkpoint.
+

@@ -94,6 +94,7 @@ Before any protected namespace mutation, the operator must independently prove:
 4. activation.lease.json, activation.lease.json.installing, activation.lease.json.tmp, and no-pycache are absent;
 5. every replacement temporary/quarantine name defined by this architecture is absent;
 6. the Task Scheduler task at \AITradingBot-PD4-UnattendedPaper-v1 is still the exact accepted capture-only D5 predecessor and is not the D10 guard action;
+   this proof must use the Architecture-126 COM-first read-only observation contract; raw XML hash equality is not scheduler authority;
 7. no source-owned observation indicates D10 P124-5 activation or scheduler mutation ever completed.
 
 An absent, unreadable, conflicting, partially activated, or indeterminate condition blocks before the first mutation.

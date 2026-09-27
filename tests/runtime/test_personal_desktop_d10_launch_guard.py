@@ -1136,9 +1136,9 @@ def test_token_scalar_dword_uses_exact_buffer_without_size_probe(
             assert buffer is not None
             assert length == ctypes.sizeof(wintypes.DWORD)
             ctypes.cast(buffer, ctypes.POINTER(wintypes.DWORD)).contents.value = 0
-            ctypes.cast(returned, ctypes.POINTER(wintypes.DWORD)).contents.value = (
-                ctypes.sizeof(wintypes.DWORD)
-            )
+            ctypes.cast(
+                returned, ctypes.POINTER(wintypes.DWORD)
+            ).contents.value = ctypes.sizeof(wintypes.DWORD)
             return 1
 
     fake = SimpleNamespace(GetTokenInformation=Function())

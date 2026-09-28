@@ -5656,3 +5656,42 @@ checkout.
 
 P124-5B read-only host preflight remains blocked until this narrow correction
 is committed, pushed, exactly reviewed, and accepted.
+
+
+### P124-5A source-provenance correction — ACCEPTED
+
+Exact GitHub review accepted correction commit
+`b6702f5f9c05ac8533746a0f3772059e958f8140` (tree
+`9475ee1d182155ab2e21ff194ce5b592b4862236`).
+
+The correction changes only
+`scripts/d10_activation_scheduler_operator.py` and the new focused provenance
+test file. It derives the reviewed repository/source/scripts roots solely from
+the operator's own absolute `__file__`, places the sibling `src` and
+repository root ahead of ambient import paths before authority imports, captures
+the exact imported governed/script module objects, and fails closed before host
+construction if any required authority module is missing, replaced, non-file,
+relative, or resolves outside the fixed reviewed roots.
+
+Focused subprocess coverage proves a foreign editable checkout and poisoned
+`PYTHONPATH`/environment source hints cannot select P124-5 authority modules.
+The scheduler/lease state machine and protected mutation ordering are unchanged.
+
+Reported verification:
+
+```text
+182 focused tests PASS
+2 fresh-process provenance regressions PASS
+Ruff lint PASS
+Ruff format --check PASS
+both PowerShell AST parse checks PASS
+diff/staged filename checks PASS
+full certification NOT RUN
+```
+
+All governed S5-R10 executable blobs remain unchanged. No real P124-5 preflight,
+scheduler observation/mutation, password acquisition, activation-lease
+publication, provider/Paper-v2/broker/live effect occurred.
+
+P124-5B read-only real-host preflight is now the next checkpoint. Protected
+P124-5 execute remains a separate later effect boundary.

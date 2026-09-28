@@ -5308,3 +5308,27 @@ protected recovery invocation requires new explicit human authorization.
 No signing, trust publication, retired cleanup, activation, scheduler mutation,
 provider/Paper-v2, broker, or live authority is granted by this certification.
 
+## P125-R1H — native rename transport diagnosis
+
+The certified R1G recovery attempt is consumed. Its first
+SetFileInformationByHandle(FileRenameInfo) call returned FALSE with immediate
+Win32 error 87 / ERROR_INVALID_PARAMETER. The operator remained fail-closed
+with zero completed renames.
+
+Fresh post-failure evidence proves exact OLD_CANONICAL with exact S5-R8
+canonical, exact S5-R10 staging, retired absent, exact reserved namespace, and
+exact D5 scheduler predecessor.
+
+No further protected retry is authorized.
+
+R1H-A is now the next source-only/read-only-development checkpoint: build a
+disposable native acceptance harness under F:\AI\temp only. It compares the
+frozen Win32 anchored call, a corrected exact-buffer-length Win32 anchored
+variant, and NtSetInformationFile(FileRenameInformation=10) with the same
+pinned source/parent concept. Production P125 rename functions/operators remain
+unchanged during R1H-A.
+
+After exact source review, run the disposable harness locally and freeze R1H-B
+from observed host behavior. Any later production transport correction must be
+recertified and separately reauthorized.
+

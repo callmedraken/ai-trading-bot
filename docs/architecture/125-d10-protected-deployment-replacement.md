@@ -395,6 +395,173 @@ and that extended error information is obtained through `GetLastError`. R1G
 uses only that bounded diagnostic to characterize the already reviewed native
 call; it does not weaken the mutation fence.
 
+## 8.2 P125-R1H native rename transport diagnosis before any further protected attempt
+
+The separately authorized and canonically certified R1G recovery attempt on
+2026-09-27 again stopped at the first OLD_TO_RETIRED mutation. Its bounded
+diagnostic was:
+
+    stage = NATIVE_FALSE
+    step = OLD_TO_RETIRED
+    win32_error = 87 (ERROR_INVALID_PARAMETER)
+
+The R1G process then exited BLOCKED with zero completed renames and
+OLD_CANONICAL as the highest definitely completed state.
+
+A fresh independent two-pass observation after that failed call proved exactly:
+
+    OLD_CANONICAL
+    canonical = exact historical S5-R8
+    staging = exact S5-R10
+    retired = absent
+    unexpected reserved names = absent
+    D5 scheduler predecessor = exact
+
+Therefore the R1G recovery authorization is consumed and no further protected
+retry is authorized. The new evidence localizes the defect to the submitted
+SetFileInformationByHandle(FileRenameInfo) call boundary, but Win32 error 87 by
+itself does not prove which parameter or representation is incompatible with
+this host.
+
+Microsoft documents all of the following:
+
+- SetFileInformationByHandle uses FileRenameInfo for FILE_RENAME_INFO and
+  returns zero on failure with GetLastError carrying extended error;
+- FILE_RENAME_INFO permits RootDirectory to be a directory handle when FileName
+  is relative;
+- FILE_RENAME_INFORMATION likewise carries ReplaceIfExists, RootDirectory,
+  FileNameLength, and a relative FileName;
+- NtSetInformationFile with FileRenameInformation (10) consumes
+  FILE_RENAME_INFORMATION and requires DELETE access on the source handle.
+
+R1H therefore separates host-mechanism discovery from production authority.
+The next checkpoint is a disposable-native acceptance harness only. Production
+F:\AITradingBot rename wiring remains frozen until that host evidence is
+reviewed.
+
+### 8.2.1 R1H-A disposable acceptance matrix
+
+R1H-A may create and rename only uniquely named disposable directories below:
+
+    F:\AI\temp\p125-r1h-native-acceptance-<random-or-guid>
+
+It must reject F:\AITradingBot, every Architecture-125 canonical/staging/
+retired path, and any caller-selected production path. The disposable root must
+be created by the harness itself and positively proven outside F:\AITradingBot
+before any rename call.
+
+R1H-A tests the Windows-host rename mechanism, not D10 identity, trust, ACL, or
+scheduler authority. Each matrix case uses a fresh disposable parent/source/
+destination triple so one case cannot affect another.
+
+The minimum matrix is:
+
+1. WIN32_FROZEN_CONTROL
+   - SetFileInformationByHandle;
+   - FileRenameInfo (3);
+   - current frozen FILE_RENAME_INFO representation;
+   - non-NULL pinned RootDirectory;
+   - fixed relative destination leaf;
+   - ReplaceIfExists false.
+
+2. WIN32_EXACT_LENGTH
+   - same Win32 API and pinned handles;
+   - same FILE_RENAME_INFO fields;
+   - buffer length passed as the exact byte range through the final FileName
+     byte: FIELD_OFFSET(FileName) + FileNameLength;
+   - no terminating NUL counted in FileNameLength.
+
+3. NT_NATIVE_ANCHORED
+   - user-mode NtSetInformationFile;
+   - FileRenameInformation (10);
+   - exact FILE_RENAME_INFORMATION representation;
+   - same pinned source handle and pinned parent handle;
+   - fixed relative destination leaf;
+   - ReplaceIfExists false;
+   - IO_STATUS_BLOCK supplied and captured.
+
+An optional diagnostic-only Win32 case with RootDirectory NULL and an absolute
+disposable destination may be added solely to isolate API behavior. It is never
+a production candidate because it drops the pinned-parent destination
+authority.
+
+No matrix result grants production retry authority.
+
+### 8.2.2 Exact native-call evidence
+
+For every disposable case, the harness must record only bounded source-owned
+evidence:
+
+- case enum;
+- API enum;
+- buffer size;
+- FileNameLength;
+- whether RootDirectory was non-NULL;
+- BOOL result + immediate Win32 error for Win32 cases;
+- raw 32-bit NTSTATUS + IO_STATUS_BLOCK status/information for the Nt case;
+- fresh post-call source/destination presence;
+- same-object proof when the rename reports success.
+
+No raw handles, ACLs, SIDs, arbitrary paths, exception text, or reusable
+authority may appear in the transcript.
+
+Win32 failure evidence captures GetLastError immediately after a zero return.
+Nt failure evidence captures the NtSetInformationFile return NTSTATUS directly;
+no RtlNtStatusToDosError conversion is required for authority or acceptance.
+
+For the Nt case, STATUS_SUCCESS (0) is the only accepted positive mutation
+result for R1H-A. Any nonzero return, STATUS_PENDING, malformed IO_STATUS_BLOCK,
+post-call identity mismatch, or close ambiguity is non-PASS evidence for that
+case.
+
+### 8.2.3 Disposable success proof and cleanup
+
+A disposable case is SUCCESS only when:
+
+1. its source and parent handles were opened successfully with the intended
+   fixed access/share/no-follow semantics;
+2. the destination was absent before the call;
+3. the call returned its exact success result;
+4. the pinned source handle re-resolves to the exact destination leaf and same
+   file identity/volume after the call;
+5. the pinned parent remains the same object;
+6. a fresh path observation proves source absent and destination present as the
+   same object;
+7. all opened handles close successfully.
+
+Harness cleanup occurs only inside the disposable acceptance root after all
+case evidence is frozen. Cleanup failure does not convert a rename case into
+success and must be reported separately. The harness never invokes P125
+replacement, recovery, signing, activation, scheduler, provider, paper, broker,
+or live code.
+
+### 8.2.4 Production transport remains undecided until host evidence
+
+R1H-A must not modify _set_fixed_rename, _rename_fixed_step,
+p125_replace_d10, or p125_recover_d10 production behavior.
+
+After R1H-A source review and focused verification, the user runs the disposable
+native acceptance harness locally. ChatGPT then reviews the exact result and
+freezes R1H-B:
+
+- if WIN32_EXACT_LENGTH succeeds with the pinned parent contract, prefer the
+  narrower Win32 buffer-length correction;
+- otherwise, if NT_NATIVE_ANCHORED succeeds exactly, R1H-B may replace only the
+  failing production rename transport with the reviewed NtSetInformationFile
+  primitive while preserving all Architecture-125 pre/post identity,
+  same-volume, destination-absence, no-replace, single-attempt, and fail-closed
+  rules;
+- if neither anchored mechanism succeeds exactly, no production retry is
+  considered and architecture returns to diagnosis.
+
+The optional absolute-path Win32 diagnostic can never be selected as the
+production transport.
+
+Any R1H-B production source change requires focused verification, exact GitHub
+review, replacement canonical three-lane certification, fresh exact
+OLD_CANONICAL preflight, and a new explicit human authorization. No prior R1F
+or R1G authorization carries forward.
+
 ## 9. Post-publication verification
 
 If both renames return success in the same admitted invocation, the operator must immediately verify:

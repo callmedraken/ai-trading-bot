@@ -5592,3 +5592,31 @@ protected recovery invocation requires new explicit human authorization.
 No signing, trust publication, retired cleanup, activation, scheduler mutation,
 provider/Paper-v2, broker, or live authority is granted by this certification.
 
+## 2026-09-27 P125-R1G recovery result and R1H diagnosis
+
+The separately authorized R1G recovery invocation was consumed and BLOCKED at
+its first protected rename with bounded evidence:
+
+    stage = NATIVE_FALSE
+    step = OLD_TO_RETIRED
+    win32_error = 87 (ERROR_INVALID_PARAMETER)
+    completed_renames = []
+    highest definitely completed state = OLD_CANONICAL
+
+A fresh independent post-failure namespace observation again proved exact
+OLD_CANONICAL: historical S5-R8 remains canonical, exact S5-R10 staging remains
+present, retired is absent, reserved names are exact, and the D5 scheduler
+predecessor is exact. No second rename, signing, cleanup, activation, scheduler
+mutation, provider/Paper-v2, broker, or live effect occurred.
+
+Architecture 125 now freezes R1H-A as a disposable-native acceptance checkpoint
+before any production transport correction. R1H-A compares the current anchored
+Win32 call, an exact-length anchored Win32 variant, and anchored
+NtSetInformationFile(FileRenameInformation=10) only under a fresh
+F:\AI\temp\p125-r1h-native-acceptance-* root. It must not change production
+P125 rename behavior or touch F:\AITradingBot.
+
+NEXT: implement and source-review the R1H-A disposable acceptance harness and
+fake/source-only tests with Sol High. Then run the harness on the Windows host.
+Only that evidence can select the narrower R1H-B production transport change.
+

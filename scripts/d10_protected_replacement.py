@@ -613,6 +613,47 @@ class CleanupBlockReason(StrEnum):
     POST_CLEANUP_VERIFICATION_FAILED = "POST_CLEANUP_VERIFICATION_FAILED"
 
 
+class CleanupOperation(StrEnum):
+    R1E = "P125-R1E"
+    R1I = "P125-R1I"
+
+
+class DeleteFailureStage(StrEnum):
+    PRE_CALL = "PRE_CALL"
+    NATIVE_FALSE = "NATIVE_FALSE"
+    TARGET_CLOSE_AMBIGUITY = "TARGET_CLOSE_AMBIGUITY"
+    POST_CALL_VERIFY = "POST_CALL_VERIFY"
+    PARENT_CLOSE_AMBIGUITY = "PARENT_CLOSE_AMBIGUITY"
+
+
+@dataclass(frozen=True, slots=True)
+class DeleteDiagnostic:
+    """Closed evidence for one source-owned plan index; no retry authority."""
+
+    target_index: int
+    stage: DeleteFailureStage
+    win32_error: int | None = None
+
+    def __post_init__(self) -> None:
+        if (
+            type(self.target_index) is not int
+            or not 0 <= self.target_index < 4096
+            or type(self.stage) is not DeleteFailureStage
+            or (
+                self.stage is DeleteFailureStage.NATIVE_FALSE
+                and (
+                    type(self.win32_error) is not int
+                    or not 0 <= self.win32_error <= 0xFFFFFFFF
+                )
+            )
+            or (
+                self.stage is not DeleteFailureStage.NATIVE_FALSE
+                and self.win32_error is not None
+            )
+        ):
+            raise ValueError("delete diagnostic requires closed bounded evidence")
+
+
 @dataclass(frozen=True, slots=True)
 class RetiredCleanupTarget:
     path: str
@@ -780,12 +821,32 @@ def build_retired_cleanup_plan(
     )
 
 
+R1I_PLAN_TARGET_COUNT = 337
+R1I_MISSING_PREFIX_COUNT = 1
+R1I_MISSING_RELATIVE_TARGET = (
+    r"source\scripts\run_personal_desktop_unattended_one_week_soak.py"
+)
+
+
+def require_retired_recovery_plan(plan: RetiredCleanupPlan) -> None:
+    """Admit only the frozen incident plan shape, never a caller-selected prefix."""
+    if (
+        type(plan) is not RetiredCleanupPlan
+        or len(plan.targets) != R1I_PLAN_TARGET_COUNT
+        or plan.targets[0].path != RETIRED_PATH + "\\" + R1I_MISSING_RELATIVE_TARGET
+        or plan.targets[0].directory is not False
+    ):
+        raise ValueError("retired recovery plan is outside the fixed incident")
+
+
 @dataclass(frozen=True, slots=True)
 class CleanupResult:
     phase: CleanupPhase
     state: CleanupState
     completed_targets: int = 0
     reason_code: CleanupBlockReason | None = None
+    delete_diagnostic: DeleteDiagnostic | None = None
+    operation: CleanupOperation = CleanupOperation.R1E
 
     def __post_init__(self) -> None:
         if (
@@ -806,13 +867,23 @@ class CleanupResult:
             )
         ):
             raise ValueError("cleanup result contains unrecognized evidence")
+        if type(self.operation) is not CleanupOperation or (
+            self.delete_diagnostic is not None
+            and (
+                type(self.delete_diagnostic) is not DeleteDiagnostic
+                or self.phase is not CleanupPhase.BLOCKED
+                or self.reason_code is not CleanupBlockReason.INDETERMINATE_DELETE
+                or self.delete_diagnostic.target_index != self.completed_targets
+            )
+        ):
+            raise ValueError("delete diagnostic is only indeterminate-target evidence")
 
     def canonical_transcript(self) -> bytes:
         """Emit only closed cleanup facts; never expose native observations."""
         passed = self.phase is CleanupPhase.PASS
         value: dict[str, object] = {
             "schema": "personal-desktop-d10-retired-cleanup/v1",
-            "operation": "P125-R1E",
+            "operation": self.operation.value,
             "status": self.phase.value,
             "cleanup_state": self.state.value,
             "completed_targets": self.completed_targets,
@@ -833,6 +904,16 @@ class CleanupResult:
         }
         if self.phase is CleanupPhase.BLOCKED:
             value["reason_code"] = self.reason_code.value
+        if self.delete_diagnostic is not None:
+            value["delete_diagnostic"] = {
+                "target_index": self.delete_diagnostic.target_index,
+                "stage": self.delete_diagnostic.stage.value,
+                **(
+                    {"win32_error": self.delete_diagnostic.win32_error}
+                    if self.delete_diagnostic.stage is DeleteFailureStage.NATIVE_FALSE
+                    else {}
+                ),
+            }
         return (
             json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
             + "\n"

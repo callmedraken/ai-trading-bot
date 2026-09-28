@@ -441,6 +441,12 @@ class FakeNative:
         self.calls.append(("absent", path))
         return path not in self.files and path not in self.directories
 
+    def absent_typed(self, path: str, *, directory: bool) -> bool:
+        assert type(directory) is bool
+        assert w._WindowsReplacementReader._allowed(path, directory=directory)
+        self.calls.append(("absent_typed", path))
+        return path not in self.files and path not in self.directories
+
 
 def test_native_path_allowlist_rejects_caller_selected_or_traversal() -> None:
     allowed = w._WindowsReplacementReader._allowed
@@ -784,7 +790,7 @@ def test_cleanup_session_stops_on_indeterminate(
     }
     session = w._FixedRetiredCleanupSession(observation, backend)
     monkeypatch.setattr(
-        w, "_delete_fixed_target", lambda *args: r.MutationOutcome.INDETERMINATE
+        w, "_delete_fixed_target", lambda *args: (r.MutationOutcome.INDETERMINATE, None)
     )
     assert session.delete_next() is r.MutationOutcome.INDETERMINATE
     assert session.completed_targets == 0
@@ -843,6 +849,7 @@ def test_cleanup_step_commit_point_is_exclusive_and_fail_closed(
     parent_item, target_item = admitted[parent_path], admitted[target.path]
     names = observation.plan.children_of(parent_path)
     backend = object.__new__(w._FixedRetiredDeletionNative)
+    backend._plan = observation.plan
     backend._targets = {item.path: item for item in observation.plan.targets}
     backend._kernel = object()
     calls: list[str] = []
@@ -916,8 +923,10 @@ def test_cleanup_step_commit_point_is_exclusive_and_fail_closed(
     monkeypatch.setattr(backend, "_bind", lambda library, name, args, result: read)
     monkeypatch.setattr(backend, "_set_disposition", disposition)
     monkeypatch.setattr(backend, "_close", close)
-    monkeypatch.setattr(backend, "absent", lambda path: failure != "absent")
-    outcome = w._delete_fixed_target(
+    monkeypatch.setattr(
+        backend, "absent_typed", lambda path, *, directory: failure != "absent"
+    )
+    outcome, diagnostic = w._delete_fixed_target(
         backend, target, parent_item, target_item, names, ()
     )
     assert outcome is (

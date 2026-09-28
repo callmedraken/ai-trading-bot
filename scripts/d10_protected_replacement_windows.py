@@ -267,6 +267,7 @@ class ReadOnlyNative(Protocol):
     def list_directory(self, path: str) -> CheckedDirectory: ...
     def read_file(self, path: str, limit: int) -> CheckedFile: ...
     def absent(self, path: str) -> bool: ...
+    def absent_typed(self, path: str, *, directory: bool) -> bool: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -287,6 +288,7 @@ class CleanupObservation:
     parent_children: tuple[str, ...] = ()
     scheduler: SchedulerObservation | None = None
     admitted_objects: tuple[NativeObject, ...] = ()
+    missing_indices: tuple[int, ...] = ()
 
 
 class _RecordingNative:
@@ -314,6 +316,9 @@ class _RecordingNative:
     def absent(self, path: str) -> bool:
         return self.native.absent(path)
 
+    def absent_typed(self, path: str, *, directory: bool) -> bool:
+        return self.native.absent_typed(path, directory=directory)
+
 
 def _checked_directory(
     native: ReadOnlyNative, path: str, names: set[str]
@@ -323,7 +328,9 @@ def _checked_directory(
     return checked.identity
 
 
-def _checked_file(native: ReadOnlyNative, path: str, limit: int) -> bytes:
+def _checked_file(
+    native: ReadOnlyNative, path: str, limit: int, *, volume_serial: int | None = None
+) -> bytes:
     checked = native.read_file(path, limit)
     if type(checked) is not CheckedFile or checked.stable is not True:
         raise AdmissionBlocked("native_file_unstable")
@@ -332,6 +339,10 @@ def _checked_file(native: ReadOnlyNative, path: str, limit: int) -> bytes:
         type(checked.data) is not bytes
         or len(checked.data) != checked.identity.size
         or len(checked.data) > limit
+        or (
+            volume_serial is not None
+            and checked.identity.volume_serial != volume_serial
+        )
     ):
         raise AdmissionBlocked("native_file_length_or_identity")
     return checked.data
@@ -578,7 +589,9 @@ def _verify_signed_new(
 
 def _retired_subset(
     native: ReadOnlyNative, verifier: object, parent_serial: int
-) -> tuple[replacement.CleanupState, replacement.RetiredCleanupPlan | None]:
+) -> tuple[
+    replacement.CleanupState, replacement.RetiredCleanupPlan | None, tuple[int, ...]
+]:
     """Classify only the fixed retired namespace; no observed name becomes a target."""
     root = replacement.RETIRED_PATH
     checked = native.list_directory(root)
@@ -603,11 +616,18 @@ def _retired_subset(
     ):
         raise AdmissionBlocked("retired_unexpected_inventory")
     for name in fixed - set(names):
-        _expect_absent(native, root + "\\" + name)
+        if name == "source":
+            if native.absent_typed(root + "\\" + name, directory=True) is not True:
+                raise AdmissionBlocked("retired_source_absence_unproved")
+        else:
+            _expect_absent(native, root + "\\" + name)
     manifest: ExecutableManifest | None = None
     if "executable-manifest.json" in names:
         manifest_bytes = _checked_file(
-            native, root + r"\executable-manifest.json", MAX_MANIFEST_BYTES
+            native,
+            root + r"\executable-manifest.json",
+            MAX_MANIFEST_BYTES,
+            volume_serial=parent_serial,
         )
         if (
             hashlib.sha256(manifest_bytes).hexdigest()
@@ -640,7 +660,9 @@ def _retired_subset(
         if (
             name in names
             and hashlib.sha256(
-                _checked_file(native, root + "\\" + name, limit)
+                _checked_file(
+                    native, root + "\\" + name, limit, volume_serial=parent_serial
+                )
             ).hexdigest()
             != digest
         ):
@@ -649,12 +671,47 @@ def _retired_subset(
         verify_signature(
             verifier,
             _checked_file(
-                native, root + r"\deployment.attestation.json", MAX_ATTESTATION_BYTES
+                native,
+                root + r"\deployment.attestation.json",
+                MAX_ATTESTATION_BYTES,
+                volume_serial=parent_serial,
             ),
             _checked_file(
-                native, root + r"\deployment.attestation.sig", MAX_SIGNATURE_BYTES
+                native,
+                root + r"\deployment.attestation.sig",
+                MAX_SIGNATURE_BYTES,
+                volume_serial=parent_serial,
             ),
         )
+    plan = None
+    if manifest is not None and set(names) == fixed:
+        attestation_bytes = _checked_file(
+            native,
+            root + r"\deployment.attestation.json",
+            MAX_ATTESTATION_BYTES,
+            volume_serial=parent_serial,
+        )
+        attestation = parse_deployment_attestation(attestation_bytes)
+        identity = replacement.OLD_IDENTITY
+        if (
+            attestation.deployment_id != identity.deployment_id
+            or attestation.executable_manifest_sha256 != manifest.digest
+            or attestation.executable_file_count != len(manifest.entries)
+            or attestation.launch_guard_sha256 != identity.guard_sha256
+            or attestation.launch_guard_byte_length != identity.guard_byte_length
+        ):
+            raise AdmissionBlocked("retired_attestation_identity")
+        plan = replacement.build_retired_cleanup_plan(
+            manifest,
+            attestation_bytes,
+            _checked_file(
+                native,
+                root + r"\deployment.attestation.sig",
+                MAX_SIGNATURE_BYTES,
+                volume_serial=parent_serial,
+            ),
+        )
+    missing: set[str] = set()
     source_complete = "source" in names
     if manifest is not None and "source" in names:
         source = root + r"\source"
@@ -672,7 +729,9 @@ def _retired_subset(
             if path != source:
                 parent_path = ntpath.dirname(path)
                 if ntpath.basename(path) not in observed_names.get(parent_path, ()):
-                    _expect_absent(native, path)
+                    if native.absent_typed(path, directory=True) is not True:
+                        raise AdmissionBlocked("retired_source_absence_unproved")
+                    missing.add(path)
                     source_complete = False
                     continue
             directory = native.list_directory(path)
@@ -695,29 +754,46 @@ def _retired_subset(
             path = source + "\\" + entry.relative_path.replace("/", "\\")
             parent_path = ntpath.dirname(path)
             if ntpath.basename(path) not in observed_names.get(parent_path, ()):
-                _expect_absent(native, path)
+                if native.absent_typed(path, directory=False) is not True:
+                    raise AdmissionBlocked("retired_source_absence_unproved")
+                missing.add(path)
                 source_complete = False
                 continue
-            checked_file = _checked_file(native, path, max(1, entry.byte_length))
+            checked_file = _checked_file(
+                native, path, max(1, entry.byte_length), volume_serial=parent_serial
+            )
             if (
                 len(checked_file) != entry.byte_length
                 or hashlib.sha256(checked_file).hexdigest() != entry.sha256
             ):
                 raise AdmissionBlocked("retired_source_byte_drift")
     if set(names) != fixed or not source_complete:
-        return replacement.CleanupState.PARTIAL_RETIRED, None
+        return (
+            replacement.CleanupState.PARTIAL_RETIRED,
+            plan,
+            tuple(i for i, target in enumerate(plan.targets) if target.path in missing)
+            if plan is not None
+            else (),
+        )
     full_manifest, serial = _verify_old(native, verifier, root)
     if serial != parent_serial:
         raise AdmissionBlocked("retired_full_volume_drift")
     attestation = _checked_file(
-        native, root + r"\deployment.attestation.json", MAX_ATTESTATION_BYTES
+        native,
+        root + r"\deployment.attestation.json",
+        MAX_ATTESTATION_BYTES,
+        volume_serial=parent_serial,
     )
     signature = _checked_file(
-        native, root + r"\deployment.attestation.sig", MAX_SIGNATURE_BYTES
+        native,
+        root + r"\deployment.attestation.sig",
+        MAX_SIGNATURE_BYTES,
+        volume_serial=parent_serial,
     )
     return (
         replacement.CleanupState.FULL_RETIRED,
         replacement.build_retired_cleanup_plan(full_manifest, attestation, signature),
+        (),
     )
 
 
@@ -755,9 +831,11 @@ def _cleanup_once(
     if retired_absent != (retired_leaf not in names):
         raise AdmissionBlocked("cleanup_retired_parent_drift")
     if retired_absent:
-        state, plan = replacement.CleanupState.RETIRED_ABSENT, None
+        state, plan, missing_indices = replacement.CleanupState.RETIRED_ABSENT, None, ()
     else:
-        state, plan = _retired_subset(native, verifier, parent.identity.volume_serial)
+        state, plan, missing_indices = _retired_subset(
+            native, verifier, parent.identity.volume_serial
+        )
     scheduler = _observe_d5_scheduler(scheduler_run)
     final_parent = native.list_directory(replacement.PARENT_PATH)
     if (
@@ -766,7 +844,9 @@ def _cleanup_once(
         or final_parent != parent
     ):
         raise AdmissionBlocked("cleanup_parent_revalidation_drift")
-    return CleanupObservation(state, plan, parent.identity, names, scheduler)
+    return CleanupObservation(
+        state, plan, parent.identity, names, scheduler, missing_indices=missing_indices
+    )
 
 
 def _observe_cleanup(
@@ -1649,7 +1729,9 @@ class _WindowsReplacementReader:
                 )(handle):
                     raise AdmissionBlocked("administrator_cleanup_failed")
 
-    def _open(self, path: str, *, directory: bool | None) -> int | None:
+    def _open(
+        self, path: str, *, directory: bool | None, absence_probe: bool = False
+    ) -> int | None:
         if not self._allowed(path, directory=directory):
             raise AdmissionBlocked("native_path_unreviewed")
         create = self._bind(
@@ -1674,7 +1756,9 @@ class _WindowsReplacementReader:
         flags = 0x00200000 | (0x02000000 if directory is not False else 0)
         handle = create(path, access, 1, None, 3, flags, None)
         if handle in (None, 0, ctypes.c_void_p(-1).value):
-            if directory is None and ctypes.get_last_error() in (2, 3):
+            if (
+                directory is None or absence_probe is True
+            ) and ctypes.get_last_error() in (2, 3):
                 return None
             raise AdmissionBlocked("native_open_unavailable")
         return int(handle)
@@ -1754,6 +1838,15 @@ class _WindowsReplacementReader:
 
     def absent(self, path: str) -> bool:
         handle = self._open(path, directory=None)
+        if handle is None:
+            return True
+        self._close(handle)
+        return False
+
+    def absent_typed(self, path: str, *, directory: bool) -> bool:
+        if type(directory) is not bool:
+            raise AdmissionBlocked("native_object_kind_unreviewed")
+        handle = self._open(path, directory=directory, absence_probe=True)
         if handle is None:
             return True
         self._close(handle)
@@ -2248,8 +2341,12 @@ def _delete_fixed_target(
     target_identity: NativeObject,
     expected_parent_names: tuple[str, ...],
     expected_target_names: tuple[str, ...],
-) -> replacement.MutationOutcome:
+) -> tuple[replacement.MutationOutcome, replacement.DeleteDiagnostic | None]:
     """One attempt only. Any uncertain native result permanently stops this session."""
+    target_index = native._plan.targets.index(target)
+    diagnostic = replacement.DeleteDiagnostic(
+        target_index, replacement.DeleteFailureStage.PRE_CALL
+    )
     parent_handle: int | None = None
     target_handle: int | None = None
     target_close_attempted = False
@@ -2291,10 +2388,20 @@ def _delete_fixed_target(
         _cleanup_identity_exact(native, parent_handle, parent_identity)
         _cleanup_identity_exact(native, target_handle, target_identity)
         if not native._set_disposition(target_handle):
+            error = ctypes.get_last_error() & 0xFFFFFFFF
+            diagnostic = replacement.DeleteDiagnostic(
+                target_index, replacement.DeleteFailureStage.NATIVE_FALSE, error
+            )
             raise AdmissionBlocked("cleanup_disposition_false")
+        diagnostic = replacement.DeleteDiagnostic(
+            target_index, replacement.DeleteFailureStage.TARGET_CLOSE_AMBIGUITY
+        )
         target_close_attempted = True
         native._close(target_handle)
         target_handle = None
+        diagnostic = replacement.DeleteDiagnostic(
+            target_index, replacement.DeleteFailureStage.POST_CALL_VERIFY
+        )
         expected_after = tuple(
             name
             for name in expected_parent_names
@@ -2302,10 +2409,11 @@ def _delete_fixed_target(
         )
         if native._pinned_names(parent_handle) != expected_after:
             raise AdmissionBlocked("cleanup_parent_post_inventory")
-        if native.absent(target.path) is not True:
+        if native.absent_typed(target.path, directory=target.directory) is not True:
             raise AdmissionBlocked("cleanup_target_post_presence")
         _cleanup_identity_exact(native, parent_handle, parent_identity)
         outcome = replacement.MutationOutcome.SUCCESS
+        diagnostic = None
     except Exception:
         outcome = replacement.MutationOutcome.INDETERMINATE
     finally:
@@ -2318,32 +2426,46 @@ def _delete_fixed_target(
             try:
                 native._close(parent_handle)
             except Exception:
+                if outcome is replacement.MutationOutcome.SUCCESS:
+                    diagnostic = replacement.DeleteDiagnostic(
+                        target_index,
+                        replacement.DeleteFailureStage.PARENT_CLOSE_AMBIGUITY,
+                    )
                 outcome = replacement.MutationOutcome.INDETERMINATE
-    return outcome
+    return outcome, diagnostic
 
 
 class _FixedRetiredCleanupSession:
     def __init__(
         self, observation: CleanupObservation, native: _FixedRetiredDeletionNative
-    ):
+    ) -> None:
         if (
             observation.state is not replacement.CleanupState.FULL_RETIRED
             or type(observation.plan) is not replacement.RetiredCleanupPlan
             or type(observation.parent_native) is not NativeObject
         ):
             raise AdmissionBlocked("cleanup_session_not_admitted")
+        self._initialize(observation, native, 0)
+
+    def _initialize(
+        self,
+        observation: CleanupObservation,
+        native: _FixedRetiredDeletionNative,
+        completed_prefix: int,
+    ) -> None:
         self.plan = observation.plan
         self._native = native
         self._admitted = {item.path: item for item in observation.admitted_objects}
         self._admitted[replacement.PARENT_PATH] = observation.parent_native
-        for target in self.plan.targets:
+        for target in self.plan.targets[completed_prefix:]:
             if (
                 target.path not in self._admitted
                 or ntpath.dirname(target.path) not in self._admitted
             ):
                 raise AdmissionBlocked("cleanup_plan_identity_missing")
         self._parent_names = observation.parent_children
-        self.completed_targets = 0
+        self.completed_targets = completed_prefix
+        self.delete_diagnostic: replacement.DeleteDiagnostic | None = None
         self._stopped = False
 
     def delete_next(self) -> replacement.MutationOutcome:
@@ -2374,7 +2496,11 @@ class _FixedRetiredCleanupSession:
                 if target.path + "\\" + name not in deleted
             )
         )
-        result = _delete_fixed_target(
+        self._stopped = True
+        self.delete_diagnostic = replacement.DeleteDiagnostic(
+            self.completed_targets, replacement.DeleteFailureStage.PRE_CALL
+        )
+        result, diagnostic = _delete_fixed_target(
             self._native,
             target,
             self._admitted[parent],
@@ -2384,8 +2510,11 @@ class _FixedRetiredCleanupSession:
         )
         if result is replacement.MutationOutcome.SUCCESS:
             self.completed_targets += 1
+            self._stopped = False
+            self.delete_diagnostic = None
         else:
             self._stopped = True
+            self.delete_diagnostic = diagnostic
         return result
 
 
@@ -2399,6 +2528,60 @@ def begin_fixed_retired_cleanup_session() -> tuple[
         return observation, None
     assert observation.plan is not None
     return observation, _FixedRetiredCleanupSession(
+        observation, _FixedRetiredDeletionNative(observation.plan)
+    )
+
+
+def _require_retired_recovery(observation: CleanupObservation) -> None:
+    if (
+        type(observation) is not CleanupObservation
+        or observation.state is not replacement.CleanupState.PARTIAL_RETIRED
+        or observation.missing_indices != (0,)
+        or type(observation.parent_native) is not NativeObject
+        or type(observation.scheduler) is not SchedulerObservation
+    ):
+        raise AdmissionBlocked("retired_recovery_not_admitted")
+    replacement.require_retired_recovery_plan(observation.plan)
+    admitted = {
+        item.path: item
+        for item in observation.admitted_objects
+        if item.path == replacement.RETIRED_PATH
+        or item.path.startswith(replacement.RETIRED_PATH + "\\")
+    }
+    remaining = observation.plan.targets[replacement.R1I_MISSING_PREFIX_COUNT :]
+    if set(admitted) != {target.path for target in remaining}:
+        raise AdmissionBlocked("retired_recovery_inventory_drift")
+    for target in remaining:
+        item = admitted[target.path]
+        require_native_object(item, target.path, directory=target.directory)
+        if item.volume_serial != observation.parent_native.volume_serial or (
+            not target.directory and item.size != target.byte_length
+        ):
+            raise AdmissionBlocked("retired_recovery_identity_drift")
+
+
+class _FixedRetiredRecoverySession(_FixedRetiredCleanupSession):
+    def __init__(
+        self, observation: CleanupObservation, native: _FixedRetiredDeletionNative
+    ) -> None:
+        _require_retired_recovery(observation)
+        if native._plan != observation.plan:
+            raise AdmissionBlocked("retired_recovery_plan_drift")
+        self._initialize(observation, native, replacement.R1I_MISSING_PREFIX_COUNT)
+
+
+def begin_fixed_retired_recovery_session() -> tuple[
+    CleanupObservation, _FixedRetiredRecoverySession | None
+]:
+    """Two matching full read-only admissions precede any destructive session."""
+    observation = _observe_cleanup(
+        _WindowsReplacementReader(), WindowsCngVerifier(), _run_scheduler_bounded
+    )
+    try:
+        _require_retired_recovery(observation)
+    except Exception:
+        return observation, None
+    return observation, _FixedRetiredRecoverySession(
         observation, _FixedRetiredDeletionNative(observation.plan)
     )
 

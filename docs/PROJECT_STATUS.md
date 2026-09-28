@@ -5278,3 +5278,33 @@ focused verification, exact GitHub review, and replacement canonical
 certification. A later protected recovery invocation requires fresh explicit
 operator approval.
 
+## 2026-09-27 P125-R1G canonical certification — ACCEPTED
+
+Certified source identity:
+- HEAD `4f898534768626ba61204eddeccfc0c056f38b65`
+- TREE `9203876e021e79a48486fc3ed7d61241b9e3e1f8`
+- branch `feature/p125-r1g-rename-diagnostic-recovery`
+
+Canonical three-lane certification:
+- broad-1: 132 modules, 3,874 cases, 3,869 passed, 5 skipped;
+- broad-2: 132 modules, 3,263 cases, 3,260 passed, 3 skipped;
+- serial safety lane: 5 modules, 935 cases, 926 passed, 9 skipped;
+- total: 8,072 cases, 8,055 passed, 17 skipped, 0 failures, 0 errors;
+- wall time: 356.109 seconds;
+- evidence: `F:\AI\temp\pytest\certification-evidence-4a0de202925e44418a11abbc357525f4`.
+
+Repository-wide Ruff, format, diff, exact branch/ref, clean worktree/index, and
+certification identity gates passed as part of the canonical certification.
+
+R1G is now the accepted source for the bounded rename diagnostic and separate
+P125 recovery operator. The earlier R1F protected-operation authorization was
+consumed by the indeterminate attempt and does not authorize R1G recovery.
+
+Next checkpoint is read-only recovery preflight only. It must prove exact
+OLD_CANONICAL, exact S5-R10 certified material, exact D5 scheduler predecessor,
+fresh full Architecture-125 admission, and no namespace drift. A later R1G
+protected recovery invocation requires new explicit human authorization.
+
+No signing, trust publication, retired cleanup, activation, scheduler mutation,
+provider/Paper-v2, broker, or live authority is granted by this certification.
+

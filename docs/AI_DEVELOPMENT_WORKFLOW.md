@@ -327,12 +327,29 @@ otherwise resolve `trading_bot` from the wrong checkout. Pytest's configured
 standalone `python -c`, module, script, Ruff, or operator invocations.
 
 For a standalone provenance probe, bind the expected source root only inside
-that one Python process instead of exporting persistent `PYTHONPATH`. For the
-current personal-desktop worktree:
+that one Python process instead of exporting persistent `PYTHONPATH`. Nontrivial
+Python under PowerShell must be delivered through a single-quoted here-string on
+stdin rather than `python -c`. For the current personal-desktop worktree:
 
 ```powershell
 Set-Location 'F:\AI\worktrees\ai-trading-bot-personal-desktop'
-& 'F:\AI\ai-trading-bot\.venv\Scripts\python.exe' -c "import sys,pathlib; root=pathlib.Path(r'F:\AI\worktrees\ai-trading-bot-personal-desktop\src').resolve(); sys.path.insert(0,str(root)); import trading_bot; module=pathlib.Path(trading_bot.__file__).resolve(); assert root in module.parents, (root,module); print(module)"
+
+@'
+import sys
+from pathlib import Path
+
+root = Path(
+    r'F:\AI\worktrees\ai-trading-bot-personal-desktop\src'
+).resolve()
+
+sys.path.insert(0, str(root))
+
+import trading_bot
+
+module = Path(trading_bot.__file__).resolve()
+assert root in module.parents, (root, module)
+print(module)
+'@ | & 'F:\AI\ai-trading-bot\.venv\Scripts\python.exe' -B -
 ```
 
 The printed module path must be under the expected worktree `src` tree. An
@@ -375,6 +392,32 @@ startup gate, Codex stops instead of self-correcting.
 Use larger defensive scripts only when a security-sensitive deployment,
 production authority gate, or unusually fragile operator operation genuinely
 requires them.
+
+### Windows/PowerShell command robustness
+
+Windows operator commands are part of the reviewed control surface. Keep their
+syntax deliberately boring and parser-stable:
+
+- nontrivial Python under PowerShell uses a single-quoted here-string piped to
+  `python -B -`; do not use `python -c` for multiline, quote-heavy, path-heavy,
+  or security-sensitive probes;
+- inline Python text containing Windows paths must use raw string literals or
+  escaped backslashes so diagnostic commands do not emit invalid-escape
+  warnings that can hide real output;
+- PowerShell .NET calls should use simple intermediate assignments instead of
+  parser-fragile multiline type/cast expressions;
+- after any PowerShell parser error, do not treat later commands in the pasted
+  block as having passed the failed prerequisite; restart from a clean,
+  explicitly fenced checkpoint;
+- protected-effect commands and their read-only preflights remain separate, and
+  the preflight must prove its own Administrator/source/host admission rather
+  than relying on a prior shell variable that may not have been assigned;
+- structured diagnostic or operator logic belongs in a reviewed `.ps1`/`.py`
+  file or a stdin Python block; PowerShell should remain a short launcher and
+  exact-state fence.
+
+These rules are mandatory for generated ChatGPT/Codex operator instructions,
+not just repository scripts.
 
 ## Parallel worktrees
 

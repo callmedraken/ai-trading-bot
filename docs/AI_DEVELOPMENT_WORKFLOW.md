@@ -287,12 +287,26 @@ otherwise resolve `trading_bot` from the wrong checkout. Pytest's configured
 standalone `python -c`, module, script, Ruff, or operator invocations.
 
 For a standalone provenance probe, bind the expected source root only inside
-that one Python process instead of exporting persistent `PYTHONPATH`. For the
-current personal-desktop worktree:
+that one Python process instead of exporting persistent `PYTHONPATH`. On
+Windows/PowerShell, nontrivial Python must be supplied through stdin rather
+than `python -c`; embedded Windows paths, backslashes, nested quotes, or
+structured material are too easy for native-command quote reconstruction to
+corrupt. For the current personal-desktop worktree:
 
 ```powershell
 Set-Location 'F:\AI\worktrees\ai-trading-bot-personal-desktop'
-& 'F:\AI\ai-trading-bot\.venv\Scripts\python.exe' -c "import sys,pathlib; root=pathlib.Path(r'F:\AI\worktrees\ai-trading-bot-personal-desktop\src').resolve(); sys.path.insert(0,str(root)); import trading_bot; module=pathlib.Path(trading_bot.__file__).resolve(); assert root in module.parents, (root,module); print(module)"
+$Python = 'F:\AI\ai-trading-bot\.venv\Scripts\python.exe'
+@'
+import sys
+from pathlib import Path
+
+root = Path(r'F:\AI\worktrees\ai-trading-bot-personal-desktop\src').resolve()
+sys.path.insert(0, str(root))
+import trading_bot
+module = Path(trading_bot.__file__).resolve()
+assert root in module.parents, (root, module)
+print(module)
+'@ | & $Python -B -
 ```
 
 The printed module path must be under the expected worktree `src` tree. An
@@ -302,6 +316,31 @@ operator commands, or certification against an ambiguous import source.
 Apply the same pattern to other worktrees by changing only the explicitly
 selected worktree path. Do not mutate the shared virtual environment or rely on
 its editable-install target as source authority for another worktree.
+
+## PowerShell to Python command transport
+
+On Windows, **stdin is the default transport for nontrivial Python snippets**.
+Do not use `python -c` for operator/preflight/deployment commands containing
+Windows paths, backslashes, nested quotes, JSON/structured data, or multiple
+statements. PowerShell/native-command argument reconstruction has repeatedly
+changed valid Python source before it reached the interpreter.
+
+Use a single-quoted PowerShell here-string piped to Python:
+
+```powershell
+@'
+from pathlib import Path
+root = Path(r'F:\AI\worktrees\example')
+print(root)
+'@ | & $Python -B -
+```
+
+For security-sensitive or substantial operations, prefer an already-reviewed
+`.py`/`.ps1` operator file over an inline program. Structured data and
+authority-bearing material belong in files or stdin, not JSON argv. `python -c`
+is reserved for trivial quote-free probes where command-line reconstruction
+cannot alter semantics. This rule must be carried into new chats and handoff
+instructions.
 
 ## PowerShell and Git checkpoint style
 

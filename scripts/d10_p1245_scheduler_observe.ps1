@@ -7,13 +7,18 @@ try {
     if ($args.Count -ne 0) { throw 'arguments forbidden' }
 
     function Read-FixedTask {
-        param($FixedFolder, [ref]$CapturedDefinition = $null)
+        param($FixedFolder, $CapturedDefinition = $null)
         $task = $FixedFolder.GetTask('AITradingBot-PD4-UnattendedPaper-v1')
         if ($task.Path -cne '\AITradingBot-PD4-UnattendedPaper-v1') {
             throw 'task identity mismatch'
         }
         $definition = $task.Definition
-        if ($null -ne $CapturedDefinition) { $CapturedDefinition.Value = $definition }
+        if ($null -ne $CapturedDefinition) {
+            if ($CapturedDefinition -isnot [System.Management.Automation.PSReference]) {
+                throw 'captured definition reference invalid'
+            }
+            $CapturedDefinition.Value = $definition
+        }
         $userId = [string]$definition.Principal.UserId
         if ([string]::IsNullOrEmpty($userId)) { throw 'principal unavailable' }
         if ($userId -match '^S-1-') {

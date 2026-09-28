@@ -5830,3 +5830,94 @@ Safe continuation is limited to exact source/document review and read-only
 preflight preparation for the frozen activation-lease + capture-only Task
 Scheduler transition. Creating the activation lease or mutating Task Scheduler
 requires fresh explicit human authorization.
+
+
+## 2026-09-28 P124-5A activation/scheduler operator source — ACCEPTED
+
+Exact GitHub review accepted the source-only protected P124-5 operator checkpoint.
+
+```text
+SOURCE HEAD:
+c4a6aab7609e44a82f70174101ce2c56e6f1860c
+
+SOURCE TREE:
+a2212cf109fd258a45a492259c7c1953f0491d2b
+
+PARENT:
+2db185a703f9b4f85ca0a581d330afff25f34a7f
+```
+
+The accepted diff is one commit / seven files. It adds the inert Python
+operator, fixed read-only/update Task Scheduler COM helpers, a lease-only
+native publication backend, a public fixed D10 read-only adapter, focused
+tests, and the validation document. No governed S5-R10 executable source or
+launch-guard byte changed.
+
+The four governed runtime contracts imported by the operator were independently
+checked against certified S5-R10 HEAD
+`c5cc0b01301600daf17f1114f4451dca2c9d7a1f`; their Git blobs are
+byte-identical on this branch.
+
+Accepted protected ordering is:
+
+```text
+fresh stable read-only admission
+-> interactive Trading credential acquisition
+-> fresh admission after the pause
+-> freeze one UTC activation instant
+-> derive exact D10 scheduler spec + canonical seven-day lease
+-> update exactly the existing D5 task
+-> independent exact D10 COM readback
+-> fresh signed-deployment + lease-absence proof
+-> create/flush/reverify lease .tmp
+-> no-replace .tmp -> .installing
+-> fresh signed-deployment + scheduler proof
+-> no-replace .installing -> final lease
+-> final independent signed-deployment + scheduler + lease reread
+```
+
+Final lease publication is the arming action. Scheduler ambiguity never permits
+lease publication; post-scheduler failures leave the guard fail-closed because
+the final lease is absent. Once final publication is attempted, uncertainty is
+classified as an indeterminate protected state. No automatic retry or rollback
+exists.
+
+The Task Scheduler update transport is fixed to the existing
+`\AITradingBot-PD4-UnattendedPaper-v1` task, exact Trading SID, Password/LUA,
+production Python, Architecture-124 guard arguments, D10 working directory,
+daily 01:30 Pacific trigger, StartWhenAvailable/IgnoreNew behavior, existing
+power/wake/runtime/priority semantics, zero retries, and an exact seven-day end
+boundary derived from the same activation instant as the lease. The helper uses
+TASK_UPDATE only and contains no task Run call or alternate task creation path.
+
+The protected operator acquires the Trading password only interactively at the
+execute boundary and sends it only through a private stdin pipe to the fixed
+PowerShell update helper. The password is absent from argv, environment,
+repository files, evidence, stdout, and stderr by design.
+
+Reported source verification:
+
+```text
+429 focused regression tests PASS
+125 final operator tests PASS
+Ruff check PASS
+Ruff format --check PASS
+PowerShell AST parse checks PASS
+git diff --check PASS
+tracked/index clean
+remote HEAD/tree exact
+```
+
+GitHub currently reports no attached commit status checks for this source commit.
+Acceptance is therefore based on the exact GitHub diff review plus the reported
+focused/local verification above.
+
+No real Task Scheduler observation or mutation, activation-lease publication,
+credential acquisition, guard/source launch, provider call, Paper-v2 effect,
+broker-paper effect, or live effect occurred during P124-5A.
+
+Next checkpoint: P124-5B read-only real-host preflight from the exact accepted
+operator source. It may observe only the protected S5-R10 deployment and the
+existing D5 scheduler predecessor. It must not prompt for a credential, mutate
+Task Scheduler, create any lease file, or launch governed source. Protected
+P124-5 execution remains a later explicit effect boundary.

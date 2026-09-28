@@ -1104,6 +1104,224 @@ or trading authority.
 
 P124-1 full signed production-Python substrate qualification occurs only after the retired-tree cleanup PASS, so its protected-host inventory does not need to admit an obsolete sibling deployment.
 
+
+## 10.6 P125-R1I typed-absence correction and exact one-prefix partial-retirement recovery
+
+### 10.6.1 Accepted incident evidence
+
+The first protected P125-R1E retired-tree cleanup attempt after S5-R10 P124-3
+trust publication admitted the retired S5-R8 tree as FULL_RETIRED, then stopped
+on the first plan target with:
+
+    status = BLOCKED
+    reason_code = INDETERMINATE_DELETE
+    cleanup_state = FULL_RETIRED
+    completed_targets = 0
+
+The first frozen target was exactly:
+
+    F:\AITradingBot\D10.retired-2fd79986-fb50-5fe4-800a-2d4aa5e7307c\
+      source\scripts\run_personal_desktop_unattended_one_week_soak.py
+
+Fresh read-only post-attempt observation through the production classifier
+collapsed to CONFLICTING with native_path_unreviewed. A diagnostic that changed
+no path, ACL, scheduler, trust, or file bytes then proved the following twice
+with matching results:
+
+- the historical cleanup plan still contains exactly 337 targets;
+- the production generic absence probe rejects the first source target when
+  called with directory=None;
+- the same fixed target is admitted when its frozen file type is supplied;
+- the retired state is PARTIAL_RETIRED under typed absence;
+- exactly one frozen plan target is absent;
+- that absent target is exactly plan index 0 above;
+- every other retired target remains present/exact under the existing signed
+  historical manifest/trust checks;
+- the two read-only classifications and missing-target sets match exactly.
+
+This is accepted diagnosis only. It grants no deletion or recovery authority.
+
+### 10.6.2 Source defect and correction boundary
+
+The incident exposes one deterministic source-contract defect shared by the
+per-target commit proof and later partial-tree classifier.
+
+_WindowsReplacementReader._allowed() intentionally permits descendants below
+...\source\... only when their object kind is explicit: directory=True or
+directory=False. Generic directory=None is rejected as native_path_unreviewed.
+
+However:
+
+1. _delete_fixed_target() performs its post-disposition pathname absence proof
+   with native.absent(target.path), which internally opens with directory=None;
+   and
+2. _retired_subset() uses the same generic absence route when a governed source
+   target is missing.
+
+Therefore an otherwise successful deletion of any manifest-governed source
+target cannot reach the current SUCCESS commit point: after the target is marked
+for deletion and the target handle is closed, the post-delete absence proof
+reaches the generic source-path rejection. The same rejection then prevents the
+later classifier from representing that missing target as PARTIAL_RETIRED and
+collapses the observation to CONFLICTING.
+
+R1I corrects only this object-kind mismatch. It MUST NOT broaden generic
+directory=None authority beneath a source tree.
+
+The native/read-only contract gains a fixed typed absence primitive whose caller
+must provide the already-known object kind. The allowed implementation is
+equivalent to:
+
+    absent_typed(path, directory=<True|False>)
+
+and reuses the existing fixed-path _allowed() and no-follow _open() semantics.
+It does not accept arbitrary paths, infer a kind from the filesystem, follow
+reparses, or convert a failed typed open into absence unless Windows positively
+reports the existing accepted not-found states.
+
+Existing generic absent(path) semantics remain unchanged for the fixed roots,
+trust names, lease/cache names, and other already reviewed paths.
+
+The cleanup classifier uses typed absence only for source descendants whose
+file/directory kind is fixed by the signed historical manifest-derived cleanup
+plan. The per-target post-disposition proof uses exactly target.directory. No
+caller-selected kind reaches either surface.
+
+### 10.6.3 R1I incident-specific recovery state
+
+R1I is not a general arbitrary PARTIAL_RETIRED cleanup facility.
+
+The only protected recovery state eligible for this incident is an exact
+one-target deleted prefix of the already frozen S5-R8 plan:
+
+    expected missing prefix count = 1
+    expected missing plan index   = 0
+    expected missing target       =
+      source\scripts\run_personal_desktop_unattended_one_week_soak.py
+    expected remaining targets    = 336
+
+Fresh recovery admission MUST independently prove all of the following before
+constructing any destructive session:
+
+- canonical S5-R10 P124-3 signed trust is exact and verifies under the frozen
+  production v3 key;
+- canonical source/guard/manifest/attestation/signature identity is exact;
+- canonical activation lease/installing/tmp and cache objects remain absent;
+- the D5 scheduler remains the exact capture-only predecessor;
+- the protected F:\AITradingBot parent remains exact;
+- staging is absent and no unexpected replacement/retired sibling exists;
+- the retired root remains the exact historical S5-R8 protected root;
+- the historical manifest, attestation, detached signature, and guard remain
+  exact and the historical signature verifies;
+- the full frozen 337-target plan can be rebuilt from that historical material;
+- exactly target index 0 is positively absent through typed no-follow proof;
+- no target after index 0 is absent;
+- every remaining file reproduces exact byte length/SHA-256 and native
+  identity/security/volume facts;
+- every remaining directory inventory equals the frozen plan after subtracting
+  only the exact missing prefix;
+- canonical and retired roots remain on the accepted same local NTFS volume;
+- two complete read-only recovery admissions match exactly.
+
+FULL_RETIRED, RETIRED_ABSENT, a missing prefix count other than one, a non-prefix
+hole, any extra missing target, any unexpected object, any identity/security
+drift, or any observation ambiguity blocks R1I. R1I never recreates the missing
+target and never treats a caller-supplied missing set as authority.
+
+### 10.6.4 Dedicated recovery operator
+
+R1I adds a new inert source-owned entry point:
+
+    scripts/p125_recover_retired_d10_r1i.py
+    --execute-protected-p125-r1i-retired-recovery
+
+It accepts no caller-selected path, plan, prefix count, target index, object
+kind, scheduler identity, signing identity, or cleanup mode.
+
+The operator begins from the exact admission in section 10.6.3 and constructs a
+session whose initial completed-prefix index is source-owned and fixed at one.
+It starts only at original plan target index 1. Target index 0 is never reopened
+for deletion, retried, reconstructed, or rolled back.
+
+All remaining targets reuse the existing frozen deletion order, exact pinned
+parent/target identity checks, byte/inventory checks, no-follow handles,
+exclusive target share mode, FileDispositionInfo-only mutation, target close,
+direct-parent post-inventory proof, typed exact-target absence proof, parent
+reinspection, and bottom-up ordering.
+
+The same invocation advances to the next target only after an exact SUCCESS
+commit point. It performs no retry after an indeterminate target, skips no
+target, and performs no automatic rollback or cleanup beyond the frozen plan.
+
+After the retired root is deleted, PASS still requires the existing two fresh
+matching post-cleanup observations proving retired absence, exact canonical
+S5-R10 signed trust, absent activation/cache, exact parent, absent staging/no
+unexpected sibling, and exact D5 predecessor.
+
+### 10.6.5 Closed per-target diagnostics
+
+R1I must not repeat R1E's opaque INDETERMINATE_DELETE evidence.
+
+The cleanup state model gains a bounded diagnostic attached only to an
+INDETERMINATE target. It contains the source-owned plan target index and exactly
+one stage enum:
+
+    PRE_CALL
+    NATIVE_FALSE
+    TARGET_CLOSE_AMBIGUITY
+    POST_CALL_VERIFY
+    PARENT_CLOSE_AMBIGUITY
+
+Only NATIVE_FALSE carries win32_error, captured immediately after the false
+SetFileInformationByHandle return and normalized to uint32. The other stages
+carry no native error code. Diagnostics contain no raw path, handle, ACL,
+exception text, environment value, or caller-selected value.
+
+Stage assignment is frozen:
+
+- PRE_CALL: failure before the disposition call is attempted;
+- NATIVE_FALSE: FileDispositionInfo returns false;
+- TARGET_CLOSE_AMBIGUITY: disposition returned success but target-handle close
+  cannot be proved successful;
+- POST_CALL_VERIFY: disposition returned success, target close is proved, but
+  direct-parent omission, typed target absence, or post-delete parent identity
+  cannot be proved exact;
+- PARENT_CLOSE_AMBIGUITY: the target reached the full SUCCESS proof except that
+  final parent-handle close is ambiguous.
+
+A later stage never converts an indeterminate target to SUCCESS. No stage grants
+retry authority.
+
+Historical R1E transcript parsing/serialization remains compatible. The consumed
+R1E protected invocation is never rerun.
+
+### 10.6.6 Source and protected gates
+
+Before any R1I protected recovery may execute:
+
+1. freeze this R1I architecture;
+2. implement the typed-absence correction, exact one-prefix admission,
+   dedicated recovery operator, and closed cleanup diagnostics;
+3. add focused tests proving generic source absence remains rejected,
+   typed source absence is exact, R1E's first-target defect is reproduced by
+   the historical path, the corrected commit proof succeeds only with typed
+   absence, arbitrary/non-prefix partial states block, only the exact one-target
+   prefix is admitted, target index 0 is never mutated by recovery, every
+   diagnostic stage is closed/deterministic, and canonical/scheduler/trading
+   surfaces remain untouched;
+4. run focused tests and changed-file Ruff/format/diff checks;
+5. perform exact GitHub source/diff review;
+6. run the canonical three-lane repository certification on the exact R1I
+   source identity;
+7. perform a fresh real-host read-only R1I preflight proving the exact
+   one-target prefix state twice with no mutation;
+8. cross the protected-operation boundary only after the already established
+   human authorization policy is satisfied for the now-reviewed R1I operator.
+
+No R1E mutation is retried. No R1H rename path is reopened. P124-1 remains
+blocked until R1I returns cleanup PASS.
+
+
 ## 11. Protected execution sequence after this design
 
 The revised protected sequence is:

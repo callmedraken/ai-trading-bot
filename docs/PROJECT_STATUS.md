@@ -5332,3 +5332,21 @@ After exact source review, run the disposable harness locally and freeze R1H-B
 from observed host behavior. Any later production transport correction must be
 recertified and separately reauthorized.
 
+## P125-R1H-C — disposable share-mode diagnosis
+
+R1H-A completed with cleanup PASS but no anchored case succeeded:
+- Win32 frozen control: ERROR_INVALID_PARAMETER (87);
+- Win32 exact-length: ERROR_INVALID_PARAMETER (87);
+- NtSetInformationFile anchored: 0xC0000043 / STATUS_SHARING_VIOLATION.
+
+All three left the disposable source present and destination absent with stable
+parent proof and exact handle close.
+
+No production retry is authorized. The exact-length Win32 hypothesis is closed.
+
+Next checkpoint is R1H-C disposable-only source work. It must hold
+NtSetInformationFile/FileRenameInformation, DesiredAccess, buffer length,
+pinned-parent anchoring, relative destination, no-replace semantics, and proof
+constant while varying only source/parent ShareAccess across a closed matrix.
+Production P125 source/operators remain unchanged.
+

@@ -5620,3 +5620,33 @@ NEXT: implement and source-review the R1H-A disposable acceptance harness and
 fake/source-only tests with Sol High. Then run the harness on the Windows host.
 Only that evidence can select the narrower R1H-B production transport change.
 
+## 2026-09-27 P125-R1H-A disposable host result
+
+The R1H-A disposable native acceptance harness ran once against accepted source
+HEAD `b250a7dd8e6ff6f8b43c582846ee4f94a550f55d` / TREE
+`d2776757f6811bc877cdfcc234052077ef2a7c51`.
+
+The harness completed all three cases and cleanup passed.
+
+Results:
+- WIN32_FROZEN_CONTROL: FALSE, Win32 87 / ERROR_INVALID_PARAMETER;
+- WIN32_EXACT_LENGTH: FALSE, Win32 87 / ERROR_INVALID_PARAMETER;
+- NT_NATIVE_ANCHORED: NTSTATUS 0xC0000043 / STATUS_SHARING_VIOLATION;
+- every case left source present, destination absent, parent stable, and handles
+  closed exactly;
+- disposable cleanup = PASS.
+
+Therefore neither anchored R1H-A production candidate passed. The exact-length
+Win32 hypothesis is rejected. No production retry is authorized.
+
+Architecture 125 now freezes R1H-C: a new disposable-only NtSetInformationFile
+share-mask matrix. It varies only source/parent ShareAccess from the frozen
+FILE_SHARE_READ control through narrowly broader FILE_SHARE_DELETE combinations
+and finally FILE_SHARE_READ|WRITE|DELETE. DesiredAccess, pinned parent,
+relative destination, no-replace semantics, native information class, and
+post-call proof remain fixed.
+
+NEXT: implement and source-review the R1H-C disposable share-diagnosis harness
+and fake/source-only tests. Do not modify production P125 code or touch
+F:\AITradingBot.
+

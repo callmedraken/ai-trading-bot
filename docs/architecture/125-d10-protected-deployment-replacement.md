@@ -562,6 +562,158 @@ review, replacement canonical three-lane certification, fresh exact
 OLD_CANONICAL preflight, and a new explicit human authorization. No prior R1F
 or R1G authorization carries forward.
 
+## 8.3 P125-R1H-C disposable share-mode diagnosis after R1H-A
+
+R1H-A real-host disposable acceptance completed successfully as a harness
+execution and cleaned its entire disposable root, but none of the three anchored
+rename candidates passed.
+
+Observed evidence:
+
+    WIN32_FROZEN_CONTROL
+      FileNameLength = 22
+      buffer = 48
+      BOOL = FALSE
+      GetLastError = 87 / ERROR_INVALID_PARAMETER
+      source remains present
+      destination remains absent
+      parent stable
+      closes exact
+
+    WIN32_EXACT_LENGTH
+      FileNameLength = 22
+      buffer = 42
+      BOOL = FALSE
+      GetLastError = 87 / ERROR_INVALID_PARAMETER
+      source remains present
+      destination remains absent
+      parent stable
+      closes exact
+
+    NT_NATIVE_ANCHORED
+      FileNameLength = 22
+      buffer = 46
+      NTSTATUS = 0xC0000043 / STATUS_SHARING_VIOLATION
+      IO_STATUS_BLOCK remains unwritten sentinel evidence
+      source remains present
+      destination remains absent
+      parent stable
+      closes exact
+
+The disposable harness itself returned COMPLETE with cleanup PASS.
+
+The exact-length Win32 result disproves the hypothesis that the production
+Win32 failure is caused only by trailing buffer bytes. The native anchored call
+reached a different failure class: sharing violation. This does not yet prove
+which open handle or share mask is responsible.
+
+Microsoft documents STATUS_SHARING_VIOLATION as incompatible share-access flags.
+Windows also documents FILE_SHARE_DELETE as permitting subsequent opens that
+request delete access, and notes that delete access includes rename operations.
+The frozen P125 rename handles currently use FILE_SHARE_READ only while the
+source handle itself requests DELETE.
+
+No production interpretation may be made from that documentation alone. R1H-C
+must isolate the host behavior in fresh disposable namespaces before any
+production transport or share-mode change is designed.
+
+### 8.3.1 R1H-C remains disposable-only
+
+R1H-C inherits every R1H-A namespace and cleanup fence:
+
+    F:\AI\temp\p125-r1h-share-diagnosis-<unique>
+
+It accepts no caller-selected path and rejects F:\AITradingBot and every
+Architecture-125 production namespace. Each case gets a fresh disposable
+parent/source/destination triple.
+
+Production P125 source and operators remain unchanged.
+
+### 8.3.2 Required native share matrix
+
+All required cases use NtSetInformationFile, FileRenameInformation=10,
+ReplaceIfExists=false, a non-NULL pinned RootDirectory, the fixed relative
+destination leaf, DELETE access on the source, and the same post-call identity
+proof as R1H-A.
+
+Use the exact-length native buffer
+FIELD_OFFSET(FileName) + FileNameLength for all R1H-C cases so the share matrix
+does not vary buffer length at the same time.
+
+The required cases are:
+
+1. NT_SHARE_READ_CONTROL
+   - source ShareAccess = FILE_SHARE_READ;
+   - parent ShareAccess = FILE_SHARE_READ.
+
+2. NT_SOURCE_SHARE_DELETE
+   - source ShareAccess = FILE_SHARE_READ | FILE_SHARE_DELETE;
+   - parent ShareAccess = FILE_SHARE_READ.
+
+3. NT_PARENT_SHARE_DELETE
+   - source ShareAccess = FILE_SHARE_READ;
+   - parent ShareAccess = FILE_SHARE_READ | FILE_SHARE_DELETE.
+
+4. NT_BOTH_SHARE_DELETE
+   - source ShareAccess = FILE_SHARE_READ | FILE_SHARE_DELETE;
+   - parent ShareAccess = FILE_SHARE_READ | FILE_SHARE_DELETE.
+
+5. NT_BOTH_SHARE_ALL
+   - source ShareAccess = FILE_SHARE_READ | FILE_SHARE_WRITE |
+     FILE_SHARE_DELETE;
+   - parent ShareAccess = FILE_SHARE_READ | FILE_SHARE_WRITE |
+     FILE_SHARE_DELETE.
+
+No case may change DesiredAccess, no-follow flags, destination anchoring,
+ReplaceIfExists, native API, information class, or post-call proof. Only the
+share masks vary.
+
+### 8.3.3 Optional Win32 isolation control
+
+One optional diagnostic case may use SetFileInformationByHandle(FileRenameInfo)
+with RootDirectory=NULL and a harness-owned absolute disposable destination.
+
+This case is diagnostic only. It can help distinguish the Win32 anchored
+ERROR_INVALID_PARAMETER from general FileRenameInfo failure on this host, but
+it can never become a production candidate because it removes the pinned-parent
+destination authority.
+
+### 8.3.4 R1H-C evidence and decision boundary
+
+For each native case freeze only bounded evidence:
+
+- case enum;
+- source share mask enum;
+- parent share mask enum;
+- exact passed buffer size and FileNameLength;
+- RootDirectory_non_null;
+- raw uint32 NTSTATUS;
+- IO_STATUS_BLOCK status/information;
+- source/destination presence;
+- same-object proof;
+- parent stability;
+- close exactness;
+- case terminal status.
+
+The transcript must not expose handles, SIDs, ACLs, arbitrary paths, raw
+exceptions, or environment values.
+
+If exactly one or more broader-share anchored cases succeeds while the
+FILE_SHARE_READ control reproduces STATUS_SHARING_VIOLATION, R1H-D may freeze
+the narrowest successful share-mask correction for production consideration.
+Preference order is the least additional share authority that passes exact host
+proof.
+
+If every anchored share case still fails, no production retry is considered and
+diagnosis continues.
+
+If results are inconsistent across otherwise identical fresh cases, treat the
+host as nondeterministic and stop rather than selecting a production mechanism.
+
+Any later production share/transport change requires a separately frozen design,
+focused tests, exact source review, canonical three-lane certification, fresh
+exact OLD_CANONICAL preflight, and new explicit human authorization.
+
 ## 9. Post-publication verification
 
 If both renames return success in the same admitted invocation, the operator must immediately verify:

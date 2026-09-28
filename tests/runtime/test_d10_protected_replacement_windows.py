@@ -28,6 +28,15 @@ from trading_bot.runtime.personal_desktop_d10_deployment_identity import (
     parse_executable_manifest,
 )
 
+_QUOTED_D5_ACTION_ARGUMENTS = (
+    r'-I "F:\AI\worktrees\ai-trading-bot-personal-desktop\scripts'
+    r'\run_personal_desktop_unattended_capture_warmup.py"'
+)
+_UNQUOTED_D5_ACTION_ARGUMENTS = (
+    r"-I F:\AI\worktrees\ai-trading-bot-personal-desktop\scripts"
+    r"\run_personal_desktop_unattended_capture_warmup.py"
+)
+
 
 def _scheduler_read(**changed: object) -> dict[str, object]:
     value = {
@@ -59,6 +68,8 @@ def _runner(data: bytes, *, exit_code: int = 0, stderr: bytes = b""):
             w.POWERSHELL,
             "-NoProfile",
             "-NonInteractive",
+            "-ExecutionPolicy",
+            "Bypass",
             "-File",
             str(w.SCHEDULER_HELPER),
         )
@@ -70,6 +81,10 @@ def _runner(data: bytes, *, exit_code: int = 0, stderr: bytes = b""):
 
 def test_exact_fixed_scheduler_transport_and_diagnostic_xml_hash() -> None:
     assert not inspect.signature(w.observe_d5_scheduler).parameters
+    assert w.POWERSHELL == (
+        r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"
+    )
+    assert set(inspect.signature(w._observe_d5_scheduler).parameters) == {"run"}
     assert not inspect.signature(w.observe_admission).parameters
     assert w.SCHEDULER_HELPER == Path(w.__file__).with_name(
         "d10_p125_d5_scheduler_observe.ps1"
@@ -79,6 +94,64 @@ def test_exact_fixed_scheduler_transport_and_diagnostic_xml_hash() -> None:
     assert observed.xml_sha256 == "a" * 64
     assert observed.xml_sha256 != w.LEGACY_D5_XML_SHA256
     assert dict(observed.semantics) == w._EXPECTED_SCHEDULER
+
+
+def test_exact_quoted_scheduler_action_arguments_is_accepted() -> None:
+    read = _scheduler_read(action_arguments=_QUOTED_D5_ACTION_ARGUMENTS)
+    observed = w._observe_d5_scheduler(_runner(_record(first=read, second=read)))
+    assert dict(observed.semantics)["action_arguments"] == _QUOTED_D5_ACTION_ARGUMENTS
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        _UNQUOTED_D5_ACTION_ARGUMENTS,
+        " " + _QUOTED_D5_ACTION_ARGUMENTS,
+        _QUOTED_D5_ACTION_ARGUMENTS + " ",
+        _QUOTED_D5_ACTION_ARGUMENTS.replace("F:", "f:"),
+        _QUOTED_D5_ACTION_ARGUMENTS.replace("\\", "/"),
+        _QUOTED_D5_ACTION_ARGUMENTS.replace('"', "'"),
+    ],
+)
+def test_scheduler_action_arguments_are_not_normalized(arguments: str) -> None:
+    read = _scheduler_read(action_arguments=arguments)
+    with pytest.raises(w.AdmissionBlocked, match="scheduler_semantic_drift"):
+        w._observe_d5_scheduler(_runner(_record(first=read, second=read)))
+
+
+@pytest.mark.parametrize(
+    "policy_options,helper",
+    [
+        ((), None),
+        (("-ExecutionPolicy",), None),
+        (("-ExecutionPolicy", "Restricted"), None),
+        (("-ExecutionPolicy", "RemoteSigned"), None),
+        (("-ExecutionPolicy", "Unrestricted"), None),
+        (("-ExecutionPolicy", "bypass"), None),
+        (("-ExecutionPolicy", "Bypass "), None),
+        (("-ExecutionPolicy", "Bypass"), r"F:\caller-selected.ps1"),
+        (("-ExecutionPolicy", "Bypass"), "d10_p125_d5_scheduler_observe.ps1"),
+    ],
+)
+def test_scheduler_transport_rejects_policy_or_helper_drift_before_launch(
+    monkeypatch: pytest.MonkeyPatch,
+    policy_options: tuple[str, ...],
+    helper: str | None,
+) -> None:
+    def forbidden_popen(*_args, **_kwargs):
+        pytest.fail("invalid scheduler command reached process launch")
+
+    monkeypatch.setattr(w.subprocess, "Popen", forbidden_popen)
+    command = (
+        w.POWERSHELL,
+        "-NoProfile",
+        "-NonInteractive",
+        *policy_options,
+        "-File",
+        str(w.SCHEDULER_HELPER) if helper is None else helper,
+    )
+    with pytest.raises(w.AdmissionBlocked, match="scheduler_transport_options"):
+        w._run_scheduler_bounded(command, capture_output=True, check=False, timeout=30)
 
 
 @pytest.mark.parametrize("field", sorted(w._EXPECTED_SCHEDULER))
@@ -246,6 +319,8 @@ def test_scheduler_process_capture_is_bounded_without_real_task(
             w.POWERSHELL,
             "-NoProfile",
             "-NonInteractive",
+            "-ExecutionPolicy",
+            "Bypass",
             "-File",
             str(w.SCHEDULER_HELPER),
         )
@@ -262,6 +337,8 @@ def test_scheduler_process_capture_is_bounded_without_real_task(
             w.POWERSHELL,
             "-NoProfile",
             "-NonInteractive",
+            "-ExecutionPolicy",
+            "Bypass",
             "-File",
             str(w.SCHEDULER_HELPER),
         ),
@@ -1170,6 +1247,17 @@ def test_complete_fake_native_admission_and_closed_facts(
         operation in {"administrator", "directory", "file", "absent"}
         for operation, _ in native.calls
     )
+
+
+def test_unquoted_predecessor_action_arguments_blocks_admission(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    native = _full_native(monkeypatch)
+    read = _scheduler_read(action_arguments=_UNQUOTED_D5_ACTION_ARGUMENTS)
+    with pytest.raises(w.AdmissionBlocked, match="scheduler_semantic_drift"):
+        w._observe_admission(
+            native, FakeVerifier(), _runner(_record(first=read, second=read))
+        )
 
 
 def test_invalid_frozen_prior_p1245_status_cannot_admit(

@@ -83,8 +83,8 @@ _EXPECTED_SCHEDULER = {
     "action_type": 0,
     "action_path": r"F:\AITradingBot\runtime\python.exe",
     "action_arguments": (
-        r"-I F:\AI\worktrees\ai-trading-bot-personal-desktop\scripts"
-        r"\run_personal_desktop_unattended_capture_warmup.py"
+        r'-I "F:\AI\worktrees\ai-trading-bot-personal-desktop\scripts'
+        r'\run_personal_desktop_unattended_capture_warmup.py"'
     ),
     "action_working_directory": r"F:\AI\worktrees\ai-trading-bot-personal-desktop",
     "trigger_count": 1,
@@ -191,6 +191,8 @@ def _observe_d5_scheduler(run: object) -> SchedulerObservation:
         POWERSHELL,
         "-NoProfile",
         "-NonInteractive",
+        "-ExecutionPolicy",
+        "Bypass",
         "-File",
         str(SCHEDULER_HELPER),
     )
@@ -226,6 +228,8 @@ def _run_scheduler_bounded(
             POWERSHELL,
             "-NoProfile",
             "-NonInteractive",
+            "-ExecutionPolicy",
+            "Bypass",
             "-File",
             str(SCHEDULER_HELPER),
         )

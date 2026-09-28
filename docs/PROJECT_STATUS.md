@@ -5350,3 +5350,24 @@ pinned-parent anchoring, relative destination, no-replace semantics, and proof
 constant while varying only source/parent ShareAccess across a closed matrix.
 Production P125 source/operators remain unchanged.
 
+## P125-R1H-D — complete disposable share lattice
+
+R1H-C host evidence:
+- R/R, RD/R, R/RD, RD/RD all returned STATUS_SHARING_VIOLATION;
+- RWD/RWD returned STATUS_SUCCESS with complete same-object/post-path/parent/
+  close proof;
+- cleanup PASS.
+
+The successful row changed FILE_SHARE_WRITE on both handles at once, so the
+least production share broadening is not yet identified.
+
+R1H-D is the next disposable-only checkpoint. It executes the complete 3 x 3
+source/parent ShareAccess lattice {R, RD, RWD} in one fresh host run while
+holding NtSetInformationFile class 10, DesiredAccess, no-follow flags, pinned
+parent anchoring, exact 42-byte buffer, relative destination, no-replace
+semantics, and post-call proof constant.
+
+No production retry is authorized. A later production candidate is considered
+only after a unique minimal PASS pair is demonstrated and separately frozen as
+R1H-E.
+

@@ -5650,3 +5650,28 @@ NEXT: implement and source-review the R1H-C disposable share-diagnosis harness
 and fake/source-only tests. Do not modify production P125 code or touch
 F:\AITradingBot.
 
+## 2026-09-27 P125-R1H-C host result and R1H-D lattice
+
+R1H-C disposable share diagnosis ran once and cleanup passed.
+
+Observed native results:
+- R/R -> 0xC0000043 / STATUS_SHARING_VIOLATION;
+- RD/R -> 0xC0000043;
+- R/RD -> 0xC0000043;
+- RD/RD -> 0xC0000043;
+- RWD/RWD -> STATUS_SUCCESS with exact source->destination same-object proof,
+  stable parent, and exact closes.
+
+This proves the native anchored rename can succeed under broader share access,
+but it does not identify the least broadening because the successful case added
+FILE_SHARE_WRITE to both pinned handles simultaneously.
+
+Architecture 125 now freezes R1H-D as a disposable-only complete 3 x 3 share
+lattice over R, RD, and RWD for source and parent. All nine cases run in one
+fresh root with every non-share field identical to R1H-C. Production selection
+is allowed only if exactly one minimal PASS pair exists under componentwise
+share-bit inclusion and all host controls reproduce cleanly.
+
+NEXT: implement/source-review R1H-D lattice harness and fake-only tests, then
+run it once on the Windows host. Production P125 source remains frozen.
+

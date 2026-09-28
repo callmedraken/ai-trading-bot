@@ -714,6 +714,122 @@ Any later production share/transport change requires a separately frozen design,
 focused tests, exact source review, canonical three-lane certification, fresh
 exact OLD_CANONICAL preflight, and new explicit human authorization.
 
+## 8.4 P125-R1H-D complete disposable share lattice before production selection
+
+The R1H-C real-host disposable matrix completed with cleanup PASS and produced
+a stable boundary:
+
+    source R,       parent R       -> 0xC0000043 / STATUS_SHARING_VIOLATION
+    source R|D,     parent R       -> 0xC0000043 / STATUS_SHARING_VIOLATION
+    source R,       parent R|D     -> 0xC0000043 / STATUS_SHARING_VIOLATION
+    source R|D,     parent R|D     -> 0xC0000043 / STATUS_SHARING_VIOLATION
+    source R|W|D,   parent R|W|D   -> STATUS_SUCCESS + exact post-call proof
+
+Every failing case left source present, destination absent, parent stable, and
+handles closed exactly. The all-share case moved the source to the destination,
+preserved the exact object identity, left the parent stable, and closed all
+handles exactly. Disposable cleanup passed.
+
+This proves that the accepted native mechanism can succeed on this host under
+at least one broader ShareAccess pair, but the R1H-C matrix does not identify
+the least share broadening needed for production. The successful row changed
+FILE_SHARE_WRITE on both pinned handles at the same time. Production selection
+therefore remains premature.
+
+R1H-D must run one complete disposable 3 x 3 share lattice in a single host
+invocation so a production candidate is selected only from contemporaneous,
+otherwise-identical cases.
+
+### 8.4.1 R1H-D fixed lattice
+
+R1H-D inherits every R1H-C namespace, API, identity-proof, transcript,
+sanitization, and cleanup rule. Production P125 source remains unchanged.
+
+For both pinned source and pinned parent, ShareAccess is drawn only from:
+
+    R   = FILE_SHARE_READ                    = 0x1
+    RD  = FILE_SHARE_READ | FILE_SHARE_DELETE = 0x5
+    RWD = FILE_SHARE_READ | FILE_SHARE_WRITE |
+          FILE_SHARE_DELETE                   = 0x7
+
+The harness must execute all nine ordered pairs in one fresh disposable root:
+
+    R/R
+    RD/R
+    R/RD
+    RD/RD
+    RWD/R
+    R/RWD
+    RWD/RD
+    RD/RWD
+    RWD/RWD
+
+Each pair gets an independent parent/source/destination triple.
+
+Every other field is frozen exactly to R1H-C:
+
+- NtSetInformationFile only;
+- FileRenameInformation = 10;
+- source DesiredAccess = 0x130081;
+- parent DesiredAccess = 0x1200A5;
+- no-follow directory flags = 0x02200000;
+- ReplaceIfExists = FALSE;
+- non-NULL pinned parent RootDirectory;
+- fixed relative leaf `destination`;
+- FileNameLength = 22;
+- x64 passed buffer size = FIELD_OFFSET(FileName) + FileNameLength = 42;
+- probe DesiredAccess = 0x80 and probe ShareAccess = 0x7;
+- exact same pinned source/parent identity and post-call close proof.
+
+No case may vary DesiredAccess, flags, API, class, buffer representation,
+destination form, no-replace semantics, or proof behavior.
+
+### 8.4.2 Selection rule
+
+A share pair is eligible for later production consideration only when its case
+is exact PASS: NTSTATUS 0, exact IO_STATUS_BLOCK success, source absent,
+destination present as the same pinned object, parent stable, and closes exact.
+
+Order share masks by set inclusion of granted share bits on each handle. A PASS
+pair is minimal only if every strictly narrower pair present in the full 3 x 3
+lattice is non-PASS.
+
+R1H-D may select a production candidate only if there is exactly one minimal
+PASS pair in that partial order and all nine cases completed cleanly in the same
+run.
+
+If there are multiple incomparable minimal PASS pairs, no automatic preference
+is allowed; architecture must choose separately after reviewing their security
+tradeoffs.
+
+If R/R does not reproduce the prior sharing failure, RWD/RWD does not reproduce
+the prior exact PASS, any case is BLOCKED/PROOF_FAILURE for reasons other than
+the intended native result, cleanup fails, or otherwise-identical cases appear
+inconsistent, production selection stops.
+
+### 8.4.3 R1H-D remains diagnostic authority only
+
+The complete lattice runs only beneath:
+
+    F:\AI\temp\p125-r1h-share-lattice-<unique>
+
+It accepts no caller-selected path and rejects F:\AITradingBot and all aliases.
+It imports/calls no P125 production operator, scheduler, signing, activation,
+provider, paper, broker, or live surface.
+
+A successful lattice result grants no production mutation authority. After
+ChatGPT reviews the host transcript, any selected production share/transport
+correction becomes a new R1H-E source/design checkpoint requiring:
+
+1. frozen production design;
+2. focused implementation tests;
+3. exact GitHub diff review;
+4. canonical three-lane certification of the exact production source identity;
+5. fresh real-host exact OLD_CANONICAL/full admission preflight;
+6. new explicit human authorization for one protected recovery attempt.
+
+No R1F, R1G, R1H-A, R1H-C, or R1H-D authorization carries forward.
+
 ## 9. Post-publication verification
 
 If both renames return success in the same admitted invocation, the operator must immediately verify:

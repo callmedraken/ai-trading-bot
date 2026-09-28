@@ -360,7 +360,10 @@ def test_diagnostic_is_bounded_frozen_and_grants_no_transition(
     from dataclasses import FrozenInstanceError
 
     diagnostic = r.RenameDiagnostic(
-        step, stage, 5 if stage is r.RenameFailureStage.NATIVE_FALSE else None
+        step,
+        stage,
+        5 if stage is r.RenameFailureStage.NATIVE_FALSE else None,
+        ntstatus=0xC0000043 if stage is r.RenameFailureStage.NATIVE_STATUS else None,
     )
     ready = _ready()
     if step is r.RenameStep.STAGING_TO_CANONICAL:
@@ -375,13 +378,22 @@ def test_diagnostic_is_bounded_frozen_and_grants_no_transition(
     assert payload["rename_diagnostic"] == {
         "stage": stage.value,
         "step": step.value,
-        "win32_error": diagnostic.win32_error,
+        **(
+            {"ntstatus": diagnostic.ntstatus}
+            if stage is r.RenameFailureStage.NATIVE_STATUS
+            else {"win32_error": diagnostic.win32_error}
+        ),
     }
     assert blocked.canonical_transcript() == blocked.canonical_transcript()
     assert blocked.canonical_transcript() == (
         json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n"
     ).encode("ascii")
-    assert set(diagnostic.__dataclass_fields__) == {"step", "stage", "win32_error"}
+    assert set(diagnostic.__dataclass_fields__) == {
+        "step",
+        "stage",
+        "win32_error",
+        "ntstatus",
+    }
     with pytest.raises(FrozenInstanceError):
         diagnostic.win32_error = 42
     for key in (
@@ -495,6 +507,7 @@ def test_closed_failure_stage_model_is_exact() -> None:
     assert {stage.value for stage in r.RenameFailureStage} == {
         "PRE_CALL",
         "NATIVE_FALSE",
+        "NATIVE_STATUS",
         "POST_CALL_VERIFY",
         "CLOSE_AMBIGUITY",
     }
@@ -531,3 +544,107 @@ def test_legacy_transcripts_without_diagnostic_are_byte_identical() -> None:
         assert result.rename_diagnostic is None
         assert b"rename_diagnostic" not in result.canonical_transcript()
         assert hashlib.sha256(result.canonical_transcript()).hexdigest() == digest
+
+
+@pytest.mark.parametrize("code", [0, 0xC0000043, 0xFFFFFFFF])
+def test_native_status_requires_only_uint32_ntstatus(code: int) -> None:
+    diagnostic = r.RenameDiagnostic(
+        r.RenameStep.OLD_TO_RETIRED, r.RenameFailureStage.NATIVE_STATUS, ntstatus=code
+    )
+    assert diagnostic.ntstatus == code and diagnostic.win32_error is None
+    with pytest.raises(ValueError):
+        replace(diagnostic, win32_error=5)
+
+
+@pytest.mark.parametrize(
+    "code", [-1, 0x100000000, True, False, 0.0, "5", None, object()]
+)
+def test_native_status_rejects_unbounded_or_untyped_status(code: object) -> None:
+    with pytest.raises(ValueError):
+        r.RenameDiagnostic(
+            r.RenameStep.OLD_TO_RETIRED,
+            r.RenameFailureStage.NATIVE_STATUS,
+            ntstatus=code,
+        )
+
+
+@pytest.mark.parametrize(
+    "stage",
+    [s for s in r.RenameFailureStage if s is not r.RenameFailureStage.NATIVE_STATUS],
+)
+@pytest.mark.parametrize("code", [0, 5, False, "private"])
+def test_other_stages_reject_ntstatus(
+    stage: r.RenameFailureStage, code: object
+) -> None:
+    with pytest.raises(ValueError):
+        r.RenameDiagnostic(
+            r.RenameStep.OLD_TO_RETIRED,
+            stage,
+            87 if stage is r.RenameFailureStage.NATIVE_FALSE else None,
+            ntstatus=code,
+        )
+
+
+@pytest.mark.parametrize(
+    "step,digest",
+    [
+        (
+            r.RenameStep.OLD_TO_RETIRED,
+            "75f9106a9688b06e72919e85a23254972f7c2b24f7c12ec2c1889a4d1a970097",
+        ),
+        (
+            r.RenameStep.STAGING_TO_CANONICAL,
+            "74c7a602c8fcc60e7474c3920392cdb00abc74597d037bf0a2407a17a09be41d",
+        ),
+    ],
+)
+def test_historical_r1g_native_false_transcript_bytes_are_unchanged(
+    step, digest
+) -> None:
+    ready = _ready()
+    if step is r.RenameStep.STAGING_TO_CANONICAL:
+        ready = r.record_rename(
+            ready, r.RenameStep.OLD_TO_RETIRED, r.MutationOutcome.SUCCESS
+        )
+    blocked = r.record_rename(
+        ready,
+        step,
+        r.MutationOutcome.INDETERMINATE,
+        r.RenameDiagnostic(step, r.RenameFailureStage.NATIVE_FALSE, 87),
+    )
+    assert hashlib.sha256(blocked.canonical_transcript()).hexdigest() == digest
+    assert b"ntstatus" not in blocked.canonical_transcript()
+
+
+def test_native_status_transcript_is_exact_sanitized_and_deterministic() -> None:
+    result = r.record_rename(
+        _ready(),
+        r.RenameStep.OLD_TO_RETIRED,
+        r.MutationOutcome.INDETERMINATE,
+        r.RenameDiagnostic(
+            r.RenameStep.OLD_TO_RETIRED,
+            r.RenameFailureStage.NATIVE_STATUS,
+            ntstatus=3221225539,
+        ),
+    )
+    transcript = result.canonical_transcript()
+    assert transcript == result.canonical_transcript()
+    assert json.loads(transcript)["rename_diagnostic"] == {
+        "stage": "NATIVE_STATUS",
+        "step": "OLD_TO_RETIRED",
+        "ntstatus": 3221225539,
+    }
+    assert (
+        b'"rename_diagnostic":{"ntstatus":3221225539,"stage":"NATIVE_STATUS","step":"OLD_TO_RETIRED"}'
+        in transcript
+    )
+    for forbidden in (
+        b"win32_error",
+        b"handle",
+        b"pointer",
+        b"ACL",
+        b"SID",
+        b"System32",
+        b"exception",
+    ):
+        assert forbidden not in transcript

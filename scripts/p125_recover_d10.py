@@ -15,7 +15,25 @@ class RecoveryOperations(RenameOperations, Protocol):
     def validate_recovery_material(self, repository_root: Path) -> None: ...
 
 
+EXPECTED_R1G_TRANSPORT_GENERATION = "P125-R1G/WIN32_FILE_RENAME_INFO_3/R_R/v1"
+
+
 def run_recovery(
+    repository_root: Path, operations: RecoveryOperations
+) -> replacement.ReplacementResult:
+    """Fence the consumed R1G authority before any observation or effect."""
+    from scripts import d10_protected_replacement_windows as windows
+
+    if windows.RENAME_TRANSPORT_GENERATION != EXPECTED_R1G_TRANSPORT_GENERATION:
+        return replacement.ReplacementResult(
+            replacement.Phase.BLOCKED,
+            replacement.NamespaceState.CONFLICTING,
+            reason_code=replacement.BlockReason.NAMESPACE_CONFLICT,
+        )
+    return run_admitted_recovery(repository_root, operations)
+
+
+def run_admitted_recovery(
     repository_root: Path, operations: RecoveryOperations
 ) -> replacement.ReplacementResult:
     """Admit only fresh exact OLD_CANONICAL under separate recovery authority."""

@@ -1,4 +1,4 @@
-"""Fake-only R1G recovery authority and terminal transcript tests."""
+"""Fake-only R1H recovery authority and terminal transcript tests."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 
 from scripts import d10_protected_replacement as r
-from scripts import p125_recover_d10 as operator
+from scripts import p125_recover_d10_r1h as operator
 
 
 def _namespace(state: r.NamespaceState) -> r.NamespaceObservation:
@@ -63,7 +63,9 @@ class FakeSession:
         self.events.append("first")
         diagnostic = (
             r.RenameDiagnostic(
-                r.RenameStep.OLD_TO_RETIRED, r.RenameFailureStage.NATIVE_FALSE, 5
+                r.RenameStep.OLD_TO_RETIRED,
+                r.RenameFailureStage.NATIVE_STATUS,
+                ntstatus=0xC0000043,
             )
             if self.first is r.MutationOutcome.INDETERMINATE
             else None
@@ -78,8 +80,8 @@ class FakeSession:
         diagnostic = (
             r.RenameDiagnostic(
                 r.RenameStep.STAGING_TO_CANONICAL,
-                r.RenameFailureStage.NATIVE_FALSE,
-                0xFFFFFFFF,
+                r.RenameFailureStage.NATIVE_STATUS,
+                ntstatus=0xFFFFFFFF,
             )
             if self.second is r.MutationOutcome.INDETERMINATE
             else None
@@ -148,7 +150,7 @@ def test_recovery_rejects_every_other_start_state_before_material_or_admission(
     state: r.NamespaceState,
 ) -> None:
     operations = FakeOperations(state)
-    result = operator.run_admitted_recovery(Path("C:/source"), operations)
+    result = operator.run_recovery(Path("C:/source"), operations)
     assert result.phase is r.Phase.BLOCKED
     assert result.highest_definitely_completed_state is state
     assert operations.events == ["observe"]
@@ -158,7 +160,7 @@ def test_recovery_rejects_every_other_start_state_before_material_or_admission(
 def test_exact_old_canonical_recovery_uses_existing_sequence_and_post_proof() -> None:
     operations = FakeOperations()
     root = Path("C:/certified/source")
-    result = operator.run_admitted_recovery(root, operations)
+    result = operator.run_recovery(root, operations)
     assert result.phase is r.Phase.PASS
     assert operations.events == [
         "observe",
@@ -194,12 +196,14 @@ def test_first_indeterminate_stops_even_after_new_exact_read_only_classification
         return outcome
 
     operations.session.retire_old_root = fail_first
-    result = operator.run_admitted_recovery(Path("C:/source"), operations)
+    result = operator.run_recovery(Path("C:/source"), operations)
     assert result.reason_code is r.BlockReason.INDETERMINATE_MUTATION
     assert result.highest_definitely_completed_state is r.NamespaceState.OLD_CANONICAL
     assert result.completed_renames == () and result.next_rename is None
     assert result.rename_diagnostic == r.RenameDiagnostic(
-        r.RenameStep.OLD_TO_RETIRED, r.RenameFailureStage.NATIVE_FALSE, 5
+        r.RenameStep.OLD_TO_RETIRED,
+        r.RenameFailureStage.NATIVE_STATUS,
+        ntstatus=0xC0000043,
     )
     assert operations.events[-2:] == ["first", "observe"]
     assert operations.events.count("first") == 1
@@ -209,12 +213,12 @@ def test_first_indeterminate_stops_even_after_new_exact_read_only_classification
 
 def test_second_indeterminate_preserves_highest_definite_old_retired_evidence() -> None:
     operations = FakeOperations(second=r.MutationOutcome.INDETERMINATE)
-    result = operator.run_admitted_recovery(Path("C:/source"), operations)
+    result = operator.run_recovery(Path("C:/source"), operations)
     assert result.reason_code is r.BlockReason.INDETERMINATE_MUTATION
     assert result.highest_definitely_completed_state is r.NamespaceState.OLD_RETIRED
     assert result.completed_renames == (r.RenameStep.OLD_TO_RETIRED,)
     assert result.rename_diagnostic.step is r.RenameStep.STAGING_TO_CANONICAL
-    assert result.rename_diagnostic.win32_error == 0xFFFFFFFF
+    assert result.rename_diagnostic.ntstatus == 0xFFFFFFFF
     assert operations.events[-1] == "observe"
     assert (
         operations.events.count("first")
@@ -232,7 +236,7 @@ def test_read_only_recovery_admission_failures_never_attempt_rename(
 ) -> None:
     operations = FakeOperations()
     setattr(operations, boundary, True)
-    result = operator.run_admitted_recovery(Path("C:/source"), operations)
+    result = operator.run_recovery(Path("C:/source"), operations)
     assert result.phase is r.Phase.BLOCKED
     assert "first" not in operations.events
     assert b"private" not in result.canonical_transcript()
@@ -244,7 +248,7 @@ def test_pass_requires_every_unchanged_post_publication_fact(field: str) -> None
 
     operations = FakeOperations()
     operations.post_facts = replace(operations.post_facts, **{field: False})
-    result = operator.run_admitted_recovery(Path("C:/source"), operations)
+    result = operator.run_recovery(Path("C:/source"), operations)
     assert result.reason_code is r.BlockReason.POST_PUBLICATION_VERIFICATION_FAILED
     assert result.highest_definitely_completed_state is r.NamespaceState.NEW_CANONICAL
 
@@ -256,7 +260,7 @@ def test_publication_observation_failure_never_claims_pass(failure: str) -> None
         operations.post_error = True
     else:
         operations.post_namespace = _namespace(r.NamespaceState.CONFLICTING)
-    result = operator.run_admitted_recovery(Path("C:/source"), operations)
+    result = operator.run_recovery(Path("C:/source"), operations)
     assert result.reason_code is r.BlockReason.POST_PUBLICATION_VERIFICATION_FAILED
     assert b"private" not in result.canonical_transcript()
 
@@ -266,8 +270,8 @@ def test_publication_observation_failure_never_claims_pass(failure: str) -> None
     [
         [],
         ["--execute-protected-p125-r1"],
-        ["--execute-protected-p125-r1g"],
-        ["--execute-protected-p125-r1g-recovery", "--staging-path", "C:/arbitrary"],
+        ["--execute-protected-p125-r1h"],
+        ["--execute-protected-p125-r1h-recovery", "--staging-path", "C:/arbitrary"],
     ],
 )
 def test_cli_import_is_inert_and_rejects_missing_wrong_abbreviated_or_path_flags(
@@ -298,7 +302,7 @@ def test_exact_cli_flag_imports_native_only_then_emits_shared_canonical_transcri
     operations = FakeOperations(
         first=r.MutationOutcome.SUCCESS if passed else r.MutationOutcome.INDETERMINATE
     )
-    result = operator.run_admitted_recovery(Path("C:/source"), operations)
+    result = operator.run_recovery(Path("C:/source"), operations)
     stream = io.BytesIO()
     monkeypatch.setattr(
         operator.sys, "stdout", type("Stdout", (), {"buffer": stream})()
@@ -315,7 +319,7 @@ def test_exact_cli_flag_imports_native_only_then_emits_shared_canonical_transcri
         [
             "--repository-root",
             "C:/certified/source",
-            "--execute-protected-p125-r1g-recovery",
+            "--execute-protected-p125-r1h-recovery",
         ]
     )
     assert code == (0 if passed else 1)
@@ -335,8 +339,8 @@ def test_recovery_source_exposes_only_reviewed_effect_methods() -> None:
         and isinstance(node.func.value, ast.Name)
         and node.func.value.id == "operations"
     }
-    assert methods == {"observe_namespace", "validate_recovery_material"}
-    assert "run_admitted_replacement(operations)" in source
+    assert methods == set()
+    assert "run_admitted_recovery(repository_root, operations)" in source
     for forbidden in (
         "construct_fixed_staging",
         "sign_digest",
@@ -352,60 +356,75 @@ def test_recovery_source_exposes_only_reviewed_effect_methods() -> None:
         assert forbidden not in source.casefold()
 
 
+@pytest.mark.parametrize(
+    "generation", ["P125-R1G/WIN32_FILE_RENAME_INFO_3/R_R/v1", "", None, "future"]
+)
 @pytest.mark.parametrize("via_cli", [False, True])
-def test_consumed_r1g_cannot_invoke_active_r1h_transport(monkeypatch, via_cli):
+def test_r1h_requires_exact_active_frozen_generation_before_observation(
+    monkeypatch, generation, via_cli
+):
     from scripts import d10_protected_replacement_windows as windows
 
-    assert (
-        windows.RENAME_TRANSPORT_GENERATION
-        != operator.EXPECTED_R1G_TRANSPORT_GENERATION
-    )
+    monkeypatch.setattr(windows, "RENAME_TRANSPORT_GENERATION", generation)
     operations = FakeOperations()
-    stream = io.BytesIO()
-    monkeypatch.setattr(
-        operator.sys, "stdout", type("Stdout", (), {"buffer": stream})()
-    )
     if via_cli:
+        stream = io.BytesIO()
+        monkeypatch.setattr(
+            operator.sys, "stdout", type("Stdout", (), {"buffer": stream})()
+        )
         monkeypatch.setattr(
             windows,
             "observe_namespace",
-            lambda: pytest.fail("consumed R1G observed namespace"),
+            lambda: pytest.fail("generation mismatch observed namespace"),
         )
         monkeypatch.setattr(
             windows,
             "begin_fixed_rename_session",
-            lambda: pytest.fail("consumed R1G crossed effect boundary"),
+            lambda: pytest.fail("generation mismatch crossed effect boundary"),
         )
         assert (
             operator.main(
                 [
                     "--repository-root",
                     "C:/source",
-                    "--execute-protected-p125-r1g-recovery",
+                    "--execute-protected-p125-r1h-recovery",
                 ]
             )
             == 1
         )
         payload = json.loads(stream.getvalue())
-        assert (
-            payload["status"] == "BLOCKED"
-            and payload["reason_code"] == "NAMESPACE_CONFLICT"
-        )
+        assert payload["status"] == "BLOCKED"
+        assert payload["reason_code"] == "NAMESPACE_CONFLICT"
         assert payload["completed_renames"] == []
     else:
         result = operator.run_recovery(Path("C:/source"), operations)
         assert result.reason_code is r.BlockReason.NAMESPACE_CONFLICT
-        assert operations.events == []
+        assert result.completed_renames == () and operations.events == []
 
 
-def test_historical_generation_fence_reuses_reviewed_recovery(monkeypatch):
+def test_r1h_transport_generation_is_fixed_and_distinct_from_consumed_r1g():
     from scripts import d10_protected_replacement_windows as windows
+    from scripts import p125_recover_d10 as old
 
-    monkeypatch.setattr(
-        windows,
-        "RENAME_TRANSPORT_GENERATION",
-        operator.EXPECTED_R1G_TRANSPORT_GENERATION,
+    assert (
+        windows.RENAME_TRANSPORT_GENERATION
+        == operator.EXPECTED_R1H_E_TRANSPORT_GENERATION
     )
-    operations = FakeOperations()
-    assert operator.run_recovery(Path("C:/source"), operations).phase is r.Phase.PASS
-    assert operations.events.count("first") == 1
+    assert (
+        windows.RENAME_TRANSPORT_GENERATION
+        == "P125-R1H-E/NT_FILE_RENAME_INFORMATION_10/R_RWD/v1"
+    )
+    assert windows.RENAME_TRANSPORT_GENERATION != old.EXPECTED_R1G_TRANSPORT_GENERATION
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ["--execute-protected-p125-r1h-recovery"],
+        ["--repository-root", "C:/source", "--execute-protected-p125-r1g-recovery"],
+    ],
+)
+def test_r1h_requires_repository_root_and_rejects_consumed_r1g_flag(argv):
+    with pytest.raises(SystemExit) as error:
+        operator.main(argv)
+    assert error.value.code == 2

@@ -69,10 +69,13 @@ _FILE_ADD_SUBDIRECTORY = 0x0004
 _FILE_TRAVERSE = 0x0020
 _FILE_READ_ATTRIBUTES = 0x0080
 _FILE_SHARE_READ = 0x00000001
+_FILE_SHARE_WRITE = 0x00000002
+_FILE_SHARE_DELETE = 0x00000004
 _OPEN_EXISTING = 3
 _FILE_FLAG_OPEN_REPARSE_POINT = 0x00200000
 _FILE_FLAG_BACKUP_SEMANTICS = 0x02000000
-_FILE_RENAME_INFO_CLASS = 3
+_FILE_RENAME_INFORMATION_CLASS = 10
+RENAME_TRANSPORT_GENERATION = "P125-R1H-E/NT_FILE_RENAME_INFORMATION_10/R_RWD/v1"
 
 _EXPECTED_SCHEDULER = {
     "task_path": r"\AITradingBot-PD4-UnattendedPaper-v1",
@@ -1497,6 +1500,7 @@ class _WindowsReplacementReader:
             self._advapi = ctypes.WinDLL(
                 r"C:\Windows\System32\advapi32.dll", use_last_error=True
             )
+            self._ntdll = ctypes.WinDLL(r"C:\Windows\System32\ntdll.dll")
         except Exception:
             raise AdmissionBlocked("windows_native_unavailable") from None
 
@@ -1732,7 +1736,7 @@ class _WindowsReplacementReader:
             | _FILE_READ_ATTRIBUTES
             | _READ_CONTROL
             | _SYNCHRONIZE,
-            _FILE_SHARE_READ,
+            _FILE_SHARE_READ | _FILE_SHARE_WRITE | _FILE_SHARE_DELETE,
             None,
             _OPEN_EXISTING,
             _FILE_FLAG_OPEN_REPARSE_POINT | _FILE_FLAG_BACKUP_SEMANTICS,
@@ -2407,13 +2411,22 @@ def observe_retired_cleanup_post() -> bool:
     return observation.state is replacement.CleanupState.RETIRED_ABSENT
 
 
-class _FileRenameInfo(ctypes.Structure):
+class _FileRenameInformation(ctypes.Structure):
     _fields_ = [
         ("replace_if_exists", ctypes.c_ubyte),
         ("root_directory", ctypes.c_void_p),
-        ("file_name_length", wintypes.DWORD),
-        ("file_name", ctypes.c_ubyte * 1),
+        ("file_name_length", ctypes.c_uint32),
+        ("file_name", ctypes.c_uint16 * 1),
     ]
+
+
+class _IoStatusUnion(ctypes.Union):
+    _fields_ = [("status", ctypes.c_int32), ("pointer", ctypes.c_void_p)]
+
+
+class _IoStatusBlock(ctypes.Structure):
+    _anonymous_ = ("result",)
+    _fields_ = [("result", _IoStatusUnion), ("information", ctypes.c_size_t)]
 
 
 def _fixed_rename_paths(step: replacement.RenameStep) -> tuple[str, str]:
@@ -2435,11 +2448,9 @@ def _fixed_rename_info(step: replacement.RenameStep, parent_handle: int):
     ):
         raise AdmissionBlocked("rename_destination_invalid")
     encoded = leaf.encode("utf-16-le")
-    offset = _FileRenameInfo.file_name.offset
-    buffer = ctypes.create_string_buffer(
-        ctypes.sizeof(_FileRenameInfo) + len(encoded) + 2
-    )
-    info = _FileRenameInfo.from_buffer(buffer)
+    offset = _FileRenameInformation.file_name.offset
+    buffer = ctypes.create_string_buffer(offset + len(encoded))
+    info = _FileRenameInformation.from_buffer(buffer)
     info.replace_if_exists = 0
     info.root_directory = parent_handle
     info.file_name_length = len(encoded)
@@ -2452,25 +2463,33 @@ def _set_fixed_rename(
     step: replacement.RenameStep,
     source_handle: int,
     parent_handle: int,
-) -> replacement.RenameDiagnostic | None:
+) -> tuple[int, _IoStatusBlock, int]:
     info = _fixed_rename_info(step, parent_handle)
     set_information = native._bind(
-        native._kernel,
-        "SetFileInformationByHandle",
-        [wintypes.HANDLE, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD],
-        wintypes.BOOL,
+        native._ntdll,
+        "NtSetInformationFile",
+        [
+            wintypes.HANDLE,
+            ctypes.POINTER(_IoStatusBlock),
+            ctypes.c_void_p,
+            ctypes.c_uint32,
+            ctypes.c_int,
+        ],
+        ctypes.c_int32,
     )
-    pointer, size = ctypes.byref(info), len(info)
-    ctypes.set_last_error(0)
-    if not set_information(source_handle, _FILE_RENAME_INFO_CLASS, pointer, size):
-        error = ctypes.get_last_error()
-        # ctypes stores a C int; interpret its signed slot as the Win32 DWORD.
-        if type(error) is int and -0x80000000 <= error < 0:
-            error += 0x100000000
-        return replacement.RenameDiagnostic(
-            step, replacement.RenameFailureStage.NATIVE_FALSE, error
-        )
-    return None
+    io_status = _IoStatusBlock()
+    # Unwritten completion evidence must never pass as a zero-initialized success.
+    io_status.status = -1
+    io_status.information = ctypes.c_size_t(-1).value
+    submitted_size = len(info)
+    status = set_information(
+        source_handle,
+        ctypes.byref(io_status),
+        ctypes.byref(info),
+        submitted_size,
+        _FILE_RENAME_INFORMATION_CLASS,
+    )
+    return status & 0xFFFFFFFF, io_status, submitted_size
 
 
 def _rename_fixed_step(
@@ -2515,9 +2534,21 @@ def _rename_fixed_step(
             or native._inspect(source_handle, source_path) != source_before
         ):
             raise AdmissionBlocked("rename_pre_call_drift")
-        diagnostic = _set_fixed_rename(native, step, source_handle, parent_handle)
-        if diagnostic is None:
+        status, io_status, submitted_size = _set_fixed_rename(
+            native, step, source_handle, parent_handle
+        )
+        if status != 0:
+            diagnostic = replacement.RenameDiagnostic(
+                step, replacement.RenameFailureStage.NATIVE_STATUS, ntstatus=status
+            )
+        else:
             native_succeeded = True
+            diagnostic = None
+            if (
+                io_status.status != 0
+                or not 0 <= io_status.information <= submitted_size
+            ):
+                raise AdmissionBlocked("rename_completion_unverified")
             expected_after = replace(source_before, final_path=destination_path)
             if (
                 native._inspect(source_handle, source_path) != expected_after

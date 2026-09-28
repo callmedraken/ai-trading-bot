@@ -1382,22 +1382,19 @@ def test_rename_source_open_requests_delete_and_no_follow() -> None:
     assert reader._open_rename_source(r.CANONICAL_PATH) == 41
     path, access, share, _, disposition, flags, _ = seen[0]
     assert path == r.CANONICAL_PATH
-    assert access & 0x00010000  # DELETE
+    assert access == 0x130081
     assert share == 1
     assert disposition == 3
-    assert flags & 0x00200000  # no follow
-    assert flags & 0x02000000  # directory backup semantics
+    assert flags == 0x02200000
     assert reader._open_rename_parent() == 41
     parent_path, parent_access, parent_share, _, parent_disposition, parent_flags, _ = (
         seen[1]
     )
     assert parent_path == r.PARENT_PATH
-    assert parent_access & 0x0004  # FILE_ADD_SUBDIRECTORY
-    assert parent_access & 0x0020  # FILE_TRAVERSE
-    assert parent_share == 1
+    assert parent_access == 0x1200A5
+    assert parent_share == 7
     assert parent_disposition == 3
-    assert parent_flags & 0x00200000
-    assert parent_flags & 0x02000000
+    assert parent_flags == 0x02200000
     with pytest.raises(w.AdmissionBlocked, match="rename_source_path_unreviewed"):
         reader._open_rename_source(r.RETIRED_PATH)
 
@@ -1412,6 +1409,10 @@ class FakeRenameNative:
         self.renamed = False
         self.collision = False
         self.native_false = False
+        self.ntstatus = 0
+        self.io_status = 0
+        self.io_information = 0
+        self.io_unwritten = False
         self.native_exception = False
         self.pre_drift = False
         self.post_drift = False
@@ -1421,6 +1422,7 @@ class FakeRenameNative:
         self.source_inspections = 0
         self.parent_inspections = 0
         self._kernel = object()
+        self._ntdll = object()
 
     def require_administrator(self) -> None:
         self.events.append(("administrator",))
@@ -1474,13 +1476,24 @@ class FakeRenameNative:
         assert path == self.destination_path
         return not self.collision
 
-    def _bind(self, _library, name, _args, _result):
-        assert name == "SetFileInformationByHandle"
+    def _bind(self, library, name, args, result):
+        assert library is self._ntdll
+        assert name == "NtSetInformationFile"
+        assert args == [
+            w.wintypes.HANDLE,
+            ctypes.POINTER(w._IoStatusBlock),
+            ctypes.c_void_p,
+            ctypes.c_uint32,
+            ctypes.c_int,
+        ]
+        assert result is ctypes.c_int32
 
-        def rename(handle, info_class, pointer, size):
-            info = ctypes.cast(pointer, ctypes.POINTER(w._FileRenameInfo)).contents
+        def rename(handle, io_pointer, pointer, size, info_class):
+            info = ctypes.cast(
+                pointer, ctypes.POINTER(w._FileRenameInformation)
+            ).contents
             name_bytes = ctypes.string_at(
-                ctypes.addressof(info) + w._FileRenameInfo.file_name.offset,
+                ctypes.addressof(info) + w._FileRenameInformation.file_name.offset,
                 info.file_name_length,
             )
             leaf = name_bytes.decode("utf-16-le")
@@ -1498,9 +1511,17 @@ class FakeRenameNative:
             if self.native_exception:
                 raise OSError("ambiguous native call")
             if self.native_false:
-                return False
+                return -1073741757  # STATUS_SHARING_VIOLATION as signed NTSTATUS
+            if self.ntstatus:
+                return self.ntstatus
             self.renamed = True
-            return True
+            if not self.io_unwritten:
+                completion = ctypes.cast(
+                    io_pointer, ctypes.POINTER(w._IoStatusBlock)
+                ).contents
+                completion.status = self.io_status
+                completion.information = self.io_information
+            return 0
 
         return rename
 
@@ -1524,10 +1545,13 @@ def test_handle_pinned_fixed_rename_success(step: r.RenameStep) -> None:
     rename = next(event for event in native.events if event[0] == "rename")
     assert rename[1:6] == (
         22,
-        3,
+        10,
         0,
         11,
         native.destination_path.rsplit("\\", 1)[-1],
+    )
+    assert rename[6] == w._FileRenameInformation.file_name.offset + len(
+        rename[5].encode("utf-16-le")
     )
     assert all(
         event[0] != "close" for event in native.events[: native.events.index(rename)]
@@ -1568,14 +1592,14 @@ def test_rename_uncertainty_is_indeterminate_without_retry(failure: str) -> None
     )
     assert outcome is r.MutationOutcome.INDETERMINATE
     expected_stage = {
-        "native_false": r.RenameFailureStage.NATIVE_FALSE,
+        "native_false": r.RenameFailureStage.NATIVE_STATUS,
         "post_drift": r.RenameFailureStage.POST_CALL_VERIFY,
         "parent_post_drift": r.RenameFailureStage.POST_CALL_VERIFY,
         "close_failure": r.RenameFailureStage.CLOSE_AMBIGUITY,
     }.get(failure, r.RenameFailureStage.PRE_CALL)
     assert diagnostic.stage is expected_stage
     assert diagnostic.step is r.RenameStep.OLD_TO_RETIRED
-    if expected_stage is not r.RenameFailureStage.NATIVE_FALSE:
+    if expected_stage is not r.RenameFailureStage.NATIVE_STATUS:
         assert diagnostic.win32_error is None
     assert len([event for event in native.events if event[0] == "rename"]) <= 1
     assert native.events[-2:] == [("close", 22), ("close", 11)]
@@ -1869,38 +1893,31 @@ def test_staging_reverification_failure_leaves_partial_state_for_review(
 
 
 @pytest.mark.parametrize("step", list(r.RenameStep))
-@pytest.mark.parametrize("error", [0, 5, 0xFFFFFFFF])
-def test_false_native_captures_saved_error_immediately_before_any_other_api(
-    monkeypatch: pytest.MonkeyPatch,
-    step: r.RenameStep,
-    error: int,
+@pytest.mark.parametrize(
+    "status", [0x103, 0xC0000043, -1073741757, -1, -0x80000000, 0xFFFFFFFF]
+)
+def test_nonzero_ntstatus_is_indeterminate_without_last_error_or_fallback(
+    monkeypatch: pytest.MonkeyPatch, step: r.RenameStep, status: int
 ) -> None:
     native = FakeRenameNative(step)
-    native.native_false = True
-    monkeypatch.setattr(
-        w.ctypes,
-        "set_last_error",
-        lambda value: native.events.append(("clear_error", value)),
-    )
+    native.ntstatus = status
 
-    def capture() -> int:
-        native.events.append(("get_last_error", error))
-        return error
+    def forbidden(*_args):
+        pytest.fail("Nt rename must not use saved Win32 last error")
 
-    monkeypatch.setattr(w.ctypes, "get_last_error", capture)
+    monkeypatch.setattr(w.ctypes, "get_last_error", forbidden)
+    monkeypatch.setattr(w.ctypes, "set_last_error", forbidden)
     outcome, diagnostic = w._rename_fixed_step(
         native, step, native.source, native.parent
     )
     assert outcome is r.MutationOutcome.INDETERMINATE
     assert diagnostic == r.RenameDiagnostic(
-        step, r.RenameFailureStage.NATIVE_FALSE, error
+        step, r.RenameFailureStage.NATIVE_STATUS, ntstatus=status & 0xFFFFFFFF
     )
     rename_index = next(
         i for i, event in enumerate(native.events) if event[0] == "rename"
     )
-    assert native.events[rename_index - 1] == ("clear_error", 0)
-    assert native.events[rename_index + 1] == ("get_last_error", error)
-    assert native.events[rename_index + 2 :] == [("close", 22), ("close", 11)]
+    assert native.events[rename_index + 1 :] == [("close", 22), ("close", 11)]
     assert len([event for event in native.events if event[0] == "rename"]) == 1
 
 
@@ -2028,7 +2045,18 @@ def test_session_final_admission_drift_reports_pre_call_without_native_rename(
 
 @pytest.mark.parametrize(
     "gate",
-    [None, "old", "new", "scheduler", "first_native_false", "second_native_false"],
+    [
+        None,
+        "old",
+        "new",
+        "scheduler",
+        "first_native_false",
+        "second_native_false",
+        "first_pending",
+        "second_pending",
+        "first_bad_io",
+        "second_bad_io",
+    ],
 )
 def test_recovery_reuses_real_session_second_revalidation_before_native_call(
     monkeypatch: pytest.MonkeyPatch,
@@ -2036,7 +2064,7 @@ def test_recovery_reuses_real_session_second_revalidation_before_native_call(
 ) -> None:
     from types import SimpleNamespace
 
-    from scripts import p125_recover_d10 as recovery
+    from scripts import p125_recover_d10_r1h as recovery
 
     native = FakeRenameNative(r.RenameStep.OLD_TO_RETIRED)
     admission = _rename_admission(native)
@@ -2049,6 +2077,8 @@ def test_recovery_reuses_real_session_second_revalidation_before_native_call(
         return admission.namespace
 
     native.native_false = gate == "first_native_false"
+    native.ntstatus = 0x103 if gate == "first_pending" else 0
+    native.io_unwritten = gate == "first_bad_io"
     operations = SimpleNamespace(
         observe_namespace=observe,
         validate_recovery_material=lambda _root: None,
@@ -2066,6 +2096,8 @@ def test_recovery_reuses_real_session_second_revalidation_before_native_call(
         native.source_inspections = 0
         native.parent_inspections = 0
         native.native_false = gate == "second_native_false"
+        native.ntstatus = 0x103 if gate == "second_pending" else 0
+        native.io_unwritten = gate == "second_bad_io"
         return outcome
 
     session.retire_old_root = retire
@@ -2105,7 +2137,7 @@ def test_recovery_reuses_real_session_second_revalidation_before_native_call(
         assert native.events[-1] == ("post_publication",)
     else:
         assert result.reason_code is r.BlockReason.INDETERMINATE_MUTATION
-        first_false = gate == "first_native_false"
+        first_false = gate in ("first_native_false", "first_pending", "first_bad_io")
         assert result.highest_definitely_completed_state is (
             r.NamespaceState.OLD_CANONICAL
             if first_false
@@ -2116,8 +2148,21 @@ def test_recovery_reuses_real_session_second_revalidation_before_native_call(
             if first_false
             else r.RenameStep.STAGING_TO_CANONICAL
         )
-        if gate in ("first_native_false", "second_native_false"):
-            assert result.rename_diagnostic.stage is r.RenameFailureStage.NATIVE_FALSE
+        native_failure = gate in (
+            "first_native_false",
+            "second_native_false",
+            "first_pending",
+            "second_pending",
+            "first_bad_io",
+            "second_bad_io",
+        )
+        if native_failure:
+            expected_stage = (
+                r.RenameFailureStage.POST_CALL_VERIFY
+                if gate.endswith("bad_io")
+                else r.RenameFailureStage.NATIVE_STATUS
+            )
+            assert result.rename_diagnostic.stage is expected_stage
             assert native.events[-3:] == [
                 ("close", 22),
                 ("close", 11),
@@ -2126,7 +2171,7 @@ def test_recovery_reuses_real_session_second_revalidation_before_native_call(
         else:
             assert result.rename_diagnostic.stage is r.RenameFailureStage.PRE_CALL
         assert result.rename_diagnostic.step is expected_step
-        assert len(renames) == (2 if gate == "second_native_false" else 1)
+        assert len(renames) == (2 if gate.startswith("second_") else 1)
         assert ("post_publication",) not in native.events
         assert result.next_rename is None
         if first_false:
@@ -2156,21 +2201,139 @@ def test_recovery_material_validation_is_read_only_and_uses_certified_builder(
     assert events == [("build", root), ("validate", material)]
 
 
-@pytest.mark.parametrize(
-    "saved_error,expected", [(-1, 0xFFFFFFFF), (-0x80000000, 0x80000000)]
-)
-def test_signed_ctypes_saved_error_is_interpreted_as_uint32(
-    monkeypatch: pytest.MonkeyPatch,
-    saved_error: int,
-    expected: int,
+@pytest.mark.parametrize("step", list(r.RenameStep))
+@pytest.mark.parametrize("fault", ["status", "too_large", "negative", "unwritten"])
+def test_zero_ntstatus_bad_completion_is_post_call_verify(
+    monkeypatch, step, fault
 ) -> None:
+    native = FakeRenameNative(step)
+    if fault == "status":
+        native.io_status = -1
+    elif fault == "too_large":
+        native.io_information = len(w._fixed_rename_info(step, 11)) + 1
+    elif fault == "negative":
+        native.io_information = -1
+    else:
+        native.io_unwritten = True
+    monkeypatch.setattr(
+        w.ctypes, "get_last_error", lambda: pytest.fail("no GetLastError")
+    )
+    outcome, diagnostic = w._rename_fixed_step(
+        native, step, native.source, native.parent
+    )
+    assert native.renamed
+    assert outcome is r.MutationOutcome.INDETERMINATE
+    assert diagnostic == r.RenameDiagnostic(step, r.RenameFailureStage.POST_CALL_VERIFY)
+    assert native.events[-2:] == [("close", 22), ("close", 11)]
+
+
+@pytest.mark.parametrize("step", list(r.RenameStep))
+@pytest.mark.parametrize("upper_bound", [False, True])
+def test_zero_ntstatus_bounded_completion_still_requires_full_identity_proof(
+    step, upper_bound
+):
+    native = FakeRenameNative(step)
+    native.io_information = len(w._fixed_rename_info(step, 11)) if upper_bound else 0
+    assert w._rename_fixed_step(native, step, native.source, native.parent) == (
+        r.MutationOutcome.SUCCESS,
+        None,
+    )
+
+
+def test_native_rename_and_io_status_x64_layouts_are_exact() -> None:
+    assert ctypes.sizeof(ctypes.c_void_p) == 8
+    layout = w._FileRenameInformation
+    assert (
+        layout.replace_if_exists.offset,
+        layout.root_directory.offset,
+        layout.file_name_length.offset,
+        layout.file_name.offset,
+    ) == (0, 8, 16, 20)
+    assert ctypes.sizeof(layout) == 24
+    assert ctypes.sizeof(layout._fields_[0][1]) == 1
+    assert ctypes.sizeof(layout._fields_[2][1]) == 4
+    assert ctypes.sizeof(layout._fields_[3][1]) == 2
+    assert w._IoStatusUnion.status.offset == w._IoStatusUnion.pointer.offset == 0
+    assert ctypes.sizeof(w._IoStatusUnion) == 8
+    assert ctypes.sizeof(w._IoStatusUnion._fields_[0][1]) == 4
+    assert w._IoStatusBlock.status.offset == 0
+    assert w._IoStatusBlock.information.offset == 8
+    assert ctypes.sizeof(w._IoStatusBlock) == 16
+
+
+@pytest.mark.parametrize("step", list(r.RenameStep))
+def test_fixed_native_buffer_is_exact_nonterminated_and_parent_pinned(step):
+    buffer = w._fixed_rename_info(step, 11)
+    info = w._FileRenameInformation.from_buffer(buffer)
+    _, destination = w._fixed_rename_paths(step)
+    encoded = destination.rsplit("\\", 1)[-1].encode("utf-16-le")
+    assert info.root_directory == 11 and info.replace_if_exists == 0
+    assert info.file_name_length == len(encoded)
+    assert len(buffer) == w._FileRenameInformation.file_name.offset + len(encoded)
+    assert buffer.raw[w._FileRenameInformation.file_name.offset :] == encoded
+
+
+@pytest.mark.parametrize("handle", [0, None, ctypes.c_void_p(-1).value])
+def test_fixed_native_buffer_rejects_missing_parent(handle):
+    with pytest.raises(w.AdmissionBlocked):
+        w._fixed_rename_info(r.RenameStep.OLD_TO_RETIRED, handle)
+
+
+def test_ntdll_binding_is_only_fixed_system32_path(monkeypatch):
+    calls = []
+
+    def load(path, **options):
+        calls.append((path, options))
+        return object()
+
+    monkeypatch.setattr(w.ctypes, "WinDLL", load)
+    native = w._WindowsReplacementReader()
+    assert native._ntdll is not None
+    assert calls == [
+        (r"C:\Windows\System32\kernel32.dll", {"use_last_error": True}),
+        (r"C:\Windows\System32\advapi32.dll", {"use_last_error": True}),
+        (r"C:\Windows\System32\ntdll.dll", {}),
+    ]
+    source = inspect.getsource(w._set_fixed_rename)
+    assert source.count('"NtSetInformationFile"') == 1
+    for forbidden in (
+        "SetFileInformationByHandle",
+        "MoveFile",
+        "last_error",
+        "RtlNtStatusToDosError",
+    ):
+        assert forbidden not in source
+
+
+@pytest.mark.parametrize("handle", [11, 22])
+def test_close_ambiguity_overrides_bad_io_completion(handle):
     native = FakeRenameNative(r.RenameStep.OLD_TO_RETIRED)
-    native.native_false = True
-    monkeypatch.setattr(w.ctypes, "get_last_error", lambda: saved_error)
+    native.io_unwritten = True
+
+    def close(value):
+        native.events.append(("close", value))
+        if value == handle:
+            raise OSError("ambiguous")
+
+    native._close = close
     outcome, diagnostic = w._rename_fixed_step(
         native, r.RenameStep.OLD_TO_RETIRED, native.source, native.parent
     )
     assert outcome is r.MutationOutcome.INDETERMINATE
     assert diagnostic == r.RenameDiagnostic(
-        r.RenameStep.OLD_TO_RETIRED, r.RenameFailureStage.NATIVE_FALSE, expected
+        r.RenameStep.OLD_TO_RETIRED, r.RenameFailureStage.CLOSE_AMBIGUITY
     )
+
+
+@pytest.mark.parametrize("step", list(r.RenameStep))
+def test_zero_ntstatus_malformed_completion_evidence_is_post_call_verify(
+    monkeypatch, step
+):
+    native = FakeRenameNative(step)
+    monkeypatch.setattr(w, "_set_fixed_rename", lambda *_args: (0, None, 42))
+    outcome, diagnostic = w._rename_fixed_step(
+        native, step, native.source, native.parent
+    )
+    assert outcome is r.MutationOutcome.INDETERMINATE
+    assert diagnostic == r.RenameDiagnostic(step, r.RenameFailureStage.POST_CALL_VERIFY)
+    assert native.events[-2:] == [("close", 22), ("close", 11)]

@@ -209,6 +209,7 @@ class RenameStep(StrEnum):
 class RenameFailureStage(StrEnum):
     PRE_CALL = "PRE_CALL"
     NATIVE_FALSE = "NATIVE_FALSE"
+    NATIVE_STATUS = "NATIVE_STATUS"
     POST_CALL_VERIFY = "POST_CALL_VERIFY"
     CLOSE_AMBIGUITY = "CLOSE_AMBIGUITY"
 
@@ -220,6 +221,7 @@ class RenameDiagnostic:
     step: RenameStep
     stage: RenameFailureStage
     win32_error: int | None = None
+    ntstatus: int | None = None
 
     def __post_init__(self) -> None:
         if (
@@ -235,6 +237,17 @@ class RenameDiagnostic:
             or (
                 self.stage is not RenameFailureStage.NATIVE_FALSE
                 and self.win32_error is not None
+            )
+            or (
+                self.stage is RenameFailureStage.NATIVE_STATUS
+                and (
+                    type(self.ntstatus) is not int
+                    or not 0 <= self.ntstatus <= 0xFFFFFFFF
+                )
+            )
+            or (
+                self.stage is not RenameFailureStage.NATIVE_STATUS
+                and self.ntstatus is not None
             )
         ):
             raise ValueError("rename diagnostic requires closed bounded evidence")
@@ -457,7 +470,12 @@ class ReplacementResult:
                 value["rename_diagnostic"] = {
                     "stage": self.rename_diagnostic.stage.value,
                     "step": self.rename_diagnostic.step.value,
-                    "win32_error": self.rename_diagnostic.win32_error,
+                    **(
+                        {"ntstatus": self.rename_diagnostic.ntstatus}
+                        if self.rename_diagnostic.stage
+                        is RenameFailureStage.NATIVE_STATUS
+                        else {"win32_error": self.rename_diagnostic.win32_error}
+                    ),
                 }
         return (
             json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True)

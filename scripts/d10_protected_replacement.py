@@ -206,6 +206,40 @@ class RenameStep(StrEnum):
     STAGING_TO_CANONICAL = "STAGING_TO_CANONICAL"
 
 
+class RenameFailureStage(StrEnum):
+    PRE_CALL = "PRE_CALL"
+    NATIVE_FALSE = "NATIVE_FALSE"
+    POST_CALL_VERIFY = "POST_CALL_VERIFY"
+    CLOSE_AMBIGUITY = "CLOSE_AMBIGUITY"
+
+
+@dataclass(frozen=True, slots=True)
+class RenameDiagnostic:
+    """Closed failure evidence only; never mutation or retry authority."""
+
+    step: RenameStep
+    stage: RenameFailureStage
+    win32_error: int | None = None
+
+    def __post_init__(self) -> None:
+        if (
+            type(self.step) is not RenameStep
+            or type(self.stage) is not RenameFailureStage
+            or (
+                self.stage is RenameFailureStage.NATIVE_FALSE
+                and (
+                    type(self.win32_error) is not int
+                    or not 0 <= self.win32_error <= 0xFFFFFFFF
+                )
+            )
+            or (
+                self.stage is not RenameFailureStage.NATIVE_FALSE
+                and self.win32_error is not None
+            )
+        ):
+            raise ValueError("rename diagnostic requires closed bounded evidence")
+
+
 @dataclass(frozen=True, slots=True)
 class RenamePlan:
     step: RenameStep
@@ -261,6 +295,7 @@ class ReplacementResult:
     highest_definitely_completed_state: NamespaceState
     completed_renames: tuple[RenameStep, ...] = ()
     reason_code: BlockReason | None = None
+    rename_diagnostic: RenameDiagnostic | None = None
 
     def __post_init__(self) -> None:
         if (
@@ -270,6 +305,18 @@ class ReplacementResult:
             or any(type(step) is not RenameStep for step in self.completed_renames)
         ):
             raise ValueError("replacement result contains unrecognized evidence")
+        if self.rename_diagnostic is not None and (
+            type(self.rename_diagnostic) is not RenameDiagnostic
+            or self.phase is not Phase.BLOCKED
+            or self.reason_code is not BlockReason.INDETERMINATE_MUTATION
+            or self.rename_diagnostic.step
+            is not (
+                RenameStep.OLD_TO_RETIRED
+                if self.completed_renames == ()
+                else RenameStep.STAGING_TO_CANONICAL
+            )
+        ):
+            raise ValueError("rename diagnostic is only indeterminate-step evidence")
         expected = {
             Phase.READY_TO_RETIRE_OLD: (NamespaceState.OLD_CANONICAL, ()),
             Phase.READY_TO_PUBLISH_NEW: (
@@ -291,6 +338,7 @@ class ReplacementResult:
             allowed = {
                 BlockReason.NAMESPACE_CONFLICT: {(NamespaceState.CONFLICTING, ())},
                 BlockReason.SEPARATE_RECOVERY_REQUIRED: {
+                    (NamespaceState.OLD_CANONICAL, ()),
                     (NamespaceState.OLD_RETIRED, ()),
                     (NamespaceState.NEW_CANONICAL, ()),
                 },
@@ -405,6 +453,12 @@ class ReplacementResult:
             )
         else:
             value["reason_code"] = self.reason_code.value
+            if self.rename_diagnostic is not None:
+                value["rename_diagnostic"] = {
+                    "stage": self.rename_diagnostic.stage.value,
+                    "step": self.rename_diagnostic.step.value,
+                    "win32_error": self.rename_diagnostic.win32_error,
+                }
         return (
             json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
             + "\n"
@@ -436,9 +490,18 @@ def begin_replacement(
 
 
 def record_rename(
-    result: ReplacementResult, step: RenameStep, outcome: MutationOutcome
+    result: ReplacementResult,
+    step: RenameStep,
+    outcome: MutationOutcome,
+    diagnostic: RenameDiagnostic | None = None,
 ) -> ReplacementResult:
     """Advance only on an explicit success in this invocation; never retry."""
+    if diagnostic is not None and (
+        type(diagnostic) is not RenameDiagnostic
+        or diagnostic.step is not step
+        or outcome is not MutationOutcome.INDETERMINATE
+    ):
+        raise ValueError("diagnostic cannot accompany success or another step")
     if type(result) is not ReplacementResult or result.next_rename is not step:
         state = (
             result.highest_definitely_completed_state
@@ -457,6 +520,7 @@ def record_rename(
             result.highest_definitely_completed_state,
             result.completed_renames,
             BlockReason.INDETERMINATE_MUTATION,
+            diagnostic,
         )
     if step is RenameStep.OLD_TO_RETIRED:
         return ReplacementResult(

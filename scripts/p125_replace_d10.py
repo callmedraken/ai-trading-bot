@@ -19,10 +19,8 @@ class ReplacementSession(Protocol):
     def publish_staged_root(self) -> replacement.MutationOutcome: ...
 
 
-class ReplacementOperations(Protocol):
+class RenameOperations(Protocol):
     def observe_namespace(self) -> replacement.NamespaceObservation: ...
-
-    def construct_fixed_staging(self, repository_root: Path) -> None: ...
 
     def begin_fixed_rename_session(self) -> ReplacementSession: ...
 
@@ -31,8 +29,12 @@ class ReplacementOperations(Protocol):
     ) -> tuple[replacement.NamespaceObservation, replacement.PostPublicationFacts]: ...
 
 
+class ReplacementOperations(RenameOperations, Protocol):
+    def construct_fixed_staging(self, repository_root: Path) -> None: ...
+
+
 def _classify_after_failure(
-    operations: ReplacementOperations,
+    operations: RenameOperations,
 ) -> replacement.NamespaceState:
     try:
         return replacement.classify_namespace(operations.observe_namespace())
@@ -65,6 +67,12 @@ def run_replacement(
         initial = replacement.classify_namespace(operations.observe_namespace())
     except Exception:
         initial = replacement.NamespaceState.CONFLICTING
+    if initial is replacement.NamespaceState.OLD_CANONICAL:
+        return replacement.ReplacementResult(
+            replacement.Phase.BLOCKED,
+            initial,
+            reason_code=replacement.BlockReason.SEPARATE_RECOVERY_REQUIRED,
+        )
     if initial in (
         replacement.NamespaceState.OLD_RETIRED,
         replacement.NamespaceState.NEW_CANONICAL,
@@ -88,6 +96,13 @@ def run_replacement(
                 reason_code=replacement.BlockReason.STAGING_FAILED,
             )
 
+    return run_admitted_replacement(operations)
+
+
+def run_admitted_replacement(
+    operations: RenameOperations,
+) -> replacement.ReplacementResult:
+    """After entry admission, perform the existing fixed one-invocation sequence."""
     try:
         session = operations.begin_fixed_rename_session()
     except Exception:
@@ -97,12 +112,16 @@ def run_replacement(
     try:
         first_outcome = session.retire_old_root()
     except Exception:
+        _classify_after_failure(operations)
         return replacement.ReplacementResult(
             replacement.Phase.BLOCKED,
             replacement.NamespaceState.OLD_CANONICAL,
             reason_code=replacement.BlockReason.INDETERMINATE_MUTATION,
         )
     if first_outcome is not replacement.MutationOutcome.SUCCESS:
+        # Fresh classification is read-only evidence, never permission to advance.
+        # Preserve the highest definitely completed state from this invocation.
+        _classify_after_failure(operations)
         return session.result
     if session.result.phase is not replacement.Phase.READY_TO_PUBLISH_NEW:
         return replacement.ReplacementResult(
@@ -115,6 +134,7 @@ def run_replacement(
     try:
         second_outcome = session.publish_staged_root()
     except Exception:
+        _classify_after_failure(operations)
         return replacement.ReplacementResult(
             replacement.Phase.BLOCKED,
             replacement.NamespaceState.OLD_RETIRED,
@@ -122,6 +142,7 @@ def run_replacement(
             replacement.BlockReason.INDETERMINATE_MUTATION,
         )
     if second_outcome is not replacement.MutationOutcome.SUCCESS:
+        _classify_after_failure(operations)
         return session.result
     if session.result.phase is not replacement.Phase.VERIFY_PUBLICATION:
         return replacement.ReplacementResult(

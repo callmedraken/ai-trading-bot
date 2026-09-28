@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import itertools
 import json
 from dataclasses import replace
@@ -348,3 +349,185 @@ def test_staging_failure_transcript_keeps_exact_highest_state(
     payload = json.loads(blocked.canonical_transcript())
     assert payload["reason_code"] == "STAGING_FAILED"
     assert payload["highest_definitely_completed_namespace_state"] == state.value
+
+
+@pytest.mark.parametrize("step", list(r.RenameStep))
+@pytest.mark.parametrize("stage", list(r.RenameFailureStage))
+def test_diagnostic_is_bounded_frozen_and_grants_no_transition(
+    step: r.RenameStep,
+    stage: r.RenameFailureStage,
+) -> None:
+    from dataclasses import FrozenInstanceError
+
+    diagnostic = r.RenameDiagnostic(
+        step, stage, 5 if stage is r.RenameFailureStage.NATIVE_FALSE else None
+    )
+    ready = _ready()
+    if step is r.RenameStep.STAGING_TO_CANONICAL:
+        ready = r.record_rename(
+            ready, r.RenameStep.OLD_TO_RETIRED, r.MutationOutcome.SUCCESS
+        )
+    blocked = r.record_rename(ready, step, r.MutationOutcome.INDETERMINATE, diagnostic)
+    assert blocked.rename_diagnostic is diagnostic
+    assert blocked.next_rename is None and blocked.rename_plan is None
+    assert r.record_rename(blocked, step, r.MutationOutcome.SUCCESS).next_rename is None
+    payload = json.loads(blocked.canonical_transcript())
+    assert payload["rename_diagnostic"] == {
+        "stage": stage.value,
+        "step": step.value,
+        "win32_error": diagnostic.win32_error,
+    }
+    assert blocked.canonical_transcript() == blocked.canonical_transcript()
+    assert blocked.canonical_transcript() == (
+        json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n"
+    ).encode("ascii")
+    assert set(diagnostic.__dataclass_fields__) == {"step", "stage", "win32_error"}
+    with pytest.raises(FrozenInstanceError):
+        diagnostic.win32_error = 42
+    for key in (
+        "activation_authority",
+        "scheduler_authority",
+        "trading_authority",
+        "retirement_cleanup_authority",
+    ):
+        assert payload[key] == "NONE"
+
+
+@pytest.mark.parametrize("error", [0, 0xFFFFFFFF])
+def test_native_false_diagnostic_uint32_endpoints(error: int) -> None:
+    assert (
+        r.RenameDiagnostic(
+            r.RenameStep.OLD_TO_RETIRED, r.RenameFailureStage.NATIVE_FALSE, error
+        ).win32_error
+        == error
+    )
+
+
+@pytest.mark.parametrize(
+    "error", [-1, 0x100000000, True, False, 0.0, "5", None, object()]
+)
+def test_native_false_rejects_non_uint32_error(error: object) -> None:
+    with pytest.raises(ValueError):
+        r.RenameDiagnostic(
+            r.RenameStep.OLD_TO_RETIRED, r.RenameFailureStage.NATIVE_FALSE, error
+        )
+
+
+@pytest.mark.parametrize(
+    "stage",
+    [
+        stage
+        for stage in r.RenameFailureStage
+        if stage is not r.RenameFailureStage.NATIVE_FALSE
+    ],
+)
+@pytest.mark.parametrize("error", [0, 5, "private host data", False])
+def test_other_diagnostic_stages_reject_error_data(
+    stage: r.RenameFailureStage, error: object
+) -> None:
+    with pytest.raises(ValueError):
+        r.RenameDiagnostic(r.RenameStep.OLD_TO_RETIRED, stage, error)
+
+
+@pytest.mark.parametrize(
+    "step,stage",
+    [
+        ("OLD_TO_RETIRED", r.RenameFailureStage.PRE_CALL),
+        (r.RenameStep.OLD_TO_RETIRED, "PRE_CALL"),
+        (r.RenameStep.OLD_TO_RETIRED, "raw exception"),
+        (object(), r.RenameFailureStage.PRE_CALL),
+    ],
+)
+def test_diagnostic_rejects_unclosed_or_caller_supplied_values(
+    step: object, stage: object
+) -> None:
+    with pytest.raises(ValueError):
+        r.RenameDiagnostic(step, stage)
+
+
+def test_diagnostic_cannot_accompany_success_other_reason_or_wrong_step() -> None:
+    diagnostic = r.RenameDiagnostic(
+        r.RenameStep.OLD_TO_RETIRED, r.RenameFailureStage.PRE_CALL
+    )
+    with pytest.raises(ValueError):
+        r.record_rename(
+            _ready(), diagnostic.step, r.MutationOutcome.SUCCESS, diagnostic
+        )
+    with pytest.raises(ValueError):
+        r.record_rename(
+            _ready(),
+            r.RenameStep.STAGING_TO_CANONICAL,
+            r.MutationOutcome.INDETERMINATE,
+            diagnostic,
+        )
+    with pytest.raises(ValueError):
+        replace(_ready(), rename_diagnostic=diagnostic)
+    with pytest.raises(ValueError):
+        r.ReplacementResult(
+            r.Phase.BLOCKED,
+            r.NamespaceState.OLD_CANONICAL,
+            reason_code=r.BlockReason.SEPARATE_RECOVERY_REQUIRED,
+            rename_diagnostic=diagnostic,
+        )
+    with pytest.raises(ValueError):
+        r.ReplacementResult(
+            r.Phase.BLOCKED,
+            r.NamespaceState.OLD_RETIRED,
+            (r.RenameStep.OLD_TO_RETIRED,),
+            r.BlockReason.INDETERMINATE_MUTATION,
+            diagnostic,
+        )
+    with pytest.raises(ValueError):
+        r.ReplacementResult(
+            r.Phase.BLOCKED,
+            r.NamespaceState.OLD_CANONICAL,
+            reason_code=r.BlockReason.INDETERMINATE_MUTATION,
+            rename_diagnostic={"path": "private"},
+        )
+    passed = r.verify_publication(
+        _published(), _namespace("NEW", "ABSENT", "OLD"), _post_publication()
+    )
+    with pytest.raises(ValueError):
+        replace(passed, rename_diagnostic=diagnostic)
+
+
+def test_closed_failure_stage_model_is_exact() -> None:
+    assert {stage.value for stage in r.RenameFailureStage} == {
+        "PRE_CALL",
+        "NATIVE_FALSE",
+        "POST_CALL_VERIFY",
+        "CLOSE_AMBIGUITY",
+    }
+
+
+def test_ordinary_old_canonical_recovery_block_is_valid_and_inert() -> None:
+    result = r.ReplacementResult(
+        r.Phase.BLOCKED,
+        r.NamespaceState.OLD_CANONICAL,
+        reason_code=r.BlockReason.SEPARATE_RECOVERY_REQUIRED,
+    )
+    assert result.next_rename is None and result.completed_renames == ()
+
+
+def test_legacy_transcripts_without_diagnostic_are_byte_identical() -> None:
+    first = r.record_rename(
+        _ready(), r.RenameStep.OLD_TO_RETIRED, r.MutationOutcome.INDETERMINATE
+    )
+    retired = r.record_rename(
+        _ready(), r.RenameStep.OLD_TO_RETIRED, r.MutationOutcome.SUCCESS
+    )
+    second = r.record_rename(
+        retired, r.RenameStep.STAGING_TO_CANONICAL, r.MutationOutcome.INDETERMINATE
+    )
+    passed = r.verify_publication(
+        _published(), _namespace("NEW", "ABSENT", "OLD"), _post_publication()
+    )
+    # Frozen SHA-256 of the exact pre-R1G terminal transcript bytes.
+    for result, digest in (
+        (first, "ee575d6ee583dac294d94b0cb3830e5e1eb41c229bbaac6e502b5d8a625677ef"),
+        (second, "7afe18feb87e96e126499f6174cdb24ef7f10cc4c456a203cf2ba430e9fcbb99"),
+        (passed, "dc1f3890f2f52236719bf1e75055eebc20b82abe15dd35876ae2a42ae40cf843"),
+    ):
+        assert result.rename_diagnostic is None
+        assert b"rename_diagnostic" not in result.canonical_transcript()
+        assert hashlib.sha256(result.canonical_transcript()).hexdigest() == digest

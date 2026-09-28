@@ -2452,7 +2452,7 @@ def _set_fixed_rename(
     step: replacement.RenameStep,
     source_handle: int,
     parent_handle: int,
-) -> bool:
+) -> replacement.RenameDiagnostic | None:
     info = _fixed_rename_info(step, parent_handle)
     set_information = native._bind(
         native._kernel,
@@ -2460,11 +2460,17 @@ def _set_fixed_rename(
         [wintypes.HANDLE, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD],
         wintypes.BOOL,
     )
-    return bool(
-        set_information(
-            source_handle, _FILE_RENAME_INFO_CLASS, ctypes.byref(info), len(info)
+    pointer, size = ctypes.byref(info), len(info)
+    ctypes.set_last_error(0)
+    if not set_information(source_handle, _FILE_RENAME_INFO_CLASS, pointer, size):
+        error = ctypes.get_last_error()
+        # ctypes stores a C int; interpret its signed slot as the Win32 DWORD.
+        if type(error) is int and -0x80000000 <= error < 0:
+            error += 0x100000000
+        return replacement.RenameDiagnostic(
+            step, replacement.RenameFailureStage.NATIVE_FALSE, error
         )
-    )
+    return None
 
 
 def _rename_fixed_step(
@@ -2472,13 +2478,17 @@ def _rename_fixed_step(
     step: replacement.RenameStep,
     expected_source: NativeObject,
     expected_parent: NativeObject,
-) -> replacement.MutationOutcome:
+) -> tuple[replacement.MutationOutcome, replacement.RenameDiagnostic | None]:
     """One handle-pinned rename; any uncertainty consumes this attempt."""
     source_path, destination_path = _fixed_rename_paths(step)
     parent_handle: int | None = None
     source_handle: int | None = None
     outcome = replacement.MutationOutcome.INDETERMINATE
     cleanup_ambiguous = False
+    native_succeeded = False
+    diagnostic = replacement.RenameDiagnostic(
+        step, replacement.RenameFailureStage.PRE_CALL
+    )
     try:
         if (
             type(expected_source) is not NativeObject
@@ -2505,16 +2515,24 @@ def _rename_fixed_step(
             or native._inspect(source_handle, source_path) != source_before
         ):
             raise AdmissionBlocked("rename_pre_call_drift")
-        if not _set_fixed_rename(native, step, source_handle, parent_handle):
-            raise AdmissionBlocked("rename_native_false")
-        expected_after = replace(source_before, final_path=destination_path)
-        if (
-            native._inspect(source_handle, source_path) != expected_after
-            or native._inspect(parent_handle, replacement.PARENT_PATH) != parent_before
-        ):
-            raise AdmissionBlocked("rename_post_call_drift")
-        outcome = replacement.MutationOutcome.SUCCESS
+        diagnostic = _set_fixed_rename(native, step, source_handle, parent_handle)
+        if diagnostic is None:
+            native_succeeded = True
+            expected_after = replace(source_before, final_path=destination_path)
+            if (
+                native._inspect(source_handle, source_path) != expected_after
+                or native._inspect(parent_handle, replacement.PARENT_PATH)
+                != parent_before
+            ):
+                raise AdmissionBlocked("rename_post_call_drift")
+            outcome = replacement.MutationOutcome.SUCCESS
     except Exception:
+        diagnostic = replacement.RenameDiagnostic(
+            step,
+            replacement.RenameFailureStage.POST_CALL_VERIFY
+            if native_succeeded
+            else replacement.RenameFailureStage.PRE_CALL,
+        )
         outcome = replacement.MutationOutcome.INDETERMINATE
     finally:
         for handle in (source_handle, parent_handle):
@@ -2523,7 +2541,14 @@ def _rename_fixed_step(
                     native._close(handle)
                 except Exception:
                     cleanup_ambiguous = True
-    return replacement.MutationOutcome.INDETERMINATE if cleanup_ambiguous else outcome
+    if cleanup_ambiguous:
+        return (
+            replacement.MutationOutcome.INDETERMINATE,
+            replacement.RenameDiagnostic(
+                step, replacement.RenameFailureStage.CLOSE_AMBIGUITY
+            ),
+        )
+    return outcome, diagnostic
 
 
 class _FixedRenameSession:
@@ -2563,6 +2588,10 @@ class _FixedRenameSession:
         if self.result.phase is not replacement.Phase.READY_TO_RETIRE_OLD:
             raise AdmissionBlocked("rename_step_not_ready")
         outcome = replacement.MutationOutcome.INDETERMINATE
+        diagnostic = replacement.RenameDiagnostic(
+            replacement.RenameStep.OLD_TO_RETIRED,
+            replacement.RenameFailureStage.PRE_CALL,
+        )
         try:
             fresh = _observe_admission(
                 self._native, self._verifier, self._scheduler_run
@@ -2576,7 +2605,7 @@ class _FixedRenameSession:
                 or fresh.new_native != self._admission.new_native
             ):
                 raise AdmissionBlocked("rename_final_admission_drift")
-            outcome = _rename_fixed_step(
+            outcome, diagnostic = _rename_fixed_step(
                 self._native,
                 replacement.RenameStep.OLD_TO_RETIRED,
                 fresh.old_native,
@@ -2585,7 +2614,7 @@ class _FixedRenameSession:
         except Exception:
             outcome = replacement.MutationOutcome.INDETERMINATE
         self.result = replacement.record_rename(
-            self.result, replacement.RenameStep.OLD_TO_RETIRED, outcome
+            self.result, replacement.RenameStep.OLD_TO_RETIRED, outcome, diagnostic
         )
         return outcome
 
@@ -2593,6 +2622,10 @@ class _FixedRenameSession:
         if self.result.phase is not replacement.Phase.READY_TO_PUBLISH_NEW:
             raise AdmissionBlocked("rename_step_not_ready")
         outcome = replacement.MutationOutcome.INDETERMINATE
+        diagnostic = replacement.RenameDiagnostic(
+            replacement.RenameStep.STAGING_TO_CANONICAL,
+            replacement.RenameFailureStage.PRE_CALL,
+        )
         try:
             self._native.require_administrator()
             parent = self._native.list_directory(replacement.PARENT_PATH)
@@ -2636,7 +2669,7 @@ class _FixedRenameSession:
                 != self._admission.scheduler
             ):
                 raise AdmissionBlocked("rename_second_admission_drift")
-            outcome = _rename_fixed_step(
+            outcome, diagnostic = _rename_fixed_step(
                 self._native,
                 replacement.RenameStep.STAGING_TO_CANONICAL,
                 self._admission.new_native,
@@ -2645,7 +2678,10 @@ class _FixedRenameSession:
         except Exception:
             outcome = replacement.MutationOutcome.INDETERMINATE
         self.result = replacement.record_rename(
-            self.result, replacement.RenameStep.STAGING_TO_CANONICAL, outcome
+            self.result,
+            replacement.RenameStep.STAGING_TO_CANONICAL,
+            outcome,
+            diagnostic,
         )
         return outcome
 
@@ -2656,3 +2692,8 @@ def begin_fixed_rename_session() -> _FixedRenameSession:
     verifier = WindowsCngVerifier()
     admission = _observe_admission(native, verifier, _run_scheduler_bounded)
     return _FixedRenameSession(native, admission, verifier, _run_scheduler_bounded)
+
+
+def validate_recovery_material(repository_root: Path) -> None:
+    """Validate the certified material input read-only; never rebuild staging."""
+    _require_s5_r10_material(build_certified_material(repository_root))

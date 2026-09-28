@@ -135,51 +135,28 @@ class FakeOperations:
         return _namespace("NEW", "ABSENT", "OLD"), self.post_facts
 
 
-@pytest.mark.parametrize("state", ["CLEAN_INITIAL", "OLD_CANONICAL"])
-def test_admitted_start_states_stage_only_when_clean_then_refresh_admission(
-    state: str,
-) -> None:
-    initial = (
-        _namespace("OLD", "ABSENT", "ABSENT")
-        if state == "CLEAN_INITIAL"
-        else _namespace("OLD", "NEW", "ABSENT")
-    )
-    states = [initial]
-    if state == "CLEAN_INITIAL":
-        states.append(_namespace("OLD", "NEW", "ABSENT"))
-    operations = FakeOperations(states)
+def test_clean_initial_stages_then_refreshes_admission_in_one_invocation() -> None:
+    operations = FakeOperations([_namespace("OLD", "ABSENT", "ABSENT")])
     repository_root = Path("C:/certified/source")
 
     result = operator.run_replacement(repository_root, operations)
 
     assert result.phase is r.Phase.PASS
-    expected = (
-        [
-            "observe-namespace",
-            "construct-fixed-staging",
-            "fresh-full-admission-and-rename-session",
-            "rename-old-to-retired",
-            "rename-staging-to-canonical",
-        ]
-        if state == "CLEAN_INITIAL"
-        else [
-            "observe-namespace",
-            "fresh-full-admission-and-rename-session",
-            "rename-old-to-retired",
-            "rename-staging-to-canonical",
-        ]
-    )
-    assert operations.events[: len(expected)] == expected
-    if state == "CLEAN_INITIAL":
-        assert operations.repository_roots == [repository_root]
-    else:
-        assert operations.repository_roots == []
+    assert operations.events[:5] == [
+        "observe-namespace",
+        "construct-fixed-staging",
+        "fresh-full-admission-and-rename-session",
+        "rename-old-to-retired",
+        "rename-staging-to-canonical",
+    ]
+    assert operations.repository_roots == [repository_root]
     assert operations.events[-1][0] == "post-publication"
 
 
 @pytest.mark.parametrize(
     ("state", "reason"),
     [
+        ("OLD_CANONICAL", r.BlockReason.SEPARATE_RECOVERY_REQUIRED),
         ("OLD_RETIRED", r.BlockReason.SEPARATE_RECOVERY_REQUIRED),
         ("NEW_CANONICAL", r.BlockReason.SEPARATE_RECOVERY_REQUIRED),
         ("CONFLICTING", r.BlockReason.NAMESPACE_CONFLICT),
@@ -189,6 +166,7 @@ def test_interrupted_or_conflicting_initial_states_do_not_continue(
     state: str, reason: r.BlockReason
 ) -> None:
     triples = {
+        "OLD_CANONICAL": ("OLD", "NEW", "ABSENT"),
         "OLD_RETIRED": ("ABSENT", "NEW", "OLD"),
         "NEW_CANONICAL": ("NEW", "ABSENT", "OLD"),
         "CONFLICTING": ("OLD", "PARTIAL", "ABSENT"),
@@ -200,6 +178,8 @@ def test_interrupted_or_conflicting_initial_states_do_not_continue(
     assert result.phase is r.Phase.BLOCKED
     assert result.reason_code is reason
     assert operations.events == ["observe-namespace"]
+    assert operations.session.first_calls == operations.session.second_calls == 0
+    assert result.next_rename is None
 
 
 @pytest.mark.parametrize(
@@ -280,7 +260,9 @@ def test_admission_failure_is_closed_and_uses_fresh_namespace_state() -> None:
 def test_first_indeterminate_stops_without_second_rename_or_retry() -> None:
     session_events: list[object] = []
     session = FakeSession(session_events, first=r.MutationOutcome.INDETERMINATE)
-    operations = FakeOperations([_namespace("OLD", "NEW", "ABSENT")], session=session)
+    operations = FakeOperations(
+        [_namespace("OLD", "ABSENT", "ABSENT")], session=session
+    )
 
     result = operator.run_replacement(Path("C:/source"), operations)
 
@@ -295,7 +277,9 @@ def test_first_indeterminate_stops_without_second_rename_or_retry() -> None:
 def test_second_indeterminate_stops_without_retry_rollback_or_cleanup() -> None:
     session_events: list[object] = []
     session = FakeSession(session_events, second=r.MutationOutcome.INDETERMINATE)
-    operations = FakeOperations([_namespace("OLD", "NEW", "ABSENT")], session=session)
+    operations = FakeOperations(
+        [_namespace("OLD", "ABSENT", "ABSENT")], session=session
+    )
 
     result = operator.run_replacement(Path("C:/source"), operations)
 
@@ -315,7 +299,7 @@ def test_second_indeterminate_stops_without_retry_rollback_or_cleanup() -> None:
 def test_every_post_publication_fact_is_required(field: str) -> None:
     session = FakeSession([])
     operations = FakeOperations(
-        [_namespace("OLD", "NEW", "ABSENT")],
+        [_namespace("OLD", "ABSENT", "ABSENT")],
         session=session,
         post_facts=r.PostPublicationFacts(
             **{
@@ -331,7 +315,7 @@ def test_every_post_publication_fact_is_required(field: str) -> None:
 
 
 def test_post_publication_pass_and_terminal_transcripts_are_deterministic() -> None:
-    operations = FakeOperations([_namespace("OLD", "NEW", "ABSENT")])
+    operations = FakeOperations([_namespace("OLD", "ABSENT", "ABSENT")])
     result = operator.run_replacement(Path("C:/source"), operations)
     transcript = result.canonical_transcript()
     assert result.phase is r.Phase.PASS

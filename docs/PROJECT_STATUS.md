@@ -5371,3 +5371,19 @@ No production retry is authorized. A later production candidate is considered
 only after a unique minimal PASS pair is demonstrated and separately frozen as
 R1H-E.
 
+## P125-R1H-E — production native rename correction frozen
+
+R1H-D completed the nine-case disposable share lattice with cleanup PASS.
+Unique minimal PASS: source share 0x1 (READ), parent share 0x7
+(READ|WRITE|DELETE). All rows with parent share 0x1 or 0x5 failed with
+STATUS_SHARING_VIOLATION.
+
+R1H-E source work is now frozen: NtSetInformationFile/FileRenameInformation=10,
+exact offset+name buffer, source share unchanged, parent share 0x7, bounded
+NTSTATUS diagnostics, and a new explicitly fenced R1H recovery CLI. The
+consumed R1G recovery CLI must not inherit the new transport.
+
+No protected retry is authorized. Focused tests, exact review, canonical
+three-lane certification, fresh OLD_CANONICAL/full-admission preflight, and new
+human authorization are required first.
+

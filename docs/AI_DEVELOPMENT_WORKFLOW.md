@@ -318,6 +318,38 @@ Rules:
 Milestone, verification, merge, and post-merge reports must always include the
 next actionable step and concrete execution material when known.
 
+## Canonical worktree location
+
+The main checkout remains at `F:\\AI\\ai-trading-bot`. Every auxiliary
+Trading Bot Git worktree must be created under:
+
+```text
+F:\\AI\\worktrees\\<explicit-project-worktree-name>
+```
+
+Do not create or adopt Trading Bot worktrees under the user profile, including
+Codex-managed defaults such as:
+
+```text
+C:\\Users\\John\\.codex\\worktrees\\...
+```
+
+Every task that creates or selects a worktree must name the exact
+`F:\\AI\\worktrees\\...` path in its startup gate. If a tool proposes or
+creates a worktree outside that root, stop before edits and recreate/select the
+worktree at the canonical F: location. Do not silently treat a noncanonical
+path as equivalent.
+
+A noncanonical worktree that already contains generated/untracked artifacts is
+not force-removed or cleaned merely to satisfy this convention. Preserve the
+artifacts, classify the worktree state, and use a separate reviewed
+reconciliation/removal step. A dirty-worktree STOP remains a STOP.
+
+When an interactive PowerShell block throws a STOP, commands appearing later in
+the pasted block are not authorized to continue just because PowerShell accepts
+subsequent input. Re-establish the exact worktree/branch/HEAD/tree/status gate
+before any further Git operation.
+
 ## Worktree source provenance
 
 When a virtual environment belongs to one checkout but is used to run code from

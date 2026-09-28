@@ -830,6 +830,74 @@ correction becomes a new R1H-E source/design checkpoint requiring:
 
 No R1F, R1G, R1H-A, R1H-C, or R1H-D authorization carries forward.
 
+## 8.5 P125-R1H-E production native rename correction
+
+R1H-D completed the full disposable 3 x 3 ShareAccess lattice on the target
+Windows host with cleanup PASS. The observed PASS rows were source/parent
+R/RWD, RD/RWD, and RWD/RWD; every row with parent R or RD failed with
+0xC0000043 / STATUS_SHARING_VIOLATION. Therefore the unique minimal PASS pair
+under componentwise share-bit inclusion is:
+
+    source ShareAccess = FILE_SHARE_READ
+    parent ShareAccess = FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE
+
+The R/R failure and RWD/RWD PASS controls reproduced prior evidence. R1H-E may
+therefore freeze that unique minimal pair for production consideration.
+
+R1H-E changes only the root-rename transport and the parent handle ShareAccess.
+Source DesiredAccess and ShareAccess remain unchanged. Parent DesiredAccess
+remains unchanged; only its ShareAccess becomes 0x7. All no-follow flags,
+fixed paths, destination-absence checks, pinned source/parent identity checks,
+same-volume proof, rename ordering, no-replace rule, second-step revalidation,
+and post-publication verification remain unchanged.
+
+The production mutation API becomes the fixed system export:
+
+    C:\Windows\System32\ntdll.dll!NtSetInformationFile
+
+using FileRenameInformation = 10 and FILE_RENAME_INFORMATION with non-NULL
+pinned RootDirectory and the fixed relative destination leaf. The submitted
+length is exactly FIELD_OFFSET(FileName) + FileNameLength. No terminating NUL is
+counted. There is no SetFileInformationByHandle fallback, absolute-path
+fallback, alternate information class, replace-existing mode, or caller-chosen
+destination.
+
+A nonzero NtSetInformationFile return is INDETERMINATE and emits a new closed
+RenameFailureStage NATIVE_STATUS carrying only the fixed RenameStep and raw
+uint32 NTSTATUS. GetLastError is not consulted. STATUS_PENDING is non-PASS and
+is not waited on. A zero return crosses the native-success boundary; malformed
+or nonzero IO_STATUS_BLOCK evidence after that point is POST_CALL_VERIFY.
+Existing pinned post-call identity proof remains mandatory. Close ambiguity
+still overrides earlier diagnostics.
+
+RenameDiagnostic adds optional uint32 ntstatus. NATIVE_FALSE continues to
+require only win32_error; NATIVE_STATUS requires only ntstatus; PRE_CALL,
+POST_CALL_VERIFY, and CLOSE_AMBIGUITY require neither. Historical R1G
+NATIVE_FALSE transcript serialization must remain byte-for-byte unchanged.
+NATIVE_STATUS serializes only stage, step, and ntstatus.
+
+The historical R1G recovery CLI is consumed and must not silently inherit the
+new shared transport. R1H-E therefore adds a source-owned transport-generation
+identifier. The old R1G recovery entry point must fail closed when that
+generation is no longer the R1G transport.
+
+A new inert recovery entry point is required:
+
+    scripts/p125_recover_d10_r1h.py
+    --execute-protected-p125-r1h-recovery
+
+It admits only fresh exact OLD_CANONICAL, validates exact S5-R10 recovery
+material, performs fresh complete Architecture-125 admission, attempts
+OLD_TO_RETIRED at most once, attempts STAGING_TO_CANONICAL only after positive
+first-step success plus the existing second-step revalidation, never retries or
+rolls back, and preserves the existing post-publication verification.
+
+Before any real protected attempt, the exact R1H-E source must pass focused
+tests, exact GitHub review, replacement canonical three-lane certification,
+fresh real-host exact OLD_CANONICAL/full-admission preflight, and new explicit
+human authorization. No prior R1F/R1G/R1H diagnostic authorization carries
+forward.
+
 ## 9. Post-publication verification
 
 If both renames return success in the same admitted invocation, the operator must immediately verify:

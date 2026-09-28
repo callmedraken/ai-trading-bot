@@ -1104,3 +1104,47 @@ class WindowsCngVerifier:
                     [ctypes.c_void_p, wintypes.ULONG],
                     ctypes.c_long,
                 )(algorithm, 0)
+
+
+class WindowsActivationLeaseBackend(WindowsDeploymentBackend):
+    """Fixed create-only P124-5 transport; inert P124-2/P124-3 stay unchanged.
+
+    The explicit path allowlist mirrors the frozen publication contract and is
+    checked against it by source tests. No runtime/controller import is added
+    to the inert deployment backend. Only tmp -> installing -> final atomic
+    no-replace moves are available; there is no directory/create/renewal/delete
+    or cleanup authority beyond the two fixed staging files.
+    """
+
+    final_path = D10_ROOT + r"\activation.lease.json"
+    installing_path = final_path + ".installing"
+    temporary_path = final_path + ".tmp"
+
+    def _allowed_directory_create(self, path: str) -> bool:
+        return False
+
+    def _allowed_file_create(self, path: str) -> bool:
+        return path in (self.temporary_path, self.installing_path)
+
+    def _allowed_object_path(self, path: str, *, directory: bool) -> bool:
+        return directory is False and path in (
+            self.temporary_path,
+            self.installing_path,
+            self.final_path,
+        )
+
+    def publish_create_only(self, installing_path: str, final_path: str) -> None:
+        if (installing_path, final_path) not in (
+            (self.temporary_path, self.installing_path),
+            (self.installing_path, self.final_path),
+        ):
+            raise DeploymentBlocked("lease_publication_path_unreviewed")
+        self.require_administrator()
+        move = self._bind(
+            self._kernel,
+            "MoveFileW",
+            [ctypes.c_wchar_p, ctypes.c_wchar_p],
+            wintypes.BOOL,
+        )
+        if not move(installing_path, final_path):
+            raise DeploymentBlocked("lease_atomic_no_replace_failed")

@@ -2911,3 +2911,16 @@ def begin_fixed_rename_session() -> _FixedRenameSession:
 def validate_recovery_material(repository_root: Path) -> None:
     """Validate the certified material input read-only; never rebuild staging."""
     _require_s5_r10_material(build_certified_material(repository_root))
+
+
+def frozen_d5_scheduler_semantics() -> dict[str, object]:
+    """Return a copy of the Architecture-126 predecessor projection."""
+    return dict(_EXPECTED_SCHEDULER)
+
+
+class WindowsD10ReadOnlyReader(_WindowsReplacementReader):
+    """Public no-follow read boundary for the fixed D10 namespace only.
+
+    Construction binds native libraries; importing the module observes nothing.
+    This reader exposes no publication, scheduler, or deletion operation.
+    """

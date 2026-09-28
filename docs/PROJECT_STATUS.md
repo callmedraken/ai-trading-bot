@@ -5387,3 +5387,71 @@ No protected retry is authorized. Focused tests, exact review, canonical
 three-lane certification, fresh OLD_CANONICAL/full-admission preflight, and new
 human authorization are required first.
 
+## 2026-09-28 P125-R1I recovery complete; S5-R10 P124-1 PASS
+
+The incident-specific P125-R1I retired-tree recovery completed successfully.
+The historical S5-R8 retired sibling is now absent. Do not rerun R1E, R1I, or
+any retired-tree cleanup.
+
+Accepted protected R1I terminal state:
+
+```text
+status: PASS
+cleanup_state: RETIRED_ABSENT
+completed_targets: 337
+canonical S5-R10 signed trust: VERIFIED
+historical S5-R8 retired root: ABSENT
+D5 scheduler predecessor: exact capture-only predecessor
+activation authority: NONE
+scheduler authority: NONE
+trading authority: NONE
+```
+
+After that cleanup PASS, the full signed S5-R10 P124-1 production-Python
+substrate qualification was run read-only from the certified
+`feature/p125-r1i-partial-retired-recovery` source.
+
+Evidence:
+
+```text
+F:\AI\temp\p1241-signed-s5r10-20260928-141816
+```
+
+Accepted result:
+
+```text
+schema: personal-desktop-p124-1-native-transcript/v4
+status: PASS
+signed attestation SHA-256:
+4e4e44d4129876454bd5d9559af7358f2600466f9291c6626f92e173d541f2c2
+detached signature verified: True
+signing key ID verified: True
+production Python: F:\AITradingBot\runtime\python.exe
+Python version: 3.14.3
+protected/runtime objects: 12514
+before/after objects: 12514 / 12514
+Trading SID: S-1-5-21-1397534616-3988210162-180023805-1009
+Trading non-admin: True
+Trading elevated: False
+Trading enabled privileges: SeChangeNotifyPrivilege
+transcript SHA-256:
+7701c21ae483ecb44761a9cf86ea6bceabe18beab848eb1a4c49f4c91cef642d
+```
+
+No signing, activation lease creation, Task Scheduler mutation, provider,
+Paper-v2, broker-paper, or live-trading effect occurred during P124-1.
+
+Current protected sequence:
+
+```text
+P125 retired-S5-R8 cleanup       PASS / complete
+P124-1 signed Python substrate  PASS
+P124-4 Trading guard            NEXT / read-only no-effect qualification
+P124-5 activation + scheduler   NOT AUTHORIZED
+```
+
+The next safe checkpoint is P124-4 under the actual non-admin Trading
+principal. It must verify the installed signed S5-R10 guard/source deployment
+without launching governed trading source or performing any effect. P124-5
+remains a separate higher-risk approval boundary.
+

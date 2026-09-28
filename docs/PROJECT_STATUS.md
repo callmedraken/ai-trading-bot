@@ -5455,3 +5455,82 @@ principal. It must verify the installed signed S5-R10 guard/source deployment
 without launching governed trading source or performing any effect. P124-5
 remains a separate higher-risk approval boundary.
 
+
+
+## 2026-09-28 P124-4 S5-R10 Trading guard qualification PASS
+
+P124-4 completed successfully under the actual non-admin local Trading
+principal after P124-1 had already passed for the same signed S5-R10
+deployment.
+
+Accepted qualification helper:
+
+```text
+F:\Users\John\Downloads\p1244_trading_guard_qualification_s5r10_v4.py
+SHA-256:
+4bbe84bef2e5bdfc56e35d7fee60210e70f1989a28f3908df7aac460f69d48d9
+```
+
+Accepted evidence:
+
+```text
+F:\Users\John\Downloads\p1244-s5r10-v4-20260928-144834.json
+SHA-256:
+6e369eb917922acf3548a0b8bec656f859e940e9ded269e4e213a834a9e7aa84
+```
+
+Accepted result:
+
+```text
+schema: personal-desktop-p124-4-trading-guard-qualification/v1
+status: PASS
+deployment_id: 9f3d111b-25bb-5ee4-9abf-f5215a32b826
+attestation_sha256:
+4e4e44d4129876454bd5d9559af7358f2600466f9291c6626f92e173d541f2c2
+certified_source_head:
+c5cc0b01301600daf17f1114f4451dca2c9d7a1f
+certified_source_tree:
+bfacfadaa14315d2d378abcc0f1e4bc7c42034f1
+executable_file_count: 306
+guard_byte_length: 69259
+guard_sha256:
+37d78c65800a315a12049b6c278addf609589d121e15d31dd9064dc8ec427298
+signed_deployment_verification: PASS
+trading_principal_verification: PASS
+sealed_source_verification: PASS
+trust_reread_stability: PASS
+guard_argv_context: EXACT_INSTALLED_GUARD_PATH_EMULATED
+activation_lease_absence_proof: NATIVE_FILE_OR_PATH_NOT_FOUND
+activation_lease: ABSENT_AND_VERIFIED
+cache_prefix: ABSENT_AND_VERIFIED
+second_stage_launch_trap: NOT_CALLED
+source_launch: NOT_RUN
+scheduler: NOT_RUN
+provider: NOT_RUN
+broker: NOT_RUN
+trading_effect: NOT_RUN
+exit: 0
+```
+
+Earlier external qualification-helper attempts blocked fail-closed before any
+governed source launch or scheduler/provider/broker/trading effect. They are
+diagnostic harness incidents, not accepted P124-4 evidence and not failures of
+the installed signed S5-R10 deployment.
+
+Current protected sequence:
+
+```text
+P125 retired-S5-R8 cleanup       PASS / complete
+P124-1 signed Python substrate  PASS
+P124-4 Trading guard            PASS
+P124-5 activation + scheduler   NEXT PROTECTED BOUNDARY / NOT AUTHORIZED
+```
+
+No activation lease was created, Task Scheduler was not mutated, and no
+provider, Paper-v2, broker-paper, or live-trading effect occurred during
+P124-4.
+
+The next safe checkpoint is read-only/source-only review of the exact P124-5
+activation-lease publication and capture-only scheduler transition. Actual
+activation-lease creation or Task Scheduler mutation requires fresh explicit
+human authorization.

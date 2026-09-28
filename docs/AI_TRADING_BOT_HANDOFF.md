@@ -5675,3 +5675,24 @@ share-bit inclusion and all host controls reproduce cleanly.
 NEXT: implement/source-review R1H-D lattice harness and fake-only tests, then
 run it once on the Windows host. Production P125 source remains frozen.
 
+## 2026-09-27 P125-R1H-D host lattice and R1H-E selection
+
+R1H-D disposable host evidence completed with cleanup PASS. PASS rows were
+source/parent R/RWD, RD/RWD, and RWD/RWD. Every row whose parent share was R
+or RD returned 0xC0000043 / STATUS_SHARING_VIOLATION. The unique minimal PASS
+pair is therefore source FILE_SHARE_READ and parent
+FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE.
+
+Architecture 125 now freezes R1H-E: production root rename moves to the fixed
+System32 NtSetInformationFile(FileRenameInformation=10) path with exact
+FIELD_OFFSET(FileName)+FileNameLength buffer, source share unchanged at READ,
+and parent share widened only to R|W|DELETE. Existing admission/order/identity/
+no-replace/post-publication rules remain unchanged.
+
+R1H-E must also prevent the consumed R1G recovery CLI from silently inheriting
+the new transport and add a new explicit R1H recovery entry point.
+
+NEXT: source-only Sol High implementation, focused verification, exact review,
+then replacement canonical three-lane certification. No F:\AITradingBot
+mutation is authorized.
+

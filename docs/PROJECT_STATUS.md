@@ -5625,3 +5625,34 @@ operator source. It may observe only the protected S5-R10 deployment and the
 existing D5 scheduler predecessor. It must not prompt for a credential, mutate
 Task Scheduler, create any lease file, or launch governed source. Protected
 P124-5 execution remains a later explicit effect boundary.
+
+
+### P124-5A exact-review follow-up — CORRECTION REQUIRED
+
+The preceding P124-5A acceptance entry is superseded before any host
+qualification or protected execution.
+
+Exact review found one source-provenance gap in the host launcher path:
+`scripts/d10_activation_scheduler_operator.py` imports the governed
+`trading_bot.runtime` lease/scheduler contracts through ordinary interpreter
+package resolution. The focused pytest configuration injects this worktree's
+`src`, but a normal protected CLI invocation from the accepted worktree using
+the existing shared development virtual environment can instead resolve the
+editable `trading_bot` package from another checkout. The four relevant
+runtime blobs are byte-identical between this branch and certified S5-R10, but
+the operator does not currently prove that those are the bytes actually loaded
+by the protected host process.
+
+No host preflight or protected P124-5 operation has run, so this is a
+source-only correction with no production effect.
+
+Required correction: the operator must bootstrap the sibling `src` directory
+derived only from its own reviewed `__file__` before importing
+`trading_bot`, and the host boundary must fail closed unless the loaded
+governed contract modules resolve under that exact sibling source root.
+No caller/env/PYTHONPATH-selected source root may grant authority. Add focused
+regression coverage for a shared/editable environment pointing at another
+checkout.
+
+P124-5B read-only host preflight remains blocked until this narrow correction
+is committed, pushed, exactly reviewed, and accepted.

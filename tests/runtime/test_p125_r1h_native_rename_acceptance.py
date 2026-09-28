@@ -755,30 +755,25 @@ def test_no_production_or_external_effect_surface_and_frozen_control_source():
         and node.func.value.id == "os"
         for node in ast.walk(tree)
     )
-    production = ast.parse(
-        Path(a.__file__).with_name("d10_protected_replacement_windows.py").read_text()
-    )
-    frozen = next(
-        node
-        for node in production.body
-        if isinstance(node, ast.ClassDef) and node.name == "_FileRenameInfo"
-    )
     harness = next(
         node
         for node in tree.body
         if isinstance(node, ast.ClassDef) and node.name == "_FileRenameInfo"
     )
-    # DWORD is exactly uint32 on Windows; all other frozen field shapes are identical.
-    frozen_text = ast.unparse(frozen.body[0]).replace(
-        "wintypes.DWORD", "ctypes.c_uint32"
+    assert ast.unparse(harness.body[0]) == (
+        "_fields_ = [('replace_if_exists', ctypes.c_ubyte), "
+        "('root_directory', ctypes.c_void_p), "
+        "('file_name_length', ctypes.c_uint32), "
+        "('file_name', ctypes.c_ubyte * 1)]"
     )
-    assert frozen_text == ast.unparse(harness.body[0])
-    builder = next(
+    buffer_size = next(
         node
-        for node in production.body
-        if isinstance(node, ast.FunctionDef) and node.name == "_fixed_rename_info"
+        for node in tree.body
+        if isinstance(node, ast.FunctionDef) and node.name == "_buffer_size"
     )
-    assert "ctypes.sizeof(_FileRenameInfo) + len(encoded) + 2" in ast.unparse(builder)
+    buffer_size_text = ast.unparse(buffer_size)
+    assert "_Case.WIN32_FROZEN_CONTROL" in buffer_size_text
+    assert "ctypes.sizeof(_FileRenameInfo) + name_length + 2" in buffer_size_text
 
 
 @pytest.mark.parametrize("prepared_count", [0, 1, 2])

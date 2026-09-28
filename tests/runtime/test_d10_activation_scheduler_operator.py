@@ -1103,6 +1103,12 @@ def test_update_uses_the_same_verified_com_definition_and_utf8_private_input() -
     update = o.UPDATE_HELPER.read_text(encoding="utf-8")
     observer = o.OBSERVE_HELPER.read_text(encoding="utf-8")
     assert "$third = Read-FixedTask $folder ([ref]$definition)" in update
+    assert "param($FixedFolder, $CapturedDefinition = $null)" in observer
+    assert "[ref]$CapturedDefinition = $null" not in observer
+    assert (
+        "$CapturedDefinition -isnot [System.Management.Automation.PSReference]"
+        in observer
+    )
     assert "$CapturedDefinition.Value = $definition" in observer
     assert (
         "[Console]::InputEncoding = [System.Text.UTF8Encoding]::new($false, $true)"

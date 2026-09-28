@@ -5535,3 +5535,30 @@ e279b6febfdfcd2024e1c19ef2a18a1f8f242b47 / tree
 branch and requires focused verification plus a replacement canonical
 three-lane certification before protected P125 replacement may be reconsidered.
 
+## 2026-09-27 P125 first-rename indeterminate incident and R1G recovery design
+
+Certified R1F source:
+- HEAD `168c0b7b799632dc366d2786932452b5b599ad12`
+- TREE `8e085a64229c3fea1696c4a5cc0b5227771a0236`
+- canonical certification: 7,972 cases / 7,955 passed / 17 skipped / 0 failures/errors.
+
+The authorized protected P125 replacement then stopped at its first rename with
+`BLOCKED / INDETERMINATE_MUTATION`, no completed renames, and last definitely
+known state `OLD_CANONICAL`.
+
+Fresh two-pass host reclassification proved exact OLD_CANONICAL:
+historical S5-R8 canonical, exact S5-R10 staging, retired absent, reserved names
+exact, D5 scheduler exact. A separate read-only pre-call replay proved fresh
+admission exact, handle opens exact, pinned identities stable, same-volume
+identity exact, destination absent, fixed rename buffer exact, and clean handle
+close. No retry was performed.
+
+Architecture 125 now contains the frozen R1G recovery contract. Next source
+checkpoint: add bounded native rename failure-stage + Win32 last-error evidence
+without changing effect authority. After exact review and replacement canonical
+certification, a new explicit operator approval is required before one R1G
+protected recovery attempt.
+
+P124-3 signing/trust publication, retired cleanup, activation, scheduler
+mutation, provider/Paper-v2, broker, and live effects remain unauthorized.
+

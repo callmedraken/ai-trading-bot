@@ -5252,3 +5252,29 @@ The certified R1E identity remains untouched. R1F must be implemented,
 reviewed, and canonically recertified before another protected replacement
 attempt.
 
+## P125-R1G — first-rename indeterminate recovery checkpoint
+
+The first protected P125 replacement attempt under certified R1F did not
+advance the namespace. It returned `INDETERMINATE_MUTATION` on
+OLD_TO_RETIRED with zero completed renames.
+
+Fresh read-only evidence now proves:
+- namespace = exact OLD_CANONICAL;
+- S5-R8 canonical exact;
+- S5-R10 staging exact;
+- retired path absent;
+- D5 scheduler exact;
+- full pre-call admission/handle/identity/volume/destination/buffer/close replay
+  exact;
+- no second rename, signing, cleanup, activation, or scheduler mutation occurred.
+
+R1G is now frozen as a source-only diagnostic/recovery enhancement. It must
+capture only a closed rename failure stage and immediate Win32 last-error value
+on a false SetFileInformationByHandle result while preserving
+INDETERMINATE_MUTATION and no automatic retry.
+
+The existing R1F operator must not be rerun. R1G requires implementation,
+focused verification, exact GitHub review, and replacement canonical
+certification. A later protected recovery invocation requires fresh explicit
+operator approval.
+

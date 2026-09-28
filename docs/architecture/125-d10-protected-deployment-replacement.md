@@ -266,6 +266,135 @@ The ordinary replacement command does not automatically continue from OLD_RETIRE
 
 This preserves the project rule that ambiguous external/protected effects are not converted into retry authority.
 
+## 8.1 P125-R1G explicit recovery after first-step indeterminate + exact OLD_CANONICAL reclassification
+
+The first protected P125-R1 replacement attempt on 2026-09-27 returned:
+
+    status = BLOCKED
+    reason_code = INDETERMINATE_MUTATION
+    completed_renames = []
+    highest_definitely_completed_namespace_state = OLD_CANONICAL
+
+That transcript did not prove whether the native first rename occurred. A fresh
+independent two-pass namespace observation then proved exactly:
+
+    OLD_CANONICAL
+    canonical = exact historical S5-R8
+    staging = exact S5-R10
+    retired = absent
+    unexpected reserved names = absent
+    D5 scheduler predecessor = exact
+
+A second read-only pre-call diagnostic reproduced the complete first-rename
+precondition boundary without calling `SetFileInformationByHandle`:
+
+- fresh full admission = exact OLD_CANONICAL;
+- every AdmissionFacts predicate = true;
+- parent handle open = success;
+- canonical source handle open = success;
+- pinned parent/source identities = exact admitted identities;
+- same volume serial/root = true;
+- retired destination = absent;
+- repeated pinned parent/source inspection = stable;
+- fixed FILE_RENAME_INFO buffer construction = exact fixed retired leaf;
+- ReplaceIfExists = false;
+- RootDirectory = the pinned parent handle;
+- source/parent close = success with no ambiguity.
+
+Therefore P125-R1G narrows the unresolved fault domain to the native rename call
+or the immediately subsequent verification/close path. The existing operator
+must not be rerun unchanged.
+
+### 8.1.1 No automatic retry authority
+
+Fresh exact OLD_CANONICAL proves that the prior attempt left no committed
+namespace transition. It does not by itself authorize an automatic retry.
+
+One additional protected retry may be considered only after:
+
+1. R1G diagnostic source is implemented, exact-reviewed, and canonically
+   certified;
+2. the operator again proves exact OLD_CANONICAL and the complete frozen
+   Architecture-125 admission immediately before mutation;
+3. the human explicitly authorizes the R1G recovery attempt.
+
+OLD_RETIRED, NEW_CANONICAL, or CONFLICTING remains a hard stop and is not
+eligible for this recovery path.
+
+### 8.1.2 Native failure diagnostics
+
+The R1G native wrapper must preserve fail-closed behavior while retaining one
+bounded diagnostic from a failed Windows rename call.
+
+Immediately before `SetFileInformationByHandle(..., FileRenameInfo, ...)` the
+ctypes saved last-error slot is cleared. If and only if the native call returns
+false, the wrapper must capture `ctypes.get_last_error()` immediately, before
+any other native/API call can overwrite it.
+
+The diagnostic surface is bounded and sanitized:
+
+- fixed rename step;
+- closed failure stage;
+- unsigned Win32 error code in the range 0..0xffffffff.
+
+It must not expose paths beyond the already frozen step identity, raw exception
+text, handles, ACLs, SIDs, arbitrary host strings, or caller-controlled data.
+
+A false native return remains `MutationOutcome.INDETERMINATE`; the error code
+is diagnostic only and grants no retry authority.
+
+For a true native return, saved last-error content is ignored as undefined/stale
+and the existing post-call pinned identity checks remain mandatory.
+
+### 8.1.3 Closed failure-stage taxonomy
+
+R1G may distinguish only these closed stages:
+
+    PRE_CALL
+    NATIVE_FALSE
+    POST_CALL_VERIFY
+    CLOSE_AMBIGUITY
+
+No raw exception class/text is emitted. Any unclassified exception collapses
+to PRE_CALL or POST_CALL_VERIFY according to whether the native rename call had
+already reported success.
+
+### 8.1.4 Recovery-attempt semantics
+
+The R1G protected recovery operator remains one invocation with at most the two
+existing fixed renames in the original order.
+
+If the first native rename returns false:
+
+- stop immediately;
+- emit BLOCKED / INDETERMINATE_MUTATION plus the bounded R1G diagnostic;
+- do not attempt the second rename;
+- do not retry;
+- do not rollback;
+- perform only fresh read-only namespace classification after handles close.
+
+If the first rename reports success and the existing pinned post-call/close
+proof succeeds, continue only under the existing second-step revalidation and
+fixed staging-to-canonical rename contract.
+
+If the second rename is indeterminate, preserve the existing OLD_RETIRED
+highest-definitely-completed-state semantics and stop without retry/rollback.
+
+A PASS still requires the unchanged post-publication verification and leaves
+canonical S5-R10 unsigned/inactive with historical S5-R8 retired.
+
+### 8.1.5 Diagnostic evidence is not trust or activation authority
+
+R1G adds no signing, trust-publication, activation-lease, scheduler-mutation,
+provider, Paper-v2, broker, or live authority. It does not change the fixed
+paths, source/staging bytes, D5 scheduler contract, no-replace behavior, or
+post-publication invariants.
+
+Microsoft documents that `SetFileInformationByHandle` returns zero on failure
+and that extended error information is obtained through `GetLastError`. R1G
+uses only that bounded diagnostic to characterize the already reviewed native
+call; it does not weaken the mutation fence.
+
 ## 9. Post-publication verification
 
 If both renames return success in the same admitted invocation, the operator must immediately verify:

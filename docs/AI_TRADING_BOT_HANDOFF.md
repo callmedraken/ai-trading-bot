@@ -5764,3 +5764,69 @@ principal. It must verify the installed signed S5-R10 guard/source deployment
 without launching governed trading source or performing any effect. P124-5
 remains a separate higher-risk approval boundary.
 
+
+
+## 2026-09-28 P124-4 S5-R10 Trading guard qualification PASS
+
+P124-4 is accepted complete.
+
+The accepted run executed under the actual local non-admin Trading principal
+(SID `S-1-5-21-1397534616-3988210162-180023805-1009`) using the fixed
+production interpreter and the admitted v4 external no-effect qualification
+helper.
+
+Accepted helper:
+
+```text
+F:\Users\John\Downloads\p1244_trading_guard_qualification_s5r10_v4.py
+SHA-256:
+4bbe84bef2e5bdfc56e35d7fee60210e70f1989a28f3908df7aac460f69d48d9
+```
+
+Accepted evidence:
+
+```text
+F:\Users\John\Downloads\p1244-s5r10-v4-20260928-144834.json
+SHA-256:
+6e369eb917922acf3548a0b8bec656f859e940e9ded269e4e213a834a9e7aa84
+```
+
+The evidence proved the exact signed S5-R10 deployment
+`9f3d111b-25bb-5ee4-9abf-f5215a32b826`, attestation SHA-256
+`4e4e44d4129876454bd5d9559af7358f2600466f9291c6626f92e173d541f2c2`,
+certified source HEAD/TREE
+`c5cc0b01301600daf17f1114f4451dca2c9d7a1f` /
+`bfacfadaa14315d2d378abcc0f1e4bc7c42034f1`, 306 executable files, and
+the exact 69,259-byte launch guard SHA-256
+`37d78c65800a315a12049b6c278addf609589d121e15d31dd9064dc8ec427298`.
+
+Accepted no-effect results:
+
+```text
+signed deployment verification: PASS
+Trading principal verification: PASS
+sealed source verification: PASS
+trust reread stability: PASS
+guard argv context: EXACT_INSTALLED_GUARD_PATH_EMULATED
+activation lease absence:
+  NATIVE_FILE_OR_PATH_NOT_FOUND / ABSENT_AND_VERIFIED
+cache prefix: ABSENT_AND_VERIFIED
+second-stage launch trap: NOT_CALLED
+source launch: NOT_RUN
+scheduler: NOT_RUN
+provider: NOT_RUN
+broker: NOT_RUN
+trading effect: NOT_RUN
+exit: 0
+```
+
+Earlier external-helper attempts blocked fail-closed before governed source
+launch or any scheduler/provider/broker/trading effect. They are diagnostic
+harness incidents, not accepted P124-4 evidence and not failures of the
+installed signed S5-R10 deployment.
+
+P124-5 is now the next protected checkpoint, but it remains NOT AUTHORIZED.
+Safe continuation is limited to exact source/document review and read-only
+preflight preparation for the frozen activation-lease + capture-only Task
+Scheduler transition. Creating the activation lease or mutating Task Scheduler
+requires fresh explicit human authorization.

@@ -19,6 +19,18 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Protocol
 
+# Authority imports must follow this source-owned bootstrap, including scripts
+# imports that transitively import trading_bot. No cwd/env/Git source is used.
+_OPERATOR_FILE = Path(__file__)
+if not _OPERATOR_FILE.is_absolute():
+    raise RuntimeError("operator_source_path_not_absolute")
+_OPERATOR_REPO_ROOT = _OPERATOR_FILE.resolve(strict=True).parent.parent
+_OPERATOR_SOURCE_ROOT = _OPERATOR_REPO_ROOT / "src"
+_OPERATOR_SCRIPTS_ROOT = _OPERATOR_REPO_ROOT / "scripts"
+sys.path.insert(0, str(_OPERATOR_REPO_ROOT))
+sys.path.insert(0, str(_OPERATOR_SOURCE_ROOT))
+
+# ruff: noqa: E402 -- fixed source bootstrap must precede authority imports.
 from scripts import d10_protected_deployment as d
 from scripts import d10_protected_replacement as replacement
 from scripts.d10_protected_deployment_windows import (
@@ -80,6 +92,54 @@ _RESERVED = (
 
 class OperatorBlocked(RuntimeError):
     """Only source-owned stage labels may appear in operator evidence."""
+
+
+# Capture the actual imported modules, including transitive contract/transport
+# dependencies, so replacing sys.modules cannot hide a foreign loaded binding.
+_GOVERNED_AUTHORITY_MODULES = (
+    "trading_bot",
+    "trading_bot.runtime",
+    "trading_bot.runtime.personal_desktop_d10_activation_lease",
+    "trading_bot.runtime.personal_desktop_unattended_one_week_soak_scheduler_contract",
+    "trading_bot.runtime.personal_desktop_unattended_scheduler_contract",
+    "trading_bot.runtime.personal_desktop_unattended_capture_warmup_scheduler_contract",
+    "trading_bot.runtime.personal_desktop_d10_deployment_identity",
+    "trading_bot.runtime.personal_desktop_d10_python_substrate",
+    "trading_bot.runtime.personal_desktop_unattended_one_week_soak_window",
+)
+_SCRIPT_AUTHORITY_MODULES = (
+    "scripts",
+    "scripts.d10_protected_deployment",
+    "scripts.d10_protected_replacement",
+    "scripts.d10_protected_deployment_windows",
+    "scripts.d10_protected_replacement_windows",
+    "scripts.build_d10_deployment_identity",
+)
+_SOURCE_PROVENANCE = tuple(
+    (name, sys.modules[name], root)
+    for names, root in (
+        (_GOVERNED_AUTHORITY_MODULES, _OPERATOR_SOURCE_ROOT),
+        (_SCRIPT_AUTHORITY_MODULES, _OPERATOR_SCRIPTS_ROOT),
+    )
+    for name in names
+)
+
+
+def _require_source_provenance() -> None:
+    """Reject missing, foreign, or replaced authority modules before host entry."""
+    try:
+        for name, module, root in _SOURCE_PROVENANCE:
+            filename = getattr(module, "__file__", None)
+            if sys.modules.get(name) is not module or type(filename) is not str:
+                raise OperatorBlocked("operator_source_provenance_mismatch")
+            path = Path(filename)
+            if not path.is_absolute():
+                raise OperatorBlocked("operator_source_provenance_mismatch")
+            resolved = path.resolve(strict=True)
+            if not resolved.is_file() or not resolved.is_relative_to(root):
+                raise OperatorBlocked("operator_source_provenance_mismatch")
+    except Exception:
+        raise OperatorBlocked("operator_source_provenance_mismatch") from None
 
 
 class Disposition(StrEnum):
@@ -808,6 +868,7 @@ def _interactive_credential() -> str:
 
 
 def _host_operator(*, protected: bool = False) -> _Operator:
+    _require_source_provenance()
     return _Operator(
         WindowsD10ReadOnlyReader(),
         WindowsCngVerifier(),
@@ -822,16 +883,19 @@ def _host_operator(*, protected: bool = False) -> _Operator:
 
 def preflight() -> dict[str, object]:
     """Read-only admission at the fixed namespace and accepted D5 task."""
+    _require_source_provenance()
     return _host_operator().preflight()
 
 
 def reconcile() -> dict[str, object]:
     """Independent read-only reconstruction; no caller plan is accepted."""
+    _require_source_provenance()
     return _host_operator().reconcile()
 
 
 def execute(*, execute_p1245: bool = False) -> dict[str, object]:
     """Protected invocation only after separately reviewed operator approval."""
+    _require_source_provenance()
     if execute_p1245 is not True:
         return {
             "schema": SCHEMA,

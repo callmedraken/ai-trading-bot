@@ -1,8 +1,9 @@
 """Architecture-128 R4B Windows staging/read/rename adapters.
 
-Importing this module performs no host observation or mutation. Constructors bind
-native libraries only. Production mutation remains separately authorization-gated
-and requires a later Architecture-128 operator to invoke these fixed adapters.
+Importing this module performs no host observation or mutation.
+Constructors bind native libraries only. Production mutation remains separately
+authorization-gated and requires a later Architecture-128 operator to invoke
+these fixed adapters.
 """
 
 from __future__ import annotations
@@ -31,10 +32,10 @@ _TRUST_INSTALLING = tuple(
     r4.STAGING_PATH + "\\" + name + ".installing" for name in _TRUST_NAMES
 )
 _TRUST_FINAL = tuple(r4.STAGING_PATH + "\\" + name for name in _TRUST_NAMES)
-_GUARD_INSTALLING = r4.STAGING_PATH + r"\\launch-guard.py.installing"
-_GUARD_FINAL = r4.STAGING_PATH + r"\\launch-guard.py"
-_SOURCE_INSTALLING = r4.STAGING_PATH + r"\\source.installing"
-_SOURCE_FINAL = r4.STAGING_PATH + r"\\source"
+_GUARD_INSTALLING = r4.STAGING_PATH + r"\launch-guard.py.installing"
+_GUARD_FINAL = r4.STAGING_PATH + r"\launch-guard.py"
+_SOURCE_INSTALLING = r4.STAGING_PATH + r"\source.installing"
+_SOURCE_FINAL = r4.STAGING_PATH + r"\source"
 
 _ALLOWED_FIXED_FILES = {
     "launch-guard.py",
@@ -362,6 +363,8 @@ def rename_fixed_step(
             except Exception:
                 cleanup_ambiguous = True
 
-    if cleanup_ambiguous or (native_succeeded and outcome is not r4.MutationOutcome.SUCCESS):
+    if cleanup_ambiguous or (
+        native_succeeded and outcome is not r4.MutationOutcome.SUCCESS
+    ):
         return r4.MutationOutcome.INDETERMINATE
     return outcome

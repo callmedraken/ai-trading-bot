@@ -139,8 +139,8 @@ class EvidenceNative:
         self.paths: dict[int, str] = {}
         self.next_handle = 1
         self.closed: list[int] = []
-        self.drift_after_append = False
-        self.appended = False
+        self.append_count = 0
+        self.drift_after_append_count: int | None = None
 
     def open(self, path: str, *, directory: bool) -> int:
         assert directory
@@ -184,7 +184,12 @@ class EvidenceNative:
             "F:\\",
             "NTFS",
             41,
-            201 if self.appended and self.drift_after_append else 200,
+            (
+                201
+                if self.drift_after_append_count is not None
+                and self.append_count >= self.drift_after_append_count
+                else 200
+            ),
             1,
             len(self.data),
             guard.ADMINISTRATORS_SID,
@@ -202,7 +207,7 @@ class EvidenceNative:
         assert self.paths[handle] == self.path
         assert len(self.data) == expected_size
         self.data += payload
-        self.appended = True
+        self.append_count += 1
 
 
 def test_append_only_acl_and_path_are_frozen() -> None:
@@ -243,7 +248,11 @@ def test_guarded_no_action_wake_is_captured_and_appended(
         )
         == 0
     )
-    assert native.data == record + b"\n"
+    lines = native.data.splitlines()
+    assert len(lines) == 2
+    assert guard.D10_GUARD_WAKE_START_EVIDENCE_SCHEMA.encode() in lines[0]
+    assert lines[1] == record
+    assert guard._parse_evidence_log(native.data, deployment, lease)[2] is False
     assert calls[0][1]["capture_output"] is True
     assert calls[0][1]["cwd"] == guard.D10_ROOT
     assert "evidence" not in " ".join(calls[0][0]).lower()
@@ -336,7 +345,7 @@ def test_post_append_native_identity_drift_fails_closed(
     deployment = _deployment()
     lease = _lease(deployment)
     native = EvidenceNative(lease)
-    native.drift_after_append = True
+    native.drift_after_append_count = 2
     record = _wake_record(deployment, lease)
     monkeypatch.setattr(
         guard.subprocess,
@@ -433,3 +442,182 @@ def test_canonical_but_malformed_child_record_becomes_terminal_guard_evidence(
     )
     assert b"CHILD_OUTPUT_INVALID" in native.data
     assert guard._parse_evidence_log(native.data, deployment, lease)[2] is True
+
+
+
+def test_post_child_append_failure_leaves_start_latch_and_blocks_retry(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    deployment = _deployment()
+    lease = _lease(deployment)
+
+    class FailingSecondAppend(EvidenceNative):
+        def append_exact(
+            self, handle: int, payload: bytes, expected_size: int
+        ) -> None:
+            if self.append_count == 1:
+                raise guard.GuardBlocked("simulated result append failure")
+            super().append_exact(handle, payload, expected_size)
+
+    native = FailingSecondAppend(lease)
+    record = _wake_record(deployment, lease)
+    calls = [0]
+
+    def child(*args, **kwargs):
+        del args, kwargs
+        calls[0] += 1
+        return SimpleNamespace(returncode=0, stdout=record + b"\n", stderr=b"")
+
+    monkeypatch.setattr(guard.subprocess, "run", child)
+    environment = {"SystemRoot": r"C:\Windows", "WINDIR": r"C:\Windows"}
+
+    with pytest.raises(guard.GuardBlocked, match="simulated result append failure"):
+        guard._run_second_stage_with_evidence(
+            deployment, lease, environment, native
+        )
+    assert calls[0] == 1
+    assert native.append_count == 1
+    assert guard.D10_GUARD_WAKE_START_EVIDENCE_SCHEMA.encode() in native.data
+    assert guard._parse_evidence_log(native.data, deployment, lease)[2] is True
+
+    with pytest.raises(guard.GuardBlocked, match="stop latch"):
+        guard._run_second_stage_with_evidence(
+            deployment, lease, environment, native
+        )
+    assert calls[0] == 1
+
+
+@pytest.mark.parametrize(
+    ("stdout", "stderr", "returncode", "reason"),
+    [
+        (b"", b"", 0, b"CHILD_OUTPUT_MISSING"),
+        (b"{}\n{}\n", b"", 0, b"CHILD_OUTPUT_INVALID"),
+        (b"not-json\n", b"", 0, b"CHILD_OUTPUT_INVALID"),
+        (b"", b"unexpected", 0, b"CHILD_OUTPUT_INVALID"),
+    ],
+)
+def test_child_output_ambiguity_is_durably_terminal(
+    monkeypatch: pytest.MonkeyPatch,
+    stdout: bytes,
+    stderr: bytes,
+    returncode: int,
+    reason: bytes,
+) -> None:
+    deployment = _deployment()
+    lease = _lease(deployment)
+    native = EvidenceNative(lease)
+    monkeypatch.setattr(
+        guard,
+        "_trusted_runtime_utc_now",
+        lambda: datetime(2026, 9, 29, 8, 33, tzinfo=UTC),
+    )
+    monkeypatch.setattr(
+        guard.subprocess,
+        "run",
+        lambda *args, **kwargs: SimpleNamespace(
+            returncode=returncode, stdout=stdout, stderr=stderr
+        ),
+    )
+    assert (
+        guard._run_second_stage_with_evidence(
+            deployment,
+            lease,
+            {"SystemRoot": r"C:\Windows", "WINDIR": r"C:\Windows"},
+            native,
+        )
+        == 1
+    )
+    assert reason in native.data
+    assert guard._parse_evidence_log(native.data, deployment, lease)[2] is True
+
+
+def test_exit_mismatch_is_durably_terminal(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    deployment = _deployment()
+    lease = _lease(deployment)
+    native = EvidenceNative(lease)
+    record = _wake_record(deployment, lease)
+    monkeypatch.setattr(
+        guard,
+        "_trusted_runtime_utc_now",
+        lambda: datetime(2026, 9, 29, 8, 34, tzinfo=UTC),
+    )
+    monkeypatch.setattr(
+        guard.subprocess,
+        "run",
+        lambda *args, **kwargs: SimpleNamespace(
+            returncode=1, stdout=record + b"\n", stderr=b""
+        ),
+    )
+    assert (
+        guard._run_second_stage_with_evidence(
+            deployment,
+            lease,
+            {"SystemRoot": r"C:\Windows", "WINDIR": r"C:\Windows"},
+            native,
+        )
+        == 1
+    )
+    assert b"CHILD_EXIT_MISMATCH" in native.data
+    assert guard._parse_evidence_log(native.data, deployment, lease)[2] is True
+
+
+def test_missing_or_wrong_security_evidence_file_blocks_before_child(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    deployment = _deployment()
+    lease = _lease(deployment)
+    calls = [0]
+
+    class MissingEvidence(EvidenceNative):
+        def open_evidence_file(self, path: str) -> int:
+            del path
+            raise guard.GuardBlocked("evidence file missing")
+
+    missing = MissingEvidence(lease)
+    monkeypatch.setattr(
+        guard.subprocess,
+        "run",
+        lambda *args, **kwargs: calls.__setitem__(0, calls[0] + 1),
+    )
+    with pytest.raises(guard.GuardBlocked, match="missing"):
+        guard._run_second_stage_with_evidence(
+            deployment,
+            lease,
+            {"SystemRoot": r"C:\Windows", "WINDIR": r"C:\Windows"},
+            missing,
+        )
+    assert calls[0] == 0
+
+    wrong = EvidenceNative(lease)
+    original = wrong.inspect
+
+    def inspect(handle: int) -> guard.ObjectFacts:
+        facts = original(handle)
+        if wrong.paths[handle] == wrong.path:
+            return guard.ObjectFacts(
+                facts.final_path,
+                facts.attributes,
+                facts.drive_type,
+                facts.volume_root,
+                facts.filesystem,
+                facts.volume_serial,
+                facts.file_index,
+                2,
+                facts.size,
+                facts.owner,
+                facts.protected,
+                facts.aces,
+            )
+        return facts
+
+    wrong.inspect = inspect
+    with pytest.raises(guard.GuardBlocked, match="hard-linked"):
+        guard._run_second_stage_with_evidence(
+            deployment,
+            lease,
+            {"SystemRoot": r"C:\Windows", "WINDIR": r"C:\Windows"},
+            wrong,
+        )
+    assert calls[0] == 0

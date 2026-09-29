@@ -483,3 +483,33 @@ External-effect prerequisites and no-effect preflight must remain separate from
 any command that can cross an effect fence. A consumed `CONFIRMED` or
 `MAY_HAVE_OCCURRED` lineage is never retried by manufacturing a new execution of
 the same consumed authority.
+
+
+## Combined Ruff diagnostic rule
+
+When ChatGPT supplies an operator verification gate that checks both Ruff lint
+and Ruff formatting, the gate must collect both results before failing. The
+canonical pattern is:
+
+```powershell
+& $Python -m ruff check --no-cache @Files
+$RuffCheckExit = $LASTEXITCODE
+if ($RuffCheckExit -ne 0) {
+    & $Python -m ruff check --diff --no-cache @Files
+}
+
+& $Python -m ruff format --check --no-cache @Files
+$RuffFormatExit = $LASTEXITCODE
+if ($RuffFormatExit -ne 0) {
+    & $Python -m ruff format --diff --no-cache @Files
+}
+
+if ($RuffCheckExit -ne 0 -or $RuffFormatExit -ne 0) {
+    throw 'STOP: Ruff verification failed'
+}
+```
+
+Both diagnostics are non-mutating. A lint failure must not prevent the formatter
+check from running, because `ruff check` and `ruff format --check` validate
+different contracts. Do not use `--fix` or run an in-place formatter merely to
+diagnose an operator gate failure.

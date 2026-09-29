@@ -357,6 +357,21 @@ def confirm_complete(
         MutationOutcome.SUCCESS,
     )
 
+
+def fail_post_rename_verification(
+    result: ReplacementResult,
+) -> ReplacementResult:
+    if (
+        type(result) is not ReplacementResult
+        or result.phase not in (Phase.VERIFY_RETIRED_WINDOW, Phase.VERIFY_COMPLETE)
+    ):
+        raise ValueError("R4 post-rename verification failure is not admissible")
+    return ReplacementResult(
+        Phase.STOPPED_INDETERMINATE,
+        result.old_to_retired,
+        result.staging_to_canonical,
+    )
+
 def fixed_rename_paths(step: RenameStep) -> tuple[str, str]:
     if step is RenameStep.OLD_TO_RETIRED:
         return CANONICAL_PATH, RETIRED_PATH

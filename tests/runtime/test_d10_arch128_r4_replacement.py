@@ -398,3 +398,33 @@ def test_completion_verification_rejects_wrong_namespace_or_facts() -> None:
             ),
             _post_facts(new_evidence_root_exact_empty=False),
         )
+
+
+def test_post_rename_verification_failure_latches_terminal_stop() -> None:
+    ready = _namespace(
+        _root(r4.CANONICAL_PATH, r4.OLD_IDENTITY),
+        _root(r4.STAGING_PATH, r4.NEW_IDENTITY),
+        _absent(r4.RETIRED_PATH),
+    )
+    first = r4.record_rename(
+        r4.begin_replacement(ready, _facts()),
+        r4.RenameStep.OLD_TO_RETIRED,
+        r4.MutationOutcome.SUCCESS,
+    )
+    stopped = r4.fail_post_rename_verification(first)
+    assert stopped == r4.ReplacementResult(
+        r4.Phase.STOPPED_INDETERMINATE,
+        r4.MutationOutcome.SUCCESS,
+        r4.MutationOutcome.NOT_CALLED,
+    )
+
+    with pytest.raises(ValueError):
+        r4.confirm_retired_window(
+            stopped,
+            _namespace(
+                _absent(r4.CANONICAL_PATH),
+                _root(r4.STAGING_PATH, r4.NEW_IDENTITY),
+                _root(r4.RETIRED_PATH, r4.OLD_IDENTITY),
+            ),
+            _post_facts(),
+        )

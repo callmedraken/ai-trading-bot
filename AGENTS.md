@@ -227,6 +227,8 @@ Current source-only examples:
 .\ops.ps1 status
 .\ops.ps1 verify arch128-parent-acl-repair
 .\ops.ps1 verify arch128-r4
+.\ops.ps1 preflight arch128-parent-acl-repair
+.\ops.ps1 preflight arch128-r4
 ```
 
 The unified runner owns the mandatory combined Ruff behavior: both

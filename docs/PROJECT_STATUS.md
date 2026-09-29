@@ -6513,3 +6513,11 @@ read-only admission with staging present before any rename. This resolves the
 earlier contradiction between “R3 read-only” and “staging already present.”
 No production mutation occurred as part of this docs correction.
 
+### Architecture 128 R3 historical-retired-state correction
+
+Accepted P125-R1I evidence already removed the historical S5-R8 retired tree.
+R3 therefore requires that S5-R8 retired namespace to remain absent. It must not
+expect or recreate that historical tree. The only retirement destination that
+must be absent before R4 is the new incident-preservation destination for the
+currently halted S5-R10 deployment.
+

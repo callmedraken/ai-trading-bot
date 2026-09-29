@@ -96,7 +96,7 @@ The old activation lease is not cleanup debris. It is incident evidence.
 Architecture 128 must never delete, overwrite, truncate, rewrite, reuse, or
 reactivate it.
 
-The previously retained S5-R8 retired deployment also remains untouched.
+The historical S5-R8 retired deployment was already removed by the accepted P125-R1I cleanup and must remain absent.
 
 ## 4. Namespace lineage
 
@@ -164,7 +164,7 @@ must prove:
 - exact old S5-R10 canonical deployment;
 - exact old final activation lease and incident identity;
 - exact disabled/non-running D10 scheduler contract;
-- exact retained S5-R8 retired root;
+- historical S5-R8 retired root absent, matching accepted P125-R1I cleanup evidence;
 - new S5-R10 retired destination absent;
 - new Architecture-128 staging destination absent;
 - no conflicting reserved names;
@@ -198,7 +198,7 @@ A successful replacement leaves:
 
 - new signed Architecture-127 deployment at canonical D10;
 - halted S5-R10 deployment + old lease at its fixed retired incident root;
-- historical S5-R8 retired root untouched;
+- historical S5-R8 retired root remains absent;
 - new canonical activation lease absent;
 - new evidence directory present but no current-soak file;
 - scheduler still disabled/non-running.

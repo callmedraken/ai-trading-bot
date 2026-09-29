@@ -55,7 +55,7 @@ Prove twice-stable:
 - exact S5-R10 canonical deployment;
 - exact old final lease and old activation/end/soak;
 - exact disabled/non-running D10 scheduler;
-- exact historical S5-R8 retired root;
+- historical S5-R8 retired root absent, matching accepted P125-R1I cleanup;
 - new retired destination absent;
 - new Architecture-128 staging destination absent;
 - no conflicting reserved names;

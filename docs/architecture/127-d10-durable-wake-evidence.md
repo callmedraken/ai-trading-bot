@@ -205,3 +205,56 @@ Source certification must prove:
 - scheduler action remains unchanged and zero-semantic-argument;
 - existing Architecture-122 effect budgets/order/gate closure remain unchanged;
 - broker/live calls remain impossible.
+
+
+## E4 correction — durable pre-launch wake-start marker
+
+Adversarial E4 review found one remaining continuation ambiguity in the initial
+E2/E3 implementation: if the second-stage child returned after crossing a
+permitted D10 effect but the guard then could not durably append the ordinary
+wake record or a guard-terminal record, the evidence log could remain
+nonterminal and a later scheduler wake could launch source again.
+
+The frozen correction is a durable **pre-launch wake-start marker**.
+
+Before launching the second-stage child, the guard must append, flush, reread,
+and verify one bounded canonical wake-start record to the same fixed
+current-soak evidence file. The wake-start record is bound to the exact
+deployment and soak and contains only a guard timestamp plus those identities.
+
+Evidence-log state is now paired:
+
+```text
+WAKE_START -> ordinary COMPLETED/NO_ACTION   = completed nonterminal wake
+WAKE_START -> ordinary STOPPED               = terminal soak
+WAKE_START -> guard-terminal failure         = terminal soak
+WAKE_START as final record                    = terminal/incomplete soak
+```
+
+A wake-start record may never appear while another start is unresolved.
+An ordinary or guard-terminal result may never appear without one immediately
+preceding unresolved wake-start. Once a terminal result is present, no later
+record is valid.
+
+The guard must reserve capacity for both the start record and the maximum
+possible result record **before** appending the start marker. Only after the
+start marker is durably verified may source launch occur.
+
+This ordering means:
+
+- failure to append the start marker causes no source launch and may safely be
+  retried by a later scheduler wake;
+- after the start marker is durable, any child launch/output/result-append
+  failure leaves either a durable explicit terminal record or the unresolved
+  start marker itself;
+- an unresolved final start marker blocks all later source launch;
+- no scheduler mutation or in-process retry is needed to preserve stop
+  semantics.
+
+The start marker is audit/stop-control evidence only. It grants no provider,
+settlement, publication, receipt-recovery, broker, live, retry, or lease
+authority.
+
+E4 acceptance must specifically prove that post-child append failure leaves the
+durable start marker as a terminal latch and that a subsequent guard invocation
+cannot launch the child.

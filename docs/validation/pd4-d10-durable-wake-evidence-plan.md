@@ -39,19 +39,29 @@ E2 — native append-only evidence capability
 
 E3 — sealed guard integration
 - verify evidence sink before child launch;
-- parse complete existing log and enforce same soak/deployment identity;
-- terminal prior record prevents child launch;
-- prove capacity for one maximum record;
+- parse the complete existing paired log and enforce the same
+  soak/deployment identity;
+- terminal prior state prevents child launch;
+- prove bounded capacity for both one wake-start marker and one maximum result
+  record before source launch;
+- durably append + flush + reread/reverify the guard-owned wake-start marker
+  before source launch;
 - capture exactly one child stdout record;
-- append + flush + reread/reverify;
+- append + flush + reread/reverify the ordinary or guard-terminal result;
 - no shell redirection and no scheduler-contract change.
 
 E4 — terminal failure behavior
-- if ordinary child emits a canonical STOPPED record, persist it and block all
-  later wakes;
+- an unresolved final wake-start marker is terminal/incomplete and blocks every
+  later source launch for that soak;
+- if ordinary child emits a canonical STOPPED record, persist it after its
+  wake-start marker and block all later wakes;
 - if child fails before producing valid ordinary evidence and safe append remains
-  available, persist one bounded guard-terminal record;
-- malformed/partial/oversized/foreign existing log blocks before source launch;
+  available, persist one bounded guard-terminal record after its wake-start
+  marker;
+- if result append/flush/reread/native verification fails after source launch,
+  the already-durable unresolved wake-start marker remains the stop latch;
+- malformed/partial/oversized/foreign/unpaired existing log blocks before
+  source launch;
 - no automatic cleanup, truncation, retry, restart, or extension.
 
 E5 — read-only operator observation

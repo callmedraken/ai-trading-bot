@@ -28,6 +28,7 @@ D10_EVIDENCE_ROOT = D10_ROOT + r"\evidence"
 D10_WAKE_EVIDENCE_SCHEMA = "personal-desktop-d10-wake-evidence/v1"
 D10_GUARD_WAKE_START_EVIDENCE_SCHEMA = "personal-desktop-d10-guard-start/v1"
 D10_GUARD_TERMINAL_EVIDENCE_SCHEMA = "personal-desktop-d10-guard-evidence/v1"
+D10_EVIDENCE_OBSERVATION_SCHEMA = "personal-desktop-d10-evidence-observation/v1"
 MAX_D10_WAKE_EVIDENCE_BYTES = 16 * 1024
 MAX_D10_GUARD_WAKE_START_EVIDENCE_BYTES = 2048
 MAX_D10_GUARD_TERMINAL_EVIDENCE_BYTES = 2048
@@ -1032,6 +1033,39 @@ class _Native:
             digest.update(buffer.raw[: received.value])
             remaining -= received.value
         return digest.hexdigest()
+
+
+def _read_fixed_activation_lease_bytes_for_observer(
+    native: _Native,
+) -> bytes:
+    """Read the fixed lease read-only without requiring the Trading token."""
+    with ExitStack() as stack:
+        for path in (D10_ACTIVATION_LEASE_INSTALLING, D10_ACTIVATION_LEASE_TEMP):
+            native.require_absent(path)
+        root_handle = native.open(D10_ROOT, directory=True)
+        stack.callback(native.close, root_handle)
+        root_before = native.inspect(root_handle)
+        _require_facts(D10_ROOT, True, root_before)
+
+        lease_handle = native.open(D10_ACTIVATION_LEASE, directory=False)
+        stack.callback(native.close, lease_handle)
+        lease_before = native.inspect(lease_handle)
+        _require_facts(D10_ACTIVATION_LEASE, False, lease_before)
+        if not 0 < lease_before.size <= ACTIVATION_LEASE_LIMIT:
+            raise GuardBlocked("D10 activation lease size is out of bounds")
+        data = native.read_exact(lease_handle, lease_before.size)
+        if type(data) is not bytes or len(data) != lease_before.size:
+            raise GuardBlocked("D10 activation lease read length differs")
+
+        for path in (D10_ACTIVATION_LEASE_INSTALLING, D10_ACTIVATION_LEASE_TEMP):
+            native.require_absent(path)
+        root_after = native.inspect(root_handle)
+        lease_after = native.inspect(lease_handle)
+        _require_facts(D10_ROOT, True, root_after)
+        _require_facts(D10_ACTIVATION_LEASE, False, lease_after)
+        _stable(root_before, root_after)
+        _stable(lease_before, lease_after)
+        return data
 
 
 def _read_fixed_activation_lease_bytes(native: _Native | None = None) -> bytes:
@@ -2675,6 +2709,175 @@ def _run_second_stage_with_evidence(
         )
         outcome, _observed = _parse_ordinary_wake_record(record, deployment, lease)
         return 1 if outcome == "STOPPED" else 0
+
+
+def observe_fixed_d10_durable_wake_evidence() -> dict[str, object]:
+    """Return sanitized exact-current-soak evidence without mutating D10 state."""
+    native = _Native()
+
+    material = _read_fixed_trust_material(native)
+    _verify_d10_signature(material.attestation, material.signature)
+    attestation = _parse_attestation(material.attestation)
+    entries = _parse_manifest(material.manifest)
+    if (
+        len(material.guard) != attestation["launch_guard_byte_length"]
+        or hashlib.sha256(material.guard).hexdigest()
+        != attestation["launch_guard_sha256"]
+        or len(entries) != attestation["executable_file_count"]
+        or hashlib.sha256(material.manifest).hexdigest()
+        != attestation["executable_manifest_sha256"]
+    ):
+        raise GuardBlocked("D10 observer deployment identity differs")
+    _verify_sealed_source(entries, native)
+    if _read_fixed_trust_material(native) != material:
+        raise GuardBlocked("D10 observer deployment trust drifted")
+
+    deployment = VerifiedDeploymentFacts(
+        deployment_id=attestation["deployment_id"],
+        attestation_sha256=hashlib.sha256(material.attestation).hexdigest(),
+        certified_source_head=attestation["certified_source_head"],
+        certified_source_tree=attestation["certified_source_tree"],
+        executable_file_count=attestation["executable_file_count"],
+        schema=attestation["schema"],
+        signing_key_id=attestation["signing_key_id"],
+        source_root=attestation["source_root"],
+        launch_guard=attestation["launch_guard"],
+        launcher=attestation["launcher"],
+        scheduler_contract_schema=attestation["scheduler_contract_schema"],
+        approved_trading_sid=attestation["approved_trading_sid"],
+        production_python=attestation["production_python"],
+        production_python_version=attestation["production_python_version"],
+    )
+
+    lease_bytes = _read_fixed_activation_lease_bytes_for_observer(native)
+    lease, _activation, _end = _parse_active_lease_facts(lease_bytes, deployment)
+    lease_facts = VerifiedActivationLeaseFacts(
+        state="PRESENT",
+        deployment_id=deployment.deployment_id,
+        attestation_sha256=deployment.attestation_sha256,
+        soak_id=lease["soak_id"],
+        accepted_activation_utc=lease["accepted_activation_utc"],
+        end_utc=lease["end_utc"],
+        certified_source_head=lease["certified_source_head"],
+        certified_source_tree=lease["certified_source_tree"],
+        scheduler_contract_schema=lease["scheduler_contract_schema"],
+        scheduler_contract_id=lease["scheduler_contract_id"],
+        trading_sid=lease["trading_sid"],
+        production_python=lease["production_python"],
+        production_python_version=lease["production_python_version"],
+    )
+    evidence_path = _wake_evidence_path(lease_facts)
+
+    with ExitStack() as stack:
+        root_handle = native.open(D10_EVIDENCE_ROOT, directory=True)
+        stack.callback(native.close, root_handle)
+        root_before = native.inspect(root_handle)
+        _require_facts(D10_EVIDENCE_ROOT, True, root_before)
+
+        file_handle = native.open_evidence_observer(evidence_path)
+        stack.callback(native.close, file_handle)
+        file_before = native.inspect(file_handle)
+        _require_facts(
+            evidence_path,
+            False,
+            file_before,
+            EVIDENCE_FILE_POLICY,
+        )
+        if file_before.size < 0 or file_before.size > MAX_D10_EVIDENCE_LOG_BYTES:
+            raise GuardBlocked("D10 observer evidence size differs")
+        data = native.read_bounded(
+            file_handle,
+            file_before.size,
+            MAX_D10_EVIDENCE_LOG_BYTES,
+        )
+        root_after = native.inspect(root_handle)
+        file_after = native.inspect(file_handle)
+        _require_facts(D10_EVIDENCE_ROOT, True, root_after)
+        _require_facts(
+            evidence_path,
+            False,
+            file_after,
+            EVIDENCE_FILE_POLICY,
+        )
+        _stable(root_before, root_after)
+        _stable(file_before, file_after)
+
+    count, last_observed, terminal = _parse_evidence_log(
+        data,
+        deployment,
+        lease_facts,
+    )
+
+    first_observed: datetime | None = None
+    wake_count = 0
+    terminal_kind: str | None = None
+    last_outcome: str | None = None
+    last_stop_reason: str | None = None
+    last_guard_reason: str | None = None
+    lines = data[:-1].split(b"\n") if data else []
+    for index, line in enumerate(lines):
+        value = _parse_evidence_json(line)
+        schema = value["schema"]
+        if schema == D10_GUARD_WAKE_START_EVIDENCE_SCHEMA:
+            observed = _parse_guard_wake_start_record(line, deployment, lease_facts)
+            if index == len(lines) - 1:
+                terminal_kind = "WAKE_STARTED_INCOMPLETE"
+        elif schema == D10_WAKE_EVIDENCE_SCHEMA:
+            outcome, observed = _parse_ordinary_wake_record(
+                line,
+                deployment,
+                lease_facts,
+            )
+            wake_count += 1
+            last_outcome = outcome
+            last_stop_reason = value["stop_reason"]
+            last_guard_reason = None
+            terminal_kind = "STOPPED" if outcome == "STOPPED" else None
+        else:
+            observed = _parse_guard_terminal_record(
+                line,
+                deployment,
+                lease_facts,
+            )
+            last_outcome = None
+            last_stop_reason = None
+            last_guard_reason = value["reason"]
+            terminal_kind = "GUARD_TERMINAL"
+        if first_observed is None:
+            first_observed = observed
+
+    def timestamp(value: datetime | None) -> str | None:
+        if value is None:
+            return None
+        return value.isoformat().replace("+00:00", "Z")
+
+    return {
+        "schema": D10_EVIDENCE_OBSERVATION_SCHEMA,
+        "status": "OBSERVED",
+        "deployment_id": deployment.deployment_id,
+        "attestation_sha256": deployment.attestation_sha256,
+        "soak_id": lease_facts.soak_id,
+        "activation_utc": lease_facts.accepted_activation_utc,
+        "end_utc": lease_facts.end_utc,
+        "evidence_path": evidence_path,
+        "evidence_byte_length": len(data),
+        "evidence_sha256": hashlib.sha256(data).hexdigest(),
+        "record_count": count,
+        "wake_count": wake_count,
+        "terminal": terminal,
+        "terminal_kind": terminal_kind,
+        "first_observed_at_utc": timestamp(first_observed),
+        "last_observed_at_utc": timestamp(last_observed),
+        "last_outcome": last_outcome,
+        "last_stop_reason": last_stop_reason,
+        "last_guard_reason": last_guard_reason,
+        "scheduler_mutation": "NOT_RUN",
+        "source_launch": "NOT_RUN",
+        "provider": "NOT_RUN",
+        "Paper-v2": "NOT_RUN",
+        "broker": "NOT_RUN",
+        "live": "NOT_RUN",
+    }
 
 
 def _sanitized_environment() -> dict[str, str]:

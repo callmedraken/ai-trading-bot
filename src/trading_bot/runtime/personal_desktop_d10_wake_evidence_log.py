@@ -174,10 +174,7 @@ class D10WakeEvidenceLogSummary:
             or self.wake_count < 0
             or self.wake_count > self.record_count
             or type(self.terminal) is not bool
-            or (
-                self.terminal_kind is not None
-                and type(self.terminal_kind) is not str
-            )
+            or (self.terminal_kind is not None and type(self.terminal_kind) is not str)
             or (
                 self.first_observed_at_utc is not None
                 and (

@@ -150,6 +150,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
         assert "tests/runtime/test_checkpoint_runner.py" in spec.tests
         assert "scripts/checkpoint_runner.py" in spec.ruff_paths
         assert "tests/runtime/test_checkpoint_runner.py" in spec.ruff_paths
+        assert spec.remote_branch == "feature/d10c-durable-wake-evidence"
 
 
 def test_current_arch128_authority_profiles_pass() -> None:
@@ -359,3 +360,49 @@ def test_preflight_checkpoint_writes_external_evidence(
     payload = report.read_text(encoding="utf-8")
     assert '"kind": "read_only_preflight"' in payload
     assert '"protected_execution": "NOT_AUTHORIZED"' in payload
+
+
+def test_preflight_checkpoint_allows_detached_with_pinned_remote(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    state = {
+        "head": "a" * 40,
+        "tree": "b" * 40,
+        "branch": "HEAD",
+        "porcelain": "",
+    }
+    observed_branches: list[str] = []
+
+    monkeypatch.setattr(runner, "_git_state", lambda repo: dict(state))
+
+    def remote_head(repo: Path, branch: str) -> str:
+        observed_branches.append(branch)
+        return state["head"]
+
+    monkeypatch.setattr(runner, "_remote_branch_head", remote_head)
+
+    spec = runner.CheckpointSpec(
+        name="example",
+        description="example",
+        tests=(),
+        ruff_paths=(),
+        authority_check=lambda repo: (),
+        preflight=lambda: {
+            "status": "PASS",
+            "primary": {"status": "PASS"},
+            "diagnostics": {},
+        },
+        remote_branch="feature/pinned",
+    )
+
+    passed, report = runner.preflight_checkpoint(
+        spec,
+        repo_root=tmp_path,
+        evidence_root=tmp_path / "external-detached",
+    )
+
+    assert passed is True
+    assert report.is_file()
+    assert observed_branches == ["feature/pinned"]
+

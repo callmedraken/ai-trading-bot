@@ -405,4 +405,3 @@ def test_preflight_checkpoint_allows_detached_with_pinned_remote(
     assert passed is True
     assert report.is_file()
     assert observed_branches == ["feature/pinned"]
-

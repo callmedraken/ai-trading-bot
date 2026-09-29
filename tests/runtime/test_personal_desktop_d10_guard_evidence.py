@@ -666,8 +666,7 @@ def test_native_evidence_observer_open_is_shared_read_only(
     assert args[5] == guard.FILE_FLAG_OPEN_REPARSE_POINT
 
 
-
-def test_public_read_only_observer_returns_exact_sanitized_current_soak(
+def test_public_read_only_observer_returns_completed_and_incomplete_current_soak(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     material = guard._TrustBytes(b"g", b"attestation", b"s" * 64, b"m")
@@ -765,3 +764,21 @@ def test_public_read_only_observer_returns_exact_sanitized_current_soak(
     assert record["Paper-v2"] == "NOT_RUN"
     assert record["broker"] == "NOT_RUN"
     assert record["live"] == "NOT_RUN"
+
+    native.data = start + b"\n"
+    incomplete = guard.observe_fixed_d10_durable_wake_evidence()
+    assert incomplete["record_count"] == 1
+    assert incomplete["wake_count"] == 0
+    assert incomplete["terminal"] is True
+    assert incomplete["terminal_kind"] == "WAKE_STARTED_INCOMPLETE"
+    assert incomplete["first_observed_at_utc"] == "2026-09-29T08:29:00Z"
+    assert incomplete["last_observed_at_utc"] == "2026-09-29T08:29:00Z"
+    assert incomplete["last_outcome"] is None
+    assert incomplete["last_stop_reason"] is None
+    assert incomplete["last_guard_reason"] is None
+    assert incomplete["scheduler_mutation"] == "NOT_RUN"
+    assert incomplete["source_launch"] == "NOT_RUN"
+    assert incomplete["provider"] == "NOT_RUN"
+    assert incomplete["Paper-v2"] == "NOT_RUN"
+    assert incomplete["broker"] == "NOT_RUN"
+    assert incomplete["live"] == "NOT_RUN"

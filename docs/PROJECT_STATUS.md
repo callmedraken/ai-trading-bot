@@ -5903,3 +5903,61 @@ retry, rollback, lease rename/publication, scheduler mutation, manual task
 start, or source/provider/Paper-v2/broker/live effect is authorized by this
 incident record. Any later recovery requires separately reviewed source and a
 fresh protected-effect authorization.
+
+
+### P124-5R safe recovery gates — ACCEPTED
+
+The bounded partial-installing-lease recovery source is frozen at:
+
+```text
+HEAD 2db4a45db7870e41cd2ee707478158068dc4def8
+TREE 701ed461c986cf506923d7d86ee3c457c1994068
+```
+
+Focused recovery verification passed with 248 tests, Ruff check passed, Ruff
+format check passed after exact formatter-only source updates, and the combined
+safe-gate command reached `P1245R_SAFE_GATES=PASS`. The command's canonical
+certification stage therefore completed successfully before the real-host
+recovery preflight was allowed to run.
+
+Accepted real-host read-only recovery preflight:
+
+```text
+status: PASS
+stage: read_only_complete
+classification: EXACT_INSTALLING_LEASE_D10_SCHEDULER
+reconciliation_required: true
+installing lease SHA-256:
+91106d61129dc9c11e017a7ea613ba0fd82c87fd9debfc346b265c03c49a1e84
+activation:
+2026-09-29T00:45:22Z
+end:
+2026-10-06T00:45:22Z
+soak ID:
+48f14b13-aa18-5ce8-a0e0-402c867b17b6
+scheduler mutation: NOT_RUN
+lease publication: NOT_RUN
+source launch: NOT_RUN
+provider: NOT_RUN
+Paper-v2: NOT_RUN
+broker: NOT_RUN
+live: NOT_RUN
+evidence:
+F:\AI\temp\p1245r-recovery-preflight-20260928-182338.json
+evidence SHA-256:
+845becc0897109658856c8c91d02a1b9e2c62ec018ecc78922c11c16973dd1c4
+```
+
+The partial state remains exact: final lease absent, installing lease present
+with exact canonical bytes/native policy, temporary lease absent, signed S5-R10
+deployment verified, and Task Scheduler matches the D10 guard contract derived
+from the original activation.
+
+All source/read-only recovery prerequisites are complete. The only remaining
+P124-5R operation is the separately protected create-only/no-replace rename of
+the verified installing lease to the final activation lease. It must not
+rewrite lease facts, mutate Task Scheduler, prompt for the Trading password,
+start the task, or perform source/provider/Paper-v2/broker/live effects.
+A fresh explicit protected-effect authorization is required before that single
+publication attempt. Any ambiguity requires read-only reconciliation and no
+automatic retry or rollback.

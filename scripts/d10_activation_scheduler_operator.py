@@ -693,6 +693,7 @@ class _Operator:
 
     def recovery_preflight(self) -> dict[str, object]:
         result = self._base("recovery_preflight")
+        result["reconciliation_required"] = True
         try:
             signed, scheduler, installing, lease, _ = self._admit_partial_installing()
             result.update(

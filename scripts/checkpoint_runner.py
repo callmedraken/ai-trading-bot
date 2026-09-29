@@ -37,6 +37,7 @@ class CheckpointSpec:
     ruff_paths: tuple[str, ...]
     authority_check: Callable[[Path], tuple[str, ...]]
     preflight: Callable[[], dict[str, object]] | None = None
+    remote_branch: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -388,6 +389,7 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             ruff_paths=parent_ruff,
             authority_check=_parent_acl_authority_check,
             preflight=_parent_acl_preflight,
+            remote_branch="feature/d10c-durable-wake-evidence",
         ),
         "arch128-r4": CheckpointSpec(
             name="arch128-r4",
@@ -396,6 +398,7 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             ruff_paths=r4_ruff,
             authority_check=_r4_authority_check,
             preflight=_r4_preflight,
+            remote_branch="feature/d10c-durable-wake-evidence",
         ),
     }
 
@@ -708,15 +711,21 @@ def preflight_checkpoint(
             f"preflight requires a clean worktree; found: {state_before['porcelain']}"
         )
 
-    branch = str(state_before["branch"])
-    if branch == "HEAD":
-        raise RuntimeError("preflight requires a named branch, not detached HEAD")
+    local_branch = str(state_before["branch"])
+    remote_branch = spec.remote_branch
+    if remote_branch is None:
+        if local_branch == "HEAD":
+            raise RuntimeError(
+                "detached preflight requires a checkpoint-pinned remote branch"
+            )
+        remote_branch = local_branch
 
-    remote_head = _remote_branch_head(repo_root, branch)
+    remote_head = _remote_branch_head(repo_root, remote_branch)
     if remote_head != state_before["head"]:
         raise RuntimeError(
             "preflight source is not the live remote branch head: "
-            f"local={state_before['head']} remote={remote_head}"
+            f"local={state_before['head']} "
+            f"remote={remote_head} branch={remote_branch}"
         )
 
     evidence_dir = evidence_root / spec.name / f"preflight-{_stamp()}"
@@ -741,6 +750,7 @@ def preflight_checkpoint(
         "source": {
             "before": state_before,
             "after": state_after,
+            "remote_branch": remote_branch,
             "remote_head": remote_head,
             "identity_stable": identity_stable,
         },

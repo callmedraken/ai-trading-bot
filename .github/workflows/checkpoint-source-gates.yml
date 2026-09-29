@@ -14,6 +14,8 @@ jobs:
   source-gates:
     runs-on: windows-latest
     timeout-minutes: 20
+    env:
+      AI_TRADING_BOT_CHECKPOINT_EVIDENCE_ROOT: ${{ runner.temp }}\ai-trading-bot-checkpoints
 
     steps:
       - name: Check out repository
@@ -39,14 +41,31 @@ jobs:
         run: |
           powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\ops.ps1 status
 
-      - name: Verify Architecture 128 parent ACL repair
+      - name: Verify source checkpoints
         shell: powershell
         run: |
-          powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\ops.ps1 `
-            verify arch128-parent-acl-repair
+          $Failures = @()
 
-      - name: Verify Architecture 128 R4 replacement
-        shell: powershell
-        run: |
-          powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\ops.ps1 `
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\ops.ps1 `
+            verify arch128-parent-acl-repair
+          if ($LASTEXITCODE -ne 0) {
+            $Failures += 'arch128-parent-acl-repair'
+          }
+
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\ops.ps1 `
             verify arch128-r4
+          if ($LASTEXITCODE -ne 0) {
+            $Failures += 'arch128-r4'
+          }
+
+          if ($Failures.Count -ne 0) {
+            throw "Checkpoint source gates failed: $($Failures -join ', ')"
+          }
+
+      - name: Upload checkpoint evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: checkpoint-source-gate-evidence
+          path: ${{ runner.temp }}\ai-trading-bot-checkpoints
+          if-no-files-found: ignore

@@ -356,11 +356,10 @@ def _require_facts(
         or facts.filesystem != "NTFS"
     ):
         raise GuardBlocked("D10 object path, type, or volume changed")
-    expected_policy = (
-        DIRECTORY_POLICY if policy is None and directory else
-        FILE_POLICY if policy is None else
-        policy
-    )
+    if policy is None:
+        expected_policy = DIRECTORY_POLICY if directory else FILE_POLICY
+    else:
+        expected_policy = policy
     if (facts.owner, facts.protected, facts.aces) != (
         expected_policy.owner,
         expected_policy.protected,

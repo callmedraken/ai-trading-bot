@@ -4,8 +4,6 @@ from dataclasses import replace
 from pathlib import Path
 
 import pytest
-
-from scripts import d10_arch128_parent_acl_repair as repair
 from scripts.d10_protected_deployment import (
     ADMINISTRATORS_SID,
     D10_PARENT,
@@ -15,6 +13,8 @@ from scripts.d10_protected_deployment import (
     DeploymentBlocked,
     NativeObject,
 )
+
+from scripts import d10_arch128_parent_acl_repair as repair
 
 
 def _native(aces: tuple[Ace, ...]) -> NativeObject:

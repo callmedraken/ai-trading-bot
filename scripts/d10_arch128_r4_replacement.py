@@ -231,7 +231,8 @@ class PostRenameFacts:
 
     def all_exact(self) -> bool:
         return all(
-            type(getattr(self, item.name)) is bool and getattr(self, item.name) is True
+            type(getattr(self, item.name)) is bool
+            and getattr(self, item.name) is True
             for item in fields(PostRenameFacts)
         )
 
@@ -311,7 +312,6 @@ def record_rename(
         MutationOutcome.SUCCESS,
         outcome,
     )
-
 
 
 def confirm_retired_window(

@@ -6427,3 +6427,32 @@ scheduler, provider, Paper-v2, broker, or live effect occurred.
 Next source-only checkpoint: E2 native append-only evidence authority followed
 by E3 sealed-guard capture/persistence and durable stop-latch integration.
 The production D10 task remains disabled and must not be started or re-enabled.
+
+
+### Architecture 127 E2/E3 append-only evidence + sealed-guard persistence — ACCEPTED
+
+Focused verification at the exact source below passed:
+
+```text
+HEAD ddd8174ab597cd79d02ebea37bc509c0e4abd5ce
+TREE 7875d3aec3037286cc329c9190fcae6e221bab4c
+pytest: 256 passed
+ruff check: PASS
+ruff format --check: PASS
+git diff --check: PASS
+worktree: clean/detached
+```
+
+E2 freezes the fixed lease-derived evidence namespace and Trading append-only
+native file capability. E3 captures exactly one second-stage wake-evidence
+record in the sealed guard, appends/flushed/rereads it through the pinned native
+object, and treats ordinary STOPPED or bounded guard-terminal evidence as a
+durable stop latch. The scheduler command remains zero-semantic-argument and
+does not carry an evidence path.
+
+No production filesystem, scheduler, provider, Paper-v2, broker, or live effect
+occurred. The production D10 task remains disabled and must not be started or
+re-enabled.
+
+Next source-only checkpoints: E4 adversarial terminal-failure coverage, then E5
+read-only exact-current-soak evidence observation.

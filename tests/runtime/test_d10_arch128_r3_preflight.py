@@ -80,7 +80,9 @@ def test_old_incident_lease_facts_are_frozen() -> None:
     assert r3.OLD_SOAK_ID == "48f14b13-aa18-5ce8-a0e0-402c867b17b6"
 
 
-def test_require_signed_identity_accepts_only_current_s5r10(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_require_signed_identity_accepts_only_current_s5r10(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     observed = type("Observed", (), {"leases_present": (True, False, False)})()
     r3._require_signed_identity(observed)
 
@@ -102,7 +104,9 @@ def test_require_signed_identity_accepts_only_current_s5r10(monkeypatch: pytest.
         (False, True, False),
     ],
 )
-def test_require_signed_identity_rejects_wrong_lease_namespace(leases: tuple[bool, bool, bool]) -> None:
+def test_require_signed_identity_rejects_wrong_lease_namespace(
+    leases: tuple[bool, bool, bool],
+) -> None:
     observed = type("Observed", (), {"leases_present": leases})()
     with pytest.raises(r3.R3Blocked, match="signed_s5r10_identity_drift"):
         r3._require_signed_identity(observed)
@@ -149,4 +153,7 @@ def test_scheduler_xml_digest_is_frozen_to_accepted_post_halt() -> None:
     assert r3.EXPECTED_SCHEDULER_XML_SHA256 == (
         "8d592a71258529fa88cd85866b0be1e91cf407d91e9acf5891a1bd82c0bf09b0"
     )
-    assert len(bytes.fromhex(r3.EXPECTED_SCHEDULER_XML_SHA256)) == hashlib.sha256().digest_size
+    assert (
+        len(bytes.fromhex(r3.EXPECTED_SCHEDULER_XML_SHA256))
+        == hashlib.sha256().digest_size
+    )

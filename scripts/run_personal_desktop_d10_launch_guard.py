@@ -895,10 +895,9 @@ class _Native:
         if not flush(handle):
             raise _error("FlushFileBuffers(D10 evidence)")
         after = ctypes.c_longlong()
-        if (
-            not get_size(handle, ctypes.byref(after))
-            or after.value != expected_size + len(payload)
-        ):
+        if not get_size(
+            handle, ctypes.byref(after)
+        ) or after.value != expected_size + len(payload):
             raise GuardBlocked("D10 evidence length differs after append")
 
     def listdir(self, path: str) -> tuple[str, ...]:
@@ -2066,9 +2065,8 @@ def _parse_ordinary_wake_record(
     stop_reason = value["stop_reason"]
     if outcome not in {"COMPLETED", "NO_ACTION", "STOPPED"}:
         raise GuardBlocked("D10 wake outcome differs")
-    if (
-        (outcome == "STOPPED" and stop_reason not in _WAKE_STOP_REASONS)
-        or (outcome != "STOPPED" and stop_reason is not None)
+    if (outcome == "STOPPED" and stop_reason not in _WAKE_STOP_REASONS) or (
+        outcome != "STOPPED" and stop_reason is not None
     ):
         raise GuardBlocked("D10 wake stop fields disagree")
     observed = _parse_wake_timestamp(value["observed_at_utc"])
@@ -2212,10 +2210,7 @@ def _parse_ordinary_wake_record(
     )
     if any(item is not None and type(item) is not str for item in optional_strings):
         raise GuardBlocked("D10 wake optional evidence type differs")
-    if (
-        type(history["reconciled_count"]) is not int
-        or history["reconciled_count"] < 0
-    ):
+    if type(history["reconciled_count"]) is not int or history["reconciled_count"] < 0:
         raise GuardBlocked("D10 wake historical count differs")
     deadline = session["preopen_deadline_utc"]
     if deadline is not None:
@@ -2419,10 +2414,9 @@ def _append_and_verify_evidence(
         EVIDENCE_FILE_POLICY,
     )
     _stable(root_before, root_after)
-    if (
-        not _same_object_except_size(file_before, file_after)
-        or file_after.size != len(prior) + len(payload)
-    ):
+    if not _same_object_except_size(file_before, file_after) or file_after.size != len(
+        prior
+    ) + len(payload):
         raise GuardBlocked("D10 evidence object identity changed")
     observed = native.read_bounded(
         file_handle, file_after.size, MAX_D10_EVIDENCE_LOG_BYTES
@@ -2466,8 +2460,7 @@ def _run_second_stage_with_evidence(
             raise GuardBlocked("D10 evidence stop latch is terminal")
         if (
             count >= MAX_D10_EVIDENCE_LOG_RECORDS
-            or len(prior) + MAX_D10_WAKE_EVIDENCE_BYTES + 1
-            > MAX_D10_EVIDENCE_LOG_BYTES
+            or len(prior) + MAX_D10_WAKE_EVIDENCE_BYTES + 1 > MAX_D10_EVIDENCE_LOG_BYTES
         ):
             raise GuardBlocked("D10 evidence log has no bounded append capacity")
 

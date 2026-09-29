@@ -260,9 +260,12 @@ def parse_persisted_d10_wake_record(
     if final_gates != {"all_closed": True, "closed_count": 8}:
         raise D10WakeEvidenceLogError("wake final gate proof differs")
 
-    for name, keys in {
-        "session": {"completed", "next_execution", "preopen_deadline_utc"},
-        "capture": {
+    session = _dict(value["session"], "session")
+    _require_keys(session, {"completed", "next_execution", "preopen_deadline_utc"})
+    capture = _dict(value["capture"], "capture")
+    _require_keys(
+        capture,
+        {
             "classification",
             "selection_id",
             "snapshot_id",
@@ -270,13 +273,21 @@ def parse_persisted_d10_wake_record(
             "terminal_state",
             "provider_call_disposition",
         },
-        "history": {
+    )
+    history = _dict(value["history"], "history")
+    _require_keys(
+        history,
+        {
             "classification",
             "reconciled_count",
             "current_decision_id",
             "unresolved_decision_id",
         },
-        "settlement": {
+    )
+    settlement = _dict(value["settlement"], "settlement")
+    _require_keys(
+        settlement,
+        {
             "decision_id",
             "classification",
             "reconciliation",
@@ -287,9 +298,46 @@ def parse_persisted_d10_wake_record(
             "predecessor_checkpoint_id",
             "successor_checkpoint_id",
         },
-        "decision": {"id", "publication", "reconciliation", "finalized_id"},
-    }.items():
-        _require_keys(_dict(value[name], name), keys)
+    )
+    decision = _dict(value["decision"], "decision")
+    _require_keys(decision, {"id", "publication", "reconciliation", "finalized_id"})
+
+    optional_strings = (
+        session["completed"],
+        session["next_execution"],
+        capture["classification"],
+        capture["selection_id"],
+        capture["snapshot_id"],
+        capture["attempt_id"],
+        capture["terminal_state"],
+        capture["provider_call_disposition"],
+        history["classification"],
+        history["current_decision_id"],
+        history["unresolved_decision_id"],
+        settlement["decision_id"],
+        settlement["classification"],
+        settlement["reconciliation"],
+        settlement["plan_id"],
+        settlement["invocation_id"],
+        settlement["operation_id"],
+        settlement["application_id"],
+        settlement["predecessor_checkpoint_id"],
+        settlement["successor_checkpoint_id"],
+        decision["id"],
+        decision["publication"],
+        decision["reconciliation"],
+        decision["finalized_id"],
+    )
+    if any(item is not None and type(item) is not str for item in optional_strings):
+        raise D10WakeEvidenceLogError("wake optional evidence type differs")
+    if (
+        type(history["reconciled_count"]) is not int
+        or history["reconciled_count"] < 0
+    ):
+        raise D10WakeEvidenceLogError("wake historical count differs")
+    deadline = session["preopen_deadline_utc"]
+    if deadline is not None:
+        _parse_wake_utc(deadline)
 
     canonical = _canonical_json_bytes(value)
     if canonical != data or len(canonical) > MAX_D10_WAKE_EVIDENCE_BYTES:

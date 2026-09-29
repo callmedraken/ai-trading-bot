@@ -340,3 +340,37 @@ For the protected operator phase, retain the checkpoint labels but use this depe
 5. **P124-5** — only after separate approval and all prior acceptance evidence, publish the activation lease and mutate the capture-only scheduler to the fixed guard.
 
 This ordering does not weaken the production-Python prerequisite: P124-1 still must PASS before any guard qualification, activation lease, scheduler mutation, or D10 effect. P124-2/P124-3 artifacts are inert if P124-1 later blocks.
+
+
+## P124-5R partial installing-lease recovery plan
+
+The consumed P124-5 attempt left the task on the exact D10 guard contract and
+left only `activation.lease.json.installing` present. The final lease and
+temporary lease are absent. No governed source/provider/Paper-v2/broker/live
+effect ran.
+
+Before any recovery effect:
+
+1. Correct signed-deployment cross-namespace comparison so only the native
+   `size` field of exact `F:\AITradingBot\D10` is ignored across an
+   otherwise fully validated lease namespace transition. Every other field and
+   object remains exact.
+2. Add a dedicated recovery entry point; do not let the consumed ordinary
+   `execute --execute-p1245` path serve as recovery.
+3. Recovery preflight must independently verify the exact signed deployment,
+   exact `false/true/false` final/installing/tmp lease namespace, exact
+   canonical installing lease, exact D10 scheduler derived from the original
+   activation, and that the original seven-day interval is still active.
+4. Canonical full certification must PASS on the corrected source.
+5. Run the dedicated recovery preflight on the real host. It is read-only.
+
+Only after a fresh explicit protected authorization may recovery perform one
+no-replace `.installing -> final` publication. It may not mutate the
+scheduler, recreate temporary state, change any lease fact, prompt for the
+Trading password, start the task, or perform a source/provider/Paper-v2/broker/
+live effect.
+
+After the one publication attempt, always run independent read-only
+reconciliation. A PASS requires `ARMED_VERIFIED` against the original lease
+and scheduler. Any ambiguity or mismatch stops; no automatic retry or rollback
+is permitted.

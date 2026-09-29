@@ -60,10 +60,7 @@ class WindowsArch128StagingBackend(WindowsDeploymentBackend):
     _creation_root = r4.STAGING_PATH
 
     def _allowed_directory_create(self, path: str) -> bool:
-        return (
-            path == r4.NEW_EVIDENCE_ROOT
-            or super()._allowed_directory_create(path)
-        )
+        return path == r4.NEW_EVIDENCE_ROOT or super()._allowed_directory_create(path)
 
     def _allowed_file_create(self, path: str) -> bool:
         return path in _TRUST_INSTALLING or super()._allowed_file_create(path)
@@ -316,9 +313,7 @@ def rename_fixed_step(
             )
 
         if native.absent(destination_path) is not True:
-            raise legacy_windows.AdmissionBlocked(
-                "arch128_rename_destination_present"
-            )
+            raise legacy_windows.AdmissionBlocked("arch128_rename_destination_present")
 
         if (
             native._inspect(parent_handle, r4.PARENT_PATH) != parent_before
@@ -336,10 +331,7 @@ def rename_fixed_step(
             return r4.MutationOutcome.INDETERMINATE
 
         native_succeeded = True
-        if (
-            io_status.status != 0
-            or not 0 <= io_status.information <= submitted_size
-        ):
+        if io_status.status != 0 or not 0 <= io_status.information <= submitted_size:
             raise legacy_windows.AdmissionBlocked(
                 "arch128_rename_completion_unverified"
             )

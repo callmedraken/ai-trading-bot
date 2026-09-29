@@ -3,11 +3,11 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from scripts.d10_protected_deployment import NativeObject
 
 from scripts import d10_arch128_r4_replacement as r4
 from scripts import d10_arch128_r4_windows as r4w
 from scripts import d10_protected_replacement_windows as legacy_windows
-from scripts.d10_protected_deployment import NativeObject
 
 
 def _backend() -> r4w.WindowsArch128StagingBackend:
@@ -27,15 +27,14 @@ def test_staging_backend_is_exact_new_root() -> None:
     assert r4w.WindowsArch128StagingBackend._creation_root == r4.STAGING_PATH
 
 
-def test_staging_create_allowlist_includes_only_inert_evidence_root_and_payload(
-) -> None:
+def test_staging_create_allowlist_includes_only_inert_evidence_root_and_payload() -> (
+    None
+):
     backend = _backend()
 
     assert backend._allowed_directory_create(r4.STAGING_PATH)
     assert backend._allowed_directory_create(r4.NEW_EVIDENCE_ROOT)
-    assert not backend._allowed_directory_create(
-        r4.NEW_EVIDENCE_ROOT + r"\unexpected"
-    )
+    assert not backend._allowed_directory_create(r4.NEW_EVIDENCE_ROOT + r"\unexpected")
 
     assert backend._allowed_file_create(
         r4.STAGING_PATH + r"\deployment.attestation.json.installing"
@@ -46,12 +45,8 @@ def test_staging_create_allowlist_includes_only_inert_evidence_root_and_payload(
     assert backend._allowed_file_create(
         r4.STAGING_PATH + r"\executable-manifest.json.installing"
     )
-    assert not backend._allowed_file_create(
-        r4.STAGING_PATH + r"\activation.lease.json"
-    )
-    assert not backend._allowed_file_create(
-        r4.NEW_EVIDENCE_ROOT + r"\wake-test.jsonl"
-    )
+    assert not backend._allowed_file_create(r4.STAGING_PATH + r"\activation.lease.json")
+    assert not backend._allowed_file_create(r4.NEW_EVIDENCE_ROOT + r"\wake-test.jsonl")
 
 
 @pytest.mark.parametrize(
@@ -149,10 +144,13 @@ def test_read_only_reader_allowlist_is_exact(
     directory: bool | None,
     expected: bool,
 ) -> None:
-    assert r4w.WindowsArch128ReadOnlyReader._allowed(
-        path,
-        directory=directory,
-    ) is expected
+    assert (
+        r4w.WindowsArch128ReadOnlyReader._allowed(
+            path,
+            directory=directory,
+        )
+        is expected
+    )
 
 
 def test_read_only_reader_rejects_alternate_path_syntax() -> None:
@@ -160,10 +158,13 @@ def test_read_only_reader_rejects_alternate_path_syntax() -> None:
         r4.STAGING_PATH + r"\source\..\escape",
         directory=True,
     )
-    assert not r4w.WindowsArch128ReadOnlyReader._allowed(
-        r4.STAGING_PATH.lower(),
-        directory=True,
-    ) or r4.STAGING_PATH.lower() == r4.STAGING_PATH
+    assert (
+        not r4w.WindowsArch128ReadOnlyReader._allowed(
+            r4.STAGING_PATH.lower(),
+            directory=True,
+        )
+        or r4.STAGING_PATH.lower() == r4.STAGING_PATH
+    )
 
 
 @pytest.mark.parametrize(
@@ -379,5 +380,3 @@ def test_rename_close_ambiguity_is_terminal_indeterminate(
         parent,
     )
     assert outcome is r4.MutationOutcome.INDETERMINATE
-
-

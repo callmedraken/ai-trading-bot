@@ -5997,3 +5997,73 @@ P124-5 execute remains a separate later effect boundary.
 
 For future Trading Bot worktrees, use `F:\AI\worktrees\...` as the canonical
 location. Do not create new managed project worktrees under `C:\Users\John\.codex\worktrees`.
+
+
+### P124-5B read-only real-host preflight — ACCEPTED
+
+The corrected P124-5 operator passed the real-host read-only admission checkpoint
+from detached source HEAD
+`2672c1650706af6ce80c546f38b7288d970eddf4` / TREE
+`884a621a907381993a072174aa7fdffef9e09e73`.
+
+The first P124-5B attempt blocked fail-closed in the new extended scheduler
+observer. Read-only diagnostics isolated the defect to the optional PowerShell
+parameter declaration `[ref]$CapturedDefinition = $null`, which Windows
+PowerShell rejected before any COM projection completed. The narrow correction
+made the optional parameter untyped and validates `PSReference` only when the
+caller supplies one; the protected update path still passes
+`([ref]$definition)`.
+
+Correction verification:
+
+```text
+182 focused tests PASS
+Ruff check PASS
+Ruff format --check PASS
+PowerShell AST parse PASS
+corrected standalone extended scheduler observer: PASS / exit 0
+two scheduler observations: identical
+```
+
+Accepted P124-5B evidence:
+
+```text
+status: PASS
+stage: read_only_complete
+evidence:
+F:\AI\temp\p1245b-readonly-preflight-r1-20260928-171838.json
+evidence SHA-256:
+0ae497bb7bccc48c97bc44ea6b9864c7e0e29c488c385d6de69b194d26ccc341
+deployment ID:
+9f3d111b-25bb-5ee4-9abf-f5215a32b826
+attestation SHA-256:
+4e4e44d4129876454bd5d9559af7358f2600466f9291c6626f92e173d541f2c2
+certified S5-R10 source:
+c5cc0b01301600daf17f1114f4451dca2c9d7a1f /
+bfacfadaa14315d2d378abcc0f1e4bc7c42034f1
+guard:
+69259 bytes /
+37d78c65800a315a12049b6c278addf609589d121e15d31dd9064dc8ec427298
+manifest SHA-256:
+e4aa71ebbe269837adfd277fbcd8b7ae05e1051343276de2449177587fe7b60a
+lease final/installing/tmp:
+absent / absent / absent
+retired/staging/cache:
+ABSENT_AND_VERIFIED
+scheduler predecessor:
+exact D5 capture-only semantics
+scheduler XML SHA-256:
+6d2d63d9997278bdbd7f58dfb9a57365a8cadacf556943a37556201e2dc61998
+scheduler mutation: NOT_RUN
+lease publication: NOT_RUN
+source launch: NOT_RUN
+provider: NOT_RUN
+Paper-v2: NOT_RUN
+broker: NOT_RUN
+live: NOT_RUN
+exit: 0
+```
+
+P124-5B is complete. The next safe checkpoint is canonical full source
+certification of the corrected P124-5 operator tree. Protected P124-5 execution
+remains a separate explicit effect boundary requiring fresh human authorization.

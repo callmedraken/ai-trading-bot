@@ -348,3 +348,51 @@ def test_post_append_native_identity_drift_fails_closed(
             {"SystemRoot": r"C:\Windows", "WINDIR": r"C:\Windows"},
             native,
         )
+
+
+
+def test_native_evidence_open_is_existing_append_only(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    deployment = _deployment()
+    lease = _lease(deployment)
+    path = guard._wake_evidence_path(lease)
+    calls: list[tuple[object, ...]] = []
+
+    class Function:
+        argtypes = None
+        restype = None
+
+        def __call__(self, *args: object) -> int:
+            calls.append(args)
+            return 7
+
+    class Kernel:
+        CreateFileW = Function()
+
+    monkeypatch.setattr(guard, "_win_dll", lambda _: Kernel())
+    assert guard._Native().open_evidence_file(path) == 7
+    assert len(calls) == 1
+    args = calls[0]
+    assert args[0] == path
+    assert args[1] == guard.TRADING_EVIDENCE_FILE_ACCESS
+    assert args[1] & guard.FILE_APPEND_DATA
+    assert not args[1] & guard.FILE_WRITE_DATA
+    assert args[2] == 1
+    assert args[4] == 3
+    assert args[5] == guard.FILE_FLAG_OPEN_REPARSE_POINT
+
+
+def test_scheduler_command_remains_zero_semantic_argument_guard_target() -> None:
+    source = (
+        guard.D10_PRODUCTION_PYTHON,
+        "-I",
+        "-S",
+        "-B",
+        "-X",
+        f"pycache_prefix={guard.D10_CACHE_PREFIX}",
+        guard.D10_SECOND_STAGE_LAUNCHER,
+    )
+    assert guard.D10_SCHEDULER_TASK_PATH == r"\AITradingBot-PD4-UnattendedPaper-v1"
+    assert guard.D10_EVIDENCE_ROOT not in " ".join(source)
+    assert guard.D10_EVIDENCE_ROOT not in guard.D10_SECOND_STAGE_LAUNCHER

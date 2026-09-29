@@ -6154,3 +6154,31 @@ re-enabled.
 
 Next source-only checkpoints: E4 adversarial terminal-failure coverage, then E5
 read-only exact-current-soak evidence observation.
+
+
+### Architecture 127 E4/E5 terminal-failure + read-only observation — ACCEPTED
+
+Focused verification at the exact source below passed:
+
+```text
+HEAD 7c3f9c0dc00284883b41d06d81852b43f752fcd2
+TREE 28b460094d9559b38a8b496db343fda1ccfd0ad8
+pytest: 272 passed
+ruff check: PASS
+ruff format --check: PASS
+git diff --check: PASS
+worktree: clean/detached
+```
+
+E4 closes the post-child evidence durability ambiguity with a durable
+pre-launch wake-start marker. An unresolved final wake-start marker is terminal
+for the current soak and prevents a later source launch. E5 provides an exact
+current-soak read-only observer that derives the evidence path only from the
+verified activation lease and emits sanitized summary facts.
+
+No production filesystem, scheduler, provider, Paper-v2, broker, or live effect
+occurred. The production D10 task remains disabled and must not be started or
+re-enabled.
+
+Next checkpoint: exact source/security diff review, then E6 canonical
+three-lane certification.

@@ -101,7 +101,6 @@ def test_nested_wake_value_types_fail_closed():
         parse_persisted_d10_wake_record(payload, lease)
 
 
-
 def _start(lease, observed=NOW - timedelta(minutes=1)):
     return D10GuardWakeStartEvidence(
         D10_GUARD_WAKE_START_EVIDENCE_SCHEMA,
@@ -122,9 +121,7 @@ def test_paired_log_summary_and_incomplete_start_are_terminal():
     assert incomplete.terminal is True
     assert incomplete.terminal_kind == "WAKE_STARTED_INCOMPLETE"
 
-    complete = summarize_d10_wake_evidence_log(
-        start + b"\n" + ordinary + b"\n", lease
-    )
+    complete = summarize_d10_wake_evidence_log(start + b"\n" + ordinary + b"\n", lease)
     assert complete.record_count == 2
     assert complete.wake_count == 1
     assert complete.terminal is False
@@ -156,8 +153,7 @@ def test_stopped_and_guard_failure_log_pairs_are_terminal():
     assert failure_summary.terminal is True
     assert failure_summary.terminal_kind == "GUARD_TERMINAL"
     assert (
-        failure_summary.last_guard_reason
-        is D10GuardTerminalReason.CHILD_OUTPUT_INVALID
+        failure_summary.last_guard_reason is D10GuardTerminalReason.CHILD_OUTPUT_INVALID
     )
 
 
@@ -175,9 +171,7 @@ def test_log_pairing_partial_blank_and_time_order_fail_closed():
 
     late_start = _start(lease, NOW + timedelta(minutes=1)).canonical_bytes()
     with pytest.raises(D10WakeEvidenceLogError, match="moved backward"):
-        summarize_d10_wake_evidence_log(
-            late_start + b"\n" + ordinary + b"\n", lease
-        )
+        summarize_d10_wake_evidence_log(late_start + b"\n" + ordinary + b"\n", lease)
 
 
 def test_guard_start_round_trip_and_foreign_identity_rejected():

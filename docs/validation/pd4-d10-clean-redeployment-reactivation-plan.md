@@ -481,3 +481,77 @@ injected backend, perform a fresh post-staging read-only admission, and expose
 only an in-process two-step rename session. Protected execution remains a
 separate explicit R4 authorization boundary.
 
+### Architecture 128 R2 protected signing — ACCEPTED
+
+The one-shot protected R2 signing run completed successfully against the exact
+reviewed sign-only source:
+
+```text
+signer HEAD:
+e9d2a0f669a2b12f7fbb3eab560bf17d51b3c2eb
+
+signer TREE:
+dff1634435bd95f9a1cbea24d4e7d3eab5072d47
+
+deployment ID:
+d2071f25-5a7c-5293-a28f-5b722c9917a2
+
+unsigned attestation SHA-256:
+3ffe4ecf1745599e7edb233d3f08a9707a1b27384d2f050a1805ee4929ebbd71
+
+detached signature SHA-256:
+9dbd3f44f259d338903a2ed2c52512992519f1f420a5825745cc81b677d104e9
+
+signature bytes:
+64
+
+public key SHA-256:
+fb22627f6d01d63ecfcc02dbe6e34a5529bdde30ceb0fcb8037eead6f0c56b1e
+
+evidence:
+F:\AI\temp\arch128-r2-signing-20260929-093116-923952
+```
+
+Detached ECDSA-P256 / SHA-256 / IEEE-P1363 verification passed. No private-key
+export or key enrollment occurred. Production filesystem, scheduler, provider,
+Paper-v2, broker, and live effects were NOT_RUN.
+
+
+### Architecture 128 R4C staging/orchestration source — ACCEPTED
+
+R4C is accepted at:
+
+```text
+HEAD:
+5433543c4e4682ac27c9ee1a1e6cf5e3dacc46b7
+
+TREE:
+525c1530165704e3a0b5c3adca8233cf8b84cfc0
+```
+
+Final source verification:
+
+```text
+457 tests passed
+ruff check --no-cache: PASS
+ruff format --check --no-cache: PASS
+git diff --check: PASS
+R4C authority-boundary scan: PASS
+final worktree: clean
+remote feature ref: exact
+```
+
+R4C binds material reconstruction to the exact Architecture-127 E6 certified
+source and the accepted R1/R2 material/signature lineage. It provides only
+private source seams for inert staging construction, fresh two-read post-staging
+admission, and a single in-process two-step replacement session. Native rename
+success advances only to a mandatory verification phase; fresh readback must
+prove RETIRED_WINDOW before the second rename and COMPLETE after the second
+rename. Native or readback uncertainty latches terminal STOP with no retry or
+rollback authority.
+
+R4C contains no public protected operator, no CLI entry point, and no scheduler,
+activation, provider, Paper-v2, broker, or live action. The next checkpoint is
+the final fixed R4 protected operator source/review. Actual creation or rename
+under F:\AITradingBot remains separately authorization-gated.
+

@@ -6428,3 +6428,79 @@ Next checkpoint: Architecture 128 R2 exact signing-material review. Actual use
 of the production private signing identity remains a separate explicit
 authorization boundary.
 
+### Architecture 128 R2 pre-sign path correction — ACCEPTED
+
+The first separately authorized R2 signing invocation stopped before any CNG
+key qualification or signature operation. The operator had already created and
+reported the external evidence directory:
+
+```text
+F:\AI\temp\arch128-r2-signing-20260929-090344-236569
+```
+
+and then failed with:
+
+```text
+R2 STOP: evidence_directory_invalid
+```
+
+The cause was source-only: the R2 validator used `type(evidence) is Path`.
+On Windows, pathlib constructs a `WindowsPath` subclass, so the exact-type
+check rejected the operator's own valid fixed evidence path before the code
+reached:
+
+- `qualify_existing_d10_signing_key_after_attempt2()`;
+- `WindowsCngExternalSigner`;
+- any NCrypt sign call.
+
+Therefore the failed attempt consumed no signature operation and made no
+production, scheduler, provider, Paper-v2, broker, or live effect. Preserve the
+reported evidence directory as diagnostic evidence and never reuse it.
+
+The correction is accepted at:
+
+```text
+HEAD:
+e9d2a0f669a2b12f7fbb3eab560bf17d51b3c2eb
+
+TREE:
+dff1634435bd95f9a1cbea24d4e7d3eab5072d47
+```
+
+It replaces the exact-type check with `isinstance(evidence, Path)`, extracts
+the evidence-directory validator, and adds regression coverage for platform
+Path subclasses plus wrong-parent, wrong-prefix, and nonempty evidence
+directories.
+
+Focused correction verification:
+
+```text
+17 passed
+Ruff check: PASS
+Ruff format --check: PASS
+git diff --check: PASS
+final HEAD/tree: exact
+worktree: clean
+```
+
+The accepted R1 signing material is unchanged:
+
+```text
+deployment_id:
+d2071f25-5a7c-5293-a28f-5b722c9917a2
+
+unsigned attestation SHA-256:
+3ffe4ecf1745599e7edb233d3f08a9707a1b27384d2f050a1805ee4929ebbd71
+
+unsigned attestation bytes:
+1011
+
+signing key ID:
+AITradingBot/D10/DeploymentAttestation/v3
+```
+
+Because the protected signing operator source identity changed after the prior
+authorization, the production-key signature requires fresh explicit
+authorization bound to the corrected HEAD/tree. No protected retry is
+authorized by this documentation closeout.
+

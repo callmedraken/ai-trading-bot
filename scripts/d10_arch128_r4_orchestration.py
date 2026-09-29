@@ -778,14 +778,14 @@ def _write_staging_payload_unchecked(
     writer.create_directory(r4.NEW_EVIDENCE_ROOT)
 
 
-def write_staging_payload(
+def _write_staging_payload(
     signed: SignedMaterial,
     writer: Writer,
 ) -> None:
     _require_signed_material(signed)
     _write_staging_payload_unchecked(signed, writer)
 
-def construct_staging(
+def _construct_staging(
     signed: SignedMaterial,
     writer: Writer,
     reader: Reader,
@@ -803,7 +803,7 @@ def construct_staging(
     payload_writer: Callable[
         [SignedMaterial, Writer],
         None,
-    ] = write_staging_payload,
+    ] = _write_staging_payload,
 ) -> AdmissionObservation:
     _require_signed_material(signed)
     verify_signature(
@@ -819,7 +819,7 @@ def construct_staging(
     return ready
 
 
-class ReplacementSession:
+class _ReplacementSession:
     """Single in-process two-step authority; no retry or rollback path."""
 
     def __init__(

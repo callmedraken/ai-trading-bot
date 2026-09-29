@@ -200,7 +200,7 @@ def test_construct_staging_requires_pre_and_post_scheduler_stability(
     monkeypatch.setattr(r4c, "_require_signed_material", lambda signed: None)
     monkeypatch.setattr(r4c, "verify_signature", lambda *args: None)
 
-    result = r4c.construct_staging(
+    result = r4c._construct_staging(
         signed,
         writer,
         object(),
@@ -251,7 +251,7 @@ def test_session_requires_readback_between_both_renames() -> None:
         state = args[3]
         return retired if state is r4.NamespaceState.RETIRED_WINDOW else complete
 
-    session = r4c.ReplacementSession(
+    session = r4c._ReplacementSession(
         object(),
         object(),
         lambda: {},
@@ -311,7 +311,7 @@ def test_session_native_indeterminate_never_calls_post_readback() -> None:
     assert post_calls == 0
 
 
-def test_r4c_import_has_no_cli_or_backend_construction() -> None:
+def test_r4c_import_has_no_cli_or_public_mutation_entrypoint() -> None:
     source = Path(r4c.__file__).read_text(encoding="utf-8")
     for forbidden in (
         "def main(",
@@ -322,6 +322,9 @@ def test_r4c_import_has_no_cli_or_backend_construction() -> None:
         "Start-ScheduledTask",
         "Enable-ScheduledTask",
         "getpass",
+        "def construct_staging(",
+        "def write_staging_payload(",
+        "class ReplacementSession:",
     ):
         assert forbidden not in source
 
@@ -330,7 +333,7 @@ def test_public_staging_writer_rejects_unreviewed_material_before_effect() -> No
     signed = _signed_material()
     writer = _Writer()
     with pytest.raises(Exception):
-        r4c.write_staging_payload(signed, writer)
+        r4c._write_staging_payload(signed, writer)
     assert writer.calls == []
 
 

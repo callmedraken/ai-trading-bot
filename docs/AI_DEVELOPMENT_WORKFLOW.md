@@ -523,6 +523,8 @@ checked-in repository launcher and runner:
 .\ops.ps1 status
 .\ops.ps1 verify arch128-parent-acl-repair
 .\ops.ps1 verify arch128-r4
+.\ops.ps1 preflight arch128-parent-acl-repair
+.\ops.ps1 preflight arch128-r4
 ```
 
 `ops.ps1` is intentionally a thin launcher. Source-gate orchestration,
@@ -553,3 +555,10 @@ same failure class produces useful structured diagnostics on the next run.
 Do not create a chain of temporary diagnostic scripts for behavior that belongs
 in the reusable checkpoint implementation.
 
+
+
+A checkpoint may pin a live remote branch for host preflight. In that case the
+runner permits a clean detached operator worktree and uses read-only
+`git ls-remote` to prove the local HEAD equals the exact live remote branch
+HEAD. This is preferred when preserving an older dirty or failed development
+worktree is safer than reconciling it merely to run host qualification.

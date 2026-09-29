@@ -172,3 +172,93 @@ At minimum test:
 18. manual task start absent;
 19. first natural wake uses exact Architecture-127 observer;
 20. provider/Paper-v2/broker/live remain closed throughout R1-R7 plumbing.
+
+### Architecture 128 R1 unsigned deployment material — ACCEPTED
+
+The second R1 construction attempt passed from a fresh byte-exact detached
+checkout of the exact Architecture-127 E6-certified executable source:
+
+```text
+certified source HEAD:
+0f9551e13486ef65b35a5a9633da19081571144b
+
+certified source TREE:
+1186e92669af100542c055368c1b72495c36bc11
+
+R1 byte-exact worktree:
+F:\AI\worktrees\ai-trading-bot-d10-arch128-r1-0f9551e-byteexact-r2
+
+R1 evidence:
+F:\AI\temp\arch128-r1-material-r2-20260929-014734
+
+status:
+PASS
+
+raw governed files:
+308
+
+raw governed mismatches:
+0
+
+executable manifest entries:
+307
+
+separately attested launch guard:
+1
+
+deployment_id:
+d2071f25-5a7c-5293-a28f-5b722c9917a2
+
+executable manifest SHA-256:
+080c622035c7c8492a66ba5d5aa9a48c9020933fb16f85a7604010d529bd06e2
+
+executable manifest byte length:
+51724
+
+total executable bytes:
+5420008
+
+unsigned attestation SHA-256:
+3ffe4ecf1745599e7edb233d3f08a9707a1b27384d2f050a1805ee4929ebbd71
+
+unsigned attestation byte length:
+1011
+
+launch guard SHA-256:
+ab80233a6ce59a579653008609753441864f74592ac52d12ec65c6dc714eabf7
+
+launch guard byte length:
+112228
+
+signing key ID:
+AITradingBot/D10/DeploymentAttestation/v3
+
+summary SHA-256:
+5a92e432c107bf5b091dc4da7984fb5f361dc570346fd0ed0503240963a27361
+```
+
+The builder and caller independently agreed on the summary, manifest, and
+unsigned-attestation digests. The new deployment ID does not reuse the halted
+S5-R10 deployment ID. Final HEAD/tree remained exact and the material checkout
+remained clean.
+
+The first R1 attempt remains preserved diagnostic evidence and is not reused:
+
+```text
+F:\AI\worktrees\ai-trading-bot-d10-arch128-r1-0f9551e-byteexact
+F:\AI\temp\arch128-r1-material-20260929-013732
+```
+
+That attempt blocked only because its external preflight retained the historical
+S5-R10 raw-governed count of 307. Architecture 127 legitimately added
+`src/trading_bot/runtime/personal_desktop_d10_wake_evidence_log.py`, making
+the E6 raw-governed count 308 while the manifest contains 307 entries because
+the launch guard is separately attested.
+
+No signing, production filesystem mutation, Task Scheduler mutation, provider,
+Paper-v2, broker, or live effect occurred.
+
+Next checkpoint: Architecture 128 R2 exact signing-material review. Actual use
+of the production private signing identity remains a separate explicit
+authorization boundary.
+

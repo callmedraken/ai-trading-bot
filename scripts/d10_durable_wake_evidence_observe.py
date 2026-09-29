@@ -67,6 +67,11 @@ def _read_activation_lease(native: guard._Native) -> bytes:
         data = native.read_exact(lease_handle, lease_before.size)
         if type(data) is not bytes or len(data) != lease_before.size:
             raise D10EvidenceObservationBlocked("activation lease read differs")
+        for path in (
+            guard.D10_ACTIVATION_LEASE_INSTALLING,
+            guard.D10_ACTIVATION_LEASE_TEMP,
+        ):
+            native.require_absent(path)
 
         root_after = native.inspect(root_handle)
         lease_after = native.inspect(lease_handle)

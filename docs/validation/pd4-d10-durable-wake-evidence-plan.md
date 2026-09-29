@@ -71,7 +71,24 @@ E5 — read-only operator observation
 - no latest-file discovery;
 - no trading authority from evidence.
 
+E6-pre — nonterminal result-acceptance correction
+- add a bounded guard-owned result-acceptance marker for ordinary nonterminal
+  wakes;
+- append it only after the preceding ordinary result has completed flush,
+  native reinspection, exact reread, and grammar validation;
+- bind it to deployment ID, soak ID, and SHA-256 of the exact preceding result;
+- treat a complete nonterminal ordinary result without acceptance as
+  terminal/unaccepted on every later wake;
+- before trusting any existing accepted sequence for a new source launch, flush
+  the existing fixed evidence handle and independently recheck identity,
+  reread, and grammar;
+- reserve capacity before source launch for start + maximum ordinary result +
+  maximum acceptance marker;
+- update the read-only observer so only an accepted three-record nonterminal
+  sequence is reported nonterminal.
+
 E6 — focused verification and certification
+- only after E6-pre implementation passes focused review;
 - focused evidence/guard/launcher/deployment tests;
 - Ruff and formatting;
 - PowerShell AST checks for any deployment helper changes;
@@ -106,12 +123,25 @@ At minimum:
     terminal guard evidence when safe;
 12. child nonzero with canonical STOPPED evidence persists the exact ordinary
     record and remains terminal;
-13. append short-write/flush/reread/native drift fails closed without retry;
+13. append short-write/flush/reread/native drift fails closed; if a nonterminal
+    ordinary result was fully written before the later failure, the missing
+    acceptance marker still blocks every later source launch;
 14. a durably appended wake-start marker with no result is terminal/incomplete
     and prevents a later child launch;
-15. result append failure after child return leaves the prior wake-start marker
-    as the durable stop latch and does not retry the child;
+15. result append failure after child return leaves either the prior wake-start
+    marker or a complete-but-unaccepted ordinary result as the durable stop
+    latch and does not retry the child;
 16. source never opens evidence by caller-provided path;
 17. scheduler action/arguments remain exact Architecture-124 D10 guard;
 18. all existing D10 effect-budget, reconciliation, gate-finally, no-receipt-
-    recovery, and no-broker/live tests remain green.
+    recovery, and no-broker/live tests remain green;
+19. a nonterminal ordinary result is not launch-admissible until an immediately
+    following acceptance marker binds its exact SHA-256;
+20. the acceptance marker is never attempted before successful result
+    flush/reinspection/reread/grammar verification;
+21. a simulated full result write followed by flush/reread/native-verification
+    failure leaves no acceptance marker and the next guard invocation cannot
+    launch the child;
+22. an existing accepted three-record sequence is launch-admissible only after
+    the new invocation flushes, reinspects, rereads, and revalidates the fixed
+    evidence object; partial/malformed/foreign acceptance evidence blocks.

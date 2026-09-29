@@ -6484,3 +6484,39 @@ re-enabled.
 
 Next checkpoint: exact source/security diff review, then E6 canonical
 three-lane certification.
+
+### Architecture 127 pre-E6 exact review — BLOCKED / CORRECTION REQUIRED
+
+Exact source/security review at:
+
+```text
+HEAD 242bfa31123e6fc8dd4ae6a1bd3a58ad6652926d
+TREE e0efa262d9c2edc9688132ba458539646819915d
+focused Architecture-127 tests before final formatting correction: 273 passed
+affected observer tests after correction: 4 passed
+Ruff check / format on corrected observer: PASS
+```
+
+found one remaining post-write durability ambiguity. The guard writes a
+nonterminal ordinary result before the later flush/reread/native-verification
+steps. If the bytes are fully written and one of those later proofs fails, the
+current two-record grammar can leave a complete `WAKE_START -> ordinary
+nonterminal` pair. A later invocation currently parses that pair as
+nonterminal and may launch source again.
+
+E6 certification is therefore NOT authorized yet. Architecture 127 now freezes
+an E6-pre correction: ordinary nonterminal wakes require a guard-owned
+result-acceptance marker that is attempted only after successful result
+durability verification and binds the exact result SHA-256. A nonterminal
+result without that marker is terminal/unaccepted. Existing accepted sequences
+must be flushed/reread/reverified again before a later source launch.
+
+Next source-only checkpoint: Sol High implementation of the E6-pre acceptance
+marker/state-machine correction plus adversarial post-write-failure tests.
+After focused verification, repeat the exact source/security diff review.
+Canonical three-lane E6 certification runs only once after that tree is final.
+
+The production D10 task remains disabled and must not be started or re-enabled.
+No production filesystem, scheduler, provider, Paper-v2, broker, or live effect
+is authorized.
+

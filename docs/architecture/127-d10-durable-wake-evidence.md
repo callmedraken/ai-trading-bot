@@ -258,3 +258,92 @@ authority.
 E4 acceptance must specifically prove that post-child append failure leaves the
 durable start marker as a terminal latch and that a subsequent guard invocation
 cannot launch the child.
+
+## E6 pre-certification correction — nonterminal result acceptance
+
+The exact pre-E6 source/security review found a remaining crash/durability
+ambiguity in the E4 pair grammar.
+
+The native append sequence necessarily performs `WriteFile` before the later
+`FlushFileBuffers`, native reinspection, reread, and parser verification.
+Therefore a nonterminal ordinary result can be fully written to the evidence
+file and then encounter a later flush/reread/reinspection failure. The current
+two-record grammar would leave durable bytes shaped like:
+
+```text
+WAKE_START -> ordinary nonterminal result
+```
+
+A later guard invocation can parse those complete bytes as a successful
+nonterminal wake even though the guard that produced them never completed the
+post-write durability proof. That permits automatic source relaunch after an
+indeterminate result-persistence boundary and does not satisfy E4.
+
+The frozen correction adds a third, guard-owned **result-acceptance marker** for
+nonterminal ordinary wakes.
+
+The marker uses a separate bounded canonical schema:
+
+```text
+personal-desktop-d10-guard-accept/v1
+```
+
+It contains only:
+
+- the schema;
+- a trusted guard acceptance timestamp;
+- deployment ID;
+- soak ID;
+- SHA-256 of the exact preceding canonical ordinary result bytes.
+
+The guard may attempt this marker **only after** the ordinary nonterminal result
+append has completed its flush, native identity/security reinspection, exact
+reread, and full evidence-log validation successfully.
+
+The durable grammar becomes:
+
+```text
+WAKE_START -> ordinary nonterminal -> ACCEPT = completed nonterminal wake
+WAKE_START -> ordinary nonterminal          = terminal/unaccepted wake
+WAKE_START -> ordinary STOPPED              = terminal soak
+WAKE_START -> guard-terminal failure        = terminal soak
+WAKE_START as final record                  = terminal/incomplete soak
+```
+
+An acceptance marker:
+
+- may appear only immediately after one nonterminal ordinary result;
+- must bind the SHA-256 of that exact preceding result;
+- may never follow STOPPED or guard-terminal evidence;
+- may never be duplicated or appear without the matching start/result pair;
+- is audit/stop-control evidence only and grants no provider, settlement,
+  publication, receipt-recovery, broker, live, retry, or lease authority.
+
+Before any later source launch, the guard must independently stabilize the
+already-existing evidence log through the pinned current-soak file handle:
+flush the existing file, recheck native identity/security, reread the exact
+bytes, and validate the complete grammar. This is required before trusting an
+existing ACCEPT marker. A fully present ACCEPT marker whose own earlier
+post-write verification was interrupted may therefore be trusted only after
+this new pre-source stabilization succeeds.
+
+A nonterminal ordinary result without ACCEPT remains terminal for that soak.
+The guard must not synthesize or append ACCEPT on a later scheduler wake and
+must not launch source. Recovery requires a new reviewed deployment/soak just as
+for other terminal evidence. Partial or malformed ACCEPT evidence is likewise
+terminal and is never repaired.
+
+Capacity must be proven before source launch for all three possible nonterminal
+records: one maximum wake-start marker, one maximum ordinary result, and one
+maximum result-acceptance marker. STOPPED and guard-terminal paths remain
+two-record terminal paths but use the same conservative pre-launch reservation.
+
+The read-only observer must report a nonterminal wake only for an accepted
+three-record sequence. A complete nonterminal result lacking ACCEPT must report
+a distinct terminal/unaccepted state.
+
+This correction changes source/design only. It authorizes no production
+filesystem, scheduler, source launch, provider, Paper-v2, broker, or live
+effect. E6 certification remains blocked until this correction is implemented,
+focused-tested, and exact-diff reviewed.
+

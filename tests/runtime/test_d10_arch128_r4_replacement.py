@@ -35,6 +35,12 @@ def _facts(**overrides: bool) -> r4.AdmissionFacts:
     return r4.AdmissionFacts(**values)
 
 
+def _post_facts(**overrides: bool) -> r4.PostRenameFacts:
+    values = {item.name: True for item in fields(r4.PostRenameFacts)}
+    values.update(overrides)
+    return r4.PostRenameFacts(**values)
+
+
 def test_fixed_arch128_paths_and_external_evidence_are_exact() -> None:
     assert r4.CANONICAL_PATH == r"F:\AITradingBot\D10"
     assert r4.STAGING_PATH == (
@@ -178,7 +184,7 @@ def test_begin_requires_ready_namespace_and_all_exact_facts() -> None:
         r4.begin_replacement(ready, _facts(old_final_lease_exact=False))
 
 
-def test_happy_path_is_exactly_two_ordered_successes() -> None:
+def test_happy_path_requires_read_only_verification_after_each_success() -> None:
     ready = _namespace(
         _root(r4.CANONICAL_PATH, r4.OLD_IDENTITY),
         _root(r4.STAGING_PATH, r4.NEW_IDENTITY),
@@ -190,11 +196,41 @@ def test_happy_path_is_exactly_two_ordered_successes() -> None:
         r4.RenameStep.OLD_TO_RETIRED,
         r4.MutationOutcome.SUCCESS,
     )
+    assert result.phase is r4.Phase.VERIFY_RETIRED_WINDOW
+
+    with pytest.raises(ValueError):
+        r4.record_rename(
+            result,
+            r4.RenameStep.STAGING_TO_CANONICAL,
+            r4.MutationOutcome.SUCCESS,
+        )
+
+    result = r4.confirm_retired_window(
+        result,
+        _namespace(
+            _absent(r4.CANONICAL_PATH),
+            _root(r4.STAGING_PATH, r4.NEW_IDENTITY),
+            _root(r4.RETIRED_PATH, r4.OLD_IDENTITY),
+        ),
+        _post_facts(),
+    )
     assert result.phase is r4.Phase.READY_TO_PUBLISH_NEW
+
     result = r4.record_rename(
         result,
         r4.RenameStep.STAGING_TO_CANONICAL,
         r4.MutationOutcome.SUCCESS,
+    )
+    assert result.phase is r4.Phase.VERIFY_COMPLETE
+
+    result = r4.confirm_complete(
+        result,
+        _namespace(
+            _root(r4.CANONICAL_PATH, r4.NEW_IDENTITY),
+            _absent(r4.STAGING_PATH),
+            _root(r4.RETIRED_PATH, r4.OLD_IDENTITY),
+        ),
+        _post_facts(),
     )
     assert result == r4.ReplacementResult(
         r4.Phase.COMPLETE,
@@ -246,6 +282,15 @@ def test_second_step_non_success_latches_terminal_stop(
         r4.RenameStep.OLD_TO_RETIRED,
         r4.MutationOutcome.SUCCESS,
     )
+    first = r4.confirm_retired_window(
+        first,
+        _namespace(
+            _absent(r4.CANONICAL_PATH),
+            _root(r4.STAGING_PATH, r4.NEW_IDENTITY),
+            _root(r4.RETIRED_PATH, r4.OLD_IDENTITY),
+        ),
+        _post_facts(),
+    )
     result = r4.record_rename(
         first,
         r4.RenameStep.STAGING_TO_CANONICAL,
@@ -269,3 +314,87 @@ def test_rename_order_and_paths_are_fixed() -> None:
         r4.STAGING_PATH,
         r4.CANONICAL_PATH,
     )
+
+
+@pytest.mark.parametrize(
+    "field",
+    [item.name for item in fields(r4.PostRenameFacts)],
+)
+def test_every_post_rename_fact_is_required(field: str) -> None:
+    assert _post_facts(**{field: False}).all_exact() is False
+
+
+def test_retired_window_verification_rejects_wrong_namespace_or_facts() -> None:
+    ready = _namespace(
+        _root(r4.CANONICAL_PATH, r4.OLD_IDENTITY),
+        _root(r4.STAGING_PATH, r4.NEW_IDENTITY),
+        _absent(r4.RETIRED_PATH),
+    )
+    result = r4.record_rename(
+        r4.begin_replacement(ready, _facts()),
+        r4.RenameStep.OLD_TO_RETIRED,
+        r4.MutationOutcome.SUCCESS,
+    )
+
+    with pytest.raises(ValueError):
+        r4.confirm_retired_window(result, ready, _post_facts())
+
+    with pytest.raises(ValueError):
+        r4.confirm_retired_window(
+            result,
+            _namespace(
+                _absent(r4.CANONICAL_PATH),
+                _root(r4.STAGING_PATH, r4.NEW_IDENTITY),
+                _root(r4.RETIRED_PATH, r4.OLD_IDENTITY),
+            ),
+            _post_facts(old_final_lease_exact=False),
+        )
+
+
+def test_completion_verification_rejects_wrong_namespace_or_facts() -> None:
+    ready = _namespace(
+        _root(r4.CANONICAL_PATH, r4.OLD_IDENTITY),
+        _root(r4.STAGING_PATH, r4.NEW_IDENTITY),
+        _absent(r4.RETIRED_PATH),
+    )
+    result = r4.record_rename(
+        r4.begin_replacement(ready, _facts()),
+        r4.RenameStep.OLD_TO_RETIRED,
+        r4.MutationOutcome.SUCCESS,
+    )
+    result = r4.confirm_retired_window(
+        result,
+        _namespace(
+            _absent(r4.CANONICAL_PATH),
+            _root(r4.STAGING_PATH, r4.NEW_IDENTITY),
+            _root(r4.RETIRED_PATH, r4.OLD_IDENTITY),
+        ),
+        _post_facts(),
+    )
+    result = r4.record_rename(
+        result,
+        r4.RenameStep.STAGING_TO_CANONICAL,
+        r4.MutationOutcome.SUCCESS,
+    )
+
+    with pytest.raises(ValueError):
+        r4.confirm_complete(
+            result,
+            _namespace(
+                _absent(r4.CANONICAL_PATH),
+                _root(r4.STAGING_PATH, r4.NEW_IDENTITY),
+                _root(r4.RETIRED_PATH, r4.OLD_IDENTITY),
+            ),
+            _post_facts(),
+        )
+
+    with pytest.raises(ValueError):
+        r4.confirm_complete(
+            result,
+            _namespace(
+                _root(r4.CANONICAL_PATH, r4.NEW_IDENTITY),
+                _absent(r4.STAGING_PATH),
+                _root(r4.RETIRED_PATH, r4.OLD_IDENTITY),
+            ),
+            _post_facts(new_evidence_root_exact_empty=False),
+        )

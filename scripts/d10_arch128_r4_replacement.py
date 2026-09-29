@@ -209,9 +209,31 @@ class MutationOutcome(StrEnum):
 
 class Phase(StrEnum):
     READY_TO_RETIRE_OLD = "READY_TO_RETIRE_OLD"
+    VERIFY_RETIRED_WINDOW = "VERIFY_RETIRED_WINDOW"
     READY_TO_PUBLISH_NEW = "READY_TO_PUBLISH_NEW"
+    VERIFY_COMPLETE = "VERIFY_COMPLETE"
     COMPLETE = "COMPLETE"
     STOPPED_INDETERMINATE = "STOPPED_INDETERMINATE"
+
+
+@dataclass(frozen=True, slots=True)
+class PostRenameFacts:
+    administrator_exact: bool
+    protected_parent_exact: bool
+    old_final_lease_exact: bool
+    scheduler_disabled_nonrunning_exact: bool
+    new_signed_trust_exact: bool
+    new_evidence_root_exact_empty: bool
+    new_activation_lease_absent: bool
+    same_volume_exact: bool
+    historical_s5r8_retired_absent: bool
+    unexpected_reserved_names_absent: bool
+
+    def all_exact(self) -> bool:
+        return all(
+            type(getattr(self, item.name)) is bool and getattr(self, item.name) is True
+            for item in fields(PostRenameFacts)
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -260,7 +282,7 @@ def record_rename(
             raise ValueError("R4 old-root rename order differs")
         if outcome is MutationOutcome.SUCCESS:
             return ReplacementResult(
-                Phase.READY_TO_PUBLISH_NEW,
+                Phase.VERIFY_RETIRED_WINDOW,
                 MutationOutcome.SUCCESS,
                 MutationOutcome.NOT_CALLED,
             )
@@ -280,7 +302,7 @@ def record_rename(
 
     if outcome is MutationOutcome.SUCCESS:
         return ReplacementResult(
-            Phase.COMPLETE,
+            Phase.VERIFY_COMPLETE,
             MutationOutcome.SUCCESS,
             MutationOutcome.SUCCESS,
         )
@@ -290,6 +312,50 @@ def record_rename(
         outcome,
     )
 
+
+
+def confirm_retired_window(
+    result: ReplacementResult,
+    observation: NamespaceObservation,
+    facts: PostRenameFacts,
+) -> ReplacementResult:
+    if (
+        type(result) is not ReplacementResult
+        or result.phase is not Phase.VERIFY_RETIRED_WINDOW
+        or result.old_to_retired is not MutationOutcome.SUCCESS
+        or result.staging_to_canonical is not MutationOutcome.NOT_CALLED
+        or type(facts) is not PostRenameFacts
+        or not facts.all_exact()
+        or classify_namespace(observation) is not NamespaceState.RETIRED_WINDOW
+    ):
+        raise ValueError("R4 retired-window verification is not exact")
+    return ReplacementResult(
+        Phase.READY_TO_PUBLISH_NEW,
+        MutationOutcome.SUCCESS,
+        MutationOutcome.NOT_CALLED,
+    )
+
+
+def confirm_complete(
+    result: ReplacementResult,
+    observation: NamespaceObservation,
+    facts: PostRenameFacts,
+) -> ReplacementResult:
+    if (
+        type(result) is not ReplacementResult
+        or result.phase is not Phase.VERIFY_COMPLETE
+        or result.old_to_retired is not MutationOutcome.SUCCESS
+        or result.staging_to_canonical is not MutationOutcome.SUCCESS
+        or type(facts) is not PostRenameFacts
+        or not facts.all_exact()
+        or classify_namespace(observation) is not NamespaceState.COMPLETE
+    ):
+        raise ValueError("R4 completion verification is not exact")
+    return ReplacementResult(
+        Phase.COMPLETE,
+        MutationOutcome.SUCCESS,
+        MutationOutcome.SUCCESS,
+    )
 
 def fixed_rename_paths(step: RenameStep) -> tuple[str, str]:
     if step is RenameStep.OLD_TO_RETIRED:

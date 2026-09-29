@@ -6011,3 +6011,32 @@ P124-5/P124-5R activation is now closed successfully. D10 is armed for the
 original seven-day bounded interval. Do not manually start the scheduled task.
 The next checkpoint is observation of the first natural scheduled D10 wake and
 its bounded evidence. Broker-paper/live remain unauthorized.
+
+
+### D10-C pre-first-wake observability gap — STOP BEFORE NATURAL WAKE
+
+Post-arming exact source review found that the sealed D10 second-stage launcher
+serializes the bounded `personal-desktop-d10-wake-evidence/v1` object and
+emits it only with `print(..., flush=True)`. The Architecture-124 guard launches
+that second stage with inherited standard handles and no capture/output sink.
+The frozen Task Scheduler contract likewise contains only the exact Python/guard
+action and no shell redirection or durable evidence destination.
+
+Therefore the currently armed task has no source-owned durable path that can
+retain the exact per-wake D10 evidence required by D10-C. Task Scheduler can
+prove start/completion/result metadata, and durable trading state can be
+reconstructed independently, but neither is the exact bounded wake-evidence
+record required by the frozen D10-C acceptance criterion.
+
+This is an operational observability defect, not evidence of a provider,
+Paper-v2, broker, or live effect. No natural D10 wake has yet been accepted.
+Do not manually start the task and do not let the soak advance into D10-D on the
+basis of scheduler return code or reconstructed state alone.
+
+The next protected action should be a reviewed fail-safe halt of the scheduled
+task before its first natural 01:30 Pacific wake. That scheduler mutation
+requires fresh explicit authorization. After halt, freeze a source/design
+correction that durably persists bounded per-wake evidence without weakening
+the sealed deployment, zero-semantic-argument scheduler, exact seven-day
+authority, or closed-gate semantics. Source changes alone do not authorize a
+redeployment or a new soak.

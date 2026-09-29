@@ -605,3 +605,44 @@ Next checkpoint is R4B source-only implementation and review of the
 Architecture-128-specific Windows staging/read-only-admission/rename adapter.
 No protected filesystem mutation is authorized by R4A acceptance.
 
+### Architecture 128 R4B Windows adapter — ACCEPTED
+
+R4B is accepted at:
+
+```text
+HEAD:
+3c3703f41524ac02fdaffc63b52082c51cdb2736
+
+TREE:
+f2ea820e7582d773f8d8cb668725bbb25661497c
+```
+
+The accepted source-only adapter provides:
+
+- a create-only staging writer confined to the exact Architecture-128 staging
+  root;
+- no activation-lease creation path;
+- no evidence-log file creation path;
+- an inert empty `evidence` directory staging path only;
+- a no-follow reader limited to canonical/new-staging/new-retired/historical
+  retired fixed namespaces;
+- exactly two parent-relative native rename paths:
+  canonical -> new incident-retired and staging -> canonical;
+- `replace_if_exists = 0`;
+- terminal `INDETERMINATE` result on native status, completion, post-call
+  identity, or handle-close ambiguity;
+- no operator/CLI, scheduler, credential, provider, Paper-v2, broker, or live
+  entry point.
+
+The corrected R4B gate passed its focused Architecture-128 tests plus the
+existing protected-deployment/replacement regressions and then passed both
+required Ruff commands independently before the final decision.
+
+R4B acceptance authorizes no production invocation. The next checkpoint is R4C
+source-only construction/orchestration: reconstruct the exact E6 material from
+the byte-exact R1 worktree, cross-check the accepted R1 manifest/attestation and
+R2 detached signature, construct the inert signed staging payload through an
+injected backend, perform a fresh post-staging read-only admission, and expose
+only an in-process two-step rename session. Protected execution remains a
+separate explicit R4 authorization boundary.
+

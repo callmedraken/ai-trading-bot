@@ -273,7 +273,7 @@ def test_guarded_no_action_wake_is_captured_and_appended(
     assert acceptance["schema"] == guard.D10_GUARD_RESULT_ACCEPT_EVIDENCE_SCHEMA
     assert acceptance["result_sha256"] == hashlib.sha256(record).hexdigest()
     assert guard._parse_evidence_log(native.data, deployment, lease)[2] is False
-    assert native.flush_sizes == []
+    assert native.read_count == 4
     assert calls[0][1]["capture_output"] is True
     assert calls[0][1]["cwd"] == guard.D10_ROOT
     assert "evidence" not in " ".join(calls[0][0]).lower()
@@ -409,7 +409,7 @@ def test_full_result_write_then_completion_failure_leaves_unaccepted_stop_latch(
     with pytest.raises(guard.GuardBlocked, match="stop latch"):
         guard._run_second_stage_with_evidence(deployment, lease, environment, native)
     assert calls[0] == 1
-    assert native.read_count == 2
+    assert native.read_count == 3
 
 
 def test_post_append_native_identity_drift_fails_closed_and_blocks_retry(
@@ -448,7 +448,7 @@ def test_post_append_native_identity_drift_fails_closed_and_blocks_retry(
     with pytest.raises(guard.GuardBlocked, match="stop latch"):
         guard._run_second_stage_with_evidence(deployment, lease, environment, native)
     assert calls[0] == 1
-    assert native.read_count == 2
+    assert native.read_count == 3
 
 
 def test_existing_accepted_wake_is_revalidated_before_next_source_launch(

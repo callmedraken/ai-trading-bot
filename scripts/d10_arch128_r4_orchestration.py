@@ -9,9 +9,10 @@ from __future__ import annotations
 import hashlib
 import json
 import stat
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Protocol
+from typing import Protocol
 
 from scripts import d10_arch128_r3_preflight as r3
 from scripts import d10_arch128_r4_replacement as r4
@@ -32,7 +33,6 @@ from scripts.d10_protected_deployment import (
     SourceFile,
     require_directory,
     require_file,
-    require_native_object,
     require_parent_native_object,
     validate_source_relative_path,
     verify_signature,
@@ -50,13 +50,9 @@ from trading_bot.runtime.personal_desktop_d10_deployment_identity import (
 )
 
 PRODUCTION_PYTHON_VERSION = "3.14.3"
-R1_SUMMARY_SHA256 = (
-    "5a92e432c107bf5b091dc4da7984fb5f361dc570346fd0ed0503240963a27361"
-)
+R1_SUMMARY_SHA256 = "5a92e432c107bf5b091dc4da7984fb5f361dc570346fd0ed0503240963a27361"
 R1_MANIFEST_PATH = Path(r4.R1_MATERIAL_ROOT) / "executable-manifest.json"
-R1_ATTESTATION_PATH = (
-    Path(r4.R1_MATERIAL_ROOT) / "deployment.attestation.unsigned.json"
-)
+R1_ATTESTATION_PATH = Path(r4.R1_MATERIAL_ROOT) / "deployment.attestation.unsigned.json"
 R1_SUMMARY_PATH = Path(r4.R1_MATERIAL_ROOT) / "summary.json"
 R2_SIGNATURE_PATH = Path(r4.R2_SIGNING_ROOT) / "deployment.attestation.sig"
 R2_SUMMARY_PATH = Path(r4.R2_SIGNING_ROOT) / "summary.json"
@@ -150,11 +146,12 @@ def _stable_regular_file(path: Path, limit: int) -> bytes:
         raise
     except OSError:
         raise DeploymentBlocked("arch128_external_file_unavailable") from None
-    if (
-        (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns)
-        != (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns)
-        or len(data) != after.st_size
-    ):
+    if (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns) != (
+        after.st_dev,
+        after.st_ino,
+        after.st_size,
+        after.st_mtime_ns,
+    ) or len(data) != after.st_size:
         raise DeploymentBlocked("arch128_external_file_drift")
     return data
 
@@ -245,8 +242,7 @@ def load_fixed_signed_material(
 
     if (
         manifest_bytes != material.manifest.canonical_bytes()
-        or hashlib.sha256(manifest_bytes).hexdigest()
-        != r4.NEW_IDENTITY.manifest_sha256
+        or hashlib.sha256(manifest_bytes).hexdigest() != r4.NEW_IDENTITY.manifest_sha256
         or attestation_bytes != material.attestation.canonical_bytes()
         or hashlib.sha256(attestation_bytes).hexdigest()
         != r4.NEW_IDENTITY.unsigned_attestation_sha256
@@ -382,8 +378,7 @@ def _verify_signed_root(
     )
     if (
         identity.detached_signature_sha256 is not None
-        and hashlib.sha256(signature).hexdigest()
-        != identity.detached_signature_sha256
+        and hashlib.sha256(signature).hexdigest() != identity.detached_signature_sha256
     ):
         raise DeploymentBlocked("arch128_signed_signature_digest_drift")
     verify_signature(verifier, attestation_bytes, signature)
@@ -417,8 +412,7 @@ def _verify_old_root(
         or lease.attestation_sha256 != r4.OLD_IDENTITY.unsigned_attestation_sha256
         or lease.certified_source_head != r4.OLD_IDENTITY.certified_source_head
         or lease.certified_source_tree != r4.OLD_IDENTITY.certified_source_tree
-        or format_utc_instant(lease.accepted_activation_utc)
-        != r4.OLD_ACTIVATION_UTC
+        or format_utc_instant(lease.accepted_activation_utc) != r4.OLD_ACTIVATION_UTC
         or format_utc_instant(lease.end_utc) != r4.OLD_END_UTC
         or lease.soak_id != r4.OLD_SOAK_ID
     ):
@@ -487,8 +481,7 @@ def _parent_native(reader: Reader, expected_reserved: set[str]) -> NativeObject:
     reserved = {
         name
         for name in names
-        if name.casefold() == "d10"
-        or name.casefold().startswith(("d10.", "d10-"))
+        if name.casefold() == "d10" or name.casefold().startswith(("d10.", "d10-"))
     }
     if reserved != expected_reserved:
         raise DeploymentBlocked("arch128_reserved_namespace_drift")
@@ -529,7 +522,11 @@ def _pre_stage_once(
     old = _verify_old_root(reader, verifier, r4.CANONICAL_PATH)
     if old.root_native.volume_serial != parent.volume_serial:
         raise DeploymentBlocked("arch128_pre_stage_volume_drift")
-    return PreStageObservation(parent, old.root_native, _scheduler_exact(scheduler_read))
+    return PreStageObservation(
+        parent,
+        old.root_native,
+        _scheduler_exact(scheduler_read),
+    )
 
 
 def observe_pre_stage(
@@ -650,9 +647,7 @@ def _post_once(
     ):
         raise DeploymentBlocked("arch128_post_volume_drift")
 
-    facts = r4.PostRenameFacts(
-        *([True] * len(r4.PostRenameFacts.__dataclass_fields__))
-    )
+    facts = r4.PostRenameFacts(*([True] * len(r4.PostRenameFacts.__dataclass_fields__)))
     return PostRenameObservation(
         namespace,
         facts,
@@ -694,8 +689,7 @@ def _require_signed_material(signed: SignedMaterial) -> None:
         or sum(entry.byte_length for entry in manifest.entries)
         != identity.executable_total_bytes
         or len(material.guard_bytes) != identity.guard_byte_length
-        or hashlib.sha256(material.guard_bytes).hexdigest()
-        != identity.guard_sha256
+        or hashlib.sha256(material.guard_bytes).hexdigest() != identity.guard_sha256
         or hashlib.sha256(attestation.canonical_bytes()).hexdigest()
         != identity.unsigned_attestation_sha256
         or attestation.deployment_id != identity.deployment_id
@@ -784,6 +778,7 @@ def _write_staging_payload(
 ) -> None:
     _require_signed_material(signed)
     _write_staging_payload_unchecked(signed, writer)
+
 
 def _construct_staging(
     signed: SignedMaterial,

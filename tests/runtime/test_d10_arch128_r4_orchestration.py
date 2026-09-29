@@ -5,16 +5,17 @@ from dataclasses import fields
 from pathlib import Path
 
 import pytest
-
-from scripts import d10_arch128_r4_orchestration as r4c
-from scripts import d10_arch128_r4_replacement as r4
+from scripts.build_d10_deployment_identity import D10BuildResult
 from scripts.d10_protected_deployment import (
     Ace,
     CertifiedMaterial,
+    DeploymentBlocked,
     NativeObject,
     SourceFile,
 )
-from scripts.build_d10_deployment_identity import D10BuildResult
+
+from scripts import d10_arch128_r4_orchestration as r4c
+from scripts import d10_arch128_r4_replacement as r4
 from trading_bot.runtime.personal_desktop_d10_deployment_identity import (
     ExecutableManifest,
     ExecutableManifestEntry,
@@ -50,9 +51,7 @@ def _admission() -> r4c.AdmissionObservation:
             True,
             True,
         ),
-        r4.AdmissionFacts(
-            *([True] * len(fields(r4.AdmissionFacts)))
-        ),
+        r4.AdmissionFacts(*([True] * len(fields(r4.AdmissionFacts)))),
         _native(r4.PARENT_PATH, 1),
         _native(r4.CANONICAL_PATH, 2),
         _native(r4.STAGING_PATH, 3),
@@ -83,9 +82,7 @@ def _post(state: r4.NamespaceState) -> r4c.PostRenameObservation:
         new = _native(r4.CANONICAL_PATH, 3)
     return r4c.PostRenameObservation(
         namespace,
-        r4.PostRenameFacts(
-            *([True] * len(fields(r4.PostRenameFacts)))
-        ),
+        r4.PostRenameFacts(*([True] * len(fields(r4.PostRenameFacts)))),
         _native(r4.PARENT_PATH, 1),
         old,
         new,
@@ -180,8 +177,7 @@ def test_write_staging_payload_has_fixed_inert_sequence() -> None:
         for call in writer.calls
     )
     assert not any(
-        call[0] == "file" and str(call[1]).endswith(".jsonl")
-        for call in writer.calls
+        call[0] == "file" and str(call[1]).endswith(".jsonl") for call in writer.calls
     )
 
 
@@ -220,8 +216,8 @@ def test_construct_staging_requires_pre_and_post_scheduler_stability(
         admission.new_native,
         (("enabled", True),),
     )
-    with pytest.raises(Exception):
-        r4c.construct_staging(
+    with pytest.raises(DeploymentBlocked):
+        r4c._construct_staging(
             signed,
             _Writer(),
             object(),
@@ -272,7 +268,7 @@ def test_session_requires_readback_between_both_renames() -> None:
 def test_session_post_rename_readback_failure_latches_stop() -> None:
     admission = _admission()
 
-    session = r4c.ReplacementSession(
+    session = r4c._ReplacementSession(
         object(),
         object(),
         lambda: {},
@@ -284,7 +280,7 @@ def test_session_post_rename_readback_failure_latches_stop() -> None:
     result = session.retire_old()
     assert result.phase is r4.Phase.STOPPED_INDETERMINATE
     assert session.stopped is True
-    with pytest.raises(Exception):
+    with pytest.raises(DeploymentBlocked):
         session.publish_new()
 
 
@@ -297,7 +293,7 @@ def test_session_native_indeterminate_never_calls_post_readback() -> None:
         post_calls += 1
         return _post(r4.NamespaceState.RETIRED_WINDOW)
 
-    session = r4c.ReplacementSession(
+    session = r4c._ReplacementSession(
         object(),
         object(),
         lambda: {},
@@ -332,14 +328,14 @@ def test_r4c_import_has_no_cli_or_public_mutation_entrypoint() -> None:
 def test_public_staging_writer_rejects_unreviewed_material_before_effect() -> None:
     signed = _signed_material()
     writer = _Writer()
-    with pytest.raises(Exception):
+    with pytest.raises(DeploymentBlocked):
         r4c._write_staging_payload(signed, writer)
     assert writer.calls == []
 
 
 def test_session_rename_exception_latches_terminal_stop() -> None:
     admission = _admission()
-    session = r4c.ReplacementSession(
+    session = r4c._ReplacementSession(
         object(),
         object(),
         lambda: {},
@@ -355,7 +351,7 @@ def test_session_rename_exception_latches_terminal_stop() -> None:
 
 def test_session_admission_exception_latches_session() -> None:
     admission = _admission()
-    session = r4c.ReplacementSession(
+    session = r4c._ReplacementSession(
         object(),
         object(),
         lambda: {},

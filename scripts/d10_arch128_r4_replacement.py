@@ -231,8 +231,7 @@ class PostRenameFacts:
 
     def all_exact(self) -> bool:
         return all(
-            type(getattr(self, item.name)) is bool
-            and getattr(self, item.name) is True
+            type(getattr(self, item.name)) is bool and getattr(self, item.name) is True
             for item in fields(PostRenameFacts)
         )
 
@@ -361,9 +360,9 @@ def confirm_complete(
 def fail_post_rename_verification(
     result: ReplacementResult,
 ) -> ReplacementResult:
-    if (
-        type(result) is not ReplacementResult
-        or result.phase not in (Phase.VERIFY_RETIRED_WINDOW, Phase.VERIFY_COMPLETE)
+    if type(result) is not ReplacementResult or result.phase not in (
+        Phase.VERIFY_RETIRED_WINDOW,
+        Phase.VERIFY_COMPLETE,
     ):
         raise ValueError("R4 post-rename verification failure is not admissible")
     return ReplacementResult(
@@ -371,6 +370,7 @@ def fail_post_rename_verification(
         result.old_to_retired,
         result.staging_to_canonical,
     )
+
 
 def fixed_rename_paths(step: RenameStep) -> tuple[str, str]:
     if step is RenameStep.OLD_TO_RETIRED:

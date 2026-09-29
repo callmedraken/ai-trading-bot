@@ -398,3 +398,35 @@ def test_scheduler_command_remains_zero_semantic_argument_guard_target() -> None
     assert guard.D10_SCHEDULER_TASK_PATH == r"\AITradingBot-PD4-UnattendedPaper-v1"
     assert guard.D10_EVIDENCE_ROOT not in " ".join(source)
     assert guard.D10_EVIDENCE_ROOT not in guard.D10_SECOND_STAGE_LAUNCHER
+
+
+
+def test_canonical_but_malformed_child_record_becomes_terminal_guard_evidence(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    deployment = _deployment()
+    lease = _lease(deployment)
+    native = EvidenceNative(lease)
+    value = json.loads(_wake_record(deployment, lease))
+    value["history"]["reconciled_count"] = -1
+    malformed = json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
+    monkeypatch.setattr(
+        guard,
+        "_trusted_runtime_utc_now",
+        lambda: datetime(2026, 9, 29, 8, 32, tzinfo=UTC),
+    )
+    monkeypatch.setattr(
+        guard.subprocess,
+        "run",
+        lambda *args, **kwargs: SimpleNamespace(
+            returncode=0, stdout=malformed + b"\n", stderr=b""
+        ),
+    )
+    assert guard._run_second_stage_with_evidence(
+        deployment,
+        lease,
+        {"SystemRoot": r"C:\Windows", "WINDIR": r"C:\Windows"},
+        native,
+    ) == 1
+    assert b"CHILD_OUTPUT_INVALID" in native.data
+    assert guard._parse_evidence_log(native.data, deployment, lease)[2] is True

@@ -47,8 +47,8 @@ def test_fixed_arch128_paths_and_external_evidence_are_exact() -> None:
         r"F:\AITradingBot\D10.retired-9f3d111b-25bb-5ee4-9abf-f5215a32b826"
     )
     assert r4.NEW_EVIDENCE_ROOT == r4.STAGING_PATH + r"\evidence"
-    assert r4.R1_MATERIAL_ROOT.startswith(r"F:\AI\temp\")
-    assert r4.R2_SIGNING_ROOT.startswith(r"F:\AI\temp\")
+    assert r4.R1_MATERIAL_ROOT.startswith("F:\\AI\\temp\\")
+    assert r4.R2_SIGNING_ROOT.startswith("F:\\AI\\temp\\")
 
 
 def test_old_halted_incident_identity_is_frozen() -> None:
@@ -150,7 +150,10 @@ def test_namespace_classifier_rejects_identity_or_reserved_name_drift() -> None:
     assert r4.classify_namespace(observation) is r4.NamespaceState.CONFLICTING
 
 
-@pytest.mark.parametrize("field", [item.name for item in __import__("dataclasses").fields(r4.AdmissionFacts)])
+@pytest.mark.parametrize(
+    "field",
+    [item.name for item in fields(r4.AdmissionFacts)],
+)
 def test_every_admission_fact_is_required(field: str) -> None:
     facts = _facts(**{field: False})
     assert facts.all_exact() is False

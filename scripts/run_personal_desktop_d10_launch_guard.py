@@ -24,6 +24,15 @@ D10_MANIFEST = D10_ROOT + r"\executable-manifest.json"
 D10_ACTIVATION_LEASE = D10_ROOT + r"\activation.lease.json"
 D10_ACTIVATION_LEASE_INSTALLING = D10_ACTIVATION_LEASE + ".installing"
 D10_ACTIVATION_LEASE_TEMP = D10_ACTIVATION_LEASE + ".tmp"
+D10_EVIDENCE_ROOT = D10_ROOT + r"\evidence"
+D10_WAKE_EVIDENCE_SCHEMA = "personal-desktop-d10-wake-evidence/v1"
+D10_GUARD_TERMINAL_EVIDENCE_SCHEMA = "personal-desktop-d10-guard-evidence/v1"
+MAX_D10_WAKE_EVIDENCE_BYTES = 16 * 1024
+MAX_D10_GUARD_TERMINAL_EVIDENCE_BYTES = 2048
+MAX_D10_EVIDENCE_LOG_RECORDS = 512
+MAX_D10_EVIDENCE_LOG_BYTES = MAX_D10_EVIDENCE_LOG_RECORDS * (
+    MAX_D10_WAKE_EVIDENCE_BYTES + 1
+)
 D10_SOURCE_ROOT = D10_ROOT + r"\source"
 D10_SOURCE_PACKAGE_ROOT = D10_SOURCE_ROOT + r"\src"
 D10_SECOND_STAGE_LAUNCHER = (
@@ -70,6 +79,8 @@ _FILE_LIMITS = {
 _AGGREGATE_LIMIT = sum(_FILE_LIMITS.values())
 
 FILE_READ_DATA = 0x0001
+FILE_WRITE_DATA = 0x0002
+FILE_APPEND_DATA = 0x0004
 FILE_READ_EA = 0x0008
 FILE_TRAVERSE = 0x0020
 FILE_READ_ATTRIBUTES = 0x0080
@@ -80,6 +91,7 @@ TRADING_FILE_READ = (
     FILE_READ_DATA | FILE_READ_EA | FILE_READ_ATTRIBUTES | READ_CONTROL | SYNCHRONIZE
 )
 TRADING_DIRECTORY_READ = TRADING_FILE_READ | FILE_TRAVERSE
+TRADING_EVIDENCE_FILE_ACCESS = TRADING_FILE_READ | FILE_APPEND_DATA
 FILE_ATTRIBUTE_DIRECTORY = 0x10
 FILE_ATTRIBUTE_REPARSE_POINT = 0x400
 FILE_FLAG_OPEN_REPARSE_POINT = 0x00200000
@@ -94,6 +106,38 @@ _DEVICE = re.compile(r"(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?\Z", re.I)
 _SHA256 = re.compile(r"[0-9a-f]{64}\Z")
 _GIT_OID = re.compile(r"[0-9a-f]{40}\Z")
 _VERSION = re.compile(r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\Z")
+_EVIDENCE_FILE_NAME = re.compile(
+    r"wake-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.jsonl\Z"
+)
+_WAKE_FIELDS = frozenset(
+    {
+        "schema",
+        "outcome",
+        "stop_reason",
+        "observed_at_utc",
+        "deployment",
+        "soak",
+        "runtime",
+        "session",
+        "capture",
+        "history",
+        "settlement",
+        "decision",
+        "budgets",
+        "effect_crossings",
+        "final_gates",
+    }
+)
+_GUARD_EVIDENCE_FIELDS = frozenset(
+    {
+        "schema",
+        "reason",
+        "observed_at_utc",
+        "deployment_id",
+        "soak_id",
+        "terminal",
+    }
+)
 _ATTESTATION_FIELDS = frozenset(
     {
         "schema",
@@ -185,6 +229,15 @@ FILE_POLICY = SecurityPolicy(
         Ace(TRADING_SID, TRADING_FILE_READ),
     ),
 )
+EVIDENCE_FILE_POLICY = SecurityPolicy(
+    ADMINISTRATORS_SID,
+    True,
+    (
+        Ace(ADMINISTRATORS_SID, FILE_ALL_ACCESS),
+        Ace(SYSTEM_SID, FILE_ALL_ACCESS),
+        Ace(TRADING_SID, TRADING_EVIDENCE_FILE_ACCESS),
+    ),
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -244,8 +297,13 @@ def _source_path(relative: str) -> str:
 
 
 def _expected_path(path: str) -> None:
-    if path in _FIXED:
+    if path in _FIXED or path == D10_EVIDENCE_ROOT:
         return
+    if path.startswith(D10_EVIDENCE_ROOT + "\\"):
+        name = path[len(D10_EVIDENCE_ROOT) + 1 :]
+        if "\\" not in name and _EVIDENCE_FILE_NAME.fullmatch(name):
+            return
+        raise GuardBlocked("D10 evidence path is not canonical")
     if not path.startswith(D10_SOURCE_ROOT + "\\"):
         raise GuardBlocked("native open is outside fixed D10")
     relative = path[len(D10_SOURCE_ROOT) + 1 :].replace("\\", "/")
@@ -258,7 +316,12 @@ def _expected_path(path: str) -> None:
         raise GuardBlocked("native source path is not canonical")
 
 
-def _require_facts(path: str, directory: bool, facts: ObjectFacts) -> None:
+def _require_facts(
+    path: str,
+    directory: bool,
+    facts: ObjectFacts,
+    policy: SecurityPolicy | None = None,
+) -> None:
     if (
         type(facts) is not ObjectFacts
         or facts.final_path != path
@@ -269,11 +332,15 @@ def _require_facts(path: str, directory: bool, facts: ObjectFacts) -> None:
         or facts.filesystem != "NTFS"
     ):
         raise GuardBlocked("D10 object path, type, or volume changed")
-    policy = DIRECTORY_POLICY if directory else FILE_POLICY
+    expected_policy = (
+        DIRECTORY_POLICY if policy is None and directory else
+        FILE_POLICY if policy is None else
+        policy
+    )
     if (facts.owner, facts.protected, facts.aces) != (
-        policy.owner,
-        policy.protected,
-        policy.aces,
+        expected_policy.owner,
+        expected_policy.protected,
+        expected_policy.aces,
     ):
         raise GuardBlocked("D10 object owner or DACL differs")
     if not directory and facts.links != 1:
@@ -519,6 +586,34 @@ class _Native:
             raise _error("CreateFileW(D10)")
         return int(handle)
 
+    def open_evidence_file(self, path: str) -> int:
+        _expected_path(path)
+        if not path.startswith(D10_EVIDENCE_ROOT + "\\"):
+            raise GuardBlocked("evidence file is outside the fixed namespace")
+        create = _win_dll("kernel32").CreateFileW
+        create.argtypes = [
+            ctypes.c_wchar_p,
+            wintypes.DWORD,
+            wintypes.DWORD,
+            ctypes.c_void_p,
+            wintypes.DWORD,
+            wintypes.DWORD,
+            wintypes.HANDLE,
+        ]
+        create.restype = wintypes.HANDLE
+        handle = create(
+            path,
+            TRADING_EVIDENCE_FILE_ACCESS,
+            1,
+            None,
+            3,
+            FILE_FLAG_OPEN_REPARSE_POINT,
+            None,
+        )
+        if handle in (None, 0, _INVALID_HANDLE):
+            raise _error("CreateFileW(D10 evidence)")
+        return int(handle)
+
     def close(self, handle: int) -> None:
         close = _win_dll("kernel32").CloseHandle
         close.argtypes = [wintypes.HANDLE]
@@ -693,6 +788,95 @@ class _Native:
                 raise GuardBlocked("D10 same-handle read ended early")
             offset += received.value
         return data.raw
+
+    def read_bounded(self, handle: int, size: int, limit: int) -> bytes:
+        if (
+            type(size) is not int
+            or type(limit) is not int
+            or size < 0
+            or limit < 0
+            or size > limit
+        ):
+            raise GuardBlocked("D10 bounded read length is invalid")
+        kernel = _win_dll("kernel32")
+        observed = ctypes.c_longlong()
+        get_size = kernel.GetFileSizeEx
+        get_size.argtypes = [wintypes.HANDLE, ctypes.POINTER(ctypes.c_longlong)]
+        get_size.restype = wintypes.BOOL
+        if not get_size(handle, ctypes.byref(observed)) or observed.value != size:
+            raise GuardBlocked("D10 bounded file length drifted")
+        if size == 0:
+            return b""
+        seek = kernel.SetFilePointerEx
+        seek.argtypes = [
+            wintypes.HANDLE,
+            ctypes.c_longlong,
+            ctypes.POINTER(ctypes.c_longlong),
+            wintypes.DWORD,
+        ]
+        seek.restype = wintypes.BOOL
+        if not seek(handle, 0, None, 0):
+            raise _error("SetFilePointerEx(D10 bounded)")
+        read = kernel.ReadFile
+        read.argtypes = [
+            wintypes.HANDLE,
+            ctypes.c_void_p,
+            wintypes.DWORD,
+            ctypes.POINTER(wintypes.DWORD),
+            ctypes.c_void_p,
+        ]
+        read.restype = wintypes.BOOL
+        buffer = ctypes.create_string_buffer(size)
+        received = wintypes.DWORD()
+        if not read(handle, buffer, size, ctypes.byref(received), None):
+            raise _error("ReadFile(D10 bounded)")
+        if received.value != size:
+            raise GuardBlocked("D10 bounded read ended early")
+        return buffer.raw
+
+    def append_exact(self, handle: int, payload: bytes, expected_size: int) -> None:
+        if (
+            type(payload) is not bytes
+            or not payload
+            or len(payload) > MAX_D10_WAKE_EVIDENCE_BYTES + 1
+            or type(expected_size) is not int
+            or expected_size < 0
+            or expected_size + len(payload) > MAX_D10_EVIDENCE_LOG_BYTES
+        ):
+            raise GuardBlocked("D10 evidence append is outside bounds")
+        kernel = _win_dll("kernel32")
+        before = ctypes.c_longlong()
+        get_size = kernel.GetFileSizeEx
+        get_size.argtypes = [wintypes.HANDLE, ctypes.POINTER(ctypes.c_longlong)]
+        get_size.restype = wintypes.BOOL
+        if not get_size(handle, ctypes.byref(before)) or before.value != expected_size:
+            raise GuardBlocked("D10 evidence length changed before append")
+        write = kernel.WriteFile
+        write.argtypes = [
+            wintypes.HANDLE,
+            ctypes.c_void_p,
+            wintypes.DWORD,
+            ctypes.POINTER(wintypes.DWORD),
+            ctypes.c_void_p,
+        ]
+        write.restype = wintypes.BOOL
+        buffer = ctypes.create_string_buffer(payload)
+        written = wintypes.DWORD()
+        if not write(handle, buffer, len(payload), ctypes.byref(written), None):
+            raise _error("WriteFile(D10 evidence)")
+        if written.value != len(payload):
+            raise GuardBlocked("D10 evidence append was partial")
+        flush = kernel.FlushFileBuffers
+        flush.argtypes = [wintypes.HANDLE]
+        flush.restype = wintypes.BOOL
+        if not flush(handle):
+            raise _error("FlushFileBuffers(D10 evidence)")
+        after = ctypes.c_longlong()
+        if (
+            not get_size(handle, ctypes.byref(after))
+            or after.value != expected_size + len(payload)
+        ):
+            raise GuardBlocked("D10 evidence length differs after append")
 
     def listdir(self, path: str) -> tuple[str, ...]:
         _expected_path(path)
@@ -1705,16 +1889,33 @@ class VerifiedActivationLeaseFacts:
     production_python_version: str
 
 
-def _require_active_lease(deployment: VerifiedDeploymentFacts) -> None:
+def _require_active_lease(
+    deployment: VerifiedDeploymentFacts,
+) -> VerifiedActivationLeaseFacts:
     """Require a fresh fixed lease bound to this just-verified deployment."""
     if type(deployment) is not VerifiedDeploymentFacts:
         raise GuardBlocked("D10 deployment evidence is unavailable")
     lease_bytes = _read_fixed_activation_lease_bytes()
-    _lease, activation, end = _parse_active_lease_facts(lease_bytes, deployment)
+    lease, activation, end = _parse_active_lease_facts(lease_bytes, deployment)
     observed = _trusted_runtime_utc_now()
     if not activation <= observed < end:
         raise GuardBlocked("D10 activation lease is not ACTIVE")
     require_trading_principal()
+    return VerifiedActivationLeaseFacts(
+        state="ACTIVE",
+        deployment_id=deployment.deployment_id,
+        attestation_sha256=deployment.attestation_sha256,
+        soak_id=lease["soak_id"],
+        accepted_activation_utc=lease["accepted_activation_utc"],
+        end_utc=lease["end_utc"],
+        certified_source_head=lease["certified_source_head"],
+        certified_source_tree=lease["certified_source_tree"],
+        scheduler_contract_schema=lease["scheduler_contract_schema"],
+        scheduler_contract_id=lease["scheduler_contract_id"],
+        trading_sid=lease["trading_sid"],
+        production_python=lease["production_python"],
+        production_python_version=lease["production_python_version"],
+    )
 
 
 def verify_fixed_activation_lease_for_second_stage() -> VerifiedActivationLeaseFacts:

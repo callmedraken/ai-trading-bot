@@ -2969,9 +2969,7 @@ def observe_fixed_d10_durable_wake_evidence() -> dict[str, object]:
                 terminal_kind = "WAKE_RESULT_UNACCEPTED"
         elif schema == D10_GUARD_RESULT_ACCEPT_EVIDENCE_SCHEMA:
             if pending_result is None:
-                raise GuardBlocked(
-                    "D10 observer acceptance lacks nonterminal result"
-                )
+                raise GuardBlocked("D10 observer acceptance lacks nonterminal result")
             observed = _parse_guard_result_accept_record(
                 line,
                 deployment,

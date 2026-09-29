@@ -676,9 +676,11 @@ def observe_post(
     return second
 
 
-
 def _require_signed_material(signed: SignedMaterial) -> None:
-    if type(signed) is not SignedMaterial or type(signed.material) is not CertifiedMaterial:
+    if (
+        type(signed) is not SignedMaterial
+        or type(signed.material) is not CertifiedMaterial
+    ):
         raise DeploymentBlocked("arch128_signed_material_type")
 
     material = signed.material
@@ -692,7 +694,8 @@ def _require_signed_material(signed: SignedMaterial) -> None:
         or sum(entry.byte_length for entry in manifest.entries)
         != identity.executable_total_bytes
         or len(material.guard_bytes) != identity.guard_byte_length
-        or hashlib.sha256(material.guard_bytes).hexdigest() != identity.guard_sha256
+        or hashlib.sha256(material.guard_bytes).hexdigest()
+        != identity.guard_sha256
         or hashlib.sha256(attestation.canonical_bytes()).hexdigest()
         != identity.unsigned_attestation_sha256
         or attestation.deployment_id != identity.deployment_id
@@ -722,9 +725,6 @@ def _write_staging_payload_unchecked(
     signed: SignedMaterial,
     writer: Writer,
 ) -> None:
-    signed: SignedMaterial,
-    writer: Writer,
-) -> None:
     material = signed.material
     writer.require_administrator()
     writer.bind_source_inventory(
@@ -742,7 +742,10 @@ def _write_staging_payload_unchecked(
         for component in entry.relative_path.split("/")[:-1]:
             parent += "\\" + component
             directories.add(parent)
-    for directory in sorted(directories, key=lambda value: (value.count("\\"), value)):
+    for directory in sorted(
+        directories,
+        key=lambda value: (value.count("\\"), value),
+    ):
         writer.create_directory(directory)
 
     for item in material.files:
@@ -775,7 +778,6 @@ def _write_staging_payload_unchecked(
     writer.create_directory(r4.NEW_EVIDENCE_ROOT)
 
 
-
 def write_staging_payload(
     signed: SignedMaterial,
     writer: Writer,
@@ -798,7 +800,10 @@ def construct_staging(
         [Reader, SignatureVerifier, SchedulerRead],
         AdmissionObservation,
     ] = observe_ready,
-    payload_writer: Callable[[SignedMaterial, Writer], None] = write_staging_payload,
+    payload_writer: Callable[
+        [SignedMaterial, Writer],
+        None,
+    ] = write_staging_payload,
 ) -> AdmissionObservation:
     _require_signed_material(signed)
     verify_signature(

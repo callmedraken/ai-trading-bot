@@ -7073,3 +7073,127 @@ checkpoint is a read-only host preflight through the final operator itself.
 Only after that passes may a separate explicit R4 authorization be requested
 for production staging creation and the two reviewed no-replace renames.
 
+### Architecture 128 parent-ACL drift and repair source — DIAGNOSED / SOURCE ACCEPTED
+
+The final R4 read-only operator correctly blocked before any production
+filesystem mutation with:
+
+```text
+d10_parent_policy_mismatch
+```
+
+Read-only native diagnosis proved that both the accepted R3 reader and the R4
+reader observe the same `F:\AITradingBot` parent object. The sole contract
+drift is one additional explicit inheritable FullControl ACE:
+
+```text
+SID:
+S-1-5-21-1397534616-3988210162-180023805-1005
+
+resolved account:
+DESKTOP-I4DOKM7\John
+
+ACE:
+Allow / FullControl
+ContainerInherit + ObjectInherit
+explicit, not inherited
+```
+
+That principal is the current elevated account and is already a member of local
+Administrators. The ACE is therefore redundant for Administrator capability,
+but it still violates the frozen Architecture-124 outer-parent contract:
+Administrators owner, protected DACL, exactly Administrators and SYSTEM
+FullControl ACEs with flags 0.
+
+No parent ACL, D10 child, scheduler, activation, provider, Paper-v2, broker, or
+live mutation occurred during diagnosis.
+
+A dedicated exact parent-ACL reconciliation operator is now source-reviewed. It
+admits only the diagnosed three-ACE parent state and can target only the frozen
+two-ACE parent policy using the existing reviewed native security-policy
+application helper. It has no recursion, child-ACL, scheduler, activation,
+source-launch, provider, Paper-v2, broker, or live authority. Post-apply
+identity/readback or handle-close ambiguity is terminal.
+
+The repair operator is source-accepted through the Architecture-129 registered
+source gate at the exact feature source tree below. This source acceptance does
+not authorize or imply that the production parent ACL has been repaired.
+
+### Architecture 129 unified checkpoint workflow — ACCEPTED
+
+Architecture 129 replaces routine one-off verification/diagnostic PowerShell
+scripts with:
+
+```text
+ops.ps1
+scripts/checkpoint_runner.py
+.github/workflows/checkpoint-source-gates.yml
+```
+
+Accepted exact source/workflow identity:
+
+```text
+HEAD:
+705e500c5b2367f89470459e93572b6cfae23c17
+
+TREE:
+b2d5666a0751732852cb2ee22454ea2741c64747
+
+GitHub Actions run:
+36647404258
+conclusion: success
+platform: windows-latest / Python 3.14
+```
+
+The CI job successfully completed:
+
+```text
+checkpoint status: PASS
+verify arch128-parent-acl-repair: PASS
+verify arch128-r4: PASS
+checkpoint evidence upload: PASS
+```
+
+The unified runner now provides:
+
+```powershell
+.\ops.ps1 status
+.\ops.ps1 verify arch128-parent-acl-repair
+.\ops.ps1 verify arch128-r4
+.\ops.ps1 preflight arch128-parent-acl-repair
+.\ops.ps1 preflight arch128-r4
+```
+
+Registered source verification always collects pytest, both required Ruff
+primary checks, non-mutating Ruff diagnostics when applicable, git diff
+checking, authority/static checks, exact source identity, and external evidence
+before deciding PASS/FAIL. GitHub Actions now satisfies these routine source
+gates, so they no longer need to be repeatedly rerun by the operator on the
+production development host.
+
+Registered `preflight` is read-only. Checkpoints pin the live feature branch,
+allowing a clean detached operator worktree while using read-only
+`git ls-remote` to prove its HEAD equals the current remote branch. The R4
+preflight also attaches the parent-ACL read-only diagnostic automatically when
+the parent policy blocks.
+
+Protected `execute` is intentionally not implemented in the unified runner
+yet. A source PASS or preflight PASS never grants production authority.
+
+Current next checkpoint:
+
+1. create/admit a dedicated clean detached operator worktree at the exact live
+   feature HEAD without disturbing the preserved development worktree;
+2. run `ops.ps1 preflight arch128-parent-acl-repair`;
+3. if that read-only preflight admits the exact diagnosed drift, stop for fresh
+   explicit authorization to add/review and then invoke the protected
+   parent-ACL repair path;
+4. after a separately authorized successful repair, run
+   `ops.ps1 preflight arch128-r4`;
+5. only after R4 preflight passes return to the separately authorized R4
+   staging/two-rename production boundary.
+
+Production D10 remains disabled/non-running. No parent-ACL repair, R4 staging,
+rename, scheduler mutation, activation, provider, Paper-v2, broker, or live
+effect is authorized by this workflow acceptance.
+

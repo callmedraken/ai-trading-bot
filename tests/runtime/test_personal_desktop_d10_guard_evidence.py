@@ -656,3 +656,104 @@ def test_native_evidence_observer_open_is_shared_read_only(
     assert args[2] == 3
     assert args[4] == 3
     assert args[5] == guard.FILE_FLAG_OPEN_REPARSE_POINT
+
+
+
+def test_public_read_only_observer_returns_exact_sanitized_current_soak(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    material = guard._TrustBytes(b"g", b"attestation", b"s" * 64, b"m")
+    attestation = {
+        "schema": guard.D10_ATTESTATION_SCHEMA,
+        "signing_key_id": guard.D10_SIGNING_KEY_ID,
+        "certified_source_head": "b" * 40,
+        "certified_source_tree": "c" * 40,
+        "source_root": guard.D10_SOURCE_ROOT,
+        "launch_guard": guard.D10_LAUNCH_GUARD,
+        "launch_guard_byte_length": 1,
+        "launch_guard_sha256": hashlib.sha256(b"g").hexdigest(),
+        "launcher": guard.D10_SECOND_STAGE_LAUNCHER,
+        "scheduler_contract_schema": guard.D10_SCHEDULER_SCHEMA,
+        "approved_trading_sid": guard.TRADING_SID,
+        "production_python": guard.D10_PRODUCTION_PYTHON,
+        "production_python_version": guard.D10_PRODUCTION_PYTHON_VERSION,
+        "executable_manifest_sha256": hashlib.sha256(b"m").hexdigest(),
+        "executable_file_count": 1,
+        "deployment_id": "11111111-1111-5111-8111-111111111111",
+    }
+    deployment = guard.VerifiedDeploymentFacts(
+        deployment_id=attestation["deployment_id"],
+        attestation_sha256=hashlib.sha256(material.attestation).hexdigest(),
+        certified_source_head=attestation["certified_source_head"],
+        certified_source_tree=attestation["certified_source_tree"],
+        executable_file_count=1,
+        schema=attestation["schema"],
+        signing_key_id=attestation["signing_key_id"],
+        source_root=attestation["source_root"],
+        launch_guard=attestation["launch_guard"],
+        launcher=attestation["launcher"],
+        scheduler_contract_schema=attestation["scheduler_contract_schema"],
+        approved_trading_sid=attestation["approved_trading_sid"],
+        production_python=attestation["production_python"],
+        production_python_version=attestation["production_python_version"],
+    )
+    lease = _lease(deployment)
+    lease_values = {
+        "soak_id": lease.soak_id,
+        "accepted_activation_utc": lease.accepted_activation_utc,
+        "end_utc": lease.end_utc,
+        "certified_source_head": lease.certified_source_head,
+        "certified_source_tree": lease.certified_source_tree,
+        "scheduler_contract_schema": lease.scheduler_contract_schema,
+        "scheduler_contract_id": lease.scheduler_contract_id,
+        "trading_sid": lease.trading_sid,
+        "production_python": lease.production_python,
+        "production_python_version": lease.production_python_version,
+    }
+    native = EvidenceNative(lease)
+    start = guard._canonical_json(
+        {
+            "schema": guard.D10_GUARD_WAKE_START_EVIDENCE_SCHEMA,
+            "observed_at_utc": "2026-09-29T08:29:00.000000Z",
+            "deployment_id": deployment.deployment_id,
+            "soak_id": lease.soak_id,
+        }
+    )
+    wake = _wake_record(deployment, lease)
+    native.data = start + b"\n" + wake + b"\n"
+
+    monkeypatch.setattr(guard, "_Native", lambda: native)
+    monkeypatch.setattr(guard, "_read_fixed_trust_material", lambda backend: material)
+    monkeypatch.setattr(guard, "_verify_d10_signature", lambda *args: None)
+    monkeypatch.setattr(guard, "_parse_attestation", lambda data: attestation)
+    monkeypatch.setattr(guard, "_parse_manifest", lambda data: (("x", 1, "0" * 64),))
+    monkeypatch.setattr(guard, "_verify_sealed_source", lambda entries, backend: None)
+    monkeypatch.setattr(
+        guard,
+        "_read_fixed_activation_lease_bytes_for_observer",
+        lambda backend: b"lease",
+    )
+    monkeypatch.setattr(
+        guard,
+        "_parse_active_lease_facts",
+        lambda data, facts: (lease_values, None, None),
+    )
+
+    record = guard.observe_fixed_d10_durable_wake_evidence()
+    assert record["schema"] == guard.D10_EVIDENCE_OBSERVATION_SCHEMA
+    assert record["status"] == "OBSERVED"
+    assert record["deployment_id"] == deployment.deployment_id
+    assert record["soak_id"] == lease.soak_id
+    assert record["record_count"] == 2
+    assert record["wake_count"] == 1
+    assert record["terminal"] is False
+    assert record["terminal_kind"] is None
+    assert record["first_observed_at_utc"] == "2026-09-29T08:29:00Z"
+    assert record["last_observed_at_utc"] == "2026-09-29T08:30:00Z"
+    assert record["last_outcome"] == "NO_ACTION"
+    assert record["scheduler_mutation"] == "NOT_RUN"
+    assert record["source_launch"] == "NOT_RUN"
+    assert record["provider"] == "NOT_RUN"
+    assert record["Paper-v2"] == "NOT_RUN"
+    assert record["broker"] == "NOT_RUN"
+    assert record["live"] == "NOT_RUN"

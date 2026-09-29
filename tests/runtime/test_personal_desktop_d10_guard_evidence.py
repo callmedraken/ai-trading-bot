@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from datetime import UTC, datetime
 from types import SimpleNamespace
@@ -145,6 +146,13 @@ class EvidenceNative:
     def open(self, path: str, *, directory: bool) -> int:
         assert directory
         assert path == guard.D10_EVIDENCE_ROOT
+        handle = self.next_handle
+        self.next_handle += 1
+        self.paths[handle] = path
+        return handle
+
+    def open_evidence_observer(self, path: str) -> int:
+        assert path == self.path
         handle = self.next_handle
         self.next_handle += 1
         self.paths[handle] = path

@@ -12,7 +12,6 @@ import json
 import ntpath
 import subprocess
 from dataclasses import asdict
-from datetime import UTC
 from pathlib import Path
 
 from scripts import d10_activation_scheduler_operator as activation

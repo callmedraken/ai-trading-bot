@@ -156,7 +156,8 @@ rename.
 
 ## 6. Protected deployment replacement ordering
 
-Protected replacement is allowed only after a fresh read-only admission proves:
+R3 is read-only and therefore runs before any new staging object exists. It
+must prove:
 
 - elevated Administrator operator identity;
 - exact protected parent/runtime substrate;
@@ -165,9 +166,16 @@ Protected replacement is allowed only after a fresh read-only admission proves:
 - exact disabled/non-running D10 scheduler contract;
 - exact retained S5-R8 retired root;
 - new S5-R10 retired destination absent;
-- exact reviewed new staging deployment present;
+- new Architecture-128 staging destination absent;
 - no conflicting reserved names;
 - no governed source/provider/Paper-v2/broker/live effect in progress.
+
+R4 begins only after a separately authorized protected action constructs and
+verifies the complete signed new staging deployment at the fixed staging path.
+After staging construction and before either rename, R4 must repeat the full
+read-only admission above and additionally prove that the exact reviewed new
+staging deployment is present. Only that post-staging admission can authorize
+the two fixed renames.
 
 The protected mutation is at most these two fixed no-replace same-parent
 renames, in order:

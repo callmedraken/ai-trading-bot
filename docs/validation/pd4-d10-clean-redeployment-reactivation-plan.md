@@ -57,11 +57,17 @@ Prove twice-stable:
 - exact disabled/non-running D10 scheduler;
 - exact historical S5-R8 retired root;
 - new retired destination absent;
-- exact new staging tree present and verified;
+- new Architecture-128 staging destination absent;
 - no conflicting reserved names;
 - provider/Paper-v2/broker/live not run.
 
 No mutation.
+
+The exact new staging tree is not a prerequisite of R3 because R3 is the
+pre-mutation checkpoint. R4 authorization covers staging construction. After
+staging is constructed and independently verified, R4 must run a fresh full
+read-only admission that additionally proves the exact staging identity before
+either rename.
 
 ## R4 — protected deployment replacement
 

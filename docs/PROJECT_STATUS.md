@@ -6504,3 +6504,12 @@ authorization, the production-key signature requires fresh explicit
 authorization bound to the corrected HEAD/tree. No protected retry is
 authorized by this documentation closeout.
 
+### Architecture 128 R3/R4 ordering correction
+
+R3 is now explicitly frozen as a pre-mutation host admission: the new staging
+destination must be absent. R4, under separate authorization, first constructs
+and verifies the exact signed staging deployment, then repeats the full
+read-only admission with staging present before any rename. This resolves the
+earlier contradiction between “R3 read-only” and “staging already present.”
+No production mutation occurred as part of this docs correction.
+

@@ -2131,9 +2131,14 @@ def _parse_ordinary_wake_record(
     }:
         raise GuardBlocked("D10 wake runtime identity differs")
 
-    nested = {
-        "session": frozenset({"completed", "next_execution", "preopen_deadline_utc"}),
-        "capture": frozenset(
+    session = _require_object(
+        value["session"],
+        frozenset({"completed", "next_execution", "preopen_deadline_utc"}),
+        "session",
+    )
+    capture = _require_object(
+        value["capture"],
+        frozenset(
             {
                 "classification",
                 "selection_id",
@@ -2143,7 +2148,11 @@ def _parse_ordinary_wake_record(
                 "provider_call_disposition",
             }
         ),
-        "history": frozenset(
+        "capture",
+    )
+    history = _require_object(
+        value["history"],
+        frozenset(
             {
                 "classification",
                 "reconciled_count",
@@ -2151,7 +2160,11 @@ def _parse_ordinary_wake_record(
                 "unresolved_decision_id",
             }
         ),
-        "settlement": frozenset(
+        "history",
+    )
+    settlement = _require_object(
+        value["settlement"],
+        frozenset(
             {
                 "decision_id",
                 "classification",
@@ -2164,12 +2177,49 @@ def _parse_ordinary_wake_record(
                 "successor_checkpoint_id",
             }
         ),
-        "decision": frozenset(
-            {"id", "publication", "reconciliation", "finalized_id"}
-        ),
-    }
-    for name, fields in nested.items():
-        _require_object(value[name], fields, name)
+        "settlement",
+    )
+    decision = _require_object(
+        value["decision"],
+        frozenset({"id", "publication", "reconciliation", "finalized_id"}),
+        "decision",
+    )
+    optional_strings = (
+        session["completed"],
+        session["next_execution"],
+        capture["classification"],
+        capture["selection_id"],
+        capture["snapshot_id"],
+        capture["attempt_id"],
+        capture["terminal_state"],
+        capture["provider_call_disposition"],
+        history["classification"],
+        history["current_decision_id"],
+        history["unresolved_decision_id"],
+        settlement["decision_id"],
+        settlement["classification"],
+        settlement["reconciliation"],
+        settlement["plan_id"],
+        settlement["invocation_id"],
+        settlement["operation_id"],
+        settlement["application_id"],
+        settlement["predecessor_checkpoint_id"],
+        settlement["successor_checkpoint_id"],
+        decision["id"],
+        decision["publication"],
+        decision["reconciliation"],
+        decision["finalized_id"],
+    )
+    if any(item is not None and type(item) is not str for item in optional_strings):
+        raise GuardBlocked("D10 wake optional evidence type differs")
+    if (
+        type(history["reconciled_count"]) is not int
+        or history["reconciled_count"] < 0
+    ):
+        raise GuardBlocked("D10 wake historical count differs")
+    deadline = session["preopen_deadline_utc"]
+    if deadline is not None:
+        _parse_wake_timestamp(deadline)
 
     budgets = _require_object(
         value["budgets"],

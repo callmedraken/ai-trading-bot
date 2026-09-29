@@ -437,9 +437,7 @@ def _remote_branch_head(repo_root: Path, branch: str) -> str:
         check=False,
     )
     if completed.returncode != 0:
-        raise RuntimeError(
-            f"git ls-remote failed: {completed.stderr.strip()}"
-        )
+        raise RuntimeError(f"git ls-remote failed: {completed.stderr.strip()}")
     lines = [line for line in completed.stdout.splitlines() if line.strip()]
     if len(lines) != 1:
         raise RuntimeError(

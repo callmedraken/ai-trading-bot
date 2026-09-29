@@ -5961,3 +5961,53 @@ start the task, or perform source/provider/Paper-v2/broker/live effects.
 A fresh explicit protected-effect authorization is required before that single
 publication attempt. Any ambiguity requires read-only reconciliation and no
 automatic retry or rollback.
+
+
+### P124-5R protected recovery publication — ACCEPTED / D10 ARMED
+
+The separately authorized bounded P124-5R recovery publication completed and
+the mandatory independent reconciliation proved the final armed state.
+
+Accepted evidence:
+
+```text
+recovery source:
+HEAD 2db4a45db7870e41cd2ee707478158068dc4def8
+TREE 701ed461c986cf506923d7d86ee3c457c1994068
+
+protected recovery:
+status: PASS
+stage: complete
+scheduler_mutation: NOT_RUN
+lease_publication: PUBLISHED_VERIFIED
+reconciliation_required: false
+source/provider/Paper-v2/broker/live: NOT_RUN
+evidence:
+F:\AI\temp\p1245r-protected-recovery-20260928-184122.json
+SHA-256:
+8b102927ea33d97e8ae8f4f24a9d84fb0421e65d6ec2f9b4c7abe284aa3ef2e2
+
+independent reconciliation:
+status: PASS
+stage: read_only_complete
+classification: ARMED_VERIFIED
+reconciliation_required: false
+lease namespace final/installing/tmp:
+true/false/false
+evidence:
+F:\AI\temp\p1245r-post-recovery-reconcile-20260928-184122.json
+SHA-256:
+12ddb235cfcfdbb04e15de29fec6ddc0473bc54c534ac218be24f3e59e94eee2
+```
+
+The final lease preserves the original accepted activation
+`2026-09-29T00:45:22Z`, exact end `2026-10-06T00:45:22Z`, and soak ID
+`48f14b13-aa18-5ce8-a0e0-402c867b17b6`. The scheduler remains the exact
+D10 sealed-guard contract. The recovery did not mutate the scheduler, prompt
+for credentials, start the task, or perform a source/provider/Paper-v2/broker/
+live effect.
+
+P124-5/P124-5R activation is now closed successfully. D10 is armed for the
+original seven-day bounded interval. Do not manually start the scheduled task.
+The next checkpoint is observation of the first natural scheduled D10 wake and
+its bounded evidence. Broker-paper/live remain unauthorized.

@@ -88,7 +88,6 @@ def test_noncanonical_bytes_fail_closed():
         parse_persisted_d10_wake_record(data + b" ", lease)
 
 
-
 def test_nested_wake_value_types_fail_closed():
     lease = _lease()
     data = json.loads(serialize_d10_wake_evidence(_wake(lease)))

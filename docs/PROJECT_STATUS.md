@@ -6303,3 +6303,39 @@ Next checkpoint: E6 canonical three-lane repository certification on the final
 reviewed Architecture-127 tree. Only after E6 passes may the project design a
 separately authorized clean D10 redeployment/re-activation path.
 
+### Architecture 127 E6 canonical certification — ACCEPTED
+
+The one-time canonical three-lane certification passed on the final reviewed
+Architecture-127 tree:
+
+```text
+HEAD  0f9551e13486ef65b35a5a9633da19081571144b
+TREE  1186e92669af100542c055368c1b72495c36bc11
+base  0024ad86767c76116094688d13ecff6ebf0aa438
+
+broad-1  4260 cases / 4257 passed / 3 skipped
+broad-2  3983 cases / 3978 passed / 5 skipped
+serial      935 cases /  926 passed / 9 skipped
+
+total 9178 cases / 9161 passed / 17 skipped / 0 failed / 0 errors
+wall 396.97 seconds
+evidence:
+F:\AI\temp\pytest\arch127-e6-certification-20260929-010726
+```
+
+The certification runner also passed final source identity, repo-wide Ruff
+check, repo-wide Ruff format check, and git diff check. Final HEAD/tree were
+unchanged and the worktree remained clean.
+
+Architecture 127 durable wake evidence is now source-certified. The production
+D10 task is still disabled/non-running. The halted activation
+`2026-09-29T00:45:22Z -> 2026-10-06T00:45:22Z`, soak
+`48f14b13-aa18-5ce8-a0e0-402c867b17b6`, and lease SHA-256
+`91106d61129dc9c11e017a7ea613ba0fd82c87fd9debfc346b265c03c49a1e84`
+remain incident evidence only and must not be resumed.
+
+Next milestone: Architecture 128 clean D10 redeployment/reactivation design.
+Protected deployment, signing, evidence provisioning, scheduler mutation,
+activation publication, provider, Paper-v2, broker-paper, and live effects
+remain separately unauthorized.
+

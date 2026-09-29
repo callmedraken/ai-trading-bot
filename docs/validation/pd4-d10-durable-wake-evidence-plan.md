@@ -171,3 +171,68 @@ Before E6 certification:
 Canonical three-lane E6 certification is allowed only after that probe and the
 final exact source/security review pass.
 
+## Architecture 127 E6 canonical certification — ACCEPTED
+
+Architecture 127 source certification is accepted at the exact final reviewed
+repository identity:
+
+```text
+HEAD: 0f9551e13486ef65b35a5a9633da19081571144b
+TREE: 1186e92669af100542c055368c1b72495c36bc11
+origin/develop at admission:
+0024ad86767c76116094688d13ecff6ebf0aa438
+
+broad-1:
+  modules: 138
+  cases: 4260
+  passed: 4257
+  skipped: 3
+  failed: 0
+  errors: 0
+
+broad-2:
+  modules: 137
+  cases: 3983
+  passed: 3978
+  skipped: 5
+  failed: 0
+  errors: 0
+
+serial:
+  modules: 5
+  cases: 935
+  passed: 926
+  skipped: 9
+  failed: 0
+  errors: 0
+
+totals:
+  cases: 9178
+  passed: 9161
+  skipped: 17
+  failed: 0
+  errors: 0
+
+certification status: passed
+certification exit: 0
+wall seconds: 396.97
+evidence:
+F:\AI\temp\pytest\arch127-e6-certification-20260929-010726
+```
+
+The canonical certification runner also completed its exact source-identity
+checks before/after testing and its repository-wide Ruff check, Ruff
+`format --check`, and `git diff --check` gates. Final HEAD/tree remained
+unchanged and the worktree remained clean.
+
+Architecture 127 is therefore source-certified. This certification does not
+authorize production deployment replacement, evidence provisioning, activation
+lease creation, Task Scheduler mutation/enabling/manual start, provider calls,
+Paper-v2 mutation, broker-paper, or live trading.
+
+The halted first D10 soak remains historical incident evidence and must never be
+resumed. Any new D10 attempt requires a new signed deployment for the certified
+Architecture-127 executable bytes, a new activation lease and soak ID, a new
+empty lease-derived evidence file, and a separately reviewed scheduler
+reactivation path.
+

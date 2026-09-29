@@ -104,20 +104,21 @@ def test_observer_reports_only_exact_current_soak_sanitized_summary(monkeypatch)
 def test_observer_exposes_unresolved_start_only_as_terminal_summary(monkeypatch):
     attestation, lease, _evidence = _facts()
     path = str(d10_wake_evidence_path(lease))
-    start = D10GuardWakeStartEvidence(
-        D10_GUARD_WAKE_START_EVIDENCE_SCHEMA,
-        NOW,
-        lease.deployment_id,
-        lease.soak_id,
-    ).canonical_bytes() + b"\n"
+    start = (
+        D10GuardWakeStartEvidence(
+            D10_GUARD_WAKE_START_EVIDENCE_SCHEMA,
+            NOW,
+            lease.deployment_id,
+            lease.soak_id,
+        ).canonical_bytes()
+        + b"\n"
+    )
 
     monkeypatch.setattr(observer, "_verified_attestation", lambda native: attestation)
     monkeypatch.setattr(
         observer, "_read_activation_lease", lambda native: lease.canonical_bytes()
     )
-    monkeypatch.setattr(
-        observer, "_read_evidence", lambda native, model: (path, start)
-    )
+    monkeypatch.setattr(observer, "_read_evidence", lambda native, model: (path, start))
 
     record = observer.observe(object())
     assert record["record_count"] == 1
@@ -163,10 +164,13 @@ def test_observer_json_surface_contains_no_raw_record_bytes(monkeypatch) -> None
         observer, "_read_evidence", lambda native, model: (path, evidence)
     )
     rendered = json.dumps(observer.observe(object()), sort_keys=True)
-    assert serialize_d10_wake_evidence(
-        D10OneWeekWakeEvidence(
-            outcome=D10WakeOutcome.NO_ACTION,
-            stop_reason=None,
-            observed_at_utc=NOW,
+    assert (
+        serialize_d10_wake_evidence(
+            D10OneWeekWakeEvidence(
+                outcome=D10WakeOutcome.NO_ACTION,
+                stop_reason=None,
+                observed_at_utc=NOW,
+            )
         )
-    ) not in rendered
+        not in rendered
+    )

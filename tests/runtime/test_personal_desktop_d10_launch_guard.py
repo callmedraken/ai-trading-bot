@@ -955,6 +955,7 @@ def test_a1246_guard_requires_deployment_and_active_lease_before_one_child(
     assert guard.main() == 1
     assert not calls
 
+
 def test_a1243_second_stage_bootstrap_is_fixed_and_fail_closed() -> None:
     path = (
         Path(__file__).parents[2]

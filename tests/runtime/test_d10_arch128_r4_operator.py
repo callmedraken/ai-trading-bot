@@ -30,18 +30,21 @@ def _admission():
     )
 
 
+class _FakeAttestation:
+    deployment_id = r4.NEW_DEPLOYMENT_ID
+
+
+class _FakeManifest:
+    digest = r4.NEW_IDENTITY.manifest_sha256
+
+
+class _FakeMaterial:
+    attestation = _FakeAttestation()
+    manifest = _FakeManifest()
+
+
 class _FakeSigned:
-    class _Attestation:
-        deployment_id = r4.NEW_DEPLOYMENT_ID
-
-    class _Manifest:
-        digest = r4.NEW_IDENTITY.manifest_sha256
-
-    class _Material:
-        attestation = _Attestation()
-        manifest = _Manifest()
-
-    material = _Material()
+    material = _FakeMaterial()
 
 
 def test_read_only_preflight_never_constructs_writer_or_rename(
@@ -50,8 +53,16 @@ def test_read_only_preflight_never_constructs_writer_or_rename(
     admission = _admission()
 
     monkeypatch.setattr(operator, "WindowsCngVerifier", lambda: object())
-    monkeypatch.setattr(operator.r4c, "load_fixed_signed_material", lambda verifier: _FakeSigned())
-    monkeypatch.setattr(operator.r4w, "WindowsArch128ReadOnlyReader", lambda: object())
+    monkeypatch.setattr(
+        operator.r4c,
+        "load_fixed_signed_material",
+        lambda verifier: _FakeSigned(),
+    )
+    monkeypatch.setattr(
+        operator.r4w,
+        "WindowsArch128ReadOnlyReader",
+        lambda: object(),
+    )
     monkeypatch.setattr(
         operator.r4c,
         "observe_pre_stage",
@@ -107,9 +118,21 @@ def test_execute_happy_path_binds_fixed_components(
     calls: list[str] = []
 
     monkeypatch.setattr(operator, "WindowsCngVerifier", lambda: object())
-    monkeypatch.setattr(operator.r4c, "load_fixed_signed_material", lambda verifier: _FakeSigned())
-    monkeypatch.setattr(operator.r4w, "WindowsArch128ReadOnlyReader", lambda: object())
-    monkeypatch.setattr(operator.r4w, "WindowsArch128StagingBackend", lambda: object())
+    monkeypatch.setattr(
+        operator.r4c,
+        "load_fixed_signed_material",
+        lambda verifier: _FakeSigned(),
+    )
+    monkeypatch.setattr(
+        operator.r4w,
+        "WindowsArch128ReadOnlyReader",
+        lambda: object(),
+    )
+    monkeypatch.setattr(
+        operator.r4w,
+        "WindowsArch128StagingBackend",
+        lambda: object(),
+    )
 
     def construct(*args):
         calls.append("staging")
@@ -156,9 +179,21 @@ def test_staging_failure_is_single_attempt_without_cleanup_or_rename(
     calls: list[str] = []
 
     monkeypatch.setattr(operator, "WindowsCngVerifier", lambda: object())
-    monkeypatch.setattr(operator.r4c, "load_fixed_signed_material", lambda verifier: _FakeSigned())
-    monkeypatch.setattr(operator.r4w, "WindowsArch128ReadOnlyReader", lambda: object())
-    monkeypatch.setattr(operator.r4w, "WindowsArch128StagingBackend", lambda: object())
+    monkeypatch.setattr(
+        operator.r4c,
+        "load_fixed_signed_material",
+        lambda verifier: _FakeSigned(),
+    )
+    monkeypatch.setattr(
+        operator.r4w,
+        "WindowsArch128ReadOnlyReader",
+        lambda: object(),
+    )
+    monkeypatch.setattr(
+        operator.r4w,
+        "WindowsArch128StagingBackend",
+        lambda: object(),
+    )
 
     def fail_staging(*args):
         calls.append("staging")
@@ -187,9 +222,21 @@ def test_first_rename_stop_never_attempts_second(
     calls: list[str] = []
 
     monkeypatch.setattr(operator, "WindowsCngVerifier", lambda: object())
-    monkeypatch.setattr(operator.r4c, "load_fixed_signed_material", lambda verifier: _FakeSigned())
-    monkeypatch.setattr(operator.r4w, "WindowsArch128ReadOnlyReader", lambda: object())
-    monkeypatch.setattr(operator.r4w, "WindowsArch128StagingBackend", lambda: object())
+    monkeypatch.setattr(
+        operator.r4c,
+        "load_fixed_signed_material",
+        lambda verifier: _FakeSigned(),
+    )
+    monkeypatch.setattr(
+        operator.r4w,
+        "WindowsArch128ReadOnlyReader",
+        lambda: object(),
+    )
+    monkeypatch.setattr(
+        operator.r4w,
+        "WindowsArch128StagingBackend",
+        lambda: object(),
+    )
     monkeypatch.setattr(operator.r4c, "_construct_staging", lambda *args: admission)
 
     class Session:

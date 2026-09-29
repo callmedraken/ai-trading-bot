@@ -131,7 +131,10 @@ def _root_state(
         return None
     if observed.present is False and observed.identity is None:
         return "ABSENT"
-    if observed.present is not True or type(observed.identity) is not DeploymentIdentity:
+    if (
+        observed.present is not True
+        or type(observed.identity) is not DeploymentIdentity
+    ):
         return None
     if old and _identity_exact(observed.identity, OLD_IDENTITY):
         return "OLD"

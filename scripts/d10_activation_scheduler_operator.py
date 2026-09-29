@@ -679,9 +679,7 @@ class _Operator:
 
         signed_again = _stable_signed(self.reader, self.verifier)
         scheduler_again = self.scheduler_read()
-        installing_again = self.reader.read_file(
-            PUBLICATION.installing_path, MAX_LEASE
-        )
+        installing_again = self.reader.read_file(PUBLICATION.installing_path, MAX_LEASE)
         d.require_file(installing_again, PUBLICATION.installing_path, data)
         if (
             signed_again != signed

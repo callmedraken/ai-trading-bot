@@ -33,13 +33,16 @@ def test_r3_future_namespace_paths_are_fixed_and_distinct() -> None:
     assert r3.NEW_STAGING == (
         r"F:\AITradingBot\D10.replacement-d2071f25-5a7c-5293-a28f-5b722c9917a2.installing"
     )
-    assert len(
-        {
-            r3.HISTORICAL_S5R8_RETIRED.casefold(),
-            r3.NEW_S5R10_RETIRED.casefold(),
-            r3.NEW_STAGING.casefold(),
-        }
-    ) == 3
+    assert (
+        len(
+            {
+                r3.HISTORICAL_S5R8_RETIRED.casefold(),
+                r3.NEW_S5R10_RETIRED.casefold(),
+                r3.NEW_STAGING.casefold(),
+            }
+        )
+        == 3
+    )
 
 
 def test_reader_allowlist_extends_only_exact_arch128_absence_roots() -> None:

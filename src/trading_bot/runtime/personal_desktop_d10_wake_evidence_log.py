@@ -9,6 +9,9 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import PureWindowsPath
 
+from trading_bot.runtime import (
+    personal_desktop_unattended_one_week_soak_scheduler_contract as scheduler_contract,
+)
 from trading_bot.runtime.personal_desktop_d10_activation_lease import (
     D10ActivationLease,
     format_utc_instant,
@@ -20,13 +23,10 @@ from trading_bot.runtime.personal_desktop_d10_deployment_identity import (
 from trading_bot.runtime.personal_desktop_d10_python_substrate import VERSION
 from trading_bot.runtime.personal_desktop_unattended_one_week_soak import (
     D10_WAKE_EVIDENCE_SCHEMA,
-    MAX_D10_SUMMARY_WAKES,
-    MAX_D10_WAKE_EVIDENCE_BYTES,
     D10WakeOutcome,
     D10WakeStopReason,
-)
-from trading_bot.runtime import (
-    personal_desktop_unattended_one_week_soak_scheduler_contract as scheduler_contract,
+    MAX_D10_SUMMARY_WAKES,
+    MAX_D10_WAKE_EVIDENCE_BYTES,
 )
 
 D10_WAKE_EVIDENCE_ROOT = PureWindowsPath(r"F:\AITradingBot\D10\evidence")

@@ -26,8 +26,10 @@ D10_ACTIVATION_LEASE_INSTALLING = D10_ACTIVATION_LEASE + ".installing"
 D10_ACTIVATION_LEASE_TEMP = D10_ACTIVATION_LEASE + ".tmp"
 D10_EVIDENCE_ROOT = D10_ROOT + r"\evidence"
 D10_WAKE_EVIDENCE_SCHEMA = "personal-desktop-d10-wake-evidence/v1"
+D10_GUARD_WAKE_START_EVIDENCE_SCHEMA = "personal-desktop-d10-guard-start/v1"
 D10_GUARD_TERMINAL_EVIDENCE_SCHEMA = "personal-desktop-d10-guard-evidence/v1"
 MAX_D10_WAKE_EVIDENCE_BYTES = 16 * 1024
+MAX_D10_GUARD_WAKE_START_EVIDENCE_BYTES = 2048
 MAX_D10_GUARD_TERMINAL_EVIDENCE_BYTES = 2048
 MAX_D10_EVIDENCE_LOG_RECORDS = 512
 MAX_D10_EVIDENCE_LOG_BYTES = MAX_D10_EVIDENCE_LOG_RECORDS * (
@@ -127,6 +129,14 @@ _WAKE_FIELDS = frozenset(
         "budgets",
         "effect_crossings",
         "final_gates",
+    }
+)
+_GUARD_START_FIELDS = frozenset(
+    {
+        "schema",
+        "observed_at_utc",
+        "deployment_id",
+        "soak_id",
     }
 )
 _GUARD_EVIDENCE_FIELDS = frozenset(
@@ -2267,6 +2277,39 @@ def _parse_ordinary_wake_record(
     return outcome, observed
 
 
+def _parse_guard_wake_start_record(
+    data: bytes,
+    deployment: VerifiedDeploymentFacts,
+    lease: VerifiedActivationLeaseFacts,
+) -> datetime:
+    value = _parse_evidence_json(data)
+    if (
+        frozenset(value) != _GUARD_START_FIELDS
+        or value["schema"] != D10_GUARD_WAKE_START_EVIDENCE_SCHEMA
+        or value["deployment_id"] != deployment.deployment_id
+        or value["soak_id"] != lease.soak_id
+    ):
+        raise GuardBlocked("D10 guard wake-start evidence differs")
+    return _parse_lease_timestamp(value["observed_at_utc"])
+
+
+def _guard_wake_start_bytes(
+    deployment: VerifiedDeploymentFacts,
+    lease: VerifiedActivationLeaseFacts,
+) -> bytes:
+    payload = _canonical_json(
+        {
+            "schema": D10_GUARD_WAKE_START_EVIDENCE_SCHEMA,
+            "observed_at_utc": _format_guard_timestamp(_trusted_runtime_utc_now()),
+            "deployment_id": deployment.deployment_id,
+            "soak_id": lease.soak_id,
+        }
+    )
+    if len(payload) > MAX_D10_GUARD_WAKE_START_EVIDENCE_BYTES:
+        raise GuardBlocked("D10 guard wake-start evidence exceeds bound")
+    return payload
+
+
 def _parse_guard_terminal_record(
     data: bytes,
     deployment: VerifiedDeploymentFacts,
@@ -2303,29 +2346,46 @@ def _parse_evidence_log(
         or any(not line for line in lines)
     ):
         raise GuardBlocked("D10 evidence log record count differs")
+
     previous: datetime | None = None
+    pending_start = False
     terminal = False
-    for index, line in enumerate(lines):
+    for line in lines:
+        if terminal:
+            raise GuardBlocked("D10 terminal evidence is not final")
         if len(line) > MAX_D10_WAKE_EVIDENCE_BYTES:
             raise GuardBlocked("D10 evidence record exceeds its bound")
         value = _parse_evidence_json(line)
         schema = value.get("schema")
-        if schema == D10_WAKE_EVIDENCE_SCHEMA:
+
+        if schema == D10_GUARD_WAKE_START_EVIDENCE_SCHEMA:
+            if pending_start:
+                raise GuardBlocked("D10 wake-start evidence is unresolved")
+            observed = _parse_guard_wake_start_record(line, deployment, lease)
+            pending_start = True
+        elif schema == D10_WAKE_EVIDENCE_SCHEMA:
+            if not pending_start:
+                raise GuardBlocked("D10 ordinary wake lacks wake-start evidence")
             outcome, observed = _parse_ordinary_wake_record(line, deployment, lease)
-            current_terminal = outcome == "STOPPED"
+            pending_start = False
+            terminal = outcome == "STOPPED"
         elif schema == D10_GUARD_TERMINAL_EVIDENCE_SCHEMA:
+            if not pending_start:
+                raise GuardBlocked("D10 guard terminal lacks wake-start evidence")
             if len(line) > MAX_D10_GUARD_TERMINAL_EVIDENCE_BYTES:
                 raise GuardBlocked("D10 guard evidence exceeds its bound")
             observed = _parse_guard_terminal_record(line, deployment, lease)
-            current_terminal = True
+            pending_start = False
+            terminal = True
         else:
             raise GuardBlocked("D10 evidence record schema differs")
+
         if previous is not None and observed < previous:
             raise GuardBlocked("D10 evidence observation time moved backward")
-        if terminal or (current_terminal and index != len(lines) - 1):
-            raise GuardBlocked("D10 terminal evidence is not final")
         previous = observed
-        terminal = current_terminal
+
+    if pending_start:
+        terminal = True
     return len(lines), previous, terminal
 
 
@@ -2401,7 +2461,7 @@ def _append_and_verify_evidence(
     record: bytes,
     deployment: VerifiedDeploymentFacts,
     lease: VerifiedActivationLeaseFacts,
-) -> None:
+) -> tuple[bytes, ObjectFacts]:
     payload = record + b"\n"
     native.append_exact(file_handle, payload, len(prior))
     root_after = native.inspect(root_handle)
@@ -2424,6 +2484,7 @@ def _append_and_verify_evidence(
     if observed != prior + payload:
         raise GuardBlocked("D10 evidence reread differs after append")
     _parse_evidence_log(observed, deployment, lease)
+    return observed, file_after
 
 
 def _run_second_stage_with_evidence(
@@ -2459,10 +2520,15 @@ def _run_second_stage_with_evidence(
         if terminal:
             raise GuardBlocked("D10 evidence stop latch is terminal")
         if (
-            count >= MAX_D10_EVIDENCE_LOG_RECORDS
-            or len(prior) + MAX_D10_WAKE_EVIDENCE_BYTES + 1 > MAX_D10_EVIDENCE_LOG_BYTES
+            count + 2 > MAX_D10_EVIDENCE_LOG_RECORDS
+            or len(prior)
+            + MAX_D10_GUARD_WAKE_START_EVIDENCE_BYTES
+            + 1
+            + MAX_D10_WAKE_EVIDENCE_BYTES
+            + 1
+            > MAX_D10_EVIDENCE_LOG_BYTES
         ):
-            raise GuardBlocked("D10 evidence log has no bounded append capacity")
+            raise GuardBlocked("D10 evidence log has no bounded wake capacity")
 
         root_check = backend.inspect(root_handle)
         file_check = backend.inspect(file_handle)
@@ -2470,6 +2536,19 @@ def _run_second_stage_with_evidence(
         _require_facts(evidence_path, False, file_check, EVIDENCE_FILE_POLICY)
         _stable(root_before, root_check)
         _stable(file_before, file_check)
+
+        start_record = _guard_wake_start_bytes(deployment, lease)
+        prior, file_before = _append_and_verify_evidence(
+            backend,
+            root_handle,
+            root_before,
+            file_handle,
+            file_before,
+            prior,
+            start_record,
+            deployment,
+            lease,
+        )
 
         command = [
             D10_PRODUCTION_PYTHON,

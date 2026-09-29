@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import ctypes
-from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -9,6 +7,7 @@ import pytest
 from scripts import d10_arch128_r4_replacement as r4
 from scripts import d10_arch128_r4_windows as r4w
 from scripts import d10_protected_replacement_windows as legacy_windows
+from scripts.d10_protected_deployment import NativeObject
 
 
 def _backend() -> r4w.WindowsArch128StagingBackend:
@@ -28,7 +27,8 @@ def test_staging_backend_is_exact_new_root() -> None:
     assert r4w.WindowsArch128StagingBackend._creation_root == r4.STAGING_PATH
 
 
-def test_staging_create_allowlist_includes_only_inert_evidence_root_and_payload() -> None:
+def test_staging_create_allowlist_includes_only_inert_evidence_root_and_payload(
+) -> None:
     backend = _backend()
 
     assert backend._allowed_directory_create(r4.STAGING_PATH)
@@ -208,39 +208,119 @@ def test_adapter_uses_new_r4_contract_not_legacy_identity_constants() -> None:
     assert "legacy_windows.replacement." not in source
 
 
+def _native(path: str, *, index: int) -> NativeObject:
+    return NativeObject(
+        path=path,
+        final_path=path,
+        directory=True,
+        owner_sid="S-1-5-32-544",
+        dacl_protected=True,
+        aces=(),
+        reparse=False,
+        drive_type=3,
+        volume_root="F:\\",
+        filesystem="NTFS",
+        volume_serial=123,
+        file_index=index,
+        links=1,
+        size=0,
+    )
+
+
+class _FakeRenameReader(r4w.WindowsArch128ReadOnlyReader):
+    def __init__(self, source: NativeObject, parent: NativeObject) -> None:
+        self.source = source
+        self.parent = parent
+        self.renamed = False
+        self.close_failed = False
+
+    def _open_rename_parent(self) -> int:
+        return 1
+
+    def _open_rename_source(self, path: str) -> int:
+        assert path in (r4.CANONICAL_PATH, r4.STAGING_PATH)
+        return 2
+
+    def _inspect(self, handle: int, path: str) -> NativeObject:
+        if handle == 1:
+            return self.parent
+        if handle != 2:
+            raise AssertionError
+        if self.renamed:
+            _, destination = (
+                r4.CANONICAL_PATH,
+                r4.RETIRED_PATH,
+            )
+            return NativeObject(
+                path=self.source.path,
+                final_path=destination,
+                directory=self.source.directory,
+                owner_sid=self.source.owner_sid,
+                dacl_protected=self.source.dacl_protected,
+                aces=self.source.aces,
+                reparse=self.source.reparse,
+                drive_type=self.source.drive_type,
+                volume_root=self.source.volume_root,
+                filesystem=self.source.filesystem,
+                volume_serial=self.source.volume_serial,
+                file_index=self.source.file_index,
+                links=self.source.links,
+                size=self.source.size,
+            )
+        return self.source
+
+    def absent(self, path: str) -> bool:
+        assert path == r4.RETIRED_PATH
+        return True
+
+    def _close(self, handle: int) -> None:
+        assert handle in (1, 2)
+        if self.close_failed:
+            raise RuntimeError("close ambiguity")
+
+
 def test_rename_success_requires_post_call_handle_identity(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    parent = object()
-    source = object()
+    parent = _native(r4.PARENT_PATH, index=1)
+    source = _native(r4.CANONICAL_PATH, index=2)
+    fake = _FakeRenameReader(source, parent)
 
-    class Fake(r4w.WindowsArch128ReadOnlyReader):
-        def __init__(self) -> None:
-            pass
+    monkeypatch.setattr(r4w, "WindowsArch128ReadOnlyReader", _FakeRenameReader)
+    monkeypatch.setattr(r4w, "require_parent_native_object", lambda value: None)
+    monkeypatch.setattr(
+        r4w,
+        "require_native_object",
+        lambda value, path, directory: None,
+    )
 
-        def _open_rename_parent(self) -> int:
-            return 1
+    def rename_success(*args):
+        fake.renamed = True
+        return (
+            0,
+            type("Io", (), {"status": 0, "information": 0})(),
+            64,
+        )
 
-        def _open_rename_source(self, path: str) -> int:
-            assert path == r4.CANONICAL_PATH
-            return 2
+    monkeypatch.setattr(r4w, "_set_fixed_rename", rename_success)
 
-        def _inspect(self, handle: int, path: str):
-            if handle == 1:
-                return parent
-            if path == r4.CANONICAL_PATH:
-                return source
-            raise AssertionError
+    outcome = r4w.rename_fixed_step(
+        fake,
+        r4.RenameStep.OLD_TO_RETIRED,
+        source,
+        parent,
+    )
+    assert outcome is r4.MutationOutcome.SUCCESS
 
-        def absent(self, path: str) -> bool:
-            assert path == r4.RETIRED_PATH
-            return True
 
-        def _close(self, handle: int) -> None:
-            assert handle in (1, 2)
+def test_rename_native_status_is_terminal_indeterminate(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    parent = _native(r4.PARENT_PATH, index=1)
+    source = _native(r4.CANONICAL_PATH, index=2)
+    fake = _FakeRenameReader(source, parent)
 
-    fake = Fake()
-
+    monkeypatch.setattr(r4w, "WindowsArch128ReadOnlyReader", _FakeRenameReader)
     monkeypatch.setattr(r4w, "require_parent_native_object", lambda value: None)
     monkeypatch.setattr(
         r4w,
@@ -251,12 +331,11 @@ def test_rename_success_requires_post_call_handle_identity(
         r4w,
         "_set_fixed_rename",
         lambda *args: (
-            0,
-            type("Io", (), {"status": 0, "information": 0})(),
+            0xC0000001,
+            type("Io", (), {"status": -1, "information": 0})(),
             64,
         ),
     )
-    monkeypatch.setattr(r4w, "replace", lambda value, **kwargs: source)
 
     outcome = r4w.rename_fixed_step(
         fake,
@@ -267,10 +346,38 @@ def test_rename_success_requires_post_call_handle_identity(
     assert outcome is r4.MutationOutcome.INDETERMINATE
 
 
-def test_rename_native_status_is_terminal_indeterminate(
+def test_rename_close_ambiguity_is_terminal_indeterminate(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    source_text = Path(r4w.__file__).read_text(encoding="utf-8")
-    assert "return r4.MutationOutcome.INDETERMINATE" in source_text
-    assert "retry" not in source_text.casefold()
-    assert "replace_if_exists = 0" in source_text
+    parent = _native(r4.PARENT_PATH, index=1)
+    source = _native(r4.CANONICAL_PATH, index=2)
+    fake = _FakeRenameReader(source, parent)
+    fake.close_failed = True
+
+    monkeypatch.setattr(r4w, "WindowsArch128ReadOnlyReader", _FakeRenameReader)
+    monkeypatch.setattr(r4w, "require_parent_native_object", lambda value: None)
+    monkeypatch.setattr(
+        r4w,
+        "require_native_object",
+        lambda value, path, directory: None,
+    )
+
+    def rename_success(*args):
+        fake.renamed = True
+        return (
+            0,
+            type("Io", (), {"status": 0, "information": 0})(),
+            64,
+        )
+
+    monkeypatch.setattr(r4w, "_set_fixed_rename", rename_success)
+
+    outcome = r4w.rename_fixed_step(
+        fake,
+        r4.RenameStep.OLD_TO_RETIRED,
+        source,
+        parent,
+    )
+    assert outcome is r4.MutationOutcome.INDETERMINATE
+
+

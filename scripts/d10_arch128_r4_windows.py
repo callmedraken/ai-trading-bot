@@ -59,7 +59,10 @@ class WindowsArch128StagingBackend(WindowsDeploymentBackend):
     _creation_root = r4.STAGING_PATH
 
     def _allowed_directory_create(self, path: str) -> bool:
-        return path == r4.NEW_EVIDENCE_ROOT or super()._allowed_directory_create(path)
+        return (
+            path == r4.NEW_EVIDENCE_ROOT
+            or super()._allowed_directory_create(path)
+        )
 
     def _allowed_file_create(self, path: str) -> bool:
         return path in _TRUST_INSTALLING or super()._allowed_file_create(path)

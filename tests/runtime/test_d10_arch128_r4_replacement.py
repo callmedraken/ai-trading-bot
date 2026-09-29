@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import replace
+from dataclasses import fields, replace
 
 import pytest
 
@@ -32,7 +32,7 @@ def _namespace(
 def _facts(**overrides: bool) -> r4.AdmissionFacts:
     values = {
         item.name: True
-        for item in __import__("dataclasses").fields(r4.AdmissionFacts)
+        for item in fields(r4.AdmissionFacts)
     }
     values.update(overrides)
     return r4.AdmissionFacts(**values)

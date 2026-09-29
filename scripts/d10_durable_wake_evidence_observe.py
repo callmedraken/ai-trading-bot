@@ -90,7 +90,7 @@ def _read_evidence(
         root_before = native.inspect(root_handle)
         guard._require_facts(guard.D10_EVIDENCE_ROOT, True, root_before)
 
-        file_handle = native.open(path, directory=False)
+        file_handle = native.open_evidence_observer(path)
         stack.callback(native.close, file_handle)
         file_before = native.inspect(file_handle)
         guard._require_facts(

@@ -167,6 +167,7 @@ def test_default_evidence_root_is_outside_repo() -> None:
     assert evidence_root != repo_root
     assert repo_root not in evidence_root.parents
 
+
 def _parent_preflight_result(status: str = "PASS") -> dict[str, object]:
     return {
         "status": status,
@@ -358,4 +359,3 @@ def test_preflight_checkpoint_writes_external_evidence(
     payload = report.read_text(encoding="utf-8")
     assert '"kind": "read_only_preflight"' in payload
     assert '"protected_execution": "NOT_AUTHORIZED"' in payload
-

@@ -225,6 +225,42 @@ def test_operator_source_has_no_production_publication_or_key_enrollment_surface
     )
 
 
+def test_evidence_directory_accepts_platform_path_subclass(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(r2, "EVIDENCE_PARENT", tmp_path)
+    evidence = tmp_path / f"{r2.EVIDENCE_PREFIX}test"
+    evidence.mkdir()
+
+    assert isinstance(evidence, Path)
+    assert type(evidence) is not Path
+    r2.require_evidence_directory(evidence)
+
+
+def test_evidence_directory_rejects_wrong_parent_prefix_and_nonempty(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    parent = tmp_path / "fixed"
+    parent.mkdir()
+    monkeypatch.setattr(r2, "EVIDENCE_PARENT", parent)
+
+    wrong_parent = tmp_path / f"{r2.EVIDENCE_PREFIX}wrong-parent"
+    wrong_parent.mkdir()
+    with pytest.raises(r2.R2Blocked, match="evidence_directory_invalid"):
+        r2.require_evidence_directory(wrong_parent)
+
+    wrong_prefix = parent / "wrong-prefix"
+    wrong_prefix.mkdir()
+    with pytest.raises(r2.R2Blocked, match="evidence_directory_invalid"):
+        r2.require_evidence_directory(wrong_prefix)
+
+    nonempty = parent / f"{r2.EVIDENCE_PREFIX}nonempty"
+    nonempty.mkdir()
+    (nonempty / "marker").write_text("x", encoding="utf-8")
+    with pytest.raises(r2.R2Blocked, match="evidence_directory_not_empty"):
+        r2.require_evidence_directory(nonempty)
+
+
 def test_cli_rejects_semantic_arguments(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(r2.sys, "argv", ["r2", "unexpected"])
     assert r2.main() == 2

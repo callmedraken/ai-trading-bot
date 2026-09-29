@@ -199,14 +199,10 @@ def _new_evidence_directory() -> Path:
     return path
 
 
-def protected_sign_fixed_r1_material(
-    evidence: Path,
-) -> dict[str, object]:
-    """One protected signature over the exact accepted R1 attestation."""
-    if os.name != "nt":
-        raise R2Blocked("windows_required")
+def require_evidence_directory(evidence: Path) -> None:
+    """Require one fresh evidence directory below the fixed external parent."""
     if (
-        type(evidence) is not Path
+        not isinstance(evidence, Path)
         or evidence.parent != EVIDENCE_PARENT
         or not evidence.name.startswith(EVIDENCE_PREFIX)
         or not evidence.is_dir()
@@ -219,6 +215,15 @@ def protected_sign_fixed_r1_material(
         raise
     except OSError:
         raise R2Blocked("evidence_directory_unavailable") from None
+
+
+def protected_sign_fixed_r1_material(
+    evidence: Path,
+) -> dict[str, object]:
+    """One protected signature over the exact accepted R1 attestation."""
+    if os.name != "nt":
+        raise R2Blocked("windows_required")
+    require_evidence_directory(evidence)
 
     data = _read_stable_regular_file(R1_ATTESTATION_PATH)
     attestation = require_exact_r1_attestation(data)

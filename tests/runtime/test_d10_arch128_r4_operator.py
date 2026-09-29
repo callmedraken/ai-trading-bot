@@ -4,10 +4,10 @@ from dataclasses import fields
 from pathlib import Path
 
 import pytest
+from scripts.d10_protected_deployment import DeploymentBlocked
 
 from scripts import d10_arch128_r4_operator as operator
 from scripts import d10_arch128_r4_replacement as r4
-from scripts.d10_protected_deployment import DeploymentBlocked
 
 
 def _admission():

@@ -527,7 +527,9 @@ def test_partial_recovery_requires_dedicated_switch(machine) -> None:
     "failure",
     ["scheduler", "bytes", "final_collision", "temporary_present", "expired"],
 )
-def test_partial_recovery_preflight_blocks_any_non_exact_state(machine, failure) -> None:
+def test_partial_recovery_preflight_blocks_any_non_exact_state(
+    machine, failure
+) -> None:
     activation = NOW - timedelta(days=8) if failure == "expired" else NOW
     operator, reader, _, state, lease = partial_installing_state(
         machine, activation=activation

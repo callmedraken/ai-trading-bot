@@ -17,7 +17,6 @@ from ctypes import wintypes
 from dataclasses import asdict, replace
 from typing import Final
 
-from scripts import d10_arch128_r4_replacement as r4
 from scripts import d10_arch128_r4_windows as r4w
 from scripts import d10_protected_replacement_windows as legacy_windows
 from scripts.d10_protected_deployment import (
@@ -45,6 +44,7 @@ DRIFT_SID: Final = "S-1-5-21-1397534616-3988210162-180023805-1005"
 DRIFT_FLAGS: Final = 3
 
 _WRITE_DAC = 0x00040000
+_WRITE_OWNER = 0x00080000
 
 
 def _expected_drift_aces() -> tuple[Ace, ...]:
@@ -140,6 +140,7 @@ def _open_parent_for_acl(
         D10_PARENT,
         legacy_windows._READ_CONTROL
         | _WRITE_DAC
+        | _WRITE_OWNER
         | legacy_windows._FILE_READ_ATTRIBUTES
         | legacy_windows._SYNCHRONIZE,
         legacy_windows._FILE_SHARE_READ
@@ -203,6 +204,8 @@ def _repair_once() -> dict[str, object]:
     applied = False
     close_ambiguous = False
 
+    failure: tuple[str, str, str] | None = None
+
     try:
         handle = _open_parent_for_acl(reader)
         pinned_before = reader._inspect(handle, D10_PARENT)
@@ -225,10 +228,11 @@ def _repair_once() -> dict[str, object]:
         if pinned_after != expected_after:
             raise DeploymentBlocked("arch128_parent_acl_post_apply_drift")
     except Exception as exc:
-        result["status"] = "STOPPED_AFTER_APPLY" if applied else "BLOCKED"
-        result["reason"] = type(exc).__name__
-        result["detail"] = str(exc)
-        return result
+        failure = (
+            "STOPPED_AFTER_APPLY" if applied else "BLOCKED",
+            type(exc).__name__,
+            str(exc),
+        )
     finally:
         if handle is not None:
             try:
@@ -237,8 +241,12 @@ def _repair_once() -> dict[str, object]:
                 close_ambiguous = True
 
     if close_ambiguous:
-        result["status"] = "STOPPED_AFTER_APPLY"
+        result["status"] = "STOPPED_AFTER_APPLY" if applied else "BLOCKED"
         result["reason"] = "handle_close_ambiguous"
+        return result
+
+    if failure is not None:
+        result["status"], result["reason"], result["detail"] = failure
         return result
 
     try:

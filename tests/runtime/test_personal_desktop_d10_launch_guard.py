@@ -830,7 +830,7 @@ def test_a1246_guard_requires_deployment_and_active_lease_before_one_child(
     activation = datetime(2026, 9, 24, 18, 15, 30, 123456, tzinfo=UTC)
     data = [_sample_lease_bytes(deployment, activation=activation)]
     observed = [activation]
-    calls: list[tuple[object, object]] = []
+    calls: list[tuple[object, object, object]] = []
     monkeypatch.setattr(guard, "_verify_pre_source", lambda: deployment)
     monkeypatch.setattr(guard, "_read_fixed_activation_lease_bytes", lambda: data[0])
     monkeypatch.setattr(guard, "_trusted_runtime_utc_now", lambda: observed[0])
@@ -841,31 +841,17 @@ def test_a1246_guard_requires_deployment_and_active_lease_before_one_child(
         lambda: {"SystemRoot": r"C:\Windows", "WINDIR": r"C:\Windows"},
     )
 
-    def child(command, **kwargs):
-        calls.append((command, kwargs))
-        return SimpleNamespace(returncode=0)
+    def guarded_wake(deployment_arg, lease_arg, environment_arg):
+        calls.append((deployment_arg, lease_arg, environment_arg))
+        return 0
 
-    monkeypatch.setattr(guard.subprocess, "run", child)
+    monkeypatch.setattr(guard, "_run_second_stage_with_evidence", guarded_wake)
     assert guard.main() == 0
-    assert calls == [
-        (
-            [
-                guard.D10_PRODUCTION_PYTHON,
-                "-I",
-                "-S",
-                "-B",
-                "-X",
-                f"pycache_prefix={guard.D10_CACHE_PREFIX}",
-                guard.D10_SECOND_STAGE_LAUNCHER,
-            ],
-            {
-                "check": False,
-                "cwd": guard.D10_ROOT,
-                "env": {"SystemRoot": r"C:\Windows", "WINDIR": r"C:\Windows"},
-                "close_fds": True,
-            },
-        )
-    ]
+    assert len(calls) == 1
+    assert calls[0][0] is deployment
+    assert calls[0][1].state == "ACTIVE"
+    assert calls[0][1].soak_id
+    assert calls[0][2] == {"SystemRoot": r"C:\Windows", "WINDIR": r"C:\Windows"}
 
     failures = [
         (b"{", activation, "malformed"),
@@ -969,7 +955,6 @@ def test_a1246_guard_requires_deployment_and_active_lease_before_one_child(
     )
     assert guard.main() == 1
     assert not calls
-
 
 def test_a1243_second_stage_bootstrap_is_fixed_and_fail_closed() -> None:
     path = (

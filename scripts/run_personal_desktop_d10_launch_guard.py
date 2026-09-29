@@ -43,6 +43,7 @@ D10_PRODUCTION_PYTHON = r"F:\AITradingBot\runtime\python.exe"
 # Measured with -I -S. Path identity only; A124-4 qualifies runtime security.
 D10_PRODUCTION_SITE_PACKAGES = r"F:\AITradingBot\runtime\Lib\site-packages"
 D10_SCHEDULER_SCHEMA = "personal-desktop-one-week-soak-scheduler-contract/v2"
+D10_SCHEDULER_TASK_PATH = r"\AITradingBot-PD4-UnattendedPaper-v1"
 D10_MANIFEST_SCHEMA = "personal-desktop-d10-executable-manifest/v1"
 D10_ATTESTATION_SCHEMA = "personal-desktop-d10-deployment-attestation/v2"
 D10_SIGNING_KEY_ID = "AITradingBot/D10/DeploymentAttestation/v3"
@@ -136,6 +137,29 @@ _GUARD_EVIDENCE_FIELDS = frozenset(
         "deployment_id",
         "soak_id",
         "terminal",
+    }
+)
+_WAKE_STOP_REASONS = frozenset(
+    {
+        "BLOCKED",
+        "SESSION_GAP",
+        "MISSED_DECISION_DEADLINE",
+        "STALE_UNRESOLVED_DECISION",
+        "PROVIDER_ATTEMPT_CONSUMED_OR_AMBIGUOUS",
+        "RECEIPT_RECOVERY_REQUIRED",
+        "AUTHORITY_DRIFT",
+        "DEPLOYMENT_IDENTITY_DRIFT",
+        "LEASE_NOT_ACTIVE_OR_EXPIRED",
+        "EFFECT_GATE_DRIFT",
+        "AMBIGUOUS_EFFECT_RESULT",
+    }
+)
+_GUARD_TERMINAL_REASONS = frozenset(
+    {
+        "CHILD_LAUNCH_FAILED",
+        "CHILD_OUTPUT_MISSING",
+        "CHILD_OUTPUT_INVALID",
+        "CHILD_EXIT_MISMATCH",
     }
 )
 _ATTESTATION_FIELDS = frozenset(
@@ -1979,6 +2003,531 @@ def verify_fixed_activation_lease_for_second_stage() -> VerifiedActivationLeaseF
     )
 
 
+def _wake_evidence_path(lease: VerifiedActivationLeaseFacts) -> str:
+    if type(lease) is not VerifiedActivationLeaseFacts:
+        raise GuardBlocked("D10 evidence requires verified activation lease")
+    try:
+        parsed = uuid.UUID(lease.soak_id)
+    except (TypeError, ValueError, AttributeError) as exc:
+        raise GuardBlocked("D10 evidence soak ID is malformed") from exc
+    if str(parsed) != lease.soak_id:
+        raise GuardBlocked("D10 evidence soak ID is not canonical")
+    path = D10_EVIDENCE_ROOT + rf"\wake-{lease.soak_id}.jsonl"
+    _expected_path(path)
+    return path
+
+
+def _parse_wake_timestamp(value: object) -> datetime:
+    if type(value) is not str or not value.endswith("Z"):
+        raise GuardBlocked("D10 wake timestamp is not canonical UTC")
+    try:
+        parsed = datetime.fromisoformat(value[:-1] + "+00:00").astimezone(UTC)
+    except ValueError as exc:
+        raise GuardBlocked("D10 wake timestamp is invalid") from exc
+    if parsed.isoformat().replace("+00:00", "Z") != value:
+        raise GuardBlocked("D10 wake timestamp is not canonical UTC")
+    return parsed
+
+
+def _require_object(
+    value: object, fields: frozenset[str], label: str
+) -> dict[str, object]:
+    if type(value) is not dict or frozenset(value) != fields:
+        raise GuardBlocked(f"D10 {label} evidence field set differs")
+    return value
+
+
+def _parse_evidence_json(data: bytes) -> dict[str, object]:
+    if type(data) is not bytes or not data or len(data) > MAX_D10_WAKE_EVIDENCE_BYTES:
+        raise GuardBlocked("D10 evidence record size is invalid")
+    try:
+        value = json.loads(
+            data.decode("utf-8"),
+            object_pairs_hook=_unique_pairs,
+            parse_constant=lambda _: (_ for _ in ()).throw(
+                GuardBlocked("D10 evidence has non-finite values")
+            ),
+        )
+    except (UnicodeError, json.JSONDecodeError) as exc:
+        raise GuardBlocked("D10 evidence JSON is invalid") from exc
+    if type(value) is not dict or _canonical_json(value) != data:
+        raise GuardBlocked("D10 evidence JSON is not canonical")
+    return value
+
+
+def _parse_ordinary_wake_record(
+    data: bytes,
+    deployment: VerifiedDeploymentFacts,
+    lease: VerifiedActivationLeaseFacts,
+) -> tuple[str, datetime]:
+    value = _parse_evidence_json(data)
+    if frozenset(value) != _WAKE_FIELDS or value["schema"] != D10_WAKE_EVIDENCE_SCHEMA:
+        raise GuardBlocked("D10 ordinary wake schema differs")
+    outcome = value["outcome"]
+    stop_reason = value["stop_reason"]
+    if outcome not in {"COMPLETED", "NO_ACTION", "STOPPED"}:
+        raise GuardBlocked("D10 wake outcome differs")
+    if (
+        (outcome == "STOPPED" and stop_reason not in _WAKE_STOP_REASONS)
+        or (outcome != "STOPPED" and stop_reason is not None)
+    ):
+        raise GuardBlocked("D10 wake stop fields disagree")
+    observed = _parse_wake_timestamp(value["observed_at_utc"])
+
+    deployment_value = _require_object(
+        value["deployment"],
+        frozenset(
+            {
+                "id",
+                "attestation_sha256",
+                "source_head",
+                "source_tree",
+                "executable_file_count",
+            }
+        ),
+        "deployment",
+    )
+    if deployment_value != {
+        "id": deployment.deployment_id,
+        "attestation_sha256": deployment.attestation_sha256,
+        "source_head": deployment.certified_source_head,
+        "source_tree": deployment.certified_source_tree,
+        "executable_file_count": deployment.executable_file_count,
+    }:
+        raise GuardBlocked("D10 wake deployment identity differs")
+
+    soak = _require_object(
+        value["soak"],
+        frozenset({"id", "activation_utc", "end_utc"}),
+        "soak",
+    )
+    if (
+        soak["id"] != lease.soak_id
+        or _parse_wake_timestamp(soak["activation_utc"])
+        != _parse_lease_timestamp(lease.accepted_activation_utc)
+        or _parse_wake_timestamp(soak["end_utc"])
+        != _parse_lease_timestamp(lease.end_utc)
+    ):
+        raise GuardBlocked("D10 wake soak identity differs")
+
+    runtime = _require_object(
+        value["runtime"],
+        frozenset(
+            {
+                "scheduler_contract_schema",
+                "scheduler_task_path",
+                "trading_sid",
+                "production_python",
+                "production_python_version",
+            }
+        ),
+        "runtime",
+    )
+    if runtime != {
+        "scheduler_contract_schema": D10_SCHEDULER_SCHEMA,
+        "scheduler_task_path": D10_SCHEDULER_TASK_PATH,
+        "trading_sid": TRADING_SID,
+        "production_python": D10_PRODUCTION_PYTHON,
+        "production_python_version": D10_PRODUCTION_PYTHON_VERSION,
+    }:
+        raise GuardBlocked("D10 wake runtime identity differs")
+
+    nested = {
+        "session": frozenset({"completed", "next_execution", "preopen_deadline_utc"}),
+        "capture": frozenset(
+            {
+                "classification",
+                "selection_id",
+                "snapshot_id",
+                "attempt_id",
+                "terminal_state",
+                "provider_call_disposition",
+            }
+        ),
+        "history": frozenset(
+            {
+                "classification",
+                "reconciled_count",
+                "current_decision_id",
+                "unresolved_decision_id",
+            }
+        ),
+        "settlement": frozenset(
+            {
+                "decision_id",
+                "classification",
+                "reconciliation",
+                "plan_id",
+                "invocation_id",
+                "operation_id",
+                "application_id",
+                "predecessor_checkpoint_id",
+                "successor_checkpoint_id",
+            }
+        ),
+        "decision": frozenset(
+            {"id", "publication", "reconciliation", "finalized_id"}
+        ),
+    }
+    for name, fields in nested.items():
+        _require_object(value[name], fields, name)
+
+    budgets = _require_object(
+        value["budgets"],
+        frozenset(
+            {
+                "provider_attempts",
+                "settlement_attempts",
+                "publication_attempts",
+                "receipt_recovery_attempts",
+                "broker_live_calls",
+            }
+        ),
+        "budgets",
+    )
+    if (
+        any(type(item) is not int for item in budgets.values())
+        or any(
+            budgets[name] not in (0, 1)
+            for name in (
+                "provider_attempts",
+                "settlement_attempts",
+                "publication_attempts",
+            )
+        )
+        or budgets["receipt_recovery_attempts"] != 0
+        or budgets["broker_live_calls"] != 0
+    ):
+        raise GuardBlocked("D10 wake effect budgets differ")
+
+    crossings = _require_object(
+        value["effect_crossings"],
+        frozenset({"provider", "settlement", "publication"}),
+        "effect crossings",
+    )
+    if (
+        any(type(item) is not bool for item in crossings.values())
+        or (crossings["provider"] and budgets["provider_attempts"] != 1)
+        or (crossings["settlement"] and budgets["settlement_attempts"] != 1)
+        or (crossings["publication"] and budgets["publication_attempts"] != 1)
+    ):
+        raise GuardBlocked("D10 wake effect crossings differ")
+
+    final_gates = _require_object(
+        value["final_gates"],
+        frozenset({"all_closed", "closed_count"}),
+        "final gates",
+    )
+    if final_gates != {"all_closed": True, "closed_count": 8}:
+        raise GuardBlocked("D10 wake final gates are not closed")
+    return outcome, observed
+
+
+def _parse_guard_terminal_record(
+    data: bytes,
+    deployment: VerifiedDeploymentFacts,
+    lease: VerifiedActivationLeaseFacts,
+) -> datetime:
+    value = _parse_evidence_json(data)
+    if (
+        frozenset(value) != _GUARD_EVIDENCE_FIELDS
+        or value["schema"] != D10_GUARD_TERMINAL_EVIDENCE_SCHEMA
+        or value["reason"] not in _GUARD_TERMINAL_REASONS
+        or value["deployment_id"] != deployment.deployment_id
+        or value["soak_id"] != lease.soak_id
+        or value["terminal"] is not True
+    ):
+        raise GuardBlocked("D10 guard terminal evidence differs")
+    return _parse_lease_timestamp(value["observed_at_utc"])
+
+
+def _parse_evidence_log(
+    data: bytes,
+    deployment: VerifiedDeploymentFacts,
+    lease: VerifiedActivationLeaseFacts,
+) -> tuple[int, datetime | None, bool]:
+    if type(data) is not bytes or len(data) > MAX_D10_EVIDENCE_LOG_BYTES:
+        raise GuardBlocked("D10 evidence log size differs")
+    if not data:
+        return 0, None, False
+    if not data.endswith(b"\n"):
+        raise GuardBlocked("D10 evidence log has a partial final record")
+    lines = data[:-1].split(b"\n")
+    if (
+        not lines
+        or len(lines) > MAX_D10_EVIDENCE_LOG_RECORDS
+        or any(not line for line in lines)
+    ):
+        raise GuardBlocked("D10 evidence log record count differs")
+    previous: datetime | None = None
+    terminal = False
+    for index, line in enumerate(lines):
+        if len(line) > MAX_D10_WAKE_EVIDENCE_BYTES:
+            raise GuardBlocked("D10 evidence record exceeds its bound")
+        value = _parse_evidence_json(line)
+        schema = value.get("schema")
+        if schema == D10_WAKE_EVIDENCE_SCHEMA:
+            outcome, observed = _parse_ordinary_wake_record(line, deployment, lease)
+            current_terminal = outcome == "STOPPED"
+        elif schema == D10_GUARD_TERMINAL_EVIDENCE_SCHEMA:
+            if len(line) > MAX_D10_GUARD_TERMINAL_EVIDENCE_BYTES:
+                raise GuardBlocked("D10 guard evidence exceeds its bound")
+            observed = _parse_guard_terminal_record(line, deployment, lease)
+            current_terminal = True
+        else:
+            raise GuardBlocked("D10 evidence record schema differs")
+        if previous is not None and observed < previous:
+            raise GuardBlocked("D10 evidence observation time moved backward")
+        if terminal or (current_terminal and index != len(lines) - 1):
+            raise GuardBlocked("D10 terminal evidence is not final")
+        previous = observed
+        terminal = current_terminal
+    return len(lines), previous, terminal
+
+
+def _format_guard_timestamp(value: datetime) -> str:
+    if type(value) is not datetime or value.tzinfo is not UTC:
+        raise GuardBlocked("D10 guard evidence time is invalid")
+    return (
+        f"{value.year:04d}-{value.month:02d}-{value.day:02d}T"
+        f"{value.hour:02d}:{value.minute:02d}:{value.second:02d}."
+        f"{value.microsecond:06d}Z"
+    )
+
+
+def _guard_terminal_bytes(
+    reason: str,
+    deployment: VerifiedDeploymentFacts,
+    lease: VerifiedActivationLeaseFacts,
+) -> bytes:
+    if reason not in _GUARD_TERMINAL_REASONS:
+        raise GuardBlocked("D10 guard terminal reason differs")
+    payload = _canonical_json(
+        {
+            "schema": D10_GUARD_TERMINAL_EVIDENCE_SCHEMA,
+            "reason": reason,
+            "observed_at_utc": _format_guard_timestamp(_trusted_runtime_utc_now()),
+            "deployment_id": deployment.deployment_id,
+            "soak_id": lease.soak_id,
+            "terminal": True,
+        }
+    )
+    if len(payload) > MAX_D10_GUARD_TERMINAL_EVIDENCE_BYTES:
+        raise GuardBlocked("D10 guard terminal evidence exceeds bound")
+    return payload
+
+
+def _same_object_except_size(before: ObjectFacts, after: ObjectFacts) -> bool:
+    if type(before) is not ObjectFacts or type(after) is not ObjectFacts:
+        return False
+    return (
+        before.final_path,
+        before.attributes,
+        before.drive_type,
+        before.volume_root,
+        before.filesystem,
+        before.volume_serial,
+        before.file_index,
+        before.links,
+        before.owner,
+        before.protected,
+        before.aces,
+    ) == (
+        after.final_path,
+        after.attributes,
+        after.drive_type,
+        after.volume_root,
+        after.filesystem,
+        after.volume_serial,
+        after.file_index,
+        after.links,
+        after.owner,
+        after.protected,
+        after.aces,
+    )
+
+
+def _append_and_verify_evidence(
+    native: _Native,
+    root_handle: int,
+    root_before: ObjectFacts,
+    file_handle: int,
+    file_before: ObjectFacts,
+    prior: bytes,
+    record: bytes,
+    deployment: VerifiedDeploymentFacts,
+    lease: VerifiedActivationLeaseFacts,
+) -> None:
+    payload = record + b"\n"
+    native.append_exact(file_handle, payload, len(prior))
+    root_after = native.inspect(root_handle)
+    file_after = native.inspect(file_handle)
+    _require_facts(D10_EVIDENCE_ROOT, True, root_after)
+    _require_facts(
+        _wake_evidence_path(lease),
+        False,
+        file_after,
+        EVIDENCE_FILE_POLICY,
+    )
+    _stable(root_before, root_after)
+    if (
+        not _same_object_except_size(file_before, file_after)
+        or file_after.size != len(prior) + len(payload)
+    ):
+        raise GuardBlocked("D10 evidence object identity changed")
+    observed = native.read_bounded(
+        file_handle, file_after.size, MAX_D10_EVIDENCE_LOG_BYTES
+    )
+    if observed != prior + payload:
+        raise GuardBlocked("D10 evidence reread differs after append")
+    _parse_evidence_log(observed, deployment, lease)
+
+
+def _run_second_stage_with_evidence(
+    deployment: VerifiedDeploymentFacts,
+    lease: VerifiedActivationLeaseFacts,
+    environment: dict[str, str],
+    native: _Native | None = None,
+) -> int:
+    if (
+        type(deployment) is not VerifiedDeploymentFacts
+        or type(lease) is not VerifiedActivationLeaseFacts
+        or type(environment) is not dict
+    ):
+        raise GuardBlocked("D10 guarded wake inputs are invalid")
+    backend = _Native() if native is None else native
+    evidence_path = _wake_evidence_path(lease)
+    with ExitStack() as stack:
+        root_handle = backend.open(D10_EVIDENCE_ROOT, directory=True)
+        stack.callback(backend.close, root_handle)
+        root_before = backend.inspect(root_handle)
+        _require_facts(D10_EVIDENCE_ROOT, True, root_before)
+
+        file_handle = backend.open_evidence_file(evidence_path)
+        stack.callback(backend.close, file_handle)
+        file_before = backend.inspect(file_handle)
+        _require_facts(evidence_path, False, file_before, EVIDENCE_FILE_POLICY)
+        if file_before.size < 0 or file_before.size > MAX_D10_EVIDENCE_LOG_BYTES:
+            raise GuardBlocked("D10 evidence file size differs")
+        prior = backend.read_bounded(
+            file_handle, file_before.size, MAX_D10_EVIDENCE_LOG_BYTES
+        )
+        count, _last, terminal = _parse_evidence_log(prior, deployment, lease)
+        if terminal:
+            raise GuardBlocked("D10 evidence stop latch is terminal")
+        if (
+            count >= MAX_D10_EVIDENCE_LOG_RECORDS
+            or len(prior) + MAX_D10_WAKE_EVIDENCE_BYTES + 1
+            > MAX_D10_EVIDENCE_LOG_BYTES
+        ):
+            raise GuardBlocked("D10 evidence log has no bounded append capacity")
+
+        root_check = backend.inspect(root_handle)
+        file_check = backend.inspect(file_handle)
+        _require_facts(D10_EVIDENCE_ROOT, True, root_check)
+        _require_facts(evidence_path, False, file_check, EVIDENCE_FILE_POLICY)
+        _stable(root_before, root_check)
+        _stable(file_before, file_check)
+
+        command = [
+            D10_PRODUCTION_PYTHON,
+            "-I",
+            "-S",
+            "-B",
+            "-X",
+            f"pycache_prefix={D10_CACHE_PREFIX}",
+            D10_SECOND_STAGE_LAUNCHER,
+        ]
+        try:
+            result = subprocess.run(
+                command,
+                check=False,
+                cwd=D10_ROOT,
+                env=environment,
+                close_fds=True,
+                capture_output=True,
+            )
+        except Exception:
+            terminal_record = _guard_terminal_bytes(
+                "CHILD_LAUNCH_FAILED", deployment, lease
+            )
+            _append_and_verify_evidence(
+                backend,
+                root_handle,
+                root_before,
+                file_handle,
+                file_before,
+                prior,
+                terminal_record,
+                deployment,
+                lease,
+            )
+            return 1
+
+        stdout = result.stdout
+        stderr = result.stderr
+        if type(stdout) is not bytes or type(stderr) is not bytes or stderr:
+            reason = "CHILD_OUTPUT_INVALID"
+            record = None
+        elif not stdout:
+            reason = "CHILD_OUTPUT_MISSING"
+            record = None
+        elif (
+            not stdout.endswith(b"\n")
+            or stdout.count(b"\n") != 1
+            or len(stdout) > MAX_D10_WAKE_EVIDENCE_BYTES + 1
+        ):
+            reason = "CHILD_OUTPUT_INVALID"
+            record = None
+        else:
+            record = stdout[:-1]
+            try:
+                outcome, _observed = _parse_ordinary_wake_record(
+                    record, deployment, lease
+                )
+            except Exception:
+                reason = "CHILD_OUTPUT_INVALID"
+                record = None
+            else:
+                expected_returncode = 1 if outcome == "STOPPED" else 0
+                reason = (
+                    None
+                    if result.returncode == expected_returncode
+                    else "CHILD_EXIT_MISMATCH"
+                )
+
+        if record is None or reason is not None:
+            terminal_record = _guard_terminal_bytes(
+                reason or "CHILD_OUTPUT_INVALID", deployment, lease
+            )
+            _append_and_verify_evidence(
+                backend,
+                root_handle,
+                root_before,
+                file_handle,
+                file_before,
+                prior,
+                terminal_record,
+                deployment,
+                lease,
+            )
+            return 1
+
+        _append_and_verify_evidence(
+            backend,
+            root_handle,
+            root_before,
+            file_handle,
+            file_before,
+            prior,
+            record,
+            deployment,
+            lease,
+        )
+        outcome, _observed = _parse_ordinary_wake_record(record, deployment, lease)
+        return 1 if outcome == "STOPPED" else 0
+
+
 def _sanitized_environment() -> dict[str, str]:
     kernel = _win_dll("kernel32")
     get_windows = kernel.GetWindowsDirectoryW
@@ -1995,25 +2544,9 @@ def main() -> int:
     """Fail closed; launch one exact child only after every pre-source proof."""
     try:
         deployment = _verify_pre_source()
-        _require_active_lease(deployment)
+        lease = _require_active_lease(deployment)
         environment = _sanitized_environment()
-        command = [
-            D10_PRODUCTION_PYTHON,
-            "-I",
-            "-S",
-            "-B",
-            "-X",
-            f"pycache_prefix={D10_CACHE_PREFIX}",
-            D10_SECOND_STAGE_LAUNCHER,
-        ]
-        result = subprocess.run(
-            command,
-            check=False,
-            cwd=D10_ROOT,
-            env=environment,
-            close_fds=True,
-        )
-        return result.returncode
+        return _run_second_stage_with_evidence(deployment, lease, environment)
     except Exception:
         return 1
 

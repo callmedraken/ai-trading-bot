@@ -194,8 +194,8 @@ def parse_persisted_d10_wake_record(
     _require_keys(soak, {"id", "activation_utc", "end_utc"})
     if (
         soak["id"] != lease.soak_id
-        or soak["activation_utc"] != format_utc_instant(lease.accepted_activation_utc)
-        or soak["end_utc"] != format_utc_instant(lease.end_utc)
+        or _parse_wake_utc(soak["activation_utc"]) != lease.accepted_activation_utc
+        or _parse_wake_utc(soak["end_utc"]) != lease.end_utc
     ):
         raise D10WakeEvidenceLogError("wake soak identity differs")
 

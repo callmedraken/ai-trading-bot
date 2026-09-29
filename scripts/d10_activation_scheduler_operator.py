@@ -334,6 +334,34 @@ def _stable_signed(reader: Reader, verifier: d.SignatureVerifier) -> SignedObser
     return second
 
 
+def _same_signed_deployment(
+    baseline: SignedObservation,
+    observed: SignedObservation,
+    *,
+    expected_leases: tuple[bool, bool, bool],
+) -> bool:
+    """Compare signed deployment identity across an admitted lease-name change."""
+
+    if observed.leases_present != expected_leases:
+        return False
+    if len(baseline.objects) != len(observed.objects):
+        return False
+
+    def normalized(item: d.NativeObject) -> d.NativeObject:
+        # The D10 root's directory allocation size may legitimately change when
+        # one reviewed lease name is created or renamed. _signed_once() already
+        # proves exact allowed children and every other native/security field.
+        return replace(item, size=0) if item.path == d.D10_ROOT else item
+
+    if sum(item.path == d.D10_ROOT for item in baseline.objects) != 1:
+        return False
+    if sum(item.path == d.D10_ROOT for item in observed.objects) != 1:
+        return False
+    return tuple(map(normalized, baseline.objects)) == tuple(
+        map(normalized, observed.objects)
+    )
+
+
 def _expected_d10(spec: OneWeekSoakSchedulerDeploymentSpec) -> dict[str, object]:
     return {
         **frozen_d5_scheduler_semantics(),
@@ -619,6 +647,147 @@ class _Operator:
             result.update(status="INDETERMINATE", reconciliation_required=True)
         return result
 
+    def _admit_partial_installing(
+        self,
+    ) -> tuple[
+        SignedObservation,
+        SchedulerObservation,
+        d.CheckedFile,
+        D10ActivationLease,
+        OneWeekSoakSchedulerDeploymentSpec,
+    ]:
+        signed = _stable_signed(self.reader, self.verifier)
+        if signed.leases_present != (False, True, False):
+            raise OperatorBlocked("recovery_lease_namespace")
+
+        installing = self.reader.read_file(PUBLICATION.installing_path, MAX_LEASE)
+        lease = parse_activation_lease(installing.data)
+        expected_lease, spec = _planned(lease.accepted_activation_utc)
+        data = expected_lease.canonical_bytes()
+        d.require_file(installing, PUBLICATION.installing_path, data)
+        if lease != expected_lease:
+            raise OperatorBlocked("recovery_lease_model")
+
+        scheduler = self.scheduler_read()
+        _require_semantics(scheduler, _expected_d10(spec))
+        if not lease.accepted_activation_utc <= self.now() < lease.end_utc:
+            raise OperatorBlocked("recovery_window_not_active")
+        if self.reader.absent(PUBLICATION.final_path) is not True:
+            raise OperatorBlocked("recovery_final_collision")
+        if self.reader.absent(PUBLICATION.temporary_path) is not True:
+            raise OperatorBlocked("recovery_temporary_present")
+
+        signed_again = _stable_signed(self.reader, self.verifier)
+        scheduler_again = self.scheduler_read()
+        installing_again = self.reader.read_file(
+            PUBLICATION.installing_path, MAX_LEASE
+        )
+        d.require_file(installing_again, PUBLICATION.installing_path, data)
+        if (
+            signed_again != signed
+            or scheduler_again != scheduler
+            or installing_again != installing
+        ):
+            raise OperatorBlocked("recovery_two_read_drift")
+        return signed, scheduler, installing, expected_lease, spec
+
+    def recovery_preflight(self) -> dict[str, object]:
+        result = self._base("recovery_preflight")
+        try:
+            signed, scheduler, installing, lease, _ = self._admit_partial_installing()
+            result.update(
+                status="PASS",
+                stage="read_only_complete",
+                classification="EXACT_INSTALLING_LEASE_D10_SCHEDULER",
+                planned=lease.to_dict(),
+                post_state=self._state(signed, scheduler),
+            )
+            result["post_state"]["installing_lease"] = _lease_evidence(installing)
+        except Exception:
+            pass
+        return result
+
+    def recover_partial_installing(
+        self, *, execute_p1245_recovery: bool = False
+    ) -> dict[str, object]:
+        result = self._base("recover_partial")
+        result["reconciliation_required"] = True
+        if execute_p1245_recovery is not True or self.used:
+            result["stage"] = "recovery_switch_or_duplicate"
+            return result
+        self.used = True
+        final_call = False
+        try:
+            signed, scheduler, installing, lease, spec = (
+                self._admit_partial_installing()
+            )
+            result["planned"] = lease.to_dict()
+            result["pre_state"] = self._state(signed, scheduler)
+            result["pre_state"]["installing_lease"] = _lease_evidence(installing)
+            if self.writer is None:
+                raise OperatorBlocked("recovery_writer_missing")
+            self.writer.require_administrator()
+            if self.reader.absent(PUBLICATION.final_path) is not True:
+                raise OperatorBlocked("recovery_final_collision")
+            if self.reader.absent(PUBLICATION.temporary_path) is not True:
+                raise OperatorBlocked("recovery_temporary_present")
+            if not lease.accepted_activation_utc <= self.now() < lease.end_utc:
+                raise OperatorBlocked("recovery_window_not_active")
+
+            result["stage"] = "final_lease_publication_recovery"
+            final_call = True
+            result["lease_publication"] = Disposition.INDETERMINATE
+            self.writer.publish_create_only(
+                PUBLICATION.installing_path, PUBLICATION.final_path
+            )
+
+            result["stage"] = "recovery_native_reverification"
+            data = lease.canonical_bytes()
+            final = self.reader.read_file(PUBLICATION.final_path, MAX_LEASE)
+            d.require_file(final, PUBLICATION.final_path, data)
+            if (
+                replace(
+                    installing.identity,
+                    path=PUBLICATION.final_path,
+                    final_path=PUBLICATION.final_path,
+                )
+                != final.identity
+            ):
+                raise OperatorBlocked("recovery_lease_native_identity_changed")
+
+            result["stage"] = "recovery_final_independent_reread"
+            final_signed = _stable_signed(self.reader, self.verifier)
+            final_scheduler = self.scheduler_read()
+            _require_semantics(final_scheduler, _expected_d10(spec))
+            final_again = self.reader.read_file(PUBLICATION.final_path, MAX_LEASE)
+            d.require_file(final_again, PUBLICATION.final_path, data)
+            if (
+                not _same_signed_deployment(
+                    signed,
+                    final_signed,
+                    expected_leases=(True, False, False),
+                )
+                or final_again != final
+                or not lease.accepted_activation_utc <= self.now() < lease.end_utc
+            ):
+                raise OperatorBlocked("recovery_final_state_disagreement")
+
+            result.update(
+                status="PASS",
+                stage="complete",
+                lease_publication=Disposition.PUBLISHED_VERIFIED,
+                reconciliation_required=False,
+                post_state=self._state(final_signed, final_scheduler),
+            )
+            result["post_state"]["lease"] = _lease_evidence(final_again)
+        except (Exception, KeyboardInterrupt):
+            result.update(
+                status="INDETERMINATE" if final_call else "BLOCKED",
+                reconciliation_required=True,
+            )
+            result["post_state"] = self.reconcile()
+        return result
+
     def execute(self, *, execute_p1245: bool = False) -> dict[str, object]:
         result = self._base("execute")
         if execute_p1245 is not True or self.used:
@@ -705,9 +874,10 @@ class _Operator:
             # Staging may take time. Fresh signed truth and independent COM reads
             # must still agree before the final no-replace publication.
             staged_signed = _stable_signed(self.reader, self.verifier)
-            if (
-                staged_signed.objects != signed.objects
-                or staged_signed.leases_present != (False, True, False)
+            if not _same_signed_deployment(
+                signed,
+                staged_signed,
+                expected_leases=(False, True, False),
             ):
                 raise OperatorBlocked("staging_deployment_drift")
             _require_semantics(self.scheduler_read(), _expected_d10(spec))
@@ -740,8 +910,11 @@ class _Operator:
             final_again = self.reader.read_file(PUBLICATION.final_path, MAX_LEASE)
             d.require_file(final_again, PUBLICATION.final_path, data)
             if (
-                final_signed.objects != signed.objects
-                or final_signed.leases_present != (True, False, False)
+                not _same_signed_deployment(
+                    signed,
+                    final_signed,
+                    expected_leases=(True, False, False),
+                )
                 or final_again != final
                 or not lease.accepted_activation_utc <= self.now() < lease.end_utc
             ):
@@ -912,6 +1085,35 @@ def execute(*, execute_p1245: bool = False) -> dict[str, object]:
     return _host_operator(protected=True).execute(execute_p1245=True)
 
 
+def recovery_preflight() -> dict[str, object]:
+    """Read-only admission for the exact partial installing-lease incident."""
+    _require_source_provenance()
+    return _host_operator().recovery_preflight()
+
+
+def recover_partial_installing(
+    *, execute_p1245_recovery: bool = False
+) -> dict[str, object]:
+    """One-shot recovery of the exact verified installing lease."""
+    _require_source_provenance()
+    if execute_p1245_recovery is not True:
+        return {
+            "schema": SCHEMA,
+            "status": "BLOCKED",
+            "stage": "recovery_switch_required",
+            "scheduler_mutation": "NOT_RUN",
+            "lease_publication": "NOT_RUN",
+            "source_launch": "NOT_RUN",
+            "provider": "NOT_RUN",
+            "Paper-v2": "NOT_RUN",
+            "broker": "NOT_RUN",
+            "live": "NOT_RUN",
+        }
+    return _host_operator(protected=True).recover_partial_installing(
+        execute_p1245_recovery=True
+    )
+
+
 class _ClosedParser(argparse.ArgumentParser):
     def error(self, message: str) -> None:
         # argparse normally echoes unknown argv values, potentially a secret.
@@ -920,15 +1122,35 @@ class _ClosedParser(argparse.ArgumentParser):
 
 def main(argv: list[str] | None = None) -> int:
     parser = _ClosedParser(description=__doc__)
-    parser.add_argument("mode", choices=("preflight", "execute", "reconcile"))
+    parser.add_argument(
+        "mode",
+        choices=(
+            "preflight",
+            "execute",
+            "reconcile",
+            "recovery-preflight",
+            "recover-partial",
+        ),
+    )
     parser.add_argument("--execute-p1245", action="store_true")
+    parser.add_argument("--execute-p1245-recovery", action="store_true")
     args = parser.parse_args(argv)
-    if (args.mode == "execute") != args.execute_p1245:
-        parser.error("execute requires --execute-p1245; read-only modes forbid it")
+    is_execute = args.mode == "execute"
+    is_recovery = args.mode == "recover-partial"
+    if (
+        is_execute != args.execute_p1245
+        or is_recovery != args.execute_p1245_recovery
+        or (args.execute_p1245 and args.execute_p1245_recovery)
+    ):
+        parser.error("protected modes require their exact execution switch")
     try:
         result = (
             execute(execute_p1245=True)
-            if args.mode == "execute"
+            if is_execute
+            else recover_partial_installing(execute_p1245_recovery=True)
+            if is_recovery
+            else recovery_preflight()
+            if args.mode == "recovery-preflight"
             else preflight()
             if args.mode == "preflight"
             else reconcile()

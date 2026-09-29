@@ -36,6 +36,7 @@ class CheckpointSpec:
     tests: tuple[str, ...]
     ruff_paths: tuple[str, ...]
     authority_check: Callable[[Path], tuple[str, ...]]
+    preflight: Callable[[], dict[str, object]] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -241,6 +242,95 @@ def _parent_acl_authority_check(repo_root: Path) -> tuple[str, ...]:
     return tuple(failures)
 
 
+def _require_not_run(
+    result: Mapping[str, object],
+    fields: Sequence[str],
+) -> None:
+    for field in fields:
+        if result.get(field) != "NOT_RUN":
+            raise RuntimeError(
+                f"read-only preflight reported unexpected effect for {field}: "
+                f"{result.get(field)!r}"
+            )
+
+
+def _parent_acl_preflight() -> dict[str, object]:
+    from scripts import d10_arch128_parent_acl_repair as repair
+
+    primary = repair._read_only()
+    _require_not_run(
+        primary,
+        (
+            "acl_mutation",
+            "recursive_acl_mutation",
+            "d10_child_mutation",
+            "scheduler_mutation",
+            "activation",
+            "source_launch",
+            "provider",
+            "Paper-v2",
+            "broker",
+            "live",
+        ),
+    )
+    return {
+        "status": primary.get("status"),
+        "primary": primary,
+        "diagnostics": {},
+    }
+
+
+def _r4_preflight() -> dict[str, object]:
+    from scripts import d10_arch128_parent_acl_repair as repair
+    from scripts import d10_arch128_r4_operator as operator
+
+    primary = operator._read_only_preflight()
+    _require_not_run(
+        primary,
+        (
+            "production_filesystem_mutation",
+            "rename_1",
+            "rename_2",
+            "scheduler_mutation",
+            "activation",
+            "source_launch",
+            "provider",
+            "Paper-v2",
+            "broker",
+            "live",
+        ),
+    )
+
+    diagnostics: dict[str, object] = {}
+    if (
+        primary.get("status") != "PASS"
+        and primary.get("detail") == "d10_parent_policy_mismatch"
+    ):
+        parent = repair._read_only()
+        _require_not_run(
+            parent,
+            (
+                "acl_mutation",
+                "recursive_acl_mutation",
+                "d10_child_mutation",
+                "scheduler_mutation",
+                "activation",
+                "source_launch",
+                "provider",
+                "Paper-v2",
+                "broker",
+                "live",
+            ),
+        )
+        diagnostics["parent_acl"] = parent
+
+    return {
+        "status": primary.get("status"),
+        "primary": primary,
+        "diagnostics": diagnostics,
+    }
+
+
 def _checkpoint_specs() -> dict[str, CheckpointSpec]:
     parent_tests = (
         *COMMON_TESTS,
@@ -297,6 +387,7 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             tests=parent_tests,
             ruff_paths=parent_ruff,
             authority_check=_parent_acl_authority_check,
+            preflight=_parent_acl_preflight,
         ),
         "arch128-r4": CheckpointSpec(
             name="arch128-r4",
@@ -304,6 +395,7 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             tests=r4_tests,
             ruff_paths=r4_ruff,
             authority_check=_r4_authority_check,
+            preflight=_r4_preflight,
         ),
     }
 
@@ -334,6 +426,29 @@ def _git_output(repo_root: Path, *arguments: str) -> str:
             f"git {' '.join(arguments)} failed: {completed.stderr.strip()}"
         )
     return completed.stdout.strip()
+
+
+def _remote_branch_head(repo_root: Path, branch: str) -> str:
+    completed = subprocess.run(
+        ("git", "ls-remote", "origin", f"refs/heads/{branch}"),
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if completed.returncode != 0:
+        raise RuntimeError(
+            f"git ls-remote failed: {completed.stderr.strip()}"
+        )
+    lines = [line for line in completed.stdout.splitlines() if line.strip()]
+    if len(lines) != 1:
+        raise RuntimeError(
+            f"remote branch lookup returned {len(lines)} rows for {branch}"
+        )
+    parts = lines[0].split()
+    if len(parts) != 2 or parts[1] != f"refs/heads/{branch}":
+        raise RuntimeError("remote branch lookup returned an unexpected row")
+    return parts[0]
 
 
 def _git_state(repo_root: Path) -> dict[str, object]:
@@ -580,6 +695,89 @@ def verify_checkpoint(
     return passed, report_path
 
 
+def preflight_checkpoint(
+    spec: CheckpointSpec,
+    *,
+    repo_root: Path,
+    evidence_root: Path,
+) -> tuple[bool, Path]:
+    if spec.preflight is None:
+        raise RuntimeError(f"checkpoint has no read-only preflight: {spec.name}")
+
+    state_before = _git_state(repo_root)
+    if state_before["porcelain"]:
+        raise RuntimeError(
+            f"preflight requires a clean worktree; found: {state_before['porcelain']}"
+        )
+
+    branch = str(state_before["branch"])
+    if branch == "HEAD":
+        raise RuntimeError("preflight requires a named branch, not detached HEAD")
+
+    remote_head = _remote_branch_head(repo_root, branch)
+    if remote_head != state_before["head"]:
+        raise RuntimeError(
+            "preflight source is not the live remote branch head: "
+            f"local={state_before['head']} remote={remote_head}"
+        )
+
+    evidence_dir = evidence_root / spec.name / f"preflight-{_stamp()}"
+    evidence_dir.mkdir(parents=True, exist_ok=False)
+
+    result = spec.preflight()
+    state_after = _git_state(repo_root)
+    identity_stable = (
+        state_before["head"] == state_after["head"]
+        and state_before["tree"] == state_after["tree"]
+        and state_before["branch"] == state_after["branch"]
+        and not state_after["porcelain"]
+    )
+    passed = result.get("status") == "PASS" and identity_stable
+
+    report = {
+        "schema": SCHEMA,
+        "kind": "read_only_preflight",
+        "checkpoint": spec.name,
+        "description": spec.description,
+        "status": "PASS" if passed else "BLOCKED",
+        "source": {
+            "before": state_before,
+            "after": state_after,
+            "remote_head": remote_head,
+            "identity_stable": identity_stable,
+        },
+        "result": result,
+        "production_effects": "NOT_RUN",
+        "protected_execution": "NOT_AUTHORIZED",
+    }
+    report_path = evidence_dir / "report.json"
+    _write_json(report_path, report)
+
+    primary = result.get("primary")
+    if isinstance(primary, dict):
+        print(f"PRIMARY_STATUS={primary.get('status')}")
+        if primary.get("reason") is not None:
+            print(f"PRIMARY_REASON={primary.get('reason')}")
+        if primary.get("detail") is not None:
+            print(f"PRIMARY_DETAIL={primary.get('detail')}")
+
+    diagnostics = result.get("diagnostics")
+    if isinstance(diagnostics, dict):
+        for name, diagnostic in diagnostics.items():
+            if isinstance(diagnostic, dict):
+                print(f"DIAGNOSTIC={name}")
+                print(f"DIAGNOSTIC_STATUS={diagnostic.get('status')}")
+                if diagnostic.get("reason") is not None:
+                    print(f"DIAGNOSTIC_REASON={diagnostic.get('reason')}")
+                if diagnostic.get("detail") is not None:
+                    print(f"DIAGNOSTIC_DETAIL={diagnostic.get('detail')}")
+
+    print(f"IDENTITY_STABLE={identity_stable}")
+    print(f"EVIDENCE={report_path}")
+    print(f"OVERALL={'PASS' if passed else 'BLOCKED'}")
+    return passed, report_path
+
+
 def _status(repo_root: Path, specs: Mapping[str, CheckpointSpec]) -> int:
     state = _git_state(repo_root)
     print(f"SCHEMA={SCHEMA}")
@@ -588,6 +786,7 @@ def _status(repo_root: Path, specs: Mapping[str, CheckpointSpec]) -> int:
     print(f"TREE={state['tree']}")
     print(f"BRANCH={state['branch']}")
     print(f"CLEAN={not bool(state['porcelain'])}")
+    print("READ_ONLY_PREFLIGHT=IMPLEMENTED_FOR_REGISTERED_PROFILES")
     print("PROTECTED_EXECUTION=NOT_IMPLEMENTED_IN_UNIFIED_RUNNER_V1")
     print("CHECKPOINTS=" + ",".join(sorted(specs)))
     for name in sorted(specs):
@@ -611,6 +810,20 @@ def _parser(specs: Mapping[str, CheckpointSpec]) -> argparse.ArgumentParser:
         type=Path,
         help="override the external checkpoint evidence root",
     )
+
+    preflight_specs = sorted(
+        name for name, spec in specs.items() if spec.preflight is not None
+    )
+    preflight = subparsers.add_parser(
+        "preflight",
+        help="run a registered read-only host preflight",
+    )
+    preflight.add_argument("checkpoint", choices=preflight_specs)
+    preflight.add_argument(
+        "--evidence-root",
+        type=Path,
+        help="override the external checkpoint evidence root",
+    )
     return parser
 
 
@@ -630,11 +843,18 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
 
     try:
-        passed, _ = verify_checkpoint(
-            spec,
-            repo_root=repo_root,
-            evidence_root=evidence_root,
-        )
+        if args.command == "verify":
+            passed, _ = verify_checkpoint(
+                spec,
+                repo_root=repo_root,
+                evidence_root=evidence_root,
+            )
+        else:
+            passed, _ = preflight_checkpoint(
+                spec,
+                repo_root=repo_root,
+                evidence_root=evidence_root,
+            )
     except Exception as exc:
         print(f"RUNNER_ERROR={type(exc).__name__}:{exc}", file=sys.stderr)
         return 2

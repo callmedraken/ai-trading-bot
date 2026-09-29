@@ -344,3 +344,12 @@ authorization, the production-key signature requires fresh explicit
 authorization bound to the corrected HEAD/tree. No protected retry is
 authorized by this documentation closeout.
 
+### Architecture 128 R3 runtime-scope clarification
+
+R3 does not require a fresh Trading-process/runtime qualification. R4 mutates
+only the inert D10 deployment namespace and does not execute D10 or modify the
+protected runtime. R3 therefore proves the protected parent plus exact halted
+D10 signed deployment, lease, disabled scheduler, and fixed absence namespaces.
+R5 retains the mandatory fresh non-admin Trading/runtime qualification of the
+new canonical deployment before any reactivation work can proceed.
+

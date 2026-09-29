@@ -160,7 +160,8 @@ R3 is read-only and therefore runs before any new staging object exists. It
 must prove:
 
 - elevated Administrator operator identity;
-- exact protected parent/runtime substrate;
+- exact protected parent and current halted D10 namespace;
+- production runtime/Python substrate remains unchanged by R4 and is freshly requalified at R5 before any reactivation;
 - exact old S5-R10 canonical deployment;
 - exact old final activation lease and incident identity;
 - exact disabled/non-running D10 scheduler contract;

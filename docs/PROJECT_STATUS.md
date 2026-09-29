@@ -6521,3 +6521,12 @@ expect or recreate that historical tree. The only retirement destination that
 must be absent before R4 is the new incident-preservation destination for the
 currently halted S5-R10 deployment.
 
+### Architecture 128 R3 runtime-scope clarification
+
+R3 does not require a fresh Trading-process/runtime qualification. R4 mutates
+only the inert D10 deployment namespace and does not execute D10 or modify the
+protected runtime. R3 therefore proves the protected parent plus exact halted
+D10 signed deployment, lease, disabled scheduler, and fixed absence namespaces.
+R5 retains the mandatory fresh non-admin Trading/runtime qualification of the
+new canonical deployment before any reactivation work can proceed.
+

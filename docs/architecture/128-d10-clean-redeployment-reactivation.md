@@ -720,3 +720,42 @@ activation, provider, Paper-v2, broker, or live action. The next checkpoint is
 the final fixed R4 protected operator source/review. Actual creation or rename
 under F:\AITradingBot remains separately authorization-gated.
 
+### Architecture 128 final R4 protected-operator source — ACCEPTED
+
+Final reviewed operator source:
+
+```text
+HEAD:
+d3bc346357d15ec63ed949479a9d6ba31f5b2c82
+
+TREE:
+e1cd77d0863fc81d79a640bf2188ab91ffdac487
+```
+
+Source verification evidence includes:
+
+```text
+613 tests passed
+focused operator closeout: 7 tests passed
+ruff check --no-cache: PASS
+ruff format --check --no-cache: PASS
+git diff --check: PASS
+AST authority review: PASS
+authority-boundary scan: PASS
+final worktree: clean
+remote feature ref: exact
+```
+
+The final operator exposes exactly two modes. `--read-only-preflight` does not
+construct the staging writer or invoke the native rename transport.
+`--execute-reviewed-r4-protected-replacement` is additionally gated by the
+exact `AI_TRADING_BOT_ARCH128_R4_AUTHORIZATION` environment interlock and
+remains filesystem-only. The operator has no scheduler mutation, activation
+publication, source-launch, provider, Paper-v2, broker, live-trading, cleanup,
+rollback, or retry authority.
+
+Operator source acceptance does not authorize protected execution. The next
+checkpoint is a read-only host preflight through the final operator itself.
+Only after that passes may a separate explicit R4 authorization be requested
+for production staging creation and the two reviewed no-replace renames.
+

@@ -163,8 +163,11 @@ def machine(monkeypatch):
     def signed(read, verifier):
         read.require_administrator()
         read.events.append("signed")
+        current_objects = tuple(
+            read.identities.get(item.path, item) for item in signed_objects
+        )
         return o.SignedObservation(
-            signed_objects, tuple(not read.absent(path) for path in o._LEASE_PATHS)
+            current_objects, tuple(not read.absent(path) for path in o._LEASE_PATHS)
         )
 
     monkeypatch.setattr(o, "_stable_signed", signed)
@@ -219,6 +222,21 @@ def machine(monkeypatch):
     return operator, reader, writer, state
 
 
+def partial_installing_state(machine, *, activation=NOW):
+    operator, reader, writer, state = machine
+    lease, spec = o._planned(activation)
+    data = lease.canonical_bytes()
+    state["semantics"] = o._expected_d10(spec)
+    reader.files[P.installing_path] = data
+    reader.identities[P.installing_path] = native(
+        P.installing_path, size=len(data), index=123
+    )
+    reader.identities[d.D10_ROOT] = native(
+        d.D10_ROOT, directory=True, size=4096, index=42
+    )
+    return operator, reader, writer, state, lease
+
+
 def test_happy_path_exact_order_and_seven_day_binding(machine) -> None:
     operator, reader, _, state = machine
     result = operator.execute(execute_p1245=True)
@@ -248,6 +266,51 @@ def test_happy_path_exact_order_and_seven_day_binding(machine) -> None:
     assert SECRET not in json.dumps(result)
     for effect in ("source_launch", "provider", "Paper-v2", "broker", "live"):
         assert result[effect] == "NOT_RUN"
+
+
+def test_expected_d10_root_size_change_during_lease_publication_is_allowed(
+    machine,
+) -> None:
+    operator, reader, writer, _ = machine
+    reader.identities[d.D10_ROOT] = native(
+        d.D10_ROOT, directory=True, size=0, index=42
+    )
+    original = writer.publish_create_only
+
+    def publish(source, target):
+        original(source, target)
+        if target == P.installing_path:
+            reader.identities[d.D10_ROOT] = replace(
+                reader.identities[d.D10_ROOT], size=4096
+            )
+
+    writer.publish_create_only = publish
+    result = operator.execute(execute_p1245=True)
+    assert result["status"] == "PASS"
+    assert result["lease_publication"] == "PUBLISHED_VERIFIED"
+
+
+def test_d10_root_non_size_identity_change_still_blocks(machine) -> None:
+    operator, reader, writer, _ = machine
+    reader.identities[d.D10_ROOT] = native(
+        d.D10_ROOT, directory=True, size=0, index=42
+    )
+    original = writer.publish_create_only
+
+    def publish(source, target):
+        original(source, target)
+        if target == P.installing_path:
+            reader.identities[d.D10_ROOT] = replace(
+                reader.identities[d.D10_ROOT],
+                size=4096,
+                file_index=999,
+            )
+
+    writer.publish_create_only = publish
+    result = operator.execute(execute_p1245=True)
+    assert result["status"] == "BLOCKED"
+    assert result["stage"] == "lease_staging"
+    assert reader.absent(P.final_path)
 
 
 @pytest.mark.parametrize(
@@ -419,6 +482,80 @@ def test_reconcile_scheduler_changed_but_lease_absent(machine) -> None:
     result = operator.execute(execute_p1245=True)
     assert result["post_state"]["classification"] == "D10_SCHEDULER_LEASE_ABSENT"
     assert reader.absent(P.final_path)
+
+
+def test_partial_recovery_preflight_is_read_only_and_exact(machine) -> None:
+    operator, reader, _, state, lease = partial_installing_state(machine)
+    result = operator.recovery_preflight()
+    assert result["status"] == "PASS"
+    assert result["classification"] == "EXACT_INSTALLING_LEASE_D10_SCHEDULER"
+    assert result["planned"] == lease.to_dict()
+    assert result["lease_publication"] == "NOT_RUN"
+    assert state["update_calls"] == 0
+    assert reader.files[P.installing_path] == lease.canonical_bytes()
+    assert reader.absent(P.final_path)
+    assert not any(event.startswith("publish:") for event in reader.events)
+
+
+def test_partial_recovery_publishes_only_verified_installing_lease(machine) -> None:
+    operator, reader, _, state, lease = partial_installing_state(machine)
+    result = operator.recover_partial_installing(execute_p1245_recovery=True)
+    assert result["status"] == "PASS"
+    assert result["stage"] == "complete"
+    assert result["lease_publication"] == "PUBLISHED_VERIFIED"
+    assert not result["reconciliation_required"]
+    assert reader.files[P.final_path] == lease.canonical_bytes()
+    assert reader.absent(P.installing_path)
+    assert reader.absent(P.temporary_path)
+    assert state["update_calls"] == 0
+    assert "credential" not in reader.events
+    assert reader.events.count("publish:final") == 1
+
+
+def test_partial_recovery_requires_dedicated_switch(machine) -> None:
+    operator, reader, _, state, lease = partial_installing_state(machine)
+    result = operator.recover_partial_installing()
+    assert result["status"] == "BLOCKED"
+    assert result["stage"] == "recovery_switch_or_duplicate"
+    assert reader.files[P.installing_path] == lease.canonical_bytes()
+    assert state["update_calls"] == 0
+    assert not any(event.startswith("publish:") for event in reader.events)
+
+
+@pytest.mark.parametrize(
+    "failure",
+    ["scheduler", "bytes", "final_collision", "temporary_present", "expired"],
+)
+def test_partial_recovery_preflight_blocks_any_non_exact_state(machine, failure) -> None:
+    activation = NOW - timedelta(days=8) if failure == "expired" else NOW
+    operator, reader, _, state, lease = partial_installing_state(
+        machine, activation=activation
+    )
+    if failure == "scheduler":
+        state["semantics"]["priority"] = 8
+    elif failure == "bytes":
+        reader.files[P.installing_path] = lease.canonical_bytes() + b"x"
+    elif failure == "final_collision":
+        reader.files[P.final_path] = lease.canonical_bytes()
+    elif failure == "temporary_present":
+        reader.files[P.temporary_path] = lease.canonical_bytes()
+
+    result = operator.recovery_preflight()
+    assert result["status"] == "BLOCKED"
+    assert result["lease_publication"] == "NOT_RUN"
+    assert not any(event.startswith("publish:") for event in reader.events)
+
+
+def test_partial_recovery_ambiguous_final_publication_never_retries(machine) -> None:
+    operator, reader, writer, state, _ = partial_installing_state(machine)
+    writer.fail = "final_after"
+    result = operator.recover_partial_installing(execute_p1245_recovery=True)
+    assert result["status"] == "INDETERMINATE"
+    assert result["reconciliation_required"]
+    assert result["lease_publication"] == "INDETERMINATE"
+    assert reader.events.count("publish:final") == 1
+    assert state["update_calls"] == 0
+    assert "credential" not in reader.events
 
 
 @pytest.mark.parametrize(
@@ -719,7 +856,11 @@ def test_fixed_pins_and_public_authority_surfaces() -> None:
     )
     assert not inspect.signature(o.preflight).parameters
     assert not inspect.signature(o.reconcile).parameters
+    assert not inspect.signature(o.recovery_preflight).parameters
     assert set(inspect.signature(o.execute).parameters) == {"execute_p1245"}
+    assert set(inspect.signature(o.recover_partial_installing).parameters) == {
+        "execute_p1245_recovery"
+    }
     assert P.final_path == r"F:\AITradingBot\D10\activation.lease.json"
     assert P.trading_read_only_mask == 0x00120089
 
@@ -754,9 +895,13 @@ def test_native_writer_allowlist_and_no_replace_call(monkeypatch) -> None:
 def test_cli_rejects_authority_and_execute_switch_misuse(capsys) -> None:
     for args in (
         ["execute"],
+        ["recover-partial"],
         ["preflight", "--execute-p1245"],
+        ["recovery-preflight", "--execute-p1245-recovery"],
         ["reconcile", "--activation-utc", "2026-01-01"],
         ["execute", "--execute-p1245", "--password", SECRET],
+        ["recover-partial", "--execute-p1245-recovery", "--password", SECRET],
+        ["execute", "--execute-p1245", "--execute-p1245-recovery"],
     ):
         with pytest.raises(SystemExit):
             o.main(args)

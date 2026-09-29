@@ -490,6 +490,7 @@ def test_partial_recovery_preflight_is_read_only_and_exact(machine) -> None:
     assert result["status"] == "PASS"
     assert result["classification"] == "EXACT_INSTALLING_LEASE_D10_SCHEDULER"
     assert result["planned"] == lease.to_dict()
+    assert result["reconciliation_required"]
     assert result["lease_publication"] == "NOT_RUN"
     assert state["update_calls"] == 0
     assert reader.files[P.installing_path] == lease.canonical_bytes()

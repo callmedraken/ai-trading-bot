@@ -14,8 +14,6 @@ jobs:
   source-gates:
     runs-on: windows-latest
     timeout-minutes: 20
-    env:
-      AI_TRADING_BOT_CHECKPOINT_EVIDENCE_ROOT: ${{ runner.temp }}\ai-trading-bot-checkpoints
 
     steps:
       - name: Check out repository
@@ -44,6 +42,8 @@ jobs:
       - name: Verify source checkpoints
         shell: powershell
         run: |
+          $env:AI_TRADING_BOT_CHECKPOINT_EVIDENCE_ROOT = Join-Path `
+            $env:RUNNER_TEMP 'ai-trading-bot-checkpoints'
           $Failures = @()
 
           & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\ops.ps1 `
@@ -67,5 +67,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: checkpoint-source-gate-evidence
-          path: ${{ runner.temp }}\ai-trading-bot-checkpoints
+          path: ${{ runner.temp }}/ai-trading-bot-checkpoints
           if-no-files-found: ignore

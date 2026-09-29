@@ -6877,3 +6877,45 @@ authorization before any protected filesystem mutation. R3 acceptance itself
 authorizes no staging creation, rename, ACL mutation, scheduler mutation,
 activation publication, provider/Paper-v2, broker, or live effect.
 
+### Architecture 128 R4A pure replacement contract — ACCEPTED
+
+R4A is accepted at:
+
+```text
+HEAD:
+ced58725167806d79c6915f792dd65da99b9a49a
+
+TREE:
+21c7922c3afc8f70e55d86e34bfc91dc18b34850
+```
+
+Behavioral verification:
+
+```text
+121 tests passed
+R4A effect surface: PURE_NO_IO
+git diff --check: PASS
+```
+
+The final Ruff-only closeout was proven AST-equivalent to the tested behavior
+source and then independently passed both required Ruff gates:
+
+```text
+ruff check --no-cache: PASS
+ruff format --check --no-cache: PASS
+AST equivalence: PASS
+final worktree: clean
+remote feature ref: exact
+```
+
+R4A freezes only pure Architecture-128 authority facts: exact halted S5-R10 and
+new E6 signed identities, fixed canonical/staging/retired paths, valid namespace
+states, all admission predicates, the exact two ordered no-replace rename
+steps, and terminal indeterminate-mutation behavior. It contains no Windows
+native API, filesystem I/O, scheduler API, credential, source-launch, provider,
+Paper-v2, broker, or live effect surface.
+
+Next checkpoint is R4B source-only implementation and review of the
+Architecture-128-specific Windows staging/read-only-admission/rename adapter.
+No protected filesystem mutation is authorized by R4A acceptance.
+

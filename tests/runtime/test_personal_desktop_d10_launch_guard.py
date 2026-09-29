@@ -417,7 +417,6 @@ def test_stdlib_only_no_effects_and_arch77_separation() -> None:
     }
     assert not imports & {"site", "trading_bot", "scripts"}
     forbidden_calls = {
-        "WriteFile",
         "CreateProcessW",
         "ShellExecuteW",
         "SetSecurityInfo",

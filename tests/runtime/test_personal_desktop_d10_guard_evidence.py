@@ -454,7 +454,6 @@ def test_canonical_but_malformed_child_record_becomes_terminal_guard_evidence(
     assert guard._parse_evidence_log(native.data, deployment, lease)[2] is True
 
 
-
 def test_post_child_append_failure_leaves_start_latch_and_blocks_retry(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -462,9 +461,7 @@ def test_post_child_append_failure_leaves_start_latch_and_blocks_retry(
     lease = _lease(deployment)
 
     class FailingSecondAppend(EvidenceNative):
-        def append_exact(
-            self, handle: int, payload: bytes, expected_size: int
-        ) -> None:
+        def append_exact(self, handle: int, payload: bytes, expected_size: int) -> None:
             if self.append_count == 1:
                 raise guard.GuardBlocked("simulated result append failure")
             super().append_exact(handle, payload, expected_size)
@@ -482,18 +479,14 @@ def test_post_child_append_failure_leaves_start_latch_and_blocks_retry(
     environment = {"SystemRoot": r"C:\Windows", "WINDIR": r"C:\Windows"}
 
     with pytest.raises(guard.GuardBlocked, match="simulated result append failure"):
-        guard._run_second_stage_with_evidence(
-            deployment, lease, environment, native
-        )
+        guard._run_second_stage_with_evidence(deployment, lease, environment, native)
     assert calls[0] == 1
     assert native.append_count == 1
     assert guard.D10_GUARD_WAKE_START_EVIDENCE_SCHEMA.encode() in native.data
     assert guard._parse_evidence_log(native.data, deployment, lease)[2] is True
 
     with pytest.raises(guard.GuardBlocked, match="stop latch"):
-        guard._run_second_stage_with_evidence(
-            deployment, lease, environment, native
-        )
+        guard._run_second_stage_with_evidence(deployment, lease, environment, native)
     assert calls[0] == 1
 
 
@@ -631,7 +624,6 @@ def test_missing_or_wrong_security_evidence_file_blocks_before_child(
             wrong,
         )
     assert calls[0] == 0
-
 
 
 def test_native_evidence_observer_open_is_shared_read_only(

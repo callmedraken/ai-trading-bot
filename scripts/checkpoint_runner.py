@@ -148,7 +148,9 @@ def _r4_authority_check(repo_root: Path) -> tuple[str, ...]:
         "os.rename",
     ):
         if forbidden in source:
-            failures.append(f"operator contains forbidden authority surface: {forbidden}")
+            failures.append(
+                f"operator contains forbidden authority surface: {forbidden}"
+            )
 
     return tuple(failures)
 

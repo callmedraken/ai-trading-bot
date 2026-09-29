@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -85,3 +86,13 @@ def test_noncanonical_bytes_fail_closed():
     data = serialize_d10_wake_evidence(_wake(lease)).encode()
     with pytest.raises(D10WakeEvidenceLogError):
         parse_persisted_d10_wake_record(data + b" ", lease)
+
+
+
+def test_nested_wake_value_types_fail_closed():
+    lease = _lease()
+    data = json.loads(serialize_d10_wake_evidence(_wake(lease)))
+    data["session"]["completed"] = 1
+    payload = json.dumps(data, sort_keys=True, separators=(",", ":")).encode()
+    with pytest.raises(D10WakeEvidenceLogError, match="optional evidence type"):
+        parse_persisted_d10_wake_record(payload, lease)

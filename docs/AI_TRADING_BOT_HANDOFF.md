@@ -6342,3 +6342,64 @@ correction that durably persists bounded per-wake evidence without weakening
 the sealed deployment, zero-semantic-argument scheduler, exact seven-day
 authority, or closed-gate semantics. Source changes alone do not authorize a
 redeployment or a new soak.
+
+
+### D10-C fail-safe scheduler halt — ACCEPTED
+
+The separately authorized pre-first-wake halt completed before the natural D10
+wake. The exact reviewed halt source was:
+
+```text
+branch: feature/d10c-scheduler-halt
+HEAD: 32a651ada12144b680fa0a3433b30626cdd13bda
+TREE: 8eae754c783b7ad8083f5f4d1f874ff7b3f6713a
+```
+
+Accepted evidence:
+
+```text
+pre-halt reconciliation:
+status: PASS
+classification: ARMED_VERIFIED
+reconciliation_required: false
+evidence:
+F:\AI\temp\d10c-pre-halt-reconcile-20260928-210931.json
+SHA-256:
+12ddb235cfcfdbb04e15de29fec6ddc0473bc54c534ac218be24f3e59e94eee2
+
+halt:
+disposition: CALL_RETURNED
+scheduler_mutation: DISABLED_VERIFIED
+pre XML SHA-256:
+cf9a46a7dea1d1b88c09c38b0152bde9146a179a6cbe46cababd190cd4ed1c42
+post XML SHA-256:
+8d592a71258529fa88cd85866b0be1e91cf407d91e9acf5891a1bd82c0bf09b0
+source/provider/Paper-v2/broker/live: NOT_RUN
+evidence:
+F:\AI\temp\d10c-protected-halt-20260928-210931.json
+SHA-256:
+5b531ccf817b112663a787590ef6c8c04fed9db280d7b843c5cb78b018aaa34c
+
+independent post-halt observation:
+status: OBSERVED
+two reads: identical
+registered task Enabled: false
+registered task State: 1
+action/arguments/working directory/trigger/end boundary: unchanged exact D10 contract
+evidence:
+F:\AI\temp\d10c-post-halt-observe-20260928-210931.json
+SHA-256:
+937d438162d703a7428db4311bdbdff503cc2dded6160ead489dea06c652a5b3
+
+activation lease SHA-256 before/after:
+91106d61129dc9c11e017a7ea613ba0fd82c87fd9debfc346b265c03c49a1e84
+```
+
+The task is disabled and non-running. The original final activation lease and
+seven-day interval remain intact for incident evidence only; the halted soak is
+not accepted as D10-C and must not resume automatically. Do not manually start
+or re-enable the task.
+
+Next safe checkpoint: freeze and implement a source-only durable per-wake D10
+evidence sink, certify it, and then design a separately authorized clean D10
+redeployment/re-activation path. Broker-paper and live remain unauthorized.

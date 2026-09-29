@@ -164,7 +164,7 @@ def parse_persisted_d10_wake_record(
             if value["stop_reason"] is None
             else D10WakeStopReason(value["stop_reason"])
         )
-        observed_at = parse_utc_instant(value["observed_at_utc"])
+        observed_at = _parse_wake_utc(value["observed_at_utc"])
     except (TypeError, ValueError) as exc:
         raise D10WakeEvidenceLogError("wake outcome or time is invalid") from exc
     if (outcome is D10WakeOutcome.STOPPED) != (stop_reason is not None):
@@ -336,6 +336,18 @@ def parse_guard_terminal_evidence(
     ):
         raise D10WakeEvidenceLogError("guard terminal identity or bytes differ")
     return model
+
+
+def _parse_wake_utc(value: object) -> datetime:
+    if type(value) is not str or not value.endswith("Z"):
+        raise D10WakeEvidenceLogError("wake timestamp is not canonical UTC")
+    try:
+        parsed = datetime.fromisoformat(value[:-1] + "+00:00").astimezone(UTC)
+    except ValueError as exc:
+        raise D10WakeEvidenceLogError("wake timestamp is invalid") from exc
+    if parsed.isoformat().replace("+00:00", "Z") != value:
+        raise D10WakeEvidenceLogError("wake timestamp is not canonical UTC")
+    return parsed
 
 
 def _dict(value: object, name: str) -> dict[str, object]:

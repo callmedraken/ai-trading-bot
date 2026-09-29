@@ -141,9 +141,7 @@ def observe(native: guard._Native | None = None) -> dict[str, object]:
     attestation = _verified_attestation(backend)
     lease_bytes = _read_activation_lease(backend)
     lease = parse_activation_lease(lease_bytes)
-    attestation_sha256 = hashlib.sha256(
-        guard._canonical_json(attestation)
-    ).hexdigest()
+    attestation_sha256 = hashlib.sha256(guard._canonical_json(attestation)).hexdigest()
     if (
         lease.deployment_id != attestation["deployment_id"]
         or lease.attestation_sha256 != attestation_sha256
@@ -177,9 +175,7 @@ def observe(native: guard._Native | None = None) -> dict[str, object]:
             None if summary.last_outcome is None else summary.last_outcome.value
         ),
         "last_stop_reason": (
-            None
-            if summary.last_stop_reason is None
-            else summary.last_stop_reason.value
+            None if summary.last_stop_reason is None else summary.last_stop_reason.value
         ),
         "last_guard_reason": (
             None

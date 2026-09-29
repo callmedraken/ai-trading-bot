@@ -601,7 +601,9 @@ def summarize_d10_wake_evidence_log(
             raise D10WakeEvidenceLogError("wake evidence record schema differs")
 
         if previous is not None and observed < previous:
-            raise D10WakeEvidenceLogError("wake evidence observation time moved backward")
+            raise D10WakeEvidenceLogError(
+                "wake evidence observation time moved backward"
+            )
         if first is None:
             first = observed
         previous = observed

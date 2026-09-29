@@ -207,8 +207,9 @@ def test_verifier_key_or_result_mismatch_blocks() -> None:
         )
 
 
-def test_operator_source_has_no_production_publication_or_key_enrollment_surface(
-) -> None:
+def test_operator_source_has_no_production_publication_or_key_enrollment_surface() -> (
+    None
+):
     source = Path(r2.__file__).read_text(encoding="utf-8")
     assert r"F:\AITradingBot" not in source
     assert "publish_signed_trust" not in source

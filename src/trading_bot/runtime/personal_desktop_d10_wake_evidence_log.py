@@ -22,9 +22,9 @@ from trading_bot.runtime.personal_desktop_d10_deployment_identity import (
 )
 from trading_bot.runtime.personal_desktop_d10_python_substrate import VERSION
 from trading_bot.runtime.personal_desktop_unattended_one_week_soak import (
-    D10_WAKE_EVIDENCE_SCHEMA,
     D10WakeOutcome,
     D10WakeStopReason,
+    D10_WAKE_EVIDENCE_SCHEMA,
     MAX_D10_SUMMARY_WAKES,
     MAX_D10_WAKE_EVIDENCE_BYTES,
 )

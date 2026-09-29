@@ -347,3 +347,66 @@ filesystem, scheduler, source launch, provider, Paper-v2, broker, or live
 effect. E6 certification remains blocked until this correction is implemented,
 focused-tested, and exact-diff reviewed.
 
+## E6 pre-certification native durability correction — append-only write-through
+
+The final E6-pre native review found that the earlier durability mechanism used
+`FlushFileBuffers` on the Trading evidence handle even though that handle is
+deliberately opened with only read + `FILE_APPEND_DATA`. The Win32
+`FlushFileBuffers` contract requires a handle with `GENERIC_WRITE`, while
+granting `GENERIC_WRITE` would map to broader write rights including
+`FILE_WRITE_DATA` and would violate the append-only evidence policy.
+
+Architecture 127 therefore forbids `FlushFileBuffers` on the Trading evidence
+handle.
+
+The frozen replacement is:
+
+- keep the evidence ACL unchanged: Trading receives read + `FILE_APPEND_DATA`
+  only, never `FILE_WRITE_DATA`, delete, rename, `WRITE_DAC`, or
+  `WRITE_OWNER`;
+- open the existing evidence file with the same exact desired-access mask,
+  `OPEN_EXISTING`, and `FILE_FLAG_OPEN_REPARSE_POINT`, plus
+  `FILE_FLAG_WRITE_THROUGH`;
+- every guard-owned append uses that synchronous write-through handle;
+- after `WriteFile` returns successfully, continue to verify exact byte count,
+  native object identity/security, resulting length, exact reread bytes, and the
+  complete evidence grammar;
+- do not call `FlushFileBuffers` before, during, or after evidence append;
+- do not add a broader write-capable second handle merely to flush.
+
+For NTFS on the fixed local volume, `FILE_FLAG_WRITE_THROUGH` is the durability
+primitive for Architecture 127. A successfully completed write-through
+`WriteFile` is the persistence boundary before the later reread/grammar proof.
+
+The E6-pre result-acceptance state machine remains unchanged:
+
+```text
+WAKE_START -> ordinary nonterminal -> ACCEPT = completed nonterminal wake
+WAKE_START -> ordinary nonterminal          = terminal/unaccepted wake
+WAKE_START -> ordinary STOPPED              = terminal soak
+WAKE_START -> guard-terminal failure        = terminal soak
+WAKE_START as final record                  = terminal/incomplete soak
+```
+
+Because ACCEPT itself is appended through the write-through handle, a later
+scheduler wake does not attempt an illegal flush of the existing file. Instead
+it opens the fixed current-soak object, verifies its exact native identity and
+security, reads the bounded bytes, validates the complete grammar and hash
+binding, reinspects the pinned root/file objects, and only then may a
+nonterminal accepted sequence permit another source launch.
+
+A crash or exception before a complete valid ACCEPT remains terminal:
+- start only -> terminal/incomplete;
+- complete nonterminal result without ACCEPT -> terminal/unaccepted;
+- partial/malformed ACCEPT -> parse failure / no source launch.
+
+If a complete ACCEPT is present after an interrupted producer process, the
+write-through contract plus the marker's exact canonical/hash binding and the
+next wake's pinned-handle read/reinspection are the recovery proof. No repair,
+retroactive ACCEPT append, or source retry is allowed for incomplete evidence.
+
+E6 remains blocked until this native write-through correction is implemented,
+focused-tested, exact-diff reviewed, and—because it depends on Win32 caching
+semantics—validated with a disposable non-production host probe before the
+canonical three-lane certification.
+

@@ -6218,3 +6218,33 @@ The production D10 task remains disabled and must not be started or re-enabled.
 No production filesystem, scheduler, provider, Paper-v2, broker, or live effect
 is authorized.
 
+### Architecture 127 final E6-pre native review — BLOCKED / WRITE-THROUGH CORRECTION
+
+The E6-pre behavioral implementation at
+`1c2ad10f11290dee31a0cb4fb48373c9f310be62` /
+TREE `f2ce8179fb4af55646487a6d439005c8ce4989c6` passed 214 focused tests,
+Ruff lint, and final Ruff formatting.
+
+The exact native review nevertheless found that the evidence writer calls
+`FlushFileBuffers` through a handle intentionally opened with read +
+`FILE_APPEND_DATA` only. The Win32 contract requires `GENERIC_WRITE` for
+`FlushFileBuffers`; granting that broader access would violate the frozen
+append-only DACL/capability model.
+
+E6 is still NOT authorized.
+
+Architecture 127 now freezes the native correction: preserve the append-only
+access mask, add `FILE_FLAG_WRITE_THROUGH` to the evidence writer open, remove
+all evidence-path `FlushFileBuffers` calls, retain exact post-write
+reinspection/reread/grammar verification, and validate existing accepted
+evidence on later wakes without an illegal flush.
+
+Next source-only checkpoint: Sol High implementation + focused tests, followed
+by a disposable non-production Windows host probe of the exact append-only
+WRITE_THROUGH open/write/reopen behavior. Only then repeat the exact
+source/security review and run E6 canonical three-lane certification.
+
+The production D10 task remains disabled and must not be started or re-enabled.
+No production filesystem, scheduler, provider, Paper-v2, broker, or live effect
+is authorized.
+

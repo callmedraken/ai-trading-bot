@@ -145,3 +145,29 @@ At minimum:
 22. an existing accepted three-record sequence is launch-admissible only after
     the new invocation flushes, reinspects, rereads, and revalidates the fixed
     evidence object; partial/malformed/foreign acceptance evidence blocks.
+
+### E6-pre native write-through correction
+
+Before E6 certification:
+
+- remove every Architecture-127 `FlushFileBuffers` call from the append-only
+  evidence path;
+- open the evidence writer with
+  `FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_WRITE_THROUGH`;
+- retain the exact Trading desired-access mask of read + `FILE_APPEND_DATA`;
+- verify tests freeze both the desired-access mask and write-through flag;
+- verify source/tests prove no broader writer handle or `FlushFileBuffers`
+  dependency is introduced;
+- preserve post-write exact-length/native-identity/reread/grammar verification;
+- preserve the result-acceptance state machine and unaccepted stop latch;
+- on later wakes, validate existing accepted evidence by pinned-handle
+  read/reinspection/grammar only, with no flush attempt;
+- run a disposable non-production Windows host probe that opens an NTFS test
+  file with the exact append-only desired-access pattern + WRITE_THROUGH,
+  appends a bounded record, closes/reopens read-only, and verifies exact bytes.
+  The probe must not touch `F:\AITradingBot`, Task Scheduler, credentials,
+  provider, Paper-v2, broker, or live state.
+
+Canonical three-lane E6 certification is allowed only after that probe and the
+final exact source/security review pass.
+

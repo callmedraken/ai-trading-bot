@@ -272,9 +272,7 @@ def test_expected_d10_root_size_change_during_lease_publication_is_allowed(
     machine,
 ) -> None:
     operator, reader, writer, _ = machine
-    reader.identities[d.D10_ROOT] = native(
-        d.D10_ROOT, directory=True, size=0, index=42
-    )
+    reader.identities[d.D10_ROOT] = native(d.D10_ROOT, directory=True, size=0, index=42)
     original = writer.publish_create_only
 
     def publish(source, target):
@@ -292,9 +290,7 @@ def test_expected_d10_root_size_change_during_lease_publication_is_allowed(
 
 def test_d10_root_non_size_identity_change_still_blocks(machine) -> None:
     operator, reader, writer, _ = machine
-    reader.identities[d.D10_ROOT] = native(
-        d.D10_ROOT, directory=True, size=0, index=42
-    )
+    reader.identities[d.D10_ROOT] = native(d.D10_ROOT, directory=True, size=0, index=42)
     original = writer.publish_create_only
 
     def publish(source, target):

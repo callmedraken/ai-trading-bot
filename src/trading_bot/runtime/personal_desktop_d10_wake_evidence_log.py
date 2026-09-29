@@ -330,10 +330,7 @@ def parse_persisted_d10_wake_record(
     )
     if any(item is not None and type(item) is not str for item in optional_strings):
         raise D10WakeEvidenceLogError("wake optional evidence type differs")
-    if (
-        type(history["reconciled_count"]) is not int
-        or history["reconciled_count"] < 0
-    ):
+    if type(history["reconciled_count"]) is not int or history["reconciled_count"] < 0:
         raise D10WakeEvidenceLogError("wake historical count differs")
     deadline = session["preopen_deadline_utc"]
     if deadline is not None:

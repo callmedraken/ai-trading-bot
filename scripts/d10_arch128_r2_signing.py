@@ -199,10 +199,27 @@ def _new_evidence_directory() -> Path:
     return path
 
 
-def protected_sign_fixed_r1_material() -> tuple[Path, dict[str, object]]:
+def protected_sign_fixed_r1_material(
+    evidence: Path,
+) -> dict[str, object]:
     """One protected signature over the exact accepted R1 attestation."""
     if os.name != "nt":
         raise R2Blocked("windows_required")
+    if (
+        type(evidence) is not Path
+        or evidence.parent != EVIDENCE_PARENT
+        or not evidence.name.startswith(EVIDENCE_PREFIX)
+        or not evidence.is_dir()
+    ):
+        raise R2Blocked("evidence_directory_invalid")
+    try:
+        if any(evidence.iterdir()):
+            raise R2Blocked("evidence_directory_not_empty")
+    except R2Blocked:
+        raise
+    except OSError:
+        raise R2Blocked("evidence_directory_unavailable") from None
+
     data = _read_stable_regular_file(R1_ATTESTATION_PATH)
     attestation = require_exact_r1_attestation(data)
 
@@ -221,7 +238,6 @@ def protected_sign_fixed_r1_material() -> tuple[Path, dict[str, object]]:
     verifier = windows.WindowsCngVerifier()
     result = sign_exact_r1_attestation(data, signer, verifier)
 
-    evidence = _new_evidence_directory()
     signature_path = evidence / "deployment.attestation.sig"
     summary_path = evidence / "summary.json"
     try:
@@ -277,7 +293,7 @@ def protected_sign_fixed_r1_material() -> tuple[Path, dict[str, object]]:
         deployment.verify_signature(verifier, data, signature_path.read_bytes())
     except Exception:
         raise R2Blocked("signature_evidence_reverification_failed") from None
-    return evidence, summary
+    return summary
 
 
 def main() -> int:
@@ -285,12 +301,17 @@ def main() -> int:
         print("R2 STOP: arguments are not accepted", file=sys.stderr)
         return 2
     try:
-        evidence, summary = protected_sign_fixed_r1_material()
+        evidence = _new_evidence_directory()
+    except R2Blocked as error:
+        print(f"R2 STOP: {error}", file=sys.stderr)
+        return 1
+    print(f"ARCH128_R2_EVIDENCE={evidence}")
+    try:
+        summary = protected_sign_fixed_r1_material(evidence)
     except R2Blocked as error:
         print(f"R2 STOP: {error}", file=sys.stderr)
         return 1
     print(json.dumps(summary, indent=2, sort_keys=True))
-    print(f"ARCH128_R2_EVIDENCE={evidence}")
     print("D10_ARCH128_R2_SIGNING=PASS")
     return 0
 

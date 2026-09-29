@@ -56,9 +56,7 @@ def _wake(lease, *, stopped=False):
 def test_path_and_ordinary_record_round_trip():
     lease = _lease()
     assert str(D10_WAKE_EVIDENCE_ROOT) == r"F:\AITradingBot\D10\evidence"
-    assert str(d10_wake_evidence_path(lease)).endswith(
-        f"wake-{lease.soak_id}.jsonl"
-    )
+    assert str(d10_wake_evidence_path(lease)).endswith(f"wake-{lease.soak_id}.jsonl")
     data = serialize_d10_wake_evidence(_wake(lease)).encode()
     parsed = parse_persisted_d10_wake_record(data, lease)
     assert parsed.canonical_bytes == data

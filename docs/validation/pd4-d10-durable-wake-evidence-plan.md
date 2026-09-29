@@ -107,7 +107,11 @@ At minimum:
 12. child nonzero with canonical STOPPED evidence persists the exact ordinary
     record and remains terminal;
 13. append short-write/flush/reread/native drift fails closed without retry;
-14. source never opens evidence by caller-provided path;
-15. scheduler action/arguments remain exact Architecture-124 D10 guard;
-16. all existing D10 effect-budget, reconciliation, gate-finally, no-receipt-
+14. a durably appended wake-start marker with no result is terminal/incomplete
+    and prevents a later child launch;
+15. result append failure after child return leaves the prior wake-start marker
+    as the durable stop latch and does not retry the child;
+16. source never opens evidence by caller-provided path;
+17. scheduler action/arguments remain exact Architecture-124 D10 guard;
+18. all existing D10 effect-budget, reconciliation, gate-finally, no-receipt-
     recovery, and no-broker/live tests remain green.

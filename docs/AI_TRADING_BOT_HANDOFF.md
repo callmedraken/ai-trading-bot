@@ -6104,3 +6104,38 @@ The protected invocation mutates the existing D5 task first and publishes the
 activation lease last. It remains a protected effect boundary; on any
 indeterminate mutation result, stop and reconcile read-only before any further
 action.
+
+
+### P124-5D final read-only reconciliation — ACCEPTED
+
+The final pre-execution read-only reconciliation passed from detached certified
+operator source HEAD
+`2672c1650706af6ce80c546f38b7288d970eddf4` / TREE
+`884a621a907381993a072174aa7fdffef9e09e73`.
+
+Accepted evidence:
+
+```text
+status: PASS
+stage: read_only_complete
+classification: D5_UNARMED
+reconciliation_required: false
+evidence:
+F:\AI\temp\p1245-final-readonly-reconcile-20260928-174008.json
+evidence SHA-256:
+ee8c6b455eae3ef19b6a9fc65bdde084edad8f67658edd172c2651b5f2b7a3df
+```
+
+The exact signed S5-R10 deployment remained stable, all three activation-lease
+paths remained absent, retired/staging/cache remained ABSENT_AND_VERIFIED, and
+the existing scheduler still matched the accepted D5 capture-only predecessor.
+No scheduler mutation, lease publication, source launch, provider, Paper-v2,
+broker, or live effect occurred.
+
+All safe source/read-only gates for P124-5 are now complete. The next checkpoint
+is the protected P124-5 execute boundary: mutate exactly the existing D5 task to
+the frozen D10 guard contract, verify it independently, then publish the exact
+seven-day activation lease last. This protected effect requires fresh explicit
+human authorization before invocation. No automatic retry or rollback is
+authorized; any indeterminate mutation requires read-only reconciliation and a
+stop.

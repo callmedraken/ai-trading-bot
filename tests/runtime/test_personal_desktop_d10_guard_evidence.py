@@ -265,14 +265,13 @@ def test_stopped_record_latches_and_prevents_later_child(
 
     monkeypatch.setattr(guard.subprocess, "run", child)
     environment = {"SystemRoot": r"C:\Windows", "WINDIR": r"C:\Windows"}
-    assert guard._run_second_stage_with_evidence(
-        deployment, lease, environment, native
-    ) == 1
+    assert (
+        guard._run_second_stage_with_evidence(deployment, lease, environment, native)
+        == 1
+    )
     assert calls[0] == 1
     with pytest.raises(guard.GuardBlocked, match="stop latch"):
-        guard._run_second_stage_with_evidence(
-            deployment, lease, environment, native
-        )
+        guard._run_second_stage_with_evidence(deployment, lease, environment, native)
     assert calls[0] == 1
 
 
@@ -294,12 +293,15 @@ def test_invalid_child_output_persists_guard_terminal_latch(
             returncode=0, stdout=b"not-json\n", stderr=b""
         ),
     )
-    assert guard._run_second_stage_with_evidence(
-        deployment,
-        lease,
-        {"SystemRoot": r"C:\Windows", "WINDIR": r"C:\Windows"},
-        native,
-    ) == 1
+    assert (
+        guard._run_second_stage_with_evidence(
+            deployment,
+            lease,
+            {"SystemRoot": r"C:\Windows", "WINDIR": r"C:\Windows"},
+            native,
+        )
+        == 1
+    )
     assert guard.D10_GUARD_TERMINAL_EVIDENCE_SCHEMA.encode() in native.data
     assert b"CHILD_OUTPUT_INVALID" in native.data
     assert guard._parse_evidence_log(native.data, deployment, lease)[2] is True
@@ -352,7 +354,6 @@ def test_post_append_native_identity_drift_fails_closed(
         )
 
 
-
 def test_native_evidence_open_is_existing_append_only(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -400,7 +401,6 @@ def test_scheduler_command_remains_zero_semantic_argument_guard_target() -> None
     assert guard.D10_EVIDENCE_ROOT not in guard.D10_SECOND_STAGE_LAUNCHER
 
 
-
 def test_canonical_but_malformed_child_record_becomes_terminal_guard_evidence(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -422,11 +422,14 @@ def test_canonical_but_malformed_child_record_becomes_terminal_guard_evidence(
             returncode=0, stdout=malformed + b"\n", stderr=b""
         ),
     )
-    assert guard._run_second_stage_with_evidence(
-        deployment,
-        lease,
-        {"SystemRoot": r"C:\Windows", "WINDIR": r"C:\Windows"},
-        native,
-    ) == 1
+    assert (
+        guard._run_second_stage_with_evidence(
+            deployment,
+            lease,
+            {"SystemRoot": r"C:\Windows", "WINDIR": r"C:\Windows"},
+            native,
+        )
+        == 1
+    )
     assert b"CHILD_OUTPUT_INVALID" in native.data
     assert guard._parse_evidence_log(native.data, deployment, lease)[2] is True

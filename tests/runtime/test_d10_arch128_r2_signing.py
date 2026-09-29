@@ -128,7 +128,10 @@ def test_any_r1_material_drift_blocks_before_signing(mutation: str) -> None:
     else:
         text = data.decode("utf-8")
         replacements = {
-            "deployment": (r2.EXPECTED_DEPLOYMENT_ID, "00000000-0000-5000-8000-000000000000"),
+            "deployment": (
+                r2.EXPECTED_DEPLOYMENT_ID,
+                "00000000-0000-5000-8000-000000000000",
+            ),
             "head": (r2.EXPECTED_SOURCE_HEAD, "f" * 40),
             "tree": (r2.EXPECTED_SOURCE_TREE, "e" * 40),
             "manifest": (r2.EXPECTED_MANIFEST_SHA256, "0" * 64),
@@ -204,7 +207,8 @@ def test_verifier_key_or_result_mismatch_blocks() -> None:
         )
 
 
-def test_operator_source_has_no_production_publication_or_key_enrollment_surface() -> None:
+def test_operator_source_has_no_production_publication_or_key_enrollment_surface(
+) -> None:
     source = Path(r2.__file__).read_text(encoding="utf-8")
     assert r"F:\AITradingBot" not in source
     assert "publish_signed_trust" not in source

@@ -16,7 +16,16 @@ from scripts import d10_activation_scheduler_operator as operator
 @pytest.mark.parametrize(
     "name", (*operator._GOVERNED_AUTHORITY_MODULES, *operator._SCRIPT_AUTHORITY_MODULES)
 )
-@pytest.mark.parametrize("mode", ("preflight", "reconcile", "execute"))
+@pytest.mark.parametrize(
+    "mode",
+    (
+        "preflight",
+        "reconcile",
+        "execute",
+        "recovery_preflight",
+        "recover_partial_installing",
+    ),
+)
 def test_foreign_loaded_authority_blocks_before_host(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, name: str, mode: str
 ) -> None:
@@ -44,7 +53,13 @@ def test_foreign_loaded_authority_blocks_before_host(
     ):
         monkeypatch.setattr(operator, boundary, forbidden)
     action = getattr(operator, mode)
-    kwargs = {"execute_p1245": True} if mode == "execute" else {}
+    kwargs = (
+        {"execute_p1245": True}
+        if mode == "execute"
+        else {"execute_p1245_recovery": True}
+        if mode == "recover_partial_installing"
+        else {}
+    )
     with pytest.raises(operator.OperatorBlocked, match="source_provenance_mismatch"):
         action(**kwargs)
     assert not calls
@@ -97,7 +112,10 @@ def test_host_factory_itself_checks_before_native_construction(
         operator._host_operator(protected=True)
 
 
-@pytest.mark.parametrize("mode", ("preflight", "reconcile", "execute"))
+@pytest.mark.parametrize(
+    "mode",
+    ("preflight", "reconcile", "execute", "recovery-preflight", "recover-partial"),
+)
 def test_cli_provenance_failure_is_secret_free_and_no_effect(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys, mode: str
 ) -> None:
@@ -106,7 +124,13 @@ def test_cli_provenance_failure_is_secret_free_and_no_effect(
     monkeypatch.setattr(
         operator, "_host_operator", lambda **_: pytest.fail("host entry forbidden")
     )
-    args = [mode, "--execute-p1245"] if mode == "execute" else [mode]
+    args = (
+        [mode, "--execute-p1245"]
+        if mode == "execute"
+        else [mode, "--execute-p1245-recovery"]
+        if mode == "recover-partial"
+        else [mode]
+    )
     assert operator.main(args) == 1
     captured = capsys.readouterr()
     evidence = json.loads(captured.out)

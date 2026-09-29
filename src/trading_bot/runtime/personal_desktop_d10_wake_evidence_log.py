@@ -370,11 +370,7 @@ def _canonical_json_bytes(value: object) -> bytes:
 
 
 def _parse_json(data: bytes) -> dict[str, object]:
-    if (
-        type(data) is not bytes
-        or not data
-        or len(data) > MAX_D10_WAKE_EVIDENCE_BYTES
-    ):
+    if type(data) is not bytes or not data or len(data) > MAX_D10_WAKE_EVIDENCE_BYTES:
         raise D10WakeEvidenceLogError("evidence record size is invalid")
 
     def pairs(items: list[tuple[str, object]]) -> dict[str, object]:

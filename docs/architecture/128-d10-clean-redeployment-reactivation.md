@@ -518,3 +518,48 @@ authorization, the production-key signature requires fresh explicit
 authorization bound to the corrected HEAD/tree. No protected retry is
 authorized by this documentation closeout.
 
+### Architecture 128 R3 read-only halted-host preflight — ACCEPTED
+
+Exact reviewed R3 source:
+
+```text
+HEAD:
+e38c85449ba206b73615758e33e76f8384001ceb
+
+TREE:
+568e2003d8c56c1f8a26c64e0ec7adf79e91f4ed
+```
+
+Source verification completed with 444 passing tests, Ruff check PASS, Ruff
+format PASS, PowerShell parse PASS, git diff --check PASS, and AST-equivalent
+formatter-only closeout.
+
+The real elevated host observation then passed read-only:
+
+```text
+D10_ARCH128_R3_READONLY_PREFLIGHT=PASS
+ARCH128_R3_OBSERVER_EXIT=0
+D10_ARCH128_R3_HOST_PREFLIGHT=PASS
+
+R3 result SHA-256:
+171edaee0e972f394ce0e4a62e6d5e6f34b54e79f903feb6c057343b1dd4537d
+
+wrapper summary SHA-256:
+36149529b48cb5187f1b562e1c8f45b0f5345d7b24b8d019f0928ca9108ce100
+```
+
+R3 proved the exact halted signed S5-R10 deployment and old final lease remain
+stable, the D10 task remains disabled/non-running, the accepted post-halt
+scheduler state remains exact, the historical S5-R8 retired namespace remains
+absent, the new S5-R10 incident-retirement destination is absent, and the new
+Architecture-128 staging destination is absent.
+
+Signing, production filesystem mutation, scheduler mutation, source launch,
+provider, Paper-v2, broker, and live effects were NOT_RUN.
+
+R3 is closed as ACCEPTED. The next checkpoint is R4 protected staging
+construction plus deployment replacement. R4 requires separate explicit human
+authorization before any protected filesystem mutation. R3 acceptance itself
+authorizes no staging creation, rename, ACL mutation, scheduler mutation,
+activation publication, provider/Paper-v2, broker, or live effect.
+

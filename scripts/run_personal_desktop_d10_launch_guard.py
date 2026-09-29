@@ -619,6 +619,34 @@ class _Native:
             raise _error("CreateFileW(D10)")
         return int(handle)
 
+    def open_evidence_observer(self, path: str) -> int:
+        _expected_path(path)
+        if not path.startswith(D10_EVIDENCE_ROOT + "\\"):
+            raise GuardBlocked("evidence file is outside the fixed namespace")
+        create = _win_dll("kernel32").CreateFileW
+        create.argtypes = [
+            ctypes.c_wchar_p,
+            wintypes.DWORD,
+            wintypes.DWORD,
+            ctypes.c_void_p,
+            wintypes.DWORD,
+            wintypes.DWORD,
+            wintypes.HANDLE,
+        ]
+        create.restype = wintypes.HANDLE
+        handle = create(
+            path,
+            TRADING_FILE_READ,
+            1 | 2,  # FILE_SHARE_READ | FILE_SHARE_WRITE
+            None,
+            3,
+            FILE_FLAG_OPEN_REPARSE_POINT,
+            None,
+        )
+        if handle in (None, 0, _INVALID_HANDLE):
+            raise _error("CreateFileW(D10 evidence observation)")
+        return int(handle)
+
     def open_evidence_file(self, path: str) -> int:
         _expected_path(path)
         if not path.startswith(D10_EVIDENCE_ROOT + "\\"):

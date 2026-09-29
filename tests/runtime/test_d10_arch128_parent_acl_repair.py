@@ -99,6 +99,7 @@ class _FakeReader:
     def __init__(self) -> None:
         self.current = _drift()
         self.closed = False
+        self.fail_close = False
 
     def require_administrator(self) -> None:
         return None
@@ -115,6 +116,8 @@ class _FakeReader:
 
     def _close(self, handle: int) -> None:
         assert handle in (11, 22)
+        if self.fail_close:
+            raise RuntimeError("close ambiguity")
         self.closed = True
 
 
@@ -190,3 +193,25 @@ def test_operator_has_no_recursive_scheduler_or_trading_authority() -> None:
 
     assert "apply_security_policy(handle, _target_policy())" in source
     assert repair.D10_PARENT == r"F:\AITradingBot"
+
+
+def test_post_apply_close_ambiguity_is_terminal(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    reader = _FakeReader()
+    monkeypatch.setattr(
+        repair.r4w,
+        "WindowsArch128ReadOnlyReader",
+        lambda: reader,
+    )
+    monkeypatch.setattr(repair, "_open_parent_for_acl", lambda reader: 22)
+
+    def apply(handle, policy):
+        reader.current = _target()
+        reader.fail_close = True
+
+    monkeypatch.setattr(repair, "apply_security_policy", apply)
+
+    result = repair._repair_once()
+    assert result["status"] == "STOPPED_AFTER_APPLY"
+    assert result["reason"] == "handle_close_ambiguous"

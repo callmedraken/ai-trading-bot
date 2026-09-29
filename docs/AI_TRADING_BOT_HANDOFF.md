@@ -6139,3 +6139,69 @@ seven-day activation lease last. This protected effect requires fresh explicit
 human authorization before invocation. No automatic retry or rollback is
 authorized; any indeterminate mutation requires read-only reconciliation and a
 stop.
+
+
+### P124-5 protected execution incident — PARTIAL LEASE PUBLICATION
+
+The separately authorized one-shot P124-5 protected invocation was consumed and
+must not be rerun.
+
+Execution evidence:
+
+```text
+source HEAD:
+2672c1650706af6ce80c546f38b7288d970eddf4
+source TREE:
+884a621a907381993a072174aa7fdffef9e09e73
+activation UTC:
+2026-09-29T00:45:22Z
+end UTC:
+2026-10-06T00:45:22Z
+soak ID:
+48f14b13-aa18-5ce8-a0e0-402c867b17b6
+scheduler mutation:
+CALL_RETURNED
+lease publication:
+NOT_PUBLISHED
+terminal execute stage:
+lease_staging
+execute evidence:
+F:\AI\temp\p1245-protected-execute-20260928-174507.json
+execute SHA-256:
+de6e814ab7081544cd2df844080ff9c686fbcb6a729c689db3290a49c9c18316
+```
+
+Independent read-only reconciliation proved:
+
+```text
+status: RECONCILIATION_REQUIRED
+classification: PARTIAL_LEASE_PUBLICATION_REQUIRES_RECONCILIATION
+scheduler: exact intended D10 guard contract
+final lease: absent
+installing lease: present
+temporary lease: absent
+signed S5-R10 deployment: verified
+source/provider/Paper-v2/broker/live: NOT_RUN
+reconcile evidence:
+F:\AI\temp\p1245-post-execute-reconcile-20260928-174507.json
+reconcile SHA-256:
+56ca3fd4572bb56aff87a4b56965cd3424a71fa6c397bb25672c9ac690b2ba6d
+```
+
+The source currently compares the complete pre-lease signed native-object tuple
+to the post-staging tuple. The D10 root NativeObject includes native directory
+size. Creating/renaming the lease staging file legitimately changes the D10
+root directory namespace and may change that size while preserving path,
+file-index, volume, ACL, reparse, link, and signed deployment identity. The
+host evidence shows the signed native-identity digest changed while the object
+count remained 338 and the only admitted lease namespace change was
+final/installing/tmp = false/true/false. This is the leading source-defect
+hypothesis and requires read-only confirmation plus a source-only correction;
+it is not authority to finish publication.
+
+Next: read-only incident diagnosis must verify the installing lease's exact
+canonical bytes/native identity and current exact D10 scheduler state. No
+retry, rollback, lease rename/publication, scheduler mutation, manual task
+start, or source/provider/Paper-v2/broker/live effect is authorized by this
+incident record. Any later recovery requires separately reviewed source and a
+fresh protected-effect authorization.

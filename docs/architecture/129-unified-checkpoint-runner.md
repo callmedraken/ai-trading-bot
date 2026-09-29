@@ -195,15 +195,21 @@ Implemented:
 - `status`;
 - `verify arch128-parent-acl-repair`;
 - `verify arch128-r4`;
+- `preflight arch128-parent-acl-repair`;
+- `preflight arch128-r4`;
+- automatic parent-ACL diagnostics when R4 blocks on parent policy;
+- checkpoint-pinned remote-branch verification through read-only
+  `git ls-remote`;
+- clean detached operator-worktree support;
 - combined Ruff diagnostics;
 - structured external evidence;
 - checkpoint authority checks;
-- Windows GitHub Actions source gates.
+- Windows GitHub Actions source gates with evidence upload.
 
 Next:
 
-1. migrate parent-ACL read-only drift qualification into `preflight`;
-2. migrate final R4 read-only host qualification into `preflight`, including
-   automatic parent-policy diagnostics;
-3. only after those source/read-only layers are accepted, add separately
-   reviewed protected `execute` dispatch.
+1. use the unified read-only preflight on a clean detached operator worktree;
+2. after the parent-ACL repair source and preflight are accepted, add a
+   separately reviewed protected `execute arch128-parent-acl-repair` dispatch;
+3. re-run `preflight arch128-r4` after the ACL repair;
+4. only then add the separately reviewed R4 protected replacement dispatch.

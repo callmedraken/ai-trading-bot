@@ -21,6 +21,11 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Final
 
+_REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
+_SRC_ROOT = _REPOSITORY_ROOT / "src"
+if str(_SRC_ROOT) not in sys.path:
+    sys.path.insert(0, str(_SRC_ROOT))
+
 SCHEMA: Final = "ai-trading-bot-checkpoint-runner/v1"
 
 
@@ -78,11 +83,7 @@ def _qualified_names(node: ast.AST) -> set[str]:
 
 
 def _top_level_functions(tree: ast.Module) -> dict[str, ast.FunctionDef]:
-    return {
-        node.name: node
-        for node in tree.body
-        if isinstance(node, ast.FunctionDef)
-    }
+    return {node.name: node for node in tree.body if isinstance(node, ast.FunctionDef)}
 
 
 def _r4_authority_check(repo_root: Path) -> tuple[str, ...]:
@@ -126,9 +127,7 @@ def _r4_authority_check(repo_root: Path) -> tuple[str, ...]:
     }
     missing_execute = sorted(required_execute - execute_names)
     if missing_execute:
-        failures.append(
-            f"protected mode missing fixed bindings: {missing_execute}"
-        )
+        failures.append(f"protected mode missing fixed bindings: {missing_execute}")
 
     dispatch_source = ast.get_source_segment(source, functions["_dispatch"]) or ""
     for required in ("READ_ONLY_FLAG", "EXECUTE_FLAG", "AUTH_ENV", "AUTH_VALUE"):
@@ -499,8 +498,7 @@ def verify_checkpoint(
     state_before = _git_state(repo_root)
     if state_before["porcelain"]:
         raise RuntimeError(
-            "source gate requires a clean worktree; "
-            f"found: {state_before['porcelain']}"
+            f"source gate requires a clean worktree; found: {state_before['porcelain']}"
         )
 
     evidence_dir = evidence_root / spec.name / f"source-gate-{_stamp()}"

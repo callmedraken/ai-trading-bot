@@ -30,10 +30,7 @@ def _namespace(
 
 
 def _facts(**overrides: bool) -> r4.AdmissionFacts:
-    values = {
-        item.name: True
-        for item in fields(r4.AdmissionFacts)
-    }
+    values = {item.name: True for item in fields(r4.AdmissionFacts)}
     values.update(overrides)
     return r4.AdmissionFacts(**values)
 

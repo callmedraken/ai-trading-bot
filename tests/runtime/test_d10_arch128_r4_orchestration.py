@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from dataclasses import fields
 from pathlib import Path
 
@@ -17,7 +18,7 @@ from scripts.build_d10_deployment_identity import D10BuildResult
 from trading_bot.runtime.personal_desktop_d10_deployment_identity import (
     ExecutableManifest,
     ExecutableManifestEntry,
-    parse_deployment_attestation,
+    build_deployment_attestation,
 )
 
 
@@ -136,25 +137,15 @@ def _signed_material() -> r4c.SignedMaterial:
         "personal-desktop-d10-executable-manifest/v1",
         (entry,),
     )
-    attestation = parse_deployment_attestation(
-        (
-            '{"approved_trading_sid":"S-1-5-21-1397534616-3988210162-180023805-1009",'
-            '"certified_source_head":"0f9551e13486ef65b35a5a9633da19081571144b",'
-            '"certified_source_tree":"1186e92669af100542c055368c1b72495c36bc11",'
-            '"deployment_id":"d2071f25-5a7c-5293-a28f-5b722c9917a2",'
-            '"executable_file_count":307,'
-            '"executable_manifest_sha256":"080c622035c7c8492a66ba5d5aa9a48c9020933fb16f85a7604010d529bd06e2",'
-            '"launch_guard":"F:\\\\AITradingBot\\\\D10\\\\launch-guard.py",'
-            '"launch_guard_byte_length":112228,'
-            '"launch_guard_sha256":"ab80233a6ce59a579653008609753441864f74592ac52d12ec65c6dc714eabf7",'
-            '"launcher":"F:\\\\AITradingBot\\\\D10\\\\source\\\\scripts\\\\run_personal_desktop_unattended_one_week_soak.py",'
-            '"production_python":"F:\\\\AITradingBot\\\\runtime\\\\python.exe",'
-            '"production_python_version":"3.14.3",'
-            '"scheduler_contract_schema":"personal-desktop-d10-scheduler-contract/v1",'
-            '"schema":"personal-desktop-d10-deployment-attestation/v2",'
-            '"signing_key_id":"AITradingBot/D10/DeploymentAttestation/v3",'
-            '"source_root":"F:\\\\AITradingBot\\\\D10\\\\source"}'
-        ).encode("utf-8")
+    guard = b"guard"
+    attestation = build_deployment_attestation(
+        certified_source_head=r4.NEW_IDENTITY.certified_source_head,
+        certified_source_tree=r4.NEW_IDENTITY.certified_source_tree,
+        production_python_version="3.14.3",
+        launch_guard_byte_length=len(guard),
+        launch_guard_sha256=hashlib.sha256(guard).hexdigest(),
+        executable_manifest_sha256=manifest.digest,
+        executable_file_count=len(manifest.entries),
     )
     build = D10BuildResult(
         manifest.canonical_bytes(),
@@ -170,7 +161,7 @@ def _signed_material() -> r4c.SignedMaterial:
         manifest,
         attestation,
         (SourceFile(entry.relative_path, b"x", entry.sha256),),
-        b"guard",
+        guard,
     )
     return r4c.SignedMaterial(material, b"s" * 64)
 

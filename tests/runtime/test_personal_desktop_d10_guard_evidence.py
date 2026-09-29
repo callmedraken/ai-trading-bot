@@ -238,6 +238,11 @@ def test_guarded_no_action_wake_is_captured_and_appended(
         calls.append((command, kwargs))
         return SimpleNamespace(returncode=0, stdout=record + b"\n", stderr=b"")
 
+    monkeypatch.setattr(
+        guard,
+        "_trusted_runtime_utc_now",
+        lambda: datetime(2026, 9, 29, 8, 29, tzinfo=UTC),
+    )
     monkeypatch.setattr(guard.subprocess, "run", child)
     assert (
         guard._run_second_stage_with_evidence(
@@ -272,6 +277,11 @@ def test_stopped_record_latches_and_prevents_later_child(
         calls[0] += 1
         return SimpleNamespace(returncode=1, stdout=record + b"\n", stderr=b"")
 
+    monkeypatch.setattr(
+        guard,
+        "_trusted_runtime_utc_now",
+        lambda: datetime(2026, 9, 29, 8, 29, tzinfo=UTC),
+    )
     monkeypatch.setattr(guard.subprocess, "run", child)
     environment = {"SystemRoot": r"C:\Windows", "WINDIR": r"C:\Windows"}
     assert (
@@ -621,3 +631,36 @@ def test_missing_or_wrong_security_evidence_file_blocks_before_child(
             wrong,
         )
     assert calls[0] == 0
+
+
+
+def test_native_evidence_observer_open_is_shared_read_only(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    deployment = _deployment()
+    lease = _lease(deployment)
+    path = guard._wake_evidence_path(lease)
+    calls: list[tuple[object, ...]] = []
+
+    class Function:
+        argtypes = None
+        restype = None
+
+        def __call__(self, *args: object) -> int:
+            calls.append(args)
+            return 7
+
+    class Kernel:
+        CreateFileW = Function()
+
+    monkeypatch.setattr(guard, "_win_dll", lambda _: Kernel())
+    assert guard._Native().open_evidence_observer(path) == 7
+    assert len(calls) == 1
+    args = calls[0]
+    assert args[0] == path
+    assert args[1] == guard.TRADING_FILE_READ
+    assert not args[1] & guard.FILE_APPEND_DATA
+    assert not args[1] & guard.FILE_WRITE_DATA
+    assert args[2] == 3
+    assert args[4] == 3
+    assert args[5] == guard.FILE_FLAG_OPEN_REPARSE_POINT

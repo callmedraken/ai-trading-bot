@@ -28,7 +28,9 @@ def _deployment() -> guard.VerifiedDeploymentFacts:
     )
 
 
-def _lease(deployment: guard.VerifiedDeploymentFacts) -> guard.VerifiedActivationLeaseFacts:
+def _lease(
+    deployment: guard.VerifiedDeploymentFacts,
+) -> guard.VerifiedActivationLeaseFacts:
     return guard.VerifiedActivationLeaseFacts(
         state="ACTIVE",
         deployment_id=deployment.deployment_id,

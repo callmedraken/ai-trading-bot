@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from dataclasses import dataclass
@@ -31,8 +32,10 @@ from trading_bot.runtime.personal_desktop_unattended_one_week_soak import (
 
 D10_WAKE_EVIDENCE_ROOT = PureWindowsPath(r"F:\AITradingBot\D10\evidence")
 D10_GUARD_WAKE_START_EVIDENCE_SCHEMA = "personal-desktop-d10-guard-start/v1"
+D10_GUARD_RESULT_ACCEPT_EVIDENCE_SCHEMA = "personal-desktop-d10-guard-accept/v1"
 D10_GUARD_TERMINAL_EVIDENCE_SCHEMA = "personal-desktop-d10-guard-evidence/v1"
 MAX_D10_GUARD_WAKE_START_EVIDENCE_BYTES = 2048
+MAX_D10_GUARD_RESULT_ACCEPT_EVIDENCE_BYTES = 2048
 MAX_D10_GUARD_TERMINAL_EVIDENCE_BYTES = 2048
 MAX_D10_EVIDENCE_LOG_RECORDS = MAX_D10_SUMMARY_WAKES
 MAX_D10_EVIDENCE_LOG_BYTES = MAX_D10_EVIDENCE_LOG_RECORDS * (
@@ -40,6 +43,7 @@ MAX_D10_EVIDENCE_LOG_BYTES = MAX_D10_EVIDENCE_LOG_RECORDS * (
 )
 
 _UUID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\Z")
+_SHA256 = re.compile(r"[0-9a-f]{64}\Z")
 
 
 class D10WakeEvidenceLogError(ValueError):
@@ -112,6 +116,46 @@ class PersistedD10WakeRecord:
             or self.observed_at_utc.tzinfo is not UTC
         ):
             raise D10WakeEvidenceLogError("persisted wake record is invalid")
+
+
+@dataclass(frozen=True, slots=True)
+class D10GuardResultAcceptanceEvidence:
+    """Guard-owned proof that a nonterminal result passed durability checks."""
+
+    schema: str
+    observed_at_utc: datetime
+    deployment_id: str
+    soak_id: str
+    result_sha256: str
+
+    def __post_init__(self) -> None:
+        if (
+            self.schema != D10_GUARD_RESULT_ACCEPT_EVIDENCE_SCHEMA
+            or type(self.observed_at_utc) is not datetime
+            or self.observed_at_utc.tzinfo is not UTC
+            or type(self.deployment_id) is not str
+            or _UUID.fullmatch(self.deployment_id) is None
+            or type(self.soak_id) is not str
+            or _UUID.fullmatch(self.soak_id) is None
+            or type(self.result_sha256) is not str
+            or _SHA256.fullmatch(self.result_sha256) is None
+        ):
+            raise D10WakeEvidenceLogError("guard result acceptance is invalid")
+
+    def canonical_bytes(self) -> bytes:
+        payload = {
+            "schema": self.schema,
+            "observed_at_utc": format_utc_instant(self.observed_at_utc),
+            "deployment_id": self.deployment_id,
+            "soak_id": self.soak_id,
+            "result_sha256": self.result_sha256,
+        }
+        data = _canonical_json_bytes(payload)
+        if len(data) > MAX_D10_GUARD_RESULT_ACCEPT_EVIDENCE_BYTES:
+            raise D10WakeEvidenceLogError(
+                "guard result acceptance evidence exceeds bound"
+            )
+        return data
 
 
 @dataclass(frozen=True, slots=True)
@@ -466,6 +510,56 @@ def parse_guard_wake_start_evidence(
     return model
 
 
+def parse_guard_result_acceptance_evidence(
+    data: bytes,
+    lease: D10ActivationLease,
+    result_bytes: bytes,
+) -> D10GuardResultAcceptanceEvidence:
+    """Parse an acceptance marker bound to the exact preceding result bytes."""
+
+    if type(lease) is not D10ActivationLease:
+        raise D10WakeEvidenceLogError(
+            "guard result acceptance requires exact activation lease"
+        )
+    if type(result_bytes) is not bytes or not result_bytes:
+        raise D10WakeEvidenceLogError(
+            "guard result acceptance requires exact result bytes"
+        )
+    value = _parse_json(data)
+    _require_keys(
+        value,
+        {
+            "schema",
+            "observed_at_utc",
+            "deployment_id",
+            "soak_id",
+            "result_sha256",
+        },
+    )
+    try:
+        model = D10GuardResultAcceptanceEvidence(
+            schema=value["schema"],
+            observed_at_utc=parse_utc_instant(value["observed_at_utc"]),
+            deployment_id=value["deployment_id"],
+            soak_id=value["soak_id"],
+            result_sha256=value["result_sha256"],
+        )
+    except (TypeError, ValueError) as exc:
+        raise D10WakeEvidenceLogError(
+            "guard result acceptance record is invalid"
+        ) from exc
+    if (
+        model.deployment_id != lease.deployment_id
+        or model.soak_id != lease.soak_id
+        or model.result_sha256 != hashlib.sha256(result_bytes).hexdigest()
+        or model.canonical_bytes() != data
+    ):
+        raise D10WakeEvidenceLogError(
+            "guard result acceptance identity, hash, or bytes differ"
+        )
+    return model
+
+
 def parse_guard_terminal_evidence(
     data: bytes, lease: D10ActivationLease
 ) -> D10GuardTerminalEvidence:
@@ -541,6 +635,7 @@ def summarize_d10_wake_evidence_log(
     first: datetime | None = None
     last: datetime | None = None
     pending_start = False
+    pending_result: bytes | None = None
     terminal = False
     terminal_kind: str | None = None
     wake_count = 0
@@ -557,8 +652,8 @@ def summarize_d10_wake_evidence_log(
         schema = value.get("schema")
 
         if schema == D10_GUARD_WAKE_START_EVIDENCE_SCHEMA:
-            if pending_start:
-                raise D10WakeEvidenceLogError("wake-start evidence is unresolved")
+            if pending_start or pending_result is not None:
+                raise D10WakeEvidenceLogError("wake evidence is unresolved")
             start = parse_guard_wake_start_evidence(line, lease)
             observed = start.observed_at_utc
             pending_start = True
@@ -567,7 +662,7 @@ def summarize_d10_wake_evidence_log(
             last_stop_reason = None
             last_guard_reason = None
         elif schema == D10_WAKE_EVIDENCE_SCHEMA:
-            if not pending_start:
+            if not pending_start or pending_result is not None:
                 raise D10WakeEvidenceLogError("ordinary wake lacks wake-start evidence")
             record = parse_persisted_d10_wake_record(line, lease)
             observed = record.observed_at_utc
@@ -580,9 +675,23 @@ def summarize_d10_wake_evidence_log(
                 terminal = True
                 terminal_kind = "STOPPED"
             else:
-                terminal_kind = None
+                pending_result = line
+                terminal_kind = "WAKE_RESULT_UNACCEPTED"
+        elif schema == D10_GUARD_RESULT_ACCEPT_EVIDENCE_SCHEMA:
+            if pending_start or pending_result is None:
+                raise D10WakeEvidenceLogError(
+                    "guard result acceptance lacks nonterminal result"
+                )
+            acceptance = parse_guard_result_acceptance_evidence(
+                line,
+                lease,
+                pending_result,
+            )
+            observed = acceptance.observed_at_utc
+            pending_result = None
+            terminal_kind = None
         elif schema == D10_GUARD_TERMINAL_EVIDENCE_SCHEMA:
-            if not pending_start:
+            if not pending_start or pending_result is not None:
                 raise D10WakeEvidenceLogError(
                     "guard terminal lacks wake-start evidence"
                 )
@@ -609,6 +718,9 @@ def summarize_d10_wake_evidence_log(
     if pending_start:
         terminal = True
         terminal_kind = "WAKE_STARTED_INCOMPLETE"
+    elif pending_result is not None:
+        terminal = True
+        terminal_kind = "WAKE_RESULT_UNACCEPTED"
 
     return D10WakeEvidenceLogSummary(
         record_count=len(lines),

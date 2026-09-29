@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from datetime import UTC, datetime, timedelta
 
@@ -9,14 +10,17 @@ from trading_bot.runtime.personal_desktop_d10_activation_lease import (
     build_activation_lease_model,
 )
 from trading_bot.runtime.personal_desktop_d10_wake_evidence_log import (
+    D10_GUARD_RESULT_ACCEPT_EVIDENCE_SCHEMA,
     D10_GUARD_TERMINAL_EVIDENCE_SCHEMA,
     D10_GUARD_WAKE_START_EVIDENCE_SCHEMA,
     D10_WAKE_EVIDENCE_ROOT,
+    D10GuardResultAcceptanceEvidence,
     D10GuardTerminalEvidence,
     D10GuardTerminalReason,
     D10GuardWakeStartEvidence,
     D10WakeEvidenceLogError,
     d10_wake_evidence_path,
+    parse_guard_result_acceptance_evidence,
     parse_guard_terminal_evidence,
     parse_guard_wake_start_evidence,
     parse_persisted_d10_wake_record,
@@ -110,7 +114,17 @@ def _start(lease, observed=NOW - timedelta(minutes=1)):
     )
 
 
-def test_paired_log_summary_and_incomplete_start_are_terminal():
+def _accept(lease, result, observed=NOW + timedelta(seconds=1)):
+    return D10GuardResultAcceptanceEvidence(
+        D10_GUARD_RESULT_ACCEPT_EVIDENCE_SCHEMA,
+        observed,
+        lease.deployment_id,
+        lease.soak_id,
+        hashlib.sha256(result).hexdigest(),
+    )
+
+
+def test_accepted_log_summary_and_incomplete_states_are_terminal():
     lease = _lease()
     start = _start(lease).canonical_bytes()
     ordinary = serialize_d10_wake_evidence(_wake(lease)).encode()
@@ -121,12 +135,71 @@ def test_paired_log_summary_and_incomplete_start_are_terminal():
     assert incomplete.terminal is True
     assert incomplete.terminal_kind == "WAKE_STARTED_INCOMPLETE"
 
-    complete = summarize_d10_wake_evidence_log(start + b"\n" + ordinary + b"\n", lease)
-    assert complete.record_count == 2
+    unaccepted = summarize_d10_wake_evidence_log(
+        start + b"\n" + ordinary + b"\n",
+        lease,
+    )
+    assert unaccepted.record_count == 2
+    assert unaccepted.wake_count == 1
+    assert unaccepted.terminal is True
+    assert unaccepted.terminal_kind == "WAKE_RESULT_UNACCEPTED"
+    assert unaccepted.last_outcome is D10WakeOutcome.NO_ACTION
+
+    acceptance = _accept(lease, ordinary).canonical_bytes()
+    complete = summarize_d10_wake_evidence_log(
+        start + b"\n" + ordinary + b"\n" + acceptance + b"\n",
+        lease,
+    )
+    assert complete.record_count == 3
     assert complete.wake_count == 1
     assert complete.terminal is False
     assert complete.terminal_kind is None
     assert complete.last_outcome is D10WakeOutcome.NO_ACTION
+    assert complete.last_observed_at_utc == NOW + timedelta(seconds=1)
+
+
+def test_result_acceptance_round_trip_binds_exact_result_hash():
+    lease = _lease()
+    ordinary = serialize_d10_wake_evidence(_wake(lease)).encode()
+    acceptance = _accept(lease, ordinary)
+    data = acceptance.canonical_bytes()
+
+    assert parse_guard_result_acceptance_evidence(data, lease, ordinary) == acceptance
+
+    different = serialize_d10_wake_evidence(
+        D10OneWeekWakeEvidence(
+            outcome=D10WakeOutcome.COMPLETED,
+            stop_reason=None,
+            observed_at_utc=NOW,
+            deployment_id=lease.deployment_id,
+            attestation_sha256=lease.attestation_sha256,
+            certified_source_head=lease.certified_source_head,
+            certified_source_tree=lease.certified_source_tree,
+            executable_file_count=306,
+            soak_id=lease.soak_id,
+            activation_utc=lease.accepted_activation_utc,
+            end_utc=lease.end_utc,
+        )
+    ).encode()
+    with pytest.raises(D10WakeEvidenceLogError, match="hash"):
+        parse_guard_result_acceptance_evidence(data, lease, different)
+
+
+def test_acceptance_cannot_appear_without_matching_nonterminal_result():
+    lease = _lease()
+    ordinary = serialize_d10_wake_evidence(_wake(lease)).encode()
+    acceptance = _accept(lease, ordinary).canonical_bytes()
+
+    with pytest.raises(D10WakeEvidenceLogError, match="acceptance"):
+        summarize_d10_wake_evidence_log(acceptance + b"\n", lease)
+
+    start = _start(lease).canonical_bytes()
+    stopped = serialize_d10_wake_evidence(_wake(lease, stopped=True)).encode()
+    with pytest.raises(D10WakeEvidenceLogError, match="terminal"):
+        summarize_d10_wake_evidence_log(
+            start + b"\n" + stopped + b"\n" + acceptance + b"\n",
+            lease,
+        )
 
 
 def test_stopped_and_guard_failure_log_pairs_are_terminal():

@@ -27,10 +27,12 @@ D10_ACTIVATION_LEASE_TEMP = D10_ACTIVATION_LEASE + ".tmp"
 D10_EVIDENCE_ROOT = D10_ROOT + r"\evidence"
 D10_WAKE_EVIDENCE_SCHEMA = "personal-desktop-d10-wake-evidence/v1"
 D10_GUARD_WAKE_START_EVIDENCE_SCHEMA = "personal-desktop-d10-guard-start/v1"
+D10_GUARD_RESULT_ACCEPT_EVIDENCE_SCHEMA = "personal-desktop-d10-guard-accept/v1"
 D10_GUARD_TERMINAL_EVIDENCE_SCHEMA = "personal-desktop-d10-guard-evidence/v1"
 D10_EVIDENCE_OBSERVATION_SCHEMA = "personal-desktop-d10-evidence-observation/v1"
 MAX_D10_WAKE_EVIDENCE_BYTES = 16 * 1024
 MAX_D10_GUARD_WAKE_START_EVIDENCE_BYTES = 2048
+MAX_D10_GUARD_RESULT_ACCEPT_EVIDENCE_BYTES = 2048
 MAX_D10_GUARD_TERMINAL_EVIDENCE_BYTES = 2048
 MAX_D10_EVIDENCE_LOG_RECORDS = 512
 MAX_D10_EVIDENCE_LOG_BYTES = MAX_D10_EVIDENCE_LOG_RECORDS * (
@@ -138,6 +140,15 @@ _GUARD_START_FIELDS = frozenset(
         "observed_at_utc",
         "deployment_id",
         "soak_id",
+    }
+)
+_GUARD_ACCEPT_FIELDS = frozenset(
+    {
+        "schema",
+        "observed_at_utc",
+        "deployment_id",
+        "soak_id",
+        "result_sha256",
     }
 )
 _GUARD_EVIDENCE_FIELDS = frozenset(
@@ -895,6 +906,29 @@ class _Native:
         if received.value != size:
             raise GuardBlocked("D10 bounded read ended early")
         return buffer.raw
+
+    def flush_existing(self, handle: int, expected_size: int) -> None:
+        if (
+            type(expected_size) is not int
+            or expected_size <= 0
+            or expected_size > MAX_D10_EVIDENCE_LOG_BYTES
+        ):
+            raise GuardBlocked("D10 existing evidence flush length is invalid")
+        kernel = _win_dll("kernel32")
+        get_size = kernel.GetFileSizeEx
+        get_size.argtypes = [wintypes.HANDLE, ctypes.POINTER(ctypes.c_longlong)]
+        get_size.restype = wintypes.BOOL
+        before = ctypes.c_longlong()
+        if not get_size(handle, ctypes.byref(before)) or before.value != expected_size:
+            raise GuardBlocked("D10 existing evidence length changed before flush")
+        flush = kernel.FlushFileBuffers
+        flush.argtypes = [wintypes.HANDLE]
+        flush.restype = wintypes.BOOL
+        if not flush(handle):
+            raise _error("FlushFileBuffers(D10 existing evidence)")
+        after = ctypes.c_longlong()
+        if not get_size(handle, ctypes.byref(after)) or after.value != expected_size:
+            raise GuardBlocked("D10 existing evidence length changed after flush")
 
     def append_exact(self, handle: int, payload: bytes, expected_size: int) -> None:
         if (
@@ -2372,6 +2406,50 @@ def _guard_wake_start_bytes(
     return payload
 
 
+def _parse_guard_result_accept_record(
+    data: bytes,
+    deployment: VerifiedDeploymentFacts,
+    lease: VerifiedActivationLeaseFacts,
+    result: bytes,
+) -> datetime:
+    if type(result) is not bytes or not result:
+        raise GuardBlocked("D10 result acceptance requires exact result bytes")
+    value = _parse_evidence_json(data)
+    result_sha256 = value.get("result_sha256")
+    if (
+        frozenset(value) != _GUARD_ACCEPT_FIELDS
+        or value["schema"] != D10_GUARD_RESULT_ACCEPT_EVIDENCE_SCHEMA
+        or value["deployment_id"] != deployment.deployment_id
+        or value["soak_id"] != lease.soak_id
+        or type(result_sha256) is not str
+        or _SHA256.fullmatch(result_sha256) is None
+        or result_sha256 != hashlib.sha256(result).hexdigest()
+    ):
+        raise GuardBlocked("D10 guard result acceptance evidence differs")
+    return _parse_lease_timestamp(value["observed_at_utc"])
+
+
+def _guard_result_accept_bytes(
+    result: bytes,
+    deployment: VerifiedDeploymentFacts,
+    lease: VerifiedActivationLeaseFacts,
+) -> bytes:
+    if type(result) is not bytes or not result:
+        raise GuardBlocked("D10 result acceptance requires exact result bytes")
+    payload = _canonical_json(
+        {
+            "schema": D10_GUARD_RESULT_ACCEPT_EVIDENCE_SCHEMA,
+            "observed_at_utc": _format_guard_timestamp(_trusted_runtime_utc_now()),
+            "deployment_id": deployment.deployment_id,
+            "soak_id": lease.soak_id,
+            "result_sha256": hashlib.sha256(result).hexdigest(),
+        }
+    )
+    if len(payload) > MAX_D10_GUARD_RESULT_ACCEPT_EVIDENCE_BYTES:
+        raise GuardBlocked("D10 guard result acceptance evidence exceeds bound")
+    return payload
+
+
 def _parse_guard_terminal_record(
     data: bytes,
     deployment: VerifiedDeploymentFacts,
@@ -2411,6 +2489,7 @@ def _parse_evidence_log(
 
     previous: datetime | None = None
     pending_start = False
+    pending_result: bytes | None = None
     terminal = False
     for line in lines:
         if terminal:
@@ -2421,18 +2500,35 @@ def _parse_evidence_log(
         schema = value.get("schema")
 
         if schema == D10_GUARD_WAKE_START_EVIDENCE_SCHEMA:
-            if pending_start:
-                raise GuardBlocked("D10 wake-start evidence is unresolved")
+            if pending_start or pending_result is not None:
+                raise GuardBlocked("D10 wake evidence is unresolved")
             observed = _parse_guard_wake_start_record(line, deployment, lease)
             pending_start = True
         elif schema == D10_WAKE_EVIDENCE_SCHEMA:
-            if not pending_start:
+            if not pending_start or pending_result is not None:
                 raise GuardBlocked("D10 ordinary wake lacks wake-start evidence")
             outcome, observed = _parse_ordinary_wake_record(line, deployment, lease)
             pending_start = False
-            terminal = outcome == "STOPPED"
+            if outcome == "STOPPED":
+                terminal = True
+            else:
+                pending_result = line
+        elif schema == D10_GUARD_RESULT_ACCEPT_EVIDENCE_SCHEMA:
+            if pending_start or pending_result is None:
+                raise GuardBlocked(
+                    "D10 guard result acceptance lacks nonterminal result"
+                )
+            if len(line) > MAX_D10_GUARD_RESULT_ACCEPT_EVIDENCE_BYTES:
+                raise GuardBlocked("D10 guard result acceptance exceeds its bound")
+            observed = _parse_guard_result_accept_record(
+                line,
+                deployment,
+                lease,
+                pending_result,
+            )
+            pending_result = None
         elif schema == D10_GUARD_TERMINAL_EVIDENCE_SCHEMA:
-            if not pending_start:
+            if not pending_start or pending_result is not None:
                 raise GuardBlocked("D10 guard terminal lacks wake-start evidence")
             if len(line) > MAX_D10_GUARD_TERMINAL_EVIDENCE_BYTES:
                 raise GuardBlocked("D10 guard evidence exceeds its bound")
@@ -2446,7 +2542,7 @@ def _parse_evidence_log(
             raise GuardBlocked("D10 evidence observation time moved backward")
         previous = observed
 
-    if pending_start:
+    if pending_start or pending_result is not None:
         terminal = True
     return len(lines), previous, terminal
 
@@ -2575,6 +2671,19 @@ def _run_second_stage_with_evidence(
         _require_facts(evidence_path, False, file_before, EVIDENCE_FILE_POLICY)
         if file_before.size < 0 or file_before.size > MAX_D10_EVIDENCE_LOG_BYTES:
             raise GuardBlocked("D10 evidence file size differs")
+        if file_before.size:
+            backend.flush_existing(file_handle, file_before.size)
+            root_stable = backend.inspect(root_handle)
+            file_stable = backend.inspect(file_handle)
+            _require_facts(D10_EVIDENCE_ROOT, True, root_stable)
+            _require_facts(
+                evidence_path,
+                False,
+                file_stable,
+                EVIDENCE_FILE_POLICY,
+            )
+            _stable(root_before, root_stable)
+            _stable(file_before, file_stable)
         prior = backend.read_bounded(
             file_handle, file_before.size, MAX_D10_EVIDENCE_LOG_BYTES
         )
@@ -2582,11 +2691,13 @@ def _run_second_stage_with_evidence(
         if terminal:
             raise GuardBlocked("D10 evidence stop latch is terminal")
         if (
-            count + 2 > MAX_D10_EVIDENCE_LOG_RECORDS
+            count + 3 > MAX_D10_EVIDENCE_LOG_RECORDS
             or len(prior)
             + MAX_D10_GUARD_WAKE_START_EVIDENCE_BYTES
             + 1
             + MAX_D10_WAKE_EVIDENCE_BYTES
+            + 1
+            + MAX_D10_GUARD_RESULT_ACCEPT_EVIDENCE_BYTES
             + 1
             > MAX_D10_EVIDENCE_LOG_BYTES
         ):
@@ -2696,7 +2807,7 @@ def _run_second_stage_with_evidence(
             )
             return 1
 
-        _append_and_verify_evidence(
+        prior, file_before = _append_and_verify_evidence(
             backend,
             root_handle,
             root_before,
@@ -2707,8 +2818,22 @@ def _run_second_stage_with_evidence(
             deployment,
             lease,
         )
-        outcome, _observed = _parse_ordinary_wake_record(record, deployment, lease)
-        return 1 if outcome == "STOPPED" else 0
+        if outcome == "STOPPED":
+            return 1
+
+        acceptance = _guard_result_accept_bytes(record, deployment, lease)
+        _append_and_verify_evidence(
+            backend,
+            root_handle,
+            root_before,
+            file_handle,
+            file_before,
+            prior,
+            acceptance,
+            deployment,
+            lease,
+        )
+        return 0
 
 
 def observe_fixed_d10_durable_wake_evidence() -> dict[str, object]:
@@ -2814,14 +2939,18 @@ def observe_fixed_d10_durable_wake_evidence() -> dict[str, object]:
     last_outcome: str | None = None
     last_stop_reason: str | None = None
     last_guard_reason: str | None = None
+    pending_result: bytes | None = None
     lines = data[:-1].split(b"\n") if data else []
-    for index, line in enumerate(lines):
+    for line in lines:
         value = _parse_evidence_json(line)
         schema = value["schema"]
         if schema == D10_GUARD_WAKE_START_EVIDENCE_SCHEMA:
             observed = _parse_guard_wake_start_record(line, deployment, lease_facts)
-            if index == len(lines) - 1:
-                terminal_kind = "WAKE_STARTED_INCOMPLETE"
+            pending_result = None
+            terminal_kind = "WAKE_STARTED_INCOMPLETE"
+            last_outcome = None
+            last_stop_reason = None
+            last_guard_reason = None
         elif schema == D10_WAKE_EVIDENCE_SCHEMA:
             outcome, observed = _parse_ordinary_wake_record(
                 line,
@@ -2832,13 +2961,32 @@ def observe_fixed_d10_durable_wake_evidence() -> dict[str, object]:
             last_outcome = outcome
             last_stop_reason = value["stop_reason"]
             last_guard_reason = None
-            terminal_kind = "STOPPED" if outcome == "STOPPED" else None
+            if outcome == "STOPPED":
+                pending_result = None
+                terminal_kind = "STOPPED"
+            else:
+                pending_result = line
+                terminal_kind = "WAKE_RESULT_UNACCEPTED"
+        elif schema == D10_GUARD_RESULT_ACCEPT_EVIDENCE_SCHEMA:
+            if pending_result is None:
+                raise GuardBlocked(
+                    "D10 observer acceptance lacks nonterminal result"
+                )
+            observed = _parse_guard_result_accept_record(
+                line,
+                deployment,
+                lease_facts,
+                pending_result,
+            )
+            pending_result = None
+            terminal_kind = None
         else:
             observed = _parse_guard_terminal_record(
                 line,
                 deployment,
                 lease_facts,
             )
+            pending_result = None
             last_outcome = None
             last_stop_reason = None
             last_guard_reason = value["reason"]

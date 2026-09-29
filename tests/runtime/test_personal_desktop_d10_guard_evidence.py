@@ -142,6 +142,7 @@ class EvidenceNative:
         self.closed: list[int] = []
         self.append_count = 0
         self.drift_after_append_count: int | None = None
+        self.flush_sizes: list[int] = []
 
     def open(self, path: str, *, directory: bool) -> int:
         assert directory
@@ -211,6 +212,11 @@ class EvidenceNative:
         assert size <= limit
         return self.data
 
+    def flush_existing(self, handle: int, expected_size: int) -> None:
+        assert self.paths[handle] == self.path
+        assert len(self.data) == expected_size
+        self.flush_sizes.append(expected_size)
+
     def append_exact(self, handle: int, payload: bytes, expected_size: int) -> None:
         assert self.paths[handle] == self.path
         assert len(self.data) == expected_size
@@ -246,11 +252,13 @@ def test_guarded_no_action_wake_is_captured_and_appended(
         calls.append((command, kwargs))
         return SimpleNamespace(returncode=0, stdout=record + b"\n", stderr=b"")
 
-    monkeypatch.setattr(
-        guard,
-        "_trusted_runtime_utc_now",
-        lambda: datetime(2026, 9, 29, 8, 29, tzinfo=UTC),
+    times = iter(
+        (
+            datetime(2026, 9, 29, 8, 29, tzinfo=UTC),
+            datetime(2026, 9, 29, 8, 31, tzinfo=UTC),
+        )
     )
+    monkeypatch.setattr(guard, "_trusted_runtime_utc_now", lambda: next(times))
     monkeypatch.setattr(guard.subprocess, "run", child)
     assert (
         guard._run_second_stage_with_evidence(
@@ -262,10 +270,14 @@ def test_guarded_no_action_wake_is_captured_and_appended(
         == 0
     )
     lines = native.data.splitlines()
-    assert len(lines) == 2
+    assert len(lines) == 3
     assert guard.D10_GUARD_WAKE_START_EVIDENCE_SCHEMA.encode() in lines[0]
     assert lines[1] == record
+    acceptance = json.loads(lines[2])
+    assert acceptance["schema"] == guard.D10_GUARD_RESULT_ACCEPT_EVIDENCE_SCHEMA
+    assert acceptance["result_sha256"] == hashlib.sha256(record).hexdigest()
     assert guard._parse_evidence_log(native.data, deployment, lease)[2] is False
+    assert native.flush_sizes == []
     assert calls[0][1]["capture_output"] is True
     assert calls[0][1]["cwd"] == guard.D10_ROOT
     assert "evidence" not in " ".join(calls[0][0]).lower()
@@ -357,7 +369,54 @@ def test_partial_existing_log_blocks_before_child(
     assert calls[0] == 0
 
 
-def test_post_append_native_identity_drift_fails_closed(
+def test_full_result_write_then_flush_failure_leaves_unaccepted_stop_latch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    deployment = _deployment()
+    lease = _lease(deployment)
+
+    class FullWriteThenFlushFailure(EvidenceNative):
+        def append_exact(self, handle: int, payload: bytes, expected_size: int) -> None:
+            if self.append_count == 1:
+                assert self.paths[handle] == self.path
+                assert len(self.data) == expected_size
+                self.data += payload
+                self.append_count += 1
+                raise guard.GuardBlocked("simulated post-write flush failure")
+            super().append_exact(handle, payload, expected_size)
+
+    native = FullWriteThenFlushFailure(lease)
+    record = _wake_record(deployment, lease)
+    calls = [0]
+
+    def child(*args, **kwargs):
+        del args, kwargs
+        calls[0] += 1
+        return SimpleNamespace(returncode=0, stdout=record + b"\n", stderr=b"")
+
+    monkeypatch.setattr(
+        guard,
+        "_trusted_runtime_utc_now",
+        lambda: datetime(2026, 9, 29, 8, 29, tzinfo=UTC),
+    )
+    monkeypatch.setattr(guard.subprocess, "run", child)
+    environment = {"SystemRoot": r"C:\Windows", "WINDIR": r"C:\Windows"}
+
+    with pytest.raises(guard.GuardBlocked, match="post-write flush failure"):
+        guard._run_second_stage_with_evidence(deployment, lease, environment, native)
+    assert calls[0] == 1
+    assert native.append_count == 2
+    assert native.data.splitlines()[1] == record
+    assert guard.D10_GUARD_RESULT_ACCEPT_EVIDENCE_SCHEMA.encode() not in native.data
+    assert guard._parse_evidence_log(native.data, deployment, lease)[2] is True
+
+    with pytest.raises(guard.GuardBlocked, match="stop latch"):
+        guard._run_second_stage_with_evidence(deployment, lease, environment, native)
+    assert calls[0] == 1
+    assert native.flush_sizes == [len(native.data)]
+
+
+def test_post_append_native_identity_drift_fails_closed_and_blocks_retry(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     deployment = _deployment()
@@ -365,20 +424,139 @@ def test_post_append_native_identity_drift_fails_closed(
     native = EvidenceNative(lease)
     native.drift_after_append_count = 2
     record = _wake_record(deployment, lease)
+    calls = [0]
+
+    def child(*args, **kwargs):
+        del args, kwargs
+        calls[0] += 1
+        return SimpleNamespace(returncode=0, stdout=record + b"\n", stderr=b"")
+
     monkeypatch.setattr(
-        guard.subprocess,
-        "run",
-        lambda *args, **kwargs: SimpleNamespace(
-            returncode=0, stdout=record + b"\n", stderr=b""
-        ),
+        guard,
+        "_trusted_runtime_utc_now",
+        lambda: datetime(2026, 9, 29, 8, 29, tzinfo=UTC),
     )
+    monkeypatch.setattr(guard.subprocess, "run", child)
+    environment = {"SystemRoot": r"C:\Windows", "WINDIR": r"C:\Windows"}
+
     with pytest.raises(guard.GuardBlocked, match="identity changed"):
+        guard._run_second_stage_with_evidence(deployment, lease, environment, native)
+    assert calls[0] == 1
+    assert native.append_count == 2
+    lines = native.data.splitlines()
+    assert len(lines) == 2
+    assert lines[1] == record
+    assert guard.D10_GUARD_RESULT_ACCEPT_EVIDENCE_SCHEMA.encode() not in native.data
+    assert guard._parse_evidence_log(native.data, deployment, lease)[2] is True
+
+    with pytest.raises(guard.GuardBlocked, match="stop latch"):
+        guard._run_second_stage_with_evidence(deployment, lease, environment, native)
+    assert calls[0] == 1
+    assert native.flush_sizes == [len(native.data)]
+
+
+def test_existing_accepted_wake_is_stabilized_before_next_source_launch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    deployment = _deployment()
+    lease = _lease(deployment)
+    native = EvidenceNative(lease)
+    record = _wake_record(deployment, lease)
+    start = guard._canonical_json(
+        {
+            "schema": guard.D10_GUARD_WAKE_START_EVIDENCE_SCHEMA,
+            "observed_at_utc": "2026-09-29T08:29:00.000000Z",
+            "deployment_id": deployment.deployment_id,
+            "soak_id": lease.soak_id,
+        }
+    )
+    acceptance = guard._canonical_json(
+        {
+            "schema": guard.D10_GUARD_RESULT_ACCEPT_EVIDENCE_SCHEMA,
+            "observed_at_utc": "2026-09-29T08:31:00.000000Z",
+            "deployment_id": deployment.deployment_id,
+            "soak_id": lease.soak_id,
+            "result_sha256": hashlib.sha256(record).hexdigest(),
+        }
+    )
+    native.data = start + b"\n" + record + b"\n" + acceptance + b"\n"
+    existing_size = len(native.data)
+    calls = [0]
+    times = iter(
+        (
+            datetime(2026, 9, 29, 8, 32, tzinfo=UTC),
+            datetime(2026, 9, 29, 8, 33, tzinfo=UTC),
+        )
+    )
+
+    def child(*args, **kwargs):
+        del args, kwargs
+        calls[0] += 1
+        raise RuntimeError("simulated launch failure")
+
+    monkeypatch.setattr(guard, "_trusted_runtime_utc_now", lambda: next(times))
+    monkeypatch.setattr(guard.subprocess, "run", child)
+
+    assert (
         guard._run_second_stage_with_evidence(
             deployment,
             lease,
             {"SystemRoot": r"C:\Windows", "WINDIR": r"C:\Windows"},
             native,
         )
+        == 1
+    )
+    assert calls[0] == 1
+    assert native.flush_sizes == [existing_size]
+    assert b"CHILD_LAUNCH_FAILED" in native.data
+
+
+def test_existing_accepted_wake_flush_failure_blocks_before_source(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    deployment = _deployment()
+    lease = _lease(deployment)
+
+    class FailingFlush(EvidenceNative):
+        def flush_existing(self, handle: int, expected_size: int) -> None:
+            super().flush_existing(handle, expected_size)
+            raise guard.GuardBlocked("simulated existing evidence flush failure")
+
+    native = FailingFlush(lease)
+    record = _wake_record(deployment, lease)
+    start = guard._canonical_json(
+        {
+            "schema": guard.D10_GUARD_WAKE_START_EVIDENCE_SCHEMA,
+            "observed_at_utc": "2026-09-29T08:29:00.000000Z",
+            "deployment_id": deployment.deployment_id,
+            "soak_id": lease.soak_id,
+        }
+    )
+    acceptance = guard._canonical_json(
+        {
+            "schema": guard.D10_GUARD_RESULT_ACCEPT_EVIDENCE_SCHEMA,
+            "observed_at_utc": "2026-09-29T08:31:00.000000Z",
+            "deployment_id": deployment.deployment_id,
+            "soak_id": lease.soak_id,
+            "result_sha256": hashlib.sha256(record).hexdigest(),
+        }
+    )
+    native.data = start + b"\n" + record + b"\n" + acceptance + b"\n"
+    calls = [0]
+    monkeypatch.setattr(
+        guard.subprocess,
+        "run",
+        lambda *args, **kwargs: calls.__setitem__(0, calls[0] + 1),
+    )
+
+    with pytest.raises(guard.GuardBlocked, match="flush failure"):
+        guard._run_second_stage_with_evidence(
+            deployment,
+            lease,
+            {"SystemRoot": r"C:\Windows", "WINDIR": r"C:\Windows"},
+            native,
+        )
+    assert calls[0] == 0
 
 
 def test_native_evidence_open_is_existing_append_only(
@@ -727,7 +905,16 @@ def test_public_read_only_observer_returns_completed_and_incomplete_current_soak
         }
     )
     wake = _wake_record(deployment, lease)
-    native.data = start + b"\n" + wake + b"\n"
+    acceptance = guard._canonical_json(
+        {
+            "schema": guard.D10_GUARD_RESULT_ACCEPT_EVIDENCE_SCHEMA,
+            "observed_at_utc": "2026-09-29T08:31:00.000000Z",
+            "deployment_id": deployment.deployment_id,
+            "soak_id": lease.soak_id,
+            "result_sha256": hashlib.sha256(wake).hexdigest(),
+        }
+    )
+    native.data = start + b"\n" + wake + b"\n" + acceptance + b"\n"
 
     monkeypatch.setattr(guard, "_Native", lambda: native)
     monkeypatch.setattr(guard, "_read_fixed_trust_material", lambda backend: material)
@@ -751,12 +938,12 @@ def test_public_read_only_observer_returns_completed_and_incomplete_current_soak
     assert record["status"] == "OBSERVED"
     assert record["deployment_id"] == deployment.deployment_id
     assert record["soak_id"] == lease.soak_id
-    assert record["record_count"] == 2
+    assert record["record_count"] == 3
     assert record["wake_count"] == 1
     assert record["terminal"] is False
     assert record["terminal_kind"] is None
     assert record["first_observed_at_utc"] == "2026-09-29T08:29:00Z"
-    assert record["last_observed_at_utc"] == "2026-09-29T08:30:00Z"
+    assert record["last_observed_at_utc"] == "2026-09-29T08:31:00Z"
     assert record["last_outcome"] == "NO_ACTION"
     assert record["scheduler_mutation"] == "NOT_RUN"
     assert record["source_launch"] == "NOT_RUN"
@@ -764,6 +951,15 @@ def test_public_read_only_observer_returns_completed_and_incomplete_current_soak
     assert record["Paper-v2"] == "NOT_RUN"
     assert record["broker"] == "NOT_RUN"
     assert record["live"] == "NOT_RUN"
+
+    native.data = start + b"\n" + wake + b"\n"
+    unaccepted = guard.observe_fixed_d10_durable_wake_evidence()
+    assert unaccepted["record_count"] == 2
+    assert unaccepted["wake_count"] == 1
+    assert unaccepted["terminal"] is True
+    assert unaccepted["terminal_kind"] == "WAKE_RESULT_UNACCEPTED"
+    assert unaccepted["last_outcome"] == "NO_ACTION"
+    assert unaccepted["last_observed_at_utc"] == "2026-09-29T08:30:00Z"
 
     native.data = start + b"\n"
     incomplete = guard.observe_fixed_d10_durable_wake_evidence()

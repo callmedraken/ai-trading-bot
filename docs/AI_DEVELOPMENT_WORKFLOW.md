@@ -513,3 +513,43 @@ Both diagnostics are non-mutating. A lint failure must not prevent the formatter
 check from running, because `ruff check` and `ruff format --check` validate
 different contracts. Do not use `--fix` or run an in-place formatter merely to
 diagnose an operator gate failure.
+
+## Unified checkpoint runner
+
+Architecture 129 replaces routine one-off verification scripts with the
+checked-in repository launcher and runner:
+
+```powershell
+.\ops.ps1 status
+.\ops.ps1 verify arch128-parent-acl-repair
+.\ops.ps1 verify arch128-r4
+```
+
+`ops.ps1` is intentionally a thin launcher. Source-gate orchestration,
+combined Ruff diagnostics, evidence capture, and checkpoint authority checks
+belong in `scripts/checkpoint_runner.py`.
+
+For registered checkpoints, this runner is the default source-verification
+surface. New generated PowerShell verification scripts are fallback-only and
+must not be used merely because a checkpoint needs another lint, formatting,
+AST, or read-only diagnostic pass.
+
+GitHub Actions runs the same launcher on Windows/Python 3.14. Source-only gates
+should normally be satisfied by CI rather than asking the user to rerun the
+same pytest/Ruff/diff checks locally.
+
+Local Windows work remains necessary for host-specific qualification such as
+ACLs, Task Scheduler, real account tokens, and protected filesystem state. Those
+operations are being migrated into the runner's registered `preflight` and
+later protected `execute` layers. A source PASS never grants protected
+production authority.
+
+Checkpoint evidence is external to the repository. The preferred development
+host root is `F:\AI\temp\ai-trading-bot-checkpoints`; CI uses its runner
+temporary directory and uploads the evidence artifact.
+
+When a registered gate fails, improve the checked-in runner/observer so the
+same failure class produces useful structured diagnostics on the next run.
+Do not create a chain of temporary diagnostic scripts for behavior that belongs
+in the reusable checkpoint implementation.
+

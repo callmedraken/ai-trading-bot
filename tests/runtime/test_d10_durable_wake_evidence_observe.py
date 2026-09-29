@@ -30,7 +30,9 @@ def test_observer_source_uses_no_private_guard_dependency() -> None:
     assert "WriteFile" not in source
     assert "FlushFileBuffers" not in source
     assert "subprocess" not in source
-    calls = {ast.unparse(node.func) for node in ast.walk(tree) if isinstance(node, ast.Call)}
+    calls = {
+        ast.unparse(node.func) for node in ast.walk(tree) if isinstance(node, ast.Call)
+    }
     assert "guard.observe_fixed_d10_durable_wake_evidence" in calls
 
 

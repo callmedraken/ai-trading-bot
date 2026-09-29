@@ -6403,3 +6403,27 @@ or re-enable the task.
 Next safe checkpoint: freeze and implement a source-only durable per-wake D10
 evidence sink, certify it, and then design a separately authorized clean D10
 redeployment/re-activation path. Broker-paper and live remain unauthorized.
+
+
+### Architecture 127 E1 durable-evidence model — ACCEPTED
+
+Focused verification at the exact source below passed:
+
+```text
+HEAD cacf6b3b9b62be35b908d20617fa6dd99289defa
+TREE 3b0af898348e764d282bafa2a3f8b5c7168d766e
+pytest: 67 passed
+ruff check: PASS
+ruff format --check: PASS
+git diff --check: PASS
+worktree: clean/detached
+```
+
+E1 freezes the lease-derived path
+`F:\AITradingBot\D10\evidence\wake-<soak_id>.jsonl`, exact ordinary wake
+record validation, and bounded guard-terminal evidence. No production host,
+scheduler, provider, Paper-v2, broker, or live effect occurred.
+
+Next source-only checkpoint: E2 native append-only evidence authority followed
+by E3 sealed-guard capture/persistence and durable stop-latch integration.
+The production D10 task remains disabled and must not be started or re-enabled.

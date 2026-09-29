@@ -25,9 +25,8 @@ from trading_bot.runtime.personal_desktop_unattended_one_week_soak import (
     D10WakeOutcome,
     D10WakeStopReason,
 )
-from trading_bot.runtime.personal_desktop_unattended_one_week_soak_scheduler_contract import (
-    D10_SCHEDULER_CONTRACT,
-    D10_SCHEDULER_CONTRACT_SCHEMA,
+from trading_bot.runtime import (
+    personal_desktop_unattended_one_week_soak_scheduler_contract as scheduler_contract,
 )
 
 D10_WAKE_EVIDENCE_ROOT = PureWindowsPath(r"F:\AITradingBot\D10\evidence")
@@ -212,8 +211,8 @@ def parse_persisted_d10_wake_record(
         },
     )
     if runtime != {
-        "scheduler_contract_schema": D10_SCHEDULER_CONTRACT_SCHEMA,
-        "scheduler_task_path": D10_SCHEDULER_CONTRACT.task_path,
+        "scheduler_contract_schema": scheduler_contract.D10_SCHEDULER_CONTRACT_SCHEMA,
+        "scheduler_task_path": scheduler_contract.D10_SCHEDULER_CONTRACT.task_path,
         "trading_sid": lease.trading_sid,
         "production_python": D10_PRODUCTION_PYTHON,
         "production_python_version": VERSION,

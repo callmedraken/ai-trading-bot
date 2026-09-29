@@ -195,3 +195,22 @@ only as part of an approved schema or serializer milestone.
 - Test-period data must never influence training selection, configuration, ranking, or optimization.
 - Walk-forward folds must be chronological, explicit, and auditable.
 - Missing or insufficient data must fail explicitly rather than being imputed silently.
+
+
+### Combined Ruff diagnostics for operator verification
+
+For local verification gates that run both Ruff lint and Ruff formatting, do
+not fail immediately after the first Ruff failure. Run both non-mutating checks,
+capture both exit codes, and emit the exact non-mutating diff for every failed
+Ruff phase before stopping:
+
+- `python -m ruff check --no-cache ...`, and on failure
+  `python -m ruff check --diff --no-cache ...`;
+- `python -m ruff format --check --no-cache ...`, and on failure
+  `python -m ruff format --diff --no-cache ...`;
+- only after both phases have run, STOP if either exit code is nonzero.
+
+This rule prevents an import-order lint failure from hiding formatter-only
+differences until a second operator run. Diagnostic commands must remain
+non-mutating; never use Ruff `--fix` or an in-place formatter in an operator
+verification gate unless a separate source-edit step is explicitly intended.

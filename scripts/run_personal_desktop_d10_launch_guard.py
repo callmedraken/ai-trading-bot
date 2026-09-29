@@ -102,6 +102,7 @@ FILE_ATTRIBUTE_DIRECTORY = 0x10
 FILE_ATTRIBUTE_REPARSE_POINT = 0x400
 FILE_FLAG_OPEN_REPARSE_POINT = 0x00200000
 FILE_FLAG_BACKUP_SEMANTICS = 0x02000000
+FILE_FLAG_WRITE_THROUGH = 0x80000000
 SE_DACL_PROTECTED = 0x1000
 ERROR_FILE_NOT_FOUND = 2
 ERROR_PATH_NOT_FOUND = 3
@@ -680,7 +681,7 @@ class _Native:
             1,
             None,
             3,
-            FILE_FLAG_OPEN_REPARSE_POINT,
+            FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_WRITE_THROUGH,
             None,
         )
         if handle in (None, 0, _INVALID_HANDLE):
@@ -907,29 +908,6 @@ class _Native:
             raise GuardBlocked("D10 bounded read ended early")
         return buffer.raw
 
-    def flush_existing(self, handle: int, expected_size: int) -> None:
-        if (
-            type(expected_size) is not int
-            or expected_size <= 0
-            or expected_size > MAX_D10_EVIDENCE_LOG_BYTES
-        ):
-            raise GuardBlocked("D10 existing evidence flush length is invalid")
-        kernel = _win_dll("kernel32")
-        get_size = kernel.GetFileSizeEx
-        get_size.argtypes = [wintypes.HANDLE, ctypes.POINTER(ctypes.c_longlong)]
-        get_size.restype = wintypes.BOOL
-        before = ctypes.c_longlong()
-        if not get_size(handle, ctypes.byref(before)) or before.value != expected_size:
-            raise GuardBlocked("D10 existing evidence length changed before flush")
-        flush = kernel.FlushFileBuffers
-        flush.argtypes = [wintypes.HANDLE]
-        flush.restype = wintypes.BOOL
-        if not flush(handle):
-            raise _error("FlushFileBuffers(D10 existing evidence)")
-        after = ctypes.c_longlong()
-        if not get_size(handle, ctypes.byref(after)) or after.value != expected_size:
-            raise GuardBlocked("D10 existing evidence length changed after flush")
-
     def append_exact(self, handle: int, payload: bytes, expected_size: int) -> None:
         if (
             type(payload) is not bytes
@@ -962,11 +940,6 @@ class _Native:
             raise _error("WriteFile(D10 evidence)")
         if written.value != len(payload):
             raise GuardBlocked("D10 evidence append was partial")
-        flush = kernel.FlushFileBuffers
-        flush.argtypes = [wintypes.HANDLE]
-        flush.restype = wintypes.BOOL
-        if not flush(handle):
-            raise _error("FlushFileBuffers(D10 evidence)")
         after = ctypes.c_longlong()
         if not get_size(
             handle, ctypes.byref(after)
@@ -2671,19 +2644,6 @@ def _run_second_stage_with_evidence(
         _require_facts(evidence_path, False, file_before, EVIDENCE_FILE_POLICY)
         if file_before.size < 0 or file_before.size > MAX_D10_EVIDENCE_LOG_BYTES:
             raise GuardBlocked("D10 evidence file size differs")
-        if file_before.size:
-            backend.flush_existing(file_handle, file_before.size)
-            root_stable = backend.inspect(root_handle)
-            file_stable = backend.inspect(file_handle)
-            _require_facts(D10_EVIDENCE_ROOT, True, root_stable)
-            _require_facts(
-                evidence_path,
-                False,
-                file_stable,
-                EVIDENCE_FILE_POLICY,
-            )
-            _stable(root_before, root_stable)
-            _stable(file_before, file_stable)
         prior = backend.read_bounded(
             file_handle, file_before.size, MAX_D10_EVIDENCE_LOG_BYTES
         )

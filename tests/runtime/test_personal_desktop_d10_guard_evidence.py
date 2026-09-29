@@ -142,7 +142,7 @@ class EvidenceNative:
         self.closed: list[int] = []
         self.append_count = 0
         self.drift_after_append_count: int | None = None
-        self.flush_sizes: list[int] = []
+        self.read_count = 0
 
     def open(self, path: str, *, directory: bool) -> int:
         assert directory
@@ -210,12 +210,8 @@ class EvidenceNative:
         assert self.paths[handle] == self.path
         assert len(self.data) == size
         assert size <= limit
+        self.read_count += 1
         return self.data
-
-    def flush_existing(self, handle: int, expected_size: int) -> None:
-        assert self.paths[handle] == self.path
-        assert len(self.data) == expected_size
-        self.flush_sizes.append(expected_size)
 
     def append_exact(self, handle: int, payload: bytes, expected_size: int) -> None:
         assert self.paths[handle] == self.path
@@ -369,23 +365,23 @@ def test_partial_existing_log_blocks_before_child(
     assert calls[0] == 0
 
 
-def test_full_result_write_then_flush_failure_leaves_unaccepted_stop_latch(
+def test_full_result_write_then_completion_failure_leaves_unaccepted_stop_latch(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     deployment = _deployment()
     lease = _lease(deployment)
 
-    class FullWriteThenFlushFailure(EvidenceNative):
+    class FullWriteThenCompletionFailure(EvidenceNative):
         def append_exact(self, handle: int, payload: bytes, expected_size: int) -> None:
             if self.append_count == 1:
                 assert self.paths[handle] == self.path
                 assert len(self.data) == expected_size
                 self.data += payload
                 self.append_count += 1
-                raise guard.GuardBlocked("simulated post-write flush failure")
+                raise guard.GuardBlocked("simulated post-write completion failure")
             super().append_exact(handle, payload, expected_size)
 
-    native = FullWriteThenFlushFailure(lease)
+    native = FullWriteThenCompletionFailure(lease)
     record = _wake_record(deployment, lease)
     calls = [0]
 
@@ -402,7 +398,7 @@ def test_full_result_write_then_flush_failure_leaves_unaccepted_stop_latch(
     monkeypatch.setattr(guard.subprocess, "run", child)
     environment = {"SystemRoot": r"C:\Windows", "WINDIR": r"C:\Windows"}
 
-    with pytest.raises(guard.GuardBlocked, match="post-write flush failure"):
+    with pytest.raises(guard.GuardBlocked, match="post-write completion failure"):
         guard._run_second_stage_with_evidence(deployment, lease, environment, native)
     assert calls[0] == 1
     assert native.append_count == 2
@@ -413,7 +409,7 @@ def test_full_result_write_then_flush_failure_leaves_unaccepted_stop_latch(
     with pytest.raises(guard.GuardBlocked, match="stop latch"):
         guard._run_second_stage_with_evidence(deployment, lease, environment, native)
     assert calls[0] == 1
-    assert native.flush_sizes == [len(native.data)]
+    assert native.read_count == 2
 
 
 def test_post_append_native_identity_drift_fails_closed_and_blocks_retry(
@@ -452,10 +448,10 @@ def test_post_append_native_identity_drift_fails_closed_and_blocks_retry(
     with pytest.raises(guard.GuardBlocked, match="stop latch"):
         guard._run_second_stage_with_evidence(deployment, lease, environment, native)
     assert calls[0] == 1
-    assert native.flush_sizes == [len(native.data)]
+    assert native.read_count == 2
 
 
-def test_existing_accepted_wake_is_stabilized_before_next_source_launch(
+def test_existing_accepted_wake_is_revalidated_before_next_source_launch(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     deployment = _deployment()
@@ -480,7 +476,6 @@ def test_existing_accepted_wake_is_stabilized_before_next_source_launch(
         }
     )
     native.data = start + b"\n" + record + b"\n" + acceptance + b"\n"
-    existing_size = len(native.data)
     calls = [0]
     times = iter(
         (
@@ -507,22 +502,43 @@ def test_existing_accepted_wake_is_stabilized_before_next_source_launch(
         == 1
     )
     assert calls[0] == 1
-    assert native.flush_sizes == [existing_size]
+    assert native.read_count == 3
     assert b"CHILD_LAUNCH_FAILED" in native.data
 
 
-def test_existing_accepted_wake_flush_failure_blocks_before_source(
+def test_existing_accepted_wake_reinspection_drift_blocks_before_source(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     deployment = _deployment()
     lease = _lease(deployment)
 
-    class FailingFlush(EvidenceNative):
-        def flush_existing(self, handle: int, expected_size: int) -> None:
-            super().flush_existing(handle, expected_size)
-            raise guard.GuardBlocked("simulated existing evidence flush failure")
+    class ReinspectionDrift(EvidenceNative):
+        def __init__(self, facts: guard.VerifiedActivationLeaseFacts) -> None:
+            super().__init__(facts)
+            self.file_inspections = 0
 
-    native = FailingFlush(lease)
+        def inspect(self, handle: int) -> guard.ObjectFacts:
+            facts = super().inspect(handle)
+            if self.paths[handle] == self.path:
+                self.file_inspections += 1
+                if self.file_inspections == 2:
+                    return guard.ObjectFacts(
+                        facts.final_path,
+                        facts.attributes,
+                        facts.drive_type,
+                        facts.volume_root,
+                        facts.filesystem,
+                        facts.volume_serial,
+                        facts.file_index + 1,
+                        facts.links,
+                        facts.size,
+                        facts.owner,
+                        facts.protected,
+                        facts.aces,
+                    )
+            return facts
+
+    native = ReinspectionDrift(lease)
     record = _wake_record(deployment, lease)
     start = guard._canonical_json(
         {
@@ -549,7 +565,7 @@ def test_existing_accepted_wake_flush_failure_blocks_before_source(
         lambda *args, **kwargs: calls.__setitem__(0, calls[0] + 1),
     )
 
-    with pytest.raises(guard.GuardBlocked, match="flush failure"):
+    with pytest.raises(guard.GuardBlocked, match="pinned object drifted"):
         guard._run_second_stage_with_evidence(
             deployment,
             lease,
@@ -557,9 +573,10 @@ def test_existing_accepted_wake_flush_failure_blocks_before_source(
             native,
         )
     assert calls[0] == 0
+    assert native.read_count == 1
 
 
-def test_native_evidence_open_is_existing_append_only(
+def test_native_evidence_open_is_existing_append_only_write_through(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     deployment = _deployment()
@@ -588,7 +605,17 @@ def test_native_evidence_open_is_existing_append_only(
     assert not args[1] & guard.FILE_WRITE_DATA
     assert args[2] == 1
     assert args[4] == 3
-    assert args[5] == guard.FILE_FLAG_OPEN_REPARSE_POINT
+    assert args[5] == (
+        guard.FILE_FLAG_OPEN_REPARSE_POINT | guard.FILE_FLAG_WRITE_THROUGH
+    )
+
+
+def test_native_evidence_append_has_no_flushfilebuffers_dependency() -> None:
+    import inspect
+
+    source = inspect.getsource(guard._Native.append_exact)
+    assert "FlushFileBuffers" not in source
+    assert not hasattr(guard._Native, "flush_existing")
 
 
 def test_scheduler_command_remains_zero_semantic_argument_guard_target() -> None:

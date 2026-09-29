@@ -360,3 +360,68 @@ historical S5-R1 HEAD/TREE pins remain unchanged; governed P124-1 source has
 changed, so a fresh S5-R2 exact-tree certification, new operator pins,
 manifest, attestation, deployment ID, and byte-exact deployment checkout are
 mandatory before a separately authorized protected attempt.
+
+
+## P124-5 partial lease-publication incident and bounded recovery
+
+The first authorized P124-5 execution on 2026-09-28/29 consumed its one-shot
+authorization and stopped after the scheduler update and the
+`.tmp -> .installing` lease publication. Independent read-only reconciliation
+proved exactly this state:
+
+```text
+scheduler = exact intended D10 guard contract
+activation.lease.json = absent
+activation.lease.json.installing = present
+activation.lease.json.tmp = absent
+source/provider/Paper-v2/broker/live = NOT_RUN
+```
+
+The installing lease was independently reread as the exact canonical
+808-byte lease for activation `2026-09-29T00:45:22Z`, end
+`2026-10-06T00:45:22Z`, and soak
+`48f14b13-aa18-5ce8-a0e0-402c867b17b6`. Its SHA-256 is
+`91106d61129dc9c11e017a7ea613ba0fd82c87fd9debfc346b265c03c49a1e84`.
+
+The stopped execution exposed a validation defect: the complete
+`NativeObject` tuple was compared byte-for-byte across an intentional D10-root
+namespace change. The D10-root directory's native `size` may change when the
+lease staging name is created or renamed even though the signed deployment,
+root path/file ID/volume/security/reparse/link identity, exact allowed children,
+and every signed executable object remain unchanged.
+
+The correction may therefore ignore **only** the `size` field of the exact
+`F:\AITradingBot\D10` root when comparing signed-deployment object identity
+across an already-validated lease namespace transition. It may not ignore root
+path, final path, directory kind, owner, DACL protection, ACEs, reparse state,
+drive type, volume root/filesystem/serial, file index, links, or any field of
+any other object. Each individual signed observation still performs its full
+native two-read stability and exact namespace validation.
+
+Recovery is a separate bounded operation. The original P124-5 execute entry
+point must not be reused. Before recovery, a read-only recovery preflight must
+prove, twice/stably:
+
+- exact signed S5-R10 deployment;
+- lease namespace exactly `final=false, installing=true, tmp=false`;
+- exact canonical installing-lease bytes and native policy;
+- exact D10 scheduler semantics derived from that lease's original activation;
+- current UTC remains inside the original seven-day lease interval;
+- final and temporary lease names remain absent.
+
+The only recovery effect is one create-only/no-replace rename of the already
+verified `.installing` lease to the final activation lease. Recovery may not
+rewrite or rebase the lease, change activation/end time, recreate `.tmp`,
+mutate Task Scheduler, reacquire the Trading password, start the task, launch
+source, call a provider, touch Paper-v2, broker-paper, or live trading.
+
+After the rename, recovery must independently reverify the exact final lease,
+the exact D10 scheduler, the signed deployment under the narrow root-size
+comparison above, and active original window. Any ambiguous final rename or
+post-publication mismatch is INDETERMINATE and requires read-only
+reconciliation. There is no automatic retry or rollback.
+
+Source implementation, focused verification, canonical certification, and a
+real-host read-only recovery preflight are safe prerequisites. The one recovery
+rename remains a fresh protected-effect boundary requiring explicit human
+authorization.

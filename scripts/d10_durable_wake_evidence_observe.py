@@ -155,8 +155,9 @@ def observe(native: guard._Native | None = None) -> dict[str, object]:
         "deployment_id": lease.deployment_id,
         "attestation_sha256": lease.attestation_sha256,
         "soak_id": lease.soak_id,
-        "activation_utc": lease.canonical_bytes()
-        and lease.accepted_activation_utc.isoformat().replace("+00:00", "Z"),
+        "activation_utc": lease.accepted_activation_utc.isoformat().replace(
+            "+00:00", "Z"
+        ),
         "end_utc": lease.end_utc.isoformat().replace("+00:00", "Z"),
         "evidence_path": evidence_path,
         "evidence_byte_length": len(evidence),

@@ -214,3 +214,32 @@ This rule prevents an import-order lint failure from hiding formatter-only
 differences until a second operator run. Diagnostic commands must remain
 non-mutating; never use Ruff `--fix` or an in-place formatter in an operator
 verification gate unless a separate source-edit step is explicitly intended.
+
+## Unified checkpoint runner
+
+For checkpoints registered by Architecture 129, use the repository-root
+`ops.ps1` launcher and `scripts/checkpoint_runner.py` instead of generating a
+new PowerShell verification wrapper.
+
+Current source-only examples:
+
+```powershell
+.\ops.ps1 status
+.\ops.ps1 verify arch128-parent-acl-repair
+.\ops.ps1 verify arch128-r4
+```
+
+The unified runner owns the mandatory combined Ruff behavior: both
+`ruff check --no-cache` and `ruff format --check --no-cache` run before the
+gate decides PASS/FAIL, with non-mutating `--diff` diagnostics for failed Ruff
+phases.
+
+GitHub Actions should satisfy routine registered source gates. Ask the user to
+run local commands only when the checkpoint depends on actual host state or a
+separately approved protected effect.
+
+Generated PowerShell verification/diagnostic scripts are fallback-only for
+bootstrap or recovery behavior not yet expressible in the reviewed runner.
+Prefer adding a tested registered checkpoint or diagnostic to the runner over
+creating another temporary script.
+

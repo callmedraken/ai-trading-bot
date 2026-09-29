@@ -676,7 +676,52 @@ def observe_post(
     return second
 
 
-def write_staging_payload(
+
+def _require_signed_material(signed: SignedMaterial) -> None:
+    if type(signed) is not SignedMaterial or type(signed.material) is not CertifiedMaterial:
+        raise DeploymentBlocked("arch128_signed_material_type")
+
+    material = signed.material
+    identity = r4.NEW_IDENTITY
+    manifest = material.manifest
+    attestation = material.attestation
+
+    if (
+        manifest.digest != identity.manifest_sha256
+        or len(manifest.entries) != identity.executable_file_count
+        or sum(entry.byte_length for entry in manifest.entries)
+        != identity.executable_total_bytes
+        or len(material.guard_bytes) != identity.guard_byte_length
+        or hashlib.sha256(material.guard_bytes).hexdigest() != identity.guard_sha256
+        or hashlib.sha256(attestation.canonical_bytes()).hexdigest()
+        != identity.unsigned_attestation_sha256
+        or attestation.deployment_id != identity.deployment_id
+        or attestation.certified_source_head != identity.certified_source_head
+        or attestation.certified_source_tree != identity.certified_source_tree
+        or attestation.executable_manifest_sha256 != manifest.digest
+        or attestation.executable_file_count != len(manifest.entries)
+        or hashlib.sha256(signed.signature).hexdigest()
+        != identity.detached_signature_sha256
+        or len(signed.signature) != MAX_SIGNATURE_BYTES
+        or tuple(item.relative_path for item in material.files)
+        != tuple(entry.relative_path for entry in manifest.entries)
+    ):
+        raise DeploymentBlocked("arch128_signed_material_identity_drift")
+
+    for item, entry in zip(material.files, manifest.entries, strict=True):
+        if (
+            type(item.data) is not bytes
+            or len(item.data) != entry.byte_length
+            or hashlib.sha256(item.data).hexdigest() != entry.sha256
+            or item.sha256 != entry.sha256
+        ):
+            raise DeploymentBlocked("arch128_signed_material_source_drift")
+
+
+def _write_staging_payload_unchecked(
+    signed: SignedMaterial,
+    writer: Writer,
+) -> None:
     signed: SignedMaterial,
     writer: Writer,
 ) -> None:
@@ -730,6 +775,14 @@ def write_staging_payload(
     writer.create_directory(r4.NEW_EVIDENCE_ROOT)
 
 
+
+def write_staging_payload(
+    signed: SignedMaterial,
+    writer: Writer,
+) -> None:
+    _require_signed_material(signed)
+    _write_staging_payload_unchecked(signed, writer)
+
 def construct_staging(
     signed: SignedMaterial,
     writer: Writer,
@@ -745,9 +798,16 @@ def construct_staging(
         [Reader, SignatureVerifier, SchedulerRead],
         AdmissionObservation,
     ] = observe_ready,
+    payload_writer: Callable[[SignedMaterial, Writer], None] = write_staging_payload,
 ) -> AdmissionObservation:
+    _require_signed_material(signed)
+    verify_signature(
+        verifier,
+        signed.material.attestation.canonical_bytes(),
+        signed.signature,
+    )
     pre = pre_observer(reader, verifier, scheduler_read)
-    write_staging_payload(signed, writer)
+    payload_writer(signed, writer)
     ready = ready_observer(reader, verifier, scheduler_read)
     if ready.scheduler != pre.scheduler:
         raise DeploymentBlocked("arch128_staging_scheduler_drift")
@@ -788,21 +848,28 @@ class ReplacementSession:
     def retire_old(self) -> r4.ReplacementResult:
         if self.stopped or self.result.phase is not r4.Phase.READY_TO_RETIRE_OLD:
             raise DeploymentBlocked("arch128_retire_step_not_ready")
-        fresh = self.ready_observer(
-            self.reader,
-            self.verifier,
-            self.scheduler_read,
-        )
+        try:
+            fresh = self.ready_observer(
+                self.reader,
+                self.verifier,
+                self.scheduler_read,
+            )
+        except Exception:
+            self.stopped = True
+            raise
         if fresh != self.admission:
             self.stopped = True
             raise DeploymentBlocked("arch128_retire_final_admission_drift")
 
-        outcome = self.rename_call(
-            self.reader,
-            r4.RenameStep.OLD_TO_RETIRED,
-            fresh.old_native,
-            fresh.parent_native,
-        )
+        try:
+            outcome = self.rename_call(
+                self.reader,
+                r4.RenameStep.OLD_TO_RETIRED,
+                fresh.old_native,
+                fresh.parent_native,
+            )
+        except Exception:
+            outcome = r4.MutationOutcome.INDETERMINATE
         self.result = r4.record_rename(
             self.result,
             r4.RenameStep.OLD_TO_RETIRED,
@@ -838,22 +905,29 @@ class ReplacementSession:
         ):
             raise DeploymentBlocked("arch128_publish_step_not_ready")
 
-        fresh = self.post_observer(
-            self.reader,
-            self.verifier,
-            self.scheduler_read,
-            r4.NamespaceState.RETIRED_WINDOW,
-        )
+        try:
+            fresh = self.post_observer(
+                self.reader,
+                self.verifier,
+                self.scheduler_read,
+                r4.NamespaceState.RETIRED_WINDOW,
+            )
+        except Exception:
+            self.stopped = True
+            raise
         if fresh != self.retired:
             self.stopped = True
             raise DeploymentBlocked("arch128_publish_final_admission_drift")
 
-        outcome = self.rename_call(
-            self.reader,
-            r4.RenameStep.STAGING_TO_CANONICAL,
-            fresh.new_native,
-            fresh.parent_native,
-        )
+        try:
+            outcome = self.rename_call(
+                self.reader,
+                r4.RenameStep.STAGING_TO_CANONICAL,
+                fresh.new_native,
+                fresh.parent_native,
+            )
+        except Exception:
+            outcome = r4.MutationOutcome.INDETERMINATE
         self.result = r4.record_rename(
             self.result,
             r4.RenameStep.STAGING_TO_CANONICAL,

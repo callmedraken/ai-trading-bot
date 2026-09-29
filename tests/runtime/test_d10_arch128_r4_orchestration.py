@@ -169,7 +169,7 @@ def _signed_material() -> r4c.SignedMaterial:
 def test_write_staging_payload_has_fixed_inert_sequence() -> None:
     signed = _signed_material()
     writer = _Writer()
-    r4c.write_staging_payload(signed, writer)
+    r4c._write_staging_payload_unchecked(signed, writer)
 
     assert writer.calls[0] == ("admin",)
     assert writer.calls[1][0] == "bind"
@@ -185,7 +185,9 @@ def test_write_staging_payload_has_fixed_inert_sequence() -> None:
     )
 
 
-def test_construct_staging_requires_pre_and_post_scheduler_stability() -> None:
+def test_construct_staging_requires_pre_and_post_scheduler_stability(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     signed = _signed_material()
     writer = _Writer()
     admission = _admission()
@@ -195,6 +197,9 @@ def test_construct_staging_requires_pre_and_post_scheduler_stability() -> None:
         admission.scheduler,
     )
 
+    monkeypatch.setattr(r4c, "_require_signed_material", lambda signed: None)
+    monkeypatch.setattr(r4c, "verify_signature", lambda *args: None)
+
     result = r4c.construct_staging(
         signed,
         writer,
@@ -203,6 +208,7 @@ def test_construct_staging_requires_pre_and_post_scheduler_stability() -> None:
         lambda: {},
         pre_observer=lambda *args: pre,
         ready_observer=lambda *args: admission,
+        payload_writer=lambda signed, writer: None,
     )
     assert result is admission
 
@@ -223,6 +229,7 @@ def test_construct_staging_requires_pre_and_post_scheduler_stability() -> None:
             lambda: {},
             pre_observer=lambda *args: pre,
             ready_observer=lambda *args: drifted,
+            payload_writer=lambda signed, writer: None,
         )
 
 
@@ -317,3 +324,43 @@ def test_r4c_import_has_no_cli_or_backend_construction() -> None:
         "getpass",
     ):
         assert forbidden not in source
+
+
+def test_public_staging_writer_rejects_unreviewed_material_before_effect() -> None:
+    signed = _signed_material()
+    writer = _Writer()
+    with pytest.raises(Exception):
+        r4c.write_staging_payload(signed, writer)
+    assert writer.calls == []
+
+
+def test_session_rename_exception_latches_terminal_stop() -> None:
+    admission = _admission()
+    session = r4c.ReplacementSession(
+        object(),
+        object(),
+        lambda: {},
+        admission,
+        lambda *args: (_ for _ in ()).throw(RuntimeError("native uncertainty")),
+        ready_observer=lambda *args: admission,
+        post_observer=lambda *args: _post(r4.NamespaceState.RETIRED_WINDOW),
+    )
+    result = session.retire_old()
+    assert result.phase is r4.Phase.STOPPED_INDETERMINATE
+    assert session.stopped is True
+
+
+def test_session_admission_exception_latches_session() -> None:
+    admission = _admission()
+    session = r4c.ReplacementSession(
+        object(),
+        object(),
+        lambda: {},
+        admission,
+        lambda *args: r4.MutationOutcome.SUCCESS,
+        ready_observer=lambda *args: (_ for _ in ()).throw(RuntimeError("drift")),
+        post_observer=lambda *args: _post(r4.NamespaceState.RETIRED_WINDOW),
+    )
+    with pytest.raises(RuntimeError):
+        session.retire_old()
+    assert session.stopped is True

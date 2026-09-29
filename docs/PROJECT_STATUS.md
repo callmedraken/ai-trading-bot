@@ -5765,3 +5765,40 @@ exit: 0
 P124-5B is complete. The next safe checkpoint is canonical full source
 certification of the corrected P124-5 operator tree. Protected P124-5 execution
 remains a separate explicit effect boundary requiring fresh human authorization.
+
+
+### P124-5C canonical source certification — ACCEPTED
+
+Canonical certification accepted the corrected P124-5 operator source at
+`2672c1650706af6ce80c546f38b7288d970eddf4` / TREE
+`884a621a907381993a072174aa7fdffef9e09e73`.
+
+Certification evidence:
+
+```text
+status: passed
+broad-1: 3,974 cases / 3,970 passed / 4 skipped / 0 failed / 0 errors
+broad-2: 4,188 cases / 4,184 passed / 4 skipped / 0 failed / 0 errors
+serial: 935 cases / 926 passed / 9 skipped / 0 failed / 0 errors
+total: 9,097 cases / 9,080 passed / 17 skipped / 0 failed / 0 errors
+wall time: 408.933 s
+evidence:
+F:\AI\temp\pytest\p1245-certification-evidence-20260928-172445
+results SHA-256:
+af475c114442bf9a664552bacd683e825dc0d79f97cf938a366ad2363aab0ecb
+```
+
+Repository-wide Ruff check, Ruff format --check, and git diff --check all
+returned exit 0. Source identity was reverified after test execution and at the
+final gate. The certification worktree remained detached and clean. The exact
+live origin/develop and feature refs matched the expected admission values.
+
+This closes the source-certification gate for the P124-5 activation/scheduler
+operator. No Task Scheduler mutation, activation-lease publication, source
+launch, provider/Paper-v2/broker/live effect occurred during certification.
+
+Next checkpoint is the final protected P124-5 execution admission/review.
+The protected invocation mutates the existing D5 task first and publishes the
+activation lease last. It remains a protected effect boundary; on any
+indeterminate mutation result, stop and reconcile read-only before any further
+action.

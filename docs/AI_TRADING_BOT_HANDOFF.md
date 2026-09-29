@@ -6550,3 +6550,58 @@ The production D10 task remains disabled and must not be started or re-enabled.
 No production filesystem, scheduler, provider, Paper-v2, broker, or live effect
 is authorized.
 
+### Architecture 127 E6-pre result-acceptance + write-through durability — ACCEPTED
+
+The final Architecture-127 pre-certification correction is accepted at:
+
+```text
+HEAD: 1c52f9b7faeefdbdc46fdcaff673e3ef8dd5bfae
+TREE: 3b880c3a524b6cbe87ec80f0f477521ce1ffb2cc
+
+focused write-through source surface:
+198 unaffected tests previously PASS
+3 corrected affected tests PASS
+Ruff check: PASS
+Ruff format --check: PASS
+
+disposable Windows host probe:
+D10_WRITE_THROUGH_HOST_PROBE=PASS
+DESIRED_ACCESS=0x0012008D
+FLAGS=0x80200000
+BYTE_LENGTH=33
+FILE_WRITE_DATA_REQUESTED=false
+FLUSHFILEBUFFERS_CALLED=false
+```
+
+The correction closes both pre-E6 durability defects found by exact review:
+
+1. A nonterminal ordinary result is not launch-admissible until a guard-owned
+   `personal-desktop-d10-guard-accept/v1` marker binds the SHA-256 of the
+   exact result after the result append has completed its own
+   write/reinspection/reread/grammar verification. A complete result without
+   ACCEPT is terminal/unaccepted and cannot be retried on a later wake.
+2. The append-only Trading evidence handle no longer depends on
+   `FlushFileBuffers`, whose Win32 contract requires broader write access than
+   Architecture 127 permits. The existing append-only desired-access mask is
+   preserved and the writer is opened with
+   `FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_WRITE_THROUGH`.
+
+Final exact GitHub review confirmed:
+- zero evidence-path `FlushFileBuffers` references;
+- zero `GENERIC_WRITE` use;
+- Trading remains read + `FILE_APPEND_DATA` only;
+- the observer remains read-only;
+- every append still performs exact length, native identity/security, reread,
+  and complete grammar verification;
+- later wakes re-read, revalidate, and reinspect the fixed current-soak object
+  before another source launch;
+- the scheduler command remains zero-semantic-argument and evidence-path-free.
+
+No production filesystem, Task Scheduler, credentials, provider, Paper-v2,
+broker, or live effect occurred. The production D10 task remains disabled and
+must not be started or re-enabled.
+
+Next checkpoint: E6 canonical three-lane repository certification on the final
+reviewed Architecture-127 tree. Only after E6 passes may the project design a
+separately authorized clean D10 redeployment/re-activation path.
+

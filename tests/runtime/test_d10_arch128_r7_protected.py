@@ -5,7 +5,6 @@ from datetime import UTC, datetime
 from scripts import d10_arch128_r6_reactivation as r6
 from scripts import d10_arch128_r7_protected as r7
 
-
 ACTIVATION = datetime(2026, 10, 1, 12, 0, 0, tzinfo=UTC)
 
 

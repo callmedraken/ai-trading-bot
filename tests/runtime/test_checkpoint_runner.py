@@ -403,6 +403,53 @@ def test_read_only_effect_guard_rejects_unexpected_mutation() -> None:
         raise AssertionError("unexpected mutation was accepted")
 
 
+
+
+def test_remote_branch_head_is_bounded_and_noninteractive(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    observed: dict[str, object] = {}
+
+    def fake_run(argv, **kwargs):
+        observed["argv"] = argv
+        observed.update(kwargs)
+        return subprocess.CompletedProcess(
+            argv,
+            0,
+            "a" * 40 + "\trefs/heads/feature/example\n",
+            "",
+        )
+
+    monkeypatch.setattr(runner.subprocess, "run", fake_run)
+
+    head = runner._remote_branch_head(tmp_path, "feature/example")
+
+    assert head == "a" * 40
+    assert observed["timeout"] == runner.REMOTE_LOOKUP_TIMEOUT_SECONDS
+    environment = observed["env"]
+    assert environment["GIT_TERMINAL_PROMPT"] == "0"
+    assert environment["GCM_INTERACTIVE"] == "Never"
+    assert environment["GIT_OPTIONAL_LOCKS"] == "0"
+
+
+def test_remote_branch_head_timeout_fails_closed(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    def fake_run(argv, **kwargs):
+        raise subprocess.TimeoutExpired(argv, kwargs["timeout"])
+
+    monkeypatch.setattr(runner.subprocess, "run", fake_run)
+
+    try:
+        runner._remote_branch_head(tmp_path, "feature/example")
+    except RuntimeError as exc:
+        assert "timed out" in str(exc)
+    else:
+        raise AssertionError("timed-out remote lookup was accepted")
+
+
 def test_preflight_checkpoint_requires_live_remote_head(
     monkeypatch,
     tmp_path: Path,

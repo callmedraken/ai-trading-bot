@@ -27,6 +27,7 @@ if str(_SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(_SRC_ROOT))
 
 SCHEMA: Final = "ai-trading-bot-checkpoint-runner/v1"
+REMOTE_LOOKUP_TIMEOUT_SECONDS: Final = 30
 R5_TRADING_PID_ENV: Final = "AI_TRADING_BOT_ARCH128_R5_TRADING_PID"
 R5_PRODUCTION_PYTHON: Final = Path(r"F:\AITradingBot\runtime\python.exe")
 R5_PYCACHE_PREFIX: Final = r"F:\AITradingBot\D10\no-pycache"
@@ -815,13 +816,29 @@ def _git_output(repo_root: Path, *arguments: str) -> str:
 
 
 def _remote_branch_head(repo_root: Path, branch: str) -> str:
-    completed = subprocess.run(
-        ("git", "ls-remote", "origin", f"refs/heads/{branch}"),
-        cwd=repo_root,
-        capture_output=True,
-        text=True,
-        check=False,
+    environment = dict(os.environ)
+    environment.update(
+        {
+            "GIT_TERMINAL_PROMPT": "0",
+            "GCM_INTERACTIVE": "Never",
+            "GIT_OPTIONAL_LOCKS": "0",
+        }
     )
+    try:
+        completed = subprocess.run(
+            ("git", "ls-remote", "origin", f"refs/heads/{branch}"),
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            check=False,
+            env=environment,
+            timeout=REMOTE_LOOKUP_TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError(
+            "git ls-remote timed out after "
+            f"{REMOTE_LOOKUP_TIMEOUT_SECONDS} seconds"
+        ) from exc
     if completed.returncode != 0:
         raise RuntimeError(f"git ls-remote failed: {completed.stderr.strip()}")
     lines = [line for line in completed.stdout.splitlines() if line.strip()]

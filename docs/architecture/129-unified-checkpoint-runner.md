@@ -246,3 +246,13 @@ Next:
 5. continue into R6 source-only reactivation/evidence design;
 6. keep R7 scheduler/lease activation behind its own separately authorized
    protected boundary.
+
+
+### Bounded live-remote admission
+
+Live-remote admission is fail-closed and non-interactive. The runner disables
+terminal/Git Credential Manager prompting for `git ls-remote`, applies a fixed
+30-second timeout, and treats timeout or authentication failure as an admission
+failure before any checkpoint-specific preflight is called. This prevents
+restricted-principal qualifications from hanging indefinitely while preserving
+the exact live-remote source requirement.

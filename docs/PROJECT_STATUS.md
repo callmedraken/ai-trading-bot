@@ -8130,3 +8130,73 @@ therefore receive a fresh read-only host preflight.
 Actual evidence creation, scheduler credential acquisition/mutation, activation
 lease publication, or any other R7 protected effect remains **NOT AUTHORIZED**
 and requires fresh explicit approval after that final exact-source admission.
+
+
+## Architecture 128 R7C concrete Windows host bindings — ACCEPTED
+
+R7C is source-accepted at the exact reviewed implementation identity:
+
+```text
+HEAD: b49cd470b11ab4ed68ce7e1a153541e6af06fcd5
+TREE: c37d650f40c401454219c98f993b52bce6a2aa08
+CI:   36771571929 SUCCESS
+```
+
+The accepted source binds the frozen R6/R7B contract to concrete Windows host
+primitives without making R7 executable through the unified runner. It adds:
+
+- an R7-only evidence backend confined to the exact lease-derived
+  `wake-<soak-id>.jsonl` path, using CREATE_NEW, empty bytes, the
+  Architecture-127 protected append-only Trading ACL, and independent native
+  zero-byte/security/identity verification;
+- a genuine Trading-token append-open probe that reuses the accepted R5 token
+  proof, impersonates that exact non-admin token, opens only the exact evidence
+  file with append-only + OPEN_EXISTING + OPEN_REPARSE_POINT + WRITE_THROUGH,
+  writes zero bytes, closes the handle, reverts impersonation, and releases the
+  token before scheduler credential acquisition;
+- a separate fixed R7 Task Scheduler updater that admits only the exact disabled
+  D10 predecessor and mutates only trigger start, trigger end, and task Enabled
+  through TASK_UPDATE, while preserving the historical P124-5 updater;
+- a separate four-stage R7 COMPLETE-state observer for INITIAL,
+  AFTER_CREDENTIAL, BEFORE_LEASE, and FINAL, while preserving the accepted R4
+  and R7A inert observer semantics;
+- exact independent COM scheduler readback against the source-owned R7 plan;
+- unchanged reuse of WindowsActivationLeaseBackend for the reviewed
+  tmp -> installing -> final create-only/no-replace lease publication protocol;
+- an expanded Architecture-129 R7 authority gate covering the new fixed host
+  surfaces while retaining the rule that `execute arch128-r7` is absent.
+
+Local registered R7 verification passed with 527 tests plus Ruff check/format,
+git diff checking, authority review, and source identity stability. GitHub
+Actions run 36771571929 independently passed every registered Architecture-128
+source profile, including `arch128-r7` with OVERALL=PASS.
+
+No real evidence file, scheduler mutation, credential acquisition, activation
+lease publication, manual task start, governed source launch, provider,
+Paper-v2, broker, or live effect occurred during R7C.
+
+Current Architecture-128 progression:
+
+```text
+R1   E6 deployment material construction                    ACCEPTED
+R2   protected signing                                      ACCEPTED
+R3   replacement read-only admission                        ACCEPTED
+R4   protected clean deployment replacement                 COMPLETE
+R5   Trading + production-Python qualification              ACCEPTED
+R6   source-only reactivation ordering contract             ACCEPTED
+R7A  read-only activation admission source                  ACCEPTED
+R7B  protected-dispatch source contract                     ACCEPTED
+R7C  concrete protected Windows host bindings               ACCEPTED
+R7D  protected runner execute registration source           NEXT
+R7E  final exact-source Windows host preflight              NOT STARTED
+R7   evidence + scheduler + lease protected activation      NOT AUTHORIZED
+R8   first natural scheduled wake                           NOT STARTED
+```
+
+The next safe checkpoint is R7D: narrowly register `execute arch128-r7` in the
+unified runner by composing the already accepted R7B interlock with the accepted
+R7C host factory. R7D remains source-only and must not perform any production
+effect. After that final executable source is accepted, one fresh elevated
+exact-source `preflight arch128-r7` is required before any protected R7
+activation can be considered. Actual R7 execution still requires separate fresh
+explicit authorization.

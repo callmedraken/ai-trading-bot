@@ -373,3 +373,36 @@ WRITE_THROUGH, zero-write contract before scheduler credential acquisition.
 Only after those concrete bindings are source-certified may a protected runner
 execute surface be registered, and actual R7 activation still requires fresh
 explicit authorization.
+
+
+### Architecture 128 R7C concrete Windows host bindings — ACCEPTED
+
+R7C is source-certified at:
+
+```text
+HEAD: b49cd470b11ab4ed68ce7e1a153541e6af06fcd5
+TREE: c37d650f40c401454219c98f993b52bce6a2aa08
+CI:   36771571929 SUCCESS
+```
+
+The accepted R7C source adds concrete fixed Windows bindings for the frozen R6
+state machine while leaving `execute arch128-r7` unregistered. It provides
+exact-plan evidence creation with the Architecture-127 append-only ACL, a
+genuine Trading-token append-open/zero-write probe before credential
+acquisition, an R7-only TASK_UPDATE transport for the exact disabled D10
+predecessor, independent COM scheduler readback, four-stage R7 COMPLETE
+observation, and unchanged reuse of the accepted activation-lease publisher.
+The R7 authority check constrains these native surfaces to the reviewed R7C
+modules/helper and continues to reject direct host authority in R7A/R7B.
+
+GitHub Actions run 36771571929 passed every registered Architecture-128 source
+gate; `arch128-r7` passed pytest, Ruff lint/format, git diff checking, authority
+review, and identity stability.
+
+R7C performed no production effect and does not itself create an executable
+runner surface. The next source-only checkpoint is narrow protected-runner
+registration: compose the accepted R7B authorization interlock with the accepted
+R7C host factory in the unified runner without duplicating mutation logic. Only
+after that final executable source is accepted should a fresh exact-source
+read-only R7 host preflight run. Actual protected activation still requires
+fresh explicit user authorization.

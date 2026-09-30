@@ -8432,3 +8432,80 @@ therefore receive a fresh read-only host preflight.
 Actual evidence creation, scheduler credential acquisition/mutation, activation
 lease publication, or any other R7 protected effect remains **NOT AUTHORIZED**
 and requires fresh explicit approval after that final exact-source admission.
+
+
+## Architecture 128 R7C accepted — concrete Windows activation bindings
+
+Exact accepted R7C source:
+
+```text
+HEAD: b49cd470b11ab4ed68ce7e1a153541e6af06fcd5
+TREE: c37d650f40c401454219c98f993b52bce6a2aa08
+CI:   36771571929 SUCCESS
+```
+
+R7C resolved the concrete-host primitive gaps without weakening accepted
+historical primitives:
+
+1. **Evidence provisioning** — `WindowsR7EvidenceBackend` creates only the exact
+   R6 lease-derived evidence path with CREATE_NEW and empty bytes, using the
+   Architecture-127 append-only Trading ACL and independent native verification.
+2. **Genuine Trading open** — the accepted R5 actual-token proof is reused; the
+   verified non-admin Trading token is impersonated only around one exact
+   append-only OPEN_EXISTING + OPEN_REPARSE_POINT + WRITE_THROUGH file open.
+   There is no WriteFile/FlushFileBuffers path and the observation reports zero
+   bytes written. Credential acquisition remains later in R6 ordering.
+3. **Scheduler update** — a dedicated R7 helper admits only the exact disabled,
+   non-running D10 predecessor and performs one fixed TASK_UPDATE changing only
+   StartBoundary, EndBoundary, and Settings.Enabled. The historical P124-5
+   warm-up updater remains unchanged.
+4. **Staged host observation** — a separate R7 COMPLETE observer admits exactly
+   INITIAL, AFTER_CREDENTIAL, BEFORE_LEASE, and FINAL. Existing R4 COMPLETE and
+   R7A read-only behavior remain unchanged.
+5. **Lease publication** — the accepted WindowsActivationLeaseBackend is reused
+   unchanged for tmp -> installing -> final create-only/no-replace publication.
+6. **Authority containment** — Architecture-129 source checks recognize only the
+   reviewed R7C native/helper surfaces; `specs["arch128-r7"].execute` remains
+   None.
+
+Verification evidence:
+
+```text
+local .\ops.ps1 verify arch128-r7:
+  PYTEST=PASS (527 tests)
+  RUFF_CHECK=PASS
+  RUFF_FORMAT=PASS
+  GIT_DIFF_CHECK=PASS
+  AUTHORITY=PASS
+  IDENTITY_STABLE=True
+  OVERALL=PASS
+
+GitHub Actions:
+  run 36771571929
+  Checkpoint Source Gates
+  SUCCESS
+  all registered Architecture-128 source profiles OVERALL=PASS
+```
+
+No protected R7 effect occurred. No real evidence file was created; Task
+Scheduler was not mutated; no real scheduler credential was acquired; no lease
+was published; the task was not started; provider/Paper-v2/broker/live effects
+remain closed.
+
+Resume sequence from here:
+
+```text
+R7C concrete Windows host bindings               ACCEPTED
+  -> R7D protected runner execute registration   NEXT / SOURCE-ONLY
+  -> R7E final exact-source preflight             READ-ONLY / NOT STARTED
+  -> fresh explicit R7 activation authorization  REQUIRED
+  -> protected R7 activation                     NOT AUTHORIZED YET
+  -> R8 first natural scheduled wake             NOT STARTED
+```
+
+For R7D, preserve the exact accepted R7B execute flag/environment interlock and
+compose it only with the accepted R7C `host_factory`; do not duplicate mutation
+primitives in the runner. R7D source acceptance grants no execution authority.
+Only after R7D is accepted should the final elevated exact-source
+`preflight arch128-r7` run. A PASS remains diagnostic only; actual
+ evidence/scheduler/lease activation needs a new explicit user approval.

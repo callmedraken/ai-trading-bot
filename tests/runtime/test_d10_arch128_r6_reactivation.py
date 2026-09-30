@@ -7,10 +7,10 @@ from scripts.d10_protected_deployment import (
     ADMINISTRATORS_SID,
     FILE_ALL_ACCESS,
 )
+
 from scripts import d10_arch128_r4_replacement as r4
 from scripts import d10_arch128_r6_reactivation as r6
 from scripts import run_personal_desktop_d10_launch_guard as guard
-
 
 ACTIVATION = datetime(2026, 10, 1, 12, 0, 0, tzinfo=UTC)
 

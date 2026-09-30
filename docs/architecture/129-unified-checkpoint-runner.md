@@ -306,3 +306,46 @@ R6 deliberately contains no Windows mutation adapter. R7 must add and
 source-certify the concrete protected host bindings before any protected
 activation is proposed, and R7 still requires fresh explicit human
 authorization.
+
+
+### Architecture 128 R7A read-only activation admission
+
+The unified runner now registers `arch128-r7` with source verification and a
+read-only host preflight only:
+
+```powershell
+.\ops.ps1 verify arch128-r7
+.\ops.ps1 preflight arch128-r7
+```
+
+There is deliberately no `execute arch128-r7` surface at this checkpoint.
+
+R7A reuses the accepted Architecture-128 COMPLETE-state observer rather than
+introducing a second host model. Its preflight re-proves, in two stable reads
+through the existing observer chain:
+
+- the exact new canonical signed deployment and sealed source/guard;
+- the exact preserved halted S5-R10 incident-retired deployment and lease;
+- absence of the historical S5-R8 retired namespace;
+- absence of the Architecture-128 replacement staging namespace;
+- the exact empty canonical evidence root;
+- absence of activation lease final/installing/tmp;
+- the exact disabled, non-running D10 scheduler state; and
+- exact parent/reserved-namespace and same-volume facts already required by R4.
+
+The R7A source profile independently requires all production/evidence/scheduler/
+lease/start/provider/Paper-v2/broker/live effect fields to remain `NOT_RUN`.
+
+Accepted source checkpoint:
+
+```text
+HEAD: 51298a60837ee1d1222c7068b2866ebb40abd2c9
+TREE: 64e47128e7813023c8c74421c9b0b7c27c25093e
+CI:   36683077156 SUCCESS
+```
+
+This source acceptance authorizes only the read-only R7A host preflight. A
+future R7 protected binding/execute implementation remains source work, and
+actual evidence creation, scheduler mutation, or activation-lease publication
+still requires a separate fresh explicit authorization after final exact-source
+admission.

@@ -7960,3 +7960,63 @@ standing safe-checkpoint authorization.
 Actual R7 evidence creation, scheduler mutation, or activation-lease
 publication remains a real protected-effect boundary and requires fresh
 explicit authorization after final exact-source read-only admission.
+
+
+### Architecture 128 R7A read-only activation admission source — ACCEPTED
+
+R7 has entered its read-only admission subcheckpoint without opening the
+protected activation boundary.
+
+Accepted source checkpoint:
+
+```text
+HEAD:
+51298a60837ee1d1222c7068b2866ebb40abd2c9
+
+TREE:
+64e47128e7813023c8c74421c9b0b7c27c25093e
+
+GitHub Actions:
+36683077156 SUCCESS
+```
+
+The unified runner now supports:
+
+```powershell
+.\ops.ps1 verify arch128-r7
+.\ops.ps1 preflight arch128-r7
+```
+
+and still does **not** support `execute arch128-r7`.
+
+The R7A preflight is read-only and reuses the accepted R4 COMPLETE observer to
+prove the exact new canonical deployment, preserved halted S5-R10
+incident-retired deployment/lease, absent historical S5-R8 retired namespace,
+absent replacement staging namespace, exact empty evidence root, absent new
+activation lease final/installing/tmp, exact parent/reserved namespace, and
+exact disabled/non-running scheduler state. All evidence provisioning,
+scheduler mutation, lease publication, manual task start, governed source
+launch, provider, Paper-v2, broker, and live fields are required to remain
+`NOT_RUN`.
+
+Current progression:
+
+```text
+R1   source-only E6 material construction                  ACCEPTED
+R2   exact material review + protected signing             ACCEPTED
+R3   halted-host/replacement read-only preflight            ACCEPTED
+R4   protected deployment replacement                      PASS / COMPLETE
+R5   non-admin Trading deployment qualification            PASS / ACCEPTED
+R6   source-only reactivation ordering contract            ACCEPTED
+R7A  read-only activation admission source                 ACCEPTED
+R7A  exact-source Windows host preflight                   NEXT
+R7B  protected host binding / execute source               NOT YET ACCEPTED
+R7   evidence + scheduler + lease activation               NOT AUTHORIZED
+R8   first natural D10-C wake observation                  NOT STARTED
+```
+
+No R7A source work performed a production-host effect. The next checkpoint is
+one elevated, exact-source `preflight arch128-r7` on the Windows production
+host. A PASS remains diagnostic admission evidence only and grants no authority
+to create the evidence object, mutate Task Scheduler, or publish the activation
+lease.

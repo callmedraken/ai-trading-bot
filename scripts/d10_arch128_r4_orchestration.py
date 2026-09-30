@@ -490,17 +490,21 @@ def _parent_native(reader: Reader, expected_reserved: set[str]) -> NativeObject:
 
 def _scheduler_exact(read: SchedulerRead) -> tuple[tuple[str, object], ...]:
     expected = r3._expected_scheduler()
+    diagnostic = {"xml_byte_length", "xml_sha256"}
     first = read()
     second = read()
     if (
         type(first) is not dict
         or type(second) is not dict
         or first != second
-        or set(first) != set(expected)
+        or set(first) != set(expected) | diagnostic
         or any(
             type(first[key]) is not type(value) or first[key] != value
             for key, value in expected.items()
         )
+        or type(first["xml_byte_length"]) is not int
+        or not 0 < first["xml_byte_length"] <= 1024 * 1024
+        or first["xml_sha256"] != r3.EXPECTED_SCHEDULER_XML_SHA256
     ):
         raise DeploymentBlocked("arch128_scheduler_drift")
     return tuple(sorted(first.items()))

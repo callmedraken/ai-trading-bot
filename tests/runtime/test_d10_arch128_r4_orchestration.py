@@ -90,6 +90,43 @@ def _post(state: r4.NamespaceState) -> r4c.PostRenameObservation:
     )
 
 
+
+
+def test_scheduler_exact_accepts_reviewed_xml_diagnostics() -> None:
+    observed = {
+        **r4c.r3._expected_scheduler(),
+        "xml_byte_length": 4096,
+        "xml_sha256": r4c.r3.EXPECTED_SCHEDULER_XML_SHA256,
+    }
+
+    result = r4c._scheduler_exact(lambda: dict(observed))
+
+    assert dict(result) == observed
+
+
+def test_scheduler_exact_rejects_unreviewed_extra_field() -> None:
+    observed = {
+        **r4c.r3._expected_scheduler(),
+        "xml_byte_length": 4096,
+        "xml_sha256": r4c.r3.EXPECTED_SCHEDULER_XML_SHA256,
+        "unexpected": "value",
+    }
+
+    with pytest.raises(DeploymentBlocked, match="arch128_scheduler_drift"):
+        r4c._scheduler_exact(lambda: dict(observed))
+
+
+def test_scheduler_exact_rejects_xml_digest_drift() -> None:
+    observed = {
+        **r4c.r3._expected_scheduler(),
+        "xml_byte_length": 4096,
+        "xml_sha256": "0" * 64,
+    }
+
+    with pytest.raises(DeploymentBlocked, match="arch128_scheduler_drift"):
+        r4c._scheduler_exact(lambda: dict(observed))
+
+
 def test_fixed_external_material_paths_are_not_feature_worktree() -> None:
     assert r4c.R1_MANIFEST_PATH.parent == Path(r4.R1_MATERIAL_ROOT)
     assert r4c.R1_ATTESTATION_PATH.parent == Path(r4.R1_MATERIAL_ROOT)

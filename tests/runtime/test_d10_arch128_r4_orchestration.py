@@ -90,8 +90,6 @@ def _post(state: r4.NamespaceState) -> r4c.PostRenameObservation:
     )
 
 
-
-
 def test_scheduler_exact_accepts_reviewed_xml_diagnostics() -> None:
     observed = {
         **r4c.r3._expected_scheduler(),

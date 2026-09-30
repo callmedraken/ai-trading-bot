@@ -7543,3 +7543,148 @@ Current next checkpoint:
    without mutating production state.
 
 Production D10 remains disabled/non-running.
+
+
+### Architecture 128 R4 elevated preflight — PASS; unified execute dispatch source accepted
+
+A fresh clean detached R4 operator worktree at canonical source
+`0122a04042578beac04d6cd09ffc3fb9c4fbf1fa` first demonstrated the expected
+fail-closed administrator requirement when launched from a non-elevated shell:
+
+```text
+PRIMARY_STATUS:
+BLOCKED
+
+PRIMARY_REASON:
+AdmissionBlocked
+
+PRIMARY_DETAIL:
+administrator_elevation_required
+
+IDENTITY_STABLE:
+True
+
+OVERALL:
+BLOCKED
+```
+
+No production effect occurred in that blocked read-only run.
+
+The same exact worktree/source was then run from an elevated Administrator
+PowerShell. The unified R4 read-only preflight passed:
+
+```text
+operator worktree:
+F:\AI\worktrees\ai-trading-bot-ops-r4-preflight-v2
+
+HEAD:
+0122a04042578beac04d6cd09ffc3fb9c4fbf1fa
+
+TREE:
+01dc85e523b301d6f4ac7bb5396e27f9f6c6fb60
+
+PRIMARY_STATUS:
+PASS
+
+IDENTITY_STABLE:
+True
+
+evidence:
+F:\AI\temp\ai-trading-bot-checkpoints\arch128-r4\preflight-20260930T022944.111190Z\report.json
+
+OVERALL:
+PASS
+
+R4_PREFLIGHT_EXIT:
+0
+```
+
+That PASS is read-only. It confirms the exact halted canonical deployment,
+signed replacement material, scheduler-disabled/non-running contract, namespace
+absence conditions, parent policy, and reviewed host prerequisites for R4. It
+does not authorize staging creation or either protected rename.
+
+Under the standing safe-checkpoint authorization, the unified runner's protected
+R4 dispatch was then added source-only. The runner now registers:
+
+```powershell
+.\ops.ps1 execute arch128-r4
+```
+
+The wrapper does not call the R4 staging or rename primitives directly. It
+delegates only through the already-reviewed
+`d10_arch128_r4_operator._dispatch()` exact execute flag and environment
+authorization interlock. It also requires scheduler, activation, source-launch,
+provider, Paper-v2, broker, and live effect fields to remain `NOT_RUN`.
+
+A protected R4 PASS is accepted only when the operator returns:
+
+```text
+production_filesystem_mutation=REPLACEMENT_COMPLETE_AND_VERIFIED
+rename_1=SUCCESS
+rename_2=SUCCESS
+```
+
+A blocked interlock with all filesystem mutation fields `NOT_RUN` is recorded
+as `NOT_STARTED`. A STOPPED result that is provably still
+`production_filesystem_mutation=NOT_STARTED` with neither rename called is also
+`NOT_STARTED`. Every other non-PASS protected R4 outcome is conservatively
+recorded as `MAY_HAVE_OCCURRED`; automatic retry remains forbidden.
+
+Accepted source checkpoint:
+
+```text
+HEAD:
+0e2001bae1b412dba3fa75a521944628aa6f8023
+
+TREE:
+9c8e48e673e758e380efe0136561412e364f5d5d
+
+GitHub Actions:
+36660485664
+
+arch128-parent-acl-repair:
+pytest PASS
+ruff check PASS
+ruff format PASS
+git diff --check PASS
+authority PASS
+identity stable True
+overall PASS
+
+arch128-r4:
+pytest PASS
+ruff check PASS
+ruff format PASS
+git diff --check PASS
+authority PASS
+identity stable True
+overall PASS
+```
+
+The preceding implementation commit
+`f0d5ce5d0ab5bf4a985830565c22f3821b0ccba3` already passed pytest, Ruff lint,
+authority review, git diff checking, and identity stability; CI rejected only
+Ruff formatting in `scripts/checkpoint_runner.py`. The formatting-only
+correction above then passed both registered source profiles.
+
+No R4 staging creation, rename, scheduler mutation, activation, source launch,
+provider, Paper-v2, broker, or live effect occurred during this source
+checkpoint.
+
+Current next checkpoint:
+
+1. finish this documentation closeout and use its exact live remote HEAD;
+2. create a fresh clean detached elevated R4 operator worktree under
+   `F:\AI\worktrees\...` at that exact final source;
+3. run `ops.ps1 status`;
+4. run read-only `ops.ps1 preflight arch128-r4`;
+5. if that fresh exact-source preflight passes, STOP at the real R4 protected
+   filesystem-effect boundary and require fresh explicit authorization before
+   setting `AI_TRADING_BOT_ARCH128_R4_AUTHORIZATION` or invoking
+   `ops.ps1 execute arch128-r4`;
+6. after a separately authorized successful replacement, continue with R5
+   non-admin Trading read-only deployment qualification;
+7. later scheduler/lease activation remains a separate protected boundary.
+
+Production D10 remains disabled/non-running.

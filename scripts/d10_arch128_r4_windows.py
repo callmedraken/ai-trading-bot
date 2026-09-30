@@ -135,8 +135,10 @@ class WindowsArch128ReadOnlyReader(legacy_windows._WindowsReplacementReader):
                 continue
 
             relative = path[len(root) + 1 :]
-            if relative in ("source", "evidence"):
+            if relative == "source":
                 return directory is True
+            if relative == "evidence":
+                return directory in (True, None)
 
             if relative.startswith("source\\"):
                 source_relative = relative[len("source\\") :]

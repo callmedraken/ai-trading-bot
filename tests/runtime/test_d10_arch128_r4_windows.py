@@ -128,7 +128,10 @@ def test_staging_readback_allowlist_is_inventory_bound() -> None:
         (r4.RETIRED_PATH, True, True),
         (r4.HISTORICAL_S5R8_RETIRED_PATH, None, True),
         (r4.STAGING_PATH + r"\source", True, True),
+        (r4.STAGING_PATH + r"\source", None, False),
+        (r4.CANONICAL_PATH + r"\evidence", None, True),
         (r4.STAGING_PATH + r"\evidence", True, True),
+        (r4.STAGING_PATH + r"\evidence", None, True),
         (r4.STAGING_PATH + r"\evidence\wake-x.jsonl", False, False),
         (r4.STAGING_PATH + r"\activation.lease.json", False, True),
         (

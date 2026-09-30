@@ -170,8 +170,7 @@ def _r4_authority_check(repo_root: Path) -> tuple[str, ...]:
         ):
             if required not in execute_names:
                 failures.append(
-                    "runner R4 execute missing reviewed dispatch binding: "
-                    f"{required}"
+                    f"runner R4 execute missing reviewed dispatch binding: {required}"
                 )
         for forbidden in (
             "operator._execute_once",
@@ -411,11 +410,7 @@ def _r4_execute() -> dict[str, object]:
             )
         disposition = "CONFIRMED"
     elif status == "BLOCKED":
-        if (
-            mutation != "NOT_RUN"
-            or rename_1 != "NOT_RUN"
-            or rename_2 != "NOT_RUN"
-        ):
+        if mutation != "NOT_RUN" or rename_1 != "NOT_RUN" or rename_2 != "NOT_RUN":
             raise RuntimeError("blocked R4 execution reported filesystem mutation")
         disposition = "NOT_STARTED"
     elif (

@@ -29,9 +29,7 @@ if str(_SRC_ROOT) not in sys.path:
 SCHEMA: Final = "ai-trading-bot-checkpoint-runner/v1"
 REMOTE_LOOKUP_TIMEOUT_SECONDS: Final = 30
 R5_TRADING_PID_ENV: Final = "AI_TRADING_BOT_ARCH128_R5_TRADING_PID"
-R5_TRADING_REMOTE_HEAD_ENV: Final = (
-    "AI_TRADING_BOT_ARCH128_R5_ADMIN_REMOTE_HEAD"
-)
+R5_TRADING_REMOTE_HEAD_ENV: Final = "AI_TRADING_BOT_ARCH128_R5_ADMIN_REMOTE_HEAD"
 R5_PRODUCTION_PYTHON: Final = Path(r"F:\AITradingBot\runtime\python.exe")
 R5_PYCACHE_PREFIX: Final = r"F:\AITradingBot\D10\no-pycache"
 

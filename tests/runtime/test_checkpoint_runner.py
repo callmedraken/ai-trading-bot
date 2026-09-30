@@ -162,8 +162,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
     assert specs["arch128-r5-trading"].execute is None
     assert specs["arch128-r5-substrate"].remote_head_env is None
     assert (
-        specs["arch128-r5-trading"].remote_head_env
-        == runner.R5_TRADING_REMOTE_HEAD_ENV
+        specs["arch128-r5-trading"].remote_head_env == runner.R5_TRADING_REMOTE_HEAD_ENV
     )
 
 
@@ -451,8 +450,6 @@ def test_remote_branch_head_timeout_fails_closed(
         assert "timed out" in str(exc)
     else:
         raise AssertionError("timed-out remote lookup was accepted")
-
-
 
 
 def test_trusted_remote_head_handoff_requires_exact_lower_hex(

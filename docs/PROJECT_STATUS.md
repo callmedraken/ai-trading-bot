@@ -7674,3 +7674,72 @@ host qualifications to be repeated from one fresh exact-source worktree at the
 final documentation-closeout HEAD. If both pass, R5 is accepted and R6
 source-only reactivation/evidence work may continue automatically. R7 remains
 the next protected effect boundary.
+
+
+### Architecture 128 R5 Trading remote admission — two-principal handoff ACCEPTED
+
+The first non-admin Trading qualification attempt at source
+`8a4f765b007f20d62856515ef6a2174663090958` did not reach the R5 Trading child.
+Unified `status` completed successfully, after which live-remote admission
+failed under the Trading account because that restricted principal has no
+GitHub credentials:
+
+```text
+RUNNER_ERROR=RuntimeError:git ls-remote failed:
+Logon failed, use ctrl+c to cancel basic credential prompt.
+fatal: could not read Username for 'https://github.com':
+terminal prompts disabled
+```
+
+This is an admission failure, not a D10 qualification failure. No R5 Trading
+preflight evidence was created and no scheduler, activation, source launch,
+provider, Paper-v2, broker, or live effect occurred.
+
+The restricted Trading principal is intentionally not provisioned with GitHub
+credentials. Architecture 129 now uses a narrow two-principal remote-identity
+handoff only for the read-only `arch128-r5-trading` profile:
+
+1. the elevated Administrator process performs the normal bounded,
+   non-interactive live `git ls-remote` observation;
+2. only the exact observed lowercase 40-hex remote HEAD is passed into the
+   short-lived Trading process as
+   `AI_TRADING_BOT_ARCH128_R5_ADMIN_REMOTE_HEAD`;
+3. Trading validates exact syntax and requires that value to equal its own
+   clean detached local HEAD before any R5-specific qualification runs; and
+4. read-only preflight evidence records
+   `remote_head_source=TRUSTED_ENV:AI_TRADING_BOT_ARCH128_R5_ADMIN_REMOTE_HEAD`.
+
+All other preflight profiles continue to perform their own live remote lookup.
+Protected execute paths do not accept the handoff and remain live-remote bound
+inside the executing principal.
+
+Accepted source:
+
+```text
+HEAD:
+659b55c56c7d92f8ec08c6e33ecca7bc4be93002
+
+TREE:
+b6f9eaa3032e9a7dbf4a46c96943b290e588e5d1
+
+GitHub Actions:
+36675706632
+
+conclusion:
+success
+```
+
+The source gate passed all four registered profiles with pytest, Ruff lint,
+Ruff format, git diff checking, authority review, and exact source identity.
+
+Because source identity advanced, final R5 acceptance still requires both
+read-only host qualifications to PASS from one fresh exact-source worktree at
+the documentation-closeout HEAD:
+
+- elevated `arch128-r5-substrate` against an actual short-lived Trading token;
+- non-admin `arch128-r5-trading` using the Administrator-observed exact remote
+  HEAD handoff.
+
+If both PASS, R5 may be accepted and R6 source-only reactivation/evidence work
+may continue automatically. R7 remains a separately authorized protected
+boundary.

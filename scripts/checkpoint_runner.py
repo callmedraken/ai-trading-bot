@@ -253,7 +253,8 @@ def _parent_acl_authority_check(repo_root: Path) -> tuple[str, ...]:
         for required in ("repair._dispatch", "repair.EXECUTE_FLAG", "os.environ"):
             if required not in execute_names:
                 failures.append(
-                    f"runner parent execute missing reviewed dispatch binding: {required}"
+                    "runner parent execute missing reviewed dispatch binding: "
+                    f"{required}"
                 )
         for forbidden in (
             "repair._repair_once",
@@ -328,7 +329,9 @@ def _parent_acl_execute() -> dict[str, object]:
     status = primary.get("status")
     if status == "PASS":
         if primary.get("acl_mutation") != "EXACT_PARENT_POLICY_APPLIED_AND_VERIFIED":
-            raise RuntimeError("parent ACL PASS lacked exact verified mutation evidence")
+            raise RuntimeError(
+                "parent ACL PASS lacked exact verified mutation evidence"
+            )
         disposition = "CONFIRMED"
     elif status == "BLOCKED":
         if primary.get("acl_mutation") != "NOT_RUN":
@@ -871,7 +874,8 @@ def execute_checkpoint(
     if remote_branch is None:
         if local_branch == "HEAD":
             raise RuntimeError(
-                "detached protected execution requires a checkpoint-pinned remote branch"
+                "detached protected execution requires a checkpoint-pinned "
+                "remote branch"
             )
         remote_branch = local_branch
 
@@ -996,7 +1000,9 @@ def _status(repo_root: Path, specs: Mapping[str, CheckpointSpec]) -> int:
     print(f"BRANCH={state['branch']}")
     print(f"CLEAN={not bool(state['porcelain'])}")
     print("READ_ONLY_PREFLIGHT=IMPLEMENTED_FOR_REGISTERED_PROFILES")
-    execute_specs = sorted(name for name, spec in specs.items() if spec.execute is not None)
+    execute_specs = sorted(
+        name for name, spec in specs.items() if spec.execute is not None
+    )
     print(
         "PROTECTED_EXECUTION="
         + (

@@ -27,6 +27,9 @@ if str(_SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(_SRC_ROOT))
 
 SCHEMA: Final = "ai-trading-bot-checkpoint-runner/v1"
+R5_TRADING_PID_ENV: Final = "AI_TRADING_BOT_ARCH128_R5_TRADING_PID"
+R5_PRODUCTION_PYTHON: Final = Path(r"F:\AITradingBot\runtime\python.exe")
+R5_PYCACHE_PREFIX: Final = r"F:\AITradingBot\D10\no-pycache"
 
 
 @dataclass(frozen=True, slots=True)
@@ -183,6 +186,78 @@ def _r4_authority_check(repo_root: Path) -> tuple[str, ...]:
                 failures.append(
                     f"runner R4 execute bypasses reviewed interlock: {forbidden}"
                 )
+
+    return tuple(failures)
+
+
+def _r5_authority_check(repo_root: Path) -> tuple[str, ...]:
+    child_path = repo_root / "scripts" / "d10_arch128_r5_trading_child.py"
+    child_source = child_path.read_text(encoding="utf-8")
+    child_tree = ast.parse(child_source, filename=str(child_path))
+    child_functions = _top_level_functions(child_tree)
+    failures: list[str] = []
+
+    qualify = child_functions.get("_qualify")
+    if qualify is None:
+        failures.append("R5 Trading child missing _qualify")
+    else:
+        names = _qualified_names(qualify)
+        for required in (
+            "guard_module._verify_pre_source",
+            "guard_module._Native",
+            "guard_module._require_facts",
+            "guard_module._stable",
+            "backend.require_absent",
+            "backend.listdir",
+            "hashlib.sha256",
+        ):
+            if required not in names:
+                failures.append(f"R5 Trading child missing read-only binding: {required}")
+        for forbidden in (
+            "guard_module.main",
+            "guard_module._run_second_stage_with_evidence",
+            "backend.append_exact",
+            "backend.open_evidence_file",
+        ):
+            if forbidden in names:
+                failures.append(f"R5 Trading child references effect binding: {forbidden}")
+
+    for forbidden in (
+        "RegisterTask",
+        "RegisterTaskDefinition",
+        "Start-ScheduledTask",
+        "Enable-ScheduledTask",
+        "WindowsActivationLeaseBackend",
+        "publish_activation",
+        "WriteFile",
+        "MoveFile",
+        "os.rename",
+        "unlink(",
+        "rmtree",
+    ):
+        if forbidden in child_source:
+            failures.append(f"R5 Trading child contains forbidden surface: {forbidden}")
+
+    runner_path = repo_root / "scripts" / "checkpoint_runner.py"
+    runner_source = runner_path.read_text(encoding="utf-8")
+    runner_tree = ast.parse(runner_source, filename=str(runner_path))
+    runner_functions = _top_level_functions(runner_tree)
+    substrate = runner_functions.get("_r5_substrate_preflight")
+    trading = runner_functions.get("_r5_trading_preflight")
+    if substrate is None:
+        failures.append("runner missing _r5_substrate_preflight")
+    else:
+        names = _qualified_names(substrate)
+        for required in ("h.collect", "w.WindowsCollector", "os.environ"):
+            if required not in names:
+                failures.append(f"R5 substrate runner missing binding: {required}")
+    if trading is None:
+        failures.append("runner missing _r5_trading_preflight")
+    else:
+        names = _qualified_names(trading)
+        for required in ("subprocess.run", "json.loads"):
+            if required not in names:
+                failures.append(f"R5 Trading runner missing binding: {required}")
 
     return tuple(failures)
 
@@ -430,6 +505,127 @@ def _r4_execute() -> dict[str, object]:
     }
 
 
+def _r5_effect_fields() -> tuple[str, ...]:
+    return (
+        "activation",
+        "source_launch",
+        "scheduler",
+        "provider",
+        "Paper-v2",
+        "broker",
+        "live",
+    )
+
+
+def _r5_substrate_preflight() -> dict[str, object]:
+    from scripts import d10_arch128_r4_replacement as r4
+    from scripts import d10_python_substrate_harness as h
+    from scripts import d10_python_substrate_windows as w
+
+    raw_pid = os.environ.get(R5_TRADING_PID_ENV, "")
+    if not raw_pid.isascii() or not raw_pid.isdigit() or int(raw_pid) <= 0:
+        primary = {
+            "status": "BLOCKED",
+            "reason": "trading_pid_interlock_not_exact",
+            **{field: "NOT_RUN" for field in _r5_effect_fields()},
+        }
+        return {"status": "BLOCKED", "primary": primary}
+
+    try:
+        transcript_bytes = h.collect(w.WindowsCollector(int(raw_pid)))
+        transcript = json.loads(transcript_bytes.decode("utf-8"))
+        signed = transcript.get("signed_a123")
+        if (
+            type(signed) is not dict
+            or signed.get("attestation_sha256")
+            != r4.NEW_IDENTITY.unsigned_attestation_sha256
+            or signed.get("python") != str(R5_PRODUCTION_PYTHON)
+            or signed.get("version") != "3.14.3"
+        ):
+            raise RuntimeError("r5_substrate_signed_identity_drift")
+        primary = {
+            "status": "PASS",
+            "production_python_substrate": "PASS",
+            "trading_pid": int(raw_pid),
+            "transcript_sha256": hashlib.sha256(transcript_bytes).hexdigest(),
+            "transcript_byte_length": len(transcript_bytes),
+            "substrate_transcript": transcript,
+            **{field: "NOT_RUN" for field in _r5_effect_fields()},
+        }
+    except Exception as exc:
+        primary = {
+            "status": "BLOCKED",
+            "reason": type(exc).__name__,
+            "detail": str(exc),
+            **{field: "NOT_RUN" for field in _r5_effect_fields()},
+        }
+
+    _require_not_run(primary, _r5_effect_fields())
+    return {"status": primary.get("status"), "primary": primary}
+
+
+def _r5_trading_preflight() -> dict[str, object]:
+    helper = Path(__file__).resolve().with_name("d10_arch128_r5_trading_child.py")
+    command = (
+        str(R5_PRODUCTION_PYTHON),
+        "-I",
+        "-S",
+        "-B",
+        "-X",
+        f"pycache_prefix={R5_PYCACHE_PREFIX}",
+        str(helper),
+    )
+    try:
+        completed = subprocess.run(
+            command,
+            input=b"",
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            cwd=str(_REPOSITORY_ROOT),
+            env={"SystemRoot": r"C:\Windows", "WINDIR": r"C:\Windows"},
+            check=False,
+            timeout=180,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        primary = {
+            "status": "BLOCKED",
+            "reason": type(exc).__name__,
+            "detail": "r5_trading_child_transport_failed",
+            **{field: "NOT_RUN" for field in _r5_effect_fields()},
+        }
+        return {"status": "BLOCKED", "primary": primary}
+
+    if len(completed.stdout) > 2 * 1024 * 1024 or len(completed.stderr) > 64 * 1024:
+        primary = {
+            "status": "BLOCKED",
+            "reason": "r5_trading_child_output_bound",
+            **{field: "NOT_RUN" for field in _r5_effect_fields()},
+        }
+        return {"status": "BLOCKED", "primary": primary}
+
+    try:
+        primary = json.loads(completed.stdout.decode("utf-8"))
+    except (UnicodeError, ValueError):
+        primary = {
+            "status": "BLOCKED",
+            "reason": "r5_trading_child_json_invalid",
+            **{field: "NOT_RUN" for field in _r5_effect_fields()},
+        }
+        return {"status": "BLOCKED", "primary": primary}
+
+    if type(primary) is not dict:
+        raise RuntimeError("R5 Trading child result type differs")
+    _require_not_run(primary, _r5_effect_fields())
+    if primary.get("second_stage_launch_trap") != "NOT_CALLED":
+        raise RuntimeError("R5 Trading child reported second-stage launch")
+    status = primary.get("status")
+    if (completed.returncode == 0) != (status == "PASS"):
+        raise RuntimeError("R5 Trading child exit/status disagree")
+    if completed.returncode not in (0, 1):
+        raise RuntimeError("R5 Trading child exit code differs")
+    return {"status": status, "primary": primary}
+
+
 def _r4_preflight() -> dict[str, object]:
     from scripts import d10_arch128_parent_acl_repair as repair
     from scripts import d10_arch128_r4_operator as operator
@@ -530,6 +726,21 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
         "scripts/d10_arch128_r4_windows.py",
         "tests/runtime/test_d10_arch128_r4_windows.py",
     )
+    r5_tests = (
+        *COMMON_TESTS,
+        "tests/runtime/test_d10_arch128_r5_trading_child.py",
+        "tests/runtime/test_d10_python_substrate_harness.py",
+        "tests/runtime/test_d10_python_substrate_windows.py",
+        "tests/runtime/test_personal_desktop_d10_python_substrate.py",
+        "tests/runtime/test_personal_desktop_d10_launch_guard.py",
+    )
+    r5_ruff = (
+        *COMMON_RUFF_PATHS,
+        "scripts/d10_arch128_r5_trading_child.py",
+        "tests/runtime/test_d10_arch128_r5_trading_child.py",
+        "scripts/d10_python_substrate_harness.py",
+        "scripts/d10_python_substrate_windows.py",
+    )
     return {
         "arch128-parent-acl-repair": CheckpointSpec(
             name="arch128-parent-acl-repair",
@@ -549,6 +760,24 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             authority_check=_r4_authority_check,
             preflight=_r4_preflight,
             execute=_r4_execute,
+            remote_branch="feature/d10c-durable-wake-evidence",
+        ),
+        "arch128-r5-substrate": CheckpointSpec(
+            name="arch128-r5-substrate",
+            description="Architecture 128 fresh protected Python substrate qualification",
+            tests=r5_tests,
+            ruff_paths=r5_ruff,
+            authority_check=_r5_authority_check,
+            preflight=_r5_substrate_preflight,
+            remote_branch="feature/d10c-durable-wake-evidence",
+        ),
+        "arch128-r5-trading": CheckpointSpec(
+            name="arch128-r5-trading",
+            description="Architecture 128 non-admin Trading deployment qualification",
+            tests=r5_tests,
+            ruff_paths=r5_ruff,
+            authority_check=_r5_authority_check,
+            preflight=_r5_trading_preflight,
             remote_branch="feature/d10c-durable-wake-evidence",
         ),
     }

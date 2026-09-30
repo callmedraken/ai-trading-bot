@@ -145,6 +145,8 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
     assert set(specs) == {
         "arch128-parent-acl-repair",
         "arch128-r4",
+        "arch128-r5-substrate",
+        "arch128-r5-trading",
     }
     for spec in specs.values():
         assert "tests/runtime/test_checkpoint_runner.py" in spec.tests
@@ -154,6 +156,8 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
 
     assert specs["arch128-parent-acl-repair"].execute is not None
     assert specs["arch128-r4"].execute is not None
+    assert specs["arch128-r5-substrate"].execute is None
+    assert specs["arch128-r5-trading"].execute is None
 
 
 def test_current_arch128_authority_profiles_pass() -> None:
@@ -162,6 +166,8 @@ def test_current_arch128_authority_profiles_pass() -> None:
 
     assert specs["arch128-parent-acl-repair"].authority_check(repo_root) == ()
     assert specs["arch128-r4"].authority_check(repo_root) == ()
+    assert specs["arch128-r5-substrate"].authority_check(repo_root) == ()
+    assert specs["arch128-r5-trading"].authority_check(repo_root) == ()
 
 
 def test_default_evidence_root_is_outside_repo() -> None:
@@ -680,3 +686,58 @@ def test_execute_checkpoint_preserves_attempt_on_runner_exception(
     assert '"status": "STOPPED"' in payload
     assert '"effect_disposition": "MAY_HAVE_OCCURRED"' in payload
     assert '"automatic_retry": "NOT_AUTHORIZED"' in payload
+
+
+def test_r5_substrate_preflight_requires_exact_pid_interlock(
+    monkeypatch,
+) -> None:
+    monkeypatch.delenv(runner.R5_TRADING_PID_ENV, raising=False)
+
+    result = runner._r5_substrate_preflight()
+
+    assert result["status"] == "BLOCKED"
+    assert result["primary"]["reason"] == "trading_pid_interlock_not_exact"
+    assert result["primary"]["source_launch"] == "NOT_RUN"
+
+
+def test_r5_trading_preflight_uses_fixed_production_command(
+    monkeypatch,
+) -> None:
+    observed: dict[str, object] = {}
+    payload = {
+        "status": "PASS",
+        "activation": "NOT_RUN",
+        "source_launch": "NOT_RUN",
+        "scheduler": "NOT_RUN",
+        "provider": "NOT_RUN",
+        "Paper-v2": "NOT_RUN",
+        "broker": "NOT_RUN",
+        "live": "NOT_RUN",
+        "second_stage_launch_trap": "NOT_CALLED",
+    }
+
+    def fake_run(command, **kwargs):
+        observed["command"] = command
+        observed["kwargs"] = kwargs
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            json.dumps(payload).encode("utf-8"),
+            b"",
+        )
+
+    monkeypatch.setattr(runner.subprocess, "run", fake_run)
+
+    result = runner._r5_trading_preflight()
+
+    command = observed["command"]
+    assert command[:6] == (
+        str(runner.R5_PRODUCTION_PYTHON),
+        "-I",
+        "-S",
+        "-B",
+        "-X",
+        f"pycache_prefix={runner.R5_PYCACHE_PREFIX}",
+    )
+    assert result["status"] == "PASS"
+    assert result["primary"]["source_launch"] == "NOT_RUN"

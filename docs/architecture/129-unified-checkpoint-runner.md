@@ -222,6 +222,10 @@ Implemented:
   existing exact authorization interlock and fresh user approval;
 - protected `execute arch128-r4` dispatch, still requiring the existing exact
   authorization interlock and fresh user approval;
+- read-only `preflight arch128-r5-substrate` for the fresh P124-1 production
+  Python substrate proof against an actual Trading process;
+- read-only `preflight arch128-r5-trading` for the actual non-admin Trading
+  canonical-deployment qualification through the fixed production interpreter;
 - automatic parent-ACL diagnostics when R4 blocks on parent policy;
 - checkpoint-pinned remote-branch verification through read-only
   `git ls-remote`;
@@ -233,12 +237,12 @@ Implemented:
 
 Next:
 
-1. source-certify the protected `execute arch128-r4` dispatch;
-2. from a fresh clean detached operator worktree at that exact live source,
-   repeat `preflight arch128-r4`;
-3. stop for fresh explicit authorization at the real R4 filesystem-effect
-   boundary;
-4. after a separately authorized successful R4 replacement, continue with the
-   read-only R5 non-admin Trading deployment qualification;
-5. keep later scheduler/lease activation behind its own separately authorized
+1. source-certify both R5 read-only profiles;
+2. run `preflight arch128-r5-substrate` elevated against one actual non-admin
+   Trading process using the exact PID interlock;
+3. run `preflight arch128-r5-trading` from the actual non-admin,
+   non-elevated Trading principal;
+4. accept R5 only if both exact-source qualifications PASS;
+5. continue into R6 source-only reactivation/evidence design;
+6. keep R7 scheduler/lease activation behind its own separately authorized
    protected boundary.

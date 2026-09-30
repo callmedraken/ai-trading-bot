@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import ast
 import json
 import subprocess
 from pathlib import Path
+
+import pytest
 
 from scripts import checkpoint_runner as runner
 
@@ -165,7 +168,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
     assert specs["arch128-r6"].preflight is None
     assert specs["arch128-r6"].execute is None
     assert specs["arch128-r7"].preflight is not None
-    assert specs["arch128-r7"].execute is None
+    assert specs["arch128-r7"].execute is runner._r7_execute
     assert specs["arch128-r5-substrate"].remote_head_env is None
     assert (
         specs["arch128-r5-trading"].remote_head_env == runner.R5_TRADING_REMOTE_HEAD_ENV
@@ -946,8 +949,368 @@ def test_r7_preflight_rejects_effect_evidence(monkeypatch) -> None:
         raise AssertionError("R7 read-only gate accepted effect evidence")
 
 
-def test_r7b_source_dispatch_is_not_registered_for_execution() -> None:
+def test_r7_registration_preserves_source_and_preflight_profiles() -> None:
     specs = runner._checkpoint_specs()
 
     assert specs["arch128-r7"].preflight is runner._r7_preflight
-    assert specs["arch128-r7"].execute is None
+    assert specs["arch128-r7"].execute is runner._r7_execute
+
+    assert specs["arch128-r7"].authority_check is runner._r7_authority_check
+    assert specs["arch128-r7"].remote_branch == "feature/d10c-durable-wake-evidence"
+    assert specs["arch128-r7"].remote_head_env is None
+    assert specs["arch128-r7"].tests == (
+        *runner.COMMON_TESTS,
+        "tests/runtime/test_d10_arch128_r7_readonly.py",
+        "tests/runtime/test_d10_arch128_r7_protected.py",
+        "tests/runtime/test_d10_arch128_r7_windows.py",
+        "tests/runtime/test_d10_python_substrate_windows.py",
+        "tests/runtime/test_d10_arch128_r6_reactivation.py",
+        "tests/runtime/test_d10_activation_scheduler_operator.py",
+        "tests/runtime/test_d10_arch128_r4_orchestration.py",
+        "tests/runtime/test_d10_arch128_r4_windows.py",
+        "tests/runtime/test_d10_arch128_r3_preflight.py",
+    )
+    parser = runner._parser(specs)
+    for command in ("verify", "preflight", "execute"):
+        assert parser.parse_args((command, "arch128-r7")).checkpoint == "arch128-r7"
+
+
+def _r7_result(status: str = "PASS") -> dict[str, object]:
+    from scripts import d10_arch128_r7_protected as protected
+
+    result = protected._base()
+    if status == "PASS":
+        result.update(
+            status="PASS",
+            stage="COMPLETE",
+            authorization="ACCEPTED",
+            evidence_provision="CALL_RETURNED",
+            scheduler_mutation="CALL_RETURNED",
+            lease_publication="PUBLISHED_VERIFIED",
+        )
+    return result
+
+
+@pytest.mark.parametrize(
+    "authorization", (None, "", "wrong", "ARCH128_R7_PROTECTED_ACTIVATION_AUTHORIZED ")
+)
+def test_r7_execute_missing_exact_authorization_never_constructs_host(
+    monkeypatch,
+    authorization,
+) -> None:
+    from scripts import d10_arch128_r7_protected as protected
+    from scripts import d10_arch128_r7_windows as windows
+
+    monkeypatch.delenv(protected.AUTH_ENV, raising=False)
+    if authorization is not None:
+        monkeypatch.setenv(protected.AUTH_ENV, authorization)
+    calls = []
+
+    def forbidden_factory():
+        calls.append("factory")
+        raise AssertionError("R7C host must remain unconstructed")
+
+    monkeypatch.setattr(windows, "host_factory", forbidden_factory)
+    result = runner._r7_execute()
+    assert result["status"] == "BLOCKED"
+    assert result["effect_disposition"] == "NOT_STARTED"
+    assert result["primary"]["authorization"] == "NOT_ACCEPTED"
+    assert calls == []
+
+
+def test_r7_execute_exact_dispatch_composition_and_pass(monkeypatch) -> None:
+    from scripts import d10_arch128_r7_protected as protected
+    from scripts import d10_arch128_r7_windows as windows
+
+    primary = _r7_result()
+    calls = []
+    monkeypatch.setenv(protected.AUTH_ENV, protected.AUTH_VALUE)
+    monkeypatch.setenv(windows.TRADING_PID_ENV, "unchanged-pid-hint")
+
+    def dispatch(argv, environment, factory):
+        calls.append((argv, environment, factory))
+        return primary
+
+    monkeypatch.setattr(protected, "_dispatch", dispatch)
+    result = runner._r7_execute()
+    assert len(calls) == 1
+    argv, environment, factory = calls[0]
+    assert argv == ("--execute-reviewed-r7-protected-activation",)
+    assert environment[protected.AUTH_ENV] == protected.AUTH_VALUE
+    assert environment[windows.TRADING_PID_ENV] == "unchanged-pid-hint"
+    assert environment == dict(runner.os.environ)
+    assert factory is windows.host_factory
+    assert result == {
+        "status": "PASS",
+        "primary": primary,
+        "effect_disposition": "CONFIRMED",
+    }
+
+
+@pytest.mark.parametrize(
+    "field",
+    (
+        "evidence_provision",
+        "scheduler_mutation",
+        "lease_publication",
+    ),
+)
+@pytest.mark.parametrize(
+    "mutation",
+    (
+        "ATTEMPTED",
+        "CALL_RETURNED",
+        "INDETERMINATE",
+        "PUBLISHED_VERIFIED",
+        "UNKNOWN",
+    ),
+)
+def test_r7_execute_possible_mutation_is_conservative(
+    monkeypatch,
+    field,
+    mutation,
+) -> None:
+    from scripts import d10_arch128_r7_protected as protected
+
+    primary = _r7_result("BLOCKED")
+    primary[field] = mutation
+    monkeypatch.setattr(protected, "_dispatch", lambda *args: primary)
+    assert runner._r7_execute()["effect_disposition"] == "MAY_HAVE_OCCURRED"
+
+
+@pytest.mark.parametrize(
+    "changes",
+    (
+        {"status": "STOPPED"},
+        {"status": "INDETERMINATE"},
+        {"status": "UNKNOWN"},
+        {"status": None},
+        {"authorization": "ACCEPTED"},
+        {"authorization": "UNKNOWN"},
+        {"stage": "UNKNOWN"},
+        {"reconciliation_required": True},
+    ),
+)
+def test_r7_execute_unproven_pre_effect_result_is_conservative(
+    monkeypatch,
+    changes,
+) -> None:
+    from scripts import d10_arch128_r7_protected as protected
+
+    primary = _r7_result("BLOCKED")
+    primary.update(changes)
+    monkeypatch.setattr(protected, "_dispatch", lambda *args: primary)
+    assert runner._r7_execute()["effect_disposition"] == "MAY_HAVE_OCCURRED"
+
+
+@pytest.mark.parametrize(
+    "field",
+    (
+        "production_filesystem_mutation",
+        "manual_task_start",
+        "source_launch",
+        "provider",
+        "Paper-v2",
+        "broker",
+        "live",
+    ),
+)
+@pytest.mark.parametrize("status", ("PASS", "BLOCKED"))
+def test_r7_execute_rejects_forbidden_effects(monkeypatch, field, status) -> None:
+    from scripts import d10_arch128_r7_protected as protected
+
+    primary = _r7_result(status)
+    primary[field] = "ATTEMPTED"
+    monkeypatch.setattr(protected, "_dispatch", lambda *args: primary)
+    with pytest.raises(RuntimeError, match=field):
+        runner._r7_execute()
+
+
+@pytest.mark.parametrize(
+    "field",
+    (
+        "automatic_retry",
+        "automatic_rollback",
+        "automatic_cleanup",
+        "reconciliation_required",
+    ),
+)
+@pytest.mark.parametrize("value", (None, 0, "False", True))
+def test_r7_execute_rejects_malformed_pass_recovery_evidence(
+    monkeypatch,
+    field,
+    value,
+) -> None:
+    from scripts import d10_arch128_r7_protected as protected
+
+    primary = _r7_result()
+    primary[field] = value
+    monkeypatch.setattr(protected, "_dispatch", lambda *args: primary)
+    with pytest.raises(RuntimeError):
+        runner._r7_execute()
+
+
+@pytest.mark.parametrize(
+    "field",
+    (
+        "stage",
+        "authorization",
+        "evidence_provision",
+        "scheduler_mutation",
+        "lease_publication",
+    ),
+)
+def test_r7_execute_rejects_incomplete_pass(monkeypatch, field) -> None:
+    from scripts import d10_arch128_r7_protected as protected
+
+    primary = _r7_result()
+    primary.pop(field)
+    monkeypatch.setattr(protected, "_dispatch", lambda *args: primary)
+    with pytest.raises(RuntimeError, match="completion evidence"):
+        runner._r7_execute()
+
+
+@pytest.mark.parametrize("primary", (None, [], {}, {"status": "PASS"}))
+def test_r7_execute_rejects_malformed_dispatch_result(monkeypatch, primary) -> None:
+    from scripts import d10_arch128_r7_protected as protected
+
+    monkeypatch.setattr(protected, "_dispatch", lambda *args: primary)
+    with pytest.raises(RuntimeError, match="malformed evidence"):
+        runner._r7_execute()
+
+
+@pytest.mark.parametrize("failure", ("exception", "malformed_pass", "forbidden_effect"))
+def test_r7_runner_records_dispatch_failures_as_possible_effect(
+    monkeypatch,
+    tmp_path,
+    failure,
+) -> None:
+    from scripts import d10_arch128_r7_protected as protected
+
+    state = {
+        "head": "a" * 40,
+        "tree": "b" * 40,
+        "branch": "feature/d10c-durable-wake-evidence",
+        "porcelain": "",
+    }
+    monkeypatch.setattr(runner, "_git_state", lambda root: state.copy())
+    monkeypatch.setattr(runner, "_remote_branch_head", lambda *args: state["head"])
+    calls = []
+
+    def dispatch(*args):
+        calls.append("dispatch")
+        if failure == "exception":
+            raise RuntimeError("test-only dispatch exception")
+        primary = _r7_result()
+        if failure == "malformed_pass":
+            primary["lease_publication"] = "INDETERMINATE"
+        else:
+            primary["broker"] = "ATTEMPTED"
+        return primary
+
+    monkeypatch.setattr(protected, "_dispatch", dispatch)
+    passed, report_path = runner.execute_checkpoint(
+        runner._checkpoint_specs()["arch128-r7"],
+        repo_root=tmp_path / "repo",
+        evidence_root=tmp_path / "external",
+    )
+    report = json.loads(report_path.read_text())
+    assert not passed
+    assert calls == ["dispatch"]
+    assert report["status"] == "STOPPED"
+    assert report["effect_disposition"] == "MAY_HAVE_OCCURRED"
+    assert report["automatic_retry"] == "NOT_AUTHORIZED"
+    assert report_path.with_name("attempt.json").is_file()
+
+
+@pytest.mark.parametrize(
+    "addition",
+    (
+        "r7_windows.host_factory()",
+        "r7_windows.WindowsR7EvidenceBackend()",
+        "r7_windows.WindowsActivationLeaseBackend()",
+        "r7_windows.WindowsR7Boundaries(1)",
+        "r7_windows._interactive_credential()",
+        "r7_windows._scheduler_update(None, None)",
+        "CreateFileW()",
+        "subprocess.run(['provider'])",
+        "guard.main()",
+        "retry()",
+        "rollback()",
+        "cleanup()",
+    ),
+)
+def test_r7d_authority_rejects_direct_host_and_recovery_calls(
+    tmp_path,
+    addition,
+) -> None:
+    root = Path(__file__).resolve().parents[2]
+    directory = tmp_path / "scripts"
+    directory.mkdir()
+    for filename in (
+        "checkpoint_runner.py",
+        "d10_arch128_r7_protected.py",
+        "d10_arch128_r7_windows.py",
+    ):
+        source = (root / "scripts" / filename).read_text(encoding="utf-8")
+        if filename == "checkpoint_runner.py":
+            source = source.replace(
+                "    primary = r7_protected._dispatch(",
+                "    " + addition + "\n    primary = r7_protected._dispatch(",
+                1,
+            )
+        (directory / filename).write_text(source, encoding="utf-8")
+    assert any("R7D" in failure for failure in runner._r7d_authority_check(tmp_path))
+
+
+@pytest.mark.parametrize(
+    "before,after",
+    (
+        ("(r7_protected.EXECUTE_FLAG,)", "('--alternate-flag',)"),
+        (
+            "dict(os.environ),\n        r7_windows.host_factory",
+            "{},\n        r7_windows.host_factory",
+        ),
+        ("execute=_r7_execute,", "execute=_r4_execute,"),
+        ('"CALL_RETURNED"', '"ATTEMPTED"'),
+        ('disposition = "MAY_HAVE_OCCURRED"', 'disposition = "CONFIRMED"'),
+        ('disposition = "NOT_STARTED"', 'disposition = "CONFIRMED"'),
+        (
+            'primary.get("automatic_retry") is not False',
+            'primary.get("automatic_retry") != False',
+        ),
+        ("ARCH128_R7_PROTECTED_ACTIVATION_AUTHORIZED", "ALTERNATE_AUTHORIZATION"),
+        ("AI_TRADING_BOT_ARCH128_R7_TRADING_PID", "ALTERNATE_PID"),
+    ),
+)
+def test_r7d_authority_rejects_composition_or_contract_drift(
+    tmp_path,
+    before,
+    after,
+) -> None:
+    root = Path(__file__).resolve().parents[2]
+    directory = tmp_path / "scripts"
+    directory.mkdir()
+    for filename in (
+        "checkpoint_runner.py",
+        "d10_arch128_r7_protected.py",
+        "d10_arch128_r7_windows.py",
+    ):
+        source = (root / "scripts" / filename).read_text(encoding="utf-8")
+        source = source.replace(before, after)
+        (directory / filename).write_text(source, encoding="utf-8")
+    assert runner._r7d_authority_check(tmp_path)
+
+
+def test_r7d_wrapper_has_no_direct_host_authority() -> None:
+    root = Path(__file__).resolve().parents[2]
+    tree = ast.parse((root / "scripts/checkpoint_runner.py").read_text())
+    wrapper = runner._top_level_functions(tree)["_r7_execute"]
+    dispatches = [
+        node
+        for node in ast.walk(wrapper)
+        if isinstance(node, ast.Call)
+        and ast.unparse(node.func) == "r7_protected._dispatch"
+    ]
+    assert len(dispatches) == 1
+    assert runner._r7d_authority_check(root) == ()

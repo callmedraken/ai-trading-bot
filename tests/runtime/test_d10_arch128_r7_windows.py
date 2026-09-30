@@ -737,8 +737,8 @@ def test_r7_powershell_syntax_only():
     assert completed.returncode == 0, completed.stderr.decode(errors="replace")
 
 
-def test_runner_stays_unregistered_and_r7c_gate_passes():
-    assert runner._checkpoint_specs()["arch128-r7"].execute is None
+def test_runner_registers_reviewed_wrapper_and_r7c_gate_passes():
+    assert runner._checkpoint_specs()["arch128-r7"].execute is runner._r7_execute
     assert runner._r7_authority_check(ROOT) == ()
     host = Path(w.__file__).read_text()
     tree = ast.parse(host)

@@ -391,6 +391,7 @@ def _r7_authority_check(repo_root: Path) -> tuple[str, ...]:
             )
 
     failures.extend(_r7c_authority_check(repo_root))
+    failures.extend(_r7d_authority_check(repo_root))
     return tuple(failures)
 
 
@@ -748,8 +749,233 @@ def _r7c_authority_check(repo_root: Path) -> tuple[str, ...]:
         ]
         if len(results) != 1 or ast.unparse(results[0].args[-1]) != "0":
             failures.append("R7C Trading probe does not construct zero bytes written")
-    if _checkpoint_specs()["arch128-r7"].execute is not None:
-        failures.append("R7 execute prematurely registered")
+    return tuple(failures)
+
+
+def _r7d_authority_check(repo_root: Path) -> tuple[str, ...]:
+    """Constrain the runner to reviewed dispatch and result classification."""
+    path = repo_root / "scripts" / "checkpoint_runner.py"
+    if not path.is_file():
+        return ("R7D runner source missing",)
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    wrapper = _top_level_functions(tree).get("_r7_execute")
+    if wrapper is None:
+        return ("R7D runner missing _r7_execute",)
+    failures: list[str] = []
+    imports = [
+        ast.unparse(node)
+        for node in ast.walk(wrapper)
+        if isinstance(node, (ast.Import, ast.ImportFrom))
+    ]
+    if imports != [
+        "from scripts import d10_arch128_r7_protected as r7_protected",
+        "from scripts import d10_arch128_r7_windows as r7_windows",
+    ]:
+        failures.append("R7D runner imports are not the reviewed composition")
+    calls = [node for node in ast.walk(wrapper) if isinstance(node, ast.Call)]
+    dispatches = [
+        node for node in calls if ast.unparse(node.func) == "r7_protected._dispatch"
+    ]
+    if (
+        len(dispatches) != 1
+        or [ast.unparse(arg) for arg in dispatches[0].args]
+        != [
+            "(r7_protected.EXECUTE_FLAG,)",
+            "dict(os.environ)",
+            "r7_windows.host_factory",
+        ]
+        or dispatches[0].keywords
+    ):
+        failures.append("R7D runner dispatch composition is not exact")
+    effect_guards = [
+        node for node in calls if ast.unparse(node.func) == "_require_not_run"
+    ]
+    expected_closed = (
+        "production_filesystem_mutation",
+        "manual_task_start",
+        "source_launch",
+        "provider",
+        "Paper-v2",
+        "broker",
+        "live",
+    )
+    if (
+        len(effect_guards) != 1
+        or len(effect_guards[0].args) != 2
+        or ast.unparse(effect_guards[0].args[0]) != "primary"
+        or ast.literal_eval(effect_guards[0].args[1]) != expected_closed
+        or effect_guards[0].keywords
+    ):
+        failures.append("R7D runner forbidden-effect guard is not exact")
+    allowed_calls = {
+        "r7_protected._dispatch",
+        "dict",
+        "type",
+        "_require_not_run",
+        "primary.get",
+        "RuntimeError",
+        "any",
+        "all",
+        "completion.items",
+        "blocked.items",
+    }
+    for node in calls:
+        called = ast.unparse(node.func)
+        if called not in allowed_calls:
+            failures.append(f"R7D runner contains unreviewed authority call: {called}")
+    for node in ast.walk(wrapper):
+        if isinstance(node, (ast.For, ast.While, ast.Try, ast.With)):
+            failures.append("R7D runner contains unreviewed retry/recovery flow")
+        if isinstance(node, (ast.Attribute, ast.Subscript)) and isinstance(
+            node.ctx, ast.Store
+        ):
+            failures.append("R7D runner mutates external state")
+    allowed_bindings = {
+        "r7_protected._dispatch",
+        "r7_protected.EXECUTE_FLAG",
+        "r7_protected.SCHEMA",
+        "r7_windows.host_factory",
+        "os.environ",
+    }
+    for name in _qualified_names(wrapper):
+        if name.startswith(("r7_protected.", "r7_windows.", "os.")):
+            if name not in allowed_bindings:
+                failures.append(f"R7D runner bypasses reviewed interlock: {name}")
+
+    expected_completion = {
+        "stage": "COMPLETE",
+        "authorization": "ACCEPTED",
+        "evidence_provision": "CALL_RETURNED",
+        "scheduler_mutation": "CALL_RETURNED",
+        "lease_publication": "PUBLISHED_VERIFIED",
+        "reconciliation_required": False,
+    }
+    expected_blocked = {
+        "stage": "EXECUTION_INTERLOCK",
+        "authorization": "NOT_ACCEPTED",
+        "evidence_provision": "NOT_RUN",
+        "scheduler_mutation": "NOT_RUN",
+        "lease_publication": "NOT_RUN",
+        "reconciliation_required": False,
+    }
+    for name, expected in (
+        ("completion", expected_completion),
+        ("blocked", expected_blocked),
+    ):
+        values = [
+            node.value
+            for node in ast.walk(wrapper)
+            if isinstance(node, ast.Assign)
+            and any(
+                isinstance(target, ast.Name) and target.id == name
+                for target in node.targets
+            )
+        ]
+        if len(values) != 1 or ast.literal_eval(values[0]) != expected:
+            failures.append(f"R7D runner {name} evidence contract changed")
+
+    wrapper_source = ast.unparse(wrapper)
+    for required in (
+        "primary.get('automatic_retry') is not False",
+        "primary.get('automatic_rollback') is not False",
+        "primary.get('automatic_cleanup') is not False",
+        "type(primary.get('reconciliation_required')) is not bool",
+        "if status == 'PASS':",
+        "any((primary.get(field) != value for field, value in completion.items()))",
+        "elif status == 'BLOCKED' and all",
+        "disposition = 'CONFIRMED'",
+        "disposition = 'NOT_STARTED'",
+        "disposition = 'MAY_HAVE_OCCURRED'",
+    ):
+        if required not in wrapper_source:
+            failures.append(f"R7D runner missing conservative result guard: {required}")
+
+    expected_classification = ast.parse(
+        """
+if status == "PASS":
+    if any(primary.get(field) != value for field, value in completion.items()):
+        raise RuntimeError("R7 PASS lacked exact verified completion evidence")
+    disposition = "CONFIRMED"
+elif status == "BLOCKED" and all(
+    primary.get(field) == value for field, value in blocked.items()
+):
+    disposition = "NOT_STARTED"
+else:
+    disposition = "MAY_HAVE_OCCURRED"
+"""
+    ).body[0]
+    classifications = [
+        node
+        for node in wrapper.body
+        if isinstance(node, ast.If) and ast.unparse(node.test) == "status == 'PASS'"
+    ]
+    assignments = [
+        node
+        for node in ast.walk(wrapper)
+        if isinstance(node, ast.Assign)
+        and any(
+            isinstance(target, ast.Name) and target.id == "disposition"
+            for target in node.targets
+        )
+    ]
+    if (
+        len(classifications) != 1
+        or ast.dump(classifications[0]) != ast.dump(expected_classification)
+        or len(assignments) != 3
+    ):
+        failures.append("R7D runner effect classification is not conservative")
+
+    registrations = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and ast.unparse(node.func) == "CheckpointSpec"
+        and any(
+            keyword.arg == "name"
+            and isinstance(keyword.value, ast.Constant)
+            and keyword.value.value == "arch128-r7"
+            for keyword in node.keywords
+        )
+    ]
+    if len(registrations) != 1 or not any(
+        keyword.arg == "execute" and ast.unparse(keyword.value) == "_r7_execute"
+        for keyword in registrations[0].keywords
+    ):
+        failures.append("R7D runner registration is not the reviewed wrapper")
+    if _checkpoint_specs()["arch128-r7"].execute is not _r7_execute:
+        failures.append("R7D R7 execute wrapper is not registered")
+
+    for filename, expected in (
+        (
+            "d10_arch128_r7_protected.py",
+            {
+                "EXECUTE_FLAG": "--execute-reviewed-r7-protected-activation",
+                "AUTH_ENV": "AI_TRADING_BOT_ARCH128_R7_AUTHORIZATION",
+                "AUTH_VALUE": "ARCH128_R7_PROTECTED_ACTIVATION_AUTHORIZED",
+            },
+        ),
+        (
+            "d10_arch128_r7_windows.py",
+            {
+                "TRADING_PID_ENV": "AI_TRADING_BOT_ARCH128_R7_TRADING_PID",
+            },
+        ),
+    ):
+        module = ast.parse(
+            (repo_root / "scripts" / filename).read_text(encoding="utf-8")
+        )
+        constants = {}
+        for node in module.body:
+            if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+                constants[node.target.id] = node.value
+            elif isinstance(node, ast.Assign):
+                for target in node.targets:
+                    if isinstance(target, ast.Name):
+                        constants[target.id] = node.value
+        for name, value in expected.items():
+            literal = constants.get(name)
+            if not isinstance(literal, ast.Constant) or literal.value != value:
+                failures.append(f"R7D reviewed interlock changed: {name}")
     return tuple(failures)
 
 
@@ -1189,6 +1415,71 @@ def _r7_preflight() -> dict[str, object]:
     return {"status": primary.get("status"), "primary": primary}
 
 
+def _r7_execute() -> dict[str, object]:
+    from scripts import d10_arch128_r7_protected as r7_protected
+    from scripts import d10_arch128_r7_windows as r7_windows
+
+    primary = r7_protected._dispatch(
+        (r7_protected.EXECUTE_FLAG,),
+        dict(os.environ),
+        r7_windows.host_factory,
+    )
+    if type(primary) is not dict or primary.get("schema") != r7_protected.SCHEMA:
+        raise RuntimeError("R7 dispatch returned malformed evidence")
+    _require_not_run(
+        primary,
+        (
+            "production_filesystem_mutation",
+            "manual_task_start",
+            "source_launch",
+            "provider",
+            "Paper-v2",
+            "broker",
+            "live",
+        ),
+    )
+    if (
+        primary.get("automatic_retry") is not False
+        or primary.get("automatic_rollback") is not False
+        or primary.get("automatic_cleanup") is not False
+        or type(primary.get("reconciliation_required")) is not bool
+    ):
+        raise RuntimeError("R7 dispatch returned invalid recovery evidence")
+
+    status = primary.get("status")
+    completion = {
+        "stage": "COMPLETE",
+        "authorization": "ACCEPTED",
+        "evidence_provision": "CALL_RETURNED",
+        "scheduler_mutation": "CALL_RETURNED",
+        "lease_publication": "PUBLISHED_VERIFIED",
+        "reconciliation_required": False,
+    }
+    blocked = {
+        "stage": "EXECUTION_INTERLOCK",
+        "authorization": "NOT_ACCEPTED",
+        "evidence_provision": "NOT_RUN",
+        "scheduler_mutation": "NOT_RUN",
+        "lease_publication": "NOT_RUN",
+        "reconciliation_required": False,
+    }
+    if status == "PASS":
+        if any(primary.get(field) != value for field, value in completion.items()):
+            raise RuntimeError("R7 PASS lacked exact verified completion evidence")
+        disposition = "CONFIRMED"
+    elif status == "BLOCKED" and all(
+        primary.get(field) == value for field, value in blocked.items()
+    ):
+        disposition = "NOT_STARTED"
+    else:
+        disposition = "MAY_HAVE_OCCURRED"
+    return {
+        "status": status,
+        "primary": primary,
+        "effect_disposition": disposition,
+    }
+
+
 def _checkpoint_specs() -> dict[str, CheckpointSpec]:
     parent_tests = (
         *COMMON_TESTS,
@@ -1346,6 +1637,7 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             ruff_paths=r7_ruff,
             authority_check=_r7_authority_check,
             preflight=_r7_preflight,
+            execute=_r7_execute,
             remote_branch="feature/d10c-durable-wake-evidence",
         ),
     }

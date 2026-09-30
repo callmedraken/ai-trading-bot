@@ -7148,3 +7148,96 @@ Current next checkpoint:
 Production D10 remains disabled/non-running. The parent ACL repair is confirmed,
 but no Architecture-128 R4 staging creation, rename, scheduler mutation,
 activation, provider, Paper-v2, broker, or live effect has occurred.
+
+
+### Architecture 128 R4 scheduler preflight contract — SOURCE FIX ACCEPTED
+
+The fresh unified R4 read-only preflight at canonical source
+`6cf5555fe0deae79a68fef5dde87a1b300608138` reached scheduler admission and
+blocked before any R4 mutation with:
+
+```text
+PRIMARY_STATUS:
+BLOCKED
+
+PRIMARY_REASON:
+DeploymentBlocked
+
+PRIMARY_DETAIL:
+arch128_scheduler_drift
+
+IDENTITY_STABLE:
+True
+
+evidence:
+F:\AI\temp\ai-trading-bot-checkpoints\arch128-r4\preflight-20260930T004117.241726Z\report.json
+
+OVERALL:
+BLOCKED
+```
+
+Source diagnosis found a deterministic contract mismatch rather than a newly
+observed scheduler mutation. `r3._observe_scheduler()` returns the exact frozen
+scheduler semantic fields plus two already-validated read-only diagnostic
+fields:
+
+```text
+xml_byte_length
+xml_sha256
+```
+
+R4 `_scheduler_exact()` incorrectly required the returned key set to equal
+only `_expected_scheduler()`, so every otherwise valid R3 scheduler observation
+was rejected as `arch128_scheduler_drift`.
+
+The bounded source correction now:
+
+- admits exactly those two reviewed scheduler XML diagnostic fields;
+- continues to require every frozen scheduler semantic field to match exactly;
+- requires `xml_byte_length` to be a bounded integer;
+- requires `xml_sha256` to equal the already-frozen accepted scheduler XML
+  digest;
+- rejects any additional unreviewed scheduler field; and
+- adds regression tests for valid diagnostics, an extra unreviewed field, and
+  XML digest drift.
+
+Accepted source:
+
+```text
+HEAD:
+516e323b4f8863f08e71ab9cda076ca553ebc1e4
+
+TREE:
+b2232fc9f88bb9c469477f974493c0b62b949142
+
+GitHub Actions:
+36652404877
+
+conclusion:
+success
+```
+
+The preceding implementation commit
+`19812ce2ba24186fcca2f71b02f18e24537f9432` already passed pytest, Ruff lint,
+authority review, git diff checking, and identity stability; CI rejected only
+Ruff formatting in the new regression-test file. The formatting-only correction
+above then passed both registered Architecture-128 source profiles.
+
+No scheduler mutation, R4 staging, rename, activation, source launch, provider,
+Paper-v2, broker, or live effect occurred during this diagnosis or source fix.
+
+Standing authorization applies to the next safe source/read-only checkpoint.
+Current next checkpoint:
+
+1. finish this documentation closeout and use its exact live remote HEAD;
+2. create a fresh clean detached R4 operator worktree under
+   `F:\AI\worktrees\...`;
+3. run `ops.ps1 status`;
+4. run read-only `ops.ps1 preflight arch128-r4`;
+5. if PASS, continue automatically into the next safe R4 protected-dispatch
+   source/design checkpoint, but stop before the first real R4 production
+   filesystem effect;
+6. if BLOCKED, preserve evidence and diagnose the checked-in observer/source
+   without mutating production state.
+
+Production D10 remains disabled/non-running.

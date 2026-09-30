@@ -7688,3 +7688,96 @@ Current next checkpoint:
 7. later scheduler/lease activation remains a separate protected boundary.
 
 Production D10 remains disabled/non-running.
+
+
+### Architecture 128 R4 protected replacement — EFFECT CONFIRMED
+
+A fresh elevated exact-source R4 effect-gate worktree was admitted at:
+
+```text
+worktree:
+F:\AI\worktrees\ai-trading-bot-ops-r4-effect-gate
+
+HEAD:
+9ca15eca9bf33d905bac9e68882c3029a58d6591
+
+TREE:
+7fc23c7c30fc50379dd99c7f08af82cfc1c327ed
+
+preflight:
+PRIMARY_STATUS=PASS
+IDENTITY_STABLE=True
+OVERALL=PASS
+
+preflight evidence:
+F:\AI\temp\ai-trading-bot-checkpoints\arch128-r4\preflight-20260930T025017.419632Z\report.json
+```
+
+After review, the user gave fresh conditional authorization for the real R4
+filesystem effect. The authorization was consumed by exactly one protected
+`execute arch128-r4` invocation. The unified runner returned:
+
+```text
+PRIMARY_STATUS:
+PASS
+
+EFFECT_DISPOSITION:
+CONFIRMED
+
+IDENTITY_STABLE:
+True
+
+execute evidence:
+F:\AI\temp\ai-trading-bot-checkpoints\arch128-r4\execute-20260930T031243.011699Z\report.json
+
+OVERALL:
+PASS
+
+R4_EXECUTE_EXIT:
+0
+```
+
+The accepted R4 operator contract requires a PASS to mean:
+
+```text
+production_filesystem_mutation=REPLACEMENT_COMPLETE_AND_VERIFIED
+rename_1=SUCCESS
+rename_2=SUCCESS
+```
+
+Therefore the Architecture-127 signed replacement is now the canonical
+`F:\AITradingBot\D10` deployment, the halted S5-R10 deployment is retained
+whole at its fixed incident-retired destination, the Architecture-128 staging
+destination is absent after publication, and the scheduler remains
+disabled/non-running. The R4 authorization is consumed. No retry, rollback, or
+cleanup authorization remains outstanding.
+
+R4 did not authorize or perform scheduler mutation, activation publication,
+source launch, provider access, Paper-v2 effects, broker submission, or live
+trading.
+
+Current Architecture-128 progression:
+
+```text
+R1  source-only E6 material construction                   ACCEPTED
+R2  exact material review + protected signing              ACCEPTED
+R3  halted-host/replacement read-only preflight             ACCEPTED
+R4  protected deployment replacement                       PASS / COMPLETE
+R5  non-admin Trading read-only deployment qualification   NEXT
+R6  source-only evidence/reactivation operator              NOT STARTED
+R7  protected evidence + scheduler + lease activation       NOT AUTHORIZED
+R8  first natural D10-C wake observation                    NOT STARTED
+```
+
+The next safe checkpoint is R5. It is read-only and must run under the actual
+non-admin, non-elevated Trading principal. It must prove the exact new signed
+canonical deployment and sealed source/guard, the protected production Python
+substrate, exact evidence-root identity/security, activation lease
+final/installing/tmp absence, no current-soak evidence, second-stage launch not
+called, and no scheduler/provider/Paper-v2/broker/live effect. Failure leaves
+the scheduler disabled and deployment inert.
+
+Under the standing safe-checkpoint authorization, source-only work may add R5
+to the unified checked-in runner. Do not create another external one-off
+qualification helper. R7 remains a separate protected boundary requiring fresh
+explicit authorization.

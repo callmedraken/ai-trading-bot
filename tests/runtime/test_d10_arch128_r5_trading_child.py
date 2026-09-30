@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 from dataclasses import dataclass
 from types import SimpleNamespace
 
@@ -55,16 +54,14 @@ class Backend:
 
 
 def _case(*, evidence: tuple[str, ...] = ()):
-    source = b"reviewed-guard-source"
-    digest = hashlib.sha256(source).hexdigest()
     identity = SimpleNamespace(
         deployment_id="new-id",
         unsigned_attestation_sha256="a" * 64,
         certified_source_head="b" * 40,
         certified_source_tree="c" * 40,
         executable_file_count=307,
-        guard_byte_length=len(source),
-        guard_sha256=digest,
+        guard_byte_length=112228,
+        guard_sha256="a" * 64,
     )
     r4 = SimpleNamespace(NEW_IDENTITY=identity)
     backend = Backend(evidence=evidence)
@@ -99,13 +96,13 @@ def _case(*, evidence: tuple[str, ...] = ()):
         guard.D10_PRODUCTION_PYTHON,
         guard.D10_PRODUCTION_PYTHON_VERSION,
     )
-    return guard, r4, source
+    return guard, r4
 
 
 def test_qualify_accepts_exact_empty_inert_deployment() -> None:
-    guard, r4, source = _case()
+    guard, r4 = _case()
 
-    result = child._qualify(guard, r4, source)
+    result = child._qualify(guard, r4)
 
     assert result["status"] == "PASS"
     assert result["second_stage_launch_trap"] == "NOT_CALLED"
@@ -115,9 +112,9 @@ def test_qualify_accepts_exact_empty_inert_deployment() -> None:
 
 
 def test_qualify_rejects_nonempty_evidence_root() -> None:
-    guard, r4, source = _case(evidence=("wake-unexpected.jsonl",))
+    guard, r4 = _case(evidence=("wake-unexpected.jsonl",))
 
-    result = child._qualify(guard, r4, source)
+    result = child._qualify(guard, r4)
 
     assert result["status"] == "BLOCKED"
     assert result["source_launch"] == "NOT_RUN"

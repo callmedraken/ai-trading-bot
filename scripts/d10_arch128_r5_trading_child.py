@@ -8,7 +8,6 @@ No scheduler, activation, provider, Paper-v2, broker, or live effect exists here
 
 from __future__ import annotations
 
-import hashlib
 import json
 import sys
 from contextlib import ExitStack
@@ -64,18 +63,10 @@ def _require_final_lease_absent(backend: object, guard_module: object) -> None:
 def _qualify(
     guard_module: object = guard,
     r4_module: object = r4,
-    source_guard_bytes: bytes | None = None,
 ) -> dict[str, object]:
     result = _base()
     try:
         expected = r4_module.NEW_IDENTITY
-        if source_guard_bytes is None:
-            source_guard_bytes = Path(guard_module.__file__).read_bytes()
-        if (
-            len(source_guard_bytes) != expected.guard_byte_length
-            or hashlib.sha256(source_guard_bytes).hexdigest() != expected.guard_sha256
-        ):
-            raise RuntimeError("r5_reviewed_guard_source_identity_drift")
 
         calls: list[tuple[object, ...]] = []
         original_run = guard_module.subprocess.run

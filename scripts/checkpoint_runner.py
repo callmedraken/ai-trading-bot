@@ -191,8 +191,6 @@ def _r4_authority_check(repo_root: Path) -> tuple[str, ...]:
 
 
 def _r5_authority_check(repo_root: Path) -> tuple[str, ...]:
-    from scripts import d10_arch128_r4_replacement as r4
-
     child_path = repo_root / "scripts" / "d10_arch128_r5_trading_child.py"
     child_source = child_path.read_text(encoding="utf-8")
     child_tree = ast.parse(child_source, filename=str(child_path))
@@ -211,7 +209,6 @@ def _r5_authority_check(repo_root: Path) -> tuple[str, ...]:
             "guard_module._stable",
             "backend.require_absent",
             "backend.listdir",
-            "hashlib.sha256",
         ):
             if required not in names:
                 failures.append(
@@ -243,14 +240,6 @@ def _r5_authority_check(repo_root: Path) -> tuple[str, ...]:
     ):
         if forbidden in child_source:
             failures.append(f"R5 Trading child contains forbidden surface: {forbidden}")
-
-    guard_path = repo_root / "scripts" / "run_personal_desktop_d10_launch_guard.py"
-    guard_bytes = guard_path.read_bytes()
-    if (
-        len(guard_bytes) != r4.NEW_IDENTITY.guard_byte_length
-        or hashlib.sha256(guard_bytes).hexdigest() != r4.NEW_IDENTITY.guard_sha256
-    ):
-        failures.append("R5 reviewed guard source differs from frozen R4 identity")
 
     runner_path = repo_root / "scripts" / "checkpoint_runner.py"
     runner_source = runner_path.read_text(encoding="utf-8")

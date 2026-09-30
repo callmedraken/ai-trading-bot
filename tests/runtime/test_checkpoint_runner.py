@@ -166,6 +166,8 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
     assert specs["arch128-r6"].execute is None
     assert specs["arch128-r7"].preflight is not None
     assert specs["arch128-r7"].execute is None
+    assert specs["arch128-r7"].preflight is not None
+    assert specs["arch128-r7"].execute is None
     assert specs["arch128-r5-substrate"].remote_head_env is None
     assert (
         specs["arch128-r5-trading"].remote_head_env == runner.R5_TRADING_REMOTE_HEAD_ENV
@@ -944,3 +946,10 @@ def test_r7_preflight_rejects_effect_evidence(monkeypatch) -> None:
         assert "scheduler_mutation" in str(exc)
     else:
         raise AssertionError("R7 read-only gate accepted effect evidence")
+
+
+def test_r7b_source_dispatch_is_not_registered_for_execution() -> None:
+    specs = runner._checkpoint_specs()
+
+    assert specs["arch128-r7"].preflight is runner._r7_preflight
+    assert specs["arch128-r7"].execute is None

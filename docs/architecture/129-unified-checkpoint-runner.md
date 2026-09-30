@@ -349,3 +349,27 @@ future R7 protected binding/execute implementation remains source work, and
 actual evidence creation, scheduler mutation, or activation-lease publication
 still requires a separate fresh explicit authorization after final exact-source
 admission.
+
+
+### Architecture 128 R7B protected-dispatch source contract
+
+R7B freezes the protected authorization/composition boundary without making R7
+executable. The source owns exact execute-flag and environment authorization
+values, calls the accepted R6 state machine only after both interlocks match,
+propagates mutation/reconciliation disposition without granting retry/rollback/
+cleanup authority, and rejects any claimed PASS that does not preserve the
+frozen R6 completion contract.
+
+R7B deliberately contains no Windows evidence writer, Trading-token acquisition,
+scheduler transport, activation-lease writer, process launcher, provider,
+Paper-v2, broker, or live-trading implementation. The unified runner continues
+to register `arch128-r7` with read-only `preflight` only; its `execute`
+field remains absent.
+
+The next source-only checkpoint is R7C concrete host binding. In particular it
+must solve the Architecture-128 requirement that the newly created evidence file
+be opened through a genuine Trading token under the exact append-only,
+WRITE_THROUGH, zero-write contract before scheduler credential acquisition.
+Only after those concrete bindings are source-certified may a protected runner
+execute surface be registered, and actual R7 activation still requires fresh
+explicit authorization.

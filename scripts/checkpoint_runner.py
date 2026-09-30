@@ -351,6 +351,45 @@ def _r7_authority_check(repo_root: Path) -> tuple[str, ...]:
         if forbidden in source:
             failures.append(f"R7 read-only source contains effect surface: {forbidden}")
 
+    protected_path = repo_root / "scripts" / "d10_arch128_r7_protected.py"
+    if not protected_path.is_file():
+        failures.append("R7 protected-dispatch source missing")
+        return tuple(failures)
+    protected_source = protected_path.read_text(encoding="utf-8")
+    protected_tree = ast.parse(protected_source, filename=str(protected_path))
+    protected_functions = _top_level_functions(protected_tree)
+    dispatch = protected_functions.get("_dispatch")
+    if dispatch is None:
+        failures.append("R7 protected-dispatch source missing _dispatch")
+    else:
+        dispatch_source = ast.get_source_segment(protected_source, dispatch) or ""
+        for required in (
+            "EXECUTE_FLAG",
+            "AUTH_ENV",
+            "AUTH_VALUE",
+            "r6.ReactivationOperator",
+            "execute_r7=True",
+        ):
+            if required not in dispatch_source:
+                failures.append(f"R7 protected dispatch missing: {required}")
+
+    for forbidden in (
+        "ctypes",
+        "subprocess",
+        "WindowsActivationLeaseBackend",
+        "WindowsDeploymentBackend",
+        "CreateFileW",
+        "RegisterTask",
+        "RegisterTaskDefinition",
+        "Start-ScheduledTask",
+        "_update_scheduler",
+        "_interactive_credential",
+    ):
+        if forbidden in protected_source:
+            failures.append(
+                f"R7B dispatch contains premature host authority surface: {forbidden}"
+            )
+
     return tuple(failures)
 
 
@@ -868,6 +907,7 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
     r7_tests = (
         *COMMON_TESTS,
         "tests/runtime/test_d10_arch128_r7_readonly.py",
+        "tests/runtime/test_d10_arch128_r7_protected.py",
         "tests/runtime/test_d10_arch128_r4_orchestration.py",
         "tests/runtime/test_d10_arch128_r4_windows.py",
         "tests/runtime/test_d10_arch128_r3_preflight.py",
@@ -876,6 +916,8 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
         *COMMON_RUFF_PATHS,
         "scripts/d10_arch128_r7_readonly.py",
         "tests/runtime/test_d10_arch128_r7_readonly.py",
+        "scripts/d10_arch128_r7_protected.py",
+        "tests/runtime/test_d10_arch128_r7_protected.py",
     )
     return {
         "arch128-parent-acl-repair": CheckpointSpec(

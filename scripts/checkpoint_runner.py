@@ -312,6 +312,48 @@ def _r6_authority_check(repo_root: Path) -> tuple[str, ...]:
     return tuple(failures)
 
 
+def _r7_authority_check(repo_root: Path) -> tuple[str, ...]:
+    path = repo_root / "scripts" / "d10_arch128_r7_readonly.py"
+    source = path.read_text(encoding="utf-8")
+    tree = ast.parse(source, filename=str(path))
+    functions = _top_level_functions(tree)
+    failures: list[str] = []
+
+    preflight = functions.get("preflight")
+    if preflight is None:
+        failures.append("R7 read-only source missing preflight")
+        return tuple(failures)
+
+    names = _qualified_names(preflight)
+    for required in (
+        "r4c.observe_post",
+        "r4w.WindowsArch128ReadOnlyReader",
+        "WindowsCngVerifier",
+        "r3._observe_scheduler",
+        "r4.NamespaceState.COMPLETE",
+    ):
+        if required not in names:
+            failures.append(f"R7 read-only source missing binding: {required}")
+
+    for forbidden in (
+        "WindowsArch128StagingBackend",
+        "WindowsActivationLeaseBackend",
+        "create_file",
+        "publish_create_only",
+        "rename_fixed_step",
+        "RegisterTask",
+        "RegisterTaskDefinition",
+        "Start-ScheduledTask",
+        "_update_scheduler",
+        "_interactive_credential",
+        "subprocess.run",
+    ):
+        if forbidden in source:
+            failures.append(f"R7 read-only source contains effect surface: {forbidden}")
+
+    return tuple(failures)
+
+
 def _parent_acl_authority_check(repo_root: Path) -> tuple[str, ...]:
     path = repo_root / "scripts" / "d10_arch128_parent_acl_repair.py"
     source = path.read_text(encoding="utf-8")
@@ -726,6 +768,28 @@ def _r4_preflight() -> dict[str, object]:
     }
 
 
+def _r7_preflight() -> dict[str, object]:
+    from scripts import d10_arch128_r7_readonly as admission
+
+    primary = admission.preflight()
+    _require_not_run(
+        primary,
+        (
+            "production_filesystem_mutation",
+            "evidence_provision",
+            "scheduler_mutation",
+            "lease_publication",
+            "manual_task_start",
+            "source_launch",
+            "provider",
+            "Paper-v2",
+            "broker",
+            "live",
+        ),
+    )
+    return {"status": primary.get("status"), "primary": primary}
+
+
 def _checkpoint_specs() -> dict[str, CheckpointSpec]:
     parent_tests = (
         *COMMON_TESTS,
@@ -801,6 +865,18 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
         "scripts/d10_arch128_r6_reactivation.py",
         "tests/runtime/test_d10_arch128_r6_reactivation.py",
     )
+    r7_tests = (
+        *COMMON_TESTS,
+        "tests/runtime/test_d10_arch128_r7_readonly.py",
+        "tests/runtime/test_d10_arch128_r4_orchestration.py",
+        "tests/runtime/test_d10_arch128_r4_windows.py",
+        "tests/runtime/test_d10_arch128_r3_preflight.py",
+    )
+    r7_ruff = (
+        *COMMON_RUFF_PATHS,
+        "scripts/d10_arch128_r7_readonly.py",
+        "tests/runtime/test_d10_arch128_r7_readonly.py",
+    )
     return {
         "arch128-parent-acl-repair": CheckpointSpec(
             name="arch128-parent-acl-repair",
@@ -849,6 +925,15 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             tests=r6_tests,
             ruff_paths=r6_ruff,
             authority_check=_r6_authority_check,
+            remote_branch="feature/d10c-durable-wake-evidence",
+        ),
+        "arch128-r7": CheckpointSpec(
+            name="arch128-r7",
+            description="Architecture 128 R7 read-only activation admission",
+            tests=r7_tests,
+            ruff_paths=r7_ruff,
+            authority_check=_r7_authority_check,
+            preflight=_r7_preflight,
             remote_branch="feature/d10c-durable-wake-evidence",
         ),
     }

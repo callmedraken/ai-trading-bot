@@ -8322,3 +8322,113 @@ one elevated, exact-source `preflight arch128-r7` on the Windows production
 host. A PASS remains diagnostic admission evidence only and grants no authority
 to create the evidence object, mutate Task Scheduler, or publish the activation
 lease.
+
+
+### Architecture 128 R7B protected dispatch source — ACCEPTED
+
+R7B is source-accepted. This checkpoint freezes the protected-dispatch
+interlock and its composition with the accepted R6 reactivation operator; it
+does not add concrete Windows host bindings and does not authorize a protected
+R7 activation.
+
+The initial R7B source commit was:
+
+```text
+HEAD:
+f8f4ba4e009792c59e3044ac53684dcc9be4ceb0
+
+TREE:
+dc3fadcaa204f7ee30c2f839ebb049826e32e962
+```
+
+GitHub Actions run `36691805290` failed only the R7 Ruff source gate because
+`tests/runtime/test_d10_arch128_r7_protected.py` contained one extra blank
+line in its import block. Review also found one duplicated pair of
+`arch128-r7` registration assertions in
+`tests/runtime/test_checkpoint_runner.py`. No runtime, authority, ordering, or
+protected-effect defect was indicated.
+
+The mechanical correction changed only those two test files and deleted three
+lines total.
+
+Accepted source checkpoint:
+
+```text
+HEAD:
+8ec7e3dc86c048bdb07578c84797ecce2bec6fdf
+
+TREE:
+10633d44579ca641371d991552f97c7d560440c4
+
+GitHub Actions:
+36697187950 SUCCESS
+```
+
+The focused local R7 verification and the GitHub source-gate job both passed
+pytest, Ruff lint, Ruff format, git diff checking, authority review, and stable
+source identity.
+
+The protected R7 dispatch remains frozen behind both exact interlocks:
+
+```text
+CLI:
+--execute-reviewed-r7-protected-activation
+
+environment:
+AI_TRADING_BOT_ARCH128_R7_AUTHORIZATION=
+ARCH128_R7_PROTECTED_ACTIVATION_AUTHORIZED
+```
+
+Without both exact values the dispatcher remains blocked and does not construct
+the R6 protected boundary factory. With both values, the source contract
+delegates to the accepted R6 ordering state machine. This is contract-only
+source acceptance: no evidence object was created, no scheduler credential was
+acquired, no scheduler state was mutated, no activation lease was published,
+and no manual task/source/provider/Paper-v2/broker/live effect occurred.
+
+The unified runner still supports only:
+
+```powershell
+.\ops.ps1 verify arch128-r7
+.\ops.ps1 preflight arch128-r7
+```
+
+and still does **not** register `execute arch128-r7`.
+
+Current Architecture-128 progression:
+
+```text
+R1   E6 deployment material construction                   ACCEPTED
+R2   protected signing                                      ACCEPTED
+R3   replacement read-only admission                        ACCEPTED
+R4   protected clean deployment replacement                 COMPLETE
+R5   Trading + production-Python qualification              ACCEPTED
+R6   source-only reactivation ordering contract             ACCEPTED
+R7A  read-only activation admission source                  ACCEPTED
+R7B  protected-dispatch source contract                     ACCEPTED
+R7C  concrete protected Windows host bindings               NEXT
+R8   first natural scheduled wake                           NOT STARTED
+```
+
+R7C must bind the accepted R6/R7B contract to concrete Windows primitives while
+preserving the frozen order and fail-closed authority boundaries. In
+particular, the genuine Trading-token evidence-file probe must open the exact
+new evidence file with the Architecture-127 append-only + WRITE_THROUGH +
+OPEN_EXISTING contract, without writing a record, and must complete before
+scheduler credential acquisition.
+
+R7C remains source-only/certification work. It must not register or invoke a
+protected R7 execution surface prematurely. After the concrete bindings are
+source-certified, the remaining protected-runner registration may be reviewed
+as its own narrow source checkpoint.
+
+Sequencing note: the elevated exact-source Windows `preflight arch128-r7` is
+deferred until the final executable R7 source has been accepted. Running that
+host admission against an intermediate R7A/R7B SHA would become stale as soon
+as R7C or the later runner-registration source advanced. Immediately before any
+actual protected R7 authorization, the final live-remote source identity must
+therefore receive a fresh read-only host preflight.
+
+Actual evidence creation, scheduler credential acquisition/mutation, activation
+lease publication, or any other R7 protected effect remains **NOT AUTHORIZED**
+and requires fresh explicit approval after that final exact-source admission.

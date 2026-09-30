@@ -152,6 +152,9 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
         assert "tests/runtime/test_checkpoint_runner.py" in spec.ruff_paths
         assert spec.remote_branch == "feature/d10c-durable-wake-evidence"
 
+    assert specs["arch128-parent-acl-repair"].execute is not None
+    assert specs["arch128-r4"].execute is None
+
 
 def test_current_arch128_authority_profiles_pass() -> None:
     repo_root = Path(runner.__file__).resolve().parent.parent
@@ -220,6 +223,44 @@ def test_parent_preflight_uses_read_only_operator(
     assert result["status"] == "PASS"
     assert result["primary"]["acl_mutation"] == "NOT_RUN"
     assert result["diagnostics"] == {}
+
+
+def test_parent_execute_delegates_through_existing_interlock(
+    monkeypatch,
+) -> None:
+    from scripts import d10_arch128_parent_acl_repair as repair
+
+    monkeypatch.delenv(repair.AUTH_ENV, raising=False)
+    monkeypatch.setattr(
+        repair,
+        "_repair_once",
+        lambda: (_ for _ in ()).throw(AssertionError("repair called")),
+    )
+
+    result = runner._parent_acl_execute()
+
+    assert result["status"] == "BLOCKED"
+    assert result["primary"]["reason"] == "authorization_interlock_not_exact"
+    assert result["effect_disposition"] == "NOT_STARTED"
+
+
+def test_parent_execute_rejects_forbidden_side_effect_evidence(
+    monkeypatch,
+) -> None:
+    from scripts import d10_arch128_parent_acl_repair as repair
+
+    result = _parent_preflight_result()
+    result["status"] = "PASS"
+    result["acl_mutation"] = "EXACT_PARENT_POLICY_APPLIED_AND_VERIFIED"
+    result["scheduler_mutation"] = "MUTATED"
+    monkeypatch.setattr(repair, "_dispatch", lambda *args, **kwargs: result)
+
+    try:
+        runner._parent_acl_execute()
+    except RuntimeError as exc:
+        assert "scheduler_mutation" in str(exc)
+    else:
+        raise AssertionError("unexpected protected side effect was accepted")
 
 
 def test_r4_preflight_attaches_parent_acl_diagnostic(
@@ -405,3 +446,150 @@ def test_preflight_checkpoint_allows_detached_with_pinned_remote(
     assert passed is True
     assert report.is_file()
     assert observed_branches == ["feature/pinned"]
+
+
+def test_execute_checkpoint_requires_live_remote_head(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    calls = 0
+    state = {
+        "head": "a" * 40,
+        "tree": "b" * 40,
+        "branch": "HEAD",
+        "porcelain": "",
+    }
+
+    monkeypatch.setattr(runner, "_git_state", lambda repo: dict(state))
+    monkeypatch.setattr(
+        runner,
+        "_remote_branch_head",
+        lambda repo, branch: "c" * 40,
+    )
+
+    def execute() -> dict[str, object]:
+        nonlocal calls
+        calls += 1
+        return {
+            "status": "PASS",
+            "primary": {"status": "PASS"},
+            "effect_disposition": "CONFIRMED",
+        }
+
+    spec = runner.CheckpointSpec(
+        name="example",
+        description="example",
+        tests=(),
+        ruff_paths=(),
+        authority_check=lambda repo: (),
+        execute=execute,
+        remote_branch="feature/pinned",
+    )
+
+    try:
+        runner.execute_checkpoint(
+            spec,
+            repo_root=tmp_path,
+            evidence_root=tmp_path / "external",
+        )
+    except RuntimeError as exc:
+        assert "live remote branch head" in str(exc)
+    else:
+        raise AssertionError("stale source was accepted")
+
+    assert calls == 0
+
+
+def test_execute_checkpoint_writes_attempt_and_final_evidence(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    state = {
+        "head": "a" * 40,
+        "tree": "b" * 40,
+        "branch": "HEAD",
+        "porcelain": "",
+    }
+
+    monkeypatch.setattr(runner, "_git_state", lambda repo: dict(state))
+    monkeypatch.setattr(
+        runner,
+        "_remote_branch_head",
+        lambda repo, branch: state["head"],
+    )
+
+    spec = runner.CheckpointSpec(
+        name="example",
+        description="example",
+        tests=(),
+        ruff_paths=(),
+        authority_check=lambda repo: (),
+        execute=lambda: {
+            "status": "PASS",
+            "primary": {"status": "PASS"},
+            "effect_disposition": "CONFIRMED",
+        },
+        remote_branch="feature/pinned",
+    )
+
+    passed, report = runner.execute_checkpoint(
+        spec,
+        repo_root=tmp_path,
+        evidence_root=tmp_path / "external",
+    )
+
+    assert passed is True
+    assert report.is_file()
+    attempt = report.with_name("attempt.json")
+    assert attempt.is_file()
+    payload = report.read_text(encoding="utf-8")
+    assert '"kind": "protected_execution"' in payload
+    assert '"protected_execution": "ATTEMPTED"' in payload
+    assert '"automatic_retry": "NOT_AUTHORIZED"' in payload
+    assert '"effect_disposition": "CONFIRMED"' in payload
+
+
+def test_execute_checkpoint_preserves_attempt_on_runner_exception(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    state = {
+        "head": "a" * 40,
+        "tree": "b" * 40,
+        "branch": "HEAD",
+        "porcelain": "",
+    }
+
+    monkeypatch.setattr(runner, "_git_state", lambda repo: dict(state))
+    monkeypatch.setattr(
+        runner,
+        "_remote_branch_head",
+        lambda repo, branch: state["head"],
+    )
+
+    def execute() -> dict[str, object]:
+        raise RuntimeError("ambiguous protected failure")
+
+    spec = runner.CheckpointSpec(
+        name="example",
+        description="example",
+        tests=(),
+        ruff_paths=(),
+        authority_check=lambda repo: (),
+        execute=execute,
+        remote_branch="feature/pinned",
+    )
+
+    passed, report = runner.execute_checkpoint(
+        spec,
+        repo_root=tmp_path,
+        evidence_root=tmp_path / "external-stop",
+    )
+
+    assert passed is False
+    assert report.is_file()
+    assert report.with_name("attempt.json").is_file()
+    payload = report.read_text(encoding="utf-8")
+    assert '"status": "STOPPED"' in payload
+    assert '"effect_disposition": "MAY_HAVE_OCCURRED"' in payload
+    assert '"automatic_retry": "NOT_AUTHORIZED"' in payload

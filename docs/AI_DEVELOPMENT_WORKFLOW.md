@@ -525,6 +525,7 @@ checked-in repository launcher and runner:
 .\ops.ps1 verify arch128-r4
 .\ops.ps1 preflight arch128-parent-acl-repair
 .\ops.ps1 preflight arch128-r4
+.\ops.ps1 execute arch128-parent-acl-repair
 ```
 
 `ops.ps1` is intentionally a thin launcher. Source-gate orchestration,
@@ -542,9 +543,12 @@ same pytest/Ruff/diff checks locally.
 
 Local Windows work remains necessary for host-specific qualification such as
 ACLs, Task Scheduler, real account tokens, and protected filesystem state. Those
-operations are being migrated into the runner's registered `preflight` and
-later protected `execute` layers. A source PASS never grants protected
-production authority.
+operations use the runner's registered `preflight` layer and, only where
+separately source-reviewed, checkpoint-specific protected `execute` dispatches.
+The current protected dispatch is limited to
+`arch128-parent-acl-repair`. A source or preflight PASS never grants protected
+production authority; a fresh explicit approval and the exact reviewed
+authorization interlock remain mandatory.
 
 Checkpoint evidence is external to the repository. The preferred development
 host root is `F:\AI\temp\ai-trading-bot-checkpoints`; CI uses its runner

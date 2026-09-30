@@ -144,7 +144,21 @@ script.
 
 ## 8. Protected execution
 
-Protected execution remains a separate future runner layer.
+Protected execution is implemented only for explicitly registered reviewed
+profiles. The first protected migration is:
+
+```text
+execute arch128-parent-acl-repair
+```
+
+The runner itself first requires a clean exact live-remote source identity and
+writes a pre-effect external attempt record. The registered parent-ACL execution
+then delegates through the already-reviewed repair operator's exact
+`EXECUTE_FLAG` / authorization-environment interlock rather than calling its
+mutation primitive directly. The final report preserves the operator result,
+effect disposition, post-run source identity, and `automatic_retry =
+NOT_AUTHORIZED`. An unexpected runner exception after dispatch is conservatively
+recorded as `MAY_HAVE_OCCURRED`.
 
 Adding `execute` to the unified runner does not imply authorization to use it.
 Each protected checkpoint must retain:
@@ -197,6 +211,8 @@ Implemented:
 - `verify arch128-r4`;
 - `preflight arch128-parent-acl-repair`;
 - `preflight arch128-r4`;
+- protected `execute arch128-parent-acl-repair` dispatch, still requiring the
+  existing exact authorization interlock and fresh user approval;
 - automatic parent-ACL diagnostics when R4 blocks on parent policy;
 - checkpoint-pinned remote-branch verification through read-only
   `git ls-remote`;
@@ -208,8 +224,10 @@ Implemented:
 
 Next:
 
-1. use the unified read-only preflight on a clean detached operator worktree;
-2. after the parent-ACL repair source and preflight are accepted, add a
-   separately reviewed protected `execute arch128-parent-acl-repair` dispatch;
-3. re-run `preflight arch128-r4` after the ACL repair;
-4. only then add the separately reviewed R4 protected replacement dispatch.
+1. source-certify the protected `execute arch128-parent-acl-repair` dispatch;
+2. from a fresh clean detached operator worktree at that exact live source,
+   repeat `preflight arch128-parent-acl-repair`;
+3. stop for fresh explicit authorization at the real parent-ACL effect boundary;
+4. after a separately authorized successful repair, run
+   `preflight arch128-r4`;
+5. only then add the separately reviewed R4 protected replacement dispatch.

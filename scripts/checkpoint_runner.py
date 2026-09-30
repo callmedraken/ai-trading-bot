@@ -1,8 +1,8 @@
 """Unified source-checkpoint runner for AI Trading Bot development.
 
-This module centralizes source-only verification. It intentionally does not
-provide protected production execution in its first version. Local Windows host
-preflight and protected actions will be added as separately reviewed commands.
+This module centralizes source verification, read-only host preflight, and
+registered protected checkpoint execution. Protected execution remains opt-in,
+checkpoint-specific, and authorization-gated.
 """
 
 from __future__ import annotations
@@ -37,6 +37,7 @@ class CheckpointSpec:
     ruff_paths: tuple[str, ...]
     authority_check: Callable[[Path], tuple[str, ...]]
     preflight: Callable[[], dict[str, object]] | None = None
+    execute: Callable[[], dict[str, object]] | None = None
     remote_branch: str | None = None
 
 
@@ -240,6 +241,30 @@ def _parent_acl_authority_check(repo_root: Path) -> tuple[str, ...]:
     if repair.D10_PARENT != r"F:\AITradingBot":
         failures.append(f"fixed parent differs: {repair.D10_PARENT!r}")
 
+    runner_path = repo_root / "scripts" / "checkpoint_runner.py"
+    runner_source = runner_path.read_text(encoding="utf-8")
+    runner_tree = ast.parse(runner_source, filename=str(runner_path))
+    runner_functions = _top_level_functions(runner_tree)
+    parent_execute = runner_functions.get("_parent_acl_execute")
+    if parent_execute is None:
+        failures.append("runner missing _parent_acl_execute")
+    else:
+        execute_names = _qualified_names(parent_execute)
+        for required in ("repair._dispatch", "repair.EXECUTE_FLAG", "os.environ"):
+            if required not in execute_names:
+                failures.append(
+                    f"runner parent execute missing reviewed dispatch binding: {required}"
+                )
+        for forbidden in (
+            "repair._repair_once",
+            "repair._open_parent_for_acl",
+            "apply_security_policy",
+        ):
+            if forbidden in execute_names:
+                failures.append(
+                    f"runner parent execute bypasses reviewed interlock: {forbidden}"
+                )
+
     return tuple(failures)
 
 
@@ -278,6 +303,44 @@ def _parent_acl_preflight() -> dict[str, object]:
         "status": primary.get("status"),
         "primary": primary,
         "diagnostics": {},
+    }
+
+
+def _parent_acl_execute() -> dict[str, object]:
+    from scripts import d10_arch128_parent_acl_repair as repair
+
+    primary = repair._dispatch((repair.EXECUTE_FLAG,), dict(os.environ))
+    _require_not_run(
+        primary,
+        (
+            "recursive_acl_mutation",
+            "d10_child_mutation",
+            "scheduler_mutation",
+            "activation",
+            "source_launch",
+            "provider",
+            "Paper-v2",
+            "broker",
+            "live",
+        ),
+    )
+
+    status = primary.get("status")
+    if status == "PASS":
+        if primary.get("acl_mutation") != "EXACT_PARENT_POLICY_APPLIED_AND_VERIFIED":
+            raise RuntimeError("parent ACL PASS lacked exact verified mutation evidence")
+        disposition = "CONFIRMED"
+    elif status == "BLOCKED":
+        if primary.get("acl_mutation") != "NOT_RUN":
+            raise RuntimeError("blocked parent ACL execution reported a mutation")
+        disposition = "NOT_STARTED"
+    else:
+        disposition = "MAY_HAVE_OCCURRED"
+
+    return {
+        "status": status,
+        "primary": primary,
+        "effect_disposition": disposition,
     }
 
 
@@ -389,6 +452,7 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             ruff_paths=parent_ruff,
             authority_check=_parent_acl_authority_check,
             preflight=_parent_acl_preflight,
+            execute=_parent_acl_execute,
             remote_branch="feature/d10c-durable-wake-evidence",
         ),
         "arch128-r4": CheckpointSpec(
@@ -786,6 +850,143 @@ def preflight_checkpoint(
     return passed, report_path
 
 
+def execute_checkpoint(
+    spec: CheckpointSpec,
+    *,
+    repo_root: Path,
+    evidence_root: Path,
+) -> tuple[bool, Path]:
+    if spec.execute is None:
+        raise RuntimeError(f"checkpoint has no protected execution: {spec.name}")
+
+    state_before = _git_state(repo_root)
+    if state_before["porcelain"]:
+        raise RuntimeError(
+            f"protected execution requires a clean worktree; "
+            f"found: {state_before['porcelain']}"
+        )
+
+    local_branch = str(state_before["branch"])
+    remote_branch = spec.remote_branch
+    if remote_branch is None:
+        if local_branch == "HEAD":
+            raise RuntimeError(
+                "detached protected execution requires a checkpoint-pinned remote branch"
+            )
+        remote_branch = local_branch
+
+    remote_head = _remote_branch_head(repo_root, remote_branch)
+    if remote_head != state_before["head"]:
+        raise RuntimeError(
+            "protected execution source is not the live remote branch head: "
+            f"local={state_before['head']} "
+            f"remote={remote_head} branch={remote_branch}"
+        )
+
+    evidence_dir = evidence_root / spec.name / f"execute-{_stamp()}"
+    evidence_dir.mkdir(parents=True, exist_ok=False)
+    attempt_path = evidence_dir / "attempt.json"
+    _write_json(
+        attempt_path,
+        {
+            "schema": SCHEMA,
+            "kind": "protected_execution_attempt",
+            "checkpoint": spec.name,
+            "description": spec.description,
+            "status": "STARTED",
+            "source": {
+                "before": state_before,
+                "remote_branch": remote_branch,
+                "remote_head": remote_head,
+            },
+            "automatic_retry": "NOT_AUTHORIZED",
+        },
+    )
+
+    try:
+        result = spec.execute()
+    except Exception as exc:
+        state_after = _git_state(repo_root)
+        identity_stable = (
+            state_before["head"] == state_after["head"]
+            and state_before["tree"] == state_after["tree"]
+            and state_before["branch"] == state_after["branch"]
+            and not state_after["porcelain"]
+        )
+        report = {
+            "schema": SCHEMA,
+            "kind": "protected_execution",
+            "checkpoint": spec.name,
+            "description": spec.description,
+            "status": "STOPPED",
+            "source": {
+                "before": state_before,
+                "after": state_after,
+                "remote_branch": remote_branch,
+                "remote_head": remote_head,
+                "identity_stable": identity_stable,
+            },
+            "runner_error": {
+                "type": type(exc).__name__,
+                "detail": str(exc),
+            },
+            "effect_disposition": "MAY_HAVE_OCCURRED",
+            "protected_execution": "ATTEMPTED",
+            "automatic_retry": "NOT_AUTHORIZED",
+        }
+        report_path = evidence_dir / "report.json"
+        _write_json(report_path, report)
+        print(f"RUNNER_EXECUTION_ERROR={type(exc).__name__}:{exc}", file=sys.stderr)
+        print(f"IDENTITY_STABLE={identity_stable}")
+        print(f"EVIDENCE={report_path}")
+        print("OVERALL=STOPPED")
+        return False, report_path
+
+    state_after = _git_state(repo_root)
+    identity_stable = (
+        state_before["head"] == state_after["head"]
+        and state_before["tree"] == state_after["tree"]
+        and state_before["branch"] == state_after["branch"]
+        and not state_after["porcelain"]
+    )
+    passed = result.get("status") == "PASS" and identity_stable
+    effect_disposition = result.get("effect_disposition", "MAY_HAVE_OCCURRED")
+
+    report = {
+        "schema": SCHEMA,
+        "kind": "protected_execution",
+        "checkpoint": spec.name,
+        "description": spec.description,
+        "status": "PASS" if passed else "STOPPED",
+        "source": {
+            "before": state_before,
+            "after": state_after,
+            "remote_branch": remote_branch,
+            "remote_head": remote_head,
+            "identity_stable": identity_stable,
+        },
+        "result": result,
+        "effect_disposition": effect_disposition,
+        "protected_execution": "ATTEMPTED",
+        "automatic_retry": "NOT_AUTHORIZED",
+    }
+    report_path = evidence_dir / "report.json"
+    _write_json(report_path, report)
+
+    primary = result.get("primary")
+    if isinstance(primary, dict):
+        print(f"PRIMARY_STATUS={primary.get('status')}")
+        if primary.get("reason") is not None:
+            print(f"PRIMARY_REASON={primary.get('reason')}")
+        if primary.get("detail") is not None:
+            print(f"PRIMARY_DETAIL={primary.get('detail')}")
+    print(f"EFFECT_DISPOSITION={effect_disposition}")
+    print(f"IDENTITY_STABLE={identity_stable}")
+    print(f"EVIDENCE={report_path}")
+    print(f"OVERALL={'PASS' if passed else 'STOPPED'}")
+    return passed, report_path
+
+
 def _status(repo_root: Path, specs: Mapping[str, CheckpointSpec]) -> int:
     state = _git_state(repo_root)
     print(f"SCHEMA={SCHEMA}")
@@ -795,7 +996,15 @@ def _status(repo_root: Path, specs: Mapping[str, CheckpointSpec]) -> int:
     print(f"BRANCH={state['branch']}")
     print(f"CLEAN={not bool(state['porcelain'])}")
     print("READ_ONLY_PREFLIGHT=IMPLEMENTED_FOR_REGISTERED_PROFILES")
-    print("PROTECTED_EXECUTION=NOT_IMPLEMENTED_IN_UNIFIED_RUNNER_V1")
+    execute_specs = sorted(name for name, spec in specs.items() if spec.execute is not None)
+    print(
+        "PROTECTED_EXECUTION="
+        + (
+            "IMPLEMENTED_FOR_" + ",".join(execute_specs)
+            if execute_specs
+            else "NOT_IMPLEMENTED"
+        )
+    )
     print("CHECKPOINTS=" + ",".join(sorted(specs)))
     for name in sorted(specs):
         print(f"{name}: {specs[name].description}")
@@ -832,6 +1041,20 @@ def _parser(specs: Mapping[str, CheckpointSpec]) -> argparse.ArgumentParser:
         type=Path,
         help="override the external checkpoint evidence root",
     )
+
+    execute_specs = sorted(
+        name for name, spec in specs.items() if spec.execute is not None
+    )
+    execute = subparsers.add_parser(
+        "execute",
+        help="run a registered protected checkpoint after explicit authorization",
+    )
+    execute.add_argument("checkpoint", choices=execute_specs)
+    execute.add_argument(
+        "--evidence-root",
+        type=Path,
+        help="override the external checkpoint evidence root",
+    )
     return parser
 
 
@@ -857,8 +1080,14 @@ def main(argv: Sequence[str] | None = None) -> int:
                 repo_root=repo_root,
                 evidence_root=evidence_root,
             )
-        else:
+        elif args.command == "preflight":
             passed, _ = preflight_checkpoint(
+                spec,
+                repo_root=repo_root,
+                evidence_root=evidence_root,
+            )
+        else:
+            passed, _ = execute_checkpoint(
                 spec,
                 repo_root=repo_root,
                 evidence_root=evidence_root,

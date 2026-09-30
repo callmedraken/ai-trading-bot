@@ -221,7 +221,7 @@ For checkpoints registered by Architecture 129, use the repository-root
 `ops.ps1` launcher and `scripts/checkpoint_runner.py` instead of generating a
 new PowerShell verification wrapper.
 
-Current source-only examples:
+Current registered examples:
 
 ```powershell
 .\ops.ps1 status
@@ -229,7 +229,13 @@ Current source-only examples:
 .\ops.ps1 verify arch128-r4
 .\ops.ps1 preflight arch128-parent-acl-repair
 .\ops.ps1 preflight arch128-r4
+.\ops.ps1 execute arch128-parent-acl-repair
 ```
+
+The `execute` surface is protected, checkpoint-specific, and never implied by a
+source/preflight PASS. It may be invoked only after fresh explicit approval at
+the effect boundary and with the checkpoint's exact reviewed authorization
+interlock.
 
 The unified runner owns the mandatory combined Ruff behavior: both
 `ruff check --no-cache` and `ruff format --check --no-cache` run before the

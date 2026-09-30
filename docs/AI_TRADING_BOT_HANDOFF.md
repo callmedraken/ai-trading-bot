@@ -7311,3 +7311,142 @@ Current next checkpoint:
 Production D10 remains disabled/non-running. No parent-ACL repair, R4 staging
 or rename, scheduler mutation, activation publication, provider, Paper-v2,
 broker, or live effect was authorized or performed by this source checkpoint.
+
+
+### Architecture 128 parent-ACL repair — EFFECT CONFIRMED; R4 read-only follow-up fixed
+
+Fresh exact-source parent-ACL preflight at the canonical Architecture-129
+operator source passed from:
+
+```text
+operator worktree:
+F:\AI\worktrees\ai-trading-bot-ops-parent-acl
+
+HEAD:
+bd03ee3f1878fa56f45b7f26ef7a3cc4acab76e2
+
+TREE:
+5a8f83f55ec71a39cc252f4239991ee8cb447ef6
+
+preflight evidence:
+F:\AI\temp\ai-trading-bot-checkpoints\arch128-parent-acl-repair\preflight-20260930T002532.897871Z\report.json
+
+PRIMARY_STATUS:
+PASS
+
+IDENTITY_STABLE:
+True
+
+OVERALL:
+PASS
+```
+
+The user then gave fresh explicit authorization for the real Architecture-128
+parent-only ACL reconciliation. The unified protected dispatch completed:
+
+```text
+PRIMARY_STATUS:
+PASS
+
+EFFECT_DISPOSITION:
+CONFIRMED
+
+IDENTITY_STABLE:
+True
+
+execute evidence:
+F:\AI\temp\ai-trading-bot-checkpoints\arch128-parent-acl-repair\execute-20260930T003249.794871Z\report.json
+
+OVERALL:
+PASS
+
+EXECUTE_EXIT:
+0
+```
+
+The authorization was consumed by that one confirmed parent-ACL effect. No
+automatic retry is authorized. No R4 replacement, scheduler, activation,
+source-launch, provider, Paper-v2, broker, or live effect was authorized by the
+repair.
+
+The immediately following unified read-only R4 preflight stopped before any R4
+filesystem mutation with:
+
+```text
+PRIMARY_STATUS:
+BLOCKED
+
+PRIMARY_REASON:
+AdmissionBlocked
+
+PRIMARY_DETAIL:
+native_path_unreviewed
+
+IDENTITY_STABLE:
+True
+
+evidence:
+F:\AI\temp\ai-trading-bot-checkpoints\arch128-r4\preflight-20260930T003253.010690Z\report.json
+
+OVERALL:
+BLOCKED
+
+R4_PREFLIGHT_EXIT:
+1
+```
+
+Source review identified this as a fail-closed read-only allowlist mismatch, not
+new production namespace drift. `observe_pre_stage()` verifies that the old
+halted canonical root has no `evidence` runtime directory by calling the
+reader's untyped absence probe. That probe uses `directory=None`, while
+`WindowsArch128ReadOnlyReader._allowed()` admitted the exact
+`<replacement-root>\evidence` path only for `directory=True`. The reader
+therefore rejected its own reviewed absence check as `native_path_unreviewed`.
+
+The bounded correction admits only the exact `evidence` directory path for
+`directory in (True, None)`; `source` remains directory-only, evidence
+children remain unadmitted except where explicitly reviewed, and no mutation
+authority was added. Regression tests freeze both the newly admitted exact
+absence probe and the still-rejected untyped `source` probe.
+
+Accepted source fix:
+
+```text
+HEAD:
+79b8311e7f0bcf5a2a380d952b6fce2c3d4ea7b1
+
+TREE:
+9547729d9daf3b58ac08d2e495e82740a9d16567
+
+files:
+scripts/d10_arch128_r4_windows.py
+tests/runtime/test_d10_arch128_r4_windows.py
+
+GitHub Actions:
+36651095389
+
+conclusion:
+success
+```
+
+This checkpoint reinforces Architecture 129's operating model: the stable
+`ops.ps1` launcher did not generate or run an ad-hoc PowerShell/Python helper.
+The reusable checked-in Python reader exposed a source bug, the source and its
+regression test were corrected, and the normal registered CI gates certified
+the new repository tree.
+
+Current next checkpoint:
+
+1. finish this documentation closeout and use its exact live remote HEAD;
+2. create a fresh clean detached operator worktree under
+   `F:\AI\worktrees\...` at that exact HEAD rather than modifying either
+   preserved earlier operator worktree;
+3. run `ops.ps1 status`;
+4. run the read-only `ops.ps1 preflight arch128-r4`;
+5. if R4 preflight passes, stop at the next protected R4 source/effect boundary;
+6. if it blocks again, preserve the evidence and diagnose the checked-in
+   observer/source without self-repairing production state.
+
+Production D10 remains disabled/non-running. The parent ACL repair is confirmed,
+but no Architecture-128 R4 staging creation, rename, scheduler mutation,
+activation, provider, Paper-v2, broker, or live effect has occurred.

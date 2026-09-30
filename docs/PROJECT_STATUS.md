@@ -7839,3 +7839,124 @@ Under the standing safe-checkpoint authorization, R6 source-only
 evidence/reactivation operator work and focused verification may proceed
 automatically. R7 remains a separate protected boundary requiring fresh
 explicit authorization.
+
+
+### Architecture 128 R6 source-only reactivation ordering gate — ACCEPTED
+
+R6 is now frozen as a checked-in pure ordering contract and registered only as:
+
+```powershell
+.\ops.ps1 verify arch128-r6
+```
+
+It has no host `preflight` surface and no protected `execute` surface.
+
+Accepted source checkpoint:
+
+```text
+HEAD:
+de160cb3eebf3d55d92482cf7e7fc490599747ef
+
+TREE:
+ca4b73b8630d42108bdbe9c9ea1782b233ffcb39
+
+GitHub Actions:
+36679776727
+
+arch128-parent-acl-repair:
+pytest PASS
+ruff check PASS
+ruff format PASS
+git diff --check PASS
+authority PASS
+identity stable True
+overall PASS
+
+arch128-r4:
+pytest PASS
+ruff check PASS
+ruff format PASS
+git diff --check PASS
+authority PASS
+identity stable True
+overall PASS
+
+arch128-r5-substrate:
+pytest PASS
+ruff check PASS
+ruff format PASS
+git diff --check PASS
+authority PASS
+identity stable True
+overall PASS
+
+arch128-r5-trading:
+pytest PASS
+ruff check PASS
+ruff format PASS
+git diff --check PASS
+authority PASS
+identity stable True
+overall PASS
+
+arch128-r6:
+pytest PASS
+ruff check PASS
+ruff format PASS
+git diff --check PASS
+authority PASS
+identity stable True
+overall PASS
+```
+
+The R6 state machine freezes and tests:
+
+- exact new activation/end/soak derivation from the Architecture-128
+  replacement identity;
+- rejection of the halted activation/end/soak identity;
+- the evidence filename derived only from the new lease soak ID;
+- exact Architecture-127 evidence-file owner/DACL/access/local-NTFS/
+  non-reparse/single-link/empty policy;
+- actual-Trading append-only + WRITE_THROUGH + OPEN_EXISTING + zero-write probe
+  semantics;
+- create-only evidence provisioning before scheduler mutation;
+- a fresh admission/readback after the interactive credential pause;
+- scheduler mutation followed by independent exact readback while the final
+  lease is still absent;
+- deployment/evidence/lease re-verification immediately before arming;
+- exact activation lease publication stages:
+  tmp -> installing -> final;
+- final lease publication as the last arming mutation;
+- post-arm deployment/scheduler/lease/evidence reread;
+- reconciliation-only treatment after possible mutation or ambiguity;
+- no automatic retry, rollback, cleanup, or evidence reuse;
+- manual task start, source launch, provider, Paper-v2, broker, and live effects
+  closed throughout.
+
+R6 deliberately owns no Windows transport or credential/scheduler/lease/evidence
+mutation adapter. Therefore R6 acceptance performs no production-host effect
+and does not itself make R7 executable.
+
+Current Architecture-128 progression:
+
+```text
+R1  source-only E6 material construction                   ACCEPTED
+R2  exact material review + protected signing              ACCEPTED
+R3  halted-host/replacement read-only preflight             ACCEPTED
+R4  protected deployment replacement                       PASS / COMPLETE
+R5  non-admin Trading read-only deployment qualification   PASS / ACCEPTED
+R6  source-only evidence/reactivation ordering operator     ACCEPTED
+R7  protected evidence + scheduler + lease activation       NOT AUTHORIZED
+R8  first natural D10-C wake observation                    NOT STARTED
+```
+
+The next safe work is source-only R7 binding/certification: bind the already
+reviewed Windows evidence, Trading append-open, scheduler, activation-lease,
+and readback primitives to the accepted R6 state machine; register read-only
+R7 admission and authorization-gated protected execution in the unified runner;
+and prove source/effect-disposition tests. This source work is covered by the
+standing safe-checkpoint authorization.
+
+Actual R7 evidence creation, scheduler mutation, or activation-lease
+publication remains a real protected-effect boundary and requires fresh
+explicit authorization after final exact-source read-only admission.

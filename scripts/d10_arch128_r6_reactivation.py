@@ -21,6 +21,9 @@ from scripts.d10_protected_deployment import (
     ADMINISTRATORS_SID,
     FILE_ALL_ACCESS,
 )
+from trading_bot.runtime import (
+    personal_desktop_unattended_one_week_soak_scheduler_contract as scheduler_contract,
+)
 from trading_bot.runtime.personal_desktop_d10_activation_lease import (
     D10ActivationLease,
     build_activation_lease_model,
@@ -28,9 +31,6 @@ from trading_bot.runtime.personal_desktop_d10_activation_lease import (
 )
 from trading_bot.runtime.personal_desktop_d10_wake_evidence_log import (
     D10_WAKE_EVIDENCE_ROOT,
-)
-from trading_bot.runtime import (
-    personal_desktop_unattended_one_week_soak_scheduler_contract as scheduler_contract,
 )
 
 SCHEMA = "architecture-128-r6-reactivation/v1"
@@ -120,7 +120,9 @@ class Boundaries(Protocol):
         self, plan: ReactivationPlan, credential: object
     ) -> MutationDisposition: ...
 
-    def read_scheduler(self) -> scheduler_contract.OneWeekSoakSchedulerDeploymentSpec: ...
+    def read_scheduler(
+        self,
+    ) -> scheduler_contract.OneWeekSoakSchedulerDeploymentSpec: ...
 
     def publish_lease(
         self, lease: D10ActivationLease
@@ -147,7 +149,9 @@ def derive_reactivation_plan(activation_utc: datetime) -> ReactivationPlan:
         certified_source_head=identity.certified_source_head,
         certified_source_tree=identity.certified_source_tree,
     )
-    scheduler = scheduler_contract.build_one_week_soak_scheduler_deployment_spec(activation_utc)
+    scheduler = scheduler_contract.build_one_week_soak_scheduler_deployment_spec(
+        activation_utc
+    )
 
     if (
         lease.accepted_activation_utc == _old_utc(r4.OLD_ACTIVATION_UTC)

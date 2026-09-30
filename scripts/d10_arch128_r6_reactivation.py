@@ -8,6 +8,7 @@ adapters to this ordering contract after separate explicit authorization.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
@@ -19,7 +20,6 @@ from scripts import run_personal_desktop_d10_launch_guard as guard
 from scripts.d10_protected_deployment import (
     ADMINISTRATORS_SID,
     FILE_ALL_ACCESS,
-    SYSTEM_SID,
 )
 from trading_bot.runtime.personal_desktop_d10_activation_lease import (
     D10ActivationLease,
@@ -29,9 +29,8 @@ from trading_bot.runtime.personal_desktop_d10_activation_lease import (
 from trading_bot.runtime.personal_desktop_d10_wake_evidence_log import (
     D10_WAKE_EVIDENCE_ROOT,
 )
-from trading_bot.runtime.personal_desktop_unattended_one_week_soak_scheduler_contract import (
-    OneWeekSoakSchedulerDeploymentSpec,
-    build_one_week_soak_scheduler_deployment_spec,
+from trading_bot.runtime import (
+    personal_desktop_unattended_one_week_soak_scheduler_contract as scheduler_contract,
 )
 
 SCHEMA = "architecture-128-r6-reactivation/v1"
@@ -57,7 +56,7 @@ class MutationDisposition(StrEnum):
 @dataclass(frozen=True, slots=True)
 class ReactivationPlan:
     lease: D10ActivationLease
-    scheduler: OneWeekSoakSchedulerDeploymentSpec
+    scheduler: scheduler_contract.OneWeekSoakSchedulerDeploymentSpec
     evidence_path: str
 
 
@@ -95,7 +94,7 @@ class AdmissionObservation:
     lease_final_installing_tmp_present: tuple[bool, bool, bool]
     evidence_paths: tuple[str, ...]
     scheduler_disabled_nonrunning_exact: bool
-    scheduler: OneWeekSoakSchedulerDeploymentSpec | None
+    scheduler: scheduler_contract.OneWeekSoakSchedulerDeploymentSpec | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -121,7 +120,7 @@ class Boundaries(Protocol):
         self, plan: ReactivationPlan, credential: object
     ) -> MutationDisposition: ...
 
-    def read_scheduler(self) -> OneWeekSoakSchedulerDeploymentSpec: ...
+    def read_scheduler(self) -> scheduler_contract.OneWeekSoakSchedulerDeploymentSpec: ...
 
     def publish_lease(
         self, lease: D10ActivationLease
@@ -148,7 +147,7 @@ def derive_reactivation_plan(activation_utc: datetime) -> ReactivationPlan:
         certified_source_head=identity.certified_source_head,
         certified_source_tree=identity.certified_source_tree,
     )
-    scheduler = build_one_week_soak_scheduler_deployment_spec(activation_utc)
+    scheduler = scheduler_contract.build_one_week_soak_scheduler_deployment_spec(activation_utc)
 
     if (
         lease.accepted_activation_utc == _old_utc(r4.OLD_ACTIVATION_UTC)
@@ -222,7 +221,9 @@ def _require_admission(
     identity = r4.NEW_IDENTITY
     expected_paths = () if plan is None else (plan.evidence_path,)
     expected_leases = (final_lease, False, False)
-    expected_scheduler = plan.scheduler if scheduler_planned and plan is not None else None
+    expected_scheduler = (
+        plan.scheduler if scheduler_planned and plan is not None else None
+    )
     expected_disabled = not scheduler_planned
 
     if (
@@ -256,7 +257,7 @@ class ReactivationOperator:
     def __init__(
         self,
         boundaries: Boundaries,
-        clock: callable,
+        clock: Callable[[], datetime],
     ) -> None:
         self._boundaries = boundaries
         self._clock = clock
@@ -311,7 +312,9 @@ class ReactivationOperator:
             self._boundaries.create_empty_evidence(plan.evidence_path)
 
             result["stage"] = "EVIDENCE_VERIFY"
-            _require_evidence(plan, self._boundaries.observe_evidence(plan.evidence_path))
+            _require_evidence(
+                plan, self._boundaries.observe_evidence(plan.evidence_path)
+            )
             _require_trading_probe(
                 self._boundaries.probe_trading_append_open(plan.evidence_path)
             )
@@ -330,7 +333,9 @@ class ReactivationOperator:
                 scheduler_planned=False,
                 final_lease=False,
             )
-            _require_evidence(plan, self._boundaries.observe_evidence(plan.evidence_path))
+            _require_evidence(
+                plan, self._boundaries.observe_evidence(plan.evidence_path)
+            )
 
             result["stage"] = "SCHEDULER_MUTATION"
             result["scheduler_mutation"] = MutationDisposition.INDETERMINATE
@@ -352,7 +357,9 @@ class ReactivationOperator:
                 scheduler_planned=True,
                 final_lease=False,
             )
-            _require_evidence(plan, self._boundaries.observe_evidence(plan.evidence_path))
+            _require_evidence(
+                plan, self._boundaries.observe_evidence(plan.evidence_path)
+            )
 
             result["stage"] = "FINAL_LEASE_PUBLICATION"
             result["lease_publication"] = MutationDisposition.INDETERMINATE
@@ -373,7 +380,9 @@ class ReactivationOperator:
                 scheduler_planned=True,
                 final_lease=True,
             )
-            _require_evidence(plan, self._boundaries.observe_evidence(plan.evidence_path))
+            _require_evidence(
+                plan, self._boundaries.observe_evidence(plan.evidence_path)
+            )
             if self._boundaries.read_scheduler() != plan.scheduler:
                 raise ReactivationBlocked("final_scheduler_readback_drift")
 

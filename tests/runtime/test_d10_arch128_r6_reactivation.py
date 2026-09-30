@@ -1,18 +1,17 @@
 from __future__ import annotations
 
-from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from scripts import d10_arch128_r4_replacement as r4
-from scripts import d10_arch128_r6_reactivation as r6
-from scripts import run_personal_desktop_d10_launch_guard as guard
 from scripts.d10_protected_deployment import (
     ADMINISTRATORS_SID,
     FILE_ALL_ACCESS,
-    SYSTEM_SID,
 )
+
+from scripts import d10_arch128_r4_replacement as r4
+from scripts import d10_arch128_r6_reactivation as r6
+from scripts import run_personal_desktop_d10_launch_guard as guard
 
 
 ACTIVATION = datetime(2026, 10, 1, 12, 0, 0, tzinfo=UTC)
@@ -47,7 +46,9 @@ class FakeBoundaries:
             lease_final_installing_tmp_present=(final_lease, False, False),
             evidence_paths=() if plan is None else (plan.evidence_path,),
             scheduler_disabled_nonrunning_exact=not scheduler_planned,
-            scheduler=plan.scheduler if scheduler_planned and plan is not None else None,
+            scheduler=plan.scheduler
+            if scheduler_planned and plan is not None
+            else None,
         )
 
     def observe_admission(
@@ -118,9 +119,7 @@ class FakeBoundaries:
         assert self.plan is not None
         return self.plan.scheduler
 
-    def publish_lease(
-        self, lease
-    ) -> r6.LeasePublicationObservation:
+    def publish_lease(self, lease) -> r6.LeasePublicationObservation:
         self.events.append("publish_lease")
         assert self.plan is not None
         assert lease == self.plan.lease
@@ -146,9 +145,7 @@ def test_plan_derives_new_lease_soak_and_evidence_path_only() -> None:
 
 
 def test_old_halted_activation_is_never_reused() -> None:
-    old = datetime.fromisoformat(
-        r4.OLD_ACTIVATION_UTC[:-1] + "+00:00"
-    ).astimezone(UTC)
+    old = datetime.fromisoformat(r4.OLD_ACTIVATION_UTC[:-1] + "+00:00").astimezone(UTC)
 
     with pytest.raises(r6.ReactivationBlocked, match="halted_soak_identity_reuse"):
         r6.derive_reactivation_plan(old)

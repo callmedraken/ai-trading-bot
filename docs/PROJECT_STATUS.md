@@ -7743,3 +7743,99 @@ the documentation-closeout HEAD:
 If both PASS, R5 may be accepted and R6 source-only reactivation/evidence work
 may continue automatically. R7 remains a separately authorized protected
 boundary.
+
+
+### Architecture 128 R5 post-replacement Trading qualification — ACCEPTED
+
+Final R5 qualification used one exact source identity:
+
+```text
+HEAD:
+9197538dfaec6448c5b1471411bea161ba06176c
+
+TREE:
+82074761a8d660308578e82cf7a237960e97335d
+```
+
+The actual non-admin Trading qualification ran through the accepted
+two-principal remote-head handoff and proved the canonical deployment from the
+real Trading principal:
+
+```text
+principal:
+DESKTOP-I4DOKM7\Trading
+
+PRIMARY_STATUS:
+PASS
+
+IDENTITY_STABLE:
+True
+
+OVERALL:
+PASS
+
+R5_TRADING_EXIT:
+0
+
+evidence:
+F:\AI\temp\ai-trading-bot-checkpoints\arch128-r5-trading\preflight-20260930T061949.273654Z\report.json
+```
+
+The elevated fresh production-Python substrate qualification then passed at the
+same source identity against an actual short-lived Trading token:
+
+```text
+PRIMARY_STATUS:
+PASS
+
+IDENTITY_STABLE:
+True
+
+OVERALL:
+PASS
+
+R5_SUBSTRATE_EXIT:
+0
+
+evidence:
+F:\AI\temp\ai-trading-bot-checkpoints\arch128-r5-substrate\preflight-20260930T062150.062284Z\report.json
+```
+
+The Trading launcher log rendered the runner output as UTF-16 text with spaced
+characters, but the checked-in runner result itself was unambiguous:
+`PRIMARY_STATUS=PASS`, `IDENTITY_STABLE=True`, `OVERALL=PASS`, and
+`R5_TRADING_EXIT=0`. The outer PowerShell Process object did not populate a
+useful ExitCode in that invocation, so it is not used as acceptance evidence.
+
+R5 therefore proves:
+
+- exact signed new canonical Architecture-127 deployment;
+- exact sealed source/guard admission;
+- protected production Python substrate freshly requalified;
+- exact evidence-root identity/security;
+- final/installing/tmp activation lease absent;
+- current-soak evidence absent;
+- second-stage launch not called;
+- scheduler/provider/Paper-v2/broker/live effects not run.
+
+Architecture-128 progression is now:
+
+```text
+R1  source-only E6 material construction                   ACCEPTED
+R2  exact material review + protected signing              ACCEPTED
+R3  halted-host/replacement read-only preflight             ACCEPTED
+R4  protected deployment replacement                       PASS / COMPLETE
+R5  non-admin Trading read-only deployment qualification   PASS / ACCEPTED
+R6  source-only evidence/reactivation operator              NEXT
+R7  protected evidence + scheduler + lease activation       NOT AUTHORIZED
+R8  first natural D10-C wake observation                    NOT STARTED
+```
+
+No R5 step authorized or performed scheduler mutation, activation publication,
+source launch, provider access, Paper-v2 effects, broker submission, or live
+trading. Production D10 remains scheduler-disabled/non-running and inert.
+
+Under the standing safe-checkpoint authorization, R6 source-only
+evidence/reactivation operator work and focused verification may proceed
+automatically. R7 remains a separate protected boundary requiring fresh
+explicit authorization.

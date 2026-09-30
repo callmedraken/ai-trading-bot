@@ -406,3 +406,27 @@ R7C host factory in the unified runner without duplicating mutation logic. Only
 after that final executable source is accepted should a fresh exact-source
 read-only R7 host preflight run. Actual protected activation still requires
 fresh explicit user authorization.
+
+
+### Architecture 128 R7D protected runner registration — ACCEPTED
+
+R7D is source-certified at:
+
+```text
+HEAD: 593070256441edcf6fdd3961f0bfbb9a8b129ff7
+TREE: b408d1200620baff30720f5366f08fd79c7be041
+CI:   36776863936 SUCCESS
+```
+
+The `arch128-r7` checkpoint now has a protected execute registration, but the
+runner adds no host mutation implementation. Its wrapper delegates only through
+the accepted R7B dispatcher using the accepted R7C host factory, freezes the
+existing interlocks, validates the exact R7 completion result, and classifies
+all ambiguous outcomes conservatively. Generic protected execution continues to
+require a clean worktree at the exact live remote branch head, writes an
+external pre-effect attempt record, and grants no automatic retry.
+
+Registration does not authorize execution. The next checkpoint is one final
+exact-source, elevated, read-only `preflight arch128-r7` on the Windows
+production host. Only after that preflight is reviewed may a fresh explicit
+operator authorization for actual R7 activation be considered.

@@ -8509,3 +8509,74 @@ primitives in the runner. R7D source acceptance grants no execution authority.
 Only after R7D is accepted should the final elevated exact-source
 `preflight arch128-r7` run. A PASS remains diagnostic only; actual
  evidence/scheduler/lease activation needs a new explicit user approval.
+
+
+## Architecture 128 R7D accepted — protected runner registration
+
+Exact accepted source:
+
+```text
+HEAD: 593070256441edcf6fdd3961f0bfbb9a8b129ff7
+TREE: b408d1200620baff30720f5366f08fd79c7be041
+CI:   36776863936 SUCCESS
+```
+
+R7D registers `execute arch128-r7` as capability only. The registered wrapper
+contains no evidence writer, token acquisition, credential acquisition,
+scheduler updater, lease publisher, source launcher, provider path, Paper-v2,
+broker, or live-trading implementation. It delegates exactly to the accepted
+R7B dispatcher with the accepted R7C `host_factory`.
+
+Frozen result classification:
+
+```text
+exact COMPLETE + accepted authorization +
+  evidence CALL_RETURNED + scheduler CALL_RETURNED +
+  lease PUBLISHED_VERIFIED + reconciliation_required=false
+    -> CONFIRMED
+
+exact EXECUTION_INTERLOCK / NOT_ACCEPTED with all protected mutations NOT_RUN
+    -> NOT_STARTED
+
+anything else / ambiguous / malformed / exception after dispatch
+    -> MAY_HAVE_OCCURRED (or generic runner STOPPED with MAY_HAVE_OCCURRED)
+```
+
+The authority gate now source-freezes the exact dispatcher/factory composition,
+forbidden-effect guard, result dictionaries/classification, and the unchanged
+R7B/R7C interlock values:
+
+```text
+--execute-reviewed-r7-protected-activation
+AI_TRADING_BOT_ARCH128_R7_AUTHORIZATION
+ARCH128_R7_PROTECTED_ACTIVATION_AUTHORIZED
+AI_TRADING_BOT_ARCH128_R7_TRADING_PID
+```
+
+Verification:
+
+```text
+local verify arch128-r7: 619 tests, all gates PASS
+GitHub Actions: 36776863936 SUCCESS
+arch128-r7: PYTEST/RUFF_CHECK/RUFF_FORMAT/GIT_DIFF_CHECK/AUTHORITY PASS
+IDENTITY_STABLE=True
+OVERALL=PASS
+```
+
+No protected execution occurred.
+
+Resume sequence:
+
+```text
+R7D protected runner registration      ACCEPTED
+R7E final exact-source host preflight  NEXT / READ-ONLY
+fresh R7 activation authorization      REQUIRED AFTER R7E REVIEW
+protected R7 activation                NOT AUTHORIZED YET
+R8 first natural scheduled wake        NOT STARTED
+```
+
+R7E must run only `ops.ps1 status` and `ops.ps1 preflight arch128-r7` from a
+clean elevated exact-live-remote worktree. Do not set the R7 authorization
+interlock and do not invoke `execute arch128-r7`. A successful preflight grants
+no effect authority; ChatGPT reviews its evidence before asking for any actual
+activation approval.

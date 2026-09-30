@@ -8200,3 +8200,63 @@ effect. After that final executable source is accepted, one fresh elevated
 exact-source `preflight arch128-r7` is required before any protected R7
 activation can be considered. Actual R7 execution still requires separate fresh
 explicit authorization.
+
+
+## Architecture 128 R7D protected runner registration — ACCEPTED
+
+R7D is source-accepted at:
+
+```text
+HEAD: 593070256441edcf6fdd3961f0bfbb9a8b129ff7
+TREE: b408d1200620baff30720f5366f08fd79c7be041
+CI:   36776863936 SUCCESS
+```
+
+The unified runner now registers the existing reviewed R7 protected execution
+composition without adding new mutation authority. The R7 wrapper delegates
+exactly through the accepted R7B dispatcher and accepted R7C host factory:
+
+```python
+r7_protected._dispatch(
+    (r7_protected.EXECUTE_FLAG,),
+    dict(os.environ),
+    r7_windows.host_factory,
+)
+```
+
+The runner independently requires the frozen R7 completion evidence before
+classifying PASS as CONFIRMED, maps the exact unauthorized pre-effect interlock
+block to NOT_STARTED, and maps all other/ambiguous cases conservatively to
+MAY_HAVE_OCCURRED. Forbidden production/source/provider/Paper-v2/broker/live
+fields remain closed, automatic retry/rollback/cleanup remain forbidden, and
+the Architecture-129 authority check freezes the exact R7B/R7C composition and
+all four interlock constants.
+
+The only changed files were `scripts/checkpoint_runner.py`,
+`tests/runtime/test_checkpoint_runner.py`, and the separately authorized R7C
+registration assertion in `tests/runtime/test_d10_arch128_r7_windows.py`.
+No R7 protected execution or production-host mutation occurred.
+
+Local `.\\ops.ps1 verify arch128-r7` passed 619 tests plus Ruff lint/format,
+git diff checking, authority review, and identity stability. GitHub Actions run
+36776863936 independently passed every registered Architecture-128 source gate,
+including `arch128-r7` with OVERALL=PASS.
+
+Current progression:
+
+```text
+R7A  read-only activation admission source                  ACCEPTED
+R7B  protected-dispatch source contract                     ACCEPTED
+R7C  concrete protected Windows host bindings               ACCEPTED
+R7D  protected runner execute registration source           ACCEPTED
+R7E  final exact-source Windows host preflight              NEXT
+R7   evidence + scheduler + lease protected activation      NOT AUTHORIZED
+R8   first natural scheduled wake                           NOT STARTED
+```
+
+R7E is the final read-only admission immediately before the protected activation
+boundary. Run it from a fresh/clean elevated Windows operator worktree at the
+exact live remote documentation-closeout HEAD. A PASS is diagnostic only and
+does not authorize `execute arch128-r7`. Actual evidence creation, scheduler
+credential/mutation, and activation-lease publication still require a new
+explicit user authorization after R7E review.

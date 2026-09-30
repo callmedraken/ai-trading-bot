@@ -430,3 +430,47 @@ Registration does not authorize execution. The next checkpoint is one final
 exact-source, elevated, read-only `preflight arch128-r7` on the Windows
 production host. Only after that preflight is reviewed may a fresh explicit
 operator authorization for actual R7 activation be considered.
+
+### Architecture 128 R7E admission and protected R7 activation — ACCEPTED
+
+The final R7 executable source was admitted and executed at
+`fdefad3f1b800b5c71ccdb0120bcefa2dbfed2e9` /
+`b6689b5a09d5a07c05d8eb20cf768296214f7a34`.
+
+R7E was a read-only elevated exact-live-remote preflight and PASSed with all
+protected effects NOT_RUN. The first authorized protected execution then
+STOPPED in the host factory because the Trading PID environment handoff was
+absent. The generic runner correctly classified that exception as
+MAY_HAVE_OCCURRED; exact protected evidence showed evidence/scheduler/lease
+mutations all NOT_RUN. A registered read-only R7 preflight then PASSed and
+re-proved the inert host state before any retry was considered.
+
+After fresh explicit authorization, the second one-shot execution returned the
+exact frozen completion contract:
+
+```text
+status=PASS
+stage=COMPLETE
+authorization=ACCEPTED
+evidence_provision=CALL_RETURNED
+scheduler_mutation=CALL_RETURNED
+lease_publication=PUBLISHED_VERIFIED
+reconciliation_required=false
+effect_disposition=CONFIRMED
+identity_stable=true
+```
+
+The accepted R6 state machine cannot produce COMPLETE unless the lease publisher
+returns the exact three publication stages and the final admission/readback
+succeeds. Manual task start, governed source launch, provider, Paper-v2, broker,
+and live effects remained NOT_RUN, with no automatic retry/rollback/cleanup.
+
+The derived R7 activation is
+`2026-09-30T22:07:24.000000Z` through
+`2026-10-07T22:07:24.000000Z`, soak
+`30e31396-9f51-57ca-a480-d2a3e9cae4a0`, evidence path
+`F:\AITradingBot\D10\evidence\wake-30e31396-9f51-57ca-a480-d2a3e9cae4a0.jsonl`.
+
+R7 is therefore ARMED. The next runner/operator activity is R8 read-only
+observation of the first **natural** scheduled wake. No manual task start or
+synthetic wake is authorized.

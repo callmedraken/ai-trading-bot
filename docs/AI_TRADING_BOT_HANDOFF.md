@@ -8580,3 +8580,89 @@ clean elevated exact-live-remote worktree. Do not set the R7 authorization
 interlock and do not invoke `execute arch128-r7`. A successful preflight grants
 no effect authority; ChatGPT reviews its evidence before asking for any actual
 activation approval.
+
+## 2026-09-30 — Architecture 128 R7E and R7 activation accepted
+
+Resume from **R8 first natural scheduled wake**.
+
+The executable R7 source was frozen at:
+
+```text
+HEAD fdefad3f1b800b5c71ccdb0120bcefa2dbfed2e9
+TREE b6689b5a09d5a07c05d8eb20cf768296214f7a34
+R7D docs/source-gate CI 36779754364 SUCCESS
+```
+
+R7E PASS:
+- elevated Administrator real console;
+- exact clean detached worktree and live remote;
+- canonical deployment exact;
+- old incident retired exact;
+- historical S5-R8 retired namespace absent;
+- replacement staging absent;
+- evidence root exact empty;
+- activation lease final/installing/tmp absent;
+- scheduler exact disabled/non-running;
+- every protected effect NOT_RUN;
+- identity stable and OVERALL PASS.
+
+Historical first R7 execution attempt:
+- authorization accepted, but Trading PID handoff was missing;
+- STOPPED at FACTORY_OR_COMPOSITION_FAILURE with
+  `DeploymentBlocked: r7_trading_pid_required`;
+- evidence/scheduler/lease fields remained NOT_RUN;
+- generic runner conservatively classified MAY_HAVE_OCCURRED;
+- authorization was consumed;
+- follow-up registered read-only R7 preflight PASS independently proved the host
+  remained inert, so no cleanup/rollback/repair was performed.
+
+Freshly authorized second R7 execution:
+```text
+PRIMARY_STATUS=PASS
+EFFECT_DISPOSITION=CONFIRMED
+IDENTITY_STABLE=True
+OVERALL=PASS
+stage=COMPLETE
+authorization=ACCEPTED
+evidence_provision=CALL_RETURNED
+scheduler_mutation=CALL_RETURNED
+lease_publication=PUBLISHED_VERIFIED
+reconciliation_required=false
+```
+
+All forbidden effects remained NOT_RUN: manual task start, source launch,
+provider, Paper-v2, broker, and live. Automatic retry/rollback/cleanup remained
+false. The accepted R6 completion check also proves the exact three lease
+publication stages completed and the final host readback matched the derived
+plan.
+
+Active soak:
+```text
+activation_utc  2026-09-30T22:07:24.000000Z
+end_utc         2026-10-07T22:07:24.000000Z
+soak_id         30e31396-9f51-57ca-a480-d2a3e9cae4a0
+evidence_path   F:\AITradingBot\D10\evidence\wake-30e31396-9f51-57ca-a480-d2a3e9cae4a0.jsonl
+deployment_id   d2071f25-5a7c-5293-a28f-5b722c9917a2
+attestation     3ffe4ecf1745599e7edb233d3f08a9707a1b27384d2f050a1805ee4929ebbd71
+```
+
+Preserved external execution evidence:
+```text
+failed attempt:
+F:\AI\temp\ai-trading-bot-checkpoints\arch128-r7\execute-20260930T215628.869661Z\report.json
+
+accepted attempt:
+F:\AI\temp\ai-trading-bot-checkpoints\arch128-r7\execute-20260930T220718.640962Z\report.json
+```
+
+Current state:
+```text
+R7E  ACCEPTED
+R7   ACCEPTED / ARMED
+R8   NEXT — FIRST NATURAL SCHEDULED WAKE
+```
+
+Do not manually start the scheduler task and do not synthesize a wake. The next
+checkpoint is read-only observation of the first natural wake. Acceptance needs
+the durable Architecture-127 wake grammar through matching ACCEPT; an incomplete,
+unaccepted, duplicate, or otherwise ambiguous wake stops progression for review.

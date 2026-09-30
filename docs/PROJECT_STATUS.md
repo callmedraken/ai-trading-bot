@@ -8260,3 +8260,128 @@ exact live remote documentation-closeout HEAD. A PASS is diagnostic only and
 does not authorize `execute arch128-r7`. Actual evidence creation, scheduler
 credential/mutation, and activation-lease publication still require a new
 explicit user authorization after R7E review.
+
+## Architecture 128 R7E + R7 protected activation — ACCEPTED
+
+The final elevated exact-source R7 admission and the protected activation are
+accepted against the frozen executable source:
+
+```text
+EXECUTABLE HEAD: fdefad3f1b800b5c71ccdb0120bcefa2dbfed2e9
+EXECUTABLE TREE: b6689b5a09d5a07c05d8eb20cf768296214f7a34
+R7D closeout CI: 36779754364 SUCCESS
+```
+
+R7E ran exactly once from an elevated Administrator console before activation
+and returned PASS with stable exact live-remote identity. It re-proved the new
+canonical deployment, retired incident state, absent historical/replacement
+staging namespaces, empty evidence root, absent activation lease
+final/installing/tmp, and exact disabled/non-running scheduler. Every protected
+effect field remained NOT_RUN. The R7E preflight granted no effect authority.
+
+The first separately authorized R7 execution attempt was STOPPED before host
+boundary construction because the Trading PID environment handoff was absent:
+
+```text
+stage: FACTORY_OR_COMPOSITION_FAILURE
+reason: DeploymentBlocked
+detail: r7_trading_pid_required
+effect_disposition: MAY_HAVE_OCCURRED
+evidence_provision: NOT_RUN
+scheduler_mutation: NOT_RUN
+lease_publication: NOT_RUN
+reconciliation_required: true
+```
+
+That authorization was treated as consumed. The exact execution evidence was
+preserved at:
+
+```text
+F:\AI\temp\ai-trading-bot-checkpoints\arch128-r7\execute-20260930T215628.869661Z\report.json
+```
+
+A subsequent registered read-only `preflight arch128-r7` returned PASS with
+stable identity and independently re-proved the inert pre-R7 host state, so no
+repair, rollback, cleanup, evidence deletion, scheduler rewrite, or lease action
+was required.
+
+After fresh explicit authorization, the second one-shot R7 execution completed
+with exact protected-success classification:
+
+```text
+PRIMARY_STATUS=PASS
+EFFECT_DISPOSITION=CONFIRMED
+IDENTITY_STABLE=True
+OVERALL=PASS
+
+stage=COMPLETE
+authorization=ACCEPTED
+evidence_provision=CALL_RETURNED
+scheduler_mutation=CALL_RETURNED
+lease_publication=PUBLISHED_VERIFIED
+reconciliation_required=false
+
+manual_task_start=NOT_RUN
+source_launch=NOT_RUN
+provider=NOT_RUN
+Paper-v2=NOT_RUN
+broker=NOT_RUN
+live=NOT_RUN
+
+automatic_retry=false
+automatic_rollback=false
+automatic_cleanup=false
+```
+
+The accepted R6 state machine reaches COMPLETE only after the exact reviewed
+lease-publication protocol returns all three required stages
+`TMP_CREATED_AND_VERIFIED`, `TMP_TO_INSTALLING_VERIFIED`, and
+`INSTALLING_TO_FINAL_VERIFIED`, followed by final deployment/scheduler/lease/
+evidence readback.
+
+The source-derived activation plan is:
+
+```text
+activation_utc: 2026-09-30T22:07:24.000000Z
+end_utc:        2026-10-07T22:07:24.000000Z
+soak_id:        30e31396-9f51-57ca-a480-d2a3e9cae4a0
+evidence_path:  F:\AITradingBot\D10\evidence\wake-30e31396-9f51-57ca-a480-d2a3e9cae4a0.jsonl
+deployment_id:  d2071f25-5a7c-5293-a28f-5b722c9917a2
+attestation:    3ffe4ecf1745599e7edb233d3f08a9707a1b27384d2f050a1805ee4929ebbd71
+```
+
+Protected execution evidence:
+
+```text
+F:\AI\temp\ai-trading-bot-checkpoints\arch128-r7\execute-20260930T220718.640962Z\report.json
+```
+
+The runner source identity was unchanged before/after execution; the operator
+worktree remained tracked/index clean and the authorization/PID environment
+variables were cleared afterward.
+
+Current Architecture-128 progression:
+
+```text
+R1   E6 deployment material construction                    ACCEPTED
+R2   protected signing                                      ACCEPTED
+R3   replacement read-only admission                        ACCEPTED
+R4   protected clean deployment replacement                 COMPLETE
+R5   Trading + production-Python qualification              ACCEPTED
+R6   source-only reactivation ordering contract             ACCEPTED
+R7A  read-only activation admission source                  ACCEPTED
+R7B  protected-dispatch source contract                     ACCEPTED
+R7C  concrete protected Windows host bindings               ACCEPTED
+R7D  protected runner execute registration source           ACCEPTED
+R7E  final exact-source Windows host preflight              ACCEPTED
+R7   evidence + scheduler + lease protected activation      ACCEPTED / ARMED
+R8   first natural scheduled wake                           NEXT
+```
+
+R8 must remain a natural scheduler wake. Do not manually start the task, invoke
+the governed source to simulate a wake, rewrite the scheduler, replace the lease,
+or create a substitute evidence stream. The next safe action is read-only
+observation of the first naturally scheduled wake and its Architecture-127
+durable WAKE_START -> nonterminal result -> ACCEPT evidence. Missing ACCEPT,
+unexpected scheduler/lease/evidence drift, or any ambiguous wake must fail
+closed and stop the soak for review.

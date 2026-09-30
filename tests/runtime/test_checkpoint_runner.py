@@ -154,6 +154,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
         "arch128-r5-trading",
         "arch128-r6",
         "arch128-r7",
+        "arch128-r8",
     }
     for spec in specs.values():
         assert "tests/runtime/test_checkpoint_runner.py" in spec.tests
@@ -185,6 +186,7 @@ def test_current_arch128_authority_profiles_pass() -> None:
     assert specs["arch128-r5-trading"].authority_check(repo_root) == ()
     assert specs["arch128-r6"].authority_check(repo_root) == ()
     assert specs["arch128-r7"].authority_check(repo_root) == ()
+    assert specs["arch128-r8"].authority_check(repo_root) == ()
 
 
 def test_default_evidence_root_is_outside_repo() -> None:
@@ -1314,3 +1316,225 @@ def test_r7d_wrapper_has_no_direct_host_authority() -> None:
     ]
     assert len(dispatches) == 1
     assert runner._r7d_authority_check(root) == ()
+
+
+def test_r8_registration_is_read_only() -> None:
+    spec = runner._checkpoint_specs()["arch128-r8"]
+    assert spec.preflight is runner._r8_preflight
+    assert spec.execute is None
+    assert spec.authority_check is runner._r8_authority_check
+    assert spec.remote_branch == "feature/d10c-durable-wake-evidence"
+    assert spec.remote_head_env is None
+    assert spec.tests == (
+        *runner.COMMON_TESTS,
+        "tests/runtime/test_d10_arch128_r8_readonly.py",
+        "tests/runtime/test_d10_durable_wake_evidence_observe.py",
+        "tests/runtime/test_personal_desktop_d10_wake_evidence_log.py",
+        "tests/runtime/test_personal_desktop_d10_guard_evidence.py",
+    )
+    assert spec.ruff_paths == (
+        *runner.COMMON_RUFF_PATHS,
+        "scripts/d10_arch128_r8_readonly.py",
+        "tests/runtime/test_d10_arch128_r8_readonly.py",
+    )
+    parser = runner._parser(runner._checkpoint_specs())
+    for command in ("verify", "preflight"):
+        assert parser.parse_args((command, "arch128-r8")).checkpoint == "arch128-r8"
+    with pytest.raises(SystemExit):
+        parser.parse_args(("execute", "arch128-r8"))
+
+
+@pytest.mark.parametrize("status", ("PASS", "BLOCKED"))
+def test_r8_preflight_delegates_once_and_preserves_runner_shape(
+    monkeypatch, status
+) -> None:
+    from scripts import d10_arch128_r8_readonly as admission
+
+    primary = admission._base()
+    primary["status"] = status
+    calls = []
+
+    def preflight():
+        calls.append(())
+        return primary
+
+    monkeypatch.setattr(admission, "preflight", preflight)
+    assert runner._r8_preflight() == {"status": status, "primary": primary}
+    assert calls == [()]
+
+
+@pytest.mark.parametrize(
+    "field",
+    (
+        "production_filesystem_mutation",
+        "evidence_mutation",
+        "scheduler_mutation",
+        "lease_mutation",
+        "manual_task_start",
+        "source_launch",
+        "provider",
+        "Paper-v2",
+        "broker",
+        "live",
+    ),
+)
+@pytest.mark.parametrize("status", ("PASS", "BLOCKED"))
+@pytest.mark.parametrize("drift", ("CALL_RETURNED", None))
+def test_r8_runner_independently_rejects_effect_drift(
+    monkeypatch, field, status, drift
+) -> None:
+    from scripts import d10_arch128_r8_readonly as admission
+
+    primary = admission._base()
+    primary["status"] = status
+    if drift is None:
+        del primary[field]
+    else:
+        primary[field] = drift
+    monkeypatch.setattr(admission, "preflight", lambda: primary)
+    with pytest.raises(RuntimeError, match=field):
+        runner._r8_preflight()
+
+
+@pytest.mark.parametrize("primary", (None, [], "PASS"))
+def test_r8_runner_rejects_malformed_result(monkeypatch, primary) -> None:
+    from scripts import d10_arch128_r8_readonly as admission
+
+    monkeypatch.setattr(admission, "preflight", lambda: primary)
+    with pytest.raises(RuntimeError, match="exact dictionary"):
+        runner._r8_preflight()
+
+
+def _r8_authority_copy(
+    tmp_path: Path,
+    *,
+    addition: str = "",
+    old: str = "",
+    new: str = "",
+    runner_old: str = "",
+    runner_new: str = "",
+) -> Path:
+    root = Path(runner.__file__).resolve().parent.parent
+    target = tmp_path / "scripts"
+    target.mkdir()
+    source = (root / "scripts/d10_arch128_r8_readonly.py").read_text(encoding="utf-8")
+    if old:
+        assert old in source
+        source = source.replace(old, new, 1)
+    if addition:
+        source = source.replace(
+            "    result = _base()", f"    {addition}\n    result = _base()", 1
+        )
+    (target / "d10_arch128_r8_readonly.py").write_text(source, encoding="utf-8")
+    runner_source = (root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+    if runner_old:
+        assert runner_old in runner_source
+        runner_source = runner_source.replace(runner_old, runner_new, 1)
+    (target / "checkpoint_runner.py").write_text(runner_source, encoding="utf-8")
+    return tmp_path
+
+
+@pytest.mark.parametrize(
+    "addition",
+    (
+        "guard.main()",
+        "observer.guard.observe_fixed_d10_durable_wake_evidence()",
+        "observer.guard.main()",
+        "ctypes.WinDLL('kernel32')",
+        "subprocess.run([])",
+        "os.system('command')",
+        "Popen([])",
+        "r7_windows.host_factory()",
+        "r7_windows.WindowsR7EvidenceBackend()",
+        "r7_windows.WindowsR7Boundaries(1)",
+        "r7_windows._interactive_credential()",
+        "_update_scheduler()",
+        "open('some-file', 'w')",
+        "Path('some-file').write_text('data')",
+        "Path('some-file').rename('another')",
+        "Path('some-file').unlink()",
+        "input('credential')",
+        "task.Run(None)",
+        "task.RegisterTaskDefinition()",
+        "provider.capture()",
+        "paper_v2.execute()",
+        "broker.order()",
+        "live.execute()",
+    ),
+)
+def test_r8_authority_rejects_direct_host_or_effect_calls(tmp_path, addition) -> None:
+    root = _r8_authority_copy(tmp_path, addition=addition)
+    assert runner._r8_authority_check(root)
+
+
+@pytest.mark.parametrize(
+    ("old", "new"),
+    (
+        ('"evidence_mutation": "NOT_RUN"', '"evidence_mutation": "CALL_RETURNED"'),
+        ("def preflight()", "def preflight(path=None)"),
+        ("observation = observer.observe()", "observation = observer.observe(None)"),
+        (
+            "observation = observer.observe()",
+            "observation = observer.observe(); observer.observe()",
+        ),
+        (
+            "from scripts import d10_durable_wake_evidence_observe as observer",
+            "from scripts import run_personal_desktop_d10_launch_guard as observer",
+        ),
+        ("import re", "import re\nimport ctypes"),
+        ("import re", "import re\nimport subprocess"),
+        ("import re", "import re\nfrom scripts import d10_arch128_r7_windows"),
+        (
+            "d2071f25-5a7c-5293-a28f-5b722c9917a2",
+            "11111111-1111-5111-8111-111111111111",
+        ),
+        ("3ffe4ecf1745599e7edb233d3f08a9707a1b27384d2f050a1805ee4929ebbd71", "a" * 64),
+        (
+            "30e31396-9f51-57ca-a480-d2a3e9cae4a0",
+            "22222222-2222-5222-8222-222222222222",
+        ),
+        ("2026-09-30T22:07:24.000000Z", "2026-09-30T22:07:25.000000Z"),
+        ("2026-10-07T22:07:24.000000Z", "2026-10-07T22:07:25.000000Z"),
+        (r"F:\AITradingBot\D10\evidence", r"F:\AITradingBot\D10\other"),
+        ('observation["record_count"] != 3', 'observation["record_count"] < 3'),
+        ('observation["wake_count"] != 1', 'observation["wake_count"] < 1'),
+        ('observation["terminal"] is not False', 'observation["terminal"] == True'),
+        (
+            'observation["terminal_kind"] is not None',
+            'observation["terminal_kind"] == "STOPPED"',
+        ),
+        ('("COMPLETED", "NO_ACTION")', '("COMPLETED", "NO_ACTION", "STOPPED")'),
+        (
+            'observation["last_stop_reason"] is not None',
+            'observation["last_stop_reason"] == "STOPPED"',
+        ),
+        (
+            'observation["last_guard_reason"] is not None',
+            'observation["last_guard_reason"] == "STOPPED"',
+        ),
+    ),
+)
+def test_r8_authority_freezes_boundary_identity_and_first_wake_policy(
+    tmp_path, old, new
+) -> None:
+    root = _r8_authority_copy(tmp_path, old=old, new=new)
+    assert runner._r8_authority_check(root)
+
+
+@pytest.mark.parametrize(
+    ("old", "new"),
+    (
+        ("preflight=_r8_preflight,", "preflight=_r8_preflight, execute=_r7_execute,"),
+        ("preflight=_r8_preflight,", "preflight=_r7_preflight,"),
+        (
+            "primary = admission.preflight()\n    if type(primary) is not dict:",
+            "primary = admission.preflight()\n    guard.main()\n"
+            "    if type(primary) is not dict:",
+        ),
+    ),
+)
+def test_r8_authority_rejects_execute_registration_and_wrapper_effects(
+    tmp_path, old, new
+) -> None:
+    root = _r8_authority_copy(tmp_path, runner_old=old, runner_new=new)
+    assert runner._r8_authority_check(root)

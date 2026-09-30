@@ -312,6 +312,267 @@ def _r6_authority_check(repo_root: Path) -> tuple[str, ...]:
     return tuple(failures)
 
 
+def _r8_authority_check(repo_root: Path) -> tuple[str, ...]:
+    """Freeze R8's public observer delegation, policy, and closed registration."""
+    path = repo_root / "scripts" / "d10_arch128_r8_readonly.py"
+    runner_path = repo_root / "scripts" / "checkpoint_runner.py"
+    try:
+        source = path.read_text(encoding="utf-8")
+        tree = ast.parse(source)
+        runner_tree = ast.parse(runner_path.read_text(encoding="utf-8"))
+    except (OSError, SyntaxError):
+        return ("R8 source missing or invalid",)
+    failures: list[str] = []
+    functions = _top_level_functions(tree)
+    preflight = functions.get("preflight")
+    if set(functions) != {"_base", "_timestamp", "preflight"}:
+        failures.append("R8 contains an unreviewed function surface")
+    if preflight is None or ast.unparse(preflight.args) != "":
+        failures.append("R8 requires zero-argument preflight")
+    imports = {
+        "from __future__ import annotations",
+        "import re",
+        "from datetime import UTC, datetime",
+        "from typing import Final",
+        "from scripts import d10_durable_wake_evidence_observe as observer",
+        "from trading_bot.runtime.personal_desktop_d10_wake_evidence_log "
+        "import MAX_D10_EVIDENCE_LOG_BYTES",
+    }
+    actual_imports = {
+        ast.unparse(node)
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.Import, ast.ImportFrom))
+    }
+    if actual_imports != imports:
+        failures.append("R8 contains unreviewed imports or direct host authority")
+    allowed_calls = {
+        "_base",
+        "_timestamp",
+        "type",
+        "set",
+        "dict",
+        "any",
+        "ValueError",
+        "observer.observe",
+        "EXPECTED_IDENTITY.items",
+        "re.fullmatch",
+        "datetime.fromisoformat",
+        "parsed.isoformat",
+        "parsed.isoformat().replace",
+        "result.update",
+    }
+    calls = [node for node in ast.walk(tree) if isinstance(node, ast.Call)]
+    for call in calls:
+        called = ast.unparse(call.func)
+        if called not in allowed_calls:
+            failures.append(f"R8 contains unreviewed authority call: {called}")
+    observer_calls = [
+        call for call in calls if ast.unparse(call.func) == "observer.observe"
+    ]
+    if (
+        len(observer_calls) != 1
+        or observer_calls[0].args
+        or observer_calls[0].keywords
+        or preflight is None
+        or not any(
+            isinstance(node, ast.Try)
+            and isinstance(node.body[0], ast.Assign)
+            and ast.unparse(node.body[0]) == "observation = observer.observe()"
+            for node in preflight.body
+        )
+    ):
+        failures.append("R8 must delegate exactly once to observer.observe()")
+    for forbidden in (
+        "ctypes",
+        "subprocess",
+        "os.system",
+        "Popen",
+        "guard.",
+        "d10_arch128_r7",
+        "scheduler_update",
+        "_update_scheduler",
+        "credential",
+        "Start-ScheduledTask",
+        "Enable-ScheduledTask",
+        "RegisterTask",
+        ".Run(",
+    ):
+        if forbidden in source:
+            failures.append(f"R8 contains forbidden host/effect surface: {forbidden}")
+    constants = {
+        node.target.id: node.value
+        for node in tree.body
+        if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name)
+    }
+    expected_identity = {
+        "schema": "personal-desktop-d10-evidence-observation/v1",
+        "status": "OBSERVED",
+        "deployment_id": "d2071f25-5a7c-5293-a28f-5b722c9917a2",
+        "attestation_sha256": (
+            "3ffe4ecf1745599e7edb233d3f08a9707a1b27384d2f050a1805ee4929ebbd71"
+        ),
+        "soak_id": "30e31396-9f51-57ca-a480-d2a3e9cae4a0",
+        "activation_utc": "2026-09-30T22:07:24.000000Z",
+        "end_utc": "2026-10-07T22:07:24.000000Z",
+        "evidence_path": (
+            r"F:\AITradingBot\D10\evidence\wake-30e31396-9f51-57ca-a480-d2a3e9cae4a0.jsonl"
+        ),
+    }
+    try:
+        if ast.literal_eval(constants["EXPECTED_IDENTITY"]) != expected_identity:
+            failures.append("R8 accepted R7 identity drift")
+        if ast.literal_eval(constants["SCHEMA"]) != (
+            "architecture-128-r8-readonly-first-wake/v1"
+        ):
+            failures.append("R8 schema drift")
+    except (KeyError, ValueError, TypeError):
+        failures.append("R8 frozen constants missing or invalid")
+    effects = (
+        "production_filesystem_mutation",
+        "evidence_mutation",
+        "scheduler_mutation",
+        "lease_mutation",
+        "manual_task_start",
+        "source_launch",
+        "provider",
+        "Paper-v2",
+        "broker",
+        "live",
+    )
+    expected_base = ast.parse(
+        "def _base() -> dict[str, object]:\n    return "
+        + repr(
+            {
+                "schema": "SCHEMA",
+                "status": "BLOCKED",
+                **dict.fromkeys(effects, "NOT_RUN"),
+            }
+        ).replace("'SCHEMA'", "SCHEMA")
+    ).body[0]
+    base = functions.get("_base")
+    if base is None or ast.dump(base, include_attributes=False) != ast.dump(
+        expected_base, include_attributes=False
+    ):
+        failures.append("R8 closed result effect fields drift")
+    try:
+        if (
+            ast.literal_eval(constants["OBSERVER_EFFECT_FIELDS"])
+            != effects[2:3] + effects[5:]
+        ):
+            failures.append("R8 accepted observer effect fields drift")
+    except (KeyError, ValueError, TypeError):
+        failures.append("R8 accepted observer effect fields invalid")
+    comparisons = {
+        ast.unparse(node)
+        for node in ast.walk(preflight or tree)
+        if isinstance(node, ast.Compare)
+    }
+    for required in (
+        "type(observation) is not dict",
+        "set(observation) != set(OBSERVATION_FIELDS)",
+        "type(observation[field]) is not str",
+        "observation[field] != expected",
+        "observation[field] != 'NOT_RUN'",
+        "type(observation['record_count']) is not int",
+        "observation['record_count'] != 3",
+        "type(observation['wake_count']) is not int",
+        "observation['wake_count'] != 1",
+        "observation['terminal'] is not False",
+        "observation['terminal_kind'] is not None",
+        "type(observation['last_outcome']) is not str",
+        "observation['last_outcome'] not in ('COMPLETED', 'NO_ACTION')",
+        "observation['last_stop_reason'] is not None",
+        "observation['last_guard_reason'] is not None",
+        "type(observation['evidence_byte_length']) is not int",
+        "0 < observation['evidence_byte_length'] <= MAX_D10_EVIDENCE_LOG_BYTES",
+        "type(observation['evidence_sha256']) is not str",
+        "re.fullmatch('[0-9a-f]{64}', observation['evidence_sha256']) is None",
+        "first > last",
+    ):
+        if required not in comparisons:
+            failures.append(f"R8 acceptance policy drift: {required}")
+    wrapper = _top_level_functions(runner_tree).get("_r8_preflight")
+    if wrapper is None:
+        failures.append("R8 runner missing read-only wrapper")
+    else:
+        wrapper_imports = [
+            ast.unparse(node)
+            for node in ast.walk(wrapper)
+            if isinstance(node, (ast.Import, ast.ImportFrom))
+        ]
+        if wrapper_imports != [
+            "from scripts import d10_arch128_r8_readonly as admission"
+        ]:
+            failures.append("R8 wrapper contains unreviewed imports")
+        for node in ast.walk(wrapper):
+            if isinstance(node, ast.Call) and ast.unparse(node.func) not in {
+                "admission.preflight",
+                "_require_not_run",
+                "primary.get",
+                "type",
+                "RuntimeError",
+            }:
+                failures.append("R8 wrapper contains direct host/effect authority")
+        effects = (
+            "production_filesystem_mutation",
+            "evidence_mutation",
+            "scheduler_mutation",
+            "lease_mutation",
+            "manual_task_start",
+            "source_launch",
+            "provider",
+            "Paper-v2",
+            "broker",
+            "live",
+        )
+        effect_calls = [
+            node
+            for node in ast.walk(wrapper)
+            if isinstance(node, ast.Call)
+            and ast.unparse(node.func) == "_require_not_run"
+        ]
+        try:
+            if (
+                len(effect_calls) != 1
+                or ast.literal_eval(effect_calls[0].args[1]) != effects
+            ):
+                failures.append("R8 wrapper effect-field closure drift")
+        except (IndexError, ValueError, TypeError):
+            failures.append("R8 wrapper effect-field closure invalid")
+    registrations = [
+        node
+        for node in ast.walk(runner_tree)
+        if isinstance(node, ast.Call)
+        and ast.unparse(node.func) == "CheckpointSpec"
+        and any(
+            keyword.arg == "name"
+            and isinstance(keyword.value, ast.Constant)
+            and keyword.value.value == "arch128-r8"
+            for keyword in node.keywords
+        )
+    ]
+    if len(registrations) != 1:
+        failures.append("R8 registration missing or duplicated")
+    else:
+        keywords = {
+            keyword.arg: ast.unparse(keyword.value)
+            for keyword in registrations[0].keywords
+        }
+        for field, expected in (
+            ("preflight", "_r8_preflight"),
+            ("authority_check", "_r8_authority_check"),
+            ("remote_branch", "'feature/d10c-durable-wake-evidence'"),
+        ):
+            if keywords.get(field) != expected:
+                failures.append(f"R8 registration drift: {field}")
+        if "execute" in keywords or "remote_head_env" in keywords:
+            failures.append("R8 must have no execute or remote handoff surface")
+    spec = _checkpoint_specs()["arch128-r8"]
+    if spec.execute is not None or spec.preflight is not _r8_preflight:
+        failures.append("R8 runtime registration must remain preflight-only")
+    return tuple(failures)
+
+
 def _r7_authority_check(repo_root: Path) -> tuple[str, ...]:
     path = repo_root / "scripts" / "d10_arch128_r7_readonly.py"
     source = path.read_text(encoding="utf-8")
@@ -1415,6 +1676,30 @@ def _r7_preflight() -> dict[str, object]:
     return {"status": primary.get("status"), "primary": primary}
 
 
+def _r8_preflight() -> dict[str, object]:
+    from scripts import d10_arch128_r8_readonly as admission
+
+    primary = admission.preflight()
+    if type(primary) is not dict:
+        raise RuntimeError("R8 preflight result must be an exact dictionary")
+    _require_not_run(
+        primary,
+        (
+            "production_filesystem_mutation",
+            "evidence_mutation",
+            "scheduler_mutation",
+            "lease_mutation",
+            "manual_task_start",
+            "source_launch",
+            "provider",
+            "Paper-v2",
+            "broker",
+            "live",
+        ),
+    )
+    return {"status": primary.get("status"), "primary": primary}
+
+
 def _r7_execute() -> dict[str, object]:
     from scripts import d10_arch128_r7_protected as r7_protected
     from scripts import d10_arch128_r7_windows as r7_windows
@@ -1580,7 +1865,28 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
         "tests/runtime/test_d10_arch128_r7_windows.py",
         "tests/runtime/test_d10_python_substrate_windows.py",
     )
+    r8_tests = (
+        *COMMON_TESTS,
+        "tests/runtime/test_d10_arch128_r8_readonly.py",
+        "tests/runtime/test_d10_durable_wake_evidence_observe.py",
+        "tests/runtime/test_personal_desktop_d10_wake_evidence_log.py",
+        "tests/runtime/test_personal_desktop_d10_guard_evidence.py",
+    )
+    r8_ruff = (
+        *COMMON_RUFF_PATHS,
+        "scripts/d10_arch128_r8_readonly.py",
+        "tests/runtime/test_d10_arch128_r8_readonly.py",
+    )
     return {
+        "arch128-r8": CheckpointSpec(
+            name="arch128-r8",
+            description="Architecture 128 first-wake read-only observation",
+            tests=r8_tests,
+            ruff_paths=r8_ruff,
+            authority_check=_r8_authority_check,
+            preflight=_r8_preflight,
+            remote_branch="feature/d10c-durable-wake-evidence",
+        ),
         "arch128-parent-acl-repair": CheckpointSpec(
             name="arch128-parent-acl-repair",
             description="Architecture 128 exact parent-ACL repair source gate",

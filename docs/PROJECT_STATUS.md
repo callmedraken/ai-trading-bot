@@ -7479,3 +7479,128 @@ Under the standing safe-checkpoint authorization, source-only work may add R5
 to the unified checked-in runner. Do not create another external one-off
 qualification helper. R7 remains a separate protected boundary requiring fresh
 explicit authorization.
+
+
+### Architecture 128 R5 unified read-only qualification source — ACCEPTED
+
+Following the confirmed R4 replacement, Architecture 129 now registers two
+separate read-only R5 host qualifications:
+
+```powershell
+.\ops.ps1 preflight arch128-r5-substrate
+.\ops.ps1 preflight arch128-r5-trading
+```
+
+Neither R5 profile has a protected `execute` surface.
+
+The split preserves the frozen Architecture-128 R5 requirements rather than
+collapsing them into one weaker observer:
+
+1. `arch128-r5-substrate` reuses the existing full P124-1 production-Python
+   substrate qualification against an actual Trading process. It requires an
+   exact Trading PID interlock and verifies the protected runtime inventory,
+   actual Trading effective access, fixed isolated production interpreter,
+   loaded runtime/System32 dependencies, signed deployment identity, and
+   before/after native stability.
+2. `arch128-r5-trading` must run from the actual non-admin, non-elevated
+   Trading principal. The unified runner launches the fixed production Python
+   with the exact isolated flags and a checked-in R5 child observer. That child
+   calls only the reviewed launch guard's pre-source verifier, binds the
+   returned facts to the Architecture-128 R4 replacement identity, verifies
+   final/installing/tmp activation-lease absence, requires the protected
+   evidence root to be exact and empty, and traps second-stage launch.
+
+The R5 observer intentionally does **not** require the current development copy
+of the launch-guard source to be byte-identical to the guard installed by R4.
+R4 deployed the guard certified at source
+`0f9551e13486ef65b35a5a9633da19081571144b`. The installed guard is instead
+bound through the signed R4 deployment attestation and the pre-source verifier,
+which verifies the installed guard bytes against that attestation. The R5
+observer itself is independently bound by the current checkpoint runner's exact
+Git HEAD/tree and source gates. This preserves both source lineages without
+conflating them.
+
+All R5 results explicitly require activation, source launch, scheduler,
+provider, Paper-v2, broker, and live effects to remain `NOT_RUN`; the Trading
+child additionally requires `second_stage_launch_trap=NOT_CALLED`.
+
+Accepted R5 source checkpoint:
+
+```text
+HEAD:
+c2117957cd9ab37d8ff2b94ad8dca88ea16db994
+
+TREE:
+f353d97be4002bbbe689766d01ad401970c9cf21
+
+GitHub Actions:
+36666851222
+
+arch128-parent-acl-repair:
+pytest PASS
+ruff check PASS
+ruff format PASS
+git diff --check PASS
+authority PASS
+identity stable True
+overall PASS
+
+arch128-r4:
+pytest PASS
+ruff check PASS
+ruff format PASS
+git diff --check PASS
+authority PASS
+identity stable True
+overall PASS
+
+arch128-r5-substrate:
+pytest PASS
+ruff check PASS
+ruff format PASS
+git diff --check PASS
+authority PASS
+identity stable True
+overall PASS
+
+arch128-r5-trading:
+pytest PASS
+ruff check PASS
+ruff format PASS
+git diff --check PASS
+authority PASS
+identity stable True
+overall PASS
+```
+
+The source checkpoint evolved through bounded CI-diagnosed corrections:
+
+- `5c484e276f2093bcb0c9fc33aa225b92903a4d20` introduced the R5 profiles;
+- `0908e0e96e3218d96a79a4bd8242b24e39b642f7` fixed the initial
+  test/Ruff issues and extended GitHub Actions to certify both R5 profiles;
+- `b55bb9cd2050cc3afea5c9d4aad027bc03860892` corrected the child dependency
+  binding and removed environment-sensitive historical guard tests from the
+  R5 profile; and
+- `c2117957cd9ab37d8ff2b94ad8dca88ea16db994` corrected the cross-generation
+  guard-source assumption and passed the full four-profile source gate.
+
+No R5 host qualification, scheduler mutation, activation, source launch,
+provider, Paper-v2, broker, or live effect occurred during this source work.
+
+Current next checkpoint:
+
+1. finish this documentation closeout and use its exact live remote HEAD;
+2. create a fresh clean detached R5 operator worktree under
+   `F:\AI\worktrees\...`;
+3. from an elevated Administrator shell, start or identify one actual
+   non-admin Trading process without exposing its credential, set only the
+   ephemeral exact Trading PID interlock, and run the read-only
+   `preflight arch128-r5-substrate`;
+4. from the actual non-admin, non-elevated Trading principal, run the read-only
+   `preflight arch128-r5-trading` from the same exact source;
+5. accept R5 only if both exact-source host qualifications PASS;
+6. then continue automatically into R6 source-only reactivation/evidence design;
+7. R7 evidence publication + scheduler + lease activation remains a separate
+   protected boundary requiring fresh explicit authorization.
+
+Production D10 remains scheduler-disabled/non-running and inert.

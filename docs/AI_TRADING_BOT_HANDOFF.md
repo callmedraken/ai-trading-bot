@@ -7906,3 +7906,73 @@ Current next checkpoint:
    protected boundary requiring fresh explicit authorization.
 
 Production D10 remains scheduler-disabled/non-running and inert.
+
+
+### Architecture 129 bounded live-remote admission; R5 substrate host PASS
+
+The first real-host R5 substrate qualification ran read-only from
+`F:\AI\worktrees\ai-trading-bot-ops-r5` at source
+`4fa5193966bfe0751dd8bf2792f28211b8a097c4`, against a short-lived actual
+non-admin Trading process. It passed:
+
+```text
+PRIMARY_STATUS=PASS
+IDENTITY_STABLE=True
+EVIDENCE=F:\AI\temp\ai-trading-bot-checkpoints\arch128-r5-substrate\preflight-20260930T041627.826076Z\report.json
+OVERALL=PASS
+R5_SUBSTRATE_EXIT=0
+```
+
+This proved the protected production-Python substrate and actual Trading token
+at that source. The short-lived Trading process was used only as a token/effective
+access observation target; no production effect was authorized.
+
+The subsequent non-admin Trading qualification did not produce a checkpoint
+result. Its redirected stdout showed that unified `status` completed cleanly,
+but no `PRIMARY_STATUS` or R5 Trading evidence was emitted. Source review
+localized the stall to Architecture-129 live-remote admission, which calls
+`git ls-remote` before creating preflight evidence or invoking the
+checkpoint-specific R5 Trading child.
+
+The prior live-remote subprocess had neither a timeout nor explicit
+non-interactive Git/Git-Credential-Manager policy. Under the alternate Trading
+logon this allowed remote admission to wait indefinitely before R5 Trading
+qualification began.
+
+Accepted Architecture-129 correction:
+
+```text
+HEAD:
+b475e3102c29fc4694f8116aed25c2e0da0a37f1
+
+GitHub Actions:
+36669762122
+
+conclusion:
+success
+```
+
+The live-remote lookup now:
+
+- sets `GIT_TERMINAL_PROMPT=0`;
+- sets `GCM_INTERACTIVE=Never`;
+- sets `GIT_OPTIONAL_LOCKS=0`;
+- has a fixed 30-second subprocess timeout; and
+- converts timeout or Git failure into a fail-closed admission error before the
+  checkpoint-specific preflight is called.
+
+Focused regression tests prove the exact timeout and non-interactive
+environment and prove timeout rejection. The full four-profile source gate
+passed pytest, Ruff lint, Ruff format, git diff checking, authority review, and
+source identity for parent-ACL repair, R4, R5 substrate, and R5 Trading.
+
+The incomplete earlier R5 Trading attempt is not a PASS or accepted R5 host
+qualification. It remained read-only and may be terminated; no scheduler,
+activation, source launch, provider, Paper-v2, broker, or live effect was
+authorized.
+
+Because source identity advanced, final R5 acceptance requires both read-only
+host qualifications to be repeated from one fresh exact-source worktree at the
+final documentation-closeout HEAD. If both pass, R5 is accepted and R6
+source-only reactivation/evidence work may continue automatically. R7 remains
+the next protected effect boundary.

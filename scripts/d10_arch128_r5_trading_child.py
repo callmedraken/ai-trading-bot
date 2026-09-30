@@ -13,7 +13,6 @@ import json
 import sys
 from contextlib import ExitStack
 from pathlib import Path
-from types import SimpleNamespace
 from typing import Final
 
 SCHEMA: Final = "arch128-r5-trading-qualification/v1"
@@ -48,15 +47,18 @@ def _base() -> dict[str, object]:
     }
 
 
-def _require_final_lease_absent(backend: object) -> None:
+def _require_final_lease_absent(backend: object, guard_module: object) -> None:
     try:
-        handle = backend.open(guard.D10_ACTIVATION_LEASE, directory=False)
-    except guard._NativeError as exc:
-        if exc.code not in (guard.ERROR_FILE_NOT_FOUND, guard.ERROR_PATH_NOT_FOUND):
+        handle = backend.open(guard_module.D10_ACTIVATION_LEASE, directory=False)
+    except guard_module._NativeError as exc:
+        if exc.code not in (
+            guard_module.ERROR_FILE_NOT_FOUND,
+            guard_module.ERROR_PATH_NOT_FOUND,
+        ):
             raise
         return
     backend.close(handle)
-    raise guard.GuardBlocked("R5 final activation lease is present")
+    raise guard_module.GuardBlocked("R5 final activation lease is present")
 
 
 def _qualify(
@@ -95,8 +97,7 @@ def _qualify(
             raise RuntimeError("r5_second_stage_launch_was_called")
         if (
             deployment.deployment_id != expected.deployment_id
-            or deployment.attestation_sha256
-            != expected.unsigned_attestation_sha256
+            or deployment.attestation_sha256 != expected.unsigned_attestation_sha256
             or deployment.certified_source_head != expected.certified_source_head
             or deployment.certified_source_tree != expected.certified_source_tree
             or deployment.executable_file_count != expected.executable_file_count
@@ -107,7 +108,7 @@ def _qualify(
             raise RuntimeError("r5_new_deployment_identity_drift")
 
         backend = guard_module._Native()
-        _require_final_lease_absent(backend)
+        _require_final_lease_absent(backend, guard_module)
         for path in (
             guard_module.D10_ACTIVATION_LEASE_INSTALLING,
             guard_module.D10_ACTIVATION_LEASE_TEMP,

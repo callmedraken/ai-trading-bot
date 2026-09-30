@@ -6895,3 +6895,117 @@ Production D10 remains disabled/non-running. No parent-ACL repair, R4 staging,
 rename, scheduler mutation, activation, provider, Paper-v2, broker, or live
 effect is authorized by this workflow acceptance.
 
+
+
+### Architecture 129 protected parent-ACL execute dispatch — ACCEPTED
+
+The first real unified parent-ACL host preflight passed from the clean detached
+operator worktree at the then-current canonical closeout source:
+
+```text
+operator worktree:
+F:\AI\worktrees\ai-trading-bot-ops
+
+HEAD:
+1d64b9ab8c7b28cf6f4f9361efabd206b728df10
+
+TREE:
+f3e4cead3a885d7248b9d842a1b5fec6d4fc227a
+
+preflight:
+arch128-parent-acl-repair
+
+PRIMARY_STATUS:
+PASS
+
+IDENTITY_STABLE:
+True
+
+evidence:
+F:\AI\temp\ai-trading-bot-checkpoints\arch128-parent-acl-repair\preflight-20260930T000909.201128Z\report.json
+```
+
+That preflight admitted only the already-diagnosed exact three-ACE
+`F:\AITradingBot` parent drift. It was read-only; no ACL, child namespace,
+scheduler, activation, source-launch, provider, Paper-v2, broker, or live
+mutation occurred.
+
+The separately authorized source-only Architecture-129 protected-dispatch
+checkpoint is accepted at:
+
+```text
+HEAD:
+d8a74d233c1a6caaa06f7c0981efb8b7bc442958
+
+TREE:
+3dc6ec8f9823200cf55f76f5876d49c76a1ea1cd
+
+GitHub Actions run:
+36649562379
+
+conclusion:
+success
+```
+
+The first implementation commit `531a0d0d5b3c379965ad27c2dcfa5787da2a02d7`
+already passed pytest and both checkpoint authority reviews; its CI gate failed
+only the mandatory Ruff lint/format phases. The bounded formatting-only
+correction above then passed both registered Architecture-128 source profiles:
+
+```text
+arch128-parent-acl-repair:
+pytest PASS
+ruff check PASS
+ruff format PASS
+git diff --check PASS
+authority PASS
+identity stable True
+overall PASS
+
+arch128-r4:
+pytest PASS
+ruff check PASS
+ruff format PASS
+git diff --check PASS
+authority PASS
+identity stable True
+overall PASS
+```
+
+The unified runner now exposes exactly one protected dispatch:
+
+```powershell
+.\ops.ps1 execute arch128-parent-acl-repair
+```
+
+That dispatch does not duplicate the ACL mutation implementation. It first
+requires clean exact live-remote source identity, writes external attempt
+evidence, and then delegates through the existing reviewed
+`d10_arch128_parent_acl_repair._dispatch()` exact execute flag and environment
+authorization interlock. The runner records final source identity, protected
+result, conservative effect disposition, and
+`automatic_retry = NOT_AUTHORIZED`. The Architecture-128 R4 replacement still
+has no unified protected execute dispatch.
+
+Source acceptance does not authorize the real parent-ACL effect. The prior
+source-only authorization is consumed at this checkpoint and must not be
+treated as repair authorization.
+
+Current next checkpoint:
+
+1. after this documentation closeout reaches the live remote branch, create a
+   fresh clean detached operator worktree at that exact final HEAD rather than
+   modifying or reusing the preserved `ai-trading-bot-ops` worktree;
+2. run `ops.ps1 status`;
+3. run `ops.ps1 preflight arch128-parent-acl-repair`;
+4. if the fresh read-only preflight again admits the exact diagnosed drift,
+   stop for a new explicit authorization bound to that exact source before
+   invoking `ops.ps1 execute arch128-parent-acl-repair`;
+5. after a separately authorized repair PASS, run
+   `ops.ps1 preflight arch128-r4`;
+6. only after R4 preflight passes may the separately reviewed R4 protected
+   replacement dispatch/source checkpoint proceed.
+
+Production D10 remains disabled/non-running. No parent-ACL repair, R4 staging
+or rename, scheduler mutation, activation publication, provider, Paper-v2,
+broker, or live effect was authorized or performed by this source checkpoint.

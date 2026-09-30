@@ -233,6 +233,7 @@ Current registered examples:
 .\ops.ps1 execute arch128-r4
 .\ops.ps1 preflight arch128-r5-substrate
 .\ops.ps1 preflight arch128-r5-trading
+.\ops.ps1 verify arch128-r6
 ```
 
 The `execute` surface is protected, checkpoint-specific, and never implied by a

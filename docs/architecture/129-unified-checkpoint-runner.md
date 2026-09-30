@@ -278,3 +278,31 @@ preflight remote lookup:
 This handoff is registered only for the read-only `arch128-r5-trading`
 profile. Protected execute checkpoints do not accept an environment-supplied
 remote head and continue to perform their own live remote lookup.
+
+
+### Architecture 128 R6 source-only reactivation gate
+
+R6 is registered as `verify arch128-r6` only. It has no `preflight` or
+`execute` surface.
+
+The pure R6 state machine freezes:
+
+- new activation/end/soak derivation from the Architecture-128 replacement
+  identity, with the halted activation/end/soak rejected;
+- the evidence filename derived only from the new lease soak ID;
+- exact Architecture-127 evidence ACL/capability facts;
+- the real-Trading append-only, WRITE_THROUGH, zero-write probe contract;
+- evidence provisioning before scheduler mutation;
+- fresh admission after the credential pause;
+- independent scheduler readback while the final lease remains absent;
+- exact tmp -> installing -> final lease publication stages;
+- final lease publication as the last arming mutation;
+- final deployment/scheduler/lease/evidence readback;
+- reconciliation-only handling after any possible mutation; and
+- manual task start, source launch, provider, Paper-v2, broker, and live effects
+  closed throughout.
+
+R6 deliberately contains no Windows mutation adapter. R7 must add and
+source-certify the concrete protected host bindings before any protected
+activation is proposed, and R7 still requires fresh explicit human
+authorization.

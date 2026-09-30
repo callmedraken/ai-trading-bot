@@ -529,6 +529,7 @@ checked-in repository launcher and runner:
 .\ops.ps1 execute arch128-r4
 .\ops.ps1 preflight arch128-r5-substrate
 .\ops.ps1 preflight arch128-r5-trading
+.\ops.ps1 verify arch128-r6
 ```
 
 `ops.ps1` is intentionally a thin launcher. Source-gate orchestration,

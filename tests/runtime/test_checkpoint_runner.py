@@ -149,6 +149,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
         "arch128-r4",
         "arch128-r5-substrate",
         "arch128-r5-trading",
+        "arch128-r6",
     }
     for spec in specs.values():
         assert "tests/runtime/test_checkpoint_runner.py" in spec.tests
@@ -160,6 +161,8 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
     assert specs["arch128-r4"].execute is not None
     assert specs["arch128-r5-substrate"].execute is None
     assert specs["arch128-r5-trading"].execute is None
+    assert specs["arch128-r6"].preflight is None
+    assert specs["arch128-r6"].execute is None
     assert specs["arch128-r5-substrate"].remote_head_env is None
     assert (
         specs["arch128-r5-trading"].remote_head_env == runner.R5_TRADING_REMOTE_HEAD_ENV
@@ -174,6 +177,7 @@ def test_current_arch128_authority_profiles_pass() -> None:
     assert specs["arch128-r4"].authority_check(repo_root) == ()
     assert specs["arch128-r5-substrate"].authority_check(repo_root) == ()
     assert specs["arch128-r5-trading"].authority_check(repo_root) == ()
+    assert specs["arch128-r6"].authority_check(repo_root) == ()
 
 
 def test_default_evidence_root_is_outside_repo() -> None:

@@ -268,6 +268,50 @@ def _r5_authority_check(repo_root: Path) -> tuple[str, ...]:
     return tuple(failures)
 
 
+def _r6_authority_check(repo_root: Path) -> tuple[str, ...]:
+    path = repo_root / "scripts" / "d10_arch128_r6_reactivation.py"
+    source = path.read_text(encoding="utf-8")
+    tree = ast.parse(source, filename=str(path))
+    functions = _top_level_functions(tree)
+    failures: list[str] = []
+
+    for required in (
+        "derive_reactivation_plan",
+        "_require_evidence",
+        "_require_trading_probe",
+        "_require_admission",
+    ):
+        if required not in functions:
+            failures.append(f"R6 source missing required function: {required}")
+
+    forbidden = (
+        "subprocess",
+        "ctypes",
+        "Start-ScheduledTask",
+        "RegisterTask",
+        "RegisterTaskDefinition",
+        "WindowsActivationLeaseBackend",
+        "WindowsDeploymentBackend",
+        "CreateFileW",
+        "MoveFile",
+        "os.remove",
+        "os.unlink",
+        "shutil.rmtree",
+    )
+    for token in forbidden:
+        if token in source:
+            failures.append(f"R6 source contains protected host surface: {token}")
+
+    if "execute_r7: bool = False" not in source:
+        failures.append("R6 execution interlock is not explicit")
+    if '"manual_task_start": "NOT_RUN"' not in source:
+        failures.append("R6 source does not freeze manual task start closed")
+    if "LEASE_PUBLICATION_STEPS" not in source:
+        failures.append("R6 source does not bind tmp/installing/final publication")
+
+    return tuple(failures)
+
+
 def _parent_acl_authority_check(repo_root: Path) -> tuple[str, ...]:
     path = repo_root / "scripts" / "d10_arch128_parent_acl_repair.py"
     source = path.read_text(encoding="utf-8")
@@ -745,6 +789,18 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
         "scripts/d10_python_substrate_harness.py",
         "scripts/d10_python_substrate_windows.py",
     )
+    r6_tests = (
+        *COMMON_TESTS,
+        "tests/runtime/test_d10_arch128_r6_reactivation.py",
+        "tests/runtime/test_personal_desktop_d10_activation_lease.py",
+        "tests/runtime/test_personal_desktop_d10_wake_evidence_log.py",
+        "tests/runtime/test_personal_desktop_unattended_scheduler_contract.py",
+    )
+    r6_ruff = (
+        *COMMON_RUFF_PATHS,
+        "scripts/d10_arch128_r6_reactivation.py",
+        "tests/runtime/test_d10_arch128_r6_reactivation.py",
+    )
     return {
         "arch128-parent-acl-repair": CheckpointSpec(
             name="arch128-parent-acl-repair",
@@ -786,6 +842,14 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             preflight=_r5_trading_preflight,
             remote_branch="feature/d10c-durable-wake-evidence",
             remote_head_env=R5_TRADING_REMOTE_HEAD_ENV,
+        ),
+        "arch128-r6": CheckpointSpec(
+            name="arch128-r6",
+            description="Architecture 128 source-only reactivation ordering gate",
+            tests=r6_tests,
+            ruff_paths=r6_ruff,
+            authority_check=_r6_authority_check,
+            remote_branch="feature/d10c-durable-wake-evidence",
         ),
     }
 

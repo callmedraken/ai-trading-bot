@@ -526,6 +526,7 @@ checked-in repository launcher and runner:
 .\ops.ps1 preflight arch128-parent-acl-repair
 .\ops.ps1 preflight arch128-r4
 .\ops.ps1 execute arch128-parent-acl-repair
+.\ops.ps1 execute arch128-r4
 ```
 
 `ops.ps1` is intentionally a thin launcher. Source-gate orchestration,
@@ -545,10 +546,10 @@ Local Windows work remains necessary for host-specific qualification such as
 ACLs, Task Scheduler, real account tokens, and protected filesystem state. Those
 operations use the runner's registered `preflight` layer and, only where
 separately source-reviewed, checkpoint-specific protected `execute` dispatches.
-The current protected dispatch is limited to
-`arch128-parent-acl-repair`. A source or preflight PASS never grants protected
-production authority; a fresh explicit approval and the exact reviewed
-authorization interlock remain mandatory.
+The current protected dispatches are limited to
+`arch128-parent-acl-repair` and `arch128-r4`. A source or preflight PASS never
+grants protected production authority; a fresh explicit approval and the exact
+reviewed authorization interlock remain mandatory.
 
 Checkpoint evidence is external to the repository. The preferred development
 host root is `F:\AI\temp\ai-trading-bot-checkpoints`; CI uses its runner

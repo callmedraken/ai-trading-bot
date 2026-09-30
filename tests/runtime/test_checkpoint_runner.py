@@ -153,7 +153,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
         assert spec.remote_branch == "feature/d10c-durable-wake-evidence"
 
     assert specs["arch128-parent-acl-repair"].execute is not None
-    assert specs["arch128-r4"].execute is None
+    assert specs["arch128-r4"].execute is not None
 
 
 def test_current_arch128_authority_profiles_pass() -> None:
@@ -261,6 +261,93 @@ def test_parent_execute_rejects_forbidden_side_effect_evidence(
         assert "scheduler_mutation" in str(exc)
     else:
         raise AssertionError("unexpected protected side effect was accepted")
+
+
+def test_r4_execute_delegates_through_existing_interlock(
+    monkeypatch,
+) -> None:
+    from scripts import d10_arch128_r4_operator as operator
+
+    monkeypatch.delenv(operator.AUTH_ENV, raising=False)
+    monkeypatch.setattr(
+        operator,
+        "_execute_once",
+        lambda: (_ for _ in ()).throw(AssertionError("R4 execute called")),
+    )
+
+    result = runner._r4_execute()
+
+    assert result["status"] == "BLOCKED"
+    assert result["primary"]["reason"] == "authorization_interlock_not_exact"
+    assert result["effect_disposition"] == "NOT_STARTED"
+
+
+def test_r4_execute_accepts_exact_complete_result(
+    monkeypatch,
+) -> None:
+    from scripts import d10_arch128_r4_operator as operator
+
+    primary = _r4_preflight_result()
+    primary.update(
+        {
+            "status": "PASS",
+            "production_filesystem_mutation": "REPLACEMENT_COMPLETE_AND_VERIFIED",
+            "rename_1": "SUCCESS",
+            "rename_2": "SUCCESS",
+        }
+    )
+    monkeypatch.setattr(operator, "_dispatch", lambda *args, **kwargs: primary)
+
+    result = runner._r4_execute()
+
+    assert result["status"] == "PASS"
+    assert result["effect_disposition"] == "CONFIRMED"
+
+
+def test_r4_execute_marks_indeterminate_effect_conservatively(
+    monkeypatch,
+) -> None:
+    from scripts import d10_arch128_r4_operator as operator
+
+    primary = _r4_preflight_result(status="STOPPED_INDETERMINATE")
+    primary.update(
+        {
+            "production_filesystem_mutation": "STAGING_CREATED_AND_VERIFIED",
+            "rename_1": "INDETERMINATE",
+            "rename_2": "NOT_CALLED",
+        }
+    )
+    monkeypatch.setattr(operator, "_dispatch", lambda *args, **kwargs: primary)
+
+    result = runner._r4_execute()
+
+    assert result["status"] == "STOPPED_INDETERMINATE"
+    assert result["effect_disposition"] == "MAY_HAVE_OCCURRED"
+
+
+def test_r4_execute_rejects_forbidden_side_effect_evidence(
+    monkeypatch,
+) -> None:
+    from scripts import d10_arch128_r4_operator as operator
+
+    primary = _r4_preflight_result()
+    primary.update(
+        {
+            "status": "PASS",
+            "production_filesystem_mutation": "REPLACEMENT_COMPLETE_AND_VERIFIED",
+            "rename_1": "SUCCESS",
+            "rename_2": "SUCCESS",
+            "scheduler_mutation": "MUTATED",
+        }
+    )
+    monkeypatch.setattr(operator, "_dispatch", lambda *args, **kwargs: primary)
+
+    try:
+        runner._r4_execute()
+    except RuntimeError as exc:
+        assert "scheduler_mutation" in str(exc)
+    else:
+        raise AssertionError("unexpected R4 side effect was accepted")
 
 
 def test_r4_preflight_attaches_parent_acl_diagnostic(

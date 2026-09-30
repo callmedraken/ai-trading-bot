@@ -230,6 +230,7 @@ Current registered examples:
 .\ops.ps1 preflight arch128-parent-acl-repair
 .\ops.ps1 preflight arch128-r4
 .\ops.ps1 execute arch128-parent-acl-repair
+.\ops.ps1 execute arch128-r4
 ```
 
 The `execute` surface is protected, checkpoint-specific, and never implied by a

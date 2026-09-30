@@ -154,6 +154,37 @@ def _r4_authority_check(repo_root: Path) -> tuple[str, ...]:
                 f"operator contains forbidden authority surface: {forbidden}"
             )
 
+    runner_path = repo_root / "scripts" / "checkpoint_runner.py"
+    runner_source = runner_path.read_text(encoding="utf-8")
+    runner_tree = ast.parse(runner_source, filename=str(runner_path))
+    runner_functions = _top_level_functions(runner_tree)
+    r4_execute = runner_functions.get("_r4_execute")
+    if r4_execute is None:
+        failures.append("runner missing _r4_execute")
+    else:
+        execute_names = _qualified_names(r4_execute)
+        for required in (
+            "operator._dispatch",
+            "operator.EXECUTE_FLAG",
+            "os.environ",
+        ):
+            if required not in execute_names:
+                failures.append(
+                    "runner R4 execute missing reviewed dispatch binding: "
+                    f"{required}"
+                )
+        for forbidden in (
+            "operator._execute_once",
+            "r4c._construct_staging",
+            "r4c._ReplacementSession",
+            "r4w.WindowsArch128StagingBackend",
+            "r4w.rename_fixed_step",
+        ):
+            if forbidden in execute_names:
+                failures.append(
+                    f"runner R4 execute bypasses reviewed interlock: {forbidden}"
+                )
+
     return tuple(failures)
 
 
@@ -276,7 +307,7 @@ def _require_not_run(
     for field in fields:
         if result.get(field) != "NOT_RUN":
             raise RuntimeError(
-                f"read-only preflight reported unexpected effect for {field}: "
+                f"checkpoint result reported unexpected effect for {field}: "
                 f"{result.get(field)!r}"
             )
 
@@ -336,6 +367,63 @@ def _parent_acl_execute() -> dict[str, object]:
     elif status == "BLOCKED":
         if primary.get("acl_mutation") != "NOT_RUN":
             raise RuntimeError("blocked parent ACL execution reported a mutation")
+        disposition = "NOT_STARTED"
+    else:
+        disposition = "MAY_HAVE_OCCURRED"
+
+    return {
+        "status": status,
+        "primary": primary,
+        "effect_disposition": disposition,
+    }
+
+
+def _r4_execute() -> dict[str, object]:
+    from scripts import d10_arch128_r4_operator as operator
+
+    primary = operator._dispatch((operator.EXECUTE_FLAG,), dict(os.environ))
+    _require_not_run(
+        primary,
+        (
+            "scheduler_mutation",
+            "activation",
+            "source_launch",
+            "provider",
+            "Paper-v2",
+            "broker",
+            "live",
+        ),
+    )
+
+    status = primary.get("status")
+    mutation = primary.get("production_filesystem_mutation")
+    rename_1 = primary.get("rename_1")
+    rename_2 = primary.get("rename_2")
+
+    if status == "PASS":
+        if (
+            mutation != "REPLACEMENT_COMPLETE_AND_VERIFIED"
+            or rename_1 != "SUCCESS"
+            or rename_2 != "SUCCESS"
+        ):
+            raise RuntimeError(
+                "R4 PASS lacked exact verified replacement completion evidence"
+            )
+        disposition = "CONFIRMED"
+    elif status == "BLOCKED":
+        if (
+            mutation != "NOT_RUN"
+            or rename_1 != "NOT_RUN"
+            or rename_2 != "NOT_RUN"
+        ):
+            raise RuntimeError("blocked R4 execution reported filesystem mutation")
+        disposition = "NOT_STARTED"
+    elif (
+        status == "STOPPED"
+        and mutation == "NOT_STARTED"
+        and rename_1 == "NOT_RUN"
+        and rename_2 == "NOT_RUN"
+    ):
         disposition = "NOT_STARTED"
     else:
         disposition = "MAY_HAVE_OCCURRED"
@@ -465,6 +553,7 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             ruff_paths=r4_ruff,
             authority_check=_r4_authority_check,
             preflight=_r4_preflight,
+            execute=_r4_execute,
             remote_branch="feature/d10c-durable-wake-evidence",
         ),
     }

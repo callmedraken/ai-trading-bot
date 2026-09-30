@@ -145,20 +145,27 @@ script.
 ## 8. Protected execution
 
 Protected execution is implemented only for explicitly registered reviewed
-profiles. The first protected migration is:
+profiles. The protected migrations are:
 
 ```text
 execute arch128-parent-acl-repair
+execute arch128-r4
 ```
 
 The runner itself first requires a clean exact live-remote source identity and
-writes a pre-effect external attempt record. The registered parent-ACL execution
-then delegates through the already-reviewed repair operator's exact
-`EXECUTE_FLAG` / authorization-environment interlock rather than calling its
-mutation primitive directly. The final report preserves the operator result,
-effect disposition, post-run source identity, and `automatic_retry =
-NOT_AUTHORIZED`. An unexpected runner exception after dispatch is conservatively
-recorded as `MAY_HAVE_OCCURRED`.
+writes a pre-effect external attempt record. Each registered execute wrapper
+delegates through the already-reviewed operator's exact `EXECUTE_FLAG` /
+authorization-environment interlock rather than calling mutation primitives
+directly.
+
+For the parent-ACL repair, a PASS must carry the exact verified parent-policy
+mutation evidence. For R4, a PASS must carry exact
+`REPLACEMENT_COMPLETE_AND_VERIFIED` evidence plus both reviewed rename outcomes
+as `SUCCESS`. Any non-PASS R4 result that is not provably pre-mutation is
+conservatively recorded as `MAY_HAVE_OCCURRED`. The final report preserves the
+operator result, effect disposition, post-run source identity, and
+`automatic_retry = NOT_AUTHORIZED`. An unexpected runner exception after
+dispatch is also conservatively recorded as `MAY_HAVE_OCCURRED`.
 
 Adding `execute` to the unified runner does not imply authorization to use it.
 Each protected checkpoint must retain:
@@ -213,6 +220,8 @@ Implemented:
 - `preflight arch128-r4`;
 - protected `execute arch128-parent-acl-repair` dispatch, still requiring the
   existing exact authorization interlock and fresh user approval;
+- protected `execute arch128-r4` dispatch, still requiring the existing exact
+  authorization interlock and fresh user approval;
 - automatic parent-ACL diagnostics when R4 blocks on parent policy;
 - checkpoint-pinned remote-branch verification through read-only
   `git ls-remote`;
@@ -224,10 +233,12 @@ Implemented:
 
 Next:
 
-1. source-certify the protected `execute arch128-parent-acl-repair` dispatch;
+1. source-certify the protected `execute arch128-r4` dispatch;
 2. from a fresh clean detached operator worktree at that exact live source,
-   repeat `preflight arch128-parent-acl-repair`;
-3. stop for fresh explicit authorization at the real parent-ACL effect boundary;
-4. after a separately authorized successful repair, run
-   `preflight arch128-r4`;
-5. only then add the separately reviewed R4 protected replacement dispatch.
+   repeat `preflight arch128-r4`;
+3. stop for fresh explicit authorization at the real R4 filesystem-effect
+   boundary;
+4. after a separately authorized successful R4 replacement, continue with the
+   read-only R5 non-admin Trading deployment qualification;
+5. keep later scheduler/lease activation behind its own separately authorized
+   protected boundary.

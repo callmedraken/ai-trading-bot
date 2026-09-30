@@ -160,6 +160,11 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
     assert specs["arch128-r4"].execute is not None
     assert specs["arch128-r5-substrate"].execute is None
     assert specs["arch128-r5-trading"].execute is None
+    assert specs["arch128-r5-substrate"].remote_head_env is None
+    assert (
+        specs["arch128-r5-trading"].remote_head_env
+        == runner.R5_TRADING_REMOTE_HEAD_ENV
+    )
 
 
 def test_current_arch128_authority_profiles_pass() -> None:
@@ -446,6 +451,118 @@ def test_remote_branch_head_timeout_fails_closed(
         assert "timed out" in str(exc)
     else:
         raise AssertionError("timed-out remote lookup was accepted")
+
+
+
+
+def test_trusted_remote_head_handoff_requires_exact_lower_hex(
+    monkeypatch,
+) -> None:
+    variable = "TEST_REMOTE_HEAD"
+
+    for value in ("", "a" * 39, "A" * 40, "g" * 40):
+        monkeypatch.setenv(variable, value)
+        try:
+            runner._trusted_remote_head_from_env(variable)
+        except RuntimeError as exc:
+            assert variable in str(exc)
+        else:
+            raise AssertionError("malformed trusted remote-head handoff was accepted")
+
+    monkeypatch.setenv(variable, "a" * 40)
+    assert runner._trusted_remote_head_from_env(variable) == "a" * 40
+
+
+def test_preflight_checkpoint_accepts_bound_trusted_remote_head(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    state = {
+        "head": "a" * 40,
+        "tree": "b" * 40,
+        "branch": "HEAD",
+        "porcelain": "",
+    }
+    variable = "TEST_TRUSTED_REMOTE_HEAD"
+    monkeypatch.setenv(variable, state["head"])
+    monkeypatch.setattr(runner, "_git_state", lambda repo: dict(state))
+    monkeypatch.setattr(
+        runner,
+        "_remote_branch_head",
+        lambda *args: (_ for _ in ()).throw(
+            AssertionError("live remote lookup should not run")
+        ),
+    )
+
+    spec = runner.CheckpointSpec(
+        name="example",
+        description="example",
+        tests=(),
+        ruff_paths=(),
+        authority_check=lambda repo: (),
+        preflight=lambda: {
+            "status": "PASS",
+            "primary": {"status": "PASS"},
+        },
+        remote_branch="feature/pinned",
+        remote_head_env=variable,
+    )
+
+    passed, report_path = runner.preflight_checkpoint(
+        spec,
+        repo_root=tmp_path,
+        evidence_root=tmp_path / "external-handoff",
+    )
+
+    assert passed is True
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    assert report["source"]["remote_head"] == state["head"]
+    assert report["source"]["remote_head_source"] == f"TRUSTED_ENV:{variable}"
+
+
+def test_preflight_checkpoint_rejects_mismatched_trusted_remote_head(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    calls = 0
+    state = {
+        "head": "a" * 40,
+        "tree": "b" * 40,
+        "branch": "HEAD",
+        "porcelain": "",
+    }
+    variable = "TEST_TRUSTED_REMOTE_HEAD"
+    monkeypatch.setenv(variable, "c" * 40)
+    monkeypatch.setattr(runner, "_git_state", lambda repo: dict(state))
+
+    def preflight() -> dict[str, object]:
+        nonlocal calls
+        calls += 1
+        return {"status": "PASS", "primary": {"status": "PASS"}}
+
+    spec = runner.CheckpointSpec(
+        name="example",
+        description="example",
+        tests=(),
+        ruff_paths=(),
+        authority_check=lambda repo: (),
+        preflight=preflight,
+        remote_branch="feature/pinned",
+        remote_head_env=variable,
+    )
+
+    try:
+        runner.preflight_checkpoint(
+            spec,
+            repo_root=tmp_path,
+            evidence_root=tmp_path / "external-handoff-mismatch",
+        )
+    except RuntimeError as exc:
+        assert "not the live remote branch head" in str(exc)
+    else:
+        raise AssertionError("mismatched trusted remote-head handoff was accepted")
+
+    assert calls == 0
 
 
 def test_preflight_checkpoint_requires_live_remote_head(

@@ -29,6 +29,9 @@ if str(_SRC_ROOT) not in sys.path:
 SCHEMA: Final = "ai-trading-bot-checkpoint-runner/v1"
 REMOTE_LOOKUP_TIMEOUT_SECONDS: Final = 30
 R5_TRADING_PID_ENV: Final = "AI_TRADING_BOT_ARCH128_R5_TRADING_PID"
+R5_TRADING_REMOTE_HEAD_ENV: Final = (
+    "AI_TRADING_BOT_ARCH128_R5_ADMIN_REMOTE_HEAD"
+)
 R5_PRODUCTION_PYTHON: Final = Path(r"F:\AITradingBot\runtime\python.exe")
 R5_PYCACHE_PREFIX: Final = r"F:\AITradingBot\D10\no-pycache"
 
@@ -43,6 +46,7 @@ class CheckpointSpec:
     preflight: Callable[[], dict[str, object]] | None = None
     execute: Callable[[], dict[str, object]] | None = None
     remote_branch: str | None = None
+    remote_head_env: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -783,6 +787,7 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             authority_check=_r5_authority_check,
             preflight=_r5_trading_preflight,
             remote_branch="feature/d10c-durable-wake-evidence",
+            remote_head_env=R5_TRADING_REMOTE_HEAD_ENV,
         ),
     }
 
@@ -849,6 +854,19 @@ def _remote_branch_head(repo_root: Path, branch: str) -> str:
     if len(parts) != 2 or parts[1] != f"refs/heads/{branch}":
         raise RuntimeError("remote branch lookup returned an unexpected row")
     return parts[0]
+
+
+def _trusted_remote_head_from_env(variable: str) -> str:
+    value = os.environ.get(variable, "")
+    if (
+        len(value) != 40
+        or value != value.lower()
+        or any(character not in "0123456789abcdef" for character in value)
+    ):
+        raise RuntimeError(
+            f"trusted remote-head handoff is missing or malformed: {variable}"
+        )
+    return value
 
 
 def _git_state(repo_root: Path) -> dict[str, object]:
@@ -1119,7 +1137,13 @@ def preflight_checkpoint(
             )
         remote_branch = local_branch
 
-    remote_head = _remote_branch_head(repo_root, remote_branch)
+    if spec.remote_head_env is None:
+        remote_head = _remote_branch_head(repo_root, remote_branch)
+        remote_head_source = "LIVE_REMOTE_LOOKUP"
+    else:
+        remote_head = _trusted_remote_head_from_env(spec.remote_head_env)
+        remote_head_source = f"TRUSTED_ENV:{spec.remote_head_env}"
+
     if remote_head != state_before["head"]:
         raise RuntimeError(
             "preflight source is not the live remote branch head: "
@@ -1151,6 +1175,7 @@ def preflight_checkpoint(
             "after": state_after,
             "remote_branch": remote_branch,
             "remote_head": remote_head,
+            "remote_head_source": remote_head_source,
             "identity_stable": identity_stable,
         },
         "result": result,

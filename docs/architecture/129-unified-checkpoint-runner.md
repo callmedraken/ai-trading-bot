@@ -256,3 +256,25 @@ terminal/Git Credential Manager prompting for `git ls-remote`, applies a fixed
 failure before any checkpoint-specific preflight is called. This prevents
 restricted-principal qualifications from hanging indefinitely while preserving
 the exact live-remote source requirement.
+
+
+### R5 Trading two-principal live-remote handoff
+
+The non-admin Trading principal is intentionally not provisioned with GitHub
+credentials. R5 therefore uses a narrow two-principal exception to the ordinary
+preflight remote lookup:
+
+1. the elevated Administrator orchestrator performs the normal bounded,
+   non-interactive live `git ls-remote` observation;
+2. only the exact 40-character lowercase remote HEAD is passed into the
+   short-lived Trading process through
+   `AI_TRADING_BOT_ARCH128_R5_ADMIN_REMOTE_HEAD`;
+3. `arch128-r5-trading` requires that value to be syntactically exact and
+   byte-for-byte equal to its own clean detached local HEAD before any
+   checkpoint-specific Trading qualification runs; and
+4. the preflight evidence records whether remote identity came from a live
+   lookup or the R5 trusted Administrator handoff.
+
+This handoff is registered only for the read-only `arch128-r5-trading`
+profile. Protected execute checkpoints do not accept an environment-supplied
+remote head and continue to perform their own live remote lookup.

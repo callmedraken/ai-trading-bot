@@ -112,7 +112,9 @@ class Boundaries(Protocol):
 
     def observe_evidence(self, path: str) -> EvidenceObservation: ...
 
-    def probe_trading_append_open(self, path: str) -> TradingOpenObservation: ...
+    def probe_trading_append_open(
+        self, path: str, credential: object
+    ) -> TradingOpenObservation: ...
 
     def acquire_scheduler_credential(self) -> object: ...
 
@@ -319,10 +321,6 @@ class ReactivationOperator:
             _require_evidence(
                 plan, self._boundaries.observe_evidence(plan.evidence_path)
             )
-            _require_trading_probe(
-                self._boundaries.probe_trading_append_open(plan.evidence_path)
-            )
-            result["evidence_provision"] = MutationDisposition.CALL_RETURNED
 
             result["stage"] = "INTERACTIVE_CREDENTIAL"
             credential = self._boundaries.acquire_scheduler_credential()
@@ -340,6 +338,14 @@ class ReactivationOperator:
             _require_evidence(
                 plan, self._boundaries.observe_evidence(plan.evidence_path)
             )
+
+            result["stage"] = "TRADING_APPEND_OPEN_PROBE"
+            _require_trading_probe(
+                self._boundaries.probe_trading_append_open(
+                    plan.evidence_path, credential
+                )
+            )
+            result["evidence_provision"] = MutationDisposition.CALL_RETURNED
 
             result["stage"] = "SCHEDULER_MUTATION"
             result["scheduler_mutation"] = MutationDisposition.INDETERMINATE

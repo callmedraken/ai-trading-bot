@@ -474,3 +474,37 @@ The derived R7 activation is
 R7 is therefore ARMED. The next runner/operator activity is R8 read-only
 observation of the first **natural** scheduled wake. No manual task start or
 synthetic wake is authorized.
+
+### Architecture 128 R8A first-natural-wake observation registration — ACCEPTED
+
+R8A is source-certified at
+`c714c4067a3fb62c9347d1b6fa01cc67518b231f` /
+`1186cb7789e4772f252ae7d9f7f8d775ae5b2ed6`, with GitHub Actions run
+`36791353238` completed SUCCESS.
+
+The runner now registers `arch128-r8` with verify + read-only preflight only.
+There is no execute registration. The R8 wrapper delegates only to the new
+zero-argument R8 policy, which in turn calls the accepted public
+Architecture-127 observer exactly once. All production filesystem/evidence/
+scheduler/lease/manual-start/source/provider/Paper-v2/broker/live mutation
+fields remain NOT_RUN.
+
+R8 accepts only the frozen R7 replacement identity and exactly one complete
+nonterminal three-record sequence:
+
+```text
+WAKE_START -> ordinary COMPLETED/NO_ACTION -> ACCEPT
+record_count=3
+wake_count=1
+terminal=false
+```
+
+Empty, incomplete, result-without-ACCEPT, STOPPED, guard-terminal, second-wake,
+malformed, or foreign-lineage observations block. The policy does not infer
+scheduler origin from evidence bytes; natural-wake status also relies on the
+controlled no-manual-start operator history.
+
+The next operation is a read-only exact-live-remote
+`preflight arch128-r8`. No task start, source launch, scheduler mutation,
+lease mutation, evidence mutation, provider, Paper-v2, broker, or live action is
+authorized by R8A.

@@ -8385,3 +8385,86 @@ observation of the first naturally scheduled wake and its Architecture-127
 durable WAKE_START -> nonterminal result -> ACCEPT evidence. Missing ACCEPT,
 unexpected scheduler/lease/evidence drift, or any ambiguous wake must fail
 closed and stop the soak for review.
+
+## Architecture 128 R8A first-wake read-only registration — ACCEPTED
+
+R8A is source-accepted at:
+
+```text
+HEAD: c714c4067a3fb62c9347d1b6fa01cc67518b231f
+TREE: 1186cb7789e4772f252ae7d9f7f8d775ae5b2ed6
+CI:   36791353238 SUCCESS
+```
+
+The checkpoint adds only a narrow read-only policy/runner layer over the already
+certified Architecture-127 current-soak observer. It does not add a second
+evidence parser, native Windows reader, scheduler observer/mutator, credential
+surface, process launcher, provider path, Paper-v2 path, broker path, or live
+path.
+
+The accepted R8 policy freezes the active R7 lineage:
+
+```text
+deployment_id:
+d2071f25-5a7c-5293-a28f-5b722c9917a2
+
+attestation_sha256:
+3ffe4ecf1745599e7edb233d3f08a9707a1b27384d2f050a1805ee4929ebbd71
+
+soak_id:
+30e31396-9f51-57ca-a480-d2a3e9cae4a0
+
+activation_utc:
+2026-09-30T22:07:24.000000Z
+
+end_utc:
+2026-10-07T22:07:24.000000Z
+
+evidence_path:
+F:\AITradingBot\D10\evidence\wake-30e31396-9f51-57ca-a480-d2a3e9cae4a0.jsonl
+```
+
+R8 PASS requires exactly one accepted nonterminal Architecture-127 wake:
+three durable records, one wake, nonterminal state, no stop/guard reason, and a
+last outcome of COMPLETED or NO_ACTION. Empty, incomplete, unaccepted, stopped,
+guard-terminal, malformed, foreign-identity, or second/later-wake evidence
+blocks the checkpoint.
+
+The implementation explicitly preserves the distinction that durable evidence
+alone does not prove scheduler origin. First-natural-wake acceptance also relies
+on the controlled operator history that no manual task start or synthetic source
+launch occurred.
+
+Exact changed files:
+
+```text
+scripts/d10_arch128_r8_readonly.py
+scripts/checkpoint_runner.py
+tests/runtime/test_d10_arch128_r8_readonly.py
+tests/runtime/test_checkpoint_runner.py
+```
+
+Local focused verification reported 351 passed, Ruff check/format PASS,
+`git diff --check` PASS, and `ops.ps1 verify arch128-r8` PASS for pytest,
+Ruff, diff, authority, and source identity. GitHub Actions run 36791353238
+independently completed SUCCESS.
+
+No production preflight, evidence inspection, scheduler/task start, source
+launch, provider, Paper-v2, broker, or live effect occurred during R8A.
+
+Current progression:
+
+```text
+R7   evidence + scheduler + lease protected activation      ACCEPTED / ARMED
+R8A  first-wake read-only observation source                ACCEPTED
+R8   first natural scheduled wake observation               NEXT / READ-ONLY
+D10  one-week unattended simulated-paper soak               ACTIVE, NOT YET ACCEPTED
+```
+
+The next safe operation is one exact-live-remote
+`ops.ps1 preflight arch128-r8` from a fresh clean worktree at the current
+documentation-closeout HEAD. That preflight is read-only. Do not manually start
+the scheduled task, invoke governed source, mutate the scheduler/lease/evidence
+file, or synthesize a wake. If R8 reports anything other than the exact first
+accepted three-record sequence, stop for review rather than repairing or retrying
+the soak.

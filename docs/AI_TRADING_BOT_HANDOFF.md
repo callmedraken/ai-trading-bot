@@ -8666,3 +8666,58 @@ Do not manually start the scheduler task and do not synthesize a wake. The next
 checkpoint is read-only observation of the first natural wake. Acceptance needs
 the durable Architecture-127 wake grammar through matching ACCEPT; an incomplete,
 unaccepted, duplicate, or otherwise ambiguous wake stops progression for review.
+
+## 2026-09-30 — Architecture 128 R8A accepted
+
+Resume from **R8 first natural scheduled wake observation**.
+
+Accepted R8A source:
+
+```text
+HEAD c714c4067a3fb62c9347d1b6fa01cc67518b231f
+TREE 1186cb7789e4772f252ae7d9f7f8d775ae5b2ed6
+CI   36791353238 SUCCESS
+```
+
+R8A registers `arch128-r8` as a read-only preflight only. There is no execute
+surface. The policy calls the accepted Architecture-127 durable-wake observer
+exactly once and accepts only the current active R7 lineage and exactly one
+accepted nonterminal first wake:
+
+```text
+record_count = 3
+wake_count   = 1
+terminal     = false
+terminal_kind = null
+last_outcome = COMPLETED or NO_ACTION
+last_stop_reason = null
+last_guard_reason = null
+```
+
+The observer remains responsible for signed deployment/lease/evidence-object
+verification and the exact WAKE_START -> nonterminal result -> ACCEPT grammar.
+R8A does not duplicate those native/security/parsing boundaries.
+
+R8A also explicitly does not claim that the durable sequence itself proves
+scheduler origin. Natural-wake acceptance depends on preserved operator history:
+no manual task start and no synthetic governed-source launch.
+
+Active soak identity remains:
+
+```text
+deployment_id  d2071f25-5a7c-5293-a28f-5b722c9917a2
+soak_id        30e31396-9f51-57ca-a480-d2a3e9cae4a0
+activation_utc 2026-09-30T22:07:24.000000Z
+end_utc        2026-10-07T22:07:24.000000Z
+evidence_path  F:\AITradingBot\D10\evidence\wake-30e31396-9f51-57ca-a480-d2a3e9cae4a0.jsonl
+```
+
+No production observation or effect occurred during source certification.
+
+Next:
+1. use a fresh clean worktree at the current live docs-closeout HEAD;
+2. run exactly one read-only `ops.ps1 preflight arch128-r8`;
+3. return the full runner output and external report contents for ChatGPT review;
+4. never manually start the task or synthesize a wake;
+5. any empty/incomplete/unaccepted/terminal/duplicate/foreign evidence is a STOP
+   for review, not retry or repair authority.

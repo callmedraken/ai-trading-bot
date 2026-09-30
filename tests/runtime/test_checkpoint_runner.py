@@ -150,6 +150,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
         "arch128-r5-substrate",
         "arch128-r5-trading",
         "arch128-r6",
+        "arch128-r7",
     }
     for spec in specs.values():
         assert "tests/runtime/test_checkpoint_runner.py" in spec.tests
@@ -163,6 +164,8 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
     assert specs["arch128-r5-trading"].execute is None
     assert specs["arch128-r6"].preflight is None
     assert specs["arch128-r6"].execute is None
+    assert specs["arch128-r7"].preflight is not None
+    assert specs["arch128-r7"].execute is None
     assert specs["arch128-r5-substrate"].remote_head_env is None
     assert (
         specs["arch128-r5-trading"].remote_head_env == runner.R5_TRADING_REMOTE_HEAD_ENV
@@ -178,6 +181,7 @@ def test_current_arch128_authority_profiles_pass() -> None:
     assert specs["arch128-r5-substrate"].authority_check(repo_root) == ()
     assert specs["arch128-r5-trading"].authority_check(repo_root) == ()
     assert specs["arch128-r6"].authority_check(repo_root) == ()
+    assert specs["arch128-r7"].authority_check(repo_root) == ()
 
 
 def test_default_evidence_root_is_outside_repo() -> None:
@@ -906,3 +910,37 @@ def test_r5_trading_preflight_uses_fixed_production_command(
     )
     assert result["status"] == "PASS"
     assert result["primary"]["source_launch"] == "NOT_RUN"
+
+
+def test_r7_preflight_delegates_to_read_only_admission(monkeypatch) -> None:
+    from scripts import d10_arch128_r7_readonly as admission
+
+    primary = admission._base()
+    primary.update(
+        status="PASS",
+        canonical_deployment="NEW_EXACT_AND_VERIFIED",
+        evidence_root="EXACT_EMPTY_AND_VERIFIED",
+        activation_lease="FINAL_INSTALLING_TMP_ABSENT_AND_VERIFIED",
+        scheduler="EXACT_DISABLED_NONRUNNING_AND_VERIFIED",
+    )
+    monkeypatch.setattr(admission, "preflight", lambda: primary)
+
+    result = runner._r7_preflight()
+
+    assert result["status"] == "PASS"
+    assert result["primary"] is primary
+
+
+def test_r7_preflight_rejects_effect_evidence(monkeypatch) -> None:
+    from scripts import d10_arch128_r7_readonly as admission
+
+    primary = admission._base()
+    primary.update(status="PASS", scheduler_mutation="MUTATED")
+    monkeypatch.setattr(admission, "preflight", lambda: primary)
+
+    try:
+        runner._r7_preflight()
+    except RuntimeError as exc:
+        assert "scheduler_mutation" in str(exc)
+    else:
+        raise AssertionError("R7 read-only gate accepted effect evidence")

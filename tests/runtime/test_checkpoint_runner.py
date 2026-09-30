@@ -402,6 +402,7 @@ def test_read_only_effect_guard_rejects_unexpected_mutation() -> None:
     else:
         raise AssertionError("unexpected mutation was accepted")
 
+
 def test_remote_branch_head_is_bounded_and_noninteractive(
     monkeypatch,
     tmp_path: Path,

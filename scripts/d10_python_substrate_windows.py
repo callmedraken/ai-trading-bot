@@ -13,6 +13,13 @@ import os
 from contextlib import ExitStack
 from ctypes import wintypes
 from functools import lru_cache
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from scripts import d10_arch128_r6_reactivation as r6
+    from trading_bot.runtime.personal_desktop_d10_activation_lease import (
+        D10ActivationLease,
+    )
 
 from scripts import d10_python_substrate_harness as h
 from trading_bot.runtime import personal_desktop_d10_python_substrate as q
@@ -968,6 +975,84 @@ def _trading_token(pid: int) -> tuple[int, h.TokenObservation]:
             return duplicate, facts
     except Exception as exc:
         raise NativeFailure("Trading token acquisition failed") from exc
+
+
+def probe_trading_evidence_append_open(
+    trading_pid: int, lease: D10ActivationLease
+) -> r6.TradingOpenObservation:
+    """One real-token, zero-write R7 open; never changes R5 collection rights.
+
+    DuplicateToken at SecurityImpersonation already returns TOKEN_QUERY and
+    TOKEN_IMPERSONATE (Windows API contract). Keep _duplicate_token unchanged.
+    The caller supplies an exact R6 lease, never a path or an access policy.
+    """
+    from scripts import d10_arch128_r6_reactivation as r6
+    from trading_bot.runtime.personal_desktop_d10_activation_lease import (
+        D10ActivationLease,
+    )
+
+    if type(lease) is not D10ActivationLease:
+        raise NativeFailure("R7 exact lease required")
+    plan = r6.derive_reactivation_plan(lease.accepted_activation_utc)
+    if lease != plan.lease:
+        raise NativeFailure("R7 lease differs from fixed plan")
+    token, facts = _trading_token(trading_pid)
+    with ExitStack() as owned:
+        owned.callback(_close, token)
+        if (
+            facts.sid != q.TRADING
+            or facts.non_admin is not True
+            or facts.elevated is not False
+            or facts.groups_complete is not True
+            or facts.privileges_complete is not True
+        ):
+            raise NativeFailure("R7 actual Trading token proof required")
+        impersonate = _bind(
+            _dll("advapi32"),
+            "ImpersonateLoggedOnUser",
+            [wintypes.HANDLE],
+            wintypes.BOOL,
+        )
+        revert = _bind(_dll("advapi32"), "RevertToSelf", [], wintypes.BOOL)
+        try:
+            _check(impersonate(token), "ImpersonateLoggedOnUser")
+            create = _bind(
+                _dll("kernel32"),
+                "CreateFileW",
+                [
+                    ctypes.c_wchar_p,
+                    wintypes.DWORD,
+                    wintypes.DWORD,
+                    ctypes.c_void_p,
+                    wintypes.DWORD,
+                    wintypes.DWORD,
+                    wintypes.HANDLE,
+                ],
+                wintypes.HANDLE,
+            )
+            handle = create(
+                plan.evidence_path,
+                r6.guard.TRADING_EVIDENCE_FILE_ACCESS,
+                FILE_SHARE_READ,
+                None,
+                OPEN_EXISTING,
+                FILE_FLAG_OPEN_REPARSE_POINT | r6.guard.FILE_FLAG_WRITE_THROUGH,
+                None,
+            )
+            if handle in (None, 0, INVALID_HANDLE):
+                raise NativeFailure("R7 Trading append open failed")
+            _close(int(handle))
+        finally:
+            _check(revert(), "RevertToSelf")
+    return r6.TradingOpenObservation(
+        q.TRADING,
+        r6.guard.TRADING_EVIDENCE_FILE_ACCESS,
+        FILE_SHARE_READ,
+        OPEN_EXISTING,
+        FILE_FLAG_OPEN_REPARSE_POINT | r6.guard.FILE_FLAG_WRITE_THROUGH,
+        True,
+        0,
+    )
 
 
 def collect_trading_access(

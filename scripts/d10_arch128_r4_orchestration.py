@@ -12,7 +12,10 @@ import stat
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
+
+if TYPE_CHECKING:
+    from scripts import d10_arch128_r6_reactivation as r6
 
 from scripts import d10_arch128_r3_preflight as r3
 from scripts import d10_arch128_r4_replacement as r4
@@ -673,6 +676,117 @@ def observe_post(
     if first != second:
         raise DeploymentBlocked("arch128_post_two_read_drift")
     return second
+
+
+def observe_r7_complete(
+    reader: Reader,
+    verifier: SignatureVerifier,
+    scheduler_read: SchedulerRead,
+    stage: str,
+    plan: r6.ReactivationPlan | None,
+) -> r6.AdmissionObservation:
+    """Bounded R6 stages over the accepted signed/native COMPLETE trust model.
+
+    This separate seam does not change observe_post or its inert R4 semantics.
+    No caller-defined child inventory or scheduler policy is accepted.
+    """
+    from scripts import d10_arch128_r6_reactivation as r6
+    from scripts import d10_arch128_r7_observation as r7o
+
+    r7o.require_stage(stage, plan)
+    activated = stage in ("BEFORE_LEASE", "FINAL")
+    final = stage == "FINAL"
+
+    def once() -> tuple[object, ...]:
+        reader.require_administrator()
+        parent = _parent_native(
+            reader, _expected_reserved_names(r4.CANONICAL_PATH, r4.RETIRED_PATH)
+        )
+        if (
+            reader.absent(r4.HISTORICAL_S5R8_RETIRED_PATH) is not True
+            or reader.absent(r4.STAGING_PATH) is not True
+        ):
+            raise DeploymentBlocked("r7_complete_namespace_drift")
+        old = _verify_old_root(reader, verifier, r4.RETIRED_PATH)
+        new = _verify_signed_root(
+            reader,
+            verifier,
+            r4.CANONICAL_PATH,
+            r4.NEW_IDENTITY,
+            {"evidence", "activation.lease.json"} if final else {"evidence"},
+        )
+        if (
+            not old.root_native.volume_serial
+            == new.root_native.volume_serial
+            == parent.volume_serial
+        ):
+            raise DeploymentBlocked("r7_complete_volume_drift")
+        evidence_root = r4.CANONICAL_PATH + r"\evidence"
+        directory = reader.list_directory(evidence_root)
+        paths = () if plan is None else (plan.evidence_path,)
+        require_directory(
+            directory, evidence_root, {path.rsplit(chr(92), 1)[-1] for path in paths}
+        )
+        if directory.identity.volume_serial != parent.volume_serial:
+            raise DeploymentBlocked("r7_evidence_directory_volume_drift")
+        evidence = None
+        if plan is not None:
+            evidence = reader.read_file(plan.evidence_path, 0)
+            r7o.require_empty_evidence(evidence, plan.evidence_path)
+            if evidence.identity.volume_serial != parent.volume_serial:
+                raise DeploymentBlocked("r7_evidence_file_volume_drift")
+        absence = tuple(
+            reader.absent(r4.CANONICAL_PATH + chr(92) + name)
+            for name in (
+                "activation.lease.json",
+                "activation.lease.json.installing",
+                "activation.lease.json.tmp",
+            )
+        )
+        if any(type(value) is not bool for value in absence):
+            raise DeploymentBlocked("r7_complete_lease_absence_unknown")
+        leases = tuple(not value for value in absence)
+        if leases != (final, False, False):
+            raise DeploymentBlocked("r7_complete_lease_names_drift")
+        lease_file = None
+        if final:
+            lease_file = reader.read_file(
+                r4.CANONICAL_PATH + r"\activation.lease.json", 64 * 1024
+            )
+            require_file(
+                lease_file,
+                r4.CANONICAL_PATH + r"\activation.lease.json",
+                plan.lease.canonical_bytes(),
+            )
+            if parse_activation_lease(lease_file.data) != plan.lease:
+                raise DeploymentBlocked("r7_complete_lease_model_drift")
+        scheduler = scheduler_read()
+        r7o.require_scheduler(scheduler, plan.scheduler if activated else None)
+        return (
+            parent,
+            old,
+            new,
+            directory,
+            evidence,
+            leases,
+            lease_file,
+            tuple(sorted(scheduler.items())),
+        )
+
+    first = once()
+    if once() != first:
+        raise DeploymentBlocked("r7_complete_two_read_drift")
+    identity = r4.NEW_IDENTITY
+    return r6.AdmissionObservation(
+        identity.deployment_id,
+        identity.unsigned_attestation_sha256,
+        identity.certified_source_head,
+        identity.certified_source_tree,
+        (final, False, False),
+        () if plan is None else (plan.evidence_path,),
+        not activated,
+        plan.scheduler if activated else None,
+    )
 
 
 def _require_signed_material(signed: SignedMaterial) -> None:

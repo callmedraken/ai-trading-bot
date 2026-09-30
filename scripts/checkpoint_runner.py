@@ -390,6 +390,366 @@ def _r7_authority_check(repo_root: Path) -> tuple[str, ...]:
                 f"R7B dispatch contains premature host authority surface: {forbidden}"
             )
 
+    failures.extend(_r7c_authority_check(repo_root))
+    return tuple(failures)
+
+
+def _r7c_authority_check(repo_root: Path) -> tuple[str, ...]:
+    """Allow native bindings only in the separately reviewed fixed R7C surfaces."""
+    import re
+
+    failures = []
+    sources = {}
+    for name in ("d10_arch128_r7_windows.py", "d10_arch128_r7_observation.py"):
+        path = repo_root / "scripts" / name
+        if not path.is_file():
+            failures.append(f"R7C source missing: {name}")
+            continue
+        source = path.read_text(encoding="utf-8")
+        sources[name] = source
+        tree = ast.parse(source)
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.Import, ast.ImportFrom)):
+                modules = (
+                    (node.module,)
+                    if isinstance(node, ast.ImportFrom)
+                    else tuple(alias.name for alias in node.names)
+                )
+                if isinstance(node, ast.ImportFrom) and node.module in (
+                    "scripts",
+                    "trading_bot.runtime",
+                ):
+                    modules = tuple(
+                        node.module + "." + alias.name for alias in node.names
+                    )
+                allowed_imports = {
+                    "__future__",
+                    "ctypes",
+                    "subprocess",
+                    "getpass",
+                    "json",
+                    "os",
+                    "re",
+                    "sys",
+                    "weakref",
+                    "ntpath",
+                    "collections.abc",
+                    "concurrent.futures",
+                    "dataclasses",
+                    "datetime",
+                    "pathlib",
+                    "uuid",
+                    "scripts.d10_arch128_r4_orchestration",
+                    "scripts.d10_arch128_r4_windows",
+                    "scripts.d10_arch128_r6_reactivation",
+                    "scripts.d10_arch128_r7_observation",
+                    "scripts.d10_python_substrate_windows",
+                    "scripts.run_personal_desktop_d10_launch_guard",
+                    "scripts.d10_protected_deployment",
+                    "scripts.d10_protected_deployment_windows",
+                    "scripts.d10_protected_replacement_windows",
+                    "trading_bot.runtime.personal_desktop_d10_activation_lease",
+                    "trading_bot.runtime.personal_desktop_d10_wake_evidence_log",
+                    "trading_bot.runtime.personal_desktop_unattended_one_week_soak_scheduler_contract",
+                }
+                for module in modules:
+                    if module not in allowed_imports:
+                        failures.append(f"R7C unreviewed import: {module}")
+            if isinstance(node, ast.Call):
+                called = ast.unparse(node.func)
+                if called in (
+                    "eval",
+                    "exec",
+                    "__import__",
+                    "open",
+                    "os.system",
+                    "subprocess.run",
+                    "subprocess.call",
+                ) or called.endswith(
+                    (
+                        ".unlink",
+                        ".rmdir",
+                        ".rmtree",
+                        ".write_bytes",
+                        ".write_text",
+                        ".rename",
+                        ".replace",
+                    )
+                ):
+                    # datetime.replace is the fixed exact-second source clock.
+                    if called != "datetime.now(UTC).replace":
+                        failures.append(f"R7C unreviewed effect call: {called}")
+                if called == "self._bind":
+                    if (
+                        len(node.args) < 2
+                        or not isinstance(node.args[1], ast.Constant)
+                        or node.args[1].value
+                        not in (
+                            "CreateFileW",
+                            "ConvertStringSecurityDescriptorToSecurityDescriptorW",
+                        )
+                    ):
+                        failures.append("R7C unreviewed native binding")
+        for forbidden in (
+            "DeleteFile",
+            "ReplaceFile",
+            "SetEndOfFile",
+            "WriteFile",
+            "FlushFileBuffers",
+            "Start-ScheduledTask",
+            "Enable-ScheduledTask",
+            "schtasks",
+            "RegisterTaskDefinition",
+            "rollback(",
+            "cleanup(",
+            "retry(",
+            "guard.main",
+            "guard._run_second_stage",
+        ):
+            if forbidden in source:
+                failures.append(f"R7C forbidden authority: {name}:{forbidden}")
+    validation = sources.get("d10_arch128_r7_observation.py", "")
+    for required in (
+        "D10_WAKE_EVIDENCE_ROOT",
+        "ntpath.dirname(path) != str(D10_WAKE_EVIDENCE_ROOT)",
+        "r6.derive_reactivation_plan",
+        "guard.TRADING_EVIDENCE_FILE_ACCESS",
+        "item.aces != aces",
+        "item.size != 0",
+        "item.links != 1",
+        "PREDECESSOR_XML_SHA256",
+        "scheduler_semantics(spec)",
+    ):
+        if required not in validation:
+            failures.append(f"R7C exact validation missing: {required}")
+    host = sources.get("d10_arch128_r7_windows.py", "")
+    for required in (
+        "class WindowsR7Boundaries:",
+        "class WindowsR7EvidenceBackend(WindowsDeploymentBackend):",
+        'TRADING_PID_ENV = "AI_TRADING_BOT_ARCH128_R7_TRADING_PID"',
+        "d10_arch128_r7_scheduler_update.ps1",
+        "d10_arch128_r3_scheduler_observe.ps1",
+        "r4c.observe_r7_complete",
+        "substrate.probe_trading_evidence_append_open",
+        "guard.TRADING_EVIDENCE_FILE_ACCESS",
+        "observation.require_plan",
+        "observation.require_evidence_path",
+        "observation.require_scheduler",
+        "WindowsActivationLeaseBackend()",
+        'payload = b""',
+        'credential.password = ""',
+        'self._phase = "PROBE_ATTEMPTED"',
+        'self._require_phase("PROBED")',
+        'self._evidence.create_file(path, b"")',
+        "sys.stdin is not sys.__stdin__",
+    ):
+        if required not in host:
+            failures.append(f"R7C fixed binding missing: {required}")
+    if host:
+        tree = ast.parse(host)
+        classes = {
+            node.name: node for node in tree.body if isinstance(node, ast.ClassDef)
+        }
+        boundary = classes.get("WindowsR7Boundaries")
+        methods = (
+            {}
+            if boundary is None
+            else {
+                node.name: node
+                for node in boundary.body
+                if isinstance(node, ast.FunctionDef)
+            }
+        )
+        for method in (
+            "observe_admission",
+            "create_empty_evidence",
+            "observe_evidence",
+            "probe_trading_append_open",
+            "acquire_scheduler_credential",
+            "update_scheduler",
+            "read_scheduler",
+            "publish_lease",
+        ):
+            if method not in methods:
+                failures.append(f"R7C fixed R6 boundary missing: {method}")
+        factory = _top_level_functions(tree).get("host_factory")
+        if (
+            factory is None
+            or factory.args.args
+            or factory.args.kwonlyargs
+            or factory.args.vararg
+            or factory.args.kwarg
+        ):
+            failures.append("R7C factory accepts caller authority")
+        transport = _top_level_functions(tree).get("_transport")
+        if (
+            transport is None
+            or "helper not in (OBSERVE_HELPER, UPDATE_HELPER)"
+            not in ast.get_source_segment(host, transport)
+        ):
+            failures.append("R7C transport is not fixed")
+    native_path = repo_root / "scripts" / "d10_python_substrate_windows.py"
+    native_source = native_path.read_text(encoding="utf-8")
+    probe = _top_level_functions(ast.parse(native_source)).get(
+        "probe_trading_evidence_append_open"
+    )
+    probe_source = "" if probe is None else ast.get_source_segment(native_source, probe)
+    for required in (
+        "_trading_token(trading_pid)",
+        "ImpersonateLoggedOnUser",
+        "RevertToSelf",
+        "CreateFileW",
+        "r6.guard.TRADING_EVIDENCE_FILE_ACCESS",
+        "FILE_SHARE_READ",
+        "OPEN_EXISTING",
+        "FILE_FLAG_OPEN_REPARSE_POINT | r6.guard.FILE_FLAG_WRITE_THROUGH",
+        '_check(revert(), "RevertToSelf")',
+        "owned.callback(_close, token)",
+        "_close(int(handle))",
+    ):
+        if required not in probe_source:
+            failures.append(f"R7C Trading zero-write binding missing: {required}")
+    for forbidden in (
+        "WriteFile",
+        "FlushFileBuffers",
+        "SetEndOfFile",
+        "DeleteFile",
+        "MoveFile",
+        "ReplaceFile",
+    ):
+        if forbidden in probe_source:
+            failures.append(f"R7C Trading probe has forbidden effect: {forbidden}")
+    helper_path = repo_root / "scripts" / "d10_arch128_r7_scheduler_update.ps1"
+    helper = helper_path.read_text(encoding="utf-8") if helper_path.is_file() else ""
+    assignments = re.findall(
+        r"(?m)^\s*(\$(?:definition|trigger|action)[.][\w.]+)\s*=", helper
+    )
+    if assignments != [
+        "$trigger.StartBoundary",
+        "$trigger.EndBoundary",
+        "$definition.Settings.Enabled",
+    ]:
+        failures.append("R7C scheduler mutations exceed frozen three-field scope")
+    for required in (
+        "arch128-r7-scheduler-update/v1",
+        "activation_utc,password",
+        "Read-FixedTask",
+        "State -ne 1",
+        "enabled = $false",
+        "8d592a71258529fa88cd85866b0be1e91cf407d91e9acf5891a1bd82c0bf09b0",
+        "$definition, 4,",
+        "$callAttempted = $true",
+        "$activation.AddDays(7)",
+    ):
+        if required not in helper:
+            failures.append(f"R7C scheduler helper missing: {required}")
+    for forbidden in (
+        "Start-ScheduledTask",
+        "Enable-ScheduledTask",
+        ".Run(",
+        "NewTask",
+        "TASK_CREATE",
+        "Remove-Item",
+        "schtasks",
+        "Start-Process",
+    ):
+        if forbidden in helper:
+            if forbidden != "TASK_CREATE" or "TASK_CREATE" in re.sub(
+                r"(?m)#.*$", "", helper
+            ):
+                failures.append(
+                    f"R7C scheduler helper forbidden authority: {forbidden}"
+                )
+    if re.search(
+        r"[.]\s*(?:Run|CreateTask)\s*[(]|Invoke-Expression|Invoke-Command|[&]", helper
+    ):
+        failures.append("R7C scheduler contains arbitrary invocation or manual start")
+    if helper.count("RegisterTaskDefinition(") != 1:
+        failures.append("R7C scheduler mutation must be a single fixed TASK_UPDATE")
+    if host:
+        host_functions = _top_level_functions(ast.parse(host))
+        transport = host_functions.get("_transport")
+        launches = [
+            node
+            for node in ast.walk(ast.parse(host))
+            if isinstance(node, ast.Call)
+            and ast.unparse(node.func) == "subprocess.Popen"
+        ]
+        expected_command = ast.parse(
+            "(POWERSHELL, '-NoProfile', '-NonInteractive', "
+            "'-ExecutionPolicy', 'Bypass', '-File', str(helper))",
+            mode="eval",
+        ).body
+        if (
+            len(launches) != 1
+            or not launches[0].args
+            or ast.dump(launches[0].args[0]) != ast.dump(expected_command)
+            or transport is None
+            or launches[0].lineno < transport.lineno
+            or launches[0].lineno > transport.end_lineno
+        ):
+            failures.append("R7C process transport exceeds the fixed helper command")
+        for node in ast.walk(ast.parse(host)):
+            if isinstance(node, ast.Call) and ast.unparse(node.func) in (
+                "ctypes.CDLL",
+                "os.open",
+                "os.mkdir",
+                "os.makedirs",
+                "WindowsDeploymentBackend",
+            ):
+                failures.append(
+                    "R7C contains unreviewed direct native/filesystem authority"
+                )
+    if host:
+        console = _top_level_functions(ast.parse(host)).get(
+            "_require_interactive_console"
+        )
+        dll_calls = [
+            node
+            for node in ast.walk(ast.parse(host))
+            if isinstance(node, ast.Call) and ast.unparse(node.func) == "ctypes.WinDLL"
+        ]
+        if (
+            len(dll_calls) != 1
+            or console is None
+            or dll_calls[0].lineno < console.lineno
+            or dll_calls[0].lineno > console.end_lineno
+            or ast.literal_eval(dll_calls[0].args[0])
+            != r"C:\Windows\System32\kernel32.dll"
+        ):
+            failures.append(
+                "R7C native DLL binding exceeds the fixed read-only console proof"
+            )
+    if probe is not None:
+        calls = [node for node in ast.walk(probe) if isinstance(node, ast.Call)]
+        opens = [
+            node
+            for node in calls
+            if isinstance(node.func, ast.Name) and node.func.id == "create"
+        ]
+        expected_open = [
+            "plan.evidence_path",
+            "r6.guard.TRADING_EVIDENCE_FILE_ACCESS",
+            "FILE_SHARE_READ",
+            "None",
+            "OPEN_EXISTING",
+            "FILE_FLAG_OPEN_REPARSE_POINT | r6.guard.FILE_FLAG_WRITE_THROUGH",
+            "None",
+        ]
+        if (
+            len(opens) != 1
+            or [ast.unparse(arg) for arg in opens[0].args] != expected_open
+        ):
+            failures.append("R7C Trading open policy is not exact")
+        results = [
+            node
+            for node in calls
+            if ast.unparse(node.func) == "r6.TradingOpenObservation"
+        ]
+        if len(results) != 1 or ast.unparse(results[0].args[-1]) != "0":
+            failures.append("R7C Trading probe does not construct zero bytes written")
+    if _checkpoint_specs()["arch128-r7"].execute is not None:
+        failures.append("R7 execute prematurely registered")
     return tuple(failures)
 
 
@@ -908,6 +1268,10 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
         *COMMON_TESTS,
         "tests/runtime/test_d10_arch128_r7_readonly.py",
         "tests/runtime/test_d10_arch128_r7_protected.py",
+        "tests/runtime/test_d10_arch128_r7_windows.py",
+        "tests/runtime/test_d10_python_substrate_windows.py",
+        "tests/runtime/test_d10_arch128_r6_reactivation.py",
+        "tests/runtime/test_d10_activation_scheduler_operator.py",
         "tests/runtime/test_d10_arch128_r4_orchestration.py",
         "tests/runtime/test_d10_arch128_r4_windows.py",
         "tests/runtime/test_d10_arch128_r3_preflight.py",
@@ -918,6 +1282,12 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
         "tests/runtime/test_d10_arch128_r7_readonly.py",
         "scripts/d10_arch128_r7_protected.py",
         "tests/runtime/test_d10_arch128_r7_protected.py",
+        "scripts/d10_arch128_r7_windows.py",
+        "scripts/d10_arch128_r7_observation.py",
+        "scripts/d10_arch128_r4_orchestration.py",
+        "scripts/d10_python_substrate_windows.py",
+        "tests/runtime/test_d10_arch128_r7_windows.py",
+        "tests/runtime/test_d10_python_substrate_windows.py",
     )
     return {
         "arch128-parent-acl-repair": CheckpointSpec(

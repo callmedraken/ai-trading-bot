@@ -1331,3 +1331,127 @@ def test_administrator_duplication_failure_closes_primary(
 def test_windows_api_failure_blocks_without_native_fallback() -> None:
     with pytest.raises(w.NativeFailure, match="MockRead failed"):
         w._check(False, "MockRead")
+
+
+def _r7_probe_fixture(monkeypatch, fail=None):
+    from datetime import UTC, datetime
+
+    from scripts import d10_arch128_r6_reactivation as r6
+
+    plan = r6.derive_reactivation_plan(datetime(2026, 10, 1, 12, tzinfo=UTC))
+    events = []
+    facts = w.h.TokenObservation(
+        q.TRADING, True, False, (), ("SeChangeNotifyPrivilege",), True, True
+    )
+
+    def token(pid):
+        events.append(("token", pid))
+        if fail == "token":
+            raise w.NativeFailure("token failed")
+        return 13, facts
+
+    def close(handle):
+        events.append(("close", handle))
+        if fail == "close" and handle == 17:
+            raise w.NativeFailure("close failed")
+        if fail == "token_close" and handle == 13:
+            raise w.NativeFailure("token close failed")
+
+    def bind(dll, name, args, result):
+        def call(*values):
+            events.append((name, values))
+            if name == "CreateFileW":
+                return w.INVALID_HANDLE if fail == "open" else 17
+            if name == "ImpersonateLoggedOnUser" and fail == "impersonate":
+                return False
+            if name == "RevertToSelf" and fail == "revert":
+                return False
+            return True
+
+        assert name in ("CreateFileW", "ImpersonateLoggedOnUser", "RevertToSelf")
+        return call
+
+    monkeypatch.setattr(w, "_trading_token", token)
+    monkeypatch.setattr(w, "_dll", lambda *args: object())
+    monkeypatch.setattr(w, "_bind", bind)
+    monkeypatch.setattr(w, "_close", close)
+    monkeypatch.setattr(w.ctypes, "get_last_error", lambda: 5, raising=False)
+    return plan, events
+
+
+def test_r7_append_open_exact_flags_zero_write_and_cleanup(monkeypatch):
+    from scripts import d10_arch128_r6_reactivation as r6
+
+    plan, events = _r7_probe_fixture(monkeypatch)
+    result = w.probe_trading_evidence_append_open(123, plan.lease)
+    assert type(result) is r6.TradingOpenObservation
+    assert result == r6.TradingOpenObservation(
+        q.TRADING,
+        r6.guard.TRADING_EVIDENCE_FILE_ACCESS,
+        1,
+        3,
+        0x00200000 | 0x80000000,
+        True,
+        0,
+    )
+    assert events == [
+        ("token", 123),
+        ("ImpersonateLoggedOnUser", (13,)),
+        (
+            "CreateFileW",
+            (
+                plan.evidence_path,
+                r6.guard.TRADING_EVIDENCE_FILE_ACCESS,
+                1,
+                None,
+                3,
+                0x00200000 | 0x80000000,
+                None,
+            ),
+        ),
+        ("close", 17),
+        ("RevertToSelf", ()),
+        ("close", 13),
+    ]
+
+
+@pytest.mark.parametrize(
+    "failure", ("token", "impersonate", "open", "close", "revert", "token_close")
+)
+def test_r7_probe_failures_fail_closed_and_always_attempt_revert(monkeypatch, failure):
+    plan, events = _r7_probe_fixture(monkeypatch, failure)
+    with pytest.raises(w.NativeFailure):
+        w.probe_trading_evidence_append_open(123, plan.lease)
+    if failure != "token":
+        assert ("RevertToSelf", ()) in events
+        assert events[-1] == ("close", 13)
+    if failure in ("token", "impersonate"):
+        assert not any(event[0] == "CreateFileW" for event in events)
+
+
+def test_r7_probe_demands_exact_r6_lease_before_token_lookup(monkeypatch):
+    plan, events = _r7_probe_fixture(monkeypatch)
+    with pytest.raises(w.NativeFailure):
+        w.probe_trading_evidence_append_open(123, object())
+    assert events == []
+
+
+@pytest.mark.parametrize(
+    "change",
+    (
+        {"sid": q.ADMIN},
+        {"non_admin": False},
+        {"elevated": True},
+        {"groups_complete": False},
+        {"privileges_complete": False},
+    ),
+)
+def test_r7_probe_requires_actual_token_proof_before_impersonation(monkeypatch, change):
+    plan, events = _r7_probe_fixture(monkeypatch)
+    facts = w.h.TokenObservation(
+        q.TRADING, True, False, (), ("SeChangeNotifyPrivilege",), True, True
+    )
+    monkeypatch.setattr(w, "_trading_token", lambda pid: (13, replace(facts, **change)))
+    with pytest.raises(w.NativeFailure):
+        w.probe_trading_evidence_append_open(123, plan.lease)
+    assert events == [("close", 13)]

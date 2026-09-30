@@ -836,8 +836,7 @@ def _remote_branch_head(repo_root: Path, branch: str) -> str:
         )
     except subprocess.TimeoutExpired as exc:
         raise RuntimeError(
-            "git ls-remote timed out after "
-            f"{REMOTE_LOOKUP_TIMEOUT_SECONDS} seconds"
+            f"git ls-remote timed out after {REMOTE_LOOKUP_TIMEOUT_SECONDS} seconds"
         ) from exc
     if completed.returncode != 0:
         raise RuntimeError(f"git ls-remote failed: {completed.stderr.strip()}")

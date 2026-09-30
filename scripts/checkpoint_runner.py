@@ -212,7 +212,9 @@ def _r5_authority_check(repo_root: Path) -> tuple[str, ...]:
             "hashlib.sha256",
         ):
             if required not in names:
-                failures.append(f"R5 Trading child missing read-only binding: {required}")
+                failures.append(
+                    f"R5 Trading child missing read-only binding: {required}"
+                )
         for forbidden in (
             "guard_module.main",
             "guard_module._run_second_stage_with_evidence",
@@ -220,7 +222,9 @@ def _r5_authority_check(repo_root: Path) -> tuple[str, ...]:
             "backend.open_evidence_file",
         ):
             if forbidden in names:
-                failures.append(f"R5 Trading child references effect binding: {forbidden}")
+                failures.append(
+                    f"R5 Trading child references effect binding: {forbidden}"
+                )
 
     for forbidden in (
         "RegisterTask",
@@ -579,8 +583,7 @@ def _r5_trading_preflight() -> dict[str, object]:
         completed = subprocess.run(
             command,
             input=b"",
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            capture_output=True,
             cwd=str(_REPOSITORY_ROOT),
             env={"SystemRoot": r"C:\Windows", "WINDIR": r"C:\Windows"},
             check=False,
@@ -764,7 +767,9 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
         ),
         "arch128-r5-substrate": CheckpointSpec(
             name="arch128-r5-substrate",
-            description="Architecture 128 fresh protected Python substrate qualification",
+            description=(
+                "Architecture 128 fresh protected Python substrate qualification"
+            ),
             tests=r5_tests,
             ruff_paths=r5_ruff,
             authority_check=_r5_authority_check,

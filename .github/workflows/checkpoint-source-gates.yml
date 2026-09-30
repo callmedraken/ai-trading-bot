@@ -58,6 +58,18 @@ jobs:
             $Failures += 'arch128-r4'
           }
 
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\ops.ps1 `
+            verify arch128-r5-substrate
+          if ($LASTEXITCODE -ne 0) {
+            $Failures += 'arch128-r5-substrate'
+          }
+
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\ops.ps1 `
+            verify arch128-r5-trading
+          if ($LASTEXITCODE -ne 0) {
+            $Failures += 'arch128-r5-trading'
+          }
+
           if ($Failures.Count -ne 0) {
             throw "Checkpoint source gates failed: $($Failures -join ', ')"
           }

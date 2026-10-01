@@ -1575,6 +1575,189 @@ def _d10_xnys_session_coverage_policy_authority_check(
     return tuple(failures)
 
 
+def _d10_xnys_session_evidence_projector_authority_check(
+    repo_root: Path,
+) -> tuple[str, ...]:
+    """Freeze pure S2C2B projection and compose accepted S2C2A authority.
+
+    The complete semantic AST pins exact lease revalidation/current identity,
+    one whole-log summary before extraction, accepted ordinary parsing once per
+    triplet, every reconstructed wake field, UTC/order preservation, one policy
+    call, bounded sanitized output, fact-only SHA/length and decision flags.
+    Verification never invokes a host observer or an operational wrapper.
+    """
+    try:
+        tree = ast.parse(
+            (repo_root / "scripts/d10_xnys_session_evidence_projector.py").read_text(
+                encoding="utf-8"
+            )
+        )
+        runner_tree = ast.parse(
+            (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+        )
+    except (OSError, SyntaxError):
+        return ("S2C2B source missing or invalid",)
+    failures = list(_d10_xnys_session_coverage_policy_authority_check(repo_root))
+    imports = {
+        "from __future__ import annotations",
+        "from datetime import UTC, date, datetime",
+        ("from scripts import d10_xnys_session_coverage_policy as session_policy"),
+        (
+            "from trading_bot.runtime import personal_desktop_d10_wake_ev"
+            "idence_log as wake_log"
+        ),
+        (
+            "from trading_bot.runtime.personal_desktop_d10_activation_lea"
+            "se import D10ActivationLease"
+        ),
+        (
+            "from trading_bot.runtime.personal_desktop_unattended_one_wee"
+            "k_soak import MAX_D10_WAKE_EVIDENCE_BYTES, D10OneWeekWakeEvi"
+            "dence"
+        ),
+        "from typing import Final",
+        "import hashlib",
+        "import json",
+    }
+    actual_imports = {
+        ast.unparse(node)
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.Import, ast.ImportFrom))
+    }
+    if actual_imports != imports:
+        failures.append("S2C2B contains unreviewed imports")
+    allowed_calls = {
+        "D10OneWeekWakeEvidence",
+        "_base",
+        "_blocked",
+        "_policy_timestamp",
+        "_policy_valid",
+        "_reconstruct",
+        "_session_text",
+        "_wake_deadline",
+        "any",
+        "date.fromisoformat",
+        "date.fromisoformat(value).isoformat",
+        "datetime.fromisoformat",
+        "enumerate",
+        "facts.items",
+        "hashlib.sha256",
+        "hashlib.sha256(log_bytes).hexdigest",
+        "json.loads",
+        "lease.__post_init__",
+        "len",
+        "log_bytes[:-1].split",
+        "parsed.isoformat",
+        "parsed.isoformat().replace",
+        "range",
+        "reconstructed_wakes.append",
+        "record.__post_init__",
+        "session_policy.analyze",
+        "set",
+        "sum",
+        "summary.__post_init__",
+        "tuple",
+        "type",
+        "value.endswith",
+        "value.get",
+        "value.isoformat",
+        "value.isoformat(timespec='microseconds').replace",
+        "wake_log.parse_persisted_d10_wake_record",
+        "wake_log.summarize_d10_wake_evidence_log",
+    }
+    if any(
+        ast.unparse(node.func) not in allowed_calls
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+    ):
+        failures.append("S2C2B contains unreviewed I/O, observer or grammar calls")
+    expected_ast_sha256 = (
+        "67a4abf69551afc0a5327952d52857de053a5f2363400ea4dd497a991328a666"
+    )
+    if (
+        hashlib.sha256(ast.dump(tree).encode("utf-8")).hexdigest()
+        != expected_ast_sha256
+    ):
+        failures.append("S2C2B frozen pure durable projector drift")
+    registrations = [
+        node
+        for node in ast.walk(runner_tree)
+        if isinstance(node, ast.Call)
+        and ast.unparse(node.func) == "CheckpointSpec"
+        and any(
+            keyword.arg == "name"
+            and isinstance(keyword.value, ast.Constant)
+            and keyword.value.value == "d10-xnys-session-evidence-projector"
+            for keyword in node.keywords
+        )
+    ]
+    expected_registration = {
+        "name": "'d10-xnys-session-evidence-projector'",
+        "description": (
+            "'D10 pure durable-log XNYS session evidence projector source gate'"
+        ),
+        "tests": "xnys_projector_tests",
+        "ruff_paths": "xnys_projector_ruff",
+        "authority_check": "_d10_xnys_session_evidence_projector_authority_check",
+        "remote_branch": "'feature/post-d10-observability'",
+    }
+    if len(registrations) != 1:
+        failures.append("S2C2B registration missing or duplicated")
+    else:
+        registration = registrations[0]
+        actual = {
+            keyword.arg: ast.unparse(keyword.value) for keyword in registration.keywords
+        }
+        if (
+            registration.args
+            or len(registration.keywords) != len(expected_registration)
+            or actual != expected_registration
+        ):
+            failures.append(
+                "S2C2B must remain verify-only with exact side registration"
+            )
+    spec = _checkpoint_specs()["d10-xnys-session-evidence-projector"]
+    upstream = _checkpoint_specs()["d10-xnys-session-coverage-policy"]
+    if (
+        spec.preflight is not None
+        or spec.execute is not None
+        or spec.remote_head_env is not None
+        or spec.remote_branch != "feature/post-d10-observability"
+        or spec.tests
+        != (
+            *upstream.tests,
+            "tests/runtime/test_d10_xnys_session_evidence_projector.py",
+            "tests/runtime/test_personal_desktop_d10_wake_evidence_log.py",
+        )
+        or spec.ruff_paths
+        != (
+            *upstream.ruff_paths,
+            "scripts/d10_xnys_session_evidence_projector.py",
+            "tests/runtime/test_d10_xnys_session_evidence_projector.py",
+        )
+    ):
+        failures.append("S2C2B runtime verification hierarchy or authority drift")
+    registry = _top_level_functions(runner_tree).get("_checkpoint_specs")
+    selections = {
+        "xnys_projector_tests": "(*xnys_session_tests, "
+        "'tests/runtime/test_d10_xnys_session_evidence_projector.py', "
+        "'tests/runtime/test_personal_desktop_d10_wake_evidence_log.py')",
+        "xnys_projector_ruff": "(*xnys_session_ruff, "
+        "'scripts/d10_xnys_session_evidence_projector.py', "
+        "'tests/runtime/test_d10_xnys_session_evidence_projector.py')",
+    }
+    actual_selections = {}
+    if registry is not None:
+        for node in registry.body:
+            if isinstance(node, ast.Assign):
+                for target in node.targets:
+                    if isinstance(target, ast.Name) and target.id in selections:
+                        actual_selections[target.id] = ast.unparse(node.value)
+    if actual_selections != selections:
+        failures.append("S2C2B source verification hierarchy drift")
+    return tuple(failures)
+
+
 def _r7_authority_check(repo_root: Path) -> tuple[str, ...]:
     path = repo_root / "scripts" / "d10_arch128_r7_readonly.py"
     source = path.read_text(encoding="utf-8")
@@ -2964,6 +3147,16 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
         "scripts/d10_xnys_session_coverage_policy.py",
         "tests/runtime/test_d10_xnys_session_coverage_policy.py",
     )
+    xnys_projector_tests = (
+        *xnys_session_tests,
+        "tests/runtime/test_d10_xnys_session_evidence_projector.py",
+        "tests/runtime/test_personal_desktop_d10_wake_evidence_log.py",
+    )
+    xnys_projector_ruff = (
+        *xnys_session_ruff,
+        "scripts/d10_xnys_session_evidence_projector.py",
+        "tests/runtime/test_d10_xnys_session_evidence_projector.py",
+    )
     return {
         "d10-soak-status": CheckpointSpec(
             name="d10-soak-status",
@@ -3012,6 +3205,16 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             tests=xnys_session_tests,
             ruff_paths=xnys_session_ruff,
             authority_check=_d10_xnys_session_coverage_policy_authority_check,
+            remote_branch="feature/post-d10-observability",
+        ),
+        "d10-xnys-session-evidence-projector": CheckpointSpec(
+            name="d10-xnys-session-evidence-projector",
+            description=(
+                "D10 pure durable-log XNYS session evidence projector source gate"
+            ),
+            tests=xnys_projector_tests,
+            ruff_paths=xnys_projector_ruff,
+            authority_check=_d10_xnys_session_evidence_projector_authority_check,
             remote_branch="feature/post-d10-observability",
         ),
         "arch128-r8": CheckpointSpec(

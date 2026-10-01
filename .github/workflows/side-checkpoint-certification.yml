@@ -177,6 +177,11 @@ jobs:
             throw "S2C2A side source certification failed: $LASTEXITCODE"
           }
 
+          .\ops.ps1 verify d10-xnys-session-evidence-projector
+          if ($LASTEXITCODE -ne 0) {
+            throw "S2C2B side source certification failed: $LASTEXITCODE"
+          }
+
       - name: Upload current side source-gate evidence
         if: always()
         uses: actions/upload-artifact@v4

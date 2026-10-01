@@ -3,6 +3,7 @@ from __future__ import annotations
 import ast
 import hashlib
 import json
+import re
 import subprocess
 from pathlib import Path
 
@@ -162,6 +163,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
         "d10-scheduler-slot-policy",
         "d10-scheduler-history-collector",
         "d10-xnys-session-coverage-policy",
+        "d10-xnys-session-evidence-projector",
     }
     for spec in specs.values():
         assert "tests/runtime/test_checkpoint_runner.py" in spec.tests
@@ -177,6 +179,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
                 "d10-scheduler-slot-policy",
                 "d10-scheduler-history-collector",
                 "d10-xnys-session-coverage-policy",
+                "d10-xnys-session-evidence-projector",
             )
             else "feature/d10c-durable-wake-evidence"
         )
@@ -3134,3 +3137,305 @@ def test_xnys_session_preserves_exact_upstream_registration_asts():
                         ast.dump(node).encode("utf-8")
                     ).hexdigest()
     assert actual == expected
+
+
+def test_xnys_projector_registration_is_verify_only():
+    specs = runner._checkpoint_specs()
+    spec = specs["d10-xnys-session-evidence-projector"]
+    upstream = specs["d10-xnys-session-coverage-policy"]
+    assert spec.preflight is None
+    assert spec.execute is None
+    assert spec.remote_head_env is None
+    assert spec.remote_branch == "feature/post-d10-observability"
+    assert (
+        spec.authority_check
+        is runner._d10_xnys_session_evidence_projector_authority_check
+    )
+    assert spec.tests == (
+        *upstream.tests,
+        "tests/runtime/test_d10_xnys_session_evidence_projector.py",
+        "tests/runtime/test_personal_desktop_d10_wake_evidence_log.py",
+    )
+    assert spec.ruff_paths == (
+        *upstream.ruff_paths,
+        "scripts/d10_xnys_session_evidence_projector.py",
+        "tests/runtime/test_d10_xnys_session_evidence_projector.py",
+    )
+    parser = runner._parser(specs)
+    assert parser.parse_args(("verify", spec.name)).checkpoint == spec.name
+    for command in ("preflight", "execute"):
+        with pytest.raises(SystemExit):
+            parser.parse_args((command, spec.name))
+
+
+def _xnys_projector_authority_copy(tmp_path, *, old="", new="", addition=""):
+    root = _xnys_session_authority_copy(tmp_path)
+    path = Path(runner.__file__).parent / "d10_xnys_session_evidence_projector.py"
+    source = path.read_text(encoding="utf-8")
+    if old:
+        assert old in source
+        source = source.replace(old, new, 1)
+    (root / "scripts/d10_xnys_session_evidence_projector.py").write_text(
+        source + "\n" + addition + "\n", encoding="utf-8"
+    )
+    return root
+
+
+@pytest.mark.parametrize(
+    "addition",
+    (
+        "import os",
+        "import subprocess",
+        "import ctypes",
+        "from pathlib import Path",
+        "open('evidence')",
+        "Path('evidence').read_bytes()",
+        "os.environ['TOKEN']",
+        "subprocess.run([])",
+        "ctypes.WinDLL('kernel32')",
+        "datetime.now(UTC)",
+        "from scripts import d10_soak_status_readonly as observer",
+        "observer.observe()",
+        "collector.observe()",
+        "provider.capture()",
+        "paper_v2.execute()",
+        "broker.order()",
+        "live.execute()",
+        "def observe(): pass",
+        "def preflight(): pass",
+        "def execute(): pass",
+        "json.loads(log_bytes)",
+        "def independent_grammar(data): return data.splitlines()",
+        "sorted(reconstructed_wakes)",
+        "set(reconstructed_wakes)",
+        "dict.fromkeys(reconstructed_wakes)",
+        "__import__('os')",
+        "eval('effect()')",
+    ),
+)
+def test_xnys_projector_authority_rejects_io_observer_grammar_sort_dedup(
+    tmp_path, addition
+):
+    root = _xnys_projector_authority_copy(tmp_path, addition=addition)
+    assert runner._d10_xnys_session_evidence_projector_authority_check(root)
+
+
+@pytest.mark.parametrize(
+    "old,new",
+    (
+        (
+            'SCHEMA: Final = "d10-xnys-session-evidence-projector/v1"',
+            'SCHEMA: Final = "other"',
+        ),
+        ("session_policy.DEPLOYMENT_ID", "'foreign'"),
+        ("session_policy.ATTESTATION_SHA256", "'foreign'"),
+        ("session_policy.SOAK_ID", "'foreign'"),
+        ("session_policy.ACTIVATION_UTC", "END_UTC"),
+        ("session_policy.END_UTC", "ACTIVATION_UTC"),
+        ("type(log_bytes) is not bytes", "False"),
+        ("type(lease) is not D10ActivationLease", "False"),
+        ("lease.__post_init__()", "pass"),
+        ("lease.deployment_id != DEPLOYMENT_ID", "False"),
+        ("lease.attestation_sha256 != ATTESTATION_SHA256", "False"),
+        ("lease.soak_id != SOAK_ID", "False"),
+        ("lease.accepted_activation_utc != ACTIVATION_UTC", "False"),
+        ("lease.end_utc != END_UTC", "False"),
+        (
+            "wake_log.summarize_d10_wake_evidence_log(log_bytes, lease)",
+            "caller_summary()",
+        ),
+        ("summary.terminal is not False", "False"),
+        ("summary.terminal_kind is not None", "False"),
+        ("summary.last_stop_reason is not None", "False"),
+        ("summary.last_guard_reason is not None", "False"),
+        ("summary.wake_count < 7", "False"),
+        ("summary.record_count != summary.wake_count * 3", "False"),
+        ('log_bytes[:-1].split(b"\\n")', "log_bytes.splitlines()"),
+        ("len(lines) != summary.record_count", "False"),
+        ("range(0, len(lines), 3)", "range(0, len(lines), 2)"),
+        ("lines[offset + 1]", "lines[offset]"),
+        (
+            "wake_log.parse_persisted_d10_wake_record(ordinary_bytes, lease)",
+            "caller_record()",
+        ),
+        ("json.loads(record.canonical_bytes)", "json.loads(ordinary_bytes)"),
+        ("observed_at_utc=record.observed_at_utc", "observed_at_utc=ACTIVATION_UTC"),
+        (
+            "certified_source_head=lease.certified_source_head",
+            "certified_source_head='new'",
+        ),
+        (
+            'executable_file_count=value["deployment"]["executable_file_count"]',
+            "executable_file_count=307",
+        ),
+        (
+            'provider_attempt_id=value["capture"]["attempt_id"]',
+            "provider_attempt_id=None",
+        ),
+        ('final_plan_id=value["settlement"]["plan_id"]', "final_plan_id=None"),
+        (
+            'historical_reconciled_count=value["history"]["reconciled_count"]',
+            "historical_reconciled_count=0",
+        ),
+        (
+            'receipt_recovery_attempts=value["budgets"]["receipt_recovery_attempts"]',
+            "receipt_recovery_attempts=0",
+        ),
+        (
+            'closed_effect_gate_count=value["final_gates"]["closed_count"]',
+            "closed_effect_gate_count=8",
+        ),
+        ("wake.observed_at_utc < previous_time", "False"),
+        (
+            "tuple(reconstructed_wakes), reviewed_at_utc=reviewed_at_utc",
+            "tuple(sorted(reconstructed_wakes)), reviewed_at_utc=reviewed_at_utc",
+        ),
+        ("session_policy.analyze(", "independent_policy("),
+        ("hashlib.sha256(log_bytes).hexdigest()", "'synthetic'"),
+        ('"input_log_byte_length": len(log_bytes)', '"input_log_byte_length": 0'),
+        ('"policy": policy', '"policy": log_bytes'),
+        ('"d10_accepted": False', '"d10_accepted": True'),
+        ('"broker_paper_authorized": False', '"broker_paper_authorized": True'),
+        ('"operator_decision_required": True', '"operator_decision_required": False'),
+        ('field: "NOT_RUN"', 'field: "RUN"'),
+    ),
+)
+def test_xnys_projector_authority_rejects_semantic_drift(tmp_path, old, new):
+    root = _xnys_projector_authority_copy(tmp_path, old=old, new=new)
+    assert runner._d10_xnys_session_evidence_projector_authority_check(root)
+
+
+@pytest.mark.parametrize(
+    "old,new",
+    (
+        (
+            "authority_check=_d10_xnys_session_evidence_projector_authority_check,",
+            (
+                "authority_check=_d10_xnys_session_evidence_projector_authority_check, "
+                "preflight=_r8_preflight,"
+            ),
+        ),
+        (
+            "authority_check=_d10_xnys_session_evidence_projector_authority_check,",
+            (
+                "authority_check=_d10_xnys_session_evidence_projector_authority_check, "
+                "execute=_r7_execute,"
+            ),
+        ),
+        ('remote_branch="feature/post-d10-observability",', 'remote_branch="develop",'),
+        ("tests=xnys_projector_tests,", "tests=xnys_session_tests,"),
+        ("ruff_paths=xnys_projector_ruff,", "ruff_paths=xnys_session_ruff,"),
+        (
+            "ruff_paths=xnys_projector_ruff,",
+            'ruff_paths=xnys_projector_ruff, remote_head_env="AUTHORITY",',
+        ),
+    ),
+)
+def test_xnys_projector_authority_rejects_registration_drift(tmp_path, old, new):
+    root = _xnys_projector_authority_copy(tmp_path)
+    path = root / "scripts/checkpoint_runner.py"
+    source = path.read_text(encoding="utf-8")
+    start = source.index(
+        '        "d10-xnys-session-evidence-projector": CheckpointSpec('
+    )
+    end = source.index('        "arch128-r8": CheckpointSpec(', start)
+    registration = source[start:end]
+    assert old in registration
+    path.write_text(
+        source[:start] + registration.replace(old, new, 1) + source[end:],
+        encoding="utf-8",
+    )
+    assert runner._d10_xnys_session_evidence_projector_authority_check(root)
+
+
+@pytest.mark.parametrize("name", ("xnys_projector_tests", "xnys_projector_ruff"))
+def test_xnys_projector_authority_freezes_hierarchy(tmp_path, name):
+    root = _xnys_projector_authority_copy(tmp_path)
+    path = root / "scripts/checkpoint_runner.py"
+    source = path.read_text(encoding="utf-8")
+    path.write_text(
+        source.replace(name + " = (", name + " = (*(),", 1), encoding="utf-8"
+    )
+    assert runner._d10_xnys_session_evidence_projector_authority_check(root)
+
+
+@pytest.mark.parametrize(
+    "filename",
+    (
+        "d10_end_of_soak_review.py",
+        "d10_external_review_package.py",
+        "d10_scheduler_slot_review_policy.py",
+        "d10_scheduler_history_windows.py",
+        "d10_xnys_session_coverage_policy.py",
+    ),
+)
+def test_xnys_projector_authority_composes_upstream(tmp_path, filename):
+    root = _xnys_projector_authority_copy(tmp_path)
+    path = root / "scripts" / filename
+    path.write_text(
+        path.read_text(encoding="utf-8") + "\nforeign_effect()\n", encoding="utf-8"
+    )
+    assert runner._d10_xnys_session_evidence_projector_authority_check(root)
+
+
+def test_xnys_projector_authority_accepts_source_and_comments(tmp_path):
+    source_root = Path(runner.__file__).resolve().parent.parent
+    assert (
+        runner._d10_xnys_session_evidence_projector_authority_check(source_root) == ()
+    )
+    root = _xnys_projector_authority_copy(tmp_path, addition="# comment only")
+    assert runner._d10_xnys_session_evidence_projector_authority_check(root) == ()
+
+
+def test_xnys_projector_authority_missing_or_invalid_blocks(tmp_path):
+    assert runner._d10_xnys_session_evidence_projector_authority_check(tmp_path)
+    root = _xnys_projector_authority_copy(tmp_path)
+    path = root / "scripts/d10_xnys_session_evidence_projector.py"
+    path.write_text("def invalid(", encoding="utf-8")
+    assert runner._d10_xnys_session_evidence_projector_authority_check(root)
+    path.unlink()
+    assert runner._d10_xnys_session_evidence_projector_authority_check(root)
+
+
+def test_xnys_projector_preserves_s2c2a_registration():
+    tree = ast.parse(Path(runner.__file__).read_text(encoding="utf-8"))
+    registrations = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and ast.unparse(node.func) == "CheckpointSpec"
+        and any(
+            keyword.arg == "name"
+            and isinstance(keyword.value, ast.Constant)
+            and keyword.value.value == "d10-xnys-session-coverage-policy"
+            for keyword in node.keywords
+        )
+    ]
+    assert len(registrations) == 1
+    assert (
+        hashlib.sha256(ast.dump(registrations[0]).encode()).hexdigest()
+        == "d0d4700af714aeb5d780f2af4ccdcb646349617131bb8eb3ec0c2823a3ce4043"
+    )
+
+
+def test_xnys_projector_ci_preserves_historical_jobs_and_verify_only():
+    root = Path(runner.__file__).resolve().parent.parent
+    source = (root / ".github/workflows/side-checkpoint-certification.yml").read_text(
+        encoding="utf-8"
+    )
+    historical, side = source.split("  side-head-source-gates:", 1)
+    assert (
+        hashlib.sha256(historical.encode()).hexdigest()
+        == "bac12b74c9a6a97a916e57e7633fd4d9768d2f70561454e90f2014f75679bc5d"
+    )
+    commands = re.findall(r"^          [.]\\ops[.]ps1 (.+)$", side, re.MULTILINE)
+    assert commands == [
+        "verify d10-soak-status",
+        "verify d10-soak-review",
+        "verify d10-external-review-package",
+        "verify d10-scheduler-slot-policy",
+        "verify d10-scheduler-history-collector",
+        "verify d10-xnys-session-coverage-policy",
+        "verify d10-xnys-session-evidence-projector",
+    ]
+    assert "name: side-head-source-gate-evidence" in side

@@ -8676,7 +8676,8 @@ Accepted R8A source:
 ```text
 HEAD c714c4067a3fb62c9347d1b6fa01cc67518b231f
 TREE 1186cb7789e4772f252ae7d9f7f8d775ae5b2ed6
-CI   36791353238 SUCCESS
+initial branch CI 36791353238 SUCCESS (did not invoke arch128-r8)
+exact R8 CI       36797778806 SUCCESS
 ```
 
 R8A registers `arch128-r8` as a read-only preflight only. There is no execute
@@ -8721,3 +8722,55 @@ Next:
 4. never manually start the task or synthesize a wake;
 5. any empty/incomplete/unaccepted/terminal/duplicate/foreign evidence is a STOP
    for review, not retry or repair authority.
+
+
+## 2026-09-30 — R8A CI correction + S1 accepted
+
+An audit found that historical workflow run 36791353238 completed SUCCESS but the
+workflow at that commit only invoked checkpoint verification through
+`arch128-r7`. It therefore did not independently certify `arch128-r8`.
+The local R8A source gate and exact source review remained valid; only the
+independent-CI claim was wrong.
+
+The gap was closed without moving the production branch. Side-branch commit
+557dc221acc8617354515a1b2265078af52bef1b added a dedicated read-only
+certification workflow. GitHub Actions run 36797778806 completed SUCCESS with:
+
+```text
+exact-r8-source-gate:
+  checkout 38a88392096214e03b8a752cbffc78ebf1aeeb15
+  verify arch128-r8
+  SUCCESS
+
+exact-s1-source-gate:
+  checkout 4f0bb9130c4e9470cbec69b94c96aeac609c18f2
+  verify d10-soak-status
+  SUCCESS
+```
+
+Both evidence artifacts were uploaded. No preflight, execute, scheduler, lease,
+evidence, provider, Paper-v2, broker, or live operation occurred.
+
+S1 accepted source:
+
+```text
+branch feature/post-d10-observability
+HEAD   4f0bb9130c4e9470cbec69b94c96aeac609c18f2
+TREE   420399b3e040c819641da715160bfef1a1304f97
+CI     36797778806 exact-s1-source-gate SUCCESS
+```
+
+S1 provides a read-only multi-wake health projection over the accepted
+Architecture-127 observer. It requires at least one wake, exactly three durable
+records per accepted wake, nonterminal state, and a current outcome of COMPLETED
+or NO_ACTION. It has no execute surface and no host/effect authority.
+
+The active D10 remote remains:
+
+```text
+feature/d10c-durable-wake-evidence
+38a88392096214e03b8a752cbffc78ebf1aeeb15
+```
+
+Resume side progression with S2 end-of-soak acceptance analysis. Do not merge or
+fast-forward the side branch into the active D10 branch during the soak.

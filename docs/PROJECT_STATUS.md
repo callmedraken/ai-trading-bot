@@ -8393,7 +8393,8 @@ R8A is source-accepted at:
 ```text
 HEAD: c714c4067a3fb62c9347d1b6fa01cc67518b231f
 TREE: 1186cb7789e4772f252ae7d9f7f8d775ae5b2ed6
-CI:   36791353238 SUCCESS
+initial branch CI: 36791353238 SUCCESS
+exact arch128-r8 CI: 36797778806 SUCCESS
 ```
 
 The checkpoint adds only a narrow read-only policy/runner layer over the already
@@ -8446,8 +8447,13 @@ tests/runtime/test_checkpoint_runner.py
 
 Local focused verification reported 351 passed, Ruff check/format PASS,
 `git diff --check` PASS, and `ops.ps1 verify arch128-r8` PASS for pytest,
-Ruff, diff, authority, and source identity. GitHub Actions run 36791353238
-independently completed SUCCESS.
+Ruff, diff, authority, and source identity. The original branch workflow run
+36791353238 completed SUCCESS but its workflow stopped at `arch128-r7`; it did
+not independently execute `verify arch128-r8`. That certification gap was
+later closed by exact-SHA GitHub Actions run 36797778806, whose
+`exact-r8-source-gate` job checked out
+38a88392096214e03b8a752cbffc78ebf1aeeb15 and completed
+`verify arch128-r8` successfully.
 
 No production preflight, evidence inspection, scheduler/task start, source
 launch, provider, Paper-v2, broker, or live effect occurred during R8A.
@@ -8468,3 +8474,80 @@ the scheduled task, invoke governed source, mutate the scheduler/lease/evidence
 file, or synthesize a wake. If R8 reports anything other than the exact first
 accepted three-record sequence, stop for review rather than repairing or retrying
 the soak.
+
+
+## D10 side progression S1 read-only soak status — ACCEPTED
+
+S1 is source-accepted on the isolated side branch:
+
+```text
+branch: feature/post-d10-observability
+implementation HEAD: 4f0bb9130c4e9470cbec69b94c96aeac609c18f2
+implementation TREE: 420399b3e040c819641da715160bfef1a1304f97
+parent / active D10 HEAD: 38a88392096214e03b8a752cbffc78ebf1aeeb15
+exact CI run: 36797778806 SUCCESS
+```
+
+The active operational branch `feature/d10c-durable-wake-evidence` remained
+unchanged at 38a88392096214e03b8a752cbffc78ebf1aeeb15 throughout S1.
+
+S1 changes only the side branch and adds a read-only multi-wake health policy
+over the accepted Architecture-127 observer. It does not add another evidence
+parser, native Windows reader, scheduler reader/writer, file reader, credential
+surface, task launcher, provider path, Paper-v2 path, broker path, or live path.
+
+A healthy S1 observation requires the certified full-log observer to report:
+
+```text
+wake_count >= 1
+record_count == 3 * wake_count
+terminal == false
+terminal_kind == null
+last_outcome in {COMPLETED, NO_ACTION}
+last_stop_reason == null
+last_guard_reason == null
+```
+
+Because Architecture-127 has already validated the complete append-only grammar,
+the exact 3:1 relation represents complete accepted durable wake triplets; S1
+does not reparse raw evidence or invent historical COMPLETED/NO_ACTION counts.
+It explicitly describes these as accepted durable wakes, not proof of scheduler
+origin.
+
+Exact S1 implementation files:
+
+```text
+scripts/d10_soak_status_readonly.py
+scripts/checkpoint_runner.py
+tests/runtime/test_d10_soak_status_readonly.py
+tests/runtime/test_checkpoint_runner.py
+```
+
+Local verification: 470 focused tests passed; clean
+`ops.ps1 verify d10-soak-status` passed 583 tests and every registered gate.
+
+Independent exact-SHA certification was added in the separate one-file commit
+557dc221acc8617354515a1b2265078af52bef1b. GitHub Actions run 36797778806
+completed both jobs successfully:
+
+```text
+exact-r8-source-gate  SUCCESS
+exact-s1-source-gate  SUCCESS
+```
+
+The jobs checked out immutable R8 and S1 source SHAs respectively, ran only
+`ops.ps1 verify`, and uploaded `exact-r8-source-gate-evidence` and
+`exact-s1-source-gate-evidence`. They ran no production preflight or execute
+surface.
+
+Current side progression:
+
+```text
+R8A  exact independent source certification   ACCEPTED
+S1   multi-wake read-only soak status          ACCEPTED
+S2   end-of-soak acceptance analyzer           NEXT / SOURCE-ONLY
+```
+
+S1 is not authorized to replace R8 first-wake acceptance. The production D10
+branch remains frozen; S1 should be used only after R8 acceptance and only from
+the isolated side lineage.

@@ -479,8 +479,11 @@ synthetic wake is authorized.
 
 R8A is source-certified at
 `c714c4067a3fb62c9347d1b6fa01cc67518b231f` /
-`1186cb7789e4772f252ae7d9f7f8d775ae5b2ed6`, with GitHub Actions run
-`36791353238` completed SUCCESS.
+`1186cb7789e4772f252ae7d9f7f8d775ae5b2ed6`. The original GitHub run
+`36791353238` completed SUCCESS but its workflow did not invoke
+`verify arch128-r8`; exact independent certification was subsequently closed by
+run `36797778806`, job `exact-r8-source-gate`, against immutable operational
+HEAD `38a88392096214e03b8a752cbffc78ebf1aeeb15`.
 
 The runner now registers `arch128-r8` with verify + read-only preflight only.
 There is no execute registration. The R8 wrapper delegates only to the new
@@ -508,3 +511,28 @@ The next operation is a read-only exact-live-remote
 `preflight arch128-r8`. No task start, source launch, scheduler mutation,
 lease mutation, evidence mutation, provider, Paper-v2, broker, or live action is
 authorized by R8A.
+
+
+### D10 side checkpoint S1 multi-wake status — ACCEPTED
+
+S1 is isolated on `feature/post-d10-observability` at implementation
+`4f0bb9130c4e9470cbec69b94c96aeac609c18f2` /
+`420399b3e040c819641da715160bfef1a1304f97`.
+
+It registers `d10-soak-status` with verify + read-only preflight only. Its
+policy delegates exactly once to the accepted Architecture-127 observer and
+requires the full-log relation `record_count == 3 * wake_count`, at least one
+wake, nonterminal state, no stop/guard reason, and last outcome COMPLETED or
+NO_ACTION. It introduces no new raw evidence parser and no execute authority.
+
+The profile's remote authority is intentionally bound to the isolated side
+branch. The active D10 branch remains frozen at
+`38a88392096214e03b8a752cbffc78ebf1aeeb15`.
+
+Exact independent CI run `36797778806` checked out immutable S1 implementation
+HEAD `4f0bb9130c4e9470cbec69b94c96aeac609c18f2`, ran
+`ops.ps1 verify d10-soak-status`, completed SUCCESS, and uploaded the exact S1
+source-gate evidence artifact. A paired exact-R8 job in the same run closed the
+previous R8A CI bookkeeping gap without moving production source.
+
+S2 is the next source-only side checkpoint: an end-of-soak acceptance analyzer.

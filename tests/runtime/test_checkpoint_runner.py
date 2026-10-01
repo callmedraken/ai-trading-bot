@@ -158,6 +158,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
         "d10-soak-status",
         "d10-soak-review",
         "d10-external-review-package",
+        "d10-scheduler-slot-policy",
     }
     for spec in specs.values():
         assert "tests/runtime/test_checkpoint_runner.py" in spec.tests
@@ -166,7 +167,12 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
         expected_branch = (
             "feature/post-d10-observability"
             if spec.name
-            in ("d10-soak-status", "d10-soak-review", "d10-external-review-package")
+            in (
+                "d10-soak-status",
+                "d10-soak-review",
+                "d10-external-review-package",
+                "d10-scheduler-slot-policy",
+            )
             else "feature/d10c-durable-wake-evidence"
         )
         assert spec.remote_branch == expected_branch
@@ -2329,3 +2335,265 @@ def test_external_review_authority_preserves_upstream_frozen_identity(tmp_path):
     source = source.replace('"d2071f25-5a7c-5293-a28f-5b722c9917a2"', '"foreign"', 1)
     path.write_text(source, encoding="utf-8")
     assert runner._d10_external_review_package_authority_check(root)
+
+
+def test_scheduler_slot_registration_is_verify_only() -> None:
+    specs = runner._checkpoint_specs()
+    spec = specs["d10-scheduler-slot-policy"]
+    assert spec.preflight is None
+    assert spec.execute is None
+    assert spec.remote_head_env is None
+    assert spec.remote_branch == "feature/post-d10-observability"
+    assert spec.authority_check is runner._d10_scheduler_slot_policy_authority_check
+    assert spec.tests == (
+        *specs["d10-external-review-package"].tests,
+        "tests/runtime/test_d10_scheduler_slot_review_policy.py",
+    )
+    assert spec.ruff_paths == (
+        *specs["d10-external-review-package"].ruff_paths,
+        "scripts/d10_scheduler_slot_review_policy.py",
+        "tests/runtime/test_d10_scheduler_slot_review_policy.py",
+    )
+    parser = runner._parser(specs)
+    assert parser.parse_args(("verify", spec.name)).checkpoint == spec.name
+    for command in ("preflight", "execute"):
+        with pytest.raises(SystemExit):
+            parser.parse_args((command, spec.name))
+    assert specs["arch128-r8"].preflight is runner._r8_preflight
+    assert specs["arch128-r8"].execute is None
+    assert specs["arch128-r8"].remote_branch == "feature/d10c-durable-wake-evidence"
+    assert specs["d10-soak-status"].preflight is runner._d10_soak_status_preflight
+    assert specs["d10-soak-status"].execute is None
+    assert specs["d10-soak-review"].preflight is None
+    assert specs["d10-soak-review"].execute is None
+    assert specs["d10-external-review-package"].preflight is None
+    assert specs["d10-external-review-package"].execute is None
+
+
+def _scheduler_slot_authority_copy(
+    tmp_path: Path,
+    *,
+    addition: str = "",
+    old: str = "",
+    new: str = "",
+    runner_old: str = "",
+    runner_new: str = "",
+) -> Path:
+    root = Path(runner.__file__).resolve().parent.parent
+    target = tmp_path / "scripts"
+    target.mkdir()
+    for filename in (
+        "d10_end_of_soak_review.py",
+        "d10_external_review_package.py",
+        "d10_scheduler_slot_review_policy.py",
+        "checkpoint_runner.py",
+    ):
+        source = (root / "scripts" / filename).read_text(encoding="utf-8")
+        if filename == "d10_scheduler_slot_review_policy.py":
+            if old:
+                assert old in source
+                source = source.replace(old, new, 1)
+            source += "\n" + addition + "\n"
+        if filename == "checkpoint_runner.py" and runner_old:
+            start = source.index('        "d10-scheduler-slot-policy": CheckpointSpec(')
+            end = source.index('        "arch128-r8": CheckpointSpec(', start)
+            registration = source[start:end]
+            assert runner_old in registration
+            source = (
+                source[:start]
+                + registration.replace(runner_old, runner_new, 1)
+                + source[end:]
+            )
+        (target / filename).write_text(source, encoding="utf-8")
+    return tmp_path
+
+
+@pytest.mark.parametrize(
+    "addition",
+    (
+        "import os",
+        "import subprocess",
+        "import ctypes",
+        "from pathlib import Path",
+        "import socket",
+        "from win32com.client import Dispatch",
+        "import win32evtlog",
+        "from scripts import d10_soak_status_readonly as observer",
+        "open('evidence')",
+        "Path('evidence').read_bytes()",
+        "os.environ['TOKEN']",
+        "subprocess.run([])",
+        "ctypes.WinDLL('kernel32')",
+        "datetime.now(UTC)",
+        "EventLogReader()",
+        "Get_WinEvent()",
+        "powershell()",
+        "scheduler.Run(None)",
+        "scheduler.RegisterTaskDefinition()",
+        "observer.observe()",
+        "provider.capture()",
+        "paper_v2.execute()",
+        "broker.order()",
+        "live.execute()",
+        "__import__('os')",
+        "eval('effect()')",
+        "def preflight(): pass",
+        "def execute(): pass",
+        "production_observer = internal_review_policy",
+    ),
+)
+def test_scheduler_slot_authority_rejects_io_or_effect_additions(tmp_path, addition):
+    root = _scheduler_slot_authority_copy(tmp_path, addition=addition)
+    assert runner._d10_scheduler_slot_policy_authority_check(root)
+
+
+@pytest.mark.parametrize(
+    ("old", "new"),
+    (
+        ('SCHEMA: Final = "d10-scheduler-slot-review/v1"', 'SCHEMA: Final = "other"'),
+        (
+            "DEPLOYMENT_ID: Final = internal_review_policy.DEPLOYMENT_ID",
+            'DEPLOYMENT_ID: Final = "foreign"',
+        ),
+        (
+            "SOAK_ID: Final = internal_review_policy.SOAK_ID",
+            'SOAK_ID: Final = "foreign"',
+        ),
+        (
+            "ACTIVATION_UTC: Final = internal_review_policy.ACTIVATION_UTC",
+            "ACTIVATION_UTC: Final = END_UTC",
+        ),
+        (
+            "END_UTC: Final = internal_review_policy.END_UTC",
+            "END_UTC: Final = ACTIVATION_UTC",
+        ),
+        (
+            'TASK_PATH: Final = r"\\AITradingBot-PD4-UnattendedPaper-v1"',
+            'TASK_PATH: Final = "foreign"',
+        ),
+        ("SLOT_COUNT: Final = 7", "SLOT_COUNT: Final = 6"),
+        (
+            "D10SchedulerHistoryEventKind.SCHEDULED_TRIGGER: 107",
+            "D10SchedulerHistoryEventKind.SCHEDULED_TRIGGER: 100",
+        ),
+        (
+            "D10SchedulerHistoryEventKind.MANUAL_TRIGGER: 110",
+            "D10SchedulerHistoryEventKind.MANUAL_TRIGGER: 111",
+        ),
+        (
+            "D10SchedulerHistoryEventKind.TASK_STARTED: 100",
+            "D10SchedulerHistoryEventKind.TASK_STARTED: 107",
+        ),
+        (
+            "D10SchedulerHistoryEventKind.TASK_COMPLETED: 102",
+            "D10SchedulerHistoryEventKind.TASK_COMPLETED: 101",
+        ),
+        ('TASK_COMPLETED = "TASK_COMPLETED"', 'TASK_COMPLETED = "OTHER"'),
+        ("@dataclass(frozen=True, slots=True)", "@dataclass(frozen=False, slots=True)"),
+        ("type(observation) is not D10SchedulerHistoryObservation", "False"),
+        ("type(observation.events) is not tuple", "False"),
+        ("type(event) is not D10SchedulerHistoryEvent", "False"),
+        ("type(event.kind) is not D10SchedulerHistoryEventKind", "False"),
+        ("event.event_id != EVENT_IDS[event.kind]", "False"),
+        ("event.record_id <= 0", "False"),
+        ("event.task_name != TASK_PATH", "False"),
+        ("value.tzinfo is UTC", "value.tzinfo is not None"),
+        ("len(value) == 36", "len(value) >= 36"),
+        ("not _instance_id(event.instance_id)", "False"),
+        ("observation.collected_at_utc < END_UTC", "False"),
+        ("observation.channel_enabled is not True", "False"),
+        ("observation.oldest_retained_event_utc > ACTIVATION_UTC", "False"),
+        ("ACTIVATION_UTC <= event.observed_at_utc < END_UTC", "True"),
+        ("event.record_id <= previous_record", "False"),
+        ("event.observed_at_utc < previous_time", "False"),
+        ("event.kind is D10SchedulerHistoryEventKind.MANUAL_TRIGGER", "False"),
+        ('return _blocked("manual_task_trigger_observed")', "pass"),
+        ("spec.__post_init__()", "pass"),
+        ("spec.task.days_interval != 1", "False"),
+        ("spec.window.activation_utc != ACTIVATION_UTC", "False"),
+        ("spec.window.end_utc != END_UTC", "False"),
+        ("spec.end_boundary.astimezone(UTC) != END_UTC", "False"),
+        ("boundary = spec.task.start_boundary", "boundary = ACTIVATION_UTC"),
+        ("timedelta(days=spec.task.days_interval)", "timedelta(days=2)"),
+        ("len(slots) != SLOT_COUNT", "False"),
+        ("slots = expected_slots_utc()", "slots = observation.expected_slots"),
+        ("len(triggers) != SLOT_COUNT", "False"),
+        ("len({event.instance_id for event in triggers}) != SLOT_COUNT", "False"),
+        ("event.observed_at_utc < slots[0]", "False"),
+        ("slot <= event.observed_at_utc < interval_end", "True"),
+        ("if not matched:", "if False:"),
+        ("len(matched) != 1", "False"),
+        ("event.instance_id not in scheduled_ids", "False"),
+        ("event.instance_id == trigger.instance_id", "True"),
+        ("if not starts:", "if False:"),
+        ("len(starts) != 1", "False"),
+        ("if not completions:", "if False:"),
+        ("len(completions) != 1", "False"),
+        (
+            "<= start.observed_at_utc",
+            ">= start.observed_at_utc",
+        ),
+        ('"d10_accepted": False', '"d10_accepted": True'),
+        ('"broker_paper_authorized": False', '"broker_paper_authorized": True'),
+        ('"operator_decision_required": True', '"operator_decision_required": False'),
+        ('"status": "READY_FOR_EXTERNAL_REVIEW_ARTIFACT"', '"status": "ACCEPTED"'),
+    ),
+)
+def test_scheduler_slot_authority_freezes_every_policy(tmp_path, old, new):
+    root = _scheduler_slot_authority_copy(tmp_path, old=old, new=new)
+    assert runner._d10_scheduler_slot_policy_authority_check(root)
+
+
+@pytest.mark.parametrize(
+    ("old", "new"),
+    (
+        (
+            "authority_check=_d10_scheduler_slot_policy_authority_check,",
+            "authority_check=_d10_scheduler_slot_policy_authority_check, "
+            "preflight=_r8_preflight,",
+        ),
+        (
+            "authority_check=_d10_scheduler_slot_policy_authority_check,",
+            "authority_check=_d10_scheduler_slot_policy_authority_check, "
+            "execute=_r7_execute,",
+        ),
+        (
+            "authority_check=_d10_scheduler_slot_policy_authority_check,",
+            "authority_check=_r8_authority_check,",
+        ),
+        (
+            'remote_branch="feature/post-d10-observability",',
+            'remote_branch="feature/d10c-durable-wake-evidence",',
+        ),
+        (
+            'remote_branch="feature/post-d10-observability",',
+            'remote_branch="feature/post-d10-observability", remote_head_env="HEAD",',
+        ),
+    ),
+)
+def test_scheduler_slot_authority_freezes_registration(tmp_path, old, new):
+    root = _scheduler_slot_authority_copy(tmp_path, runner_old=old, runner_new=new)
+    assert runner._d10_scheduler_slot_policy_authority_check(root)
+
+
+def test_scheduler_slot_authority_accepts_exact_source():
+    root = Path(runner.__file__).resolve().parent.parent
+    assert runner._d10_scheduler_slot_policy_authority_check(root) == ()
+
+
+def test_scheduler_slot_authority_blocks_missing_or_invalid_source(tmp_path):
+    assert runner._d10_scheduler_slot_policy_authority_check(tmp_path)
+    root = _scheduler_slot_authority_copy(tmp_path, addition="def invalid(")
+    assert runner._d10_scheduler_slot_policy_authority_check(root)
+
+
+@pytest.mark.parametrize(
+    "filename", ("d10_end_of_soak_review.py", "d10_external_review_package.py")
+)
+def test_scheduler_slot_authority_preserves_upstream_contracts(tmp_path, filename):
+    root = _scheduler_slot_authority_copy(tmp_path)
+    path = root / "scripts" / filename
+    source = path.read_text(encoding="utf-8")
+    source = source.replace('"d10_accepted": False', '"d10_accepted": True', 1)
+    path.write_text(source, encoding="utf-8")
+    assert runner._d10_scheduler_slot_policy_authority_check(root)

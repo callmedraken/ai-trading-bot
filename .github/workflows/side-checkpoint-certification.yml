@@ -162,6 +162,11 @@ jobs:
             throw "S2B side source certification failed: $LASTEXITCODE"
           }
 
+          .\ops.ps1 verify d10-scheduler-slot-policy
+          if ($LASTEXITCODE -ne 0) {
+            throw "S2C1A side source certification failed: $LASTEXITCODE"
+          }
+
       - name: Upload current side source-gate evidence
         if: always()
         uses: actions/upload-artifact@v4

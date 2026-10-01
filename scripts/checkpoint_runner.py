@@ -1162,6 +1162,129 @@ def _d10_external_review_package_authority_check(repo_root: Path) -> tuple[str, 
     return tuple(failures)
 
 
+def _d10_scheduler_slot_policy_authority_check(repo_root: Path) -> tuple[str, ...]:
+    """Freeze S2C1A's complete pure policy and verify-only registration."""
+    try:
+        tree = ast.parse(
+            (repo_root / "scripts/d10_scheduler_slot_review_policy.py").read_text(
+                encoding="utf-8"
+            )
+        )
+        runner_tree = ast.parse(
+            (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+        )
+    except (OSError, SyntaxError):
+        return ("S2C1A source missing or invalid",)
+    failures = list(_d10_external_review_package_authority_check(repo_root))
+    imports = {
+        "from __future__ import annotations",
+        "from dataclasses import dataclass",
+        "from datetime import UTC, datetime, timedelta",
+        "from enum import StrEnum",
+        "from typing import Final",
+        "from scripts import d10_end_of_soak_review as internal_review_policy",
+        "from trading_bot.runtime import "
+        "personal_desktop_unattended_one_week_soak_scheduler_contract "
+        "as scheduler_contract",
+    }
+    actual_imports = {
+        ast.unparse(node)
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.Import, ast.ImportFrom))
+    }
+    if actual_imports != imports:
+        failures.append("S2C1A contains unreviewed imports")
+    allowed_calls = {
+        "dataclass",
+        "type",
+        "len",
+        "all",
+        "any",
+        "enumerate",
+        "range",
+        "zip",
+        "tuple",
+        "timedelta",
+        "slots.append",
+        "instances.append",
+        "ordered_triggers.append",
+        "_blocked",
+        "_utc",
+        "_timestamp",
+        "_instance_id",
+        "expected_slots_utc",
+        "value.isoformat",
+        "value.isoformat(timespec='microseconds').replace",
+        "scheduler_contract.build_one_week_soak_scheduler_deployment_spec",
+        "scheduler_contract.is_frozen_one_week_soak_scheduler_contract",
+        "scheduler_contract.one_week_soak_scheduler_contract",
+        "spec.__post_init__",
+        "spec.end_boundary.astimezone",
+        "boundary.astimezone",
+    }
+    if any(
+        ast.unparse(node.func) not in allowed_calls
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+    ):
+        failures.append("S2C1A contains unreviewed I/O or effect calls")
+    # Pin every semantic statement: exact sanitized types/UUID/event-ID mapping,
+    # fixed side identity/task, full frozen scheduler-spec revalidation and seven
+    # derived local daily slots, half-open intervals, retention and record order,
+    # manual-start block, unique 107 -> 100 -> 102 lifecycles, no unmatched
+    # executions, bounded output and False/False/True non-authority flags.
+    expected_ast_sha256 = (
+        "89783cf169ea158e0757776752e9149f96edd459d43a8ae5c9227877e39895cf"
+    )
+    actual_ast_sha256 = hashlib.sha256(ast.dump(tree).encode("utf-8")).hexdigest()
+    if actual_ast_sha256 != expected_ast_sha256:
+        failures.append("S2C1A frozen pure scheduler-slot review policy drift")
+    registrations = [
+        node
+        for node in ast.walk(runner_tree)
+        if isinstance(node, ast.Call)
+        and ast.unparse(node.func) == "CheckpointSpec"
+        and any(
+            keyword.arg == "name"
+            and isinstance(keyword.value, ast.Constant)
+            and keyword.value.value == "d10-scheduler-slot-policy"
+            for keyword in node.keywords
+        )
+    ]
+    if len(registrations) != 1:
+        failures.append("S2C1A registration missing or duplicated")
+    else:
+        expected = {
+            "name": "'d10-scheduler-slot-policy'",
+            "description": "'D10 pure scheduler-slot coverage review source gate'",
+            "tests": "scheduler_slot_tests",
+            "ruff_paths": "scheduler_slot_ruff",
+            "authority_check": "_d10_scheduler_slot_policy_authority_check",
+            "remote_branch": "'feature/post-d10-observability'",
+        }
+        actual = {
+            keyword.arg: ast.unparse(keyword.value)
+            for keyword in registrations[0].keywords
+        }
+        if (
+            registrations[0].args
+            or len(registrations[0].keywords) != len(expected)
+            or actual != expected
+        ):
+            failures.append(
+                "S2C1A must remain verify-only with exact side registration"
+            )
+    spec = _checkpoint_specs()["d10-scheduler-slot-policy"]
+    if (
+        spec.preflight is not None
+        or spec.execute is not None
+        or spec.remote_head_env is not None
+        or spec.remote_branch != "feature/post-d10-observability"
+    ):
+        failures.append("S2C1A runtime registration must remain verify-only")
+    return tuple(failures)
+
+
 def _r7_authority_check(repo_root: Path) -> tuple[str, ...]:
     path = repo_root / "scripts" / "d10_arch128_r7_readonly.py"
     source = path.read_text(encoding="utf-8")
@@ -2522,6 +2645,15 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
         "scripts/d10_external_review_package.py",
         "tests/runtime/test_d10_external_review_package.py",
     )
+    scheduler_slot_tests = (
+        *external_review_tests,
+        "tests/runtime/test_d10_scheduler_slot_review_policy.py",
+    )
+    scheduler_slot_ruff = (
+        *external_review_ruff,
+        "scripts/d10_scheduler_slot_review_policy.py",
+        "tests/runtime/test_d10_scheduler_slot_review_policy.py",
+    )
     return {
         "d10-soak-status": CheckpointSpec(
             name="d10-soak-status",
@@ -2546,6 +2678,14 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             tests=external_review_tests,
             ruff_paths=external_review_ruff,
             authority_check=_d10_external_review_package_authority_check,
+            remote_branch="feature/post-d10-observability",
+        ),
+        "d10-scheduler-slot-policy": CheckpointSpec(
+            name="d10-scheduler-slot-policy",
+            description="D10 pure scheduler-slot coverage review source gate",
+            tests=scheduler_slot_tests,
+            ruff_paths=scheduler_slot_ruff,
+            authority_check=_d10_scheduler_slot_policy_authority_check,
             remote_branch="feature/post-d10-observability",
         ),
         "arch128-r8": CheckpointSpec(

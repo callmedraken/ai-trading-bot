@@ -8646,3 +8646,103 @@ S2B  external review evidence/package design            NEXT / SOURCE-ONLY
 
 S2A does not replace R8 or the eventual Architecture-122 end-of-week operator
 review. Production remains frozen while side work continues.
+
+
+## D10 side progression S2B external-review evidence package — ACCEPTED
+
+S2B is source-accepted on the isolated side branch:
+
+```text
+branch: feature/post-d10-observability
+implementation HEAD: 1ba9283b74c251bde6ef2e3a3393b9e0380798a3
+implementation TREE: b7d176e27230b6bbc2cf9b18e70f18c25d6e1069
+parent: a485f094d978e3597186128ebef111c899d56276
+CI run: 36818566661 SUCCESS
+```
+
+The active D10 branch remained unchanged at:
+
+```text
+feature/d10c-durable-wake-evidence
+38a88392096214e03b8a752cbffc78ebf1aeeb15
+```
+
+S2B defines a pure metadata package for the five external Architecture-122 review
+categories left intentionally unresolved by S2A:
+
+```text
+SCHEDULER_SLOT_COVERAGE
+ELIGIBLE_XNYS_SESSION_COVERAGE
+SLEEP_REBOOT_DUPLICATE_CONTEXT
+PAPER_V2_ACCOUNT_TRADES_POSITIONS_PERFORMANCE
+AUDIT_COMPLETENESS
+```
+
+It does not collect or independently verify those external facts. It accepts only
+bounded metadata envelopes containing exact category, current-soak identity,
+review time, immutable artifact digest/byte length, completeness, and unresolved
+finding count. Raw scheduler history, account/trade/position data, authority
+objects, native handles, credentials, and arbitrary free-form artifact content
+are excluded from the package contract.
+
+The package also requires an exact successful S2A result but does not rerun S2A.
+The exact S2A key set, current-soak identity, count relationships, source
+HEAD/TREE, executable count, canonical UTC ordering, and five-category external
+review tuple are checked fail-closed.
+
+S2B returns READY_FOR_OPERATOR_DECISION only when all five exact categories are
+present exactly once, complete=true, unresolved_findings=0, bound to the exact
+active soak, and reviewed at/after the soak end and no later than package time.
+
+Critically, even successful packaging freezes:
+
+```text
+d10_accepted = false
+broker_paper_authorized = false
+operator_decision_required = true
+```
+
+It contains no profitability threshold and does not require Paper-v2 performance
+to be positive. Artifact SHA-256 values identify reviewed artifacts only; they
+are not treated as independent proof that the artifact's claims are true.
+
+Exact changed files:
+
+```text
+scripts/d10_external_review_package.py
+scripts/checkpoint_runner.py
+tests/runtime/test_d10_external_review_package.py
+tests/runtime/test_checkpoint_runner.py
+.github/workflows/side-checkpoint-certification.yml
+```
+
+Local verification reported 810 focused tests passed and clean
+`ops.ps1 verify d10-external-review-package` PASS with 1,109 tests, Ruff,
+format, diff, authority, and identity gates all passing. The initial pytest
+temporary-directory permission issue was bypassed with a fresh isolated temp
+path and did not require source changes.
+
+GitHub Actions run 36818566661 completed SUCCESS. The exact event-HEAD
+`side-head-source-gates` job ran:
+
+```text
+verify d10-soak-status                 OVERALL=PASS
+verify d10-soak-review                 OVERALL=PASS
+verify d10-external-review-package     OVERALL=PASS
+```
+
+and uploaded the side-head source-gate artifact. Historical exact-R8 and exact-S1
+jobs also remained successful.
+
+Current side progression:
+
+```text
+R8A  first-wake observer source                         ACCEPTED
+S1   multi-wake read-only soak status                   ACCEPTED
+S2A  pure internal end-of-soak review readiness         ACCEPTED
+S2B  pure external-review evidence package              ACCEPTED
+S2C  read-only external-review collectors               NEXT / SOURCE-ONLY
+```
+
+S2B creates no authority to inspect production or to accept D10. Production
+remains frozen while collector source design proceeds separately.

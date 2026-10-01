@@ -8840,3 +8840,71 @@ Next side checkpoint: S2B should define a pure, non-authorizing external review
 package/interface for the five Architecture-122 facts S2A explicitly cannot
 infer. Do not inspect production or merge side source into the active D10 branch
 during the soak.
+
+
+## 2026-09-30 — S2B external-review package accepted
+
+Resume side progression from **S2C read-only external-review collectors**.
+
+Accepted S2B source:
+
+```text
+branch feature/post-d10-observability
+HEAD   1ba9283b74c251bde6ef2e3a3393b9e0380798a3
+TREE   b7d176e27230b6bbc2cf9b18e70f18c25d6e1069
+CI     36818566661 SUCCESS
+```
+
+Active D10 remains frozen at:
+
+```text
+feature/d10c-durable-wake-evidence
+38a88392096214e03b8a752cbffc78ebf1aeeb15
+```
+
+S2B is pure/offline. It validates a previously produced exact successful S2A
+dictionary plus exactly five typed external-review metadata envelopes. It does
+not call S2A `analyze`, read production, access scheduler history, read Paper-v2
+state, invoke a provider, access broker/live authority, or perform I/O.
+
+The five external categories are fixed:
+
+```text
+SCHEDULER_SLOT_COVERAGE
+ELIGIBLE_XNYS_SESSION_COVERAGE
+SLEEP_REBOOT_DUPLICATE_CONTEXT
+PAPER_V2_ACCOUNT_TRADES_POSITIONS_PERFORMANCE
+AUDIT_COMPLETENESS
+```
+
+Each envelope binds only bounded metadata to the current soak:
+deployment/soak/window identity, exact UTC review time, artifact SHA-256 and byte
+length, completeness flag, and unresolved finding count. Digests are immutable
+references, not proof of artifact truth.
+
+READY_FOR_OPERATOR_DECISION requires every category exactly once, complete=true,
+unresolved_findings=0, review timestamps at/after the soak end and no later than
+package time, plus an exact READY_FOR_OPERATOR_REVIEW S2A input.
+
+Even then:
+
+```text
+d10_accepted=false
+broker_paper_authorized=false
+operator_decision_required=true
+```
+
+No profitability threshold exists.
+
+GitHub Actions run 36818566661 independently ran all current side source gates on
+exact event HEAD and recorded OVERALL=PASS for S1, S2A, and S2B. The side-head
+evidence artifact was uploaded.
+
+The initial local pytest temporary-directory permission error was resolved by
+using a fresh isolated temp root; no source correction or broadened authority was
+required.
+
+Next: S2C should source-design the read-only collectors that can later produce
+the five external artifacts. Collector source work must remain inert and
+production-uninvoked during the active soak unless a separate read-only
+operational checkpoint is later reviewed and explicitly chosen.

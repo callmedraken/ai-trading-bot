@@ -575,3 +575,38 @@ the source profile correctly uses the existing split source/controller tests.
 
 The active D10 branch remains unchanged at
 `38a88392096214e03b8a752cbffc78ebf1aeeb15`.
+
+
+### D10 side checkpoint S2B external-review package — ACCEPTED
+
+S2B is isolated on `feature/post-d10-observability` at
+`1ba9283b74c251bde6ef2e3a3393b9e0380798a3` /
+`b7d176e27230b6bbc2cf9b18e70f18c25d6e1069`.
+
+It registers `d10-external-review-package` as verify-only: no preflight,
+execute, or remote-head handoff. The module contains only pure metadata
+validation and packaging.
+
+The package consumes an exact successful S2A result without rerunning S2A and
+exactly five typed external-review metadata envelopes. It freezes the five
+Architecture-122 external categories, exact current-soak identity, exact UTC
+review/package timing, artifact digest/byte-length shape, complete=true,
+unresolved_findings=0, and deterministic output ordering.
+
+Successful output is only `READY_FOR_OPERATOR_DECISION`. It explicitly cannot
+accept D10 or authorize broker-paper and always preserves
+`d10_accepted=false`, `broker_paper_authorized=false`, and
+`operator_decision_required=true`. No positive-performance/profitability rule
+exists.
+
+The S2B authority gate freezes the complete semantic AST and composes the frozen
+S2A authority gate. Any new import/effect call, I/O, production observer,
+scheduler access, credential access, S2A analyze call, provider/Paper-v2/
+broker/live path, preflight/execute registration, identity/category weakening, or
+acceptance/authorization status drift fails the source gate.
+
+GitHub Actions run `36818566661` completed SUCCESS. Its exact event-HEAD
+side-source job produced OVERALL=PASS for `d10-soak-status`,
+`d10-soak-review`, and `d10-external-review-package`, and uploaded external
+source-gate evidence. The active D10 branch remains unchanged at
+`38a88392096214e03b8a752cbffc78ebf1aeeb15`.

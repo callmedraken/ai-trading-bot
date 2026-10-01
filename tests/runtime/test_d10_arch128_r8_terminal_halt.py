@@ -416,7 +416,7 @@ def test_native_pre_call_diagnostic_source_is_read_only() -> None:
     ):
         assert forbidden not in source
     for reason in diagnostic.REASONS:
-        assert f"'{{reason}}'" in source
+        assert f"'{reason}'" in source
 
 
 def test_scheduler_helper_is_reused_and_two_reads_must_match(monkeypatch) -> None:

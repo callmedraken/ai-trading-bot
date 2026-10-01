@@ -8884,3 +8884,41 @@ The failed first natural child's provider/publication/Paper-v2 effects remain
 UNKNOWN / REQUIRES READ-ONLY RECONCILIATION and are unaffected by this
 containment diagnostic.
 
+## 2026-10-01 — R8I-H1b accepted; identify enabled-XML representation
+
+The R8I-H1a host preflight reached:
+
+```text
+DIAGNOSTIC_STATUS=BLOCKED
+DIAGNOSTIC_REASON=XML_ENABLED_NODE
+```
+
+This proves every native pre-call check before the final XML Enabled-node
+assumption passed. In particular, the exact scheduler is still semantically
+enabled/non-running and the independently reacquired full task XML still
+matches the observer's exact byte length and SHA-256.
+
+The historical R7 activation helper explicitly set
+`Definition.Settings.Enabled = true` before registering the current task, so
+the remaining question is how Windows serialized that true/default state.
+
+R8I-H1b accepted source:
+
+```text
+HEAD 52a403609a167c7b8daff3b81d3e06f28e204965
+TREE d92ddd567dc293b3397df3f2d6531f95d35e778e
+CI   36930139702 SUCCESS
+```
+
+The read-only diagnostic now adds only
+`scheduler.xml_enabled_node_state` on the blocked XML path, with an exact
+sanitized value of `MISSING`, `COUNT_DRIFT`, or `VALUE_NOT_TRUE`.
+No raw task XML is emitted. The protected halt helper is unchanged.
+
+Resume with a fresh exact-source read-only halt preflight and inspect the
+generated report. Do not set the authorization environment variable and do not
+run protected execute. If the state is MISSING, review whether Task Scheduler's
+implicit/default-enabled XML representation is compatible with a narrowly
+corrected normalization contract; COUNT_DRIFT or VALUE_NOT_TRUE remain
+unexpected representation drift and require separate review.
+

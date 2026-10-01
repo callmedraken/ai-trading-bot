@@ -8607,3 +8607,54 @@ The diagnostic reason from that preflight determines the next action. No new
 halt authorization may be considered unless the native diagnostic reports
 `READY`.
 
+## 2026-10-01 — R8I-H1b XML-enabled shape diagnostic accepted
+
+Fresh exact-source R8I-H1a host preflight at
+`6198de9ab585268cc5a1b03ac0e9484d1dfb37be` /
+`c3b0f2154493f087e31a287a2b2145c70b66c302` reproduced the original
+pre-call stop without any protected effect:
+
+```text
+PRIMARY_STATUS=PASS
+DIAGNOSTIC=native_pre_call
+DIAGNOSTIC_STATUS=BLOCKED
+DIAGNOSTIC_REASON=XML_ENABLED_NODE
+IDENTITY_STABLE=True
+OVERALL=BLOCKED
+```
+
+All native admission stages before the XML-enabled check therefore succeeded:
+Administrator token, helper load, Task Scheduler COM connect, two stable exact
+scheduler reads, exact scheduler semantics, fixed-task reacquisition, target
+state, and immediate full XML digest/length verification.
+
+Repository review also confirmed that the accepted R7 activation updater set
+`Definition.Settings.Enabled = true` before the fixed TASK_UPDATE registration.
+The remaining ambiguity is therefore the exact Task Scheduler XML representation
+of the enabled setting, not the COM scheduler state itself.
+
+R8I-H1b adds only a sanitized read-only refinement to the existing diagnostic
+helper. On the already-blocked `XML_ENABLED_NODE` path, its local diagnostic
+snapshot now records exactly one of:
+
+```text
+MISSING
+COUNT_DRIFT
+VALUE_NOT_TRUE
+```
+
+No task XML contents are emitted, and the protected halt helper remains
+unchanged. Accepted source:
+
+```text
+HEAD: 52a403609a167c7b8daff3b81d3e06f28e204965
+TREE: d92ddd567dc293b3397df3f2d6531f95d35e778e
+CI:   36930139702 SUCCESS
+```
+
+Next: a fresh exact-source read-only
+`ops.ps1 preflight arch128-r8-terminal-halt`. Inspect
+`diagnostics.native_pre_call.scheduler.xml_enabled_node_state` in the generated
+report. No protected halt authorization may be considered until this XML-shape
+ambiguity is resolved and a later native diagnostic reports READY.
+

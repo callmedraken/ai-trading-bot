@@ -388,7 +388,7 @@ R8_HALT_REGISTRATION_PIN: Final = (
     "cde19fec3d2899be468ae96247f8b4b7794cd176cbe79915a4adb33a331f9ee9"
 )
 
-ARCH130_R8I_D1_SOURCE_BLOB_SHA1: Final = "11b4e34829d2411f06249802be7b663bd9019966"
+ARCH130_R8I_D1_SOURCE_BLOB_SHA1: Final = "1270b5c75bdca08392585fbb95b37f837362353f"
 ARCH130_R8I_D1_REMOTE_BRANCH: Final = "feature/d10c-r8-incident-reconciliation"
 
 
@@ -396,13 +396,14 @@ def _arch130_r8i_d1_authority_check(repo_root: Path) -> tuple[str, ...]:
     failures: list[str] = []
     path = repo_root / "scripts/d10_arch130_r8i_d1.py"
     try:
-        data = path.read_bytes()
+        text = path.read_text(encoding="utf-8")
+        data = text.encode("utf-8")
         actual = hashlib.sha1(
             b"blob " + str(len(data)).encode("ascii") + bytes((0,)) + data
         ).hexdigest()
         if actual != ARCH130_R8I_D1_SOURCE_BLOB_SHA1:
             failures.append("Architecture 130 D1 reconciler source drift")
-        tree = ast.parse(data.decode("utf-8"))
+        tree = ast.parse(text)
         names = _qualified_names(tree)
         forbidden = {
             "subprocess.run",

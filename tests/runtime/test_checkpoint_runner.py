@@ -156,6 +156,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
         "arch128-r7",
         "arch128-r8",
         "arch128-r8-terminal-halt",
+        "arch130-r8i-d1",
     }
     for spec in specs.values():
         assert "tests/runtime/test_checkpoint_runner.py" in spec.tests

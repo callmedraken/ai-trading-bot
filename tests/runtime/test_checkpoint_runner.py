@@ -155,12 +155,18 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
         "arch128-r6",
         "arch128-r7",
         "arch128-r8",
+        "arch128-r8-terminal-halt",
     }
     for spec in specs.values():
         assert "tests/runtime/test_checkpoint_runner.py" in spec.tests
         assert "scripts/checkpoint_runner.py" in spec.ruff_paths
         assert "tests/runtime/test_checkpoint_runner.py" in spec.ruff_paths
-        assert spec.remote_branch == "feature/d10c-durable-wake-evidence"
+        expected_branch = (
+            "feature/d10c-r8-terminal-halt"
+            if spec.name == "arch128-r8-terminal-halt"
+            else "feature/d10c-durable-wake-evidence"
+        )
+        assert spec.remote_branch == expected_branch
 
     assert specs["arch128-parent-acl-repair"].execute is not None
     assert specs["arch128-r4"].execute is not None

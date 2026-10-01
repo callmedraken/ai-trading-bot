@@ -508,3 +508,83 @@ The next operation is a read-only exact-live-remote
 `preflight arch128-r8`. No task start, source launch, scheduler mutation,
 lease mutation, evidence mutation, provider, Paper-v2, broker, or live action is
 authorized by R8A.
+
+
+### R8I-H1 terminal first-wake halt source — pending independent acceptance
+
+On October 1, 2026, the first natural wake started at
+`2026-10-01T08:30:09.370767Z` and ended in `GUARD_TERMINAL` /
+`CHILD_OUTPUT_INVALID` at `2026-10-01T08:30:21.815609Z`. R8 failed acceptance;
+this terminal soak cannot automatically resume or count as the planned week.
+The failed child's provider/publication/Paper-v2 effects remain unknown and
+require separate read-only reconciliation. Observer NOT_RUN fields describe
+only the observer, and halt NOT_RUN fields describe only the halt.
+
+`arch128-r8-terminal-halt` registers verify, read-only preflight, and protected
+execute on the isolated `feature/d10c-r8-terminal-halt` branch. Registration,
+source verification, CI, and preflight grant no mutation authorization.
+
+The frozen incident is deployment `d2071f25-5a7c-5293-a28f-5b722c9917a2`,
+attestation `3ffe4ecf1745599e7edb233d3f08a9707a1b27384d2f050a1805ee4929ebbd71`,
+soak `30e31396-9f51-57ca-a480-d2a3e9cae4a0`, activation
+`2026-09-30T22:07:24.000000Z`, end `2026-10-07T22:07:24.000000Z`.
+The accepted public Architecture-127 observer must report exactly two records,
+zero wakes, terminal GUARD_TERMINAL / CHILD_OUTPUT_INVALID, the two timestamps
+above, null last outcome/stop reason, 453 bytes, and digest
+`b2b5d5f84db2dd7d41b67d38b0449a1e701b9f1a1e0c4bac825663a0ebf36d7e`.
+Every observation field and effect field is exact and type checked.
+
+The native-safe read-only lease reader requires the current canonical lease,
+its exact source identity, protected file policy, and stable native identity.
+The canonical lease digest is
+`d2bdf74cb50420acbfed6adc1c79a1d4fe291233407b0506e0d71423248b76af`.
+Before/after lease bytes and native identity must match. The public durable
+observer independently re-verifies the signed deployment and sealed source.
+
+The accepted R3 scheduler observer performs two identical reads of the fixed
+`\AITradingBot-PD4-UnattendedPaper-v1` task. All scheduler semantics derive from
+the current activation through the frozen deployment contract and public R7
+projection. The current trigger starts `2026-10-01T01:30:00-07:00` and ends
+`2026-10-07T15:07:24-07:00`. Historical September-29 intervals are rejected.
+The pre-state must be enabled/ready, the post-state disabled/non-running.
+An already-disabled exact task is separately classified and grants no mutation.
+
+Generic protected execution admits only a clean local HEAD equal to the exact
+live remote head of `feature/d10c-r8-terminal-halt`, and writes external attempt
+evidence before dispatch. There is no environment remote-head exception.
+The additional interlock is exactly:
+
+```text
+--execute-reviewed-r8-terminal-halt
+AI_TRADING_BOT_ARCH128_R8_HALT_AUTHORIZATION
+ARCH128_R8_TERMINAL_HALT_AUTHORIZED
+```
+
+The reviewed fixed Task Scheduler COM helper requires that interlock and an
+Administrator token. It independently repeats two stable exact pre-reads,
+reacquires the fixed task, checks its full XML against the observed digest, and
+sets call_attempted immediately before the single `task.Enabled = false`
+assignment. It never starts/stops/deletes/registers a task or changes settings,
+credentials, lease, evidence, or governed source. It never calls provider,
+Paper-v2, broker, or live boundaries.
+
+A returned call is followed by independent task reacquisition, two identical
+post-reads, and comparison of the entire scheduler XML with only Settings/Enabled
+normalized. Any unrelated XML change blocks. Python independently observes the
+post-state again and requires identical incident evidence, deployment, and
+lease. Only this complete verified contract permits DISABLED_VERIFIED / PASS.
+Exceptions after a possible mutation are INDETERMINATE; lost/malformed transport
+results remain MAY_HAVE_OCCURRED. Proven pre-call rejection is NOT_CALLED.
+There is no automatic retry, rollback, or cleanup.
+
+Canonical AST pins freeze the complete policy, adapter, accepted observer and
+contract sources, runner wrappers, registration, and native helper text. Tests
+exercise exact incident drift, every scheduler semantic, authorization, runner
+attempt evidence, post-state drift, and fake-COM-only native fault paths.
+
+Next: independent exact diff + CI review, then a fresh elevated read-only
+`ops.ps1 preflight arch128-r8-terminal-halt`. Only after that evidence is reviewed
+may fresh explicit human authorization for the actual disable be requested.
+No production preflight or halt was run during implementation. R8I-D1 follows
+containment: read-only first-wake effect reconciliation and CHILD_OUTPUT_INVALID
+root-cause correction.

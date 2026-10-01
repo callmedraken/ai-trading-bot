@@ -312,6 +312,127 @@ def _r6_authority_check(repo_root: Path) -> tuple[str, ...]:
     return tuple(failures)
 
 
+# Canonical AST pins freeze the complete reviewed incident policy, native helper,
+# accepted observation chain, and runner composition. Formatting is not authority.
+R8_HALT_SOURCE_PINS: Final = {
+    "scripts/d10_arch128_r8_terminal_halt.py": (
+        "3e9386d5f3d925b2475fb4701f74d54d5bf2649781cfc3a5655f82946216a547"
+    ),
+    "scripts/d10_arch128_r8_halt_windows.py": (
+        "c85efb5913c986384608234c282191831d3f254784db225733465aeb1dfc98ff"
+    ),
+    "scripts/d10_arch128_r8_terminal_halt.ps1": (
+        "816a1789dd9c905721896954d47eed06d020ec5c67cf5ca8ca06143e95ff2635"
+    ),
+    "scripts/d10_arch128_r8_readonly.py": (
+        "59762e5d7dbd748f9525b51ea67b5bcdf1d1b1f4ec177992fed3ac5a0e29bdfc"
+    ),
+    "scripts/d10_durable_wake_evidence_observe.py": (
+        "db64b72f9daaf74c0ff73d52378d407a29fbc8aeabcb30b5e7d4b47f5994ddb3"
+    ),
+    "scripts/run_personal_desktop_d10_launch_guard.py": (
+        "a2bd8eea6dcd5e4df78a6ce94f070ef3bbafc243d1c27d79fbeb93f3a30cd1f6"
+    ),
+    "scripts/d10_arch128_r3_scheduler_observe.ps1": (
+        "e688aab821028cedfca4a6fc6ebff2af847e645f25f8442f5c2ba772c3413505"
+    ),
+    "scripts/d10_p1245_scheduler_observe.ps1": (
+        "a1bc4ef906806014bf15bed1e02c69742870f9977e99621bef14619c00b6058e"
+    ),
+    "scripts/d10_arch128_r6_reactivation.py": (
+        "369b0feec8421e6a3470171fdf1285cf4c6d22b5c99308c7b427b505b919dea9"
+    ),
+    "scripts/d10_arch128_r7_observation.py": (
+        "84238e6f11cc8fb82b5f0c73eee0dfcc63a3f7bc14b24e42038304ce0533f978"
+    ),
+    "scripts/d10_arch128_r4_replacement.py": (
+        "2ec31172f0daeef152b8e4b6cf03ee3674d82ea5f07208eda32de3a58ecad54f"
+    ),
+    (
+        "src/trading_bot/runtime/"
+        "personal_desktop_unattended_one_week_soak_scheduler_contract.py"
+    ): ("64a6cc2e44e98e7f301a64ae6777f57f7ca19339419ce6b8d90820e9dd4addf2"),
+    "src/trading_bot/runtime/personal_desktop_d10_activation_lease.py": (
+        "ff2885d6ee5cfd3998cb8c1ece5462c48a70ce704ab335fb71f3f3173c8d4e54"
+    ),
+}
+R8_HALT_RUNNER_PINS: Final = {
+    "_r8_halt_authority_check": (
+        "d0e00ab3d3596828592c94483c9a114588f81bf40daa00fca29208d31b5a0ff1"
+    ),
+    "_r8_halt_preflight": (
+        "c13251fcd510411563869735818e7afb12c9d3aa163f81f758571d596b50afbd"
+    ),
+    "_r8_halt_execute": (
+        "f0a9c6388f63b1184426f6b7072213e3e7af4bb16f27435d81f98ad0566c97ef"
+    ),
+    "execute_checkpoint": (
+        "031c22f037b6704ca50d68fc4445330edc0e38f1cd575f85e8dd9b3d81250eda"
+    ),
+    "preflight_checkpoint": (
+        "686c25f4de2d3c01cbb146efc181c6ca295de766b19d8436bd427431cbc930ca"
+    ),
+    "_remote_branch_head": (
+        "46ea1a2afa1e52622b257c9d635bb115529ae99b1c09aa6bb18ede99a5c2d27e"
+    ),
+    "_git_state": ("c63292862490a972afd8c7ffafe01dcdd90dc19d5973eca83be876ebd611c113"),
+    "_write_json": ("bd3cabc882528e471e226c434eb3657c3f461b520112f60782eb0bda4b3d5f82"),
+}
+R8_HALT_REGISTRATION_PIN: Final = (
+    "c4d52e17d6a881d23f4433d1747132e0d91d873efa880dc69da28231c68f24b2"
+)
+
+
+def _r8_halt_authority_check(repo_root: Path) -> tuple[str, ...]:
+    failures: list[str] = []
+    for name, expected in R8_HALT_SOURCE_PINS.items():
+        try:
+            text = (repo_root / name).read_text(encoding="utf-8")
+            material = (
+                ast.dump(ast.parse(text), include_attributes=False)
+                if name.endswith(".py")
+                else text
+            )
+            actual = hashlib.sha256(material.encode("utf-8")).hexdigest()
+            if actual != expected:
+                failures.append(f"R8 halt frozen source drift: {name}")
+        except (OSError, SyntaxError, UnicodeError):
+            failures.append(f"R8 halt frozen source unavailable: {name}")
+    try:
+        tree = ast.parse(
+            (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+        )
+        functions = _top_level_functions(tree)
+        for name, expected in R8_HALT_RUNNER_PINS.items():
+            material = ast.dump(functions[name], include_attributes=False)
+            if hashlib.sha256(material.encode("utf-8")).hexdigest() != expected:
+                failures.append(f"R8 halt runner composition drift: {name}")
+        registrations = [
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "CheckpointSpec"
+            and any(
+                kw.arg == "name"
+                and isinstance(kw.value, ast.Constant)
+                and kw.value.value == "arch128-r8-terminal-halt"
+                for kw in node.keywords
+            )
+        ]
+        if (
+            len(registrations) != 1
+            or hashlib.sha256(
+                ast.dump(registrations[0], include_attributes=False).encode("utf-8")
+            ).hexdigest()
+            != R8_HALT_REGISTRATION_PIN
+        ):
+            failures.append("R8 halt registration drift")
+    except (OSError, SyntaxError, UnicodeError, KeyError):
+        failures.append("R8 halt runner source unavailable")
+    return tuple(failures)
+
+
 def _r8_authority_check(repo_root: Path) -> tuple[str, ...]:
     """Freeze R8's public observer delegation, policy, and closed registration."""
     path = repo_root / "scripts" / "d10_arch128_r8_readonly.py"
@@ -1700,6 +1821,98 @@ def _r8_preflight() -> dict[str, object]:
     return {"status": primary.get("status"), "primary": primary}
 
 
+def _r8_halt_preflight() -> dict[str, object]:
+    from scripts import d10_arch128_r8_halt_windows as windows
+    from scripts import d10_arch128_r8_terminal_halt as halt
+
+    primary = halt.preflight(windows.ReadOnlyWindowsHost())
+    closed = all(primary.get(field) == "NOT_RUN" for field in halt.CLOSED_EFFECTS)
+    closed = closed and primary.get("scheduler_mutation") == "NOT_RUN"
+    passed = primary.get("status") == "PASS" and closed
+    passed = (
+        passed
+        and primary.get("call_attempted") is False
+        and primary.get("disposition") == "NOT_CALLED"
+    )
+    if passed:
+        try:
+            halt.require_snapshot(
+                halt.Snapshot(
+                    primary["evidence"], primary["lease"], primary["scheduler"]
+                ),
+                enabled=True,
+            )
+        except Exception:
+            passed = False
+    return {
+        "status": "PASS" if passed else "BLOCKED",
+        "primary": primary,
+        "diagnostics": {},
+    }
+
+
+def _r8_halt_execute() -> dict[str, object]:
+    from scripts import d10_arch128_r8_halt_windows as windows
+    from scripts import d10_arch128_r8_terminal_halt as halt
+
+    primary = halt.execute(
+        (halt.EXECUTE_FLAG,), os.environ, windows.ProtectedWindowsHost
+    )
+    required = {
+        "schema": halt.SCHEMA,
+        "status": "PASS",
+        "call_attempted": True,
+        "disposition": "CALL_RETURNED",
+        "incident": "EXACT_TERMINAL_FIRST_WAKE",
+        "scheduler_pre": "ENABLED_NON_RUNNING_EXACT",
+        "scheduler_mutation": "DISABLED_VERIFIED",
+        "scheduler_post": "DISABLED_NON_RUNNING_EXACT",
+        "evidence_before_after": "IDENTICAL",
+        "lease_before_after": "IDENTICAL",
+        "automatic_retry": False,
+        "automatic_rollback": False,
+        "automatic_cleanup": False,
+        "failed_child_effects": "UNKNOWN_REQUIRES_READ_ONLY_RECONCILIATION",
+        **dict.fromkeys(halt.CLOSED_EFFECTS, "NOT_RUN"),
+    }
+    passed = type(primary) is dict and all(
+        type(primary.get(key)) is type(value) and primary.get(key) == value
+        for key, value in required.items()
+    )
+    if passed:
+        try:
+            halt.require_snapshot(
+                halt.Snapshot(
+                    primary["evidence"], primary["lease"], primary["scheduler_before"]
+                ),
+                enabled=True,
+            )
+            halt.require_snapshot(
+                halt.Snapshot(
+                    primary["evidence"], primary["lease"], primary["scheduler_after"]
+                ),
+                enabled=False,
+            )
+        except Exception:
+            passed = False
+    not_called = (
+        type(primary) is dict
+        and primary.get("call_attempted") is False
+        and primary.get("disposition") == "NOT_CALLED"
+        and primary.get("scheduler_mutation") == "NOT_RUN"
+        and all(primary.get(field) == "NOT_RUN" for field in halt.CLOSED_EFFECTS)
+    )
+    disposition = (
+        "CONFIRMED" if passed else ("NOT_RUN" if not_called else "MAY_HAVE_OCCURRED")
+    )
+    return {
+        "status": "PASS" if passed else "STOPPED",
+        "primary": primary,
+        "effect_disposition": disposition,
+        "automatic_retry": "NOT_AUTHORIZED",
+    }
+
+
 def _r7_execute() -> dict[str, object]:
     from scripts import d10_arch128_r7_protected as r7_protected
     from scripts import d10_arch128_r7_windows as r7_windows
@@ -1878,6 +2091,27 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
         "tests/runtime/test_d10_arch128_r8_readonly.py",
     )
     return {
+        "arch128-r8-terminal-halt": CheckpointSpec(
+            name="arch128-r8-terminal-halt",
+            description="R8I-H1 exact terminal first-wake scheduler halt source",
+            tests=(
+                *COMMON_TESTS,
+                "tests/runtime/test_d10_arch128_r8_terminal_halt.py",
+                "tests/runtime/test_d10_arch128_r8_readonly.py",
+                "tests/runtime/test_d10_durable_wake_evidence_observe.py",
+            ),
+            ruff_paths=(
+                "scripts/checkpoint_runner.py",
+                "tests/runtime/test_checkpoint_runner.py",
+                "scripts/d10_arch128_r8_terminal_halt.py",
+                "scripts/d10_arch128_r8_halt_windows.py",
+                "tests/runtime/test_d10_arch128_r8_terminal_halt.py",
+            ),
+            authority_check=_r8_halt_authority_check,
+            preflight=_r8_halt_preflight,
+            execute=_r8_halt_execute,
+            remote_branch="feature/d10c-r8-terminal-halt",
+        ),
         "arch128-r8": CheckpointSpec(
             name="arch128-r8",
             description="Architecture 128 first-wake read-only observation",

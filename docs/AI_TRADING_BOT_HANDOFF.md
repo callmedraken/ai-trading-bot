@@ -8721,3 +8721,34 @@ Next:
 4. never manually start the task or synthesize a wake;
 5. any empty/incomplete/unaccepted/terminal/duplicate/foreign evidence is a STOP
    for review, not retry or repair authority.
+
+
+## 2026-10-01 — R8 terminal first-wake incident; R8I-H1 source pending review
+
+This supersedes the preceding R8 NEXT / active-soak status. The first natural
+scheduled wake occurred at 1:30 AM PDT, with WAKE_START
+`2026-10-01T08:30:09.370767Z` followed by GUARD_TERMINAL /
+CHILD_OUTPUT_INVALID at `2026-10-01T08:30:21.815609Z`.
+The durable stream has two records, zero accepted wakes, 453 bytes, and SHA-256
+`b2b5d5f84db2dd7d41b67d38b0449a1e701b9f1a1e0c4bac825663a0ebf36d7e`.
+R8 is FAILED / NOT ACCEPTED and D10 is TERMINAL / NOT ACCEPTABLE as the planned
+one-week soak. Preserve the terminal evidence and activation lease unchanged.
+
+The failed natural child was launched. Its provider, publication, and Paper-v2
+effects remain UNKNOWN / REQUIRES READ-ONLY RECONCILIATION. NOT_RUN fields from
+the observer or future halt operation do not classify that failed child.
+
+R8I-H1 source is isolated on `feature/d10c-r8-terminal-halt`, based exactly on
+`38a88392096214e03b8a752cbffc78ebf1aeeb15` /
+`4164ecb7310090c6618b278bcd1cbe1b42e8ccfc`. It adds the registered
+`arch128-r8-terminal-halt` verify/preflight/protected-execute checkpoint, with
+only one permitted external mutation: disable the exact non-running scheduler
+task. Source registration is pending independent acceptance and grants no
+execution authority. The active D10 branch/deployment is unchanged.
+
+Next: independent exact diff + CI review. After source acceptance, perform a
+fresh elevated read-only halt preflight; review its evidence before requesting
+fresh authorization for scheduler disable. No real host preflight or execute
+was run in this source checkpoint. After containment, R8I-D1 must reconcile
+first-wake effects and diagnose/correct CHILD_OUTPUT_INVALID before any new soak.
+See Architecture 129 for the exact incident contract and interlock.

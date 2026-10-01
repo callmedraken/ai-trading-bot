@@ -759,9 +759,7 @@ function Read-FixedTask {
     assert result["disposition"] == disposition
     assert result["mock_calls"] == calls
     assert result["call_attempted"] is (calls == 1)
-    assert result["xml_unchanged"] is (
-        scenario in ("success", "pre_enabled_omitted")
-    )
+    assert result["xml_unchanged"] is (scenario in ("success", "pre_enabled_omitted"))
 
 
 @pytest.mark.parametrize(

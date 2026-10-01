@@ -265,11 +265,9 @@ def _read_c3_inventory(
             "claim_id": None if claim_id is None else _uuid(claim_id, "c3_claim"),
             "claim_committed_at_utc": claim_committed,
             "reservation_id": (
-                (
-                    None
-                    if reservation_id is None
-                    else _uuid(reservation_id, "c3_reservation")
-                )
+                None
+                if reservation_id is None
+                else _uuid(reservation_id, "c3_reservation")
             ),
             "reservation_state": reservation_state,
             "reservation_committed_at_utc": reservation_committed,

@@ -418,6 +418,9 @@ def test_native_pre_call_diagnostic_source_is_read_only() -> None:
     for reason in diagnostic.REASONS:
         assert f"'{reason}'" in source
 
+    for state in ("MISSING", "COUNT_DRIFT", "VALUE_NOT_TRUE"):
+        assert f"'xml_enabled_node_state'] = '{state}'" in source
+
 
 def test_scheduler_helper_is_reused_and_two_reads_must_match(monkeypatch) -> None:
     monkeypatch.setattr(windows, "transport", Mock())

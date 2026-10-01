@@ -154,8 +154,17 @@ try {
         'http://schemas.microsoft.com/windows/2004/02/mit/task'
     )
     $nodes = $document.SelectNodes('/t:Task/t:Settings/t:Enabled', $manager)
-    if ($nodes.Count -ne 1 -or $nodes[0].InnerText -cne 'true') {
-        throw 'XML enabled drift'
+    if ($nodes.Count -eq 0) {
+        $scheduler['xml_enabled_node_state'] = 'MISSING'
+        throw 'XML enabled node missing'
+    }
+    if ($nodes.Count -ne 1) {
+        $scheduler['xml_enabled_node_state'] = 'COUNT_DRIFT'
+        throw 'XML enabled node count drift'
+    }
+    if ($nodes[0].InnerText -cne 'true') {
+        $scheduler['xml_enabled_node_state'] = 'VALUE_NOT_TRUE'
+        throw 'XML enabled value drift'
     }
 
     $record = [ordered]@{

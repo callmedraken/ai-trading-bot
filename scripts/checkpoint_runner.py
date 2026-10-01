@@ -388,6 +388,31 @@ R8_HALT_REGISTRATION_PIN: Final = (
     "cde19fec3d2899be468ae96247f8b4b7794cd176cbe79915a4adb33a331f9ee9"
 )
 
+ARCH130_R8I_D1_SOURCE_SHA256: Final = "93a2ec8f24b5932ac11184596adb1b686cddaf37834d425f95c7556ba14e53ae"
+ARCH130_R8I_D1_REMOTE_BRANCH: Final = "feature/d10c-r8-incident-reconciliation"
+
+
+def _arch130_r8i_d1_authority_check(repo_root: Path) -> tuple[str, ...]:
+    failures: list[str] = []
+    path = repo_root / "scripts/d10_arch130_r8i_d1.py"
+    try:
+        actual = hashlib.sha256(path.read_bytes()).hexdigest()
+        if actual != ARCH130_R8I_D1_SOURCE_SHA256:
+            failures.append("Architecture 130 D1 reconciler source drift")
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        names = _qualified_names(tree)
+        forbidden = {
+            "subprocess.run",
+            "open_writable_authority_sqlite_connection",
+            "run_personal_desktop_unattended_one_week_soak",
+            "run_personal_desktop_unattended_market_data_capture",
+        }
+        if names & forbidden:
+            failures.append("Architecture 130 D1 effect boundary appeared")
+    except (OSError, UnicodeError, SyntaxError):
+        failures.append("Architecture 130 D1 reconciler source unavailable")
+    return tuple(failures)
+
 
 def _r8_halt_authority_check(repo_root: Path) -> tuple[str, ...]:
     failures: list[str] = []
@@ -1803,6 +1828,16 @@ def _r7_preflight() -> dict[str, object]:
     return {"status": primary.get("status"), "primary": primary}
 
 
+def _arch130_r8i_d1_preflight() -> dict[str, object]:
+    from scripts import d10_arch130_r8i_d1 as d1
+
+    primary = d1.preflight()
+    if type(primary) is not dict:
+        raise RuntimeError("Architecture 130 D1 result must be an exact dictionary")
+    _require_not_run(primary, d1.CLOSED_EFFECTS)
+    return {"status": primary.get("status"), "primary": primary}
+
+
 def _r8_preflight() -> dict[str, object]:
     from scripts import d10_arch128_r8_readonly as admission
 
@@ -2133,6 +2168,23 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
         "tests/runtime/test_d10_arch128_r8_readonly.py",
     )
     return {
+        "arch130-r8i-d1": CheckpointSpec(
+            name="arch130-r8i-d1",
+            description="Architecture 130 failed first-wake read-only effect reconciliation",
+            tests=(
+                *COMMON_TESTS,
+                "tests/runtime/test_d10_arch130_r8i_d1.py",
+            ),
+            ruff_paths=(
+                "scripts/checkpoint_runner.py",
+                "tests/runtime/test_checkpoint_runner.py",
+                "scripts/d10_arch130_r8i_d1.py",
+                "tests/runtime/test_d10_arch130_r8i_d1.py",
+            ),
+            authority_check=_arch130_r8i_d1_authority_check,
+            preflight=_arch130_r8i_d1_preflight,
+            remote_branch=ARCH130_R8I_D1_REMOTE_BRANCH,
+        ),
         "arch128-r8-terminal-halt": CheckpointSpec(
             name="arch128-r8-terminal-halt",
             description="R8I-H1 exact terminal first-wake scheduler halt source",

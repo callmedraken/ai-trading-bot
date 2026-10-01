@@ -8752,3 +8752,55 @@ fresh authorization for scheduler disable. No real host preflight or execute
 was run in this source checkpoint. After containment, R8I-D1 must reconcile
 first-wake effects and diagnose/correct CHILD_OUTPUT_INVALID before any new soak.
 See Architecture 129 for the exact incident contract and interlock.
+
+## 2026-10-01 — R8I-H1 terminal scheduler-halt source accepted
+
+Resume from **R8I-H1 exact-live-remote read-only host preflight**.
+
+Accepted R8I-H1 source:
+
+```text
+HEAD 8263ecf6823d04276987277a82c268fced63b9a3
+TREE 859eb8adf08b5ad36638f8ba0d938aeb436c11e9
+CI   36924851723 SUCCESS
+```
+
+Independent review accepted the complete source contract, including the
+follow-up correction that makes `decision_publication=NOT_RUN` mandatory in
+halt preflight and execute evidence. The runner independently rejects missing
+or altered publication evidence, and source authority rejects introduction of a
+publication call. Shared-helper pin expansion remains optional hardening, not a
+blocker for this accepted checkpoint.
+
+No production host preflight and no protected halt execution occurred during
+source acceptance. The failed natural child's provider/publication/Paper-v2
+effects remain UNKNOWN / REQUIRES READ-ONLY RECONCILIATION; NOT_RUN fields from
+the halt checkpoint classify only the halt operation.
+
+Next safe sequence:
+
+```text
+R8I-H1 source review                         ACCEPTED
+  -> exact-live-remote elevated preflight   NEXT / READ-ONLY
+  -> ChatGPT evidence review                REQUIRED
+  -> fresh explicit halt authorization      REQUIRED
+  -> protected task Enabled true -> false   NOT AUTHORIZED YET
+  -> post-halt verification                 REQUIRED
+  -> R8I-D1 effect reconciliation + CHILD_OUTPUT_INVALID root cause
+```
+
+Before the host preflight, synchronize the existing local
+`F:\AI\worktrees\ai-trading-bot-d10c-r8-terminal-halt` worktree only by
+fast-forward if it is tracked/index-clean at the known pre-closeout HEAD and the
+remote is this docs-closeout descendant. Any different state is a STOP.
+Then run only:
+
+```powershell
+.\ops.ps1 status
+.\ops.ps1 preflight arch128-r8-terminal-halt
+```
+
+Do not set `AI_TRADING_BOT_ARCH128_R8_HALT_AUTHORIZATION` and do not invoke
+`execute arch128-r8-terminal-halt` until a fresh explicit authorization is
+requested after review of the preflight evidence.
+

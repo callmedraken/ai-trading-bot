@@ -8499,3 +8499,46 @@ fresh authorization for scheduler disable. No real host preflight or execute
 was run in this source checkpoint. After containment, R8I-D1 must reconcile
 first-wake effects and diagnose/correct CHILD_OUTPUT_INVALID before any new soak.
 See Architecture 129 for the exact incident contract and interlock.
+
+## 2026-10-01 — R8I-H1 terminal first-wake scheduler-halt source — ACCEPTED
+
+Independent exact-diff and CI review accepted the R8I-H1 source at:
+
+```text
+HEAD: 8263ecf6823d04276987277a82c268fced63b9a3
+TREE: 859eb8adf08b5ad36638f8ba0d938aeb436c11e9
+CI:   36924851723 SUCCESS
+```
+
+This acceptance includes the corrective decision-publication closure. The halt
+contract now requires `decision_publication=NOT_RUN` in both read-only
+preflight and protected-execute evidence, the runner rejects missing or changed
+publication evidence, and the authority tests reject introduction of a
+decision-publication call.
+
+R8I-H1 remains a containment checkpoint only. Its single permitted protected
+mutation is disabling the exact non-running
+`\AITradingBot-PD4-UnattendedPaper-v1` scheduled task. Source acceptance does
+not authorize that mutation. No production-host preflight or halt execution has
+occurred.
+
+Current progression:
+
+```text
+R8      first natural scheduled wake                         FAILED / NOT ACCEPTED
+D10     planned one-week unattended simulated-paper soak     TERMINAL
+R8I-H1  terminal-incident scheduler-halt source              ACCEPTED
+R8I-H1  exact-live-remote host preflight                     NEXT / READ-ONLY
+R8I-H1  protected scheduler disable                          NOT AUTHORIZED
+R8I-D1  first-wake effect reconciliation/root-cause work     AFTER CONTAINMENT
+```
+
+The next safe operation is the registered elevated read-only
+`ops.ps1 preflight arch128-r8-terminal-halt` from the clean local
+`feature/d10c-r8-terminal-halt` worktree after it is fast-forwarded, if
+necessary, to this docs-closeout live remote HEAD. Do not set the R8 halt
+authorization environment variable and do not invoke protected execute.
+Return the complete runner output and generated preflight report for independent
+review. The actual scheduler disable still requires fresh explicit human
+authorization after that preflight is accepted.
+

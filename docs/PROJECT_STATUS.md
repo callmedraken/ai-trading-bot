@@ -8746,3 +8746,110 @@ S2C  read-only external-review collectors               NEXT / SOURCE-ONLY
 
 S2B creates no authority to inspect production or to accept D10. Production
 remains frozen while collector source design proceeds separately.
+
+
+## D10 side progression S2C1A scheduler-slot review policy — ACCEPTED
+
+S2C1A is source-accepted on the isolated side branch:
+
+```text
+branch: feature/post-d10-observability
+implementation HEAD: 74c40d534f85b6d9137b4172cb3483569dba385f
+implementation TREE: 6f3608511424ae0d8cd7283e845c0f90b9c99fa5
+parent: 72700e5d9f5acfb71875cce60340c2fb99c97577
+CI run: 36823082625 SUCCESS
+```
+
+The active D10 branch remained unchanged at:
+
+```text
+feature/d10c-durable-wake-evidence
+38a88392096214e03b8a752cbffc78ebf1aeeb15
+```
+
+S2C1A is a pure, source-only scheduler-slot review policy. It performs no
+Windows Event Log access, Task Scheduler access, filesystem/environment access,
+PowerShell/subprocess execution, credential operation, provider/Paper-v2/broker/
+live call, production observation, preflight, or execute action.
+
+It freezes the supplied sanitized Task Scheduler event semantics:
+
+```text
+107 SCHEDULED_TRIGGER
+110 MANUAL_TRIGGER
+100 TASK_STARTED
+102 TASK_COMPLETED
+```
+
+Generic task-start events do not establish scheduled origin. Any supplied manual
+trigger during the soak blocks. Expected trigger slots are derived from the
+accepted frozen one-week scheduler deployment spec for the exact active
+activation/window, not supplied by the caller; the current activation derives
+exactly seven daily slots.
+
+A review-ready supplied history must:
+- bind to the exact current deployment/soak/window and fixed D10 task path;
+- be collected at/after the soak end;
+- report the history channel enabled;
+- retain history from at/before activation;
+- contain canonical, strictly increasing record IDs and nondecreasing event time;
+- contain exactly one event 107 in every derived half-open slot interval;
+- contain no event 110;
+- use seven unique scheduled instance IDs;
+- contain exactly one matching event 100 and one event 102 for every scheduled
+  instance, in trigger <= start <= completion order;
+- contain no unmatched task start/completion execution.
+
+The successful status is only
+`READY_FOR_EXTERNAL_REVIEW_ARTIFACT`. It explicitly does not prove collector
+truth, continuous event-channel enablement, durable wake acceptance, Paper-v2
+correctness, D10 acceptance, or broker-paper readiness, and always preserves:
+
+```text
+d10_accepted = false
+broker_paper_authorized = false
+operator_decision_required = true
+```
+
+Exact implementation files:
+
+```text
+scripts/d10_scheduler_slot_review_policy.py
+scripts/checkpoint_runner.py
+tests/runtime/test_d10_scheduler_slot_review_policy.py
+tests/runtime/test_checkpoint_runner.py
+.github/workflows/side-checkpoint-certification.yml
+```
+
+Local verification reported 1,306 focused tests passed plus Ruff lint/format,
+working/cached diff checks, and clean
+`ops.ps1 verify d10-scheduler-slot-policy` with authority and identity gates
+passing.
+
+GitHub Actions run 36823082625 completed SUCCESS. Its exact event-HEAD
+`side-head-source-gates` job reported:
+
+```text
+d10-soak-status                 OVERALL=PASS
+d10-soak-review                 OVERALL=PASS
+d10-external-review-package     OVERALL=PASS
+d10-scheduler-slot-policy       OVERALL=PASS
+```
+
+and uploaded `side-head-source-gate-evidence`. Exact historical R8/S1
+certification jobs also remained successful.
+
+Current side progression:
+
+```text
+R8A   first-wake observer source                         ACCEPTED
+S1    multi-wake read-only soak status                   ACCEPTED
+S2A   pure internal end-of-soak review readiness         ACCEPTED
+S2B   pure external-review evidence package              ACCEPTED
+S2C1A pure scheduler-slot coverage policy                ACCEPTED
+S2C1B fixed read-only Windows scheduler-history collector NEXT / SOURCE-ONLY
+```
+
+S2C1A adds no production read authority. S2C1B must remain a separately reviewed
+read-only Windows collector and must fail closed rather than enabling or changing
+the Task Scheduler Operational channel.

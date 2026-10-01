@@ -8908,3 +8908,51 @@ Next: S2C should source-design the read-only collectors that can later produce
 the five external artifacts. Collector source work must remain inert and
 production-uninvoked during the active soak unless a separate read-only
 operational checkpoint is later reviewed and explicitly chosen.
+
+
+## 2026-09-30 — S2C1A scheduler-slot review policy accepted
+
+Resume side progression from **S2C1B fixed read-only Windows scheduler-history
+collector**.
+
+Accepted S2C1A source:
+
+```text
+branch feature/post-d10-observability
+HEAD   74c40d534f85b6d9137b4172cb3483569dba385f
+TREE   6f3608511424ae0d8cd7283e845c0f90b9c99fa5
+CI     36823082625 SUCCESS
+```
+
+Active D10 remains frozen:
+
+```text
+feature/d10c-durable-wake-evidence
+38a88392096214e03b8a752cbffc78ebf1aeeb15
+```
+
+S2C1A is pure/offline. It consumes only a typed sanitized scheduler-history
+observation and derives the seven expected trigger slots from the frozen current
+one-week scheduler deployment spec. It has no Event Log, Task Scheduler,
+filesystem, environment, subprocess/PowerShell, credential, provider, Paper-v2,
+broker, live, preflight, or execute authority.
+
+Fixed event semantics are 107 scheduled-trigger, 110 manual-trigger, 100
+task-started, and 102 task-completed. Any manual trigger blocks. Exactly one 107
+must fall into each derived slot; every scheduled instance requires exactly one
+matching 100 and 102 in temporal order; unmatched executions and insufficient
+retained history block.
+
+Successful output is only `READY_FOR_EXTERNAL_REVIEW_ARTIFACT` and retains
+false/false/true D10/broker/operator authority flags. It explicitly does not
+establish collector truth or automatically accept D10.
+
+GitHub Actions run 36823082625 completed all current side source gates with
+OVERALL=PASS and uploaded the side-head evidence artifact.
+
+Next S2C1B should implement the fixed read-only Windows collector for
+`Microsoft-Windows-TaskScheduler/Operational`, projecting only the fixed D10
+task and event IDs 107/110/100/102 into the accepted S2C1A model. It must never
+enable, resize, clear, configure, or otherwise mutate the event channel or task.
+Production invocation remains separately gated and should not occur as part of
+source implementation.

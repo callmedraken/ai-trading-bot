@@ -610,3 +610,37 @@ side-source job produced OVERALL=PASS for `d10-soak-status`,
 `d10-soak-review`, and `d10-external-review-package`, and uploaded external
 source-gate evidence. The active D10 branch remains unchanged at
 `38a88392096214e03b8a752cbffc78ebf1aeeb15`.
+
+
+### D10 side checkpoint S2C1A scheduler-slot review policy — ACCEPTED
+
+S2C1A is isolated on `feature/post-d10-observability` at
+`74c40d534f85b6d9137b4172cb3483569dba385f` /
+`6f3608511424ae0d8cd7283e845c0f90b9c99fa5`.
+
+It registers `d10-scheduler-slot-policy` as verify-only. No preflight, execute,
+or remote-head handoff exists. The module is pure and contains no Windows/Event
+Log/Task Scheduler or other I/O authority.
+
+Expected slots are derived from the frozen active scheduler deployment spec. The
+current window must derive exactly seven daily slots. The supplied history
+policy freezes event 107 as scheduled-trigger, 110 as manual-trigger, 100 as
+task-started, and 102 as task-completed. A manual trigger blocks; exactly one
+scheduled trigger must occur in each slot interval; every scheduled instance
+must have exactly one start and completion in order; unmatched task executions,
+foreign-task events, insufficient retained history, event/order drift, or
+identity drift block.
+
+The success status is only
+`READY_FOR_EXTERNAL_REVIEW_ARTIFACT` and cannot accept D10 or authorize
+broker-paper.
+
+The authority gate composes the previously frozen S2B/S2A contracts and freezes
+the complete S2C1A semantic AST, imports, event mapping, current identity,
+derived-slot logic, lifecycle cardinality/order, no-I/O boundary, verify-only
+registration, and false/false/true non-authority flags.
+
+GitHub Actions run `36823082625` completed SUCCESS; the exact event-HEAD
+side-source job recorded OVERALL=PASS for S1, S2A, S2B, and S2C1A and uploaded
+the side-head source-gate artifact. Active D10 remains frozen at
+`38a88392096214e03b8a752cbffc78ebf1aeeb15`.

@@ -156,6 +156,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
         "arch128-r7",
         "arch128-r8",
         "d10-soak-status",
+        "d10-soak-review",
     }
     for spec in specs.values():
         assert "tests/runtime/test_checkpoint_runner.py" in spec.tests
@@ -163,7 +164,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
         assert "tests/runtime/test_checkpoint_runner.py" in spec.ruff_paths
         expected_branch = (
             "feature/post-d10-observability"
-            if spec.name == "d10-soak-status"
+            if spec.name in ("d10-soak-status", "d10-soak-review")
             else "feature/d10c-durable-wake-evidence"
         )
         assert spec.remote_branch == expected_branch
@@ -194,6 +195,7 @@ def test_current_arch128_authority_profiles_pass() -> None:
     assert specs["arch128-r7"].authority_check(repo_root) == ()
     assert specs["arch128-r8"].authority_check(repo_root) == ()
     assert specs["d10-soak-status"].authority_check(repo_root) == ()
+    assert specs["d10-soak-review"].authority_check(repo_root) == ()
 
 
 def test_default_evidence_root_is_outside_repo() -> None:
@@ -1672,8 +1674,18 @@ def _soak_status_authority_copy(
                 + runner_source[end:]
             )
         else:
-            assert runner_old in runner_source
-            runner_source = runner_source.replace(runner_old, runner_new, 1)
+            # Scope S1 mutations to S1; S2A also names the same side branch.
+            start = runner_source.index('        "d10-soak-status": CheckpointSpec(')
+            end = runner_source.index(
+                '        "d10-soak-review": CheckpointSpec(', start
+            )
+            registration = runner_source[start:end]
+            assert runner_old in registration
+            runner_source = (
+                runner_source[:start]
+                + registration.replace(runner_old, runner_new, 1)
+                + runner_source[end:]
+            )
     (target / "checkpoint_runner.py").write_text(runner_source, encoding="utf-8")
     return tmp_path
 
@@ -1866,3 +1878,201 @@ def test_soak_status_runner_rejects_dictionary_subclass(monkeypatch) -> None:
     )
     with pytest.raises(RuntimeError, match="exact dictionary"):
         runner._d10_soak_status_preflight()
+
+
+def test_soak_review_registration_is_verify_only() -> None:
+    spec = runner._checkpoint_specs()["d10-soak-review"]
+    assert spec.preflight is None
+    assert spec.execute is None
+    assert spec.remote_head_env is None
+    assert spec.remote_branch == "feature/post-d10-observability"
+    assert spec.authority_check is runner._d10_soak_review_authority_check
+    assert spec.tests == (
+        "tests/runtime/test_checkpoint_runner.py",
+        "tests/runtime/test_d10_soak_status_readonly.py",
+        "tests/runtime/test_d10_arch128_r8_readonly.py",
+        "tests/runtime/test_d10_durable_wake_evidence_observe.py",
+        "tests/runtime/test_personal_desktop_d10_wake_evidence_log.py",
+        "tests/runtime/test_d10_end_of_soak_review.py",
+        "tests/runtime/test_personal_desktop_unattended_one_week_soak_source.py",
+        "tests/runtime/test_personal_desktop_unattended_one_week_soak_controller.py",
+    )
+    assert spec.ruff_paths == (
+        *runner.COMMON_RUFF_PATHS,
+        "scripts/d10_end_of_soak_review.py",
+        "tests/runtime/test_d10_end_of_soak_review.py",
+    )
+    parser = runner._parser(runner._checkpoint_specs())
+    assert parser.parse_args(("verify", "d10-soak-review")).checkpoint == (
+        "d10-soak-review"
+    )
+    for command in ("preflight", "execute"):
+        with pytest.raises(SystemExit):
+            parser.parse_args((command, "d10-soak-review"))
+
+
+def _soak_review_authority_copy(
+    tmp_path: Path,
+    *,
+    addition: str = "",
+    old: str = "",
+    new: str = "",
+    runner_old: str = "",
+    runner_new: str = "",
+) -> Path:
+    root = Path(runner.__file__).resolve().parent.parent
+    target = tmp_path / "scripts"
+    target.mkdir()
+    source = (root / "scripts/d10_end_of_soak_review.py").read_text(encoding="utf-8")
+    if old:
+        assert old in source
+        source = source.replace(old, new, 1)
+    if addition:
+        source += "\n" + addition + "\n"
+    (target / "d10_end_of_soak_review.py").write_text(source, encoding="utf-8")
+    runner_source = (root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+    if runner_old:
+        start = runner_source.index('        "d10-soak-review": CheckpointSpec(')
+        end = runner_source.index('        "arch128-r8": CheckpointSpec(', start)
+        registration = runner_source[start:end]
+        assert runner_old in registration
+        runner_source = (
+            runner_source[:start]
+            + registration.replace(runner_old, runner_new, 1)
+            + runner_source[end:]
+        )
+    (target / "checkpoint_runner.py").write_text(runner_source, encoding="utf-8")
+    return tmp_path
+
+
+@pytest.mark.parametrize(
+    "addition",
+    (
+        "import os",
+        "import subprocess",
+        "import ctypes",
+        "from pathlib import Path",
+        "open('evidence')",
+        "Path('evidence').read_bytes()",
+        "Path('evidence').write_text('data')",
+        "os.environ['TOKEN']",
+        "subprocess.run([])",
+        "ctypes.WinDLL('kernel32')",
+        "datetime.now(UTC)",
+        "datetime.today()",
+        "observer.observe()",
+        "guard.main()",
+        "scheduler.Run(None)",
+        "scheduler.RegisterTaskDefinition()",
+        "credential.read()",
+        "provider.capture()",
+        "paper_v2.execute()",
+        "broker.order()",
+        "live.execute()",
+        "__import__('os')",
+        "eval('effect()')",
+        "build_d10_one_week_wake_summary(())",
+        "def preflight(): pass",
+        "def execute(): pass",
+    ),
+)
+def test_soak_review_authority_rejects_io_and_effect_additions(tmp_path, addition):
+    root = _soak_review_authority_copy(tmp_path, addition=addition)
+    assert runner._d10_soak_review_authority_check(root)
+
+
+@pytest.mark.parametrize(
+    ("old", "new"),
+    (
+        (
+            'SCHEMA: Final = "d10-end-of-soak-operator-review/v1"',
+            'SCHEMA: Final = "other"',
+        ),
+        ('"d2071f25-5a7c-5293-a28f-5b722c9917a2"', '"foreign"'),
+        (
+            '"3ffe4ecf1745599e7edb233d3f08a9707a1b27384d2f050a1805ee4929ebbd71"',
+            '"foreign"',
+        ),
+        ('"30e31396-9f51-57ca-a480-d2a3e9cae4a0"', '"foreign"'),
+        (
+            "datetime(2026, 9, 30, 22, 7, 24, tzinfo=UTC)",
+            "datetime(2026, 9, 30, 22, 7, 25, tzinfo=UTC)",
+        ),
+        (
+            "datetime(2026, 10, 7, 22, 7, 24, tzinfo=UTC)",
+            "datetime(2026, 10, 7, 22, 7, 25, tzinfo=UTC)",
+        ),
+        ("MINIMUM_DAILY_WAKE_COUNT: Final = 7", "MINIMUM_DAILY_WAKE_COUNT: Final = 6"),
+        ("summary.wake_count < MINIMUM_DAILY_WAKE_COUNT", "summary.wake_count != 7"),
+        ("reviewed_at_utc < END_UTC", "reviewed_at_utc <= END_UTC"),
+        ("value.tzinfo is UTC", "value.tzinfo is not None"),
+        ("type(item) is not D10OneWeekWakeEvidence", "False"),
+        ("build_d10_one_week_wake_summary(wakes)", "None"),
+        ("wake.certified_source_head != first.certified_source_head", "False"),
+        ("wake.certified_source_tree != first.certified_source_tree", "False"),
+        ("wake.executable_file_count != first.executable_file_count", "False"),
+        (
+            "ACTIVATION_UTC <= wake.observed_at_utc < END_UTC",
+            "ACTIVATION_UTC <= wake.observed_at_utc <= END_UTC",
+        ),
+        ("D10WakeOutcome.NO_ACTION,", "D10WakeOutcome.STOPPED,"),
+        ("wake.stop_reason is not None", "False"),
+        ("wake.historical_unresolved_decision_id is not None", "False"),
+        ("wake.all_effect_gates_closed is not True", "False"),
+        ("wake.closed_effect_gate_count != 8", "wake.closed_effect_gate_count != 7"),
+        ("wake.receipt_recovery_attempts != 0", "wake.receipt_recovery_attempts > 1"),
+        ("wake.broker_live_calls != 0", "wake.broker_live_calls > 1"),
+        ("count not in (0, 1)", "count not in (0, 1, 2)"),
+        ("summary.stopped_count != 0", "False"),
+        ("summary.stop_counts != ()", "False"),
+        ("summary.all_effect_gates_closed is not True", "False"),
+        ('"SCHEDULER_SLOT_COVERAGE",', '"AUTOMATIC_COVERAGE",'),
+        ('"ELIGIBLE_XNYS_SESSION_COVERAGE",', '"AUTOMATIC_COVERAGE",'),
+        ('"SLEEP_REBOOT_DUPLICATE_CONTEXT",', '"AUTOMATIC_COVERAGE",'),
+        ('"PAPER_V2_ACCOUNT_TRADES_POSITIONS_PERFORMANCE",', '"AUTOMATIC_COVERAGE",'),
+        ('"AUDIT_COMPLETENESS",', '"AUTOMATIC_COVERAGE",'),
+        ('"d10_accepted": False', '"d10_accepted": True'),
+        ('"broker_paper_authorized": False', '"broker_paper_authorized": True'),
+        ('"operator_decision_required": True', '"operator_decision_required": False'),
+    ),
+)
+def test_soak_review_authority_freezes_every_policy(tmp_path, old, new):
+    root = _soak_review_authority_copy(tmp_path, old=old, new=new)
+    assert runner._d10_soak_review_authority_check(root)
+
+
+@pytest.mark.parametrize(
+    ("old", "new"),
+    (
+        (
+            "authority_check=_d10_soak_review_authority_check,",
+            "authority_check=_d10_soak_review_authority_check, "
+            "preflight=_r8_preflight,",
+        ),
+        (
+            "authority_check=_d10_soak_review_authority_check,",
+            "authority_check=_d10_soak_review_authority_check, execute=_r7_execute,",
+        ),
+        (
+            "authority_check=_d10_soak_review_authority_check,",
+            "authority_check=_r8_authority_check,",
+        ),
+        (
+            'remote_branch="feature/post-d10-observability",',
+            'remote_branch="feature/d10c-durable-wake-evidence",',
+        ),
+        (
+            'remote_branch="feature/post-d10-observability",',
+            'remote_branch="feature/post-d10-observability", remote_head_env="HEAD",',
+        ),
+    ),
+)
+def test_soak_review_authority_freezes_verify_only_registration(tmp_path, old, new):
+    root = _soak_review_authority_copy(tmp_path, runner_old=old, runner_new=new)
+    assert runner._d10_soak_review_authority_check(root)
+
+
+def test_soak_review_authority_blocks_missing_or_invalid_source(tmp_path):
+    assert runner._d10_soak_review_authority_check(tmp_path)
+    root = _soak_review_authority_copy(tmp_path, addition="def invalid(")
+    assert runner._d10_soak_review_authority_check(root)

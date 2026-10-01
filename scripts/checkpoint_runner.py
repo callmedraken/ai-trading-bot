@@ -952,6 +952,111 @@ def _d10_soak_status_authority_check(repo_root: Path) -> tuple[str, ...]:
     return tuple(failures)
 
 
+def _d10_soak_review_authority_check(repo_root: Path) -> tuple[str, ...]:
+    """Freeze S2A's pure policy and verify-only side-branch registration."""
+    try:
+        tree = ast.parse(
+            (repo_root / "scripts/d10_end_of_soak_review.py").read_text(
+                encoding="utf-8"
+            )
+        )
+        runner_tree = ast.parse(
+            (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+        )
+    except (OSError, SyntaxError):
+        return ("S2A source missing or invalid",)
+    failures: list[str] = []
+    imports = {
+        "from __future__ import annotations",
+        "from datetime import UTC, datetime",
+        "from typing import Final",
+        "from trading_bot.runtime.personal_desktop_unattended_one_week_soak "
+        "import D10OneWeekWakeEvidence, D10OneWeekWakeSummary, D10WakeOutcome, "
+        "build_d10_one_week_wake_summary",
+    }
+    actual_imports = {
+        ast.unparse(node)
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.Import, ast.ImportFrom))
+    }
+    if actual_imports != imports:
+        failures.append("S2A contains unreviewed imports")
+    allowed_calls = {
+        "datetime",
+        "type",
+        "any",
+        "_blocked",
+        "_utc",
+        "_timestamp",
+        "value.isoformat",
+        "value.isoformat(timespec='microseconds').replace",
+        "build_d10_one_week_wake_summary",
+    }
+    calls = [node for node in ast.walk(tree) if isinstance(node, ast.Call)]
+    if any(ast.unparse(node.func) not in allowed_calls for node in calls):
+        failures.append("S2A contains unreviewed I/O or effect calls")
+    summary_calls = [
+        node
+        for node in calls
+        if ast.unparse(node.func) == "build_d10_one_week_wake_summary"
+    ]
+    if len(summary_calls) != 1 or ast.unparse(summary_calls[0]) != (
+        "build_d10_one_week_wake_summary(wakes)"
+    ):
+        failures.append("S2A must use the existing summary exactly once")
+    # Pin the complete reviewed semantic AST, including all module statements.
+    # This freezes exact input types, UTC review >= end, current-soak constants,
+    # seven-wake minimum (never equality/coverage), provenance, nonterminal
+    # outcomes, zero recovery/broker calls, final eight gates, external review,
+    # and False/False/True acceptance/authorization/operator-decision fields.
+    # Whitespace is irrelevant; every semantic addition or policy drift blocks.
+    expected_ast_sha256 = (
+        "81c49c386d2122f26071971be92ce479e321aa5c28dce7858541f7abb08c52a5"
+    )
+    actual_ast_sha256 = hashlib.sha256(ast.dump(tree).encode("utf-8")).hexdigest()
+    if actual_ast_sha256 != expected_ast_sha256:
+        failures.append("S2A frozen pure operator-review policy drift")
+
+    registrations = [
+        node
+        for node in ast.walk(runner_tree)
+        if isinstance(node, ast.Call)
+        and ast.unparse(node.func) == "CheckpointSpec"
+        and any(
+            keyword.arg == "name"
+            and isinstance(keyword.value, ast.Constant)
+            and keyword.value.value == "d10-soak-review"
+            for keyword in node.keywords
+        )
+    ]
+    if len(registrations) != 1:
+        failures.append("S2A registration missing or duplicated")
+    else:
+        expected = {
+            "name": "'d10-soak-review'",
+            "description": "'D10 pure end-of-soak operator-review source gate'",
+            "tests": "soak_review_tests",
+            "ruff_paths": "soak_review_ruff",
+            "authority_check": "_d10_soak_review_authority_check",
+            "remote_branch": "'feature/post-d10-observability'",
+        }
+        actual = {
+            keyword.arg: ast.unparse(keyword.value)
+            for keyword in registrations[0].keywords
+        }
+        if registrations[0].args or actual != expected:
+            failures.append("S2A must remain verify-only with exact side registration")
+    spec = _checkpoint_specs()["d10-soak-review"]
+    if (
+        spec.preflight is not None
+        or spec.execute is not None
+        or spec.remote_head_env is not None
+        or spec.remote_branch != "feature/post-d10-observability"
+    ):
+        failures.append("S2A runtime registration must remain verify-only")
+    return tuple(failures)
+
+
 def _r7_authority_check(repo_root: Path) -> tuple[str, ...]:
     path = repo_root / "scripts" / "d10_arch128_r7_readonly.py"
     source = path.read_text(encoding="utf-8")
@@ -2292,6 +2397,17 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
         "scripts/d10_soak_status_readonly.py",
         "tests/runtime/test_d10_soak_status_readonly.py",
     )
+    soak_review_tests = (
+        *soak_status_tests,
+        "tests/runtime/test_d10_end_of_soak_review.py",
+        "tests/runtime/test_personal_desktop_unattended_one_week_soak_source.py",
+        "tests/runtime/test_personal_desktop_unattended_one_week_soak_controller.py",
+    )
+    soak_review_ruff = (
+        *COMMON_RUFF_PATHS,
+        "scripts/d10_end_of_soak_review.py",
+        "tests/runtime/test_d10_end_of_soak_review.py",
+    )
     return {
         "d10-soak-status": CheckpointSpec(
             name="d10-soak-status",
@@ -2300,6 +2416,14 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             ruff_paths=soak_status_ruff,
             authority_check=_d10_soak_status_authority_check,
             preflight=_d10_soak_status_preflight,
+            remote_branch="feature/post-d10-observability",
+        ),
+        "d10-soak-review": CheckpointSpec(
+            name="d10-soak-review",
+            description="D10 pure end-of-soak operator-review source gate",
+            tests=soak_review_tests,
+            ruff_paths=soak_review_ruff,
+            authority_check=_d10_soak_review_authority_check,
             remote_branch="feature/post-d10-observability",
         ),
         "arch128-r8": CheckpointSpec(

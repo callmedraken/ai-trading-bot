@@ -573,6 +573,385 @@ def _r8_authority_check(repo_root: Path) -> tuple[str, ...]:
     return tuple(failures)
 
 
+def _d10_soak_status_authority_check(repo_root: Path) -> tuple[str, ...]:
+    """Freeze S1's public observer delegation, policy, and closed registration."""
+    path = repo_root / "scripts" / "d10_soak_status_readonly.py"
+    runner_path = repo_root / "scripts" / "checkpoint_runner.py"
+    try:
+        source = path.read_text(encoding="utf-8")
+        tree = ast.parse(source)
+        runner_tree = ast.parse(runner_path.read_text(encoding="utf-8"))
+    except (OSError, SyntaxError):
+        return ("S1 source missing or invalid",)
+    failures: list[str] = []
+    functions = _top_level_functions(tree)
+    preflight = functions.get("preflight")
+    if set(functions) != {"_base", "_timestamp", "preflight"}:
+        failures.append("S1 contains an unreviewed function surface")
+    if preflight is None or ast.unparse(preflight.args) != "":
+        failures.append("S1 requires zero-argument preflight")
+    imports = {
+        "from __future__ import annotations",
+        "import re",
+        "from datetime import UTC, datetime",
+        "from typing import Final",
+        "from scripts import d10_durable_wake_evidence_observe as observer",
+        "from trading_bot.runtime.personal_desktop_d10_wake_evidence_log "
+        "import MAX_D10_EVIDENCE_LOG_BYTES",
+    }
+    actual_imports = {
+        ast.unparse(node)
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.Import, ast.ImportFrom))
+    }
+    if actual_imports != imports:
+        failures.append("S1 contains unreviewed imports or direct host authority")
+    allowed_calls = {
+        "_base",
+        "_timestamp",
+        "type",
+        "set",
+        "dict",
+        "any",
+        "ValueError",
+        "observer.observe",
+        "EXPECTED_IDENTITY.items",
+        "re.fullmatch",
+        "datetime.fromisoformat",
+        "parsed.isoformat",
+        "parsed.isoformat().replace",
+        "result.update",
+    }
+    calls = [node for node in ast.walk(tree) if isinstance(node, ast.Call)]
+    for call in calls:
+        called = ast.unparse(call.func)
+        if called not in allowed_calls:
+            failures.append(f"S1 contains unreviewed authority call: {called}")
+    observer_calls = [
+        call for call in calls if ast.unparse(call.func) == "observer.observe"
+    ]
+    if (
+        len(observer_calls) != 1
+        or observer_calls[0].args
+        or observer_calls[0].keywords
+        or preflight is None
+        or not any(
+            isinstance(node, ast.Try)
+            and isinstance(node.body[0], ast.Assign)
+            and ast.unparse(node.body[0]) == "observation = observer.observe()"
+            for node in preflight.body
+        )
+    ):
+        failures.append("S1 must delegate exactly once to observer.observe()")
+    for forbidden in (
+        "ctypes",
+        "subprocess",
+        "os.system",
+        "Popen",
+        "guard.",
+        "d10_arch128_r7",
+        "scheduler_update",
+        "_update_scheduler",
+        "credential",
+        "Start-ScheduledTask",
+        "Enable-ScheduledTask",
+        "RegisterTask",
+        ".Run(",
+    ):
+        if forbidden in source:
+            failures.append(f"S1 contains forbidden host/effect surface: {forbidden}")
+    constants = {
+        node.target.id: node.value
+        for node in tree.body
+        if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name)
+    }
+    expected_identity = {
+        "schema": "personal-desktop-d10-evidence-observation/v1",
+        "status": "OBSERVED",
+        "deployment_id": "d2071f25-5a7c-5293-a28f-5b722c9917a2",
+        "attestation_sha256": (
+            "3ffe4ecf1745599e7edb233d3f08a9707a1b27384d2f050a1805ee4929ebbd71"
+        ),
+        "soak_id": "30e31396-9f51-57ca-a480-d2a3e9cae4a0",
+        "activation_utc": "2026-09-30T22:07:24.000000Z",
+        "end_utc": "2026-10-07T22:07:24.000000Z",
+        "evidence_path": (
+            r"F:\AITradingBot\D10\evidence\wake-30e31396-9f51-57ca-a480-d2a3e9cae4a0.jsonl"
+        ),
+    }
+    try:
+        if ast.literal_eval(constants["EXPECTED_IDENTITY"]) != expected_identity:
+            failures.append("S1 accepted R7 identity drift")
+        if ast.literal_eval(constants["SCHEMA"]) != ("d10-readonly-soak-status/v1"):
+            failures.append("S1 schema drift")
+    except (KeyError, ValueError, TypeError):
+        failures.append("S1 frozen constants missing or invalid")
+    effects = (
+        "production_filesystem_mutation",
+        "evidence_mutation",
+        "scheduler_mutation",
+        "lease_mutation",
+        "manual_task_start",
+        "source_launch",
+        "provider",
+        "Paper-v2",
+        "broker",
+        "live",
+    )
+    expected_base = ast.parse(
+        "def _base() -> dict[str, object]:\n    return "
+        + repr(
+            {
+                "schema": "SCHEMA",
+                "status": "BLOCKED",
+                **dict.fromkeys(effects, "NOT_RUN"),
+            }
+        ).replace("'SCHEMA'", "SCHEMA")
+    ).body[0]
+    base = functions.get("_base")
+    if base is None or ast.dump(base, include_attributes=False) != ast.dump(
+        expected_base, include_attributes=False
+    ):
+        failures.append("S1 closed result effect fields drift")
+    try:
+        if (
+            ast.literal_eval(constants["OBSERVER_EFFECT_FIELDS"])
+            != effects[2:3] + effects[5:]
+        ):
+            failures.append("S1 accepted observer effect fields drift")
+    except (KeyError, ValueError, TypeError):
+        failures.append("S1 accepted observer effect fields invalid")
+    expected_fields = (
+        ast.parse(
+            "OBSERVATION_FIELDS: Final = ("
+            "*EXPECTED_IDENTITY, 'evidence_byte_length', 'evidence_sha256', "
+            "'record_count', 'wake_count', 'terminal', 'terminal_kind', "
+            "'first_observed_at_utc', 'last_observed_at_utc', 'last_outcome', "
+            "'last_stop_reason', 'last_guard_reason', *OBSERVER_EFFECT_FIELDS)"
+        )
+        .body[0]
+        .value
+    )
+    if "OBSERVATION_FIELDS" not in constants or ast.dump(
+        constants["OBSERVATION_FIELDS"]
+    ) != ast.dump(expected_fields):
+        failures.append("S1 exact observer dictionary shape drift")
+    timestamp = functions.get("_timestamp")
+    timestamp_comparisons = {
+        ast.unparse(node)
+        for node in ast.walk(timestamp or tree)
+        if isinstance(node, ast.Compare)
+    }
+    for required in (
+        "type(value) is not str",
+        "parsed.tzinfo is not UTC",
+        "parsed.isoformat().replace('+00:00', 'Z') != value",
+    ):
+        if required not in timestamp_comparisons:
+            failures.append("S1 canonical timestamp policy drift")
+    # The observer call must stay in the one-shot top-level try, with no retry.
+    expected_observe = ast.parse(
+        "try:\n    observation = observer.observe()\n"
+        "except Exception:\n"
+        "    result.update(reason='observer_blocked', "
+        "detail='Read-only observation failed.')\n    return result"
+    ).body[0]
+    if (
+        preflight is None
+        or len(preflight.body) != 7
+        or ast.dump(preflight.body[2]) != ast.dump(expected_observe)
+    ):
+        failures.append("S1 observation must remain one-shot with bounded failure")
+    comparisons = {
+        ast.unparse(node)
+        for node in ast.walk(preflight or tree)
+        if isinstance(node, ast.Compare)
+    }
+    for required in (
+        "type(observation) is not dict",
+        "set(observation) != set(OBSERVATION_FIELDS)",
+        "type(observation[field]) is not str",
+        "observation[field] != expected",
+        "observation[field] != 'NOT_RUN'",
+        "type(observation['record_count']) is not int",
+        "observation['record_count'] != 3 * observation['wake_count']",
+        "type(observation['wake_count']) is not int",
+        "observation['wake_count'] < 1",
+        "observation['terminal'] is not False",
+        "observation['terminal_kind'] is not None",
+        "type(observation['last_outcome']) is not str",
+        "observation['last_outcome'] not in ('COMPLETED', 'NO_ACTION')",
+        "observation['last_stop_reason'] is not None",
+        "observation['last_guard_reason'] is not None",
+        "type(observation['evidence_byte_length']) is not int",
+        "0 < observation['evidence_byte_length'] <= MAX_D10_EVIDENCE_LOG_BYTES",
+        "type(observation['evidence_sha256']) is not str",
+        "re.fullmatch('[0-9a-f]{64}', observation['evidence_sha256']) is None",
+        "first > last",
+    ):
+        if required not in comparisons:
+            failures.append(f"S1 acceptance policy drift: {required}")
+    expected_health_gate = ast.parse(
+        "if (type(observation['wake_count']) is not int "
+        "or observation['wake_count'] < 1 "
+        "or type(observation['record_count']) is not int "
+        "or observation['record_count'] != 3 * observation['wake_count'] "
+        "or observation['terminal'] is not False "
+        "or observation['terminal_kind'] is not None "
+        "or type(observation['last_outcome']) is not str "
+        "or observation['last_outcome'] not in ('COMPLETED', 'NO_ACTION') "
+        "or observation['last_stop_reason'] is not None "
+        "or observation['last_guard_reason'] is not None):\n    raise ValueError"
+    ).body[0]
+    validation = (
+        preflight.body[4]
+        if preflight is not None and len(preflight.body) == 7
+        else None
+    )
+    if (
+        not isinstance(validation, ast.Try)
+        or len(validation.body) != 13
+        or ast.dump(validation.body[6]) != ast.dump(expected_health_gate)
+    ):
+        failures.append("S1 healthy relation must reject every unhealthy observation")
+    expected_blocked = ast.parse(
+        "try:\n    pass\nexcept Exception:\n"
+        "    result.update(reason=reason, "
+        "detail='Read-only soak status policy blocked.')\n    return result"
+    ).body[0]
+    if (
+        not isinstance(validation, ast.Try)
+        or ast.dump(ast.Module(body=validation.handlers, type_ignores=[]))
+        != ast.dump(ast.Module(body=expected_blocked.handlers, type_ignores=[]))
+        or validation.orelse
+        or validation.finalbody
+    ):
+        failures.append("S1 validation failure must return bounded BLOCKED")
+    expected_rollup = ast.parse(
+        "result.update(status='PASS', soak_state='HEALTHY', "
+        "accepted_wake_count=observation['wake_count'], "
+        "durable_record_count=observation['record_count'], "
+        "last_outcome=observation['last_outcome'], "
+        "first_observed_at_utc=observation['first_observed_at_utc'], "
+        "last_observed_at_utc=observation['last_observed_at_utc'], "
+        "evidence_byte_length=observation['evidence_byte_length'], "
+        "evidence_sha256=observation['evidence_sha256'], "
+        "observation=dict(observation))"
+    ).body[0]
+    if (
+        preflight is None
+        or len(preflight.body) != 7
+        or ast.dump(preflight.body[5]) != ast.dump(expected_rollup)
+        or ast.unparse(preflight.body[6]) != "return result"
+    ):
+        failures.append("S1 sanitized rollup or closed result effects drift")
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            if node.decorator_list or isinstance(node, ast.AsyncFunctionDef):
+                failures.append("S1 contains an unreviewed function binding")
+        if isinstance(node, ast.Assign):
+            if any(not isinstance(target, ast.Name) for target in node.targets):
+                failures.append("S1 contains an unreviewed object mutation")
+            if any(
+                isinstance(target, ast.Name)
+                and target.id in {*constants, "observer", "datetime", "re"}
+                for target in node.targets
+            ):
+                failures.append("S1 frozen source binding drift")
+    wrapper = _top_level_functions(runner_tree).get("_d10_soak_status_preflight")
+    if wrapper is None:
+        failures.append("S1 runner missing read-only wrapper")
+    else:
+        wrapper_imports = [
+            ast.unparse(node)
+            for node in ast.walk(wrapper)
+            if isinstance(node, (ast.Import, ast.ImportFrom))
+        ]
+        if wrapper_imports != [
+            "from scripts import d10_soak_status_readonly as admission"
+        ]:
+            failures.append("S1 wrapper contains unreviewed imports")
+        for node in ast.walk(wrapper):
+            if isinstance(node, ast.Call) and ast.unparse(node.func) not in {
+                "admission.preflight",
+                "_require_not_run",
+                "primary.get",
+                "type",
+                "RuntimeError",
+            }:
+                failures.append("S1 wrapper contains direct host/effect authority")
+        effects = (
+            "production_filesystem_mutation",
+            "evidence_mutation",
+            "scheduler_mutation",
+            "lease_mutation",
+            "manual_task_start",
+            "source_launch",
+            "provider",
+            "Paper-v2",
+            "broker",
+            "live",
+        )
+        effect_calls = [
+            node
+            for node in ast.walk(wrapper)
+            if isinstance(node, ast.Call)
+            and ast.unparse(node.func) == "_require_not_run"
+        ]
+        try:
+            if (
+                len(effect_calls) != 1
+                or ast.literal_eval(effect_calls[0].args[1]) != effects
+            ):
+                failures.append("S1 wrapper effect-field closure drift")
+        except (IndexError, ValueError, TypeError):
+            failures.append("S1 wrapper effect-field closure invalid")
+    expected_wrapper = ast.parse(
+        "def _d10_soak_status_preflight() -> dict[str, object]:\n"
+        "    from scripts import d10_soak_status_readonly as admission\n"
+        "    primary = admission.preflight()\n"
+        "    if type(primary) is not dict:\n"
+        "        raise RuntimeError("
+        "'S1 preflight result must be an exact dictionary')\n"
+        f"    _require_not_run(primary, {effects!r})\n"
+        "    return {'status': primary.get('status'), 'primary': primary}"
+    ).body[0]
+    if wrapper is None or ast.dump(wrapper) != ast.dump(expected_wrapper):
+        failures.append("S1 exact read-only wrapper contract drift")
+    registrations = [
+        node
+        for node in ast.walk(runner_tree)
+        if isinstance(node, ast.Call)
+        and ast.unparse(node.func) == "CheckpointSpec"
+        and any(
+            keyword.arg == "name"
+            and isinstance(keyword.value, ast.Constant)
+            and keyword.value.value == "d10-soak-status"
+            for keyword in node.keywords
+        )
+    ]
+    if len(registrations) != 1:
+        failures.append("S1 registration missing or duplicated")
+    else:
+        keywords = {
+            keyword.arg: ast.unparse(keyword.value)
+            for keyword in registrations[0].keywords
+        }
+        for field, expected in (
+            ("preflight", "_d10_soak_status_preflight"),
+            ("authority_check", "_d10_soak_status_authority_check"),
+            ("remote_branch", "'feature/post-d10-observability'"),
+        ):
+            if keywords.get(field) != expected:
+                failures.append(f"S1 registration drift: {field}")
+        if "execute" in keywords or "remote_head_env" in keywords:
+            failures.append("S1 must have no execute or remote handoff surface")
+    spec = _checkpoint_specs()["d10-soak-status"]
+    if spec.execute is not None or spec.preflight is not _d10_soak_status_preflight:
+        failures.append("S1 runtime registration must remain preflight-only")
+    return tuple(failures)
+
+
 def _r7_authority_check(repo_root: Path) -> tuple[str, ...]:
     path = repo_root / "scripts" / "d10_arch128_r7_readonly.py"
     source = path.read_text(encoding="utf-8")
@@ -1700,6 +2079,30 @@ def _r8_preflight() -> dict[str, object]:
     return {"status": primary.get("status"), "primary": primary}
 
 
+def _d10_soak_status_preflight() -> dict[str, object]:
+    from scripts import d10_soak_status_readonly as admission
+
+    primary = admission.preflight()
+    if type(primary) is not dict:
+        raise RuntimeError("S1 preflight result must be an exact dictionary")
+    _require_not_run(
+        primary,
+        (
+            "production_filesystem_mutation",
+            "evidence_mutation",
+            "scheduler_mutation",
+            "lease_mutation",
+            "manual_task_start",
+            "source_launch",
+            "provider",
+            "Paper-v2",
+            "broker",
+            "live",
+        ),
+    )
+    return {"status": primary.get("status"), "primary": primary}
+
+
 def _r7_execute() -> dict[str, object]:
     from scripts import d10_arch128_r7_protected as r7_protected
     from scripts import d10_arch128_r7_windows as r7_windows
@@ -1877,7 +2280,28 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
         "scripts/d10_arch128_r8_readonly.py",
         "tests/runtime/test_d10_arch128_r8_readonly.py",
     )
+    soak_status_tests = (
+        *COMMON_TESTS,
+        "tests/runtime/test_d10_soak_status_readonly.py",
+        "tests/runtime/test_d10_arch128_r8_readonly.py",
+        "tests/runtime/test_d10_durable_wake_evidence_observe.py",
+        "tests/runtime/test_personal_desktop_d10_wake_evidence_log.py",
+    )
+    soak_status_ruff = (
+        *COMMON_RUFF_PATHS,
+        "scripts/d10_soak_status_readonly.py",
+        "tests/runtime/test_d10_soak_status_readonly.py",
+    )
     return {
+        "d10-soak-status": CheckpointSpec(
+            name="d10-soak-status",
+            description="D10 read-only status of accepted durable wakes",
+            tests=soak_status_tests,
+            ruff_paths=soak_status_ruff,
+            authority_check=_d10_soak_status_authority_check,
+            preflight=_d10_soak_status_preflight,
+            remote_branch="feature/post-d10-observability",
+        ),
         "arch128-r8": CheckpointSpec(
             name="arch128-r8",
             description="Architecture 128 first-wake read-only observation",

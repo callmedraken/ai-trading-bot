@@ -8542,3 +8542,68 @@ Return the complete runner output and generated preflight report for independent
 review. The actual scheduler disable still requires fresh explicit human
 authorization after that preflight is accepted.
 
+## 2026-10-01 — R8I-H1 first halt attempt NOT_CALLED; R8I-H1a native diagnostic accepted
+
+The first separately authorized R8I-H1 protected halt attempt ran from exact
+source `2013a8bcf1487acd686af15a1be5711e216dd203` /
+`1518da393e67f2ea34e80522bcb9453e7a57e0e9` after an accepted elevated
+read-only preflight. The protected runner stopped with:
+
+```text
+PRIMARY_STATUS=BLOCKED
+PRIMARY_REASON=native_pre_call_blocked
+EFFECT_DISPOSITION=NOT_RUN
+IDENTITY_STABLE=True
+OVERALL=STOPPED
+EXECUTE_EXIT=1
+```
+
+Execution evidence is preserved at:
+
+```text
+F:\AI\temp\ai-trading-bot-checkpoints\arch128-r8-terminal-halt\execute-20261001T211321.566792Z\report.json
+```
+
+The native helper reported `call_attempted=false` / `NOT_CALLED`, so the
+reviewed `task.Enabled = false` setter was not reached. The one-shot
+authorization is consumed and must not be reused. A subsequent read-only token
+check proved the operator shell was elevated
+(`DESKTOP-I4DOKM7\John`, `IsAdministrator=true`) and that the halt
+authorization environment variable had been removed, eliminating missing
+Administrator elevation as the pre-call cause.
+
+R8I-H1a therefore adds a separate read-only native pre-call diagnostic rather
+than weakening or modifying the protected halt helper. Accepted source:
+
+```text
+HEAD: cecef39f96066f97d21cc60b635fed344a73b119
+TREE: afb4d0ed976233407eddf1f42f8532627886f090
+CI:   36928543031 SUCCESS
+```
+
+The new diagnostic reproduces the native COM admission path through exact
+scheduler semantics, task reacquisition, immediate XML digest/length, and the
+Settings/Enabled XML-node check. It has no scheduler setter or other mutation
+surface and returns only fixed sanitized stage values. The registered
+`arch128-r8-terminal-halt` preflight now requires that diagnostic to report
+`READY`, `call_attempted=false`, `scheduler_mutation=NOT_RUN`, and a
+scheduler snapshot identical to the primary read-only snapshot.
+
+Current progression:
+
+```text
+R8I-H1 source + first host preflight                 ACCEPTED
+R8I-H1 first protected halt attempt                  NOT_CALLED / AUTH CONSUMED
+R8I-H1a native pre-call diagnostic source            ACCEPTED
+R8I-H1a fresh exact-source read-only host preflight  NEXT
+protected scheduler disable                          NOT AUTHORIZED
+R8I-D1 first-wake reconciliation/root cause          AFTER CONTAINMENT
+```
+
+Next: use a fresh clean exact-source operator worktree and run only
+`ops.ps1 status` plus `ops.ps1 preflight arch128-r8-terminal-halt`.
+Do not set the halt authorization variable and do not invoke protected execute.
+The diagnostic reason from that preflight determines the next action. No new
+halt authorization may be considered unless the native diagnostic reports
+`READY`.
+

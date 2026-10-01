@@ -8804,3 +8804,83 @@ Do not set `AI_TRADING_BOT_ARCH128_R8_HALT_AUTHORIZATION` and do not invoke
 `execute arch128-r8-terminal-halt` until a fresh explicit authorization is
 requested after review of the preflight evidence.
 
+## 2026-10-01 — R8I-H1a accepted after protected halt pre-call block
+
+Resume from **fresh R8I-H1a read-only native pre-call diagnostic preflight**.
+
+Historical first halt attempt:
+
+```text
+source HEAD 2013a8bcf1487acd686af15a1be5711e216dd203
+source TREE 1518da393e67f2ea34e80522bcb9453e7a57e0e9
+
+PRIMARY_STATUS=BLOCKED
+PRIMARY_REASON=native_pre_call_blocked
+EFFECT_DISPOSITION=NOT_RUN
+IDENTITY_STABLE=True
+OVERALL=STOPPED
+EXECUTE_EXIT=1
+```
+
+Preserved execute report:
+
+```text
+F:\AI\temp\ai-trading-bot-checkpoints\arch128-r8-terminal-halt\execute-20261001T211321.566792Z\report.json
+```
+
+The native result proved `call_attempted=false`; the scheduler setter was not
+reached. That authorization is consumed. Do not retry it. A subsequent
+read-only check in the same operator shell proved
+`IsAdministrator=true` and that
+`AI_TRADING_BOT_ARCH128_R8_HALT_AUTHORIZATION` was absent, so missing
+elevation is not the root cause.
+
+R8I-H1a source is accepted at:
+
+```text
+HEAD cecef39f96066f97d21cc60b635fed344a73b119
+TREE afb4d0ed976233407eddf1f42f8532627886f090
+CI   36928543031 SUCCESS
+```
+
+R8I-H1a leaves the protected
+`d10_arch128_r8_terminal_halt.ps1` helper unchanged. It adds a separate
+read-only native diagnostic that mirrors the pre-call COM checks and emits only
+fixed stage enums:
+
+```text
+AUTHORIZATION_PRESENT
+ADMINISTRATOR_REQUIRED
+OBSERVE_HELPER_LOAD
+COM_CONNECT
+SCHEDULER_READ_FIRST
+SCHEDULER_READ_SECOND
+SCHEDULER_TWO_READ
+SCHEDULER_SEMANTICS
+TASK_REACQUIRE
+TASK_TARGET
+IMMEDIATE_XML
+XML_ENABLED_NODE
+```
+
+The registered halt preflight now passes only when the original incident /
+lease / scheduler admission passes **and** this native diagnostic reports
+`READY` with an identical scheduler snapshot. The diagnostic is read-only:
+`call_attempted=false`, `scheduler_mutation=NOT_RUN`, no source/provider/
+decision-publication/Paper-v2/broker/live effect, and no task setter.
+
+Next sequence:
+
+```text
+R8I-H1a source                           ACCEPTED
+  -> fresh exact-source host preflight  NEXT / READ-ONLY
+  -> inspect native_pre_call diagnostic REQUIRED
+  -> if BLOCKED: diagnose/fix, no halt authorization
+  -> if READY: fresh human halt authorization may be considered
+  -> protected disable remains NOT AUTHORIZED
+```
+
+The failed first natural child's provider/publication/Paper-v2 effects remain
+UNKNOWN / REQUIRES READ-ONLY RECONCILIATION and are unaffected by this
+containment diagnostic.
+

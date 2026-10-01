@@ -8922,3 +8922,56 @@ implicit/default-enabled XML representation is compatible with a narrowly
 corrected normalization contract; COUNT_DRIFT or VALUE_NOT_TRUE remain
 unexpected representation drift and require separate review.
 
+## 2026-10-01 — R8I-H1c implicit-enabled normalization accepted
+
+R8I-H1b host result established that the exact task is semantically enabled but
+its serialized Settings XML omits Enabled:
+
+```text
+DIAGNOSTIC_REASON=XML_ENABLED_NODE
+xml_enabled_node_state=MISSING
+call_attempted=false
+scheduler_mutation=NOT_RUN
+```
+
+Microsoft's full Task Scheduler schema defines Settings/Enabled with
+default=true and minOccurs=0. This matches the live host and explains why the
+earlier helper's requirement for an explicit `<Enabled>true</Enabled>` node
+was too strict.
+
+Accepted corrective source:
+
+```text
+HEAD 51e71b3f3185fc087dc052603da8617e3ea74c3e
+TREE bad45df9d58d9f8e75b350e8ced40f8598fbc7c6
+CI   36933324947 SUCCESS
+```
+
+The contract is intentionally asymmetric:
+
+```text
+PRE enabled=true:
+  COM Settings.Enabled=true REQUIRED
+  task state READY REQUIRED
+  XML Enabled missing             ACCEPT (implicit schema default true)
+  XML Enabled exactly true        ACCEPT
+  duplicate/conflicting value     BLOCK
+
+POST enabled=false:
+  COM Settings.Enabled=false REQUIRED
+  task state DISABLED REQUIRED
+  XML Enabled exactly false       REQUIRED
+  missing/duplicate/other value   BLOCK / INDETERMINATE
+```
+
+Only the validated Enabled element is removed from an in-memory DOM before
+comparing the remaining XML structure. Full pre/post XML bytes are still
+independently checked against observer byte length/SHA-256. The protected
+mutation surface remains one `task.Enabled = false` assignment.
+
+Resume with a fresh exact-source elevated read-only preflight. Do not set
+`AI_TRADING_BOT_ARCH128_R8_HALT_AUTHORIZATION` and do not execute the halt.
+Only a native diagnostic READY plus the unchanged incident, lease, scheduler,
+and closed-effect evidence can reopen the separate one-shot human authorization
+boundary.
+

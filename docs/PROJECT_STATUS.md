@@ -8658,3 +8658,58 @@ Next: a fresh exact-source read-only
 report. No protected halt authorization may be considered until this XML-shape
 ambiguity is resolved and a later native diagnostic reports READY.
 
+## 2026-10-01 — R8I-H1c implicit-enabled XML normalization accepted
+
+The R8I-H1b read-only host diagnostic proved:
+
+```text
+OverallStatus       = BLOCKED
+PrimaryStatus       = PASS
+DiagnosticStatus    = BLOCKED
+DiagnosticReason    = XML_ENABLED_NODE
+XmlEnabledNodeState = MISSING
+CallAttempted       = false
+SchedulerMutation   = NOT_RUN
+```
+
+This is consistent with the Task Scheduler schema: the full Microsoft schema
+defines Settings/Enabled with default=true and minOccurs=0. The TaskSettings
+COM property independently reports whether the task is enabled. For this exact
+incident, the native pre-call path had already proved Settings.Enabled=true,
+task state READY, stable exact scheduler semantics, and exact full XML
+digest/length before observing the omitted XML node.
+
+R8I-H1c therefore narrows XML normalization as follows:
+
+- pre-state: a missing Settings/Enabled element is accepted only after COM and
+  task-state checks independently prove enabled=true;
+- explicit pre-state Enabled must still be exactly true;
+- duplicate or conflicting Enabled elements remain blocked;
+- post-disable: exactly one explicit Enabled=false element is still required;
+  omission after disable remains invalid because the schema default is true;
+- comparison removes only the validated Enabled element from an in-memory DOM
+  and compares the remaining XML structure, while independently verifying the
+  full pre/post XML bytes against each observer digest.
+
+The single protected mutation remains exactly `task.Enabled = false`; no new
+mutation, retry, rollback, cleanup, task-registration, provider,
+decision-publication, Paper-v2, broker, or live authority was added.
+
+Accepted source:
+
+```text
+HEAD: 51e71b3f3185fc087dc052603da8617e3ea74c3e
+TREE: bad45df9d58d9f8e75b350e8ced40f8598fbc7c6
+CI:   36933324947 SUCCESS
+```
+
+Focused native fake-COM coverage now proves the observed
+`pre_enabled_omitted` representation can reach CALL_RETURNED, while
+`post_enabled_omitted` remains INDETERMINATE/fail-closed.
+
+Next: fresh exact-source elevated read-only
+`ops.ps1 preflight arch128-r8-terminal-halt`. The native diagnostic must report
+READY and all original incident/lease/scheduler/effect-closure evidence must
+still pass. Protected scheduler disable remains NOT AUTHORIZED until that fresh
+preflight is reviewed and a new explicit one-shot human authorization is given.
+

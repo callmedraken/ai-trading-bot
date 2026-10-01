@@ -8975,3 +8975,53 @@ Only a native diagnostic READY plus the unchanged incident, lease, scheduler,
 and closed-effect evidence can reopen the separate one-shot human authorization
 boundary.
 
+## 2026-10-01 — R8I-H1 containment COMPLETE
+
+Protected scheduler halt execution succeeded at the accepted exact source and
+was independently verified:
+
+```text
+report
+F:\AI\temp\ai-trading-bot-checkpoints\arch128-r8-terminal-halt\execute-20261001T222215.491110Z\report.json
+
+status=PASS
+effect_disposition=CONFIRMED
+call_attempted=true
+disposition=CALL_RETURNED
+scheduler_mutation=DISABLED_VERIFIED
+scheduler_pre=ENABLED_NON_RUNNING_EXACT
+scheduler_post=DISABLED_NON_RUNNING_EXACT
+```
+
+Before/after scheduler state:
+
+```text
+before: enabled=true,  task_state=3
+after:  enabled=false, task_state=1
+```
+
+All non-Enabled task semantics remained exact. Evidence and activation lease
+were identical before/after. No task start/stop/delete/registration, source
+launch, provider, decision publication, Paper-v2, broker, live, evidence, lease,
+or production-filesystem effect was performed by the halt operation.
+
+The one-shot halt authorization is consumed and must not be reused.
+
+Containment does **not** resolve the failed child effects from the 01:30 wake.
+They remain:
+
+```text
+UNKNOWN_REQUIRES_READ_ONLY_RECONCILIATION
+```
+
+Next milestone: **R8I-D1**. Build and run a registered, source-governed,
+read-only reconciliation that examines durable production truth to determine
+whether the failed child produced:
+1. a provider capture / selected-C3 artifact,
+2. an unattended decision publication,
+3. a Paper-v2 invocation / operation / successor-account effect.
+
+Also diagnose `CHILD_OUTPUT_INVALID` as far as durable evidence allows.
+The exact rejected stdout/stderr bytes are unrecoverable because the guard
+captured but did not persist them. Do not restart the old soak.
+

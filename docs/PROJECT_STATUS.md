@@ -8713,3 +8713,65 @@ READY and all original incident/lease/scheduler/effect-closure evidence must
 still pass. Protected scheduler disable remains NOT AUTHORIZED until that fresh
 preflight is reviewed and a new explicit one-shot human authorization is given.
 
+## 2026-10-01 — R8I-H1 terminal scheduler containment COMPLETE
+
+The fresh one-shot protected halt was explicitly authorized only for the fixed
+Task Scheduler mutation on:
+
+```text
+\AITradingBot-PD4-UnattendedPaper-v1
+Enabled: true -> false
+```
+
+Execution evidence:
+
+```text
+execute report:
+F:\AI\temp\ai-trading-bot-checkpoints\arch128-r8-terminal-halt\execute-20261001T222215.491110Z\report.json
+
+PRIMARY_STATUS=PASS
+EFFECT_DISPOSITION=CONFIRMED
+IDENTITY_STABLE=True
+OVERALL=PASS
+EXECUTE_EXIT=0
+```
+
+Verified result:
+
+```text
+call_attempted=true
+disposition=CALL_RETURNED
+scheduler_mutation=DISABLED_VERIFIED
+scheduler_pre=ENABLED_NON_RUNNING_EXACT
+scheduler_post=DISABLED_NON_RUNNING_EXACT
+before enabled=true / task_state=3
+after  enabled=false / task_state=1
+evidence_before_after=IDENTICAL
+lease_before_after=IDENTICAL
+```
+
+The scheduler action, principal, trigger, timezone, wake/start settings, execution
+limit, priority, restart policy, and all other reviewed semantics remained exact.
+The post-disable XML was independently reread and verified. The scheduler XML
+changed from the prior implicit-enabled serialization to an explicit false
+representation, which is expected under the accepted R8I-H1c normalization.
+
+No task start/stop/delete/registration, evidence mutation, lease mutation,
+production filesystem mutation, source launch, provider call,
+decision publication, Paper-v2 action, broker action, or live action occurred as
+part of containment. Automatic retry, rollback, and cleanup remained disabled.
+
+The original failed 01:30 wake remains a separate unresolved question:
+`failed_child_effects=UNKNOWN_REQUIRES_READ_ONLY_RECONCILIATION`. The later
+halt evidence does not reclassify what the failed child may have done before its
+stdout/stderr was rejected by the guard.
+
+R8I-H1 containment is therefore COMPLETE. The stopped soak must not be resumed,
+extended, replaced, or automatically retried.
+
+Next milestone: **R8I-D1 read-only failed-child effect reconciliation and
+CHILD_OUTPUT_INVALID diagnosis**. It must reconstruct whether the failed child
+performed provider capture, decision publication, or Paper-v2 effects using
+durable artifacts/logs/state only. Exact rejected stdout/stderr are not
+recoverable from the incident because the guard did not persist them.
+

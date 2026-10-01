@@ -401,9 +401,9 @@ def test_native_pre_call_diagnostic_transport_is_fixed_read_only(monkeypatch) ->
 
 
 def test_native_pre_call_diagnostic_source_is_read_only() -> None:
-    source = (
-        ROOT / "scripts/d10_arch128_r8_terminal_halt_diagnose.ps1"
-    ).read_text(encoding="utf-8")
+    source = (ROOT / "scripts/d10_arch128_r8_terminal_halt_diagnose.ps1").read_text(
+        encoding="utf-8"
+    )
     for forbidden in (
         "$task.Enabled = $false",
         ".Run(",

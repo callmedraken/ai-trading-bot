@@ -200,6 +200,7 @@ def test_current_arch128_authority_profiles_pass() -> None:
     assert specs["arch128-r6"].authority_check(repo_root) == ()
     assert specs["arch128-r7"].authority_check(repo_root) == ()
     assert specs["arch128-r8"].authority_check(repo_root) == ()
+    assert specs["arch130-r8i-d1"].authority_check(repo_root) == ()
 
 
 def test_default_evidence_root_is_outside_repo() -> None:

@@ -8853,3 +8853,96 @@ S2C1B fixed read-only Windows scheduler-history collector NEXT / SOURCE-ONLY
 S2C1A adds no production read authority. S2C1B must remain a separately reviewed
 read-only Windows collector and must fail closed rather than enabling or changing
 the Task Scheduler Operational channel.
+
+
+## D10 side progression S2C1B fixed Windows scheduler-history collector — ACCEPTED
+
+S2C1B is source-accepted on the isolated side branch:
+
+```text
+branch: feature/post-d10-observability
+implementation HEAD: a21acbcf243b2ac5821981465f5e7aaebfe270dc
+implementation TREE: c346067798b8027a43041f18b3f3f6124c13f81c
+parent: 0e91b5c3aba328a45469e7054e9732a4dcaeccea
+CI run: 36827858048 SUCCESS
+```
+
+The active D10 branch remained unchanged at:
+
+```text
+feature/d10c-durable-wake-evidence
+38a88392096214e03b8a752cbffc78ebf1aeeb15
+```
+
+S2C1B adds the reviewed Windows read boundary for
+`Microsoft-Windows-TaskScheduler/Operational` but remains verify-only and was
+not run operationally. Source acceptance does not authorize `observe()`.
+
+The fixed PowerShell helper accepts zero arguments and reads only:
+- fixed channel `Microsoft-Windows-TaskScheduler/Operational`;
+- fixed provider `Microsoft-Windows-TaskScheduler`;
+- fixed D10 task `\AITradingBot-PD4-UnattendedPaper-v1`;
+- fixed active soak window;
+- event IDs 100, 102, 107, and 110.
+
+It uses only `Get-WinEvent` read surfaces. It never enables, disables, clears,
+resizes, configures, repairs, or writes the event channel or Task Scheduler and
+contains no task-start or registration operation. A disabled channel is reported
+without an event query or mutation.
+
+The helper parses event XML with DTD/entity resolution disabled, rejects
+ambiguous required nodes and duplicate relevant EventData names, filters to the
+fixed task, canonicalizes GUIDs and UTC timestamps, bounds candidate and target
+events, and never emits rendered messages, raw XML, UserContext, Computer,
+Security UserID, process IDs, credentials, or arbitrary host data.
+
+The Python collector uses exactly one fixed
+`C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe` helper process
+with NoProfile/NonInteractive/ExecutionPolicy Bypass/File, shell=false,
+stdin=DEVNULL, captured bounded stdout/stderr, and one fixed timeout. It has no
+retry, fallback command, alternate collector, or caller/environment arguments.
+Duplicate JSON keys and any transport/schema/type/identity drift fail closed.
+
+For an otherwise valid helper observation the collector constructs the accepted
+S2C1A typed observation and invokes `policy.analyze(...)` exactly once. It does
+not reimplement scheduler-slot semantics. A S2C1A rejection remains a bounded
+collector rejection. A successful result is only a sanitized
+SCHEDULER_SLOT_COVERAGE PASS projection with all effect/mutation fields NOT_RUN.
+
+Exact implementation files:
+
+```text
+scripts/d10_scheduler_history_windows.py
+scripts/d10_scheduler_history_observe.ps1
+scripts/checkpoint_runner.py
+tests/runtime/test_d10_scheduler_history_windows.py
+tests/runtime/test_checkpoint_runner.py
+.github/workflows/side-checkpoint-certification.yml
+```
+
+Local verification reported focused tests passing (750 initially; 175 final
+affected rerun), Ruff lint/format PASS, PowerShell parser-only PASS, working and
+cached diff checks PASS, and clean
+`ops.ps1 verify d10-scheduler-history-collector` with 1,481 tests passed,
+authority PASS, stable identity, and OVERALL=PASS. The collector itself and
+`Get-WinEvent` were never run.
+
+GitHub Actions run 36827858048 completed SUCCESS. Its exact event-HEAD
+`side-head-source-gates` job reported OVERALL=PASS for S1, S2A, S2B, S2C1A,
+and S2C1B and uploaded `side-head-source-gate-evidence`.
+
+Current side progression:
+
+```text
+R8A   first-wake observer source                          ACCEPTED
+S1    multi-wake read-only soak status                    ACCEPTED
+S2A   pure internal end-of-soak review readiness          ACCEPTED
+S2B   pure external-review evidence package               ACCEPTED
+S2C1A pure scheduler-slot coverage policy                 ACCEPTED
+S2C1B fixed Windows scheduler-history collector source    ACCEPTED
+S2C2A pure eligible-XNYS-session coverage policy          NEXT / SOURCE-ONLY
+```
+
+Operational scheduler-history collection remains deferred until the soak-end
+review boundary and separate operator review; this source checkpoint grants no
+host-observation authority.

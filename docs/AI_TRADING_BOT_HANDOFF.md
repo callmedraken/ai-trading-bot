@@ -8956,3 +8956,49 @@ task and event IDs 107/110/100/102 into the accepted S2C1A model. It must never
 enable, resize, clear, configure, or otherwise mutate the event channel or task.
 Production invocation remains separately gated and should not occur as part of
 source implementation.
+
+
+## 2026-10-01 — S2C1B scheduler-history collector source accepted
+
+Resume side progression from **S2C2A pure eligible-XNYS-session coverage
+policy**.
+
+Accepted S2C1B source:
+
+```text
+branch feature/post-d10-observability
+HEAD   a21acbcf243b2ac5821981465f5e7aaebfe270dc
+TREE   c346067798b8027a43041f18b3f3f6124c13f81c
+CI     36827858048 SUCCESS
+```
+
+Active D10 remains frozen:
+
+```text
+feature/d10c-durable-wake-evidence
+38a88392096214e03b8a752cbffc78ebf1aeeb15
+```
+
+S2C1B is a verify-only source checkpoint. It implements but does not authorize
+the fixed Windows read-only scheduler-history collector.
+
+The PowerShell helper reads only the fixed Task Scheduler Operational channel,
+fixed provider/task, fixed soak interval, and IDs 100/102/107/110. It does not
+enable or mutate history or scheduler state. XML parsing is non-localized,
+bounded, entity/DTD-disabled, and sanitizes to event ID, record ID, canonical UTC
+time, fixed task name, and canonical instance GUID.
+
+The Python wrapper invokes one fixed Windows PowerShell helper process only once,
+with bounded streams and timeout, no shell, no stdin, no retry/fallback, exact
+JSON schema/type/key validation, and exact mapping through the already accepted
+S2C1A EVENT_IDS. It calls S2C1A analyze exactly once for a valid observation and
+preserves all mutation/effect fields as NOT_RUN.
+
+The Windows collector was never executed during implementation or certification.
+GitHub Actions run 36827858048 recorded OVERALL=PASS for all current side gates
+through S2C1B and uploaded the side-head source-gate artifact.
+
+Next safe source checkpoint: S2C2A should define a pure policy for
+ELIGIBLE_XNYS_SESSION_COVERAGE using already accepted market-calendar/session
+semantics and caller-supplied sanitized daily-cycle/session facts. Do not inspect
+production or authorize an operational collector as part of S2C2A.

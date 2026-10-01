@@ -644,3 +644,34 @@ GitHub Actions run `36823082625` completed SUCCESS; the exact event-HEAD
 side-source job recorded OVERALL=PASS for S1, S2A, S2B, and S2C1A and uploaded
 the side-head source-gate artifact. Active D10 remains frozen at
 `38a88392096214e03b8a752cbffc78ebf1aeeb15`.
+
+
+### D10 side checkpoint S2C1B scheduler-history collector source — ACCEPTED
+
+S2C1B is isolated on `feature/post-d10-observability` at
+`a21acbcf243b2ac5821981465f5e7aaebfe270dc` /
+`c346067798b8027a43041f18b3f3f6124c13f81c`.
+
+It registers `d10-scheduler-history-collector` as verify-only. No preflight,
+execute, or remote-head handoff exists. The collector source may read Windows
+history only when a later separately authorized operational boundary invokes it;
+verification never does so.
+
+The fixed helper bytes are SHA-frozen by the source authority gate. The helper
+accepts zero args, uses only read-only `Get-WinEvent` surfaces against the
+fixed Task Scheduler Operational channel/task/window/ID set, never mutates
+Windows configuration, bounds candidate/target records, sanitizes XML without
+localized rendered text, and fails closed on ambiguity.
+
+The Python semantic AST is separately SHA-frozen. It launches exactly one fixed
+PowerShell helper with bounded transport/no retry/no fallback, validates exact
+JSON and accepted event semantics, constructs the accepted S2C1A typed model,
+and invokes S2C1A policy exactly once. All source/provider/Paper-v2/broker/live,
+scheduler/event-log mutation, manual-start, and production-filesystem effect
+fields remain NOT_RUN.
+
+GitHub Actions run `36827858048` completed SUCCESS; the exact event-HEAD
+side-source job recorded OVERALL=PASS for all current side gates through S2C1B
+and uploaded external source-gate evidence. The collector and Windows event log
+were never invoked operationally. Active D10 remains frozen at
+`38a88392096214e03b8a752cbffc78ebf1aeeb15`.

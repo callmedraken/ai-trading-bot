@@ -1,0 +1,112 @@
+name: Frozen Side Checkpoint Certification
+
+on:
+  push:
+    branches:
+      - feature/post-d10-observability
+
+permissions:
+  contents: read
+
+jobs:
+  exact-r8-source-gate:
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out exact R8 operational source
+        uses: actions/checkout@v4
+        with:
+          ref: "38a88392096214e03b8a752cbffc78ebf1aeeb15"
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Python 3.14
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install source-gate dependencies
+        shell: powershell
+        run: |
+          python -m pip install --disable-pip-version-check `
+            "pytest>=8.0,<9.0" `
+            "ruff>=0.6,<1.0" `
+            "tzdata>=2024.1,<2027.0"
+          if ($LASTEXITCODE -ne 0) {
+            throw "source-gate dependency installation failed: $LASTEXITCODE"
+          }
+
+      - name: Certify exact R8 source
+        shell: powershell
+        run: |
+          $Head = git rev-parse HEAD
+          if ($Head -ne '38a88392096214e03b8a752cbffc78ebf1aeeb15') {
+              throw "unexpected R8 certification HEAD: $Head"
+          }
+          $env:AI_TRADING_BOT_CHECKPOINT_EVIDENCE_ROOT =
+              Join-Path $env:RUNNER_TEMP 'r8-checkpoints'
+          powershell.exe -NoProfile -ExecutionPolicy Bypass `
+            -File .\ops.ps1 verify arch128-r8
+          if ($LASTEXITCODE -ne 0) {
+            throw "R8 source certification failed: $LASTEXITCODE"
+          }
+
+      - name: Upload exact R8 source-gate evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: exact-r8-source-gate-evidence
+          path: ${{ runner.temp }}/r8-checkpoints
+          if-no-files-found: error
+
+  exact-s1-source-gate:
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out exact S1 implementation source
+        uses: actions/checkout@v4
+        with:
+          ref: "4f0bb9130c4e9470cbec69b94c96aeac609c18f2"
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Python 3.14
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install source-gate dependencies
+        shell: powershell
+        run: |
+          python -m pip install --disable-pip-version-check `
+            "pytest>=8.0,<9.0" `
+            "ruff>=0.6,<1.0" `
+            "tzdata>=2024.1,<2027.0"
+          if ($LASTEXITCODE -ne 0) {
+            throw "source-gate dependency installation failed: $LASTEXITCODE"
+          }
+
+      - name: Certify exact S1 source
+        shell: powershell
+        run: |
+          $Head = git rev-parse HEAD
+          if ($Head -ne '4f0bb9130c4e9470cbec69b94c96aeac609c18f2') {
+              throw "unexpected S1 certification HEAD: $Head"
+          }
+          $env:AI_TRADING_BOT_CHECKPOINT_EVIDENCE_ROOT =
+              Join-Path $env:RUNNER_TEMP 's1-checkpoints'
+          powershell.exe -NoProfile -ExecutionPolicy Bypass `
+            -File .\ops.ps1 verify d10-soak-status
+          if ($LASTEXITCODE -ne 0) {
+            throw "S1 source certification failed: $LASTEXITCODE"
+          }
+
+      - name: Upload exact S1 source-gate evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: exact-s1-source-gate-evidence
+          path: ${{ runner.temp }}/s1-checkpoints
+          if-no-files-found: error

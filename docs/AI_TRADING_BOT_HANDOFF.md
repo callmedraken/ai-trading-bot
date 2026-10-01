@@ -8774,3 +8774,69 @@ feature/d10c-durable-wake-evidence
 
 Resume side progression with S2 end-of-soak acceptance analysis. Do not merge or
 fast-forward the side branch into the active D10 branch during the soak.
+
+
+## 2026-09-30 — S2A end-of-soak review analyzer accepted
+
+Resume side progression from **S2B external review evidence/package design**.
+
+Accepted S2A source:
+
+```text
+branch feature/post-d10-observability
+HEAD   ddfe6575f3bc1c1125d78f1259d78411372a6951
+TREE   08a539eea57f1453e38fe9f2bfc181b88582f3e4
+CI     36804638203 SUCCESS
+```
+
+The active D10 branch remains frozen at:
+
+```text
+feature/d10c-durable-wake-evidence
+38a88392096214e03b8a752cbffc78ebf1aeeb15
+```
+
+S2A is pure/offline. It accepts only a caller-supplied tuple of exact
+`D10OneWeekWakeEvidence` instances plus explicit UTC review time. It calls the
+existing `build_d10_one_week_wake_summary` once and has no production observer,
+filesystem, environment, subprocess, scheduler, credential, provider,
+Paper-v2, broker, or live path.
+
+Internal readiness requires:
+- review at/after 2026-10-07T22:07:24Z;
+- exact active soak deployment/attestation/soak/window facts;
+- identical nonempty source HEAD/TREE and positive executable count across wakes;
+- every wake inside the active interval;
+- at least seven wakes;
+- all wakes COMPLETED or NO_ACTION;
+- no stop reason or unresolved historical decision;
+- zero receipt recovery and broker/live calls;
+- provider/settlement/publication attempts individually bounded to 0/1;
+- all eight effect gates closed.
+
+A wake count of seven or greater is not scheduler-slot proof. S2A intentionally
+leaves scheduler-slot/session coverage, sleep/reboot/duplicate context,
+Paper-v2 account/trade/position/performance review, and audit completeness to
+external operator evidence.
+
+S2A can return only internal readiness. It always preserves:
+
+```text
+d10_accepted=false
+broker_paper_authorized=false
+operator_decision_required=true
+```
+
+CI run 36804638203 completed all three jobs successfully:
+`exact-r8-source-gate`, `exact-s1-source-gate`, and
+`side-head-source-gates`. The side-head job ran both S1 and S2A verify gates
+against exact event HEAD and uploaded evidence.
+
+The requested single one-week-soak test module did not exist; the source gate
+uses the repository's existing split source/controller soak tests instead.
+That substitution was independently verified and accepted.
+
+Next side checkpoint: S2B should define a pure, non-authorizing external review
+package/interface for the five Architecture-122 facts S2A explicitly cannot
+infer. Do not inspect production or merge side source into the active D10 branch
+during the soak.

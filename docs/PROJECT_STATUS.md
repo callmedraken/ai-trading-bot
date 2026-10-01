@@ -8551,3 +8551,98 @@ S2   end-of-soak acceptance analyzer           NEXT / SOURCE-ONLY
 S1 is not authorized to replace R8 first-wake acceptance. The production D10
 branch remains frozen; S1 should be used only after R8 acceptance and only from
 the isolated side lineage.
+
+
+## D10 side progression S2A end-of-soak operator-review analyzer — ACCEPTED
+
+S2A is source-accepted on the isolated side branch:
+
+```text
+branch: feature/post-d10-observability
+implementation HEAD: ddfe6575f3bc1c1125d78f1259d78411372a6951
+implementation TREE: 08a539eea57f1453e38fe9f2bfc181b88582f3e4
+parent: 4296c9dff12165091c063b2255bae7c899618b60
+CI run: 36804638203 SUCCESS
+```
+
+The active operational D10 branch remained unchanged at:
+
+```text
+feature/d10c-durable-wake-evidence
+38a88392096214e03b8a752cbffc78ebf1aeeb15
+```
+
+S2A is a pure offline analyzer over caller-supplied sanitized
+`D10OneWeekWakeEvidence` objects. It performs no production observation,
+filesystem/network/environment access, scheduler operation, credential handling,
+provider call, Paper-v2 operation, broker operation, or live operation.
+
+The analyzer reuses `build_d10_one_week_wake_summary(...)` exactly once and
+requires the active soak provenance, review time at/after the seven-day end
+boundary, at least seven internally healthy wakes, no STOPPED wake, zero receipt
+recovery, zero broker/live calls, no unresolved historical decision, bounded
+per-wake attempt counts, and all eight effect gates closed at every supplied
+wake.
+
+Seven wakes are intentionally only a minimum. S2A does not infer complete
+scheduler-slot coverage from a wake count; duplicate/restart wakes may exist.
+It therefore leaves these facts explicitly external:
+
+```text
+SCHEDULER_SLOT_COVERAGE
+ELIGIBLE_XNYS_SESSION_COVERAGE
+SLEEP_REBOOT_DUPLICATE_CONTEXT
+PAPER_V2_ACCOUNT_TRADES_POSITIONS_PERFORMANCE
+AUDIT_COMPLETENESS
+```
+
+Even on internal success S2A returns:
+
+```text
+status = READY_FOR_OPERATOR_REVIEW
+d10_accepted = false
+broker_paper_authorized = false
+operator_decision_required = true
+```
+
+It cannot automatically accept D10 or authorize broker-paper.
+
+Exact changed files:
+
+```text
+scripts/d10_end_of_soak_review.py
+scripts/checkpoint_runner.py
+tests/runtime/test_d10_end_of_soak_review.py
+tests/runtime/test_checkpoint_runner.py
+.github/workflows/side-checkpoint-certification.yml
+```
+
+The requested monolithic one-week-soak test filename does not exist in this
+repository. The registered source gate instead uses the existing split
+`test_personal_desktop_unattended_one_week_soak_source.py` and
+`test_personal_desktop_unattended_one_week_soak_controller.py`; both files are
+present and cover the existing source/controller split. This deviation is
+accepted.
+
+Local verification reported 767 focused tests passed, Ruff lint/format PASS,
+working/staged diff checks PASS, and clean
+`ops.ps1 verify d10-soak-review` PASS with stable identity.
+
+GitHub Actions run 36804638203 completed SUCCESS. In particular,
+`side-head-source-gates` checked out exact event HEAD
+ddfe6575f3bc1c1125d78f1259d78411372a6951, ran both
+`verify d10-soak-status` and `verify d10-soak-review`, and uploaded the
+`side-head-source-gate-evidence` artifact. The historical exact R8 and exact S1
+jobs also remained green.
+
+Current side progression:
+
+```text
+R8A  first-wake observer source                         ACCEPTED
+S1   multi-wake read-only soak status                   ACCEPTED
+S2A  pure internal end-of-soak review readiness         ACCEPTED
+S2B  external review evidence/package design            NEXT / SOURCE-ONLY
+```
+
+S2A does not replace R8 or the eventual Architecture-122 end-of-week operator
+review. Production remains frozen while side work continues.

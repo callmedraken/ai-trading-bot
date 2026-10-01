@@ -536,3 +536,42 @@ source-gate evidence artifact. A paired exact-R8 job in the same run closed the
 previous R8A CI bookkeeping gap without moving production source.
 
 S2 is the next source-only side checkpoint: an end-of-soak acceptance analyzer.
+
+
+### D10 side checkpoint S2A end-of-soak review analyzer — ACCEPTED
+
+S2A is isolated on `feature/post-d10-observability` at
+`ddfe6575f3bc1c1125d78f1259d78411372a6951` /
+`08a539eea57f1453e38fe9f2bfc181b88582f3e4`.
+
+It registers `d10-soak-review` as a verify-only checkpoint: no preflight, no
+execute, no remote-head handoff. The pure analyzer has no production I/O
+authority and consumes only sanitized exact `D10OneWeekWakeEvidence` values
+plus explicit UTC review time.
+
+The analyzer calls the accepted one-week wake-summary builder exactly once,
+requires the fixed active soak identity, review time at/after the end boundary,
+a minimum of seven internally healthy wakes, bounded effect-attempt counts,
+zero receipt-recovery and broker/live calls, no unresolved historical decision,
+and final closure of all eight gates.
+
+The minimum wake count is not treated as scheduler coverage. S2A explicitly
+requires later external review of scheduler-slot coverage, eligible-XNYS-session
+coverage, sleep/reboot/duplicate context, Paper-v2 account/trades/positions/
+performance, and audit completeness.
+
+READY_FOR_OPERATOR_REVIEW does not accept D10 and does not authorize
+broker-paper. The result contract freezes
+`d10_accepted=false`, `broker_paper_authorized=false`, and
+`operator_decision_required=true`.
+
+GitHub Actions run `36804638203` completed SUCCESS. Its
+`side-head-source-gates` job verified both `d10-soak-status` and
+`d10-soak-review` against exact event HEAD and uploaded side-head gate
+evidence. Existing exact-R8 and exact-S1 jobs remained successful.
+
+The requested monolithic one-week-soak test path is absent in this repository;
+the source profile correctly uses the existing split source/controller tests.
+
+The active D10 branch remains unchanged at
+`38a88392096214e03b8a752cbffc78ebf1aeeb15`.

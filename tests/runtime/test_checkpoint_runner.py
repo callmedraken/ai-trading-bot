@@ -163,9 +163,13 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
         assert "scripts/checkpoint_runner.py" in spec.ruff_paths
         assert "tests/runtime/test_checkpoint_runner.py" in spec.ruff_paths
         expected_branch = (
-            "feature/d10c-r8-terminal-halt"
-            if spec.name == "arch128-r8-terminal-halt"
-            else "feature/d10c-durable-wake-evidence"
+            "feature/d10c-r8-incident-reconciliation"
+            if spec.name == "arch130-r8i-d1"
+            else (
+                "feature/d10c-r8-terminal-halt"
+                if spec.name == "arch128-r8-terminal-halt"
+                else "feature/d10c-durable-wake-evidence"
+            )
         )
         assert spec.remote_branch == expected_branch
 

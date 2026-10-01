@@ -52,9 +52,7 @@ def test_decision_attribution_separates_presence_from_causality() -> None:
 
 def test_decision_absence_is_only_durable_absence_fact() -> None:
     assert (
-        d1._decision_attribution(
-            {"selected": None}, {"incident_next_decisions": []}
-        )
+        d1._decision_attribution({"selected": None}, {"incident_next_decisions": []})
         == "NO_DURABLE_INCIDENT_NEXT_DECISION"
     )
 
@@ -77,9 +75,7 @@ def test_invocation_dependency_is_not_promoted_to_paper_effect() -> None:
     snapshot_id = "22222222-2222-2222-2222-222222222222"
     c3 = {"selected": {"snapshot_id": snapshot_id}}
     invocations = {
-        "incident_execution_invocations": [
-            {"selected_snapshot_id": snapshot_id}
-        ]
+        "incident_execution_invocations": [{"selected_snapshot_id": snapshot_id}]
     }
     operations = {"transitions": [], "operations": []}
     assert (
@@ -146,8 +142,7 @@ def test_incident_times_and_sessions_are_frozen() -> None:
 
 def test_architecture_document_states_attribution_limit() -> None:
     text = (
-        ROOT
-        / "docs/architecture/130-d10-first-wake-incident-reconciliation.md"
+        ROOT / "docs/architecture/130-d10-first-wake-incident-reconciliation.md"
     ).read_text(encoding="utf-8")
     assert "durable presence into causal authorship" in text
     assert "no trusted publication timestamp" in text

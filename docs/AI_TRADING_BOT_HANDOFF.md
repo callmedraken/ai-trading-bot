@@ -9002,3 +9002,56 @@ Next safe source checkpoint: S2C2A should define a pure policy for
 ELIGIBLE_XNYS_SESSION_COVERAGE using already accepted market-calendar/session
 semantics and caller-supplied sanitized daily-cycle/session facts. Do not inspect
 production or authorize an operational collector as part of S2C2A.
+
+
+## 2026-10-01 — S2C2A eligible-XNYS-session coverage policy accepted
+
+Resume side progression from **S2C2B read-only durable session-evidence
+collector**.
+
+Accepted S2C2A source:
+
+```text
+branch feature/post-d10-observability
+HEAD   bc8b31c365aa94663468045a89b81446a55f49e8
+TREE   e80b4a00717f5d0c6587e357920adf5f29011532
+CI     36833057651 SUCCESS
+```
+
+Active D10 remains frozen:
+
+```text
+feature/d10c-durable-wake-evidence
+38a88392096214e03b8a752cbffc78ebf1aeeb15
+```
+
+S2C2A is pure/offline. It accepts only sanitized exact
+`D10OneWeekWakeEvidence` tuples plus explicit UTC review time and reuses the
+accepted Architecture-111 timing functions plus S2C1A expected scheduler slots.
+It does not implement a second NYSE calendar.
+
+The seven current scheduler slots derive completed sessions
+Sep30/Oct1/Oct2/Oct2/Oct2/Oct5/Oct6, unique completed sessions
+Sep30/Oct1/Oct2/Oct5/Oct6, and next-execution sessions
+Oct1/Oct2/Oct5/Oct6/Oct7. This intentionally represents Oct. 7 as the final
+next-execution/publication target without demanding an Oct. 8 post-soak
+settlement wake.
+
+Every wake must be healthy and source-bound; completed session, next execution
+session, and pre-open deadline must exactly match source-owned timing derivation.
+Duplicates are allowed, but the first-seen completed and execution coverage must
+match the derived sequence exactly. Effect attempt counts are facts, not success
+thresholds.
+
+Successful output is only READY_FOR_EXTERNAL_REVIEW_ARTIFACT and retains
+d10_accepted=false, broker_paper_authorized=false, and
+operator_decision_required=true.
+
+GitHub Actions run 36833057651 completed all current side source gates through
+S2C2A with OVERALL=PASS and uploaded the side-head evidence artifact.
+
+Next S2C2B should project the accepted durable wake evidence into the exact
+`D10OneWeekWakeEvidence` values consumed by S2C2A using existing
+Architecture-127 read-only/durable-evidence parsing authority rather than
+creating a second evidence grammar. Source implementation must remain
+verify-only and must not read production during verification.

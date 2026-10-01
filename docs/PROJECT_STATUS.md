@@ -8946,3 +8946,125 @@ S2C2A pure eligible-XNYS-session coverage policy          NEXT / SOURCE-ONLY
 Operational scheduler-history collection remains deferred until the soak-end
 review boundary and separate operator review; this source checkpoint grants no
 host-observation authority.
+
+
+## D10 side progression S2C2A eligible-XNYS-session coverage policy — ACCEPTED
+
+S2C2A is source-accepted on the isolated side branch:
+
+```text
+branch: feature/post-d10-observability
+implementation HEAD: bc8b31c365aa94663468045a89b81446a55f49e8
+implementation TREE: e80b4a00717f5d0c6587e357920adf5f29011532
+parent: 208bca7cd1ebfbbe264f62fed0f7fa3c8359bd9e
+CI run: 36833057651 SUCCESS
+```
+
+The active D10 branch remained unchanged at:
+
+```text
+feature/d10c-durable-wake-evidence
+38a88392096214e03b8a752cbffc78ebf1aeeb15
+```
+
+S2C2A is pure/source-only and validates caller-supplied sanitized
+`D10OneWeekWakeEvidence` values against the already accepted Architecture-111
+XNYS timing functions and the accepted S2C1A scheduler-slot derivation. It
+performs no durable-file read, scheduler/Windows read, filesystem/environment
+access, subprocess operation, provider/Paper-v2/broker/live call, preflight, or
+execute action.
+
+Per wake it requires exact current-soak/source identity, an ordinary healthy
+COMPLETED/NO_ACTION result, an in-window monotone observation time, exact
+source-derived completed session, exact next XNYS execution session, and exact
+09:30 America/New_York pre-open deadline. Session text is strict canonical
+YYYY-MM-DD and the accepted timing functions remain the only XNYS semantic
+authority.
+
+Expected session coverage is derived from the seven frozen scheduler slots,
+rather than hard-coded in policy source. For the current soak that derivation is:
+
+```text
+slot completed sessions:
+2026-09-30
+2026-10-01
+2026-10-02
+2026-10-02
+2026-10-02
+2026-10-05
+2026-10-06
+
+unique completed sessions:
+2026-09-30
+2026-10-01
+2026-10-02
+2026-10-05
+2026-10-06
+
+next execution sessions:
+2026-10-01
+2026-10-02
+2026-10-05
+2026-10-06
+2026-10-07
+```
+
+The repeated Oct. 2 completed session is expected across weekend/Monday pre-open
+wakes and is not a duplicate error. Additional restart/duplicate wakes within an
+already covered session are permitted. The final Oct. 7 session is represented
+as a valid next-execution/publication target; S2C2A does not incorrectly require
+a post-soak Oct. 8 settlement wake.
+
+Coverage requires the supplied first-seen completed-session progression and
+first-seen next-execution progression to exactly equal the derived sequences.
+Missing, unexpected, reordered, malformed, or source-inconsistent session facts
+block. Provider/settlement/publication attempt counts are bounded review facts
+only and are not success thresholds; zero-attempt and NO_ACTION wakes remain
+legitimate.
+
+A successful result is only
+`READY_FOR_EXTERNAL_REVIEW_ARTIFACT` for
+`ELIGIBLE_XNYS_SESSION_COVERAGE`. It does not prove durable collector truth,
+scheduler origin, Paper-v2 correctness, profitability, audit completeness,
+sleep/reboot correctness, D10 acceptance, or broker-paper readiness, and always
+preserves:
+
+```text
+d10_accepted = false
+broker_paper_authorized = false
+operator_decision_required = true
+```
+
+Exact implementation files:
+
+```text
+scripts/d10_xnys_session_coverage_policy.py
+scripts/checkpoint_runner.py
+tests/runtime/test_d10_xnys_session_coverage_policy.py
+tests/runtime/test_checkpoint_runner.py
+.github/workflows/side-checkpoint-certification.yml
+```
+
+Local verification reported 1,751 focused tests passed, Ruff lint/format PASS,
+working/cached diff checks PASS, authority PASS, stable identity, and clean
+`ops.ps1 verify d10-xnys-session-coverage-policy` OVERALL=PASS.
+
+GitHub Actions run 36833057651 completed SUCCESS. Its exact event-HEAD
+`side-head-source-gates` job recorded OVERALL=PASS for all current side gates
+through S2C2A and uploaded `side-head-source-gate-evidence`.
+
+Current side progression:
+
+```text
+R8A   first-wake observer source                          ACCEPTED
+S1    multi-wake read-only soak status                    ACCEPTED
+S2A   pure internal end-of-soak review readiness          ACCEPTED
+S2B   pure external-review evidence package               ACCEPTED
+S2C1A pure scheduler-slot coverage policy                 ACCEPTED
+S2C1B fixed Windows scheduler-history collector source    ACCEPTED
+S2C2A pure eligible-XNYS-session coverage policy          ACCEPTED
+S2C2B read-only durable session-evidence collector        NEXT / SOURCE-ONLY
+```
+
+S2C2A creates no production-read authority. S2C2B must remain separately
+reviewed and source-only until a later explicit operational boundary.

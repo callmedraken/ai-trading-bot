@@ -675,3 +675,36 @@ side-source job recorded OVERALL=PASS for all current side gates through S2C1B
 and uploaded external source-gate evidence. The collector and Windows event log
 were never invoked operationally. Active D10 remains frozen at
 `38a88392096214e03b8a752cbffc78ebf1aeeb15`.
+
+
+### D10 side checkpoint S2C2A eligible-XNYS-session coverage policy — ACCEPTED
+
+S2C2A is isolated on `feature/post-d10-observability` at
+`bc8b31c365aa94663468045a89b81446a55f49e8` /
+`e80b4a00717f5d0c6587e357920adf5f29011532`.
+
+It registers `d10-xnys-session-coverage-policy` as verify-only. No preflight,
+execute, or remote-head handoff exists. The module is pure and contains no
+filesystem, Windows, scheduler, subprocess, production-observer, provider,
+Paper-v2, broker, or live authority.
+
+The source reuses current-soak identity from S2A, the frozen S2C1A
+`expected_slots_utc()`, and Architecture-111
+`completed_xnys_session_at`, `next_xnys_execution_session`, and
+`xnys_regular_open`. The complete semantic AST/import/call surface is frozen by
+the authority gate, which composes the accepted S2C1B gate and includes the
+direct timing and NYSE-calendar tests in the source-verification hierarchy.
+
+The policy validates per-wake XNYS session/deadline truth and complete
+first-seen coverage of the unique completed sessions implied by the seven
+scheduler slots. Weekend/restart duplicates are legitimate; attempt counts are
+review facts rather than thresholds. The final Oct. 7 next execution target is
+represented without inventing a post-soak Oct. 8 settlement requirement.
+
+Success is only `READY_FOR_EXTERNAL_REVIEW_ARTIFACT` for
+ELIGIBLE_XNYS_SESSION_COVERAGE and cannot accept D10 or authorize broker-paper.
+
+GitHub Actions run `36833057651` completed SUCCESS and recorded OVERALL=PASS
+for all current side source gates through S2C2A, with side-head source-gate
+evidence uploaded. Active D10 remains frozen at
+`38a88392096214e03b8a752cbffc78ebf1aeeb15`.

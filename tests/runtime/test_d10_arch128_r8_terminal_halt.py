@@ -433,6 +433,11 @@ def test_authority_gate_freezes_source() -> None:
             "observer.main()",
         ),
         (
+            "scripts/d10_arch128_r8_terminal_halt.py",
+            "        mutation = host.disable()",
+            "        mutation = host.disable()\n        publish_decision()",
+        ),
+        (
             "scripts/checkpoint_runner.py",
             "preflight=_r8_halt_preflight",
             "preflight=_r7_preflight",
@@ -724,3 +729,38 @@ def test_fixed_native_reader_and_accepted_observers_are_composed(
         evidence.assert_called_once_with()
         transport.assert_called_once_with(windows.OBSERVE_HELPER)
         assert reader.read_file.call_count == 2
+
+
+def test_decision_publication_is_explicitly_closed_in_halt_evidence() -> None:
+    assert "decision_publication" in halt.CLOSED_EFFECTS
+    assert halt.preflight(host())["decision_publication"] == "NOT_RUN"
+    assert execute(host())["decision_publication"] == "NOT_RUN"
+
+
+@pytest.mark.parametrize("operation", ("preflight", "execute"))
+def test_runner_rejects_missing_decision_publication_evidence(
+    monkeypatch, operation
+) -> None:
+    primary = halt.preflight(host()) if operation == "preflight" else execute(host())
+    del primary["decision_publication"]
+    monkeypatch.setattr(halt, operation, lambda *args: primary)
+    result = (
+        runner._r8_halt_preflight()
+        if operation == "preflight"
+        else runner._r8_halt_execute()
+    )
+    assert result["status"] != "PASS"
+    if operation == "execute":
+        assert result["effect_disposition"] == "MAY_HAVE_OCCURRED"
+
+
+def test_halt_sources_have_no_decision_publication_boundary() -> None:
+    for name in ("d10_arch128_r8_terminal_halt.py", "d10_arch128_r8_halt_windows.py"):
+        tree = ast.parse((ROOT / "scripts" / name).read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call):
+                target = ast.unparse(node.func).casefold()
+                assert "publish" not in target
+                assert "decision_publication" not in target
+    helper = (ROOT / "scripts/d10_arch128_r8_terminal_halt.ps1").read_text()
+    assert "publish" not in helper.casefold()

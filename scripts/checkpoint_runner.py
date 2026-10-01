@@ -316,7 +316,7 @@ def _r6_authority_check(repo_root: Path) -> tuple[str, ...]:
 # accepted observation chain, and runner composition. Formatting is not authority.
 R8_HALT_SOURCE_PINS: Final = {
     "scripts/d10_arch128_r8_terminal_halt.py": (
-        "3e9386d5f3d925b2475fb4701f74d54d5bf2649781cfc3a5655f82946216a547"
+        "45c7e7fab0e48ea74995211e59758b6f27ea974b785e62ab5c2510be43c851cf"
     ),
     "scripts/d10_arch128_r8_halt_windows.py": (
         "c85efb5913c986384608234c282191831d3f254784db225733465aeb1dfc98ff"

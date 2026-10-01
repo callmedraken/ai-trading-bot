@@ -48,6 +48,7 @@ CLOSED_EFFECTS = (
     "task_delete",
     "task_registration",
     "source_launch",
+    "decision_publication",
     "provider",
     "Paper-v2",
     "broker",

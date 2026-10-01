@@ -565,8 +565,10 @@ Administrator token. It independently repeats two stable exact pre-reads,
 reacquires the fixed task, checks its full XML against the observed digest, and
 sets call_attempted immediately before the single `task.Enabled = false`
 assignment. It never starts/stops/deletes/registers a task or changes settings,
-credentials, lease, evidence, or governed source. It never calls provider,
-Paper-v2, broker, or live boundaries.
+credentials, lease, evidence, or governed source. It never calls decision
+publication, provider, Paper-v2, broker, or live boundaries. Preflight and execute
+evidence must explicitly report `decision_publication=NOT_RUN`; the independent
+runner rejects a missing or changed decision-publication effect field.
 
 A returned call is followed by independent task reacquisition, two identical
 post-reads, and comparison of the entire scheduler XML with only Settings/Enabled

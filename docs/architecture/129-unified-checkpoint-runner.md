@@ -708,3 +708,34 @@ GitHub Actions run `36833057651` completed SUCCESS and recorded OVERALL=PASS
 for all current side source gates through S2C2A, with side-head source-gate
 evidence uploaded. Active D10 remains frozen at
 `38a88392096214e03b8a752cbffc78ebf1aeeb15`.
+
+
+### D10 side checkpoint S2C2B durable XNYS evidence projector — ACCEPTED
+
+S2C2B is isolated on `feature/post-d10-observability` at
+`e01bd20ae20403849aca617e023079fefca1b47d` /
+`39e1fe2d1c4bcf96b26798a8711817e288821e42`.
+
+It registers `d10-xnys-session-evidence-projector` as verify-only. No preflight,
+execute, production observer, filesystem reader, or remote-head handoff exists.
+
+Architecture 127 remains the durable-evidence grammar authority. The projector
+calls the complete log summarizer once before extraction, requires fully
+accepted triplets, reparses each ordinary wake with the accepted ordinary parser,
+and only then decodes canonical bytes to reconstruct every
+D10OneWeekWakeEvidence field. It does not implement an alternate JSONL grammar.
+
+Durable wake order is preserved and duplicate/restart wakes are retained.
+S2C2A is invoked exactly once; its exact sanitized result envelope is
+independently checked before projector success.
+
+The authority gate composes S2C2A and freezes the entire S2C2B semantic AST and
+pure import/call surface. Filesystem, Windows, scheduler, environment,
+subprocess, production-observer, provider/Paper-v2/broker/live, sorting,
+deduplication, retry/repair, raw-byte output, or operational runner registration
+drift fail the source gate.
+
+GitHub Actions run `36843094622` completed SUCCESS with OVERALL=PASS for all
+current side source gates through S2C2B and uploaded exact event-head source-gate
+evidence. Active D10 remains frozen at
+`38a88392096214e03b8a752cbffc78ebf1aeeb15`.

@@ -9055,3 +9055,51 @@ Next S2C2B should project the accepted durable wake evidence into the exact
 Architecture-127 read-only/durable-evidence parsing authority rather than
 creating a second evidence grammar. Source implementation must remain
 verify-only and must not read production during verification.
+
+
+## 2026-10-01 — S2C2B durable XNYS evidence projector accepted
+
+Resume side progression from **S2C3A pure sleep/reboot/duplicate-context review
+policy**.
+
+Accepted S2C2B source:
+
+```text
+branch feature/post-d10-observability
+HEAD   e01bd20ae20403849aca617e023079fefca1b47d
+TREE   39e1fe2d1c4bcf96b26798a8711817e288821e42
+CI     36843094622 SUCCESS
+```
+
+Active D10 remains frozen at:
+
+```text
+feature/d10c-durable-wake-evidence
+38a88392096214e03b8a752cbffc78ebf1aeeb15
+```
+
+S2C2B is pure/offline and accepts supplied durable-log bytes plus an exact
+activation lease. It does not open the production evidence file and does not
+prove filesystem provenance.
+
+The projector delegates whole-log grammar validation to Architecture 127 exactly
+once, requires nonterminal complete 3-record accepted-wake grammar, reparses each
+ordinary wake with the accepted Architecture-127 ordinary parser, reconstructs
+all D10OneWeekWakeEvidence fields losslessly, preserves durable order, and calls
+S2C2A exactly once. No second durable grammar, sorting, deduplication, retry, or
+repair path exists.
+
+The source authority gate freezes the complete projector AST, exact imports/call
+surface, current-soak lease identity, Architecture-127 parser delegation, full
+wake reconstruction, no-I/O boundary, exact S2C2A envelope, and verify-only
+runner registration.
+
+GitHub Actions run 36843094622 recorded OVERALL=PASS for all current side gates
+through S2C2B and uploaded the side-head source-gate artifact.
+
+Next safe source checkpoint: S2C3A should define a pure review policy for
+SLEEP_REBOOT_DUPLICATE_CONTEXT using sanitized externally supplied host-context
+facts plus the accepted scheduler/wake identities. It must distinguish evidence
+that an event happened from evidence that every requested disruption scenario
+was actually exercised; no required reboot/sleep may be invented merely because
+the soak ran successfully.

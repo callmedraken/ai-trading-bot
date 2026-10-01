@@ -9068,3 +9068,92 @@ S2C2B read-only durable session-evidence collector        NEXT / SOURCE-ONLY
 
 S2C2A creates no production-read authority. S2C2B must remain separately
 reviewed and source-only until a later explicit operational boundary.
+
+
+## D10 side progression S2C2B durable XNYS evidence projector — ACCEPTED
+
+S2C2B is source-accepted on the isolated side branch:
+
+```text
+branch: feature/post-d10-observability
+implementation HEAD: e01bd20ae20403849aca617e023079fefca1b47d
+implementation TREE: 39e1fe2d1c4bcf96b26798a8711817e288821e42
+parent: 3ca9ea67f1c9082fb6ee2c13ae86c7366c33c8f9
+CI run: 36843094622 SUCCESS
+```
+
+The active D10 branch remained unchanged at:
+
+```text
+feature/d10c-durable-wake-evidence
+38a88392096214e03b8a752cbffc78ebf1aeeb15
+```
+
+S2C2B is a pure supplied-bytes projector. It performs no filesystem read and does
+not establish that input bytes came from the production evidence file.
+
+Architecture 127 remains the durable-log grammar authority. S2C2B first calls
+`summarize_d10_wake_evidence_log(log_bytes, lease)` exactly once and requires
+a fully accepted, nonterminal 3-record-per-wake log. It then reuses
+`parse_persisted_d10_wake_record` for each ordinary record before decoding its
+already-validated canonical bytes. No second JSONL grammar or ordinary-record
+validation authority is introduced.
+
+Every serialized wake field is projected into an exact
+`D10OneWeekWakeEvidence`: deployment/source/soak provenance, session timing,
+capture, history, settlement, decision, effect budgets, crossings, and final gate
+proof. Durable order is preserved exactly; duplicate/restart wakes are not sorted
+or deduplicated.
+
+The reconstructed wake tuple is delegated exactly once to accepted S2C2A. The
+projector independently validates the exact S2C2A sanitized envelope and rejects
+any malformed/expanded policy output. A S2C2A policy rejection remains a bounded
+projector rejection.
+
+Successful output contains only bounded facts including wake/record counts,
+input byte length/SHA-256, and the sanitized S2C2A policy result. It never returns
+raw log bytes, canonical wake bytes, raw JSON, credentials, authority objects, or
+native handles.
+
+All host/effect fields remain NOT_RUN and successful projection always preserves:
+
+```text
+d10_accepted = false
+broker_paper_authorized = false
+operator_decision_required = true
+```
+
+Exact implementation files:
+
+```text
+scripts/d10_xnys_session_evidence_projector.py
+scripts/checkpoint_runner.py
+tests/runtime/test_d10_xnys_session_evidence_projector.py
+tests/runtime/test_checkpoint_runner.py
+.github/workflows/side-checkpoint-certification.yml
+```
+
+Local verification reported 104 projector tests plus 979 runner/upstream tests
+passed; post-commit source gate passed 1,955 tests with Ruff, diff, authority and
+identity gates PASS and OVERALL=PASS.
+
+GitHub Actions run 36843094622 completed SUCCESS. Its exact event-HEAD
+`side-head-source-gates` job recorded OVERALL=PASS for all current side gates
+through S2C2B and uploaded `side-head-source-gate-evidence`.
+
+Current side progression:
+
+```text
+R8A   first-wake observer source                          ACCEPTED
+S1    multi-wake read-only soak status                    ACCEPTED
+S2A   pure internal end-of-soak review readiness          ACCEPTED
+S2B   pure external-review evidence package               ACCEPTED
+S2C1A pure scheduler-slot coverage policy                 ACCEPTED
+S2C1B fixed Windows scheduler-history collector source    ACCEPTED
+S2C2A pure eligible-XNYS-session coverage policy          ACCEPTED
+S2C2B pure durable XNYS evidence projector                ACCEPTED
+S2C3A pure sleep/reboot/duplicate-context review policy   NEXT / SOURCE-ONLY
+```
+
+S2C2B creates no production-read authority. Production provenance and any future
+fixed host/file collector remain separately reviewed operational boundaries.

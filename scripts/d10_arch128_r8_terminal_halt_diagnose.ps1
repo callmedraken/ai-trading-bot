@@ -154,15 +154,13 @@ try {
         'http://schemas.microsoft.com/windows/2004/02/mit/task'
     )
     $nodes = $document.SelectNodes('/t:Task/t:Settings/t:Enabled', $manager)
-    if ($nodes.Count -eq 0) {
-        $scheduler['xml_enabled_node_state'] = 'MISSING'
-        throw 'XML enabled node missing'
-    }
-    if ($nodes.Count -ne 1) {
+    # Task Scheduler schema permits omission here and defines the default as
+    # true. COM/task-state checks above already prove this exact task is enabled.
+    if ($nodes.Count -gt 1) {
         $scheduler['xml_enabled_node_state'] = 'COUNT_DRIFT'
         throw 'XML enabled node count drift'
     }
-    if ($nodes[0].InnerText -cne 'true') {
+    if ($nodes.Count -eq 1 -and $nodes[0].InnerText -cne 'true') {
         $scheduler['xml_enabled_node_state'] = 'VALUE_NOT_TRUE'
         throw 'XML enabled value drift'
     }

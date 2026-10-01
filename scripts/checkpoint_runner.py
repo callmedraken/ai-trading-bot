@@ -325,10 +325,10 @@ R8_HALT_SOURCE_PINS: Final = {
         "6369c8fcfd719171538b34d4d0842735e863cfb5609c8de180569c2a28ef29e5"
     ),
     "scripts/d10_arch128_r8_terminal_halt_diagnose.ps1": (
-        "97fc5c5064adf0d08519fa416430df1b022510cf301a4ebc08edb49090deac13"
+        "c07c054b01fc1bb0e2b4a720e3b82ff85c2c100432f66854ab7e132ddc9a37ce"
     ),
     "scripts/d10_arch128_r8_terminal_halt.ps1": (
-        "816a1789dd9c905721896954d47eed06d020ec5c67cf5ca8ca06143e95ff2635"
+        "0a6001494e265e79d443d6aaa1506a9791bd97c30c775e99d050056b512eb9a5"
     ),
     "scripts/d10_arch128_r8_readonly.py": (
         "59762e5d7dbd748f9525b51ea67b5bcdf1d1b1f4ec177992fed3ac5a0e29bdfc"

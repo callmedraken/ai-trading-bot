@@ -83,14 +83,33 @@ try {
         param([string]$Text, [string]$ExpectedEnabled)
         $document = [System.Xml.XmlDocument]::new()
         $document.XmlResolver = $null
-        $document.PreserveWhitespace = $true
+        # Ignore serialization-only indentation while preserving every XML
+        # element/attribute except the independently validated Enabled setting.
+        $document.PreserveWhitespace = $false
         $document.LoadXml($Text)
         $manager = [System.Xml.XmlNamespaceManager]::new($document.NameTable)
         $manager.AddNamespace('t', 'http://schemas.microsoft.com/windows/2004/02/mit/task')
         $nodes = $document.SelectNodes('/t:Task/t:Settings/t:Enabled', $manager)
-        if ($nodes.Count -ne 1 -or $nodes[0].InnerText -cne $ExpectedEnabled) { throw 'XML enabled drift' }
-        # This mutates only an in-memory XML copy, never a scheduler definition.
-        $nodes[0].InnerText = 'false'
+        if ($ExpectedEnabled -ceq 'true') {
+            # Task Scheduler schema permits omission; the default is true.
+            # COM/task-state checks above independently prove this exact pre-state.
+            if ($nodes.Count -gt 1) { throw 'XML enabled drift' }
+            if ($nodes.Count -eq 1 -and $nodes[0].InnerText -cne 'true') {
+                throw 'XML enabled drift'
+            }
+        } elseif ($ExpectedEnabled -ceq 'false') {
+            # Missing cannot represent false because the schema default is true.
+            if ($nodes.Count -ne 1 -or $nodes[0].InnerText -cne 'false') {
+                throw 'XML enabled drift'
+            }
+        } else {
+            throw 'XML enabled expectation invalid'
+        }
+        # Mutate only an in-memory DOM: compare all remaining XML structure
+        # after removing the one setting whose before/after semantics are proven.
+        if ($nodes.Count -eq 1) {
+            $null = $nodes[0].ParentNode.RemoveChild($nodes[0])
+        }
         return $document.OuterXml
     }
 

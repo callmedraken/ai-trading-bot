@@ -418,8 +418,9 @@ def test_native_pre_call_diagnostic_source_is_read_only() -> None:
     for reason in diagnostic.REASONS:
         assert f"'{reason}'" in source
 
-    for state in ("MISSING", "COUNT_DRIFT", "VALUE_NOT_TRUE"):
+    for state in ("COUNT_DRIFT", "VALUE_NOT_TRUE"):
         assert f"'xml_enabled_node_state'] = '{state}'" in source
+    assert "'xml_enabled_node_state'] = 'MISSING'" not in source
 
 
 def test_scheduler_helper_is_reused_and_two_reads_must_match(monkeypatch) -> None:
@@ -601,12 +602,17 @@ def test_native_source_has_single_fixed_mutation_and_ordering() -> None:
         assert forbidden not in source
     assert "Normalize-EnabledXml" in source
     assert "$first | ConvertTo-Json" in source and "$fourth | ConvertTo-Json" in source
+    assert "Task Scheduler schema permits omission" in source
+    assert "$nodes.Count -gt 1" in source
+    assert "$nodes.Count -ne 1 -or $nodes[0].InnerText -cne 'false'" in source
 
 
 @pytest.mark.parametrize(
     "scenario,disposition,calls",
     (
         ("success", "CALL_RETURNED", 1),
+        ("pre_enabled_omitted", "CALL_RETURNED", 1),
+        ("post_enabled_omitted", "INDETERMINATE", 1),
         ("before_exception", "NOT_CALLED", 0),
         ("pre_running", "NOT_CALLED", 0),
         ("pre_disabled", "NOT_CALLED", 0),
@@ -671,9 +677,17 @@ $global:MockTask | Add-Member ScriptProperty Xml {
     $other = if ($global:MockCalls -gt 0 -and $global:Case -eq 'post_xml_drift') {
         9
     } else { 7 }
+    $omitEnabled = (
+        ($global:Case -eq 'pre_enabled_omitted' -and $global:MockCalls -eq 0) -or
+        ($global:Case -eq 'post_enabled_omitted' -and $global:MockCalls -gt 0)
+    )
+    $enabledXml = if ($omitEnabled) {
+        ''
+    } else {
+        '<Enabled>' + $enabledText + '</Enabled>'
+    }
     return '<Task xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">' +
-           '<Settings><Enabled>' +
-           $enabledText + '</Enabled><Priority>' + $other +
+           '<Settings>' + $enabledXml + '<Priority>' + $other +
            '</Priority></Settings></Task>'
 }
 $global:MockFolder = [pscustomobject]@{}

@@ -593,6 +593,17 @@ preflight now requires this diagnostic to report READY with a scheduler snapshot
 identical to the primary read-only snapshot before a later protected
 authorization can be considered.
 
+R8I-H1c resolves the observed Windows XML representation at the same boundary:
+the live task's COM settings and task state both prove enabled=true while the
+serialized Settings XML omits Enabled. The Task Scheduler schema defines Enabled
+with default=true and permits omission. The read-only diagnostic therefore
+accepts the missing pre-state only after those independent COM checks. The
+protected helper's XML normalization likewise accepts missing only for the
+already-proven true pre-state, still requires one explicit false Enabled element
+after the setter, removes only that validated element from an in-memory DOM, and
+compares the remaining XML structure. Duplicate or conflicting Enabled elements,
+missing post-disable false, or any unrelated XML structure drift still block.
+
 Next: independent exact diff + CI review, then a fresh elevated read-only
 `ops.ps1 preflight arch128-r8-terminal-halt`. Only after that evidence is reviewed
 may fresh explicit human authorization for the actual disable be requested.

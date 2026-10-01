@@ -157,6 +157,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
         "arch128-r8",
         "d10-soak-status",
         "d10-soak-review",
+        "d10-external-review-package",
     }
     for spec in specs.values():
         assert "tests/runtime/test_checkpoint_runner.py" in spec.tests
@@ -164,7 +165,8 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
         assert "tests/runtime/test_checkpoint_runner.py" in spec.ruff_paths
         expected_branch = (
             "feature/post-d10-observability"
-            if spec.name in ("d10-soak-status", "d10-soak-review")
+            if spec.name
+            in ("d10-soak-status", "d10-soak-review", "d10-external-review-package")
             else "feature/d10c-durable-wake-evidence"
         )
         assert spec.remote_branch == expected_branch
@@ -196,6 +198,7 @@ def test_current_arch128_authority_profiles_pass() -> None:
     assert specs["arch128-r8"].authority_check(repo_root) == ()
     assert specs["d10-soak-status"].authority_check(repo_root) == ()
     assert specs["d10-soak-review"].authority_check(repo_root) == ()
+    assert specs["d10-external-review-package"].authority_check(repo_root) == ()
 
 
 def test_default_evidence_root_is_outside_repo() -> None:
@@ -2076,3 +2079,253 @@ def test_soak_review_authority_blocks_missing_or_invalid_source(tmp_path):
     assert runner._d10_soak_review_authority_check(tmp_path)
     root = _soak_review_authority_copy(tmp_path, addition="def invalid(")
     assert runner._d10_soak_review_authority_check(root)
+
+
+def test_external_review_package_registration_is_verify_only() -> None:
+    specs = runner._checkpoint_specs()
+    spec = specs["d10-external-review-package"]
+    assert spec.preflight is None
+    assert spec.execute is None
+    assert spec.remote_head_env is None
+    assert spec.remote_branch == "feature/post-d10-observability"
+    assert spec.authority_check is runner._d10_external_review_package_authority_check
+    assert spec.tests == (
+        *specs["d10-soak-review"].tests,
+        "tests/runtime/test_d10_external_review_package.py",
+    )
+    assert spec.ruff_paths == (
+        *specs["d10-soak-review"].ruff_paths,
+        "scripts/d10_external_review_package.py",
+        "tests/runtime/test_d10_external_review_package.py",
+    )
+    parser = runner._parser(specs)
+    assert parser.parse_args(("verify", spec.name)).checkpoint == spec.name
+    for command in ("preflight", "execute"):
+        with pytest.raises(SystemExit):
+            parser.parse_args((command, spec.name))
+    # Independently retained operational registrations and authority profiles.
+    assert specs["d10-soak-status"].preflight is runner._d10_soak_status_preflight
+    assert specs["d10-soak-status"].execute is None
+    assert specs["d10-soak-review"].preflight is None
+    assert specs["d10-soak-review"].execute is None
+    assert specs["arch128-r8"].preflight is runner._r8_preflight
+    assert specs["arch128-r8"].execute is None
+    assert specs["arch128-r8"].remote_branch == "feature/d10c-durable-wake-evidence"
+
+
+def _external_review_authority_copy(
+    tmp_path: Path,
+    *,
+    addition: str = "",
+    old: str = "",
+    new: str = "",
+    runner_old: str = "",
+    runner_new: str = "",
+) -> Path:
+    root = Path(runner.__file__).resolve().parent.parent
+    target = tmp_path / "scripts"
+    target.mkdir()
+    source = (root / "scripts/d10_external_review_package.py").read_text(
+        encoding="utf-8"
+    )
+    if old:
+        assert old in source
+        source = source.replace(old, new, 1)
+    if addition:
+        source += "\n" + addition + "\n"
+    (target / "d10_external_review_package.py").write_text(source, encoding="utf-8")
+    # The S2B authority gate also preserves S2A's accepted source contract.
+    (target / "d10_end_of_soak_review.py").write_text(
+        (root / "scripts/d10_end_of_soak_review.py").read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    runner_source = (root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+    if runner_old:
+        start = runner_source.index(
+            '        "d10-external-review-package": CheckpointSpec('
+        )
+        end = runner_source.index('        "arch128-r8": CheckpointSpec(', start)
+        registration = runner_source[start:end]
+        assert runner_old in registration
+        runner_source = (
+            runner_source[:start]
+            + registration.replace(runner_old, runner_new, 1)
+            + runner_source[end:]
+        )
+    (target / "checkpoint_runner.py").write_text(runner_source, encoding="utf-8")
+    return tmp_path
+
+
+@pytest.mark.parametrize(
+    "addition",
+    (
+        "import os",
+        "import subprocess",
+        "import ctypes",
+        "from pathlib import Path",
+        "import socket",
+        "from scripts import d10_soak_status_readonly as observer",
+        "open('evidence')",
+        "Path('evidence').read_bytes()",
+        "Path('evidence').write_text('data')",
+        "os.environ['TOKEN']",
+        "subprocess.run([])",
+        "ctypes.WinDLL('kernel32')",
+        "datetime.now(UTC)",
+        "datetime.today()",
+        "observer.observe()",
+        "internal_review_policy.analyze(())",
+        "scheduler.Run(None)",
+        "scheduler.RegisterTaskDefinition()",
+        "credential.read()",
+        "provider.capture()",
+        "paper_v2.execute()",
+        "broker.order()",
+        "live.execute()",
+        "__import__('os')",
+        "eval('effect()')",
+        "def preflight(): pass",
+        "def execute(): pass",
+        "production_observer = internal_review_policy",
+    ),
+)
+def test_external_review_authority_rejects_io_or_effect_additions(tmp_path, addition):
+    root = _external_review_authority_copy(tmp_path, addition=addition)
+    assert runner._d10_external_review_package_authority_check(root)
+
+
+@pytest.mark.parametrize(
+    ("old", "new"),
+    (
+        ('SCHEMA: Final = "d10-external-review-package/v1"', 'SCHEMA: Final = "other"'),
+        (
+            "DEPLOYMENT_ID: Final = internal_review_policy.DEPLOYMENT_ID",
+            'DEPLOYMENT_ID: Final = "foreign"',
+        ),
+        (
+            "SOAK_ID: Final = internal_review_policy.SOAK_ID",
+            'SOAK_ID: Final = "foreign"',
+        ),
+        (
+            "ATTESTATION_SHA256: Final = internal_review_policy.ATTESTATION_SHA256",
+            'ATTESTATION_SHA256: Final = "foreign"',
+        ),
+        (
+            "ACTIVATION_UTC: Final = internal_review_policy.ACTIVATION_UTC",
+            "ACTIVATION_UTC: Final = END_UTC",
+        ),
+        (
+            "END_UTC: Final = internal_review_policy.END_UTC",
+            "END_UTC: Final = ACTIVATION_UTC",
+        ),
+        ('AUDIT_COMPLETENESS = "AUDIT_COMPLETENESS"', 'AUDIT_COMPLETENESS = "OTHER"'),
+        (
+            'AUDIT_COMPLETENESS = "AUDIT_COMPLETENESS"',
+            'AUDIT_COMPLETENESS = "AUDIT_COMPLETENESS"\n    EXTRA = "EXTRA"',
+        ),
+        ("@dataclass(frozen=True, slots=True)", "@dataclass(frozen=False, slots=True)"),
+        ("type(review) is not dict", "False"),
+        ("set(review) != set(INTERNAL_REVIEW_FIELDS)", "False"),
+        ('review["schema"] != internal_review_policy.SCHEMA', "False"),
+        ('review["status"] != "READY_FOR_OPERATOR_REVIEW"', "False"),
+        ('review["internal_wake_evidence"] != "PASS"', "False"),
+        ('review["d10_accepted"] is not False', "False"),
+        ('review["broker_paper_authorized"] is not False', "False"),
+        ('review["operator_decision_required"] is not True', "False"),
+        ('review["minimum_daily_wake_count_met"] is not True', "False"),
+        ("required != internal_review_policy.EXTERNAL_REVIEW_REQUIRED", "False"),
+        ('review["wake_count"] < 7', "False"),
+        (
+            'review["completed_count"] + review["no_action_count"] '
+            '!= review["wake_count"]',
+            "False",
+        ),
+        ('review["stopped_count"] != 0', "False"),
+        ('review["extra_wake_count"] != review["wake_count"] - 7', "False"),
+        ('review["executable_file_count"] <= 0', "False"),
+        ("type(review[field]) is not str or not review[field]", "False"),
+        ("value.tzinfo is UTC", "value.tzinfo is not None"),
+        ("_timestamp(parsed) != value", "False"),
+        ("ACTIVATION_UTC <= first <= last < END_UTC", "first <= last"),
+        ("END_UTC <= reviewed <= packaged_at_utc", "True"),
+        ("packaged_at_utc < END_UTC", "packaged_at_utc <= END_UTC"),
+        ("type(external_reviews) is not tuple", "False"),
+        ("type(item) is not D10ExternalReviewEvidence", "False"),
+        ("len(external_reviews) != 5", "len(external_reviews) < 5"),
+        ("type(item.category) is not D10ExternalReviewCategory", "False"),
+        ("len(by_category) != 5", "False"),
+        ("set(by_category) != set(CATEGORY_ORDER)", "False"),
+        (
+            "tuple(by_category[category] for category in CATEGORY_ORDER)",
+            "external_reviews",
+        ),
+        ("item.deployment_id != DEPLOYMENT_ID", "False"),
+        ("item.soak_id != SOAK_ID", "False"),
+        ("item.activation_utc != ACTIVATION_UTC", "False"),
+        ("item.end_utc != END_UTC", "False"),
+        ("END_UTC <= item.reviewed_at_utc <= packaged_at_utc", "True"),
+        ('re.fullmatch(r"[0-9a-f]{64}", item.artifact_sha256) is None', "False"),
+        ("item.artifact_byte_length <= 0", "False"),
+        ("item.complete is not True", "False"),
+        ("item.unresolved_findings != 0", "False"),
+        ('"d10_accepted": False', '"d10_accepted": True'),
+        ('"broker_paper_authorized": False', '"broker_paper_authorized": True'),
+        ('"operator_decision_required": True', '"operator_decision_required": False'),
+        ('"status": "READY_FOR_OPERATOR_DECISION"', '"status": "ACCEPTED"'),
+        ('"status": "READY_FOR_OPERATOR_DECISION"', '"status": "GRADUATED"'),
+        ('"status": "READY_FOR_OPERATOR_DECISION"', '"status": "BROKER_READY"'),
+        ('"status": "READY_FOR_OPERATOR_DECISION"', '"status": "GO_LIVE"'),
+        ('"status": "READY_FOR_OPERATOR_DECISION"', '"status": "APPROVED"'),
+        ('"category": item.category.value', '"category": item'),
+    ),
+)
+def test_external_review_authority_freezes_every_policy(tmp_path, old, new):
+    root = _external_review_authority_copy(tmp_path, old=old, new=new)
+    assert runner._d10_external_review_package_authority_check(root)
+
+
+@pytest.mark.parametrize(
+    ("old", "new"),
+    (
+        (
+            "authority_check=_d10_external_review_package_authority_check,",
+            "authority_check=_d10_external_review_package_authority_check, "
+            "preflight=_r8_preflight,",
+        ),
+        (
+            "authority_check=_d10_external_review_package_authority_check,",
+            "authority_check=_d10_external_review_package_authority_check, "
+            "execute=_r7_execute,",
+        ),
+        (
+            "authority_check=_d10_external_review_package_authority_check,",
+            "authority_check=_r8_authority_check,",
+        ),
+        (
+            'remote_branch="feature/post-d10-observability",',
+            'remote_branch="feature/d10c-durable-wake-evidence",',
+        ),
+        (
+            'remote_branch="feature/post-d10-observability",',
+            'remote_branch="feature/post-d10-observability", remote_head_env="HEAD",',
+        ),
+    ),
+)
+def test_external_review_authority_freezes_verify_only_registration(tmp_path, old, new):
+    root = _external_review_authority_copy(tmp_path, runner_old=old, runner_new=new)
+    assert runner._d10_external_review_package_authority_check(root)
+
+
+def test_external_review_authority_blocks_missing_or_invalid_source(tmp_path):
+    assert runner._d10_external_review_package_authority_check(tmp_path)
+    root = _external_review_authority_copy(tmp_path, addition="def invalid(")
+    assert runner._d10_external_review_package_authority_check(root)
+
+
+def test_external_review_authority_preserves_upstream_frozen_identity(tmp_path):
+    root = _external_review_authority_copy(tmp_path)
+    path = root / "scripts/d10_end_of_soak_review.py"
+    source = path.read_text(encoding="utf-8")
+    source = source.replace('"d2071f25-5a7c-5293-a28f-5b722c9917a2"', '"foreign"', 1)
+    path.write_text(source, encoding="utf-8")
+    assert runner._d10_external_review_package_authority_check(root)

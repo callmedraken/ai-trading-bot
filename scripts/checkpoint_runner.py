@@ -1057,6 +1057,111 @@ def _d10_soak_review_authority_check(repo_root: Path) -> tuple[str, ...]:
     return tuple(failures)
 
 
+def _d10_external_review_package_authority_check(repo_root: Path) -> tuple[str, ...]:
+    """Freeze S2B's entire pure contract and its verify-only registration."""
+    try:
+        tree = ast.parse(
+            (repo_root / "scripts/d10_external_review_package.py").read_text(
+                encoding="utf-8"
+            )
+        )
+        runner_tree = ast.parse(
+            (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+        )
+    except (OSError, SyntaxError):
+        return ("S2B source missing or invalid",)
+    failures = list(_d10_soak_review_authority_check(repo_root))
+    imports = {
+        "from __future__ import annotations",
+        "import re",
+        "from dataclasses import dataclass",
+        "from datetime import UTC, datetime",
+        "from enum import StrEnum",
+        "from typing import Final",
+        "from scripts import d10_end_of_soak_review as internal_review_policy",
+    }
+    actual_imports = {
+        ast.unparse(node)
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.Import, ast.ImportFrom))
+    }
+    if actual_imports != imports:
+        failures.append("S2B contains unreviewed imports")
+    allowed_calls = {
+        "_blocked",
+        "_internal_reason",
+        "_parse_timestamp",
+        "_timestamp",
+        "_utc",
+        "any",
+        "dataclass",
+        "datetime.fromisoformat",
+        "len",
+        "re.fullmatch",
+        "set",
+        "tuple",
+        "type",
+        "value.isoformat",
+        "value.isoformat(timespec='microseconds').replace",
+    }
+    if any(
+        ast.unparse(node.func) not in allowed_calls
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+    ):
+        failures.append("S2B contains unreviewed I/O or effect calls")
+    # Freeze all semantic statements: exact imports/types, enum order and set,
+    # current S2A identity/success expectations, exactly five unique envelopes,
+    # complete=True, unresolved=0, canonical ordered UTC times, artifact shape,
+    # deterministic sanitized output, and False/False/True non-authority flags.
+    # S2A's existing independent frozen authority check also pins the imported
+    # constants. Whitespace changes cannot weaken this complete AST contract.
+    expected_ast_sha256 = (
+        "357c6232b4dfde83786dcdd6c1f430e0764d6c38442632ad7a04f01bc063ba24"
+    )
+    actual_ast_sha256 = hashlib.sha256(ast.dump(tree).encode("utf-8")).hexdigest()
+    if actual_ast_sha256 != expected_ast_sha256:
+        failures.append("S2B frozen pure external-review package policy drift")
+    registrations = [
+        node
+        for node in ast.walk(runner_tree)
+        if isinstance(node, ast.Call)
+        and ast.unparse(node.func) == "CheckpointSpec"
+        and any(
+            keyword.arg == "name"
+            and isinstance(keyword.value, ast.Constant)
+            and keyword.value.value == "d10-external-review-package"
+            for keyword in node.keywords
+        )
+    ]
+    if len(registrations) != 1:
+        failures.append("S2B registration missing or duplicated")
+    else:
+        expected = {
+            "name": "'d10-external-review-package'",
+            "description": "'D10 pure external-review evidence package source gate'",
+            "tests": "external_review_tests",
+            "ruff_paths": "external_review_ruff",
+            "authority_check": "_d10_external_review_package_authority_check",
+            "remote_branch": "'feature/post-d10-observability'",
+        }
+        actual = {
+            keyword.arg: ast.unparse(keyword.value)
+            for keyword in registrations[0].keywords
+        }
+        if registrations[0].args or actual != expected:
+            failures.append("S2B must remain verify-only with exact side registration")
+    spec = _checkpoint_specs()["d10-external-review-package"]
+    if (
+        spec.preflight is not None
+        or spec.execute is not None
+        or spec.remote_head_env is not None
+        or spec.remote_branch != "feature/post-d10-observability"
+    ):
+        failures.append("S2B runtime registration must remain verify-only")
+    return tuple(failures)
+
+
 def _r7_authority_check(repo_root: Path) -> tuple[str, ...]:
     path = repo_root / "scripts" / "d10_arch128_r7_readonly.py"
     source = path.read_text(encoding="utf-8")
@@ -2408,6 +2513,15 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
         "scripts/d10_end_of_soak_review.py",
         "tests/runtime/test_d10_end_of_soak_review.py",
     )
+    external_review_tests = (
+        *soak_review_tests,
+        "tests/runtime/test_d10_external_review_package.py",
+    )
+    external_review_ruff = (
+        *soak_review_ruff,
+        "scripts/d10_external_review_package.py",
+        "tests/runtime/test_d10_external_review_package.py",
+    )
     return {
         "d10-soak-status": CheckpointSpec(
             name="d10-soak-status",
@@ -2424,6 +2538,14 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             tests=soak_review_tests,
             ruff_paths=soak_review_ruff,
             authority_check=_d10_soak_review_authority_check,
+            remote_branch="feature/post-d10-observability",
+        ),
+        "d10-external-review-package": CheckpointSpec(
+            name="d10-external-review-package",
+            description="D10 pure external-review evidence package source gate",
+            tests=external_review_tests,
+            ruff_paths=external_review_ruff,
+            authority_check=_d10_external_review_package_authority_check,
             remote_branch="feature/post-d10-observability",
         ),
         "arch128-r8": CheckpointSpec(

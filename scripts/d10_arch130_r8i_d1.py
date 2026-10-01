@@ -17,10 +17,16 @@ from uuid import UUID
 from scripts import d10_arch128_r8_halt_windows as halt_windows
 from scripts import d10_arch128_r8_terminal_halt as halt
 from trading_bot.market_calendar import NYSEMarketCalendar
-from trading_bot.market_data import BoundMarketCalendar, XNYS_CALENDAR_DESCRIPTOR
-from trading_bot.runtime import personal_desktop_paper_account_read_authority as account_read
-from trading_bot.runtime import personal_desktop_unattended_paper_decision_storage as decision_storage
-from trading_bot.runtime import personal_desktop_unattended_paper_invocation_storage as invocation_storage
+from trading_bot.market_data import XNYS_CALENDAR_DESCRIPTOR, BoundMarketCalendar
+from trading_bot.runtime import (
+    personal_desktop_paper_account_read_authority as account_read,
+)
+from trading_bot.runtime import (
+    personal_desktop_unattended_paper_decision_storage as decision_storage,
+)
+from trading_bot.runtime import (
+    personal_desktop_unattended_paper_invocation_storage as invocation_storage,
+)
 from trading_bot.runtime.paper_operation import parse_paper_operation_receipt
 from trading_bot.runtime.personal_desktop_paper_account_security import (
     PERSONAL_DESKTOP_PAPER_V2_OPERATIONS,
@@ -65,7 +71,9 @@ EXPECTED_NEXT_EXECUTION_SESSION = "2026-10-01"
 MAX_C3_ATTEMPTS = 16
 _UUID_TEXT = r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
 _INVOCATION_FINAL = re.compile(rf"unattended-paper-invocation-({_UUID_TEXT})")
-_INVOCATION_STAGING = re.compile(rf"\.unattended-paper-invocation-({_UUID_TEXT})\.staging")
+_INVOCATION_STAGING = re.compile(
+    rf"\.unattended-paper-invocation-({_UUID_TEXT})\.staging"
+)
 _DECISION_FINAL = re.compile(rf"unattended-paper-decision-({_UUID_TEXT})")
 _DECISION_STAGING = re.compile(rf"\.unattended-paper-decision-({_UUID_TEXT})\.staging")
 _OPERATION = re.compile(rf"paper-operation-({_UUID_TEXT})")
@@ -257,7 +265,11 @@ def _read_c3_inventory(
             "claim_id": None if claim_id is None else _uuid(claim_id, "c3_claim"),
             "claim_committed_at_utc": claim_committed,
             "reservation_id": (
-                None if reservation_id is None else _uuid(reservation_id, "c3_reservation")
+                (
+                    None
+                    if reservation_id is None
+                    else _uuid(reservation_id, "c3_reservation")
+                )
             ),
             "reservation_state": reservation_state,
             "reservation_committed_at_utc": reservation_committed,
@@ -366,7 +378,9 @@ def _decision_inventory(
             staged = _DECISION_STAGING.fullmatch(name)
             if staged is not None:
                 identity = _uuid(staged.group(1), "decision_staging")
-                session.pin(PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_DECISIONS + "\\" + name)
+                session.pin(
+                    PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_DECISIONS + "\\" + name
+                )
                 staging.append(identity)
                 continue
             if match is None:
@@ -377,7 +391,9 @@ def _decision_inventory(
                 identity
             )
             if session.names(directory) != (artifact_name,):
-                raise IncidentReconciliationBlocked("decision_directory_contents_invalid")
+                raise IncidentReconciliationBlocked(
+                    "decision_directory_contents_invalid"
+                )
             binding = verify_personal_desktop_unattended_paper_decision_intent(
                 session.read(directory + "\\" + artifact_name),
                 calendar,
@@ -387,13 +403,17 @@ def _decision_inventory(
             final.append(
                 {
                     "decision_id": str(decision.decision_id),
-                    "selected_session": decision.selected_session.session_date.isoformat(),
+                    "selected_session": (
+                        decision.selected_session.session_date.isoformat()
+                    ),
                     "execution_session": (
                         decision.intended_execution_session.session_date.isoformat()
                     ),
                     "current_selection_id": str(decision.current_c3.selection_id),
                     "current_snapshot_id": str(decision.current_c3.snapshot_id),
-                    "predecessor_checkpoint_id": str(decision.predecessor_checkpoint_id),
+                    "predecessor_checkpoint_id": str(
+                        decision.predecessor_checkpoint_id
+                    ),
                     "artifact_sha256": binding.artifact_sha256,
                     "artifact_byte_length": binding.artifact_byte_length,
                 }
@@ -433,14 +453,18 @@ def _invocation_inventory(
                 staging.append(identity)
                 continue
             if match is None:
-                raise IncidentReconciliationBlocked("invocation_namespace_unknown_entry")
+                raise IncidentReconciliationBlocked(
+                    "invocation_namespace_unknown_entry"
+                )
             identity = UUID(_uuid(match.group(1), "invocation"))
             directory = PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_INVOCATIONS + "\\" + name
-            artifact_name = invocation_storage.unattended_paper_invocation_artifact_name(
-                identity
+            artifact_name = (
+                invocation_storage.unattended_paper_invocation_artifact_name(identity)
             )
             if session.names(directory) != (artifact_name,):
-                raise IncidentReconciliationBlocked("invocation_directory_contents_invalid")
+                raise IncidentReconciliationBlocked(
+                    "invocation_directory_contents_invalid"
+                )
             binding = verify_personal_desktop_unattended_paper_invocation(
                 session.read(directory + "\\" + artifact_name),
                 calendar,
@@ -450,7 +474,9 @@ def _invocation_inventory(
             final.append(
                 {
                     "invocation_id": str(invocation.invocation_id),
-                    "execution_session": invocation.execution_session.session_date.isoformat(),
+                    "execution_session": (
+                        invocation.execution_session.session_date.isoformat()
+                    ),
                     "selection_id": str(invocation.selection_id),
                     "selected_snapshot_id": str(invocation.selected_snapshot_id),
                     "plan_id": str(invocation.plan_id),
@@ -498,7 +524,9 @@ def _paper_operation_inventory(trading_sid: str) -> dict[str, object]:
                 )
                 continue
             if contents != (expected,):
-                raise IncidentReconciliationBlocked("operation_directory_contents_invalid")
+                raise IncidentReconciliationBlocked(
+                    "operation_directory_contents_invalid"
+                )
             receipt = parse_paper_operation_receipt(
                 session.read(directory + "\\" + expected)
             )
@@ -509,7 +537,9 @@ def _paper_operation_inventory(trading_sid: str) -> dict[str, object]:
                     "operation_id": operation_id,
                     "receipt_present": True,
                     "status": receipt.status.value,
-                    "outcome": None if receipt.outcome is None else receipt.outcome.value,
+                    "outcome": (
+                        None if receipt.outcome is None else receipt.outcome.value
+                    ),
                     "application_id": str(receipt.application_id),
                     "snapshot_id": str(
                         receipt.intent.completed_snapshot_artifact.artifact_id
@@ -545,9 +575,7 @@ def _paper_operation_inventory(trading_sid: str) -> dict[str, object]:
     }
 
 
-def _decision_attribution(
-    c3: dict[str, object], decisions: dict[str, object]
-) -> str:
+def _decision_attribution(c3: dict[str, object], decisions: dict[str, object]) -> str:
     relevant = decisions["incident_next_decisions"]
     if type(relevant) is not list:
         raise IncidentReconciliationBlocked("decision_inventory_shape_invalid")

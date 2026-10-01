@@ -159,6 +159,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
         "d10-soak-review",
         "d10-external-review-package",
         "d10-scheduler-slot-policy",
+        "d10-scheduler-history-collector",
     }
     for spec in specs.values():
         assert "tests/runtime/test_checkpoint_runner.py" in spec.tests
@@ -172,6 +173,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
                 "d10-soak-review",
                 "d10-external-review-package",
                 "d10-scheduler-slot-policy",
+                "d10-scheduler-history-collector",
             )
             else "feature/d10c-durable-wake-evidence"
         )
@@ -2597,3 +2599,265 @@ def test_scheduler_slot_authority_preserves_upstream_contracts(tmp_path, filenam
     source = source.replace('"d10_accepted": False', '"d10_accepted": True', 1)
     path.write_text(source, encoding="utf-8")
     assert runner._d10_scheduler_slot_policy_authority_check(root)
+
+
+def test_scheduler_history_registration_is_verify_only():
+    specs = runner._checkpoint_specs()
+    spec = specs["d10-scheduler-history-collector"]
+    upstream = specs["d10-scheduler-slot-policy"]
+    assert spec.preflight is None
+    assert spec.execute is None
+    assert spec.remote_head_env is None
+    assert spec.remote_branch == "feature/post-d10-observability"
+    assert (
+        spec.authority_check is runner._d10_scheduler_history_collector_authority_check
+    )
+    assert spec.tests == (
+        *upstream.tests,
+        "tests/runtime/test_d10_scheduler_history_windows.py",
+    )
+    assert spec.ruff_paths == (
+        *upstream.ruff_paths,
+        "scripts/d10_scheduler_history_windows.py",
+        "tests/runtime/test_d10_scheduler_history_windows.py",
+    )
+    parser = runner._parser(specs)
+    assert parser.parse_args(("verify", spec.name)).checkpoint == spec.name
+    for command in ("preflight", "execute"):
+        with pytest.raises(SystemExit):
+            parser.parse_args((command, spec.name))
+    # The accepted hierarchy retains its original operational boundaries.
+    assert upstream.preflight is None and upstream.execute is None
+    assert specs["d10-soak-status"].preflight is runner._d10_soak_status_preflight
+    assert specs["d10-soak-status"].execute is None
+    for name in ("d10-soak-review", "d10-external-review-package"):
+        assert specs[name].preflight is None and specs[name].execute is None
+    assert specs["arch128-r8"].preflight is runner._r8_preflight
+    assert specs["arch128-r8"].execute is None
+    assert specs["arch128-r8"].remote_branch == "feature/d10c-durable-wake-evidence"
+
+
+def _scheduler_history_authority_copy(tmp_path):
+    root = _scheduler_slot_authority_copy(tmp_path)
+    source_root = Path(runner.__file__).resolve().parent.parent
+    for name in (
+        "d10_scheduler_history_windows.py",
+        "d10_scheduler_history_observe.ps1",
+    ):
+        (root / "scripts" / name).write_bytes(
+            (source_root / "scripts" / name).read_bytes()
+        )
+    return root
+
+
+@pytest.mark.parametrize(
+    ("old", "new"),
+    (
+        ("shell=False", "shell=True"),
+        ("stdin=subprocess.DEVNULL", "stdin=subprocess.PIPE"),
+        ("TIMEOUT_SECONDS = 60", "TIMEOUT_SECONDS = 600"),
+        ("MAX_STDOUT = 256 * 1024", "MAX_STDOUT = 1024 * 1024"),
+        ("MAX_STDERR = 256", "MAX_STDERR = 1024"),
+        ("MAX_TARGET_EVENTS = 256", "MAX_TARGET_EVENTS = 512"),
+        (
+            r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+            "powershell.exe",
+        ),
+        ("d10_scheduler_history_observe.ps1", "alternate.ps1"),
+        ('"-NonInteractive"', '"-Command"'),
+        ("str(HELPER)", "os.environ['HELPER']"),
+        ("def observe()", "def observe(arguments)"),
+        (
+            "policy.analyze(observation)",
+            "policy.analyze(observation); policy.analyze(observation)",
+        ),
+        (
+            "code = process.wait(timeout=TIMEOUT_SECONDS)",
+            "while True: code = process.wait(timeout=TIMEOUT_SECONDS)",
+        ),
+        ('"event_log_mutation": "NOT_RUN"', '"event_log_mutation": "RUN"'),
+        ("policy.EVENT_IDS.items()", "{'OTHER': 999}.items()"),
+        ("str(UUID(value)) != value", "False"),
+        (
+            r'r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}Z"',
+            'r".*"',
+        ),
+    ),
+)
+def test_scheduler_history_authority_rejects_transport_or_projection_drift(
+    tmp_path, old, new
+):
+    root = _scheduler_history_authority_copy(tmp_path)
+    path = root / "scripts/d10_scheduler_history_windows.py"
+    source = path.read_text(encoding="utf-8")
+    assert old in source
+    path.write_text(source.replace(old, new, 1), encoding="utf-8")
+    assert runner._d10_scheduler_history_collector_authority_check(root)
+
+
+@pytest.mark.parametrize(
+    "addition",
+    (
+        "import os",
+        "import ctypes",
+        "from win32com.client import Dispatch",
+        "raw_xml = '<Event />'",
+        "message = event.Message",
+        "provider.capture()",
+        "paper_v2.execute()",
+        "broker.order()",
+        "live.execute()",
+        "scheduler.Run(None)",
+        "scheduler.RegisterTaskDefinition()",
+        "observe()",
+        "subprocess.run([])",
+        "def preflight(): pass",
+        "def execute(): pass",
+    ),
+)
+def test_scheduler_history_authority_rejects_new_python_surfaces(tmp_path, addition):
+    root = _scheduler_history_authority_copy(tmp_path)
+    path = root / "scripts/d10_scheduler_history_windows.py"
+    path.write_text(
+        path.read_text(encoding="utf-8") + "\n" + addition + "\n", encoding="utf-8"
+    )
+    assert runner._d10_scheduler_history_collector_authority_check(root)
+
+
+@pytest.mark.parametrize(
+    "addition",
+    (
+        "# changed helper",
+        "wevtutil sl channel /e:true",
+        "Clear-EventLog channel",
+        "Limit-EventLog channel",
+        "Write-EventLog channel",
+        "New-EventLog channel",
+        "Remove-EventLog channel",
+        "Set-WinEvent channel",
+        "Enable-ScheduledTask task",
+        "Disable-ScheduledTask task",
+        "Start-ScheduledTask task",
+        "Stop-ScheduledTask task",
+        "Register-ScheduledTask task",
+        "Unregister-ScheduledTask task",
+        "schtasks /run",
+        "New-Object -ComObject Schedule.Service",
+        "$task.Run($null)",
+        "$task.RegisterTaskDefinition()",
+        "$events.Add($_.Message)",
+        "$events.Add($_.ToXml())",
+    ),
+)
+def test_scheduler_history_authority_rejects_any_helper_mutation(tmp_path, addition):
+    root = _scheduler_history_authority_copy(tmp_path)
+    path = root / "scripts/d10_scheduler_history_observe.ps1"
+    path.write_bytes(path.read_bytes() + addition.encode("ascii") + b"\r\n")
+    assert runner._d10_scheduler_history_collector_authority_check(root)
+
+
+@pytest.mark.parametrize(
+    ("old", "new"),
+    (
+        ("100000", "100001"),
+        ("256", "512"),
+        ("@(100, 102, 107, 110)", "@(100, 102)"),
+        ("2026-09-30T22:07:24.000000Z", "2026-09-29T22:07:24.000000Z"),
+        ("2026-10-07T22:07:24.000000Z", "2026-10-08T22:07:24.000000Z"),
+        ("Microsoft-Windows-TaskScheduler/Operational", "System"),
+        (r"\AITradingBot-PD4-UnattendedPaper-v1", r"\Foreign"),
+        ("$instant.Ticks % 10", "$instant.Ticks % 1"),
+        (".ToString('D').ToLowerInvariant()", ".ToString('B')"),
+        ("if ($args.Count -ne 0)", "if ($false)"),
+    ),
+)
+def test_scheduler_history_authority_freezes_helper_bounds_and_identity(
+    tmp_path, old, new
+):
+    root = _scheduler_history_authority_copy(tmp_path)
+    path = root / "scripts/d10_scheduler_history_observe.ps1"
+    data = path.read_bytes()
+    assert old.encode("ascii") in data
+    path.write_bytes(data.replace(old.encode("ascii"), new.encode("ascii"), 1))
+    assert runner._d10_scheduler_history_collector_authority_check(root)
+
+
+@pytest.mark.parametrize(
+    ("old", "new"),
+    (
+        (
+            "authority_check=_d10_scheduler_history_collector_authority_check,",
+            "authority_check=_d10_scheduler_history_collector_authority_check, "
+            "preflight=_r8_preflight,",
+        ),
+        (
+            "authority_check=_d10_scheduler_history_collector_authority_check,",
+            "authority_check=_d10_scheduler_history_collector_authority_check, "
+            "execute=_r7_execute,",
+        ),
+        (
+            'remote_branch="feature/post-d10-observability",',
+            'remote_branch="feature/d10c-durable-wake-evidence",',
+        ),
+        (
+            'remote_branch="feature/post-d10-observability",',
+            'remote_branch="feature/post-d10-observability", remote_head_env="HEAD",',
+        ),
+        ("tests=scheduler_history_tests,", "tests=scheduler_slot_tests,"),
+        ("ruff_paths=scheduler_history_ruff,", "ruff_paths=scheduler_slot_ruff,"),
+    ),
+)
+def test_scheduler_history_authority_freezes_registration(tmp_path, old, new):
+    root = _scheduler_history_authority_copy(tmp_path)
+    path = root / "scripts/checkpoint_runner.py"
+    source = path.read_text(encoding="utf-8")
+    start = source.index('        "d10-scheduler-history-collector": CheckpointSpec(')
+    end = source.index('        "arch128-r8": CheckpointSpec(', start)
+    registration = source[start:end]
+    assert old in registration
+    path.write_text(
+        source[:start] + registration.replace(old, new, 1) + source[end:],
+        encoding="utf-8",
+    )
+    assert runner._d10_scheduler_history_collector_authority_check(root)
+
+
+@pytest.mark.parametrize(
+    "filename",
+    (
+        "d10_scheduler_slot_review_policy.py",
+        "d10_external_review_package.py",
+        "d10_end_of_soak_review.py",
+    ),
+)
+def test_scheduler_history_authority_composes_upstream(tmp_path, filename):
+    root = _scheduler_history_authority_copy(tmp_path)
+    path = root / "scripts" / filename
+    source = path.read_text(encoding="utf-8")
+    path.write_text(
+        source.replace('"d10_accepted": False', '"d10_accepted": True', 1),
+        encoding="utf-8",
+    )
+    assert runner._d10_scheduler_history_collector_authority_check(root)
+
+
+def test_scheduler_history_authority_accepts_source_without_observation(monkeypatch):
+    from scripts import d10_scheduler_history_windows as collector
+
+    monkeypatch.setattr(
+        collector, "observe", lambda: pytest.fail("source gate must not collect")
+    )
+    monkeypatch.setattr(
+        collector.subprocess, "Popen", lambda *a, **k: pytest.fail("no helper")
+    )
+    root = Path(runner.__file__).resolve().parent.parent
+    assert runner._d10_scheduler_history_collector_authority_check(root) == ()
+
+
+def test_scheduler_history_authority_missing_source_blocks(tmp_path):
+    assert runner._d10_scheduler_history_collector_authority_check(tmp_path)
+    root = _scheduler_history_authority_copy(tmp_path)
+    (root / "scripts/d10_scheduler_history_windows.py").write_text(
+        "def invalid(", encoding="utf-8"
+    )
+    assert runner._d10_scheduler_history_collector_authority_check(root)

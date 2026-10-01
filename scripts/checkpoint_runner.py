@@ -1285,6 +1285,123 @@ def _d10_scheduler_slot_policy_authority_check(repo_root: Path) -> tuple[str, ..
     return tuple(failures)
 
 
+def _d10_scheduler_history_collector_authority_check(
+    repo_root: Path,
+) -> tuple[str, ...]:
+    """Freeze the S2C1B Python semantics, exact Windows helper bytes and registry.
+
+    Source acceptance does not authorize observe(). No reader is invoked here.
+    The complete AST pins all imports/calls, one fixed bounded helper transport,
+    zero arguments, no retry, exact projection and one accepted policy call.
+    """
+    try:
+        tree = ast.parse(
+            (repo_root / "scripts/d10_scheduler_history_windows.py").read_text(
+                encoding="utf-8"
+            )
+        )
+        helper = (repo_root / "scripts/d10_scheduler_history_observe.ps1").read_bytes()
+        runner_tree = ast.parse(
+            (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+        )
+    except (OSError, SyntaxError):
+        return ("S2C1B source missing or invalid",)
+    failures = list(_d10_scheduler_slot_policy_authority_check(repo_root))
+    expected_ast_sha256 = (
+        "4cc09e5e11df6491e137b4305fc38198f41365c5a8fe9567cc147128c98ce826"
+    )
+    if (
+        hashlib.sha256(ast.dump(tree).encode("utf-8")).hexdigest()
+        != expected_ast_sha256
+    ):
+        failures.append("S2C1B frozen collector semantic AST drift")
+    # Exact CRLF Windows checkout bytes, including comments and final newline.
+    expected_helper_sha256 = (
+        "2d224ca0e4bbb3ba0714a68a631c3b99501dff65ae21680a9fe8df8659151237"
+    )
+    if hashlib.sha256(helper).hexdigest() != expected_helper_sha256:
+        failures.append("S2C1B fixed read-only helper bytes drift")
+    registrations = [
+        node
+        for node in ast.walk(runner_tree)
+        if isinstance(node, ast.Call)
+        and ast.unparse(node.func) == "CheckpointSpec"
+        and any(
+            keyword.arg == "name"
+            and isinstance(keyword.value, ast.Constant)
+            and keyword.value.value == "d10-scheduler-history-collector"
+            for keyword in node.keywords
+        )
+    ]
+    expected = {
+        "name": "'d10-scheduler-history-collector'",
+        "description": "'D10 fixed Windows scheduler-history collector source gate'",
+        "tests": "scheduler_history_tests",
+        "ruff_paths": "scheduler_history_ruff",
+        "authority_check": "_d10_scheduler_history_collector_authority_check",
+        "remote_branch": "'feature/post-d10-observability'",
+    }
+    if len(registrations) != 1:
+        failures.append("S2C1B registration missing or duplicated")
+    else:
+        registration = registrations[0]
+        actual = {
+            keyword.arg: ast.unparse(keyword.value) for keyword in registration.keywords
+        }
+        if (
+            registration.args
+            or len(registration.keywords) != len(expected)
+            or actual != expected
+        ):
+            failures.append(
+                "S2C1B must remain verify-only with exact side registration"
+            )
+    spec = _checkpoint_specs()["d10-scheduler-history-collector"]
+    upstream = _checkpoint_specs()["d10-scheduler-slot-policy"]
+    if (
+        spec.preflight is not None
+        or spec.execute is not None
+        or spec.remote_head_env is not None
+        or spec.remote_branch != "feature/post-d10-observability"
+        or spec.tests
+        != (
+            *upstream.tests,
+            "tests/runtime/test_d10_scheduler_history_windows.py",
+        )
+        or spec.ruff_paths
+        != (
+            *upstream.ruff_paths,
+            "scripts/d10_scheduler_history_windows.py",
+            "tests/runtime/test_d10_scheduler_history_windows.py",
+        )
+    ):
+        failures.append("S2C1B runtime registration must remain exact and verify-only")
+    # Also pin the source selections; inspecting a mutated copy must not rely
+    # solely on this running interpreter's unchanged registry.
+    functions = _top_level_functions(runner_tree)
+    registry = functions.get("_checkpoint_specs")
+    selections = {
+        "scheduler_history_tests": (
+            "(*scheduler_slot_tests, "
+            "'tests/runtime/test_d10_scheduler_history_windows.py')"
+        ),
+        "scheduler_history_ruff": (
+            "(*scheduler_slot_ruff, 'scripts/d10_scheduler_history_windows.py', "
+            "'tests/runtime/test_d10_scheduler_history_windows.py')"
+        ),
+    }
+    actual_selections = {}
+    if registry is not None:
+        for node in registry.body:
+            if isinstance(node, ast.Assign):
+                for target in node.targets:
+                    if isinstance(target, ast.Name) and target.id in selections:
+                        actual_selections[target.id] = ast.unparse(node.value)
+    if actual_selections != selections:
+        failures.append("S2C1B source verification hierarchy drift")
+    return tuple(failures)
+
+
 def _r7_authority_check(repo_root: Path) -> tuple[str, ...]:
     path = repo_root / "scripts" / "d10_arch128_r7_readonly.py"
     source = path.read_text(encoding="utf-8")
@@ -2654,6 +2771,15 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
         "scripts/d10_scheduler_slot_review_policy.py",
         "tests/runtime/test_d10_scheduler_slot_review_policy.py",
     )
+    scheduler_history_tests = (
+        *scheduler_slot_tests,
+        "tests/runtime/test_d10_scheduler_history_windows.py",
+    )
+    scheduler_history_ruff = (
+        *scheduler_slot_ruff,
+        "scripts/d10_scheduler_history_windows.py",
+        "tests/runtime/test_d10_scheduler_history_windows.py",
+    )
     return {
         "d10-soak-status": CheckpointSpec(
             name="d10-soak-status",
@@ -2686,6 +2812,14 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             tests=scheduler_slot_tests,
             ruff_paths=scheduler_slot_ruff,
             authority_check=_d10_scheduler_slot_policy_authority_check,
+            remote_branch="feature/post-d10-observability",
+        ),
+        "d10-scheduler-history-collector": CheckpointSpec(
+            name="d10-scheduler-history-collector",
+            description="D10 fixed Windows scheduler-history collector source gate",
+            tests=scheduler_history_tests,
+            ruff_paths=scheduler_history_ruff,
+            authority_check=_d10_scheduler_history_collector_authority_check,
             remote_branch="feature/post-d10-observability",
         ),
         "arch128-r8": CheckpointSpec(

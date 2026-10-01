@@ -1402,6 +1402,179 @@ def _d10_scheduler_history_collector_authority_check(
     return tuple(failures)
 
 
+def _d10_xnys_session_coverage_policy_authority_check(
+    repo_root: Path,
+) -> tuple[str, ...]:
+    """Freeze all S2C2A semantics and compose the accepted S2C1B source gate.
+
+    No observer or collector runs here. The complete semantic AST freezes the
+    exact accepted timing/slot calls, seven-slot derivation, strict session text,
+    healthy identity/window/order requirements, first-seen coverage, duplicate
+    allowance, bounded fact-only sums and False/False/True non-authority flags.
+    """
+    try:
+        tree = ast.parse(
+            (repo_root / "scripts/d10_xnys_session_coverage_policy.py").read_text(
+                encoding="utf-8"
+            )
+        )
+        runner_tree = ast.parse(
+            (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+        )
+    except (OSError, SyntaxError):
+        return ("S2C2A source missing or invalid",)
+    failures = list(_d10_scheduler_history_collector_authority_check(repo_root))
+    imports = {
+        "from __future__ import annotations",
+        "from datetime import UTC, date, datetime",
+        "from scripts import d10_end_of_soak_review as internal_review_policy",
+        "from scripts import d10_scheduler_slot_review_policy as slot_policy",
+        "from trading_bot.market_calendar import TradingSession",
+        (
+            "from trading_bot.runtime import personal_desktop_unatte"
+            "nded_daily_cycle_timing as timing"
+        ),
+        (
+            "from trading_bot.runtime.personal_desktop_unattended_on"
+            "e_week_soak import MAX_D10_SUMMARY_WAKES, D10OneWeekWak"
+            "eEvidence, D10WakeOutcome"
+        ),
+        "from typing import Final",
+    }
+    actual_imports = {
+        ast.unparse(node)
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.Import, ast.ImportFrom))
+    }
+    if actual_imports != imports:
+        failures.append("S2C2A contains unreviewed imports")
+    allowed_calls = {
+        "TradingSession",
+        "_blocked",
+        "_coverage_reason",
+        "_expected_coverage",
+        "_session",
+        "_timestamp",
+        "_unique",
+        "_utc",
+        "any",
+        "completed_texts.append",
+        "date.fromisoformat",
+        "deadlines.append",
+        "dict.fromkeys",
+        "execution.session_date.isoformat",
+        "execution_texts.append",
+        "executions.append",
+        "len",
+        "parsed.isoformat",
+        "rows.append",
+        "session.session_date.isoformat",
+        "set",
+        "slot_policy.expected_slots_utc",
+        "sum",
+        "timing.completed_xnys_session_at",
+        "timing.next_xnys_execution_session",
+        "timing.xnys_regular_open",
+        "tuple",
+        "type",
+        "value.isoformat",
+        "value.isoformat(timespec='microseconds').replace",
+        "wake.__post_init__",
+        "zip",
+    }
+    if any(
+        ast.unparse(node.func) not in allowed_calls
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+    ):
+        failures.append("S2C2A contains unreviewed I/O, effect or calendar calls")
+    expected_ast_sha256 = (
+        "2690f7304ec0a380177b7689b18d461da36ebdcdf1db78bfd5f7c44a5641927b"
+    )
+    if (
+        hashlib.sha256(ast.dump(tree).encode("utf-8")).hexdigest()
+        != expected_ast_sha256
+    ):
+        failures.append("S2C2A frozen pure XNYS session coverage policy drift")
+    registrations = [
+        node
+        for node in ast.walk(runner_tree)
+        if isinstance(node, ast.Call)
+        and ast.unparse(node.func) == "CheckpointSpec"
+        and any(
+            keyword.arg == "name"
+            and isinstance(keyword.value, ast.Constant)
+            and keyword.value.value == "d10-xnys-session-coverage-policy"
+            for keyword in node.keywords
+        )
+    ]
+    expected_registration = {
+        "name": "'d10-xnys-session-coverage-policy'",
+        "description": "'D10 pure eligible XNYS session coverage review source gate'",
+        "tests": "xnys_session_tests",
+        "ruff_paths": "xnys_session_ruff",
+        "authority_check": "_d10_xnys_session_coverage_policy_authority_check",
+        "remote_branch": "'feature/post-d10-observability'",
+    }
+    if len(registrations) != 1:
+        failures.append("S2C2A registration missing or duplicated")
+    else:
+        registration = registrations[0]
+        actual = {
+            keyword.arg: ast.unparse(keyword.value) for keyword in registration.keywords
+        }
+        if (
+            registration.args
+            or len(registration.keywords) != len(expected_registration)
+            or actual != expected_registration
+        ):
+            failures.append(
+                "S2C2A must remain verify-only with exact side registration"
+            )
+    spec = _checkpoint_specs()["d10-xnys-session-coverage-policy"]
+    upstream = _checkpoint_specs()["d10-scheduler-history-collector"]
+    if (
+        spec.preflight is not None
+        or spec.execute is not None
+        or spec.remote_head_env is not None
+        or spec.remote_branch != "feature/post-d10-observability"
+        or spec.tests
+        != (
+            *upstream.tests,
+            "tests/runtime/test_d10_xnys_session_coverage_policy.py",
+            "tests/runtime/test_personal_desktop_unattended_daily_cycle_timing.py",
+            "tests/market_calendar/test_nyse_calendar.py",
+        )
+        or spec.ruff_paths
+        != (
+            *upstream.ruff_paths,
+            "scripts/d10_xnys_session_coverage_policy.py",
+            "tests/runtime/test_d10_xnys_session_coverage_policy.py",
+        )
+    ):
+        failures.append("S2C2A runtime verification hierarchy or authority drift")
+    registry = _top_level_functions(runner_tree).get("_checkpoint_specs")
+    selections = {
+        "xnys_session_tests": "(*scheduler_history_tests, "
+        "'tests/runtime/test_d10_xnys_session_coverage_policy.py', "
+        "'tests/runtime/test_personal_desktop_unattended_daily_cycle_timing.py', "
+        "'tests/market_calendar/test_nyse_calendar.py')",
+        "xnys_session_ruff": "(*scheduler_history_ruff, "
+        "'scripts/d10_xnys_session_coverage_policy.py', "
+        "'tests/runtime/test_d10_xnys_session_coverage_policy.py')",
+    }
+    actual_selections = {}
+    if registry is not None:
+        for node in registry.body:
+            if isinstance(node, ast.Assign):
+                for target in node.targets:
+                    if isinstance(target, ast.Name) and target.id in selections:
+                        actual_selections[target.id] = ast.unparse(node.value)
+    if actual_selections != selections:
+        failures.append("S2C2A source verification hierarchy drift")
+    return tuple(failures)
+
+
 def _r7_authority_check(repo_root: Path) -> tuple[str, ...]:
     path = repo_root / "scripts" / "d10_arch128_r7_readonly.py"
     source = path.read_text(encoding="utf-8")
@@ -2780,6 +2953,17 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
         "scripts/d10_scheduler_history_windows.py",
         "tests/runtime/test_d10_scheduler_history_windows.py",
     )
+    xnys_session_tests = (
+        *scheduler_history_tests,
+        "tests/runtime/test_d10_xnys_session_coverage_policy.py",
+        "tests/runtime/test_personal_desktop_unattended_daily_cycle_timing.py",
+        "tests/market_calendar/test_nyse_calendar.py",
+    )
+    xnys_session_ruff = (
+        *scheduler_history_ruff,
+        "scripts/d10_xnys_session_coverage_policy.py",
+        "tests/runtime/test_d10_xnys_session_coverage_policy.py",
+    )
     return {
         "d10-soak-status": CheckpointSpec(
             name="d10-soak-status",
@@ -2820,6 +3004,14 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             tests=scheduler_history_tests,
             ruff_paths=scheduler_history_ruff,
             authority_check=_d10_scheduler_history_collector_authority_check,
+            remote_branch="feature/post-d10-observability",
+        ),
+        "d10-xnys-session-coverage-policy": CheckpointSpec(
+            name="d10-xnys-session-coverage-policy",
+            description="D10 pure eligible XNYS session coverage review source gate",
+            tests=xnys_session_tests,
+            ruff_paths=xnys_session_ruff,
+            authority_check=_d10_xnys_session_coverage_policy_authority_check,
             remote_branch="feature/post-d10-observability",
         ),
         "arch128-r8": CheckpointSpec(

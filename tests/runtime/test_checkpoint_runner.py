@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import hashlib
 import json
 import subprocess
 from pathlib import Path
@@ -160,6 +161,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
         "d10-external-review-package",
         "d10-scheduler-slot-policy",
         "d10-scheduler-history-collector",
+        "d10-xnys-session-coverage-policy",
     }
     for spec in specs.values():
         assert "tests/runtime/test_checkpoint_runner.py" in spec.tests
@@ -174,6 +176,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
                 "d10-external-review-package",
                 "d10-scheduler-slot-policy",
                 "d10-scheduler-history-collector",
+                "d10-xnys-session-coverage-policy",
             )
             else "feature/d10c-durable-wake-evidence"
         )
@@ -2861,3 +2864,273 @@ def test_scheduler_history_authority_missing_source_blocks(tmp_path):
         "def invalid(", encoding="utf-8"
     )
     assert runner._d10_scheduler_history_collector_authority_check(root)
+
+
+def test_xnys_session_registration_is_verify_only():
+    specs = runner._checkpoint_specs()
+    spec = specs["d10-xnys-session-coverage-policy"]
+    upstream = specs["d10-scheduler-history-collector"]
+    assert spec.preflight is None
+    assert spec.execute is None
+    assert spec.remote_head_env is None
+    assert spec.remote_branch == "feature/post-d10-observability"
+    assert (
+        spec.authority_check is runner._d10_xnys_session_coverage_policy_authority_check
+    )
+    assert spec.tests == (
+        *upstream.tests,
+        "tests/runtime/test_d10_xnys_session_coverage_policy.py",
+        "tests/runtime/test_personal_desktop_unattended_daily_cycle_timing.py",
+        "tests/market_calendar/test_nyse_calendar.py",
+    )
+    assert spec.ruff_paths == (
+        *upstream.ruff_paths,
+        "scripts/d10_xnys_session_coverage_policy.py",
+        "tests/runtime/test_d10_xnys_session_coverage_policy.py",
+    )
+    parser = runner._parser(specs)
+    assert parser.parse_args(("verify", spec.name)).checkpoint == spec.name
+    for command in ("preflight", "execute"):
+        with pytest.raises(SystemExit):
+            parser.parse_args((command, spec.name))
+
+
+def _xnys_session_authority_copy(tmp_path, *, old="", new="", addition=""):
+    root = _scheduler_history_authority_copy(tmp_path)
+    path = Path(runner.__file__).parent / "d10_xnys_session_coverage_policy.py"
+    source = path.read_text(encoding="utf-8")
+    if old:
+        assert old in source
+        source = source.replace(old, new, 1)
+    (root / "scripts/d10_xnys_session_coverage_policy.py").write_text(
+        source + "\n" + addition + "\n", encoding="utf-8"
+    )
+    return root
+
+
+@pytest.mark.parametrize(
+    "addition",
+    (
+        "import os",
+        "import subprocess",
+        "import ctypes",
+        "from pathlib import Path",
+        "from trading_bot.market_calendar import NYSEMarketCalendar",
+        "from scripts import d10_soak_status_readonly as observer",
+        "from scripts import d10_scheduler_history_windows as collector",
+        "open('evidence')",
+        "Path('evidence').read_bytes()",
+        "os.environ['TOKEN']",
+        "subprocess.run([])",
+        "ctypes.WinDLL('kernel32')",
+        "datetime.now(UTC)",
+        "datetime.today()",
+        "observer.observe()",
+        "collector.observe()",
+        "provider.capture()",
+        "paper_v2.execute()",
+        "broker.order()",
+        "live.execute()",
+        "NYSEMarketCalendar().previous_session(None)",
+        "def independent_calendar(value): return value.weekday() < 5",
+        "def preflight(): pass",
+        "def execute(): pass",
+        "__import__('os')",
+        "eval('effect()')",
+    ),
+)
+def test_xnys_session_authority_rejects_io_effect_clock_calendar(tmp_path, addition):
+    root = _xnys_session_authority_copy(tmp_path, addition=addition)
+    assert runner._d10_xnys_session_coverage_policy_authority_check(root)
+
+
+@pytest.mark.parametrize(
+    ("old", "new"),
+    (
+        (
+            'SCHEMA: Final = "d10-xnys-session-coverage-review/v1"',
+            'SCHEMA: Final = "other"',
+        ),
+        ("internal_review_policy.DEPLOYMENT_ID", "'foreign'"),
+        ("internal_review_policy.ATTESTATION_SHA256", "'foreign'"),
+        ("internal_review_policy.SOAK_ID", "'foreign'"),
+        ("internal_review_policy.ACTIVATION_UTC", "END_UTC"),
+        ("internal_review_policy.END_UTC", "ACTIVATION_UTC"),
+        ("type(wakes) is not tuple", "False"),
+        ("not 7 <= len(wakes) <= MAX_D10_SUMMARY_WAKES", "False"),
+        ("type(wake) is not D10OneWeekWakeEvidence", "False"),
+        ("value.tzinfo is UTC", "value.tzinfo is not None"),
+        ("reviewed_at_utc < END_UTC", "False"),
+        ("type(value) is not str", "False"),
+        ("len(value) != 10", "False"),
+        ("parsed.isoformat() != value", "False"),
+        ("slot_policy.expected_slots_utc()", "caller_slots()"),
+        ("len(slots) != 7", "len(slots) != 6"),
+        ("timing.completed_xnys_session_at(slot)", "TradingSession(date(2026, 9, 30))"),
+        ("dict.fromkeys(values)", "sorted(set(values))"),
+        ("wake.deployment_id != DEPLOYMENT_ID", "False"),
+        ("wake.attestation_sha256 != ATTESTATION_SHA256", "False"),
+        ("wake.soak_id != SOAK_ID", "False"),
+        ("wake.activation_utc != ACTIVATION_UTC", "False"),
+        ("wake.end_utc != END_UTC", "False"),
+        ("not wake.certified_source_head", "False"),
+        ("not wake.certified_source_tree", "False"),
+        ("wake.executable_file_count <= 0", "False"),
+        ("wake.certified_source_head != first.certified_source_head", "False"),
+        ("wake.certified_source_tree != first.certified_source_tree", "False"),
+        ("wake.executable_file_count != first.executable_file_count", "False"),
+        ("ACTIVATION_UTC <= wake.observed_at_utc < END_UTC", "True"),
+        ("wake.observed_at_utc < previous_time", "False"),
+        ("type(wake.outcome) is not D10WakeOutcome", "False"),
+        ("D10WakeOutcome.NO_ACTION)", "D10WakeOutcome.STOPPED)"),
+        ("wake.stop_reason is not None", "False"),
+        ("wake.all_effect_gates_closed is not True", "False"),
+        ("wake.closed_effect_gate_count != 8", "False"),
+        ("wake.receipt_recovery_attempts != 0", "False"),
+        ("wake.broker_live_calls != 0", "False"),
+        ("count not in (0, 1)", "count not in (1,)"),
+        ("timing.completed_xnys_session_at(wake.observed_at_utc)", "completed_session"),
+        ("completed_session != expected_session", "False"),
+        ("timing.next_xnys_execution_session(expected_session)", "execution_session"),
+        ("execution_session != expected_next", "False"),
+        ("timing.xnys_regular_open(expected_next)", "wake.preopen_deadline_utc"),
+        ("wake.preopen_deadline_utc != expected_deadline", "False"),
+        ("wake.__post_init__()", "pass"),
+        ("wake.completed_session not in expected_completed", "False"),
+        ("set(covered) != set(expected)", "False"),
+        ("covered != expected", "False"),
+        ('"d10_accepted": False', '"d10_accepted": True'),
+        ('"broker_paper_authorized": False', '"broker_paper_authorized": True'),
+        ('"operator_decision_required": True', '"operator_decision_required": False'),
+        ('"READY_FOR_EXTERNAL_REVIEW_ARTIFACT"', '"ACCEPTED"'),
+        (
+            '"provider_attempts": sum(wake.provider_attempts for wake in matching)',
+            '"provider_attempts": 1',
+        ),
+    ),
+)
+def test_xnys_session_authority_rejects_semantic_weakening(tmp_path, old, new):
+    root = _xnys_session_authority_copy(tmp_path, old=old, new=new)
+    assert runner._d10_xnys_session_coverage_policy_authority_check(root)
+
+
+@pytest.mark.parametrize(
+    ("old", "new"),
+    (
+        (
+            "authority_check=_d10_xnys_session_coverage_policy_authority_check,",
+            (
+                "authority_check=_d10_xnys_session_coverage_policy_autho"
+                "rity_check, preflight=_r8_preflight,"
+            ),
+        ),
+        (
+            "authority_check=_d10_xnys_session_coverage_policy_authority_check,",
+            (
+                "authority_check=_d10_xnys_session_coverage_policy_autho"
+                "rity_check, execute=_r7_execute,"
+            ),
+        ),
+        ('remote_branch="feature/post-d10-observability",', 'remote_branch="develop",'),
+        ("tests=xnys_session_tests,", "tests=scheduler_history_tests,"),
+        ("ruff_paths=xnys_session_ruff,", "ruff_paths=scheduler_history_ruff,"),
+        (
+            "ruff_paths=xnys_session_ruff,",
+            'ruff_paths=xnys_session_ruff, remote_head_env="AUTHORITY",',
+        ),
+    ),
+)
+def test_xnys_session_authority_rejects_registration_drift(tmp_path, old, new):
+    root = _xnys_session_authority_copy(tmp_path)
+    path = root / "scripts/checkpoint_runner.py"
+    source = path.read_text(encoding="utf-8")
+    start = source.index('        "d10-xnys-session-coverage-policy": CheckpointSpec(')
+    end = source.index('        "arch128-r8": CheckpointSpec(', start)
+    registration = source[start:end]
+    assert old in registration
+    path.write_text(
+        source[:start] + registration.replace(old, new, 1) + source[end:],
+        encoding="utf-8",
+    )
+    assert runner._d10_xnys_session_coverage_policy_authority_check(root)
+
+
+@pytest.mark.parametrize("name", ("xnys_session_tests", "xnys_session_ruff"))
+def test_xnys_session_authority_freezes_source_test_hierarchy(tmp_path, name):
+    root = _xnys_session_authority_copy(tmp_path)
+    path = root / "scripts/checkpoint_runner.py"
+    source = path.read_text(encoding="utf-8")
+    source = source.replace(name + " = (", name + " = (*(),", 1)
+    path.write_text(source, encoding="utf-8")
+    assert runner._d10_xnys_session_coverage_policy_authority_check(root)
+
+
+@pytest.mark.parametrize(
+    "filename",
+    (
+        "d10_end_of_soak_review.py",
+        "d10_external_review_package.py",
+        "d10_scheduler_slot_review_policy.py",
+        "d10_scheduler_history_windows.py",
+    ),
+)
+def test_xnys_session_authority_composes_upstream_semantics(tmp_path, filename):
+    root = _xnys_session_authority_copy(tmp_path)
+    path = root / "scripts" / filename
+    path.write_text(
+        path.read_text(encoding="utf-8") + "\nforeign_effect()\n", encoding="utf-8"
+    )
+    assert runner._d10_xnys_session_coverage_policy_authority_check(root)
+
+
+def test_xnys_session_authority_accepts_frozen_source_and_whitespace(tmp_path):
+    source_root = Path(runner.__file__).resolve().parent.parent
+    assert runner._d10_xnys_session_coverage_policy_authority_check(source_root) == ()
+    root = _xnys_session_authority_copy(tmp_path, addition="# comment only")
+    assert runner._d10_xnys_session_coverage_policy_authority_check(root) == ()
+
+
+def test_xnys_session_authority_missing_invalid_source_blocks(tmp_path):
+    assert runner._d10_xnys_session_coverage_policy_authority_check(tmp_path)
+    root = _xnys_session_authority_copy(tmp_path)
+    (root / "scripts/d10_xnys_session_coverage_policy.py").write_text(
+        "def invalid(", encoding="utf-8"
+    )
+    assert runner._d10_xnys_session_coverage_policy_authority_check(root)
+
+
+def test_xnys_session_preserves_exact_upstream_registration_asts():
+    tree = ast.parse(Path(runner.__file__).read_text(encoding="utf-8"))
+    expected = {
+        "d10-soak-status": (
+            "c931432dc1c416fba25c6d12c3c63dc81961b7dbf37dada871e57f6e8cd89b73"
+        ),
+        "d10-soak-review": (
+            "4d4bf1a361f1e4184da9d727e2fd3d8903233b08fc721aa8f646e3f4b6143b41"
+        ),
+        "d10-external-review-package": (
+            "749a6974c8f39eaaf7f4fd633773b29b312d69a4a7ba13e12298380db4083004"
+        ),
+        "d10-scheduler-slot-policy": (
+            "39d11ed9fe65215ea80cd10e9375f81f775ed92bb61e50573bc2ef1c2cc85768"
+        ),
+        "d10-scheduler-history-collector": (
+            "97f0c544281b10c41b0445d895fe28c882e5230a1e0782667fcade5dc7af247a"
+        ),
+        "arch128-r8": (
+            "6da83416d48314b92e0ac4a158b3fefbbd4193a52d6c35913799ec53202c5b07"
+        ),
+    }
+    actual = {}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call) and ast.unparse(node.func) == "CheckpointSpec":
+            for keyword in node.keywords:
+                if (
+                    keyword.arg == "name"
+                    and isinstance(keyword.value, ast.Constant)
+                    and keyword.value.value in expected
+                ):
+                    actual[keyword.value.value] = hashlib.sha256(
+                        ast.dump(node).encode("utf-8")
+                    ).hexdigest()
+    assert actual == expected

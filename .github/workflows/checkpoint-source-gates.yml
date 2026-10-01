@@ -6,6 +6,7 @@ on:
       - develop
       - feature/d10c-durable-wake-evidence
       - feature/d10c-r8-terminal-halt
+      - feature/d10c-r8-incident-reconciliation
   pull_request:
 
 permissions:
@@ -87,6 +88,12 @@ jobs:
             verify arch128-r8-terminal-halt
           if ($LASTEXITCODE -ne 0) {
             $Failures += 'arch128-r8-terminal-halt'
+          }
+
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\ops.ps1 `
+            verify arch130-r8i-d1
+          if ($LASTEXITCODE -ne 0) {
+            $Failures += 'arch130-r8i-d1'
           }
 
           if ($Failures.Count -ne 0) {

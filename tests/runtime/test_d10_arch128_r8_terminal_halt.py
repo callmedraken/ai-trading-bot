@@ -13,6 +13,7 @@ import pytest
 from scripts.d10_protected_deployment import CheckedFile, NativeObject, expected_policy
 
 from scripts import checkpoint_runner as runner
+from scripts import d10_arch128_r8_halt_diagnostic as diagnostic
 from scripts import d10_arch128_r8_halt_windows as windows
 from scripts import d10_arch128_r8_terminal_halt as halt
 
@@ -46,6 +47,17 @@ def host() -> Mock:
             }
         ),
     )
+
+
+def diagnostic_ready() -> dict[str, object]:
+    return {
+        "schema": diagnostic.SCHEMA,
+        "status": diagnostic.READY,
+        "reason": None,
+        "call_attempted": False,
+        "scheduler_mutation": "NOT_RUN",
+        "scheduler": snapshot().scheduler,
+    }
 
 
 def execute(boundary: Mock) -> dict[str, object]:
@@ -272,6 +284,7 @@ def test_registration_does_not_execute_and_preflight_has_only_reader(
     protected = Mock(side_effect=AssertionError("writer constructed"))
     monkeypatch.setattr(windows, "ProtectedWindowsHost", protected)
     monkeypatch.setattr(windows, "ReadOnlyWindowsHost", lambda: host())
+    monkeypatch.setattr(diagnostic, "observe", diagnostic_ready)
     spec = runner._checkpoint_specs()["arch128-r8-terminal-halt"]
     assert spec.preflight is runner._r8_halt_preflight
     assert spec.execute is runner._r8_halt_execute
@@ -354,6 +367,58 @@ def test_runner_preflight_rejects_effect_drift(monkeypatch, field) -> None:
     assert runner._r8_halt_preflight()["status"] == "BLOCKED"
 
 
+def test_runner_preflight_requires_native_pre_call_ready(monkeypatch) -> None:
+    monkeypatch.setattr(windows, "ReadOnlyWindowsHost", lambda: host())
+    monkeypatch.setattr(diagnostic, "observe", diagnostic_ready)
+    result = runner._r8_halt_preflight()
+    assert result["status"] == "PASS"
+    assert result["diagnostics"]["native_pre_call"] == diagnostic_ready()
+
+
+@pytest.mark.parametrize("reason", sorted(diagnostic.REASONS))
+def test_runner_preflight_blocks_native_pre_call_reason(monkeypatch, reason) -> None:
+    monkeypatch.setattr(windows, "ReadOnlyWindowsHost", lambda: host())
+    blocked = diagnostic_ready()
+    blocked["status"] = diagnostic.BLOCKED
+    blocked["reason"] = reason
+    monkeypatch.setattr(diagnostic, "observe", lambda: blocked)
+    result = runner._r8_halt_preflight()
+    assert result["status"] == "BLOCKED"
+    assert result["primary"]["status"] == "PASS"
+    assert result["diagnostics"]["native_pre_call"]["reason"] == reason
+    assert result["diagnostics"]["native_pre_call"]["call_attempted"] is False
+
+
+def test_native_pre_call_diagnostic_transport_is_fixed_read_only(monkeypatch) -> None:
+    payload = json.dumps(diagnostic_ready(), separators=(",", ":")).encode("utf-8")
+    run = Mock(return_value=subprocess.CompletedProcess((), 0, payload, b""))
+    monkeypatch.setattr(diagnostic.subprocess, "run", run)
+    assert diagnostic.observe() == diagnostic_ready()
+    command = run.call_args.args[0]
+    assert command[-1] == str(diagnostic.HELPER)
+    assert halt.EXECUTE_FLAG not in command
+    assert str(windows.HALT_HELPER) not in command
+
+
+def test_native_pre_call_diagnostic_source_is_read_only() -> None:
+    source = (
+        ROOT / "scripts/d10_arch128_r8_terminal_halt_diagnose.ps1"
+    ).read_text(encoding="utf-8")
+    for forbidden in (
+        "$task.Enabled = $false",
+        ".Run(",
+        ".Stop(",
+        ".DeleteTask(",
+        ".RegisterTask",
+        "Start-ScheduledTask",
+        "Stop-ScheduledTask",
+        "Set-ScheduledTask",
+    ):
+        assert forbidden not in source
+    for reason in diagnostic.REASONS:
+        assert f"'{{reason}}'" in source
+
+
 def test_scheduler_helper_is_reused_and_two_reads_must_match(monkeypatch) -> None:
     monkeypatch.setattr(windows, "transport", Mock())
     tree = ast.parse((ROOT / "scripts/d10_arch128_r8_halt_windows.py").read_text())
@@ -423,6 +488,11 @@ def test_authority_gate_freezes_source() -> None:
             "2026-09-29T01:30:00-07:00",
         ),
         (
+            "scripts/d10_arch128_r8_terminal_halt_diagnose.ps1",
+            "    exit 0",
+            "    $task.Enabled = $false\n    exit 0",
+        ),
+        (
             "scripts/d10_arch128_r8_terminal_halt.py",
             '"record_count": 2',
             '"record_count": 3',
@@ -478,10 +548,17 @@ def test_authority_rejects_widening_and_stale_interval(
     assert runner._r8_halt_authority_check(tmp_path)
 
 
-def test_powershell_source_parses_without_host_execution() -> None:
+@pytest.mark.parametrize(
+    "filename",
+    (
+        "d10_arch128_r8_terminal_halt.ps1",
+        "d10_arch128_r8_terminal_halt_diagnose.ps1",
+    ),
+)
+def test_powershell_source_parses_without_host_execution(filename) -> None:
     if __import__("os").name != "nt":
         pytest.skip("PowerShell AST syntax gate on Windows only")
-    helper = ROOT / "scripts/d10_arch128_r8_terminal_halt.ps1"
+    helper = ROOT / "scripts" / filename
     command = (
         "$tokens=$null; $errors=$null; "
         "[System.Management.Automation.Language.Parser]::ParseFile('"

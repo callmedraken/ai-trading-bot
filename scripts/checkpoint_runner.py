@@ -321,6 +321,12 @@ R8_HALT_SOURCE_PINS: Final = {
     "scripts/d10_arch128_r8_halt_windows.py": (
         "c85efb5913c986384608234c282191831d3f254784db225733465aeb1dfc98ff"
     ),
+    "scripts/d10_arch128_r8_halt_diagnostic.py": (
+        "6369c8fcfd719171538b34d4d0842735e863cfb5609c8de180569c2a28ef29e5"
+    ),
+    "scripts/d10_arch128_r8_terminal_halt_diagnose.ps1": (
+        "b8a9bc0e93b36187129ba39eb5bb93cedd71a61fa443fd99954cc4924ee4b67d"
+    ),
     "scripts/d10_arch128_r8_terminal_halt.ps1": (
         "816a1789dd9c905721896954d47eed06d020ec5c67cf5ca8ca06143e95ff2635"
     ),
@@ -361,7 +367,7 @@ R8_HALT_RUNNER_PINS: Final = {
         "d0e00ab3d3596828592c94483c9a114588f81bf40daa00fca29208d31b5a0ff1"
     ),
     "_r8_halt_preflight": (
-        "c13251fcd510411563869735818e7afb12c9d3aa163f81f758571d596b50afbd"
+        "3a7244189088f41c17e001a7aad8c60c4c85bf5a9cbbab497a3a2f194019ec53"
     ),
     "_r8_halt_execute": (
         "f0a9c6388f63b1184426f6b7072213e3e7af4bb16f27435d81f98ad0566c97ef"
@@ -379,7 +385,7 @@ R8_HALT_RUNNER_PINS: Final = {
     "_write_json": ("bd3cabc882528e471e226c434eb3657c3f461b520112f60782eb0bda4b3d5f82"),
 }
 R8_HALT_REGISTRATION_PIN: Final = (
-    "c4d52e17d6a881d23f4433d1747132e0d91d873efa880dc69da28231c68f24b2"
+    "cde19fec3d2899be468ae96247f8b4b7794cd176cbe79915a4adb33a331f9ee9"
 )
 
 
@@ -1822,6 +1828,7 @@ def _r8_preflight() -> dict[str, object]:
 
 
 def _r8_halt_preflight() -> dict[str, object]:
+    from scripts import d10_arch128_r8_halt_diagnostic as diagnostic
     from scripts import d10_arch128_r8_halt_windows as windows
     from scripts import d10_arch128_r8_terminal_halt as halt
 
@@ -1844,10 +1851,45 @@ def _r8_halt_preflight() -> dict[str, object]:
             )
         except Exception:
             passed = False
+
+    diagnostics: dict[str, object] = {}
+    if passed:
+        try:
+            native = diagnostic.observe()
+        except Exception:
+            native = {
+                "status": "BLOCKED",
+                "reason": "diagnostic_transport_failed",
+            }
+        diagnostics["native_pre_call"] = native
+        expected_native = {
+            "schema": diagnostic.SCHEMA,
+            "status": diagnostic.READY,
+            "reason": None,
+            "call_attempted": False,
+            "scheduler_mutation": "NOT_RUN",
+        }
+        native_ready = type(native) is dict and all(
+            type(native.get(key)) is type(value) and native.get(key) == value
+            for key, value in expected_native.items()
+        )
+        native_ready = native_ready and type(native.get("scheduler")) is dict
+        if native_ready:
+            try:
+                halt.require_scheduler(native["scheduler"], enabled=True)
+                halt.require_exact(
+                    native["scheduler"],
+                    primary["scheduler"],
+                    "native_pre_call_scheduler_drift",
+                )
+            except Exception:
+                native_ready = False
+        passed = native_ready
+
     return {
         "status": "PASS" if passed else "BLOCKED",
         "primary": primary,
-        "diagnostics": {},
+        "diagnostics": diagnostics,
     }
 
 
@@ -2105,6 +2147,7 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
                 "tests/runtime/test_checkpoint_runner.py",
                 "scripts/d10_arch128_r8_terminal_halt.py",
                 "scripts/d10_arch128_r8_halt_windows.py",
+                "scripts/d10_arch128_r8_halt_diagnostic.py",
                 "tests/runtime/test_d10_arch128_r8_terminal_halt.py",
             ),
             authority_check=_r8_halt_authority_check,

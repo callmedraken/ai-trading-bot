@@ -584,6 +584,15 @@ contract sources, runner wrappers, registration, and native helper text. Tests
 exercise exact incident drift, every scheduler semantic, authorization, runner
 attempt evidence, post-state drift, and fake-COM-only native fault paths.
 
+R8I-H1a adds a separate read-only native pre-call diagnostic after the first
+authorized halt attempt returned NOT_CALLED / native_pre_call_blocked. The
+diagnostic reproduces the native COM admission checks through the immediate task
+XML and Settings/Enabled validation, reports only a fixed sanitized stage enum,
+and contains no scheduler setter or other mutation surface. Registered halt
+preflight now requires this diagnostic to report READY with a scheduler snapshot
+identical to the primary read-only snapshot before a later protected
+authorization can be considered.
+
 Next: independent exact diff + CI review, then a fresh elevated read-only
 `ops.ps1 preflight arch128-r8-terminal-halt`. Only after that evidence is reviewed
 may fresh explicit human authorization for the actual disable be requested.

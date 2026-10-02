@@ -393,6 +393,41 @@ ARCH130_R8I_D1_REMOTE_BRANCH: Final = "feature/d10c-r8-incident-reconciliation"
 ARCH131_REVIEW_PAPER_REMOTE_BRANCH: Final = "feature/robinhood-review-paper-mode"
 
 
+def _arch131_performance_authority_check(repo_root: Path) -> tuple[str, ...]:
+    failures: list[str] = []
+    relative = "src/trading_bot/review_paper/performance.py"
+    try:
+        source = (repo_root / relative).read_text(encoding="utf-8")
+        tree = ast.parse(source)
+        names = _qualified_names(tree)
+        forbidden = {
+            "subprocess.run",
+            "subprocess.Popen",
+            "socket.socket",
+            "requests.get",
+            "requests.post",
+            "httpx.get",
+            "httpx.post",
+            "urllib.request.urlopen",
+        }
+        if names & forbidden:
+            failures.append("Architecture 131-D contains a network/effect boundary")
+        for token in (
+            "review_equity_order",
+            "place_equity_order",
+            "cancel_equity_order",
+            "place_option_order",
+            "place_crypto_order",
+        ):
+            if token in source:
+                failures.append(
+                    f"Architecture 131-D references Robinhood effect tool: {token}"
+                )
+    except (OSError, UnicodeError, SyntaxError):
+        failures.append("Architecture 131-D performance source unavailable")
+    return tuple(failures)
+
+
 def _arch131_paper_cycle_authority_check(repo_root: Path) -> tuple[str, ...]:
     failures: list[str] = []
     relative = "src/trading_bot/robinhood_paper_cycle.py"
@@ -2308,6 +2343,22 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
         "tests/runtime/test_d10_arch128_r8_readonly.py",
     )
     return {
+        "arch131-robinhood-performance": CheckpointSpec(
+            name="arch131-robinhood-performance",
+            description="Architecture 131-D durable Robinhood paper performance",
+            tests=(
+                *COMMON_TESTS,
+                "tests/review_paper/test_performance.py",
+            ),
+            ruff_paths=(
+                *COMMON_RUFF_PATHS,
+                "src/trading_bot/review_paper/__init__.py",
+                "src/trading_bot/review_paper/performance.py",
+                "tests/review_paper/test_performance.py",
+            ),
+            authority_check=_arch131_performance_authority_check,
+            remote_branch=ARCH131_REVIEW_PAPER_REMOTE_BRANCH,
+        ),
         "arch131-robinhood-paper-cycle": CheckpointSpec(
             name="arch131-robinhood-paper-cycle",
             description="Architecture 131-C fail-closed Robinhood paper cycle",

@@ -9330,3 +9330,61 @@ that, qualify read-only tool inventory, `get_equity_orders`, and
 `get_equity_quotes`. The first `review_equity_order` paper cycle remains a
 later separate non-placement brokerage-request approval.
 
+## 2026-10-02 — Architecture 131-F exact-source host dependency qualification ACCEPTED
+
+The accepted 131-F source was fast-forwarded through its reviewed docs-only
+closeout commits in the canonical F: worktree without source drift:
+
+```text
+worktree F:\AI\worktrees\ai-trading-bot-robinhood-review-paper-mode
+branch   feature/robinhood-review-paper-mode
+HEAD     3fa35d4d725b859d3c50b310605236896c2e6174
+TREE     fd3d3741464904ebd05fc7da8158eb9c2ef3bf0a
+```
+
+Both docs-closeout source-gate runs completed successfully:
+
+```text
+36988729413 SUCCESS
+36988733987 SUCCESS
+```
+
+The reviewed optional runtime dependencies were then installed into the shared
+F: development virtual environment:
+
+```text
+mcp    2.2.0
+httpx2 2.13.1
+```
+
+The dependency-installed focused qualification passed:
+
+```text
+tests/robinhood_mcp/test_windows_oauth.py
+tests/robinhood_mcp/test_sdk_transport.py
+
+122 passed
+0 skipped
+```
+
+This exercised the previously skipped real MCP SDK model round trip. A separate
+inert composition probe constructed the Windows-backed Robinhood OAuth factory
+and an MCP `OAuthClientProvider` successfully while opening no browser, reading
+or writing no Credential Manager record, sending no Robinhood/MCP request, and
+causing no brokerage effect.
+
+No source file changed during this qualification. Production/live trading
+remains NO-GO.
+
+The next boundary is now the first human-interactive Robinhood OAuth
+authorization. That boundary may open a browser, contact Robinhood's OAuth
+infrastructure, dynamically register the MCP client when required, and persist
+the resulting client-registration/token state in the reviewed Windows
+Credential Manager targets. It requires separate explicit human authorization.
+
+After a successful grant, the next separately bounded qualification is read-only
+MCP inventory followed by `get_equity_orders` and `get_equity_quotes`.
+`review_equity_order` remains separately authorized after the read-only
+qualification. Placement/cancellation/options/crypto remain outside the
+application surface.
+

@@ -9438,3 +9438,78 @@ After 131-F:
 5. only later, separately authorize the first non-placement
    review_equity_order paper cycle.
 
+## 2026-10-02 — Architecture 131-F Windows OAuth persistence accepted
+
+Canonical Robinhood branch/worktree:
+
+```text
+branch   feature/robinhood-review-paper-mode
+worktree F:\AI\worktrees\ai-trading-bot-robinhood-review-paper-mode
+```
+
+Accepted source:
+
+```text
+HEAD 79e9df03ee8021796eedb2d28462238edfe75d33
+TREE b8281809c01013c56dc3a63dec85946bdbec46db
+CI   36986643994 SUCCESS
+```
+
+Architecture 131-F adds the reviewed Windows OAuth host boundary needed by the
+131-E direct MCP transport:
+
+- Credential Manager targets:
+  `AITradingBot/Brokerage/Robinhood/MCP/OAuthTokens/v1` and
+  `AITradingBot/Brokerage/Robinhood/MCP/OAuthClientInfo/v1`;
+- generic credential persistence only, with a hard 2,560-byte per-record limit;
+- full MCP OAuth token/client-registration model persistence;
+- no enumeration, environment/plaintext/repository fallback, or record splitting;
+- exact IPv4 loopback callback on `127.0.0.1` with explicit port/path,
+  bounded parsing/timeouts, fixed sanitized responses, and no callback-secret
+  logging;
+- exact `code`, `state`, and optional `iss` pass-through to the MCP SDK,
+  which validates state and issuer;
+- per-flow generation ownership so a completed/failed/stale flow cannot release,
+  cancel, or clean resources belonging to another flow;
+- no change to the three-method Robinhood review/read transport allowlist;
+- no source-gate preflight or execute capability.
+
+The first published source at `23291e909efb9cf6c4b2cb8f690288707d8cf64d`
+had one exact-review blocker: cleanup could release helper ownership while its
+redirect handler was still active. The accepted correction
+`79e9df03ee8021796eedb2d28462238edfe75d33` introduced flow-scoped ownership,
+cancellation-protected bounded cleanup, and regressions proving the old race.
+
+Final certification:
+
+```text
+131-F gate: 355 passed, 1 skipped
+full suite: 10,178 passed, 18 skipped, 0 failed/errors
+10,196 cases / 302 modules
+Ruff lint/format: PASS
+git diff --check: PASS
+wall time: 428.847 seconds
+```
+
+The skipped 131-F test is the optional real-MCP SDK model round trip because
+`mcp` is not installed in the shared development environment. No real
+authentication, Credential Manager operation, Robinhood/MCP call, or brokerage
+effect occurred.
+
+Immediate next step:
+
+1. synchronize the local F: worktree through these reviewed docs-only closeout
+   commits using the canonical fast-forward-only catch-up rule;
+2. install/qualify the accepted `robinhood-mcp` optional runtime dependencies
+   against this exact source and run the previously skipped real-SDK model
+   round-trip/inert composition checks;
+3. stop before opening a browser or starting a real Robinhood OAuth grant;
+4. obtain separate human authorization for the first interactive OAuth grant;
+5. after authentication, qualify read-only MCP tool inventory and only
+   `get_equity_orders` / `get_equity_quotes`;
+6. separately authorize the first non-placement `review_equity_order` paper
+   cycle.
+
+Production/live trading remains NO-GO. Placement/cancellation/options/crypto
+brokerage tools remain outside the application surface.
+

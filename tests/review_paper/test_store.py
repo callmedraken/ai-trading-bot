@@ -23,7 +23,7 @@ from trading_bot.risk import RiskOutcome
 
 def _intent(
     *,
-    order_id: UUID = UUID("22222222-2222-2222-2222-222222222222"),
+    order_id: UUID | None = None,
     side: OrderSide = OrderSide.BUY,
     desired: Decimal = Decimal("10"),
     approved: Decimal = Decimal("10"),
@@ -33,7 +33,7 @@ def _intent(
 ) -> ReviewPaperIntent:
     return ReviewPaperIntent(
         proposal_id=UUID("11111111-1111-1111-1111-111111111111"),
-        order_id=order_id,
+        order_id=order_id or UUID("22222222-2222-2222-2222-222222222222"),
         symbol=Symbol("SPY"),
         side=side,
         desired_quantity=desired,
@@ -194,7 +194,9 @@ def test_sell_without_virtual_position_is_not_persisted(tmp_path) -> None:
     assert store.history() == ()
 
 
-def test_nonempty_robinhood_order_checks_are_preserved_not_interpreted(tmp_path) -> None:
+def test_nonempty_robinhood_order_checks_are_preserved_not_interpreted(
+    tmp_path,
+) -> None:
     store = ReviewPaperStore(
         tmp_path / "paper.sqlite",
         starting_cash=Decimal("10000"),

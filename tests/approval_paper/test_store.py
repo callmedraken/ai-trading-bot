@@ -16,7 +16,7 @@ from trading_bot.approval_paper import (
     UnsupportedApprovalPaperOrderError,
 )
 from trading_bot.domain import OrderSide, OrderType, Symbol, TimeInForce
-from trading_bot.ledger import InsufficientPositionError
+from trading_bot.ledger import PositionNotFoundError
 from trading_bot.risk import RiskOutcome
 
 
@@ -50,8 +50,7 @@ def _intent(
         proposal_confidence=Decimal("0.72"),
         order_type=order_type,
         time_in_force=TimeInForce.DAY,
-        proposed_at=proposed_at
-        or datetime(2026, 10, 2, 15, 0, tzinfo=UTC),
+        proposed_at=proposed_at or datetime(2026, 10, 2, 15, 0, tzinfo=UTC),
         limit_price=Decimal("500") if order_type is OrderType.LIMIT else None,
     )
 
@@ -161,7 +160,7 @@ def test_sell_without_virtual_position_is_not_persisted(tmp_path) -> None:
     )
     sell = _intent(side=OrderSide.SELL)
 
-    with pytest.raises(InsufficientPositionError):
+    with pytest.raises(PositionNotFoundError):
         store.record_market_approval(sell, _quote())
 
     assert store.history() == ()

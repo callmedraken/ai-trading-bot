@@ -9074,3 +9074,64 @@ transport. It must compare agentic order history before/after review, fail
 closed if any unexpected real order appears, and durably record the synthetic
 paper fill only after that safety assertion.
 
+## 2026-10-02 — Architecture 131-C fail-closed Robinhood paper cycle ACCEPTED
+
+The review-only paper-cycle orchestrator is accepted on the canonical Robinhood
+branch.
+
+Accepted identity:
+
+```text
+BRANCH feature/robinhood-review-paper-mode
+HEAD   3985730ebc0c6ddf0592234f6eb865775f2a45f5
+TREE   d730427fb37f612ec6c4c1467ea5cab8c4fd4c6f
+CI     36975160912 SUCCESS
+```
+
+Exact gate:
+
+```text
+CHECKPOINT=arch131-robinhood-paper-cycle
+PYTEST=PASS
+RUFF_CHECK=PASS
+RUFF_FORMAT=PASS
+GIT_DIFF_CHECK=PASS
+AUTHORITY=PASS
+IDENTITY_STABLE=True
+OVERALL=PASS
+```
+
+The cycle remains transport-injected and has no concrete MCP/network/auth
+implementation.
+
+Accepted ordering:
+
+```text
+exact local order_id replay check
+-> read complete agentic equity-order window for symbol since proposal time
+-> require window empty
+-> Robinhood review_equity_order through typed adapter
+-> read same complete agentic equity-order window again
+-> require window still empty
+-> only then persist the synthetic review-derived paper fill
+```
+
+Safety semantics:
+
+- an exact already-durable local order is replayed without another Robinhood
+  call;
+- reuse of the same local order_id with changed intent is a hard conflict;
+- any real agentic order in the relevant pre-review window blocks before review;
+- any real agentic order in the post-review window blocks persistence of the
+  synthetic fill;
+- a concurrent unrelated agentic order is not attributed to the review, but
+  still blocks because paper mode cannot prove isolation;
+- order-history pagination is exhaustive, cursor repetition fails closed, and a
+  bounded page limit prevents unbounded observation;
+- a non-agentic row returned through the forced agentic filter fails closed;
+- no place/cancel/options/crypto mutation tool appears in the cycle source.
+
+Next: forward paper-performance tracking over the accepted local ReviewPaperStore
+and typed quote data. This remains source-only and can be built before direct MCP
+authentication.
+

@@ -9279,3 +9279,47 @@ the source.
 Direct Streamable-HTTP authentication remains a later transport implementation
 step; 131-C stays testable with an injected transport.
 
+## 2026-10-02 — Architecture 131-C paper-cycle orchestration accepted
+
+Accepted source:
+
+```text
+BRANCH feature/robinhood-review-paper-mode
+HEAD   3985730ebc0c6ddf0592234f6eb865775f2a45f5
+TREE   d730427fb37f612ec6c4c1467ea5cab8c4fd4c6f
+CI     36975160912 SUCCESS
+```
+
+Registered checkpoint:
+
+```text
+arch131-robinhood-paper-cycle
+```
+
+The accepted paper cycle composes only the typed read/review adapter and the
+local durable ReviewPaperStore. There is still no direct Robinhood MCP client or
+authentication code.
+
+One cycle:
+
+```text
+if exact durable order already exists:
+    return it with zero Robinhood calls
+else:
+    exhaustively read agentic orders for the exact symbol since proposal time
+    require empty
+    review the exact risk-approved MARKET order
+    exhaustively read the same agentic-order window again
+    require empty
+    persist synthetic fill
+```
+
+This ordering intentionally prefers false blocks over accidentally recording a
+paper trade while a real MCP order exists in the same safety window.
+
+The next safe milestone is Architecture 131-D forward-performance tracking:
+durable valuation snapshots derived from the virtual PaperLedger plus typed
+Robinhood quote data, with realized/unrealized P&L, total return, drawdown, and
+trade-level/model attribution. It remains transport-injected and does not need a
+live Robinhood session.
+

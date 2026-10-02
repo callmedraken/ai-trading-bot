@@ -162,6 +162,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
         "arch131-robinhood-paper-cycle",
         "arch131-robinhood-performance",
         "arch131-robinhood-direct-mcp",
+        "arch131-robinhood-oauth-windows",
     }
     for spec in specs.values():
         assert "tests/runtime/test_checkpoint_runner.py" in spec.tests
@@ -176,6 +177,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
                 "arch131-robinhood-paper-cycle",
                 "arch131-robinhood-performance",
                 "arch131-robinhood-direct-mcp",
+                "arch131-robinhood-oauth-windows",
             }
             else (
                 "feature/d10c-r8-incident-reconciliation"
@@ -1583,3 +1585,90 @@ def test_r8_authority_rejects_execute_registration_and_wrapper_effects(
 ) -> None:
     root = _r8_authority_copy(tmp_path, runner_old=old, runner_new=new)
     assert runner._r8_authority_check(root)
+
+
+@pytest.mark.parametrize(
+    "before,after",
+    [
+        ("AITradingBot/Brokerage/Robinhood/MCP/OAuthTokens/v1", "wrong-token-target"),
+        (
+            "AITradingBot/Brokerage/Robinhood/MCP/OAuthClientInfo/v1",
+            "wrong-client-target",
+        ),
+        ("CRED_TYPE_GENERIC: Final = 1", "CRED_TYPE_GENERIC: Final = 2"),
+        ('LOOPBACK_HOST: Final = "127.0.0.1"', 'LOOPBACK_HOST: Final = "0.0.0.0"'),
+        ("host=LOOPBACK_HOST", 'host="192.168.1.2"'),
+        ("self._api.CredReadW", "self._api.CredEnumerateW"),
+        ("_require_target(target)", "pass"),
+    ],
+)
+def test_131f_authority_detects_boundary_drift(tmp_path, before, after):
+    repo = Path(runner.__file__).resolve().parent.parent
+    relative = Path("src/trading_bot/robinhood_mcp/windows_oauth.py")
+    destination = tmp_path / relative
+    destination.parent.mkdir(parents=True)
+    source = (repo / relative).read_text(encoding="utf-8")
+    assert before in source
+    destination.write_text(source.replace(before, after), encoding="utf-8")
+    script = tmp_path / "scripts/checkpoint_runner.py"
+    script.parent.mkdir()
+    script.write_bytes((repo / "scripts/checkpoint_runner.py").read_bytes())
+    assert runner._arch131_windows_oauth_authority_check(tmp_path)
+
+
+@pytest.mark.parametrize(
+    "addition",
+    [
+        "import keyring",
+        "import os\nvalue = os.getenv('TOKEN')",
+        "from pathlib import Path\nPath('tokens').write_text('secret')",
+        "value = open('tokens', 'w')",
+        "value = native.CredEnumerateW()",
+        "def place_equity_order(): pass",
+        "tool = 'cancel_equity_order'",
+        "import socket\nsocket.socket().bind(('0.0.0.0', 1234))",
+    ],
+)
+def test_131f_authority_rejects_new_effects(tmp_path, addition):
+    repo = Path(runner.__file__).resolve().parent.parent
+    relative = Path("src/trading_bot/robinhood_mcp/windows_oauth.py")
+    destination = tmp_path / relative
+    destination.parent.mkdir(parents=True)
+    destination.write_text(
+        (repo / relative).read_text(encoding="utf-8") + "\n" + addition,
+        encoding="utf-8",
+    )
+    script = tmp_path / "scripts/checkpoint_runner.py"
+    script.parent.mkdir()
+    script.write_bytes((repo / "scripts/checkpoint_runner.py").read_bytes())
+    assert runner._arch131_windows_oauth_authority_check(tmp_path)
+
+
+@pytest.mark.parametrize("capability", ["preflight", "execute"])
+def test_131f_authority_rejects_host_registration(tmp_path, capability):
+    repo = Path(runner.__file__).resolve().parent.parent
+    relative = Path("src/trading_bot/robinhood_mcp/windows_oauth.py")
+    destination = tmp_path / relative
+    destination.parent.mkdir(parents=True)
+    destination.write_bytes((repo / relative).read_bytes())
+    script = tmp_path / "scripts/checkpoint_runner.py"
+    script.parent.mkdir()
+    source = (repo / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+    script.write_text(
+        source.replace(f"{capability}=None,", f"{capability}=dangerous_host,"),
+        encoding="utf-8",
+    )
+    assert runner._arch131_windows_oauth_authority_check(tmp_path)
+
+
+def test_131f_source_registration_and_workflow():
+    specs = runner._checkpoint_specs()
+    spec = specs["arch131-robinhood-oauth-windows"]
+    assert spec.preflight is None and spec.execute is None
+    assert spec.remote_branch == "feature/robinhood-review-paper-mode"
+    repo = Path(runner.__file__).resolve().parent.parent
+    assert spec.authority_check(repo) == ()
+    workflow = (repo / ".github/workflows/checkpoint-source-gates.yml").read_text()
+    assert workflow.index("verify arch131-robinhood-oauth-windows") > workflow.index(
+        "verify arch131-robinhood-direct-mcp"
+    )

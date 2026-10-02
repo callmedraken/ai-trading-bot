@@ -393,6 +393,225 @@ ARCH130_R8I_D1_REMOTE_BRANCH: Final = "feature/d10c-r8-incident-reconciliation"
 ARCH131_REVIEW_PAPER_REMOTE_BRANCH: Final = "feature/robinhood-review-paper-mode"
 
 
+def _arch131_windows_oauth_authority_check(repo_root: Path) -> tuple[str, ...]:
+    failures: list[str] = []
+    try:
+        path = repo_root / "src/trading_bot/robinhood_mcp/windows_oauth.py"
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        constants = {
+            node.target.id: node.value
+            for node in tree.body
+            if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name)
+        }
+        expected = {
+            "TOKEN_TARGET": "AITradingBot/Brokerage/Robinhood/MCP/OAuthTokens/v1",
+            "CLIENT_INFO_TARGET": (
+                "AITradingBot/Brokerage/Robinhood/MCP/OAuthClientInfo/v1"
+            ),
+            "CRED_TYPE_GENERIC": 1,
+            "CRED_PERSIST_LOCAL_MACHINE": 2,
+            "CRED_MAX_CREDENTIAL_BLOB_SIZE": 2560,
+            "LOOPBACK_HOST": "127.0.0.1",
+        }
+        for name, value in expected.items():
+            if name not in constants or ast.literal_eval(constants[name]) != value:
+                failures.append(f"131-F frozen constant drift: {name}")
+
+        names = _qualified_names(tree)
+        required = {
+            "self._api.CredReadW",
+            "self._api.CredWriteW",
+            "self._api.CredFree",
+            "WindowsCredentialApi",
+            "WindowsOAuthStorage",
+            "_require_target",
+            "asyncio.start_server",
+            "create_robinhood_oauth_factory",
+        }
+        if required - names:
+            failures.append("131-F Windows storage/composition boundary is missing")
+        forbidden_tools = {
+            "place_equity_order",
+            "cancel_equity_order",
+            "place_option_order",
+            "cancel_option_order",
+            "exercise_option",
+            "place_crypto_order",
+            "cancel_crypto_order",
+        }
+        strings = {
+            node.value
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Constant) and isinstance(node.value, str)
+        }
+        identifiers = {name.rsplit(".", 1)[-1] for name in names}
+        identifiers.update(
+            node.name
+            for node in ast.walk(tree)
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
+        )
+        if forbidden_tools & (strings | identifiers):
+            failures.append("131-F exposes a forbidden Robinhood tool")
+        forbidden = {
+            "CredEnumerateW",
+            "CredEnumerateA",
+            "environ",
+            "getenv",
+            "Path",
+            "write_text",
+            "write_bytes",
+            "read_text",
+            "read_bytes",
+            "load_dotenv",
+            "call_tool",
+            "socket",
+            "bind",
+            "listen",
+        }
+        unsafe_open = any(
+            name == "open" or name.endswith(".open") and name != "webbrowser.open"
+            for name in names
+        )
+        if forbidden & (identifiers | strings) or unsafe_open:
+            failures.append("131-F enumeration/fallback/unreviewed effect boundary")
+        allowed_imports = {
+            "__future__",
+            "asyncio",
+            "ctypes",
+            "ctypes.wintypes",
+            "math",
+            "os",
+            "re",
+            "threading",
+            "webbrowser",
+            "collections.abc",
+            "typing",
+            "urllib.parse",
+            "mcp.shared.auth",
+            "trading_bot.robinhood_mcp.sdk_transport",
+        }
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                if any(alias.name not in allowed_imports for alias in node.names):
+                    failures.append("131-F unreviewed persistence/effect import")
+            elif (
+                isinstance(node, ast.ImportFrom) and node.module not in allowed_imports
+            ):
+                failures.append("131-F unreviewed persistence/effect import")
+            elif isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name):
+                if node.value.id == "os" and node.attr != "name":
+                    failures.append("131-F unreviewed OS boundary")
+        listeners = [
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == "start_server"
+        ]
+        if len(listeners) != 1:
+            failures.append("131-F exact loopback listener is missing")
+        else:
+            keywords = {item.arg: item.value for item in listeners[0].keywords}
+            host = keywords.get("host")
+            port = keywords.get("port")
+            if not (
+                isinstance(host, ast.Name)
+                and host.id == "LOOPBACK_HOST"
+                and isinstance(port, ast.Attribute)
+                and port.attr == "_port"
+                and isinstance(port.value, ast.Name)
+                and port.value.id == "self"
+            ):
+                failures.append("131-F loopback bind drift")
+        native = next(
+            node
+            for node in tree.body
+            if isinstance(node, ast.ClassDef) and node.name == "WindowsCredentialApi"
+        )
+        for method_name, operation in (
+            ("read_generic", "CredReadW"),
+            ("write_generic", "CredWriteW"),
+        ):
+            method = next(
+                node
+                for node in native.body
+                if isinstance(node, ast.FunctionDef) and node.name == method_name
+            )
+            method_names = _qualified_names(method)
+            if "_require_target" not in method_names:
+                failures.append("131-F exact target guard missing")
+            if "CRED_TYPE_GENERIC" not in method_names:
+                failures.append(f"131-F generic credential type missing: {operation}")
+        guard = _top_level_functions(tree).get("_require_target")
+        if guard is None or not any(
+            isinstance(node, ast.Set)
+            and {item.id for item in node.elts if isinstance(item, ast.Name)}
+            == {"TOKEN_TARGET", "CLIENT_INFO_TARGET"}
+            and len(node.elts) == 2
+            for node in ast.walk(guard)
+        ):
+            failures.append("131-F exact target set drift")
+        calls = [node for node in ast.walk(native) if isinstance(node, ast.Call)]
+        for call in calls:
+            if isinstance(call.func, ast.Attribute) and call.func.attr == "CredReadW":
+                if not (
+                    len(call.args) == 4
+                    and isinstance(call.args[0], ast.Name)
+                    and call.args[0].id == "target"
+                    and isinstance(call.args[1], ast.Name)
+                    and call.args[1].id == "CRED_TYPE_GENERIC"
+                ):
+                    failures.append("131-F exact generic read call drift")
+            if isinstance(call.func, ast.Attribute) and call.func.attr == "_credential":
+                fields = {item.arg: item.value for item in call.keywords}
+                for field, constant in (
+                    ("Type", "CRED_TYPE_GENERIC"),
+                    ("Persist", "CRED_PERSIST_LOCAL_MACHINE"),
+                    ("TargetName", "target"),
+                ):
+                    value = fields.get(field)
+                    if not isinstance(value, ast.Name) or value.id != constant:
+                        failures.append("131-F generic write record drift")
+        runner_tree = ast.parse(
+            (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+        )
+        registrations = [
+            node
+            for node in ast.walk(runner_tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "CheckpointSpec"
+            and any(
+                item.arg == "name"
+                and isinstance(item.value, ast.Constant)
+                and item.value.value == "arch131-robinhood-oauth-windows"
+                for item in node.keywords
+            )
+        ]
+        if len(registrations) != 1:
+            failures.append("131-F source-only registration missing")
+        else:
+            for item in registrations[0].keywords:
+                if item.arg in {"preflight", "execute"} and not (
+                    isinstance(item.value, ast.Constant) and item.value.value is None
+                ):
+                    failures.append("131-F checkpoint has host/effect capability")
+        spec = _checkpoint_specs()["arch131-robinhood-oauth-windows"]
+        if spec.preflight is not None or spec.execute is not None:
+            failures.append("131-F checkpoint has host/effect capability")
+    except (
+        OSError,
+        UnicodeError,
+        SyntaxError,
+        KeyError,
+        ValueError,
+        TypeError,
+        StopIteration,
+    ):
+        failures.append("131-F source or structural boundary unavailable")
+    return tuple(failures)
+
+
 def _arch131_direct_mcp_authority_check(repo_root: Path) -> tuple[str, ...]:
     failures: list[str] = []
     relative = "src/trading_bot/robinhood_mcp/sdk_transport.py"
@@ -2429,6 +2648,24 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
         "tests/runtime/test_d10_arch128_r8_readonly.py",
     )
     return {
+        "arch131-robinhood-oauth-windows": CheckpointSpec(
+            name="arch131-robinhood-oauth-windows",
+            description="Architecture 131-F Windows OAuth persistence and callback",
+            tests=(
+                *COMMON_TESTS,
+                "tests/robinhood_mcp/test_windows_oauth.py",
+                "tests/robinhood_mcp/test_sdk_transport.py",
+            ),
+            ruff_paths=(
+                *COMMON_RUFF_PATHS,
+                "src/trading_bot/robinhood_mcp/windows_oauth.py",
+                "tests/robinhood_mcp/test_windows_oauth.py",
+            ),
+            authority_check=_arch131_windows_oauth_authority_check,
+            remote_branch=ARCH131_REVIEW_PAPER_REMOTE_BRANCH,
+            preflight=None,
+            execute=None,
+        ),
         "arch131-robinhood-direct-mcp": CheckpointSpec(
             name="arch131-robinhood-direct-mcp",
             description="Architecture 131-E direct Robinhood MCP transport",

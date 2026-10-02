@@ -127,6 +127,12 @@ jobs:
             $Failures += 'arch131-robinhood-direct-mcp'
           }
 
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\ops.ps1 `
+            verify arch131-robinhood-oauth-windows
+          if ($LASTEXITCODE -ne 0) {
+            $Failures += 'arch131-robinhood-oauth-windows'
+          }
+
           if ($Failures.Count -ne 0) {
             throw "Checkpoint source gates failed: $($Failures -join ', ')"
           }

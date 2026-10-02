@@ -401,16 +401,14 @@ def _arch131_paper_cycle_authority_check(repo_root: Path) -> tuple[str, ...]:
         tree = ast.parse(source)
         names = _qualified_names(tree)
         required = {
-            "self._adapter.agentic_equity_orders",
+            "adapter.agentic_equity_orders",
             "self._adapter.review_market_order",
             "self._store.get_by_order_id",
             "self._store.record_market_review",
         }
         missing = sorted(required - names)
         if missing:
-            failures.append(
-                f"Architecture 131-C missing reviewed bindings: {missing}"
-            )
+            failures.append(f"Architecture 131-C missing reviewed bindings: {missing}")
         forbidden = {
             "subprocess.run",
             "subprocess.Popen",

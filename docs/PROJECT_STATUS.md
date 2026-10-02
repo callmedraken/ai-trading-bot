@@ -9388,3 +9388,57 @@ MCP inventory followed by `get_equity_orders` and `get_equity_quotes`.
 qualification. Placement/cancellation/options/crypto remain outside the
 application surface.
 
+## 2026-10-02 — First Robinhood OAuth grant ACCEPTED
+
+The first human-interactive Robinhood OAuth grant completed successfully against
+the accepted Windows-backed 131-F boundary.
+
+Pre-grant remote/source identity:
+
+```text
+BRANCH feature/robinhood-review-paper-mode
+HEAD   45c325fd1ff56641fb6d2263ccc4570bd41c0970
+TREE   4cef11b61408c6d89d3d9b6c10e5b772ed6e8579
+CI     37052736424 SUCCESS
+```
+
+Observed OAuth boundary:
+
+```text
+INITIAL_HTTP_STATUS=401
+BEARER_CHALLENGE_PRESENT=TRUE
+RESOURCE_METADATA_ADVERTISED=TRUE
+OAUTH_GRANT=PASS
+MCP_VERSION=2.2.0
+HTTPX2_VERSION=2.13.1
+RESOURCE_CHALLENGE_REQUESTS=1
+POST_AUTH_RESOURCE_REPLAY_BLOCKED=TRUE
+CLIENT_REGISTRATION_PERSISTED=TRUE
+OAUTH_TOKEN_PERSISTED=TRUE
+MCP_INITIALIZE_SENT=FALSE
+MCP_DISCOVER_SENT=FALSE
+MCP_LIST_TOOLS_SENT=FALSE
+MCP_TOOL_CALL_SENT=FALSE
+BROKERAGE_ORDER_REQUEST_SENT=FALSE
+NETWORK_REQUEST_COUNT=5
+```
+
+The browser-side flow connected the existing Agentic account and did not require
+opening a new brokerage account. The OAuth client-registration record and token
+record were persisted through the reviewed Windows Credential Manager targets.
+
+The authenticated MCP resource replay was deliberately intercepted locally after
+token exchange. Therefore the accepted grant performed OAuth discovery,
+registration/authorization/token exchange and secure persistence only. It did
+not send MCP initialize, tool inventory, read-tool, review-tool, placement,
+cancellation, or brokerage-order requests.
+
+Production/live trading remains NO-GO.
+
+Next protected boundary: live read-only MCP qualification. That stage may create
+an authenticated MCP session, enumerate the server tool inventory, and invoke
+only `get_equity_orders` and `get_equity_quotes`. It requires separate
+authorization. `review_equity_order` remains a later separately authorized
+non-placement brokerage request, and placement/cancellation/options/crypto
+remain outside the application surface.
+

@@ -415,7 +415,7 @@ def test_loopback_success_exact_values_and_listener_before_browser(issuer):
             value not in response
             for value in (b"CODE", b"STATE", b"issuer.example", b"SECRET")
         )
-        assert not helper._requests and not helper._writers
+        assert helper._active is None
 
     run(scenario())
     assert order == ["listener"]
@@ -513,13 +513,13 @@ def test_timeout_closes_partial_request_even_without_callback_waiter():
         reader, writer = await asyncio.open_connection("127.0.0.1", port)
         writer.write(b"GET /callback?code=SECRET")
         await writer.drain()
-        flow = helper._flow
+        flow = helper._active
         with pytest.raises(oauth.LoopbackOAuthError, match="timed out"):
-            await asyncio.wait_for(flow, timeout=2)
+            await asyncio.wait_for(flow.owner, timeout=2)
         assert await reader.read() == b""
         writer.close()
         await writer.wait_closed()
-        assert not helper._writers and not helper._requests
+        assert flow.closed and not flow.writers and not flow.requests
 
     run(scenario())
     assert_closed(port)
@@ -582,7 +582,7 @@ def test_callback_cancellation_and_concurrent_redirect():
         with pytest.raises(asyncio.CancelledError):
             await task
         assert calls == ["first"]
-        assert not helper._requests and not helper._writers
+        assert helper._active is None
 
     run(scenario())
     assert_closed(port)
@@ -803,7 +803,7 @@ def test_browser_timeout_closes_listener():
         try:
             with pytest.raises(oauth.LoopbackOAuthError):
                 await helper.redirect_handler("auth")
-            assert helper._server is None
+            assert helper._active is None
             assert not helper._lock.locked()
             assert_closed(port)
         finally:
@@ -836,3 +836,238 @@ def test_storage_construction_does_not_import_optional_sdk(monkeypatch):
     storage = oauth.WindowsOAuthStorage(native_api=api)
     assert storage._native is api
     assert not api.reads and not api.writes
+
+
+def test_blocked_browser_success_retains_flow_ownership():
+    import threading
+
+    port = free_port()
+    release_browser = threading.Event()
+
+    async def scenario():
+        loop = asyncio.get_running_loop()
+        browser_started = asyncio.Event()
+        resources_closed = asyncio.Event()
+        calls = []
+
+        def opener(url):
+            calls.append(url)
+            if url == "flow-A":
+                loop.call_soon_threadsafe(browser_started.set)
+                if not release_browser.wait(3):
+                    return False
+            return True
+
+        helper = oauth.LoopbackOAuthCallback(
+            f"http://127.0.0.1:{port}/callback", browser_opener=opener
+        )
+        close = helper._close
+
+        async def observe_close(*args):
+            await close(*args)
+            resources_closed.set()
+
+        helper._close = observe_close
+        redirect = asyncio.create_task(helper.redirect_handler("flow-A"))
+        try:
+            await asyncio.wait_for(browser_started.wait(), 2)
+            await request(port, "/callback?code=CODE-A&state=STATE-A&iss=issuer-A")
+            await asyncio.wait_for(resources_closed.wait(), 2)
+            assert not redirect.done()
+            with pytest.raises(oauth.LoopbackOAuthError):
+                await helper.callback_handler()
+            with pytest.raises(oauth.LoopbackOAuthError, match="already active"):
+                await helper.redirect_handler("flow-B")
+            assert helper._lock.locked()
+            assert calls == ["flow-A"]
+
+            release_browser.set()
+            await asyncio.wait_for(redirect, 2)
+            # Ownership also covers the pending callback result after redirect returns.
+            with pytest.raises(oauth.LoopbackOAuthError, match="already active"):
+                await helper.redirect_handler("flow-B")
+            result = await helper.callback_handler()
+            assert (result.code, result.state, result.iss) == (
+                "CODE-A",
+                "STATE-A",
+                "issuer-A",
+            )
+            assert not helper._lock.locked()
+
+            await helper.redirect_handler("flow-B")
+            await request(port, "/callback?code=CODE-B&state=STATE-B&iss=issuer-B")
+            later = await helper.callback_handler()
+            assert (later.code, later.state, later.iss) == (
+                "CODE-B",
+                "STATE-B",
+                "issuer-B",
+            )
+            assert calls == ["flow-A", "flow-B"]
+        finally:
+            release_browser.set()
+            if not redirect.done():
+                redirect.cancel()
+            await asyncio.gather(redirect, return_exceptions=True)
+
+    run(scenario())
+    assert_closed(port)
+
+
+@pytest.mark.parametrize("terminal", ["timeout", "browser-failure", "cancellation"])
+def test_terminal_redirect_cleanup_retains_flow_ownership(terminal):
+    import threading
+
+    port = free_port()
+    release_browser = threading.Event()
+
+    async def scenario():
+        loop = asyncio.get_running_loop()
+        browser_started = asyncio.Event()
+        cleanup_paused = asyncio.Event()
+        finish_cleanup = asyncio.Event()
+        browser_finished = asyncio.Event()
+        calls = []
+
+        def opener(url):
+            calls.append(url)
+            if url == "flow-A":
+                loop.call_soon_threadsafe(browser_started.set)
+                release_browser.wait(3)
+                loop.call_soon_threadsafe(browser_finished.set)
+                return False
+            return True
+
+        helper = oauth.LoopbackOAuthCallback(
+            f"http://127.0.0.1:{port}/callback",
+            browser_opener=opener,
+            timeout_seconds=0.2 if terminal == "timeout" else 2,
+        )
+        abort = helper._abort
+
+        async def pause_abort(*args):
+            await abort(*args)
+            cleanup_paused.set()
+            await finish_cleanup.wait()
+
+        helper._abort = pause_abort
+        redirect = asyncio.create_task(helper.redirect_handler("flow-A"))
+        try:
+            await asyncio.wait_for(browser_started.wait(), 2)
+            if terminal == "browser-failure":
+                release_browser.set()
+            elif terminal == "cancellation":
+                redirect.cancel()
+            await asyncio.wait_for(cleanup_paused.wait(), 2)
+            assert not redirect.done()
+            # Cleanup has finished but the redirect handler still owns its lifecycle.
+            with pytest.raises(oauth.LoopbackOAuthError, match="already active"):
+                await helper.redirect_handler("flow-B")
+            assert helper._lock.locked()
+            assert calls == ["flow-A"]
+
+            finish_cleanup.set()
+            expected = (
+                asyncio.CancelledError
+                if terminal == "cancellation"
+                else oauth.LoopbackOAuthError
+            )
+            with pytest.raises(expected):
+                await redirect
+            with pytest.raises(oauth.LoopbackOAuthError):
+                await helper.callback_handler()
+            assert not helper._lock.locked()
+
+            # Late completion of A's browser worker must not disturb active B.
+            helper._timeout = 2
+            await helper.redirect_handler("flow-B")
+            release_browser.set()
+            await asyncio.wait_for(browser_finished.wait(), 2)
+            await request(port, "/callback?code=CODE-B&state=STATE-B")
+            result = await helper.callback_handler()
+            assert (result.code, result.state) == ("CODE-B", "STATE-B")
+            assert calls == ["flow-A", "flow-B"]
+        finally:
+            release_browser.set()
+            finish_cleanup.set()
+            if not redirect.done():
+                redirect.cancel()
+            await asyncio.gather(redirect, return_exceptions=True)
+
+    run(scenario())
+    assert_closed(port)
+
+
+def test_stale_flow_cleanup_cannot_touch_later_flow():
+    port = free_port()
+    helper = oauth.LoopbackOAuthCallback(
+        f"http://127.0.0.1:{port}/callback", browser_opener=lambda _: True
+    )
+
+    async def scenario():
+        await helper.redirect_handler("flow-A")
+        earlier = helper._active
+        await request(port, "/callback?code=CODE-A&state=STATE-A")
+        assert (await helper.callback_handler()).code == "CODE-A"
+
+        await helper.redirect_handler("flow-B")
+        later = helper._active
+        assert later is not earlier
+        server, owner, result = later.server, later.owner, later.result
+        await helper._abort(earlier)
+        await helper._close(earlier)
+        helper._retire(earlier)
+
+        class LateWriter:
+            closed = False
+
+            def close(self):
+                self.closed = True
+
+        late_writer = LateWriter()
+        await helper._request(earlier, asyncio.StreamReader(), late_writer)
+        assert late_writer.closed
+        assert helper._active is later
+        assert helper._lock.locked()
+        assert later.server is server and server.is_serving()
+        assert later.owner is owner and not owner.done()
+        assert later.result is result and not result.done()
+        assert not earlier.writers and not earlier.requests
+        assert not later.writers and not later.requests
+        await request(port, "/callback?code=CODE-B&state=STATE-B&iss=issuer-B")
+        returned = await helper.callback_handler()
+        assert (returned.code, returned.state, returned.iss) == (
+            "CODE-B",
+            "STATE-B",
+            "issuer-B",
+        )
+        assert helper._active is None
+
+    run(scenario())
+    assert_closed(port)
+
+
+def test_flow_cleanup_deadline_remains_fail_closed(monkeypatch):
+    monkeypatch.setattr(oauth, "MAX_CLEANUP_TIMEOUT", 0.02)
+    port = free_port()
+    helper = oauth.LoopbackOAuthCallback(
+        f"http://127.0.0.1:{port}/callback", browser_opener=lambda _: True
+    )
+
+    async def scenario():
+        await helper.redirect_handler("auth")
+        flow = helper._active
+
+        async def stalled_shutdown():
+            await asyncio.Event().wait()
+
+        monkeypatch.setattr(flow.server, "wait_closed", stalled_shutdown)
+        await request(port)
+        with pytest.raises(oauth.LoopbackOAuthError, match="cleanup failed") as caught:
+            await asyncio.wait_for(helper.callback_handler(), 2)
+        assert "CODE" not in str(caught.value) + repr(caught.value)
+        assert flow.closed and not flow.writers and not flow.requests
+        assert helper._active is None
+        assert not helper._lock.locked()
+
+    run(scenario())
+    assert_closed(port)

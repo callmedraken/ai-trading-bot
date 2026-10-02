@@ -35,6 +35,7 @@ MAX_REQUEST_LINE: Final = 4096
 MAX_HEADER_BYTES: Final = 8192
 MAX_HEADERS: Final = 32
 MAX_CALLBACK_TIMEOUT: Final = 300.0
+MAX_CLEANUP_TIMEOUT: Final = 5.0
 _MAX_ADDRESS: Final = (1 << (8 * ctypes.sizeof(ctypes.c_void_p))) - 1
 
 
@@ -357,6 +358,32 @@ def _redirect_parts(uri: str) -> tuple[str, str, int]:
         raise LoopbackOAuthError("OAuth redirect URI is invalid") from None
 
 
+class _OAuthFlow:
+    """One generation owns all its resources; no callback values in repr/str."""
+
+    def __init__(self) -> None:
+        self.loop = asyncio.get_running_loop()
+        self.result: asyncio.Future[AuthorizationCodeResult] | None = (
+            self.loop.create_future()
+        )
+        self.owner: asyncio.Task[AuthorizationCodeResult] | None = None
+        self.cleanup: asyncio.Task[None] | None = None
+        self.server: asyncio.Server | None = None
+        self.writers: set[asyncio.StreamWriter] = set()
+        self.requests: set[asyncio.Task] = set()
+        self.redirect_active = True
+        self.redirect_succeeded = False
+        self.callback_active = False
+        self.callback_consumed = False
+        self.closing = False
+        self.closed = False
+
+    def __repr__(self) -> str:
+        return "_OAuthFlow(<redacted>)"
+
+    __str__ = __repr__
+
+
 class LoopbackOAuthCallback:
     """One bounded authorization flow; SDK retains state/issuer validation authority."""
 
@@ -378,12 +405,7 @@ class LoopbackOAuthCallback:
         self._timeout = float(timeout_seconds)
         self._opener = browser_opener
         self._lock = threading.Lock()
-        self._flow: asyncio.Task | None = None
-        self._result: asyncio.Future | None = None
-        self._server: asyncio.Server | None = None
-        self._writers: set[asyncio.StreamWriter] = set()
-        self._requests: set[asyncio.Task] = set()
-        self._callback_waiting = False
+        self._active: _OAuthFlow | None = None
 
     def __repr__(self) -> str:
         return "LoopbackOAuthCallback(<redacted>)"
@@ -391,20 +413,21 @@ class LoopbackOAuthCallback:
     __str__ = __repr__
 
     async def redirect_handler(self, authorization_url: str) -> None:
-        if self._flow is not None or not self._lock.acquire(blocking=False):
+        if not self._lock.acquire(blocking=False):
             raise LoopbackOAuthError("OAuth callback flow is already active")
+        flow = _OAuthFlow()
+        self._active = flow
         try:
-            self._result = asyncio.get_running_loop().create_future()
-            self._server = await asyncio.start_server(
-                self._request,
+            flow.server = await asyncio.start_server(
+                lambda reader, writer: self._request(flow, reader, writer),
                 host=LOOPBACK_HOST,
                 port=self._port,
                 limit=MAX_HEADER_BYTES,
                 reuse_address=False,
             )
-            self._flow = asyncio.create_task(self._own_flow())
+            flow.owner = asyncio.create_task(self._own_flow(flow))
             # Retrieve abandoned errors; callback_handler can still await them.
-            self._flow.add_done_callback(
+            flow.owner.add_done_callback(
                 lambda task: None if task.cancelled() else task.exception()
             )
             opened = await asyncio.wait_for(
@@ -413,69 +436,124 @@ class LoopbackOAuthCallback:
             )
             if opened is not True:
                 raise LoopbackOAuthError("OAuth browser open failed")
+            if flow.owner.done():
+                # A timeout/rejection during browser opening cannot grant a
+                # successful redirect lifecycle. Successful results remain pending.
+                flow.owner.result()
+            flow.redirect_succeeded = True
         except BaseException as error:
-            await self._abort()
+            await self._abort(flow)
             if isinstance(error, asyncio.CancelledError):
                 raise
             raise LoopbackOAuthError("OAuth browser or listener start failed") from None
+        finally:
+            flow.redirect_active = False
+            self._retire(flow)
 
     async def callback_handler(self) -> AuthorizationCodeResult:
-        flow = self._flow
-        if flow is None or self._callback_waiting:
+        flow = self._active
+        if (
+            flow is None
+            or flow.loop is not asyncio.get_running_loop()
+            or flow.redirect_active
+            or not flow.redirect_succeeded
+            or flow.callback_active
+            or flow.callback_consumed
+            or flow.owner is None
+        ):
             raise LoopbackOAuthError("OAuth callback flow is unavailable")
-        self._callback_waiting = True
+        flow.callback_active = True
         try:
-            return await flow
+            return await flow.owner
         except asyncio.CancelledError:
-            await self._abort()
+            await self._abort(flow)
             raise
         finally:
-            self._callback_waiting = False
-            if self._flow is flow:
-                self._flow = None
+            flow.callback_consumed = True
+            flow.callback_active = False
+            self._retire(flow)
 
-    async def _abort(self) -> None:
-        flow = self._flow
-        self._flow = None
-        if flow is not None:
-            flow.cancel()
-            await asyncio.gather(flow, return_exceptions=True)
-        await self._close()
-
-    async def _close(self) -> None:
-        server = self._server
-        self._server = None
-        if server is not None:
-            server.close()
-        # Server.wait_closed waits for accepted connections on current Python.
-        # Close those transports before waiting for the listener.
-        for writer in tuple(self._writers):
-            writer.close()
-        for task in tuple(self._requests):
-            task.cancel()
-        await asyncio.gather(*tuple(self._requests), return_exceptions=True)
-        if server is not None:
-            await server.wait_closed()
-        self._writers.clear()
-        self._requests.clear()
-        self._result = None
-        if self._lock.locked():
+    def _retire(self, flow: _OAuthFlow) -> None:
+        # Resource completion alone never transfers helper ownership. Only the
+        # current generation, after its handlers finish, may release admission.
+        if (
+            self._active is flow
+            and flow.closed
+            and not flow.redirect_active
+            and not flow.callback_active
+            and (not flow.redirect_succeeded or flow.callback_consumed)
+        ):
+            self._active = None
             self._lock.release()
 
-    async def _own_flow(self) -> AuthorizationCodeResult:
+    async def _abort(self, flow: _OAuthFlow) -> None:
+        owner = flow.owner
+        if owner is not None:
+            if not owner.done():
+                owner.cancel()
+            await asyncio.gather(owner, return_exceptions=True)
+        await self._close(flow)
+
+    async def _close(self, flow: _OAuthFlow) -> None:
+        if flow.cleanup is None:
+            # A separate bounded task survives cancellation of either handler.
+            flow.cleanup = asyncio.create_task(self._cleanup(flow))
+            flow.cleanup.add_done_callback(
+                lambda task: None if task.cancelled() else task.exception()
+            )
+        await asyncio.shield(flow.cleanup)
+
+    async def _cleanup(self, flow: _OAuthFlow) -> None:
+        flow.closing = True
+        server = flow.server
+        flow.server = None
+        writers = tuple(flow.writers)
+        requests = tuple(flow.requests)
         try:
-            return await asyncio.wait_for(self._result, timeout=self._timeout)
+            if server is not None:
+                server.close()
+            # Close accepted transports before waiting for server shutdown.
+            for writer in writers:
+                writer.close()
+            for task in requests:
+                task.cancel()
+            async with asyncio.timeout(MAX_CLEANUP_TIMEOUT):
+                await asyncio.gather(*requests, return_exceptions=True)
+                if server is not None:
+                    await server.wait_closed()
+        except Exception:
+            for writer in writers:
+                writer.transport.abort()
+            raise LoopbackOAuthError("OAuth callback cleanup failed") from None
+        finally:
+            flow.writers.clear()
+            flow.requests.clear()
+            if flow.result is not None and not flow.result.done():
+                flow.result.cancel()
+            flow.result = None
+            flow.closed = True
+            self._retire(flow)
+
+    async def _own_flow(self, flow: _OAuthFlow) -> AuthorizationCodeResult:
+        try:
+            return await asyncio.wait_for(flow.result, timeout=self._timeout)
         except TimeoutError:
             raise LoopbackOAuthError("OAuth callback timed out") from None
         finally:
-            await self._close()
+            await self._close(flow)
 
     async def _request(
-        self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
+        self,
+        flow: _OAuthFlow,
+        reader: asyncio.StreamReader,
+        writer: asyncio.StreamWriter,
     ) -> None:
+        if flow.closing:
+            writer.close()
+            return
         task = asyncio.current_task()
-        self._requests.add(task)
-        self._writers.add(writer)
+        flow.requests.add(task)
+        flow.writers.add(writer)
         result = None
         failed = False
         try:
@@ -579,9 +657,9 @@ class LoopbackOAuthCallback:
                 await writer.wait_closed()
             except Exception:
                 failed = True
-            self._writers.discard(writer)
-            self._requests.discard(task)
-            future = self._result
+            flow.writers.discard(writer)
+            flow.requests.discard(task)
+            future = flow.result
             if future is not None and not future.done():
                 if failed:
                     future.set_exception(LoopbackOAuthError("OAuth callback rejected"))

@@ -9135,3 +9135,57 @@ Next: forward paper-performance tracking over the accepted local ReviewPaperStor
 and typed quote data. This remains source-only and can be built before direct MCP
 authentication.
 
+## 2026-10-02 — Architecture 131-D durable paper performance ACCEPTED
+
+Forward-performance tracking over the review-paper ledger is accepted.
+
+Accepted identity:
+
+```text
+BRANCH feature/robinhood-review-paper-mode
+HEAD   e0e59004fc2032b07c6a332e2cae87658be9b593
+TREE   4b21ecf9d7ec433ad6ef1e108e25664e55acd429
+CI     36977600889 SUCCESS
+```
+
+Exact gate:
+
+```text
+CHECKPOINT=arch131-robinhood-performance
+PYTEST=PASS
+RUFF_CHECK=PASS
+RUFF_FORMAT=PASS
+GIT_DIFF_CHECK=PASS
+AUTHORITY=PASS
+IDENTITY_STABLE=True
+OVERALL=PASS
+```
+
+Implemented under `trading_bot.review_paper.performance`:
+
+- durable valuation snapshots beside the review-paper SQLite ledger;
+- exact mark-to-market symbol matching for all currently open positions;
+- current-price selection from the newer regular/non-regular Robinhood trade
+  candidate;
+- explicit quote freshness bound and rejection of future/stale/nonpositive,
+  never-traded, or inactive-instrument marks;
+- deterministic valuation IDs and idempotent duplicate valuation handling;
+- rejection of conflicting same-timestamp valuations and backward valuation
+  time;
+- account equity, realized P&L, unrealized P&L, absolute/percentage return;
+- maximum drawdown amount/percentage from durable valuation history;
+- durable closed-trade realization reconstruction and win/loss/breakeven rate;
+- retained exit proposal reason/confidence attribution.
+
+The checkpoint remains source-only. It contains no Robinhood network/auth,
+review invocation, placement, cancellation, broker, or live effect boundary.
+
+Next: Architecture 131-E direct Robinhood MCP client transport using the official
+MCP Python SDK over Streamable HTTP and standard MCP OAuth discovery. The
+application-facing transport must remain exactly the three-method allowlist
+(`review_equity_order`, `get_equity_quotes`, `get_equity_orders`); no
+place/cancel/options/crypto tool method may be reachable.
+
+The first real Robinhood authentication/session will remain a separate
+human-interactive read-only boundary after source certification.
+

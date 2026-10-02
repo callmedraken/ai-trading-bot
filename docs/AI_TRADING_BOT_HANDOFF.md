@@ -9323,3 +9323,58 @@ Robinhood quote data, with realized/unrealized P&L, total return, drawdown, and
 trade-level/model attribution. It remains transport-injected and does not need a
 live Robinhood session.
 
+## 2026-10-02 — Architecture 131-D performance accepted
+
+Accepted source:
+
+```text
+HEAD e0e59004fc2032b07c6a332e2cae87658be9b593
+TREE 4b21ecf9d7ec433ad6ef1e108e25664e55acd429
+CI   36977600889 SUCCESS
+```
+
+Registered checkpoint:
+
+```text
+arch131-robinhood-performance
+```
+
+The review-paper system can now persist forward valuation history and produce a
+performance report from durable synthetic fills plus typed Robinhood quote
+responses. It rejects missing/extra position symbols, stale/future quote
+timestamps, inactive/never-traded symbols, duplicate conflicting valuations,
+and non-monotonic valuation time.
+
+Performance output includes:
+
+```text
+latest virtual account snapshot
+absolute P&L
+total return
+realized P&L
+unrealized P&L
+maximum drawdown amount / percentage
+paper trade count
+closed trade count
+win / loss / breakeven counts
+win rate
+closed-trade realization records with exit model reason/confidence
+```
+
+No concrete MCP client exists yet. The accepted 131-B adapter is still
+transport-injected and exposes only:
+
+```text
+review_equity_order
+get_equity_quotes
+get_equity_orders
+```
+
+Next safe milestone: 131-E concrete Streamable-HTTP/OAuth transport. Use the
+official MCP Python SDK and standard OAuth discovery; keep OAuth token storage
+separate from source/plain config. Source certification must prove that
+placement/cancellation tools are absent from the application transport.
+
+Actual Robinhood authentication remains a later interactive read-only host
+checkpoint.
+

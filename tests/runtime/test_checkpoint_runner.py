@@ -1688,6 +1688,11 @@ def test_131g_source_registration():
     } <= set(spec.tests)
     repo = Path(runner.__file__).resolve().parent.parent
     assert spec.authority_check(repo) == ()
+    workflow = (repo / ".github/workflows/checkpoint-source-gates.yml").read_text()
+    assert "verify arch131-robinhood-agentic-account" in workflow
+    assert workflow.index("verify arch131-robinhood-agentic-account") > workflow.index(
+        "verify arch131-robinhood-oauth-windows"
+    )
 
 
 @pytest.mark.parametrize(

@@ -13,7 +13,7 @@ from trading_bot.domain import OrderSide, Symbol
 from trading_bot.domain._validation import normalize_utc, require_decimal
 from trading_bot.ledger import AccountSnapshot
 from trading_bot.review_paper.store import ReviewPaperStore
-from trading_bot.robinhood_mcp import (
+from trading_bot.robinhood_mcp.models import (
     RobinhoodEquityQuotesResponse,
     RobinhoodQuoteData,
 )

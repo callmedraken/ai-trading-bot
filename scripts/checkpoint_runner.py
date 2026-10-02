@@ -411,9 +411,7 @@ def _arch131_direct_mcp_authority_check(repo_root: Path) -> tuple[str, ...]:
         )
         try:
             if ast.literal_eval(constants["_ALLOWED_TOOL_NAMES"]) != expected_tools:
-                failures.append(
-                    "Architecture 131-E direct MCP allowlist is not exact"
-                )
+                failures.append("Architecture 131-E direct MCP allowlist is not exact")
             if ast.literal_eval(constants["ROBINHOOD_TRADING_MCP_URL"]) != (
                 "https://agent.robinhood.com/mcp/trading"
             ):

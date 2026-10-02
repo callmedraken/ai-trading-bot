@@ -9442,3 +9442,90 @@ authorization. `review_equity_order` remains a later separately authorized
 non-placement brokerage request, and placement/cancellation/options/crypto
 remain outside the application surface.
 
+## 2026-10-02 — Robinhood authenticated read-only MCP qualification ACCEPTED
+
+Authenticated read-only qualification passed against the accepted Architecture 131-F
+OAuth/Windows host boundary.
+
+Pre-qualification source identity:
+
+```text
+BRANCH feature/robinhood-review-paper-mode
+HEAD   acb8c5af4e394865f4e3538d3bc27fc1386e76d6
+TREE   2d7745579a2d89f8b53255c2242222b383f03489
+```
+
+Accepted live evidence:
+
+```text
+persisted OAuth reuse: PASS
+MCP session initialization: PASS
+bounded tool inventory: PASS
+review_equity_order advertised: TRUE
+get_equity_quotes advertised: TRUE
+get_equity_orders advertised: TRUE
+
+get_equity_quotes(SPY): PASS
+quote production parser: PASS
+
+get_accounts diagnostic:
+  advertised: TRUE
+  required args: 0
+  returned account count: 2
+  agentic_allowed account count: 1
+  manually entered app-visible account matched MCP account_number: FALSE
+  manually entered account matched rhs_account_number: FALSE
+
+canonical MCP account resolution:
+  unique agentic_allowed account resolved: TRUE
+  account number printed: FALSE
+  account number persisted by diagnostic: FALSE
+
+get_equity_orders:
+  canonical resolved account_number: used in-memory only
+  placed_agent=agentic
+  symbol=SPY
+  created_at_gte=recent 30-minute UTC window
+  is_error: FALSE
+  production parser: PASS
+  matching order count: 0
+  next cursor present: FALSE
+
+review_equity_order called: FALSE
+placement called: FALSE
+cancellation called: FALSE
+options tool called: FALSE
+crypto tool called: FALSE
+interactive reauthorization: FALSE
+```
+
+The earlier `get_equity_orders -> NOT_FOUND` failures were traced to account identity,
+not to OAuth, MCP transport, live schema, the optional order filters, or the order-history
+tool. Removing `created_at_gte`, `symbol`, and `placed_agent` individually did not
+change the error. A one-time read-only `get_accounts` diagnostic proved that the manually
+entered app-visible account number was not either MCP-returned account identifier. Using
+the unique MCP account with `agentic_allowed=true` made the original narrow order-history
+query succeed.
+
+Architecture consequence: production paper mode must not treat a manually copied
+Robinhood app-visible account number as authoritative MCP account identity. The canonical
+Agentic equities account must be resolved from Robinhood MCP account metadata, fail closed
+unless exactly one eligible account is identified, and remain internal to the brokerage
+transport/application boundary.
+
+The public AI/application MCP surface remains exactly:
+
+```text
+review_equity_order
+get_equity_quotes
+get_equity_orders
+```
+
+`get_accounts` was used only as an explicitly authorized read-only diagnostic and is not
+an AI-facing tool.
+
+Production/live trading remains NO-GO.
+
+Next milestone: design and implement the source-only canonical MCP Agentic-account resolver
+before authorizing the first `review_equity_order` paper-cycle qualification.
+

@@ -9079,3 +9079,41 @@ failure.
 Next host action is one fresh elevated read-only preflight from this exact
 remote identity. No effect authorization is involved.
 
+## 2026-10-01 — R8I-D1a ACL localization accepted
+
+The first production-host R8I-D1 reconciliation remained completely read-only
+but blocked before durable effect attribution:
+
+```text
+reason=AuthoritySecurityError
+detail=PD1B object DACL violates its exact role policy
+```
+
+Source identity stayed exact and all effect fields remained NOT_RUN.
+
+The generic PD1B exception did not reveal whether the failure occurred while
+pinning a fixed decision, invocation, operation/runtime container, or one of
+their governed children. R8I-D1a adds a sanitized diagnostic only:
+
+```text
+paper_security_diagnostic:
+  stage: decision_inventory | invocation_inventory | paper_operation_inventory
+  last_role: <source-owned PaperObjectRole value>
+```
+
+It records no path bytes, ACEs, owner SID, or DACL contents and does not repair
+anything.
+
+Accepted identity:
+
+```text
+HEAD 5b37825fd2fdd33e570d8ea48aed159a4919a057
+TREE 4c1b8e39f61f384276eb1544363cf1a7f0f607e1
+CI   36946039744 SUCCESS
+```
+
+Next host action is another fresh exact-source elevated read-only preflight for
+`arch130-r8i-d1`. There is still no protected execute profile and no
+authorization variable. Use the sanitized role/stage only to decide whether a
+later narrower read-only diagnosis or separately designed ACL repair is needed.
+

@@ -8829,3 +8829,60 @@ ops.ps1 preflight arch130-r8i-d1
 No authorization variable is required or permitted. There is no execute path.
 Do not restart, extend, replace, or retry the stopped soak.
 
+## 2026-10-01 — R8I-D1 first host preflight blocked on PD1B DACL admission
+
+The first exact-source Architecture 130 host preflight ran read-only at:
+
+```text
+HEAD 4acdf433ef09be31a8d255d59409aa93ecbc7b4f
+TREE f0d6efeae478d518dca8f65243806cf4592ce622
+```
+
+Result:
+
+```text
+PRIMARY_STATUS=BLOCKED
+PRIMARY_REASON=AuthoritySecurityError
+PRIMARY_DETAIL=PD1B object DACL violates its exact role policy
+IDENTITY_STABLE=True
+OVERALL=BLOCKED
+```
+
+The report preserved all current-checkpoint effects as NOT_RUN. Scheduler
+containment remained closed; no evidence, lease, production filesystem,
+provider, decision-publication, Paper-v2, broker, live, source-launch, or task
+effect was performed.
+
+The broad AuthoritySecurityError did not identify which fixed PD1B role failed
+while the observer entered its pinned Paper-v2 reads. R8I-D1a therefore adds
+only a sanitized read-only diagnostic: the existing native read API records the
+last source-owned PD1B role inspected and the active inventory stage
+(decision/invocation/paper-operation). It does not expose ACEs, owner data, or
+security descriptors and adds no mutation/repair capability.
+
+Accepted R8I-D1a source:
+
+```text
+HEAD 5b37825fd2fdd33e570d8ea48aed159a4919a057
+TREE 4c1b8e39f61f384276eb1544363cf1a7f0f607e1
+CI   36946039744 SUCCESS
+```
+
+Exact gate:
+
+```text
+CHECKPOINT=arch130-r8i-d1
+PYTEST=PASS
+RUFF_CHECK=PASS
+RUFF_FORMAT=PASS
+GIT_DIFF_CHECK=PASS
+AUTHORITY=PASS
+IDENTITY_STABLE=True
+OVERALL=PASS
+```
+
+Next: fresh exact-source elevated read-only `arch130-r8i-d1` preflight. If it
+blocks again, inspect `paper_security_diagnostic.stage` and
+`paper_security_diagnostic.last_role`. Do not repair ACLs, provision storage,
+or run any execute path from this diagnostic result.
+

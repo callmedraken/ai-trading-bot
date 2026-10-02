@@ -8951,3 +8951,65 @@ Next: Architecture 131-B read-only Robinhood MCP boundary. It may inspect the
 trade-approval setting, approval history, and equity quotes, but must not call
 place/approve/decline/cancel order actions.
 
+## 2026-10-02 — Architecture 131-A2 review-based paper core ACCEPTED
+
+The originally accepted manual-approval paper design was superseded after live
+MCP metadata discovery showed the connected Robinhood surface does not expose
+the assumed approval-management tools. No Robinhood order/proposal effect had
+been wired into the repository, so the obsolete approval-ID package was removed
+before any external paper cycle existed.
+
+The connected MCP does expose `review_equity_order`,
+`get_equity_quotes`, and `get_equity_orders`. Architecture 131 now uses
+Robinhood review as the non-placement broker validation/quote boundary and keeps
+the durable paper account entirely local.
+
+Canonical branch:
+
+```text
+feature/robinhood-review-paper-mode
+```
+
+Accepted identity:
+
+```text
+HEAD f323f4e1d05c6c33847e25f24e526c440584b833
+TREE 561b34528740432e5980c1cf4ba917bd99360ecd
+CI   36972689262 SUCCESS
+```
+
+Exact gate:
+
+```text
+CHECKPOINT=arch131-robinhood-review-paper
+PYTEST=PASS
+RUFF_CHECK=PASS
+RUFF_FORMAT=PASS
+GIT_DIFF_CHECK=PASS
+AUTHORITY=PASS
+IDENTITY_STABLE=True
+OVERALL=PASS
+```
+
+Implemented:
+
+- `trading_bot.review_paper` immutable intent/review/quote/record models;
+- deterministic paper-trade and fill IDs derived from local order ID;
+- exact review echo validation against symbol/side/type/risk-approved quantity;
+- synthetic MARKET BUY fills from review ask and SELL fills from review bid;
+- side-specific venue timestamps as synthetic fill timestamps;
+- explicit slippage/commission persistence;
+- exact canonical `order_checks` JSON persistence without trying to freeze
+  Robinhood's evolving alert taxonomy;
+- exact `market_data_disclosure` retention;
+- SQLite durability and idempotent replay;
+- virtual PaperLedger reconstruction and mark-to-market snapshot support;
+- no network/MCP/broker/order-changing capability in this checkpoint.
+
+The old `approval_paper` package and manual-approval Architecture 131 document
+were removed on this branch.
+
+Next: Architecture 131-B typed Robinhood MCP schema adapter. It may parse the
+observed review/quote/order response shapes and define a read/review-only
+transport interface. It must not expose place/cancel/approve/decline methods.
+

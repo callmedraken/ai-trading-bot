@@ -9165,3 +9165,61 @@ Next milestone: 131-B read-only Robinhood MCP adapter for
 `get_equity_quotes`. No proposal or order-changing tool is authorized in
 131-B.
 
+## 2026-10-02 — Architecture 131-A2 review-paper core accepted
+
+Canonical future execution branch:
+
+```text
+feature/robinhood-review-paper-mode
+```
+
+Accepted source:
+
+```text
+HEAD f323f4e1d05c6c33847e25f24e526c440584b833
+TREE 561b34528740432e5980c1cf4ba917bd99360ecd
+CI   36972689262 SUCCESS
+```
+
+Registered checkpoint:
+
+```text
+arch131-robinhood-review-paper
+```
+
+The previous approval-based design is obsolete. The actual connected Robinhood
+MCP omitted approval-management tools, so all approval-ID/decline bookkeeping
+was removed before external execution existed.
+
+Current paper cycle contract:
+
+```text
+third-party AI
+-> TradeProposal
+-> deterministic RiskManager
+-> ExecutionInstruction
+-> Robinhood review_equity_order
+-> parse echoed order + quote_data + order_checks + disclosure
+-> durable synthetic fill in local ReviewPaperStore
+-> virtual PaperLedger / P&L
+```
+
+Paper mode never calls `place_equity_order` or `cancel_equity_order`.
+
+Important schema-derived behavior:
+
+- review quote_data is already sufficient for the immediate synthetic fill;
+- BUY uses ask_price / venue_ask_time;
+- SELL uses bid_price / venue_bid_time;
+- non-positive side-specific quote, has_traded=false, or non-active listing
+  blocks the synthetic fill;
+- non-empty order_checks are preserved as broker diagnostics and not interpreted
+  as a stable closed enum;
+- market_data_disclosure is preserved exactly for any operator-facing surface;
+- get_equity_quotes is reserved for later mark-to-market/fresh pricing;
+- get_equity_orders may be used as a read-only before/after safety assertion
+  that review did not create an actual agentic order.
+
+Next milestone: 131-B typed MCP schema adapter. Keep it effect-closed: review/read
+tool interface only, no placement/cancellation methods.
+

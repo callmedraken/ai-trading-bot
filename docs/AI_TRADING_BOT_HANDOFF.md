@@ -9117,3 +9117,51 @@ Next host action is another fresh exact-source elevated read-only preflight for
 authorization variable. Use the sanitized role/stage only to decide whether a
 later narrower read-only diagnosis or separately designed ACL repair is needed.
 
+## 2026-10-01 — Architecture 131-A accepted; Robinhood manual-approval paper mode
+
+Canonical branch:
+
+```text
+feature/robinhood-approval-paper-mode
+```
+
+Accepted source:
+
+```text
+HEAD bfbe2d0cda8d93157e441223e451de3dc94c5507
+TREE 4f2e8c7c320310de93a5abff4cdb2ed04f34c8ee
+CI   36948444333 SUCCESS
+```
+
+Architecture document:
+
+```text
+docs/architecture/131-robinhood-manual-approval-paper-trading.md
+```
+
+Phase A is intentionally network-free. The durable paper store lives under
+`trading_bot.approval_paper` and treats each future Robinhood trade-approval
+request as one external idempotency key.
+
+Core paper-mode ordering for the later MCP adapter is frozen as:
+
+```text
+prove Trade approvals ON
+-> create/identify exact Robinhood proposal
+-> capture post-proposal quote
+-> durably record synthetic fill
+-> decline approval
+-> verify decline
+```
+
+If the paper record is durable but decline is not confirmed, later proposal
+creation must stop until reconciliation. A pending Robinhood approval must never
+be silently forgotten.
+
+Paper risk state is the virtual PaperLedger, not real Robinhood cash/positions.
+
+Next milestone: 131-B read-only Robinhood MCP adapter for
+`get_trade_approval_setting`, `get_trade_approvals`, and
+`get_equity_quotes`. No proposal or order-changing tool is authorized in
+131-B.
+

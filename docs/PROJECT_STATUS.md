@@ -8886,3 +8886,68 @@ blocks again, inspect `paper_security_diagnostic.stage` and
 `paper_security_diagnostic.last_role`. Do not repair ACLs, provision storage,
 or run any execute path from this diagnostic result.
 
+## 2026-10-01 — Architecture 131-A Robinhood approval-paper ledger ACCEPTED
+
+The project has pivoted away from further D10 standalone-host development as the
+future execution path. D10 remains frozen historical infrastructure with its
+scheduler disabled.
+
+New target architecture:
+
+```text
+third-party AI / research
+        -> TradeProposal
+        -> deterministic RiskManager
+        -> ExecutionInstruction
+        -> Robinhood Trading MCP with Trade approvals ON
+        -> Robinhood approval request
+        -> durable local synthetic paper fill
+        -> decline Robinhood approval
+        -> virtual paper account / P&L history
+```
+
+Robinhood is the proposal/market-data/execution transport. Our code remains the
+strategy, research, risk, and paper-account authority.
+
+Architecture 131-A implemented a network-free foundation:
+
+- immutable approval-paper intent/quote/record models;
+- independent virtual account with configurable starting cash (default policy
+  remains $10,000);
+- deterministic synthetic MARKET fills using post-proposal bid/ask plus explicit
+  slippage;
+- SQLite-backed durable approval history;
+- Robinhood approval ID as the idempotency key;
+- preserved AI proposal reason/confidence and deterministic risk outcome/reasons;
+- PaperLedger reconstruction from durable synthetic fills;
+- realized/unrealized P&L valuation through the existing ledger;
+- explicit PENDING_DECLINE / DECLINED cleanup state;
+- conflict rejection when one approval ID is reused with different material;
+- no MCP, network, broker, or real-order capability in this checkpoint.
+
+Accepted identity:
+
+```text
+BRANCH feature/robinhood-approval-paper-mode
+HEAD   bfbe2d0cda8d93157e441223e451de3dc94c5507
+TREE   4f2e8c7c320310de93a5abff4cdb2ed04f34c8ee
+CI     36948444333 SUCCESS
+```
+
+Exact checkpoint gate:
+
+```text
+CHECKPOINT=arch131-robinhood-approval-paper
+PYTEST=PASS
+RUFF_CHECK=PASS
+RUFF_FORMAT=PASS
+GIT_DIFF_CHECK=PASS
+AUTHORITY=PASS
+IDENTITY_STABLE=True
+OVERALL=PASS
+```
+
+Next: Architecture 131-B read-only Robinhood MCP boundary. It may inspect the
+trade-approval setting, approval history, and equity quotes, but must not call
+place/approve/decline/cancel order actions.
+

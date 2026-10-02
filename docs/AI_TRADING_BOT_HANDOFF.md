@@ -9025,3 +9025,57 @@ Also diagnose `CHILD_OUTPUT_INVALID` as far as durable evidence allows.
 The exact rejected stdout/stderr bytes are unrecoverable because the guard
 captured but did not persist them. Do not restart the old soak.
 
+## 2026-10-01 — R8I-D1 source accepted; host reconciliation next
+
+Canonical R8I-D1 branch:
+
+```text
+feature/d10c-r8-incident-reconciliation
+```
+
+Accepted identity:
+
+```text
+HEAD cbd1ddcf89920bf8bfa21207084458a56dc61891
+TREE 65a84ecd94ee58909b68f4cc9f6177e533ec0c1d
+CI   36937600477 SUCCESS
+```
+
+Registered checkpoint:
+
+```text
+arch130-r8i-d1
+```
+
+It is read-only only; no protected execute function exists.
+
+The observer re-verifies the contained scheduler and fixed incident, derives the
+2026-09-30 completed XNYS session / 2026-10-01 next execution session from the
+incident timestamp, then inspects durable production truth:
+
+1. C3/provider attempt, claim, reservation, launch, terminal, selection lineage
+   through approved query-only SQLite;
+2. the complete fixed unattended-decision namespace through pinned read-only
+   Paper-v2 access and canonical verification;
+3. unattended invocation, paper-operation receipt, and runtime transition state
+   through existing pinned read authorities.
+
+Attribution is intentionally conservative. Durable artifacts with no trusted
+publication/effect timestamp may prove dependency on the incident C3 state but
+do not automatically prove that the failed child authored the effect.
+
+The child-output diagnosis remains bounded:
+
+```text
+exact rejected stdout = UNRECOVERABLE
+exact rejected stderr = UNRECOVERABLE
+guard reason           = CHILD_OUTPUT_INVALID
+```
+
+The durable observer may narrow how far the workflow progressed but must not
+invent whether the rejection was stderr, line-count, JSON, schema, or child-exit
+failure.
+
+Next host action is one fresh elevated read-only preflight from this exact
+remote identity. No effect authorization is involved.
+

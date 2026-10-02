@@ -8775,3 +8775,57 @@ performed provider capture, decision publication, or Paper-v2 effects using
 durable artifacts/logs/state only. Exact rejected stdout/stderr are not
 recoverable from the incident because the guard did not persist them.
 
+## 2026-10-01 — R8I-D1 read-only incident reconciliation source ACCEPTED
+
+Architecture 130 source is accepted on the canonical incident-reconciliation
+branch:
+
+```text
+branch: feature/d10c-r8-incident-reconciliation
+HEAD:   cbd1ddcf89920bf8bfa21207084458a56dc61891
+TREE:   65a84ecd94ee58909b68f4cc9f6177e533ec0c1d
+CI:     36937600477 SUCCESS
+```
+
+Exact source gate:
+
+```text
+CHECKPOINT=arch130-r8i-d1
+PYTEST=PASS
+RUFF_CHECK=PASS
+RUFF_FORMAT=PASS
+GIT_DIFF_CHECK=PASS
+AUTHORITY=PASS
+IDENTITY_STABLE=True
+OVERALL=PASS
+```
+
+The checkpoint is read-only and has no protected execute profile. It reconstructs
+durable C3/provider lineage, unattended decision artifacts, unattended
+invocations, A67/Paper-v2 operation state, receipts, and transition/account
+state for the fixed first-wake incident while keeping durable presence separate
+from causal attribution.
+
+Key conservative rules:
+
+- incident sessions are derived from the frozen 2026-10-01T08:30:09.370767Z
+  wake timestamp, not diagnosis wall-clock time;
+- second-resolution C3 timestamps preserve the 08:30:09 boundary-second
+  ambiguity instead of inventing sub-second order;
+- decision/invocation/Paper-v2 artifacts without trusted effect timestamps are
+  reported as dependency evidence, not proof of failed-child authorship;
+- exact rejected child stdout/stderr remain unrecoverable because the guard did
+  not persist them;
+- every current-checkpoint effect field remains NOT_RUN;
+- scheduler containment must still be DISABLED_NON_RUNNING_EXACT before durable
+  reconciliation is admitted.
+
+Next: fresh elevated read-only host preflight:
+
+```text
+ops.ps1 preflight arch130-r8i-d1
+```
+
+No authorization variable is required or permitted. There is no execute path.
+Do not restart, extend, replace, or retry the stopped soak.
+

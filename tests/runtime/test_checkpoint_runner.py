@@ -161,6 +161,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
         "arch131-robinhood-mcp-schema",
         "arch131-robinhood-paper-cycle",
         "arch131-robinhood-performance",
+        "arch131-robinhood-direct-mcp",
     }
     for spec in specs.values():
         assert "tests/runtime/test_checkpoint_runner.py" in spec.tests
@@ -174,6 +175,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
                 "arch131-robinhood-mcp-schema",
                 "arch131-robinhood-paper-cycle",
                 "arch131-robinhood-performance",
+                "arch131-robinhood-direct-mcp",
             }
             else (
                 "feature/d10c-r8-incident-reconciliation"
@@ -205,6 +207,8 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
     assert specs["arch131-robinhood-paper-cycle"].execute is None
     assert specs["arch131-robinhood-performance"].preflight is None
     assert specs["arch131-robinhood-performance"].execute is None
+    assert specs["arch131-robinhood-direct-mcp"].preflight is None
+    assert specs["arch131-robinhood-direct-mcp"].execute is None
     assert specs["arch128-r5-substrate"].remote_head_env is None
     assert (
         specs["arch128-r5-trading"].remote_head_env == runner.R5_TRADING_REMOTE_HEAD_ENV
@@ -227,6 +231,7 @@ def test_current_arch128_authority_profiles_pass() -> None:
     assert specs["arch131-robinhood-mcp-schema"].authority_check(repo_root) == ()
     assert specs["arch131-robinhood-paper-cycle"].authority_check(repo_root) == ()
     assert specs["arch131-robinhood-performance"].authority_check(repo_root) == ()
+    assert specs["arch131-robinhood-direct-mcp"].authority_check(repo_root) == ()
 
 
 def test_default_evidence_root_is_outside_repo() -> None:

@@ -393,6 +393,94 @@ ARCH130_R8I_D1_REMOTE_BRANCH: Final = "feature/d10c-r8-incident-reconciliation"
 ARCH131_REVIEW_PAPER_REMOTE_BRANCH: Final = "feature/robinhood-review-paper-mode"
 
 
+def _arch131_direct_mcp_authority_check(repo_root: Path) -> tuple[str, ...]:
+    failures: list[str] = []
+    relative = "src/trading_bot/robinhood_mcp/sdk_transport.py"
+    try:
+        source = (repo_root / relative).read_text(encoding="utf-8")
+        tree = ast.parse(source)
+        constants = {
+            node.target.id: node.value
+            for node in tree.body
+            if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name)
+        }
+        expected_tools = (
+            "get_equity_orders",
+            "get_equity_quotes",
+            "review_equity_order",
+        )
+        try:
+            if ast.literal_eval(constants["_ALLOWED_TOOL_NAMES"]) != expected_tools:
+                failures.append(
+                    "Architecture 131-E direct MCP allowlist is not exact"
+                )
+            if ast.literal_eval(constants["ROBINHOOD_TRADING_MCP_URL"]) != (
+                "https://agent.robinhood.com/mcp/trading"
+            ):
+                failures.append("Architecture 131-E Robinhood endpoint drift")
+        except (KeyError, ValueError, TypeError):
+            failures.append("Architecture 131-E frozen constants are invalid")
+
+        transport = next(
+            (
+                node
+                for node in tree.body
+                if isinstance(node, ast.ClassDef)
+                and node.name == "RobinhoodMcpStreamableHttpTransport"
+            ),
+            None,
+        )
+        if transport is None:
+            failures.append("Architecture 131-E transport class is missing")
+        else:
+            public = {
+                node.name
+                for node in transport.body
+                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+                and not node.name.startswith("_")
+            }
+            expected_public = {
+                "for_test",
+                "review_equity_order",
+                "get_equity_quotes",
+                "get_equity_orders",
+            }
+            if public != expected_public:
+                failures.append(
+                    "Architecture 131-E public transport surface is not exact"
+                )
+
+        names = _qualified_names(tree)
+        required = {
+            "httpx2.AsyncClient",
+            "streamable_http_client",
+            "Client",
+            "client.list_tools",
+            "client.call_tool",
+        }
+        missing = sorted(required - names)
+        if missing:
+            failures.append(
+                f"Architecture 131-E missing direct MCP bindings: {missing}"
+            )
+        for token in (
+            "place_equity_order",
+            "cancel_equity_order",
+            "place_option_order",
+            "cancel_option_order",
+            "exercise_option",
+            "place_crypto_order",
+            "cancel_crypto_order",
+        ):
+            if token in source:
+                failures.append(
+                    f"Architecture 131-E exposes forbidden Robinhood tool: {token}"
+                )
+    except (OSError, UnicodeError, SyntaxError):
+        failures.append("Architecture 131-E direct MCP source unavailable")
+    return tuple(failures)
+
+
 def _arch131_performance_authority_check(repo_root: Path) -> tuple[str, ...]:
     failures: list[str] = []
     relative = "src/trading_bot/review_paper/performance.py"
@@ -2343,6 +2431,22 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
         "tests/runtime/test_d10_arch128_r8_readonly.py",
     )
     return {
+        "arch131-robinhood-direct-mcp": CheckpointSpec(
+            name="arch131-robinhood-direct-mcp",
+            description="Architecture 131-E direct Robinhood MCP transport",
+            tests=(
+                *COMMON_TESTS,
+                "tests/robinhood_mcp/test_sdk_transport.py",
+            ),
+            ruff_paths=(
+                *COMMON_RUFF_PATHS,
+                "src/trading_bot/robinhood_mcp/__init__.py",
+                "src/trading_bot/robinhood_mcp/sdk_transport.py",
+                "tests/robinhood_mcp/test_sdk_transport.py",
+            ),
+            authority_check=_arch131_direct_mcp_authority_check,
+            remote_branch=ARCH131_REVIEW_PAPER_REMOTE_BRANCH,
+        ),
         "arch131-robinhood-performance": CheckpointSpec(
             name="arch131-robinhood-performance",
             description="Architecture 131-D durable Robinhood paper performance",

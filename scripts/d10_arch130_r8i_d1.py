@@ -358,19 +358,35 @@ def _read_c3_inventory(
     }
 
 
-def _paper_session(trading_sid: str) -> PinnedTradingPaperReadSession:
-    return PinnedTradingPaperReadSession(WindowsPaperReadNativeApi(), trading_sid)
+class _TracingPaperReadNativeApi(WindowsPaperReadNativeApi):
+    """Read-only native API wrapper that records only the last fixed PD1B role."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.last_role: str | None = None
+
+    def inspect(self, handle: object, path: str, kind: object):
+        self.last_role = self.object_spec(path).role.value
+        return super().inspect(handle, path, kind)
+
+
+def _paper_session(
+    trading_sid: str,
+    api: WindowsPaperReadNativeApi,
+) -> PinnedTradingPaperReadSession:
+    return PinnedTradingPaperReadSession(api, trading_sid)
 
 
 def _decision_inventory(
     trading_sid: str,
     completed: object,
     execution: object,
+    api: WindowsPaperReadNativeApi,
 ) -> dict[str, object]:
     calendar = personal_desktop_unattended_decision_calendar()
     final: list[dict[str, object]] = []
     staging: list[str] = []
-    with _paper_session(trading_sid) as session:
+    with _paper_session(trading_sid, api) as session:
         for name in session.names(PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_DECISIONS):
             match = _DECISION_FINAL.fullmatch(name)
             staged = _DECISION_STAGING.fullmatch(name)
@@ -435,11 +451,12 @@ def _decision_inventory(
 def _invocation_inventory(
     trading_sid: str,
     completed: object,
+    api: WindowsPaperReadNativeApi,
 ) -> dict[str, object]:
     calendar = _calendar()
     final: list[dict[str, object]] = []
     staging: list[str] = []
-    with _paper_session(trading_sid) as session:
+    with _paper_session(trading_sid, api) as session:
         for name in session.names(PERSONAL_DESKTOP_PAPER_V2_UNATTENDED_INVOCATIONS):
             match = _INVOCATION_FINAL.fullmatch(name)
             staged = _INVOCATION_STAGING.fullmatch(name)
@@ -496,10 +513,13 @@ def _invocation_inventory(
     }
 
 
-def _paper_operation_inventory(trading_sid: str) -> dict[str, object]:
+def _paper_operation_inventory(
+    trading_sid: str,
+    api: WindowsPaperReadNativeApi,
+) -> dict[str, object]:
     operations: list[dict[str, object]] = []
     transitions: list[dict[str, object]] = []
-    with _paper_session(trading_sid) as session:
+    with _paper_session(trading_sid, api) as session:
         operation_names = session.names(PERSONAL_DESKTOP_PAPER_V2_OPERATIONS)
         for name in operation_names:
             match = _OPERATION.fullmatch(name)
@@ -654,6 +674,8 @@ def _base() -> dict[str, object]:
 def preflight() -> dict[str, object]:
     """Reconstruct fixed durable incident truth without any effect capability."""
     result = _base()
+    paper_api: _TracingPaperReadNativeApi | None = None
+    paper_read_stage: str | None = None
     try:
         snapshot = halt_windows.ReadOnlyWindowsHost().observe()
         halt.require_snapshot(snapshot, enabled=False)
@@ -662,13 +684,27 @@ def preflight() -> dict[str, object]:
         before = validate_installed_authority_complete()
         production = require_initialized_supported_authority_evidence(before)
         c3 = _read_c3_inventory(before, completed)
+        paper_api = _TracingPaperReadNativeApi()
+
+        paper_read_stage = "decision_inventory"
         decisions = _decision_inventory(
             before.provisioning.trading_sid,
             completed,
             execution,
+            paper_api,
         )
-        invocations = _invocation_inventory(before.provisioning.trading_sid, completed)
-        operations = _paper_operation_inventory(before.provisioning.trading_sid)
+        paper_read_stage = "invocation_inventory"
+        invocations = _invocation_inventory(
+            before.provisioning.trading_sid,
+            completed,
+            paper_api,
+        )
+        paper_read_stage = "paper_operation_inventory"
+        operations = _paper_operation_inventory(
+            before.provisioning.trading_sid,
+            paper_api,
+        )
+        paper_read_stage = None
         after = validate_installed_authority_complete()
         if after != before:
             raise IncidentReconciliationBlocked("authority_validation_drift")
@@ -724,4 +760,9 @@ def preflight() -> dict[str, object]:
     except Exception as exc:
         result["reason"] = type(exc).__name__
         result["detail"] = str(exc)
+        if paper_api is not None and paper_api.last_role is not None:
+            result["paper_security_diagnostic"] = {
+                "stage": paper_read_stage,
+                "last_role": paper_api.last_role,
+            }
     return result

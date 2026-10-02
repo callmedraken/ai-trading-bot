@@ -147,3 +147,30 @@ def test_architecture_document_states_attribution_limit() -> None:
     assert "durable presence into causal authorship" in text
     assert "no trusted publication timestamp" in text
     assert "**no protected execute function**" in text
+
+
+def test_tracing_paper_api_reports_only_source_owned_role(monkeypatch) -> None:
+    api = object.__new__(d1._TracingPaperReadNativeApi)
+    api.last_role = None
+
+    class Spec:
+        role = type("Role", (), {"value": "unattended-decisions"})()
+
+    monkeypatch.setattr(api, "object_spec", lambda path: Spec())
+    monkeypatch.setattr(
+        d1.WindowsPaperReadNativeApi,
+        "inspect",
+        lambda self, handle, path, kind: "observed",
+    )
+
+    assert api.inspect(object(), "ignored", object()) == "observed"
+    assert api.last_role == "unattended-decisions"
+
+
+def test_preflight_source_exposes_only_sanitized_paper_security_diagnostic() -> None:
+    source = inspect.getsource(d1.preflight)
+    assert '"paper_security_diagnostic"' in source
+    assert '"stage": paper_read_stage' in source
+    assert '"last_role": paper_api.last_role' in source
+    assert "aces" not in source
+    assert "owner_sid" not in source

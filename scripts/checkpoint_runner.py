@@ -393,6 +393,69 @@ ARCH130_R8I_D1_REMOTE_BRANCH: Final = "feature/d10c-r8-incident-reconciliation"
 ARCH131_REVIEW_PAPER_REMOTE_BRANCH: Final = "feature/robinhood-review-paper-mode"
 
 
+def _arch131_mcp_schema_authority_check(repo_root: Path) -> tuple[str, ...]:
+    failures: list[str] = []
+    relative = "src/trading_bot/robinhood_mcp/adapter.py"
+    try:
+        source = (repo_root / relative).read_text(encoding="utf-8")
+        tree = ast.parse(source)
+        protocol = next(
+            (
+                node
+                for node in tree.body
+                if isinstance(node, ast.ClassDef)
+                and node.name == "RobinhoodReviewReadTransport"
+            ),
+            None,
+        )
+        if protocol is None:
+            failures.append("Architecture 131-B transport protocol is missing")
+        else:
+            methods = {
+                node.name
+                for node in protocol.body
+                if isinstance(node, ast.FunctionDef)
+            }
+            expected = {
+                "review_equity_order",
+                "get_equity_quotes",
+                "get_equity_orders",
+            }
+            if methods != expected:
+                failures.append(
+                    "Architecture 131-B transport surface is not exact allowlist"
+                )
+        names = _qualified_names(tree)
+        forbidden = {
+            "subprocess.run",
+            "subprocess.Popen",
+            "socket.socket",
+            "requests.get",
+            "requests.post",
+            "httpx.get",
+            "httpx.post",
+            "urllib.request.urlopen",
+        }
+        if names & forbidden:
+            failures.append("Architecture 131-B contains a concrete network boundary")
+        for token in (
+            "place_equity_order",
+            "cancel_equity_order",
+            "place_option_order",
+            "cancel_option_order",
+            "exercise_option",
+            "place_crypto_order",
+            "cancel_crypto_order",
+        ):
+            if token in source:
+                failures.append(
+                    f"Architecture 131-B exposes forbidden Robinhood tool: {token}"
+                )
+    except (OSError, UnicodeError, SyntaxError):
+        failures.append("Architecture 131-B adapter source unavailable")
+    return tuple(failures)
+
+
 def _arch131_review_paper_authority_check(repo_root: Path) -> tuple[str, ...]:
     failures: list[str] = []
     names: set[str] = set()
@@ -2201,6 +2264,24 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
         "tests/runtime/test_d10_arch128_r8_readonly.py",
     )
     return {
+        "arch131-robinhood-mcp-schema": CheckpointSpec(
+            name="arch131-robinhood-mcp-schema",
+            description="Architecture 131-B typed Robinhood MCP read/review schema",
+            tests=(
+                *COMMON_TESTS,
+                "tests/robinhood_mcp/test_adapter.py",
+            ),
+            ruff_paths=(
+                *COMMON_RUFF_PATHS,
+                "src/trading_bot/robinhood_mcp/__init__.py",
+                "src/trading_bot/robinhood_mcp/models.py",
+                "src/trading_bot/robinhood_mcp/parsing.py",
+                "src/trading_bot/robinhood_mcp/adapter.py",
+                "tests/robinhood_mcp/test_adapter.py",
+            ),
+            authority_check=_arch131_mcp_schema_authority_check,
+            remote_branch=ARCH131_REVIEW_PAPER_REMOTE_BRANCH,
+        ),
         "arch131-robinhood-review-paper": CheckpointSpec(
             name="arch131-robinhood-review-paper",
             description="Architecture 131 Robinhood review-based paper ledger",

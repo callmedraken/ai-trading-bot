@@ -102,6 +102,12 @@ Architecture 109  personal-desktop Paper-v2 receipt-recovery authority
 Architecture 110  personal-desktop unattended Paper-v2 operation authority
 Architecture 111  personal-desktop unattended daily-cycle authority
 Architecture 112  personal-desktop capture-only warm-up authority
+Architecture 131-A2 Robinhood review-paper accounting core
+Architecture 131-B  typed Robinhood MCP review/read adapter
+Architecture 131-C  fail-closed Robinhood paper cycle
+Architecture 131-D  durable Robinhood paper performance
+Architecture 131-E  direct Robinhood MCP transport
+Architecture 131-F  Windows OAuth persistence and loopback callback
 ```
 
 ## Mandatory personal-desktop security baseline
@@ -9246,4 +9252,81 @@ authentication occurs during source certification.
 
 After 131-F acceptance, the first human-interactive OAuth grant and read-only
 capability qualification remain a separate host boundary.
+
+## 2026-10-02 — Architecture 131-F Windows OAuth persistence ACCEPTED
+
+Architecture 131-F is accepted on the canonical Robinhood review-paper branch.
+
+Accepted source:
+
+```text
+BRANCH feature/robinhood-review-paper-mode
+HEAD   79e9df03ee8021796eedb2d28462238edfe75d33
+TREE   b8281809c01013c56dc3a63dec85946bdbec46db
+CI     36986643994 SUCCESS
+```
+
+Registered source checkpoint:
+
+```text
+arch131-robinhood-oauth-windows
+```
+
+The accepted implementation adds Windows-backed OAuth persistence and a bounded
+local callback boundary without performing a real authentication flow:
+
+- exact Windows Credential Manager generic targets for OAuth tokens and dynamic
+  client registration;
+- no environment, .env, repository/config plaintext, credential enumeration,
+  record splitting, or fallback persistence path;
+- complete MCP SDK token/client-registration model persistence;
+- explicit 2,560-byte generic-credential record limit with fail-closed handling;
+- malformed records and orphaned token state fail closed;
+- mutable native/copy buffers are cleared at their ownership boundaries, while
+  immutable Python/Pydantic string zeroization is not claimed;
+- exact `127.0.0.1:<port>/<path>` callback binding with bounded request,
+  header, query, timeout, and cleanup limits;
+- callback `code`, `state`, and optional `iss` are passed through exactly;
+  the MCP SDK retains state/issuer validation authority;
+- one generation owns its listener/result/tasks/writers/cleanup until the
+  redirect and callback lifecycle is complete, preventing stale-flow cleanup
+  from touching a later OAuth flow;
+- the Robinhood application transport remains exactly
+  `review_equity_order`, `get_equity_quotes`, and
+  `get_equity_orders`;
+- the checkpoint remains source-only with no preflight or execute profile.
+
+The initial 131-F source exposed a flow-ownership race in which resource cleanup
+could release helper admission while the redirect handler still owned shared
+state. Commit `79e9df03ee8021796eedb2d28462238edfe75d33` corrected that
+race with per-flow ownership and added regressions for browser-still-running,
+terminal cleanup, stale-generation isolation, and bounded cleanup failure.
+
+Final certification:
+
+```text
+131-F source gate: 355 passed, 1 skipped
+full certification: 10,178 passed, 18 skipped, 0 failed/errors
+discovered test cases: 10,196 across 302 modules
+broad-1: 4,789 passed, 4 skipped
+broad-2: 4,463 passed, 5 skipped
+serial: 926 passed, 9 skipped
+Ruff lint: PASS
+Ruff format: PASS
+git diff --check: PASS
+wall time: 428.847 seconds
+```
+
+The optional real-MCP model test remained skipped because the accepted local
+environment did not have the `mcp` optional dependency installed. No
+authentication, credential-store operation, Robinhood/MCP request, or brokerage
+effect occurred during source implementation or certification.
+
+Next boundary: exact-source Windows dependency/host qualification with the
+accepted `robinhood-mcp` optional runtime dependencies installed. Qualify the
+real MCP SDK model round trip and inert Windows composition first. The first
+human-interactive Robinhood OAuth grant remains separately authorized; after
+that, qualify read-only tool inventory, `get_equity_orders`, and
+`get_equity_quotes`. The first `review_equity_order` paper cycle remains a
+later separate non-placement brokerage-request approval.
 

@@ -9577,3 +9577,59 @@ for evidence review. Read-only MCP inventory / `get_equity_orders` /
 `review_equity_order` remains a later separately authorized non-placement
 brokerage request.
 
+## 2026-10-02 — First Robinhood OAuth grant accepted
+
+The first live Robinhood authentication boundary is complete.
+
+Accepted pre-grant source:
+
+```text
+HEAD 45c325fd1ff56641fb6d2263ccc4570bd41c0970
+TREE 4cef11b61408c6d89d3d9b6c10e5b772ed6e8579
+CI   37052736424 SUCCESS
+```
+
+Live evidence:
+
+```text
+401 bearer challenge observed
+resource_metadata advertised
+OAuth grant PASS
+client registration persisted
+OAuth token persisted
+post-auth resource replay blocked locally
+MCP initialize sent: false
+MCP discover sent: false
+MCP list_tools sent: false
+MCP tool call sent: false
+brokerage order request sent: false
+network requests: 5
+```
+
+The browser connected the existing Agentic account without new-account
+onboarding. No additional brokerage account was opened.
+
+The OAuth grant used the accepted `mcp==2.2.0` / `httpx2==2.13.1`
+dependency path. Client registration and token state now exist only in the
+reviewed Windows Credential Manager records.
+
+Crucially, the grant driver stopped immediately after token persistence and
+before transmitting the authenticated MCP resource replay. No MCP session was
+initialized and no Robinhood tool was called.
+
+STOP boundary: do not run the production transport yet. The next stage requires
+separate authorization for authenticated read-only MCP qualification:
+
+1. initialize the MCP session;
+2. enumerate the complete bounded tool inventory and prove the reviewed
+   `review_equity_order`, `get_equity_quotes`, and `get_equity_orders`
+   surface is available;
+3. call only `get_equity_orders` and `get_equity_quotes` with explicitly
+   bounded read-only arguments;
+4. stop for evidence review.
+
+`review_equity_order` remains separately authorized after read-only
+qualification. No placement/cancel/options/crypto mutation tool is authorized.
+
+Production/live trading remains NO-GO.
+

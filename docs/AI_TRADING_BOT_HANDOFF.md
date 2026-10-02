@@ -9633,3 +9633,61 @@ qualification. No placement/cancel/options/crypto mutation tool is authorized.
 
 Production/live trading remains NO-GO.
 
+## 2026-10-02 — Authenticated read-only Robinhood MCP qualification accepted
+
+Read-only live qualification is complete on source:
+
+```text
+HEAD acb8c5af4e394865f4e3538d3bc27fc1386e76d6
+TREE 2d7745579a2d89f8b53255c2242222b383f03489
+```
+
+Qualified live behaviors:
+
+- persisted Windows OAuth state reused without interactive reauthorization;
+- authenticated MCP session initialized successfully;
+- complete bounded tool inventory succeeded;
+- `review_equity_order`, `get_equity_quotes`, and `get_equity_orders` are advertised;
+- `get_equity_quotes` for SPY returned a non-error structured response accepted by the
+  production parser;
+- the live `get_equity_orders` input schema matches the frozen adapter contract;
+- `get_equity_orders` succeeds and parses correctly when given the canonical MCP account
+  number resolved from the unique account where `agentic_allowed=true`;
+- the qualified recent SPY/agentic order query returned zero matching orders and no cursor.
+
+Account-identity finding:
+
+A manually entered app-visible Robinhood/Agentic number repeatedly produced
+`CallToolResult(is_error=true)` classified as NOT_FOUND, including when all optional
+order filters were removed. A bounded `get_accounts` diagnostic returned two MCP
+accounts, exactly one with `agentic_allowed=true`, and proved the entered value matched
+neither MCP `account_number` nor `rhs_account_number`. Resolving the eligible MCP
+account in memory fixed the order-history read immediately.
+
+No account number was printed or persisted by the diagnostics.
+
+No review, placement, cancellation, options, or crypto tool was called.
+
+### Required architecture correction before first review qualification
+
+Do not proceed directly to `review_equity_order` using operator-entered account text.
+Add a source-owned internal account-resolution boundary that:
+
+1. retrieves Robinhood MCP accounts internally;
+2. requires exactly one equities account with `agentic_allowed=true`;
+3. obtains its canonical MCP `account_number`;
+4. never exposes `get_accounts` to the AI/application facade;
+5. does not print/log/persist the account number as diagnostic output;
+6. fails closed on zero/multiple eligible accounts, malformed account metadata, tool
+   errors, or missing structured content;
+7. feeds that canonical identifier to the existing typed review/order-read adapter.
+
+The public application-facing MCP contract remains exactly three methods:
+`review_equity_order`, `get_equity_quotes`, and `get_equity_orders`.
+
+Next milestone should be a source-only checkpoint for this canonical Agentic-account
+resolver, followed by focused/full certification. Only after that source is accepted
+should the first live `review_equity_order` paper-cycle qualification occur.
+
+Production/live trading remains NO-GO.
+

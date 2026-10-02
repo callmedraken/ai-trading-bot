@@ -390,6 +390,35 @@ R8_HALT_REGISTRATION_PIN: Final = (
 
 ARCH130_R8I_D1_SOURCE_BLOB_SHA1: Final = "4dece99d8993934e9747f091415927353b70a2e3"
 ARCH130_R8I_D1_REMOTE_BRANCH: Final = "feature/d10c-r8-incident-reconciliation"
+ARCH131_APPROVAL_PAPER_REMOTE_BRANCH: Final = "feature/robinhood-approval-paper-mode"
+
+
+def _arch131_approval_paper_authority_check(repo_root: Path) -> tuple[str, ...]:
+    failures: list[str] = []
+    names: set[str] = set()
+    for relative in (
+        "src/trading_bot/approval_paper/models.py",
+        "src/trading_bot/approval_paper/store.py",
+    ):
+        path = repo_root / relative
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+            names.update(_qualified_names(tree))
+        except (OSError, UnicodeError, SyntaxError):
+            failures.append(f"Architecture 131 source unavailable: {relative}")
+    forbidden = {
+        "subprocess.run",
+        "subprocess.Popen",
+        "socket.socket",
+        "requests.get",
+        "requests.post",
+        "httpx.get",
+        "httpx.post",
+        "urllib.request.urlopen",
+    }
+    if names & forbidden:
+        failures.append("Architecture 131 phase A contains a network/effect boundary")
+    return tuple(failures)
 
 
 def _arch130_r8i_d1_authority_check(repo_root: Path) -> tuple[str, ...]:
@@ -2172,6 +2201,23 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
         "tests/runtime/test_d10_arch128_r8_readonly.py",
     )
     return {
+        "arch131-robinhood-approval-paper": CheckpointSpec(
+            name="arch131-robinhood-approval-paper",
+            description="Architecture 131 Robinhood manual-approval paper ledger",
+            tests=(
+                *COMMON_TESTS,
+                "tests/approval_paper/test_store.py",
+            ),
+            ruff_paths=(
+                *COMMON_RUFF_PATHS,
+                "src/trading_bot/approval_paper/__init__.py",
+                "src/trading_bot/approval_paper/models.py",
+                "src/trading_bot/approval_paper/store.py",
+                "tests/approval_paper/test_store.py",
+            ),
+            authority_check=_arch131_approval_paper_authority_check,
+            remote_branch=ARCH131_APPROVAL_PAPER_REMOTE_BRANCH,
+        ),
         "arch130-r8i-d1": CheckpointSpec(
             name="arch130-r8i-d1",
             description=(

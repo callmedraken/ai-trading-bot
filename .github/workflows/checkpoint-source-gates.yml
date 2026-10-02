@@ -7,6 +7,7 @@ on:
       - feature/d10c-durable-wake-evidence
       - feature/d10c-r8-terminal-halt
       - feature/d10c-r8-incident-reconciliation
+      - feature/robinhood-approval-paper-mode
   pull_request:
 
 permissions:
@@ -94,6 +95,12 @@ jobs:
             verify arch130-r8i-d1
           if ($LASTEXITCODE -ne 0) {
             $Failures += 'arch130-r8i-d1'
+          }
+
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\ops.ps1 `
+            verify arch131-robinhood-approval-paper
+          if ($LASTEXITCODE -ne 0) {
+            $Failures += 'arch131-robinhood-approval-paper'
           }
 
           if ($Failures.Count -ne 0) {

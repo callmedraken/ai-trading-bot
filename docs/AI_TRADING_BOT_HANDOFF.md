@@ -9378,3 +9378,63 @@ placement/cancellation tools are absent from the application transport.
 Actual Robinhood authentication remains a later interactive read-only host
 checkpoint.
 
+## 2026-10-02 — Architecture 131-E direct MCP transport accepted
+
+Canonical Robinhood branch:
+
+```text
+feature/robinhood-review-paper-mode
+```
+
+Accepted source:
+
+```text
+HEAD e500c9d27031216923b513305d87ea63a35d0494
+TREE bb0645932ab87c18b7340e3717892a4ae665366d
+CI   36978964812 SUCCESS
+```
+
+Registered checkpoint:
+
+```text
+arch131-robinhood-direct-mcp
+```
+
+The Python application now has a concrete direct Streamable-HTTP MCP transport,
+but source certification did not authenticate or contact Robinhood.
+
+Production transport public surface remains exactly:
+
+```text
+review_equity_order
+get_equity_quotes
+get_equity_orders
+```
+
+It intentionally exposes no generic MCP tool call method and no
+place/cancel/options/crypto mutation method. Before an allowlisted call it
+enumerates the server tool inventory, requires all three reviewed tools,
+requires a successful MCP result, and requires structured mapping output.
+
+OAuth is standard MCP OAuth discovery using the fixed Robinhood Trading MCP
+resource endpoint. Token/client-registration storage and user authorization
+callbacks are injected.
+
+The optional runtime extra is:
+
+```text
+mcp>=2.2,<3
+httpx2>=2.13,<3
+```
+
+Next milestone: 131-F Windows-backed OAuth persistence and loopback callback
+handling. Do not perform the real Robinhood grant during source development.
+
+After 131-F:
+1. fresh exact-source host setup/qualification;
+2. explicit interactive OAuth authorization;
+3. read-only capability inventory;
+4. read-only get_equity_orders/get_equity_quotes qualification;
+5. only later, separately authorize the first non-placement
+   review_equity_order paper cycle.
+

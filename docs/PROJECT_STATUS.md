@@ -9189,3 +9189,61 @@ place/cancel/options/crypto tool method may be reachable.
 The first real Robinhood authentication/session will remain a separate
 human-interactive read-only boundary after source certification.
 
+## 2026-10-02 — Architecture 131-E direct Robinhood MCP transport ACCEPTED
+
+The concrete direct MCP transport is accepted without performing any real
+Robinhood authentication or tool call.
+
+Accepted identity:
+
+```text
+BRANCH feature/robinhood-review-paper-mode
+HEAD   e500c9d27031216923b513305d87ea63a35d0494
+TREE   bb0645932ab87c18b7340e3717892a4ae665366d
+CI     36978964812 SUCCESS
+```
+
+Exact gate:
+
+```text
+CHECKPOINT=arch131-robinhood-direct-mcp
+PYTEST=PASS
+RUFF_CHECK=PASS
+RUFF_FORMAT=PASS
+GIT_DIFF_CHECK=PASS
+AUTHORITY=PASS
+IDENTITY_STABLE=True
+OVERALL=PASS
+```
+
+Architecture 131-E adds:
+
+- optional `robinhood-mcp` runtime dependencies:
+  `mcp>=2.2,<3` and `httpx2>=2.13,<3`;
+- fixed Robinhood Trading MCP endpoint
+  `https://agent.robinhood.com/mcp/trading`;
+- direct Streamable-HTTP transport through the official MCP Python SDK;
+- standard MCP OAuth provider/discovery rather than hard-coded Robinhood
+  authorization/token endpoints;
+- injected OAuth token/client-registration storage;
+- strict loopback HTTP redirect-URI validation;
+- exhaustive bounded MCP tool inventory verification before every call;
+- exact three-tool application allowlist:
+  `review_equity_order`, `get_equity_quotes`, `get_equity_orders`;
+- structured-result / tool-error / malformed-inventory fail-closed handling;
+- no generic public `call_tool` surface;
+- no placement, cancellation, options, crypto, exercise, approval, or other
+  brokerage-mutation method.
+
+The source gate uses an injected async caller and performs no network access.
+The first source revision exposed an import-cycle and one shared-runner format
+issue; both were corrected before acceptance. No Robinhood effect occurred.
+
+Next: Architecture 131-F secure OAuth persistence + local callback
+infrastructure. It must keep tokens/client registration out of source, repo
+files, environment variables, and plaintext config. No real Robinhood
+authentication occurs during source certification.
+
+After 131-F acceptance, the first human-interactive OAuth grant and read-only
+capability qualification remain a separate host boundary.
+

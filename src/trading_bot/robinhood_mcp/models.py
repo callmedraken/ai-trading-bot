@@ -260,9 +260,7 @@ class RobinhoodEquityOrder:
         _nonnegative(self.fees, "fees")
         if self.ref_id is not None and not isinstance(self.ref_id, str):
             raise TypeError("ref_id must be a string or None")
-        if self.reject_reason is not None and not isinstance(
-            self.reject_reason, str
-        ):
+        if self.reject_reason is not None and not isinstance(self.reject_reason, str):
             raise TypeError("reject_reason must be a string or None")
         if self.dollar_based_amount is not None and not isinstance(
             self.dollar_based_amount, RobinhoodDollarBasedAmount

@@ -57,7 +57,9 @@ class ApprovalPaperIntent:
             or len(self.approval_id) > 256
         ):
             raise ValueError("approval_id must be nonblank exact text up to 256 chars")
-        if not isinstance(self.proposal_id, UUID) or not isinstance(self.order_id, UUID):
+        if not isinstance(self.proposal_id, UUID) or not isinstance(
+            self.order_id, UUID
+        ):
             raise TypeError("proposal_id and order_id must be UUIDs")
         if not isinstance(self.symbol, Symbol):
             raise TypeError("symbol must be a Symbol")
@@ -68,11 +70,15 @@ class ApprovalPaperIntent:
         if not isinstance(self.risk_outcome, RiskOutcome):
             raise TypeError("risk_outcome must be a RiskOutcome")
         if self.risk_outcome is RiskOutcome.REJECTED:
-            raise ValueError("rejected risk decisions cannot create approval-paper intent")
+            raise ValueError(
+                "rejected risk decisions cannot create approval-paper intent"
+            )
         if self.risk_outcome is RiskOutcome.APPROVED and approved != desired:
             raise ValueError("APPROVED intent must retain desired quantity")
         if self.risk_outcome is RiskOutcome.RESIZED and not approved < desired:
-            raise ValueError("RESIZED intent requires approved_quantity < desired_quantity")
+            raise ValueError(
+                "RESIZED intent requires approved_quantity < desired_quantity"
+            )
         if not isinstance(self.risk_reason_codes, tuple) or not all(
             isinstance(item, str) and item.strip() and item == item.strip()
             for item in self.risk_reason_codes
@@ -80,7 +86,10 @@ class ApprovalPaperIntent:
             raise TypeError("risk_reason_codes must be exact nonblank strings")
         if len(set(self.risk_reason_codes)) != len(self.risk_reason_codes):
             raise ValueError("risk_reason_codes must be unique")
-        if not isinstance(self.proposal_reason, str) or not self.proposal_reason.strip():
+        if (
+            not isinstance(self.proposal_reason, str)
+            or not self.proposal_reason.strip()
+        ):
             raise ValueError("proposal_reason must be nonblank")
         if self.proposal_confidence is not None:
             require_decimal(self.proposal_confidence, "proposal_confidence")
@@ -152,9 +161,7 @@ class ApprovalPaperRecord:
         commission = require_decimal(self.commission, "commission")
         if commission < 0:
             raise ValueError("commission must be zero or greater")
-        slippage = require_decimal(
-            self.slippage_basis_points, "slippage_basis_points"
-        )
+        slippage = require_decimal(self.slippage_basis_points, "slippage_basis_points")
         if not Decimal("0") <= slippage <= _MAX_SLIPPAGE_BPS:
             raise ValueError("slippage_basis_points must be between 0 and 9999")
         expected_price = synthetic_market_fill_price(

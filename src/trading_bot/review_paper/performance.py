@@ -504,7 +504,9 @@ def _valuation_from_row(row: tuple[object, ...]) -> ReviewPaperValuation:
     try:
         decoded = json.loads(str(marks_json))
     except json.JSONDecodeError as error:
-        raise ReviewPaperPerformanceError("stored valuation marks are invalid") from error
+        raise ReviewPaperPerformanceError(
+            "stored valuation marks are invalid"
+        ) from error
     if not isinstance(decoded, list):
         raise ReviewPaperPerformanceError("stored valuation marks must be a list")
     marks: list[ReviewPaperMark] = []

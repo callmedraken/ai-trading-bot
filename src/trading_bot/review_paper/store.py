@@ -331,9 +331,7 @@ def _record_row(record: ReviewPaperRecord) -> tuple[object, ...]:
         intent.risk_outcome.value,
         "|".join(intent.risk_reason_codes),
         intent.proposal_reason,
-        None
-        if intent.proposal_confidence is None
-        else str(intent.proposal_confidence),
+        None if intent.proposal_confidence is None else str(intent.proposal_confidence),
         intent.order_type.value,
         intent.time_in_force.value,
         intent.proposed_at.isoformat(),
@@ -418,9 +416,7 @@ def _record_from_row(row: tuple[object, ...]) -> ReviewPaperRecord:
         ),
         proposal_reason=str(proposal_reason),
         proposal_confidence=(
-            None
-            if proposal_confidence is None
-            else Decimal(str(proposal_confidence))
+            None if proposal_confidence is None else Decimal(str(proposal_confidence))
         ),
         order_type=OrderType(str(order_type)),
         time_in_force=TimeInForce(str(time_in_force)),
@@ -462,9 +458,7 @@ def _record_from_row(row: tuple[object, ...]) -> ReviewPaperRecord:
         order_checks_json=str(order_checks_json),
         reviewed_at=datetime.fromisoformat(str(reviewed_at)),
         market_data_disclosure=(
-            None
-            if market_data_disclosure is None
-            else str(market_data_disclosure)
+            None if market_data_disclosure is None else str(market_data_disclosure)
         ),
     )
     return ReviewPaperRecord(

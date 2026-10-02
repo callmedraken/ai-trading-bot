@@ -9223,3 +9223,59 @@ Important schema-derived behavior:
 Next milestone: 131-B typed MCP schema adapter. Keep it effect-closed: review/read
 tool interface only, no placement/cancellation methods.
 
+## 2026-10-02 — Architecture 131-B typed MCP adapter accepted
+
+Accepted identity:
+
+```text
+BRANCH feature/robinhood-review-paper-mode
+HEAD   e4c3011fcee70459a4ea5a31d4772858033489af
+TREE   7e2ecddc7eb785c423c34c0f0e39a8ddb4695e1f
+CI     36974097709 SUCCESS
+```
+
+Registered checkpoint:
+
+```text
+arch131-robinhood-mcp-schema
+```
+
+The application-facing Robinhood boundary is now intentionally narrower than
+the server's full MCP tool inventory. It exposes only:
+
+```text
+review_equity_order
+get_equity_quotes
+get_equity_orders
+```
+
+There is no place/cancel/options/crypto mutation method on
+`RobinhoodReviewReadTransport`.
+
+The adapter requires the account number explicitly and maps the phase-A2
+risk-approved MARKET order to Robinhood regular-hours review arguments. It
+parses Robinhood decimal strings to Decimal and timestamps to UTC-aware
+datetimes, preserves review order_checks/disclosure, and provides typed quote
+and equity-order history models.
+
+`get_equity_orders` queries produced by the adapter always set
+`placed_agent=agentic`; this is the basis for the next paper-cycle tripwire.
+
+Next milestone: 131-C orchestration:
+
+```text
+capture baseline agentic orders
+-> review risk-approved order
+-> capture post-review agentic orders
+-> if any new order appears: STOP / no synthetic fill
+-> otherwise persist review-derived synthetic fill
+```
+
+The new-order comparison is a conservative safety assertion. A concurrent
+agentic order from another actor is not automatically attributed to the review;
+it still blocks the paper cycle because paper mode cannot safely distinguish
+the source.
+
+Direct Streamable-HTTP authentication remains a later transport implementation
+step; 131-C stays testable with an injected transport.
+

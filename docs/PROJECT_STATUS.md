@@ -9013,3 +9013,64 @@ Next: Architecture 131-B typed Robinhood MCP schema adapter. It may parse the
 observed review/quote/order response shapes and define a read/review-only
 transport interface. It must not expose place/cancel/approve/decline methods.
 
+## 2026-10-02 — Architecture 131-B typed Robinhood MCP schema ACCEPTED
+
+The typed read/review boundary is accepted on
+`feature/robinhood-review-paper-mode`.
+
+Accepted identity:
+
+```text
+HEAD e4c3011fcee70459a4ea5a31d4772858033489af
+TREE 7e2ecddc7eb785c423c34c0f0e39a8ddb4695e1f
+CI   36974097709 SUCCESS
+```
+
+Exact gate:
+
+```text
+CHECKPOINT=arch131-robinhood-mcp-schema
+PYTEST=PASS
+RUFF_CHECK=PASS
+RUFF_FORMAT=PASS
+GIT_DIFF_CHECK=PASS
+AUTHORITY=PASS
+IDENTITY_STABLE=True
+OVERALL=PASS
+```
+
+Implemented under `trading_bot.robinhood_mcp`:
+
+- typed parsing for the observed `review_equity_order` payload;
+- typed parsing for `get_equity_quotes`, including official-close pairing;
+- typed parsing for `get_equity_orders`, including agent source, ref_id,
+  fills/executions, state, timestamps, prices, fees and pagination cursor;
+- Decimal-only conversion for Robinhood's decimal strings;
+- timezone-aware UTC normalization for MCP timestamps;
+- quote/current-trade candidate representation without silently asserting
+  freshness;
+- explicit account-number requirement; the adapter never defaults to the first
+  Robinhood account;
+- review request construction from the exact deterministic risk-approved order;
+- agentic-order safety queries always force `placed_agent=agentic`;
+- valuation quote batches capped at 20 so official-close lookup remains in the
+  expected schema path.
+
+The transport protocol is an exact three-method allowlist:
+
+```text
+review_equity_order
+get_equity_quotes
+get_equity_orders
+```
+
+The source authority gate rejects any expansion of that protocol and rejects
+concrete HTTP/subprocess/network bindings in 131-B. There is still no direct MCP
+authentication/client implementation and no order-placement/cancellation
+surface.
+
+Next: Architecture 131-C paper-cycle orchestration over the injected typed
+transport. It must compare agentic order history before/after review, fail
+closed if any unexpected real order appears, and durably record the synthetic
+paper fill only after that safety assertion.
+

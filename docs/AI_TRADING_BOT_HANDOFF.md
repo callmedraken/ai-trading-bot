@@ -9513,3 +9513,67 @@ Immediate next step:
 Production/live trading remains NO-GO. Placement/cancellation/options/crypto
 brokerage tools remain outside the application surface.
 
+## 2026-10-02 — 131-F exact-source MCP/Windows host qualification accepted
+
+The canonical F: worktree was fast-forwarded from the certified source through
+the two reviewed docs-only closeout commits:
+
+```text
+branch feature/robinhood-review-paper-mode
+HEAD   3fa35d4d725b859d3c50b310605236896c2e6174
+TREE   fd3d3741464904ebd05fc7da8158eb9c2ef3bf0a
+```
+
+Docs source gates:
+
+```text
+run 124 / 36988729413 SUCCESS
+run 125 / 36988733987 SUCCESS
+```
+
+The accepted optional dependency range resolved on the Windows development
+environment to:
+
+```text
+mcp==2.2.0
+httpx2==2.13.1
+```
+
+Dependency-installed focused verification:
+
+```text
+tests/robinhood_mcp/test_windows_oauth.py
+tests/robinhood_mcp/test_sdk_transport.py
+
+122 passed in 2.04s
+```
+
+The previously optional real-SDK model test therefore ran rather than skipping.
+An inert production-composition probe also constructed the actual
+`OAuthClientProvider` from
+`create_windows_robinhood_oauth_factory(...)`.
+
+Observed effects remained exactly:
+
+```text
+WINDOWS_OAUTH_INERT_COMPOSITION=PASS
+NO_BROWSER_OPENED=TRUE
+NO_CREDENTIAL_READ_WRITE=TRUE
+NO_ROBINHOOD_REQUEST=TRUE
+```
+
+No repository source change, authentication, Credential Manager mutation,
+Robinhood/MCP request, or brokerage effect occurred.
+
+STOP boundary: do not start the first OAuth flow merely because dependency/host
+qualification passed. The first interactive grant requires explicit user
+authorization because it can open a browser, communicate with Robinhood OAuth,
+perform dynamic MCP client registration, and persist OAuth state in Windows
+Credential Manager.
+
+Once explicitly authorized, perform only the first OAuth grant and then stop
+for evidence review. Read-only MCP inventory / `get_equity_orders` /
+`get_equity_quotes` are the next bounded stage after grant acceptance.
+`review_equity_order` remains a later separately authorized non-placement
+brokerage request.
+

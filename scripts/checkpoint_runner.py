@@ -412,9 +412,7 @@ def _arch131_mcp_schema_authority_check(repo_root: Path) -> tuple[str, ...]:
             failures.append("Architecture 131-B transport protocol is missing")
         else:
             methods = {
-                node.name
-                for node in protocol.body
-                if isinstance(node, ast.FunctionDef)
+                node.name for node in protocol.body if isinstance(node, ast.FunctionDef)
             }
             expected = {
                 "review_equity_order",

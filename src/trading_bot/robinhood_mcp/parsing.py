@@ -269,8 +269,7 @@ def _parse_order(value: object) -> RobinhoodEquityOrder:
         ()
         if raw_executions is None
         else tuple(
-            _parse_execution(item)
-            for item in _sequence(raw_executions, "executions")
+            _parse_execution(item) for item in _sequence(raw_executions, "executions")
         )
     )
     dollar_amount = data.get("dollar_based_amount")
@@ -294,7 +293,9 @@ def _parse_order(value: object) -> RobinhoodEquityOrder:
             data.get("cumulative_quantity"),
             "cumulative_quantity",
         ),
-        average_price=_optional_decimal_text(data.get("average_price"), "average_price"),
+        average_price=_optional_decimal_text(
+            data.get("average_price"), "average_price"
+        ),
         price=_optional_decimal_text(data.get("price"), "price"),
         stop_price=_optional_decimal_text(data.get("stop_price"), "stop_price"),
         fees=_decimal_text(data.get("fees"), "fees"),

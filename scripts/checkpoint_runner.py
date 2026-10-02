@@ -612,6 +612,154 @@ def _arch131_windows_oauth_authority_check(repo_root: Path) -> tuple[str, ...]:
     return tuple(failures)
 
 
+def _arch131_agentic_account_authority_check(repo_root: Path) -> tuple[str, ...]:
+    failures = list(_arch131_direct_mcp_authority_check(repo_root))
+    failures.extend(_arch131_mcp_schema_authority_check(repo_root))
+    failures.extend(_arch131_paper_cycle_authority_check(repo_root))
+    # Freeze the reviewed dispatch/result boundaries by AST, independent of formatting.
+    expected_boundaries = {
+        "create_robinhood_agentic_account_resolver": (
+            "46c9aefd35d30a33144f9c5df8e38f73440ae160c46c70ac01d29d7e4aef6e3d"
+        ),
+        "_accounts_structured_result": (
+            "85c5807dffab7b33a9863e5d568fbe309159188374c0d7274cd19b153cd6a17c"
+        ),
+        "_require_review_read_tools": (
+            "fa32303576c5bde08977352c878113bb7c687ae62c0863499c4fb56f70b41ad6"
+        ),
+        "_structured_result": (
+            "d915278f59306fd2f4037859cbfa24e66886b96d9b79dd7fc71ee0eff87bba83"
+        ),
+        "review_equity_order": (
+            "89462d4a8178a599feb6eaf076aceb8dba57f3dbb026c630f654fb86f732441c"
+        ),
+        "get_equity_quotes": (
+            "d7abf621e34cd63b373bc1315a85f2a75cd960c3bbd43ff2f4dabe3b7526b182"
+        ),
+        "get_equity_orders": (
+            "79ea648678d31543e48877310ea0862583ca769c06c781dddaf214dd02e88e21"
+        ),
+        "_invoke": ("43928e96254633e219999afaafb132755b23cc489fe73cc38b702c76f515b24e"),
+        "_call_tool_once": (
+            "684a89f8028f3deb6f4a84753b0b7cbe77be2e40293368837f5eb0d8cd0d2105"
+        ),
+        "_get_accounts": (
+            "67bdf9bcf91217f7bb07a595882b72e1aa4e9347b7610d257892bae9ed8f1575"
+        ),
+        "_request_once": (
+            "5fb0c878f9ead1b967cb1e996824e12c36674abcbd84ea8edceae17ea3530816"
+        ),
+    }
+    try:
+        sdk_source = (
+            repo_root / "src/trading_bot/robinhood_mcp/sdk_transport.py"
+        ).read_text(encoding="utf-8")
+        sdk_tree = ast.parse(sdk_source)
+        for name, expected in expected_boundaries.items():
+            nodes = [
+                node
+                for node in ast.walk(sdk_tree)
+                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+                and node.name == name
+            ]
+            if (
+                len(nodes) != 1
+                or hashlib.sha256(
+                    ast.dump(nodes[0], include_attributes=False).encode("utf-8")
+                ).hexdigest()
+                != expected
+            ):
+                failures.append(f"131-G internal/public MCP boundary drift: {name}")
+        public_functions = {
+            node.name
+            for node in sdk_tree.body
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+            and not node.name.startswith("_")
+        }
+        if public_functions != {
+            "create_robinhood_oauth_factory",
+            "create_robinhood_agentic_account_resolver",
+        }:
+            failures.append("131-G exposes an unreviewed public MCP function")
+        for relative in (
+            "src/trading_bot/robinhood_mcp/account_resolution.py",
+            "src/trading_bot/robinhood_mcp/__init__.py",
+        ):
+            source = (repo_root / relative).read_text(encoding="utf-8")
+            tree = ast.parse(source)
+            for node in ast.walk(tree):
+                if isinstance(
+                    node, (ast.FunctionDef, ast.AsyncFunctionDef)
+                ) and node.name in {"get_accounts", "call_tool"}:
+                    failures.append("131-G exposes a raw account/generic MCP tool")
+            for token in (
+                "place_equity_order",
+                "cancel_equity_order",
+                "place_option_order",
+                "cancel_option_order",
+                "exercise_option",
+                "place_crypto_order",
+                "cancel_crypto_order",
+            ):
+                if token in source:
+                    failures.append(f"131-G exposes forbidden tool: {token}")
+            if relative.endswith("account_resolution.py"):
+                names = _qualified_names(tree)
+                if any(
+                    name == "print"
+                    or name == "open"
+                    or name.endswith(
+                        (
+                            ".call_tool",
+                            ".write_text",
+                            ".write_bytes",
+                            ".info",
+                            ".debug",
+                            ".warning",
+                            ".error",
+                        )
+                    )
+                    for name in names
+                ):
+                    failures.append(
+                        "131-G resolver contains raw-tool/log/persistence exposure"
+                    )
+                if "rhs_account_number" in source:
+                    failures.append(
+                        "131-G resolver contains alternate account identity"
+                    )
+        runner_tree = ast.parse(
+            (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+        )
+        registrations = [
+            node
+            for node in ast.walk(runner_tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "CheckpointSpec"
+            and any(
+                item.arg == "name"
+                and isinstance(item.value, ast.Constant)
+                and item.value.value == "arch131-robinhood-agentic-account"
+                for item in node.keywords
+            )
+        ]
+        if len(registrations) != 1:
+            failures.append("131-G source-only registration missing")
+        else:
+            fields = {item.arg: item.value for item in registrations[0].keywords}
+            for field in ("preflight", "execute"):
+                value = fields.get(field)
+                if not isinstance(value, ast.Constant) or value.value is not None:
+                    failures.append("131-G checkpoint has host/effect capability")
+        spec = _checkpoint_specs()["arch131-robinhood-agentic-account"]
+        if spec.preflight is not None or spec.execute is not None:
+            failures.append("131-G checkpoint has host/effect capability")
+    except (OSError, UnicodeError, SyntaxError, KeyError, ValueError, TypeError):
+        failures.append("131-G source or structural boundary unavailable")
+    return tuple(failures)
+
+
 def _arch131_direct_mcp_authority_check(repo_root: Path) -> tuple[str, ...]:
     failures: list[str] = []
     relative = "src/trading_bot/robinhood_mcp/sdk_transport.py"
@@ -2648,6 +2796,30 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
         "tests/runtime/test_d10_arch128_r8_readonly.py",
     )
     return {
+        "arch131-robinhood-agentic-account": CheckpointSpec(
+            name="arch131-robinhood-agentic-account",
+            description="Architecture 131-G internal Agentic-account resolution",
+            tests=(
+                *COMMON_TESTS,
+                "tests/robinhood_mcp/test_account_resolution.py",
+                "tests/robinhood_mcp/test_sdk_transport.py",
+                "tests/test_robinhood_paper_cycle.py",
+            ),
+            ruff_paths=(
+                *COMMON_RUFF_PATHS,
+                "src/trading_bot/robinhood_mcp/account_resolution.py",
+                "src/trading_bot/robinhood_mcp/sdk_transport.py",
+                "src/trading_bot/robinhood_mcp/__init__.py",
+                "src/trading_bot/robinhood_paper_cycle.py",
+                "tests/robinhood_mcp/test_account_resolution.py",
+                "tests/robinhood_mcp/test_sdk_transport.py",
+                "tests/test_robinhood_paper_cycle.py",
+            ),
+            authority_check=_arch131_agentic_account_authority_check,
+            remote_branch=ARCH131_REVIEW_PAPER_REMOTE_BRANCH,
+            preflight=None,
+            execute=None,
+        ),
         "arch131-robinhood-oauth-windows": CheckpointSpec(
             name="arch131-robinhood-oauth-windows",
             description="Architecture 131-F Windows OAuth persistence and callback",

@@ -163,6 +163,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
         "arch131-robinhood-performance",
         "arch131-robinhood-direct-mcp",
         "arch131-robinhood-oauth-windows",
+        "arch131-robinhood-agentic-account",
     }
     for spec in specs.values():
         assert "tests/runtime/test_checkpoint_runner.py" in spec.tests
@@ -178,6 +179,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
                 "arch131-robinhood-performance",
                 "arch131-robinhood-direct-mcp",
                 "arch131-robinhood-oauth-windows",
+                "arch131-robinhood-agentic-account",
             }
             else (
                 "feature/d10c-r8-incident-reconciliation"
@@ -1672,3 +1674,104 @@ def test_131f_source_registration_and_workflow():
     assert workflow.index("verify arch131-robinhood-oauth-windows") > workflow.index(
         "verify arch131-robinhood-direct-mcp"
     )
+
+
+def test_131g_source_registration():
+    spec = runner._checkpoint_specs()["arch131-robinhood-agentic-account"]
+    assert spec.preflight is None and spec.execute is None
+    assert spec.remote_branch == "feature/robinhood-review-paper-mode"
+    assert spec.authority_check is runner._arch131_agentic_account_authority_check
+    assert {
+        "tests/robinhood_mcp/test_account_resolution.py",
+        "tests/robinhood_mcp/test_sdk_transport.py",
+        "tests/test_robinhood_paper_cycle.py",
+    } <= set(spec.tests)
+    repo = Path(runner.__file__).resolve().parent.parent
+    assert spec.authority_check(repo) == ()
+
+
+@pytest.mark.parametrize(
+    "relative,before,after",
+    [
+        (
+            "src/trading_bot/robinhood_mcp/sdk_transport.py",
+            '    "get_equity_orders",',
+            '    "get_accounts",\n    "get_equity_orders",',
+        ),
+        (
+            "src/trading_bot/robinhood_mcp/sdk_transport.py",
+            "    def _get_accounts(",
+            "    def get_accounts(",
+        ),
+        (
+            "src/trading_bot/robinhood_mcp/sdk_transport.py",
+            "    def get_equity_orders(",
+            "    def call_tool(",
+        ),
+        (
+            "src/trading_bot/robinhood_mcp/sdk_transport.py",
+            "tool_name not in _ALLOWED_TOOL_NAMES",
+            "False",
+        ),
+        (
+            "src/trading_bot/robinhood_mcp/sdk_transport.py",
+            "    return RobinhoodAgenticAccountResolver(transport._get_accounts)",
+            "    return transport._get_accounts",
+        ),
+        (
+            "src/trading_bot/robinhood_mcp/adapter.py",
+            "    def get_equity_orders(",
+            "    def get_accounts(",
+        ),
+        (
+            "src/trading_bot/robinhood_mcp/account_resolution.py",
+            "class RobinhoodAgenticAccountResolver:",
+            "def call_tool(): pass\n\nclass RobinhoodAgenticAccountResolver:",
+        ),
+        (
+            "src/trading_bot/robinhood_mcp/account_resolution.py",
+            "        return eligible[0]",
+            "        print(eligible[0])\n        return eligible[0]",
+        ),
+        (
+            "src/trading_bot/robinhood_mcp/account_resolution.py",
+            "        return eligible[0]",
+            '        return "rhs_account_number"',
+        ),
+        (
+            "src/trading_bot/robinhood_mcp/account_resolution.py",
+            "        return eligible[0]",
+            '        return "place_equity_order"',
+        ),
+        (
+            "src/trading_bot/robinhood_mcp/__init__.py",
+            "__all__ = [",
+            "def get_accounts(): pass\n\n__all__ = [",
+        ),
+        (
+            "scripts/checkpoint_runner.py",
+            "preflight=None,",
+            "preflight=dangerous_host,",
+        ),
+        ("scripts/checkpoint_runner.py", "execute=None,", "execute=dangerous_host,"),
+    ],
+)
+def test_131g_authority_rejects_boundary_drift(tmp_path, relative, before, after):
+    repo = Path(runner.__file__).resolve().parent.parent
+    paths = (
+        "src/trading_bot/robinhood_mcp/sdk_transport.py",
+        "src/trading_bot/robinhood_mcp/adapter.py",
+        "src/trading_bot/robinhood_mcp/account_resolution.py",
+        "src/trading_bot/robinhood_mcp/__init__.py",
+        "src/trading_bot/robinhood_paper_cycle.py",
+        "scripts/checkpoint_runner.py",
+    )
+    for path in paths:
+        destination = tmp_path / path
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        source = (repo / path).read_text(encoding="utf-8")
+        if path == relative:
+            assert before in source
+            source = source.replace(before, after)
+        destination.write_text(source, encoding="utf-8")
+    assert runner._arch131_agentic_account_authority_check(tmp_path)

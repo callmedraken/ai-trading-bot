@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import asdict
 from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import UUID
@@ -17,8 +18,13 @@ from trading_bot.review_paper import (
 )
 from trading_bot.risk import RiskOutcome
 from trading_bot.robinhood_mcp import (
+    RobinhoodAgenticAccountResolutionError,
+    RobinhoodAgenticAccountResolver,
     RobinhoodEquityOrder,
     RobinhoodEquityOrdersPage,
+    RobinhoodMcpStreamableHttpTransport,
+    RobinhoodReviewReadAdapter,
+    create_robinhood_agentic_account_resolver,
 )
 from trading_bot.robinhood_paper_cycle import (
     RobinhoodPaperCycleSafetyError,
@@ -127,6 +133,18 @@ class FakeAdapter:
         return _review()
 
 
+def _resolver() -> RobinhoodAgenticAccountResolver:
+    return RobinhoodAgenticAccountResolver(
+        lambda: {
+            "data": {
+                "accounts": [
+                    {"agentic_allowed": True, "account_number": "agentic-account"}
+                ]
+            }
+        }
+    )
+
+
 def _empty_page(next_cursor: str | None = None) -> RobinhoodEquityOrdersPage:
     return RobinhoodEquityOrdersPage(orders=(), next_cursor=next_cursor)
 
@@ -137,10 +155,9 @@ def test_successful_cycle_checks_real_orders_before_persisting(tmp_path) -> None
         tmp_path / "paper.sqlite",
         starting_cash=Decimal("10000"),
     )
-    cycle = RobinhoodReviewPaperCycle(adapter, store)
+    cycle = RobinhoodReviewPaperCycle(adapter, store, account_resolver=_resolver())
 
     result = cycle.run(
-        account_number="agentic-account",
         intent=_intent(),
         review_received_at=datetime(2026, 10, 2, 15, 0, 2, tzinfo=UTC),
     )
@@ -168,8 +185,7 @@ def test_existing_real_order_blocks_before_review(tmp_path) -> None:
     )
 
     with pytest.raises(RobinhoodPaperCycleSafetyError, match="before_review"):
-        RobinhoodReviewPaperCycle(adapter, store).run(
-            account_number="agentic-account",
+        RobinhoodReviewPaperCycle(adapter, store, account_resolver=_resolver()).run(
             intent=_intent(),
             review_received_at=datetime(2026, 10, 2, 15, 0, 2, tzinfo=UTC),
         )
@@ -194,8 +210,7 @@ def test_real_order_after_review_blocks_synthetic_fill(tmp_path) -> None:
     )
 
     with pytest.raises(RobinhoodPaperCycleSafetyError, match="after_review"):
-        RobinhoodReviewPaperCycle(adapter, store).run(
-            account_number="agentic-account",
+        RobinhoodReviewPaperCycle(adapter, store, account_resolver=_resolver()).run(
             intent=_intent(),
             review_received_at=datetime(2026, 10, 2, 15, 0, 2, tzinfo=UTC),
         )
@@ -218,8 +233,9 @@ def test_order_history_paginates_until_terminal_cursor(tmp_path) -> None:
         starting_cash=Decimal("10000"),
     )
 
-    result = RobinhoodReviewPaperCycle(adapter, store).run(
-        account_number="agentic-account",
+    result = RobinhoodReviewPaperCycle(
+        adapter, store, account_resolver=_resolver()
+    ).run(
         intent=_intent(),
         review_received_at=datetime(2026, 10, 2, 15, 0, 2, tzinfo=UTC),
     )
@@ -244,8 +260,7 @@ def test_repeated_pagination_cursor_fails_closed(tmp_path) -> None:
     )
 
     with pytest.raises(RobinhoodPaperCycleSafetyError, match="cursor repeated"):
-        RobinhoodReviewPaperCycle(adapter, store).run(
-            account_number="agentic-account",
+        RobinhoodReviewPaperCycle(adapter, store, account_resolver=_resolver()).run(
             intent=_intent(),
             review_received_at=datetime(2026, 10, 2, 15, 0, 2, tzinfo=UTC),
         )
@@ -268,8 +283,7 @@ def test_non_agentic_order_in_filtered_response_fails_closed(tmp_path) -> None:
     )
 
     with pytest.raises(RobinhoodPaperCycleSafetyError, match="non-agentic"):
-        RobinhoodReviewPaperCycle(adapter, store).run(
-            account_number="agentic-account",
+        RobinhoodReviewPaperCycle(adapter, store, account_resolver=_resolver()).run(
             intent=_intent(),
             review_received_at=datetime(2026, 10, 2, 15, 0, 2, tzinfo=UTC),
         )
@@ -281,16 +295,25 @@ def test_durable_order_id_is_reused_without_another_robinhood_call(tmp_path) -> 
         starting_cash=Decimal("10000"),
     )
     first_adapter = FakeAdapter(order_pages=[_empty_page(), _empty_page()])
-    first_cycle = RobinhoodReviewPaperCycle(first_adapter, store)
+    first_cycle = RobinhoodReviewPaperCycle(
+        first_adapter, store, account_resolver=_resolver()
+    )
     first = first_cycle.run(
-        account_number="agentic-account",
         intent=_intent(),
         review_received_at=datetime(2026, 10, 2, 15, 0, 2, tzinfo=UTC),
     )
 
+    resolver_calls = []
+
+    def unexpected_accounts():
+        resolver_calls.append("accounts")
+        raise AssertionError("replay must not resolve an account")
+
+    replay_resolver = RobinhoodAgenticAccountResolver(unexpected_accounts)
     replay_adapter = FakeAdapter(order_pages=[])
-    replay = RobinhoodReviewPaperCycle(replay_adapter, store).run(
-        account_number="agentic-account",
+    replay = RobinhoodReviewPaperCycle(
+        replay_adapter, store, account_resolver=replay_resolver
+    ).run(
         intent=_intent(),
         review_received_at=datetime(2026, 10, 2, 15, 1, tzinfo=UTC),
     )
@@ -298,6 +321,7 @@ def test_durable_order_id_is_reused_without_another_robinhood_call(tmp_path) -> 
     assert replay.record == first.record
     assert replay.reused_durable_record is True
     assert replay_adapter.calls == []
+    assert resolver_calls == []
 
 
 def test_existing_order_id_with_changed_intent_is_conflict(tmp_path) -> None:
@@ -306,15 +330,169 @@ def test_existing_order_id_with_changed_intent_is_conflict(tmp_path) -> None:
         starting_cash=Decimal("10000"),
     )
     first_adapter = FakeAdapter(order_pages=[_empty_page(), _empty_page()])
-    RobinhoodReviewPaperCycle(first_adapter, store).run(
-        account_number="agentic-account",
+    RobinhoodReviewPaperCycle(first_adapter, store, account_resolver=_resolver()).run(
         intent=_intent(),
         review_received_at=datetime(2026, 10, 2, 15, 0, 2, tzinfo=UTC),
     )
 
+    resolver_calls = []
+
+    def unexpected_accounts():
+        resolver_calls.append("accounts")
+        raise AssertionError("conflict must not resolve an account")
+
+    conflict_resolver = RobinhoodAgenticAccountResolver(unexpected_accounts)
     with pytest.raises(ReviewPaperConflictError):
-        RobinhoodReviewPaperCycle(FakeAdapter(order_pages=[]), store).run(
-            account_number="agentic-account",
+        RobinhoodReviewPaperCycle(
+            FakeAdapter(order_pages=[]), store, account_resolver=conflict_resolver
+        ).run(
             intent=_intent(reason="different signal"),
             review_received_at=datetime(2026, 10, 2, 15, 1, tzinfo=UTC),
         )
+
+    assert resolver_calls == []
+
+
+def test_new_cycle_resolves_once_before_all_reads_and_review(tmp_path) -> None:
+    events = []
+
+    def read_accounts():
+        events.append("accounts")
+        return {
+            "data": {
+                "accounts": [
+                    {"agentic_allowed": True, "account_number": "canonical-agent"}
+                ]
+            }
+        }
+
+    resolver = RobinhoodAgenticAccountResolver(read_accounts)
+    adapter = FakeAdapter(
+        order_pages=[
+            _empty_page("page-2"),
+            _empty_page(),
+            _empty_page("page-4"),
+            _empty_page(),
+        ]
+    )
+    original_orders = adapter.agentic_equity_orders
+
+    def orders(**kwargs):
+        assert events == ["accounts"]
+        return original_orders(**kwargs)
+
+    adapter.agentic_equity_orders = orders
+    store = ReviewPaperStore(tmp_path / "paper.sqlite", starting_cash=Decimal("10000"))
+    result = RobinhoodReviewPaperCycle(adapter, store, account_resolver=resolver).run(
+        intent=_intent(),
+        review_received_at=_review().reviewed_at,
+    )
+    assert events == ["accounts"]
+    assert [name for name, _ in adapter.calls] == [
+        "orders",
+        "orders",
+        "review",
+        "orders",
+        "orders",
+    ]
+    assert all(
+        payload["account_number"] == "canonical-agent" for _, payload in adapter.calls
+    )
+    assert "canonical-agent" not in repr(result)
+    assert b"canonical-agent" not in (tmp_path / "paper.sqlite").read_bytes()
+
+
+@pytest.mark.parametrize(
+    "response",
+    [
+        None,
+        {},
+        {"data": {"accounts": []}},
+        {"data": {"accounts": [{"agentic_allowed": True, "account_number": ""}]}},
+    ],
+)
+def test_resolution_failure_precedes_orders_review_and_store_mutation(
+    tmp_path, response
+) -> None:
+    resolver = RobinhoodAgenticAccountResolver(lambda: response)
+    adapter = FakeAdapter(order_pages=[])
+    store = ReviewPaperStore(tmp_path / "paper.sqlite", starting_cash=Decimal("10000"))
+    before = (tmp_path / "paper.sqlite").read_bytes()
+    with pytest.raises(RobinhoodAgenticAccountResolutionError):
+        RobinhoodReviewPaperCycle(adapter, store, account_resolver=resolver).run(
+            intent=_intent(),
+            review_received_at=_review().reviewed_at,
+        )
+    assert adapter.calls == []
+    assert store.history() == ()
+    assert (tmp_path / "paper.sqlite").read_bytes() == before
+
+
+def test_concrete_transport_composition_resolves_once_and_replays_without_calls(
+    tmp_path,
+) -> None:
+    calls = []
+    quote = asdict(_review().quote)
+    for key, value in quote.items():
+        if isinstance(value, Decimal):
+            quote[key] = str(value)
+        elif isinstance(value, datetime):
+            quote[key] = value.isoformat()
+    quote["symbol"] = "SPY"
+
+    async def caller(name, arguments):
+        calls.append((name, dict(arguments)))
+        if name == "get_accounts":
+            return {
+                "data": {
+                    "accounts": [
+                        {"agentic_allowed": False, "account_number": "ordinary"},
+                        {"agentic_allowed": True, "account_number": "canonical-agent"},
+                    ]
+                }
+            }
+        if name == "get_equity_orders":
+            return {"data": {"orders": [], "next": ""}}
+        if name == "review_equity_order":
+            return {
+                "data": {
+                    "symbol": "SPY",
+                    "side": "buy",
+                    "type": "market",
+                    "quantity": "5",
+                    "quote_data": quote,
+                    "order_checks": {},
+                    "market_data_disclosure": "verbatim disclosure",
+                }
+            }
+        raise AssertionError("unexpected MCP operation")
+
+    transport = RobinhoodMcpStreamableHttpTransport.for_test(caller)
+    store = ReviewPaperStore(tmp_path / "paper.sqlite", starting_cash=Decimal("10000"))
+    cycle = RobinhoodReviewPaperCycle(
+        RobinhoodReviewReadAdapter(transport),
+        store,
+        account_resolver=create_robinhood_agentic_account_resolver(transport),
+    )
+    result = cycle.run(intent=_intent(), review_received_at=_review().reviewed_at)
+    assert [name for name, _ in calls] == [
+        "get_accounts",
+        "get_equity_orders",
+        "review_equity_order",
+        "get_equity_orders",
+    ]
+    assert calls[0][1] == {}
+    assert all(
+        arguments["account_number"] == "canonical-agent" for _, arguments in calls[1:]
+    )
+    for name, arguments in calls:
+        if name == "get_equity_orders":
+            assert arguments["placed_agent"] == "agentic"
+            assert arguments["symbol"] == "SPY"
+            assert arguments["created_at_gte"] == _intent().proposed_at.isoformat()
+    calls.clear()
+    assert (
+        cycle.run(intent=_intent(), review_received_at=_review().reviewed_at).record
+        == result.record
+    )
+    assert calls == []

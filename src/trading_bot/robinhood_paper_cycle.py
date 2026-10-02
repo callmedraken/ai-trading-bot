@@ -13,6 +13,7 @@ from trading_bot.review_paper import (
     ReviewPaperStore,
 )
 from trading_bot.robinhood_mcp import (
+    RobinhoodAgenticAccountResolver,
     RobinhoodEquityOrder,
     RobinhoodEquityOrdersPage,
     RobinhoodReviewReadAdapter,
@@ -51,9 +52,11 @@ class RobinhoodReviewPaperCycle:
         adapter: RobinhoodReviewReadAdapter,
         store: ReviewPaperStore,
         *,
+        account_resolver: RobinhoodAgenticAccountResolver,
         slippage_basis_points: Decimal = Decimal("0"),
         commission: Decimal = Decimal("0"),
     ) -> None:
+        self._account_resolver = account_resolver
         self._adapter = adapter
         self._store = store
         self._slippage_basis_points = slippage_basis_points
@@ -62,7 +65,6 @@ class RobinhoodReviewPaperCycle:
     def run(
         self,
         *,
-        account_number: str,
         intent: ReviewPaperIntent,
         review_received_at: datetime,
     ) -> RobinhoodPaperCycleResult:
@@ -84,6 +86,7 @@ class RobinhoodReviewPaperCycle:
                 post_review_order_pages=0,
             )
 
+        account_number = self._account_resolver.resolve()
         baseline, baseline_pages = _collect_agentic_orders(
             self._adapter,
             account_number=account_number,

@@ -6,6 +6,7 @@ from types import SimpleNamespace
 import pytest
 
 from trading_bot.robinhood_mcp.sdk_transport import (
+    _ALLOWED_TOOL_NAMES,
     ROBINHOOD_TRADING_MCP_URL,
     RobinhoodMcpEventLoopError,
     RobinhoodMcpStreamableHttpTransport,
@@ -199,3 +200,51 @@ def test_oauth_factory_rejects_non_token_storage() -> None:
             callback_handler=callback_handler,
             redirect_uri="http://127.0.0.1:8765/callback",
         )
+
+
+def test_public_facade_and_allowlist_remain_exact() -> None:
+    from trading_bot.robinhood_mcp.adapter import RobinhoodReviewReadTransport
+
+    expected = {"review_equity_order", "get_equity_quotes", "get_equity_orders"}
+    assert _ALLOWED_TOOL_NAMES == (
+        "get_equity_orders",
+        "get_equity_quotes",
+        "review_equity_order",
+    )
+    assert {
+        name
+        for name in vars(RobinhoodMcpStreamableHttpTransport)
+        if not name.startswith("_")
+    } == expected | {"for_test"}
+    assert {
+        name for name in vars(RobinhoodReviewReadTransport) if not name.startswith("_")
+    } == expected
+
+    async def caller(name, arguments):
+        raise AssertionError("nonpublic tool must not reach caller")
+
+    transport = RobinhoodMcpStreamableHttpTransport.for_test(caller)
+    with pytest.raises(RobinhoodMcpToolUnavailableError):
+        transport._invoke("get_accounts", {})
+    with pytest.raises(RobinhoodMcpToolUnavailableError):
+        asyncio.run(transport._call_tool_once("get_accounts", {}))
+    with pytest.raises(RobinhoodMcpToolUnavailableError):
+        _structured_result("get_accounts", object())
+
+
+@pytest.mark.parametrize("advertised", [False, True])
+def test_internal_account_resolution_requires_account_inventory(advertised) -> None:
+    class Client:
+        async def list_tools(self, *, cursor=None):
+            names = list(_ALLOWED_TOOL_NAMES)
+            if advertised:
+                names.append("get_accounts")
+            return SimpleNamespace(
+                tools=[SimpleNamespace(name=name) for name in names], next_cursor=None
+            )
+
+    if advertised:
+        asyncio.run(_require_review_read_tools(Client(), require_accounts=True))
+    else:
+        with pytest.raises(RobinhoodMcpToolUnavailableError):
+            asyncio.run(_require_review_read_tools(Client(), require_accounts=True))

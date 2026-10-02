@@ -1,5 +1,9 @@
 """Typed Robinhood MCP read/review boundary for paper trading."""
 
+from trading_bot.robinhood_mcp.account_resolution import (
+    RobinhoodAgenticAccountResolutionError,
+    RobinhoodAgenticAccountResolver,
+)
 from trading_bot.robinhood_mcp.adapter import (
     RobinhoodReviewReadAdapter,
     RobinhoodReviewReadTransport,
@@ -29,11 +33,14 @@ from trading_bot.robinhood_mcp.sdk_transport import (
     RobinhoodMcpStructuredResultError,
     RobinhoodMcpToolCallError,
     RobinhoodMcpToolUnavailableError,
+    create_robinhood_agentic_account_resolver,
     create_robinhood_oauth_factory,
 )
 
 __all__ = [
     "ROBINHOOD_TRADING_MCP_URL",
+    "RobinhoodAgenticAccountResolutionError",
+    "RobinhoodAgenticAccountResolver",
     "RobinhoodMcpClientError",
     "RobinhoodMcpDependencyError",
     "RobinhoodMcpEventLoopError",
@@ -52,6 +59,7 @@ __all__ = [
     "RobinhoodQuoteData",
     "RobinhoodReviewReadAdapter",
     "RobinhoodReviewReadTransport",
+    "create_robinhood_agentic_account_resolver",
     "create_robinhood_oauth_factory",
     "parse_equity_orders_response",
     "parse_equity_quotes_response",

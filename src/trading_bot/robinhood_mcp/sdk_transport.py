@@ -7,6 +7,8 @@ from collections.abc import Awaitable, Callable, Mapping, Sequence
 from typing import Final, Protocol
 from urllib.parse import urlparse
 
+from trading_bot.robinhood_mcp.account_resolution import RobinhoodAgenticAccountResolver
+
 ROBINHOOD_TRADING_MCP_URL: Final = "https://agent.robinhood.com/mcp/trading"
 _ALLOWED_TOOL_NAMES: Final = (
     "get_equity_orders",
@@ -111,6 +113,23 @@ class RobinhoodMcpStreamableHttpTransport:
     ) -> Mapping[str, object]:
         if tool_name not in _ALLOWED_TOOL_NAMES:
             raise RobinhoodMcpToolUnavailableError("tool is outside paper allowlist")
+        return await self._request_once(tool_name, arguments)
+
+    def _get_accounts(self) -> Mapping[str, object]:
+        caller = self._test_caller
+        if caller is not None:
+            return _run_blocking(lambda: caller("get_accounts", {}))
+        return _run_blocking(lambda: self._request_once("get_accounts", {}))
+
+    async def _request_once(
+        self,
+        tool_name: str,
+        arguments: Mapping[str, object],
+    ) -> Mapping[str, object]:
+        if tool_name not in _ALLOWED_TOOL_NAMES and tool_name != "get_accounts":
+            raise RobinhoodMcpToolUnavailableError("tool is outside paper boundary")
+        if tool_name == "get_accounts" and arguments:
+            raise RobinhoodMcpToolUnavailableError("account lookup takes no arguments")
         oauth_factory = self._oauth_factory
         if oauth_factory is None:
             raise RobinhoodMcpClientError("production OAuth factory is unavailable")
@@ -130,9 +149,33 @@ class RobinhoodMcpStreamableHttpTransport:
                 http_client=http_client,
             )
             async with Client(stream) as client:
-                await _require_review_read_tools(client)
+                await _require_review_read_tools(
+                    client, require_accounts=tool_name == "get_accounts"
+                )
                 result = await client.call_tool(tool_name, dict(arguments))
+        if tool_name == "get_accounts":
+            return _accounts_structured_result(result)
         return _structured_result(tool_name, result)
+
+
+def create_robinhood_agentic_account_resolver(
+    transport: RobinhoodMcpStreamableHttpTransport,
+) -> RobinhoodAgenticAccountResolver:
+    """Bind canonical account resolution to the private transport read boundary."""
+    if not isinstance(transport, RobinhoodMcpStreamableHttpTransport):
+        raise TypeError("transport must be RobinhoodMcpStreamableHttpTransport")
+    return RobinhoodAgenticAccountResolver(transport._get_accounts)
+
+
+def _accounts_structured_result(result: object) -> Mapping[str, object]:
+    if getattr(result, "is_error", None) is not False:
+        raise RobinhoodMcpToolCallError("account metadata returned an MCP tool error")
+    structured = getattr(result, "structured_content", None)
+    if not isinstance(structured, Mapping):
+        raise RobinhoodMcpStructuredResultError(
+            "account metadata returned no structured content"
+        )
+    return dict(structured)
 
 
 def create_robinhood_oauth_factory(
@@ -180,8 +223,12 @@ def create_robinhood_oauth_factory(
     return factory
 
 
-async def _require_review_read_tools(client: object) -> None:
+async def _require_review_read_tools(
+    client: object, *, require_accounts: bool = False
+) -> None:
     expected = set(_ALLOWED_TOOL_NAMES)
+    if require_accounts:
+        expected.add("get_accounts")
     observed: set[str] = set()
     cursor: str | None = None
     seen_cursors: set[str] = set()

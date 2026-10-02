@@ -393,6 +393,54 @@ ARCH130_R8I_D1_REMOTE_BRANCH: Final = "feature/d10c-r8-incident-reconciliation"
 ARCH131_REVIEW_PAPER_REMOTE_BRANCH: Final = "feature/robinhood-review-paper-mode"
 
 
+def _arch131_paper_cycle_authority_check(repo_root: Path) -> tuple[str, ...]:
+    failures: list[str] = []
+    relative = "src/trading_bot/robinhood_paper_cycle.py"
+    try:
+        source = (repo_root / relative).read_text(encoding="utf-8")
+        tree = ast.parse(source)
+        names = _qualified_names(tree)
+        required = {
+            "self._adapter.agentic_equity_orders",
+            "self._adapter.review_market_order",
+            "self._store.get_by_order_id",
+            "self._store.record_market_review",
+        }
+        missing = sorted(required - names)
+        if missing:
+            failures.append(
+                f"Architecture 131-C missing reviewed bindings: {missing}"
+            )
+        forbidden = {
+            "subprocess.run",
+            "subprocess.Popen",
+            "socket.socket",
+            "requests.get",
+            "requests.post",
+            "httpx.get",
+            "httpx.post",
+            "urllib.request.urlopen",
+        }
+        if names & forbidden:
+            failures.append("Architecture 131-C contains a concrete network boundary")
+        for token in (
+            "place_equity_order",
+            "cancel_equity_order",
+            "place_option_order",
+            "cancel_option_order",
+            "exercise_option",
+            "place_crypto_order",
+            "cancel_crypto_order",
+        ):
+            if token in source:
+                failures.append(
+                    f"Architecture 131-C exposes forbidden Robinhood tool: {token}"
+                )
+    except (OSError, UnicodeError, SyntaxError):
+        failures.append("Architecture 131-C paper cycle source unavailable")
+    return tuple(failures)
+
+
 def _arch131_mcp_schema_authority_check(repo_root: Path) -> tuple[str, ...]:
     failures: list[str] = []
     relative = "src/trading_bot/robinhood_mcp/adapter.py"
@@ -2262,6 +2310,21 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
         "tests/runtime/test_d10_arch128_r8_readonly.py",
     )
     return {
+        "arch131-robinhood-paper-cycle": CheckpointSpec(
+            name="arch131-robinhood-paper-cycle",
+            description="Architecture 131-C fail-closed Robinhood paper cycle",
+            tests=(
+                *COMMON_TESTS,
+                "tests/test_robinhood_paper_cycle.py",
+            ),
+            ruff_paths=(
+                *COMMON_RUFF_PATHS,
+                "src/trading_bot/robinhood_paper_cycle.py",
+                "tests/test_robinhood_paper_cycle.py",
+            ),
+            authority_check=_arch131_paper_cycle_authority_check,
+            remote_branch=ARCH131_REVIEW_PAPER_REMOTE_BRANCH,
+        ),
         "arch131-robinhood-mcp-schema": CheckpointSpec(
             name="arch131-robinhood-mcp-schema",
             description="Architecture 131-B typed Robinhood MCP read/review schema",

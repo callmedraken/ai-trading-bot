@@ -109,6 +109,12 @@ jobs:
             $Failures += 'arch131-robinhood-mcp-schema'
           }
 
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\ops.ps1 `
+            verify arch131-robinhood-paper-cycle
+          if ($LASTEXITCODE -ne 0) {
+            $Failures += 'arch131-robinhood-paper-cycle'
+          }
+
           if ($Failures.Count -ne 0) {
             throw "Checkpoint source gates failed: $($Failures -join ', ')"
           }
